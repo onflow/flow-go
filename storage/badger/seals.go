@@ -44,7 +44,10 @@ func (s *Seals) Store(seal *flow.Seal) error {
 
 func (s *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {
 	seal, err := s.cache.Get(sealID)
-	return seal.(*flow.Seal), err
+	if err != nil {
+		return nil, err
+	}
+	return seal.(*flow.Seal), nil
 }
 
 func (s *Seals) ByBlockID(blockID flow.Identifier) ([]*flow.Seal, error) {

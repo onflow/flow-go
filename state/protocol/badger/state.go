@@ -20,12 +20,11 @@ type State struct {
 	headers    storage.Headers
 	payloads   storage.Payloads
 	seals      storage.Seals
-	commits    storage.Commits
 }
 
 // NewState initializes a new state backed by a badger database, applying the
 // optional configuration parameters.
-func NewState(db *badger.DB, identities storage.Identities, headers storage.Headers, payloads storage.Payloads, seals storage.Seals, commits storage.Commits, options ...func(*State)) (*State, error) {
+func NewState(db *badger.DB, identities storage.Identities, headers storage.Headers, payloads storage.Payloads, seals storage.Seals, options ...func(*State)) (*State, error) {
 	s := &State{
 		db:         db,
 		clusters:   1,
@@ -33,14 +32,13 @@ func NewState(db *badger.DB, identities storage.Identities, headers storage.Head
 		headers:    headers,
 		payloads:   payloads,
 		seals:      seals,
-		commits:    commits,
 	}
 	for _, option := range options {
 		option(s)
 	}
 
 	if s.clusters < 1 {
-		return nil, fmt.Errorf("must have clusters>0 (actual=%d)", s.clusters)
+		return nil, fmt.Errorf("must have at least one cluster)")
 	}
 
 	return s, nil
@@ -52,7 +50,7 @@ func (s *State) Final() protocol.Snapshot {
 	var finalized uint64
 	err := s.db.View(operation.RetrieveFinalizedHeight(&finalized))
 	if err != nil {
-		return &Snapshot{err: err}
+		return &Snapshot{err: fmt.Errorf("could not retrieve finalized height: %w", err)}
 	}
 
 	return s.AtHeight(finalized)
@@ -64,7 +62,7 @@ func (s *State) Executed() protocol.Snapshot {
 	var executed uint64
 	err := s.db.View(operation.RetrieveExecutedHeight(&executed))
 	if err != nil {
-		return &Snapshot{err: err}
+		return &Snapshot{err: fmt.Errorf("could not retrieve executed height: %w", err)}
 	}
 
 	return s.AtHeight(executed)
@@ -76,7 +74,7 @@ func (s *State) Sealed() protocol.Snapshot {
 	var sealed uint64
 	err := s.db.View(operation.RetrieveSealedHeight(&sealed))
 	if err != nil {
-		return &Snapshot{err: err}
+		return &Snapshot{err: fmt.Errorf("could not retrieve sealed height: %w", err)}
 	}
 
 	return s.AtHeight(sealed)
@@ -88,7 +86,7 @@ func (s *State) AtHeight(height uint64) protocol.Snapshot {
 	var blockID flow.Identifier
 	err := s.db.View(operation.LookupBlockHeight(height, &blockID))
 	if err != nil {
-		return &Snapshot{err: err}
+		return &Snapshot{err: fmt.Errorf("could not look up block by height: %w", err)}
 	}
 
 	return s.AtBlockID(blockID)

@@ -33,3 +33,11 @@ func IndexBlockSeal(blockID flow.Identifier, sealID flow.Identifier) func(*badge
 func LookupBlockSeal(blockID flow.Identifier, sealID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeBlockToSeal, blockID), &sealID)
 }
+
+func IndexSealedBlock(blockID flow.Identifier, sealedID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeCommit, blockID), sealedID)
+}
+
+func LookupSealedBlock(blockID flow.Identifier, sealedID *flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeCommit, blockID), sealedID)
+}

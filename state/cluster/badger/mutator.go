@@ -110,6 +110,7 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 					duplicateTxIDs = append(duplicateTxIDs, txID)
 				}
 			}
+			ancestorID = ancestor.ParentID
 		}
 
 		// if we have duplicate transactions, fail

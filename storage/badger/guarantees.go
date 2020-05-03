@@ -43,7 +43,10 @@ func (g *Guarantees) Store(guarantee *flow.CollectionGuarantee) error {
 
 func (g *Guarantees) ByID(guarID flow.Identifier) (*flow.CollectionGuarantee, error) {
 	guarantee, err := g.cache.Get(guarID)
-	return guarantee.(*flow.CollectionGuarantee), err
+	if err != nil {
+		return nil, err
+	}
+	return guarantee.(*flow.CollectionGuarantee), nil
 }
 
 func (g *Guarantees) ByBlockID(blockID flow.Identifier) ([]*flow.CollectionGuarantee, error) {

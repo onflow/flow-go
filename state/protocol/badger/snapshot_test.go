@@ -1,6 +1,6 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
 
-package badger
+package badger_test
 
 import (
 	"math/rand"
@@ -13,6 +13,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
+	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -23,7 +24,8 @@ func init() {
 }
 
 func TestHead(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
 		// setup
 		block := unittest.BlockFixture()
 		block.Header.Height = 42
@@ -39,8 +41,6 @@ func TestHead(t *testing.T) {
 
 		err = db.Update(operation.UpdateFinalizedHeight(block.Header.Height))
 		require.NoError(t, err)
-
-		state := State{db: db}
 
 		t.Run("works with block number", func(t *testing.T) {
 			header, err := state.AtHeight(block.Header.Height).Head()
@@ -63,14 +63,18 @@ func TestHead(t *testing.T) {
 }
 
 func TestIdentity(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
 		identity := unittest.IdentityFixture()
 
-		err := db.Update(operation.InsertIdentities(flow.IdentityList{identity}))
+		err := db.Update(operation.InsertFinalizedHeight(0))
 		require.NoError(t, err)
 
-		state := State{db: db}
+		err = db.Update(operation.IndexBlockHeight(0, unittest.IdentifierFixture()))
+		require.NoError(t, err)
+
+		err = db.Update(operation.InsertIdentities(flow.IdentityList{identity}))
+		require.NoError(t, err)
 
 		actual, err := state.Final().Identity(identity.NodeID)
 		require.NoError(t, err)
@@ -82,14 +86,18 @@ func TestIdentity(t *testing.T) {
 }
 
 func TestIdentities(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
 		identities := unittest.IdentityListFixture(8)
 
-		err := db.Update(operation.InsertIdentities(identities))
+		err := db.Update(operation.InsertFinalizedHeight(0))
 		require.NoError(t, err)
 
-		state := State{db: db}
+		err = db.Update(operation.IndexBlockHeight(0, unittest.IdentifierFixture()))
+		require.NoError(t, err)
+
+		err = db.Update(operation.InsertIdentities(identities))
+		require.NoError(t, err)
 
 		actual, err := state.Final().Identities(filter.Any)
 		require.NoError(t, err)
@@ -98,14 +106,18 @@ func TestIdentities(t *testing.T) {
 }
 
 func TestClusters(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
 		identities := unittest.IdentityListFixture(7, unittest.WithRole(flow.RoleCollection))
 
-		err := db.Update(operation.InsertIdentities(identities))
+		err := db.Update(operation.InsertFinalizedHeight(0))
 		require.NoError(t, err)
 
-		state := State{db: db, clusters: 3}
+		err = db.Update(operation.IndexBlockHeight(0, unittest.IdentifierFixture()))
+		require.NoError(t, err)
+
+		err = db.Update(operation.InsertIdentities(identities))
+		require.NoError(t, err)
 
 		actual, err := state.Final().Clusters()
 		require.NoError(t, err)
@@ -114,5 +126,5 @@ func TestClusters(t *testing.T) {
 		assert.Len(t, actual.ByIndex(0), 3)
 		assert.Len(t, actual.ByIndex(1), 2)
 		assert.Len(t, actual.ByIndex(2), 2)
-	})
+	}, protocol.SetClusters(3))
 }

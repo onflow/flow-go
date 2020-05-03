@@ -1,7 +1,6 @@
 package badger
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -15,8 +14,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/cluster"
 	"github.com/dapperlabs/flow-go/state/protocol"
-	protocolkv "github.com/dapperlabs/flow-go/state/protocol/badger"
-	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -54,8 +51,7 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.Assert().Nil(err)
 	suite.mutator = suite.state.Mutate()
 
-	suite.protoState, err = protocolkv.NewState(suite.db)
-	suite.Require().Nil(err)
+	suite.protoState = unittest.ProtocolState(suite.T(), suite.db)
 }
 
 // runs after each test finishes
@@ -287,8 +283,7 @@ func (suite *MutatorSuite) TestExtend_UnfinalizedBlockWithDupeTx() {
 
 	// should be unable to extend block 2, as it contains a dupe transaction
 	err = suite.mutator.Extend(block2.ID())
-	suite.T().Log(err)
-	suite.Assert().True(errors.Is(err, storage.ErrAlreadyIndexed))
+	suite.Assert().Error(err)
 }
 
 func (suite *MutatorSuite) TestExtend_FinalizedBlockWithDupeTx() {
@@ -318,8 +313,7 @@ func (suite *MutatorSuite) TestExtend_FinalizedBlockWithDupeTx() {
 
 	// should be unable to extend block 2, as it contains a dupe transaction
 	err = suite.mutator.Extend(block2.ID())
-	suite.T().Log(err)
-	suite.Assert().True(errors.Is(err, storage.ErrAlreadyIndexed))
+	suite.Assert().Error(err)
 }
 
 func (suite *MutatorSuite) TestExtend_ConflictingForkWithDupeTx() {

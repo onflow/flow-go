@@ -102,7 +102,7 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 	// FIRST: Check that the header is a valid extension of the state; it should
 	// connect to the last finalized block.
 
-	pending, err := m.state.headers.ByBlockID(blockID)
+	candidate, err := m.state.headers.ByBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve pending header: %w", err)
 	}
@@ -123,22 +123,22 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 	// 3) Check that the parent is not below the last finalized block.
 	// We will either run into one of the error conditions or break the loop when we
 	// managed to trace back all the way to the last finalized block.
-	height := pending.Height
-	chainID := pending.ChainID
-	ancestorID := pending.ParentID
+	height := candidate.Height
+	chainID := candidate.ChainID
+	ancestorID := candidate.ParentID
 	for ancestorID != finalID {
 		ancestor, err := m.state.headers.ByBlockID(ancestorID)
 		if err != nil {
-			return fmt.Errorf("could not get block's ancestor from state (%x): %w", ancestorID, err)
+			return fmt.Errorf("could not retrieve ancestor (%x): %w", ancestorID, err)
 		}
 		if chainID != ancestor.ChainID {
-			return fmt.Errorf("pending block has invalid chain (pending: %s, parent: %s)", chainID, ancestor.ChainID)
+			return fmt.Errorf("candidate block has invalid chain (candidate: %s, parent: %s)", chainID, ancestor.ChainID)
 		}
 		if height != ancestor.Height+1 {
-			return fmt.Errorf("pending block has invalid height (pending: %d, parent: %d)", height, ancestor.Height)
+			return fmt.Errorf("candidate block has invalid height (candidate: %d, parent: %d)", height, ancestor.Height)
 		}
 		if ancestor.Height < finalized {
-			return fmt.Errorf("pending block not connected to finalized state (ancestor: %d final: %d)", ancestor.Height, finalized)
+			return fmt.Errorf("candidate block conflicts with immutable state (ancestor: %d final: %d)", ancestor.Height, finalized)
 		}
 		height = ancestor.Height
 		chainID = ancestor.ChainID
@@ -154,10 +154,10 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 		return fmt.Errorf("could not retrieve payload: %w", err)
 	}
 	if len(payload.Identities) > 0 {
-		return fmt.Errorf("extend block has identities")
+		return fmt.Errorf("candidate block has identities")
 	}
 	if payload.Hash() != candidate.PayloadHash {
-		return fmt.Errorf("payload integrity check failed")
+		return fmt.Errorf("candidate payload integrity check failed")
 	}
 
 	// THIRD: Check that all guarantees and all seals in the payload have not
@@ -168,7 +168,7 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 	height = candidate.Height - 1
 	limit := height - 1000
 	if limit > height { // overflow check
-		height = 0
+		limit = 0
 	}
 
 	// In order to check if a payload in one of the ancestors already contained
@@ -244,7 +244,7 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 	for {
 		sealed, err := m.state.headers.ByBlockID(sealedID)
 		if err != nil {
-			return fmt.Errorf("could not look up sealed parent (%x): %w", sealedID, err)
+			return fmt.Errorf("could not look up sealed ancestor (%x): %w", sealedID, err)
 		}
 		if sealed.Height < limit {
 			return fmt.Errorf("could not find sealed block in range")
@@ -280,7 +280,7 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 				return fmt.Errorf("could not index block seal (block: %x): %w", seal.BlockID, err)
 			}
 		}
-		err = operation.IndexStateCommitment(candidate.ID(), lastSeal.FinalState)(tx)
+		err = operation.IndexSealedBlock(candidate.ID(), lastSeal.BlockID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index commit: %w", err)
 		}
@@ -321,6 +321,20 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		return fmt.Errorf("can't finalize non-child of chain head")
 	}
 
+	// get the last sealed state
+	var sealedID flow.Identifier
+	err = m.state.db.View(operation.LookupSealedBlock(blockID, &sealedID))
+	if err != nil {
+		return fmt.Errorf("could not look up sealed state: %w", err)
+	}
+
+	// get the last sealed header
+	var sealed flow.Header
+	err = m.state.db.View(operation.RetrieveHeader(sealedID, &sealed))
+	if err != nil {
+		return fmt.Errorf("could not look up sealed header: %w", err)
+	}
+
 	// execute the write operations
 	err = operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
 		err = operation.IndexBlockHeight(pending.Height, blockID)(tx)
@@ -331,8 +345,15 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		// update the finalized boundary
 		err = operation.UpdateFinalizedHeight(pending.Height)(tx)
 		if err != nil {
-			return fmt.Errorf("could not update finalized boundary: %w", err)
+			return fmt.Errorf("could not update finalized height: %w", err)
 		}
+
+		// update the sealed boundary
+		err = operation.UpdateSealedHeight(sealed.Height)(tx)
+		if err != nil {
+			return fmt.Errorf("could not update sealed height: %w", err)
+		}
+
 		return nil
 	})
 	if err != nil {

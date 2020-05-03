@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/order"
 	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
@@ -26,6 +27,9 @@ type Snapshot struct {
 // Identities retrieves all active ids at the given snapshot and
 // applies the given filters.
 func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
 
 	// retrieve identities from storage
 	identities, err := s.state.identities.ByBlockID(s.blockID)
@@ -45,6 +49,9 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 }
 
 func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
 
 	// filter identities at snapshot for node ID
 	identities, err := s.Identities(filter.HasNodeID(nodeID))
@@ -61,7 +68,24 @@ func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 }
 
 func (s *Snapshot) Commit() (flow.StateCommitment, error) {
-	return s.state.commits.ByBlockID(s.blockID)
+	if s.err != nil {
+		return nil, s.err
+	}
+
+	// get the ID of the sealed block
+	var sealedID flow.Identifier
+	err := s.state.db.View(operation.LookupSealedBlock(s.blockID, &sealedID))
+	if err != nil {
+		return nil, fmt.Errorf("could not look up sealed block: %w", err)
+	}
+
+	// get the seal for the given sealed block
+	seal, err := s.state.seals.BySealedID(sealedID)
+	if err != nil {
+		return nil, fmt.Errorf("could not look up seal: %w", err)
+	}
+
+	return seal.FinalState, nil
 }
 
 // Clusters sorts the list of node identities after filtering into the given
@@ -70,6 +94,9 @@ func (s *Snapshot) Commit() (flow.StateCommitment, error) {
 // This is guaranteed to be deterministic for an identical set of identities,
 // regardless of the order.
 func (s *Snapshot) Clusters() (*flow.ClusterList, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
 
 	// get the node identities
 	identities, err := s.Identities(filter.HasRole(flow.RoleCollection))
@@ -81,10 +108,17 @@ func (s *Snapshot) Clusters() (*flow.ClusterList, error) {
 }
 
 func (s *Snapshot) Head() (*flow.Header, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+
 	return s.state.headers.ByBlockID(s.blockID)
 }
 
 func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
 
 	if len(indices)*4 > hash.KmacMaxParamsLen {
 		return nil, fmt.Errorf("unsupported number of indices")

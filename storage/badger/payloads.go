@@ -41,5 +41,8 @@ func (p *Payloads) Store(blockID flow.Identifier, payload *flow.Payload) error {
 
 func (p *Payloads) ByBlockID(blockID flow.Identifier) (*flow.Payload, error) {
 	payload, err := p.cache.Get(blockID)
-	return payload.(*flow.Payload), err
+	if err != nil {
+		return nil, err
+	}
+	return payload.(*flow.Payload), nil
 }

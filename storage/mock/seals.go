@@ -56,13 +56,13 @@ func (_m *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {
 	return r0, r1
 }
 
-// BySealedID provides a mock function with given fields: sealID
-func (_m *Seals) BySealedID(sealID flow.Identifier) (*flow.Seal, error) {
-	ret := _m.Called(sealID)
+// BySealedID provides a mock function with given fields: sealedID
+func (_m *Seals) BySealedID(sealedID flow.Identifier) (*flow.Seal, error) {
+	ret := _m.Called(sealedID)
 
 	var r0 *flow.Seal
 	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Seal); ok {
-		r0 = rf(sealID)
+		r0 = rf(sealedID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Seal)
@@ -71,7 +71,7 @@ func (_m *Seals) BySealedID(sealID flow.Identifier) (*flow.Seal, error) {
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(sealID)
+		r1 = rf(sealedID)
 	} else {
 		r1 = ret.Error(1)
 	}

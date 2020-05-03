@@ -87,6 +87,8 @@ func Bootstrap(commit flow.StateCommitment, genesis *flow.Block) func(*badger.Tx
 			return fmt.Errorf("could not index payload: %w", err)
 		}
 
+		// TODO: put seal back into payload to have it signed
+
 		// generate genesis execution result
 		result := flow.ExecutionResult{ExecutionResultBody: flow.ExecutionResultBody{
 			PreviousResultID: flow.ZeroID,
@@ -114,14 +116,8 @@ func Bootstrap(commit flow.StateCommitment, genesis *flow.Block) func(*badger.Tx
 			return fmt.Errorf("could not index genesis seal: %w", err)
 		}
 
-		// index the state commitment for the void state (before genesis)
-		err = operation.IndexStateCommitment(flow.ZeroID, seal.InitialState)(tx)
-		if err != nil {
-			return fmt.Errorf("could not index void commit: %w", err)
-		}
-
 		// index the genesis seal state commitment (after genesis)
-		err = operation.IndexStateCommitment(genesis.ID(), seal.FinalState)(tx)
+		err = operation.IndexSealedBlock(genesis.ID(), genesis.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index genesis commit: %w", err)
 		}
