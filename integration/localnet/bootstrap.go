@@ -15,6 +15,7 @@ const (
 	BootstrapDir          = "./bootstrap"
 	DockerComposeFile     = "./docker-compose.nodes.yml"
 	DefaultConsensusCount = 3
+	AccessAPIPort         = 3569
 )
 
 var consensusCount int
@@ -64,6 +65,7 @@ func main() {
 	}
 
 	fmt.Print("Bootstrapping success!\n\n")
+	fmt.Printf("The Access API will be accessible at localhost:%d\n\n", AccessAPIPort)
 	fmt.Print("Run \"make start\" to launch the network.\n")
 }
 
@@ -83,6 +85,7 @@ type Service struct {
 	}
 	Command []string
 	Volumes []string
+	Ports   []string
 }
 
 func WriteDockerComposeConfig(containers []testnet.ContainerConfig) error {
@@ -105,12 +108,7 @@ func WriteDockerComposeConfig(containers []testnet.ContainerConfig) error {
 	services := make(Services)
 
 	for _, container := range containers {
-		// only include consensus nodes in Docker Compose network (for now)
-		if container.Role != flow.RoleConsensus {
-			continue
-		}
-
-		services[container.ContainerName] = Service{
+		service := Service{
 			Build: struct {
 				Context    string
 				Dockerfile string
@@ -135,6 +133,34 @@ func WriteDockerComposeConfig(containers []testnet.ContainerConfig) error {
 				fmt.Sprintf("%s:/bootstrap", BootstrapDir),
 			},
 		}
+
+		if container.Role == flow.RoleCollection {
+			service.Command = append(
+				service.Command,
+				fmt.Sprintf("--ingress-addr=%s:9000", container.ContainerName),
+			)
+		}
+
+		if container.Role == flow.RoleAccess {
+			service.Command = append(service.Command, []string{
+				fmt.Sprintf("--rpc-addr=%s:9000", container.ContainerName),
+				"--ingress-addr=collection_1:9000",
+				"--script-addr=execution_1:9000",
+			}...)
+
+			service.Ports = []string{
+				fmt.Sprintf("%d:9000", AccessAPIPort),
+			}
+		}
+
+		if container.Role == flow.RoleExecution {
+			service.Command = append(
+				service.Command,
+				fmt.Sprintf("--rpc-addr=%s:9000", container.ContainerName),
+			)
+		}
+
+		services[container.ContainerName] = service
 	}
 
 	network := Network{
