@@ -77,7 +77,7 @@ func main() {
 				panic("error while boostrapping execution state - resulting state is different than precalculated!")
 			}
 			if !bytes.Equal(flow.GenesisStateCommitment, node.GenesisCommit) {
-				panic("genesis seal state commitment different from precalculated")
+				panic(fmt.Sprintf("genesis seal state commitment (%x) different from precalculated (%x)", node.GenesisCommit, flow.GenesisStateCommitment))
 			}
 
 			err = bootstrap.BootstrapExecutionDatabase(node.DB, block.Header)
@@ -107,11 +107,14 @@ func main() {
 			return providerEngine, err
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			blocks = badger.NewBlocks(node.DB)
-			collections := badger.NewCollections(node.DB)
+			// Only needed for ingestion engine
 			payloads := badger.NewPayloads(node.DB)
-			events := badger.NewEvents(node.DB)
-			txResults := badger.NewTransactionResults(node.DB)
+			collections := badger.NewCollections(node.DB)
+
+			// Needed for grpc server, make sure to assign to main scoped vars
+			blocks = badger.NewBlocks(node.DB)
+			events = badger.NewEvents(node.DB)
+			txResults = badger.NewTransactionResults(node.DB)
 			ingestionEng, err = ingestion.New(
 				node.Logger,
 				node.Network,
