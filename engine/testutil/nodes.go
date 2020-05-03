@@ -49,9 +49,8 @@ func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, participa
 	headers := storage.NewHeaders(db)
 	payloads := storage.NewPayloads(db)
 	seals := storage.NewSeals(db)
-	commits := storage.NewCommits(db)
 
-	state, err := UncheckedState(db, identities, headers, payloads, seals, commits, flow.GenesisStateCommitment, participants)
+	state, err := UncheckedState(db, identities, headers, payloads, seals, flow.GenesisStateCommitment, participants)
 	require.NoError(t, err)
 
 	for _, option := range options {
@@ -203,10 +202,13 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	genesisHead, err := node.State.Final().Head()
 	require.NoError(t, err)
 
+	commit, err := commitsStorage.ByBlockID(genesisHead.ID())
+	require.NoError(t, err)
+
 	_, err = bootstrap.BootstrapLedger(ls)
 	require.NoError(t, err)
 
-	err = bootstrap.BootstrapExecutionDatabase(node.DB, genesisHead)
+	err = bootstrap.BootstrapExecutionDatabase(node.DB, commit, genesisHead)
 	require.NoError(t, err)
 
 	execState := state.NewExecutionState(ls, commitsStorage, chunkDataPackStorage, executionResults, node.DB)

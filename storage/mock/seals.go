@@ -10,22 +10,22 @@ type Seals struct {
 	mock.Mock
 }
 
-// ByBlockID provides a mock function with given fields: blockID
-func (_m *Seals) ByBlockID(blockID flow.Identifier) ([]*flow.Seal, error) {
-	ret := _m.Called(blockID)
+// ByBlockID provides a mock function with given fields: sealedID
+func (_m *Seals) ByBlockID(sealedID flow.Identifier) (*flow.Seal, error) {
+	ret := _m.Called(sealedID)
 
-	var r0 []*flow.Seal
-	if rf, ok := ret.Get(0).(func(flow.Identifier) []*flow.Seal); ok {
-		r0 = rf(blockID)
+	var r0 *flow.Seal
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Seal); ok {
+		r0 = rf(sealedID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*flow.Seal)
+			r0 = ret.Get(0).(*flow.Seal)
 		}
 	}
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(blockID)
+		r1 = rf(sealedID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -56,22 +56,22 @@ func (_m *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {
 	return r0, r1
 }
 
-// BySealedID provides a mock function with given fields: sealedID
-func (_m *Seals) BySealedID(sealedID flow.Identifier) (*flow.Seal, error) {
-	ret := _m.Called(sealedID)
+// PayloadFor provides a mock function with given fields: blockID
+func (_m *Seals) PayloadFor(blockID flow.Identifier) ([]*flow.Seal, error) {
+	ret := _m.Called(blockID)
 
-	var r0 *flow.Seal
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Seal); ok {
-		r0 = rf(sealedID)
+	var r0 []*flow.Seal
+	if rf, ok := ret.Get(0).(func(flow.Identifier) []*flow.Seal); ok {
+		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Seal)
+			r0 = ret.Get(0).([]*flow.Seal)
 		}
 	}
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(sealedID)
+		r1 = rf(blockID)
 	} else {
 		r1 = ret.Error(1)
 	}

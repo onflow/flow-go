@@ -150,7 +150,6 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 
 	// start the libp2p node
 	err = m.libP2PNode.Start(m.ctx, nodeAddress, m.log, libp2pKey, m.handleIncomingStream, psOptions...)
-
 	if err != nil {
 		return fmt.Errorf("failed to start libp2p node: %w", err)
 	}

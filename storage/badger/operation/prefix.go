@@ -35,7 +35,7 @@ const (
 
 	// codes for indexing single identifier by identifier
 	codeHeightToBlock       = 40 // index mapping height to block ID
-	codeBlockToSeal         = 41 // index mapping sealed block ID to seal ID
+	codeBlockToSeal         = 41 // index mapping a block its last payload seal
 	codeCollectionReference = 42 // index reference block ID for collection
 
 	// codes for indexing multiple identifiers by identifier

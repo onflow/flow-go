@@ -14,14 +14,14 @@ type Commits struct {
 
 func NewCommits(db *badger.DB) *Commits {
 
-	store := func(blockID flow.Identifier, sealedID interface{}) error {
-		return db.Update(operation.IndexSealedBlock(blockID, sealedID.(flow.Identifier)))
+	store := func(blockID flow.Identifier, commit interface{}) error {
+		return db.Update(operation.IndexStateCommitment(blockID, commit.(flow.StateCommitment)))
 	}
 
 	retrieve := func(blockID flow.Identifier) (interface{}, error) {
-		var sealedID flow.Identifier
-		err := db.View(operation.LookupSealedBlock(blockID, &sealedID))
-		return sealedID, err
+		var commit flow.StateCommitment
+		err := db.View(operation.LookupStateCommitment(blockID, &commit))
+		return commit, err
 	}
 
 	c := &Commits{
@@ -32,11 +32,14 @@ func NewCommits(db *badger.DB) *Commits {
 	return c
 }
 
-func (c *Commits) Store(blockID flow.Identifier, sealedID flow.Identifier) error {
-	return c.cache.Put(blockID, sealedID)
+func (c *Commits) Store(blockID flow.Identifier, commit flow.StateCommitment) error {
+	return c.cache.Put(blockID, commit)
 }
 
-func (c *Commits) ByBlockID(blockID flow.Identifier) (flow.Identifier, error) {
-	sealedID, err := c.cache.Get(blockID)
-	return sealedID.(flow.Identifier), err
+func (c *Commits) ByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {
+	commit, err := c.cache.Get(blockID)
+	if err != nil {
+		return nil, err
+	}
+	return commit.(flow.StateCommitment), nil
 }

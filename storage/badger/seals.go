@@ -50,7 +50,7 @@ func (s *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {
 	return seal.(*flow.Seal), nil
 }
 
-func (s *Seals) ByBlockID(blockID flow.Identifier) ([]*flow.Seal, error) {
+func (s *Seals) PayloadFor(blockID flow.Identifier) ([]*flow.Seal, error) {
 	payload, err := s.payloads.ByBlockID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve block payload: %w", err)
@@ -58,9 +58,9 @@ func (s *Seals) ByBlockID(blockID flow.Identifier) ([]*flow.Seal, error) {
 	return payload.Seals, nil
 }
 
-func (s *Seals) BySealedID(sealedID flow.Identifier) (*flow.Seal, error) {
+func (s *Seals) ByBlockID(blockID flow.Identifier) (*flow.Seal, error) {
 	var sealID flow.Identifier
-	err := s.db.View(operation.LookupBlockSeal(sealedID, &sealID))
+	err := s.db.View(operation.LookupBlockSeal(blockID, &sealID))
 	if err != nil {
 		return nil, fmt.Errorf("could not look up seal for sealed: %w", err)
 	}

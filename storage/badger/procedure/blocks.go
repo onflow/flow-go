@@ -56,6 +56,20 @@ func RetrieveBlock(blockID flow.Identifier, block *flow.Block) func(*badger.Txn)
 			Payload: &payload,
 		}
 
+		// if we have a height, this is not genesis and we can return
+		if header.Height > 0 {
+			return nil
+		}
+
+		// add identities for genesis block
+		var identities flow.IdentityList
+		err = operation.RetrieveIdentities(&identities)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve identities: %w", err)
+		}
+
+		block.Payload.Identities = identities
+
 		return nil
 	}
 }
@@ -64,107 +78,71 @@ func RetrieveBlock(blockID flow.Identifier, block *flow.Block) func(*badger.Txn)
 func Bootstrap(commit flow.StateCommitment, genesis *flow.Block) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
-		// insert genesis identities
-		err := operation.InsertIdentities(genesis.Payload.Identities)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert genesis identities: %w", err)
-		}
-
-		// insert the block header
+		// 1) insert the block, the genesis identities and index it by beight
 		genesisID := genesis.ID()
-		err = operation.InsertHeader(genesisID, genesis.Header)(tx)
+		err := InsertBlock(genesisID, genesis)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert header: %w", err)
 		}
-
-		// NOTE: no need to insert the payload, both seal and guarantees should
-		// be empty and we don't want guarantees inserted as the payload, just
-		// as the genesis identities
-
-		// index the genesis payload (still useful to have empty index entry)
-		err = InsertPayload(genesisID, genesis.Payload)(tx)
+		err = operation.InsertIdentities(genesis.Payload.Identities)(tx)
 		if err != nil {
-			return fmt.Errorf("could not index payload: %w", err)
+			return fmt.Errorf("could not insert genesis identities: %w", err)
+		}
+		err = operation.IndexBlockHeight(0, genesis.ID())(tx)
+		if err != nil {
+			return fmt.Errorf("could not initialize boundary: %w", err)
 		}
 
-		// TODO: put seal back into payload to have it signed
+		// TODO: put seal into payload to have it signed
 
-		// generate genesis execution result
+		// 3) generate genesis execution result, insert and index by block
 		result := flow.ExecutionResult{ExecutionResultBody: flow.ExecutionResultBody{
 			PreviousResultID: flow.ZeroID,
 			BlockID:          genesis.ID(),
 			FinalStateCommit: commit,
 		}}
+		err = operation.InsertExecutionResult(&result)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert genesis result: %w", err)
+		}
+		err = operation.IndexExecutionResult(genesis.ID(), result.ID())(tx)
+		if err != nil {
+			return fmt.Errorf("could not index genesis result: %w", err)
+		}
 
-		// generate genesis block seal
+		// 4) generate genesis block seal, insert and index by block
 		seal := flow.Seal{
 			BlockID:      genesis.ID(),
 			ResultID:     result.ID(),
 			InitialState: flow.GenesisStateCommitment,
 			FinalState:   result.FinalStateCommit,
 		}
-
-		// insert genesis block seal
 		err = operation.InsertSeal(seal.ID(), &seal)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis seal: %w", err)
 		}
-
-		// index genesis block seal
 		err = operation.IndexBlockSeal(genesis.ID(), seal.ID())(tx)
 		if err != nil {
-			return fmt.Errorf("could not index genesis seal: %w", err)
+			return fmt.Errorf("could not index genesis block seal: %w", err)
 		}
 
-		// index the genesis seal state commitment (after genesis)
-		err = operation.IndexSealedBlock(genesis.ID(), genesis.ID())(tx)
-		if err != nil {
-			return fmt.Errorf("could not index genesis commit: %w", err)
-		}
-
-		// insert first execution result
-		err = operation.InsertExecutionResult(&result)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert genesis result: %w", err)
-		}
-
-		// index first execution block for genesis block
-		err = operation.IndexExecutionResult(genesis.ID(), result.ID())(tx)
-		if err != nil {
-			return fmt.Errorf("could not index genesis result: %w", err)
-		}
-
-		// insert the block number mapping
-		err = operation.IndexBlockHeight(0, genesis.ID())(tx)
-		if err != nil {
-			return fmt.Errorf("could not initialize boundary: %w", err)
-		}
-
-		// insert last started view
+		// 5) initialize all of the special views and heights
 		err = operation.InsertStartedView(genesis.Header.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert started view: %w", err)
 		}
-
-		// insert last voted view
 		err = operation.InsertVotedView(genesis.Header.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert started view: %w", err)
 		}
-
-		// insert the finalized boundary
 		err = operation.InsertFinalizedHeight(genesis.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert finalized height: %w", err)
 		}
-
-		// insert the executed boundary
 		err = operation.InsertExecutedHeight(genesis.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert executed height: %w", err)
 		}
-
-		// insert the sealed boundary
 		err = operation.InsertSealedHeight(genesis.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert sealed height: %w", err)

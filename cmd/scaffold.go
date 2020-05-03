@@ -268,7 +268,6 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.Headers,
 		fnb.Payloads,
 		fnb.Seals,
-		fnb.Commits,
 		protocol.SetClusters(fnb.BaseConfig.nClusters),
 	)
 	fnb.MustNot(err).Msg("could not initialize flow state")

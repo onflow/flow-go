@@ -10,7 +10,6 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
@@ -46,7 +45,6 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 		for _, identity := range genesis.Payload.Identities {
 			roles[identity.Role]++
 		}
-
 		if roles[flow.RoleConsensus] < 1 {
 			return fmt.Errorf("need at least one consensus node")
 		}
@@ -97,17 +95,14 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 	})
 }
 
-func (m *Mutator) Extend(blockID flow.Identifier) error {
+func (m *Mutator) Extend(candidate *flow.Block) error {
 
 	// FIRST: Check that the header is a valid extension of the state; it should
-	// connect to the last finalized block.
+	// connect to the last finalized block, have the correct payload hash and
+	// include no identities for now.
 
-	candidate, err := m.state.headers.ByBlockID(blockID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve pending header: %w", err)
-	}
 	var finalized uint64
-	err = m.state.db.View(operation.RetrieveFinalizedHeight(&finalized))
+	err := m.state.db.View(operation.RetrieveFinalizedHeight(&finalized))
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized height: %w", err)
 	}
@@ -115,6 +110,12 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 	err = m.state.db.View(operation.LookupBlockHeight(finalized, &finalID))
 	if err != nil {
 		return fmt.Errorf("could not lookup finalized block: %w", err)
+	}
+	if len(candidate.Payload.Identities) > 0 {
+		return fmt.Errorf("extend block has identities")
+	}
+	if candidate.Payload.Hash() != candidate.Header.PayloadHash {
+		return fmt.Errorf("payload integrity check failed")
 	}
 
 	// In order to check if the candidate connects to the last finalized block
@@ -165,40 +166,35 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 
 	// NOTE: We currently limit ourselves to going back at most 1000 for this
 	// check, as this is approximately what we have cached.
-	height = candidate.Height - 1
+	height = candidate.Header.Height - 1
 	limit := height - 1000
 	if limit > height { // overflow check
 		limit = 0
 	}
 
 	// In order to check if a payload in one of the ancestors already contained
-	// any of the seals or the guarantees, we proceed as follows:
-	// 1) Build a lookup table for candidate seals & guarantees.
+	// any of the guarantees, we proceed as follows:
+	// 1) Build a lookup table for candidate guarantees.
 	// 2) Retrieve the header to go to next (should be cached).
 	// 3) Retrieve the next ancestor payload (should be cached).
 	// 4) Collect the IDs for any duplicates.
 	gLookup := make(map[flow.Identifier]struct{})
-	for _, guarantee := range payload.Guarantees {
+	for _, guarantee := range candidate.Payload.Guarantees {
 		gLookup[guarantee.ID()] = struct{}{}
 	}
-	sLookup := make(map[flow.Identifier]struct{})
-	for _, seal := range payload.Seals {
-		sLookup[seal.ID()] = struct{}{}
-	}
 	var duplicateGuarIDs flow.IdentifierList
-	var duplicateSealIDs flow.IdentifierList
-	ancestorID = candidate.ParentID
+	ancestorID = candidate.Header.ParentID
 	for {
 		ancestor, err := m.state.headers.ByBlockID(ancestorID)
 		if err != nil {
-			return fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
+			return fmt.Errorf("could not retrieve ancestor header (%x): %w", ancestorID, err)
 		}
 		if ancestor.Height <= limit {
 			break
 		}
 		previous, err := m.state.payloads.ByBlockID(ancestorID)
 		if err != nil {
-			return fmt.Errorf("could not get ancestor paylooad (%x): %w", ancestorID, err)
+			return fmt.Errorf("could not retrieve ancestor payload (%x): %w", ancestorID, err)
 		}
 		for _, guarantee := range previous.Guarantees {
 			guarID := guarantee.ID()
@@ -207,17 +203,10 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 				duplicateGuarIDs = append(duplicateGuarIDs, guarID)
 			}
 		}
-		for _, seal := range previous.Seals {
-			sealID := seal.ID()
-			_, duplicated := sLookup[sealID]
-			if duplicated {
-				duplicateSealIDs = append(duplicateSealIDs, sealID)
-			}
-		}
 		ancestorID = ancestor.ParentID
 	}
-	if len(duplicateGuarIDs) > 0 || len(duplicateSealIDs) > 0 {
-		return fmt.Errorf("duplicate payload entities (guarantees: %s, seals: %s)", duplicateGuarIDs, duplicateSealIDs)
+	if len(duplicateGuarIDs) > 0 {
+		return fmt.Errorf("duplicate payload guarantees (duplicates: %s)", duplicateGuarIDs)
 	}
 
 	// FOURTH: Check that we can create a valid extension chain from the last
@@ -225,64 +214,52 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 
 	// In order to accomplish this:
 	// 1) Map each seal in the payload to the parent of the sealed block.
-	// 2) Go through ancestors until we find last sealed block.
-	// 3) Try to build a chain of seals by looking up by parent of sealed block.
+	// 2) Start with the execution state at the parent with its seal.
+	// 3) Try to build a chain of seals by looking for seal that seals parent.
 	// We either succeed or end up with unused seals or an error.
 	byParent := make(map[flow.Identifier]*flow.Seal)
-	for _, seal := range payload.Seals {
+	for _, seal := range candidate.Payload.Seals {
 		sealed, err := m.state.headers.ByBlockID(seal.BlockID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve sealed header: %w", err)
 		}
 		byParent[sealed.ParentID] = seal
 	}
-	if len(payload.Seals) > len(byParent) {
+	if len(candidate.Payload.Seals) > len(byParent) {
 		return fmt.Errorf("multiple seals have the same parent block")
 	}
-	sealedID := candidate.ParentID
-	var lastSeal *flow.Seal
-	for {
-		sealed, err := m.state.headers.ByBlockID(sealedID)
-		if err != nil {
-			return fmt.Errorf("could not look up sealed ancestor (%x): %w", sealedID, err)
-		}
-		if sealed.Height < limit {
-			return fmt.Errorf("could not find sealed block in range")
-		}
-		lastSeal, err = m.state.seals.BySealedID(sealedID)
-		if errors.Is(err, storage.ErrNotFound) {
-			sealedID = sealed.ParentID
-			continue
-		}
-		if err != nil {
-			return fmt.Errorf("could not look up seal for block: %w", err)
-		}
-		break
+	lastSeal, err := m.state.seals.ByBlockID(candidate.Header.ParentID)
+	if err != nil {
+		return fmt.Errorf("could not look up parent seal (%x): %w", candidate.Header.ParentID, err)
 	}
 	for len(byParent) > 0 {
 		seal, found := byParent[lastSeal.BlockID]
 		if !found {
 			return fmt.Errorf("could not find connecting seal (parent: %x)", lastSeal.BlockID)
 		}
-		if !bytes.Equal(seal.InitialState, lastSeal.FinalState) {
+		if !bytes.Equal(lastSeal.FinalState, seal.InitialState) {
 			return fmt.Errorf("seal execution states do not connect")
 		}
 		delete(byParent, lastSeal.BlockID)
 		lastSeal = seal
 	}
 
-	// FIFTH: Map each block to the seal that sealed ID and index the state
-	// commitment after the block. Also create an empty child lookup entry.
+	// FIFTH: Map the block to the seal corresponding to the sealed state after
+	// applying all of the seals in its payload. If its payload is empty, this
+	// corresponds to the seal of the last sealed block.
+	blockID := candidate.ID()
 	err = operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
-		for _, seal := range payload.Seals {
-			err = operation.IndexBlockSeal(seal.BlockID, seal.ID())(tx)
-			if err != nil {
-				return fmt.Errorf("could not index block seal (block: %x): %w", seal.BlockID, err)
-			}
-		}
-		err = operation.IndexSealedBlock(candidate.ID(), lastSeal.BlockID)(tx)
+		err := operation.InsertHeader(blockID, candidate.Header)(tx)
 		if err != nil {
-			return fmt.Errorf("could not index commit: %w", err)
+			return fmt.Errorf("could not insert candidate header: %w", err)
+		}
+		err = procedure.InsertPayload(blockID, candidate.Payload)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert candidate payload: %w", err)
+		}
+		err = operation.IndexBlockSeal(blockID, lastSeal.ID())(tx)
+		if err != nil {
+			return fmt.Errorf("could not index candidate seal: %w", err)
 		}
 		err = operation.InsertBlockChildren(candidate.ID(), nil)(tx)
 		if err != nil {
@@ -290,6 +267,9 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 		}
 		return nil
 	})
+	if err != nil {
+		return fmt.Errorf("could not execute state extension: %w", err)
+	}
 
 	return nil
 }
@@ -321,22 +301,22 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		return fmt.Errorf("can't finalize non-child of chain head")
 	}
 
-	// get the last sealed state
-	var sealedID flow.Identifier
-	err = m.state.db.View(operation.LookupSealedBlock(blockID, &sealedID))
-	if err != nil {
-		return fmt.Errorf("could not look up sealed state: %w", err)
-	}
-
-	// get the last sealed header
-	var sealed flow.Header
-	err = m.state.db.View(operation.RetrieveHeader(sealedID, &sealed))
+	// get the seal for the last sealed state
+	seal, err := m.state.seals.ByBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not look up sealed header: %w", err)
 	}
 
+	// retrieve the last sealed header
+	sealed, err := m.state.headers.ByBlockID(seal.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve sealed heder: %w", err)
+	}
+
 	// execute the write operations
 	err = operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
+
+		// index the block as finalized block for its height
 		err = operation.IndexBlockHeight(pending.Height, blockID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert number mapping: %w", err)

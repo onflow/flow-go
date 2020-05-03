@@ -13,6 +13,6 @@ type Guarantees interface {
 	// ByID retrieves the collection guarantee by collection ID.
 	ByID(collID flow.Identifier) (*flow.CollectionGuarantee, error)
 
-	// ByBlockID returns guarantees from a block.
-	ByBlockID(blockID flow.Identifier) ([]*flow.CollectionGuarantee, error)
+	// PayloadFor returns guarantees from a block.
+	PayloadFor(blockID flow.Identifier) ([]*flow.CollectionGuarantee, error)
 }

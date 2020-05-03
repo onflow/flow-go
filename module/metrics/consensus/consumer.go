@@ -46,7 +46,7 @@ func (c *MetricsConsumer) OnFinalizedBlock(block *model.Block) {
 }
 
 func (c *MetricsConsumer) OnBlockIncorporated(block *model.Block) {
-	guarantees, err := c.guarantees.ByBlockID(block.BlockID)
+	guarantees, err := c.guarantees.PayloadFor(block.BlockID)
 	if err != nil {
 		c.log.Err(fmt.Errorf("could not get guarantee: %w", err))
 		return
@@ -70,7 +70,7 @@ func (c *MetricsConsumer) OnQcIncorporated(qc *model.QuorumCertificate) {
 
 // trace the end of the duration from when a collection is received to when it's finalized
 func (c *MetricsConsumer) traceFinalizedCollections(block *model.Block) error {
-	collections, err := c.guarantees.ByBlockID(block.BlockID)
+	collections, err := c.guarantees.PayloadFor(block.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not get guarantee: %w", err)
 	}
@@ -88,7 +88,7 @@ func (c *MetricsConsumer) traceFinalizedCollections(block *model.Block) error {
 
 // trace the end of duration from when a block is received to when it's sealed
 func (c *MetricsConsumer) traceFinalizedSeals(block *model.Block) error {
-	seals, err := c.seals.ByBlockID(block.BlockID)
+	seals, err := c.seals.PayloadFor(block.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not get seals: %w", err)
 	}

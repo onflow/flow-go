@@ -13,7 +13,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/order"
 	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
@@ -73,16 +72,9 @@ func (s *Snapshot) Commit() (flow.StateCommitment, error) {
 	}
 
 	// get the ID of the sealed block
-	var sealedID flow.Identifier
-	err := s.state.db.View(operation.LookupSealedBlock(s.blockID, &sealedID))
+	seal, err := s.state.seals.ByBlockID(s.blockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not look up sealed block: %w", err)
-	}
-
-	// get the seal for the given sealed block
-	seal, err := s.state.seals.BySealedID(sealedID)
-	if err != nil {
-		return nil, fmt.Errorf("could not look up seal: %w", err)
+		return nil, fmt.Errorf("could not get look up sealed commit: %w", err)
 	}
 
 	return seal.FinalState, nil

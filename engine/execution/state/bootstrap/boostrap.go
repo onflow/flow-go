@@ -27,10 +27,15 @@ func BootstrapLedger(ledger storage.Ledger) (flow.StateCommitment, error) {
 	return newStateCommitment, nil
 }
 
-func BootstrapExecutionDatabase(db *badger.DB, genesis *flow.Header) error {
+func BootstrapExecutionDatabase(db *badger.DB, commit flow.StateCommitment, genesis *flow.Header) error {
 	err := db.Update(func(txn *badger.Txn) error {
 
 		err := operation.InsertExecutedHeight(genesis.Height)(txn)
+		if err != nil {
+			return err
+		}
+
+		err = operation.IndexStateCommitment(genesis.ID(), commit)(txn)
 		if err != nil {
 			return err
 		}

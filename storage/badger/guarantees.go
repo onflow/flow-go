@@ -49,7 +49,7 @@ func (g *Guarantees) ByID(guarID flow.Identifier) (*flow.CollectionGuarantee, er
 	return guarantee.(*flow.CollectionGuarantee), nil
 }
 
-func (g *Guarantees) ByBlockID(blockID flow.Identifier) ([]*flow.CollectionGuarantee, error) {
+func (g *Guarantees) PayloadFor(blockID flow.Identifier) ([]*flow.CollectionGuarantee, error) {
 	payload, err := g.payloads.ByBlockID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve block payload: %w", err)

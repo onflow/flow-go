@@ -208,7 +208,6 @@ func (suite *IngestTestSuite) TestHandleReceipt_MissingCollection() {
 	// mocks existing resources at the engine's disposal
 	//
 	// mocks the possession of 'suite.block` in the storage
-	suite.headerStorage.On("ByID", suite.block.ID()).Return(suite.block.Header, nil).Once()
 	suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil).Once()
 	// mocks the possession of chunk data pack associated with the `suite.block`
 	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true).Once()
