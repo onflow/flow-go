@@ -20,7 +20,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
-	followerfinalizer "github.com/dapperlabs/flow-go/module/finalizer/follower"
+	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/signature"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
@@ -96,7 +96,7 @@ func main() {
 
 			// create a finalizer that will handle updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := followerfinalizer.NewFinalizer(node.DB)
+			final := finalizer.NewFinalizer(node.DB, node.Headers, node.Payloads, node.Proto)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)

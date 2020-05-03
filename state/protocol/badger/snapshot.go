@@ -71,15 +71,13 @@ func (s *Snapshot) Commit() (flow.StateCommitment, error) {
 // regardless of the order.
 func (s *Snapshot) Clusters() (*flow.ClusterList, error) {
 
-	nClusters := s.state.clusters
-
 	// get the node identities
 	identities, err := s.Identities(filter.HasRole(flow.RoleCollection))
 	if err != nil {
 		return nil, fmt.Errorf("could not get identities: %w", err)
 	}
 
-	return protocol.Clusters(nClusters, identities), nil
+	return protocol.Clusters(s.state.clusters, identities), nil
 }
 
 func (s *Snapshot) Head() (*flow.Header, error) {

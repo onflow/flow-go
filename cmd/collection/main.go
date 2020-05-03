@@ -25,7 +25,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/collection"
 	colfinalizer "github.com/dapperlabs/flow-go/module/finalizer/collection"
-	followerfinalizer "github.com/dapperlabs/flow-go/module/finalizer/follower"
+	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/ingress"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
@@ -126,7 +126,7 @@ func main() {
 
 			// create a finalizer that will handling updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := followerfinalizer.NewFinalizer(node.DB)
+			final := finalizer.NewFinalizer(node.DB, node.Headers, node.Payloads, node.Proto)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)

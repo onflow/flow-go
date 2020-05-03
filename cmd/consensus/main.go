@@ -132,13 +132,15 @@ func main() {
 			}
 
 			// initialize the block builder
-			build := builder.NewBuilder(node.DB, guarantees, seals,
+			build := builder.NewBuilder(node.DB, node.Headers, node.Payloads, node.Seals, guarantees, seals,
 				builder.WithMinInterval(minInterval),
 				builder.WithMaxInterval(maxInterval),
 			)
 
 			// initialize the block finalizer
-			final := finalizer.NewFinalizer(node.DB, guarantees, seals)
+			finalize := finalizer.NewFinalizer(node.DB, node.Headers, node.Payloads, node.Proto,
+				finalizer.WithCleanup(finalizer.CleanupMempools(node.Payloads, guarantees, seals)),
+			)
 
 			// initialize the aggregating signature module for staking signatures
 			staking := signature.NewAggregationProvider(encoding.ConsensusVoteTag, node.Me)
@@ -156,7 +158,7 @@ func main() {
 			}
 
 			// initialize the combined signer for hotstuff
-			signer := verification.NewCombinedSigner(committee, node.DKG, staking, beacon, merger, node.Me.NodeID())
+			signer := verification.NewCombinedSigner(committee, node.DKG, staking, beacon, merger, node.NodeID)
 
 			// initialize a logging notifier for hotstuff
 			notifier := consensus.CreateNotifier(node.Logger, node.Metrics, node.Guarantees, node.Seals)
@@ -172,7 +174,7 @@ func main() {
 
 			// initialize hotstuff consensus algorithm
 			hot, err := consensus.NewParticipant(
-				node.Logger, notifier, node.Metrics, node.Headers, committee, build, final,
+				node.Logger, notifier, node.Metrics, node.Headers, committee, build, finalize,
 				persist, signer, comp, node.GenesisBlock.Header, node.GenesisQC,
 				finalized, pending,
 				consensus.WithTimeout(hotstuffTimeout),

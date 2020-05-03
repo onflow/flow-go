@@ -21,12 +21,20 @@ func withStore(store storeFunc) func(*Cache) {
 	}
 }
 
+func noStore(flow.Identifier, interface{}) error {
+	return fmt.Errorf("no store function for cache put available")
+}
+
 type retrieveFunc func(flow.Identifier) (interface{}, error)
 
 func withRetrieve(retrieve retrieveFunc) func(*Cache) {
 	return func(c *Cache) {
 		c.retrieve = retrieve
 	}
+}
+
+func noRetrieve(flow.Identifier) (interface{}, error) {
+	return nil, fmt.Errorf("no retrieve function for cach get available")
 }
 
 type Cache struct {
@@ -39,6 +47,8 @@ type Cache struct {
 
 func newCache(options ...func(*Cache)) *Cache {
 	c := Cache{
+		store:    noStore,
+		retrieve: noRetrieve,
 		entities: make(map[flow.Identifier]interface{}),
 		limit:    1000,
 	}
@@ -60,11 +70,6 @@ func (c *Cache) Get(entityID flow.Identifier) (interface{}, error) {
 		return entity, nil
 	}
 
-	// if we don't have a retrieve function, fail
-	if c.retrieve == nil {
-		return nil, fmt.Errorf("no retrieve function for cache miss")
-	}
-
 	// get it from the database
 	entity, err := c.retrieve(entityID)
 	if err != nil {
@@ -82,11 +87,6 @@ func (c *Cache) Get(entityID flow.Identifier) (interface{}, error) {
 func (c *Cache) Put(entityID flow.Identifier, entity interface{}) error {
 	c.Lock()
 	defer c.Unlock()
-
-	// if there is no store function, fail
-	if c.store == nil {
-		return fmt.Errorf("no store function for cache put")
-	}
 
 	// try to store the entity
 	err := c.store(entityID, entity)

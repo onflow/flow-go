@@ -91,12 +91,7 @@ func (s *State) AtHeight(height uint64) protocol.Snapshot {
 		return &Snapshot{err: err}
 	}
 
-	snapshot := &Snapshot{
-		state:   s,
-		blockID: blockID,
-	}
-
-	return snapshot
+	return s.AtBlockID(blockID)
 }
 
 func (s *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {

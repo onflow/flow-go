@@ -12,7 +12,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 type Mutator struct {
@@ -103,9 +102,9 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 	// FIRST: Check that the header is a valid extension of the state; it should
 	// connect to the last finalized block.
 
-	candidate, err := m.state.headers.ByBlockID(blockID)
+	pending, err := m.state.headers.ByBlockID(blockID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve candidate header: %w", err)
+		return fmt.Errorf("could not retrieve pending header: %w", err)
 	}
 	var finalized uint64
 	err = m.state.db.View(operation.RetrieveFinalizedHeight(&finalized))
@@ -124,21 +123,26 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 	// 3) Check that the parent is not below the last finalized block.
 	// We will either run into one of the error conditions or break the loop when we
 	// managed to trace back all the way to the last finalized block.
-	height := candidate.Height
-	ancestorID := candidate.ParentID
+	height := pending.Height
+	chainID := pending.ChainID
+	ancestorID := pending.ParentID
 	for ancestorID != finalID {
 		ancestor, err := m.state.headers.ByBlockID(ancestorID)
 		if err != nil {
 			return fmt.Errorf("could not get block's ancestor from state (%x): %w", ancestorID, err)
 		}
+		if chainID != ancestor.ChainID {
+			return fmt.Errorf("pending block has invalid chain (pending: %s, parent: %s)", chainID, ancestor.ChainID)
+		}
 		if height != ancestor.Height+1 {
-			return fmt.Errorf("block needs height equal to ancestor height+1 (%d != %d+1)", height, ancestor.Height)
+			return fmt.Errorf("pending block has invalid height (pending: %d, parent: %d)", height, ancestor.Height)
 		}
 		if ancestor.Height < finalized {
-			return fmt.Errorf("block doesn't connect to finalized state (%d < %d), ancestorID (%v)", ancestor.Height, finalized, ancestorID)
+			return fmt.Errorf("pending block not connected to finalized state (ancestor: %d final: %d)", ancestor.Height, finalized)
 		}
-		ancestorID = ancestor.ParentID
 		height = ancestor.Height
+		chainID = ancestor.ChainID
+		ancestorID = ancestor.ParentID
 	}
 
 	// SECOND: Check that the payload has no identities; this is only allowed
@@ -303,58 +307,42 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	var finalID flow.Identifier
 	err = m.state.db.View(operation.LookupBlockHeight(finalized, &finalID))
 	if err != nil {
-		return fmt.Errorf("could not retrieve finalized header: %w", err)
+		return fmt.Errorf("could not retrieve final header: %w", err)
 	}
 
-	// retrieve the pending block
+	// get the pending block
 	pending, err := m.state.headers.ByBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve pending header: %w", err)
 	}
 
-	// Check to see if we are trying to finalize at a heigth that is already
-	// finalized; if so, compary the ID of the finalized block.
-	// 1) If it matches, this is a no-op.
-	// 2) If it doesn't match, this is an invalid operation.
-	if pending.Height <= finalized {
-		dup, err := m.state.headers.ByHeight(pending.Height)
+	// check that the head ID is the parent of the block we finalize
+	if pending.ParentID != finalID {
+		return fmt.Errorf("can't finalize non-child of chain head")
+	}
+
+	// execute the write operations
+	err = operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
+		err = operation.IndexBlockHeight(pending.Height, blockID)(tx)
 		if err != nil {
-			return fmt.Errorf("could not get non-pending alternative: %w", err)
+			return fmt.Errorf("could not insert number mapping: %w", err)
 		}
-		if dup.ID() != blockID {
-			return fmt.Errorf("cannot finalize conflicting state (height: %d, pending: %x, finalized: %x)", pending.Height, blockID, dup.ID())
+
+		// update the finalized boundary
+		err = operation.UpdateFinalizedHeight(pending.Height)(tx)
+		if err != nil {
+			return fmt.Errorf("could not update finalized boundary: %w", err)
 		}
 		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("could not execute finalization: %w", err)
 	}
 
-	// in order to validate the validity of all changes, we need to iterate
-	// through the blocks that need to be finalized from oldest to youngest;
-	// we thus start at the youngest and remember the intermediary steps
-	// while tracing back until we reach the finalized state
-	pendings := []*flow.Header{pending}
-
-	// create a copy of header for the loop to not change the header the slice above points to
-	ancestorID := pending.ParentID
-	for ancestorID != finalID {
-		ancestor, err := m.state.headers.ByBlockID(ancestorID)
-		if err != nil {
-			return fmt.Errorf("could not retrieve parent (%x): %w", ancestorID, err)
-		}
-		pendings = append(pendings, ancestor)
-		ancestorID = ancestor.ParentID
-	}
-
-	// now we can step backwards in order to go from oldest to youngest; for
-	// each header, we reconstruct the block and then apply the related
-	// changes to the protocol state
-	for i := len(pendings) - 1; i >= 0; i-- {
-
-		// Finalize the block
-		err = m.state.db.Update(procedure.FinalizeBlock(pendings[i].ID()))
-		if err != nil {
-			return fmt.Errorf("could not finalize block (%s): %w", pendings[i].ID(), err)
-		}
-	}
+	// NOTE: we don't want to prune forks that have become invalid here, so
+	// that we can keep validating entities and generating slashing
+	// challenges for some time - the pruning should happen some place else
+	// after a certain delay of blocks
 
 	return nil
 }

@@ -217,15 +217,13 @@ func (fnb *FlowNodeBuilder) initLogger() {
 	}
 	log = log.Level(lvl)
 
-	log.Info().Msg("initializing engine modules")
-
 	fnb.Logger = log
 }
 
 func (fnb *FlowNodeBuilder) initDatabase() {
 	//Pre-create DB path (Badger creates only one-level dirs)
 	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
-	fnb.MustNot(err).Msgf("could not create datadir %s", fnb.BaseConfig.datadir)
+	fnb.MustNot(err).Str("dir", fnb.BaseConfig.datadir).Msg("could not create datadir")
 
 	// we initialize the database with options that allow us to keep the maximum
 	// item size in the trie itself (up to 1MB) and where we keep all level zero
@@ -247,13 +245,13 @@ func (fnb *FlowNodeBuilder) initDatabase() {
 	fnb.MustNot(err).Msg("could not initialize max tracker")
 
 	fnb.DB = db
-	fnb.Identities = storage.NewIdentities(fnb.DB)
-	fnb.Headers = storage.NewHeaders(fnb.DB)
-	fnb.Payloads = storage.NewPayloads(fnb.DB)
-	fnb.Blocks = storage.NewBlocks(fnb.DB)
-	fnb.Guarantees = storage.NewGuarantees(fnb.DB)
-	fnb.Seals = storage.NewSeals(fnb.DB)
-	fnb.Commits = storage.NewCommits(fnb.DB)
+	fnb.Identities = storage.NewIdentities(db)
+	fnb.Headers = storage.NewHeaders(db)
+	fnb.Payloads = storage.NewPayloads(db)
+	fnb.Blocks = storage.NewBlocks(db)
+	fnb.Guarantees = storage.NewGuarantees(db)
+	fnb.Seals = storage.NewSeals(db)
+	fnb.Commits = storage.NewCommits(db)
 }
 
 func (fnb *FlowNodeBuilder) initMetrics() {
@@ -304,6 +302,8 @@ func (fnb *FlowNodeBuilder) initState() {
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
 		}
+
+		// TODO: this always needs to be available, so we need to persist it
 		fnb.DKG = wrapper.NewState(dkgPubData)
 
 		err = proto.Mutate().Bootstrap(fnb.GenesisCommit, fnb.GenesisBlock)
@@ -340,14 +340,10 @@ func (fnb *FlowNodeBuilder) initState() {
 	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
 	fnb.MustNot(err).Msg("could not parse node identifier")
 
-	allIdentities, err := proto.Final().Identities(filter.Any)
-	fnb.MustNot(err).Msg("could not retrieve finalized identities")
-	fnb.Logger.Debug().Msgf("known nodes: %v", allIdentities)
-
-	id, err := proto.Final().Identity(myID)
+	self, err := proto.Final().Identity(myID)
 	fnb.MustNot(err).Msg("could not get identity")
 
-	fnb.Me, err = local.New(id, fnb.stakingKey)
+	fnb.Me, err = local.New(self, fnb.stakingKey)
 	fnb.MustNot(err).Msg("could not initialize local")
 
 	fnb.Proto = proto
