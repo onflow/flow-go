@@ -4,6 +4,7 @@ services:
     image: prom/prometheus:latest
     volumes:
       - ./conf/prometheus.yaml:/etc/prometheus/prometheus.yaml
+      - ./targets.nodes.json:/etc/prometheus/targets.nodes.json
     command: "--config.file=/etc/prometheus/prometheus.yaml --storage.tsdb.path=/prometheus"
     ports:
       - 9090:9090

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -12,10 +13,13 @@ import (
 )
 
 const (
-	BootstrapDir          = "./bootstrap"
-	DockerComposeFile     = "./docker-compose.nodes.yml"
-	DefaultConsensusCount = 3
-	AccessAPIPort         = 3569
+	BootstrapDir             = "./bootstrap"
+	DockerComposeFile        = "./docker-compose.nodes.yml"
+	DockerComposeFileVersion = "3.7"
+	PrometheusTargetsFile    = "./targets.nodes.json"
+	DefaultConsensusCount    = 3
+	AccessAPIPort            = 3569
+	MetricsPort              = 8080
 )
 
 var consensusCount int
@@ -59,7 +63,14 @@ func main() {
 		panic(err)
 	}
 
-	err = WriteDockerComposeConfig(containers)
+	services := prepareServices(containers)
+
+	err = writeDockerComposeConfig(services)
+	if err != nil {
+		panic(err)
+	}
+
+	err = writePrometheusConfig(containers)
 	if err != nil {
 		panic(err)
 	}
@@ -88,83 +99,99 @@ type Service struct {
 	Ports   []string
 }
 
-func WriteDockerComposeConfig(containers []testnet.ContainerConfig) error {
-	f, err := os.OpenFile(DockerComposeFile, os.O_RDWR|os.O_CREATE, 0755)
-	if err != nil {
-		return err
-	}
-
-	// overwrite current file contents
-	err = f.Truncate(0)
-	if err != nil {
-		return err
-	}
-
-	_, err = f.Seek(0, 0)
-	if err != nil {
-		return err
-	}
-
+func prepareServices(containers []testnet.ContainerConfig) Services {
 	services := make(Services)
 
 	for _, container := range containers {
-		service := Service{
-			Build: struct {
-				Context    string
-				Dockerfile string
-				Args       map[string]string
-				Target     string
-			}{
-				Context:    "../../",
-				Dockerfile: "cmd/Dockerfile",
-				Args: map[string]string{
-					"TARGET": container.Role.String(),
-				},
-				Target: "production",
+		switch container.Role {
+		case flow.RoleCollection:
+			services[container.ContainerName] = prepareCollectionService(container)
+		case flow.RoleExecution:
+			services[container.ContainerName] = prepareExecutionService(container)
+		case flow.RoleAccess:
+			services[container.ContainerName] = prepareAccessService(container)
+		default:
+			services[container.ContainerName] = prepareService(container)
+		}
+	}
+
+	return services
+}
+
+func prepareService(container testnet.ContainerConfig) Service {
+	return Service{
+		Build: struct {
+			Context    string
+			Dockerfile string
+			Args       map[string]string
+			Target     string
+		}{
+			Context:    "../../",
+			Dockerfile: "cmd/Dockerfile",
+			Args: map[string]string{
+				"TARGET": container.Role.String(),
 			},
-			Command: []string{
-				fmt.Sprintf("--nodeid=%s", container.NodeID),
-				"--bootstrapdir=/bootstrap",
-				"--datadir=/flowdb",
-				"--loglevel=DEBUG",
-				"--nclusters=1",
-			},
-			Volumes: []string{
-				fmt.Sprintf("%s:/bootstrap", BootstrapDir),
-			},
-		}
+			Target: "production",
+		},
+		Command: []string{
+			fmt.Sprintf("--nodeid=%s", container.NodeID),
+			"--bootstrapdir=/bootstrap",
+			"--datadir=/flowdb",
+			"--loglevel=DEBUG",
+			"--nclusters=1",
+		},
+		Volumes: []string{
+			fmt.Sprintf("%s:/bootstrap", BootstrapDir),
+		},
+	}
+}
 
-		if container.Role == flow.RoleCollection {
-			service.Command = append(
-				service.Command,
-				fmt.Sprintf("--ingress-addr=%s:9000", container.ContainerName),
-			)
-		}
+func prepareCollectionService(container testnet.ContainerConfig) Service {
+	service := prepareService(container)
 
-		if container.Role == flow.RoleAccess {
-			service.Command = append(service.Command, []string{
-				fmt.Sprintf("--rpc-addr=%s:9000", container.ContainerName),
-				"--ingress-addr=collection_1:9000",
-				"--script-addr=execution_1:9000",
-			}...)
+	service.Command = append(
+		service.Command,
+		fmt.Sprintf("--ingress-addr=%s:9000", container.ContainerName),
+	)
 
-			service.Ports = []string{
-				fmt.Sprintf("%d:9000", AccessAPIPort),
-			}
-		}
+	return service
+}
 
-		if container.Role == flow.RoleExecution {
-			service.Command = append(
-				service.Command,
-				fmt.Sprintf("--rpc-addr=%s:9000", container.ContainerName),
-			)
-		}
+func prepareExecutionService(container testnet.ContainerConfig) Service {
+	service := prepareService(container)
 
-		services[container.ContainerName] = service
+	service.Command = append(
+		service.Command,
+		fmt.Sprintf("--rpc-addr=%s:9000", container.ContainerName),
+	)
+
+	return service
+}
+
+func prepareAccessService(container testnet.ContainerConfig) Service {
+	service := prepareService(container)
+
+	service.Command = append(service.Command, []string{
+		fmt.Sprintf("--rpc-addr=%s:9000", container.ContainerName),
+		"--ingress-addr=collection_1:9000",
+		"--script-addr=execution_1:9000",
+	}...)
+
+	service.Ports = []string{
+		fmt.Sprintf("%d:9000", AccessAPIPort),
+	}
+
+	return service
+}
+
+func writeDockerComposeConfig(services Services) error {
+	f, err := openAndTruncate(DockerComposeFile)
+	if err != nil {
+		return err
 	}
 
 	network := Network{
-		Version:  "3.7",
+		Version:  DockerComposeFileVersion,
 		Services: services,
 	}
 
@@ -176,4 +203,61 @@ func WriteDockerComposeConfig(containers []testnet.ContainerConfig) error {
 	}
 
 	return nil
+}
+
+type PrometheusServiceDiscovery []PromtheusTargets
+
+type PromtheusTargets struct {
+	Targets []string          `json:"targets"`
+	Labels  map[string]string `json:"labels"`
+}
+
+func writePrometheusConfig(containers []testnet.ContainerConfig) error {
+	f, err := openAndTruncate(PrometheusTargetsFile)
+	if err != nil {
+		return err
+	}
+
+	targets := make([]string, len(containers))
+	for i, container := range containers {
+		targets[i] = fmt.Sprintf("%s:%d", container.ContainerName, MetricsPort)
+	}
+
+	promServiceDisc := PrometheusServiceDiscovery{
+		PromtheusTargets{
+			Targets: targets,
+			Labels: map[string]string{
+				"job": "flow",
+			},
+		},
+	}
+
+	enc := json.NewEncoder(f)
+
+	err = enc.Encode(&promServiceDisc)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func openAndTruncate(filename string) (*os.File, error) {
+	f, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0755)
+	if err != nil {
+		return nil, err
+	}
+
+	// overwrite current file contents
+	err = f.Truncate(0)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = f.Seek(0, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	return f, nil
 }
