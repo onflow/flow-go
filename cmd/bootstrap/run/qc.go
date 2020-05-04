@@ -133,7 +133,7 @@ func NewProtocolState(block *flow.Block) (*protoBadger.State, *badger.DB, error)
 	}
 
 	opts := badger.
-		LSMOnlyOptions(dir).
+		DefaultOptions(dir).
 		WithKeepL0InMemory(true).
 		WithLogger(nil)
 

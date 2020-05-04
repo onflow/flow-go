@@ -230,7 +230,7 @@ func (fnb *FlowNodeBuilder) initDatabase() {
 	// tables in-memory as well; this slows down compaction and increases memory
 	// usage, but it improves overall performance and disk i/o
 	opts := badger.
-		LSMOnlyOptions(fnb.BaseConfig.datadir).
+		DefaultOptions(fnb.BaseConfig.datadir).
 		WithKeepL0InMemory(true).
 		WithLogger(nil)
 	db, err := badger.Open(opts)
