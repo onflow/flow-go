@@ -54,27 +54,22 @@ func TestExecutionFlow(t *testing.T) {
 		col2.ID(): col2,
 	}
 
-	block := &flow.Block{
-		Header: flow.Header{
-			ChainID:  genesis.ChainID,
-			ParentID: genesis.ID(),
-			View:     42,
-		},
-		Payload: flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{
-				{
-					CollectionID: col1.ID(),
-					SignerIDs:    []flow.Identifier{colID.NodeID},
-				},
-				{
-					CollectionID: col2.ID(),
-					SignerIDs:    []flow.Identifier{colID.NodeID},
-				},
+	block := unittest.BlockWithParentFixture(genesis.Header)
+	block.Header.View = 42
+	block.SetPayload(flow.Payload{
+		Guarantees: []*flow.CollectionGuarantee{
+			{
+				CollectionID: col1.ID(),
+				SignerIDs:    []flow.Identifier{colID.NodeID},
+			},
+			{
+				CollectionID: col2.ID(),
+				SignerIDs:    []flow.Identifier{colID.NodeID},
 			},
 		},
-	}
+	})
 
-	proposal := unittest.ProposalFromBlock(block)
+	proposal := unittest.ProposalFromBlock(&block)
 
 	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21)
 	defer exeNode.Done()
@@ -161,37 +156,24 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 
 	genesis := flow.Genesis(identities)
 
-	block2 := &flow.Block{
-		Header: flow.Header{
-			ChainID:    genesis.ChainID,
-			ParentID:   genesis.ID(),
-			View:       2,
-			Height:     2,
-			ProposerID: con1ID.ID(),
-		},
-	}
-	fork := &flow.Block{
-		Header: flow.Header{
-			ChainID:    genesis.ChainID,
-			ParentID:   genesis.ID(),
-			View:       2,
-			Height:     2,
-			ProposerID: con2ID.ID(),
-		},
-	}
-	block3 := &flow.Block{
-		Header: flow.Header{
-			ChainID:    genesis.ChainID,
-			ParentID:   block2.ID(),
-			View:       3,
-			Height:     3,
-			ProposerID: con2ID.ID(),
-		},
-	}
+	block2 := unittest.BlockWithParentFixture(genesis.Header)
+	block2.Header.View = 2
+	block2.Header.ProposerID = con1ID.ID()
+	block2.SetPayload(flow.Payload{})
 
-	proposal2 := unittest.ProposalFromBlock(block2)
-	proposal2alt := unittest.ProposalFromBlock(fork)
-	proposal3 := unittest.ProposalFromBlock(block3)
+	fork := unittest.BlockWithParentFixture(genesis.Header)
+	fork.Header.View = 2
+	fork.Header.ProposerID = con2ID.ID()
+	fork.SetPayload(flow.Payload{})
+
+	block3 := unittest.BlockWithParentFixture(block2.Header)
+	block3.Header.View = 3
+	block3.Header.ProposerID = con2ID.ID()
+	block3.SetPayload(flow.Payload{})
+
+	proposal2 := unittest.ProposalFromBlock(&block2)
+	proposal2alt := unittest.ProposalFromBlock(&fork)
+	proposal3 := unittest.ProposalFromBlock(&block3)
 
 	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21)
 
@@ -207,7 +189,7 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 		Run(func(args mock.Arguments) { actualCalls++ }).
 		Return(nil)
 
-	exeNode.AssertHighestExecutedBlock(t, &genesis.Header)
+	exeNode.AssertHighestExecutedBlock(t, genesis.Header)
 
 	exeNode.IngestionEngine.Submit(con1ID.NodeID, proposal2alt)
 	exeNode.IngestionEngine.Submit(con1ID.NodeID, proposal3) // block 3 cannot be executed if parent (block2 is missing)
@@ -217,7 +199,7 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 	exeNode.IngestionEngine.Submit(con1ID.NodeID, proposal2)
 	hub.Eventually(t, equal(6, &actualCalls)) // now block 3 and 2 can be executed
 
-	exeNode.AssertHighestExecutedBlock(t, &block3.Header)
+	exeNode.AssertHighestExecutedBlock(t, block3.Header)
 
 	consensusEngine.AssertExpectations(t)
 
@@ -242,42 +224,29 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	// transaction that will change state and succeed, used to test that state commitment changes
 	tx1 := execTestutil.DeployCounterContractTransaction()
 	col1 := flow.Collection{Transactions: []*flow.TransactionBody{&tx1}}
-	block2 := &flow.Block{
-		Header: flow.Header{
-			ParentID:   genesis.ID(),
-			ChainID:    genesis.ChainID,
-			View:       2,
-			Height:     2,
-			ProposerID: conID.ID(),
+	block2 := unittest.BlockWithParentFixture(genesis.Header)
+	block2.Header.View = 2
+	block2.Header.ProposerID = conID.ID()
+	block2.SetPayload(flow.Payload{
+		Guarantees: []*flow.CollectionGuarantee{
+			{CollectionID: col1.ID(), SignerIDs: []flow.Identifier{colID.NodeID}},
 		},
-		Payload: flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{
-				{CollectionID: col1.ID(), SignerIDs: []flow.Identifier{colID.NodeID}},
-			},
-		},
-	}
-	block2.PayloadHash = block2.Payload.Hash()
-	proposal2 := unittest.ProposalFromBlock(block2)
+	})
+
+	proposal2 := unittest.ProposalFromBlock(&block2)
 
 	// transaction that will change state but then panic and revert, used to test that state commitment stays identical
 	tx2 := execTestutil.CreateCounterPanicTransaction()
 	col2 := flow.Collection{Transactions: []*flow.TransactionBody{&tx2}}
-	block3 := &flow.Block{
-		Header: flow.Header{
-			ParentID:   block2.ID(),
-			ChainID:    genesis.ChainID,
-			View:       3,
-			Height:     3,
-			ProposerID: conID.ID(),
+	block3 := unittest.BlockWithParentFixture(block2.Header)
+	block3.Header.View = 3
+	block3.Header.ProposerID = conID.ID()
+	block3.SetPayload(flow.Payload{
+		Guarantees: []*flow.CollectionGuarantee{
+			{CollectionID: col2.ID(), SignerIDs: []flow.Identifier{colID.NodeID}},
 		},
-		Payload: flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{
-				{CollectionID: col2.ID(), SignerIDs: []flow.Identifier{colID.NodeID}},
-			},
-		},
-	}
-	block3.PayloadHash = block3.Payload.Hash()
-	proposal3 := unittest.ProposalFromBlock(block3)
+	})
+	proposal3 := unittest.ProposalFromBlock(&block3)
 
 	// setup mocks and assertions
 	collectionNode := testutil.GenericNode(t, hub, colID, identities)
@@ -323,7 +292,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	// esure block has been executed
 	hub.Eventually(t, equal(1, &receiptsReceived))
-	exe1Node.AssertHighestExecutedBlock(t, &block2.Header)
+	exe1Node.AssertHighestExecutedBlock(t, block2.Header)
 	scExe1Genesis, err := exe1Node.ExecutionState.StateCommitmentByBlockID(genesis.ID())
 	assert.NoError(t, err)
 	scExe1Block2, err := exe1Node.ExecutionState.StateCommitmentByBlockID(block2.ID())
@@ -333,7 +302,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	// start execution node 2 with sync threshold 0 so it starts state sync right away
 	exe2Node := testutil.ExecutionNode(t, hub, exe2ID, identities, 0)
 	defer exe2Node.Done()
-	exe2Node.AssertHighestExecutedBlock(t, &genesis.Header)
+	exe2Node.AssertHighestExecutedBlock(t, genesis.Header)
 
 	// submit block3 from consensus node to execution node 2 (who does not have block2), but not to execution node 1
 	exe2Node.IngestionEngine.Submit(conID.NodeID, proposal3)
@@ -342,8 +311,8 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	hub.Eventually(t, equal(3, &receiptsReceived))
 
 	// ensure state has been synced across both nodes
-	exe1Node.AssertHighestExecutedBlock(t, &block2.Header)
-	exe2Node.AssertHighestExecutedBlock(t, &block3.Header)
+	exe1Node.AssertHighestExecutedBlock(t, block2.Header)
+	exe2Node.AssertHighestExecutedBlock(t, block3.Header)
 
 	// verify state commitment is the same across nodes
 	scExe2Block2, err := exe2Node.ExecutionState.StateCommitmentByBlockID(block2.ID())
@@ -371,14 +340,10 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 
 	genesis := flow.Genesis(identities)
 
-	block := &flow.Block{
-		Header: flow.Header{
-			ParentID: genesis.ID(),
-			ChainID:  genesis.ChainID,
-			View:     42,
-		},
-	}
-	proposal := unittest.ProposalFromBlock(block)
+	block := unittest.BlockWithParentFixture(genesis.Header)
+	block.Header.View = 42
+	block.SetPayload(flow.Payload{})
+	proposal := unittest.ProposalFromBlock(&block)
 
 	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21)
 	defer exeNode.Done()

@@ -76,7 +76,7 @@ func TestInvalidTransaction(t *testing.T) {
 			require.Nil(t, err)
 			err = node.DB.Update(procedure.FinalizeBlock(next.ID()))
 			require.Nil(t, err)
-			parent = &next.Header
+			parent = next.Header
 		}
 
 		tx := unittest.TransactionBodyFixture()

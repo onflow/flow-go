@@ -56,8 +56,8 @@ func NewBuilder(db *badger.DB, transactions mempool.Transactions) *Builder {
 
 // BuildOn creates a new block built on the given parent. It produces a payload
 // that is valid with respect to the un-finalized chain it extends.
-func (builder *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (*flow.Header, error) {
-	var header *flow.Header
+func (builder *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
+	var proposal *flow.Header
 	err := builder.db.Update(func(tx *badger.Txn) error {
 
 		// retrieve a set of non-expired transactions from the mempool
@@ -133,7 +133,7 @@ func (builder *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Head
 		// build the payload from the transactions
 		payload := cluster.PayloadFromTransactions(colRefID, validTransactions...)
 
-		header = &flow.Header{
+		proposal = &flow.Header{
 			ChainID:     parent.ChainID,
 			ParentID:    parentID,
 			Height:      parent.Height + 1,
@@ -149,23 +149,26 @@ func (builder *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Head
 		}
 
 		// set fields specific to the consensus algorithm
-		setter(header)
+		err = setter(proposal)
+		if err != nil {
+			return fmt.Errorf("could not set fields to header: %w", err)
+		}
 
 		// insert the header for the newly built block
-		err = operation.InsertHeader(header)(tx)
+		err = operation.InsertHeader(proposal)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert cluster header: %w", err)
 		}
 
 		// insert the payload
 		// this inserts the collection AND all constituent transactions
-		err = procedure.InsertClusterPayload(header, &payload)(tx)
+		err = procedure.InsertClusterPayload(proposal, &payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert cluster payload: %w", err)
 		}
 
 		// index the payload by block ID
-		err = procedure.IndexClusterPayload(header, &payload)(tx)
+		err = procedure.IndexClusterPayload(proposal, &payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index cluster payload: %w", err)
 		}
@@ -176,7 +179,7 @@ func (builder *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Head
 		return nil, fmt.Errorf("could not build block: %w", err)
 	}
 
-	return header, nil
+	return proposal, nil
 }
 
 // getCandidateTransactions creates a set of candidate transactions from the

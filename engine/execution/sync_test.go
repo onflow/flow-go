@@ -48,81 +48,53 @@ func TestSyncFlow(t *testing.T) {
 	col4 := flow.Collection{Transactions: []*flow.TransactionBody{&tx4}}
 
 	//Create three blocks, with one tx each
-	block1 := &flow.Block{
-		Header: flow.Header{
-			ChainID:  genesis.ChainID,
-			ParentID: genesis.ID(),
-			View:     42,
-			Height:   1,
-		},
-		Payload: flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{
-				{
-					CollectionID: col1.ID(),
-					SignerIDs:    []flow.Identifier{colID.NodeID},
-				},
+	block1 := unittest.BlockWithParentFixture(genesis.Header)
+	block1.Header.View = 42
+	block1.SetPayload(flow.Payload{
+		Guarantees: []*flow.CollectionGuarantee{
+			{
+				CollectionID: col1.ID(),
+				SignerIDs:    []flow.Identifier{colID.NodeID},
 			},
 		},
-	}
-	block1.PayloadHash = block1.Payload.Hash()
+	})
 
-	block2 := &flow.Block{
-		Header: flow.Header{
-			ChainID:  genesis.ChainID,
-			ParentID: block1.ID(),
-			View:     44,
-			Height:   2,
-		},
-		Payload: flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{
-				{
-					CollectionID: col2.ID(),
-					SignerIDs:    []flow.Identifier{colID.NodeID},
-				},
+	block2 := unittest.BlockWithParentFixture(block1.Header)
+	block2.Header.View = 44
+	block2.SetPayload(flow.Payload{
+		Guarantees: []*flow.CollectionGuarantee{
+			{
+				CollectionID: col2.ID(),
+				SignerIDs:    []flow.Identifier{colID.NodeID},
 			},
 		},
-	}
-	block2.PayloadHash = block2.Payload.Hash()
+	})
 
-	block3 := &flow.Block{
-		Header: flow.Header{
-			ChainID:  genesis.ChainID,
-			ParentID: block2.ID(),
-			View:     45,
-			Height:   3,
-		},
-		Payload: flow.Payload{},
-	}
-	block3.PayloadHash = block3.Payload.Hash()
+	block3 := unittest.BlockWithParentFixture(block2.Header)
+	block3.Header.View = 45
+	block3.SetPayload(flow.Payload{})
 
-	block4 := &flow.Block{
-		Header: flow.Header{
-			ChainID:  genesis.ChainID,
-			ParentID: block3.ID(),
-			View:     46,
-			Height:   4,
-		},
-		Payload: flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{
-				{
-					CollectionID: col4.ID(),
-					SignerIDs:    []flow.Identifier{colID.NodeID},
-				},
+	block4 := unittest.BlockWithParentFixture(block3.Header)
+	block4.Header.View = 46
+	block4.SetPayload(flow.Payload{
+		Guarantees: []*flow.CollectionGuarantee{
+			{
+				CollectionID: col4.ID(),
+				SignerIDs:    []flow.Identifier{colID.NodeID},
 			},
 		},
-	}
-	block4.PayloadHash = block4.Payload.Hash()
+	})
 
-	proposal1 := unittest.ProposalFromBlock(block1)
-	proposal2 := unittest.ProposalFromBlock(block2)
-	proposal3 := unittest.ProposalFromBlock(block3)
-	proposal4 := unittest.ProposalFromBlock(block4)
+	proposal1 := unittest.ProposalFromBlock(&block1)
+	proposal2 := unittest.ProposalFromBlock(&block2)
+	proposal3 := unittest.ProposalFromBlock(&block3)
+	proposal4 := unittest.ProposalFromBlock(&block4)
 
-	fmt.Printf("block0 ID %x parent %x\n", genesis.ID(), genesis.ParentID)
-	fmt.Printf("block1 ID %x parent %x\n", block1.ID(), block1.ParentID)
-	fmt.Printf("block2 ID %x parent %x\n", block2.ID(), block2.ParentID)
-	fmt.Printf("block3 ID %x parent %x\n", block3.ID(), block3.ParentID)
-	fmt.Printf("block4 ID %x parent %x\n", block4.ID(), block4.ParentID)
+	fmt.Printf("block0 ID %x parent %x\n", genesis.ID(), genesis.Header.ParentID)
+	fmt.Printf("block1 ID %x parent %x\n", block1.ID(), block1.Header.ParentID)
+	fmt.Printf("block2 ID %x parent %x\n", block2.ID(), block2.Header.ParentID)
+	fmt.Printf("block3 ID %x parent %x\n", block3.ID(), block3.Header.ParentID)
+	fmt.Printf("block4 ID %x parent %x\n", block4.ID(), block4.Header.ParentID)
 
 	collectionEngine := new(network.Engine)
 	colConduit, _ := collectionNode.Net.Register(engine.CollectionProvider, collectionEngine)
@@ -169,8 +141,8 @@ func TestSyncFlow(t *testing.T) {
 	})
 
 	// make sure exe1 didn't get any blocks
-	exeNode1.AssertHighestExecutedBlock(t, &genesis.Header)
-	exeNode2.AssertHighestExecutedBlock(t, &block2.Header)
+	exeNode1.AssertHighestExecutedBlock(t, genesis.Header)
+	exeNode2.AssertHighestExecutedBlock(t, block2.Header)
 
 	// submit block3 and block4 to exe1 which should trigger sync
 	exeNode1.IngestionEngine.Submit(conID.NodeID, proposal3)

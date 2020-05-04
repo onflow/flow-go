@@ -47,11 +47,11 @@ func GenerateGenesisQC(participantData ParticipantData, block *flow.Block) (*mod
 
 	hotBlock := model.Block{
 		BlockID:     block.ID(),
-		View:        block.View,
-		ProposerID:  block.ProposerID,
+		View:        block.Header.View,
+		ProposerID:  block.Header.ProposerID,
 		QC:          nil,
-		PayloadHash: block.PayloadHash,
-		Timestamp:   block.Timestamp,
+		PayloadHash: block.Header.PayloadHash,
+		Timestamp:   block.Header.Timestamp,
 	}
 
 	votes := make([]*model.Vote, 0, len(signers))

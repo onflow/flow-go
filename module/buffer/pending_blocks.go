@@ -60,3 +60,11 @@ func (b *PendingBlocks) DropForParent(parent *flow.Header) {
 	}
 	b.backend.dropForParent(parent.ID())
 }
+
+func (b *PendingBlocks) PruneByHeight(height uint64) {
+	b.backend.pruneByHeight(height)
+}
+
+func (b *PendingBlocks) Size() uint {
+	return uint(len(b.backend.byID))
+}

@@ -23,7 +23,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-var noopSetter = func(*flow.Header) {}
+var noopSetter = func(*flow.Header) error { return nil }
 
 type BuilderSuite struct {
 	suite.Suite
@@ -51,12 +51,13 @@ func (suite *BuilderSuite) SetupTest() {
 	rand.Seed(time.Now().UnixNano())
 
 	suite.genesis = model.Genesis()
-	suite.chainID = suite.genesis.ChainID
+	suite.chainID = suite.genesis.Header.ChainID
 
 	suite.pool, err = stdmap.NewTransactions(1000)
 	suite.Require().Nil(err)
 
-	suite.db, suite.dbdir = unittest.TempBadgerDB(suite.T())
+	suite.dbdir = unittest.TempDir(suite.T())
+	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
 
 	suite.state, err = clusterkv.NewState(suite.db, suite.chainID)
 	suite.Require().Nil(err)
@@ -138,8 +139,9 @@ func (suite *BuilderSuite) TestBuildOn_NonExistentParent() {
 func (suite *BuilderSuite) TestBuildOn_Success() {
 
 	var expectedHeight uint64 = 42
-	setter := func(h *flow.Header) {
+	setter := func(h *flow.Header) error {
 		h.Height = expectedHeight
+		return nil
 	}
 
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), setter)
@@ -152,7 +154,7 @@ func (suite *BuilderSuite) TestBuildOn_Success() {
 	var built model.Block
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
 	suite.Assert().Nil(err)
-	builtCollection := built.Collection
+	builtCollection := built.Payload.Collection
 
 	// payload should include only items from mempool
 	mempoolTransactions := suite.pool.All()
@@ -192,7 +194,7 @@ func (suite *BuilderSuite) TestBuildOn_WithForks() {
 	var built model.Block
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
 	assert.Nil(t, err)
-	builtCollection := built.Collection
+	builtCollection := built.Payload.Collection
 
 	// payload should include ONLY tx2 and tx3
 	assert.Len(t, builtCollection.Transactions, 2)
@@ -215,14 +217,14 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 	finalizedBlock := unittest.ClusterBlockWithParent(suite.genesis)
 	finalizedBlock.SetPayload(finalizedPayload)
 	suite.InsertBlock(finalizedBlock)
-	t.Logf("finalized: id=%s\tparent_id=%s\theight=%d\n", finalizedBlock.ID(), finalizedBlock.ParentID, finalizedBlock.Height)
+	t.Logf("finalized: id=%s\tparent_id=%s\theight=%d\n", finalizedBlock.ID(), finalizedBlock.Header.ParentID, finalizedBlock.Header.Height)
 
 	// build a block containing tx2 on the first block
 	unFinalizedPayload := suite.Payload(tx2)
 	unFinalizedBlock := unittest.ClusterBlockWithParent(&finalizedBlock)
 	unFinalizedBlock.SetPayload(unFinalizedPayload)
 	suite.InsertBlock(unFinalizedBlock)
-	t.Logf("unfinalized: id=%s\tparent_id=%s\theight=%d\n", unFinalizedBlock.ID(), unFinalizedBlock.ParentID, unFinalizedBlock.Height)
+	t.Logf("unfinalized: id=%s\tparent_id=%s\theight=%d\n", unFinalizedBlock.ID(), unFinalizedBlock.Header.ParentID, unFinalizedBlock.Header.Height)
 
 	// finalize first block
 	err := suite.db.Update(procedure.FinalizeClusterBlock(finalizedBlock.ID()))
@@ -236,7 +238,7 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 	var built model.Block
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
 	assert.Nil(t, err)
-	builtCollection := built.Collection
+	builtCollection := built.Payload.Collection
 
 	// payload should only contain tx3
 	assert.Len(t, builtCollection.Light().Transactions, 1)
@@ -263,14 +265,14 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingInvalidatedForks() {
 	finalizedBlock.SetPayload(finalizedPayload)
 
 	suite.InsertBlock(finalizedBlock)
-	t.Logf("finalized: id=%s\tparent_id=%s\theight=%d\n", finalizedBlock.ID(), finalizedBlock.ParentID, finalizedBlock.Height)
+	t.Logf("finalized: id=%s\tparent_id=%s\theight=%d\n", finalizedBlock.ID(), finalizedBlock.Header.ParentID, finalizedBlock.Header.Height)
 
 	// build a block containing tx2 ALSO on genesis - will be invalidated
 	invalidatedPayload := suite.Payload(tx2)
 	invalidatedBlock := unittest.ClusterBlockWithParent(suite.genesis)
 	invalidatedBlock.SetPayload(invalidatedPayload)
 	suite.InsertBlock(invalidatedBlock)
-	t.Logf("invalidated: id=%s\tparent_id=%s\theight=%d\n", invalidatedBlock.ID(), invalidatedBlock.ParentID, invalidatedBlock.Height)
+	t.Logf("invalidated: id=%s\tparent_id=%s\theight=%d\n", invalidatedBlock.ID(), invalidatedBlock.Header.ParentID, invalidatedBlock.Header.Height)
 
 	// finalize first block - this indirectly invalidates the second block
 	err := suite.db.Update(procedure.FinalizeClusterBlock(finalizedBlock.ID()))
@@ -284,7 +286,7 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingInvalidatedForks() {
 	var built model.Block
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
 	assert.Nil(t, err)
-	builtCollection := built.Collection
+	builtCollection := built.Payload.Collection
 
 	// tx2 and tx3 should be in the built collection
 	assert.Len(t, builtCollection.Light().Transactions, 2)
@@ -338,7 +340,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 		// conflicting fork, build on the parent of the head
 		parent := head
 		if conflicting {
-			err = suite.db.View(procedure.RetrieveClusterBlock(parent.ParentID, &parent))
+			err = suite.db.View(procedure.RetrieveClusterBlock(parent.Header.ParentID, &parent))
 			assert.Nil(t, err)
 			// add the transaction to the invalidated list
 			invalidatedTxIds = append(invalidatedTxIds, tx.ID())
@@ -368,7 +370,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 	var built model.Block
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
 	require.Nil(t, err)
-	builtCollection := built.Collection
+	builtCollection := built.Payload.Collection
 
 	// payload should only contain transactions from invalidated blocks
 	assert.Len(t, builtCollection.Transactions, len(invalidatedTxIds), "expected len=%d, got len=%d", len(invalidatedTxIds), len(builtCollection.Transactions))
@@ -391,7 +393,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 			suite.Require().Nil(err)
 			return nil
 		})
-		head = &block.Header
+		head = block.Header
 	}
 
 	// reset the pool and builder
@@ -426,7 +428,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 	var built model.Block
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
 	suite.Require().Nil(err)
-	builtCollection := built.Collection
+	builtCollection := built.Payload.Collection
 
 	// the block should only contain the un-expired transaction
 	suite.Assert().False(collectionContains(builtCollection, tx1.ID()))
@@ -477,12 +479,13 @@ func benchmarkBuildOn(b *testing.B, size int) {
 	{
 		var err error
 		suite.genesis = model.Genesis()
-		suite.chainID = suite.genesis.ChainID
+		suite.chainID = suite.genesis.Header.ChainID
 
 		suite.pool, err = stdmap.NewTransactions(1000)
 		assert.Nil(b, err)
 
-		suite.db, suite.dbdir = unittest.TempBadgerDB(b)
+		suite.dbdir = unittest.TempDir(b)
+		suite.db = unittest.BadgerDB(b, suite.dbdir)
 		defer func() {
 			err = suite.db.Close()
 			assert.Nil(b, err)

@@ -23,13 +23,13 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 	return m.state.db.Update(func(tx *badger.Txn) error {
 
 		// check that the genesis block is valid
-		err := checkGenesisHeader(&genesis.Header)
+		err := checkGenesisHeader(genesis.Header)
 		if err != nil {
 			return fmt.Errorf("genesis header not valid: %w", err)
 		}
 
 		// check that the new identities are valid
-		err = checkGenesisPayload(tx, &genesis.Payload)
+		err = checkGenesisPayload(tx, genesis.Payload)
 		if err != nil {
 			return fmt.Errorf("genesis identities not valid: %w", err)
 		}
@@ -50,7 +50,7 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 			}
 
 			// check the header validity
-			err = checkExtendHeader(tx, &block.Header)
+			err = checkExtendHeader(tx, block.Header)
 			if err != nil {
 				return fmt.Errorf("extend header not valid: %w", err)
 			}
@@ -70,7 +70,7 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 
 			// create a lookup for all seals by the parent of the block they sealed
 			byParent := make(map[flow.Identifier]*flow.Seal)
-			for _, seal := range block.Seals {
+			for _, seal := range block.Payload.Seals {
 				var header flow.Header
 				err = operation.RetrieveHeader(seal.BlockID, &header)(tx)
 				if err != nil {
@@ -80,13 +80,13 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 			}
 
 			// no two seals should have the same parent block
-			if len(block.Seals) > len(byParent) {
+			if len(block.Payload.Seals) > len(byParent) {
 				return fmt.Errorf("multiple seals have the same parent block")
 			}
 
 			// start at the parent seal to extend execution state
 			lastSeal := &flow.Seal{}
-			err = procedure.LookupSealByBlock(block.ParentID, lastSeal)(tx)
+			err = procedure.LookupSealByBlock(block.Header.ParentID, lastSeal)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve parent seal: %w", err)
 			}
