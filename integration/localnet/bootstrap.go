@@ -277,15 +277,15 @@ func writeDockerComposeConfig(services Services) error {
 	return nil
 }
 
-type PrometheusServiceDiscovery []PromtheusTargets
+type PrometheusServiceDiscovery []PromtheusTargetList
 
-type PromtheusTargets struct {
+type PromtheusTargetList struct {
 	Targets []string          `json:"targets"`
 	Labels  map[string]string `json:"labels"`
 }
 
-func newPrometheusTarget(role flow.Role) PromtheusTargets {
-	return PromtheusTargets{
+func newPrometheusTargetList(role flow.Role) PromtheusTargetList {
+	return PromtheusTargetList{
 		Targets: make([]string, 0),
 		Labels: map[string]string{
 			"job":  "flow",
@@ -295,12 +295,12 @@ func newPrometheusTarget(role flow.Role) PromtheusTargets {
 }
 
 func prepareServiceDiscovery(containers []testnet.ContainerConfig) PrometheusServiceDiscovery {
-	targets := map[flow.Role]PromtheusTargets{
-		flow.RoleCollection:   newPrometheusTarget(flow.RoleCollection),
-		flow.RoleConsensus:    newPrometheusTarget(flow.RoleConsensus),
-		flow.RoleExecution:    newPrometheusTarget(flow.RoleExecution),
-		flow.RoleVerification: newPrometheusTarget(flow.RoleVerification),
-		flow.RoleAccess:       newPrometheusTarget(flow.RoleAccess),
+	targets := map[flow.Role]PromtheusTargetList{
+		flow.RoleCollection:   newPrometheusTargetList(flow.RoleCollection),
+		flow.RoleConsensus:    newPrometheusTargetList(flow.RoleConsensus),
+		flow.RoleExecution:    newPrometheusTargetList(flow.RoleExecution),
+		flow.RoleVerification: newPrometheusTargetList(flow.RoleVerification),
+		flow.RoleAccess:       newPrometheusTargetList(flow.RoleAccess),
 	}
 
 	for _, container := range containers {
