@@ -179,7 +179,7 @@ func (r *LedgerDAL) CreateAccountInLedger(publicKeys []flow.AccountPublicKey) (f
 }
 
 func (r *LedgerDAL) SetAccountPublicKeys(accountID []byte, publicKeys []flow.AccountPublicKey) error {
-	var existingCount int
+	var existingCount uint64
 
 	countBytes, err := r.Ledger.Get(
 		fullKeyHash(string(accountID), string(accountID), keyPublicKeyCount),
@@ -189,34 +189,29 @@ func (r *LedgerDAL) SetAccountPublicKeys(accountID []byte, publicKeys []flow.Acc
 	}
 
 	if countBytes != nil {
-		existingCount = int(new(big.Int).SetBytes(countBytes).Int64())
+		countInt := new(big.Int).SetBytes(countBytes)
+		if !countInt.IsUint64() {
+			return fmt.Errorf("retrieved public key account bytes (hex): %x do not represent valid uint64", countBytes)
+		}
+		existingCount = countInt.Uint64()
 	} else {
 		existingCount = 0
 	}
 
-	newCount := len(publicKeys)
+	newCount := uint64(len(publicKeys))
+	newKeyCount := new(big.Int).SetUint64(newCount)
 
 	r.Ledger.Set(
 		fullKeyHash(string(accountID), string(accountID), keyPublicKeyCount),
-		big.NewInt(int64(newCount)).Bytes(),
+		newKeyCount.Bytes(),
 	)
 
 	for i, publicKey := range publicKeys {
-
-		//accountPublicKey, err := flow.DecodeAccountPublicKey(publicKey)
-		//if err != nil {
-		//	return err
-		//}
 
 		err = publicKey.Validate()
 		if err != nil {
 			return err
 		}
-
-		//fullAccountPublicKey, err := flow.EncodeAccountPublicKey(accountPublicKey)
-		//if err != nil {
-		//	return err
-		//}
 
 		publicKeyBytes, err := flow.EncodeAccountPublicKey(publicKey)
 		if err != nil {
@@ -228,7 +223,7 @@ func (r *LedgerDAL) SetAccountPublicKeys(accountID []byte, publicKeys []flow.Acc
 
 	// delete leftover keys
 	for i := newCount; i < existingCount; i++ {
-		r.Ledger.Delete(fullKeyHash(string(accountID), string(accountID), keyPublicKey(i)))
+		r.Ledger.Delete(fullKeyHash(string(accountID), string(accountID), keyPublicKey(int(i))))
 	}
 
 	return nil
