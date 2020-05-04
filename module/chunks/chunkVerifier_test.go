@@ -273,3 +273,11 @@ func (vm *virtualMachineMock) NewBlockContext(header *flow.Header) virtualmachin
 		header: header,
 	}
 }
+
+func (vm *virtualMachineMock) GetCache() virtualmachine.ASTCache {
+	cache, err := virtualmachine.NewLRUASTCache(1)
+	if err != nil {
+		return nil
+	}
+	return cache
+}

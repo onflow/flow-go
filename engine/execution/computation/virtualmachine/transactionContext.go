@@ -319,14 +319,6 @@ func (r *TransactionContext) EmitEvent(event cadence.Event) {
 	r.events = append(r.events, event)
 }
 
-func (r *TransactionContext) GetCachedProgram(runtime.Location) (*ast.Program, error) {
-	return nil, nil
-}
-
-func (r *TransactionContext) CacheProgram(runtime.Location, *ast.Program) error {
-	return nil
-}
-
 func (r *TransactionContext) GenerateUUID() uint64 {
 	defer func() { r.uuid++ }()
 	return r.uuid

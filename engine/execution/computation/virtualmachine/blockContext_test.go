@@ -127,7 +127,8 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 
 	h := unittest.BlockHeaderFixture()
 
-	vm := virtualmachine.New(rt)
+	vm, err := virtualmachine.New(rt)
+	assert.NoError(t, err)
 	bc := vm.NewBlockContext(&h)
 
 	arg1, _ := jsoncdc.Encode(cadence.NewInt(42))
@@ -172,8 +173,8 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 		{
 			label: "parameters and authorizer",
 			script: `
-				transaction(x: Int, y: String) { 
-					prepare(acct: AuthAccount) { log(acct.address) } 
+				transaction(x: Int, y: String) {
+					prepare(acct: AuthAccount) { log(acct.address) }
 					execute { log(x); log(y) }
 				}`,
 			args:        [][]byte{arg1, arg2},
