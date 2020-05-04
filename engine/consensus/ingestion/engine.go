@@ -3,6 +3,7 @@
 package ingestion
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -12,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -26,6 +28,9 @@ type Engine struct {
 	prop    network.Engine // used to process & propagate collections
 	state   protocol.State // used to access the  protocol state
 	me      module.Local   // used to access local node information
+	// the number of blocks that can be between the reference block and the
+	// finalized head before we consider the transaction expired
+	expiry uint64
 }
 
 // New creates a new collection propagation engine.
@@ -39,6 +44,9 @@ func New(log zerolog.Logger, net module.Network, prop network.Engine, state prot
 		prop:    prop,
 		state:   state,
 		me:      me,
+		// add 20 blocks of leeway -- this means a transaction has at minimum 20
+		// blocks to be included in a block before it expires
+		expiry: flow.DefaultTransactionExpiry - 20,
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -119,16 +127,22 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 
 	final := e.state.Final()
 
-	clusters, err := final.Clusters()
-	if err != nil {
-		return fmt.Errorf("could not get clusters: %w", err)
-	}
-
 	guarantors := guarantee.SignerIDs
 
 	// ensure there is at least one guarantor
 	if len(guarantors) == 0 {
 		return fmt.Errorf("invalid collection guarantee with no guarantors")
+	}
+
+	// ensure that collection has not expired
+	err := e.validateCollectionGuaranteeExpiry(guarantee, final)
+	if err != nil {
+		return err
+	}
+
+	clusters, err := final.Clusters()
+	if err != nil {
+		return fmt.Errorf("could not get clusters: %w", err)
 	}
 
 	cluster, ok := clusters.ByNodeID(guarantors[0])
@@ -174,6 +188,27 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	e.prop.SubmitLocal(guarantee)
 
 	e.metrics.StartCollectionToFinalized(guarantee.ID())
+
+	return nil
+}
+
+func (e *Engine) validateCollectionGuaranteeExpiry(guarantee *flow.CollectionGuarantee, snapshot protocol.Snapshot) error {
+
+	head, err := snapshot.Head()
+	if err != nil {
+		return fmt.Errorf("could not get finalized header: %w", err)
+	}
+
+	ref, err := e.state.AtBlockID(guarantee.ReferenceBlockID).Head()
+	if errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("collection guarantee refers to an unknown block: %x", guarantee.ReferenceBlockID)
+	}
+
+	// if head has advanced beyond the block referenced by the collection guarantee by more than 'expiry' number of blocks,
+	// then reject the collection
+	if head.Height > ref.Height && head.Height-ref.Height > e.expiry {
+		return fmt.Errorf("collection guarantee expired ref_height=%d final_height=%d", ref.Height, head.Height)
+	}
 
 	return nil
 }
