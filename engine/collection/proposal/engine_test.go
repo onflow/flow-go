@@ -50,7 +50,7 @@ type Suite struct {
 	payloads     *storage.ClusterPayloads
 	builder      *module.Builder
 	finalizer    *module.Finalizer
-	cache        *module.PendingClusterBlockBuffer
+	pending      *module.PendingClusterBlockBuffer
 	eng          *proposal.Engine
 	coldstuff    *module.ColdStuff
 }
@@ -102,10 +102,12 @@ func (suite *Suite) SetupTest() {
 	suite.payloads = new(storage.ClusterPayloads)
 	suite.builder = new(module.Builder)
 	suite.finalizer = new(module.Finalizer)
-	suite.cache = new(module.PendingClusterBlockBuffer)
+	suite.pending = new(module.PendingClusterBlockBuffer)
+	suite.pending.On("Size").Return(uint(0))
+	suite.pending.On("PruneByHeight", mock.Anything).Return()
 	suite.coldstuff = new(module.ColdStuff)
 
-	eng, err := proposal.New(log, suite.net, suite.me, suite.proto.state, suite.cluster.state, metrics, suite.validator, suite.pool, suite.transactions, suite.headers, suite.payloads, suite.cache)
+	eng, err := proposal.New(log, suite.net, suite.me, suite.proto.state, suite.cluster.state, metrics, suite.validator, suite.pool, suite.transactions, suite.headers, suite.payloads, suite.pending)
 	require.NoError(suite.T(), err)
 	suite.eng = eng.WithConsensus(suite.coldstuff)
 }
@@ -137,7 +139,7 @@ func (suite *Suite) TestHandleProposal() {
 	// should submit to consensus algo
 	suite.coldstuff.On("SubmitProposal", proposal.Header, parent.Header.View).Once()
 	// we don't have any cached children
-	suite.cache.On("ByParentID", block.ID()).Return(nil, false)
+	suite.pending.On("ByParentID", block.ID()).Return(nil, false)
 
 	err := suite.eng.Process(originID, proposal)
 	suite.Assert().Nil(err)
@@ -174,7 +176,7 @@ func (suite *Suite) TestHandleProposalWithUnknownValidTransactions() {
 	// should submit to consensus algo
 	suite.coldstuff.On("SubmitProposal", proposal.Header, parent.Header.View).Once()
 	// we don't have any cached children
-	suite.cache.On("ByParentID", block.ID()).Return(nil, false)
+	suite.pending.On("ByParentID", block.ID()).Return(nil, false)
 
 	err := suite.eng.Process(originID, proposal)
 	suite.Assert().Nil(err)
@@ -200,8 +202,8 @@ func (suite *Suite) TestHandlePendingProposal() {
 	suite.headers.On("ByBlockID", block.Header.ParentID).Return(nil, realstorage.ErrNotFound)
 	// should request parent block
 	suite.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-	suite.cache.On("Add", mock.Anything).Return(true).Once()
-	suite.cache.On("ByID", block.Header.ParentID).Return(nil, false)
+	suite.pending.On("Add", mock.Anything).Return(true).Once()
+	suite.pending.On("ByID", block.Header.ParentID).Return(nil, false)
 
 	err := suite.eng.Process(originID, proposal)
 	suite.Assert().Nil(err)
@@ -235,9 +237,9 @@ func (suite *Suite) TestHandlePendingProposalWithPendingParent() {
 	suite.headers.On("ByBlockID", block.Header.ParentID).Return(nil, realstorage.ErrNotFound)
 
 	// should add block to the cache
-	suite.cache.On("Add", mock.Anything).Return(true).Once()
-	suite.cache.On("ByID", parent.ID()).Return(pendingParent, true).Once()
-	suite.cache.On("ByID", grandparent.ID()).Return(nil, false).Once()
+	suite.pending.On("Add", mock.Anything).Return(true).Once()
+	suite.pending.On("ByID", parent.ID()).Return(pendingParent, true).Once()
+	suite.pending.On("ByID", grandparent.ID()).Return(nil, false).Once()
 	// should send a request for the grandparent
 	suite.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		// assert the right ID was requested manually as we don't know what nonce was used
@@ -286,13 +288,13 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	// should submit to consensus algo
 	suite.coldstuff.On("SubmitProposal", mock.Anything, mock.Anything).Twice()
 	// should return the pending child
-	suite.cache.On("ByParentID", block.ID()).Return([]*cluster.PendingBlock{{
+	suite.pending.On("ByParentID", block.ID()).Return([]*cluster.PendingBlock{{
 		OriginID: unittest.IdentifierFixture(),
 		Header:   child.Header,
 		Payload:  child.Payload,
 	}}, true)
-	suite.cache.On("DropForParent", block.ID()).Once()
-	suite.cache.On("ByParentID", child.ID()).Return(nil, false)
+	suite.pending.On("DropForParent", block.ID()).Once()
+	suite.pending.On("ByParentID", child.ID()).Return(nil, false)
 
 	err := suite.eng.Process(originID, proposal)
 	suite.Assert().Nil(err)

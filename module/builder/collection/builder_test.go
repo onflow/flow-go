@@ -21,7 +21,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-var noopSetter = func(*flow.Header) {}
+var noopSetter = func(*flow.Header) error { return nil }
 
 type BuilderSuite struct {
 	suite.Suite
@@ -108,8 +108,9 @@ func (suite *BuilderSuite) TestBuildOn_NonExistentParent() {
 func (suite *BuilderSuite) TestBuildOn_Success() {
 
 	var expectedHeight uint64 = 42
-	setter := func(h *flow.Header) {
+	setter := func(h *flow.Header) error {
 		h.Height = expectedHeight
+		return nil
 	}
 
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), setter)
