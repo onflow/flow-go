@@ -323,7 +323,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 // reference un-finalized blocks.
 func (b *Builder) getCandidateGuarantees(tx *badger.Txn, guaranteeLookup map[flow.Identifier]struct{}) ([]flow.Identifier, uint64, error) {
 
-	// retrieve the finalized head ON THE MAIN CHAIN in order to know which
+	// retrieve the finalized head in order to know which
 	// guarantees have expired and should be discarded
 	var final flow.Header
 	err := procedure.RetrieveLatestFinalizedHeader(&final)(tx)
