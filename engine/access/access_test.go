@@ -55,6 +55,7 @@ func (suite *Suite) SetupTest() {
 	suite.log = zerolog.New(os.Stderr)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
@@ -193,7 +194,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 func (suite *Suite) TestGetSealedTransaction() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
 		// create block -> collection -> transactions and seal
-		block, collection, seal := suite.createChain()
+		block, collection := suite.createChain()
 
 		// setup mocks
 		originID := unittest.IdentifierFixture()
@@ -228,7 +229,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
 		err = blocks.Store(&block)
 		require.NoError(suite.T(), err)
-		suite.snapshot.On("Seal").Return(&seal, nil).Once()
+		suite.snapshot.On("Head").Return(block.Header, nil).Once()
 
 		// 2. Ingest engine was notified by the follower engine about a new block.
 		// Follower engine --> Ingest engine
@@ -271,14 +272,11 @@ func (suite *Suite) TestExecuteScript() {
 		// create a block and a seal pointing to that block
 		lastBlock := unittest.BlockFixture()
 		lastBlock.Header.Height = 2
-		seal := flow.Seal{
-			BlockID: lastBlock.ID(),
-		}
 		err := blocks.Store(&lastBlock)
 		require.NoError(suite.T(), err)
 		err = db.Update(operation.IndexBlockHeight(lastBlock.Header.Height, lastBlock.ID()))
 		require.NoError(suite.T(), err)
-		suite.snapshot.On("Seal").Return(&seal, nil).Once()
+		suite.snapshot.On("Head").Return(lastBlock.Header, nil).Once()
 
 		// create another block as a predecessor of the block created earlier
 		prevBlock := unittest.BlockFixture()
@@ -351,7 +349,7 @@ func (suite *Suite) TestExecuteScript() {
 	})
 }
 
-func (suite *Suite) createChain() (flow.Block, flow.Collection, flow.Seal) {
+func (suite *Suite) createChain() (flow.Block, flow.Collection) {
 	collection := unittest.CollectionFixture(10)
 	cg := &flow.CollectionGuarantee{
 		CollectionID: collection.ID(),
@@ -360,9 +358,5 @@ func (suite *Suite) createChain() (flow.Block, flow.Collection, flow.Seal) {
 	block := unittest.BlockFixture()
 	block.Payload.Guarantees = []*flow.CollectionGuarantee{cg}
 
-	seal := flow.Seal{
-		BlockID: block.ID(),
-	}
-
-	return block, collection, seal
+	return block, collection
 }

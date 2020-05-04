@@ -18,7 +18,7 @@ func (h *Handler) GetLatestBlockHeader(ctx context.Context, req *access.GetLates
 	var err error
 	if req.IsSealed {
 		// get the latest seal header from storage
-		header, err = h.getLatestSealedHeader()
+		header, err = h.state.Sealed().Head()
 	} else {
 		// get the finalized header from state
 		header, err = h.state.Final().Head()

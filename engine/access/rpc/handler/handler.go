@@ -71,10 +71,6 @@ func (h *Handler) Ping(ctx context.Context, req *access.PingRequest) (*access.Pi
 	return &access.PingResponse{}, nil
 }
 
-func (h *Handler) getLatestSealedHeader() (*flow.Header, error) {
-	return h.state.Sealed().Head()
-}
-
 func (h *Handler) GetCollectionByID(_ context.Context, req *access.GetCollectionByIDRequest) (*access.CollectionResponse, error) {
 
 	id := flow.HashToID(req.Id)
@@ -124,7 +120,7 @@ func (h *Handler) GetAccount(ctx context.Context, req *access.GetAccountRequest)
 	}
 
 	// get the latest sealed header
-	latestHeader, err := h.getLatestSealedHeader()
+	latestHeader, err := h.state.Sealed().Head()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get latest sealed header: %v", err)
 	}

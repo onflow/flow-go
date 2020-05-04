@@ -112,7 +112,7 @@ func (h *Handler) deriveTransactionStatus(tx *flow.TransactionBody) (entities.Tr
 	}
 
 	// get the latest sealed block from the state
-	latestSealedBlock, err := h.getLatestSealedHeader()
+	latestSealedBlock, err := h.state.Sealed().Head()
 	if err != nil {
 		return entities.TransactionStatus_UNKNOWN, err
 	}
