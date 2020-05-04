@@ -17,32 +17,45 @@ const (
 	DockerComposeFile        = "./docker-compose.nodes.yml"
 	DockerComposeFileVersion = "3.7"
 	PrometheusTargetsFile    = "./targets.nodes.json"
+	DefaultCollectionCount   = 1
 	DefaultConsensusCount    = 3
+	DefaultExecutionCount    = 1
+	DefaultVerificationCount = 1
+	DefaultAccessCount       = 1
 	AccessAPIPort            = 3569
 	MetricsPort              = 8080
+	RPCPort                  = 9000
 )
 
-var consensusCount int
+var (
+	collectionCount   int
+	consensusCount    int
+	executionCount    int
+	verificationCount int
+	accessCount       int
+)
 
 func init() {
+	flag.IntVar(&collectionCount, "collection", DefaultCollectionCount, "number of collection nodes")
 	flag.IntVar(&consensusCount, "consensus", DefaultConsensusCount, "number of consensus nodes")
+	flag.IntVar(&executionCount, "execution", DefaultExecutionCount, "number of execution nodes")
+	flag.IntVar(&verificationCount, "verification", DefaultVerificationCount, "number of verification nodes")
+	flag.IntVar(&accessCount, "access", DefaultAccessCount, "number of access nodes")
 }
 
 func main() {
 	flag.Parse()
 
-	fmt.Printf("Bootstrapping a network with %d consensus nodes...\n", consensusCount)
+	fmt.Println("Bootstrapping a new FLITE network...")
 
-	nodes := []testnet.NodeConfig{
-		testnet.NewNodeConfig(flow.RoleCollection),
-		testnet.NewNodeConfig(flow.RoleExecution),
-		testnet.NewNodeConfig(flow.RoleVerification),
-		testnet.NewNodeConfig(flow.RoleAccess),
-	}
+	fmt.Printf("Node counts:\n")
+	fmt.Printf("- Collection: %d\n", collectionCount)
+	fmt.Printf("- Consensus: %d\n", consensusCount)
+	fmt.Printf("- Execution: %d\n", executionCount)
+	fmt.Printf("- Verification: %d\n", verificationCount)
+	fmt.Printf("- Access: %d\n\n", accessCount)
 
-	for i := 0; i < consensusCount; i++ {
-		nodes = append(nodes, testnet.NewNodeConfig(flow.RoleConsensus))
-	}
+	nodes := prepareNodes()
 
 	conf := testnet.NewNetworkConfig("localnet", nodes)
 
@@ -76,8 +89,39 @@ func main() {
 	}
 
 	fmt.Print("Bootstrapping success!\n\n")
-	fmt.Printf("The Access API will be accessible at localhost:%d\n\n", AccessAPIPort)
+
+	for i := 0; i < accessCount; i++ {
+		fmt.Printf("Access API %d will be accessible at localhost:%d\n", i+1, AccessAPIPort+i)
+	}
+	fmt.Println()
+
 	fmt.Print("Run \"make start\" to launch the network.\n")
+}
+
+func prepareNodes() []testnet.NodeConfig {
+	nodes := make([]testnet.NodeConfig, 0)
+
+	for i := 0; i < collectionCount; i++ {
+		nodes = append(nodes, testnet.NewNodeConfig(flow.RoleCollection))
+	}
+
+	for i := 0; i < consensusCount; i++ {
+		nodes = append(nodes, testnet.NewNodeConfig(flow.RoleConsensus))
+	}
+
+	for i := 0; i < executionCount; i++ {
+		nodes = append(nodes, testnet.NewNodeConfig(flow.RoleExecution))
+	}
+
+	for i := 0; i < verificationCount; i++ {
+		nodes = append(nodes, testnet.NewNodeConfig(flow.RoleVerification))
+	}
+
+	for i := 0; i < accessCount; i++ {
+		nodes = append(nodes, testnet.NewNodeConfig(flow.RoleAccess))
+	}
+
+	return nodes
 }
 
 type Network struct {
@@ -88,51 +132,58 @@ type Network struct {
 type Services map[string]Service
 
 type Service struct {
-	Build struct {
-		Context    string
-		Dockerfile string
-		Args       map[string]string
-		Target     string
-	}
-	Command []string
-	Volumes []string
-	Ports   []string
+	Build     Build `yaml:"build,omitempty"`
+	Image     string
+	DependsOn []string `yaml:"depends_on,omitempty"`
+	Command   []string
+	Volumes   []string
+	Ports     []string `yaml:"ports,omitempty"`
+}
+
+type Build struct {
+	Context    string
+	Dockerfile string
+	Args       map[string]string
+	Target     string
 }
 
 func prepareServices(containers []testnet.ContainerConfig) Services {
 	services := make(Services)
 
+	var (
+		numCollection   = 0
+		numConsensus    = 0
+		numExecution    = 0
+		numVerification = 0
+		numAccess       = 0
+	)
+
 	for _, container := range containers {
 		switch container.Role {
+		case flow.RoleConsensus:
+			services[container.ContainerName] = prepareService(container, numConsensus)
+			numConsensus++
 		case flow.RoleCollection:
-			services[container.ContainerName] = prepareCollectionService(container)
+			services[container.ContainerName] = prepareCollectionService(container, numCollection)
+			numCollection++
 		case flow.RoleExecution:
-			services[container.ContainerName] = prepareExecutionService(container)
+			services[container.ContainerName] = prepareExecutionService(container, numExecution)
+			numExecution++
+		case flow.RoleVerification:
+			services[container.ContainerName] = prepareService(container, numVerification)
+			numVerification++
 		case flow.RoleAccess:
-			services[container.ContainerName] = prepareAccessService(container)
-		default:
-			services[container.ContainerName] = prepareService(container)
+			services[container.ContainerName] = prepareAccessService(container, numAccess)
+			numAccess++
 		}
 	}
 
 	return services
 }
 
-func prepareService(container testnet.ContainerConfig) Service {
-	return Service{
-		Build: struct {
-			Context    string
-			Dockerfile string
-			Args       map[string]string
-			Target     string
-		}{
-			Context:    "../../",
-			Dockerfile: "cmd/Dockerfile",
-			Args: map[string]string{
-				"TARGET": container.Role.String(),
-			},
-			Target: "production",
-		},
+func prepareService(container testnet.ContainerConfig, i int) Service {
+	service := Service{
+		Image: fmt.Sprintf("localnet-%s", container.Role),
 		Command: []string{
 			fmt.Sprintf("--nodeid=%s", container.NodeID),
 			"--bootstrapdir=/bootstrap",
@@ -144,41 +195,60 @@ func prepareService(container testnet.ContainerConfig) Service {
 			fmt.Sprintf("%s:/bootstrap", BootstrapDir),
 		},
 	}
+
+	// only specify build config for first service of each role
+	if i == 0 {
+		service.Build = Build{
+			Context:    "../../",
+			Dockerfile: "cmd/Dockerfile",
+			Args: map[string]string{
+				"TARGET": container.Role.String(),
+			},
+			Target: "production",
+		}
+	} else {
+		// remaining services of this role must depend on first service
+		service.DependsOn = []string{
+			fmt.Sprintf("%s_1", container.Role),
+		}
+	}
+
+	return service
 }
 
-func prepareCollectionService(container testnet.ContainerConfig) Service {
-	service := prepareService(container)
+func prepareCollectionService(container testnet.ContainerConfig, i int) Service {
+	service := prepareService(container, i)
 
 	service.Command = append(
 		service.Command,
-		fmt.Sprintf("--ingress-addr=%s:9000", container.ContainerName),
+		fmt.Sprintf("--ingress-addr=%s:%d", container.ContainerName, RPCPort),
 	)
 
 	return service
 }
 
-func prepareExecutionService(container testnet.ContainerConfig) Service {
-	service := prepareService(container)
+func prepareExecutionService(container testnet.ContainerConfig, i int) Service {
+	service := prepareService(container, i)
 
 	service.Command = append(
 		service.Command,
-		fmt.Sprintf("--rpc-addr=%s:9000", container.ContainerName),
+		fmt.Sprintf("--rpc-addr=%s:%d", container.ContainerName, RPCPort),
 	)
 
 	return service
 }
 
-func prepareAccessService(container testnet.ContainerConfig) Service {
-	service := prepareService(container)
+func prepareAccessService(container testnet.ContainerConfig, i int) Service {
+	service := prepareService(container, i)
 
 	service.Command = append(service.Command, []string{
-		fmt.Sprintf("--rpc-addr=%s:9000", container.ContainerName),
-		"--ingress-addr=collection_1:9000",
-		"--script-addr=execution_1:9000",
+		fmt.Sprintf("--rpc-addr=%s:%d", container.ContainerName, RPCPort),
+		fmt.Sprintf("--ingress-addr=collection_1:%d", RPCPort),
+		fmt.Sprintf("--script-addr=execution_1:%d", RPCPort),
 	}...)
 
 	service.Ports = []string{
-		fmt.Sprintf("%d:9000", AccessAPIPort),
+		fmt.Sprintf("%d:%d", AccessAPIPort+i, RPCPort),
 	}
 
 	return service
