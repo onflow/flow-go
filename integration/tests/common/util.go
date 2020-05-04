@@ -105,6 +105,63 @@ func createCounter(ctx context.Context, client *testnet.Client) error {
 	return client.SendTransaction(ctx, tx)
 }
 
+// CreateCounterPanic creates a counter instance in the root account, but panics after manipulating state. The counter
+// contract must first have been deployed. It can be used to test whether execution state stays untouched/will revert.
+func CreateCounterPanic(ctx context.Context, client *testnet.Client) error {
+	txDSL := dsl.Transaction{
+		Import: dsl.Import{Address: flow.RootAddress},
+		Content: dsl.Prepare{
+			Content: dsl.Code(`
+				var maybeCounter <- signer.load<@Testing.Counter>(from: /storage/counter)
+
+				if maybeCounter == nil {
+					maybeCounter <-! Testing.createCounter()
+				}
+
+				maybeCounter?.add(2)
+				signer.save(<-maybeCounter!, to: /storage/counter)
+
+				signer.link<&Testing.Counter>(/public/counter, target: /storage/counter)
+
+				panic("fail for testing purposes")
+				`),
+		},
+	}
+
+	tx := unittest.TransactionBodyFixture(unittest.WithTransactionDSL(txDSL))
+	return client.SendTransaction(ctx, tx)
+}
+
+// CreateCounterWrongSig creates a counter instance in the root account, but uses a wrong signature. The counter
+// contract must first have been deployed. It can be used to test whether wrongly signed txs are not executed.
+func CreateCounterWrongSig(ctx context.Context, client *testnet.Client) error {
+	txDSL := dsl.Transaction{
+		Import: dsl.Import{Address: flow.RootAddress},
+		Content: dsl.Prepare{
+			Content: dsl.Code(`
+				var maybeCounter <- signer.load<@Testing.Counter>(from: /storage/counter)
+
+				if maybeCounter == nil {
+					maybeCounter <-! Testing.createCounter()
+				}
+
+				maybeCounter?.add(2)
+				signer.save(<-maybeCounter!, to: /storage/counter)
+
+				signer.link<&Testing.Counter>(/public/counter, target: /storage/counter)
+				`),
+		},
+	}
+
+	tx := unittest.TransactionBodyFixture(unittest.WithTransactionDSL(txDSL))
+
+	// remove signatures
+	tx.PayloadSignatures = nil
+	tx.EnvelopeSignatures = nil
+
+	return client.SendTransaction(ctx, tx)
+}
+
 func GetGhostClient(ghostContainer *testnet.Container) (*client.GhostClient, error) {
 
 	if !ghostContainer.Config.Ghost {

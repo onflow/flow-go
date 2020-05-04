@@ -16,7 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestExecution(t *testing.T) {
+func TestStateSyncAfterNetworkPartition(t *testing.T) {
 	suite.Run(t, new(ExecutionSuite))
 }
 
