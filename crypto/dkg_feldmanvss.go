@@ -273,7 +273,7 @@ func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) {
 // P(x) is written in dest, while g2^P(x) is written in y
 // x being a small integer
 func zrPolynomialImage(dest []byte, a []scalar, x index, y *pointG2) {
-	C.Zr_polynomialImage((*C.uchar)(&dest[0]),
+	C.Zr_polynomialImage_export((*C.uchar)(&dest[0]),
 		(*C.ep2_st)(y),
 		(*C.bn_st)(&a[0]), (C.int)(len(a)),
 		(C.uint8_t)(x),

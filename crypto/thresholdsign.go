@@ -322,9 +322,12 @@ func ThresholdSignKeyGen(size int) ([]PrivateKey,
 	}
 	// compute the shares
 	for i := index(1); int(i) <= size; i++ {
-		data := make([]byte, PrKeyLenBLSBLS12381)
-		zrPolynomialImage(data, a, i, &y[i-1])
-		C.bn_read_bin((*C.bn_st)(&x[i-1]),(*C.uchar)(&data[0]),	PrKeyLenBLSBLS12381)
+		C.Zr_polynomialImage(
+		(*C.bn_st)(&x[i-1]),
+		(*C.ep2_st)(&y[i-1]),
+		(*C.bn_st)(&a[0]), (C.int)(len(a)),
+		(C.uint8_t)(i),
+		)
 	}
 	// group public key
 	genScalarMultG2(&X0, &a[0])
