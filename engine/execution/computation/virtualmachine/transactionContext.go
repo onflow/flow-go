@@ -326,13 +326,13 @@ func (r *TransactionContext) verifySignatures() error {
 	return nil
 }
 
-// CheckAndIncrementSequenceNumber validates and increments a sequence number for with an account key.
+// CheckAndIncrementSequenceNumber validates and increments a sequence number for an account key.
 //
 // This function first checks that the provided sequence number matches the version stored on-chain.
 // If they are equal, the on-chain sequence number is incremented.
 // If they are not equal, the on-chain sequence number is not incremented.
 //
-// This function returns an error if any problem occured during checking or the check failed
+// This function returns an error if any problem occurred during checking or the check failed
 func (r *TransactionContext) checkAndIncrementSequenceNumber() error {
 
 	proposalKey := r.tx.ProposalKey

@@ -25,7 +25,7 @@ func (e *MissingSignatureError) Error() string {
 	return fmt.Sprintf("account %s does not have sufficient signatures", e.Address)
 }
 
-// A MissingPayerError indicates that a transaction is missing payer.
+// A MissingPayerError indicates that a transaction is missing a payer.
 type MissingPayerError struct {
 }
 
@@ -52,7 +52,7 @@ func (e *InvalidProposalKeyError) Error() string {
 	return fmt.Sprintf("invalid proposal key %d on account %s", e.KeyID, e.Address)
 }
 
-// An InvalidProposalSequenceNumberError indicates that proposal key sequence number doesn't match
+// An InvalidProposalSequenceNumberError indicates that proposal key sequence number does not match the on-chain value.
 type InvalidProposalSequenceNumberError struct {
 	Address           flow.Address
 	KeyID             uint64

@@ -28,7 +28,6 @@ func (cf CFMissingRegisterTouch) String() string {
 		hexStrings[i] = hex.EncodeToString([]byte(s))
 	}
 
-	//strings.Join(hexStrings)
 	return fmt.Sprint("at least one register touch was missing inside the chunk data package that was needed while running transactions (hex-encoded): ", hexStrings)
 }
 

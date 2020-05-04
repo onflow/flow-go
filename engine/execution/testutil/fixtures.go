@@ -93,7 +93,7 @@ func AddToCounterTransaction() flow.TransactionBody {
 	}
 }
 
-func SignTransactionbyRoot(tx *flow.TransactionBody, seqNum uint64) error {
+func SignTransactionByRoot(tx *flow.TransactionBody, seqNum uint64) error {
 
 	hasher, err := hash.NewHasher(flow.RootAccountPrivateKey.HashAlgo)
 	if err != nil {

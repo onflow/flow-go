@@ -55,7 +55,7 @@ func keyPublicKey(index uint64) string {
 	return fmt.Sprintf("public_key_%d", index)
 }
 
-// Set of functions to read/write Ledger
+// A LedgerDAL is an abstraction layer used to read and manipulate ledger state in a consistent way.
 type LedgerDAL struct {
 	Ledger Ledger
 }
@@ -220,7 +220,7 @@ func (r *LedgerDAL) SetAccountPublicKeys(accountID []byte, publicKeys []flow.Acc
 
 		publicKeyBytes, err := flow.EncodeAccountPublicKey(publicKey)
 		if err != nil {
-			return fmt.Errorf("cannot enocde accout public key: %w", err)
+			return fmt.Errorf("cannot encode account public key: %w", err)
 		}
 
 		// asserted length of publicKeys so i should always fit into uint64

@@ -241,7 +241,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	seq := uint64(0)
 
-	err := execTestutil.SignTransactionbyRoot(&tx1, seq)
+	err := execTestutil.SignTransactionByRoot(&tx1, seq)
 	require.NoError(t, err)
 	seq++
 
@@ -264,7 +264,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	// transaction that will change state but then panic and revert, used to test that state commitment stays identical
 	tx2 := execTestutil.CreateCounterPanicTransaction()
-	err = execTestutil.SignTransactionbyRoot(&tx2, seq)
+	err = execTestutil.SignTransactionByRoot(&tx2, seq)
 	require.NoError(t, err)
 
 	col2 := flow.Collection{Transactions: []*flow.TransactionBody{&tx2}}

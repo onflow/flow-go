@@ -40,7 +40,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
             `)).
 			AddAuthorizer(unittest.AddressFixture())
 
-		err := execTestutil.SignTransactionbyRoot(tx, 0)
+		err := execTestutil.SignTransactionByRoot(tx, 0)
 		require.NoError(t, err)
 
 		ledger, err := execTestutil.RootBootstrappedLedger()
@@ -73,7 +73,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
                 }
             `))
 
-		err := execTestutil.SignTransactionbyRoot(tx, 0)
+		err := execTestutil.SignTransactionByRoot(tx, 0)
 		require.NoError(t, err)
 
 		ledger, err := execTestutil.RootBootstrappedLedger()
@@ -97,7 +97,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
                 }
             `))
 
-		err := execTestutil.SignTransactionbyRoot(tx, 0)
+		err := execTestutil.SignTransactionByRoot(tx, 0)
 		require.NoError(t, err)
 
 		ledger, err := execTestutil.RootBootstrappedLedger()
@@ -121,7 +121,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
                 }
             `))
 
-		err := execTestutil.SignTransactionbyRoot(tx, 0)
+		err := execTestutil.SignTransactionByRoot(tx, 0)
 		require.NoError(t, err)
 
 		ledger, err := execTestutil.RootBootstrappedLedger()
@@ -214,7 +214,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 			ledger, err := execTestutil.RootBootstrappedLedger()
 			require.NoError(t, err)
 
-			err = execTestutil.SignTransactionbyRoot(tx, 0)
+			err = execTestutil.SignTransactionByRoot(tx, 0)
 			require.NoError(t, err)
 			//seq++
 
