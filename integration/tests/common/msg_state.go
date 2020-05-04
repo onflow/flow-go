@@ -1,6 +1,7 @@
 package common
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 	"time"
@@ -74,4 +75,18 @@ func MsgIsChunkDataPackRequest(msg interface{}) bool {
 func MsgIsChunkDataPackResponse(msg interface{}) bool {
 	_, ok := msg.(*messages.ChunkDataPackResponse)
 	return ok
+}
+
+func MsgIsExecutionStateDelta(msg interface{}) bool {
+	_, ok := msg.(*messages.ExecutionStateDelta)
+	return ok
+}
+
+func MsgIsExecutionStateDeltaWithChanges(msg interface{}) bool {
+	delta, ok := msg.(*messages.ExecutionStateDelta)
+	if !ok {
+		return false
+	}
+
+	return bytes.Compare(delta.StartState, delta.EndState) != 0
 }

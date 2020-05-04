@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/rs/zerolog"
@@ -40,7 +41,7 @@ func (h Handler) SendEvent(_ context.Context, req *ghost.SendEventRequest) (*emp
 	conduit, found := h.conduitMap[uint8(channelID)]
 
 	if !found {
-		return nil, status.Error(codes.InvalidArgument, "conduit not found for given channel id")
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("conduit not found for given channel id %v", channelID))
 	}
 
 	message := req.GetMessage()

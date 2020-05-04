@@ -9,14 +9,16 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/ghost/client"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/integration/tests/common"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestStateSyncAfterNetworkPartition(t *testing.T) {
+func TestExecutionStateSync(t *testing.T) {
 	suite.Run(t, new(ExecutionSuite))
 }
 
@@ -85,7 +87,7 @@ func (gs *ExecutionSuite) SetupTest() {
 
 	// add the ghost node config
 	gs.ghostID = unittest.IdentifierFixture()
-	ghostConfig := testnet.NewNodeConfig(flow.RoleAccess, testnet.WithID(gs.ghostID), testnet.AsGhost(),
+	ghostConfig := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithID(gs.ghostID), testnet.AsGhost(),
 		testnet.WithLogLevel(zerolog.ErrorLevel))
 	nodeConfigs = append(nodeConfigs, ghostConfig)
 
@@ -175,5 +177,13 @@ func (gs *ExecutionSuite) TestStateSyncAfterNetworkPartition() {
 	// require that state for blockC is the same for execution node 1 and 2
 	require.Equal(gs.T(), erExe1BlockC.ExecutionResult.FinalStateCommit, erExe2BlockC.ExecutionResult.FinalStateCommit)
 
-	// TODO: trigger messages.ExecutionStateSyncRequest
+	// send a ExecutionStateSyncRequest from Ghost node
+	err = gs.Ghost().Send(context.Background(), engine.ExecutionSync, []flow.Identifier{gs.exe1ID},
+		&messages.ExecutionStateSyncRequest{CurrentBlockID: blockA.Header.ID(), TargetBlockID: blockB.Header.ID()})
+	require.NoError(gs.T(), err)
+
+	// wait for ExecutionStateDelta
+	msg2 := gs.MsgState.WaitForMsgFrom(gs.T(), common.MsgIsExecutionStateDeltaWithChanges, gs.exe1ID)
+	executionStateDelta := msg2.(*messages.ExecutionStateDelta)
+	require.Equal(gs.T(), erExe1BlockB.ExecutionResult.FinalStateCommit, executionStateDelta.EndState)
 }
