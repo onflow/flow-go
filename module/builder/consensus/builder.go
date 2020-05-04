@@ -24,7 +24,6 @@ type Builder struct {
 	seals      mempool.Seals
 	cfg        Config
 	// cache of block ID -> height for checking transaction expiry
-	// NOTE: these are blocks from the main consensus chain, NOT from the cluster
 	cache map[flow.Identifier]uint64
 }
 
