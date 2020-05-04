@@ -2,6 +2,7 @@ package collection
 
 import (
 	"context"
+	"math/rand"
 
 	"github.com/onflow/flow-go-sdk/client"
 	"google.golang.org/grpc"
@@ -11,13 +12,168 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// Create some collections containing transactions. Then delete one of the
-// node's database, requiring it to recover the missing blocks.
+// Run consensus on a multi-cluster setup. Ensure that transactions
+// are always included in the appropriate cluster.
+func (suite *CollectorSuite) TestProposal_MultiCluster() {
+
+	var (
+		nNodes        = 9
+		nClusters     = 3
+		clusterSize   = nNodes / nClusters
+		nTransactions = 10
+	)
+
+	suite.SetupTest("col_proposal_multicluster", uint(nNodes), uint(nClusters))
+
+	clusters := suite.Clusters()
+
+	// create a client for each node, organized by cluster
+	clientsByCluster := [3][]*client.Client{{}, {}, {}}
+	for i := 0; i < nClusters; i++ {
+		forCluster := make([]*client.Client, 0, clusterSize)
+
+		for j := 0; j < clusterSize; j++ {
+			node := suite.Collector(uint(i), uint(j))
+			client, err := client.New(node.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
+			suite.Require().Nil(err)
+			forCluster = append(forCluster, client)
+		}
+
+		clientsByCluster[i] = append(clientsByCluster[i], forCluster...)
+	}
+
+	// keep track of which cluster is responsible for which transaction ID
+	txIDsByCluster := [3][]flow.Identifier{{}, {}, {}}
+
+	// queue up functions to send the transactions to avoid race conditions
+	// when waiting for inclusion
+	var senders []func()
+
+	// ROUND 1 - round robin transactions to the appropriate cluster, no dupes
+	suite.T().Log("ROUND 1")
+	for clusterIdx := 0; clusterIdx < nClusters; clusterIdx++ {
+		forCluster := make([]flow.Identifier, 0, nTransactions)
+
+		for txIdx := 0; txIdx < nTransactions; txIdx++ {
+			tx := suite.TxForCluster(clusters.ByIndex(uint(clusterIdx)))
+			forCluster = append(forCluster, convert.IDFromSDK(tx.ID()))
+
+			// pick a client from this cluster
+			target := clientsByCluster[clusterIdx][txIdx%clusterSize]
+			// queue up a function to send the transaction
+			senders = append(senders, func() {
+				ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
+				err := target.SendTransaction(ctx, *tx)
+				cancel()
+				suite.Require().Nil(err)
+			})
+		}
+
+		txIDsByCluster[clusterIdx] = append(txIDsByCluster[clusterIdx], forCluster...)
+	}
+
+	// send off the transactions
+	for _, send := range senders {
+		go send()
+	}
+
+	// wait for all the transactions to be included
+	suite.AwaitTransactionsIncluded(
+		append(append(txIDsByCluster[0], txIDsByCluster[1]...), txIDsByCluster[2]...)...,
+	)
+
+	// reset the queued sender functions
+	senders = nil
+
+	// ROUND 2 - send all transactions to the wrong cluster - no dupes
+	suite.T().Log("ROUND 2")
+	for clusterIdx := 0; clusterIdx < nClusters; clusterIdx++ {
+		forCluster := make([]flow.Identifier, 0, nTransactions)
+
+		for txIdx := 0; txIdx < nTransactions; txIdx++ {
+			tx := suite.TxForCluster(clusters.ByIndex(uint(clusterIdx)))
+			forCluster = append(forCluster, convert.IDFromSDK(tx.ID()))
+
+			// pick a client from a different cluster
+			clusterIndex := rand.Intn(nClusters)
+			if clusterIndex == clusterIdx {
+				clusterIndex = (clusterIndex + 1) % nClusters
+			}
+			target := clientsByCluster[clusterIndex][txIdx%clusterSize]
+
+			// queue up a function to send the transaction
+			senders = append(senders, func() {
+				ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
+				err := target.SendTransaction(ctx, *tx)
+				cancel()
+				suite.Require().Nil(err)
+			})
+		}
+
+		txIDsByCluster[clusterIdx] = append(txIDsByCluster[clusterIdx], forCluster...)
+	}
+
+	// send off the transactions
+	for _, send := range senders {
+		go send()
+	}
+
+	// wait for all the NEW transactions to be included
+	suite.AwaitTransactionsIncluded(
+		append(append(txIDsByCluster[0][nTransactions:], txIDsByCluster[1][nTransactions:]...), txIDsByCluster[2][nTransactions:]...)...,
+	)
+
+	// reset the queued sender functions
+	senders = nil
+
+	// ROUND 3 - send each transaction to 2 non-responsible nodes
+	suite.T().Log("ROUND 3")
+	for clusterIdx := 0; clusterIdx < nClusters; clusterIdx++ {
+		forCluster := make([]flow.Identifier, 0, nTransactions)
+
+		for txIdx := 0; txIdx < nTransactions; txIdx++ {
+			tx := suite.TxForCluster(clusters.ByIndex(uint(clusterIdx)))
+			forCluster = append(forCluster, convert.IDFromSDK(tx.ID()))
+
+			for senderIdx := 0; senderIdx < 3; senderIdx++ {
+				// don't send the responsible cluster
+				if senderIdx == clusterIdx {
+					continue
+				}
+
+				target := clientsByCluster[senderIdx][txIdx%clusterSize]
+				// queue up a function to send the transaction
+				senders = append(senders, func() {
+					ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
+					err := target.SendTransaction(ctx, *tx)
+					cancel()
+					suite.Require().Nil(err)
+					suite.T().Log("sent tx: ", convert.IDFromSDK(tx.ID()))
+				})
+			}
+		}
+		txIDsByCluster[clusterIdx] = append(txIDsByCluster[clusterIdx], forCluster...)
+	}
+
+	// send off the transactions
+	for _, send := range senders {
+		go send()
+	}
+
+	// wait for all the NEW transactions to be included
+	suite.AwaitTransactionsIncluded(
+		append(append(txIDsByCluster[0][2*nTransactions:], txIDsByCluster[1][2*nTransactions:]...), txIDsByCluster[2][2*nTransactions:]...)...,
+	)
+
+}
+
+// Start consensus, pause a node, allow consensus to continue, then restart
+// the node. It should be able to catch up.
 func (suite *CollectorSuite) TestProposal_Recovery() {
 
 	var (
-		nNodes        = 3
-		nTransactions = 10
+		nNodes        = 6
+		nTransactions = 30
 		err           error
 	)
 
@@ -73,17 +229,14 @@ func (suite *CollectorSuite) TestProposal_Recovery() {
 		txIDs = append(txIDs, convert.IDFromSDK(tx.ID()))
 	}
 
-	// drop the paused node's database
-	db, err := col1.DB()
-	suite.Require().Nil(err)
-	err = db.DropAll()
-	suite.Require().Nil(err)
+	// wait for the transactions to be included (5/6 nodes can make progress)
+	suite.AwaitTransactionsIncluded(txIDs...)
 
 	// restart the paused collector
 	err = col1.Start()
 	suite.Require().Nil(err)
 
-	// wait for all the transactions to be included
-	// this requires the paused collector to recover existing blocks
-	suite.AwaitTransactionsIncluded(txIDs...)
+	// TODO check that it has recovered
+	// should be able to check this be looking for its signature on a
+	// sufficiently high block proposal
 }

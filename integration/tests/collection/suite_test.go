@@ -173,6 +173,8 @@ func (suite *CollectorSuite) AwaitClusterBlocks(n uint) []cluster.Block {
 
 	blocks := make([]cluster.Block, 0, n)
 
+	suite.T().Logf("awaiting %d cluster blocks", n)
+
 	// allow 5 seconds for each block
 	waitFor := time.Duration(n) * time.Second * 5
 	deadline := time.Now().Add(waitFor)
@@ -215,6 +217,8 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 	// the height at which the collection is included
 	height := uint64(0)
 
+	suite.T().Logf("awaiting %d transactions included", len(txIDs))
+
 	waitFor := time.Second * 30
 	deadline := time.Now().Add(waitFor)
 	for time.Now().Before(deadline) {
@@ -244,11 +248,20 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 			}
 
 		case *flow.CollectionGuarantee:
-			// TODO use this as indication of finalization w/ HotStuff
+		// TODO use this as indication of finalization w/ HotStuff
+		case *flow.TransactionBody:
+			suite.T().Log("ghost recv tx: ", val.ID())
 		}
 	}
 
 	suite.T().Logf("timed out waiting for inclusion (timeout=%s, saw=%d, expected=%d)", waitFor.String(), len(seen), len(lookup))
+	var missing []flow.Identifier
+	for id := range lookup {
+		if _, ok := seen[id]; !ok {
+			missing = append(missing, id)
+		}
+	}
+	suite.T().Logf("missing: %v", missing)
 	suite.T().FailNow()
 }
 

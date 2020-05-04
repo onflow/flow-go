@@ -31,7 +31,14 @@ type Engine struct {
 }
 
 // New creates a new collection ingest engine.
-func New(log zerolog.Logger, net module.Network, state protocol.State, metrics module.Metrics, me module.Local, pool mempool.Transactions) (*Engine, error) {
+func New(
+	log zerolog.Logger,
+	net module.Network,
+	state protocol.State,
+	metrics module.Metrics,
+	me module.Local,
+	pool mempool.Transactions,
+) (*Engine, error) {
 
 	logger := log.With().
 		Str("engine", "ingest").
@@ -163,8 +170,10 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 	// if the transaction is submitted locally, propagate it
 	if originID == localID {
-		log.Debug().Msg("propagating transaction to cluster")
 		targetIDs := txCluster.Filter(filter.Not(filter.HasNodeID(localID)))
+		log.Debug().
+			Str("recipients", fmt.Sprintf("%v", targetIDs.NodeIDs())).
+			Msg("propagating transaction to cluster")
 		err = e.con.Submit(tx, targetIDs.NodeIDs()...)
 		if err != nil {
 			return fmt.Errorf("could not route transaction to cluster: %w", err)
