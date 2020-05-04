@@ -11,14 +11,13 @@ import (
 
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/engine/access/ingestion"
 	"github.com/dapperlabs/flow-go/engine/access/rpc"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/model/encoding"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	followerfinalizer "github.com/dapperlabs/flow-go/module/finalizer/follower"
@@ -47,9 +46,9 @@ func main() {
 
 	cmd.FlowNode("access").
 		ExtraFlags(func(flags *pflag.FlagSet) {
-			flags.UintVar(&receiptLimit, "receipt-limit", 100000, "maximum number of execution receipts in the memory pool")
-			flags.UintVar(&collectionLimit, "collection-limit", 100000, "maximum number of collections in the memory pool")
-			flags.UintVar(&blockLimit, "block-limit", 100000, "maximum number of result blocks in the memory pool")
+			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
+			flags.UintVar(&collectionLimit, "collection-limit", 1000, "maximum number of collections in the memory pool")
+			flags.UintVar(&blockLimit, "block-limit", 1000, "maximum number of result blocks in the memory pool")
 			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "r", "localhost:9000", "the address the gRPC server listens on")
 			flags.StringVarP(&rpcConf.CollectionAddr, "ingress-addr", "i", "localhost:9000", "the address (of the collection node) to send transactions to")
 			flags.StringVarP(&rpcConf.ExecutionAddr, "script-addr", "s", "localhost:9000", "the address (of the execution node) forward the script to")
@@ -91,6 +90,10 @@ func main() {
 			return ingestEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+
+			// initialize cleaner for DB
+			cleaner := storage.NewCleaner(node.Logger, node.DB)
+
 			// create a finalizer that will handle updating the protocol
 			// state when the follower detects newly finalized blocks
 			final := followerfinalizer.NewFinalizer(node.DB)
@@ -100,15 +103,20 @@ func main() {
 			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
 			merger := signature.NewCombiner()
 
-			// define the node set that is valid as signers
-			selector := filter.And(filter.HasRole(flow.RoleConsensus), filter.HasStake(true))
+			// initialize consensus committee's membership state
+			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
+			// Note: node.Me.NodeID() is not part of the consensus committee
+			mainConsensusCommittee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID())
+			if err != nil {
+				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
+			}
 
 			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(node.State, node.DKGState, staking, beacon, merger, selector)
+			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, node.DKGState, staking, beacon, merger)
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			core, err := consensus.NewFollower(node.Logger, node.State, node.Me, final, verifier, ingestEng, &node.GenesisBlock.Header, node.GenesisQC, selector)
+			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, final, verifier, ingestEng, node.GenesisBlock.Header, node.GenesisQC)
 			if err != nil {
 				// TODO for now we ignore failures in follower
 				// this is necessary for integration tests to run, until they are
@@ -117,7 +125,7 @@ func main() {
 				node.Logger.Debug().Err(err).Msg("ignoring failures in follower core")
 			}
 
-			follower, err := followereng.New(node.Logger, node.Network, node.Me, node.State, headers, payloads, conCache, core)
+			follower, err := followereng.New(node.Logger, node.Network, node.Me, cleaner, headers, payloads, node.State, conCache, core)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}

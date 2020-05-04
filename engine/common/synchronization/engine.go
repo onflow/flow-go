@@ -9,6 +9,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -369,14 +370,14 @@ func (e *Engine) processIncomingBlock(originID flow.Identifier, block *flow.Bloc
 
 	// check if we still need to process this block or it is stale already
 	blockID := block.ID()
-	_, wantHeight := e.heights[block.Height]
+	_, wantHeight := e.heights[block.Header.Height]
 	_, wantBlockID := e.blockIDs[blockID]
 	if !wantHeight && !wantBlockID {
 		return
 	}
 
 	// delete from the queue and forward
-	delete(e.heights, block.Height)
+	delete(e.heights, block.Header.Height)
 	delete(e.blockIDs, blockID)
 
 	synced := &events.SyncedBlock{
@@ -442,6 +443,7 @@ func (e *Engine) pollHeight() error {
 		return fmt.Errorf("could not send get consensus identities: %w", err)
 	}
 
+	var errs error
 	// send the request for synchronization
 	for _, targetID := range identities.Sample(3).NodeIDs() {
 		req := &messages.SyncRequest{
@@ -450,11 +452,11 @@ func (e *Engine) pollHeight() error {
 		}
 		err := e.con.Submit(req, targetID)
 		if err != nil {
-			return fmt.Errorf("could not send sync request: %w", err)
+			errs = multierror.Append(errs, fmt.Errorf("could not send sync request: %w", err))
 		}
 	}
 
-	return nil
+	return errs
 }
 
 // scanPending will check which items shall be requested.

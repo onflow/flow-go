@@ -10,12 +10,27 @@ type Metrics interface {
 	// Common Metrics
 	//
 
-	// BadgerDBSize total size on-disk of the badger database.
-	BadgerDBSize(sizeBytes int64)
+	// BadgerLSMSize total size on-disk of the badger database.
+	BadgerLSMSize(sizeBytes int64)
+	BadgerVLogSize(sizeBytes int64)
+
+	// Badger built-in metrics (from badger/y/metrics.go)
+	BadgerNumReads(n int64)
+	BadgerNumWrites(n int64)
+	BadgerNumBytesRead(n int64)
+	BadgerNumBytesWritten(n int64)
+	BadgerNumGets(n int64)
+	BadgerNumPuts(n int64)
+	BadgerNumBlockedPuts(n int64)
+	BadgerNumMemtableGets(n int64)
 
 	// Network Metrics
-	// NetworkMessageSent size of the network message in bytes
-	NetworkMessageSent(sizeBytes int)
+	// NetworkMessageSent size in bytes and count of the network message sent
+	NetworkMessageSent(sizeBytes int, topic string)
+
+	// Network Metrics
+	// NetworkMessageReceived size in bytes and count of the network message received
+	NetworkMessageReceived(sizeBytes int, topic string)
 
 	// Collection Metrics
 	//
@@ -32,8 +47,14 @@ type Metrics interface {
 	// CollectionGuaranteed is called when a collection is finalized.
 	CollectionGuaranteed(collection flow.LightCollection)
 
+	// PendingClusterBlocks the number of cluster blocks in the pending cache.
+	PendingClusterBlocks(n uint)
+
 	// Consensus Metrics
 	//
+
+	// PendingBlocks the number of blocks in the pending cache.
+	PendingBlocks(n uint)
 
 	// StartCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized Block
 	StartCollectionToFinalized(collectionID flow.Identifier)
@@ -73,6 +94,21 @@ type Metrics interface {
 
 	// NewestKnownQC reports Metrics C9: View of Newest Known QC
 	NewestKnownQC(view uint64)
+
+	// MadeBlockProposal reports that a block proposal has been made
+	MadeBlockProposal()
+
+	// MempoolGuaranteesSize reports the size of the guarantees mempool
+	MempoolGuaranteesSize(size uint)
+
+	// MempoolReceiptsSize reports the size of the receipts mempool
+	MempoolReceiptsSize(size uint)
+
+	// MempoolApprovalsSize reports the size of the approvals mempool
+	MempoolApprovalsSize(size uint)
+
+	// MempoolSealsSize reports the size of the seals mempool
+	MempoolSealsSize(size uint)
 
 	// Verification Metrics
 	//

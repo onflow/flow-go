@@ -49,6 +49,7 @@ type Engine struct {
 	payloads           storage.Payloads
 	collections        storage.Collections
 	events             storage.Events
+	transactionResults storage.TransactionResults
 	computationManager computation.ComputationManager
 	providerEngine     provider.ProviderEngine
 	mempool            *Mempool
@@ -60,6 +61,7 @@ type Engine struct {
 	syncTargetBlockID  atomic.Value
 	stateSync          executionSync.StateSynchronizer
 	mc                 module.Metrics
+	extensiveLogging   bool
 }
 
 func New(
@@ -71,11 +73,13 @@ func New(
 	payloads storage.Payloads,
 	collections storage.Collections,
 	events storage.Events,
+	transactionResults storage.TransactionResults,
 	executionEngine computation.ComputationManager,
 	providerEngine provider.ProviderEngine,
 	execState state.ExecutionState,
 	syncThreshold uint64,
 	mc module.Metrics,
+	extLog bool,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "blocks").Logger()
 
@@ -91,6 +95,7 @@ func New(
 		payloads:           payloads,
 		collections:        collections,
 		events:             events,
+		transactionResults: transactionResults,
 		computationManager: executionEngine,
 		providerEngine:     providerEngine,
 		mempool:            mempool,
@@ -99,6 +104,7 @@ func New(
 		syncInProgress:     atomic.NewBool(false),
 		stateSync:          executionSync.NewStateSynchronizer(execState),
 		mc:                 mc,
+		extensiveLogging:   extLog,
 	}
 
 	con, err := net.Register(engine.BlockProvider, &eng)
@@ -188,13 +194,13 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) handleBlockProposal(proposal *messages.BlockProposal) error {
 
 	block := &flow.Block{
-		Header:  *proposal.Header,
-		Payload: *proposal.Payload,
+		Header:  proposal.Header,
+		Payload: proposal.Payload,
 	}
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(block)).
-		Uint64("block_view", block.View).
+		Uint64("block_view", block.Header.View).
 		Msg("received block")
 
 	e.mc.StartBlockReceivedToExecuted(block.ID())
@@ -233,7 +239,7 @@ func (e *Engine) handleBlockProposal(proposal *messages.BlockProposal) error {
 			return nil
 		}
 
-		stateCommitment, err := e.execState.StateCommitmentByBlockID(block.ParentID)
+		stateCommitment, err := e.execState.StateCommitmentByBlockID(block.Header.ParentID)
 		// if state commitment doesn't exist and there are no known blocks which will produce
 		// it soon (execution queue) that we save it as orphaned
 		if err == storage.ErrNotFound {
@@ -408,7 +414,9 @@ func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse)
 		if executableBlock.IsComplete() {
 
 			e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("block complete - executing")
-
+			if e.extensiveLogging {
+				e.logExecutableBlock(executableBlock)
+			}
 			e.wg.Add(1)
 			go e.executeBlock(executableBlock)
 		}
@@ -478,7 +486,7 @@ func (e *Engine) onExecutionStateSyncRequest(originID flow.Identifier, req *mess
 }
 
 func (e *Engine) clearCollectionsCache(block *entity.ExecutableBlock, backdata *stdmap.BlockByCollectionBackdata) {
-	for _, collection := range block.Block.Guarantees {
+	for _, collection := range block.Block.Payload.Guarantees {
 		backdata.Rem(collection.ID())
 	}
 }
@@ -510,7 +518,7 @@ func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Que
 
 func (e *Engine) sendCollectionsRequest(executableBlock *entity.ExecutableBlock, backdata *stdmap.BlockByCollectionBackdata) error {
 
-	for _, guarantee := range executableBlock.Block.Guarantees {
+	for _, guarantee := range executableBlock.Block.Payload.Guarantees {
 
 		// TODO - Once collection can map to multiple blocks
 		maybeBlockByCollection, err := backdata.ByID(guarantee.ID())
@@ -537,7 +545,7 @@ func (e *Engine) sendCollectionsRequest(executableBlock *entity.ExecutableBlock,
 				Hex("collection_id", logging.ID(guarantee.ID())).
 				Msg("requesting collection")
 
-			err = e.collectionConduit.Submit(&messages.CollectionRequest{ID: guarantee.ID()}, collectionGuaranteesIdentifiers...)
+			err = e.collectionConduit.Submit(&messages.CollectionRequest{ID: guarantee.ID(), Nonce: rand.Uint64()}, collectionGuaranteesIdentifiers...)
 			if err != nil {
 				// TODO - this should be handled, maybe retried or put into some form of a queue
 				e.log.Err(err).Msg("cannot submit collection requests")
@@ -594,7 +602,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 		Hex("block_id", logging.ID(result.ExecutableBlock.Block.ID())).
 		Msg("received computation result")
 
-	receipt, err := e.saveExecutionResults(result.ExecutableBlock.Block, result.StateSnapshots, result.Events, startState)
+	receipt, err := e.saveExecutionResults(result.ExecutableBlock.Block, result.StateSnapshots, result.Events, result.TransactionResult, startState)
 	if err != nil {
 		return nil, err
 	}
@@ -607,7 +615,7 @@ func (e *Engine) handleComputationResult(result *execution.ComputationResult, st
 	return receipt.ExecutionResult.FinalStateCommit, nil
 }
 
-func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*delta.Snapshot, events []flow.Event, startState flow.StateCommitment) (*flow.ExecutionReceipt, error) {
+func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*delta.Snapshot, events []flow.Event, txResults []flow.TransactionResult, startState flow.StateCommitment) (*flow.ExecutionReceipt, error) {
 
 	originalState := startState
 
@@ -654,7 +662,7 @@ func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*de
 		return nil, fmt.Errorf("failed to store state commitment: %w", err)
 	}
 
-	err = e.execState.UpdateHighestExecutedBlockIfHigher(&block.Header)
+	err = e.execState.UpdateHighestExecutedBlockIfHigher(block.Header)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update highest executed block: %w", err)
 	}
@@ -676,6 +684,13 @@ func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*de
 		}
 	}
 
+	for _, te := range txResults {
+		err = e.transactionResults.Store(block.ID(), &te)
+		if err != nil {
+			return nil, fmt.Errorf("failed to store transaction error: %w", err)
+		}
+	}
+
 	e.log.Debug().Hex("block_id", logging.Entity(block)).Hex("start_state", originalState).Hex("final_state", endState).Msg("saved computation results")
 
 	err = e.providerEngine.BroadcastExecutionReceipt(receipt)
@@ -684,6 +699,36 @@ func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*de
 	}
 
 	return receipt, nil
+}
+
+// logExecutableBlock logs all data about an executable block
+// over time we should skip this
+func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
+	// log block
+	e.log.Info().
+		Hex("block_id", logging.Entity(eb.Block)).
+		Hex("prev_block_id", logging.ID(eb.Block.Header.ParentID)).
+		Int("block_height", int(eb.Block.Header.Height)).
+		Int("number_of_collections", len(eb.Collections())).
+		RawJSON("block_header", logging.AsJSON(eb.Block.Header)).
+		Msg("extensive log: block header")
+
+	// logs transactions
+	for i, col := range eb.Collections() {
+		for j, tx := range col.Transactions {
+			e.log.Info().
+				Hex("block_id", logging.Entity(eb.Block)).
+				Int("block_height", int(eb.Block.Header.Height)).
+				Hex("prev_block_id", logging.ID(eb.Block.Header.ParentID)).
+				Int("collection_index", i).
+				Int("tx_index", j).
+				Hex("collection_id", logging.ID(col.Guarantee.CollectionID)).
+				Hex("tx_hash", logging.Entity(tx)).
+				Hex("start_state_commitment", eb.StartState).
+				RawJSON("transaction", logging.AsJSON(tx)).
+				Msg("extensive log: executed tx content")
+		}
+	}
 }
 
 // generateChunk creates a chunk from the provided computation data.
@@ -712,7 +757,7 @@ func (e *Engine) generateExecutionResultForBlock(
 	endState flow.StateCommitment,
 ) (*flow.ExecutionResult, error) {
 
-	previousErID, err := e.execState.GetExecutionResultID(block.ParentID)
+	previousErID, err := e.execState.GetExecutionResultID(block.Header.ParentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get previous execution result ID: %w", err)
 	}
@@ -762,7 +807,7 @@ func (e *Engine) StartSync(firstKnown *entity.ExecutableBlock) {
 	// this way we maximise chance of path existing between it and fresh one
 	// TODO - this doesn't make sense if we treat every block as finalized (MVP)
 
-	targetBlockID := firstKnown.Block.ParentID
+	targetBlockID := firstKnown.Block.Header.ParentID
 
 	e.syncTargetBlockID.Store(targetBlockID)
 
@@ -773,7 +818,7 @@ func (e *Engine) StartSync(firstKnown *entity.ExecutableBlock) {
 		e.log.Fatal().Err(err).Msg("error while starting sync - cannot find highest executed block")
 	}
 
-	e.log.Debug().Msgf("sync from height %d to height %d", lastExecutedHeight, firstKnown.Block.Height-1)
+	e.log.Debug().Msgf("sync from height %d to height %d", lastExecutedHeight, firstKnown.Block.Header.Height-1)
 
 	otherNodes, err := e.state.Final().Identities(filter.And(filter.HasRole(flow.RoleExecution), e.me.NotMeFilter()))
 	if err != nil {
@@ -859,7 +904,8 @@ func (e *Engine) saveDelta(executionStateDelta *messages.ExecutionStateDelta) {
 	}
 
 	//TODO - validate state sync, reject invalid messages, change provider
-	executionReceipt, err := e.saveExecutionResults(executionStateDelta.Block, executionStateDelta.StateInteractions, executionStateDelta.Events, executionStateDelta.StartState)
+	executionReceipt, err := e.saveExecutionResults(executionStateDelta.Block, executionStateDelta.StateInteractions,
+		executionStateDelta.Events, executionStateDelta.TransactionResults, executionStateDelta.StartState)
 	if err != nil {
 		e.log.Fatal().Hex("block_id", logging.Entity(executionStateDelta.Block)).Err(err).Msg("fatal error while processing sync message")
 	}
@@ -881,7 +927,7 @@ func (e *Engine) saveDelta(executionStateDelta *messages.ExecutionStateDelta) {
 			var syncedQueue *queue.Queue
 			hadQueue := false
 			for _, q := range orphanQueues.All() {
-				if q.Head.Item.(*entity.ExecutableBlock).Block.ParentID == targetBlockID {
+				if q.Head.Item.(*entity.ExecutableBlock).Block.Header.ParentID == targetBlockID {
 					syncedQueue = q
 					hadQueue = true
 					break

@@ -1,6 +1,8 @@
 package ingestion
 
 import (
+	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -11,6 +13,18 @@ import (
 	realStorage "github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
+
+type colReqMatcher struct {
+	req *messages.CollectionRequest
+}
+
+func (c *colReqMatcher) Matches(x interface{}) bool {
+	other := x.(*messages.CollectionRequest)
+	return c.req.ID == other.ID
+}
+func (c *colReqMatcher) String() string {
+	return fmt.Sprintf("ID %x", c.req.ID)
+}
 
 func TestCollectionRequests(t *testing.T) {
 
@@ -24,19 +38,28 @@ func TestCollectionRequests(t *testing.T) {
 		guarantees[1].SignerIDs = []flow.Identifier{collection2Identity.NodeID}
 		guarantees[2].SignerIDs = []flow.Identifier{collection2Identity.NodeID, collection3Identity.NodeID}
 
-		block.Guarantees = guarantees
-		block.PayloadHash = block.Payload.Hash()
+		block.Payload.Guarantees = guarantees
+		block.Header.PayloadHash = block.Payload.Hash()
 
 		ctx.blocks.EXPECT().Store(gomock.Eq(&block))
 		ctx.state.On("AtBlockID", block.ID()).Return(ctx.snapshot).Maybe()
 
-		ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: guarantees[0].ID()}), gomock.Eq([]flow.Identifier{collection1Identity.NodeID, collection3Identity.NodeID}))
+		ctx.collectionConduit.EXPECT().Submit(
+			&colReqMatcher{req: &messages.CollectionRequest{ID: guarantees[0].ID(), Nonce: rand.Uint64()}},
+			gomock.Eq([]flow.Identifier{collection1Identity.NodeID, collection3Identity.NodeID}),
+		)
 
-		ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: guarantees[1].ID()}), gomock.Eq(collection2Identity.NodeID))
+		ctx.collectionConduit.EXPECT().Submit(
+			&colReqMatcher{req: &messages.CollectionRequest{ID: guarantees[1].ID(), Nonce: rand.Uint64()}},
+			gomock.Eq(collection2Identity.NodeID),
+		)
 
-		ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: guarantees[2].ID()}), gomock.Eq([]flow.Identifier{collection2Identity.NodeID, collection3Identity.NodeID}))
+		ctx.collectionConduit.EXPECT().Submit(
+			&colReqMatcher{req: &messages.CollectionRequest{ID: guarantees[2].ID(), Nonce: rand.Uint64()}},
+			gomock.Eq([]flow.Identifier{collection2Identity.NodeID, collection3Identity.NodeID}),
+		)
 
-		ctx.executionState.On("StateCommitmentByBlockID", block.ParentID).Return(unittest.StateCommitmentFixture(), nil)
+		ctx.executionState.On("StateCommitmentByBlockID", block.Header.ParentID).Return(unittest.StateCommitmentFixture(), nil)
 
 		proposal := unittest.ProposalFromBlock(&block)
 		err := ctx.engine.ProcessLocal(proposal)
@@ -57,15 +80,15 @@ func TestNoCollectionRequestsIfParentMissing(t *testing.T) {
 		guarantees[1].SignerIDs = []flow.Identifier{collection2Identity.NodeID}
 		guarantees[2].SignerIDs = []flow.Identifier{collection2Identity.NodeID, collection3Identity.NodeID}
 
-		block.Guarantees = guarantees
-		block.PayloadHash = block.Payload.Hash()
+		block.Payload.Guarantees = guarantees
+		block.Header.PayloadHash = block.Payload.Hash()
 
 		ctx.blocks.EXPECT().Store(gomock.Eq(&block))
 		ctx.state.On("AtBlockID", block.ID()).Return(ctx.snapshot).Maybe()
 
 		ctx.collectionConduit.EXPECT().Submit(gomock.Any(), gomock.Any()).Times(0)
 
-		ctx.executionState.On("StateCommitmentByBlockID", block.ParentID).Return(nil, realStorage.ErrNotFound)
+		ctx.executionState.On("StateCommitmentByBlockID", block.Header.ParentID).Return(nil, realStorage.ErrNotFound)
 
 		proposal := unittest.ProposalFromBlock(&block)
 		err := ctx.engine.ProcessLocal(proposal)
@@ -87,8 +110,11 @@ func TestValidatingCollectionResponse(t *testing.T) {
 
 		ctx.state.On("AtBlockID", executableBlock.Block.ID()).Return(ctx.snapshot).Maybe()
 
-		ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: id}), gomock.Eq(collection1Identity.NodeID)).Return(nil)
-		ctx.executionState.On("StateCommitmentByBlockID", executableBlock.Block.ParentID).Return(executableBlock.StartState, nil)
+		ctx.collectionConduit.EXPECT().Submit(
+			&colReqMatcher{req: &messages.CollectionRequest{ID: id, Nonce: rand.Uint64()}},
+			gomock.Eq(collection1Identity.NodeID),
+		).Return(nil)
+		ctx.executionState.On("StateCommitmentByBlockID", executableBlock.Block.Header.ParentID).Return(executableBlock.StartState, nil)
 
 		proposal := unittest.ProposalFromBlock(executableBlock.Block)
 		err := ctx.engine.ProcessLocal(proposal)
@@ -110,7 +136,7 @@ func TestValidatingCollectionResponse(t *testing.T) {
 		// no interaction with conduit for finished executableBlock
 		// </TODO enable>
 
-		//ctx.executionState.On("StateCommitmentByBlockID", executableBlock.Block.ParentID).Return(unittest.StateCommitmentFixture(), realStorage.ErrNotFound)
+		//ctx.executionState.On("StateCommitmentByBlockID", executableBlock.Block.Header.ParentID).Return(unittest.StateCommitmentFixture(), realStorage.ErrNotFound)
 
 		ctx.assertSuccessfulBlockComputation(executableBlock, unittest.IdentifierFixture())
 
@@ -131,14 +157,17 @@ func TestNoBlockExecutedUntilAllCollectionsArePosted(t *testing.T) {
 			},
 		)
 
-		for _, col := range executableBlock.Block.Guarantees {
-			ctx.collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collection1Identity.NodeID))
+		for _, col := range executableBlock.Block.Payload.Guarantees {
+			ctx.collectionConduit.EXPECT().Submit(
+				&colReqMatcher{req: &messages.CollectionRequest{ID: col.ID(), Nonce: rand.Uint64()}},
+				gomock.Eq(collection1Identity.NodeID),
+			)
 		}
 
 		ctx.state.On("AtBlockID", executableBlock.ID()).Return(ctx.snapshot)
 
 		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlock.Block))
-		ctx.executionState.On("StateCommitmentByBlockID", executableBlock.Block.ParentID).Return(unittest.StateCommitmentFixture(), nil)
+		ctx.executionState.On("StateCommitmentByBlockID", executableBlock.Block.Header.ParentID).Return(unittest.StateCommitmentFixture(), nil)
 
 		proposal := unittest.ProposalFromBlock(executableBlock.Block)
 		err := ctx.engine.ProcessLocal(proposal)

@@ -2,9 +2,11 @@ package chunks_test
 
 import (
 	"errors"
+	"math/rand"
 	"testing"
+	"time"
 
-	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
@@ -25,6 +27,8 @@ type ChunkVerifierTestSuite struct {
 // Make sure variables are set properly
 // SetupTest is executed prior to each individual test in this test suite
 func (s *ChunkVerifierTestSuite) SetupTest() {
+	// seed the RNG
+	rand.Seed(time.Now().UnixNano())
 	s.verifier = chunks.NewChunkVerifier(&virtualMachineMock{})
 }
 
@@ -124,8 +128,8 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 	header := unittest.BlockHeaderFixture()
 	header.PayloadHash = payload.Hash()
 	block := flow.Block{
-		Header:  header,
-		Payload: payload,
+		Header:  &header,
+		Payload: &payload,
 	}
 
 	// registerTouch and State setup
@@ -144,7 +148,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 
 	var verifiableChunk verification.VerifiableChunk
 
-	unittest.RunWithTempDBDir(t, func(dbDir string) {
+	unittest.RunWithTempDir(t, func(dbDir string) {
 		f, _ := ledger.NewTrieStorage(dbDir)
 		startState, _ := f.UpdateRegisters(ids, values, f.EmptyStateCommitment())
 		regTs, _ := f.GetRegisterTouches(ids, startState)
@@ -213,7 +217,7 @@ func (bc *blockContextMock) ExecuteTransaction(
 		ledger.Set(id1, UpdatedValue1)
 		txRes = virtualmachine.TransactionResult{
 			TransactionID: unittest.IdentifierFixture(),
-			Events:        []runtime.Event{},
+			Events:        []cadence.Event{},
 			Logs:          []string{"log1", "log2"},
 			Error:         nil,
 			GasUsed:       0,
@@ -225,7 +229,7 @@ func (bc *blockContextMock) ExecuteTransaction(
 		ledger.Set(id1, UpdatedValue1)
 		txRes = virtualmachine.TransactionResult{
 			TransactionID: unittest.IdentifierFixture(),
-			Events:        []runtime.Event{},
+			Events:        []cadence.Event{},
 			Logs:          nil,
 			Error:         errors.New("runtime error"), // inside the runtime (e.g. div by zero, access account)
 			GasUsed:       0,
@@ -239,7 +243,7 @@ func (bc *blockContextMock) ExecuteTransaction(
 		ledger.Set(id2, UpdatedValue2)
 		txRes = virtualmachine.TransactionResult{
 			TransactionID: unittest.IdentifierFixture(),
-			Events:        []runtime.Event{},
+			Events:        []cadence.Event{},
 			Logs:          []string{"log1", "log2"},
 			Error:         nil,
 			GasUsed:       0,

@@ -1,7 +1,9 @@
 package collection_test
 
 import (
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -23,8 +25,11 @@ import (
 func TestFinalizer(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
+		// seed the RNG
+		rand.Seed(time.Now().UnixNano())
+
 		genesis := model.Genesis()
-		chainID := genesis.ChainID
+		chainID := genesis.Header.ChainID
 
 		state, err := cluster.NewState(db, chainID)
 		require.NoError(t, err)
@@ -108,7 +113,7 @@ func TestFinalizer(t *testing.T) {
 
 			// create a new block that isn't connected to a parent
 			block := unittest.ClusterBlockWithParent(genesis)
-			block.ParentID = unittest.IdentifierFixture()
+			block.Header.ParentID = unittest.IdentifierFixture()
 			insert(block)
 
 			// try to finalize - this should fail
@@ -180,8 +185,8 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block.Payload.Collection.ID(),
-					SignerIDs:    block.ParentVoterIDs,
-					Signature:    block.ParentVoterSig,
+					SignerIDs:    block.Header.ParentVoterIDs,
+					Signature:    block.Header.ParentVoterSig,
 				},
 			})
 		})
@@ -231,15 +236,15 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block1.Payload.Collection.ID(),
-					SignerIDs:    block1.ParentVoterIDs,
-					Signature:    block1.ParentVoterSig,
+					SignerIDs:    block1.Header.ParentVoterIDs,
+					Signature:    block1.Header.ParentVoterSig,
 				},
 			})
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block2.Payload.Collection.ID(),
-					SignerIDs:    block2.ParentVoterIDs,
-					Signature:    block2.ParentVoterSig,
+					SignerIDs:    block2.Header.ParentVoterIDs,
+					Signature:    block2.Header.ParentVoterSig,
 				},
 			})
 		})
@@ -288,8 +293,8 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block1.Payload.Collection.ID(),
-					SignerIDs:    block1.ParentVoterIDs,
-					Signature:    block1.ParentVoterSig,
+					SignerIDs:    block1.Header.ParentVoterIDs,
+					Signature:    block1.Header.ParentVoterSig,
 				},
 			})
 		})
@@ -340,8 +345,8 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block1.Payload.Collection.ID(),
-					SignerIDs:    block1.ParentVoterIDs,
-					Signature:    block1.ParentVoterSig,
+					SignerIDs:    block1.Header.ParentVoterIDs,
+					Signature:    block1.Header.ParentVoterSig,
 				},
 			})
 		})

@@ -40,7 +40,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.C
 		ids = append(ids, id1, id2)
 		values = append(values, value1, value2)
 
-		unittest.RunWithTempDBDir(t, func(dir string) {
+		unittest.RunWithTempDir(t, func(dir string) {
 			f, err := ledger.NewTrieStorage(dir)
 			defer f.Done()
 			require.NoError(t, err)
@@ -70,7 +70,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.C
 	}
 
 	payload := flow.Payload{
-		Identities: unittest.IdentityListFixture(32),
+		Identities: nil,
 		Guarantees: guarantees,
 	}
 	header := unittest.BlockHeaderFixture()
@@ -78,8 +78,8 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.C
 	header.PayloadHash = payload.Hash()
 
 	block := flow.Block{
-		Header:  header,
-		Payload: payload,
+		Header:  &header,
+		Payload: &payload,
 	}
 
 	result := flow.ExecutionResult{

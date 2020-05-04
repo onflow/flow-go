@@ -14,8 +14,8 @@ const (
 	// special database markers
 	codeBoundary             = 1 // latest finalized block number
 	codeFinalizedBlockNumber = 2 // lookup for block by number
-	codeDelta                = 3 // history of stake changes
 	codeView                 = 4 // persisting the latest view for hotstuff
+	codeMax                  = 5 // keeps track of the maximum key size
 
 	// block header and entities included in block contents
 	codeHeader    = 10
@@ -30,12 +30,12 @@ const (
 	codeExecutionResult = 24
 	// codeReceipt       = 25
 	// codeApproval      = 26
-	// codeChunkHeader                = 27
+	// codeChunkHeader   = 27
 	codeChunkDataPack              = 28
 	codeEvent                      = 29
 	codeExecutionStateInteractions = 30
+	codeTransactionResult          = 31
 
-	codeIndexIdentity                = 100
 	codeIndexGuarantee               = 101
 	codeIndexSeal                    = 102
 	codeIndexCollection              = 104

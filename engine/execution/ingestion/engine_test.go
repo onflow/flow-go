@@ -84,6 +84,8 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	payloads := storage.NewMockPayloads(ctrl)
 	collections := storage.NewMockCollections(ctrl)
 	events := storage.NewMockEvents(ctrl)
+	txResults := storage.NewMockTransactionResults(ctrl)
+
 	computationEngine := new(computation.ComputationManager)
 	providerEngine := new(provider.ProviderEngine)
 	protocolState := new(protocol.State)
@@ -124,7 +126,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.ExecutionSync)), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 
-	engine, err = New(log, net, me, protocolState, blocks, payloads, collections, events, computationEngine, providerEngine, executionState, 21, metrics)
+	engine, err = New(log, net, me, protocolState, blocks, payloads, collections, events, txResults, computationEngine, providerEngine, executionState, 21, metrics, false)
 	require.NoError(t, err)
 
 	f(testingContext{
@@ -163,11 +165,11 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 		})).Return(nil)
 	}
 
-	ctx.executionState.On("GetExecutionResultID", executableBlock.Block.ParentID).Return(func(blockID flow.Identifier) flow.Identifier {
+	ctx.executionState.On("GetExecutionResultID", executableBlock.Block.Header.ParentID).Return(func(blockID flow.Identifier) flow.Identifier {
 		return previousExecutionResultID
 	}, nil)
 
-	ctx.executionState.On("UpdateHighestExecutedBlockIfHigher", &executableBlock.Block.Header).Return(nil)
+	ctx.executionState.On("UpdateHighestExecutedBlockIfHigher", executableBlock.Block.Header).Return(nil)
 
 	ctx.executionState.On("PersistExecutionResult", executableBlock.Block.ID(), mock.MatchedBy(func(er flow.ExecutionResult) bool {
 		return er.BlockID == executableBlock.Block.ID() && er.PreviousResultID == previousExecutionResultID
@@ -204,7 +206,7 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 	endState := unittest.StateCommitmentFixture()
 	previousExecutionResultID := unittest.IdentifierFixture()
 
-	execState.On("GetExecutionResultID", executableBlock.Block.ParentID).Return(previousExecutionResultID, nil)
+	execState.On("GetExecutionResultID", executableBlock.Block.Header.ParentID).Return(previousExecutionResultID, nil)
 	execState.On("PersistExecutionResult", executableBlock.Block.ID(), mock.Anything).Return(nil)
 
 	er, err := e.generateExecutionResultForBlock(executableBlock.Block, nil, endState)
@@ -220,9 +222,9 @@ func TestBlockOutOfOrder(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
 
 		executableBlockA := unittest.ExecutableBlockFixture(nil)
-		executableBlockB := unittest.ExecutableBlockFixtureWithParent(nil, &executableBlockA.Block.Header)
-		executableBlockC := unittest.ExecutableBlockFixtureWithParent(nil, &executableBlockA.Block.Header)
-		executableBlockD := unittest.ExecutableBlockFixtureWithParent(nil, &executableBlockC.Block.Header)
+		executableBlockB := unittest.ExecutableBlockFixtureWithParent(nil, executableBlockA.Block.Header)
+		executableBlockC := unittest.ExecutableBlockFixtureWithParent(nil, executableBlockA.Block.Header)
+		executableBlockD := unittest.ExecutableBlockFixtureWithParent(nil, executableBlockC.Block.Header)
 		executableBlockA.StartState = unittest.StateCommitmentFixture()
 
 		// blocks has no collections, so state is essentially the same
@@ -252,19 +254,19 @@ func TestBlockOutOfOrder(t *testing.T) {
 		proposalD := unittest.ProposalFromBlock(executableBlockD.Block)
 
 		// no execution state, so puts to waiting queue
-		ctx.executionState.On("StateCommitmentByBlockID", executableBlockB.Block.ParentID).Return(nil, realStorage.ErrNotFound)
+		ctx.executionState.On("StateCommitmentByBlockID", executableBlockB.Block.Header.ParentID).Return(nil, realStorage.ErrNotFound)
 		err := ctx.engine.handleBlockProposal(proposalB)
 		require.NoError(t, err)
 
 		// no execution state, no connection to other nodes
-		ctx.executionState.On("StateCommitmentByBlockID", executableBlockC.Block.ParentID).Return(nil, realStorage.ErrNotFound)
+		ctx.executionState.On("StateCommitmentByBlockID", executableBlockC.Block.Header.ParentID).Return(nil, realStorage.ErrNotFound)
 		err = ctx.engine.handleBlockProposal(proposalC)
 		require.NoError(t, err)
 
 		// child of c so no need to query execution state
 
 		// we account for every call, so if this call would have happen, test will fail
-		// ctx.executionState.On("StateCommitmentByBlockID", executableBlockD.Block.ParentID).Return(nil, realStorage.ErrNotFound)
+		// ctx.executionState.On("StateCommitmentByBlockID", executableBlockD.Block.Header.ParentID).Return(nil, realStorage.ErrNotFound)
 		err = ctx.engine.handleBlockProposal(proposalD)
 		require.NoError(t, err)
 
@@ -279,7 +281,7 @@ func TestBlockOutOfOrder(t *testing.T) {
 		ctx.assertSuccessfulBlockComputation(executableBlockC, blockAExecutionResultID)
 		ctx.assertSuccessfulBlockComputation(executableBlockD, unittest.IdentifierFixture())
 
-		ctx.executionState.On("StateCommitmentByBlockID", executableBlockA.Block.ParentID).Return(executableBlockA.StartState, nil)
+		ctx.executionState.On("StateCommitmentByBlockID", executableBlockA.Block.Header.ParentID).Return(executableBlockA.StartState, nil)
 		err = ctx.engine.handleBlockProposal(proposalA)
 		require.NoError(t, err)
 
@@ -300,7 +302,7 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 		executableBlock.StartState = unittest.StateCommitmentFixture()
 
 		snapshot := new(protocol.Snapshot)
-		snapshot.On("Head").Return(&executableBlock.Block.Header, nil)
+		snapshot.On("Head").Return(executableBlock.Block.Header, nil)
 
 		// Add all data needed for execution of script
 		ctx.executionState.On("StateCommitmentByBlockID", executableBlock.Block.ID()).Return(executableBlock.StartState, nil)
@@ -309,7 +311,7 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 		ctx.executionState.On("NewView", executableBlock.StartState).Return(view)
 
 		// Successful call to computation manager
-		ctx.computationManager.On("ExecuteScript", script, &executableBlock.Block.Header, view).Return(scriptResult, nil)
+		ctx.computationManager.On("ExecuteScript", script, executableBlock.Block.Header, view).Return(scriptResult, nil)
 
 		// Execute our script and expect no error
 		res, err := ctx.engine.ExecuteScriptAtBlockID(script, executableBlock.Block.ID())

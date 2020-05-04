@@ -46,9 +46,7 @@ func BenchmarkECDSASecp256k1Verify(b *testing.B) {
 	benchVerify(b, ECDSASecp256k1, halg)
 }
 
-// ECDSA tests
-
-// TestBLSEncodeDecode tests encoding and decoding of ECDSA keys
+// TestECDSAEncodeDecode tests encoding and decoding of ECDSA keys
 func TestECDSAEncodeDecode(t *testing.T) {
 	ecdsaCurves := []SigningAlgorithm{
 		ECDSAP256,

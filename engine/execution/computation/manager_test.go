@@ -31,10 +31,10 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	}
 
 	block := flow.Block{
-		Header: flow.Header{
+		Header: &flow.Header{
 			View: 42,
 		},
-		Payload: flow.Payload{
+		Payload: &flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
 		},
 	}

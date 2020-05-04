@@ -4,8 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/cadence"
-	encoding "github.com/onflow/cadence/encoding/xdr"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -79,7 +78,7 @@ func (bc *blockContext) ExecuteTransaction(
 	location := runtime.TransactionLocation(txID[:])
 
 	ctx := bc.newTransactionContext(ledger, tx, options...)
-	err := bc.vm.executeTransaction(tx.Script, ctx, location)
+	err := bc.vm.executeTransaction(tx.Script, tx.Arguments, ctx, location)
 	if err != nil {
 		if errors.As(err, &runtime.Error{}) {
 			// runtime errors occur when the execution reverts
@@ -139,28 +138,19 @@ func (bc *blockContext) GetAccount(ledger Ledger, address flow.Address) *flow.Ac
 	return account
 }
 
-// ConvertEvents creates flow.Events from runtime.events
+// ConvertEvents converts events of type cadence.Event to flow.Event
 func ConvertEvents(txIndex uint32, tr *TransactionResult) ([]flow.Event, error) {
 
 	flowEvents := make([]flow.Event, len(tr.Events))
 
 	for i, event := range tr.Events {
-		fields := make([]cadence.Value, len(event.Fields))
-
-		for j, field := range event.Fields {
-			convertedField := cadence.ConvertValue(field)
-			fields[j] = convertedField
-		}
-
-		eventValue := cadence.NewEvent(fields)
-
-		payload, err := encoding.Encode(eventValue)
+		payload, err := jsoncdc.Encode(event)
 		if err != nil {
 			return nil, fmt.Errorf("failed to encode event: %w", err)
 		}
 
 		flowEvents[i] = flow.Event{
-			Type:             flow.EventType(event.Type.ID()),
+			Type:             flow.EventType(event.EventType.ID()),
 			TransactionID:    tr.TransactionID,
 			TransactionIndex: txIndex,
 			EventIndex:       uint32(i),

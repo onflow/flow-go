@@ -4,7 +4,6 @@ package operation
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -15,6 +14,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
@@ -29,10 +29,10 @@ type Entity struct {
 	ID uint64
 }
 
-type UnencodeableEntity bool
+type UnencodeableEntity Entity
 
-var errCantEncode = fmt.Errorf("MarshalJSON not supported")
-var errCantDecode = fmt.Errorf("UnmarshalJSON not supported")
+var errCantEncode = fmt.Errorf("encoding not supported")
+var errCantDecode = fmt.Errorf("decoding not supported")
 
 func (a UnencodeableEntity) MarshalJSON() ([]byte, error) {
 	return nil, errCantEncode
@@ -42,11 +42,19 @@ func (a *UnencodeableEntity) UnmarshalJSON(b []byte) error {
 	return errCantDecode
 }
 
+func (a UnencodeableEntity) MarshalMsgpack() ([]byte, error) {
+	return nil, errCantEncode
+}
+
+func (a UnencodeableEntity) UnmarshalMsgpack(b []byte) error {
+	return errCantDecode
+}
+
 func TestInsertValid(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
-		val := []byte(`{"ID":1337}`)
+		val, _ := msgpack.Marshal(e)
 
 		err := db.Update(insert(key, e))
 		require.NoError(t, err)
@@ -68,7 +76,7 @@ func TestInsertDuplicate(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
-		val := []byte(`{"ID":1337}`)
+		val, _ := msgpack.Marshal(e)
 
 		// persist first time
 		err := db.Update(insert(key, e))
@@ -97,9 +105,10 @@ func TestInsertDuplicate(t *testing.T) {
 
 func TestInsertEncodingError(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
 
-		err := db.Update(insert(key, UnencodeableEntity(true)))
+		err := db.Update(insert(key, UnencodeableEntity(e)))
 
 		require.True(t, errors.Is(err, errCantEncode))
 	})
@@ -107,8 +116,9 @@ func TestInsertEncodingError(t *testing.T) {
 
 func TestCheckTrue(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
-		val := []byte(`{"ID":1337}`)
+		val, _ := msgpack.Marshal(e)
 
 		_ = db.Update(func(tx *badger.Txn) error {
 			err := tx.Set(key, val)
@@ -138,7 +148,7 @@ func TestUpdateValid(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
-		val := []byte(`{"ID":1337}`)
+		val, _ := msgpack.Marshal(e)
 
 		_ = db.Update(func(tx *badger.Txn) error {
 			err := tx.Set(key, []byte{})
@@ -181,8 +191,9 @@ func TestUpdateMissing(t *testing.T) {
 
 func TestUpdateEncodingError(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
-		val := []byte(`{"ID":1337}`)
+		val, _ := msgpack.Marshal(e)
 
 		_ = db.Update(func(tx *badger.Txn) error {
 			err := tx.Set(key, val)
@@ -190,7 +201,7 @@ func TestUpdateEncodingError(t *testing.T) {
 			return nil
 		})
 
-		err := db.Update(update(key, UnencodeableEntity(true)))
+		err := db.Update(update(key, UnencodeableEntity(e)))
 		require.True(t, errors.Is(err, errCantEncode))
 
 		// ensure value did not change
@@ -211,7 +222,7 @@ func TestRetrieveValid(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
-		val := []byte(`{"ID":1337}`)
+		val, _ := msgpack.Marshal(e)
 
 		_ = db.Update(func(tx *badger.Txn) error {
 			err := tx.Set(key, val)
@@ -239,8 +250,9 @@ func TestRetrieveMissing(t *testing.T) {
 
 func TestRetrieveUnencodeable(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
-		val := []byte(`{"ID":1337}`)
+		val, _ := msgpack.Marshal(e)
 
 		_ = db.Update(func(tx *badger.Txn) error {
 			err := tx.Set(key, val)
@@ -248,7 +260,7 @@ func TestRetrieveUnencodeable(t *testing.T) {
 			return nil
 		})
 
-		var act UnencodeableEntity
+		var act *UnencodeableEntity
 		err := db.View(retrieve(key, &act))
 		require.True(t, errors.Is(err, errCantDecode))
 	})
@@ -283,12 +295,12 @@ func TestLookup(t *testing.T) {
 func TestIterate(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		keys := [][]byte{[]byte{0x00}, []byte{0x12}, []byte{0xf0}, []byte{0xff}}
-		vals := []bool{false, false, true, false}
+		vals := []bool{false, false, true, true}
 		expected := []bool{false, true}
 
 		_ = db.Update(func(tx *badger.Txn) error {
 			for i, key := range keys {
-				enc, err := json.Marshal(vals[i])
+				enc, err := msgpack.Marshal(vals[i])
 				require.NoError(t, err)
 				err = tx.Set(key, enc)
 				require.NoError(t, err)
@@ -327,7 +339,7 @@ func TestTraverse(t *testing.T) {
 
 		_ = db.Update(func(tx *badger.Txn) error {
 			for i, key := range keys {
-				enc, err := json.Marshal(vals[i])
+				enc, err := msgpack.Marshal(vals[i])
 				require.NoError(t, err)
 				err = tx.Set(key, enc)
 				require.NoError(t, err)
@@ -360,8 +372,9 @@ func TestTraverse(t *testing.T) {
 
 func TestRemove(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
-		val := []byte(`{"ID":1337}`)
+		val, _ := msgpack.Marshal(e)
 
 		_ = db.Update(func(tx *badger.Txn) error {
 			err := tx.Set(key, val)
@@ -417,6 +430,14 @@ func TestIterateBoundaries(t *testing.T) {
 		// after end -> not included in range
 		{0x21, 0x00},
 	}
+
+	// set the maximum current DB key range
+	for _, key := range keys {
+		if uint32(len(key)) > max {
+			max = uint32(len(key))
+		}
+	}
+
 	// keys within the expected range
 	keysInRange := keys[1:11]
 
@@ -452,14 +473,18 @@ func TestIterateBoundaries(t *testing.T) {
 		// iterate forward and check boundaries are included correctly
 		found = nil
 		err := db.View(iterate(start, end, iteration))
-		t.Log(found)
+		for i, f := range found {
+			t.Logf("forward %d: %x", i, f)
+		}
 		require.NoError(t, err, "should iterate forward without error")
 		assert.ElementsMatch(t, keysInRange, found, "forward iteration should go over correct keys")
 
 		// iterate backward and check boundaries are included correctly
 		found = nil
 		err = db.View(iterate(end, start, iteration))
-		t.Log(found)
+		for i, f := range found {
+			t.Logf("backward %d: %x", i, f)
+		}
 		require.NoError(t, err, "should iterate backward without error")
 		assert.ElementsMatch(t, keysInRange, found, "backward iteration should go over correct keys")
 	})

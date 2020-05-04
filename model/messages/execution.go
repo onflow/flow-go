@@ -23,11 +23,12 @@ type ExecutionStateSyncRequest struct {
 }
 
 type ExecutionStateDelta struct {
-	Block             *flow.Block
-	StateInteractions []*delta.Snapshot
-	StartState        flow.StateCommitment
-	EndState          flow.StateCommitment
-	Events            []flow.Event
+	Block              *flow.Block
+	StateInteractions  []*delta.Snapshot
+	StartState         flow.StateCommitment
+	EndState           flow.StateCommitment
+	Events             []flow.Event
+	TransactionResults []flow.TransactionResult
 }
 
 func (b *ExecutionStateDelta) ID() flow.Identifier {
@@ -39,9 +40,9 @@ func (b *ExecutionStateDelta) Checksum() flow.Identifier {
 }
 
 func (b *ExecutionStateDelta) Height() uint64 {
-	return b.Block.Height
+	return b.Block.Header.Height
 }
 
 func (b *ExecutionStateDelta) ParentID() flow.Identifier {
-	return b.Block.ParentID
+	return b.Block.Header.ParentID
 }

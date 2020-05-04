@@ -47,29 +47,26 @@ var (
 		Namespace: namespaceConsensus,
 		Help:      "The number of collections included in the finalized block",
 	})
-	hotstuffBusyDuration = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name:      "busy_duration",
+	hotstuffBusyDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:      "busy_duration_seconds",
 		Namespace: namespaceConsensus,
 		Subsystem: "hotstuff",
 		Help:      "the duration of how long hotstuff's event loop has been busy processing one event",
+		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
 	}, []string{"event_type"})
-	hotstuffBusySecondsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name:      "busy_seconds_total",
-		Namespace: namespaceConsensus,
-		Subsystem: "hotstuff",
-		Help:      "the total seconds hotstuff has spent in a busy state",
-	}, []string{"event_type"})
-	hotstuffIdleDuration = promauto.NewGauge(prometheus.GaugeOpts{
-		Name:      "idle_duration",
+	hotstuffIdleDuration = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name:      "idle_duration_seconds",
 		Namespace: namespaceConsensus,
 		Subsystem: "hotstuff",
 		Help:      "the duration of how long hotstuff's event loop has been idle without processing any event",
+		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
 	})
-	hotstuffWaitDuration = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name:      "wait_duration",
+	hotstuffWaitDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:      "wait_duration_seconds",
 		Namespace: namespaceConsensus,
 		Subsystem: "hotstuff",
 		Help:      "the duration of how long an event has been waited in the hotstuff event loop queue before being processed.",
+		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
 	}, []string{"event_type"})
 	newviewGauge = promauto.NewGauge(prometheus.GaugeOpts{
 		Name:      "cur_view",
@@ -83,7 +80,43 @@ var (
 		Subsystem: "hotstuff",
 		Help:      "The view of the newest known qc from hotstuff",
 	})
+	blockProposalCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Name:      "block_proposals",
+		Namespace: namespaceConsensus,
+		Help:      "the number of block proposals made",
+	})
+	mempoolGuaranteesSizeGauge = promauto.NewGauge(prometheus.GaugeOpts{
+		Name:      "mempool_guarantees_size",
+		Namespace: namespaceConsensus,
+		Help:      "the size of the guarantees mempool",
+	})
+	mempoolReceiptsSizeGauge = promauto.NewGauge(prometheus.GaugeOpts{
+		Name:      "mempool_receipts_size",
+		Namespace: namespaceConsensus,
+		Help:      "the size of the receipts mempool",
+	})
+	mempoolApprovalsSizeGauge = promauto.NewGauge(prometheus.GaugeOpts{
+		Name:      "mempool_approvals_size",
+		Namespace: namespaceConsensus,
+		Help:      "the size of the approvals mempool",
+	})
+	mempoolSealsSizeGauge = promauto.NewGauge(prometheus.GaugeOpts{
+		Name:      "mempool_seals_size",
+		Namespace: namespaceConsensus,
+		Help:      "the size of the seals mempool",
+	})
+	pendingBlocksGauge = promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespaceConsensus,
+		Subsystem: subsystemCompliance,
+		Name:      "pending_blocks_total",
+		Help:      "number of blocks in pending cache of compliance engine",
+	})
 )
+
+// PendingBlocks sets the number of blocks in the pending cache.
+func (c *Collector) PendingBlocks(n uint) {
+	pendingBlocksGauge.Set(float64(n))
+}
 
 // StartCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized Block
 func (c *Collector) StartCollectionToFinalized(collectionID flow.Identifier) {
@@ -122,18 +155,17 @@ func (c *Collector) SealsInFinalizedBlock(count int) {
 
 // HotStuffBusyDuration reports Metrics C6 HotStuff Busy Duration
 func (c *Collector) HotStuffBusyDuration(duration time.Duration, event string) {
-	hotstuffBusyDuration.WithLabelValues(event).Set(float64(duration))
-	hotstuffBusySecondsTotal.WithLabelValues(event).Add(duration.Seconds())
+	hotstuffBusyDuration.WithLabelValues(event).Observe(duration.Seconds())
 }
 
 // HotStuffIdleDuration reports Metrics C6 HotStuff Idle Duration
 func (c *Collector) HotStuffIdleDuration(duration time.Duration) {
-	hotstuffIdleDuration.Set(float64(duration))
+	hotstuffIdleDuration.Observe(duration.Seconds())
 }
 
 // HotStuffWaitDuration reports Metrics C6 HotStuff Wait Duration
 func (c *Collector) HotStuffWaitDuration(duration time.Duration, event string) {
-	hotstuffWaitDuration.WithLabelValues(event).Set(float64(duration))
+	hotstuffWaitDuration.WithLabelValues(event).Observe(duration.Seconds())
 }
 
 // FinalizedBlocks reports Metric C7: Number of Blocks Finalized (per second)
@@ -149,4 +181,29 @@ func (c *Collector) StartNewView(view uint64) {
 // NewestKnownQC reports Metrics C9: View of Newest Known QC
 func (c *Collector) NewestKnownQC(view uint64) {
 	newestKnownQC.Set(float64(view))
+}
+
+// MadeBlockProposal reports that a block proposal has been made
+func (c *Collector) MadeBlockProposal() {
+	blockProposalCounter.Inc()
+}
+
+// MempoolGuaranteesSize reports the size of the guarantees mempool
+func (c *Collector) MempoolGuaranteesSize(size uint) {
+	mempoolGuaranteesSizeGauge.Set(float64(size))
+}
+
+// MempoolReceiptsSize reports the size of the receipts mempool
+func (c *Collector) MempoolReceiptsSize(size uint) {
+	mempoolReceiptsSizeGauge.Set(float64(size))
+}
+
+// MempoolApprovalsSize reports the size of the approvals mempool
+func (c *Collector) MempoolApprovalsSize(size uint) {
+	mempoolApprovalsSizeGauge.Set(float64(size))
+}
+
+// MempoolSealsSize reports the size of the seals mempool
+func (c *Collector) MempoolSealsSize(size uint) {
+	mempoolSealsSizeGauge.Set(float64(size))
 }

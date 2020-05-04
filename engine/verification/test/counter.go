@@ -103,15 +103,15 @@ func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExe
 	header.PayloadHash = payload.Hash()
 
 	block := flow.Block{
-		Header:  header,
-		Payload: payload,
+		Header:  &header,
+		Payload: &payload,
 	}
 
 	// Setup chunk and chunk data package
 	chunks := make([]*flow.Chunk, 0)
 	chunkDataPacks := make([]*flow.ChunkDataPack, 0)
 
-	unittest.RunWithTempDBDir(t, func(dir string) {
+	unittest.RunWithTempDir(t, func(dir string) {
 		led, err := ledger.NewTrieStorage(dir)
 		require.NoError(t, err)
 		defer led.Done()

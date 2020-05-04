@@ -14,15 +14,17 @@ const chunkExecutionSpanner = "chunk_execution_duration"
 // contains set of functions interacting with the Prometheus server
 var (
 	chunksCheckedPerBlock = promauto.NewCounter(prometheus.CounterOpts{
-		Name:      "verifications_chunks_checked",
+		Name:      "checked_chunks_total",
 		Namespace: namespaceVerification,
 		Help:      "The total number of chunks checked",
 	})
 	resultApprovalsPerBlock = promauto.NewCounter(prometheus.CounterOpts{
-		Name:      "verifications_result_approvals",
+		Name:      "result_approvals_total",
 		Namespace: namespaceVerification,
 		Help:      "The total number of emitted result approvals",
 	})
+
+	// TODO(andrew) This metric is problematic. Label explosion and gauge sampling loss. Refactor needed
 	storagePerChunk = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name:      "verifications_storage_per_chunk",
 		Namespace: namespaceVerification,

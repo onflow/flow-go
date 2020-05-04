@@ -16,20 +16,20 @@ func TestGenerateGenesisQC(t *testing.T) {
 	participantData := createSignerData(t, 3)
 
 	block := unittest.BlockFixture()
-	block.Height = 0
-	block.Identities = flow.IdentityList{
+	block.Payload.Identities = flow.IdentityList{
 		unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection)),
 		unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)),
 		unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
 	}
+	block.Payload.Guarantees = nil
+	block.Payload.Seals = nil
 	for _, participant := range participantData.Participants {
-		block.Identities = append(block.Identities, participant.Identity())
+		block.Payload.Identities = append(block.Payload.Identities, participant.Identity())
 	}
-	block.ParentID = flow.ZeroID
-	block.View = 3
-	block.Seals = []*flow.Seal{&flow.Seal{}}
-	block.Guarantees = nil
-	block.PayloadHash = block.Payload.Hash()
+	block.Header.Height = 0
+	block.Header.ParentID = flow.ZeroID
+	block.Header.View = 3
+	block.Header.PayloadHash = block.Payload.Hash()
 
 	_, err := GenerateGenesisQC(participantData, &block)
 	require.NoError(t, err)

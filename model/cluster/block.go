@@ -7,7 +7,7 @@ import (
 )
 
 func Genesis() *Block {
-	header := flow.Header{
+	header := &flow.Header{
 		View:      0,
 		ChainID:   "",
 		Timestamp: flow.GenesisTime(),
@@ -29,42 +29,24 @@ func Genesis() *Block {
 // Block represents a block in collection node cluster consensus. It contains
 // a standard block header with a payload containing only a single collection.
 type Block struct {
-	flow.Header
-	Payload
+	Header  *flow.Header
+	Payload *Payload
 }
 
 // SetPayload sets the payload and payload hash.
-func (b *Block) SetPayload(payload Payload) {
+func (b *Block) SetPayload(payload *Payload) {
 	b.Payload = payload
-	b.PayloadHash = payload.Hash()
+	b.Header.PayloadHash = payload.Hash()
 }
 
-// Payload is the payload for blocks in collection node cluster consensus.
-// It contains only a single collection.
-type Payload struct {
-	Collection flow.Collection
+// ID returns the ID of the underlying block header.
+func (b *Block) ID() flow.Identifier {
+	return b.Header.ID()
 }
 
-func EmptyPayload() Payload {
-	return PayloadFromTransactions()
-}
-
-// PayloadFromTransactions creates a payload given a list of transaction hashes.
-func PayloadFromTransactions(transactions ...*flow.TransactionBody) Payload {
-	// avoid a nil transaction list
-	if len(transactions) == 0 {
-		transactions = []*flow.TransactionBody{}
-	}
-	return Payload{
-		Collection: flow.Collection{
-			Transactions: transactions,
-		},
-	}
-}
-
-// Hash returns the hash of the payload, simply the ID of the collection.
-func (p Payload) Hash() flow.Identifier {
-	return p.Collection.ID()
+// Checksum returns the checksum of the underlying block header.
+func (b *Block) Checksum() flow.Identifier {
+	return b.Header.Checksum()
 }
 
 // PendingBlock is a wrapper type representing a block that cannot yet be

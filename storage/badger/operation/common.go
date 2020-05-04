@@ -5,11 +5,11 @@ package operation
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
@@ -19,7 +19,17 @@ import (
 // binary data in the badger DB under the provided key. It will error if the
 // key already exists.
 func insert(key []byte, entity interface{}) func(*badger.Txn) error {
+
 	return func(tx *badger.Txn) error {
+
+		// update the maximum key size if the inserted key is bigger
+		if uint32(len(key)) > max {
+			max = uint32(len(key))
+			err := SetMax(tx)
+			if err != nil {
+				return fmt.Errorf("could not update max tracker: %w", err)
+			}
+		}
 
 		// check if the key already exists in the db
 		_, err := tx.Get(key)
@@ -32,7 +42,7 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 		}
 
 		// serialize the entity data
-		val, err := json.Marshal(entity)
+		val, err := msgpack.Marshal(entity)
 		if err != nil {
 			return fmt.Errorf("could not encode entity: %w", err)
 		}
@@ -81,7 +91,7 @@ func update(key []byte, entity interface{}) func(*badger.Txn) error {
 		}
 
 		// serialize the entity data
-		val, err := json.Marshal(entity)
+		val, err := msgpack.Marshal(entity)
 		if err != nil {
 			return fmt.Errorf("could not encode entity: %w", err)
 		}
@@ -131,7 +141,7 @@ func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 
 		// get the value from the item
 		err = item.Value(func(val []byte) error {
-			err := json.Unmarshal(val, entity)
+			err := msgpack.Unmarshal(val, entity)
 			return err
 		})
 		if err != nil {
@@ -201,7 +211,7 @@ func lookup(entityIDs *[]flow.Identifier) func() (checkFunc, createFunc, handleF
 // On each iteration, it will call the iteration function to initialize
 // functions specific to processing the given key-value pair.
 //
-//TODO: this function is unbounded – pass context.Context to this or calling
+// TODO: this function is unbounded – pass context.Context to this or calling
 // functions to allow timing functions out.
 func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
@@ -211,24 +221,15 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn
 		options := badger.DefaultIteratorOptions
 
 		// In order to satisfy this function's prefix-wise inclusion semantics,
-		// we append 256 0xff bytes to the largest of start and end.
+		// we append 0xff bytes to the largest of start and end.
 		// This ensures Badger will seek to the largest key with that prefix
 		// for reverse iteration, thus including all keys with a prefix matching
 		// the starting key. It also enables us to detect boundary conditions by
 		// simple lexicographic comparison (ie. bytes.Compare) rather than
 		// explicitly comparing prefixes.
 		//
-		// NOTE: This is guaranteed to work, so long as keys don't have lengths
-		// greater than 256 bytes above and beyond the specified start/end keys.
-		// It will also work for larger keys, so long as their 256 bytes above
-		// the top-most prefix contain any zeroes.
-		//
 		// See https://github.com/dapperlabs/flow-go/pull/3310#issuecomment-618127494
 		// for discussion and more detail on this.
-		suffix := make([]byte, 256)
-		for i := range suffix {
-			suffix[i] = 0xff
-		}
 
 		// If start is bigger than end, we have a backwards iteration:
 		// 1) We set the reverse option on the iterator, so we step through all
@@ -236,21 +237,29 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn
 		//    the first key that is less than or equal to the start key (as
 		//    opposed to greater than or equal in a regular iteration).
 		// 2) In order to satisfy this function's prefix-wise inclusion semantics,
-		//    we append the 256-0xff-byte suffix to the start key so the seek
-		//    will go to the right place.
+		//    we append a 0xff-byte suffix to the start key so the seek will go
+		// to the right place.
 		// 3) For a regular iteration, we break the loop upon hitting the first
 		//    item that has a key higher than the end prefix. In order to reverse
 		//    this, we use a modifier for the comparison that reverses the check
 		//    and makes it stop upon the first item lower than the end prefix.
 		if bytes.Compare(start, end) > 0 {
-			options.Reverse = true           // make sure to go in reverse order
-			start = append(start, suffix...) // include all keys with prefix matching start
-			modifier = -1                    // make sure to stop after end prefix
+			options.Reverse = true // make sure to go in reverse order
+			modifier = -1          // make sure to stop after end prefix
+			length := uint32(len(start))
+			diff := max - length
+			for i := uint32(0); i < diff; i++ {
+				start = append(start, 0xff)
+			}
 		} else {
-			// for forward iteration, add the 256-0xff-byte suffix to the end
+			// for forward iteration, add the 0xff-bytes suffix to the end
 			// prefix, to ensure we include all keys with that prefix before
 			// finishing.
-			end = append(end, suffix...)
+			length := uint32(len(end))
+			diff := max - length
+			for i := uint32(0); i < diff; i++ {
+				end = append(end, 0xff)
+			}
 		}
 
 		it := tx.NewIterator(options)
@@ -281,7 +290,7 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn
 
 				// decode into the entity
 				entity := create()
-				err := json.Unmarshal(val, entity)
+				err := msgpack.Unmarshal(val, entity)
 				if err != nil {
 					return fmt.Errorf("could not decode entity: %w", err)
 				}
@@ -323,6 +332,7 @@ func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 		it := tx.NewIterator(opts)
 		defer it.Close()
 
+		// this is where we actually enforce that all results have the prefix
 		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
 
 			item := it.Item()
@@ -342,7 +352,7 @@ func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 
 				// decode into the entity
 				entity := create()
-				err := json.Unmarshal(val, entity)
+				err := msgpack.Unmarshal(val, entity)
 				if err != nil {
 					return fmt.Errorf("could not decode entity: %w", err)
 				}

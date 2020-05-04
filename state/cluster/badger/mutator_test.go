@@ -3,8 +3,10 @@ package badger
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/suite"
@@ -34,10 +36,14 @@ type MutatorSuite struct {
 func (suite *MutatorSuite) SetupTest() {
 	var err error
 
-	suite.genesis = model.Genesis()
-	suite.chainID = suite.genesis.ChainID
+	// seed the RNG
+	rand.Seed(time.Now().UnixNano())
 
-	suite.db, suite.dbdir = unittest.TempBadgerDB(suite.T())
+	suite.genesis = model.Genesis()
+	suite.chainID = suite.genesis.Header.ChainID
+
+	suite.dbdir = unittest.TempDir(suite.T())
+	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
 
 	suite.state, err = NewState(suite.db, suite.chainID)
 	suite.Assert().Nil(err)
@@ -67,28 +73,28 @@ func TestMutator(t *testing.T) {
 }
 
 func (suite *MutatorSuite) TestBootstrap_InvalidChainID() {
-	suite.genesis.ChainID = fmt.Sprintf("%s-invalid", suite.genesis.ChainID)
+	suite.genesis.Header.ChainID = fmt.Sprintf("%s-invalid", suite.genesis.Header.ChainID)
 
 	err := suite.mutator.Bootstrap(suite.genesis)
 	suite.Assert().Error(err)
 }
 
 func (suite *MutatorSuite) TestBootstrap_InvalidNumber() {
-	suite.genesis.Height = 1
+	suite.genesis.Header.Height = 1
 
 	err := suite.mutator.Bootstrap(suite.genesis)
 	suite.Assert().Error(err)
 }
 
 func (suite *MutatorSuite) TestBootstrap_InvalidParentHash() {
-	suite.genesis.ParentID = unittest.IdentifierFixture()
+	suite.genesis.Header.ParentID = unittest.IdentifierFixture()
 
 	err := suite.mutator.Bootstrap(suite.genesis)
 	suite.Assert().Error(err)
 }
 
 func (suite *MutatorSuite) TestBootstrap_InvalidPayloadHash() {
-	suite.genesis.PayloadHash = unittest.IdentifierFixture()
+	suite.genesis.Header.PayloadHash = unittest.IdentifierFixture()
 
 	err := suite.mutator.Bootstrap(suite.genesis)
 	suite.Assert().Error(err)
@@ -112,15 +118,15 @@ func (suite *MutatorSuite) TestBootstrap_Successful() {
 
 		// should insert collection
 		var collection flow.LightCollection
-		err = operation.RetrieveCollection(suite.genesis.Collection.ID(), &collection)(tx)
+		err = operation.RetrieveCollection(suite.genesis.Payload.Collection.ID(), &collection)(tx)
 		suite.Assert().Nil(err)
-		suite.Assert().Equal(suite.genesis.Collection.Light(), collection)
+		suite.Assert().Equal(suite.genesis.Payload.Collection.Light(), collection)
 
 		// should index collection
 		collection = flow.LightCollection{} // reset the collection
-		err = operation.LookupCollectionPayload(suite.genesis.Height, suite.genesis.ID(), suite.genesis.ParentID, &collection.Transactions)(tx)
+		err = operation.LookupCollectionPayload(suite.genesis.Header.Height, suite.genesis.ID(), suite.genesis.Header.ParentID, &collection.Transactions)(tx)
 		suite.Assert().Nil(err)
-		suite.Assert().Equal(suite.genesis.Collection.Light(), collection)
+		suite.Assert().Equal(suite.genesis.Payload.Collection.Light(), collection)
 
 		// should insert header
 		var header flow.Header
@@ -130,15 +136,15 @@ func (suite *MutatorSuite) TestBootstrap_Successful() {
 
 		// should insert block number -> ID lookup
 		var blockID flow.Identifier
-		err = operation.RetrieveNumberForCluster(suite.genesis.ChainID, suite.genesis.Height, &blockID)(tx)
+		err = operation.RetrieveNumberForCluster(suite.genesis.Header.ChainID, suite.genesis.Header.Height, &blockID)(tx)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.ID(), blockID)
 
 		// should insert boundary
 		var boundary uint64
-		err = operation.RetrieveBoundaryForCluster(suite.genesis.ChainID, &boundary)(tx)
+		err = operation.RetrieveBoundaryForCluster(suite.genesis.Header.ChainID, &boundary)(tx)
 		suite.Assert().Nil(err)
-		suite.Assert().Equal(suite.genesis.Height, boundary)
+		suite.Assert().Equal(suite.genesis.Header.Height, boundary)
 
 		return nil
 	})
@@ -168,7 +174,7 @@ func (suite *MutatorSuite) TestExtend_InvalidChainID() {
 
 	block := unittest.ClusterBlockWithParent(suite.genesis)
 	// change the chain ID
-	block.ChainID = fmt.Sprintf("%s-invalid", block.ChainID)
+	block.Header.ChainID = fmt.Sprintf("%s-invalid", block.Header.ChainID)
 	suite.InsertBlock(block)
 
 	err := suite.mutator.Extend(block.ID())
@@ -180,7 +186,7 @@ func (suite *MutatorSuite) TestExtend_InvalidBlockNumber() {
 
 	block := unittest.ClusterBlockWithParent(suite.genesis)
 	// change the block number
-	block.Height = block.Height - 1
+	block.Header.Height = block.Header.Height - 1
 	suite.InsertBlock(block)
 
 	err := suite.mutator.Extend(block.ID())

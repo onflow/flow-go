@@ -29,8 +29,9 @@ func NewBuilder(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Seal
 
 	// initialize default config
 	cfg := Config{
-		minInterval: 500 * time.Millisecond,
-		maxInterval: 10 * time.Second,
+		minInterval:  500 * time.Millisecond,
+		maxInterval:  10 * time.Second,
+		expiryBlocks: 64,
 	}
 
 	// apply option parameters
@@ -49,7 +50,7 @@ func NewBuilder(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Seal
 
 // BuildOn creates a new block header build on the provided parent, using the given view and applying the
 // custom setter function to allow the caller to make changes to the header before storing it.
-func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (*flow.Header, error) {
+func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
 	var header *flow.Header
 	err := b.db.Update(func(tx *badger.Txn) error {
 
@@ -62,6 +63,12 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		err := operation.RetrieveBoundary(&boundary)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve boundary: %w", err)
+		}
+
+		// calculate how many blocks we look back
+		limit := boundary - b.cfg.expiryBlocks
+		if limit > boundary { // overflow check
+			limit = 0
 		}
 
 		// get the last finalized block ID
@@ -86,8 +93,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 				return fmt.Errorf("could not retrieve ancestor (%x): %w", ancestorID, err)
 			}
 
-			// if we have reached the finalized boundary, stop indexing
-			if ancestor.Height <= boundary {
+			// if we have reached the limit, stop indexing
+			if ancestor.Height <= limit {
 				break
 			}
 
@@ -179,6 +186,11 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 				return fmt.Errorf("could not get ancestor: %w", err)
 			}
 
+			// sanity check; should never be going that long without seal
+			if ancestor.Height <= limit {
+				break
+			}
+
 			// add to list
 			ancestorIDs = append(ancestorIDs, ancestorID)
 			ancestorID = ancestor.ParentID
@@ -268,7 +280,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		}
 
 		// apply the custom fields setter of the consensus algorithm
-		setter(header)
+		err = setter(header)
+		if err != nil {
+			return fmt.Errorf("could not set fields to header: %w", err)
+		}
 
 		// insert the header into the DB
 		err = operation.InsertHeader(header)(tx)

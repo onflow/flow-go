@@ -3,6 +3,7 @@ package virtualmachine
 import (
 	"fmt"
 
+	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -51,16 +52,17 @@ func (vm *virtualMachine) GetCache() ASTCache {
 
 func (vm *virtualMachine) executeTransaction(
 	script []byte,
+	arguments [][]byte,
 	runtimeInterface runtime.Interface,
 	location runtime.Location,
 ) error {
-	return vm.rt.ExecuteTransaction(script, runtimeInterface, location)
+	return vm.rt.ExecuteTransaction(script, arguments, runtimeInterface, location)
 }
 
 func (vm *virtualMachine) executeScript(
 	script []byte,
 	runtimeInterface runtime.Interface,
 	location runtime.Location,
-) (runtime.Value, error) {
+) (cadence.Value, error) {
 	return vm.rt.ExecuteScript(script, runtimeInterface, location)
 }
