@@ -46,3 +46,9 @@ You can view realtime metrics while the network is running:
 - Grafana: http://localhost:3000/
   - Username: `admin`
   - Password: `admin`
+
+Here's an example of a Prometheus query that filters by the `consensus` role:
+
+```
+avg(rate(consensus_finalized_blocks{role="consensus"}[2m]))
+```
