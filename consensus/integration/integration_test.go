@@ -104,6 +104,25 @@ func TestMessagesLostAcrossNetwork(t *testing.T) {
 	cleanupNodes(nodes)
 }
 
+// verify if each receiver receive 10% delayed messages, the network can still reach consensus
+func TestDelay(t *testing.T) {
+
+	nodes, stopper, hub := createNodes(t, 5, 150, 1500)
+
+	hub.WithFilter(delayReceiverMessagesByRange(hotstuffTimeout/10, hotstuffTimeout/2))
+	runNodes(nodes)
+
+	<-stopper.stopped
+
+	for i := range nodes {
+		printState(t, nodes, i)
+	}
+	allViews := allFinalizedViews(t, nodes)
+	assertSafety(t, allViews)
+	assertLiveness(t, allViews, 90)
+	cleanupNodes(nodes)
+}
+
 // TODO: verify if each receiver lost 50% messages, the network can't reach consensus
 
 func nextDelay(low, high time.Duration) time.Duration {

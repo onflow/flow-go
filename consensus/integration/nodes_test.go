@@ -131,8 +131,10 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	metrics.On("HotStuffBusyDuration", mock.Anything, mock.Anything)
 	metrics.On("HotStuffIdleDuration", mock.Anything, mock.Anything)
 	metrics.On("HotStuffWaitDuration", mock.Anything, mock.Anything)
+	metrics.On("PendingBlocks", mock.Anything)
 
 	cleaner := &storagemock.Cleaner{}
+	cleaner.On("RunGC")
 
 	// make local
 	priv := helper.MakeBLSKey(t)
@@ -181,6 +183,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	final := finalizer.NewFinalizer(db, guarantees, seals)
 
 	prov := &networkmock.Engine{}
+	prov.On("SubmitLocal", mock.Anything).Return(nil)
 
 	// initialize the compliance engine
 	comp, err := compliance.New(log, net, local, cleaner, headersDB, payloadsDB, state, prov, cache, metrics)
