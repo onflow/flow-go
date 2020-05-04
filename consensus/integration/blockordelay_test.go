@@ -59,8 +59,8 @@ func blockNodesForFirstNMessages(n int, blackList ...*Node) BlockOrDelayFunc {
 		// case *messages.RangeRequest:
 		// case *messages.BatchRequest:
 		case *messages.BlockResponse:
-			log := receiver.log.With().Int("blocks", len(m.Blocks)).Uint64("first", m.Blocks[0].View).
-				Uint64("last", m.Blocks[len(m.Blocks)-1].View).Logger()
+			log := receiver.log.With().Int("blocks", len(m.Blocks)).Uint64("first", m.Blocks[0].Header.View).
+				Uint64("last", m.Blocks[len(m.Blocks)-1].Header.View).Logger()
 			log.Info().Msg("receives BlockResponse")
 		default:
 			return notBlock, 0

@@ -71,13 +71,13 @@ func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint) ([]*N
 
 	// add all identities to genesis block and
 	// create and bootstrap consensus node with the genesis
-	genesis := run.GenerateRootBlock(participants, run.GenerateRootSeal([]byte{}))
+	genesis := run.GenerateRootBlock(participants)
 
 	hub := NewHub()
 	stopper := NewStopper(stopAtView, stopCountAt)
 	nodes := make([]*Node, 0, len(consensus))
 	for i, identity := range consensus {
-		node := createNode(t, i, identity, consensus, &genesis, hub, stopper)
+		node := createNode(t, i, identity, consensus, genesis, hub, stopper)
 		nodes = append(nodes, node)
 	}
 
@@ -90,7 +90,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	state, err := protocol.NewState(db)
 	require.NoError(t, err)
 
-	err = state.Mutate().Bootstrap(genesis)
+	err = state.Mutate().Bootstrap(flow.GenesisStateCommitment, genesis)
 	require.NoError(t, err)
 
 	localID := identity.ID()
