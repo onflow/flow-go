@@ -302,7 +302,7 @@ func EnoughShares(size int, sharesNumber int) bool {
 }
 
 
-func ThresholdSignKeyGen(size int) ([]PrivateKey, 
+func ThresholdSignKeyGen(size int, seed []byte) ([]PrivateKey, 
 	[]PublicKey, PublicKey,	error) {
 	// set threshold 
 	threshold := optimalThreshold(size)
@@ -312,6 +312,10 @@ func ThresholdSignKeyGen(size int) ([]PrivateKey,
 	x := make([]scalar, size)
 	y := make([]pointG2, size)
 	var X0 pointG2
+	// seed relic
+	if err := seedRelic(seed) ; err != nil {
+		return nil, nil, nil, err
+	}
 	// Generate a polyomial P in Zr[X] of degree t
 	a := make([]scalar, threshold+1)
 	for i := 0; i < threshold+1; i++ {
