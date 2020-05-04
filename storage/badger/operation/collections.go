@@ -51,6 +51,7 @@ func LookupCollectionPayload(height uint64, blockID, parentID flow.Identifier, t
 // the main chain, which involves adding extra indexing to do properly. For
 // now, the heuristic is acceptable since EXE nodes will reject duplicate
 // transactions.
+// ref https://github.com/dapperlabs/flow-go/issues/3556
 func VerifyCollectionPayload(height uint64, blockID flow.Identifier, txIDs []flow.Identifier) func(*badger.Txn) error {
 	var to uint64
 	if height > flow.DefaultTransactionExpiry {
@@ -72,6 +73,7 @@ func VerifyCollectionPayload(height uint64, blockID flow.Identifier, txIDs []flo
 // the main chain, which involves adding extra indexing to do properly. For
 // now, the heuristic is acceptable since EXE nodes will reject duplicate
 // transactions.
+// ref https://github.com/dapperlabs/flow-go/issues/3556
 func CheckCollectionPayload(height uint64, blockID flow.Identifier, candidateIDs []flow.Identifier, invalidIDs *map[flow.Identifier]struct{}) func(*badger.Txn) error {
 	var to uint64
 	if height > flow.DefaultTransactionExpiry {
