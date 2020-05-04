@@ -45,10 +45,6 @@ func TestBootstrapValid(t *testing.T) {
 		err = db.View(operation.RetrieveSealedHeight(&sealed))
 		require.NoError(t, err)
 
-		var executed uint64
-		err = db.View(operation.RetrieveExecutedHeight(&executed))
-		require.NoError(t, err)
-
 		var genesisID flow.Identifier
 		err = db.View(operation.LookupBlockHeight(0, &genesisID))
 		require.NoError(t, err)
@@ -66,7 +62,6 @@ func TestBootstrapValid(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, genesis.Header.Height, finalized)
-		assert.Equal(t, genesis.Header.Height, executed)
 		assert.Equal(t, genesis.Header.Height, sealed)
 		assert.Equal(t, genesis.ID(), genesisID)
 		assert.Equal(t, genesis.ID(), seal.BlockID)
@@ -81,6 +76,7 @@ func TestExtendSealedBoundary(t *testing.T) {
 		commit := unittest.StateCommitmentFixture()
 		genesis := flow.Genesis(participants)
 		err := proto.Mutate().Bootstrap(commit, genesis)
+		require.NoError(t, err)
 
 		finalCommit, err := proto.Final().Commit()
 		require.NoError(t, err)

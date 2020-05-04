@@ -92,9 +92,8 @@ type FlowNodeBuilder struct {
 	Blocks         *storage.Blocks
 	Guarantees     *storage.Guarantees
 	Seals          *storage.Seals
-	Commits        *storage.Commits
-	Proto          *protocol.State
-	DKG            *wrapper.State
+	State          *protocol.State
+	DKGState       *wrapper.State
 	modules        []namedModuleFunc
 	components     []namedComponentFunc
 	doneObject     []namedDoneObject
@@ -143,12 +142,12 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			return nil, fmt.Errorf("could not initialize middleware: %w", err)
 		}
 
-		participants, err := fnb.Proto.Final().Identities(filter.Any)
+		participants, err := fnb.State.Final().Identities(filter.Any)
 		if err != nil {
 			return nil, fmt.Errorf("could not get network identities: %w", err)
 		}
 
-		nodeID, err := fnb.Proto.Final().Identity(fnb.Me.NodeID())
+		nodeID, err := fnb.State.Final().Identity(fnb.Me.NodeID())
 		if err != nil {
 			return nil, fmt.Errorf("could not get node id: %w", err)
 		}
@@ -251,7 +250,6 @@ func (fnb *FlowNodeBuilder) initDatabase() {
 	fnb.Blocks = storage.NewBlocks(db)
 	fnb.Guarantees = storage.NewGuarantees(db)
 	fnb.Seals = storage.NewSeals(db)
-	fnb.Commits = storage.NewCommits(db)
 }
 
 func (fnb *FlowNodeBuilder) initMetrics() {
@@ -262,7 +260,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 
 func (fnb *FlowNodeBuilder) initState() {
 
-	proto, err := protocol.NewState(
+	state, err := protocol.NewState(
 		fnb.DB,
 		fnb.Identities,
 		fnb.Headers,
@@ -273,7 +271,7 @@ func (fnb *FlowNodeBuilder) initState() {
 	fnb.MustNot(err).Msg("could not initialize flow state")
 
 	// check if database is initialized
-	head, err := proto.Final().Head()
+	head, err := state.Final().Head()
 	if errors.Is(err, storerr.ErrNotFound) {
 		// Bootstrap!
 
@@ -303,9 +301,9 @@ func (fnb *FlowNodeBuilder) initState() {
 		}
 
 		// TODO: this always needs to be available, so we need to persist it
-		fnb.DKG = wrapper.NewState(dkgPubData)
+		fnb.DKGState = wrapper.NewState(dkgPubData)
 
-		err = proto.Mutate().Bootstrap(fnb.GenesisCommit, fnb.GenesisBlock)
+		err = state.Mutate().Bootstrap(fnb.GenesisCommit, fnb.GenesisBlock)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap protocol state")
 		}
@@ -339,13 +337,13 @@ func (fnb *FlowNodeBuilder) initState() {
 	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
 	fnb.MustNot(err).Msg("could not parse node identifier")
 
-	self, err := proto.Final().Identity(myID)
+	self, err := state.Final().Identity(myID)
 	fnb.MustNot(err).Msg("could not get identity")
 
 	fnb.Me, err = local.New(self, fnb.stakingKey)
 	fnb.MustNot(err).Msg("could not initialize local")
 
-	fnb.Proto = proto
+	fnb.State = state
 }
 
 func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) {

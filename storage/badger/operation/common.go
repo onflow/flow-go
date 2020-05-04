@@ -82,7 +82,7 @@ func update(key []byte, entity interface{}) func(*badger.Txn) error {
 
 		// retrieve the item from the key-value store
 		_, err := tx.Get(key)
-		if err == badger.ErrKeyNotFound {
+		if errors.Is(err, badger.ErrKeyNotFound) {
 			return storage.ErrNotFound
 		}
 		if err != nil {
@@ -111,7 +111,7 @@ func remove(key []byte) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		// retrieve the item from the key-value store
 		_, err := tx.Get(key)
-		if err == badger.ErrKeyNotFound {
+		if errors.Is(err, badger.ErrKeyNotFound) {
 			return fmt.Errorf("could not find key %x): %w", key, err)
 		}
 		if err != nil {
@@ -131,10 +131,10 @@ func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 
 		// retrieve the item from the key-value store
 		item, err := tx.Get(key)
+		if errors.Is(err, badger.ErrKeyNotFound) {
+			return storage.ErrNotFound
+		}
 		if err != nil {
-			if err == badger.ErrKeyNotFound {
-				return storage.ErrNotFound
-			}
 			return fmt.Errorf("could not load data: %w", err)
 		}
 

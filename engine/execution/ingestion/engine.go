@@ -2,11 +2,11 @@ package ingestion
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
@@ -110,17 +110,17 @@ func New(
 
 	con, err := net.Register(engine.BlockProvider, &eng)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not register engine")
+		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 
 	collConduit, err := net.Register(engine.CollectionProvider, &eng)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not register collection provider engine")
+		return nil, fmt.Errorf("could not register collection provider engine: %w", err)
 	}
 
 	syncConduit, err := net.Register(engine.ExecutionSync, &eng)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not register execution sync engine")
+		return nil, fmt.Errorf("could not register execution sync engine: %w", err)
 	}
 
 	eng.conduit = con
@@ -181,10 +181,10 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 		case *messages.ExecutionStateSyncRequest:
 			return e.onExecutionStateSyncRequest(originID, v)
 		default:
-			err = errors.Errorf("invalid event type (%T)", event)
+			err = fmt.Errorf("invalid event type (%T)", event)
 		}
 		if err != nil {
-			return errors.Wrap(err, "could not process event")
+			return fmt.Errorf("could not process event (%T): %w", event, err)
 		}
 		return nil
 	})
@@ -231,8 +231,10 @@ func (e *Engine) handleBlockProposal(proposal *messages.BlockProposal) error {
 			e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("added block to existing orphan queue")
 			e.tryRequeueOrphans(executableBlock, queue, orphanQueues)
 			// this is only queue which grew and could trigger threshold
-			if !e.syncInProgress.Load() && queue.Height() >= e.syncModeThreshold {
-				e.syncInProgress.Store(true)
+			if queue.Height() < e.syncModeThreshold {
+				return nil
+			}
+			if e.syncInProgress.CAS(false, true) {
 				// Start sync mode - initializing would require DB operation and will stop processing blocks here
 				// which is exactly what we want
 				e.StartSync(queue.Head.Item.(*entity.ExecutableBlock))
@@ -243,7 +245,7 @@ func (e *Engine) handleBlockProposal(proposal *messages.BlockProposal) error {
 		stateCommitment, err := e.execState.StateCommitmentByBlockID(block.Header.ParentID)
 		// if state commitment doesn't exist and there are no known blocks which will produce
 		// it soon (execution queue) that we save it as orphaned
-		if err == storage.ErrNotFound {
+		if errors.Is(err, storage.ErrNotFound) {
 			queue, err := enqueue(executableBlock, orphanQueues)
 			if err != nil {
 				panic(fmt.Sprintf("cannot add orphaned block: %s", err))
@@ -251,8 +253,10 @@ func (e *Engine) handleBlockProposal(proposal *messages.BlockProposal) error {
 			e.tryRequeueOrphans(executableBlock, queue, orphanQueues)
 			e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("added block to new orphan queue")
 			// special case when sync threshold is reached
-			if queue.Height() >= e.syncModeThreshold && !e.syncInProgress.Load() {
-				e.syncInProgress.Store(true)
+			if queue.Height() < e.syncModeThreshold {
+				return nil
+			}
+			if e.syncInProgress.CAS(false, true) {
 				// Start sync mode - initializing would require DB operation and will stop processing blocks here
 				// which is exactly what we want
 				e.StartSync(queue.Head.Item.(*entity.ExecutableBlock))
@@ -692,11 +696,6 @@ func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*de
 	}
 
 	e.log.Debug().Hex("block_id", logging.Entity(block)).Hex("start_state", originalState).Hex("final_state", endState).Msg("saved computation results")
-
-	err = e.providerEngine.BroadcastExecutionReceipt(receipt)
-	if err != nil {
-		return nil, fmt.Errorf("could not send broadcast order: %w", err)
-	}
 
 	return receipt, nil
 }

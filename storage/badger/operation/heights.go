@@ -18,18 +18,6 @@ func RetrieveFinalizedHeight(height *uint64) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeFinalizedHeight), height)
 }
 
-func InsertExecutedHeight(height uint64) func(*badger.Txn) error {
-	return insert(makePrefix(codeExecutedHeight), height)
-}
-
-func UpdateExecutedHeight(height uint64) func(*badger.Txn) error {
-	return update(makePrefix(codeExecutedHeight), height)
-}
-
-func RetrieveExecutedHeight(height *uint64) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeExecutedHeight), height)
-}
-
 func InsertSealedHeight(height uint64) func(*badger.Txn) error {
 	return insert(makePrefix(codeSealedHeight), height)
 }

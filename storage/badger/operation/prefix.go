@@ -20,9 +20,9 @@ const (
 
 	// code for heights with special meaning
 	codeFinalizedHeight = 20 // latest finalized block height
-	codeExecutedHeight  = 21 // highest executed block height
-	codeSealedHeight    = 22 // latest sealed block height
-	codeClusterHeight   = 23 // latest finalized height on cluster
+	codeSealedHeight    = 21 // latest sealed block height
+	codeClusterHeight   = 22 // latest finalized height on cluster
+	codeExecutedBlock   = 23 // latest executed block with max height
 
 	// codes for single entity storage
 	codeHeader          = 30

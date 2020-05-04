@@ -91,18 +91,18 @@ func main() {
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			results := storage.NewExecutionResults(node.DB)
-			return matching.New(node.Logger, node.Network, node.Proto, node.Me, results, receipts, approvals, seals)
+			return matching.New(node.Logger, node.Network, node.State, node.Me, results, receipts, approvals, seals)
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			prov, err = provider.New(node.Logger, node.Metrics, node.Network, node.Proto, node.Me)
+			prov, err = provider.New(node.Logger, node.Metrics, node.Network, node.State, node.Me)
 			return prov, err
 		}).
 		Component("propagation engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			prop, err = propagation.New(node.Logger, node.Network, node.Proto, node.Me, guarantees)
+			prop, err = propagation.New(node.Logger, node.Network, node.State, node.Me, guarantees)
 			return prop, err
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ing, err := ingestion.New(node.Logger, node.Network, prop, node.Proto, node.Metrics, node.Me)
+			ing, err := ingestion.New(node.Logger, node.Network, prop, node.State, node.Metrics, node.Me)
 			return ing, err
 		}).
 		Component("mempool metrics monitor", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -120,13 +120,13 @@ func main() {
 			cache := buffer.NewPendingBlocks()
 
 			// initialize the compliance engine
-			comp, err := compliance.New(node.Logger, node.Network, node.Me, cleaner, node.Headers, node.Payloads, node.Proto, prov, cache, node.Metrics)
+			comp, err := compliance.New(node.Logger, node.Network, node.Me, cleaner, node.Headers, node.Payloads, node.State, prov, cache, node.Metrics)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
 
 			// initialize the synchronization engine
-			sync, err = synchronization.New(node.Logger, node.Network, node.Me, node.Proto, node.Blocks, comp)
+			sync, err = synchronization.New(node.Logger, node.Network, node.Me, node.State, node.Blocks, comp)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 			}
@@ -138,7 +138,7 @@ func main() {
 			)
 
 			// initialize the block finalizer
-			finalize := finalizer.NewFinalizer(node.DB, node.Headers, node.Payloads, node.Proto,
+			finalize := finalizer.NewFinalizer(node.DB, node.Headers, node.Payloads, node.State,
 				finalizer.WithCleanup(finalizer.CleanupMempools(node.Payloads, guarantees, seals)),
 			)
 
@@ -152,13 +152,13 @@ func main() {
 			merger := signature.NewCombiner()
 
 			// initialize Main consensus committee's state
-			committee, err := committee.NewMainConsensusCommitteeState(node.Proto, node.Me.NodeID())
+			committee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID())
 			if err != nil {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
 
 			// initialize the combined signer for hotstuff
-			signer := verification.NewCombinedSigner(committee, node.DKG, staking, beacon, merger, node.NodeID)
+			signer := verification.NewCombinedSigner(committee, node.DKGState, staking, beacon, merger, node.NodeID)
 
 			// initialize a logging notifier for hotstuff
 			notifier := consensus.CreateNotifier(node.Logger, node.Metrics, node.Guarantees, node.Seals)
@@ -167,7 +167,7 @@ func main() {
 			persist := persister.New(node.DB)
 
 			// query the last finalized block and pending blocks for recovery
-			finalized, pending, err := findLatest(node.Proto, node.Headers, node.GenesisBlock.Header)
+			finalized, pending, err := findLatest(node.State, node.Headers, node.GenesisBlock.Header)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks: %w", err)
 			}

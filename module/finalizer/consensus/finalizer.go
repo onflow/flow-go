@@ -42,7 +42,7 @@ func NewFinalizer(db *badger.DB, headers storage.Headers, payloads storage.Paylo
 // MakeFinal will finalize the block with the given ID and clean up the memory
 // pools after it.
 //
-// This assumes that guarantees and seals are alreadyin persistent state when
+// This assumes that guarantees and seals are already in persistent state when
 // included in a block proposal. Between entering the non-finalized chain state
 // and being finalized, entities should be present in both the volatile memory
 // pools and persistent storage.

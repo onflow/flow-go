@@ -35,3 +35,15 @@ func IndexBlockHeight(height uint64, blockID flow.Identifier) func(*badger.Txn) 
 func LookupBlockHeight(height uint64, blockID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeHeightToBlock, height), blockID)
 }
+
+func InsertExecutedBlock(blockID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeExecutedBlock), blockID)
+}
+
+func UpdateExecutedBlock(blockID flow.Identifier) func(*badger.Txn) error {
+	return update(makePrefix(codeExecutedBlock), blockID)
+}
+
+func RetrieveExecutedBlock(blockID *flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeExecutedBlock), blockID)
+}

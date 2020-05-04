@@ -40,7 +40,16 @@ import (
 )
 
 func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, participants []*flow.Identity, options ...func(*protocol.State)) mock.GenericNode {
-	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
+
+	var index int
+	var participant *flow.Identity
+	for index, participant = range participants {
+		if identity.NodeID == participant.NodeID {
+			break
+		}
+	}
+
+	log := zerolog.New(os.Stderr).With().Int("index", index).Hex("node_id", identity.NodeID[:]).Logger()
 
 	dbDir := unittest.TempDir(t)
 	db := unittest.BadgerDB(t, dbDir)
@@ -202,10 +211,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	genesisHead, err := node.State.Final().Head()
 	require.NoError(t, err)
 
-	commit, err := commitsStorage.ByBlockID(genesisHead.ID())
-	require.NoError(t, err)
-
-	_, err = bootstrap.BootstrapLedger(ls)
+	commit, err := bootstrap.BootstrapLedger(ls)
 	require.NoError(t, err)
 
 	err = bootstrap.BootstrapExecutionDatabase(node.DB, commit, genesisHead)

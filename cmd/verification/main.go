@@ -123,7 +123,7 @@ func main() {
 			rt := runtime.NewInterpreterRuntime()
 			vm := virtualmachine.New(rt)
 			chunkVerifier := chunks.NewChunkVerifier(vm)
-			verifierEng, err = verifier.New(node.Logger, node.Network, node.Proto, node.Me, chunkVerifier, node.Metrics)
+			verifierEng, err = verifier.New(node.Logger, node.Network, node.State, node.Me, chunkVerifier, node.Metrics)
 			return verifierEng, err
 		}).
 		Component("ingest engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -134,7 +134,7 @@ func main() {
 			}
 			ingestEng, err = ingest.New(node.Logger,
 				node.Network,
-				node.Proto,
+				node.State,
 				node.Me,
 				verifierEng,
 				authReceipts,
@@ -160,7 +160,7 @@ func main() {
 
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Headers, node.Payloads, node.Proto)
+			final := finalizer.NewFinalizer(node.DB, node.Headers, node.Payloads, node.State)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -170,13 +170,13 @@ func main() {
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
 			// Note: node.Me.NodeID() is not part of the consensus committee
-			mainConsensusCommittee, err := committee.NewMainConsensusCommitteeState(node.Proto, node.Me.NodeID())
+			mainConsensusCommittee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID())
 			if err != nil {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
 
 			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, node.DKG, staking, beacon, merger)
+			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, node.DKGState, staking, beacon, merger)
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
@@ -196,7 +196,7 @@ func main() {
 				cleaner,
 				node.Headers,
 				node.Payloads,
-				node.Proto,
+				node.State,
 				conCache,
 				core)
 			if err != nil {
@@ -208,7 +208,7 @@ func main() {
 			sync, err := synchronization.New(node.Logger,
 				node.Network,
 				node.Me,
-				node.Proto,
+				node.State,
 				node.Blocks,
 				followerEng)
 			if err != nil {

@@ -193,7 +193,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 // is reported as sealed
 func (suite *Suite) TestGetSealedTransaction() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		// create block -> collection -> transactions and seal
+		// create block -> collection -> transactions
 		block, collection := suite.createChain()
 
 		// setup mocks

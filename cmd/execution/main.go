@@ -55,7 +55,7 @@ func main() {
 			computationManager = computation.New(
 				node.Logger,
 				node.Me,
-				node.Proto,
+				node.State,
 				vm,
 			)
 
@@ -89,13 +89,14 @@ func main() {
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			chunkDataPacks := badger.NewChunkDataPacks(node.DB)
 			executionResults := badger.NewExecutionResults(node.DB)
-			executionState = state.NewExecutionState(ledgerStorage, node.Commits, chunkDataPacks, executionResults, node.DB)
+			stateCommitments := badger.NewCommits(node.DB)
+			executionState = state.NewExecutionState(ledgerStorage, stateCommitments, chunkDataPacks, executionResults, node.DB)
 			//registerDeltas := badger.NewRegisterDeltas(node.DB)
 			stateSync := sync.NewStateSynchronizer(executionState)
 			providerEngine, err = provider.New(
 				node.Logger,
 				node.Network,
-				node.Proto,
+				node.State,
 				node.Me,
 				executionState,
 				stateSync,
@@ -114,7 +115,7 @@ func main() {
 				node.Logger,
 				node.Network,
 				node.Me,
-				node.Proto,
+				node.State,
 				node.Blocks,
 				node.Payloads,
 				collections,

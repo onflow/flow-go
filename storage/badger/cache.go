@@ -34,7 +34,7 @@ func withRetrieve(retrieve retrieveFunc) func(*Cache) {
 }
 
 func noRetrieve(flow.Identifier) (interface{}, error) {
-	return nil, fmt.Errorf("no retrieve function for cach get available")
+	return nil, fmt.Errorf("no retrieve function for cache get available")
 }
 
 type Cache struct {

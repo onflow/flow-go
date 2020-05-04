@@ -30,20 +30,25 @@ func BootstrapLedger(ledger storage.Ledger) (flow.StateCommitment, error) {
 func BootstrapExecutionDatabase(db *badger.DB, commit flow.StateCommitment, genesis *flow.Header) error {
 	err := db.Update(func(txn *badger.Txn) error {
 
-		err := operation.InsertExecutedHeight(genesis.Height)(txn)
+		err := operation.InsertExecutedBlock(genesis.ID())(txn)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not index initial genesis execution block: %w", err)
+		}
+
+		err = operation.IndexStateCommitment(flow.ZeroID, commit)(txn)
+		if err != nil {
+			return fmt.Errorf("could not index void state commitment: %w", err)
 		}
 
 		err = operation.IndexStateCommitment(genesis.ID(), commit)(txn)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not index genesis state commitment: %w", err)
 		}
 
 		views := make([]*delta.Snapshot, 0)
 		err = operation.InsertExecutionStateInteractions(genesis.ID(), views)(txn)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not bootstrap execution state interactions: %w", err)
 		}
 
 		return nil

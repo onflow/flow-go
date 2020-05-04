@@ -36,30 +36,6 @@ func TestFinalizedInsertUpdateRetrieve(t *testing.T) {
 	})
 }
 
-func TestExecutedInsertUpdateRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		height := uint64(1337)
-
-		err := db.Update(InsertExecutedHeight(height))
-		require.Nil(t, err)
-
-		var retrieved uint64
-		err = db.View(RetrieveExecutedHeight(&retrieved))
-		require.Nil(t, err)
-
-		assert.Equal(t, retrieved, height)
-
-		height = 9999
-		err = db.Update(UpdateExecutedHeight(height))
-		require.Nil(t, err)
-
-		err = db.View(RetrieveExecutedHeight(&retrieved))
-		require.Nil(t, err)
-
-		assert.Equal(t, retrieved, height)
-	})
-}
-
 func TestSealedInsertUpdateRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		height := uint64(1337)

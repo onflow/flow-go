@@ -139,10 +139,6 @@ func Bootstrap(commit flow.StateCommitment, genesis *flow.Block) func(*badger.Tx
 		if err != nil {
 			return fmt.Errorf("could not insert finalized height: %w", err)
 		}
-		err = operation.InsertExecutedHeight(genesis.Header.Height)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert executed height: %w", err)
-		}
 		err = operation.InsertSealedHeight(genesis.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert sealed height: %w", err)

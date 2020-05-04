@@ -159,6 +159,7 @@ func (e *Engine) BroadcastExecutionReceipt(receipt *flow.ExecutionReceipt) error
 	e.log.Debug().
 		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).
 		Hex("receipt_id", logging.Entity(receipt)).
+		Hex("final_state", receipt.ExecutionResult.FinalStateCommit).
 		Msg("broadcasting execution receipt")
 
 	identities, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus, flow.RoleVerification))
