@@ -3,9 +3,10 @@ package integration_test
 import (
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
-	"github.com/rs/zerolog"
 )
 
 type CounterConsumer struct {
@@ -29,7 +30,7 @@ func (c *CounterConsumer) OnFinalizedBlock(block *model.Block) {
 	c.finalized(c.total)
 
 	// if we are still before the next printing, skip rest
-	diff := time.Now().Sub(c.next)
+	diff := time.Since(c.next)
 	if diff < c.interval {
 		return
 	}

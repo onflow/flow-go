@@ -1,9 +1,7 @@
 package integration_test
 
 import (
-	"fmt"
 	"math/rand"
-	"reflect"
 	"time"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -98,22 +96,5 @@ func delayReceiverMessagesByRange(low time.Duration, high time.Duration) BlockOr
 		rng := high - low
 		delay := int64(low) + rand.Int63n(int64(rng))
 		return false, time.Duration(delay)
-	}
-}
-
-func blockProposals() BlockOrDelayFunc {
-	return func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
-		switch event.(type) {
-		case *messages.BlockProposal:
-		case *messages.BlockVote:
-		case *messages.SyncRequest:
-		case *messages.SyncResponse:
-		case *messages.RangeRequest:
-		case *messages.BatchRequest:
-		case *messages.BlockResponse:
-		default:
-			panic(fmt.Sprintf("wrong message from channel %v, type: %v", channelID, reflect.TypeOf(event)))
-		}
-		return false, 0
 	}
 }

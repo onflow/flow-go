@@ -5,6 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
@@ -25,11 +30,8 @@ import (
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
+	storagemock "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
-	"github.com/dgraph-io/badger/v2"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 const hotstuffTimeout = 200 * time.Millisecond
@@ -130,6 +132,8 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	metrics.On("HotStuffIdleDuration", mock.Anything, mock.Anything)
 	metrics.On("HotStuffWaitDuration", mock.Anything, mock.Anything)
 
+	cleaner := &storagemock.Cleaner{}
+
 	// make local
 	priv := helper.MakeBLSKey(t)
 	local, err := local.New(identity, priv)
@@ -162,9 +166,9 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 		signerIDs = append(signerIDs, participant.ID())
 	}
 
-	rootHeader := &genesis.Header
+	rootHeader := genesis.Header
 	rootQC := &model.QuorumCertificate{
-		View:      genesis.View,
+		View:      genesis.Header.View,
 		BlockID:   genesis.ID(),
 		SignerIDs: signerIDs,
 		SigData:   nil,
@@ -179,7 +183,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	prov := &networkmock.Engine{}
 
 	// initialize the compliance engine
-	comp, err := compliance.New(log, net, local, state, headersDB, payloadsDB, prov, cache)
+	comp, err := compliance.New(log, net, local, cleaner, headersDB, payloadsDB, state, prov, cache, metrics)
 	require.NoError(t, err)
 
 	// initialize the synchronization engine
