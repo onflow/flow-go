@@ -90,7 +90,7 @@ func (r *LedgerDAL) GetAccountPublicKeys(accountID []byte) (publicKeys []flow.Ac
 		return nil, fmt.Errorf("key count not set")
 	}
 
-	count := int(big.NewInt(0).SetBytes(countBytes).Int64())
+	count := int(new(big.Int).SetBytes(countBytes).Int64())
 
 	publicKeys = make([]flow.AccountPublicKey, count)
 
@@ -126,7 +126,7 @@ func (r *LedgerDAL) GetAccount(address flow.Address) *flow.Account {
 	}
 
 	balanceBytes, _ := r.Ledger.Get(fullKeyHash(string(accountID), "", keyBalance))
-	balanceInt := big.NewInt(0).SetBytes(balanceBytes)
+	balanceInt := new(big.Int).SetBytes(balanceBytes)
 
 	code, _ := r.Ledger.Get(fullKeyHash(string(accountID), string(accountID), keyCode))
 
@@ -154,7 +154,7 @@ func (r *LedgerDAL) CreateAccountInLedger(publicKeys []flow.AccountPublicKey) (f
 
 	accountID := accountAddress[:]
 
-	accountIDInt := big.NewInt(0).SetBytes(accountID)
+	accountIDInt := new(big.Int).SetBytes(accountID)
 	newAccountBytes := accountIDInt.Add(accountIDInt, big.NewInt(1)).Bytes()
 
 	newAccountAddress := flow.BytesToAddress(newAccountBytes)
@@ -189,7 +189,7 @@ func (r *LedgerDAL) SetAccountPublicKeys(accountID []byte, publicKeys []flow.Acc
 	}
 
 	if countBytes != nil {
-		existingCount = int(big.NewInt(0).SetBytes(countBytes).Int64())
+		existingCount = int(new(big.Int).SetBytes(countBytes).Int64())
 	} else {
 		existingCount = 0
 	}
