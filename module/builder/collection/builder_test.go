@@ -294,9 +294,6 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingInvalidatedForks() {
 	assert.Len(t, builtCollection.Light().Transactions, 2)
 	assert.True(t, collectionContains(builtCollection, tx2.ID(), tx3.ID()))
 	assert.False(t, collectionContains(builtCollection, tx1.ID()))
-
-	// tx1 should be removed from mempool, as it is in a finalized block
-	assert.False(t, suite.pool.Has(tx1.ID()))
 }
 
 func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
