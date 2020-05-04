@@ -88,13 +88,12 @@ func (r *TransactionContext) CreateAccount(publicKeysBytes [][]byte) (runtime.Ad
 	for i, keyBytes := range publicKeysBytes {
 		publicKeys[i], err = flow.DecodeRuntimeAccountPublicKey(keyBytes, 0)
 		if err != nil {
-			return runtime.Address{}, fmt.Errorf("cannot decode public key %d:%w", i, err)
+			return runtime.Address{}, fmt.Errorf("cannot decode public key %d: %w", i, err)
 		}
 	}
 
 	accountAddress, err := r.CreateAccountInLedger(publicKeys)
-	r.Log("Creating new account\n")
-	r.Log(fmt.Sprintf("Address: %x", accountAddress))
+	r.Log(fmt.Sprintf("Created new account with address: %x", accountAddress))
 
 	return runtime.Address(accountAddress), err
 }
