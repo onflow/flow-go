@@ -15,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/integration/tests/common"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -138,17 +139,23 @@ func (gs *ExecutionSuite2) TestVerificationNodesRequestChunkDataPacks() {
 	// TODO the following is extremely flaky, investigate why and re-activate.
 	// wait for ChunkDataPack pushed from execution node
 	// msg := gs.MsgState.WaitForMsgFrom(gs.T(), common.MsgIsChunkDataPackResponse, gs.exe1ID)
-	// chunkDataPackResponse := msg.(*messages.ChunkDataPackResponse)
-	// require.Equal(gs.T(), erExe1BlockB.ExecutionResult.Chunks[0].ID(), chunkDataPackResponse.Data.ChunkID
+	// pack := msg.(*messages.ChunkDataPackResponse)
+	// require.Equal(gs.T(), erExe1BlockB.ExecutionResult.Chunks[0].ID(), pack.Data.ChunkID
 	// TODO clear messages
 
 	// send a ChunkDataPackRequest from Ghost node
-	err = gs.Ghost().Send(context.Background(), engine.ChunkDataPackProvider, []flow.Identifier{gs.exe1ID}, &messages.ChunkDataPackRequest{ChunkID: chunkID})
+	err = gs.Ghost().Send(context.Background(), engine.ExecutionReceiptProvider, []flow.Identifier{gs.exe1ID}, &messages.ChunkDataPackRequest{ChunkID: chunkID})
 	require.NoError(gs.T(), err)
 
 	// wait for ChunkDataPackResponse
 	msg2 := gs.MsgState.WaitForMsgFrom(gs.T(), common.MsgIsChunkDataPackResponse, gs.exe1ID)
-	chunkDataPackResponse2 := msg2.(*messages.ChunkDataPackResponse)
-	require.Equal(gs.T(), chunkID, chunkDataPackResponse2.Data.ChunkID)
-	require.Equal(gs.T(), erExe1BlockB.ExecutionResult.Chunks[0].StartState, chunkDataPackResponse2.Data.StartState)
+	pack2 := msg2.(*messages.ChunkDataPackResponse)
+	require.Equal(gs.T(), chunkID, pack2.Data.ChunkID)
+	require.Equal(gs.T(), erExe1BlockB.ExecutionResult.Chunks[0].StartState, pack2.Data.StartState)
+
+	// verify state proofs
+	v := ledger.NewTrieVerifier(257)
+	isValid, err := v.VerifyRegistersProof(pack2.Data.Registers(), pack2.Data.Values(), pack2.Data.Proofs(), pack2.Data.StartState)
+	require.NoError(gs.T(), err, "error verifying chunk trie proofs")
+	require.True(gs.T(), isValid, "chunk trie proofs are not valid, but must be")
 }
