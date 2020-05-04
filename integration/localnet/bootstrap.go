@@ -83,7 +83,9 @@ func main() {
 		panic(err)
 	}
 
-	err = writePrometheusConfig(containers)
+	serviceDisc := prepareServiceDiscovery(containers)
+
+	err = writePrometheusConfig(serviceDisc)
 	if err != nil {
 		panic(err)
 	}
@@ -282,29 +284,50 @@ type PromtheusTargets struct {
 	Labels  map[string]string `json:"labels"`
 }
 
-func writePrometheusConfig(containers []testnet.ContainerConfig) error {
+func newPrometheusTarget(role flow.Role) PromtheusTargets {
+	return PromtheusTargets{
+		Targets: make([]string, 0),
+		Labels: map[string]string{
+			"job":  "flow",
+			"role": role.String(),
+		},
+	}
+}
+
+func prepareServiceDiscovery(containers []testnet.ContainerConfig) PrometheusServiceDiscovery {
+	targets := map[flow.Role]PromtheusTargets{
+		flow.RoleCollection:   newPrometheusTarget(flow.RoleCollection),
+		flow.RoleConsensus:    newPrometheusTarget(flow.RoleConsensus),
+		flow.RoleExecution:    newPrometheusTarget(flow.RoleExecution),
+		flow.RoleVerification: newPrometheusTarget(flow.RoleVerification),
+		flow.RoleAccess:       newPrometheusTarget(flow.RoleAccess),
+	}
+
+	for _, container := range containers {
+		containerAddr := fmt.Sprintf("%s:%d", container.ContainerName, MetricsPort)
+		containerTargets := targets[container.Role]
+		containerTargets.Targets = append(containerTargets.Targets, containerAddr)
+		targets[container.Role] = containerTargets
+	}
+
+	return PrometheusServiceDiscovery{
+		targets[flow.RoleCollection],
+		targets[flow.RoleConsensus],
+		targets[flow.RoleExecution],
+		targets[flow.RoleVerification],
+		targets[flow.RoleAccess],
+	}
+}
+
+func writePrometheusConfig(serviceDisc PrometheusServiceDiscovery) error {
 	f, err := openAndTruncate(PrometheusTargetsFile)
 	if err != nil {
 		return err
 	}
 
-	targets := make([]string, len(containers))
-	for i, container := range containers {
-		targets[i] = fmt.Sprintf("%s:%d", container.ContainerName, MetricsPort)
-	}
-
-	promServiceDisc := PrometheusServiceDiscovery{
-		PromtheusTargets{
-			Targets: targets,
-			Labels: map[string]string{
-				"job": "flow",
-			},
-		},
-	}
-
 	enc := json.NewEncoder(f)
 
-	err = enc.Encode(&promServiceDisc)
+	err = enc.Encode(&serviceDisc)
 	if err != nil {
 		return err
 	}
