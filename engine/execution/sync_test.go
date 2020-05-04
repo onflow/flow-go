@@ -2,6 +2,7 @@ package execution_test
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -149,11 +150,14 @@ func TestSyncFlow(t *testing.T) {
 	var receipt *flow.ExecutionReceipt
 
 	executedBlocks := map[flow.Identifier]*flow.Identifier{}
+	ebMutex := sync.RWMutex{}
 
 	verificationEngine := new(network.Engine)
 	_, _ = verificationNode.Net.Register(engine.ExecutionReceiptProvider, verificationEngine)
 	verificationEngine.On("Submit", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
+			ebMutex.Lock()
+			defer ebMutex.Unlock()
 			identifier, _ := args[0].(flow.Identifier)
 			receipt, _ = args[1].(*flow.ExecutionReceipt)
 			executedBlocks[receipt.ExecutionResult.BlockID] = &identifier
@@ -171,6 +175,9 @@ func TestSyncFlow(t *testing.T) {
 
 	// wait for block2 to be executed on execNode2
 	hub.Eventually(t, func() bool {
+		ebMutex.RLock()
+		defer ebMutex.RUnlock()
+
 		if nodeId, ok := executedBlocks[block2.ID()]; ok {
 			return *nodeId == exe2ID.NodeID
 		}
@@ -187,6 +194,9 @@ func TestSyncFlow(t *testing.T) {
 
 	// wait for block3/4 to be executed on execNode1
 	hub.Eventually(t, func() bool {
+		ebMutex.RLock()
+		defer ebMutex.RUnlock()
+
 		block3ok := false
 		block4ok := false
 		if nodeId, ok := executedBlocks[block3.ID()]; ok {

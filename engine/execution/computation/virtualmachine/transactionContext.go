@@ -339,7 +339,7 @@ func (r *TransactionContext) checkAndIncrementSequenceNumber() error {
 
 	account := r.GetAccount(proposalKey.Address)
 
-	if proposalKey.KeyID < 0 || proposalKey.KeyID >= len(account.Keys) {
+	if proposalKey.KeyID < 0 || int(proposalKey.KeyID) >= len(account.Keys) {
 		return &InvalidProposalKeyError{
 			Address: proposalKey.Address,
 			KeyID:   proposalKey.KeyID,
@@ -437,7 +437,7 @@ func (r *TransactionContext) verifyAccountSignature(
 }
 
 func sigIsForProposalKey(txSig flow.TransactionSignature, proposalKey flow.ProposalKey) bool {
-	return txSig.Address == proposalKey.Address && txSig.KeyID == proposalKey.KeyID
+	return txSig.Address == proposalKey.Address && txSig.KeyID == int(proposalKey.KeyID)
 }
 
 func hasSufficientKeyWeight(weights map[flow.Address]int, address flow.Address) bool {

@@ -94,7 +94,7 @@ func (tb *TransactionBody) SetGasLimit(limit uint64) *TransactionBody {
 //
 // The first two arguments specify the account key to be used, and the last argument is the sequence
 // number being declared.
-func (tb *TransactionBody) SetProposalKey(address Address, keyID int, sequenceNum uint64) *TransactionBody {
+func (tb *TransactionBody) SetProposalKey(address Address, keyID uint64, sequenceNum uint64) *TransactionBody {
 	proposalKey := ProposalKey{
 		Address:        address,
 		KeyID:          keyID,
@@ -388,7 +388,7 @@ func (f TransactionField) String() string {
 // A ProposalKey is the key that specifies the proposal key and sequence number for a transaction.
 type ProposalKey struct {
 	Address        Address
-	KeyID          int
+	KeyID          uint64
 	SequenceNumber uint64
 }
 

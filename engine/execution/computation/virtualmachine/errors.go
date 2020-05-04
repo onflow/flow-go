@@ -45,7 +45,7 @@ func (e *InvalidSignatureAccountError) Error() string {
 // An InvalidProposalKeyError indicates that proposal key references an invalid public key.
 type InvalidProposalKeyError struct {
 	Address flow.Address
-	KeyID   int
+	KeyID   uint64
 }
 
 func (e *InvalidProposalKeyError) Error() string {
@@ -55,7 +55,7 @@ func (e *InvalidProposalKeyError) Error() string {
 // An InvalidProposalSequenceNumberError indicates that proposal key sequence number doesn't match
 type InvalidProposalSequenceNumberError struct {
 	Address           flow.Address
-	KeyID             int
+	KeyID             uint64
 	CurrentSeqNumber  uint64
 	ProvidedSeqNumber uint64
 }

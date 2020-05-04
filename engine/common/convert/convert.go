@@ -25,7 +25,7 @@ func MessageToTransaction(m *entities.Transaction) (flow.TransactionBody, error)
 	proposalKey := m.GetProposalKey()
 	if proposalKey != nil {
 		proposalAddress := flow.BytesToAddress(proposalKey.GetAddress())
-		t.SetProposalKey(proposalAddress, int(proposalKey.GetKeyId()), proposalKey.GetSequenceNumber())
+		t.SetProposalKey(proposalAddress, uint64(proposalKey.GetKeyId()), proposalKey.GetSequenceNumber())
 	}
 
 	payer := m.GetPayer()

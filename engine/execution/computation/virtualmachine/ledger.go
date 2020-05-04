@@ -51,7 +51,7 @@ func fullKeyHash(owner, controller, key string) flow.RegisterID {
 	return h.Sum(nil)
 }
 
-func keyPublicKey(index int) string {
+func keyPublicKey(index uint64) string {
 	return fmt.Sprintf("public_key_%d", index)
 }
 
@@ -90,11 +90,15 @@ func (r *LedgerDAL) GetAccountPublicKeys(accountID []byte) (publicKeys []flow.Ac
 		return nil, fmt.Errorf("key count not set")
 	}
 
-	count := int(new(big.Int).SetBytes(countBytes).Int64())
+	countInt := new(big.Int).SetBytes(countBytes)
+	if !countInt.IsUint64() {
+		return nil, fmt.Errorf("retrieved public key account count bytes (hex-encoded): %x do not represent valid uint64", countBytes)
+	}
+	count := countInt.Uint64()
 
 	publicKeys = make([]flow.AccountPublicKey, count)
 
-	for i := 0; i < count; i++ {
+	for i := uint64(0); i < count; i++ {
 		publicKey, err := r.Ledger.Get(
 			fullKeyHash(string(accountID), string(accountID), keyPublicKey(i)),
 		)
@@ -179,6 +183,7 @@ func (r *LedgerDAL) CreateAccountInLedger(publicKeys []flow.AccountPublicKey) (f
 }
 
 func (r *LedgerDAL) SetAccountPublicKeys(accountID []byte, publicKeys []flow.AccountPublicKey) error {
+
 	var existingCount uint64
 
 	countBytes, err := r.Ledger.Get(
@@ -198,7 +203,7 @@ func (r *LedgerDAL) SetAccountPublicKeys(accountID []byte, publicKeys []flow.Acc
 		existingCount = 0
 	}
 
-	newCount := uint64(len(publicKeys))
+	newCount := uint64(len(publicKeys)) //len returns int and this won't exceed uint64
 	newKeyCount := new(big.Int).SetUint64(newCount)
 
 	r.Ledger.Set(
@@ -218,18 +223,19 @@ func (r *LedgerDAL) SetAccountPublicKeys(accountID []byte, publicKeys []flow.Acc
 			return fmt.Errorf("cannot enocde accout public key: %w", err)
 		}
 
-		r.setAccountPublicKey(accountID, i, publicKeyBytes)
+		// asserted length of publicKeys so i should always fit into uint64
+		r.setAccountPublicKey(accountID, uint64(i), publicKeyBytes)
 	}
 
 	// delete leftover keys
 	for i := newCount; i < existingCount; i++ {
-		r.Ledger.Delete(fullKeyHash(string(accountID), string(accountID), keyPublicKey(int(i))))
+		r.Ledger.Delete(fullKeyHash(string(accountID), string(accountID), keyPublicKey(i)))
 	}
 
 	return nil
 }
 
-func (r *LedgerDAL) setAccountPublicKey(accountID []byte, keyndex int, publicKey []byte) {
+func (r *LedgerDAL) setAccountPublicKey(accountID []byte, keyndex uint64, publicKey []byte) {
 	r.Ledger.Set(
 		fullKeyHash(string(accountID), string(accountID), keyPublicKey(keyndex)),
 		publicKey,
