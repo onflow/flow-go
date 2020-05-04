@@ -16,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/storage/ledger"
+	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -118,7 +119,8 @@ func (gs *ExecutionSuite2) TestVerificationNodesRequestChunkDataPacks() {
 	gs.T().Logf("got erExe1BlockA with SC %x", erExe1BlockA.ExecutionResult.FinalStateCommit)
 
 	// assert there were no ChunkDataPackRequests from the verification node yet
-	require.Equal(gs.T(), 0, gs.MsgState.LenFrom(gs.verID), "expected no ChunkDataPackRequest to be sent before a transaction existed")
+	require.Equal(gs.T(), 0, gs.MsgState.LenFrom(gs.verID),
+		"expected no ChunkDataPackRequest to be sent before a transaction existed")
 
 	// send transaction
 	err := common.DeployCounter(context.Background(), gs.AccessClient())
@@ -144,7 +146,8 @@ func (gs *ExecutionSuite2) TestVerificationNodesRequestChunkDataPacks() {
 	// TODO clear messages
 
 	// send a ChunkDataPackRequest from Ghost node
-	err = gs.Ghost().Send(context.Background(), engine.ExecutionReceiptProvider, []flow.Identifier{gs.exe1ID}, &messages.ChunkDataPackRequest{ChunkID: chunkID})
+	err = gs.Ghost().Send(context.Background(), engine.ExecutionReceiptProvider, []flow.Identifier{gs.exe1ID},
+		&messages.ChunkDataPackRequest{ChunkID: chunkID})
 	require.NoError(gs.T(), err)
 
 	// wait for ChunkDataPackResponse
@@ -155,7 +158,11 @@ func (gs *ExecutionSuite2) TestVerificationNodesRequestChunkDataPacks() {
 
 	// verify state proofs
 	v := ledger.NewTrieVerifier(257)
-	isValid, err := v.VerifyRegistersProof(pack2.Data.Registers(), pack2.Data.Values(), pack2.Data.Proofs(), pack2.Data.StartState)
+	isValid, err := v.VerifyRegistersProof(pack2.Data.Registers(), pack2.Data.Values(), pack2.Data.Proofs(),
+		erExe1BlockB.ExecutionResult.Chunks[0].StartState)
 	require.NoError(gs.T(), err, "error verifying chunk trie proofs")
 	require.True(gs.T(), isValid, "chunk trie proofs are not valid, but must be")
+
+	_, err = trie.NewPSMT(pack2.Data.StartState, 257, pack2.Data.Registers(), pack2.Data.Values(), pack2.Data.Proofs())
+	require.NoError(gs.T(), err, "error building PSMT")
 }
