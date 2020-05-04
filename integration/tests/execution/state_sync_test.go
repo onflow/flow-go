@@ -109,7 +109,7 @@ func (gs *ExecutionSuite) TearDownTest() {
 	gs.cancel()
 }
 
-func (gs *ExecutionSuite) xTestStateSyncAfterNetworkPartition() {
+func (gs *ExecutionSuite) TestStateSyncAfterNetworkPartition() {
 
 	// pause execution node 2
 	err := gs.net.ContainerByID(gs.exe2ID).Pause()
@@ -125,6 +125,7 @@ func (gs *ExecutionSuite) xTestStateSyncAfterNetworkPartition() {
 
 	// send transaction
 	err = common.DeployCounter(context.Background(), gs.AccessClient())
+	require.NoError(gs.T(), err, "could not deploy counter")
 
 	// wait until we see a different state commitment for a finalized block, call that block blockB
 	blockB, _ := common.WaitUntilFinalizedStateCommitmentChanged(gs.T(), &gs.BlockState, &gs.ReceiptState)
@@ -173,4 +174,6 @@ func (gs *ExecutionSuite) xTestStateSyncAfterNetworkPartition() {
 
 	// require that state for blockC is the same for execution node 1 and 2
 	require.Equal(gs.T(), erExe1BlockC.ExecutionResult.FinalStateCommit, erExe2BlockC.ExecutionResult.FinalStateCommit)
+
+	// TODO: trigger messages.ExecutionStateSyncRequest
 }

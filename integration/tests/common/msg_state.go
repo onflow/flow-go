@@ -11,7 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 )
 
-const msgStateTimeout = 10 * time.Second
+const msgStateTimeout = 20 * time.Second
 
 type MsgState struct {
 	// TODO add lock to prevent concurrent map access bugs
@@ -68,5 +68,10 @@ func (ms *MsgState) WaitForMsgFrom(t *testing.T, predicate func(msg interface{})
 
 func MsgIsChunkDataPackRequest(msg interface{}) bool {
 	_, ok := msg.(*messages.ChunkDataPackRequest)
+	return ok
+}
+
+func MsgIsChunkDataPackResponse(msg interface{}) bool {
+	_, ok := msg.(*messages.ChunkDataPackResponse)
 	return ok
 }
