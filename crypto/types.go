@@ -1,9 +1,5 @@
 package crypto
 
-import (
-	"github.com/dapperlabs/flow-go/crypto/hash"
-)
-
 //revive:disable:var-naming
 
 // SigningAlgorithm is an identifier for a signing algorithm
@@ -102,19 +98,3 @@ const (
 
 // Signature is a generic type, regardless of the signature scheme
 type Signature []byte
-
-// CompatibleAlgorithms returns true if the signature and hash algorithms are compatible.
-func CompatibleAlgorithms(sigAlgo SigningAlgorithm, hashAlgo hash.HashingAlgorithm) bool {
-	switch sigAlgo {
-	case ECDSAP256:
-		fallthrough
-	case ECDSASecp256k1:
-		switch hashAlgo {
-		case hash.SHA2_256:
-			fallthrough
-		case hash.SHA3_256:
-			return true
-		}
-	}
-	return false
-}

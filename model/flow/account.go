@@ -36,7 +36,7 @@ type AccountPublicKey struct {
 // - It specifies an incompatible signature/hash algorithm pairing
 // - (TODO) It specifies a negative key weight
 func (a AccountPublicKey) Validate() error {
-	if !crypto.CompatibleAlgorithms(a.SignAlgo, a.HashAlgo) {
+	if !CompatibleAlgorithms(a.SignAlgo, a.HashAlgo) {
 		return errors.Errorf(
 			"signing algorithm (%s) is incompatible with hashing algorithm (%s)",
 			a.SignAlgo,
@@ -61,4 +61,20 @@ func (a AccountPrivateKey) PublicKey(weight int) AccountPublicKey {
 		HashAlgo:  a.HashAlgo,
 		Weight:    weight,
 	}
+}
+
+// CompatibleAlgorithms returns true if the signature and hash algorithms are compatible.
+func CompatibleAlgorithms(sigAlgo crypto.SigningAlgorithm, hashAlgo hash.HashingAlgorithm) bool {
+	switch sigAlgo {
+	case crypto.ECDSAP256:
+		fallthrough
+	case crypto.ECDSASecp256k1:
+		switch hashAlgo {
+		case hash.SHA2_256:
+			fallthrough
+		case hash.SHA3_256:
+			return true
+		}
+	}
+	return false
 }
