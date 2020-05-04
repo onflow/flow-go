@@ -5,6 +5,7 @@ package consensus
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -22,6 +23,9 @@ type Builder struct {
 	guarantees mempool.Guarantees
 	seals      mempool.Seals
 	cfg        Config
+	// cache of block ID -> height for checking transaction expiry
+	// NOTE: these are blocks from the main consensus chain, NOT from the cluster
+	cache map[flow.Identifier]uint64
 }
 
 // NewBuilder creates a new block builder.
@@ -44,6 +48,7 @@ func NewBuilder(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Seal
 		guarantees: guarantees,
 		seals:      seals,
 		cfg:        cfg,
+		cache:      make(map[flow.Identifier]uint64),
 	}
 	return b
 }
@@ -132,18 +137,15 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 
 		// collect guarantees from memory pool, excluding those already pending
 		// on this fork
-		var guaranteeIDs []flow.Identifier
-		for _, guarantee := range b.guarantees.All() {
-			_, ok := guaranteeLookup[guarantee.ID()]
-			if ok {
-				continue
-			}
-			guaranteeIDs = append(guaranteeIDs, guarantee.ID())
+		// also find the minHeight of the ref. block id among all the guarantees in the pool
+		guaranteeIDs, minHeight, err := b.getCandidateGuarantees(tx, guaranteeLookup)
+		if err != nil {
+			return fmt.Errorf("could not get candidate guarantees: %w", err)
 		}
 
-		// find any guarantees that conflict with FINALIZED blocks
+		// find any guarantees between the boundary and going back till minimal block height that conflict with FINALIZED blocks
 		var invalidIDs map[flow.Identifier]struct{}
-		err = operation.CheckGuaranteePayload(boundary, finalizedID, guaranteeIDs, &invalidIDs)(tx)
+		err = operation.CheckGuaranteePayload(minHeight, boundary, finalizedID, guaranteeIDs, &invalidIDs)(tx)
 		if err != nil {
 			return fmt.Errorf("could not check guarantee payload: %w", err)
 		}
@@ -315,4 +317,80 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 	})
 
 	return header, err
+}
+
+// getCandidateGuarantees creates a set of candidate guarantees from the
+// mempool. It guarantees that all candidates are not expired and do not
+// reference un-finalized blocks.
+func (b *Builder) getCandidateGuarantees(tx *badger.Txn, guaranteeLookup map[flow.Identifier]struct{}) ([]flow.Identifier, uint64, error) {
+
+	// retrieve the finalized head ON THE MAIN CHAIN in order to know which
+	// guarantees have expired and should be discarded
+	var final flow.Header
+	err := procedure.RetrieveLatestFinalizedHeader(&final)(tx)
+	if err != nil {
+		return nil, 0, fmt.Errorf("could not retrieve finalized header: %w", err)
+	}
+
+	// build a payload that includes as many guarantees from the memory
+	// that have not expired
+	var guaranteeIDs []flow.Identifier
+	var minHeight uint64 = math.MaxUint64
+	for _, guarantee := range b.guarantees.All() {
+
+		_, ok := guaranteeLookup[guarantee.ID()]
+		if ok {
+			continue
+		}
+
+		refBlkID := guarantee.ReferenceBlockID
+
+		refHeight, cached := b.cache[refBlkID]
+		// the block isn't in our cache, retrieve it from storage
+		if !cached {
+			var ref flow.Header
+			err = operation.RetrieveHeader(refBlkID, &ref)(tx)
+			if err != nil {
+				return nil, 0, fmt.Errorf("could not retrieve reference block: %w", err)
+			}
+
+			// sanity check: ensure the reference block is from the main chain
+			if ref.ChainID != flow.DefaultChainID {
+				return nil, 0, fmt.Errorf("invalid reference block (chain_id=%s)", ref.ChainID)
+			}
+
+			refHeight = ref.Height
+			b.cache[refBlkID] = ref.Height
+		}
+
+		// for now, disallow un-finalized reference blocks
+		if final.Height < refHeight {
+			continue
+		}
+
+		if minHeight < refHeight {
+			minHeight = refHeight
+		}
+
+		// ensure the reference block is not too old
+		// TODO: Define a buffer similar to Transaction and then use (flow.DefaultTransactionExpiry -b.cfg.expiryBuffer)
+		if final.Height-refHeight > flow.DefaultTransactionExpiry {
+			// the guarantee is expired, it will never be valid
+			b.guarantees.Rem(guarantee.ID())
+			continue
+		}
+
+		guaranteeIDs = append(guaranteeIDs, guarantee.ID())
+	}
+
+	// invalidate expired items in reference block ID cache
+	// NOTE: the maximum number of items here is 100s, so this linear-time
+	// invalidation should be OK
+	for id, height := range b.cache {
+		if final.Height-height > flow.DefaultTransactionExpiry {
+			delete(b.cache, id)
+		}
+	}
+
+	return guaranteeIDs, minHeight, nil
 }

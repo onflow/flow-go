@@ -37,8 +37,8 @@ func VerifyGuaranteePayload(height uint64, limit uint64, blockID flow.Identifier
 
 // CheckGuaranteePayload populates `invalidIDs` with any IDs in the candidate
 // set that already exist in an ancestor block.
-func CheckGuaranteePayload(height uint64, blockID flow.Identifier, candidateIDs []flow.Identifier, invalidIDs *map[flow.Identifier]struct{}) func(*badger.Txn) error {
-	start, end := payloadIterRange(codeIndexGuarantee, height, 0)
+func CheckGuaranteePayload(minHeight, maxHeight uint64, blockID flow.Identifier, candidateIDs []flow.Identifier, invalidIDs *map[flow.Identifier]struct{}) func(*badger.Txn) error {
+	start, end := payloadIterRange(codeIndexGuarantee, maxHeight, minHeight)
 	return iterate(start, end, searchduplicates(blockID, candidateIDs, invalidIDs))
 }
 
