@@ -305,7 +305,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 	// use a mempool with 2000 transactions, one per block
 	suite.pool, err = stdmap.NewTransactions(2000)
 	require.Nil(t, err)
-	suite.builder = builder.NewBuilder(suite.db, suite.pool)
+	suite.builder = builder.NewBuilder(suite.db, suite.pool, builder.WithMaxCollectionSize(10000))
 
 	// get a valid reference block ID
 	final, err := suite.protoState.Final().Head()
@@ -375,6 +375,24 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 	// payload should only contain transactions from invalidated blocks
 	assert.Len(t, builtCollection.Transactions, len(invalidatedTxIds), "expected len=%d, got len=%d", len(invalidatedTxIds), len(builtCollection.Transactions))
 	assert.True(t, collectionContains(builtCollection, invalidatedTxIds...))
+}
+
+func (suite *BuilderSuite) TestBuildOn_MaxCollectionSize() {
+	// set the max collection size to 1
+	suite.builder = builder.NewBuilder(suite.db, suite.pool, builder.WithMaxCollectionSize(1))
+
+	// build a block
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
+	suite.Require().Nil(err)
+
+	// retrieve the built block from storage
+	var built model.Block
+	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+	suite.Require().Nil(err)
+	builtCollection := built.Payload.Collection
+
+	// should be only 1 transaction in the collection
+	suite.Assert().Equal(builtCollection.Len(), 1)
 }
 
 func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
