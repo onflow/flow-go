@@ -333,15 +333,9 @@ func (cs *ComplianceSuite) TestOnBlockProposalValidParent() {
 	err := cs.e.onBlockProposal(originID, proposal)
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
-	// we should store the payload
-	cs.payloads.AssertCalled(cs.T(), "Store", block.Header, block.Payload)
-
-	// we should store the header
-	cs.headers.AssertCalled(cs.T(), "Store", block.Header)
-
 	// we should extend the state with the header
 	cs.state.AssertCalled(cs.T(), "Mutate")
-	cs.mutator.AssertCalled(cs.T(), "Extend", block.ID())
+	cs.mutator.AssertCalled(cs.T(), "Extend", &block)
 
 	// we should submit the proposal to hotstuff
 	cs.hotstuff.AssertCalled(cs.T(), "SubmitProposal", block.Header, cs.head.View)
@@ -364,44 +358,12 @@ func (cs *ComplianceSuite) TestOnBlockProposalValidAncestor() {
 	err := cs.e.onBlockProposal(originID, proposal)
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
-	// we should store the payload
-	cs.payloads.AssertCalled(cs.T(), "Store", block.Header, block.Payload)
-
-	// we should store the header
-	cs.headers.AssertCalled(cs.T(), "Store", block.Header)
-
 	// we should extend the state with the header
 	cs.state.AssertCalled(cs.T(), "Mutate")
-	cs.mutator.AssertCalled(cs.T(), "Extend", block.ID())
+	cs.mutator.AssertCalled(cs.T(), "Extend", &block)
 
 	// we should submit the proposal to hotstuff
 	cs.hotstuff.AssertCalled(cs.T(), "SubmitProposal", block.Header, parent.Header.View)
-}
-
-func (cs *ComplianceSuite) TestOnBlockProposalInvalidHeight() {
-
-	// create a proposal that has two ancestors in the cache
-	originID := cs.participants[1].NodeID
-	block := unittest.BlockWithParentFixture(cs.head)
-	block.Header.Height = cs.head.Height // make height intvalid
-	proposal := unittest.ProposalFromBlock(&block)
-
-	// it should be processed without error
-	err := cs.e.onBlockProposal(originID, proposal)
-	require.NoError(cs.T(), err, "proposal with outdated view should be no-op")
-
-	// we should not store the payload
-	cs.payloads.AssertNotCalled(cs.T(), "Store", mock.Anything, mock.Anything)
-
-	// we should not store the header
-	cs.headers.AssertNotCalled(cs.T(), "Store", mock.Anything)
-
-	// we should not extend the state with the header
-	cs.state.AssertNotCalled(cs.T(), "Mutate")
-	cs.mutator.AssertNotCalled(cs.T(), "Extend", mock.Anything)
-
-	// we should not submit the proposal to hotstuff
-	cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything, mock.Anything)
 }
 
 func (cs *ComplianceSuite) TestOnBlockProposalInvalidExtension() {
@@ -425,15 +387,9 @@ func (cs *ComplianceSuite) TestOnBlockProposalInvalidExtension() {
 	err := cs.e.onBlockProposal(originID, proposal)
 	require.Error(cs.T(), err, "proposal with invalid extension should fail")
 
-	// we should store the payload
-	cs.payloads.AssertCalled(cs.T(), "Store", block.Header, block.Payload)
-
-	// we should store the header
-	cs.headers.AssertCalled(cs.T(), "Store", block.Header)
-
 	// we should extend the state with the header
 	cs.state.AssertCalled(cs.T(), "Mutate")
-	cs.mutator.AssertCalled(cs.T(), "Extend", block.ID())
+	cs.mutator.AssertCalled(cs.T(), "Extend", &block)
 
 	// we should not submit the proposal to hotstuff
 	cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything, mock.Anything)
@@ -525,7 +481,7 @@ func (cs *ComplianceSuite) TestProposalBufferingOrder() {
 	// replace the engine buffer with the real one
 	cs.e.pending = real.NewPendingBlocks()
 
-	// process/pending all of the descendants
+	// process all of the descendants
 	for _, proposal := range proposals {
 
 		// check that we request the ancestor block each time
@@ -558,6 +514,7 @@ func (cs *ComplianceSuite) TestProposalBufferingOrder() {
 			header := args.Get(0).(*flow.Header)
 			assert.Equal(cs.T(), order[index], header.ID(), "should submit correct header to hotstuff")
 			index++
+			cs.headerDB[header.ID()] = header
 		},
 	)
 
