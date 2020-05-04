@@ -4,9 +4,11 @@ package crypto
 
 import (
 	"crypto/rand"
+	mrand "math/rand"
 	"sync"
 	"testing"
 	"time"
+	"fmt"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -365,7 +367,9 @@ func tsStatelessRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing
 	}
 }
 
-
+// simple single-threaded test of threshold signature using the simple key generation.
+// The test generates keys for a threshold signatures scheme, uses the keys to sign shares,
+// and reconstruct the threshold signatures using (t+1) random shares.
 func testStatelessThresholdSignatureSimpleKeyGen (t *testing.T) {
 	n := 5
 	threshold := optimalThreshold(n)
@@ -377,7 +381,17 @@ func testStatelessThresholdSignatureSimpleKeyGen (t *testing.T) {
 	// generate signature shares
 	signShares := make([]Signature, 0, n)
 	signers := make([]int, 0, n)
-	for i:=0; i<threshold+1; i++ {
+	// fill the signers list and shuffle it
+	for i:=0; i < n; i++ {
+		signers = append(signers, i)
+	}
+	mrand.Seed(time.Now().UnixNano())
+	mrand.Shuffle(n, func(i, j int) {
+		signers[i], signers[j] = signers[j], signers[i]
+	})
+	// create (t+1) signatures of the first randomly chosen signers
+	for j:=0; j < threshold+1; j++ {
+		i := signers[j]
 		share, err := skShares[i].Sign(messageToSign, kmac)
 		require.NoError(t,err)
 		verif, err := pkShares[i].Verify(share, messageToSign, kmac)
@@ -385,10 +399,10 @@ func testStatelessThresholdSignatureSimpleKeyGen (t *testing.T) {
 		assert.True(t, verif, "signature share is not valid")
 		if verif {
 		signShares = append(signShares, share)
-		signers = append(signers, i)
 		}
 	}
-	thresholdSignature, err := ReconstructThresholdSignature(n, signShares, signers)
+	// reconstruct and test the threshold signature
+	thresholdSignature, err := ReconstructThresholdSignature(n, signShares, signers[:threshold+1])
 	require.NoError(t, err)
 	verif, err := pkGroup.Verify(thresholdSignature, messageToSign, kmac)
 	require.NoError(t, err)
