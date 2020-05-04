@@ -66,13 +66,9 @@ func (a AccountPrivateKey) PublicKey(weight int) AccountPublicKey {
 // CompatibleAlgorithms returns true if the signature and hash algorithms are compatible.
 func CompatibleAlgorithms(sigAlgo crypto.SigningAlgorithm, hashAlgo hash.HashingAlgorithm) bool {
 	switch sigAlgo {
-	case crypto.ECDSAP256:
-		fallthrough
-	case crypto.ECDSASecp256k1:
+	case crypto.ECDSAP256, crypto.ECDSASecp256k1:
 		switch hashAlgo {
-		case hash.SHA2_256:
-			fallthrough
-		case hash.SHA3_256:
+		case hash.SHA2_256, hash.SHA3_256:
 			return true
 		}
 	}
