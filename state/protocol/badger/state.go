@@ -46,7 +46,7 @@ func NewState(db *badger.DB, identities storage.Identities, headers storage.Head
 
 func (s *State) Final() protocol.Snapshot {
 
-	// retrieve the latest finalized block at this height
+	// retrieve the latest finalized height
 	var finalized uint64
 	err := s.db.View(operation.RetrieveFinalizedHeight(&finalized))
 	if err != nil {
@@ -56,21 +56,9 @@ func (s *State) Final() protocol.Snapshot {
 	return s.AtHeight(finalized)
 }
 
-func (s *State) Executed() protocol.Snapshot {
-
-	// retrieve the latest finalized block at this height
-	var executed uint64
-	err := s.db.View(operation.RetrieveExecutedHeight(&executed))
-	if err != nil {
-		return &Snapshot{err: fmt.Errorf("could not retrieve executed height: %w", err)}
-	}
-
-	return s.AtHeight(executed)
-}
-
 func (s *State) Sealed() protocol.Snapshot {
 
-	// retrieve the latest finalized block at this height
+	// retrieve the latest sealed height
 	var sealed uint64
 	err := s.db.View(operation.RetrieveSealedHeight(&sealed))
 	if err != nil {
