@@ -18,26 +18,6 @@ func runNodes(nodes []*Node) {
 	}
 }
 
-func estSlowdown(t *testing.T) {
-
-	// create a network hub for all nodes
-	nodes, stopper, hub := createNodes(t, 10, 250000, 200000)
-
-	hub.WithFilter(blockNothing)
-	runNodes(nodes)
-
-	<-stopper.stopped
-
-	for i := range nodes {
-		printState(t, nodes, i)
-	}
-	allViews := allFinalizedViews(t, nodes)
-	assertSafety(t, allViews)
-	assertLiveness(t, allViews, 90)
-
-	cleanupNodes(nodes)
-}
-
 // happy path: with 3 nodes, they can reach consensus
 func Test3Nodes(t *testing.T) {
 
