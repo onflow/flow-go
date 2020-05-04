@@ -372,7 +372,6 @@ func (b *Builder) getCandidateGuarantees(tx *badger.Txn, guaranteeLookup map[flo
 		}
 
 		// ensure the reference block is not too old
-		// TODO: Define a buffer similar to Transaction and then use (flow.DefaultTransactionExpiry -b.cfg.expiryBuffer)
 		if final.Height-refHeight > flow.DefaultTransactionExpiry {
 			// the guarantee is expired, it will never be valid
 			b.guarantees.Rem(guarantee.ID())
