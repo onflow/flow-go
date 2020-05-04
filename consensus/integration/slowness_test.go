@@ -91,7 +91,7 @@ func TestMessagesLost(t *testing.T) {
 
 	nodes, stopper, hub := createNodes(t, 5, 100, 1000)
 
-	hub.WithFilter(blockNothing)
+	hub.WithFilter(blockNodesForFirstNMessages(100, nodes[0]))
 	runNodes(nodes)
 
 	<-stopper.stopped
@@ -110,7 +110,7 @@ func TestMessagesLostAcrossNetwork(t *testing.T) {
 
 	nodes, stopper, hub := createNodes(t, 5, 150, 1500)
 
-	hub.WithFilter(blockNothing)
+	hub.WithFilter(blockReceiverMessagesByPercentage(10))
 	runNodes(nodes)
 
 	<-stopper.stopped
