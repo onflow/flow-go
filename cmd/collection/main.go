@@ -44,7 +44,9 @@ const (
 func main() {
 
 	var (
-		txLimit      uint
+		txLimit           uint
+		maxCollectionSize uint
+
 		ingressConf  ingress.Config
 		pool         mempool.Transactions
 		collections  *storage.Collections
@@ -67,7 +69,8 @@ func main() {
 
 	cmd.FlowNode("collection").
 		ExtraFlags(func(flags *pflag.FlagSet) {
-			flags.UintVar(&txLimit, "tx-limit", 10000, "maximum number of transactions in the memory pool")
+			flags.UintVar(&txLimit, "tx-limit", 50000, "maximum number of transactions in the memory pool")
+			flags.UintVar(&maxCollectionSize, "max-collection-size", 100, "maximum number of transactions in proposed collections")
 			flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000", "the address the ingress server listens on")
 		}).
 		Module("transactions mempool", func(node *cmd.FlowNodeBuilder) error {
@@ -186,7 +189,7 @@ func main() {
 			return prov, err
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			build := builder.NewBuilder(node.DB, pool)
+			build := builder.NewBuilder(node.DB, pool, builder.WithMaxCollectionSize(maxCollectionSize))
 			final := colfinalizer.NewFinalizer(node.DB, pool, prov, node.Metrics, clusterID)
 
 			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, clusterState, node.Metrics, ing, pool, transactions, headers, colPayloads, colCache)
