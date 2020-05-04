@@ -472,6 +472,78 @@ func setupMockExeNode(t *testing.T,
 	return &exeNode, exeEngine
 }
 
+func BenchmarkIngestEngine(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		ingestHappyPath(b)
+	}
+
+}
+
+func ingestHappyPath(tb testing.TB) {
+	// ingest engine parameters
+	// set based on following issue
+	// https://github.com/dapperlabs/flow-go/issues/3443
+	requestInterval := uint(1000)
+	failureThreshold := uint(2)
+
+	// generates network hub
+	hub := stub.NewNetworkHub()
+
+	// generates identities of nodes, one of each type
+	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	exeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	conIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
+
+	identities := flow.IdentityList{colIdentity, conIdentity, exeIdentity, verIdentity}
+
+	// Execution receipt and chunk assignment
+	//
+	// creates an execution receipt with a single chunk
+	completeER := CompleteExecutionResultFixture(tb, 1)
+
+	// mocks the assignment to assign the single chunk to this verifier node
+	assigner := &mock.ChunkAssigner{}
+	a := chmodel.NewAssignment()
+
+	assignees := []flow.Identifier{verIdentity.NodeID}
+	chunk := completeER.Receipt.ExecutionResult.Chunks[0]
+
+	a.Add(chunk, assignees)
+
+	assigner.On("Assign",
+		testifymock.Anything,
+		completeER.Receipt.ExecutionResult.Chunks,
+		testifymock.Anything).
+		Return(a, nil)
+
+	// nodes and engines
+	//
+	// verification node
+
+	verNode := testutil.VerificationNode(tb, hub, verIdentity, identities, assigner, requestInterval, failureThreshold)
+
+	// starts the ingest engine
+	<-verNode.IngestEngine.Ready()
+
+	// assumes the verification node has received the block
+	err := verNode.BlockStorage.Store(completeER.Block)
+	require.NoError(tb, err)
+
+	// assumes the collection is in the authenticated collections mempool
+	err = verNode.AuthCollections.Add(completeER.Collections[chunk.Index])
+	require.NoError(tb, err)
+
+	// assumes the chunk data pack is in the authenticated chunk data packs mempool
+	err = verNode.ChunkDataPacks.Add(completeER.ChunkDataPacks[chunk.Index])
+	require.NoError(tb, err)
+
+	err = verNode.IngestEngine.Process(exeIdentity.NodeID, completeER.Receipt)
+	require.NoError(tb, err)
+
+	verNode.Done()
+}
+
 // setupMockConsensusNode creates and returns a mock consensus node (conIdentity) and its registered engine in the
 // network (hub). It mocks the process method of the consensus engine to receive a message from a certain
 // verification node (verIdentity) evaluates whether it is a result approval about an assigned chunk to that verifier node.

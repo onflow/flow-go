@@ -14,7 +14,7 @@ import (
 // CompleteExecutionResultFixture returns complete execution result with an
 // execution receipt referencing the block/collections.
 // chunkCount determines the number of chunks inside each receipt
-func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.CompleteExecutionResult {
+func CompleteExecutionResultFixture(t testing.TB, chunkCount int) verification.CompleteExecutionResult {
 	chunks := make([]*flow.Chunk, 0)
 	collections := make([]*flow.Collection, 0, chunkCount)
 	guarantees := make([]*flow.CollectionGuarantee, 0, chunkCount)
@@ -43,11 +43,17 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.C
 		unittest.RunWithTempDir(t, func(dir string) {
 			f, err := ledger.NewTrieStorage(dir)
 			defer f.Done()
-			require.NoError(t, err)
+			if t != nil {
+				require.NoError(t, err)
+			}
 			startState, err := f.UpdateRegisters(ids, values, f.EmptyStateCommitment())
-			require.NoError(t, err)
+			if t != nil {
+				require.NoError(t, err)
+			}
 			regTs, err := f.GetRegisterTouches(ids, startState)
-			require.NoError(t, err)
+			if t != nil {
+				require.NoError(t, err)
+			}
 
 			chunk := &flow.Chunk{
 				ChunkBody: flow.ChunkBody{

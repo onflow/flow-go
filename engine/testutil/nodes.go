@@ -39,7 +39,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, options ...func(*protocol.State)) mock.GenericNode {
+func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, options ...func(*protocol.State)) mock.GenericNode {
 	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
 
 	dbDir := unittest.TempDir(t)
@@ -262,7 +262,7 @@ func WithVerifierEngine(eng network.Engine) VerificationOpt {
 	}
 }
 
-func VerificationNode(t *testing.T,
+func VerificationNode(tb testing.TB,
 	hub *stub.Hub,
 	identity *flow.Identity,
 	identities []*flow.Identity,
@@ -273,7 +273,7 @@ func VerificationNode(t *testing.T,
 
 	var err error
 	node := mock.VerificationNode{
-		GenericNode: GenericNode(t, hub, identity, identities),
+		GenericNode: GenericNode(tb, hub, identity, identities),
 	}
 
 	for _, apply := range opts {
@@ -282,37 +282,37 @@ func VerificationNode(t *testing.T,
 
 	if node.AuthReceipts == nil {
 		node.AuthReceipts, err = stdmap.NewReceipts(1000)
-		require.Nil(t, err)
+		require.Nil(tb, err)
 	}
 
 	if node.PendingReceipts == nil {
 		node.PendingReceipts, err = stdmap.NewPendingReceipts(1000)
-		require.Nil(t, err)
+		require.Nil(tb, err)
 	}
 
 	if node.AuthCollections == nil {
 		node.AuthCollections, err = stdmap.NewCollections(1000)
-		require.Nil(t, err)
+		require.Nil(tb, err)
 	}
 
 	if node.PendingCollections == nil {
 		node.PendingCollections, err = stdmap.NewPendingCollections(1000)
-		require.Nil(t, err)
+		require.Nil(tb, err)
 	}
 
 	if node.CollectionTrackers == nil {
 		node.CollectionTrackers, err = stdmap.NewCollectionTrackers(1000)
-		require.Nil(t, err)
+		require.Nil(tb, err)
 	}
 
 	if node.ChunkDataPacks == nil {
 		node.ChunkDataPacks, err = stdmap.NewChunkDataPacks(1000)
-		require.Nil(t, err)
+		require.Nil(tb, err)
 	}
 
 	if node.ChunkDataPackTrackers == nil {
 		node.ChunkDataPackTrackers, err = stdmap.NewChunkDataPackTrackers(1000)
-		require.Nil(t, err)
+		require.Nil(tb, err)
 	}
 
 	if node.BlockStorage == nil {
@@ -324,19 +324,19 @@ func VerificationNode(t *testing.T,
 		vm := virtualmachine.New(rt)
 		chunkVerifier := chunks.NewChunkVerifier(vm)
 
-		require.NoError(t, err)
+		require.NoError(tb, err)
 		node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me, chunkVerifier, node.Metrics)
-		require.Nil(t, err)
+		require.Nil(tb, err)
 	}
 
 	if node.IngestedChunkIDs == nil {
 		node.IngestedChunkIDs, err = stdmap.NewIdentifiers(1000)
-		require.Nil(t, err)
+		require.Nil(tb, err)
 	}
 
 	if node.IngestedResultIDs == nil {
 		node.IngestedResultIDs, err = stdmap.NewIdentifiers(1000)
-		require.Nil(t, err)
+		require.Nil(tb, err)
 	}
 
 	if node.IngestEngine == nil {
@@ -359,7 +359,7 @@ func VerificationNode(t *testing.T,
 			requestIntervalMs,
 			failureThreshold,
 		)
-		require.Nil(t, err)
+		require.Nil(tb, err)
 	}
 
 	return node
