@@ -109,7 +109,7 @@ func (gs *ExecutionSuite) TearDownTest() {
 	gs.cancel()
 }
 
-func (gs *ExecutionSuite) TestStateSyncAfterNetworkPartition() {
+func (gs *ExecutionSuite) xTestStateSyncAfterNetworkPartition() {
 
 	// pause execution node 2
 	err := gs.net.ContainerByID(gs.exe2ID).Pause()

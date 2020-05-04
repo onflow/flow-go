@@ -41,8 +41,8 @@ func (ms *MsgState) LenFrom(node flow.Identifier) int {
 	return len(msgs)
 }
 
-// WaitForAtFrom waits for a msg satisfying the predicate from the given node and returns it
-func (ms *MsgState) WaitForAtFrom(t *testing.T, predicate func(msg interface{}) bool, node flow.Identifier) interface{} {
+// WaitForMsgFrom waits for a msg satisfying the predicate from the given node and returns it
+func (ms *MsgState) WaitForMsgFrom(t *testing.T, predicate func(msg interface{}) bool, node flow.Identifier) interface{} {
 	var m interface{}
 	i := 0
 	require.Eventually(t, func() bool {
