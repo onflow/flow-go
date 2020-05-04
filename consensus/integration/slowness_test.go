@@ -63,7 +63,7 @@ func Test5Nodes(t *testing.T) {
 
 	nodes, stopper, hub := createNodes(t, 5, 100, 1000)
 
-	hub.WithFilter(blockNodesForFirstNMessages(0, nodes[0]))
+	hub.WithFilter(blockNodes(nodes[0]))
 	runNodes(nodes)
 
 	<-stopper.stopped
