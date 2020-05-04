@@ -182,7 +182,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) error {
 		// the-leader-own share
 		if i-1 == s.currentIndex {
 			xdata := make([]byte, shareSize)
-			ZrPolynomialImage(xdata, s.a, i, &s.y[i-1])
+			zrPolynomialImage(xdata, s.a, i, &s.y[i-1])
 			C.bn_read_bin((*C.bn_st)(&s.x),
 				(*C.uchar)(&xdata[0]),
 				PrKeyLenBLSBLS12381,
@@ -192,7 +192,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) error {
 		// the-other-node shares
 		data := make([]byte, shareSize+1)
 		data[0] = byte(feldmanVSSShare)
-		ZrPolynomialImage(data[1:], s.a, i, &s.y[i-1])
+		zrPolynomialImage(data[1:], s.a, i, &s.y[i-1])
 		s.processor.PrivateSend(int(i-1), data)
 	}
 	// broadcast the vector
@@ -268,11 +268,11 @@ func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) {
 	}
 }
 
-// ZrPolynomialImage computes P(x) = a_0 + a_1*x + .. + a_n*x^n (mod r) in Z/Zr
+// zrPolynomialImage computes P(x) = a_0 + a_1*x + .. + a_n*x^n (mod r) in Z/Zr
 // r being the order of G1
 // P(x) is written in dest, while g2^P(x) is written in y
 // x being a small integer
-func ZrPolynomialImage(dest []byte, a []scalar, x index, y *pointG2) {
+func zrPolynomialImage(dest []byte, a []scalar, x index, y *pointG2) {
 	C.Zr_polynomialImage((*C.uchar)(&dest[0]),
 		(*C.ep2_st)(y),
 		(*C.bn_st)(&a[0]), (C.int)(len(a)),

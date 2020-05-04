@@ -73,6 +73,9 @@ func NewThresholdSigner(size int, currentIndex int, hashAlgo hash.Hasher) (*thre
 		return nil, fmt.Errorf("The current index must be between 0 and %d", size-1)
 	}
 
+	// initialize BLS settings
+	_ = newBLSBLS12381()
+
 	// optimal threshold (t) to allow the largest number of malicious nodes (m)
 	threshold := optimalThreshold(size)
 	// internal list of valid signature shares
@@ -253,6 +256,8 @@ func (s *thresholdSigner) reconstructThresholdSignature() (Signature, error) {
 // - error if the inputs are not in the correct range or if the threshold is not reached
 // - Signature: the threshold signature if there is no returned error, nil otherwise
 func ReconstructThresholdSignature(size int, shares []Signature, signers []int) (Signature, error) {
+	// initialize BLS settings
+	_ = newBLSBLS12381()
 	if size < ThresholdMinSize || size > ThresholdMaxSize {
 		return nil, fmt.Errorf("size should be between %d and %d",
 			ThresholdMinSize, ThresholdMaxSize)
@@ -295,3 +300,49 @@ func ReconstructThresholdSignature(size int, shares []Signature, signers []int) 
 func EnoughShares(size int, sharesNumber int) bool {
 	return sharesNumber >= (optimalThreshold(size) + 1)
 }
+
+
+func ThresholdSignKeyGen(size int) ([]PrivateKey, 
+	[]PublicKey, PublicKey,	error) {
+	// set threshold 
+	threshold := optimalThreshold(size)
+	// initialize BLS settings
+	_ = newBLSBLS12381()
+	// the scalars x and G2 points y
+	x := make([]scalar, size)
+	y := make([]pointG2, size)
+	var X0 pointG2
+	// Generate a polyomial P in Zr[X] of degree t
+	a := make([]scalar, threshold+1)
+	for i := 0; i < threshold+1; i++ {
+ 		err := randZr(&a[i])
+		if err != nil {
+			return nil, nil, nil, err
+		}
+	}
+	// compute the shares
+	for i := index(1); int(i) <= size; i++ {
+		data := make([]byte, PrKeyLenBLSBLS12381)
+		zrPolynomialImage(data, a, i, &y[i-1])
+		C.bn_read_bin((*C.bn_st)(&x[i-1]),(*C.uchar)(&data[0]),	PrKeyLenBLSBLS12381)
+	}
+	// group public key
+	genScalarMultG2(&X0, &a[0])
+	// export the keys
+	skShares := make([]PrivateKey, size)
+	pkShares := make([]PublicKey, size)
+	var pkGroup PublicKey
+	for i := 0; i < size; i++ {
+		skShares[i] = &PrKeyBLSBLS12381{
+			scalar: x[i], 
+		}
+		pkShares[i] = &PubKeyBLSBLS12381{
+			point: y[i], 
+		}
+	}
+	pkGroup = &PubKeyBLSBLS12381{
+		point: X0, 
+	}
+	return skShares, pkShares, pkGroup, nil
+}
+
