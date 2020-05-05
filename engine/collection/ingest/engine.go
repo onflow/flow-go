@@ -219,7 +219,12 @@ func (e *Engine) ValidateTransaction(tx *flow.TransactionBody) error {
 		return fmt.Errorf("could not get reference block: %w", err)
 	}
 
-	if final.Height > ref.Height && final.Height-ref.Height > e.expiry {
+	diff := final.Height - ref.Height
+	// check for overflow
+	if ref.Height > final.Height {
+		diff = 0
+	}
+	if diff > e.expiry {
 		return ExpiredTransactionError{
 			RefHeight:   ref.Height,
 			FinalHeight: final.Height,
