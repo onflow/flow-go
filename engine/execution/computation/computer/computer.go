@@ -127,54 +127,49 @@ func (e *blockComputer) executeCollection(
 	)
 
 	for _, tx := range collection.Transactions {
-		var txSpan opentracing.Span
-
-		if e.tracer != nil {
-			txSpan = e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
-		}
-
-		txView := collectionView.NewChild()
-
-		result, err := blockCtx.ExecuteTransaction(txView, tx)
-		if err != nil {
-			if txSpan != nil {
-				txSpan.Finish()
+		err := func(tx *flow.TransactionBody) error {
+			if e.tracer != nil {
+				txSpan := e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
+				defer txSpan.Finish()
 			}
 
+			txView := collectionView.NewChild()
+
+			result, err := blockCtx.ExecuteTransaction(txView, tx)
+			if err != nil {
+				txIndex++
+				return fmt.Errorf("failed to execute transaction: %w", err)
+			}
+
+			txEvents, err := virtualmachine.ConvertEvents(txIndex, result)
 			txIndex++
-			return nil, nil, txIndex, 0, fmt.Errorf("failed to execute transaction: %w", err)
-		}
+			gasUsed += result.GasUsed
 
-		txEvents, err := virtualmachine.ConvertEvents(txIndex, result)
-		txIndex++
-		gasUsed += result.GasUsed
-
-		if err != nil {
-			if txSpan != nil {
-				txSpan.Finish()
+			if err != nil {
+				return fmt.Errorf("failed to create flow events: %w", err)
 			}
 
-			return nil, nil, txIndex, 0, fmt.Errorf("failed to create flow events: %w", err)
-		}
+			events = append(events, txEvents...)
 
-		events = append(events, txEvents...)
+			txResult := flow.TransactionResult{
+				TransactionID: tx.ID(),
+			}
 
-		txResult := flow.TransactionResult{
-			TransactionID: tx.ID(),
-		}
+			if result.Error != nil {
+				txResult.ErrorMessage = result.Error.Error()
+			}
 
-		if result.Error != nil {
-			txResult.ErrorMessage = result.Error.Error()
-		}
+			txResults = append(txResults, txResult)
 
-		txResults = append(txResults, txResult)
+			if result.Succeeded() {
+				collectionView.MergeView(txView)
+			}
 
-		if result.Succeeded() {
-			collectionView.MergeView(txView)
-		}
+			return nil
+		}(tx)
 
-		if txSpan != nil {
-			txSpan.Finish()
+		if err != nil {
+			return nil, nil, txIndex, 0, err
 		}
 	}
 
