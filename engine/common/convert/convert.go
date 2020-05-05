@@ -212,10 +212,11 @@ func AccountToMessage(a *flow.Account) (*entities.Account, error) {
 func AccountKeyToMessage(a flow.AccountPublicKey) (*entities.AccountKey, error) {
 	publicKey := a.PublicKey.Encode()
 	return &entities.AccountKey{
-		PublicKey: publicKey,
-		SignAlgo:  uint32(a.SignAlgo),
-		HashAlgo:  uint32(a.HashAlgo),
-		Weight:    uint32(a.Weight),
+		PublicKey:      publicKey,
+		SignAlgo:       uint32(a.SignAlgo),
+		HashAlgo:       uint32(a.HashAlgo),
+		Weight:         uint32(a.Weight),
+		SequenceNumber: uint32(a.SeqNumber),
 	}, nil
 }
 
