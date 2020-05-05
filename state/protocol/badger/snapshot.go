@@ -116,16 +116,16 @@ func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
 			return fmt.Errorf("could not get snapshot header: %w", err)
 		}
 
-		// retrieve the chain ID to ensure we are only dealing with blocks from
-		// the main consensus-node chain within the protocol state
-		var chainID string
-		err = s.state.getChainID(&chainID)(tx)
+		// retrieve the finalized header to ensure we are only dealing with
+		// blocks from the main consensus-node chain within the protocol state
+		var final flow.Header
+		err = procedure.RetrieveLatestFinalizedHeader(&final)(tx)
 		if err != nil {
 			return fmt.Errorf("could not get chain ID: %w", err)
 		}
 
-		if head.ChainID != chainID {
-			return fmt.Errorf("invalid chain id (got=%s expected=%s)", head.ChainID, chainID)
+		if head.ChainID != final.ChainID {
+			return fmt.Errorf("invalid chain id (got=%s expected=%s)", head.ChainID, final.ChainID)
 		}
 
 		return err

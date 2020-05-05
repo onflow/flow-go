@@ -10,17 +10,12 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 type State struct {
 	db               *badger.DB
 	clusters         uint
 	validationBlocks uint64
-
-	// lazily set the chain ID once for each instance, we use this to ensure
-	// all blocks returned by protocol state are part of the main chain
-	chainID string
 }
 
 // NewState initializes a new state backed by a badger database, applying the
@@ -74,31 +69,4 @@ func (s *State) Mutate() protocol.Mutator {
 		state: s,
 	}
 	return m
-}
-
-// getChainID retrieves the chain ID of the main chain, ensuring that
-// the ID is only actually retrieved once.
-func (s *State) getChainID(chainID *string) func(tx *badger.Txn) error {
-	return func(tx *badger.Txn) error {
-
-		// if the chain ID is already set, return it
-		if s.chainID != "" {
-			*chainID = s.chainID
-			return nil
-		}
-
-		// otherwise, retrieve the finalized head to get the chain ID
-		// we could get any block here, since they all use the same chain ID
-		var final flow.Header
-		err := procedure.RetrieveLatestFinalizedHeader(&final)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve finalized header to check chain ID: %w", err)
-		}
-
-		// only if we have successfully retrieved the header, set the chain ID
-		s.chainID = final.ChainID
-		*chainID = s.chainID
-
-		return nil
-	}
 }
