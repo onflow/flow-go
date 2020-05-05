@@ -107,7 +107,7 @@ func (h *handler) ExecuteScriptAtBlockID(
 ) (*execution.ExecuteScriptAtBlockIDResponse, error) {
 	blockID := flow.HashToID(req.GetBlockId())
 
-	value, err := h.engine.ExecuteScriptAtBlockID(req.Script, blockID)
+	value, err := h.engine.ExecuteScriptAtBlockID(ctx, req.Script, blockID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to execute script: %v", err)
 	}
@@ -224,8 +224,10 @@ func (h *handler) eventResult(blockID flow.Identifier,
 	}, nil
 }
 
-func (h *handler) GetAccountAtBlockID(_ context.Context,
-	req *execution.GetAccountAtBlockIDRequest) (*execution.GetAccountAtBlockIDResponse, error) {
+func (h *handler) GetAccountAtBlockID(
+	ctx context.Context,
+	req *execution.GetAccountAtBlockIDRequest,
+) (*execution.GetAccountAtBlockIDResponse, error) {
 
 	blockID := req.GetBlockId()
 	if blockID == nil {
@@ -239,7 +241,7 @@ func (h *handler) GetAccountAtBlockID(_ context.Context,
 	}
 	flowAddress := flow.BytesToAddress(address)
 
-	value, err := h.engine.GetAccount(flowAddress, blockFlowID)
+	value, err := h.engine.GetAccount(ctx, flowAddress, blockFlowID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get account: %v", err)
 	}
