@@ -474,12 +474,12 @@ func setupMockExeNode(t *testing.T,
 
 func BenchmarkIngestEngine(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		ingestHappyPath(b)
+		ingestHappyPath(t, 10, 100, 6)
 	}
 
 }
 
-func ingestHappyPath(tb testing.TB) {
+func ingestHappyPath(tb testing.TB, receiptCount int, chunkCount int, verCount int) {
 	// ingest engine parameters
 	// set based on following issue
 	// https://github.com/dapperlabs/flow-go/issues/3443
@@ -489,58 +489,83 @@ func ingestHappyPath(tb testing.TB) {
 	// generates network hub
 	hub := stub.NewNetworkHub()
 
-	// generates identities of nodes, one of each type
+	// generates identities of nodes, one of each type and `verCount` many verification node
 	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	exeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	verIdentities := unittest.IdentityListFixture(verCount, unittest.WithRole(flow.RoleVerification))
 	conIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 
-	identities := flow.IdentityList{colIdentity, conIdentity, exeIdentity, verIdentity}
+	// marks first verification node as the one running
+	verIdentity := verIdentities[0]
+
+	identities := flow.IdentityList{colIdentity, conIdentity, exeIdentity}
+	identities = append(identities, verIdentities...)
 
 	// Execution receipt and chunk assignment
 	//
-	// creates an execution receipt with a single chunk
-	completeER := CompleteExecutionResultFixture(tb, 1)
+	ers := make([]verification.CompleteExecutionResult, receiptCount)
+	for i := 0; i < receiptCount; i++ {
+		ers[i] = CompleteExecutionResultFixture(tb, chunkCount)
+	}
+
+	fmt.Println("Chunks have been made")
 
 	// mocks the assignment to assign the single chunk to this verifier node
 	assigner := &mock.ChunkAssigner{}
 	a := chmodel.NewAssignment()
 
-	assignees := []flow.Identifier{verIdentity.NodeID}
-	chunk := completeER.Receipt.ExecutionResult.Chunks[0]
-
-	a.Add(chunk, assignees)
-
-	assigner.On("Assign",
-		testifymock.Anything,
-		completeER.Receipt.ExecutionResult.Chunks,
-		testifymock.Anything).
-		Return(a, nil)
+	// assigns some chunks based on isAssigned method to the verification node
+	for _, er := range ers {
+		for _, chunk := range er.Receipt.ExecutionResult.Chunks {
+			if isAssigned(int(chunk.Index), chunkCount) {
+				a.Add(chunk, []flow.Identifier{verIdentity.NodeID})
+			}
+		}
+		assigner.On("Assign",
+			testifymock.Anything,
+			er.Receipt.ExecutionResult.Chunks,
+			testifymock.Anything).
+			Return(a, nil)
+	}
 
 	// nodes and engines
 	//
 	// verification node
-
 	verNode := testutil.VerificationNode(tb, hub, verIdentity, identities, assigner, requestInterval, failureThreshold)
 
 	// starts the ingest engine
 	<-verNode.IngestEngine.Ready()
 
-	// assumes the verification node has received the block
-	err := verNode.BlockStorage.Store(completeER.Block)
-	require.NoError(tb, err)
+	// assumes the verification node has received the block, collections, and chunk data pack associated
+	// with each receipt
+	for _, er := range ers {
+		// block
+		err := verNode.BlockStorage.Store(er.Block)
+		require.NoError(tb, err)
 
-	// assumes the collection is in the authenticated collections mempool
-	err = verNode.AuthCollections.Add(completeER.Collections[chunk.Index])
-	require.NoError(tb, err)
+		for _, chunk := range er.Receipt.ExecutionResult.Chunks {
+			// collection
+			err = verNode.AuthCollections.Add(er.Collections[chunk.Index])
+			require.NoError(tb, err)
 
-	// assumes the chunk data pack is in the authenticated chunk data packs mempool
-	err = verNode.ChunkDataPacks.Add(completeER.ChunkDataPacks[chunk.Index])
-	require.NoError(tb, err)
+			// chunk
+			err = verNode.ChunkDataPacks.Add(er.ChunkDataPacks[chunk.Index])
+			require.NoError(tb, err)
+		}
+	}
 
-	err = verNode.IngestEngine.Process(exeIdentity.NodeID, completeER.Receipt)
-	require.NoError(tb, err)
+	ingestWG := sync.WaitGroup{}
+	ingestWG.Add(receiptCount)
 
+	for _, er := range ers {
+		go func(receipt *flow.ExecutionReceipt) {
+			defer ingestWG.Done()
+			err := verNode.IngestEngine.Process(exeIdentity.NodeID, receipt)
+			require.NoError(tb, err)
+		}(er.Receipt)
+	}
+
+	unittest.RequireReturnsBefore(tb, ingestWG.Wait, time.Duration(receiptCount)*time.Second)
 	verNode.Done()
 }
 
