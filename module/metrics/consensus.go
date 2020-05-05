@@ -42,8 +42,14 @@ var (
 		Namespace: namespaceConsensus,
 		Help:      "the number of collections per block",
 	})
-	collectionsPerFinalizedBlockCounter = promauto.NewCounter(prometheus.CounterOpts{
+	collectionsInFinalizedBlockCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Name:      "collections_in_finalized_block",
+		Namespace: namespaceConsensus,
+		Help:      "The total number of collections included in the finalized block",
+	})
+	collectionsPerFinalizedBlock = promauto.NewHistogram(prometheus.HistogramOpts{
 		Name:      "collections_per_finalized_block",
+		Buckets:   []float64{1, 5, 10, 50, 100}, //TODO(andrew) update once collection limits are known
 		Namespace: namespaceConsensus,
 		Help:      "The number of collections included in the finalized block",
 	})
@@ -130,7 +136,8 @@ func (c *Collector) FinishCollectionToFinalized(collectionID flow.Identifier) {
 
 // CollectionsInFinalizedBlock reports Metric C2: Counter: Total number of Collections included in finalized Blocks (converted later to rate)
 func (c *Collector) CollectionsInFinalizedBlock(count int) {
-	collectionsPerFinalizedBlockCounter.Add(float64(count))
+	collectionsInFinalizedBlockCounter.Add(float64(count))
+	collectionsPerFinalizedBlock.Observe(float64(count))
 }
 
 // CollectionsPerBlock reports Metric C3: Gauge type: number of Collections per Block

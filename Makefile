@@ -6,10 +6,10 @@ COMMIT := $(shell git rev-parse HEAD)
 # The tag of the current commit, otherwise empty
 VERSION := $(shell git describe --tags --abbrev=0 --exact-match 2>/dev/null)
 # Image tag
-IMAGE_TAG := ${VERSION}
-ifeq (${IMAGE_TAG},)
-IMAGE_TAG := ${SHORT_COMMIT}
-endif
+IMAGE_TAG := devnet5
+# ifeq (${IMAGE_TAG},)
+# IMAGE_TAG := ${SHORT_COMMIT}
+# endif
 # Name of the cover profile
 COVER_PROFILE := cover.out
 # Disable go sum database lookup for private repos

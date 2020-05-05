@@ -32,14 +32,19 @@ var (
 	})
 	proposalSizeGauge = promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceCollection,
-		Buckets:   []float64{5, 10, 50, 100}, //TODO(andrew) update once collection limits are known
+		Buckets:   []float64{1, 5, 10, 50, 100}, //TODO(andrew) update once collection limits are known
 		Name:      "proposal_size_transactions",
 		Help:      "number of transactions in proposed collections",
 	})
 	guaranteedCollectionSizeGauge = promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceCollection,
-		Buckets:   []float64{5, 10, 50, 100}, //TODO(andrew) update once collection limits are known
+		Buckets:   []float64{1, 5, 10, 50, 100}, //TODO(andrew) update once collection limits are known
 		Name:      "guarantee_size_transactions",
+		Help:      "number of transactions in guaranteed collections",
+	})
+	transactionsInCollectionGuarantees = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: namespaceCollection,
+		Name:      "transactions_in_collection_guarantees",
 		Help:      "number of transactions in guaranteed collections",
 	})
 	pendingClusterBlocksGauge = promauto.NewGauge(prometheus.GaugeOpts{
@@ -72,6 +77,7 @@ func (c *Collector) CollectionProposed(collection flow.LightCollection) {
 // finishes the tx->collection span for each constituent transaction.
 func (c *Collector) CollectionGuaranteed(collection flow.LightCollection) {
 	guaranteedCollectionSizeGauge.Observe(float64(collection.Len()))
+	transactionsInCollectionGuarantees.Add(float64(collection.Len()))
 	for _, txID := range collection.Transactions {
 		c.tracer.FinishSpan(txID, spanTransactionToCollection)
 	}
