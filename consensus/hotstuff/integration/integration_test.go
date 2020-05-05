@@ -15,7 +15,7 @@ import (
 
 // a pacemaker timeout to wait for proposals. Usually 10 ms is enough,
 // but for slow environment like CI, a longer one is needed.
-const safeTimeout = 10 * time.Second
+const safeTimeout = 200 * time.Millisecond
 
 func TestSingleInstance(t *testing.T) {
 

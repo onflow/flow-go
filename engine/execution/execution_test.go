@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine"
 	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
@@ -240,6 +241,13 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	// transaction that will change state and succeed, used to test that state commitment changes
 	tx1 := execTestutil.DeployCounterContractTransaction()
+
+	seq := uint64(0)
+
+	err := execTestutil.SignTransactionByRoot(&tx1, seq)
+	require.NoError(t, err)
+	seq++
+
 	col1 := flow.Collection{Transactions: []*flow.TransactionBody{&tx1}}
 	block2 := &flow.Block{
 		Header: &flow.Header{
@@ -259,6 +267,9 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	// transaction that will change state but then panic and revert, used to test that state commitment stays identical
 	tx2 := execTestutil.CreateCounterPanicTransaction()
+	err = execTestutil.SignTransactionByRoot(&tx2, seq)
+	require.NoError(t, err)
+
 	col2 := flow.Collection{Transactions: []*flow.TransactionBody{&tx2}}
 	block3 := &flow.Block{
 		Header: &flow.Header{

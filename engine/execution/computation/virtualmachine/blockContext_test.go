@@ -16,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
+	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -40,7 +41,11 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
             `)).
 			AddAuthorizer(unittest.AddressFixture())
 
-		ledger := make(virtualmachine.MapLedger)
+		err := execTestutil.SignTransactionByRoot(tx, 0)
+		require.NoError(t, err)
+
+		ledger, err := execTestutil.RootBootstrappedLedger()
+		require.NoError(t, err)
 
 		result, err := bc.ExecuteTransaction(ledger, tx)
 
@@ -69,7 +74,11 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
                 }
             `))
 
-		ledger := make(virtualmachine.MapLedger)
+		err := execTestutil.SignTransactionByRoot(tx, 0)
+		require.NoError(t, err)
+
+		ledger, err := execTestutil.RootBootstrappedLedger()
+		require.NoError(t, err)
 
 		result, err := bc.ExecuteTransaction(ledger, tx)
 
@@ -89,7 +98,11 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
                 }
             `))
 
-		ledger := make(virtualmachine.MapLedger)
+		err := execTestutil.SignTransactionByRoot(tx, 0)
+		require.NoError(t, err)
+
+		ledger, err := execTestutil.RootBootstrappedLedger()
+		require.NoError(t, err)
 
 		result, err := bc.ExecuteTransaction(ledger, tx)
 		assert.NoError(t, err)
@@ -109,7 +122,11 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
                 }
             `))
 
-		ledger := make(virtualmachine.MapLedger)
+		err := execTestutil.SignTransactionByRoot(tx, 0)
+		require.NoError(t, err)
+
+		ledger, err := execTestutil.RootBootstrappedLedger()
+		require.NoError(t, err)
 
 		result, err := bc.ExecuteTransaction(ledger, tx)
 		assert.NoError(t, err)
@@ -196,7 +213,12 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 				tx.AddAuthorizer(authorizer)
 			}
 
-			ledger := make(virtualmachine.MapLedger)
+			ledger, err := execTestutil.RootBootstrappedLedger()
+			require.NoError(t, err)
+
+			err = execTestutil.SignTransactionByRoot(tx, 0)
+			require.NoError(t, err)
+			//seq++
 
 			result, err := bc.ExecuteTransaction(ledger, tx)
 			require.NoError(t, err)
@@ -224,7 +246,8 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 			}
 		`)
 
-		ledger := make(virtualmachine.MapLedger)
+		ledger, err := execTestutil.RootBootstrappedLedger()
+		require.NoError(t, err)
 
 		result, err := bc.ExecuteScript(ledger, script)
 		assert.NoError(t, err)
@@ -239,7 +262,8 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 			}
 		`)
 
-		ledger := make(virtualmachine.MapLedger)
+		ledger, err := execTestutil.RootBootstrappedLedger()
+		require.NoError(t, err)
 
 		result, err := bc.ExecuteScript(ledger, script)
 
@@ -257,7 +281,8 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 			}
 		`)
 
-		ledger := make(virtualmachine.MapLedger)
+		ledger, err := execTestutil.RootBootstrappedLedger()
+		require.NoError(t, err)
 
 		result, err := bc.ExecuteScript(ledger, script)
 		assert.NoError(t, err)
@@ -280,7 +305,12 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	require.NoError(t, err)
 	bc := vm.NewBlockContext(&h)
 
-	ledger := make(virtualmachine.MapLedger)
+	sequenceNumber := 0
+
+	ledger, err := execTestutil.RootBootstrappedLedger()
+	require.NoError(t, err)
+
+	ledgerAccess := virtualmachine.LedgerDAL{Ledger: ledger}
 
 	createAccount := func() (flow.Address, crypto.PublicKey) {
 
@@ -299,7 +329,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 			SignAlgo:  key.Algorithm(),
 			HashAlgo:  hash.SHA3_256,
 		}
-		keyBytes, err := flow.EncodeAccountPublicKey(accountKey)
+		keyBytes, err := flow.EncodeRuntimeAccountPublicKey(accountKey)
 		assert.NoError(t, err)
 
 		// encode the bytes to cadence string
@@ -318,7 +348,21 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		// create the transaction to create the account
 		tx := &flow.TransactionBody{
 			Script: []byte(script),
+			Payer:  flow.RootAddress,
+			ProposalKey: flow.ProposalKey{
+				Address:        flow.RootAddress,
+				KeyID:          0,
+				SequenceNumber: uint64(sequenceNumber),
+			},
 		}
+
+		sequenceNumber++
+
+		rootHasher, err := hash.NewHasher(flow.RootAccountPrivateKey.HashAlgo)
+		require.NoError(t, err)
+
+		err = tx.SignEnvelope(flow.RootAddress, 0, flow.RootAccountPrivateKey.PrivateKey, rootHasher)
+		require.NoError(t, err)
 
 		// execute the transaction
 		result, err := bc.ExecuteTransaction(ledger, tx)
@@ -344,7 +388,8 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	// happy path - get each of the created account and check if it is the right one
 	t.Run("get accounts", func(t *testing.T) {
 		for address, expectedKey := range accounts {
-			account := bc.GetAccount(ledger, address)
+
+			account := ledgerAccess.GetAccount(address)
 
 			assert.Len(t, account.Keys, 1)
 			actualKey := account.Keys[0].PublicKey
@@ -355,7 +400,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	// non-happy path - get an account that was never created
 	t.Run("get a non-existing account", func(t *testing.T) {
 		address := flow.HexToAddress(fmt.Sprintf("%d", count+1))
-		account := bc.GetAccount(ledger, address)
+		account := ledgerAccess.GetAccount(address)
 		assert.Nil(t, account)
 	})
 }

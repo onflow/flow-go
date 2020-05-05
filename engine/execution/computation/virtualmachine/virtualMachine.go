@@ -10,7 +10,8 @@ import (
 )
 
 const (
-	MaxProgramASTCacheSize = 256
+	AccountKeyWeightThreshold = 1000
+	MaxProgramASTCacheSize    = 256
 )
 
 // VirtualMachine augments the Cadence runtime with the Flow host functionality required

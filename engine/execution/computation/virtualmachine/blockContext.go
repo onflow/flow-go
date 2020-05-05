@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -22,12 +23,10 @@ type BlockContext interface {
 
 	// ExecuteScript computes the result of a read-only script.
 	ExecuteScript(ledger Ledger, script []byte) (*ScriptResult, error)
-
-	// GetAccount looks up the flow account for the given address
-	GetAccount(ledger Ledger, address flow.Address) *flow.Account
 }
 
 type blockContext struct {
+	LedgerDAL
 	vm     *virtualMachine
 	header *flow.Header
 }
@@ -44,9 +43,10 @@ func (bc *blockContext) newTransactionContext(
 	}
 
 	ctx := &TransactionContext{
-		ledger:          ledger,
 		astCache:        bc.vm.cache,
+		LedgerDAL:       LedgerDAL{ledger},
 		signingAccounts: signingAccounts,
+		tx:              tx,
 	}
 
 	for _, option := range options {
@@ -58,8 +58,8 @@ func (bc *blockContext) newTransactionContext(
 
 func (bc *blockContext) newScriptContext(ledger Ledger) *TransactionContext {
 	return &TransactionContext{
-		ledger:   ledger,
-		astCache: bc.vm.cache,
+		astCache:  bc.vm.cache,
+		LedgerDAL: LedgerDAL{ledger},
 	}
 }
 
@@ -78,7 +78,24 @@ func (bc *blockContext) ExecuteTransaction(
 	location := runtime.TransactionLocation(txID[:])
 
 	ctx := bc.newTransactionContext(ledger, tx, options...)
-	err := bc.vm.executeTransaction(tx.Script, tx.Arguments, ctx, location)
+
+	err := ctx.verifySignatures()
+	if err != nil {
+		return &TransactionResult{
+			TransactionID: txID,
+			Error:         err,
+		}, nil
+	}
+
+	err = ctx.checkAndIncrementSequenceNumber()
+	if err != nil {
+		return &TransactionResult{
+			TransactionID: txID,
+			Error:         err,
+		}, nil
+	}
+
+	err = bc.vm.executeTransaction(tx.Script, tx.Arguments, ctx, location)
 	if err != nil {
 		if errors.As(err, &runtime.Error{}) {
 			// runtime errors occur when the execution reverts
@@ -108,7 +125,6 @@ func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte) (*ScriptResu
 	location := runtime.ScriptLocation(scriptHash)
 
 	ctx := bc.newScriptContext(ledger)
-
 	value, err := bc.vm.executeScript(script, ctx, location)
 	if err != nil {
 		if errors.As(err, &runtime.Error{}) {
@@ -127,18 +143,11 @@ func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte) (*ScriptResu
 		ScriptID: flow.HashToID(scriptHash),
 		Value:    value,
 		Logs:     ctx.Logs(),
+		Events:   ctx.events,
 	}, nil
 }
 
-func (bc *blockContext) GetAccount(ledger Ledger, address flow.Address) *flow.Account {
-	ctx := bc.newScriptContext(ledger)
-
-	account := ctx.GetAccount(address)
-
-	return account
-}
-
-// ConvertEvents converts events of type cadence.Event to flow.Event
+// ConvertEvents creates flow.Events from runtime.events
 func ConvertEvents(txIndex uint32, tr *TransactionResult) ([]flow.Event, error) {
 
 	flowEvents := make([]flow.Event, len(tr.Events))

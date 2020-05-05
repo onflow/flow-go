@@ -21,9 +21,9 @@ func TestMVP_Network(t *testing.T) {
 		colNode,
 		testnet.NewNodeConfig(flow.RoleCollection),
 		exeNode,
-		testnet.NewNodeConfig(flow.RoleConsensus),
-		testnet.NewNodeConfig(flow.RoleConsensus),
-		testnet.NewNodeConfig(flow.RoleConsensus),
+		testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithAdditionalFlag("--hotstuff-timeout=12s")),
+		testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithAdditionalFlag("--hotstuff-timeout=12s")),
+		testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithAdditionalFlag("--hotstuff-timeout=12s")),
 		testnet.NewNodeConfig(flow.RoleVerification),
 		testnet.NewNodeConfig(flow.RoleAccess),
 	}
