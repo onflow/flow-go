@@ -20,8 +20,6 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-const defaultExpiryBuffer = 30
-
 // Engine is the transaction ingestion engine, which ensures that new
 // transactions are delegated to the correct collection cluster, and prepared
 // to be included in a collection.
@@ -40,7 +38,15 @@ type Engine struct {
 }
 
 // New creates a new collection ingest engine.
-func New(log zerolog.Logger, net module.Network, state protocol.State, metrics module.Metrics, me module.Local, pool mempool.Transactions) (*Engine, error) {
+func New(
+	log zerolog.Logger,
+	net module.Network,
+	state protocol.State,
+	metrics module.Metrics,
+	me module.Local,
+	pool mempool.Transactions,
+	expiryBuffer uint64,
+) (*Engine, error) {
 
 	logger := log.With().
 		Str("engine", "ingest").
@@ -56,7 +62,7 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, metrics m
 		// add some expiry buffer -- this is how much time a transaction has
 		// to be included in a collection, then for that collection to be
 		// included in a block
-		expiry: flow.DefaultTransactionExpiry - defaultExpiryBuffer,
+		expiry: flow.DefaultTransactionExpiry - expiryBuffer,
 	}
 
 	con, err := net.Register(engine.CollectionIngest, e)

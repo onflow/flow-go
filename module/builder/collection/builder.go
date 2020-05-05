@@ -52,6 +52,12 @@ func WithMaxCollectionSize(size uint) Opt {
 	}
 }
 
+func WithExpiryBuffer(buf uint64) Opt {
+	return func(c *config) {
+		c.expiryBuffer = buf
+	}
+}
+
 func NewBuilder(db *badger.DB, transactions mempool.Transactions, opts ...Opt) *Builder {
 
 	conf := defaultConfig
