@@ -39,7 +39,7 @@ func TestSyncFlow(t *testing.T) {
 	verificationNode := testutil.GenericNode(t, hub, verID, identities)
 	consensusNode := testutil.GenericNode(t, hub, conID, identities)
 
-	genesis := flow.Genesis(identities)
+	genesis := unittest.GenesisFixture(identities)
 
 	seq := uint64(0)
 

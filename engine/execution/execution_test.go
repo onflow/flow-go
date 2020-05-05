@@ -29,7 +29,7 @@ func TestExecutionFlow(t *testing.T) {
 
 	identities := flow.IdentityList{colID, conID, exeID, verID}
 
-	genesis := flow.Genesis(identities)
+	genesis := unittest.GenesisFixture(identities)
 
 	tx1 := flow.TransactionBody{
 		Script: []byte("transaction { execute { log(1) } }"),
@@ -155,7 +155,7 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 
 	identities := flow.IdentityList{con1ID, con2ID, exeID}
 
-	genesis := flow.Genesis(identities)
+	genesis := unittest.GenesisFixture(identities)
 
 	block2 := unittest.BlockWithParentFixture(genesis.Header)
 	block2.Header.View = 2
@@ -220,7 +220,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	identities := flow.IdentityList{colID, conID, exe1ID, exe2ID}
 
-	genesis := flow.Genesis(identities)
+	genesis := unittest.GenesisFixture(identities)
 
 	// transaction that will change state and succeed, used to test that state commitment changes
 	tx1 := execTestutil.DeployCounterContractTransaction()
@@ -349,7 +349,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 
 	identities := flow.IdentityList{colID, exeID, ver1ID, ver2ID}
 
-	genesis := flow.Genesis(identities)
+	genesis := unittest.GenesisFixture(identities)
 
 	block := unittest.BlockWithParentFixture(genesis.Header)
 	block.Header.View = 42
