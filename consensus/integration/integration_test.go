@@ -99,7 +99,7 @@ func TestMessagesLostAcrossNetwork(t *testing.T) {
 	}
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
-	assertLiveness(t, allViews, 90)
+	assertLiveness(t, allViews, 50)
 	cleanupNodes(nodes)
 }
 
