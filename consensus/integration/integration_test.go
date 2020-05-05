@@ -2,7 +2,6 @@ package integration_test
 
 import (
 	"fmt"
-	"math/rand"
 	"sort"
 	"testing"
 	"time"
@@ -126,11 +125,31 @@ func TestDelay(t *testing.T) {
 	cleanupNodes(nodes)
 }
 
-// TODO: verify if each receiver lost 50% messages, the network can't reach consensus
+// verify that if a node always
+func TestOneNodeBehind(t *testing.T) {
+	nodes, stopper, hub := createNodes(t, 5, 150, 1500)
 
-func nextDelay(low, high time.Duration) time.Duration {
-	return time.Duration(int64(low) + rand.Int63n(int64(high-low)))
+	hub.WithFilter(func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+		if receiver == nodes[0] {
+			return false, hotstuffTimeout + time.Millisecond
+		}
+		// no block or delay to other nodes
+		return false, 0
+	})
+	runNodes(nodes)
+
+	<-stopper.stopped
+
+	for i := range nodes {
+		printState(t, nodes, i)
+	}
+	allViews := allFinalizedViews(t, nodes)
+	assertSafety(t, allViews)
+	assertLiveness(t, allViews, 90)
+	cleanupNodes(nodes)
 }
+
+// TODO: verify if each receiver lost 50% messages, the network can't reach consensus
 
 func allFinalizedViews(t *testing.T, nodes []*Node) [][]uint64 {
 	allViews := make([][]uint64, 0)
