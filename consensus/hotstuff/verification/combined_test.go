@@ -81,7 +81,7 @@ func TestCombinedQC(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(8, unittest.WithRole(flow.RoleConsensus))
 	voterIDs := identities.NodeIDs()
-	minShares := len(voterIDs) / 2
+	minShares := (len(voterIDs)-1) / 2 + 1
 	committeeState, dkg, stakingKeys, beaconKeys := MakeHotstuffCommitteeState(t, identities, true)
 	signers := MakeSigners(t, committeeState, dkg, identities.NodeIDs(), stakingKeys, beaconKeys)
 
@@ -99,18 +99,18 @@ func TestCombinedQC(t *testing.T) {
 	require.NoError(t, err, "should be able to create QC from valid votes")
 
 	// creation with insufficient threshold should fail
-	_, err = signers[0].CreateQC(votes[:3])
+	_, err = signers[0].CreateQC(votes[:minShares-1-1])
 	assert.Error(t, err, "creating QC with insufficient shares should fail")
 
 	// creation from different views should fail
 	votes[0].View++
-	_, err = signers[0].CreateQC(votes[:4])
+	_, err = signers[0].CreateQC(votes[:minShares])
 	assert.Error(t, err, "creating QC with mismatching view should fail")
 	votes[0].View--
 
 	// creation from different block IDs should fail
 	votes[0].BlockID[0]++
-	_, err = signers[0].CreateQC(votes[:4])
+	_, err = signers[0].CreateQC(votes[:minShares])
 	assert.Error(t, err, "creating QC with mismatching block ID should fail")
 	votes[0].BlockID[0]--
 

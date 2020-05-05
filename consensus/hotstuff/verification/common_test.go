@@ -2,6 +2,7 @@ package verification
 
 import (
 	"testing"
+	"crypto/rand"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -15,7 +16,6 @@ import (
 	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/state/dkg"
 	dkgmock "github.com/dapperlabs/flow-go/state/dkg/mocks"
-	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func MakeSigners(t *testing.T, committee hotstuff.Committee, dkg dkg.State, signerIDs []flow.Identifier, stakingKeys []crypto.PrivateKey, beaconKeys []crypto.PrivateKey) []hotstuff.Signer {
@@ -82,20 +82,23 @@ func MakeHotstuffCommitteeState(t *testing.T, identities flow.IdentityList, beac
 		stakingKeys = append(stakingKeys, stakingKey)
 	}
 
-	// generate the dkg keys (only if becon is enabled
-	var beaconKeys []crypto.PrivateKey
-	var dkgKey crypto.PublicKey
+	// generate the dkg keys (only if beacon is enabled
+	var beaconSKs []crypto.PrivateKey
 	if beaconEnabled {
-		beaconKeys, dkgKey, _ = unittest.RunDKG(t, len(identities))
-		dkg.On("GroupSize").Return(uint(len(beaconKeys)), nil)
-		dkg.On("GroupKey").Return(dkgKey, nil)
+		seed := make([]byte, crypto.SeedMinLenDKG)
+		n, err := rand.Read(seed)
+		require.NoError(t, err)
+		require.Equal(t, n, crypto.SeedMinLenDKG)
+		beaconSKs, beaconPKs, beaconGroupPK, err := crypto.ThresholdSignKeyGen(len(identities), seed)
+		require.NoError(t, err)
+		dkg.On("GroupSize").Return(uint(len(beaconSKs)), nil)
+		dkg.On("GroupKey").Return(beaconGroupPK, nil)
 		for i, identity := range identities {
 			dkg.On("HasParticipant", identity.NodeID).Return(true, nil)
 			dkg.On("ParticipantIndex", identity.NodeID).Return(uint(i), nil)
-			dkg.On("ParticipantKey", identity.NodeID).Return(beaconKeys[i].PublicKey(), nil)
+			dkg.On("ParticipantKey", identity.NodeID).Return(beaconPKs[i], nil)
 		}
 	}
 
-	//
-	return committee, dkg, stakingKeys, beaconKeys
+	return committee, dkg, stakingKeys, beaconSKs
 }

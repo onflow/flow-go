@@ -2,12 +2,12 @@ package signature
 
 import (
 	"testing"
+	"crypto/rand"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 const NUM_THRES_TEST = 3
@@ -29,7 +29,11 @@ func createThresholdsB(b *testing.B, n uint) []*ThresholdProvider {
 
 // createKDGsT creates a set of Thresholds with real key shares and a real group key.
 func createThresholdsT(t *testing.T, n uint) ([]*ThresholdProvider, crypto.PublicKey) {
-	beaconKeys, groupKey, _ := unittest.RunDKG(t, int(n))
+	seed := make([]byte, crypto.SeedMinLenDKG)
+	_, err := rand.Read(seed)
+	require.NoError(t, err)
+	beaconKeys, _, groupKey , err := crypto.ThresholdSignKeyGen(int(n), seed)
+	require.NoError(t, err)
 	signers := make([]*ThresholdProvider, 0, int(n))
 	for i := 0; i < int(n); i++ {
 		thres := NewThresholdProvider("test_beacon", beaconKeys[i])
