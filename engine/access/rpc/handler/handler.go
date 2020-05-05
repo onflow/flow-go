@@ -135,9 +135,15 @@ func (h *Handler) GetAccount(ctx context.Context, req *access.GetAccountRequest)
 	}
 
 	// get the latest sealed header
-	latestHeader, err := h.getLatestSealedHeader()
+	// latestHeader, err := h.getLatestSealedHeader()
+	// if err != nil {
+	// 	return nil, status.Errorf(codes.Internal, "failed to get latest sealed header: %v", err)
+	// }
+
+	// TODO currently using latest finalized header, fix when seals are working
+	latestHeader, err := h.state.Final().Head()
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get latest sealed header: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to get latest finalized header: %v", err)
 	}
 
 	// get the block id of the latest sealed header
