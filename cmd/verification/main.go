@@ -75,10 +75,10 @@ func main() {
 
 	cmd.FlowNode("verification").
 		ExtraFlags(func(flags *pflag.FlagSet) {
-			flags.UintVar(&receiptLimit, "receipt-limit", 100000, "maximum number of execution receipts in the memory pool")
-			flags.UintVar(&collectionLimit, "collection-limit", 100000, "maximum number of authCollections in the memory pool")
-			flags.UintVar(&blockLimit, "block-limit", 100000, "maximum number of result blocks in the memory pool")
-			flags.UintVar(&chunkLimit, "chunk-limit", 100000, "maximum number of chunk states in the memory pool")
+			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
+			flags.UintVar(&collectionLimit, "collection-limit", 1000, "maximum number of authCollections in the memory pool")
+			flags.UintVar(&blockLimit, "block-limit", 1000, "maximum number of result blocks in the memory pool")
+			flags.UintVar(&chunkLimit, "chunk-limit", 10000, "maximum number of chunk states in the memory pool")
 			flags.UintVar(&alpha, "alpha", 10, "maximum number of chunk states in the memory pool")
 		}).
 		Module("execution authenticated receipts mempool", func(node *cmd.FlowNodeBuilder) error {
@@ -165,6 +165,10 @@ func main() {
 			return ingestEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+
+			// initialize cleaner for DB
+			cleaner := storage.NewCleaner(node.Logger, node.DB)
+
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
 			final := finalizer.NewFinalizer(node.DB)
@@ -187,7 +191,7 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, final, verifier, ingestEng, &node.GenesisBlock.Header, node.GenesisQC)
+			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, final, verifier, ingestEng, node.GenesisBlock.Header, node.GenesisQC)
 			if err != nil {
 				// return nil, fmt.Errorf("could not create follower core logic: %w", err)
 				// TODO for now we ignore failures in follower
@@ -200,9 +204,10 @@ func main() {
 			followerEng, err := followereng.New(node.Logger,
 				node.Network,
 				node.Me,
-				node.State,
+				cleaner,
 				headerStorage,
 				conPayloads,
+				node.State,
 				conCache,
 				core)
 			if err != nil {

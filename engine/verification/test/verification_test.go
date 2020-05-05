@@ -205,14 +205,8 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 		}(verNode)
 	}
 
-	unittest.AssertReturnsBefore(t, verWG.Wait, 5*time.Second)
+	unittest.RequireReturnsBefore(t, verWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second)
 
-	for _, verNode := range verNodes {
-		// both receipts should be added to the authenticated mempool of verification node
-		require.True(t, verNode.AuthReceipts.Has(receipt1.ID()) && verNode.AuthReceipts.Has(receipt2.ID()))
-		// and do not reside in pending pool
-		require.False(t, verNode.PendingReceipts.Has(receipt1.ID()) || verNode.PendingReceipts.Has(receipt2.ID()))
-	}
 	// creates a network instance for each verification node
 	// and sets it in continuous delivery mode
 	// then flushes the collection requests
@@ -228,7 +222,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 		verNets = append(verNets, verNet)
 	}
 
-	conWG.Wait()
+	unittest.RequireReturnsBefore(t, conWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second)
 	// assert that the RA was received
 	conEngine.AssertExpectations(t)
 
@@ -281,6 +275,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 // path assuming a single collection (including transactions on counter example)
 // are submited to the verification node.
 func TestSingleCollectionProcessing(t *testing.T) {
+	// TODO unskip this :(
 	t.Skip()
 
 	// ingest engine parameters

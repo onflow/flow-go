@@ -22,25 +22,38 @@ const (
 var (
 	transactionsIngestedCounter = promauto.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceCollection,
-		Name:      "transactions_ingested_total",
+		Name:      "ingested_transactions_total",
 		Help:      "count of transactions ingested by this node",
 	})
 	proposalsCounter = promauto.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceCollection,
-		Name:      "collection_proposals_total",
+		Name:      "proposals_total",
 		Help:      "count of collection proposals",
 	})
-	proposalSizeGauge = promauto.NewGauge(prometheus.GaugeOpts{
+	proposalSizeGauge = promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceCollection,
-		Name:      "collection_proposal_size",
+		Buckets:   []float64{5, 10, 50, 100}, //TODO(andrew) update once collection limits are known
+		Name:      "proposal_size_transactions",
 		Help:      "number of transactions in proposed collections",
 	})
-	guaranteedCollectionSizeGauge = promauto.NewGauge(prometheus.GaugeOpts{
+	guaranteedCollectionSizeGauge = promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceCollection,
-		Name:      "guaranteed_collection_size",
+		Buckets:   []float64{5, 10, 50, 100}, //TODO(andrew) update once collection limits are known
+		Name:      "guarantee_size_transactions",
 		Help:      "number of transactions in guaranteed collections",
 	})
+	pendingClusterBlocksGauge = promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespaceCollection,
+		Subsystem: subsystemProposal,
+		Name:      "pending_blocks_total",
+		Help:      "number of cluster blocks in pending cache of collection proposal engine",
+	})
 )
+
+// PendingClusterBlocks sets the number of cluster blocks in the pending cache.
+func (c *Collector) PendingClusterBlocks(n uint) {
+	pendingClusterBlocksGauge.Set(float64(n))
+}
 
 // TransactionReceived starts a span to trace the duration of a transaction
 // from being created to being included as part of a collection.
@@ -51,14 +64,14 @@ func (c *Collector) TransactionReceived(txID flow.Identifier) {
 
 // CollectionProposed tracks the size and number of proposals.
 func (c *Collector) CollectionProposed(collection flow.LightCollection) {
-	proposalSizeGauge.Set(float64(collection.Len()))
+	proposalSizeGauge.Observe(float64(collection.Len()))
 	proposalsCounter.Inc()
 }
 
 // CollectionGuaranteed updates the guaranteed collection size gauge and
 // finishes the tx->collection span for each constituent transaction.
 func (c *Collector) CollectionGuaranteed(collection flow.LightCollection) {
-	guaranteedCollectionSizeGauge.Set(float64(collection.Len()))
+	guaranteedCollectionSizeGauge.Observe(float64(collection.Len()))
 	for _, txID := range collection.Transactions {
 		c.tracer.FinishSpan(txID, spanTransactionToCollection)
 	}

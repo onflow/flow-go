@@ -1,7 +1,6 @@
 package bootstrap
 
 import (
-	"encoding/hex"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
@@ -30,6 +29,7 @@ func BootstrapLedger(ledger storage.Ledger) (flow.StateCommitment, error) {
 
 func BootstrapExecutionDatabase(db *badger.DB, genesis *flow.Header) error {
 	err := db.Update(func(txn *badger.Txn) error {
+
 		err := operation.InsertHighestExecutedBlockNumber(genesis.Height, genesis.ID())(txn)
 		if err != nil {
 			return err
@@ -41,7 +41,7 @@ func BootstrapExecutionDatabase(db *badger.DB, genesis *flow.Header) error {
 			return err
 		}
 
-		return operation.IndexStateCommitment(flow.GenesisParentID, flow.GenesisStateCommitment)(txn)
+		return nil
 	})
 
 	if err != nil {
@@ -52,21 +52,8 @@ func BootstrapExecutionDatabase(db *badger.DB, genesis *flow.Header) error {
 }
 
 func BootstrapView(view *delta.View) {
-	privateKeyBytes, err := hex.DecodeString(flow.RootAccountPrivateKeyHex)
-	if err != nil {
-		panic("Cannot hex decode hardcoded key!")
-	}
-
-	privateKey, err := flow.DecodeAccountPrivateKey(privateKeyBytes)
-	if err != nil {
-		panic("Cannot decode hardcoded private key!")
-	}
-
-	publicKeyBytes, err := flow.EncodeAccountPublicKey(privateKey.PublicKey(1000))
-	if err != nil {
-		panic("Cannot encode public key of hardcoded private key!")
-	}
-	_, err = virtualmachine.CreateAccountInLedger(view, [][]byte{publicKeyBytes})
+	ledgerAccess := virtualmachine.LedgerDAL{Ledger: view}
+	_, err := ledgerAccess.CreateAccountInLedger([]flow.AccountPublicKey{flow.RootAccountPrivateKey.PublicKey(1000)})
 	if err != nil {
 		panic(fmt.Sprintf("error while creating account in ledger: %s ", err))
 	}

@@ -3,7 +3,6 @@ package bootstrap
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -12,14 +11,13 @@ import (
 )
 
 func TestGenerateGenesisStateCommitment(t *testing.T) {
-	unittest.RunWithTempDBDir(t, func(dbDir string) {
+	unittest.RunWithTempDir(t, func(dbDir string) {
 
 		ls, err := ledger.NewTrieStorage(dbDir)
 		require.NoError(t, err)
 
 		newStateCommitment, err := BootstrapLedger(ls)
 		require.NoError(t, err)
-
-		assert.Equal(t, flow.GenesisStateCommitment, newStateCommitment)
+		require.Equal(t, flow.GenesisStateCommitment, newStateCommitment)
 	})
 }

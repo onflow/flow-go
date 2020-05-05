@@ -202,6 +202,16 @@ func (_m *Metrics) OnResultApproval() {
 	_m.Called()
 }
 
+// PendingBlocks provides a mock function with given fields: n
+func (_m *Metrics) PendingBlocks(n uint) {
+	_m.Called(n)
+}
+
+// PendingClusterBlocks provides a mock function with given fields: n
+func (_m *Metrics) PendingClusterBlocks(n uint) {
+	_m.Called(n)
+}
+
 // SealsInFinalizedBlock provides a mock function with given fields: count
 func (_m *Metrics) SealsInFinalizedBlock(count int) {
 	_m.Called(count)

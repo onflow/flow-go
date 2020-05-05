@@ -42,9 +42,10 @@ import (
 func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, options ...func(*protocol.State)) mock.GenericNode {
 	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
 
-	db, dbDir := unittest.TempBadgerDB(t)
+	dbDir := unittest.TempDir(t)
+	db := unittest.BadgerDB(t, dbDir)
 
-	state, err := UncheckedState(db, identities)
+	state, err := UncheckedState(db, flow.GenesisStateCommitment, identities)
 	require.NoError(t, err)
 
 	for _, option := range options {
@@ -188,7 +189,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
 	executionResults := storage.NewExecutionResults(node.DB)
 
-	dbDir := unittest.TempDBDir(t)
+	dbDir := unittest.TempDir(t)
 
 	ls, err := ledger.NewTrieStorage(dbDir)
 	require.NoError(t, err)

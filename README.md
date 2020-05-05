@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.com/dapperlabs/flow-go.svg?token=MYJ5scBoBxhZRGvDecen&branch=master)](https://travis-ci.com/dapperlabs/flow-go)
 
-Flow is a fast, secure, and developer-friendly blockchain built to support the next generation of games, apps, and the digital assets that power them.
+Flow is a fast, secure, and developer-friendly blockchain built to support the next generation of games, apps and the digital assets that power them.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->

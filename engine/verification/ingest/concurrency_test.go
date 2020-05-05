@@ -3,10 +3,12 @@ package ingest_test
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -64,8 +66,8 @@ func TestConcurrency(t *testing.T) {
 		},
 		{
 			erCount:     2,
-			senderCount: 10,
-			chunksNum:   10,
+			senderCount: 5,
+			chunksNum:   4,
 		},
 	}
 
@@ -77,6 +79,13 @@ func TestConcurrency(t *testing.T) {
 }
 
 func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
+	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
+	// to demarcate the logs
+	log.Debug().
+		Int("execution_receipt_count", erCount).
+		Int("sender_count", senderCount).
+		Int("chunks_num", chunksNum).
+		Msg("TestConcurrency started")
 	hub := stub.NewNetworkHub()
 
 	// ingest engine parameters
@@ -184,11 +193,11 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 					// casts block into a Hotstuff block for notifier
 					hotstuffBlock := &model.Block{
 						BlockID:     block.ID(),
-						View:        block.View,
-						ProposerID:  block.ProposerID,
+						View:        block.Header.View,
+						ProposerID:  block.Header.ProposerID,
 						QC:          nil,
-						PayloadHash: block.Hash(),
-						Timestamp:   block.Timestamp,
+						PayloadHash: block.Header.PayloadHash,
+						Timestamp:   block.Header.Timestamp,
 					}
 					verNode.IngestEngine.OnFinalizedBlock(hotstuffBlock)
 				}
@@ -219,8 +228,8 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	}
 
 	// wait for all ERs to be sent to VER
-	unittest.RequireReturnsBefore(t, senderWG.Wait, 10*time.Second)
-	unittest.RequireReturnsBefore(t, verifierEngWG.Wait, 10*time.Second)
+	unittest.RequireReturnsBefore(t, senderWG.Wait, time.Duration(senderCount*chunksNum*erCount)*time.Second)
+	unittest.RequireReturnsBefore(t, verifierEngWG.Wait, time.Duration(senderCount*chunksNum*erCount)*time.Second)
 
 	// stops ingest engine of verification node
 	// Note: this should be done prior to any evaluation to make sure that
@@ -240,6 +249,13 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	exeNode.Done()
 	colNode.Done()
 	verNode.Done()
+
+	// to demarcate the logs
+	log.Debug().
+		Int("execution_receipt_count", erCount).
+		Int("sender_count", senderCount).
+		Int("chunks_num", chunksNum).
+		Msg("TestConcurrency finished")
 }
 
 // setupMockExeNode sets up a mocked execution node that responds to requests for

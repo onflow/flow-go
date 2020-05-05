@@ -10,12 +10,12 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
-func UncheckedState(db *badger.DB, identities flow.IdentityList) (*protocol.State, error) {
+func UncheckedState(db *badger.DB, commit flow.StateCommitment, participants flow.IdentityList) (*protocol.State, error) {
 
-	genesis := flow.Genesis(identities)
+	genesis := flow.Genesis(participants)
 
 	err := db.Update(func(txn *badger.Txn) error {
-		return procedure.Bootstrap(genesis)(txn)
+		return procedure.Bootstrap(commit, genesis)(txn)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not bootstrap: %w", err)

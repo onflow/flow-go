@@ -100,10 +100,17 @@ func (f *TrieStorage) GetRegistersWithProof(
 	proofs []flow.StorageProof,
 	err error,
 ) {
-	values, proofHldr, err := f.tree.Read(registerIDs, false, stateCommitment)
+
+	values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Could not get registers with proofs: %w", err)
+		return nil, nil, fmt.Errorf("Could not get register values: %w", err)
 	}
+
+	proofHldr, err := f.tree.GetBatchProof(registerIDs, stateCommitment)
+	if err != nil {
+		return nil, nil, fmt.Errorf("Could not get proofs: %w", err)
+	}
+
 	proofs = trie.EncodeProof(proofHldr)
 	return values, proofs, err
 }

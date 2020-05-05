@@ -1,35 +1,31 @@
-package ledger
+package ledger_test
 
-// // TODO (Ramtin) this is going to be updated in the next PRs
-// import (
-// 	"bytes"
-// 	"testing"
+import (
+	"testing"
 
-// 	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
-// 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
-// 	"github.com/dapperlabs/flow-go/utils/unittest"
-// )
+	"github.com/dapperlabs/flow-go/storage/ledger"
+	"github.com/dapperlabs/flow-go/utils/unittest"
+)
 
-// func TestTrieUntrustedAndVerify(t *testing.T) {
-// 	unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
-// 		f, err := NewTrieStorage(db)
-// 		if err != nil {
-// 			t.Fatal(err)
-// 		}
-// 		ids, values := makeTestValues()
-// 		newRoot, proofs, err := f.UpdateRegistersWithProof(ids, values)
-// 		if err != nil {
-// 			t.Fatal(err)
-// 		}
+func TestTrieUntrustedAndVerify(t *testing.T) {
+	trieH := 257
+	unittest.RunWithTempDir(t, func(dbDir string) {
+		f, err := ledger.NewTrieStorage(dbDir)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-// 		if !bytes.Equal(f.tree.GetRoot().GetValue(), newRoot) {
-// 			t.Fatalf("Something in UpdateRegister went wrong")
-// 		}
+		ids, values := makeTestValues()
+		stateCommitment := f.EmptyStateCommitment()
+		newRoot, proofs, err := f.UpdateRegistersWithProof(ids, values, stateCommitment)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-// 		v := NewTrieVerifier(f.tree.GetHeight(), trie.GetDefaultHashes())
-// 		_, err = v.VerifyRegistersProof(ids, f.tree.GetRoot().GetValue(), values, proofs)
-// 		if err != nil {
-// 			t.Fatal(err)
-// 		}
-// 	})
-// }
+		v := ledger.NewTrieVerifier(trieH)
+		_, err = v.VerifyRegistersProof(ids, values, proofs, newRoot)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+}
