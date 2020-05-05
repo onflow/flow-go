@@ -168,7 +168,7 @@ func (e *Engine) Done() <-chan struct{} {
 }
 
 func (e *Engine) Wait() {
-	e.wg.Wait()     // wait for execution
+	e.wg.Wait()     // wait for block execution
 	e.syncWg.Wait() // wait for sync
 }
 
