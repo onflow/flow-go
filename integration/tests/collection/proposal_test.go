@@ -176,7 +176,6 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 						err := target.SendTransaction(ctx, *tx)
 						cancel()
 						suite.Require().Nil(err)
-						suite.T().Log("sent tx: ", convert.IDFromSDK(tx.ID()))
 					}()
 				}
 			}

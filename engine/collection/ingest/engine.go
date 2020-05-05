@@ -171,10 +171,10 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 		log.Debug().Msg("added transaction to pool")
 	}
 
-	// propagate the transaction to 25% of the responsible nodes
+	// propagate the transaction to 2 responsible nodes
 	targetIDs := txCluster.
 		Filter(filter.Not(filter.HasNodeID(localID))).
-		SamplePct(0.25)
+		Sample(2)
 
 	log.Debug().
 		Str("recipients", fmt.Sprintf("%v", targetIDs.NodeIDs())).
