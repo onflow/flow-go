@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	model "github.com/dapperlabs/flow-go/model/cluster"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/cluster"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -104,7 +105,7 @@ func (suite *SnapshotSuite) TestEmptyCollection() {
 
 	// create a block with an empty collection
 	block := unittest.ClusterBlockWithParent(suite.genesis)
-	block.SetPayload(model.EmptyPayload())
+	block.SetPayload(model.EmptyPayload(flow.ZeroID))
 	suite.InsertBlock(block)
 
 	snapshot := suite.state.AtBlockID(block.ID())

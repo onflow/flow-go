@@ -9,19 +9,17 @@ import (
 func Genesis() *Block {
 	header := &flow.Header{
 		View:      0,
-		ChainID:   "",
+		ChainID:   "cluster",
 		Timestamp: flow.GenesisTime(),
 		ParentID:  flow.ZeroID,
 	}
 
-	payload := EmptyPayload()
-
-	header.PayloadHash = payload.Hash()
+	payload := EmptyPayload(flow.ZeroID)
 
 	block := &Block{
-		Header:  header,
-		Payload: payload,
+		Header: header,
 	}
+	block.SetPayload(payload)
 
 	return block
 }
@@ -33,20 +31,15 @@ type Block struct {
 	Payload *Payload
 }
 
-// SetPayload sets the payload and payload hash.
-func (b *Block) SetPayload(payload *Payload) {
-	b.Payload = payload
-	b.Header.PayloadHash = payload.Hash()
-}
-
 // ID returns the ID of the underlying block header.
-func (b *Block) ID() flow.Identifier {
+func (b Block) ID() flow.Identifier {
 	return b.Header.ID()
 }
 
-// Checksum returns the checksum of the underlying block header.
-func (b *Block) Checksum() flow.Identifier {
-	return b.Header.Checksum()
+// SetPayload sets the payload and payload hash.
+func (b *Block) SetPayload(payload Payload) {
+	b.Payload = &payload
+	b.Header.PayloadHash = payload.Hash()
 }
 
 // PendingBlock is a wrapper type representing a block that cannot yet be

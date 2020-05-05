@@ -1,7 +1,6 @@
 package unittest
 
 import (
-	"crypto/rand"
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -23,10 +22,7 @@ func AlterTransactionForCluster(tx flow.TransactionBody, clusters *flow.ClusterL
 
 	// Bound to avoid infinite loop in case the routing algorithm is broken
 	for i := 0; i < 10000; i++ {
-		_, err := rand.Read(tx.ReferenceBlockID[:])
-		if err != nil {
-			panic(err)
-		}
+		tx.Script = append(tx.Script, '/', '/')
 
 		after(&tx)
 		routed := clusters.ByTxID(tx.ID())
