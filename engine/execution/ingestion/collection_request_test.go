@@ -6,10 +6,12 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	realStorage "github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -176,6 +178,62 @@ func TestNoBlockExecutedUntilAllCollectionsArePosted(t *testing.T) {
 		// Expected no calls so test should fail if any occurs
 		rightResponse := messages.CollectionResponse{
 			Collection: flow.Collection{Transactions: executableBlock.Collections()[1].Transactions},
+		}
+
+		err = ctx.engine.ProcessLocal(&rightResponse)
+
+		require.NoError(t, err)
+	})
+}
+
+func TestCollectionSharedByMultipleBlocks(t *testing.T) {
+
+	runWithEngine(t, func(ctx testingContext) {
+
+		blockA := unittest.BlockFixture()
+		blockB := unittest.BlockFixture()
+
+		collection := unittest.CollectionFixture(1)
+		guarantee := collection.Guarantee()
+		guarantee.SignerIDs = []flow.Identifier{collection1Identity.NodeID}
+
+		blockA.Payload.Guarantees = []*flow.CollectionGuarantee{&guarantee}
+		blockA.Header.PayloadHash = blockA.Payload.Hash()
+
+		blockB.Payload.Guarantees = []*flow.CollectionGuarantee{&guarantee}
+		blockB.Header.PayloadHash = blockB.Payload.Hash()
+
+		ctx.blocks.EXPECT().Store(gomock.Eq(&blockA))
+		ctx.blocks.EXPECT().Store(gomock.Eq(&blockB))
+		ctx.state.On("AtBlockID", blockA.ID()).Return(ctx.snapshot).Maybe()
+		ctx.state.On("AtBlockID", blockB.ID()).Return(ctx.snapshot).Maybe()
+
+		ctx.collectionConduit.EXPECT().Submit(
+			&colReqMatcher{req: &messages.CollectionRequest{ID: guarantee.ID(), Nonce: rand.Uint64()}},
+			gomock.Any(),
+		).Times(1)
+
+		ctx.executionState.On("StateCommitmentByBlockID", blockA.Header.ParentID).Return(unittest.StateCommitmentFixture(), nil)
+		ctx.executionState.On("StateCommitmentByBlockID", blockB.Header.ParentID).Return(unittest.StateCommitmentFixture(), nil)
+
+		proposalA := unittest.ProposalFromBlock(&blockA)
+		err := ctx.engine.ProcessLocal(proposalA)
+		require.NoError(t, err)
+
+		proposalB := unittest.ProposalFromBlock(&blockB)
+		err = ctx.engine.ProcessLocal(proposalB)
+		require.NoError(t, err)
+
+		ctx.computationManager.On("ComputeBlock", mock.MatchedBy(func(b *entity.ExecutableBlock) bool {
+			return b.Block.ID() == blockA.ID()
+		}), mock.Anything).Return(nil, nil)
+
+		ctx.computationManager.On("ComputeBlock", mock.MatchedBy(func(b *entity.ExecutableBlock) bool {
+			return b.Block.ID() == blockB.ID()
+		}), mock.Anything).Return(nil, nil)
+
+		rightResponse := messages.CollectionResponse{
+			Collection: flow.Collection{Transactions: collection.Transactions},
 		}
 
 		err = ctx.engine.ProcessLocal(&rightResponse)

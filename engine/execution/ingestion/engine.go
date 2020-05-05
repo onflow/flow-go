@@ -528,7 +528,7 @@ func (e *Engine) sendCollectionsRequest(executableBlock *entity.ExecutableBlock,
 				Guarantee:    guarantee,
 				Transactions: nil,
 			}
-			err := backdata.Add(&entity.BlockByCollection{
+			err := backdata.Add(&entity.BlocksByCollection{
 				CollectionID:    guarantee.ID(),
 				ExecutableBlock: executableBlock,
 			})
@@ -556,7 +556,7 @@ func (e *Engine) sendCollectionsRequest(executableBlock *entity.ExecutableBlock,
 		if err != nil {
 			return fmt.Errorf("cannot get an item from mempool: %w", err)
 		}
-		if maybeBlockByCollection.ID() != executableBlock.Block.ID() {
+		if maybeBlockByCollection.ExecutableBlock.ID() != executableBlock.Block.ID() {
 			// Should not happen in MVP, but see TODO at beggining of the function
 			return fmt.Errorf("received block with same collection alredy pointing to different block ")
 		}
