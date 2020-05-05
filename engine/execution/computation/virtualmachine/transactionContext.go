@@ -339,7 +339,7 @@ func (r *TransactionContext) checkAndIncrementSequenceNumber() error {
 
 	account := r.GetAccount(proposalKey.Address)
 
-	if proposalKey.KeyID < 0 || int(proposalKey.KeyID) >= len(account.Keys) {
+	if int(proposalKey.KeyID) >= len(account.Keys) {
 		return &InvalidProposalKeyError{
 			Address: proposalKey.Address,
 			KeyID:   proposalKey.KeyID,
