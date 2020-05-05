@@ -1,6 +1,7 @@
 package mock
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -97,7 +98,7 @@ func (en ExecutionNode) Done() {
 
 func (en ExecutionNode) AssertHighestExecutedBlock(t *testing.T, header *flow.Header) {
 
-	height, blockID, err := en.ExecutionState.GetHighestExecutedBlockID()
+	height, blockID, err := en.ExecutionState.GetHighestExecutedBlockID(context.Background())
 	require.NoError(t, err)
 
 	require.Equal(t, header.ID(), blockID)

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/opentracing/opentracing-go"
+
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
@@ -24,7 +26,7 @@ type blockComputer struct {
 }
 
 // NewBlockComputer creates a new block executor.
-func NewBlockComputer(tracer module.Tracer, vm virtualmachine.VirtualMachine) BlockComputer {
+func NewBlockComputer(vm virtualmachine.VirtualMachine, tracer module.Tracer) BlockComputer {
 	return &blockComputer{
 		tracer: tracer,
 		vm:     vm,
@@ -38,8 +40,10 @@ func (e *blockComputer) ExecuteBlock(
 	stateView *delta.View,
 ) (*execution.ComputationResult, error) {
 
-	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEComputeBlock)
-	defer span.Finish()
+	if e.tracer != nil {
+		span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEComputeBlock)
+		defer span.Finish()
+	}
 
 	results, err := e.executeBlock(ctx, block, stateView)
 	if err != nil {
@@ -110,8 +114,11 @@ func (e *blockComputer) executeCollection(
 	collection *entity.CompleteCollection,
 ) ([]flow.Event, []flow.TransactionResult, uint32, uint64, error) {
 
-	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEComputeCollection)
-	defer span.Finish()
+	var colSpan opentracing.Span
+	if e.tracer != nil {
+		colSpan, _ = e.tracer.StartSpanFromContext(ctx, trace.EXEComputeCollection)
+		defer colSpan.Finish()
+	}
 
 	var (
 		events    []flow.Event
@@ -120,13 +127,20 @@ func (e *blockComputer) executeCollection(
 	)
 
 	for _, tx := range collection.Transactions {
-		txSpan := e.tracer.StartSpanFromParent(span, trace.EXEComputeTransaction)
+		var txSpan opentracing.Span
+
+		if e.tracer != nil {
+			txSpan = e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
+		}
 
 		txView := collectionView.NewChild()
 
 		result, err := blockCtx.ExecuteTransaction(txView, tx)
 		if err != nil {
-			txSpan.Finish()
+			if txSpan != nil {
+				txSpan.Finish()
+			}
+
 			txIndex++
 			return nil, nil, txIndex, 0, fmt.Errorf("failed to execute transaction: %w", err)
 		}
@@ -136,7 +150,10 @@ func (e *blockComputer) executeCollection(
 		gasUsed += result.GasUsed
 
 		if err != nil {
-			txSpan.Finish()
+			if txSpan != nil {
+				txSpan.Finish()
+			}
+
 			return nil, nil, txIndex, 0, fmt.Errorf("failed to create flow events: %w", err)
 		}
 
@@ -156,7 +173,9 @@ func (e *blockComputer) executeCollection(
 			collectionView.MergeView(txView)
 		}
 
-		txSpan.Finish()
+		if txSpan != nil {
+			txSpan.Finish()
+		}
 	}
 
 	return events, txResults, txIndex, gasUsed, nil

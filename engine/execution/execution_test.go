@@ -1,6 +1,7 @@
 package execution_test
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -332,10 +333,13 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	// esure block has been executed
 	hub.Eventually(t, equal(1, &receiptsReceived))
 	exe1Node.AssertHighestExecutedBlock(t, block2.Header)
-	scExe1Genesis, err := exe1Node.ExecutionState.StateCommitmentByBlockID(genesis.ID())
+
+	scExe1Genesis, err := exe1Node.ExecutionState.StateCommitmentByBlockID(context.Background(), genesis.ID())
 	assert.NoError(t, err)
-	scExe1Block2, err := exe1Node.ExecutionState.StateCommitmentByBlockID(block2.ID())
+
+	scExe1Block2, err := exe1Node.ExecutionState.StateCommitmentByBlockID(context.Background(), block2.ID())
 	assert.NoError(t, err)
+
 	assert.NotEqual(t, scExe1Genesis, scExe1Block2)
 
 	// start execution node 2 with sync threshold 0 so it starts state sync right away
@@ -354,12 +358,13 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	exe2Node.AssertHighestExecutedBlock(t, block3.Header)
 
 	// verify state commitment is the same across nodes
-	scExe2Block2, err := exe2Node.ExecutionState.StateCommitmentByBlockID(block2.ID())
+	scExe2Block2, err := exe2Node.ExecutionState.StateCommitmentByBlockID(context.Background(), block2.ID())
 	assert.NoError(t, err)
+
 	assert.Equal(t, scExe1Block2, scExe2Block2)
 
 	// verify state commitment of block 3 is the same as block 2, since tx failed
-	scExe2Block3, err := exe2Node.ExecutionState.StateCommitmentByBlockID(block3.ID())
+	scExe2Block3, err := exe2Node.ExecutionState.StateCommitmentByBlockID(context.Background(), block3.ID())
 	assert.NoError(t, err)
 	assert.Equal(t, scExe2Block2, scExe2Block3)
 

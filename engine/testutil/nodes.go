@@ -71,7 +71,7 @@ func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identitie
 	mc, err := metrics.NewCollector(log)
 	require.NoError(t, err)
 
-	tracer, err := trace.NewTracer(log)
+	tracer, err := trace.NewTracer(log, "test")
 	require.NoError(t, err)
 
 	return mock.GenericNode{

@@ -1,6 +1,7 @@
 package computer_test
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -23,7 +24,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := new(vmmock.VirtualMachine)
 		bc := new(vmmock.BlockContext)
 
-		exe := computer.NewBlockComputer(vm)
+		exe := computer.NewBlockComputer(vm, nil)
 
 		// create a block with 1 collection with 2 transactions
 		block := generateBlock(1, 2)
@@ -38,7 +39,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(block, view)
+		result, err := exe.ExecuteBlock(context.Background(), block, view)
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
 
@@ -50,7 +51,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := new(vmmock.VirtualMachine)
 		bc := new(vmmock.BlockContext)
 
-		exe := computer.NewBlockComputer(vm)
+		exe := computer.NewBlockComputer(vm, nil)
 
 		collectionCount := 2
 		transactionsPerCollection := 2
@@ -74,16 +75,16 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(block, view)
+		result, err := exe.ExecuteBlock(context.Background(), block, view)
 		assert.NoError(t, err)
 
-		//chunk count should match collection count
+		// chunk count should match collection count
 		assert.Len(t, result.StateSnapshots, collectionCount)
 
 		// all events should have been collected
 		assert.Len(t, result.Events, totalEventCount)
 
-		//events should have been indexed by transaction and event
+		// events should have been indexed by transaction and event
 		k := 0
 		for expectedTxIndex := 0; expectedTxIndex < totalTransactionCount; expectedTxIndex++ {
 			for expectedEventIndex := 0; expectedEventIndex < eventsPerTransaction; expectedEventIndex++ {

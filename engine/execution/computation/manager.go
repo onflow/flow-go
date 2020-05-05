@@ -25,7 +25,6 @@ type ComputationManager interface {
 		block *entity.ExecutableBlock,
 		view *delta.View,
 	) (*execution.ComputationResult, error)
-	GetAccount(address flow.Address, blockHeader *flow.Header, view *delta.View) (*flow.Account, error)
 }
 
 // Manager manages computation and execution
@@ -51,7 +50,7 @@ func New(
 		me:            me,
 		protoState:    protoState,
 		vm:            vm,
-		blockComputer: computer.NewBlockComputer(tracer, vm),
+		blockComputer: computer.NewBlockComputer(vm, tracer),
 	}
 
 	return &e
