@@ -113,8 +113,8 @@ func (builder *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Head
 				}
 
 				// sanity check: ensure the reference block is from the main chain
-				if ref.ChainID != flow.DefaultChainID {
-					return fmt.Errorf("invalid reference block (chain_id=%s)", ref.ChainID)
+				if ref.ChainID != final.ChainID {
+					return fmt.Errorf("invalid reference block (chain_id=%s expected=%s)", ref.ChainID, final.ChainID)
 				}
 
 				refHeight = ref.Height

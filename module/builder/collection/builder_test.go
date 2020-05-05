@@ -84,7 +84,7 @@ func (suite *BuilderSuite) Bootstrap() {
 	// bootstrap main chain so we have valid reference blocks
 	role := flow.RoleCollection
 	// just bootstrap with a genesis block, we'll use this as reference
-	genesis := flow.Genesis(unittest.IdentityListFixture(5, func(id *flow.Identity) {
+	genesis := unittest.GenesisFixture(unittest.IdentityListFixture(5, func(id *flow.Identity) {
 		id.Role = role
 		role++
 	}))
