@@ -201,7 +201,7 @@ func (tb *TransactionBody) signerMap() map[Address]int {
 //being added to the transaction.
 //
 //This function returns an error if the signature cannot be generated.
-func (tb *TransactionBody) SignPayload(address Address, keyID int, privateKey crypto.PrivateKey, hasher hash.Hasher) error {
+func (tb *TransactionBody) SignPayload(address Address, keyID uint64, privateKey crypto.PrivateKey, hasher hash.Hasher) error {
 
 	sig, err := privateKey.Sign(tb.PayloadMessage(), hasher)
 	if err != nil {
@@ -219,7 +219,7 @@ func (tb *TransactionBody) SignPayload(address Address, keyID int, privateKey cr
 //being added to the transaction.
 //
 //This function returns an error if the signature cannot be generated.
-func (tb *TransactionBody) SignEnvelope(address Address, keyID int, privateKey crypto.PrivateKey, hasher hash.Hasher) error {
+func (tb *TransactionBody) SignEnvelope(address Address, keyID uint64, privateKey crypto.PrivateKey, hasher hash.Hasher) error {
 
 	sig, err := privateKey.Sign(tb.EnvelopeMessage(), hasher)
 	if err != nil {
@@ -232,7 +232,7 @@ func (tb *TransactionBody) SignEnvelope(address Address, keyID int, privateKey c
 }
 
 // AddPayloadSignature adds a payload signature to the transaction for the given address and key ID.
-func (tb *TransactionBody) AddPayloadSignature(address Address, keyID int, sig []byte) *TransactionBody {
+func (tb *TransactionBody) AddPayloadSignature(address Address, keyID uint64, sig []byte) *TransactionBody {
 	s := tb.createSignature(address, keyID, sig)
 
 	tb.PayloadSignatures = append(tb.PayloadSignatures, s)
@@ -242,7 +242,7 @@ func (tb *TransactionBody) AddPayloadSignature(address Address, keyID int, sig [
 }
 
 // AddEnvelopeSignature adds an envelope signature to the transaction for the given address and key ID.
-func (tb *TransactionBody) AddEnvelopeSignature(address Address, keyID int, sig []byte) *TransactionBody {
+func (tb *TransactionBody) AddEnvelopeSignature(address Address, keyID uint64, sig []byte) *TransactionBody {
 	s := tb.createSignature(address, keyID, sig)
 
 	tb.EnvelopeSignatures = append(tb.EnvelopeSignatures, s)
@@ -251,7 +251,7 @@ func (tb *TransactionBody) AddEnvelopeSignature(address Address, keyID int, sig 
 	return tb
 }
 
-func (tb *TransactionBody) createSignature(address Address, keyID int, sig []byte) TransactionSignature {
+func (tb *TransactionBody) createSignature(address Address, keyID uint64, sig []byte) TransactionSignature {
 	signerIndex, signerExists := tb.signerMap()[address]
 	if !signerExists {
 		signerIndex = -1
@@ -396,7 +396,7 @@ type ProposalKey struct {
 type TransactionSignature struct {
 	Address     Address
 	SignerIndex int
-	KeyID       int
+	KeyID       uint64
 	Signature   []byte
 }
 

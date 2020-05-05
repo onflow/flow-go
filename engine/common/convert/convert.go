@@ -43,12 +43,12 @@ func MessageToTransaction(m *entities.Transaction) (flow.TransactionBody, error)
 
 	for _, sig := range m.GetPayloadSignatures() {
 		addr := flow.BytesToAddress(sig.GetAddress())
-		t.AddPayloadSignature(addr, int(sig.GetKeyId()), sig.GetSignature())
+		t.AddPayloadSignature(addr, uint64(sig.GetKeyId()), sig.GetSignature())
 	}
 
 	for _, sig := range m.GetEnvelopeSignatures() {
 		addr := flow.BytesToAddress(sig.GetAddress())
-		t.AddEnvelopeSignature(addr, int(sig.GetKeyId()), sig.GetSignature())
+		t.AddEnvelopeSignature(addr, uint64(sig.GetKeyId()), sig.GetSignature())
 	}
 
 	return *t, nil

@@ -272,7 +272,7 @@ func (r *TransactionContext) checkProgram(code []byte, address runtime.Address) 
 // verifySignatures verifies that a transaction contains the necessary signatures.
 //
 // An error is returned if any of the expected signatures are invalid or missing.
-func (r *TransactionContext) verifySignatures() error {
+func (r *TransactionContext) verifySignatures() FlowError {
 
 	if r.tx.Payer == flow.ZeroAddress {
 		return &MissingPayerError{}
@@ -413,7 +413,7 @@ func (r *TransactionContext) verifyAccountSignature(
 		return accountKey, &InvalidSignatureAccountError{Address: txSig.Address}
 	}
 
-	if txSig.KeyID < 0 || txSig.KeyID >= len(account.Keys) {
+	if int(txSig.KeyID) >= len(account.Keys) {
 		return accountKey, &InvalidSignatureAccountError{Address: txSig.Address}
 	}
 
@@ -421,12 +421,20 @@ func (r *TransactionContext) verifyAccountSignature(
 
 	hasher, err := hash.NewHasher(accountKey.HashAlgo)
 	if err != nil {
-		return accountKey, fmt.Errorf("public key specifies invalid hash algorithm")
+		return accountKey, &InvalidHashingAlgorithmError{
+			Address:          txSig.Address,
+			KeyID:            txSig.KeyID,
+			HashingAlgorithm: accountKey.HashAlgo,
+		}
 	}
 
 	valid, err := accountKey.PublicKey.Verify(txSig.Signature, message, hasher)
 	if err != nil {
-		return accountKey, fmt.Errorf("cannot verify public key")
+		return accountKey, &PublicKeyVerificationError{
+			Address: txSig.Address,
+			KeyID:   txSig.KeyID,
+			Err:     err,
+		}
 	}
 
 	if !valid {
@@ -437,7 +445,7 @@ func (r *TransactionContext) verifyAccountSignature(
 }
 
 func sigIsForProposalKey(txSig flow.TransactionSignature, proposalKey flow.ProposalKey) bool {
-	return txSig.Address == proposalKey.Address && txSig.KeyID == int(proposalKey.KeyID)
+	return txSig.Address == proposalKey.Address && txSig.KeyID == proposalKey.KeyID
 }
 
 func hasSufficientKeyWeight(weights map[flow.Address]int, address flow.Address) bool {
