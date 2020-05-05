@@ -17,6 +17,8 @@ import (
 // rxid is the regex for parsing node identity entries.
 var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|access)-([0-9a-fA-F]{64})@([\w\d]+|[\w\d][\w\d\-]*[\w\d](?:\.*[\w\d][\w\d\-]*[\w\d])*|[\w\d][\w\d\-]*[\w\d])(:[\d]+)?=(\d{1,20})$`)
 
+var keyCache = map[string]crypto.PublicKey{}
+
 // Identity represents a node identity.
 type Identity struct {
 	NodeID        Identifier
@@ -85,9 +87,13 @@ func toEncodable(iy Identity) (encodableIdentity, error) {
 	ie := encodableIdentity{iy.NodeID, iy.Address, iy.Role, iy.Stake, nil, nil}
 	if iy.StakingPubKey != nil {
 		ie.StakingPubKey = iy.StakingPubKey.Encode()
+		keyCache[string(ie.StakingPubKey)] = iy.StakingPubKey
+
 	}
 	if iy.NetworkPubKey != nil {
 		ie.NetworkPubKey = iy.NetworkPubKey.Encode()
+		keyCache[string(ie.NetworkPubKey)] = iy.NetworkPubKey
+
 	}
 	return ie, nil
 }
@@ -123,13 +129,23 @@ func fromEncodable(ie encodableIdentity, identity *Identity) error {
 	identity.Stake = ie.Stake
 	var err error
 	if ie.StakingPubKey != nil {
-		if identity.StakingPubKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, ie.StakingPubKey); err != nil {
-			return fmt.Errorf("could not decode staking key: %w", err)
+		cachedKey, ok := keyCache[string(ie.StakingPubKey)]
+		if ok {
+			identity.StakingPubKey = cachedKey
+		} else {
+			if identity.StakingPubKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, ie.StakingPubKey); err != nil {
+				return err
+			}
 		}
 	}
 	if ie.NetworkPubKey != nil {
-		if identity.NetworkPubKey, err = crypto.DecodePublicKey(crypto.ECDSAP256, ie.NetworkPubKey); err != nil {
-			return fmt.Errorf("could not decode network key: %w", err)
+		cachedKey, ok := keyCache[string(ie.NetworkPubKey)]
+		if ok {
+			identity.NetworkPubKey = cachedKey
+		} else {
+			if identity.NetworkPubKey, err = crypto.DecodePublicKey(crypto.ECDSAP256, ie.NetworkPubKey); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
