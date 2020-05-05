@@ -1,17 +1,17 @@
 package run
 
 import (
-	"testing"
 	"crypto/rand"
+	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/dkg"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
 	"github.com/dapperlabs/flow-go/utils/unittest"
-	"github.com/dapperlabs/flow-go/crypto"
 )
 
 func TestGenerateGenesisQC(t *testing.T) {
@@ -50,6 +50,7 @@ func createSignerData(t *testing.T, n int) ParticipantData {
 	_, err = rand.Read(seed)
 	require.NoError(t, err)
 	randomBSKs, randomBPKs, groupKey, err := crypto.ThresholdSignKeyGen(n, seed)
+	require.NoError(t, err)
 
 	pubData := dkg.PublicData{
 		GroupPubKey:     groupKey,

@@ -1,8 +1,8 @@
 package signature
 
 import (
-	"testing"
 	"crypto/rand"
+	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,7 +32,7 @@ func createThresholdsT(t *testing.T, n uint) ([]*ThresholdProvider, crypto.Publi
 	seed := make([]byte, crypto.SeedMinLenDKG)
 	_, err := rand.Read(seed)
 	require.NoError(t, err)
-	beaconKeys, _, groupKey , err := crypto.ThresholdSignKeyGen(int(n), seed)
+	beaconKeys, _, groupKey, err := crypto.ThresholdSignKeyGen(int(n), seed)
 	require.NoError(t, err)
 	signers := make([]*ThresholdProvider, 0, int(n))
 	for i := 0; i < int(n); i++ {
