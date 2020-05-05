@@ -124,7 +124,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
 		assignees := make([]flow.Identifier, 0)
 		for _, verIdentity := range verIdentities {
-			if isAssigned(int(chunk.Index), chunkNum) {
+			if IsAssigned(chunk.Index) {
 				assignees = append(assignees, verIdentity.NodeID)
 			}
 		}
@@ -157,7 +157,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 	colNode := testutil.CollectionNode(t, hub, colIdentity, identities)
 	// injects the assigned collections into the collection node mempool
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
-		if isAssigned(int(chunk.Index), chunkNum) {
+		if IsAssigned(chunk.Index) {
 			err := colNode.Collections.Store(completeER.Collections[chunk.Index])
 			assert.Nil(t, err)
 		}
@@ -250,7 +250,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 			assert.False(t, verNode.AuthCollections.Has(completeER.Collections[i].ID()))
 			assert.False(t, verNode.PendingCollections.Has(completeER.Collections[i].ID()))
 			assert.False(t, verNode.ChunkDataPacks.Has(completeER.ChunkDataPacks[i].ID()))
-			if isAssigned(i, chunkNum) {
+			if IsAssigned(completeER.Receipt.ExecutionResult.Chunks[i].Index) {
 				// chunk ID of assigned chunks should be added to ingested chunks mempool
 				assert.True(t, verNode.IngestedChunkIDs.Has(completeER.Receipt.ExecutionResult.Chunks[i].ID()))
 			}
@@ -393,88 +393,10 @@ func TestSingleCollectionProcessing(t *testing.T) {
 
 }
 
-// setupMockExeNode creates and returns an execution node and its registered engine in the network (hub)
-// it mocks the process method of execution node that on receiving a chunk data pack request from
-// a certain verifier node (verIdentity) about a chunk that is assigned to it, replies the chunk back
-// data pack back to the node. Otherwise, if the request is not a chunk data pack request, or if the
-// requested chunk data pack is not about an assigned chunk to the verifier node (verIdentity), it fails the
-// test.
-func setupMockExeNode(t *testing.T,
-	hub *stub.Hub,
-	exeIdentity *flow.Identity,
-	verIdentities flow.IdentityList,
-	othersIdentity flow.IdentityList,
-	completeER verification.CompleteExecutionResult) (*mock2.GenericNode, *network.Engine) {
-	// mock the execution node with a generic node and mocked engine
-	// to handle request for chunk state
-	exeNode := testutil.GenericNode(t, hub, exeIdentity, othersIdentity)
-	exeEngine := new(network.Engine)
-
-	// determines the expected number of result chunk data pack requests
-	chunkDataPackCount := 0
-	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
-		if isAssigned(int(chunk.Index), len(completeER.ChunkDataPacks)) {
-			chunkDataPackCount++
-		}
-	}
-
-	// map form verIds --> chunks they asked
-	exeChunkDataSeen := make(map[flow.Identifier]map[flow.Identifier]struct{})
-	for _, verIdentity := range verIdentities {
-		exeChunkDataSeen[verIdentity.NodeID] = make(map[flow.Identifier]struct{})
-	}
-
-	exeChunkDataConduit, err := exeNode.Net.Register(engine.ChunkDataPackProvider, exeEngine)
-	assert.Nil(t, err)
-
-	chunkNum := len(completeER.ChunkDataPacks)
-
-	exeEngine.On("Process", testifymock.Anything, testifymock.Anything).
-		Run(func(args testifymock.Arguments) {
-			if originID, ok := args[0].(flow.Identifier); ok {
-				if req, ok := args[1].(*messages.ChunkDataPackRequest); ok {
-					require.True(t, ok)
-					for i := 0; i < chunkNum; i++ {
-						chunk, ok := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i))
-						require.True(t, ok, "chunk out of range requested")
-						chunkID := chunk.ID()
-						if isAssigned(i, chunkNum) && chunkID == req.ChunkID {
-							// each assigned chunk data pack should be requested only once
-							_, ok := exeChunkDataSeen[originID][chunkID]
-							require.False(t, ok)
-
-							// marks execution chunk data pack request as seen
-							exeChunkDataSeen[originID][chunkID] = struct{}{}
-
-							// publishes the chunk data pack response to the network
-							res := &messages.ChunkDataPackResponse{
-								Data: *completeER.ChunkDataPacks[i],
-							}
-							err := exeChunkDataConduit.Submit(res, originID)
-							assert.Nil(t, err)
-							return
-						}
-					}
-					require.Error(t, fmt.Errorf(" requested an unidentifed chunk data pack %v", req))
-				}
-			}
-
-			require.Error(t, fmt.Errorf("unknown request to execution node %v", args[1]))
-
-		}).
-		Return(nil).
-		// each verification node is assigned to `chunkDataPackCount`-many independent chunks
-		// and there are `len(verIdentities)`-many verification nodes
-		// so there is a total of len(verIdentities) * chunkDataPackCount expected
-		// chunk data pack requests
-		Times(len(verIdentities) * chunkDataPackCount)
-
-	return &exeNode, exeEngine
-}
-
+//
 func BenchmarkIngestEngine(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		ingestHappyPath(t, 10, 100, 6)
+		ingestHappyPath(b, 10, 100, 6)
 	}
 
 }
@@ -514,11 +436,14 @@ func ingestHappyPath(tb testing.TB, receiptCount int, chunkCount int, verCount i
 	assigner := &mock.ChunkAssigner{}
 	a := chmodel.NewAssignment()
 
+	vChunks := make([]*verification.VerifiableChunk, 0)
+
 	// assigns some chunks based on isAssigned method to the verification node
 	for _, er := range ers {
 		for _, chunk := range er.Receipt.ExecutionResult.Chunks {
-			if isAssigned(int(chunk.Index), chunkCount) {
+			if IsAssigned(chunk.Index) {
 				a.Add(chunk, []flow.Identifier{verIdentity.NodeID})
+				vChunks = append(vChunks, VerifiableChunk(chunk.Index, er))
 			}
 		}
 		assigner.On("Assign",
@@ -531,7 +456,9 @@ func ingestHappyPath(tb testing.TB, receiptCount int, chunkCount int, verCount i
 	// nodes and engines
 	//
 	// verification node
-	verNode := testutil.VerificationNode(tb, hub, verIdentity, identities, assigner, requestInterval, failureThreshold)
+	verifierEng, verifierEngWG := SetupMockVerifierEng(tb, vChunks)
+	verNode := testutil.VerificationNode(tb, hub, verIdentity, identities, assigner, requestInterval, failureThreshold,
+		testutil.WithVerifierEngine(verifierEng))
 
 	// starts the ingest engine
 	<-verNode.IngestEngine.Ready()
@@ -554,19 +481,94 @@ func ingestHappyPath(tb testing.TB, receiptCount int, chunkCount int, verCount i
 		}
 	}
 
-	ingestWG := sync.WaitGroup{}
-	ingestWG.Add(receiptCount)
-
 	for _, er := range ers {
 		go func(receipt *flow.ExecutionReceipt) {
-			defer ingestWG.Done()
 			err := verNode.IngestEngine.Process(exeIdentity.NodeID, receipt)
 			require.NoError(tb, err)
 		}(er.Receipt)
 	}
 
-	unittest.RequireReturnsBefore(tb, ingestWG.Wait, time.Duration(receiptCount)*time.Second)
+	unittest.RequireReturnsBefore(tb, verifierEngWG.Wait, time.Duration(receiptCount)*time.Second)
 	verNode.Done()
+}
+
+// setupMockExeNode creates and returns an execution node and its registered engine in the network (hub)
+// it mocks the process method of execution node that on receiving a chunk data pack request from
+// a certain verifier node (verIdentity) about a chunk that is assigned to it, replies the chunk back
+// data pack back to the node. Otherwise, if the request is not a chunk data pack request, or if the
+// requested chunk data pack is not about an assigned chunk to the verifier node (verIdentity), it fails the
+// test.
+func setupMockExeNode(t *testing.T,
+	hub *stub.Hub,
+	exeIdentity *flow.Identity,
+	verIdentities flow.IdentityList,
+	othersIdentity flow.IdentityList,
+	completeER verification.CompleteExecutionResult) (*mock2.GenericNode, *network.Engine) {
+	// mock the execution node with a generic node and mocked engine
+	// to handle request for chunk state
+	exeNode := testutil.GenericNode(t, hub, exeIdentity, othersIdentity)
+	exeEngine := new(network.Engine)
+
+	// determines the expected number of result chunk data pack requests
+	chunkDataPackCount := 0
+	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
+		if IsAssigned(chunk.Index) {
+			chunkDataPackCount++
+		}
+	}
+
+	// map form verIds --> chunks they asked
+	exeChunkDataSeen := make(map[flow.Identifier]map[flow.Identifier]struct{})
+	for _, verIdentity := range verIdentities {
+		exeChunkDataSeen[verIdentity.NodeID] = make(map[flow.Identifier]struct{})
+	}
+
+	exeChunkDataConduit, err := exeNode.Net.Register(engine.ChunkDataPackProvider, exeEngine)
+	assert.Nil(t, err)
+
+	chunkNum := len(completeER.ChunkDataPacks)
+
+	exeEngine.On("Process", testifymock.Anything, testifymock.Anything).
+		Run(func(args testifymock.Arguments) {
+			if originID, ok := args[0].(flow.Identifier); ok {
+				if req, ok := args[1].(*messages.ChunkDataPackRequest); ok {
+					require.True(t, ok)
+					for i := 0; i < chunkNum; i++ {
+						chunk, ok := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i))
+						require.True(t, ok, "chunk out of range requested")
+						chunkID := chunk.ID()
+						if IsAssigned(chunk.Index) && chunkID == req.ChunkID {
+							// each assigned chunk data pack should be requested only once
+							_, ok := exeChunkDataSeen[originID][chunkID]
+							require.False(t, ok)
+
+							// marks execution chunk data pack request as seen
+							exeChunkDataSeen[originID][chunkID] = struct{}{}
+
+							// publishes the chunk data pack response to the network
+							res := &messages.ChunkDataPackResponse{
+								Data: *completeER.ChunkDataPacks[i],
+							}
+							err := exeChunkDataConduit.Submit(res, originID)
+							assert.Nil(t, err)
+							return
+						}
+					}
+					require.Error(t, fmt.Errorf(" requested an unidentifed chunk data pack %v", req))
+				}
+			}
+
+			require.Error(t, fmt.Errorf("unknown request to execution node %v", args[1]))
+
+		}).
+		Return(nil).
+		// each verification node is assigned to `chunkDataPackCount`-many independent chunks
+		// and there are `len(verIdentities)`-many verification nodes
+		// so there is a total of len(verIdentities) * chunkDataPackCount expected
+		// chunk data pack requests
+		Times(len(verIdentities) * chunkDataPackCount)
+
+	return &exeNode, exeEngine
 }
 
 // setupMockConsensusNode creates and returns a mock consensus node (conIdentity) and its registered engine in the
@@ -581,7 +583,7 @@ func setupMockConsensusNode(t *testing.T,
 	// determines the expected number of result approvals this node should receive
 	approvalsCount := 0
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
-		if isAssigned(int(chunk.Index), len(completeER.ChunkDataPacks)) {
+		if IsAssigned(chunk.Index) {
 			approvalsCount++
 		}
 	}
@@ -620,7 +622,7 @@ func setupMockConsensusNode(t *testing.T,
 			resultApprovalSeen[originID][resultApproval.ID()] = struct{}{}
 
 			// asserts that the result approval is assigned to the verifier
-			assert.True(t, isAssigned(int(resultApproval.Body.ChunkIndex), len(completeER.ChunkDataPacks)))
+			assert.True(t, IsAssigned(resultApproval.Body.ChunkIndex))
 
 			wg.Done()
 		}).Return(nil)
@@ -629,10 +631,4 @@ func setupMockConsensusNode(t *testing.T,
 	assert.Nil(t, err)
 
 	return &conNode, conEngine, wg
-}
-
-// isAssigned is a helper function that returns true for the even indices in [0, chunkNum-1]
-func isAssigned(index int, chunkNum int) bool {
-	answer := index >= 0 && index < chunkNum && index%2 == 0
-	return answer
 }

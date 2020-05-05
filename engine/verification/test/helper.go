@@ -1,12 +1,17 @@
 package test
 
 import (
+	"bytes"
+	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
+	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -104,5 +109,101 @@ func CompleteExecutionResultFixture(t testing.TB, chunkCount int) verification.C
 		Block:          &block,
 		Collections:    collections,
 		ChunkDataPacks: chunkDataPacks,
+	}
+}
+
+// SetupMockVerifierEng sets up a mock verifier engine that asserts the followings:
+// - that a set of chunks are delivered to it.
+// - that each chunk is delivered exactly once
+// SetupMockVerifierEng returns the mock engine and a wait group that unblocks when all ERs are received.
+func SetupMockVerifierEng(t testing.TB, vChunks []*verification.VerifiableChunk) (*network.Engine, *sync.WaitGroup) {
+	eng := new(network.Engine)
+
+	// keep track of which verifiable chunks we have received
+	receivedChunks := make(map[flow.Identifier]struct{})
+	var (
+		// decrement the wait group when each verifiable chunk received
+		wg sync.WaitGroup
+		// check one verifiable chunk at a time to ensure dupe checking works
+		mu sync.Mutex
+	)
+
+	// computes expected number of assigned chunks
+	expected := 0
+	for _, c := range vChunks {
+		if IsAssigned(c.ChunkIndex) {
+			expected++
+		}
+	}
+	wg.Add(expected)
+
+	eng.On("ProcessLocal", testifymock.Anything).
+		Run(func(args testifymock.Arguments) {
+			mu.Lock()
+			defer mu.Unlock()
+
+			// the received entity should be a verifiable chunk
+			vchunk, ok := args[0].(*verification.VerifiableChunk)
+			assert.True(t, ok)
+
+			// retrieves the content of received chunk
+			chunk, ok := vchunk.Receipt.ExecutionResult.Chunks.ByIndex(vchunk.ChunkIndex)
+			require.True(t, ok, "chunk out of range requested")
+			vID := chunk.ID()
+
+			// verifies that it has not seen this chunk before
+			_, alreadySeen := receivedChunks[vID]
+			if alreadySeen {
+				t.Logf("received duplicated chunk (id=%s)", vID)
+				t.Fail()
+				return
+			}
+
+			// ensure the received chunk matches one we expect
+			for _, vc := range vChunks {
+				if chunk.ID() == vID {
+					// mark it as seen and decrement the waitgroup
+					receivedChunks[vID] = struct{}{}
+					// checks end states match as expected
+					if !bytes.Equal(vchunk.EndState, vc.EndState) {
+						t.Logf("end states are not equal: expected %x got %x", vchunk.EndState, chunk.EndState)
+						t.Fail()
+					}
+					wg.Done()
+					return
+				}
+			}
+
+			// the received chunk doesn't match any expected ERs
+			t.Logf("received unexpected ER (id=%s)", vID)
+			t.Fail()
+		}).
+		Return(nil)
+
+	return eng, &wg
+}
+
+// isAssigned is a helper function that returns true for the even indices in [0, chunkNum-1]
+func IsAssigned(index uint64) bool {
+	answer := index >= 0 && index%2 == 0
+	return answer
+}
+
+func VerifiableChunk(chunkIndex uint64, er verification.CompleteExecutionResult) *verification.VerifiableChunk {
+	var endState flow.StateCommitment
+	// last chunk
+	if int(chunkIndex) == len(er.Receipt.ExecutionResult.Chunks)-1 {
+		endState = er.Receipt.ExecutionResult.FinalStateCommit
+	} else {
+		endState = er.Receipt.ExecutionResult.Chunks[chunkIndex+1].StartState
+	}
+
+	return &verification.VerifiableChunk{
+		ChunkIndex:    chunkIndex,
+		EndState:      endState,
+		Block:         er.Block,
+		Receipt:       er.Receipt,
+		Collection:    er.Collections[chunkIndex],
+		ChunkDataPack: er.ChunkDataPacks[chunkIndex],
 	}
 }
