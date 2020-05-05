@@ -174,7 +174,7 @@ func (builder *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Head
 		// For now, this heuristic is acceptable, since duplicate transactions
 		// will not be executed by EXE nodes.
 		var conflictingFinalized map[flow.Identifier]struct{}
-		err = operation.CheckCollectionPayload(parent.Height, parent.ID(), candidateTxIDs, &conflictingFinalized)(tx)
+		err = operation.CheckCollectionPayload(final.Height, parent.ID(), candidateTxIDs, &conflictingFinalized)(tx)
 		if err != nil {
 			return fmt.Errorf("could not check collection payload: %w", err)
 		}

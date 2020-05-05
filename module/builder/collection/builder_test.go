@@ -247,6 +247,8 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 
 	// tx1 should be removed from mempool, as it is in a finalized block
 	assert.False(t, suite.pool.Has(tx1.ID()))
+	// tx2 should NOT be removed from mempool, as it is in an un-finalized block
+	assert.True(t, suite.pool.Has(tx2.ID()))
 }
 
 func (suite *BuilderSuite) TestBuildOn_ConflictingInvalidatedForks() {
