@@ -99,7 +99,7 @@ func TestCombinedQC(t *testing.T) {
 	require.NoError(t, err, "should be able to create QC from valid votes")
 
 	// creation with insufficient threshold should fail
-	_, err = signers[0].CreateQC(votes[:minShares-1-1])
+	_, err = signers[0].CreateQC(votes[:minShares-1])
 	assert.Error(t, err, "creating QC with insufficient shares should fail")
 
 	// creation from different views should fail

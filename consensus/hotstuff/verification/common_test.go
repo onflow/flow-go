@@ -82,14 +82,16 @@ func MakeHotstuffCommitteeState(t *testing.T, identities flow.IdentityList, beac
 		stakingKeys = append(stakingKeys, stakingKey)
 	}
 
-	// generate the dkg keys (only if beacon is enabled
+	// generate the dkg keys (only if beacon is enabled)
 	var beaconSKs []crypto.PrivateKey
+	var beaconPKs []crypto.PublicKey
+	var beaconGroupPK crypto.PublicKey
 	if beaconEnabled {
 		seed := make([]byte, crypto.SeedMinLenDKG)
 		n, err := rand.Read(seed)
 		require.NoError(t, err)
 		require.Equal(t, n, crypto.SeedMinLenDKG)
-		beaconSKs, beaconPKs, beaconGroupPK, err := crypto.ThresholdSignKeyGen(len(identities), seed)
+		beaconSKs, beaconPKs, beaconGroupPK, err = crypto.ThresholdSignKeyGen(len(identities), seed)
 		require.NoError(t, err)
 		dkg.On("GroupSize").Return(uint(len(beaconSKs)), nil)
 		dkg.On("GroupKey").Return(beaconGroupPK, nil)
@@ -99,6 +101,5 @@ func MakeHotstuffCommitteeState(t *testing.T, identities flow.IdentityList, beac
 			dkg.On("ParticipantKey", identity.NodeID).Return(beaconPKs[i], nil)
 		}
 	}
-
 	return committee, dkg, stakingKeys, beaconSKs
 }
