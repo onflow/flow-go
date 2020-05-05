@@ -42,7 +42,7 @@ func PayloadFromTransactions(refID flow.Identifier, transactions ...*flow.Transa
 	}
 }
 
-// Hash returns the hash of the payload, simply the ID of the collection.
+// Hash returns the hash of the payload.
 func (p Payload) Hash() flow.Identifier {
 	return flow.MakeID(p)
 }
