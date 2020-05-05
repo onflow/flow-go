@@ -11,8 +11,8 @@ type VirtualMachine struct {
 	mock.Mock
 }
 
-// GetCache provides a mock function with given fields:
-func (_m *VirtualMachine) GetCache() virtualmachine.ASTCache {
+// ASTCache provides a mock function with given fields:
+func (_m *VirtualMachine) ASTCache() virtualmachine.ASTCache {
 	ret := _m.Called()
 
 	var r0 virtualmachine.ASTCache

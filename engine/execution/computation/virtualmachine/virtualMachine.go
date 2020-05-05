@@ -20,7 +20,7 @@ type VirtualMachine interface {
 	// NewBlockContext creates a new block context for executing transactions.
 	NewBlockContext(b *flow.Header) BlockContext
 	// GetCache returns the program AST cache.
-	GetCache() ASTCache
+	ASTCache() ASTCache
 }
 
 // New creates a new virtual machine instance with the provided runtime.
@@ -47,7 +47,7 @@ func (vm *virtualMachine) NewBlockContext(header *flow.Header) BlockContext {
 	}
 }
 
-func (vm *virtualMachine) GetCache() ASTCache {
+func (vm *virtualMachine) ASTCache() ASTCache {
 	return vm.cache
 }
 
