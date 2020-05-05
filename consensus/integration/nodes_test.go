@@ -106,7 +106,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 
 	// log with node index an ID
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
-	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Int("index", index).Hex("node_id", localID[:]).Logger()
+	log := zerolog.New(os.Stderr).Level(zerolog.WarnLevel).With().Timestamp().Int("index", index).Hex("node_id", localID[:]).Logger()
 
 	stopConsumer := stopper.AddNode(node)
 

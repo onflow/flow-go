@@ -80,7 +80,6 @@ func (c *Conduit) Submit(event interface{}, targetIDs ...flow.Identifier) error 
 		block, delay := c.net.hub.filter(c.channelID, event, sender, receiver)
 		// block the message
 		if block {
-			fmt.Printf("message blocked\n")
 			continue
 		}
 
