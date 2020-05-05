@@ -14,7 +14,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
-	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
+	"github.com/dapperlabs/flow-go/storage/ledger/databases/inmemdb"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 	"github.com/dapperlabs/flow-go/utils/io"
 )
@@ -245,7 +245,7 @@ func (f *forest) Get(root Root) (*tree, error) {
 
 	db, err := f.newDB(root)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create LevelDB: %w", err)
+		return nil, fmt.Errorf("cannot create DB: %w", err)
 	}
 
 	tree, err := f.newTree(root, db)
@@ -258,10 +258,11 @@ func (f *forest) Get(root Root) (*tree, error) {
 	return tree, nil
 }
 
-func (f *forest) newDB(root Root) (*leveldb.LevelDB, error) {
+func (f *forest) newDB(root Root) (databases.DAL, error) {
 	treePath := filepath.Join(f.dbDir, root.String())
 
-	db, err := leveldb.NewLevelDB(treePath)
+	// db, err := leveldb.NewLevelDB(treePath)
+	db, err := inmemdb.NewInMemDB(treePath)
 	return db, err
 }
 
@@ -1098,6 +1099,7 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 	}
 
 	newTreeRoot := treeRoot.deepCopy()
+
 	batcher := t.database.NewBatcher()
 	newRootNode, err := s.UpdateAtomically(newTreeRoot, keys, values, s.height-1, batcher, t.database)
 
@@ -1110,7 +1112,8 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 		return newRootNode.value, nil
 	}
 
-	db, err := leveldb.NewLevelDB(filepath.Join(s.forest.dbDir, newRootNode.value.String()))
+	// db, err := leveldb.NewLevelDB(filepath.Join(s.forest.dbDir, newRootNode.value.String()))
+	db, err := inmemdb.NewInMemDB(filepath.Join(s.forest.dbDir, newRootNode.value.String()))
 	if err != nil {
 		return nil, fmt.Errorf("cannot create new DB: %w", err)
 	}
@@ -1145,6 +1148,8 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 	if err != nil {
 		return nil, err
 	}
+	// TODO make this less frequent
+	go db.Persist()
 	s.forest.Add(newTree)
 
 	return newRootNode.value, nil
