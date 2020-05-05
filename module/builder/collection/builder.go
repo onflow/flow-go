@@ -80,10 +80,9 @@ func (builder *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Head
 	var proposal flow.Header
 	err := builder.db.Update(func(tx *badger.Txn) error {
 
-		// retrieve the finalized head ON THE MAIN CHAIN in order to know which
-		// transactions have expired and should be discarded
-		var final flow.Header
-		err := procedure.RetrieveLatestFinalizedHeader(&final)(tx)
+		// retrieve the finalized head ON THE MAIN CHAIN
+		var mainChainFinal flow.Header
+		err := procedure.RetrieveLatestFinalizedHeader(&mainChainFinal)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized header: %w", err)
 		}
@@ -93,6 +92,13 @@ func (builder *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Head
 		err = operation.RetrieveHeader(parentID, &parent)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve parent: %w", err)
+		}
+
+		// retrieve the finalized boundary ON THE CLUSTER CHAIN
+		var final flow.Header
+		err = procedure.RetrieveLatestFinalizedClusterHeader(parent.ChainID, &final)(tx)
+		if err != nil {
+			return fmt.Errorf("could not get final header: %w", err)
 		}
 
 		// STEP 1: retrieve a set of non-expired transactions from the mempool
@@ -113,8 +119,8 @@ func (builder *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Head
 				}
 
 				// sanity check: ensure the reference block is from the main chain
-				if ref.ChainID != final.ChainID {
-					return fmt.Errorf("invalid reference block (chain_id=%s expected=%s)", ref.ChainID, final.ChainID)
+				if ref.ChainID != mainChainFinal.ChainID {
+					return fmt.Errorf("invalid reference block (chain_id=%s expected=%s)", ref.ChainID, mainChainFinal.ChainID)
 				}
 
 				refHeight = ref.Height
@@ -122,12 +128,12 @@ func (builder *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Head
 			}
 
 			// for now, disallow un-finalized reference blocks
-			if final.Height < refHeight {
+			if mainChainFinal.Height < refHeight {
 				continue
 			}
 
 			// ensure the reference block is not too old
-			if final.Height-refHeight > flow.DefaultTransactionExpiry-builder.conf.expiryBuffer {
+			if mainChainFinal.Height-refHeight > flow.DefaultTransactionExpiry-builder.conf.expiryBuffer {
 				// the transaction is expired, it will never be valid
 				builder.transactions.Rem(candidateID)
 				continue
@@ -149,8 +155,8 @@ func (builder *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Head
 				return fmt.Errorf("could not retrieve ancestor (id=%x): %w", ancestorID, err)
 			}
 
-			// stop before we've reached the finalized boundary
-			if ancestor.Height <= final.Height+1 {
+			// stop once we've reached the finalized boundary
+			if ancestor.Height == final.Height {
 				break
 			}
 
@@ -180,7 +186,7 @@ func (builder *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Head
 		// For now, this heuristic is acceptable, since duplicate transactions
 		// will not be executed by EXE nodes.
 		var conflictingFinalized map[flow.Identifier]struct{}
-		err = operation.CheckCollectionPayload(final.Height, parent.ID(), candidateTxIDs, &conflictingFinalized)(tx)
+		err = operation.CheckCollectionPayload(final.Height, final.ID(), candidateTxIDs, &conflictingFinalized)(tx)
 		if err != nil {
 			return fmt.Errorf("could not check collection payload: %w", err)
 		}
@@ -287,7 +293,7 @@ func (builder *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Head
 		// NOTE: the maximum number of items here is 100s, so this linear-time
 		// invalidation should be OK
 		for id, height := range builder.cache {
-			if final.Height-height > flow.DefaultTransactionExpiry {
+			if mainChainFinal.Height-height > flow.DefaultTransactionExpiry {
 				delete(builder.cache, id)
 			}
 		}

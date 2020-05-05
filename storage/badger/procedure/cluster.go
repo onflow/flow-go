@@ -71,6 +71,31 @@ func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*b
 	}
 }
 
+// RetrieveLatestFinalizedClusterHeader retrieves the latest finalized for the
+// given cluster chain ID.
+func RetrieveLatestFinalizedClusterHeader(chainID string, final *flow.Header) func(tx *badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		var boundary uint64
+		err := operation.RetrieveBoundaryForCluster(chainID, &boundary)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve boundary: %w", err)
+		}
+
+		var finalID flow.Identifier
+		err = operation.RetrieveNumberForCluster(chainID, boundary, &finalID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve final ID: %w", err)
+		}
+
+		err = operation.RetrieveHeader(finalID, final)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve finalized header: %w", err)
+		}
+
+		return nil
+	}
+}
+
 // FinalizeClusterBlock finalizes a block in cluster consensus.
 func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
