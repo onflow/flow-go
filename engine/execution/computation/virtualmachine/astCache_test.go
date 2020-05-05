@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
+	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/hash"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -29,7 +30,13 @@ func TestTransactionASTCache(t *testing.T) {
                 }
             `),
 		}
-		ledger := make(virtualmachine.MapLedger)
+
+		err := execTestutil.SignTransactionByRoot(tx, 0)
+		require.NoError(t, err)
+
+		ledger, err := execTestutil.RootBootstrappedLedger()
+		require.NoError(t, err)
+
 		result, err := bc.ExecuteTransaction(ledger, tx)
 
 		assert.NoError(t, err)
@@ -63,7 +70,9 @@ func TestScriptASTCache(t *testing.T) {
 			}
 		`)
 
-		ledger := make(virtualmachine.MapLedger)
+		ledger, err := execTestutil.RootBootstrappedLedger()
+		require.NoError(t, err)
+
 		result, err := bc.ExecuteScript(ledger, script)
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
