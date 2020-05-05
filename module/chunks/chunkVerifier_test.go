@@ -1,7 +1,6 @@
 package chunks_test
 
 import (
-	"errors"
 	"math/rand"
 	"testing"
 	"time"
@@ -231,7 +230,7 @@ func (bc *blockContextMock) ExecuteTransaction(
 			TransactionID: unittest.IdentifierFixture(),
 			Events:        []cadence.Event{},
 			Logs:          nil,
-			Error:         errors.New("runtime error"), // inside the runtime (e.g. div by zero, access account)
+			Error:         &virtualmachine.MissingPayerError{}, // inside the runtime (e.g. div by zero, access account)
 			GasUsed:       0,
 		}
 	default:

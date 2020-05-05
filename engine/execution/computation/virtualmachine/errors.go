@@ -3,6 +3,8 @@ package virtualmachine
 import (
 	"fmt"
 
+	"github.com/onflow/cadence/runtime"
+
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -86,7 +88,7 @@ type InvalidHashingAlgorithmError struct {
 	HashingAlgorithm hash.HashingAlgorithm
 }
 
-func (e *InvalidHashingAlgorithmError) Error() string {
+func (e *InvalidHashingAlgorithmError) ErrorMessage() string {
 	return fmt.Sprintf("invalid hashing algorithm %d for key %d on account %s", e.HashingAlgorithm, e.KeyID, e.Address)
 }
 
@@ -117,10 +119,37 @@ type InvalidProposalSequenceNumberError struct {
 	ProvidedSeqNumber uint64
 }
 
-func (e *InvalidProposalSequenceNumberError) Error() string {
+func (e *InvalidProposalSequenceNumberError) ErrorMessage() string {
 	return fmt.Sprintf("invalid proposal key sequence number: key %d on account %s has sequence number %d, but given %d", e.KeyID, e.Address, e.CurrentSeqNumber, e.ProvidedSeqNumber)
 }
 
 func (e *InvalidProposalSequenceNumberError) StatusCode() uint32 {
 	return 7
+}
+
+// A MissingSignatureForProposalKeyError indicates that a transaction is missing a required signature for proposal key.
+type MissingSignatureForProposalKeyError struct {
+	Address flow.Address
+	KeyID   uint64
+}
+
+func (e *MissingSignatureForProposalKeyError) ErrorMessage() string {
+	return fmt.Sprintf("key %d on account %s does not have sufficient signatures for proposal key", e.KeyID, e.Address)
+}
+
+func (e *MissingSignatureForProposalKeyError) StatusCode() uint32 {
+	return 8
+}
+
+// A MissingSignatureForProposalKeyError indicates that a transaction is missing a required signature for proposal key.
+type CodeExecutionError struct {
+	RuntimeError runtime.Error
+}
+
+func (e *CodeExecutionError) ErrorMessage() string {
+	return fmt.Sprintf("code execution failed: %s", e.RuntimeError.Error())
+}
+
+func (e *CodeExecutionError) StatusCode() uint32 {
+	return 9
 }

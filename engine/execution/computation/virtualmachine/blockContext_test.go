@@ -50,7 +50,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
-		assert.NoError(t, result.Error)
+		assert.Nil(t, result.Error)
 	})
 
 	t.Run("transaction failure", func(t *testing.T) {
@@ -83,7 +83,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.False(t, result.Succeeded())
-		assert.Error(t, result.Error)
+		assert.NotNil(t, result.Error)
 	})
 
 	t.Run("transaction logs", func(t *testing.T) {
@@ -131,7 +131,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 		assert.NoError(t, err)
 
 		assert.True(t, result.Succeeded())
-		assert.NoError(t, result.Error)
+		assert.Nil(t, result.Error)
 
 		require.Len(t, result.Events, 1)
 		assert.EqualValues(t, "flow.AccountCreated", result.Events[0].EventType.ID())
@@ -161,7 +161,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 			script: `transaction { execute { log("Hello, World!") } }`,
 			args:   [][]byte{arg1},
 			check: func(t *testing.T, result *virtualmachine.TransactionResult) {
-				assert.Error(t, result.Error)
+				assert.NotNil(t, result.Error)
 			},
 		},
 		{
@@ -169,7 +169,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 			script: `transaction(x: Int) { execute { log(x) } }`,
 			args:   [][]byte{arg1},
 			check: func(t *testing.T, result *virtualmachine.TransactionResult) {
-				require.NoError(t, result.Error)
+				require.Nil(t, result.Error)
 				require.Len(t, result.Logs, 1)
 				assert.Equal(t, "42", result.Logs[0])
 			},
@@ -179,7 +179,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 			script: `transaction(x: Int, y: String) { execute { log(x); log(y) } }`,
 			args:   [][]byte{arg1, arg2},
 			check: func(t *testing.T, result *virtualmachine.TransactionResult) {
-				require.NoError(t, result.Error)
+				require.Nil(t, result.Error)
 				require.Len(t, result.Logs, 2)
 				assert.Equal(t, "42", result.Logs[0])
 				assert.Equal(t, `"foo"`, result.Logs[1])
@@ -195,7 +195,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 			args:        [][]byte{arg1, arg2},
 			authorizers: []flow.Address{flow.HexToAddress("01")},
 			check: func(t *testing.T, result *virtualmachine.TransactionResult) {
-				require.NoError(t, result.Error)
+				require.Nil(t, result.Error)
 				assert.ElementsMatch(t, []string{"0x1", "42", `"foo"`}, result.Logs)
 			},
 		},
@@ -266,7 +266,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.False(t, result.Succeeded())
-		assert.Error(t, result.Error)
+		assert.NotNil(t, result.Error)
 	})
 
 	t.Run("script logs", func(t *testing.T) {
@@ -364,7 +364,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		result, err := bc.ExecuteTransaction(ledger, tx)
 		require.NoError(t, err)
 		require.True(t, result.Succeeded())
-		require.NoError(t, result.Error)
+		require.Nil(t, result.Error)
 		require.Len(t, result.Events, 1)
 		require.EqualValues(t, flow.EventAccountCreated, result.Events[0].EventType.ID())
 

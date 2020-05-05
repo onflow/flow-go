@@ -299,11 +299,10 @@ func (r *TransactionContext) verifySignatures() FlowError {
 	proposalKeyVerified := proposalKeyVerifiedInPayload || proposalKeyVerifiedInEnvelope
 
 	if !proposalKeyVerified {
-		return fmt.Errorf(
-			"missing signature for proposal key (address: %s, key: %d)",
-			r.tx.ProposalKey.Address,
-			r.tx.ProposalKey.KeyID,
-		)
+		return &MissingSignatureForProposalKeyError{
+			Address: r.tx.ProposalKey.Address,
+			KeyID:   r.tx.ProposalKey.KeyID,
+		}
 	}
 
 	for _, addr := range r.tx.Authorizers {
@@ -333,7 +332,7 @@ func (r *TransactionContext) verifySignatures() FlowError {
 // If they are not equal, the on-chain sequence number is not incremented.
 //
 // This function returns an error if any problem occurred during checking or the check failed
-func (r *TransactionContext) checkAndIncrementSequenceNumber() error {
+func (r *TransactionContext) checkAndIncrementSequenceNumber() (FlowError, error) {
 
 	proposalKey := r.tx.ProposalKey
 
@@ -343,7 +342,7 @@ func (r *TransactionContext) checkAndIncrementSequenceNumber() error {
 		return &InvalidProposalKeyError{
 			Address: proposalKey.Address,
 			KeyID:   proposalKey.KeyID,
-		}
+		}, nil
 	}
 
 	accountKey := account.Keys[proposalKey.KeyID]
@@ -356,18 +355,18 @@ func (r *TransactionContext) checkAndIncrementSequenceNumber() error {
 			KeyID:             proposalKey.KeyID,
 			CurrentSeqNumber:  accountKey.SeqNumber,
 			ProvidedSeqNumber: proposalKey.SequenceNumber,
-		}
+		}, nil
 	}
 
 	accountKey.SeqNumber++
 
 	updatedAccountBytes, err := flow.EncodeAccountPublicKey(accountKey)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	r.setAccountPublicKey(account.Address.Bytes(), proposalKey.KeyID, updatedAccountBytes)
 
-	return nil
+	return nil, nil
 }
 
 func (r *TransactionContext) aggregateAccountSignatures(
@@ -377,7 +376,7 @@ func (r *TransactionContext) aggregateAccountSignatures(
 ) (
 	weights map[flow.Address]int,
 	proposalKeyVerified bool,
-	err error,
+	err FlowError,
 ) {
 	weights = make(map[flow.Address]int)
 
@@ -407,17 +406,17 @@ func (r *TransactionContext) aggregateAccountSignatures(
 func (r *TransactionContext) verifyAccountSignature(
 	txSig flow.TransactionSignature,
 	message []byte,
-) (accountKey *flow.AccountPublicKey, err error) {
+) (*flow.AccountPublicKey, FlowError) {
 	account := r.GetAccount(txSig.Address)
 	if account == nil {
-		return accountKey, &InvalidSignatureAccountError{Address: txSig.Address}
+		return nil, &InvalidSignatureAccountError{Address: txSig.Address}
 	}
 
 	if int(txSig.KeyID) >= len(account.Keys) {
-		return accountKey, &InvalidSignatureAccountError{Address: txSig.Address}
+		return nil, &InvalidSignatureAccountError{Address: txSig.Address}
 	}
 
-	accountKey = &account.Keys[txSig.KeyID]
+	accountKey := &account.Keys[txSig.KeyID]
 
 	hasher, err := hash.NewHasher(accountKey.HashAlgo)
 	if err != nil {
