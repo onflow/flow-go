@@ -170,15 +170,26 @@ func (e *Engine) Wait() {
 func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 	return e.unit.Do(func() error {
+
+		log := e.log.With().Hex("origin", logging.ID(originID)).Logger()
+
 		var err error
 		switch v := event.(type) {
 		case *messages.BlockProposal:
+			log.Debug().Hex("block_id", logging.Entity(v.Header)).
+				Uint64("block_view", v.Header.View).
+				Hex("block_proposal", logging.Entity(v.Header)).Msg("received block proposal")
 			err = e.handleBlockProposal(v)
 		case *messages.CollectionResponse:
+			log.Debug().Hex("collection_id", logging.Entity(v.Collection)).Msg("received collection response")
 			err = e.handleCollectionResponse(v)
 		case *messages.ExecutionStateDelta:
+			log.Debug().Hex("block_id", logging.Entity(v.Block)).Msg("received block delta")
 			err = e.handleExecutionStateDelta(v, originID)
 		case *messages.ExecutionStateSyncRequest:
+			log.Debug().Hex("current_block_id", logging.ID(v.CurrentBlockID)).
+				Hex("target_block_id", logging.ID(v.TargetBlockID)).
+				Msg("received execution state sync request")
 			return e.onExecutionStateSyncRequest(originID, v)
 		default:
 			err = errors.Errorf("invalid event type (%T)", event)
@@ -198,11 +209,6 @@ func (e *Engine) handleBlockProposal(proposal *messages.BlockProposal) error {
 		Header:  proposal.Header,
 		Payload: proposal.Payload,
 	}
-
-	e.log.Debug().
-		Hex("block_id", logging.Entity(block)).
-		Uint64("block_view", block.Header.View).
-		Msg("received block")
 
 	e.mc.StartBlockReceivedToExecuted(block.ID())
 
@@ -383,11 +389,6 @@ func (e *Engine) executeBlock(executableBlock *entity.ExecutableBlock) {
 func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse) error {
 
 	collection := response.Collection
-
-	e.log.Debug().
-		Hex("collection_id", logging.Entity(collection)).
-		Msg("received collection")
-
 	collID := collection.ID()
 
 	return e.mempool.BlockByCollection.Run(func(backdata *stdmap.BlockByCollectionBackdata) error {
@@ -447,11 +448,6 @@ func (e *Engine) findCollectionNodesForGuarantee(blockID flow.Identifier, guaran
 }
 
 func (e *Engine) onExecutionStateSyncRequest(originID flow.Identifier, req *messages.ExecutionStateSyncRequest) error {
-	e.log.Info().
-		Hex("origin_id", logging.ID(originID)).
-		Hex("current_block_id", logging.ID(req.CurrentBlockID)).
-		Hex("target_block_id", logging.ID(req.TargetBlockID)).
-		Msg("received execution state synchronization request")
 
 	id, err := e.state.Final().Identity(originID)
 	if err != nil {
@@ -833,12 +829,18 @@ func (e *Engine) StartSync(firstKnown *entity.ExecutableBlock) {
 	// TODO - ability to sync from multiple servers
 	otherNodeIdentity := otherNodes[rand.Intn(len(otherNodes))]
 
-	e.log.Debug().Hex("target_node", logging.Entity(otherNodeIdentity)).Msg("requesting sync from node")
-
-	err = e.syncConduit.Submit(&messages.ExecutionStateSyncRequest{
+	exeStateReq := messages.ExecutionStateSyncRequest{
 		CurrentBlockID: lastExecutedBlockID,
 		TargetBlockID:  targetBlockID,
-	}, otherNodeIdentity.NodeID)
+	}
+
+	e.log.Debug().
+		Hex("target_node", logging.Entity(otherNodeIdentity)).
+		Hex("current_block_id", logging.ID(exeStateReq.CurrentBlockID)).
+		Hex("target_block_id", logging.ID(exeStateReq.TargetBlockID)).
+		Msg("requesting execution state sync")
+
+	err = e.syncConduit.Submit(&exeStateReq, otherNodeIdentity.NodeID)
 
 	if err != nil {
 		e.log.Fatal().Err(err).Str("target_node_id", otherNodeIdentity.NodeID.String()).Msg("error while requesting state sync from other node")
@@ -846,8 +848,6 @@ func (e *Engine) StartSync(firstKnown *entity.ExecutableBlock) {
 }
 
 func (e *Engine) handleExecutionStateDelta(executionStateDelta *messages.ExecutionStateDelta, originID flow.Identifier) error {
-
-	e.log.Debug().Hex("block_id", logging.Entity(executionStateDelta.Block)).Msg("received sync delta")
 
 	return e.mempool.SyncQueues.Run(func(backdata *stdmap.QueuesBackdata) error {
 
