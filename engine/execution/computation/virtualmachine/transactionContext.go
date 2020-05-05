@@ -1,32 +1,28 @@
 package virtualmachine
 
 import (
-	"crypto/sha256"
 	"fmt"
-	"math/big"
-	"strings"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/model/encoding/rlp"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 type CheckerFunc func([]byte, runtime.Location) error
 
 type TransactionContext struct {
-	ledger            Ledger
+	LedgerDAL
 	signingAccounts   []runtime.Address
 	checker           CheckerFunc
 	logs              []string
 	events            []cadence.Event
 	OnSetValueHandler func(owner, controller, key, value []byte)
 	gasUsed           uint64 // TODO fill with actual gas
+	tx                *flow.TransactionBody
 	uuid              uint64
 }
 
@@ -57,13 +53,13 @@ func (r *TransactionContext) Logs() []string {
 
 // GetValue gets a register value from the world state.
 func (r *TransactionContext) GetValue(owner, controller, key []byte) ([]byte, error) {
-	v, _ := r.ledger.Get(fullKeyHash(string(owner), string(controller), string(key)))
+	v, _ := r.Ledger.Get(fullKeyHash(string(owner), string(controller), string(key)))
 	return v, nil
 }
 
 // SetValue sets a register value in the world state.
 func (r *TransactionContext) SetValue(owner, controller, key, value []byte) error {
-	r.ledger.Set(fullKeyHash(string(owner), string(controller), string(key)), value)
+	r.Ledger.Set(fullKeyHash(string(owner), string(controller), string(key)), value)
 	if r.OnSetValueHandler != nil {
 		r.OnSetValueHandler(owner, controller, key, value)
 	}
@@ -79,44 +75,27 @@ func (r *TransactionContext) ValueExists(owner, controller, key []byte) (exists 
 	return v != nil, nil
 }
 
-func CreateAccountInLedger(ledger Ledger, publicKeys [][]byte) (runtime.Address, error) {
-	latestAccountID, _ := ledger.Get(fullKeyHash("", "", keyLatestAccount))
-
-	accountIDInt := big.NewInt(0).SetBytes(latestAccountID)
-	accountIDBytes := accountIDInt.Add(accountIDInt, big.NewInt(1)).Bytes()
-
-	accountAddress := flow.BytesToAddress(accountIDBytes)
-
-	accountID := accountAddress[:]
-
-	// mark that account with this ID exists
-	ledger.Set(fullKeyHash(string(accountID), "", keyExists), []byte{1})
-
-	// set account balance to 0
-	ledger.Set(fullKeyHash(string(accountID), "", keyBalance), big.NewInt(0).Bytes())
-
-	err := setAccountPublicKeys(ledger, accountID, publicKeys)
-	if err != nil {
-		return runtime.Address{}, err
-	}
-
-	ledger.Set(fullKeyHash("", "", keyLatestAccount), accountID)
-
-	return runtime.Address(accountAddress), nil
-}
-
 // CreateAccount creates a new account and inserts it into the world state.
 //
 // This function returns an error if the input is invalid.
 //
 // After creating the account, this function calls the onAccountCreated callback registered
 // with this context.
-func (r *TransactionContext) CreateAccount(publicKeys [][]byte) (runtime.Address, error) {
-	accountAddress, err := CreateAccountInLedger(r.ledger, publicKeys)
-	r.Log("Creating new account\n")
-	r.Log(fmt.Sprintf("Address: %x", accountAddress))
+func (r *TransactionContext) CreateAccount(publicKeysBytes [][]byte) (runtime.Address, error) {
 
-	return accountAddress, err
+	publicKeys := make([]flow.AccountPublicKey, len(publicKeysBytes))
+	var err error
+	for i, keyBytes := range publicKeysBytes {
+		publicKeys[i], err = flow.DecodeRuntimeAccountPublicKey(keyBytes, 0)
+		if err != nil {
+			return runtime.Address{}, fmt.Errorf("cannot decode public key %d: %w", i, err)
+		}
+	}
+
+	accountAddress, err := r.CreateAccountInLedger(publicKeys)
+	r.Log(fmt.Sprintf("Created new account with address: %x", accountAddress))
+
+	return runtime.Address(accountAddress), err
 }
 
 // AddAccountKey adds a public key to an existing account.
@@ -126,19 +105,24 @@ func (r *TransactionContext) CreateAccount(publicKeys [][]byte) (runtime.Address
 func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []byte) error {
 	accountID := address[:]
 
-	err := r.checkAccountExists(accountID)
+	err := r.CheckAccountExists(accountID)
 	if err != nil {
 		return err
 	}
 
-	publicKeys, err := r.getAccountPublicKeys(accountID)
+	runtimePublicKey, err := flow.DecodeRuntimeAccountPublicKey(publicKey, 0)
+	if err != nil {
+		return fmt.Errorf("cannot decode runtime public account key: %w", err)
+	}
+
+	publicKeys, err := r.GetAccountPublicKeys(accountID)
 	if err != nil {
 		return err
 	}
 
-	publicKeys = append(publicKeys, publicKey)
+	publicKeys = append(publicKeys, runtimePublicKey)
 
-	return setAccountPublicKeys(r.ledger, accountID, publicKeys)
+	return r.SetAccountPublicKeys(accountID, publicKeys)
 }
 
 // RemoveAccountKey removes a public key by index from an existing account.
@@ -148,12 +132,12 @@ func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []
 func (r *TransactionContext) RemoveAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
 	accountID := address[:]
 
-	err = r.checkAccountExists(accountID)
+	err = r.CheckAccountExists(accountID)
 	if err != nil {
 		return nil, err
 	}
 
-	publicKeys, err := r.getAccountPublicKeys(accountID)
+	publicKeys, err := r.GetAccountPublicKeys(accountID)
 	if err != nil {
 		return publicKey, err
 	}
@@ -166,84 +150,16 @@ func (r *TransactionContext) RemoveAccountKey(address runtime.Address, index int
 
 	publicKeys = append(publicKeys[:index], publicKeys[index+1:]...)
 
-	err = setAccountPublicKeys(r.ledger, accountID, publicKeys)
+	err = r.SetAccountPublicKeys(accountID, publicKeys)
 	if err != nil {
 		return publicKey, err
 	}
 
-	return removedKey, nil
-}
-
-func (r *TransactionContext) getAccountPublicKeys(accountID []byte) (publicKeys [][]byte, err error) {
-	countBytes, err := r.ledger.Get(
-		fullKeyHash(string(accountID), string(accountID), keyPublicKeyCount),
-	)
+	removedKeyBytes, err := flow.EncodeRuntimeAccountPublicKey(removedKey)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot encode removed runtime account key: %w", err)
 	}
-
-	if countBytes == nil {
-		return nil, fmt.Errorf("key count not set")
-	}
-
-	count := int(big.NewInt(0).SetBytes(countBytes).Int64())
-
-	publicKeys = make([][]byte, count)
-
-	for i := 0; i < count; i++ {
-		publicKey, err := r.ledger.Get(
-			fullKeyHash(string(accountID), string(accountID), keyPublicKey(i)),
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		if publicKey == nil {
-			return nil, fmt.Errorf("failed to retrieve key from account %s", accountID)
-		}
-
-		publicKeys[i] = publicKey
-	}
-
-	return publicKeys, nil
-}
-
-func setAccountPublicKeys(ledger Ledger, accountID []byte, publicKeys [][]byte) error {
-	var existingCount int
-
-	countBytes, err := ledger.Get(
-		fullKeyHash(string(accountID), string(accountID), keyPublicKeyCount),
-	)
-	if err != nil {
-		return err
-	}
-
-	if countBytes != nil {
-		existingCount = int(big.NewInt(0).SetBytes(countBytes).Int64())
-	} else {
-		existingCount = 0
-	}
-
-	newCount := len(publicKeys)
-
-	ledger.Set(
-		fullKeyHash(string(accountID), string(accountID), keyPublicKeyCount),
-		big.NewInt(int64(newCount)).Bytes(),
-	)
-
-	for i, publicKey := range publicKeys {
-		ledger.Set(
-			fullKeyHash(string(accountID), string(accountID), keyPublicKey(i)),
-			publicKey,
-		)
-	}
-
-	// delete leftover keys
-	for i := newCount; i < existingCount; i++ {
-		ledger.Delete(fullKeyHash(string(accountID), string(accountID), keyPublicKey(i)))
-	}
-
-	return nil
+	return removedKeyBytes, nil
 }
 
 // CheckCode checks the code for its validity.
@@ -262,12 +178,12 @@ func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []b
 		return fmt.Errorf("not permitted to update account with ID %s", address)
 	}
 
-	err = r.checkAccountExists(accountID)
+	err = r.CheckAccountExists(accountID)
 	if err != nil {
 		return err
 	}
 
-	r.ledger.Set(fullKeyHash(string(accountID), string(accountID), keyCode), code)
+	r.Ledger.Set(fullKeyHash(string(accountID), string(accountID), keyCode), code)
 
 	return nil
 }
@@ -286,7 +202,7 @@ func (r *TransactionContext) ResolveImport(location runtime.Location) ([]byte, e
 
 	accountID := address.Bytes()
 
-	code, err := r.ledger.Get(fullKeyHash(string(accountID), string(accountID), keyCode))
+	code, err := r.Ledger.Get(fullKeyHash(string(accountID), string(accountID), keyCode))
 	if err != nil {
 		return nil, err
 	}
@@ -331,43 +247,6 @@ func (r *TransactionContext) DecodeArgument(b []byte, t cadence.Type) (cadence.V
 }
 
 // GetAccount gets an account by address.
-//
-// The function returns nil if the specified account does not exist.
-func (r *TransactionContext) GetAccount(address flow.Address) *flow.Account {
-	accountID := address.Bytes()
-
-	err := r.checkAccountExists(accountID)
-	if err != nil {
-		return nil
-	}
-
-	balanceBytes, _ := r.ledger.Get(fullKeyHash(string(accountID), "", keyBalance))
-	balanceInt := big.NewInt(0).SetBytes(balanceBytes)
-
-	code, _ := r.ledger.Get(fullKeyHash(string(accountID), string(accountID), keyCode))
-
-	publicKeys, err := r.getAccountPublicKeys(accountID)
-	if err != nil {
-		panic(err)
-	}
-
-	accountPublicKeys := make([]flow.AccountPublicKey, len(publicKeys))
-	for i, publicKey := range publicKeys {
-		accountPublicKey, err := decodePublicKey(publicKey)
-		if err != nil {
-			panic(err)
-		}
-
-		accountPublicKeys[i] = accountPublicKey
-	}
-
-	return &flow.Account{
-		Address: address,
-		Balance: balanceInt.Uint64(),
-		Code:    code,
-		Keys:    accountPublicKeys,
-	}
-}
 
 func (r *TransactionContext) isValidSigningAccount(address runtime.Address) bool {
 	for _, accountAddress := range r.GetSigningAccounts() {
@@ -390,73 +269,177 @@ func (r *TransactionContext) checkProgram(code []byte, address runtime.Address) 
 	return r.checker(code, location)
 }
 
-const (
-	keyLatestAccount  = "latest_account"
-	keyExists         = "exists"
-	keyBalance        = "balance"
-	keyCode           = "code"
-	keyPublicKeyCount = "public_key_count"
-)
+// verifySignatures verifies that a transaction contains the necessary signatures.
+//
+// An error is returned if any of the expected signatures are invalid or missing.
+func (r *TransactionContext) verifySignatures() error {
 
-func fullKey(owner, controller, key string) string {
-	return strings.Join([]string{owner, controller, key}, "__")
-}
-func fullKeyHash(owner, controller, key string) flow.RegisterID {
-	h := sha256.New()
-	_, _ = h.Write([]byte(fullKey(owner, controller, key)))
-	return h.Sum(nil)
-}
+	if r.tx.Payer == flow.ZeroAddress {
+		return &MissingPayerError{}
+	}
 
-func keyPublicKey(index int) string {
-	return fmt.Sprintf("public_key_%d", index)
-}
-
-func (r *TransactionContext) checkAccountExists(accountID []byte) error {
-	exists, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyExists))
+	payloadWeights, proposalKeyVerifiedInPayload, err := r.aggregateAccountSignatures(
+		r.tx.PayloadSignatures,
+		r.tx.PayloadMessage(),
+		r.tx.ProposalKey,
+	)
 	if err != nil {
 		return err
 	}
 
-	bal, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyBalance))
+	envelopeWeights, proposalKeyVerifiedInEnvelope, err := r.aggregateAccountSignatures(
+		r.tx.EnvelopeSignatures,
+		r.tx.EnvelopeMessage(),
+		r.tx.ProposalKey,
+	)
 	if err != nil {
 		return err
 	}
 
-	if len(exists) != 0 || bal != nil {
-		return nil
+	proposalKeyVerified := proposalKeyVerifiedInPayload || proposalKeyVerifiedInEnvelope
+
+	if !proposalKeyVerified {
+		return fmt.Errorf(
+			"missing signature for proposal key (address: %s, key: %d)",
+			r.tx.ProposalKey.Address,
+			r.tx.ProposalKey.KeyID,
+		)
 	}
 
-	return fmt.Errorf("account with ID %s does not exist", accountID)
+	for _, addr := range r.tx.Authorizers {
+		// Skip this authorizer if it is also the payer. In the case where an account is
+		// both a PAYER as well as an AUTHORIZER or PROPOSER, that account is required
+		// to sign only the envelope.
+		if addr == r.tx.Payer {
+			continue
+		}
+
+		if !hasSufficientKeyWeight(payloadWeights, addr) {
+			return &MissingSignatureError{addr}
+		}
+	}
+
+	if !hasSufficientKeyWeight(envelopeWeights, r.tx.Payer) {
+		return &MissingSignatureError{r.tx.Payer}
+	}
+
+	return nil
 }
 
-// TODO: replace once public key format changes @psiemens
-func decodePublicKey(b []byte) (a flow.AccountPublicKey, err error) {
-	var temp struct {
-		PublicKey []byte
-		SignAlgo  uint
-		HashAlgo  uint
-		Weight    uint
+// CheckAndIncrementSequenceNumber validates and increments a sequence number for an account key.
+//
+// This function first checks that the provided sequence number matches the version stored on-chain.
+// If they are equal, the on-chain sequence number is incremented.
+// If they are not equal, the on-chain sequence number is not incremented.
+//
+// This function returns an error if any problem occurred during checking or the check failed
+func (r *TransactionContext) checkAndIncrementSequenceNumber() error {
+
+	proposalKey := r.tx.ProposalKey
+
+	account := r.GetAccount(proposalKey.Address)
+
+	if int(proposalKey.KeyID) >= len(account.Keys) {
+		return &InvalidProposalKeyError{
+			Address: proposalKey.Address,
+			KeyID:   proposalKey.KeyID,
+		}
 	}
 
-	encoder := rlp.NewEncoder()
+	accountKey := account.Keys[proposalKey.KeyID]
 
-	err = encoder.Decode(b, &temp)
+	valid := accountKey.SeqNumber == proposalKey.SequenceNumber
+
+	if !valid {
+		return &InvalidProposalSequenceNumberError{
+			Address:           proposalKey.Address,
+			KeyID:             proposalKey.KeyID,
+			CurrentSeqNumber:  accountKey.SeqNumber,
+			ProvidedSeqNumber: proposalKey.SequenceNumber,
+		}
+	}
+
+	accountKey.SeqNumber++
+
+	updatedAccountBytes, err := flow.EncodeAccountPublicKey(accountKey)
 	if err != nil {
-		return a, err
+		return err
+	}
+	r.setAccountPublicKey(account.Address.Bytes(), proposalKey.KeyID, updatedAccountBytes)
+
+	return nil
+}
+
+func (r *TransactionContext) aggregateAccountSignatures(
+	signatures []flow.TransactionSignature,
+	message []byte,
+	proposalKey flow.ProposalKey,
+) (
+	weights map[flow.Address]int,
+	proposalKeyVerified bool,
+	err error,
+) {
+	weights = make(map[flow.Address]int)
+
+	for _, txSig := range signatures {
+		accountKey, err := r.verifyAccountSignature(txSig, message)
+		if err != nil {
+			return nil, false, err
+		}
+
+		if sigIsForProposalKey(txSig, proposalKey) {
+			proposalKeyVerified = true
+		}
+
+		weights[txSig.Address] += accountKey.Weight
 	}
 
-	signAlgo := crypto.SigningAlgorithm(temp.SignAlgo)
-	hashAlgo := hash.HashingAlgorithm(temp.HashAlgo)
+	return
+}
 
-	publicKey, err := crypto.DecodePublicKey(signAlgo, temp.PublicKey)
+// verifyAccountSignature verifies that an account signature is valid for the
+// account and given message.
+//
+// If the signature is valid, this function returns the associated account key.
+//
+// An error is returned if the account does not contain a public key that
+// correctly verifies the signature against the given message.
+func (r *TransactionContext) verifyAccountSignature(
+	txSig flow.TransactionSignature,
+	message []byte,
+) (accountKey *flow.AccountPublicKey, err error) {
+	account := r.GetAccount(txSig.Address)
+	if account == nil {
+		return accountKey, &InvalidSignatureAccountError{Address: txSig.Address}
+	}
+
+	if int(txSig.KeyID) >= len(account.Keys) {
+		return accountKey, &InvalidSignatureAccountError{Address: txSig.Address}
+	}
+
+	accountKey = &account.Keys[txSig.KeyID]
+
+	hasher, err := hash.NewHasher(accountKey.HashAlgo)
 	if err != nil {
-		return a, err
+		return accountKey, fmt.Errorf("public key specifies invalid hash algorithm")
 	}
 
-	return flow.AccountPublicKey{
-		PublicKey: publicKey,
-		SignAlgo:  signAlgo,
-		HashAlgo:  hashAlgo,
-		Weight:    int(temp.Weight),
-	}, nil
+	valid, err := accountKey.PublicKey.Verify(txSig.Signature, message, hasher)
+	if err != nil {
+		return accountKey, fmt.Errorf("cannot verify public key")
+	}
+
+	if !valid {
+		return accountKey, &InvalidSignaturePublicKeyError{Address: txSig.Address, KeyID: txSig.KeyID}
+	}
+
+	return accountKey, nil
+}
+
+func sigIsForProposalKey(txSig flow.TransactionSignature, proposalKey flow.ProposalKey) bool {
+	return txSig.Address == proposalKey.Address && txSig.KeyID == proposalKey.KeyID
+}
+
+func hasSufficientKeyWeight(weights map[flow.Address]int, address flow.Address) bool {
+	return weights[address] >= AccountKeyWeightThreshold
 }
