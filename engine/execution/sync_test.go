@@ -2,9 +2,11 @@ package execution_test
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine"
 	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
@@ -39,9 +41,21 @@ func TestSyncFlow(t *testing.T) {
 
 	genesis := flow.Genesis(identities)
 
+	seq := uint64(0)
+
 	tx1 := execTestutil.DeployCounterContractTransaction()
+	err := execTestutil.SignTransactionByRoot(&tx1, seq)
+	require.NoError(t, err)
+	seq++
+
 	tx2 := execTestutil.CreateCounterTransaction()
+	err = execTestutil.SignTransactionByRoot(&tx2, seq)
+	require.NoError(t, err)
+	seq++
+
 	tx4 := execTestutil.AddToCounterTransaction()
+	err = execTestutil.SignTransactionByRoot(&tx4, seq)
+	require.NoError(t, err)
 
 	col1 := flow.Collection{Transactions: []*flow.TransactionBody{&tx1}}
 	col2 := flow.Collection{Transactions: []*flow.TransactionBody{&tx2}}
@@ -136,11 +150,14 @@ func TestSyncFlow(t *testing.T) {
 	var receipt *flow.ExecutionReceipt
 
 	executedBlocks := map[flow.Identifier]*flow.Identifier{}
+	ebMutex := sync.RWMutex{}
 
 	verificationEngine := new(network.Engine)
 	_, _ = verificationNode.Net.Register(engine.ExecutionReceiptProvider, verificationEngine)
 	verificationEngine.On("Submit", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
+			ebMutex.Lock()
+			defer ebMutex.Unlock()
 			identifier, _ := args[0].(flow.Identifier)
 			receipt, _ = args[1].(*flow.ExecutionReceipt)
 			executedBlocks[receipt.ExecutionResult.BlockID] = &identifier
@@ -158,6 +175,9 @@ func TestSyncFlow(t *testing.T) {
 
 	// wait for block2 to be executed on execNode2
 	hub.Eventually(t, func() bool {
+		ebMutex.RLock()
+		defer ebMutex.RUnlock()
+
 		if nodeId, ok := executedBlocks[block2.ID()]; ok {
 			return *nodeId == exe2ID.NodeID
 		}
@@ -174,6 +194,9 @@ func TestSyncFlow(t *testing.T) {
 
 	// wait for block3/4 to be executed on execNode1
 	hub.Eventually(t, func() bool {
+		ebMutex.RLock()
+		defer ebMutex.RUnlock()
+
 		block3ok := false
 		block4ok := false
 		if nodeId, ok := executedBlocks[block3.ID()]; ok {

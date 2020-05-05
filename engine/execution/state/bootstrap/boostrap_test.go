@@ -1,7 +1,6 @@
 package bootstrap
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -19,6 +18,6 @@ func TestGenerateGenesisStateCommitment(t *testing.T) {
 
 		newStateCommitment, err := BootstrapLedger(ls)
 		require.NoError(t, err)
-		require.True(t, bytes.Equal(flow.GenesisStateCommitment, newStateCommitment))
+		require.Equal(t, flow.GenesisStateCommitment, newStateCommitment)
 	})
 }

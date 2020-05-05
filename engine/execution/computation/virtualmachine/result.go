@@ -25,6 +25,7 @@ type ScriptResult struct {
 	Value    cadence.Value
 	Logs     []string
 	Error    error
+	Events   []cadence.Event
 }
 
 func (r ScriptResult) Succeeded() bool {

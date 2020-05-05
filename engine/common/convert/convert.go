@@ -25,7 +25,7 @@ func MessageToTransaction(m *entities.Transaction) (flow.TransactionBody, error)
 	proposalKey := m.GetProposalKey()
 	if proposalKey != nil {
 		proposalAddress := flow.BytesToAddress(proposalKey.GetAddress())
-		t.SetProposalKey(proposalAddress, int(proposalKey.GetKeyId()), proposalKey.GetSequenceNumber())
+		t.SetProposalKey(proposalAddress, uint64(proposalKey.GetKeyId()), proposalKey.GetSequenceNumber())
 	}
 
 	payer := m.GetPayer()
@@ -43,12 +43,12 @@ func MessageToTransaction(m *entities.Transaction) (flow.TransactionBody, error)
 
 	for _, sig := range m.GetPayloadSignatures() {
 		addr := flow.BytesToAddress(sig.GetAddress())
-		t.AddPayloadSignature(addr, int(sig.GetKeyId()), sig.GetSignature())
+		t.AddPayloadSignature(addr, uint64(sig.GetKeyId()), sig.GetSignature())
 	}
 
 	for _, sig := range m.GetEnvelopeSignatures() {
 		addr := flow.BytesToAddress(sig.GetAddress())
-		t.AddEnvelopeSignature(addr, int(sig.GetKeyId()), sig.GetSignature())
+		t.AddEnvelopeSignature(addr, uint64(sig.GetKeyId()), sig.GetSignature())
 	}
 
 	return *t, nil
