@@ -8,7 +8,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
 	"github.com/dapperlabs/flow-go/module"
@@ -21,7 +20,6 @@ import (
 // it also echos them back
 type EchoEngine struct {
 	sync.Mutex
-	unit     *engine.Unit
 	t        *testing.T
 	con      network.Conduit  // used to directly communicate with the network
 	originID flow.Identifier  // used to keep track of the id of the sender of the messages
@@ -40,7 +38,6 @@ func NewEchoEngine(t *testing.T, net module.Network, cap int, engineID uint8, ec
 		received: make(chan struct{}, cap),
 		seen:     make(map[string]int),
 		echo:     echo,
-		unit:     engine.NewUnit(),
 	}
 
 	c2, err := net.Register(engineID, te)
@@ -59,12 +56,12 @@ func (te *EchoEngine) SubmitLocal(event interface{}) {
 // Submit is implemented for a valid type assertion to Engine
 // any call to it fails the test
 func (te *EchoEngine) Submit(originID flow.Identifier, event interface{}) {
-	te.unit.Launch(func() {
+	go func() {
 		err := te.Process(originID, event)
 		if err != nil {
 			require.Fail(te.t, "could not process submitted event")
 		}
-	})
+	}()
 }
 
 // ProcessLocal is implemented for a valid type assertion to Engine
