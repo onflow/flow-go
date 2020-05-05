@@ -24,6 +24,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	module "github.com/dapperlabs/flow-go/module/mocks"
+	"github.com/dapperlabs/flow-go/module/trace"
 	network "github.com/dapperlabs/flow-go/network/mocks"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	realStorage "github.com/dapperlabs/flow-go/storage"
@@ -122,11 +123,31 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	metrics, err := metrics.NewCollector(log)
 	require.NoError(t, err)
 
+	tracer, err := trace.NewTracer(log)
+	require.NoError(t, err)
+
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.BlockProvider)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.ExecutionSync)), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 
-	engine, err = New(log, net, me, protocolState, blocks, payloads, collections, events, txResults, computationEngine, providerEngine, executionState, 21, metrics, false)
+	engine, err = New(
+		log,
+		net,
+		me,
+		protocolState,
+		blocks,
+		payloads,
+		collections,
+		events,
+		txResults,
+		computationEngine,
+		providerEngine,
+		executionState,
+		21,
+		metrics,
+		tracer,
+		false,
+	)
 	require.NoError(t, err)
 
 	f(testingContext{
