@@ -42,7 +42,7 @@ func TestSMTInitialization(t *testing.T) {
 }
 
 func TestSMTHeightTooSmall(t *testing.T) {
-	dbDir := unittest.TempDBDir(t)
+	dbDir := unittest.TempDir(t)
 
 	defer func() {
 		os.RemoveAll(dbDir)
@@ -2768,7 +2768,7 @@ func withSMT(
 	numHistoricalStates int,
 	numFullStates int, f func(t *testing.T, smt *SMT, emptyTree *tree)) {
 
-	dbDir := unittest.TempDBDir(t)
+	dbDir := unittest.TempDir(t)
 
 	trie, err := NewSMT(dbDir, height, interval, numHistoricalStates, numFullStates)
 	require.NoError(t, err)

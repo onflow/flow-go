@@ -18,13 +18,14 @@ func MessageToTransaction(m *entities.Transaction) (flow.TransactionBody, error)
 	t := flow.NewTransactionBody()
 
 	t.SetScript(m.GetScript())
+	t.SetArguments(m.GetArguments())
 	t.SetReferenceBlockID(flow.HashToID(m.GetReferenceBlockId()))
 	t.SetGasLimit(m.GetGasLimit())
 
 	proposalKey := m.GetProposalKey()
 	if proposalKey != nil {
 		proposalAddress := flow.BytesToAddress(proposalKey.GetAddress())
-		t.SetProposalKey(proposalAddress, int(proposalKey.GetKeyId()), proposalKey.GetSequenceNumber())
+		t.SetProposalKey(proposalAddress, uint64(proposalKey.GetKeyId()), proposalKey.GetSequenceNumber())
 	}
 
 	payer := m.GetPayer()
@@ -42,12 +43,12 @@ func MessageToTransaction(m *entities.Transaction) (flow.TransactionBody, error)
 
 	for _, sig := range m.GetPayloadSignatures() {
 		addr := flow.BytesToAddress(sig.GetAddress())
-		t.AddPayloadSignature(addr, int(sig.GetKeyId()), sig.GetSignature())
+		t.AddPayloadSignature(addr, uint64(sig.GetKeyId()), sig.GetSignature())
 	}
 
 	for _, sig := range m.GetEnvelopeSignatures() {
 		addr := flow.BytesToAddress(sig.GetAddress())
-		t.AddEnvelopeSignature(addr, int(sig.GetKeyId()), sig.GetSignature())
+		t.AddEnvelopeSignature(addr, uint64(sig.GetKeyId()), sig.GetSignature())
 	}
 
 	return *t, nil
@@ -87,6 +88,7 @@ func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 
 	return &entities.Transaction{
 		Script:             tb.Script,
+		Arguments:          tb.Arguments,
 		ReferenceBlockId:   tb.ReferenceBlockID[:],
 		GasLimit:           tb.GasLimit,
 		ProposalKey:        proposalKeyMessage,
@@ -111,30 +113,30 @@ func BlockToMessage(h *flow.Block) (*entities.Block, error) {
 
 	id := h.ID()
 
-	parentID := h.ParentID
-	t, err := ptypes.TimestampProto(h.Timestamp)
+	parentID := h.Header.ParentID
+	t, err := ptypes.TimestampProto(h.Header.Timestamp)
 	if err != nil {
 		return nil, err
 	}
 
-	cg := make([]*entities.CollectionGuarantee, len(h.Guarantees))
-	for i, g := range h.Guarantees {
+	cg := make([]*entities.CollectionGuarantee, len(h.Payload.Guarantees))
+	for i, g := range h.Payload.Guarantees {
 		cg[i] = collectionGuaranteeToMessage(g)
 	}
 
-	seals := make([]*entities.BlockSeal, len(h.Seals))
-	for i, s := range h.Seals {
+	seals := make([]*entities.BlockSeal, len(h.Payload.Seals))
+	for i, s := range h.Payload.Seals {
 		seals[i] = blockSealToMessage(s)
 	}
 
 	bh := entities.Block{
 		Id:                   id[:],
-		Height:               h.Height,
+		Height:               h.Header.Height,
 		ParentId:             parentID[:],
 		Timestamp:            t,
 		CollectionGuarantees: cg,
 		BlockSeals:           seals,
-		Signatures:           [][]byte{h.ParentVoterSig},
+		Signatures:           [][]byte{h.Header.ParentVoterSig},
 	}
 	return &bh, nil
 }

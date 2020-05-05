@@ -16,11 +16,11 @@ func TestInsertIndexRetreiveGuarantees(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		block := unittest.BlockFixture()
 
-		err := db.Update(operation.InsertHeader(&block.Header))
+		err := db.Update(operation.InsertHeader(block.Header))
 		require.NoError(t, err)
 
 		err = db.Update(func(tx *badger.Txn) error {
-			for _, guarantee := range block.Guarantees {
+			for _, guarantee := range block.Payload.Guarantees {
 				err := operation.InsertGuarantee(guarantee)(tx)
 				if err != nil {
 					return fmt.Errorf("could not insert guarantee (%x): %w", guarantee.CollectionID, err)
@@ -30,14 +30,14 @@ func TestInsertIndexRetreiveGuarantees(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		err = db.Update(IndexGuarantees(block.Height, block.ID(), block.ParentID, block.Guarantees))
+		err = db.Update(IndexGuarantees(block.Header.Height, block.ID(), block.Header.ParentID, block.Payload.Guarantees))
 		require.NoError(t, err)
 
 		var retrieved []*flow.CollectionGuarantee
 		err = db.View(RetrieveGuarantees(block.ID(), &retrieved))
 		require.NoError(t, err)
 
-		for i, id := range block.Guarantees {
+		for i, id := range block.Payload.Guarantees {
 			require.Equal(t, id, retrieved[i])
 		}
 	})

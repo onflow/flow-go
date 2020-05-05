@@ -77,20 +77,20 @@ func (suite *Suite) TestHandlePendingBlock() {
 	head := unittest.BlockFixture()
 	block := unittest.BlockFixture()
 
-	head.Height = 10
-	block.Height = 12
+	head.Header.Height = 10
+	block.Header.Height = 12
 
 	// not in cache
 	suite.cache.On("ByID", block.ID()).Return(nil, false).Once()
 	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 
 	// don't return the parent when requested
-	suite.snapshot.On("Head").Return(&head.Header, nil).Once()
-	suite.cache.On("ByID", block.ParentID).Return(nil, false).Once()
-	suite.headers.On("ByBlockID", block.ParentID).Return(nil, realstorage.ErrNotFound).Once()
+	suite.snapshot.On("Head").Return(head.Header, nil).Once()
+	suite.cache.On("ByID", block.Header.ParentID).Return(nil, false).Once()
+	suite.headers.On("ByBlockID", block.Header.ParentID).Return(nil, realstorage.ErrNotFound).Once()
 
 	suite.cache.On("Add", mock.Anything, mock.Anything).Return(true).Once()
-	suite.sync.On("RequestBlock", block.ParentID).Return().Once()
+	suite.sync.On("RequestBlock", block.Header.ParentID).Return().Once()
 
 	// submit the block
 	proposal := unittest.ProposalFromBlock(&block)
@@ -108,25 +108,25 @@ func (suite *Suite) TestHandleProposal() {
 	parent := unittest.BlockFixture()
 	block := unittest.BlockFixture()
 
-	parent.Height = 10
-	block.Height = 11
-	block.ParentID = parent.ID()
+	parent.Header.Height = 10
+	block.Header.Height = 11
+	block.Header.ParentID = parent.ID()
 
 	// not in cache
 	suite.cache.On("ByID", block.ID()).Return(nil, false).Once()
-	suite.cache.On("ByID", block.ParentID).Return(nil, false).Once()
+	suite.cache.On("ByID", block.Header.ParentID).Return(nil, false).Once()
 	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 
 	// the parent is the last finalized state
-	suite.snapshot.On("Head").Return(&parent.Header, nil).Once()
+	suite.snapshot.On("Head").Return(parent.Header, nil).Once()
 	// we should be able to extend the state with the block
 	suite.mutator.On("Extend", block.ID()).Return(nil).Once()
 	// we should be able to get the parent header by its ID
-	suite.headers.On("ByBlockID", block.ParentID).Return(&parent.Header, nil).Twice()
+	suite.headers.On("ByBlockID", block.Header.ParentID).Return(parent.Header, nil).Twice()
 	// we do not have any children cached
 	suite.cache.On("ByParentID", block.ID()).Return(nil, false)
 	// the proposal should be forwarded to the follower
-	suite.follower.On("SubmitProposal", &block.Header, parent.View).Once()
+	suite.follower.On("SubmitProposal", block.Header, parent.Header.View).Once()
 
 	// submit the block
 	proposal := unittest.ProposalFromBlock(&block)
@@ -143,44 +143,44 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	block := unittest.BlockFixture()
 	child := unittest.BlockFixture()
 
-	parent.Height = 9
-	block.Height = 10
-	child.Height = 11
+	parent.Header.Height = 9
+	block.Header.Height = 10
+	child.Header.Height = 11
 
-	block.ParentID = parent.ID()
-	child.ParentID = block.ID()
+	block.Header.ParentID = parent.ID()
+	child.Header.ParentID = block.ID()
 
 	// the parent is the last finalized state
-	suite.snapshot.On("Head").Return(&parent.Header, nil).Once()
-	suite.snapshot.On("Head").Return(&block.Header, nil).Once()
+	suite.snapshot.On("Head").Return(parent.Header, nil).Once()
+	suite.snapshot.On("Head").Return(block.Header, nil).Once()
 
 	// both parent and child not in cache
 	// suite.cache.On("ByID", child.ID()).Return(nil, false).Once()
 	suite.cache.On("ByID", block.ID()).Return(nil, false).Once()
-	suite.cache.On("ByID", block.ParentID).Return(nil, false).Once()
+	suite.cache.On("ByID", block.Header.ParentID).Return(nil, false).Once()
 	// first time calling, assume it's not there
 	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 	// should extend state with new block
 	suite.mutator.On("Extend", block.ID()).Return(nil).Once()
 	suite.mutator.On("Extend", child.ID()).Return(nil).Once()
 	// we have already received and stored the parent
-	suite.headers.On("ByBlockID", parent.ID()).Return(&parent.Header, nil)
-	suite.headers.On("ByBlockID", block.ID()).Return(&block.Header, nil).Once()
+	suite.headers.On("ByBlockID", parent.ID()).Return(parent.Header, nil)
+	suite.headers.On("ByBlockID", block.ID()).Return(block.Header, nil).Once()
 	// should submit to follower
-	suite.follower.On("SubmitProposal", &block.Header, parent.View).Once()
-	suite.follower.On("SubmitProposal", &child.Header, block.View).Once()
+	suite.follower.On("SubmitProposal", block.Header, parent.Header.View).Once()
+	suite.follower.On("SubmitProposal", child.Header, block.Header.View).Once()
 
 	// we have one pending child cached
 	pending := []*flow.PendingBlock{
 		{
 			OriginID: originID,
-			Header:   &child.Header,
-			Payload:  &child.Payload,
+			Header:   child.Header,
+			Payload:  child.Payload,
 		},
 	}
 	suite.cache.On("ByParentID", block.ID()).Return(pending, true)
 	suite.cache.On("ByParentID", child.ID()).Return(nil, false)
-	suite.cache.On("DropForParent", &block.Header).Once()
+	suite.cache.On("DropForParent", block.Header).Once()
 
 	// submit the block proposal
 	proposal := unittest.ProposalFromBlock(&block)
