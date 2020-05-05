@@ -413,7 +413,7 @@ func (r *TransactionContext) verifyAccountSignature(
 		return accountKey, &InvalidSignatureAccountError{Address: txSig.Address}
 	}
 
-	if txSig.KeyID < 0 || txSig.KeyID >= len(account.Keys) {
+	if int(txSig.KeyID) >= len(account.Keys) {
 		return accountKey, &InvalidSignatureAccountError{Address: txSig.Address}
 	}
 
@@ -437,7 +437,7 @@ func (r *TransactionContext) verifyAccountSignature(
 }
 
 func sigIsForProposalKey(txSig flow.TransactionSignature, proposalKey flow.ProposalKey) bool {
-	return txSig.Address == proposalKey.Address && txSig.KeyID == int(proposalKey.KeyID)
+	return txSig.Address == proposalKey.Address && txSig.KeyID == proposalKey.KeyID
 }
 
 func hasSufficientKeyWeight(weights map[flow.Address]int, address flow.Address) bool {

@@ -9,7 +9,7 @@ import (
 // An InvalidSignaturePublicKeyError indicates that signature uses an invalid public key.
 type InvalidSignaturePublicKeyError struct {
 	Address flow.Address
-	KeyID   int
+	KeyID   uint64
 }
 
 func (e *InvalidSignaturePublicKeyError) Error() string {
