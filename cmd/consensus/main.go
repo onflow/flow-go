@@ -11,6 +11,8 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/dapperlabs/flow-go/module/metrics"
+
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
 
 	"github.com/dapperlabs/flow-go/cmd"
@@ -86,6 +88,10 @@ func main() {
 		}).
 		Module("block seals mempool", func(node *cmd.FlowNodeBuilder) error {
 			seals, err = stdmap.NewSeals(sealLimit)
+			return err
+		}).
+		Module("metrics collector", func(node *cmd.FlowNodeBuilder) error {
+			node.Metrics, err = metrics.NewConsensusCollector(node.Logger)
 			return err
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -179,7 +185,7 @@ func main() {
 			comp = comp.WithSynchronization(sync).WithConsensus(hot)
 			return comp, nil
 		}).
-		Run("consensus")
+		Run(flow.RoleConsensus.String())
 }
 
 func loadDKGPrivateData(path string, myID flow.Identifier) (*bootstrap.DKGParticipantPriv, error) {

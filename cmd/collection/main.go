@@ -10,6 +10,8 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/dapperlabs/flow-go/module/metrics"
+
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 
@@ -126,6 +128,10 @@ func main() {
 			}
 
 			return nil
+		}).
+		Module("metrics collector", func(node *cmd.FlowNodeBuilder) error {
+			node.Metrics, err = metrics.NewClusterCollector(node.Logger, clusterID)
+			return err
 		}).
 		// if a genesis cluster block already exists in the database, discard
 		// the loaded bootstrap files and use the existing cluster state
@@ -263,7 +269,7 @@ func main() {
 			prop = prop.WithConsensus(hot)
 			return prop, nil
 		}).
-		Run("collection")
+		Run(flow.RoleCollection.String())
 }
 
 // initClusterCommittee initializes the Collector cluster's HotStuff committee state

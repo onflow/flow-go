@@ -33,6 +33,7 @@ func NewMetricsConsumer(metrics module.Metrics, guarantees storage.Guarantees, s
 
 func (c *MetricsConsumer) OnFinalizedBlock(block *model.Block) {
 	c.metrics.FinalizedBlocks(1)
+	c.metrics.FinalizedBlockView(block.View)
 
 	err := c.traceFinalizedCollections(block)
 	if err != nil {

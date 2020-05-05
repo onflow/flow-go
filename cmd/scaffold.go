@@ -227,12 +227,6 @@ func (fnb *FlowNodeBuilder) initDatabase() {
 	fnb.DB = db
 }
 
-func (fnb *FlowNodeBuilder) initMetrics() {
-	metrics, err := metrics.NewCollector(fnb.Logger)
-	fnb.MustNot(err).Msg("could not initialize metrics")
-	fnb.Metrics = metrics
-}
-
 func (fnb *FlowNodeBuilder) initState() {
 	state, err := protocol.NewState(fnb.DB, protocol.SetClusters(fnb.BaseConfig.nClusters))
 	fnb.MustNot(err).Msg("could not initialize flow state")
@@ -440,8 +434,6 @@ func (fnb *FlowNodeBuilder) Run(role string) {
 	fnb.initNodeInfo()
 
 	fnb.initLogger()
-
-	fnb.initMetrics()
 
 	fnb.initDatabase()
 
