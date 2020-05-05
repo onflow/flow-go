@@ -26,7 +26,7 @@ require (
 	github.com/magiconair/properties v1.8.1
 	github.com/multiformats/go-multiaddr v0.2.0
 	github.com/onflow/cadence v0.1.1-0.20200429063251-116d638b2d80
-	github.com/onflow/flow/protobuf/go/flow v0.1.4-0.20200429165610-9e1383f48fde
+	github.com/onflow/flow/protobuf/go/flow v0.1.4
 	github.com/onsi/ginkgo v1.10.1 // indirect
 	github.com/onsi/gomega v1.7.0 // indirect
 	github.com/opentracing/opentracing-go v1.1.0
@@ -40,6 +40,8 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
 	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
+	github.com/vmihailenco/msgpack v4.0.4+incompatible
+	github.com/vmihailenco/msgpack/v4 v4.3.11
 	github.com/whyrusleeping/go-logging v0.0.1
 	go.uber.org/atomic v1.5.1
 	golang.org/x/crypto v0.0.0-20200423211502-4bdfaf469ed5

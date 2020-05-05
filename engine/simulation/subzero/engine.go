@@ -155,8 +155,8 @@ ConsentLoop:
 				continue ConsentLoop
 			}
 			block := flow.Block{
-				Header:  *proposal,
-				Payload: *payload,
+				Header:  proposal,
+				Payload: payload,
 			}
 
 			// Broadcast block
@@ -177,8 +177,9 @@ func (e *Engine) createProposal() (*flow.Header, error) {
 	}
 
 	// define the block header build function
-	setProposer := func(header *flow.Header) {
+	setProposer := func(header *flow.Header) error {
 		header.ProposerID = e.me.NodeID()
+		return nil
 	}
 
 	// create the proposal payload on top of the parent

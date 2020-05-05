@@ -63,12 +63,12 @@ func TestSyncFlow(t *testing.T) {
 
 	//Create three blocks, with one tx each
 	block1 := &flow.Block{
-		Header: flow.Header{
+		Header: &flow.Header{
 			ParentID: genesis.ID(),
 			View:     42,
 			Height:   1,
 		},
-		Payload: flow.Payload{
+		Payload: &flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{
 				{
 					CollectionID: col1.ID(),
@@ -77,15 +77,15 @@ func TestSyncFlow(t *testing.T) {
 			},
 		},
 	}
-	block1.PayloadHash = block1.Payload.Hash()
+	block1.Header.PayloadHash = block1.Payload.Hash()
 
 	block2 := &flow.Block{
-		Header: flow.Header{
+		Header: &flow.Header{
 			ParentID: block1.ID(),
 			View:     44,
 			Height:   2,
 		},
-		Payload: flow.Payload{
+		Payload: &flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{
 				{
 					CollectionID: col2.ID(),
@@ -94,25 +94,25 @@ func TestSyncFlow(t *testing.T) {
 			},
 		},
 	}
-	block2.PayloadHash = block2.Payload.Hash()
+	block2.Header.PayloadHash = block2.Payload.Hash()
 
 	block3 := &flow.Block{
-		Header: flow.Header{
+		Header: &flow.Header{
 			ParentID: block2.ID(),
 			View:     45,
 			Height:   3,
 		},
-		Payload: flow.Payload{},
+		Payload: &flow.Payload{},
 	}
-	block3.PayloadHash = block3.Payload.Hash()
+	block3.Header.PayloadHash = block3.Payload.Hash()
 
 	block4 := &flow.Block{
-		Header: flow.Header{
+		Header: &flow.Header{
 			ParentID: block3.ID(),
 			View:     46,
 			Height:   4,
 		},
-		Payload: flow.Payload{
+		Payload: &flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{
 				{
 					CollectionID: col4.ID(),
@@ -121,18 +121,18 @@ func TestSyncFlow(t *testing.T) {
 			},
 		},
 	}
-	block4.PayloadHash = block4.Payload.Hash()
+	block4.Header.PayloadHash = block4.Payload.Hash()
 
 	proposal1 := unittest.ProposalFromBlock(block1)
 	proposal2 := unittest.ProposalFromBlock(block2)
 	proposal3 := unittest.ProposalFromBlock(block3)
 	proposal4 := unittest.ProposalFromBlock(block4)
 
-	fmt.Printf("block0 ID %x parent %x\n", genesis.ID(), genesis.ParentID)
-	fmt.Printf("block1 ID %x parent %x\n", block1.ID(), block1.ParentID)
-	fmt.Printf("block2 ID %x parent %x\n", block2.ID(), block2.ParentID)
-	fmt.Printf("block3 ID %x parent %x\n", block3.ID(), block3.ParentID)
-	fmt.Printf("block4 ID %x parent %x\n", block4.ID(), block4.ParentID)
+	fmt.Printf("block0 ID %x parent %x\n", genesis.ID(), genesis.Header.ParentID)
+	fmt.Printf("block1 ID %x parent %x\n", block1.ID(), block1.Header.ParentID)
+	fmt.Printf("block2 ID %x parent %x\n", block2.ID(), block2.Header.ParentID)
+	fmt.Printf("block3 ID %x parent %x\n", block3.ID(), block3.Header.ParentID)
+	fmt.Printf("block4 ID %x parent %x\n", block4.ID(), block4.Header.ParentID)
 
 	collectionEngine := new(network.Engine)
 	colConduit, _ := collectionNode.Net.Register(engine.CollectionProvider, collectionEngine)
@@ -185,8 +185,8 @@ func TestSyncFlow(t *testing.T) {
 	})
 
 	// make sure exe1 didn't get any blocks
-	exeNode1.AssertHighestExecutedBlock(t, &genesis.Header)
-	exeNode2.AssertHighestExecutedBlock(t, &block2.Header)
+	exeNode1.AssertHighestExecutedBlock(t, genesis.Header)
+	exeNode2.AssertHighestExecutedBlock(t, block2.Header)
 
 	// submit block3 and block4 to exe1 which should trigger sync
 	exeNode1.IngestionEngine.Submit(conID.NodeID, proposal3)

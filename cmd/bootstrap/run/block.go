@@ -25,7 +25,7 @@ func GenerateRootBlock(identityList flow.IdentityList) *flow.Block {
 	}
 
 	return &flow.Block{
-		Header:  header,
-		Payload: payload,
+		Header:  &header,
+		Payload: &payload,
 	}
 }
