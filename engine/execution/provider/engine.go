@@ -167,7 +167,7 @@ func (e *Engine) onChunkDataPackRequest(
 
 func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.ExecutionReceipt) error {
 
-	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEBroadcastExecutionReceipt)
+	span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEBroadcastExecutionReceipt)
 	defer span.Finish()
 
 	e.log.Debug().
