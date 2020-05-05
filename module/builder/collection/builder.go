@@ -228,7 +228,7 @@ func (builder *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Head
 			// this should never happen, since we populated the cache with all
 			// these earlier in this very function
 			if !ok {
-				return fmt.Errorf("could not check reference height")
+				panic("could not check reference height")
 			}
 
 			// ensure we find the lowest reference block height
