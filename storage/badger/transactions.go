@@ -22,7 +22,7 @@ func NewTransactions(db *badger.DB) *Transactions {
 
 func (t *Transactions) Store(tx *flow.TransactionBody) error {
 	return t.db.Update(func(btx *badger.Txn) error {
-		err := operation.InsertTransaction(tx)(btx)
+		err := operation.SkipDuplicates(operation.InsertTransaction(tx))(btx)
 		if err != nil {
 			return fmt.Errorf("could not insert transaction: %w", err)
 		}
