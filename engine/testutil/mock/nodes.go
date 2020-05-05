@@ -32,6 +32,7 @@ import (
 type GenericNode struct {
 	Log     zerolog.Logger
 	Metrics module.Metrics
+	Tracer  module.Tracer
 	DB      *badger.DB
 	State   protocol.State
 	Me      module.Local
@@ -42,6 +43,8 @@ type GenericNode struct {
 func (g *GenericNode) Done() {
 	_ = g.DB.Close()
 	_ = os.RemoveAll(g.DBDir)
+
+	<-g.Tracer.Done()
 }
 
 // Closes closes the badger database of the node
