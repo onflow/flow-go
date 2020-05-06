@@ -266,10 +266,16 @@ func main() {
 			// initialize logging notifier for hotstuff
 			notifier := createNotifier(node.Logger, node.Metrics)
 
+			// TODO: for recovery, the latestFinalizedBlock and the unfinalized-pending blocks need to be read from storage
+			// For now, we always start from genesis, i.e. there is no ability to recover from a crash
+			latestFinalizedBlock := clusterGenesis.Header
+			pendingBlocks := []*flow.Header{}
+
 			hot, err := consensus.NewParticipant(
-				node.Logger, notifier, node.Metrics, headers, views, committee, node.State,
-				build, final, signer, prop, clusterGenesis.Header, clusterQC,
-				consensus.WithTimeout(hotstuffTimeout),
+				node.Logger, notifier, node.Metrics, headers,
+				views, committee, build, final,
+				signer, prop, clusterGenesis.Header, clusterQC,
+				latestFinalizedBlock, pendingBlocks, consensus.WithTimeout(hotstuffTimeout),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("creating HotStuff participant failed: %w", err)
