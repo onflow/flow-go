@@ -14,6 +14,8 @@ import (
 	model "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/cluster"
+	"github.com/dapperlabs/flow-go/state/protocol"
+	protocolkv "github.com/dapperlabs/flow-go/state/protocol/badger"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
@@ -27,6 +29,9 @@ type MutatorSuite struct {
 
 	genesis *model.Block
 	chainID string
+
+	// protocol state for reference blocks for transactions
+	protoState protocol.State
 
 	state   cluster.State
 	mutator cluster.Mutator
@@ -48,6 +53,9 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.state, err = NewState(suite.db, suite.chainID)
 	suite.Assert().Nil(err)
 	suite.mutator = suite.state.Mutate()
+
+	suite.protoState, err = protocolkv.NewState(suite.db)
+	suite.Require().Nil(err)
 }
 
 // runs after each test finishes
@@ -59,13 +67,31 @@ func (suite *MutatorSuite) TearDownTest() {
 }
 
 func (suite *MutatorSuite) Bootstrap() {
-	err := suite.mutator.Bootstrap(suite.genesis)
+
+	// bootstrap main chain so we have valid reference blocks
+	role := flow.RoleCollection
+	// just bootstrap with a genesis block, we'll use this as reference
+	genesis := unittest.GenesisFixture(unittest.IdentityListFixture(5, func(id *flow.Identity) {
+		id.Role = role
+		role++
+	}))
+	err := suite.protoState.Mutate().Bootstrap(flow.GenesisStateCommitment, genesis)
+	suite.Require().Nil(err)
+
+	// bootstrap cluster chain
+	err = suite.mutator.Bootstrap(suite.genesis)
 	suite.Assert().Nil(err)
 }
 
 func (suite *MutatorSuite) InsertBlock(block model.Block) {
 	err := suite.db.Update(procedure.InsertClusterBlock(&block))
 	suite.Assert().Nil(err)
+}
+
+func (suite *MutatorSuite) Payload(transactions ...*flow.TransactionBody) model.Payload {
+	final, err := suite.protoState.Final().Head()
+	suite.Require().Nil(err)
+	return model.PayloadFromTransactions(final.ID(), transactions...)
 }
 
 func TestMutator(t *testing.T) {
@@ -231,7 +257,7 @@ func (suite *MutatorSuite) TestExtend_WithEmptyCollection() {
 
 	block := unittest.ClusterBlockWithParent(suite.genesis)
 	// set an empty collection as the payload
-	block.SetPayload(model.EmptyPayload())
+	block.SetPayload(model.EmptyPayload(flow.ZeroID))
 	suite.InsertBlock(block)
 
 	err := suite.mutator.Extend(block.ID())
@@ -245,7 +271,7 @@ func (suite *MutatorSuite) TestExtend_UnfinalizedBlockWithDupeTx() {
 
 	// create a block extending genesis containing tx1
 	block1 := unittest.ClusterBlockWithParent(suite.genesis)
-	payload1 := model.PayloadFromTransactions(&tx1)
+	payload1 := suite.Payload(&tx1)
 	block1.SetPayload(payload1)
 	suite.InsertBlock(block1)
 
@@ -255,7 +281,7 @@ func (suite *MutatorSuite) TestExtend_UnfinalizedBlockWithDupeTx() {
 
 	// create a block building on block1 ALSO containing tx1
 	block2 := unittest.ClusterBlockWithParent(&block1)
-	payload2 := model.PayloadFromTransactions(&tx1)
+	payload2 := suite.Payload(&tx1)
 	block2.SetPayload(payload2)
 	suite.InsertBlock(block2)
 
@@ -272,7 +298,7 @@ func (suite *MutatorSuite) TestExtend_FinalizedBlockWithDupeTx() {
 
 	// create a block extending genesis containing tx1
 	block1 := unittest.ClusterBlockWithParent(suite.genesis)
-	payload1 := model.PayloadFromTransactions(&tx1)
+	payload1 := suite.Payload(&tx1)
 	block1.SetPayload(payload1)
 	suite.InsertBlock(block1)
 
@@ -286,7 +312,7 @@ func (suite *MutatorSuite) TestExtend_FinalizedBlockWithDupeTx() {
 
 	// create a block building on block1 ALSO containing tx1
 	block2 := unittest.ClusterBlockWithParent(&block1)
-	payload2 := model.PayloadFromTransactions(&tx1)
+	payload2 := suite.Payload(&tx1)
 	block2.SetPayload(payload2)
 	suite.InsertBlock(block2)
 
@@ -303,7 +329,7 @@ func (suite *MutatorSuite) TestExtend_ConflictingForkWithDupeTx() {
 
 	// create a block extending genesis containing tx1
 	block1 := unittest.ClusterBlockWithParent(suite.genesis)
-	payload1 := model.PayloadFromTransactions(&tx1)
+	payload1 := suite.Payload(&tx1)
 	block1.SetPayload(payload1)
 	suite.InsertBlock(block1)
 
@@ -313,7 +339,7 @@ func (suite *MutatorSuite) TestExtend_ConflictingForkWithDupeTx() {
 
 	// create a block ALSO extending genesis ALSO containing tx1
 	block2 := unittest.ClusterBlockWithParent(suite.genesis)
-	payload2 := model.PayloadFromTransactions(&tx1)
+	payload2 := suite.Payload(&tx1)
 	block2.SetPayload(payload2)
 	suite.InsertBlock(block2)
 

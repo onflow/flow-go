@@ -281,8 +281,9 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 	// trace back from new block until we find a block that has the latest
 	// finalized block as its parent
 	height := header.Height
+	chainID := header.ChainID
 	ancestorID := header.ParentID
-	for ancestorID != finalID {
+	for {
 
 		// get the parent of the block we current look at
 		var ancestor flow.Header
@@ -298,9 +299,19 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 			return fmt.Errorf("block needs height equal to ancestor height+1 (%d != %d+1)", height, ancestor.Height)
 		}
 
+		// check that the chain ID is consistent
+		if chainID != ancestor.ChainID {
+			return fmt.Errorf("invalid chain ID (ancestor=%s extension=%s)", ancestor.ChainID, chainID)
+		}
+
 		// check if the ancestor is unfinalized, but already behind the last finalized height (orphaned fork)
 		if ancestor.Height < boundary {
 			return fmt.Errorf("block doesn't connect to finalized state (%d < %d), ancestorID (%v)", ancestor.Height, boundary, ancestorID)
+		}
+
+		// if we've reached the finalized boundary, exit
+		if ancestorID == finalID {
+			break
 		}
 
 		// forward to next parent

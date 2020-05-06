@@ -109,7 +109,27 @@ func (s *Snapshot) Clusters() (*flow.ClusterList, error) {
 }
 
 func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
-	return procedure.RetrieveHeader(&s.number, &s.blockID, head)
+	return func(tx *badger.Txn) error {
+
+		err := procedure.RetrieveHeader(&s.number, &s.blockID, head)(tx)
+		if err != nil {
+			return fmt.Errorf("could not get snapshot header: %w", err)
+		}
+
+		// retrieve the finalized header to ensure we are only dealing with
+		// blocks from the main consensus-node chain within the protocol state
+		var final flow.Header
+		err = procedure.RetrieveLatestFinalizedHeader(&final)(tx)
+		if err != nil {
+			return fmt.Errorf("could not get chain ID: %w", err)
+		}
+
+		if head.ChainID != final.ChainID {
+			return fmt.Errorf("invalid chain id (got=%s expected=%s)", head.ChainID, final.ChainID)
+		}
+
+		return err
+	}
 }
 
 func (s *Snapshot) Head() (*flow.Header, error) {

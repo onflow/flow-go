@@ -35,6 +35,7 @@ const (
 	codeEvent                      = 29
 	codeExecutionStateInteractions = 30
 	codeTransactionResult          = 31
+	codeCollectionRefBlockID       = 32
 
 	codeIndexGuarantee               = 101
 	codeIndexSeal                    = 102
