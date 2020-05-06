@@ -9,6 +9,8 @@ import (
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
+	"github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
 	network "github.com/dapperlabs/flow-go/network/mock"
@@ -42,8 +44,20 @@ func CompleteExecutionResultFixture(t testing.TB, chunkCount int) verification.C
 
 		ids := make([][]byte, 0)
 		values := make([][]byte, 0)
+
+		//bootstrap with root account as it is retrieved by VM to check for permissions
+		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+			return nil, nil
+		})
+		err := testutil.BootstrapLedgerWithRootAccount(view)
+		require.NoError(t, err)
+
+		rootRegisterIDs, rootRegisterValues := view.Interactions().Delta.RegisterUpdates()
+
 		ids = append(ids, id1, id2)
+		ids = append(ids, rootRegisterIDs...)
 		values = append(values, value1, value2)
+		values = append(values, rootRegisterValues...)
 
 		unittest.RunWithTempDir(t, func(dir string) {
 			f, err := ledger.NewTrieStorage(dir)

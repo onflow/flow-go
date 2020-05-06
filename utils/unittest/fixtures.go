@@ -130,11 +130,17 @@ func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDe
 	}
 }
 
+func GenesisFixture(identities flow.IdentityList) *flow.Block {
+	genesis := flow.Genesis(identities)
+	genesis.Header.ChainID = flow.TestingChainID
+	return genesis
+}
+
 func BlockHeaderFixture() flow.Header {
 	height := rand.Uint64()
 	view := height + uint64(rand.Intn(1000))
 	return BlockHeaderWithParentFixture(&flow.Header{
-		ChainID:  "testing_chain",
+		ChainID:  flow.TestingChainID,
 		ParentID: IdentifierFixture(),
 		Height:   height,
 		View:     view,
@@ -164,7 +170,8 @@ func ClusterPayloadFixture(n int) *cluster.Payload {
 		tx := TransactionBodyFixture()
 		transactions[i] = &tx
 	}
-	return cluster.PayloadFromTransactions(transactions...)
+	payload := cluster.PayloadFromTransactions(flow.ZeroID, transactions...)
+	return &payload
 }
 
 func ClusterBlockFixture() cluster.Block {
@@ -508,6 +515,12 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 func WithTransactionDSL(txDSL dsl.Transaction) func(tx *flow.TransactionBody) {
 	return func(tx *flow.TransactionBody) {
 		tx.Script = []byte(txDSL.ToCadence())
+	}
+}
+
+func WithReferenceBlock(id flow.Identifier) func(tx *flow.TransactionBody) {
+	return func(tx *flow.TransactionBody) {
+		tx.ReferenceBlockID = id
 	}
 }
 

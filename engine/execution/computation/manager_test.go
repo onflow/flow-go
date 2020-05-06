@@ -21,6 +21,11 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	tx1 := testutil.DeployCounterContractTransaction()
 	tx2 := testutil.CreateCounterTransaction()
 
+	err := testutil.SignTransactionByRoot(&tx1, 0)
+	require.NoError(t, err)
+	err = testutil.SignTransactionByRoot(&tx2, 1)
+	require.NoError(t, err)
+
 	transactions := []*flow.TransactionBody{&tx1, &tx2}
 
 	col := flow.Collection{Transactions: transactions}
@@ -54,7 +59,8 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	rt := runtime.NewInterpreterRuntime()
 
-	vm := virtualmachine.New(rt)
+	vm, err := virtualmachine.New(rt)
+	require.NoError(t, err)
 
 	blockComputer := computer.NewBlockComputer(vm)
 
