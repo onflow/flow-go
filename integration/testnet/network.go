@@ -559,7 +559,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	// generate genesis blocks for each collector cluster
 	clusterBlocks, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, confs, genesis)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// write collector-specific genesis bootstrap files for each cluster
@@ -568,18 +568,18 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		clusterQC := clusterQCs[i]
 
 		// cluster ID is equivalent to chain ID
-		clusterID := clusterGenesis.ChainID
+		clusterID := clusterGenesis.Header.ChainID
 
 		clusterGenesisPath := fmt.Sprintf(bootstrap.FilenameGenesisClusterBlock, clusterID)
 		err = writeJSON(filepath.Join(bootstrapDir, clusterGenesisPath), clusterGenesis)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		clusterQCPath := fmt.Sprintf(bootstrap.FilenameGenesisClusterQC, clusterID)
 		err = writeJSON(filepath.Join(bootstrapDir, clusterQCPath), clusterQC)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 

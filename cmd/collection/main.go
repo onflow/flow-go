@@ -281,7 +281,7 @@ func main() {
 		Run(flow.RoleCollection.String())
 }
 
-// initClusterCommittee initializes the Collector cluster's HotStuff committee state
+// initClusterCommittee initializetestnet/network.gos the Collector cluster's HotStuff committee state
 func initClusterCommittee(node *cmd.FlowNodeBuilder) (hotstuff.Committee, error) {
 	mainGenesisBlockID := node.GenesisBlock.ID()
 	// TODO: update to return reference block ID from collection
