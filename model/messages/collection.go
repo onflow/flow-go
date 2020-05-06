@@ -28,6 +28,7 @@ type CollectionRequest struct {
 // CollectionResponse is a response to a request for a collection.
 type CollectionResponse struct {
 	Collection flow.Collection
+	Nonce      uint64 // so that we aren't deduplicated by the network layer
 }
 
 // TransactionRequest is a request message for a single transaction.
