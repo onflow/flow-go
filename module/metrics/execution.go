@@ -41,6 +41,12 @@ var (
 		Name:      "commitment_size_bytes",
 		Help:      "the storage size of a state commitment in bytes",
 	})
+	executionLastExecutedBlockViewGauge = promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemStateStorage,
+		Name:      "last_executed_block_view",
+		Help:      "the last view that was executed",
+	})
 )
 
 // StartBlockReceivedToExecuted starts a span to trace the duration of a block
@@ -74,4 +80,9 @@ func (c *Collector) ExecutionStateStorageDiskTotal(bytes int64) {
 // ExecutionStorageStateCommitment reports the storage size of a state commitment
 func (c *Collector) ExecutionStorageStateCommitment(bytes int64) {
 	executionStorageStateCommitmentGauge.Set(float64(bytes))
+}
+
+// ExecutionLastExecutedBlockView reports last executed block view
+func (c *Collector) ExecutionLastExecutedBlockView(view uint64) {
+	executionLastExecutedBlockViewGauge.Set(float64(view))
 }

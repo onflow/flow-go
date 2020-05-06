@@ -193,6 +193,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // Main handling
 
 func (e *Engine) handleBlockProposal(proposal *messages.BlockProposal) error {
+	e.mc.NewestKnownQC(proposal.Header.View)
 
 	block := &flow.Block{
 		Header:  proposal.Header,
@@ -378,6 +379,8 @@ func (e *Engine) executeBlock(executableBlock *entity.ExecutableBlock) {
 		Hex("block_id", logging.Entity(executableBlock.Block)).
 		Hex("final_state", finalState).
 		Msg("executing block")
+
+	e.mc.ExecutionLastExecutedBlockView(executableBlock.Block.Header.View)
 }
 
 func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse) error {
