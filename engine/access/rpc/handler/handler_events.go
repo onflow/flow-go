@@ -102,8 +102,9 @@ func (h *Handler) getTransactionResultFromExecutionNode(ctx context.Context, blo
 		TransactionId: transactionID,
 	}
 
-	// call the execution node gRPC
+	// call the execution node GRPC
 	resp, err := h.executionRPC.GetTransactionResult(ctx, &req)
+
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
 			return nil, 0, "", err
