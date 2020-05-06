@@ -68,7 +68,7 @@ var (
 )
 
 // PendingBlocks sets the number of blocks in the pending cache.
-func (c *Collector) PendingBlocks(n uint) {
+func (c *BaseMetrics) PendingBlocks(n uint) {
 	pendingBlocksGauge.Set(float64(n))
 }
 

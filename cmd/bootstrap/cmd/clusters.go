@@ -44,7 +44,7 @@ func constructGenesisBlocksForCollectorClusters(clusters *flow.ClusterList) []*c
 
 	for _, clusterBlock := range clusterBlocks {
 		// cluster ID is equivalent to chain ID
-		clusterID := clusterBlock.ChainID
+		clusterID := clusterBlock.Header.ChainID
 		writeJSON(fmt.Sprintf(model.FilenameGenesisClusterBlock, clusterID), clusterBlock)
 	}
 
@@ -67,7 +67,7 @@ func constructGenesisQCsForCollectorClusters(clusterList *flow.ClusterList, node
 		}
 
 		// cluster ID is equivalent to chain ID
-		clusterID := clusterBlocks[i].ChainID
+		clusterID := clusterBlocks[i].Header.ChainID
 		writeJSON(fmt.Sprintf(model.FilenameGenesisClusterQC, clusterID), qc)
 	}
 }

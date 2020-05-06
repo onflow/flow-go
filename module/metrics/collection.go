@@ -51,7 +51,7 @@ var (
 )
 
 // PendingClusterBlocks sets the number of cluster blocks in the pending cache.
-func (c *Collector) PendingClusterBlocks(n uint) {
+func (c *BaseMetrics) PendingClusterBlocks(n uint) {
 	pendingClusterBlocksGauge.Set(float64(n))
 }
 

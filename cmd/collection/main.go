@@ -58,7 +58,7 @@ func main() {
 		maxCollectionSize   uint
 		ingressExpiryBuffer uint64
 		builderExpiryBuffer uint64
-		hotstuffTimeout time.Duration
+		hotstuffTimeout     time.Duration
 
 		ingressConf  ingress.Config
 		pool         mempool.Transactions
@@ -268,7 +268,7 @@ func main() {
 
 			hot, err := consensus.NewParticipant(
 				node.Logger, notifier, node.Metrics, headers, views, committee, node.State,
-				build, final, signer, prop, &clusterGenesis.Header, clusterQC,
+				build, final, signer, prop, clusterGenesis.Header, clusterQC,
 				consensus.WithTimeout(hotstuffTimeout),
 			)
 			if err != nil {
