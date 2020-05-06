@@ -156,6 +156,11 @@ func (h *Handler) GetAccount(ctx context.Context, req *access.GetAccountRequest)
 
 	exeResp, err := h.executionRPC.GetAccountAtBlockID(ctx, &exeReq)
 	if err != nil {
+		errStatus, _ := status.FromError(err)
+		if errStatus.Code() == codes.NotFound {
+			return nil, err
+		}
+
 		return nil, status.Errorf(codes.Internal, "failed to get account from the execution node: %v", err)
 	}
 

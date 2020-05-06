@@ -48,3 +48,16 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 		return nil
 	})
 }
+
+// MakePending will declare a block has passed all the validation, and is
+// incorporated to a certain branch that is waiting to be finalized.
+func (f *Finalizer) MakePending(blockID flow.Identifier, parentID flow.Identifier) error {
+	return f.db.Update(func(tx *badger.Txn) error {
+		err := procedure.IndexChildByBlockID(parentID, blockID)(tx)
+		if err != nil {
+			return fmt.Errorf("cannot index child by blockID: %w", err)
+		}
+
+		return nil
+	})
+}

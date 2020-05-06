@@ -224,8 +224,10 @@ func (h *handler) eventResult(blockID flow.Identifier,
 	}, nil
 }
 
-func (h *handler) GetAccountAtBlockID(_ context.Context,
-	req *execution.GetAccountAtBlockIDRequest) (*execution.GetAccountAtBlockIDResponse, error) {
+func (h *handler) GetAccountAtBlockID(
+	_ context.Context,
+	req *execution.GetAccountAtBlockIDRequest,
+) (*execution.GetAccountAtBlockIDResponse, error) {
 
 	blockID := req.GetBlockId()
 	if blockID == nil {
@@ -242,6 +244,10 @@ func (h *handler) GetAccountAtBlockID(_ context.Context,
 	value, err := h.engine.GetAccount(flowAddress, blockFlowID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get account: %v", err)
+	}
+
+	if value == nil {
+		return nil, status.Errorf(codes.NotFound, "account with address %s does not exist", flowAddress)
 	}
 
 	account, err := convert.AccountToMessage(value)
