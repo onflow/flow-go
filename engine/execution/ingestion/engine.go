@@ -334,11 +334,13 @@ func (e *Engine) executeBlock(executableBlock *entity.ExecutableBlock) {
 		return
 	}
 
-	diskTotal, err := e.execState.Size()
-	if err != nil {
-		e.log.Err(err).Msg("could not get execution state disk size")
-	}
-	e.mc.ExecutionStateStorageDiskTotal(diskTotal)
+	// Pause checking disc size for now. There is a stat on the node exporter that tracts total disc space used
+	// diskTotal, err := e.execState.Size()
+	// if err != nil {
+	// 	e.log.Err(err).Msg("could not get execution state disk size")
+	// }
+	// e.mc.ExecutionStateStorageDiskTotal(diskTotal)
+
 	e.mc.ExecutionStorageStateCommitment(int64(len(finalState)))
 
 	err = e.mempool.Run(func(blockByCollection *stdmap.BlockByCollectionBackdata, executionQueues *stdmap.QueuesBackdata, _ *stdmap.QueuesBackdata) error {
