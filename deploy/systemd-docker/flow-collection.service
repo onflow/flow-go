@@ -4,13 +4,15 @@ Requires=docker.service
 After=network-online.target docker.service
 
 [Install]
+Alias=flow.service
 WantedBy=default.target
 
 [Service]
 Type=simple
+TimeoutStopSec=1m
 
 RestartSec=5s
-Restart=always
+Restart=no
 
 StandardOutput=journal
 
@@ -29,4 +31,6 @@ ExecStart=docker run --rm \
 	--bootstrapdir=/bootstrap \
 	--datadir=/data/protocol \
 	--ingress-addr=0.0.0.0:9000 \
-	--nclusters=${FLOW_NETWORK_COLLECTION_CLUSTER_COUNT}
+	--nclusters=${FLOW_NETWORK_COLLECTION_CLUSTER_COUNT} \
+	--bind 0.0.0.0:3569 \
+	--loglevel=ERROR

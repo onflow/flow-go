@@ -4,13 +4,15 @@ Requires=docker.service
 After=network-online.target docker.service
 
 [Install]
+Alias=flow.service
 WantedBy=default.target
 
 [Service]
 Type=simple
+TimeoutStopSec=1m
 
 RestartSec=5s
-Restart=always
+Restart=no
 
 StandardOutput=journal
 
@@ -30,4 +32,6 @@ ExecStart=docker run --rm \
 	--datadir=/data/protocol \
 	--rpc-addr=0.0.0.0:9000 \
 	--ingress-addr=${FLOW_NETWORK_COLLECTION_NODE} \
-	--script-addr=${FLOW_NETWORK_EXECUTION_NODE}
+	--script-addr=${FLOW_NETWORK_EXECUTION_NODE} \
+	--bind 0.0.0.0:3569 \
+	--loglevel=ERROR

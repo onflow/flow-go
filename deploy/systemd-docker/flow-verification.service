@@ -4,13 +4,15 @@ Requires=docker.service
 After=network-online.target docker.service
 
 [Install]
+Alias=flow.service
 WantedBy=default.target
 
 [Service]
 Type=simple
+TimeoutStopSec=1m
 
 RestartSec=5s
-Restart=always
+Restart=no
 
 StandardOutput=journal
 
@@ -28,4 +30,6 @@ ExecStart=docker run --rm \
 	--nodeid=${FLOW_GO_NODE_ID} \
 	--bootstrapdir=/bootstrap \
 	--datadir=/data/protocol \
-	--alpha=1
+	--alpha=1 \
+	--bind 0.0.0.0:3569 \
+	--loglevel=ERROR
