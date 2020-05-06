@@ -281,7 +281,7 @@ func main() {
 		Run(flow.RoleCollection.String())
 }
 
-// initClusterCommittee initializetestnet/network.gos the Collector cluster's HotStuff committee state
+// initClusterCommittee initializetestnet/network.gos tcmd/bootstrap/run/cluster_qc.gohe Collector cluster's HotStuff committee state
 func initClusterCommittee(node *cmd.FlowNodeBuilder, colPayloads *badger.ClusterPayloads) (hotstuff.Committee, error) {
 	blockTranslator := func(blockID *flow.Identifier) (*flow.Identifier, error) {
 		payload, err := colPayloads.ByBlockID(*blockID)
