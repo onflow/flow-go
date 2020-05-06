@@ -13,16 +13,16 @@ type ExecutableBlock struct {
 	StartState          flow.StateCommitment
 }
 
-type BlockByCollection struct {
-	CollectionID    flow.Identifier
-	ExecutableBlock *ExecutableBlock
+type BlocksByCollection struct {
+	CollectionID     flow.Identifier
+	ExecutableBlocks map[flow.Identifier]*ExecutableBlock
 }
 
-func (b *BlockByCollection) ID() flow.Identifier {
+func (b *BlocksByCollection) ID() flow.Identifier {
 	return b.CollectionID
 }
 
-func (b *BlockByCollection) Checksum() flow.Identifier {
+func (b *BlocksByCollection) Checksum() flow.Identifier {
 	return b.CollectionID
 }
 

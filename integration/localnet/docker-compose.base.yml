@@ -63,6 +63,8 @@ services:
 
   logspout:
     image: gliderlabs/logspout
-    command: 'syslog+udp://logstash:6000'
+    command: "syslog+udp://logstash:6000"
     depends_on:
       - logstash
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"

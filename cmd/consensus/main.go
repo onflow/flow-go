@@ -11,12 +11,9 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/dapperlabs/flow-go/module/metrics"
-
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
-
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
@@ -33,9 +30,11 @@ import (
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	consensusmetrics "github.com/dapperlabs/flow-go/module/metrics/consensus"
 	"github.com/dapperlabs/flow-go/module/signature"
-	storage "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/storage/badger"
 )
 
 func main() {
@@ -95,7 +94,7 @@ func main() {
 			return err
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			results := storage.NewExecutionResults(node.DB)
+			results := badger.NewExecutionResults(node.DB)
 			return matching.New(node.Logger, node.Network, node.State, node.Me, results, receipts, approvals, seals)
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -119,13 +118,13 @@ func main() {
 			// TODO: we should probably find a way to initialize mutually dependent engines separately
 
 			// initialize the entity database accessors
-			cleaner := storage.NewCleaner(node.Logger, node.DB)
-			headersDB := storage.NewHeaders(node.DB)
-			payloadsDB := storage.NewPayloads(node.DB)
-			blocksDB := storage.NewBlocks(node.DB)
-			guaranteesDB := storage.NewGuarantees(node.DB)
-			sealsDB := storage.NewSeals(node.DB)
-			viewsDB := storage.NewViews(node.DB)
+			cleaner := badger.NewCleaner(node.Logger, node.DB)
+			headersDB := badger.NewHeaders(node.DB)
+			payloadsDB := badger.NewPayloads(node.DB)
+			blocksDB := badger.NewBlocks(node.DB)
+			guaranteesDB := badger.NewGuarantees(node.DB)
+			sealsDB := badger.NewSeals(node.DB)
+			viewsDB := badger.NewViews(node.DB)
 
 			// initialize the pending blocks cache
 			cache := buffer.NewPendingBlocks()
@@ -172,10 +171,17 @@ func main() {
 			// initialize a logging notifier for hotstuff
 			notifier := createNotifier(node.Logger, node.Metrics, guaranteesDB, sealsDB)
 
+			// query the last finalized block and pending blocks for recovery
+			finalized, pending, err := findLatest(node.State, headersDB, node.GenesisBlock.Header)
+			if err != nil {
+				return nil, fmt.Errorf("could not find latest finalized block and pending blocks: %w", err)
+			}
+
 			// initialize hotstuff consensus algorithm
 			hot, err := consensus.NewParticipant(
-				node.Logger, notifier, node.Metrics, headersDB, viewsDB, committee, node.State,
+				node.Logger, notifier, node.Metrics, headersDB, viewsDB, committee,
 				build, final, signer, comp, node.GenesisBlock.Header, node.GenesisQC,
+				finalized, pending,
 				consensus.WithTimeout(hotstuffTimeout),
 			)
 			if err != nil {
@@ -201,4 +207,31 @@ func loadDKGPrivateData(path string, myID flow.Identifier) (*bootstrap.DKGPartic
 		return nil, err
 	}
 	return &priv, nil
+}
+
+func findLatest(state protocol.State, headers *badger.Headers, rootHeader *flow.Header) (*flow.Header, []*flow.Header, error) {
+	// find finalized block
+	finalized, err := state.Final().Head()
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not find finalized block")
+	}
+
+	// find all pending blockIDs
+	pendingIDs, err := state.Final().Pending()
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not find pending block")
+	}
+
+	// find all pending header by ID
+	pending := make([]*flow.Header, 0, len(pendingIDs))
+	for _, u := range pendingIDs {
+		pendingHeader, err := headers.ByBlockID(u)
+		if err != nil {
+			return nil, nil, fmt.Errorf("could not find pending block by ID: %w", err)
+		}
+		pending = append(pending, pendingHeader)
+	}
+
+	return finalized, pending, nil
 }
