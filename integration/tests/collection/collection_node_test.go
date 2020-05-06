@@ -169,7 +169,7 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transac
 func (suite *CollectorSuite) AwaitTransactionIncluded(txID flow.Identifier) {
 
 	// the height at which the collection is included
-	var height uint64
+	var colID flow.Identifier
 
 	waitFor := time.Second * 30
 	deadline := time.Now().Add(waitFor)
@@ -185,19 +185,17 @@ func (suite *CollectorSuite) AwaitTransactionIncluded(txID flow.Identifier) {
 			collection := val.Payload.Collection
 			suite.T().Logf("got proposal height=%d col_id=%x size=%d", header.Height, collection.ID(), collection.Len())
 
-			// note the height when transaction is includedj
+			// note the collection where the transaction is included
+			//TODO this will only work for single-tx collections
+			// need to update in https://github.com/dapperlabs/flow-go/pull/3546
 			if collection.Light().Has(txID) {
-				height = header.Height
-			}
-
-			// use building two blocks as an indication of inclusion
-			// TODO replace this with finalization by listening to guarantees
-			if height > 0 && header.Height-height >= 2 {
-				return
+				colID = collection.ID()
 			}
 
 		case *flow.CollectionGuarantee:
-			// TODO use this as indication of finalization w/ HotStuff
+			if val.CollectionID == colID {
+				return
+			}
 		}
 	}
 
