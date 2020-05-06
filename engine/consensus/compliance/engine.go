@@ -193,6 +193,8 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	}
 
 	// fill in the fields that can't be populated by HotStuff
+	//TODO clean this up - currently we set these fields in builder, then lose
+	// them in HotStuff, then need to set them again here
 	header.ChainID = parent.ChainID
 	header.Height = parent.Height + 1
 
