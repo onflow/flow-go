@@ -25,7 +25,7 @@ require (
 	github.com/libp2p/go-tcp-transport v0.1.1
 	github.com/magiconair/properties v1.8.1
 	github.com/multiformats/go-multiaddr v0.2.0
-	github.com/onflow/cadence v0.1.1-0.20200506212150-171ac52e3382
+	github.com/onflow/cadence v0.2.1-0.20200506214136-9bc6d69a61d8
 	github.com/onflow/flow-go-sdk v0.1.0 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.1.4
 	github.com/opentracing/opentracing-go v1.1.0

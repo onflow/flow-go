@@ -62,7 +62,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	vm := virtualmachine.New(rt)
 
-	blockComputer := computer.NewBlockComputer(vm, nil)
+	blockComputer := computer.NewBlockComputer(vm, nil, nil)
 
 	engine := &Manager{
 		blockComputer: blockComputer,

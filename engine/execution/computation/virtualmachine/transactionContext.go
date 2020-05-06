@@ -7,6 +7,7 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -47,7 +48,8 @@ func newTransactionContext(
 ) *TransactionContext {
 	signers := make([]runtime.Address, len(tx.Authorizers))
 	for i, addr := range tx.Authorizers {
-		signers[i] = runtime.Address(addr)
+		// TODO: replace with proper conversion
+		signers[i] = common.BytesToAddress(addr.Bytes())
 	}
 
 	ctx := newScriptContext(ledger, options...)
@@ -132,7 +134,8 @@ func (r *TransactionContext) CreateAccount(publicKeysBytes [][]byte) (runtime.Ad
 	accountAddress, err := r.CreateAccountInLedger(publicKeys)
 	r.Log(fmt.Sprintf("Created new account with address: %x", accountAddress))
 
-	return runtime.Address(accountAddress), err
+	// TODO: replace with proper conversion
+	return common.BytesToAddress(accountAddress.Bytes()), err
 }
 
 // AddAccountKey adds a public key to an existing account.

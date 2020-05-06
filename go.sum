@@ -563,6 +563,8 @@ github.com/onflow/cadence v0.1.1-0.20200506212150-171ac52e3382 h1:7q/6BJcw2+2UD3
 github.com/onflow/cadence v0.1.1-0.20200506212150-171ac52e3382/go.mod h1:GaLQ7IsJi5bqpH66GprNs8uoQtperK/xbXXIOq11nZw=
 github.com/onflow/cadence v0.2.1-0.20200506205848-833a1d53a27b h1:PbUI3ldNGzI+GEhOvPhm7dlZ203b8ykBSoiA9GOY6FY=
 github.com/onflow/cadence v0.2.1-0.20200506205848-833a1d53a27b/go.mod h1:GaLQ7IsJi5bqpH66GprNs8uoQtperK/xbXXIOq11nZw=
+github.com/onflow/cadence v0.2.1-0.20200506214136-9bc6d69a61d8 h1:oi1m8JV8oO9Em5DH21Ug6EGWxHcnL0+Ewajs9ISPilA=
+github.com/onflow/cadence v0.2.1-0.20200506214136-9bc6d69a61d8/go.mod h1:GaLQ7IsJi5bqpH66GprNs8uoQtperK/xbXXIOq11nZw=
 github.com/onflow/flow-go-sdk v0.1.0/go.mod h1:ShDDEC0Nb1PXtb3sGhwnFnbu+Hmib5uDfuC8H383PNE=
 github.com/onflow/flow/protobuf/go/flow v0.1.3/go.mod h1:kRugbzZjwQqvevJhrnnCFMJZNmoSJmxlKt6hTGXZojM=
 github.com/onflow/flow/protobuf/go/flow v0.1.4 h1:xRdLYCxR/V6lq03ElK3g0T/F8pCIpLrKs2IHQTYr9rM=
