@@ -34,7 +34,7 @@ import (
 	consensusMetrics "github.com/dapperlabs/flow-go/module/metrics/consensus"
 	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage/badger"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
 func main() {
@@ -204,7 +204,7 @@ func loadDKGPrivateData(path string, myID flow.Identifier) (*bootstrap.DKGPartic
 	return &priv, nil
 }
 
-func findLatest(state protocol.State, headers *badger.Headers, rootHeader *flow.Header) (*flow.Header, []*flow.Header, error) {
+func findLatest(state protocol.State, headers *storage.Headers, rootHeader *flow.Header) (*flow.Header, []*flow.Header, error) {
 	// find finalized block
 	finalized, err := state.Final().Head()
 

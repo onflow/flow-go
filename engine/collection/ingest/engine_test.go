@@ -13,7 +13,6 @@ import (
 	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -74,7 +73,7 @@ func TestInvalidTransaction(t *testing.T) {
 			next := unittest.BlockWithParentFixture(parent)
 			err := blocks.Store(&next)
 			require.Nil(t, err)
-			err = node.DB.Update(procedure.FinalizeBlock(next.ID()))
+			err = node.State.Mutate().Finalize(next.ID())
 			require.Nil(t, err)
 			parent = next.Header
 		}

@@ -8,12 +8,14 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	model "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/cluster"
-	"github.com/dapperlabs/flow-go/state/protocol"
+	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -28,7 +30,7 @@ type MutatorSuite struct {
 	chainID string
 
 	// protocol state for reference blocks for transactions
-	protoState protocol.State
+	protoState *protocol.State
 
 	state   cluster.State
 	mutator cluster.Mutator
@@ -51,7 +53,12 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.Assert().Nil(err)
 	suite.mutator = suite.state.Mutate()
 
-	suite.protoState = unittest.ProtocolState(suite.T(), suite.db)
+	identities := storage.NewIdentities(suite.db)
+	headers := storage.NewHeaders(suite.db)
+	payloads := storage.NewPayloads(suite.db)
+	seals := storage.NewSeals(suite.db)
+	suite.protoState, err = protocol.NewState(suite.db, identities, headers, payloads, seals)
+	require.NoError(suite.T(), err)
 }
 
 // runs after each test finishes

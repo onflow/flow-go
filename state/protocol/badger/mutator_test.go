@@ -392,7 +392,7 @@ func TestExtendHeightTooSmall(t *testing.T) {
 }
 
 func TestExtendHeightTooLarge(t *testing.T) {
-	unittest.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	RunWithProtocolState(t, func(db *badger.DB, state *State) {
 
 		genesis := flow.Genesis(participants)
 		mutator := state.Mutate()
@@ -402,10 +402,7 @@ func TestExtendHeightTooLarge(t *testing.T) {
 		// set an invalid height
 		block.Header.Height = genesis.Header.Height + 2
 
-		err := db.Update(procedure.InsertBlock(block.ID(), &block))
-		require.NoError(t, err)
-
-		err = mutator.Extend(block.ID())
+		err := mutator.Extend(&block)
 		unittest.AssertErrSubstringMatch(t, err, errors.New("block needs height equal to ancestor height+1"))
 	})
 }
@@ -517,7 +514,7 @@ func TestExtendWrongIdentity(t *testing.T) {
 }
 
 func TestExtendInvalidChainID(t *testing.T) {
-	unittest.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+	RunWithProtocolState(t, func(db *badger.DB, state *State) {
 
 		genesis := flow.Genesis(participants)
 		mutator := state.Mutate()
@@ -526,10 +523,7 @@ func TestExtendInvalidChainID(t *testing.T) {
 		// use an invalid chain ID
 		block.Header.ChainID = genesis.Header.ChainID + "-invalid"
 
-		err := db.Update(procedure.InsertBlock(block.ID(), &block))
-		require.NoError(t, err)
-
-		err = mutator.Extend(block.ID())
+		err := mutator.Extend(&block)
 		unittest.AssertErrSubstringMatch(t, err, errors.New("invalid chain ID"))
 	})
 }

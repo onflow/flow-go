@@ -11,6 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 type Mutator struct {
@@ -124,9 +125,9 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	// 3) Check that the parent is not below the last finalized block.
 	// We will either run into one of the error conditions or break the loop when we
 	// managed to trace back all the way to the last finalized block.
-	height := candidate.Height
-	chainID := candidate.ChainID
-	ancestorID := candidate.ParentID
+	height := candidate.Header.Height
+	chainID := candidate.Header.ChainID
+	ancestorID := candidate.Header.ParentID
 	for ancestorID != finalID {
 		ancestor, err := m.state.headers.ByBlockID(ancestorID)
 		if err != nil {
@@ -150,14 +151,10 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	// for the genesis block for now. We also do a sanity check on the payload
 	// hash, just to be sure.
 
-	payload, err := m.state.payloads.ByBlockID(blockID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve payload: %w", err)
-	}
-	if len(payload.Identities) > 0 {
+	if len(candidate.Payload.Identities) > 0 {
 		return fmt.Errorf("candidate block has identities")
 	}
-	if payload.Hash() != candidate.PayloadHash {
+	if candidate.Payload.Hash() != candidate.Header.PayloadHash {
 		return fmt.Errorf("candidate payload integrity check failed")
 	}
 

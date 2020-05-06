@@ -17,8 +17,8 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/state/cluster"
 	clusterkv "github.com/dapperlabs/flow-go/state/cluster/badger"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	protocolkv "github.com/dapperlabs/flow-go/state/protocol/badger"
+	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -33,11 +33,13 @@ type BuilderSuite struct {
 	genesis *model.Block
 	chainID string
 
+	headers *storage.Headers
+
 	state   cluster.State
 	mutator cluster.Mutator
 
 	// protocol state for reference blocks for transactions
-	protoState protocol.State
+	protoState *protocol.State
 
 	pool    *stdmap.Transactions
 	builder *builder.Builder
@@ -63,12 +65,16 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.Require().Nil(err)
 	suite.mutator = suite.state.Mutate()
 
-	suite.protoState, err = protocolkv.NewState(suite.db)
-	suite.Require().Nil(err)
+	identities := storage.NewIdentities(suite.db)
+	suite.headers = storage.NewHeaders(suite.db)
+	payloads := storage.NewPayloads(suite.db)
+	seals := storage.NewSeals(suite.db)
+	suite.protoState, err = protocol.NewState(suite.db, identities, suite.headers, payloads, seals)
+	require.NoError(suite.T(), err)
 
 	suite.Bootstrap()
 
-	suite.builder = builder.NewBuilder(suite.db, suite.pool)
+	suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.pool)
 }
 
 // runs after each test finishes
@@ -304,7 +310,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 	// use a mempool with 2000 transactions, one per block
 	suite.pool, err = stdmap.NewTransactions(2000)
 	require.Nil(t, err)
-	suite.builder = builder.NewBuilder(suite.db, suite.pool, builder.WithMaxCollectionSize(10000))
+	suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.pool, builder.WithMaxCollectionSize(10000))
 
 	// get a valid reference block ID
 	final, err := suite.protoState.Final().Head()
@@ -378,7 +384,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 
 func (suite *BuilderSuite) TestBuildOn_MaxCollectionSize() {
 	// set the max collection size to 1
-	suite.builder = builder.NewBuilder(suite.db, suite.pool, builder.WithMaxCollectionSize(1))
+	suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.pool, builder.WithMaxCollectionSize(1))
 
 	// build a block
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
@@ -403,20 +409,16 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 	head := genesis
 	for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
 		block := unittest.BlockWithParentFixture(head)
-		_ = suite.db.Update(func(tx *badger.Txn) error {
-			err := procedure.InsertBlock(&block)(tx)
-			suite.Require().Nil(err)
-			err = procedure.FinalizeBlock(block.ID())(tx)
-			suite.Require().Nil(err)
-			return nil
-		})
+		_ = suite.db.Update(procedure.InsertBlock(block.ID(), &block))
+		suite.Require().Nil(err)
+		suite.FinalizeBlock(block.ID())
 		head = block.Header
 	}
 
 	// reset the pool and builder
 	suite.pool, err = stdmap.NewTransactions(10)
 	suite.Require().Nil(err)
-	suite.builder = builder.NewBuilder(suite.db, suite.pool)
+	suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.pool)
 
 	// insert a transaction referring genesis (now expired)
 	tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) {
@@ -525,7 +527,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		}
 
 		// create the builder
-		suite.builder = builder.NewBuilder(suite.db, suite.pool)
+		suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.pool)
 	}
 
 	// create a block history to test performance against

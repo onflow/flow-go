@@ -46,8 +46,8 @@ func main() {
 	var (
 		txLimit             uint
 		maxCollectionSize   uint
-		ingressExpiryBuffer uint64
-		builderExpiryBuffer uint64
+		ingressExpiryBuffer uint
+		builderExpiryBuffer uint
 
 		ingressConf  ingress.Config
 		pool         mempool.Transactions
@@ -69,8 +69,8 @@ func main() {
 	cmd.FlowNode("collection").
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&txLimit, "tx-limit", 50000, "maximum number of transactions in the memory pool")
-			flags.Uint64Var(&ingressExpiryBuffer, "ingress-expiry-buffer", 30, "expiry buffer for inbound transactions")
-			flags.Uint64Var(&builderExpiryBuffer, "builder-expiry-buffer", 15, "expiry buffer for transactions in proposed collections")
+			flags.UintVar(&ingressExpiryBuffer, "ingress-expiry-buffer", 30, "expiry buffer for inbound transactions")
+			flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", 15, "expiry buffer for transactions in proposed collections")
 			flags.UintVar(&maxCollectionSize, "max-collection-size", 100, "maximum number of transactions in proposed collections")
 			flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000", "the address the ingress server listens on")
 		}).
@@ -187,7 +187,7 @@ func main() {
 			return prov, err
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			build := builder.NewBuilder(node.DB, pool,
+			build := builder.NewBuilder(node.DB, node.Headers, pool,
 				builder.WithMaxCollectionSize(maxCollectionSize),
 				builder.WithExpiryBuffer(builderExpiryBuffer),
 			)
