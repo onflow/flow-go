@@ -13,23 +13,23 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 // Builder is the builder for consensus block payloads. Upon providing a payload
 // hash, it also memorizes which entities were included into the payload.
 type Builder struct {
 	db       *badger.DB
+	seals    storage.Seals
 	headers  storage.Headers
 	payloads storage.Payloads
-	seals    storage.Seals
+	blocks   storage.Blocks
 	guarPool mempool.Guarantees
 	sealPool mempool.Seals
 	cfg      Config
 }
 
 // NewBuilder creates a new block builder.
-func NewBuilder(db *badger.DB, headers storage.Headers, payloads storage.Payloads, seals storage.Seals, guarPool mempool.Guarantees, sealPool mempool.Seals, options ...func(*Config)) *Builder {
+func NewBuilder(db *badger.DB, headers storage.Headers, seals storage.Seals, payloads storage.Payloads, blocks storage.Blocks, guarPool mempool.Guarantees, sealPool mempool.Seals, options ...func(*Config)) *Builder {
 
 	// initialize default config
 	cfg := Config{
@@ -46,8 +46,9 @@ func NewBuilder(db *badger.DB, headers storage.Headers, payloads storage.Payload
 	b := &Builder{
 		db:       db,
 		headers:  headers,
-		payloads: payloads,
 		seals:    seals,
+		payloads: payloads,
+		blocks:   blocks,
 		guarPool: guarPool,
 		sealPool: sealPool,
 		cfg:      cfg,
@@ -140,7 +141,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// and store the block header, as well as index the payload contents.
 
 	// build the payload so we can get the hash
-	payload := flow.Payload{
+	payload := &flow.Payload{
 		Identities: nil,
 		Guarantees: guarantees,
 		Seals:      seals,
@@ -166,7 +167,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 
 	// construct default block on top of the provided parent
-	proposal := flow.Header{
+	header := &flow.Header{
 		ChainID:     parent.ChainID,
 		ParentID:    parentID,
 		Height:      parent.Height + 1,
@@ -184,22 +185,22 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 
 	// apply the custom fields setter of the consensus algorithm
-	err = setter(&proposal)
+	err = setter(header)
 	if err != nil {
 		return nil, fmt.Errorf("could not apply setter: %w", err)
 	}
 
 	// insert the proposal into the database
+	proposal := &flow.Block{
+		Header:  header,
+		Payload: payload,
+	}
+	err = b.blocks.Store(proposal)
+	if err != nil {
+		return nil, fmt.Errorf("could ot store proposal: %w", err)
+	}
 	blockID := proposal.ID()
 	err = operation.RetryOnConflict(b.db.Update, func(tx *badger.Txn) error {
-		err = operation.InsertHeader(blockID, &proposal)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert proposal header: %w", err)
-		}
-		err = procedure.InsertPayload(blockID, &payload)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert proposal payload: %w", err)
-		}
 		err = operation.IndexBlockSeal(blockID, lastSeal.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index proposal seal: %w", err)
@@ -212,5 +213,5 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil
 	})
 
-	return &proposal, err
+	return header, err
 }

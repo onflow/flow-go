@@ -30,13 +30,19 @@ import (
 
 // GenericNode implements a generic in-process node for tests.
 type GenericNode struct {
-	Log     zerolog.Logger
-	Metrics module.Metrics
-	DB      *badger.DB
-	State   protocol.State
-	Me      module.Local
-	Net     *stub.Network
-	DBDir   string
+	Log        zerolog.Logger
+	Metrics    module.Metrics
+	DB         *badger.DB
+	Headers    storage.Headers
+	Identities storage.Identities
+	Guarantees storage.Guarantees
+	Seals      storage.Seals
+	Payloads   storage.Payloads
+	Blocks     storage.Blocks
+	State      protocol.State
+	Me         module.Local
+	Net        *stub.Network
+	DBDir      string
 }
 
 func (g *GenericNode) Done() {
@@ -106,8 +112,6 @@ type VerificationNode struct {
 	GenericNode
 	AuthReceipts          mempool.Receipts
 	PendingReceipts       mempool.PendingReceipts
-	HeaderStorage         storage.Headers
-	BlockStorage          storage.Blocks
 	AuthCollections       mempool.Collections
 	PendingCollections    mempool.PendingCollections
 	CollectionTrackers    mempool.CollectionTrackers

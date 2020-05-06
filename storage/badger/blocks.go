@@ -9,7 +9,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 // Blocks implements a simple read-only block storage around a badger DB.
@@ -19,11 +18,11 @@ type Blocks struct {
 	payloads *Payloads
 }
 
-func NewBlocks(db *badger.DB) *Blocks {
+func NewBlocks(db *badger.DB, headers *Headers, payloads *Payloads) *Blocks {
 	b := &Blocks{
 		db:       db,
-		headers:  NewHeaders(db),
-		payloads: NewPayloads(db),
+		headers:  headers,
+		payloads: payloads,
 	}
 	return b
 }
@@ -65,18 +64,11 @@ func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
 	return b.ByID(blockID)
 }
 
-func (b *Blocks) ByCollectionID(collectionID flow.Identifier) (*flow.Block, error) {
+func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	var blockID flow.Identifier
-	err := b.db.View(operation.LookupBlockIDByCollectionID(collectionID, &blockID))
+	err := b.db.View(operation.LookupCollectionBlock(collID, &blockID))
 	if err != nil {
 		return nil, fmt.Errorf("could not look up block: %w", err)
 	}
 	return b.ByID(blockID)
-}
-
-func (b *Blocks) IndexByGuarantees(blockID flow.Identifier) error {
-	err := b.db.Update(func(tx *badger.Txn) error {
-		return procedure.IndexBlockByGuarantees(blockID)(tx)
-	})
-	return err
 }

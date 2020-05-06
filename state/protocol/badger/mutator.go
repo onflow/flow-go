@@ -11,7 +11,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 type Mutator struct {
@@ -20,6 +19,8 @@ type Mutator struct {
 
 func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) error {
 	return m.state.db.Update(func(tx *badger.Txn) error {
+
+		// FIRST: execute all the validity checks on the genesis block
 
 		// the initial height needs to be height zero
 		if genesis.Header.Height != 0 {
@@ -86,10 +87,71 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 			}
 		}
 
-		// insert an empty children lookup for the block
-		err := operation.InsertBlockChildren(genesis.ID(), nil)(tx)
+		// SECOND: update the underyling database with the genesis data
+
+		// 1) insert the block, the genesis identities and index it by beight
+		err := m.state.blocks.Store(genesis)
+		if err != nil {
+			return fmt.Errorf("could not insert header: %w", err)
+		}
+		err = operation.IndexBlockHeight(0, genesis.ID())(tx)
+		if err != nil {
+			return fmt.Errorf("could not initialize boundary: %w", err)
+		}
+		err = operation.InsertBlockChildren(genesis.ID(), nil)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert empty block children: %w", err)
+		}
+
+		// TODO: put seal into payload to have it signed
+
+		// 2) generate genesis execution result, insert and index by block
+		result := flow.ExecutionResult{ExecutionResultBody: flow.ExecutionResultBody{
+			PreviousResultID: flow.ZeroID,
+			BlockID:          genesis.ID(),
+			FinalStateCommit: commit,
+		}}
+		err = operation.InsertExecutionResult(&result)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert genesis result: %w", err)
+		}
+		err = operation.IndexExecutionResult(genesis.ID(), result.ID())(tx)
+		if err != nil {
+			return fmt.Errorf("could not index genesis result: %w", err)
+		}
+
+		// 3) generate genesis block seal, insert and index by block
+		seal := flow.Seal{
+			BlockID:      genesis.ID(),
+			ResultID:     result.ID(),
+			InitialState: flow.GenesisStateCommitment,
+			FinalState:   result.FinalStateCommit,
+		}
+		err = operation.InsertSeal(seal.ID(), &seal)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert genesis seal: %w", err)
+		}
+		err = operation.IndexBlockSeal(genesis.ID(), seal.ID())(tx)
+		if err != nil {
+			return fmt.Errorf("could not index genesis block seal: %w", err)
+		}
+
+		// 4) initialize all of the special views and heights
+		err = operation.InsertStartedView(genesis.Header.View)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert started view: %w", err)
+		}
+		err = operation.InsertVotedView(genesis.Header.View)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert started view: %w", err)
+		}
+		err = operation.InsertFinalizedHeight(genesis.Header.Height)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert finalized height: %w", err)
+		}
+		err = operation.InsertSealedHeight(genesis.Header.Height)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert sealed height: %w", err)
 		}
 
 		return nil
@@ -244,17 +306,13 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	// FIFTH: Map the block to the seal corresponding to the sealed state after
 	// applying all of the seals in its payload. If its payload is empty, this
 	// corresponds to the seal of the last sealed block.
+	err = m.state.blocks.Store(candidate)
+	if err != nil {
+		return fmt.Errorf("could not store candidate block: %w", err)
+	}
 	blockID := candidate.ID()
 	err = operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
-		err := operation.InsertHeader(blockID, candidate.Header)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert candidate header: %w", err)
-		}
-		err = procedure.InsertPayload(blockID, candidate.Payload)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert candidate payload: %w", err)
-		}
-		err = operation.IndexBlockSeal(blockID, lastSeal.ID())(tx)
+		err := operation.IndexBlockSeal(blockID, lastSeal.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index candidate seal: %w", err)
 		}

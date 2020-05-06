@@ -20,10 +20,6 @@ type Blocks interface {
 	// for finalized blocks.
 	ByHeight(height uint64) (*flow.Block, error)
 
-	// ByCollectionID returns the block for a given guarantee ID. It is only available
-	// for finalized blocks.
-	ByCollectionID(collectionID flow.Identifier) (*flow.Block, error)
-
-	// IndexByGuarantees indexed the block for the given ID by guarantees
-	IndexByGuarantees(blockID flow.Identifier) error
+	// ByCollectionID returns the block for the given collection ID.
+	ByCollectionID(collID flow.Identifier) (*flow.Block, error)
 }

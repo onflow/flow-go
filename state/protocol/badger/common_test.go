@@ -12,10 +12,12 @@ import (
 
 func ProtocolState(t testing.TB, db *badger.DB, options ...func(*State)) *State {
 	identities := storage.NewIdentities(db)
-	headers := storage.NewHeaders(db)
-	payloads := storage.NewPayloads(db)
+	guarantees := storage.NewGuarantees(db)
 	seals := storage.NewSeals(db)
-	proto, err := NewState(db, identities, headers, payloads, seals, options...)
+	headers := storage.NewHeaders(db)
+	payloads := storage.NewPayloads(db, identities, guarantees, seals)
+	blocks := storage.NewBlocks(db, headers, payloads)
+	proto, err := NewState(db, blocks, headers, payloads, identities, seals, options...)
 	require.NoError(t, err)
 	return proto
 }

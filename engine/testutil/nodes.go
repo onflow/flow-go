@@ -55,11 +55,17 @@ func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, participa
 	db := unittest.BadgerDB(t, dbDir)
 
 	identities := storage.NewIdentities(db)
-	headers := storage.NewHeaders(db)
-	payloads := storage.NewPayloads(db)
+	guarantees := storage.NewGuarantees(db)
 	seals := storage.NewSeals(db)
+	headers := storage.NewHeaders(db)
+	payloads := storage.NewPayloads(db, identities, guarantees, seals)
+	blocks := storage.NewBlocks(db, headers, payloads)
 
-	state, err := UncheckedState(db, identities, headers, payloads, seals, flow.GenesisStateCommitment, participants)
+	state, err := protocol.NewState(db, headers, identities, seals, payloads, blocks)
+	require.NoError(t, err)
+
+	genesis := flow.Genesis(participants)
+	err = state.Mutate().Bootstrap(flow.GenesisStateCommitment, genesis)
 	require.NoError(t, err)
 
 	for _, option := range options {
@@ -85,13 +91,19 @@ func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, participa
 	require.NoError(t, err)
 
 	return mock.GenericNode{
-		Log:     log,
-		Metrics: metrics,
-		DB:      db,
-		State:   state,
-		Me:      me,
-		Net:     stub,
-		DBDir:   dbDir,
+		Log:        log,
+		Metrics:    metrics,
+		DB:         db,
+		Headers:    headers,
+		Identities: identities,
+		Guarantees: guarantees,
+		Seals:      seals,
+		Payloads:   payloads,
+		Blocks:     blocks,
+		State:      state,
+		Me:         me,
+		Net:        stub,
+		DBDir:      dbDir,
 	}
 }
 
@@ -194,8 +206,6 @@ func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int) []mock.ConsensusNod
 func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, syncThreshold uint64) mock.ExecutionNode {
 	node := GenericNode(t, hub, identity, identities)
 
-	blocksStorage := storage.NewBlocks(node.DB)
-	payloadsStorage := storage.NewPayloads(node.DB)
 	collectionsStorage := storage.NewCollections(node.DB)
 	eventsStorage := storage.NewEvents(node.DB)
 	txResultStorage := storage.NewTransactionResults(node.DB)
@@ -241,8 +251,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Net,
 		node.Me,
 		node.State,
-		blocksStorage,
-		payloadsStorage,
+		node.Blocks,
+		node.Payloads,
 		collectionsStorage,
 		eventsStorage,
 		txResultStorage,
@@ -329,14 +339,6 @@ func VerificationNode(t *testing.T,
 		require.Nil(t, err)
 	}
 
-	if node.HeaderStorage == nil {
-		node.HeaderStorage = storage.NewHeaders(node.DB)
-	}
-
-	if node.BlockStorage == nil {
-		node.BlockStorage = storage.NewBlocks(node.DB)
-	}
-
 	if node.VerifierEngine == nil {
 		rt := runtime.NewInterpreterRuntime()
 		vm := virtualmachine.New(rt)
@@ -372,8 +374,8 @@ func VerificationNode(t *testing.T,
 			node.ChunkDataPackTrackers,
 			node.IngestedChunkIDs,
 			node.IngestedResultIDs,
-			node.HeaderStorage,
-			node.BlockStorage,
+			node.Headers,
+			node.Blocks,
 			assigner,
 			requestIntervalMs,
 			failureThreshold,

@@ -10,8 +10,8 @@ type Guarantees struct {
 	mock.Mock
 }
 
-// ByID provides a mock function with given fields: collID
-func (_m *Guarantees) ByID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
+// ByCollectionID provides a mock function with given fields: collID
+func (_m *Guarantees) ByCollectionID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
 	ret := _m.Called(collID)
 
 	var r0 *flow.CollectionGuarantee
@@ -26,29 +26,6 @@ func (_m *Guarantees) ByID(collID flow.Identifier) (*flow.CollectionGuarantee, e
 	var r1 error
 	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
 		r1 = rf(collID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// PayloadFor provides a mock function with given fields: blockID
-func (_m *Guarantees) PayloadFor(blockID flow.Identifier) ([]*flow.CollectionGuarantee, error) {
-	ret := _m.Called(blockID)
-
-	var r0 []*flow.CollectionGuarantee
-	if rf, ok := ret.Get(0).(func(flow.Identifier) []*flow.CollectionGuarantee); ok {
-		r0 = rf(blockID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*flow.CollectionGuarantee)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(blockID)
 	} else {
 		r1 = ret.Error(1)
 	}

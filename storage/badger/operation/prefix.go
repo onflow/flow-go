@@ -40,8 +40,10 @@ const (
 
 	// codes for indexing multiple identifiers by identifier
 	codeBlockChildren     = 50 // index mapping block ID to children blocks
-	codePayloadGuarantees = 51 // index mapping block ID to payload guarantees
-	codePayloadSeals      = 52 // index mapping block ID to payload seals
+	codePayloadIdentities = 51 // index mapping block ID to payload identities
+	codePayloadGuarantees = 52 // index mapping block ID to payload guarantees
+	codePayloadSeals      = 53 // index mapping block ID to payload seals
+	codeCollectionBlock   = 54 // index mapping collection ID to block ID
 
 	// legacy codes (should be cleaned up)
 	codeChunkDataPack                = 100
@@ -53,7 +55,6 @@ const (
 	codeIndexCollection              = 200
 	codeIndexExecutionResultByBlock  = 202
 	codeIndexCollectionByTransaction = 203
-	codeIndexHeaderByCollection      = 204
 )
 
 func makePrefix(code byte, keys ...interface{}) []byte {

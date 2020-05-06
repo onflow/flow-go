@@ -17,17 +17,15 @@ import (
 type MetricsConsumer struct {
 	// inherit from noop consumer in order to satisfy the full interface
 	notifications.NoopConsumer
-	log        zerolog.Logger
-	guarantees storage.Guarantees
-	seals      storage.Seals
-	metrics    module.Metrics
+	log      zerolog.Logger
+	payloads storage.Payloads
+	metrics  module.Metrics
 }
 
-func NewMetricsConsumer(metrics module.Metrics, guarantees storage.Guarantees, seals storage.Seals) *MetricsConsumer {
+func NewMetricsConsumer(metrics module.Metrics, payloads storage.Payloads) *MetricsConsumer {
 	return &MetricsConsumer{
-		metrics:    metrics,
-		guarantees: guarantees,
-		seals:      seals,
+		metrics:  metrics,
+		payloads: payloads,
 	}
 }
 
@@ -46,7 +44,7 @@ func (c *MetricsConsumer) OnFinalizedBlock(block *model.Block) {
 }
 
 func (c *MetricsConsumer) OnBlockIncorporated(block *model.Block) {
-	guarantees, err := c.guarantees.PayloadFor(block.BlockID)
+	guarantees, err := c.payloads.GuaranteesFor(block.BlockID)
 	if err != nil {
 		c.log.Err(fmt.Errorf("could not get guarantee: %w", err))
 		return
@@ -70,7 +68,7 @@ func (c *MetricsConsumer) OnQcIncorporated(qc *model.QuorumCertificate) {
 
 // trace the end of the duration from when a collection is received to when it's finalized
 func (c *MetricsConsumer) traceFinalizedCollections(block *model.Block) error {
-	collections, err := c.guarantees.PayloadFor(block.BlockID)
+	collections, err := c.payloads.GuaranteesFor(block.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not get guarantee: %w", err)
 	}
@@ -88,7 +86,7 @@ func (c *MetricsConsumer) traceFinalizedCollections(block *model.Block) error {
 
 // trace the end of duration from when a block is received to when it's sealed
 func (c *MetricsConsumer) traceFinalizedSeals(block *model.Block) error {
-	seals, err := c.seals.PayloadFor(block.BlockID)
+	seals, err := c.payloads.SealsFor(block.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not get seals: %w", err)
 	}

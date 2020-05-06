@@ -20,11 +20,6 @@ func TestSealInsertCheckRetrieve(t *testing.T) {
 		err := db.Update(InsertSeal(expected.ID(), expected))
 		require.Nil(t, err)
 
-		var exists bool
-		err = db.View(CheckSeal(expected.ID(), &exists))
-		require.Nil(t, err)
-		require.True(t, exists)
-
 		var actual flow.Seal
 		err = db.View(RetrieveSeal(expected.ID(), &actual))
 		require.Nil(t, err)

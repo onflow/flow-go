@@ -12,17 +12,12 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestGuaranteeInsertCheckRetrieve(t *testing.T) {
+func TestGuaranteeInsertRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		g := unittest.CollectionGuaranteeFixture()
 
 		err := db.Update(InsertGuarantee(g.CollectionID, g))
 		require.Nil(t, err)
-
-		var exists bool
-		err = db.View(CheckGuarantee(g.CollectionID, &exists))
-		require.NoError(t, err)
-		require.True(t, exists)
 
 		var retrieved flow.CollectionGuarantee
 		err = db.View(RetrieveGuarantee(g.CollectionID, &retrieved))

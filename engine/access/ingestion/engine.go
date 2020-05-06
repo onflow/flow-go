@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/rand"
 
+	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
@@ -18,6 +19,7 @@ import (
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
 // Engine represents the ingestion engine, used to funnel data from other nodes
@@ -33,6 +35,8 @@ type Engine struct {
 	collectionConduit network.Conduit
 
 	// storage
+	// FIX: remove direct DB access by substituting indexer module
+	db           *badger.DB
 	blocks       storage.Blocks
 	headers      storage.Headers
 	collections  storage.Collections
@@ -45,6 +49,7 @@ func New(log zerolog.Logger,
 	state protocol.State,
 	metrics module.Metrics,
 	me module.Local,
+	db *badger.DB,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
@@ -57,6 +62,7 @@ func New(log zerolog.Logger,
 		metrics:      metrics,
 		state:        state,
 		me:           me,
+		db:           db,
 		blocks:       blocks,
 		headers:      headers,
 		collections:  collections,
@@ -156,10 +162,19 @@ func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 // TODO this will be an event triggered by the follower node when a new finalized or sealed block is received
 func (e *Engine) onBlockProposal(_ flow.Identifier, proposal *messages.BlockProposal) error {
 
+	// FIX: we can't index guarantees here, as we might have more than one block
+	// with the same collection as long as it is not finalized
+
+	// TODO: substitute an indexer module as layer between engine and storage
+
 	// index the block storage with each of the collection guarantee
-	err := e.blocks.IndexByGuarantees(proposal.Header.ID())
-	if err != nil {
-		return err
+	blockID := proposal.Header.ID()
+	for _, guarantee := range proposal.Payload.Guarantees {
+		collID := guarantee.ID()
+		err := e.db.Update(operation.SkipDuplicates(operation.IndexCollectionBlock(guarantee.ID(), blockID)))
+		if err != nil {
+			return fmt.Errorf("could not index collection block (%x): %w", collID, err)
+		}
 	}
 
 	// request each of the collections from the collection node
@@ -170,6 +185,9 @@ func (e *Engine) onBlockProposal(_ flow.Identifier, proposal *messages.BlockProp
 func (e *Engine) handleCollectionResponse(originID flow.Identifier, response *messages.CollectionResponse) error {
 	collection := response.Collection
 	light := collection.Light()
+
+	// FIX: we can't index guarantees here, as we might have more than one block
+	// with the same collection as long as it is not finalized
 
 	// store the light collection (collection minus the transaction body - those are stored separately)
 	// and add transaction ids as index

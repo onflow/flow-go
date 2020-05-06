@@ -78,20 +78,6 @@ func (mr *MockBlocksMockRecorder) ByID(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByID", reflect.TypeOf((*MockBlocks)(nil).ByID), arg0)
 }
 
-// IndexByGuarantees mocks base method
-func (m *MockBlocks) IndexByGuarantees(arg0 flow.Identifier) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IndexByGuarantees", arg0)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// IndexByGuarantees indicates an expected call of IndexByGuarantees
-func (mr *MockBlocksMockRecorder) IndexByGuarantees(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IndexByGuarantees", reflect.TypeOf((*MockBlocks)(nil).IndexByGuarantees), arg0)
-}
-
 // Store mocks base method
 func (m *MockBlocks) Store(arg0 *flow.Block) error {
 	m.ctrl.T.Helper()
@@ -142,6 +128,51 @@ func (m *MockPayloads) ByBlockID(arg0 flow.Identifier) (*flow.Payload, error) {
 func (mr *MockPayloadsMockRecorder) ByBlockID(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByBlockID", reflect.TypeOf((*MockPayloads)(nil).ByBlockID), arg0)
+}
+
+// GuaranteesFor mocks base method
+func (m *MockPayloads) GuaranteesFor(arg0 flow.Identifier) ([]*flow.CollectionGuarantee, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GuaranteesFor", arg0)
+	ret0, _ := ret[0].([]*flow.CollectionGuarantee)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GuaranteesFor indicates an expected call of GuaranteesFor
+func (mr *MockPayloadsMockRecorder) GuaranteesFor(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GuaranteesFor", reflect.TypeOf((*MockPayloads)(nil).GuaranteesFor), arg0)
+}
+
+// IdentitiesFor mocks base method
+func (m *MockPayloads) IdentitiesFor(arg0 flow.Identifier) (flow.IdentityList, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IdentitiesFor", arg0)
+	ret0, _ := ret[0].(flow.IdentityList)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IdentitiesFor indicates an expected call of IdentitiesFor
+func (mr *MockPayloadsMockRecorder) IdentitiesFor(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IdentitiesFor", reflect.TypeOf((*MockPayloads)(nil).IdentitiesFor), arg0)
+}
+
+// SealsFor mocks base method
+func (m *MockPayloads) SealsFor(arg0 flow.Identifier) ([]*flow.Seal, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SealsFor", arg0)
+	ret0, _ := ret[0].([]*flow.Seal)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SealsFor indicates an expected call of SealsFor
+func (mr *MockPayloadsMockRecorder) SealsFor(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SealsFor", reflect.TypeOf((*MockPayloads)(nil).SealsFor), arg0)
 }
 
 // Store mocks base method

@@ -132,7 +132,7 @@ func main() {
 			}
 
 			// initialize the block builder
-			build := builder.NewBuilder(node.DB, node.Headers, node.Payloads, node.Seals, guarantees, seals,
+			build := builder.NewBuilder(node.DB, node.Headers, node.Seals, node.Payloads, node.Blocks, guarantees, seals,
 				builder.WithMinInterval(minInterval),
 				builder.WithMaxInterval(maxInterval),
 			)
@@ -161,7 +161,7 @@ func main() {
 			signer := verification.NewCombinedSigner(committee, node.DKGState, staking, beacon, merger, node.NodeID)
 
 			// initialize a logging notifier for hotstuff
-			notifier := consensus.CreateNotifier(node.Logger, node.Metrics, node.Guarantees, node.Seals)
+			notifier := consensus.CreateNotifier(node.Logger, node.Metrics, node.Payloads)
 
 			// initialize the persister
 			persist := persister.New(node.DB)

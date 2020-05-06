@@ -79,20 +79,6 @@ func (_m *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 	return r0, r1
 }
 
-// IndexByGuarantees provides a mock function with given fields: blockID
-func (_m *Blocks) IndexByGuarantees(blockID flow.Identifier) error {
-	ret := _m.Called(blockID)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) error); ok {
-		r0 = rf(blockID)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // Store provides a mock function with given fields: block
 func (_m *Blocks) Store(block *flow.Block) error {
 	ret := _m.Called(block)

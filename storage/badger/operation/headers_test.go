@@ -51,11 +51,11 @@ func TestHeaderIDIndexByCollectionID(t *testing.T) {
 		headerID := unittest.IdentifierFixture()
 		collectionID := unittest.IdentifierFixture()
 
-		err := db.Update(IndexHeaderByCollection(collectionID, headerID))
+		err := db.Update(IndexCollectionBlock(collectionID, headerID))
 		require.Nil(t, err)
 
 		actualID := &flow.Identifier{}
-		err = db.View(LookupBlockIDByCollectionID(collectionID, actualID))
+		err = db.View(LookupCollectionBlock(collectionID, actualID))
 		require.Nil(t, err)
 		assert.Equal(t, headerID, *actualID)
 	})

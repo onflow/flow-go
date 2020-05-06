@@ -1,9 +1,6 @@
 package badger
 
 import (
-	"fmt"
-	"sync"
-
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -11,36 +8,37 @@ import (
 )
 
 type Identities struct {
-	sync.Mutex
-	db         *badger.DB
-	identities flow.IdentityList
+	db    *badger.DB
+	cache *Cache
 }
 
 func NewIdentities(db *badger.DB) *Identities {
+
+	store := func(nodeID flow.Identifier, identity interface{}) error {
+		return db.Update(operation.SkipDuplicates(operation.InsertIdentity(nodeID, identity.(*flow.Identity))))
+	}
+
+	retrieve := func(nodeID flow.Identifier) (interface{}, error) {
+		var identity flow.Identity
+		err := db.View(operation.RetrieveIdentity(nodeID, &identity))
+		return &identity, err
+	}
+
 	i := &Identities{
-		db:         db,
-		identities: nil,
+		db:    db,
+		cache: newCache(withLimit(100), withStore(store), withRetrieve(retrieve)),
 	}
 	return i
 }
 
-func (i *Identities) ByBlockID(blockID flow.Identifier) (flow.IdentityList, error) {
-	i.Lock()
-	defer i.Unlock()
+func (i *Identities) Store(identity *flow.Identity) error {
+	return i.cache.Put(identity.NodeID, identity)
+}
 
-	// check if identities were already loaded
-	if i.identities != nil {
-		return i.identities, nil
-	}
-
-	// load identities
-	var identities flow.IdentityList
-	err := i.db.View(operation.RetrieveIdentities(&identities))
+func (i *Identities) ByNodeID(nodeID flow.Identifier) (*flow.Identity, error) {
+	identity, err := i.cache.Get(nodeID)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve identities: %w", err)
+		return nil, err
 	}
-
-	// cache identities
-	i.identities = identities
-	return identities, nil
+	return identity.(*flow.Identity), nil
 }

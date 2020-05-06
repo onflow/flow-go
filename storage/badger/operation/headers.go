@@ -20,12 +20,12 @@ func RetrieveHeader(blockID flow.Identifier, header *flow.Header) func(*badger.T
 	return retrieve(makePrefix(codeHeader, blockID), header)
 }
 
-func IndexHeaderByCollection(collectionID, headerID flow.Identifier) func(*badger.Txn) error {
-	return insert(makePrefix(codeIndexHeaderByCollection, collectionID), headerID)
+func IndexCollectionBlock(collID flow.Identifier, blockID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeCollectionBlock, collID), blockID)
 }
 
-func LookupBlockIDByCollectionID(collectionID flow.Identifier, headerID *flow.Identifier) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeIndexHeaderByCollection, collectionID), headerID)
+func LookupCollectionBlock(collID flow.Identifier, blockID *flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeCollectionBlock, collID), blockID)
 }
 
 func IndexBlockHeight(height uint64, blockID flow.Identifier) func(*badger.Txn) error {

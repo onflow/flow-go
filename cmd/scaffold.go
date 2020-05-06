@@ -86,10 +86,10 @@ type FlowNodeBuilder struct {
 	Metrics        *metrics.Collector
 	Me             *local.Local
 	DB             *badger.DB
-	Identities     *storage.Identities
+	Blocks         *storage.Blocks
 	Headers        *storage.Headers
 	Payloads       *storage.Payloads
-	Blocks         *storage.Blocks
+	Identities     *storage.Identities
 	Guarantees     *storage.Guarantees
 	Seals          *storage.Seals
 	State          *protocol.State
@@ -244,12 +244,12 @@ func (fnb *FlowNodeBuilder) initDatabase() {
 	fnb.MustNot(err).Msg("could not initialize max tracker")
 
 	fnb.DB = db
-	fnb.Identities = storage.NewIdentities(db)
 	fnb.Headers = storage.NewHeaders(db)
-	fnb.Payloads = storage.NewPayloads(db)
-	fnb.Blocks = storage.NewBlocks(db)
+	fnb.Identities = storage.NewIdentities(db)
 	fnb.Guarantees = storage.NewGuarantees(db)
 	fnb.Seals = storage.NewSeals(db)
+	fnb.Payloads = storage.NewPayloads(db, fnb.Identities, fnb.Guarantees, fnb.Seals)
+	fnb.Blocks = storage.NewBlocks(db, fnb.Headers, fnb.Payloads)
 }
 
 func (fnb *FlowNodeBuilder) initMetrics() {
@@ -262,10 +262,11 @@ func (fnb *FlowNodeBuilder) initState() {
 
 	state, err := protocol.NewState(
 		fnb.DB,
-		fnb.Identities,
 		fnb.Headers,
-		fnb.Payloads,
+		fnb.Identities,
 		fnb.Seals,
+		fnb.Payloads,
+		fnb.Blocks,
 		protocol.SetClusters(fnb.BaseConfig.nClusters),
 	)
 	fnb.MustNot(err).Msg("could not initialize flow state")

@@ -100,7 +100,6 @@ func (h *Handler) GetTransactionResult(ctx context.Context, req *access.GetTrans
 func (h *Handler) deriveTransactionStatus(tx *flow.TransactionBody) (entities.TransactionStatus, error) {
 
 	block, err := h.lookupBlock(tx.ID())
-
 	if errors.Is(err, storage.ErrNotFound) {
 		// tx found in transaction storage and collection storage but not in block storage
 		// However, this will not happen as of now since the ingestion engine doesn't subscribe
@@ -112,14 +111,14 @@ func (h *Handler) deriveTransactionStatus(tx *flow.TransactionBody) (entities.Tr
 	}
 
 	// get the latest sealed block from the state
-	latestSealedBlock, err := h.state.Sealed().Head()
+	sealed, err := h.state.Sealed().Head()
 	if err != nil {
 		return entities.TransactionStatus_UNKNOWN, err
 	}
 
 	// if the finalized block precedes the latest sealed block, then it can be safely assumed that it would have been
 	// sealed as well and the transaction can be considered sealed
-	if block.Header.Height <= latestSealedBlock.Height {
+	if block.Header.Height <= sealed.Height {
 		return entities.TransactionStatus_SEALED, nil
 	}
 	// otherwise, the finalized block of the transaction has not yet been sealed

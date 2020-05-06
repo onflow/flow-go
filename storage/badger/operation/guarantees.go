@@ -10,10 +10,6 @@ func InsertGuarantee(guarID flow.Identifier, guarantee *flow.CollectionGuarantee
 	return insert(makePrefix(codeGuarantee, guarID), guarantee)
 }
 
-func CheckGuarantee(guarID flow.Identifier, exists *bool) func(*badger.Txn) error {
-	return check(makePrefix(codeGuarantee, guarID), exists)
-}
-
 func RetrieveGuarantee(guarID flow.Identifier, guarantee *flow.CollectionGuarantee) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeGuarantee, guarID), guarantee)
 }

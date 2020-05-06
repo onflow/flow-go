@@ -10,10 +10,6 @@ func InsertSeal(sealID flow.Identifier, seal *flow.Seal) func(*badger.Txn) error
 	return insert(makePrefix(codeSeal, sealID), seal)
 }
 
-func CheckSeal(sealID flow.Identifier, exists *bool) func(*badger.Txn) error {
-	return check(makePrefix(codeSeal, sealID), exists)
-}
-
 func RetrieveSeal(sealID flow.Identifier, seal *flow.Seal) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeSeal, sealID), seal)
 }

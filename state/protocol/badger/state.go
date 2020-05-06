@@ -16,22 +16,24 @@ import (
 type State struct {
 	db         *badger.DB
 	clusters   uint
-	identities storage.Identities
 	headers    storage.Headers
-	payloads   storage.Payloads
+	identities storage.Identities
 	seals      storage.Seals
+	payloads   storage.Payloads
+	blocks     storage.Blocks
 }
 
 // NewState initializes a new state backed by a badger database, applying the
 // optional configuration parameters.
-func NewState(db *badger.DB, identities storage.Identities, headers storage.Headers, payloads storage.Payloads, seals storage.Seals, options ...func(*State)) (*State, error) {
+func NewState(db *badger.DB, headers storage.Headers, identities storage.Identities, seals storage.Seals, payloads storage.Payloads, blocks storage.Blocks, options ...func(*State)) (*State, error) {
 	s := &State{
 		db:         db,
 		clusters:   1,
-		identities: identities,
 		headers:    headers,
-		payloads:   payloads,
+		identities: identities,
 		seals:      seals,
+		payloads:   payloads,
+		blocks:     blocks,
 	}
 	for _, option := range options {
 		option(s)
@@ -44,18 +46,6 @@ func NewState(db *badger.DB, identities storage.Identities, headers storage.Head
 	return s, nil
 }
 
-func (s *State) Final() protocol.Snapshot {
-
-	// retrieve the latest finalized height
-	var finalized uint64
-	err := s.db.View(operation.RetrieveFinalizedHeight(&finalized))
-	if err != nil {
-		return &Snapshot{err: fmt.Errorf("could not retrieve finalized height: %w", err)}
-	}
-
-	return s.AtHeight(finalized)
-}
-
 func (s *State) Sealed() protocol.Snapshot {
 
 	// retrieve the latest sealed height
@@ -66,6 +56,18 @@ func (s *State) Sealed() protocol.Snapshot {
 	}
 
 	return s.AtHeight(sealed)
+}
+
+func (s *State) Final() protocol.Snapshot {
+
+	// retrieve the latest finalized height
+	var finalized uint64
+	err := s.db.View(operation.RetrieveFinalizedHeight(&finalized))
+	if err != nil {
+		return &Snapshot{err: fmt.Errorf("could not retrieve finalized height: %w", err)}
+	}
+
+	return s.AtHeight(finalized)
 }
 
 func (s *State) AtHeight(height uint64) protocol.Snapshot {

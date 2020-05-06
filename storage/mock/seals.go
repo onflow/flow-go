@@ -56,29 +56,6 @@ func (_m *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {
 	return r0, r1
 }
 
-// PayloadFor provides a mock function with given fields: blockID
-func (_m *Seals) PayloadFor(blockID flow.Identifier) ([]*flow.Seal, error) {
-	ret := _m.Called(blockID)
-
-	var r0 []*flow.Seal
-	if rf, ok := ret.Get(0).(func(flow.Identifier) []*flow.Seal); ok {
-		r0 = rf(blockID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*flow.Seal)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(blockID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // Store provides a mock function with given fields: guarantee
 func (_m *Seals) Store(guarantee *flow.Seal) error {
 	ret := _m.Called(guarantee)

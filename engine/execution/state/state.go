@@ -11,7 +11,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 // ReadOnlyExecutionState allows to read the execution state
@@ -64,6 +63,7 @@ type ExecutionState interface {
 type state struct {
 	ls               storage.Ledger
 	commits          storage.Commits
+	blocks           storage.Blocks
 	chunkDataPacks   storage.ChunkDataPacks
 	executionResults storage.ExecutionResults
 	db               *badger.DB
@@ -175,17 +175,18 @@ func (s *state) PersistStateInteractions(blockID flow.Identifier, views []*delta
 }
 
 func (s *state) RetrieveStateDelta(blockID flow.Identifier) (*messages.ExecutionStateDelta, error) {
-	var block flow.Block
+
+	block, err := s.blocks.ByID(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("cannot retrieve block: %w", err)
+	}
+
 	var startStateCommitment flow.StateCommitment
 	var endStateCommitment flow.StateCommitment
 	var stateInteractions []*delta.Snapshot
 	var events []flow.Event
 	var txResults []flow.TransactionResult
-	err := s.db.View(func(txn *badger.Txn) error {
-		err := procedure.RetrieveBlock(blockID, &block)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot retrieve block: %w", err)
-		}
+	err = s.db.View(func(txn *badger.Txn) error {
 
 		err = operation.LookupStateCommitment(blockID, &endStateCommitment)(txn)
 		if err != nil {
@@ -218,7 +219,7 @@ func (s *state) RetrieveStateDelta(blockID flow.Identifier) (*messages.Execution
 		return nil, err
 	}
 	return &messages.ExecutionStateDelta{
-		Block:              &block,
+		Block:              block,
 		StateInteractions:  stateInteractions,
 		StartState:         startStateCommitment,
 		EndState:           endStateCommitment,

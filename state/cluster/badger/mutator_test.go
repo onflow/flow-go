@@ -54,10 +54,12 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.mutator = suite.state.Mutate()
 
 	identities := storage.NewIdentities(suite.db)
-	headers := storage.NewHeaders(suite.db)
-	payloads := storage.NewPayloads(suite.db)
+	guarantees := storage.NewGuarantees(suite.db)
 	seals := storage.NewSeals(suite.db)
-	suite.protoState, err = protocol.NewState(suite.db, identities, headers, payloads, seals)
+	headers := storage.NewHeaders(suite.db)
+	payloads := storage.NewPayloads(suite.db, identities, guarantees, seals)
+	blocks := storage.NewBlocks(suite.db, headers, payloads)
+	suite.protoState, err = protocol.NewState(suite.db, blocks, headers, payloads, identities, seals)
 	require.NoError(suite.T(), err)
 }
 

@@ -7,6 +7,9 @@ import (
 // Identities represents the simple storage for identities.
 type Identities interface {
 
-	// ByBlockID will retrieve all identities from the storage by block
-	ByBlockID(blockID flow.Identifier) (flow.IdentityList, error)
+	// Store will store the given identity.
+	Store(identity *flow.Identity) error
+
+	// ByNodeID will retrieve the identity for a node.
+	ByNodeID(nodeID flow.Identifier) (*flow.Identity, error)
 }
