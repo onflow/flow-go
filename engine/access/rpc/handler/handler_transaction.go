@@ -83,7 +83,7 @@ func (h *Handler) GetTransactionResult(ctx context.Context, req *access.GetTrans
 		return nil, convertStorageError(err)
 	}
 
-	//TODO: Set correct values for StatusCode and ErrorMessage
+	// TODO: Set correct values for StatusCode and ErrorMessage
 
 	// return result
 	resp := &access.TransactionResultResponse{
@@ -155,5 +155,14 @@ func (h *Handler) lookupTransactionResult(ctx context.Context, txID flow.Identif
 	}
 
 	blockID := block.ID()
-	return h.getTransactionResultFromExecutionNode(ctx, blockID[:], txID[:])
+
+	events, txStatus, message, err := h.getTransactionResultFromExecutionNode(ctx, blockID[:], txID[:])
+	if err != nil {
+		errStatus, _ := status.FromError(err)
+		if errStatus.Code() == codes.NotFound {
+			return nil, 0, "", nil
+		}
+	}
+
+	return events, txStatus, message, nil
 }
