@@ -22,6 +22,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
+	"github.com/dapperlabs/flow-go/utils/logging"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -562,7 +563,10 @@ func setupMockExeNode(t *testing.T,
 						chunk, ok := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i))
 						require.True(t, ok, "chunk out of range requested")
 						chunkID := chunk.ID()
-						if IsAssigned(chunk.Index) && chunkID == req.ChunkID {
+						if chunkID == req.ChunkID {
+							if !IsAssigned(chunk.Index) {
+								require.Error(t, fmt.Errorf(" requested an unassigned chunk data pack %x", req))
+							}
 							// each assigned chunk data pack should be requested only once
 							_, ok := exeChunkDataSeen[originID][chunkID]
 							require.False(t, ok)
@@ -576,6 +580,12 @@ func setupMockExeNode(t *testing.T,
 							}
 							err := exeChunkDataConduit.Submit(res, originID)
 							assert.Nil(t, err)
+
+							log.Debug().
+								Hex("origin_id", logging.ID(originID)).
+								Hex("chunk_id", logging.ID(chunkID)).
+								Msg("chunk data pack request answered by execution node")
+
 							return
 						}
 					}
