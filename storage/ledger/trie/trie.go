@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"sync"
 
 	"github.com/gammazero/deque"
 	lru "github.com/hashicorp/golang-lru"
@@ -1112,7 +1113,6 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 		return newRootNode.value, nil
 	}
 
-	// db, err := leveldb.NewLevelDB(filepath.Join(s.forest.dbDir, newRootNode.value.String()))
 	db, err := inmemdb.NewInMemDB(filepath.Join(s.forest.dbDir, newRootNode.value.String()))
 	if err != nil {
 		return nil, fmt.Errorf("cannot create new DB: %w", err)
@@ -1148,7 +1148,7 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 	if err != nil {
 		return nil, err
 	}
-	// TODO make this less frequent
+
 	go db.Persist()
 	s.forest.Add(newTree)
 
@@ -1203,7 +1203,9 @@ func (s *SMT) insertIntoKeys(database databases.DAL, insert []byte, keys [][]byt
 // UpdateAtomically updates the trie atomically and returns the state rootNode
 // NOTE: This function assumes keys and values are sorted and haves indexes mapping to each other
 func (s *SMT) UpdateAtomically(rootNode *node, keys [][]byte, values [][]byte, height int, batcher databases.Batcher, database databases.DAL) (*node, error) {
+
 	var err error
+
 	if rootNode.value != nil {
 		batcher.Put(rootNode.value, nil)
 	}
@@ -1253,23 +1255,28 @@ func (s *SMT) UpdateAtomically(rootNode *node, keys [][]byte, values [][]byte, h
 	return rootNode, nil
 }
 
-// GetandSetChildren checks if any of the children are nill and creates them as a default node if they are, otherwise
-// we just return the children
-func (n *node) GetandSetChildren(hashes [257]Root) (*node, *node) {
-	if n.lChild == nil {
-		n.lChild = newNode(nil, n.height-1)
-	}
-	if n.rChild == nil {
-		n.rChild = newNode(nil, n.height-1)
-	}
-
-	return n.lChild, n.rChild
-}
-
 // updateParallel updates both the left and right subtrees and computes a new rootNode
 func (s *SMT) updateParallel(lnode *node, rnode *node, rootNode *node, keys [][]byte, values [][]byte, lkeys [][]byte, rkeys [][]byte, lvalues [][]byte, rvalues [][]byte, height int, batcher databases.Batcher, database databases.DAL) (*node, error) {
-	lupdate, err1 := s.UpdateAtomically(lnode, lkeys, lvalues, height-1, batcher, database)
-	rupdate, err2 := s.UpdateAtomically(rnode, rkeys, rvalues, height-1, batcher, database)
+
+	wg := sync.WaitGroup{}
+	var lupdate, rupdate *node
+	var err1, err2 error
+
+	lbatcher := inmemdb.NewInMemBatcher()
+	rbatcher := inmemdb.NewInMemBatcher()
+
+	f1 := func() {
+		defer wg.Done()
+		lupdate, err1 = s.UpdateAtomically(lnode, lkeys, lvalues, height-1, lbatcher, database)
+	}
+	f2 := func() {
+		defer wg.Done()
+		rupdate, err2 = s.UpdateAtomically(rnode, rkeys, rvalues, height-1, rbatcher, database)
+	}
+	wg.Add(2)
+	go f1()
+	go f2()
+	wg.Wait()
 
 	if err1 != nil {
 		return nil, err1
@@ -1277,6 +1284,8 @@ func (s *SMT) updateParallel(lnode *node, rnode *node, rootNode *node, keys [][]
 	if err2 != nil {
 		return nil, err2
 	}
+	batcher.Merge(lbatcher)
+	batcher.Merge(rbatcher)
 
 	return s.ComputeRootNode(lupdate, rupdate, rootNode, keys, values, height, batcher), nil
 }
@@ -1297,6 +1306,19 @@ func (s *SMT) updateRight(lnode *node, rnode *node, rootNode *node, rkeys [][]by
 		return nil, err
 	}
 	return s.ComputeRootNode(lnode, update, rootNode, rkeys, rvalues, height, batcher), nil
+}
+
+// GetandSetChildren checks if any of the children are nill and creates them as a default node if they are, otherwise
+// we just return the children
+func (n *node) GetandSetChildren(hashes [257]Root) (*node, *node) {
+	if n.lChild == nil {
+		n.lChild = newNode(nil, n.height-1)
+	}
+	if n.rChild == nil {
+		n.rChild = newNode(nil, n.height-1)
+	}
+
+	return n.lChild, n.rChild
 }
 
 // ComputeRoot either returns a new leafNode or computes a new rootNode by hashing its children

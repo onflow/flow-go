@@ -34,4 +34,5 @@ type DAL interface {
 }
 type Batcher interface {
 	Put(key []byte, value []byte)
+	Merge(Batcher)
 }

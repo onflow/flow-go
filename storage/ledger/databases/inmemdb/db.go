@@ -51,7 +51,7 @@ func NewInMemDB(path string) (*InMemDB, error) {
 		Path:    path,
 		Kvdb:    make(map[string][]byte),
 		Tdb:     make(map[string][]byte),
-		batcher: newInMemBatcher(),
+		batcher: NewInMemBatcher(),
 	}
 	m.Load()
 	return m, nil
@@ -59,7 +59,7 @@ func NewInMemDB(path string) (*InMemDB, error) {
 
 // NewBatcher creates a new batch
 func (m *InMemDB) NewBatcher() databases.Batcher {
-	return newInMemBatcher()
+	return NewInMemBatcher()
 }
 
 // PutIntoBatcher inserts or Deletes a KV pair into the batcher.
