@@ -21,4 +21,5 @@ const (
 const (
 	subsystemStateStorage = "state_storage"
 	subsystemRuntime      = "runtime"
+	subsystemIngestion    = "ingestion"
 )

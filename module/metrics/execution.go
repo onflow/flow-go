@@ -43,7 +43,7 @@ var (
 	})
 	executionLastExecutedBlockViewGauge = promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
-		Subsystem: subsystemStateStorage,
+		Subsystem: subsystemIngestion,
 		Name:      "last_executed_block_view",
 		Help:      "the last view that was executed",
 	})
