@@ -30,6 +30,9 @@ If the metric is in the form of a verb, it should be in the past tense.
 Metrics should always be suffixed with the unit the metric is in, pluralized.
 `seconds`, `bytes`, `messages`, `transactions`, `chunks`
 
+Use the [Prometheus standard base units](https://prometheus.io/docs/practices/naming/#base-units).
+Avoid `milliseconds`, `bits`, etc
+
 If the metrics is an ever accumulating counter, it should be additionally suffixed with `total` after the unit.
 `seconds_total`, `transations_total`
 
