@@ -254,7 +254,7 @@ func main() {
 			}
 
 			//Collector cluster's HotStuff committee state
-			committee, err := initClusterCommittee(node)
+			committee, err := initClusterCommittee(node, colPayloads)
 			if err != nil {
 				return nil, fmt.Errorf("creating HotStuff committee state failed: %w", err)
 			}
@@ -282,10 +282,14 @@ func main() {
 }
 
 // initClusterCommittee initializetestnet/network.gos the Collector cluster's HotStuff committee state
-func initClusterCommittee(node *cmd.FlowNodeBuilder) (hotstuff.Committee, error) {
-	mainGenesisBlockID := node.GenesisBlock.ID()
-	// TODO: update to return reference block ID from collection
-	blockTranslator := func(blockID flow.Identifier) (flow.Identifier, error) { return mainGenesisBlockID, nil }
+func initClusterCommittee(node *cmd.FlowNodeBuilder, colPayloads *badger.ClusterPayloads) (hotstuff.Committee, error) {
+	blockTranslator := func(blockID *flow.Identifier) (*flow.Identifier, error) {
+		payload, err := colPayloads.ByBlockID(*blockID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to retrive payload for cluster block %x: %w", blockID, err)
+		}
+		return &payload.ReferenceBlockID, nil
+	}
 
 	// create a filter for consensus members for our cluster
 	cluster, err := protocol.ClusterFor(node.State.Final(), node.Me.NodeID())
