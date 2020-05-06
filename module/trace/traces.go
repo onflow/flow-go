@@ -11,6 +11,10 @@ const (
 	EXEComputeCollection  = "computer.computeCollection"
 	EXEComputeTransaction = "computer.computeTransaction"
 
+	EXEParseTransaction     = "runtime.parseTransaction"
+	EXECheckTransaction     = "runtime.checkTransaction"
+	EXEInterpretTransaction = "runtime.interpretTransaction"
+
 	EXECommitDelta                        = "state.commitDelta"
 	EXEGetRegisters                       = "state.getRegisters"
 	EXEGetRegistersWithProofs             = "state.getRegistersWithProofs"
