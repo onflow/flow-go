@@ -184,8 +184,20 @@ type LedgerMetrics interface {
 	ReadDurationPerItem(duration time.Duration)
 }
 
+type RuntimeMetrics interface {
+	// TransactionParsed reports the time spent parsing a single transaction
+	TransactionParsed(dur time.Duration)
+
+	// TransactionChecked reports the time spent checking a single transaction
+	TransactionChecked(dur time.Duration)
+
+	// TransactionInterpreted reports the time spent interpreting a single transaction
+	TransactionInterpreted(dur time.Duration)
+}
+
 type ExecutionMetrics interface {
 	LedgerMetrics
+	RuntimeMetrics
 
 	// StartBlockReceivedToExecuted starts a span to trace the duration of a block
 	// from being received for execution to execution being finished

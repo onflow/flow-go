@@ -23,16 +23,18 @@ type BlockComputer interface {
 }
 
 type blockComputer struct {
-	tracer module.Tracer
-	vm     virtualmachine.VirtualMachine
-	blocks storage.Blocks
+	metrics module.Metrics
+	tracer  module.Tracer
+	vm      virtualmachine.VirtualMachine
+		blocks storage.Blocks
 }
 
 // NewBlockComputer creates a new block executor.
-func NewBlockComputer(vm virtualmachine.VirtualMachine, tracer module.Tracer, blocks storage.Blocks) BlockComputer {
+func NewBlockComputer(vm virtualmachine.VirtualMachine, metrics module.Metrics, tracer module.Tracer, blocks storage.Blocks) BlockComputer {
 	return &blockComputer{
-		tracer: tracer,
-		vm:     vm,
+		metrics: metrics,
+		tracer:  tracer,
+		vm:      vm,
 		blocks: blocks,
 	}
 }
@@ -156,6 +158,13 @@ func (e *blockComputer) executeCollection(
 			txView := collectionView.NewChild()
 
 			result, err := blockCtx.ExecuteTransaction(txView, tx, virtualmachine.WithMetrics(metrics))
+
+			if e.metrics != nil {
+				e.metrics.ExecutionTransactionParsed(metrics.Parsed())
+				e.metrics.ExecutionTransactionChecked(metrics.Checked())
+				e.metrics.ExecutionTransactionInterpreted(metrics.Interpreted())
+			}
+
 			if err != nil {
 				txIndex++
 				return fmt.Errorf("failed to execute transaction: %w", err)
