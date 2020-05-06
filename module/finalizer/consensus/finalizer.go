@@ -97,3 +97,16 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 		return nil
 	})
 }
+
+// MakePending indexes a block by its parent. The index is useful for looking up the child block
+// of a finalized block.
+func (f *Finalizer) MakePending(blockID flow.Identifier, parentID flow.Identifier) error {
+	return f.db.Update(func(tx *badger.Txn) error {
+		err := procedure.IndexChildByBlockID(parentID, blockID)(tx)
+		if err != nil {
+			return fmt.Errorf("cannot index child by blockID: %w", err)
+		}
+
+		return nil
+	})
+}

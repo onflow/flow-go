@@ -147,6 +147,10 @@ func (r *Finalizer) AddBlock(block *model.Block) error {
 	if err != nil {
 		return fmt.Errorf("updating consensus state failed: %w", err)
 	}
+	err = r.finalizationCallback.MakePending(blockContainer.Block.BlockID, blockContainer.Block.QC.BlockID)
+	if err != nil {
+		return fmt.Errorf("MakePending fails in other component: %w", err)
+	}
 	r.notifier.OnBlockIncorporated(blockContainer.Block)
 	return nil
 }
