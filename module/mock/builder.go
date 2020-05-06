@@ -11,11 +11,11 @@ type Builder struct {
 }
 
 // BuildOn provides a mock function with given fields: parentID, setter
-func (_m *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (*flow.Header, error) {
+func (_m *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
 	ret := _m.Called(parentID, setter)
 
 	var r0 *flow.Header
-	if rf, ok := ret.Get(0).(func(flow.Identifier, func(*flow.Header)) *flow.Header); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, func(*flow.Header) error) *flow.Header); ok {
 		r0 = rf(parentID, setter)
 	} else {
 		if ret.Get(0) != nil {
@@ -24,7 +24,7 @@ func (_m *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) 
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier, func(*flow.Header)) error); ok {
+	if rf, ok := ret.Get(1).(func(flow.Identifier, func(*flow.Header) error) error); ok {
 		r1 = rf(parentID, setter)
 	} else {
 		r1 = ret.Error(1)

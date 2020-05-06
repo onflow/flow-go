@@ -60,7 +60,7 @@ func (ss *stateSync) findDeltasToSend(startID, endID flow.Identifier) ([]*messag
 	// but other option are also supported, so handy variable to distinguish later
 	reversedHeights := false
 
-	if startDelta.Block.Height > endDelta.Block.Height {
+	if startDelta.Block.Header.Height > endDelta.Block.Header.Height {
 		highDelta, lowDelta = lowDelta, highDelta
 		higherChainDelta, lowerChainDelta = lowerChainDelta, higherChainDelta
 		reversedHeights = true
@@ -68,9 +68,9 @@ func (ss *stateSync) findDeltasToSend(startID, endID flow.Identifier) ([]*messag
 
 	// worst case we should reach genesis, block common for all
 	for {
-		highParentDelta, err := ss.execState.RetrieveStateDelta(highDelta.Block.ParentID)
+		highParentDelta, err := ss.execState.RetrieveStateDelta(highDelta.Block.Header.ParentID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to retrieve state delta for blockID %s: %w", highDelta.Block.ParentID, err)
+			return nil, fmt.Errorf("failed to retrieve state delta for blockID %s: %w", highDelta.Block.Header.ParentID, err)
 		}
 
 		if highParentDelta.Block.ID() == lowDelta.Block.ID() {
@@ -83,12 +83,12 @@ func (ss *stateSync) findDeltasToSend(startID, endID flow.Identifier) ([]*messag
 			break
 		}
 
-		if highDelta.Block.Height <= lowDelta.Block.Height {
+		if highDelta.Block.Header.Height <= lowDelta.Block.Header.Height {
 			// reached end block height without match
 			// now descent both paths until we find common parent
-			lowParentDelta, err := ss.execState.RetrieveStateDelta(lowDelta.Block.ParentID)
+			lowParentDelta, err := ss.execState.RetrieveStateDelta(lowDelta.Block.Header.ParentID)
 			if err != nil {
-				return nil, fmt.Errorf("failed to retrieve state delta for blockID %s: %w", lowDelta.Block.ParentID, err)
+				return nil, fmt.Errorf("failed to retrieve state delta for blockID %s: %w", lowDelta.Block.Header.ParentID, err)
 			}
 
 			if lowParentDelta.Block.ID() == highParentDelta.Block.ID() {

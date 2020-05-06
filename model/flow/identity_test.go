@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -44,22 +45,22 @@ func TestHexStringToIdentifier(t *testing.T) {
 	}
 }
 
-func TestJSONEncodeDecode(t *testing.T) {
-	id := unittest.IdentityFixture()
-	enc, err := json.Marshal(id)
+func TestIdentityEncodingJSON(t *testing.T) {
+	identity := unittest.IdentityFixture(unittest.WithRandomPublicKeys())
+	enc, err := json.Marshal(identity)
 	require.NoError(t, err)
 	var dec flow.Identity
 	err = json.Unmarshal(enc, &dec)
 	require.NoError(t, err)
-	require.Equal(t, *id, dec)
+	require.Equal(t, identity, &dec)
 }
 
-func TestJSONEncodeDecodeWithPublicKeys(t *testing.T) {
-	id := unittest.IdentityFixture(unittest.WithRandomPublicKeys())
-	enc, err := json.Marshal(id)
+func TestIdentityEncodingMsgpack(t *testing.T) {
+	identity := unittest.IdentityFixture(unittest.WithRandomPublicKeys())
+	enc, err := msgpack.Marshal(identity)
 	require.NoError(t, err)
 	var dec flow.Identity
-	err = json.Unmarshal(enc, &dec)
+	err = msgpack.Unmarshal(enc, &dec)
 	require.NoError(t, err)
-	require.Equal(t, *id, dec)
+	require.Equal(t, identity, &dec)
 }

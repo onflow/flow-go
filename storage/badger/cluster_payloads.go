@@ -7,6 +7,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
@@ -30,7 +31,7 @@ func (cp *ClusterPayloads) Store(header *flow.Header, payload *cluster.Payload) 
 
 		// insert the payload, allow duplicates because it is valid for two
 		// identical payloads on competing forks to co-exist.
-		err := procedure.InsertClusterPayload(payload)(tx)
+		err := procedure.InsertClusterPayload(header, payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert cluster payload: %w", err)
 		}
@@ -47,7 +48,20 @@ func (cp *ClusterPayloads) Store(header *flow.Header, payload *cluster.Payload) 
 
 func (cp *ClusterPayloads) ByBlockID(blockID flow.Identifier) (*cluster.Payload, error) {
 	var payload cluster.Payload
-	err := cp.db.View(procedure.RetrieveClusterPayload(blockID, &payload))
+	err := cp.db.View(func(tx *badger.Txn) error {
+		var header flow.Header
+		err := operation.RetrieveHeader(blockID, &header)(tx)
+		if err != nil {
+			return fmt.Errorf("could not get header: %w", err)
+		}
+
+		err = procedure.RetrieveClusterPayload(&header, &payload)(tx)
+		if err != nil {
+			return fmt.Errorf("could not get payload: %w", err)
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}

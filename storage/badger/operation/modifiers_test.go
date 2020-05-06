@@ -8,6 +8,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -16,7 +17,7 @@ func TestSkipDuplicates(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
-		val := []byte(`{"ID":1337}`)
+		val, _ := msgpack.Marshal(e)
 
 		// persist first time
 		err := db.Update(insert(key, e))

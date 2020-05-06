@@ -193,11 +193,11 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 					// casts block into a Hotstuff block for notifier
 					hotstuffBlock := &model.Block{
 						BlockID:     block.ID(),
-						View:        block.View,
-						ProposerID:  block.ProposerID,
+						View:        block.Header.View,
+						ProposerID:  block.Header.ProposerID,
 						QC:          nil,
-						PayloadHash: block.Hash(),
-						Timestamp:   block.Timestamp,
+						PayloadHash: block.Header.PayloadHash,
+						Timestamp:   block.Header.Timestamp,
 					}
 					verNode.IngestEngine.OnFinalizedBlock(hotstuffBlock)
 				}

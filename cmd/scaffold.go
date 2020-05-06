@@ -33,6 +33,7 @@ import (
 	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -129,7 +130,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		}
 
 		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, myAddr, fnb.Me.NodeID(),
-			fnb.networkKey, fnb.Metrics, fnb.MsgValidators...)
+			fnb.networkKey, fnb.Metrics, libp2p.DefaultMaxPubSubMsgSize, fnb.MsgValidators...)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize middleware: %w", err)
 		}
@@ -218,12 +219,25 @@ func (fnb *FlowNodeBuilder) initDatabase() {
 	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
 	fnb.MustNot(err).Msgf("could not create datadir %s", fnb.BaseConfig.datadir)
 
+	// we initialize the database with options that allow us to keep the maximum
+	// item size in the trie itself (up to 1MB) and where we keep all level zero
+	// tables in-memory as well; this slows down compaction and increases memory
+	// usage, but it improves overall performance and disk i/o
 	opts := badger.
 		LSMOnlyOptions(fnb.BaseConfig.datadir).
 		WithKeepL0InMemory(true).
 		WithLogger(nil)
 	db, err := badger.Open(opts)
 	fnb.MustNot(err).Msg("could not open key-value store")
+
+	// in order to void long iterations with big keys when initializing with an
+	// already populated database, we bootstrap the initial maximum key size
+	// upon starting
+	err = db.Update(func(tx *badger.Txn) error {
+		return operation.InitMax(tx)
+	})
+	fnb.MustNot(err).Msg("could not initialize max tracker")
+
 	fnb.DB = db
 }
 
@@ -242,7 +256,7 @@ func (fnb *FlowNodeBuilder) initState() {
 	if errors.Is(err, storage.ErrNotFound) {
 		// Bootstrap!
 
-		fnb.Logger.Info().Msg("bootstrapping empty database")
+		fnb.Logger.Info().Msg("bootstrapping empty protocol state")
 
 		// Load the genesis state commitment
 		fnb.GenesisCommit, err = loadGenesisCommit(fnb.BaseConfig.BootstrapDir)
@@ -251,7 +265,7 @@ func (fnb *FlowNodeBuilder) initState() {
 		}
 
 		// Load the rest of the genesis info, eventually needed for the consensus follower
-		fnb.GenesisBlock, err = loadTrustedRootBlock(fnb.BaseConfig.BootstrapDir)
+		fnb.GenesisBlock, err = loadGenesisBlock(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
 		}
@@ -279,6 +293,24 @@ func (fnb *FlowNodeBuilder) initState() {
 			Hex("final_id", logging.ID(head.ID())).
 			Uint64("final_height", head.Height).
 			Msg("using existing database")
+
+		// Load the genesis info for recovery
+		fnb.GenesisBlock, err = loadGenesisBlock(fnb.BaseConfig.BootstrapDir)
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
+		}
+
+		// load genesis QC and DKG data from bootstrap files for recovery
+		fnb.GenesisQC, err = loadRootBlockQC(fnb.BaseConfig.BootstrapDir)
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
+		}
+
+		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
+		}
+		fnb.DKGState = wrapper.NewState(dkgPubData)
 	}
 
 	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
@@ -518,7 +550,7 @@ func loadGenesisCommit(path string) (flow.StateCommitment, error) {
 	return commit, err
 }
 
-func loadTrustedRootBlock(path string) (*flow.Block, error) {
+func loadGenesisBlock(path string) (*flow.Block, error) {
 	data, err := ioutil.ReadFile(filepath.Join(path, bootstrap.FilenameGenesisBlock))
 	if err != nil {
 		return nil, err

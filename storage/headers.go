@@ -19,4 +19,10 @@ type Headers interface {
 	// ByNumber returns the block with the given number. It is only available
 	// for finalized blocks.
 	ByNumber(number uint64) (*flow.Header, error)
+
+	// Find a valid child block by parent block. The child block might not
+	// be a finalized block.
+	// when there is no valid child for the given parent, storage.ErrNotFound
+	// will be returned
+	ByParentID(parentID flow.Identifier) (*flow.Header, error)
 }

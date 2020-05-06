@@ -19,7 +19,6 @@ type MeshEngine struct {
 	originID flow.Identifier  // used to keep track of the id of the sender of the messages
 	event    chan interface{} // used to keep track of the events that the node receives
 	received chan struct{}    // used as an indicator on reception of messages for testing
-
 }
 
 func NewMeshEngine(t *testing.T, net module.Network, cap int, engineID uint8) *MeshEngine {
@@ -45,7 +44,12 @@ func (te *MeshEngine) SubmitLocal(event interface{}) {
 // Submit is implemented for a valid type assertion to Engine
 // any call to it fails the test
 func (te *MeshEngine) Submit(originID flow.Identifier, event interface{}) {
-	require.Fail(te.t, "not implemented")
+	go func() {
+		err := te.Process(originID, event)
+		if err != nil {
+			require.Fail(te.t, "could not process submitted event")
+		}
+	}()
 }
 
 // ProcessLocal is implemented for a valid type assertion to Engine

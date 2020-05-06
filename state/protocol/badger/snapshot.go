@@ -109,7 +109,27 @@ func (s *Snapshot) Clusters() (*flow.ClusterList, error) {
 }
 
 func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
-	return procedure.RetrieveHeader(&s.number, &s.blockID, head)
+	return func(tx *badger.Txn) error {
+
+		err := procedure.RetrieveHeader(&s.number, &s.blockID, head)(tx)
+		if err != nil {
+			return fmt.Errorf("could not get snapshot header: %w", err)
+		}
+
+		// retrieve the finalized header to ensure we are only dealing with
+		// blocks from the main consensus-node chain within the protocol state
+		var final flow.Header
+		err = procedure.RetrieveLatestFinalizedHeader(&final)(tx)
+		if err != nil {
+			return fmt.Errorf("could not get chain ID: %w", err)
+		}
+
+		if head.ChainID != final.ChainID {
+			return fmt.Errorf("invalid chain id (got=%s expected=%s)", head.ChainID, final.ChainID)
+		}
+
+		return err
+	}
 }
 
 func (s *Snapshot) Head() (*flow.Header, error) {
@@ -168,11 +188,11 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 	return seed, nil
 }
 
-func (s *Snapshot) Unfinalized() ([]flow.Identifier, error) {
-	var unfinalizedBlockIDs []flow.Identifier
+func (s *Snapshot) Pending() ([]flow.Identifier, error) {
+	var pendingBlockIDs []flow.Identifier
 	err := s.state.db.View(func(tx *badger.Txn) error {
 		var boundary uint64
-		// retrieve the current finalized view
+		// retrieve the current finalized height
 		err := operation.RetrieveBoundary(&boundary)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve boundary: %w", err)
@@ -185,17 +205,21 @@ func (s *Snapshot) Unfinalized() ([]flow.Identifier, error) {
 			return fmt.Errorf("could not retrieve head: %w", err)
 		}
 
-		// find all the unfinalized blocks that connect to the finalized block
+		// find all the pending blocks that connect to the finalized block
 		// the order guarantees that if a block requires certain blocks to connect to the
 		// finalized block, those connecting blocks must appear before this block.
-		operation.FindDescendants(boundary, headID, &unfinalizedBlockIDs)
+		// TODO: double check the pending blocks don't include invalid blocks with invalid payload
+		err = operation.FindDescendants(boundary, headID, &pendingBlockIDs)(tx)
+		if err != nil {
+			return fmt.Errorf("could not find descendants: %w", err)
+		}
 
 		return nil
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("could not find unfinalized block IDs: %w", err)
+		return nil, fmt.Errorf("could not find pending block IDs: %w", err)
 	}
 
-	return unfinalizedBlockIDs, nil
+	return pendingBlockIDs, nil
 }

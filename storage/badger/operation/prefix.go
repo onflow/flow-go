@@ -35,6 +35,7 @@ const (
 	codeEvent                      = 29
 	codeExecutionStateInteractions = 30
 	codeTransactionResult          = 31
+	codeCollectionRefBlockID       = 32
 
 	codeIndexGuarantee               = 101
 	codeIndexSeal                    = 102
@@ -44,6 +45,7 @@ const (
 	codeIndexCollectionByTransaction = 107
 	codeIndexHeaderByCollection      = 108
 	codeHighestExecutedBlockNumber   = 109 //highest executed block number
+	codeIndexChild                   = 110
 )
 
 func makePrefix(code byte, keys ...interface{}) []byte {

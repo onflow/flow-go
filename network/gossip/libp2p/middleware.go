@@ -35,30 +35,36 @@ const (
 	OneToK
 )
 
+const DefaultMaxPubSubMsgSize = 1 << 21 //2mb
+
+// the inbound message queue size for One to One and One to K messages (each)
+const InboundMessageQueueSize = 100
+
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
 	sync.Mutex
-	ctx        context.Context
-	cancel     context.CancelFunc
-	log        zerolog.Logger
-	codec      network.Codec
-	ov         middleware.Overlay
-	wg         *sync.WaitGroup
-	libP2PNode *P2PNode
-	stop       chan struct{}
-	me         flow.Identifier
-	host       string
-	port       string
-	key        crypto.PrivateKey
-	metrics    module.Metrics
-	validators []validators.MessageValidator
+	ctx              context.Context
+	cancel           context.CancelFunc
+	log              zerolog.Logger
+	codec            network.Codec
+	ov               middleware.Overlay
+	wg               *sync.WaitGroup
+	libP2PNode       *P2PNode
+	stop             chan struct{}
+	me               flow.Identifier
+	host             string
+	port             string
+	key              crypto.PrivateKey
+	metrics          module.Metrics
+	maxPubSubMsgSize int
+	validators       []validators.MessageValidator
 }
 
 // NewMiddleware creates a new middleware instance with the given config and using the
 // given codec to encode/decode messages to our peers.
 func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flowID flow.Identifier,
-	key crypto.PrivateKey, metrics module.Metrics, validators ...validators.MessageValidator) (*Middleware, error) {
+	key crypto.PrivateKey, metrics module.Metrics, maxPubSubMsgSize int, validators ...validators.MessageValidator) (*Middleware, error) {
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
@@ -72,21 +78,26 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		validators = defaultValidators(log, flowID)
 	}
 
+	if maxPubSubMsgSize <= 0 {
+		maxPubSubMsgSize = DefaultMaxPubSubMsgSize
+	}
+
 	// create the node entity and inject dependencies & config
 	m := &Middleware{
-		ctx:        ctx,
-		cancel:     cancel,
-		log:        log,
-		codec:      codec,
-		libP2PNode: p2p,
-		wg:         &sync.WaitGroup{},
-		stop:       make(chan struct{}),
-		me:         flowID,
-		host:       ip,
-		port:       port,
-		key:        key,
-		metrics:    metrics,
-		validators: validators,
+		ctx:              ctx,
+		cancel:           cancel,
+		log:              log,
+		codec:            codec,
+		libP2PNode:       p2p,
+		wg:               &sync.WaitGroup{},
+		stop:             make(chan struct{}),
+		me:               flowID,
+		host:             ip,
+		port:             port,
+		key:              key,
+		metrics:          metrics,
+		maxPubSubMsgSize: maxPubSubMsgSize,
+		validators:       validators,
 	}
 
 	return m, err
@@ -121,10 +132,16 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 	// create a discovery object to help libp2p discover peers
 	d := NewDiscovery(m.log, m.ov, m.me, m.stop)
 
-	// create PubSub options for libp2p to use the discovery object
-	psOptions := []pubsub.Option{pubsub.WithDiscovery(d),
+	// create PubSub options for libp2p to use
+	psOptions := []pubsub.Option{
+		// set the discovery object
+		pubsub.WithDiscovery(d),
+		// skip message signing
 		pubsub.WithMessageSigning(false),
+		// skip message signature
 		pubsub.WithStrictSignatureVerification(false),
+		// set max message size limit for 1-k PubSub messaging
+		pubsub.WithMaxMessageSize(m.maxPubSubMsgSize),
 	}
 
 	nodeAddress := NodeAddress{Name: m.me.String(), IP: m.host, Port: m.port}
@@ -424,6 +441,13 @@ func (m *Middleware) publish(channelID uint8, msg *message.Message) error {
 	data, err := msg.Marshal()
 	if err != nil {
 		return fmt.Errorf("failed to marshal the message: %w", err)
+	}
+
+	msgSize := len(data)
+	if msgSize > m.maxPubSubMsgSize {
+		// libp2p pubsub will silently drop the message if its size is greater than the configured pubsub max message size
+		// hence return an error as this message is undeliverable
+		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, m.maxPubSubMsgSize)
 	}
 
 	topic := topicFromChannelID(channelID)

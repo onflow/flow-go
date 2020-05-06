@@ -13,8 +13,10 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestMVP_Network(t *testing.T) {
+// timeout for individual actions
+const defaultTimeout = time.Second * 10
 
+func TestMVP_Network(t *testing.T) {
 	colNode := testnet.NewNodeConfig(flow.RoleCollection)
 	exeNode := testnet.NewNodeConfig(flow.RoleExecution)
 
@@ -22,30 +24,27 @@ func TestMVP_Network(t *testing.T) {
 		colNode,
 		testnet.NewNodeConfig(flow.RoleCollection),
 		exeNode,
-		testnet.NewNodeConfig(flow.RoleConsensus),
-		testnet.NewNodeConfig(flow.RoleConsensus),
-		testnet.NewNodeConfig(flow.RoleConsensus),
+		testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithAdditionalFlag("--hotstuff-timeout=12s")),
+		testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithAdditionalFlag("--hotstuff-timeout=12s")),
+		testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithAdditionalFlag("--hotstuff-timeout=12s")),
 		testnet.NewNodeConfig(flow.RoleVerification),
 		testnet.NewNodeConfig(flow.RoleAccess),
 	}
 	conf := testnet.NewNetworkConfig("mvp", net)
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	flowNetwork := testnet.PrepareFlowNetwork(t, conf)
 
 	flowNetwork.Start(ctx)
 	defer flowNetwork.Remove()
 
-	accessClient, err := testnet.NewClient(fmt.Sprintf(":%s", flowNetwork.AccessPorts[testnet.AccessNodeAPIPort]))
-	require.NoError(t, err)
-
-	runMVPTest(t, accessClient)
+	runMVPTest(t, ctx, flowNetwork)
 }
 
 func TestMVP_Emulator(t *testing.T) {
-
-	//Start emulator manually for now, used for testing the test
+	// Start emulator manually for now, used for testing the test
 	// TODO - start an emulator instance
 	t.Skip()
 
@@ -55,37 +54,59 @@ func TestMVP_Emulator(t *testing.T) {
 	c, err := testnet.NewClientWithKey(":3569", key)
 	require.NoError(t, err)
 
-	runMVPTest(t, c)
+	//TODO commented out because main test requires genesis for sending tx
+	// with valid reference block ID
+	//runMVPTest(t, c)
+	_ = c
 }
 
-func runMVPTest(t *testing.T, accessClient *testnet.Client) {
-	ctx := context.Background()
+func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
+
+	client, err := testnet.NewClient(fmt.Sprintf(":%s", net.AccessPorts[testnet.AccessNodeAPIPort]))
+	require.NoError(t, err)
+
+	genesis := net.Genesis()
 
 	// contract is not deployed, so script fails
-	counter, err := readCounter(ctx, accessClient)
+	childCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	counter, err := readCounter(childCtx, client)
+	cancel()
 	require.Error(t, err)
 
-	err = deployCounter(ctx, accessClient)
+	// deploy the contract
+	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
+	err = client.DeployContract(childCtx, genesis.ID(), counterContract)
+	cancel()
 	require.NoError(t, err)
 
 	// script executes eventually, but no counter instance is created
 	require.Eventually(t, func() bool {
-		counter, err = readCounter(ctx, accessClient)
+		childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
+		counter, err = readCounter(ctx, client)
+		cancel()
 		if err != nil {
-			fmt.Println("EXECUTE SCRIPT ERR", err)
+			t.Log("EXECUTE SCRIPT ERR", err)
 		}
 		return err == nil && counter == -3
 	}, 30*time.Second, time.Second)
 
-	//TODO: Fix Cadence code
-	err = createCounter(ctx, accessClient)
+	tx := unittest.TransactionBodyFixture(
+		unittest.WithTransactionDSL(createCounterTx),
+		unittest.WithReferenceBlock(genesis.ID()),
+	)
+	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
+	err = client.SendTransaction(ctx, tx)
+	cancel()
+
 	require.NoError(t, err)
 
 	// counter is created and incremented eventually
 	require.Eventually(t, func() bool {
-		counter, err = readCounter(ctx, accessClient)
-		fmt.Printf("counter = %d\n", counter)
-		fmt.Printf("error = %s\n", err)
+		childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
+		counter, err = readCounter(ctx, client)
+		cancel()
+
+		t.Logf("read counter: counter=%d, err=%s", counter, err)
 		return err == nil && counter == 2
 	}, 30*time.Second, time.Second)
 }

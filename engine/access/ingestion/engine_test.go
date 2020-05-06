@@ -97,7 +97,7 @@ func (suite *Suite) TestHandleBlock() {
 	suite.blocks.On("IndexByGuarantees", block.ID()).Return(nil).Once()
 
 	// expect that the collection is requested
-	suite.collectionsConduit.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(len(block.Guarantees))
+	suite.collectionsConduit.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(len(block.Payload.Guarantees))
 
 	err := suite.eng.Process(originID, proposal)
 	require.NoError(suite.T(), err)

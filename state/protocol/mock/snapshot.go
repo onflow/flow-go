@@ -102,16 +102,16 @@ func (_m *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 	return r0, r1
 }
 
-// Seal provides a mock function with given fields:
-func (_m *Snapshot) Seal() (*flow.Seal, error) {
+// Pending provides a mock function with given fields:
+func (_m *Snapshot) Pending() ([]flow.Identifier, error) {
 	ret := _m.Called()
 
-	var r0 *flow.Seal
-	if rf, ok := ret.Get(0).(func() *flow.Seal); ok {
+	var r0 []flow.Identifier
+	if rf, ok := ret.Get(0).(func() []flow.Identifier); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Seal)
+			r0 = ret.Get(0).([]flow.Identifier)
 		}
 	}
 
@@ -125,16 +125,16 @@ func (_m *Snapshot) Seal() (*flow.Seal, error) {
 	return r0, r1
 }
 
-// Unfinalized provides a mock function with given fields:
-func (_m *Snapshot) Unfinalized() ([]flow.Identifier, error) {
+// Seal provides a mock function with given fields:
+func (_m *Snapshot) Seal() (*flow.Seal, error) {
 	ret := _m.Called()
 
-	var r0 []flow.Identifier
-	if rf, ok := ret.Get(0).(func() []flow.Identifier); ok {
+	var r0 *flow.Seal
+	if rf, ok := ret.Get(0).(func() *flow.Seal); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.Identifier)
+			r0 = ret.Get(0).(*flow.Seal)
 		}
 	}
 

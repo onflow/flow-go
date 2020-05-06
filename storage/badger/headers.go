@@ -3,11 +3,13 @@
 package badger
 
 import (
+	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
-	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 // Headers implements a simple read-only header storage around a badger DB.
@@ -41,17 +43,23 @@ func (h *Headers) ByNumber(number uint64) (*flow.Header, error) {
 		var blockID flow.Identifier
 		err := operation.RetrieveNumber(number, &blockID)(tx)
 		if err != nil {
-			return errors.Wrap(err, "could not retrieve blockID")
+			return fmt.Errorf("could not retrieve blockID: %w", err)
 		}
 
 		// get the header by hash
 		err = operation.RetrieveHeader(blockID, &header)(tx)
 		if err != nil {
-			return errors.Wrap(err, "could not retrieve header")
+			return fmt.Errorf("could not retrieve header: %w", err)
 		}
 
 		return nil
 	})
 
+	return &header, err
+}
+
+func (h *Headers) ByParentID(parentID flow.Identifier) (*flow.Header, error) {
+	var header flow.Header
+	err := h.db.View(procedure.RetrieveChildByBlockID(parentID, &header))
 	return &header, err
 }

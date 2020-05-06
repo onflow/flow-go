@@ -18,6 +18,10 @@ type PendingBlockBuffer interface {
 	ByParentID(parentID flow.Identifier) ([]*flow.PendingBlock, bool)
 
 	DropForParent(header *flow.Header)
+
+	PruneByHeight(height uint64)
+
+	Size() uint
 }
 
 // PendingClusterBlockBuffer is the same thing as PendingBlockBuffer, but for
@@ -30,4 +34,8 @@ type PendingClusterBlockBuffer interface {
 	ByParentID(parentID flow.Identifier) ([]*cluster.PendingBlock, bool)
 
 	DropForParent(parentID flow.Identifier)
+
+	PruneByHeight(height uint64)
+
+	Size() uint
 }

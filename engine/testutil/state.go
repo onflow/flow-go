@@ -8,11 +8,12 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func UncheckedState(db *badger.DB, commit flow.StateCommitment, participants flow.IdentityList) (*protocol.State, error) {
 
-	genesis := flow.Genesis(participants)
+	genesis := unittest.GenesisFixture(participants)
 
 	err := db.Update(func(txn *badger.Txn) error {
 		return procedure.Bootstrap(commit, genesis)(txn)
