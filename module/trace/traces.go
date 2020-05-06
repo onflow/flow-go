@@ -11,10 +11,6 @@ const (
 	EXEComputeCollection  = "computer.computeCollection"
 	EXEComputeTransaction = "computer.computeTransaction"
 
-	EXEParseTransaction     = "runtime.parseTransaction"
-	EXECheckTransaction     = "runtime.checkTransaction"
-	EXEInterpretTransaction = "runtime.interpretTransaction"
-
 	EXECommitDelta                        = "state.commitDelta"
 	EXEGetRegisters                       = "state.getRegisters"
 	EXEGetRegistersWithProofs             = "state.getRegistersWithProofs"
@@ -26,4 +22,10 @@ const (
 	EXERetrieveStateDelta                 = "state.retrieveStateDelta"
 	EXEUpdateHighestExecutedBlockIfHigher = "state.updateHighestExecutedBlockIfHigher"
 	EXEGetHighestExecutedBlockID          = "state.getHighestExecutedBlockID"
+)
+
+const (
+	EXEParseDurationTag     = "runtime.parseTransactionDuration"
+	EXECheckDurationTag     = "runtime.checkTransactionDuration"
+	EXEInterpretDurationTag = "runtime.interpretTransactionDuration"
 )

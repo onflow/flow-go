@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/log"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
@@ -133,27 +134,11 @@ func (e *blockComputer) executeCollection(
 			if e.tracer != nil {
 				txSpan := e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
 				defer func() {
-					parseSpan := e.tracer.StartSpanFromParent(
-						txSpan,
-						trace.EXEParseTransaction,
-						opentracing.StartTime(metrics.Parsed().Start),
+					txSpan.LogFields(
+						log.Int64(trace.EXEParseDurationTag, int64(metrics.Parsed())),
+						log.Int64(trace.EXECheckDurationTag, int64(metrics.Checked())),
+						log.Int64(trace.EXEInterpretDurationTag, int64(metrics.Interpreted())),
 					)
-					parseSpan.FinishWithOptions(opentracing.FinishOptions{FinishTime: metrics.Parsed().End})
-
-					checkSpan := e.tracer.StartSpanFromParent(
-						txSpan,
-						trace.EXECheckTransaction,
-						opentracing.StartTime(metrics.Checked().Start),
-					)
-					checkSpan.FinishWithOptions(opentracing.FinishOptions{FinishTime: metrics.Checked().End})
-
-					interpSpan := e.tracer.StartSpanFromParent(
-						txSpan,
-						trace.EXEInterpretTransaction,
-						opentracing.StartTime(metrics.Interpreted().Start),
-					)
-					interpSpan.FinishWithOptions(opentracing.FinishOptions{FinishTime: metrics.Interpreted().End})
-
 					txSpan.Finish()
 				}()
 			}
