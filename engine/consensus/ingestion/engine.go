@@ -3,6 +3,7 @@
 package ingestion
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -12,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -26,6 +28,9 @@ type Engine struct {
 	prop    network.Engine // used to process & propagate collections
 	state   protocol.State // used to access the  protocol state
 	me      module.Local   // used to access local node information
+	// the number of blocks that can be between the reference block and the
+	// finalized head before we consider the transaction expired
+	expiry uint64
 }
 
 // New creates a new collection propagation engine.
@@ -39,6 +44,7 @@ func New(log zerolog.Logger, net module.Network, prop network.Engine, state prot
 		prop:    prop,
 		state:   state,
 		me:      me,
+		expiry:  flow.DefaultTransactionExpiry,
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -119,16 +125,38 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 
 	final := e.state.Final()
 
-	clusters, err := final.Clusters()
-	if err != nil {
-		return fmt.Errorf("could not get clusters: %w", err)
-	}
-
 	guarantors := guarantee.SignerIDs
 
 	// ensure there is at least one guarantor
 	if len(guarantors) == 0 {
 		return fmt.Errorf("invalid collection guarantee with no guarantors")
+	}
+
+	// get the identity of the origin node, so we can check if it's a valid
+	// source for a collection guarantee (usually collection nodes)
+	id, err := final.Identity(originID)
+	if err != nil {
+		return fmt.Errorf("could not get origin node identity: %w", err)
+	}
+
+	// check that the origin is a collection node; this check is fine even if it
+	// excludes our own ID - in the case of local submission of collections, we
+	// should use the propagation engine, which is for exchange of collections
+	// between consensus nodes anyway; we do no processing or validation in this
+	// engine beyond validating the origin
+	if id.Role != flow.RoleCollection {
+		return fmt.Errorf("invalid origin node role (%s)", id.Role)
+	}
+
+	// ensure that collection has not expired
+	err = e.validateCollectionGuaranteeExpiry(guarantee, final)
+	if err != nil {
+		return err
+	}
+
+	clusters, err := final.Clusters()
+	if err != nil {
+		return fmt.Errorf("could not get clusters: %w", err)
 	}
 
 	cluster, ok := clusters.ByNodeID(guarantors[0])
@@ -150,22 +178,6 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 		}
 	}
 
-	// get the identity of the origin node, so we can check if it's a valid
-	// source for a collection guarantee (usually collection nodes)
-	id, err := final.Identity(originID)
-	if err != nil {
-		return fmt.Errorf("could not get origin node identity: %w", err)
-	}
-
-	// check that the origin is a collection node; this check is fine even if it
-	// excludes our own ID - in the case of local submission of collections, we
-	// should use the propagation engine, which is for exchange of collections
-	// between consensus nodes anyway; we do no processing or validation in this
-	// engine beyond validating the origin
-	if id.Role != flow.RoleCollection {
-		return fmt.Errorf("invalid origin node role (%s)", id.Role)
-	}
-
 	log.Info().Msg("forwarding collection guarantee to propagation engine")
 
 	// submit the collection to the propagation engine - this is non-blocking
@@ -174,6 +186,27 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	e.prop.SubmitLocal(guarantee)
 
 	e.metrics.StartCollectionToFinalized(guarantee.ID())
+
+	return nil
+}
+
+func (e *Engine) validateCollectionGuaranteeExpiry(guarantee *flow.CollectionGuarantee, snapshot protocol.Snapshot) error {
+
+	head, err := snapshot.Head()
+	if err != nil {
+		return fmt.Errorf("could not get finalized header: %w", err)
+	}
+
+	ref, err := e.state.AtBlockID(guarantee.ReferenceBlockID).Head()
+	if errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("collection guarantee refers to an unknown block: %x", guarantee.ReferenceBlockID)
+	}
+
+	// if head has advanced beyond the block referenced by the collection guarantee by more than 'expiry' number of blocks,
+	// then reject the collection
+	if head.Height > ref.Height && head.Height-ref.Height > e.expiry {
+		return fmt.Errorf("collection guarantee expired ref_height=%d final_height=%d", ref.Height, head.Height)
+	}
 
 	return nil
 }
