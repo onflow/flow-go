@@ -393,23 +393,30 @@ func TestSingleCollectionProcessing(t *testing.T) {
 
 }
 
-// BenchmarkIngestEngine is only executed if the LOCAL environmental variable is
+// BenchmarkIngestEngine is only executed if the 'benchmark' environmental variable is
 // declared as TRUE.
 // BenchmarkIngestEngine benchmarks the happy path of ingest engine with sending
 // 10 execution receipts simultaneously where each receipt has 100 chunks in it.
-// Although it tests for a single instance of ingest engine, but it considers the
-// existence of 6 verification nodes in the identity space.
 func BenchmarkIngestEngine(b *testing.B) {
-	if os.Getenv("LOCAL") != "TRUE" {
-		b.Skip()
+	if os.Getenv("benchmark") != "TRUE" {
+		fmt.Println("skips")
+		b.Skip("skips benchmarking ingest engine")
 	}
 	for i := 0; i < b.N; i++ {
-		ingestHappyPath(b, 10, 100, 6)
+		ingestHappyPath(b, 10, 100)
 	}
 
 }
 
-func ingestHappyPath(tb testing.TB, receiptCount int, chunkCount int, verCount int) {
+// ingestHappyPath is used for benchmarking the happy path performance of ingest engine
+// on receiving `receiptCount`-many receipts each with `chunkCount`-many chunks.
+// It runs a single instance of verification node, with an actual ingest engine and a mocked
+// verify engine.
+// The execution receipts are sent to the node simultaneously assuming that it already has all the other
+// resources for them, i.e., collections, blocks, and chunk data packs.
+// The benchmark finishes when a verifiable chunk is sent for each assigned chunk from the ingest engine
+// to the verify engine.
+func ingestHappyPath(tb testing.TB, receiptCount int, chunkCount int) {
 	// ingest engine parameters
 	// set based on following issue
 	// https://github.com/dapperlabs/flow-go/issues/3443
@@ -422,14 +429,11 @@ func ingestHappyPath(tb testing.TB, receiptCount int, chunkCount int, verCount i
 	// generates identities of nodes, one of each type and `verCount` many verification node
 	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	exeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	verIdentities := unittest.IdentityListFixture(verCount, unittest.WithRole(flow.RoleVerification))
+	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	conIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 
-	// marks first verification node as the one running
-	verIdentity := verIdentities[0]
-
 	identities := flow.IdentityList{colIdentity, conIdentity, exeIdentity}
-	identities = append(identities, verIdentities...)
+	identities = append(identities, verIdentity)
 
 	// Execution receipt and chunk assignment
 	//
