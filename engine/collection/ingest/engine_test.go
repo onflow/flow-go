@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/testutil"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
@@ -22,10 +23,11 @@ import (
 // detected and should result in an error.
 func TestInvalidTransaction(t *testing.T) {
 
-	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+	identity := identities.Filter(filter.HasRole(flow.RoleCollection))[0]
 	hub := stub.NewNetworkHub()
 
-	node := testutil.CollectionNode(t, hub, identity, []*flow.Identity{identity})
+	node := testutil.CollectionNode(t, hub, identity, identities)
 	defer node.Done()
 
 	genesis, err := node.State.Final().Head()
@@ -73,10 +75,9 @@ func TestInvalidTransaction(t *testing.T) {
 			parent := genesis
 			for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
 				next := unittest.BlockWithParentFixture(parent)
-				err := blocks.Store(&next)
+				err = node.State.Mutate().Extend(&next)
 				require.Nil(t, err)
 				err = node.State.Mutate().Finalize(next.ID())
-				require.Nil(t, err)
 				parent = next.Header
 			}
 
@@ -108,7 +109,6 @@ func TestClusterRouting(t *testing.T) {
 
 		// name the various nodes
 		localNode, remoteNode, noopNode := nodes[0], nodes[1], nodes[2]
-
 		genesis, err := localNode.State.Final().Head()
 		require.Nil(t, err)
 
