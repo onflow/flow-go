@@ -3,6 +3,8 @@ package metrics
 import (
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/model/flow"
+
 	"github.com/dapperlabs/flow-go/module"
 
 	"github.com/dapperlabs/flow-go/module/trace"
@@ -61,13 +63,20 @@ func NewConsensusCollector(log zerolog.Logger) (module.Metrics, error) {
 		return nil, err
 	}
 
+	// constant labels for metrics
+	metricLabels := map[string]string{
+		"chain_id":    mainConsensusCommittee,
+		"node_role":   flow.RoleConsensus.String(),
+		"beta_metric": "true",
+	}
+
 	// anonymous struct implementing module.Metrics interface.
 	metricsCollector := struct {
 		BaseMetrics
 		HotStuffMetrics
 	}{
 		BaseMetrics:     BaseMetrics{tracer},
-		HotStuffMetrics: NewHotStuffMetrics(mainConsensusCommittee),
+		HotStuffMetrics: NewHotStuffMetrics(metricLabels),
 	}
 	return &metricsCollector, nil
 }
@@ -79,13 +88,20 @@ func NewClusterCollector(log zerolog.Logger, clusterID string) (module.Metrics, 
 		return nil, err
 	}
 
+	// constant labels for metrics
+	metricLabels := map[string]string{
+		"chain_id":    clusterID,
+		"node_role":   flow.RoleCollection.String(),
+		"beta_metric": "true",
+	}
+
 	// anonymous struct implementing module.Metrics interface.
 	metricsCollector := struct {
 		BaseMetrics
 		HotStuffMetrics
 	}{
 		BaseMetrics:     BaseMetrics{tracer},
-		HotStuffMetrics: NewHotStuffMetrics(clusterID),
+		HotStuffMetrics: NewHotStuffMetrics(metricLabels),
 	}
 	return &metricsCollector, nil
 }
