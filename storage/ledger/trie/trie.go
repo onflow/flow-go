@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/gammazero/deque"
 	lru "github.com/hashicorp/golang-lru"
@@ -1059,11 +1060,16 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 	if len(keys) < 1 {
 		return root, nil
 	}
+	fmt.Println("step0- update is called")
+	start := time.Now()
+	updateStart := time.Now()
 
 	t, err := s.forest.Get(root)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get tree: %w", err)
 	}
+	fmt.Println("step1- trie lookup is done", time.Since(start).Milliseconds())
+	start = time.Now()
 
 	// sort keys and deduplicate keys (we only consider the first occurance, and ignore the rest)
 	sortedKeys := make([][]byte, 0)
@@ -1080,6 +1086,8 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 			valueMap[string(key)] = values[i]
 		}
 	}
+	fmt.Println("step2- deduplication is done", time.Since(start).Milliseconds())
+	start = time.Now()
 
 	sort.Slice(sortedKeys, func(i, j int) bool {
 		return bytes.Compare(sortedKeys[i], sortedKeys[j]) < 0
@@ -1089,6 +1097,9 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 	for _, key := range sortedKeys {
 		sortedValues = append(sortedValues, valueMap[string(key)])
 	}
+
+	fmt.Println("step3- key sorting is done", time.Since(start).Milliseconds())
+	start = time.Now()
 
 	// use sorted keys
 	keys = sortedKeys
@@ -1101,8 +1112,14 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 
 	newTreeRoot := treeRoot.deepCopy()
 
+	fmt.Println("step4- deep copy of trie is done", time.Since(start).Milliseconds())
+	start = time.Now()
+
 	batcher := t.database.NewBatcher()
 	newRootNode, err := s.UpdateAtomically(newTreeRoot, keys, values, s.height-1, batcher, t.database)
+
+	fmt.Println("step5- update atomically is done", time.Since(start).Milliseconds())
+	start = time.Now()
 
 	if err != nil {
 		return nil, err
@@ -1124,6 +1141,9 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 	}
 	newHistoricalStatRoots.PushBack(newRootNode.value)
 
+	fmt.Println("step6- historic state queue push is done", time.Since(start).Milliseconds())
+	start = time.Now()
+
 	newTree := &tree{
 		root:                 newRootNode.value,
 		rootNode:             newRootNode,
@@ -1135,23 +1155,37 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 		historicalStateRoots: newHistoricalStatRoots,
 	}
 
+	fmt.Println("step7- new tree creation is done", time.Since(start).Milliseconds())
+	start = time.Now()
+
 	err = s.updateHistoricalStates(t, newTree, batcher)
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println("step8- updateHistoricalStates is done", time.Since(start).Milliseconds())
+	start = time.Now()
+
 	err = db.UpdateTrieDB(batcher)
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println("step9- UpdateTrieDB is done", time.Since(start).Milliseconds())
+	start = time.Now()
 
 	err = db.UpdateKVDB(keys, values)
 	if err != nil {
 		return nil, err
 	}
 
-	go db.Persist()
+	fmt.Println("step10- UpdateKVDB is done", time.Since(start).Milliseconds())
+	start = time.Now()
+
+	// go db.Persist()
 	s.forest.Add(newTree)
 
+	fmt.Println("end of update, total time:", time.Since(updateStart).Seconds())
 	return newRootNode.value, nil
 }
 

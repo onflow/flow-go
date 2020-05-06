@@ -4,15 +4,18 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 )
 
 type TrieStorage struct {
-	tree *trie.SMT
+	tree    *trie.SMT
+	mForest *mtrie.MForest
 }
 
 // NewTrieStorage creates a new trie-backed ledger storage.
 func NewTrieStorage(dbDir string) (*TrieStorage, error) {
+
 	tree, err := trie.NewSMT(
 		dbDir,
 		257,
@@ -24,8 +27,11 @@ func NewTrieStorage(dbDir string) (*TrieStorage, error) {
 		return nil, err
 	}
 
+	mForest := mtrie.NewMForest(257)
+
 	return &TrieStorage{
-		tree: tree,
+		tree:    tree,
+		mForest: mForest,
 	}, nil
 }
 
@@ -43,7 +49,8 @@ func (f *TrieStorage) Done() <-chan struct{} {
 }
 
 func (f *TrieStorage) EmptyStateCommitment() flow.StateCommitment {
-	return trie.GetDefaultHashForHeight(f.tree.GetHeight() - 1)
+	return f.mForest.GetEmptyRootHash()
+	// return trie.GetDefaultHashForHeight(f.tree.GetHeight() - 1)
 }
 
 // GetRegisters read the values at the given registers at the given flow.StateCommitment
@@ -55,7 +62,8 @@ func (f *TrieStorage) GetRegisters(
 	values []flow.RegisterValue,
 	err error,
 ) {
-	values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
+	_, values, err = f.mForest.Read(registerIDs, stateCommitment)
+	// values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
 	return values, err
 }
 
@@ -82,7 +90,8 @@ func (f *TrieStorage) UpdateRegisters(
 		return stateCommitment, nil
 	}
 
-	newStateCommitment, err = f.tree.Update(ids, values, stateCommitment)
+	newStateCommitment, err = f.mForest.Update(ids, values, stateCommitment)
+	// newStateCommitment, err = f.tree.Update(ids, values, stateCommitment)
 	if err != nil {
 		return nil, fmt.Errorf("cannot update state: %w", err)
 	}
