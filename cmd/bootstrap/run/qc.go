@@ -47,11 +47,11 @@ func GenerateGenesisQC(participantData ParticipantData, block *flow.Block) (*mod
 
 	hotBlock := model.Block{
 		BlockID:     block.ID(),
-		View:        block.View,
-		ProposerID:  block.ProposerID,
+		View:        block.Header.View,
+		ProposerID:  block.Header.ProposerID,
 		QC:          nil,
-		PayloadHash: block.PayloadHash,
-		Timestamp:   block.Timestamp,
+		PayloadHash: block.Header.PayloadHash,
+		Timestamp:   block.Header.Timestamp,
 	}
 
 	votes := make([]*model.Vote, 0, len(signers))
@@ -131,7 +131,12 @@ func NewProtocolState(block *flow.Block) (*protoBadger.State, *badger.DB, error)
 		return nil, nil, err
 	}
 
-	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
+	opts := badger.
+		LSMOnlyOptions(dir).
+		WithKeepL0InMemory(true).
+		WithLogger(nil)
+
+	db, err := badger.Open(opts)
 	if err != nil {
 		return nil, nil, err
 	}

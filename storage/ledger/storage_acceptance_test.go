@@ -84,7 +84,7 @@ func TestLedgerFunctionality(t *testing.T) {
 		steps := 40                            // number of steps
 		histStorage := make(map[string][]byte) // historic storage string(key, statecommitment) -> value
 		latestValue := make(map[string][]byte) // key to value
-		unittest.RunWithTempDBDir(t, func(dbDir string) {
+		unittest.RunWithTempDir(t, func(dbDir string) {
 			led, err := ledger.NewTrieStorage(dbDir)
 			assert.NoError(t, err)
 			stateCommitment := led.EmptyStateCommitment()

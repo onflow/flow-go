@@ -42,7 +42,8 @@ import (
 func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, options ...func(*protocol.State)) mock.GenericNode {
 	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
 
-	db, dbDir := unittest.TempBadgerDB(t)
+	dbDir := unittest.TempDir(t)
+	db := unittest.BadgerDB(t, dbDir)
 
 	state, err := UncheckedState(db, flow.GenesisStateCommitment, identities)
 	require.NoError(t, err)
@@ -91,7 +92,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 	collections := storage.NewCollections(node.DB)
 	transactions := storage.NewTransactions(node.DB)
 
-	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Me, pool)
+	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Me, pool, 0)
 	require.Nil(t, err)
 
 	providerEngine, err := provider.New(node.Log, node.Net, node.State, node.Metrics, node.Me, pool, collections, transactions)
@@ -188,7 +189,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
 	executionResults := storage.NewExecutionResults(node.DB)
 
-	dbDir := unittest.TempDBDir(t)
+	dbDir := unittest.TempDir(t)
 
 	ls, err := ledger.NewTrieStorage(dbDir)
 	require.NoError(t, err)
@@ -210,7 +211,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	rt := runtime.NewInterpreterRuntime()
-	vm := virtualmachine.New(rt)
+	vm, err := virtualmachine.New(rt)
 
 	require.NoError(t, err)
 
@@ -320,7 +321,8 @@ func VerificationNode(t *testing.T,
 
 	if node.VerifierEngine == nil {
 		rt := runtime.NewInterpreterRuntime()
-		vm := virtualmachine.New(rt)
+		vm, err := virtualmachine.New(rt)
+		require.NoError(t, err)
 		chunkVerifier := chunks.NewChunkVerifier(vm)
 
 		require.NoError(t, err)

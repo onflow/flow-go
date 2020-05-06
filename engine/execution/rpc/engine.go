@@ -219,7 +219,7 @@ func (h *handler) eventResult(blockID flow.Identifier,
 
 	return &execution.GetEventsForBlockIDsResponse_Result{
 		BlockId:     blockID[:],
-		BlockHeight: block.Height,
+		BlockHeight: block.Header.Height,
 		Events:      events,
 	}, nil
 }

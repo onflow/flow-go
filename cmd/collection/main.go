@@ -44,7 +44,11 @@ const (
 func main() {
 
 	var (
-		txLimit      uint
+		txLimit             uint
+		maxCollectionSize   uint
+		ingressExpiryBuffer uint64
+		builderExpiryBuffer uint64
+
 		ingressConf  ingress.Config
 		pool         mempool.Transactions
 		collections  *storage.Collections
@@ -67,7 +71,10 @@ func main() {
 
 	cmd.FlowNode("collection").
 		ExtraFlags(func(flags *pflag.FlagSet) {
-			flags.UintVar(&txLimit, "tx-limit", 10000, "maximum number of transactions in the memory pool")
+			flags.UintVar(&txLimit, "tx-limit", 50000, "maximum number of transactions in the memory pool")
+			flags.Uint64Var(&ingressExpiryBuffer, "ingress-expiry-buffer", 30, "expiry buffer for inbound transactions")
+			flags.Uint64Var(&builderExpiryBuffer, "builder-expiry-buffer", 15, "expiry buffer for transactions in proposed collections")
+			flags.UintVar(&maxCollectionSize, "max-collection-size", 100, "maximum number of transactions in proposed collections")
 			flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000", "the address the ingress server listens on")
 		}).
 		Module("transactions mempool", func(node *cmd.FlowNodeBuilder) error {
@@ -102,7 +109,7 @@ func main() {
 
 			// create genesis block for cluster consensus
 			genesis := cluster.Genesis()
-			genesis.ChainID = clusterID
+			genesis.Header.ChainID = clusterID
 
 			node.Logger.Info().
 				Hex("genesis_id", logging.ID(genesis.ID())).
@@ -119,6 +126,10 @@ func main() {
 			return nil
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+
+			// initialize cleaner for DB
+			cleaner := storage.NewCleaner(node.Logger, node.DB)
+
 			// create a finalizer that will handling updating the protocol
 			// state when the follower detects newly finalized blocks
 			final := followerfinalizer.NewFinalizer(node.DB)
@@ -144,7 +155,7 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, final, verifier, notifier, &node.GenesisBlock.Header, node.GenesisQC)
+			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, final, verifier, notifier, node.GenesisBlock.Header, node.GenesisQC)
 			if err != nil {
 				//return nil, fmt.Errorf("could not create follower core logic: %w", err)
 				// TODO for now we ignore failures in follower
@@ -154,7 +165,7 @@ func main() {
 				node.Logger.Debug().Err(err).Msg("ignoring failures in follower core")
 			}
 
-			follower, err := followereng.New(node.Logger, node.Network, node.Me, node.State, headers, conPayloads, conCache, core)
+			follower, err := followereng.New(node.Logger, node.Network, node.Me, cleaner, headers, conPayloads, node.State, conCache, core)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
@@ -169,7 +180,7 @@ func main() {
 			return follower.WithSynchronization(sync), nil
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ing, err = ingest.New(node.Logger, node.Network, node.State, node.Metrics, node.Me, pool)
+			ing, err = ingest.New(node.Logger, node.Network, node.State, node.Metrics, node.Me, pool, ingressExpiryBuffer)
 			return ing, err
 		}).
 		Component("ingress server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -182,7 +193,10 @@ func main() {
 			return prov, err
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			build := builder.NewBuilder(node.DB, pool)
+			build := builder.NewBuilder(node.DB, pool,
+				builder.WithMaxCollectionSize(maxCollectionSize),
+				builder.WithExpiryBuffer(builderExpiryBuffer),
+			)
 			final := colfinalizer.NewFinalizer(node.DB, pool, prov, node.Metrics, clusterID)
 
 			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, clusterState, node.Metrics, ing, pool, transactions, headers, colPayloads, colCache)

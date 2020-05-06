@@ -30,101 +30,19 @@ type Snapshot struct {
 // applies the given filters.
 func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
 
-	// execute the transaction that retrieves everything
+	// retrieve identities from the database
 	var identities flow.IdentityList
-	err := s.state.db.View(func(tx *badger.Txn) error {
+	err := s.state.db.View(operation.RetrieveIdentities(&identities))
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve identities: %w", err)
+	}
 
-		// get the top header at the requested snapshot
-		var head flow.Header
-		err := s.head(&head)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve head: %w", err)
-		}
+	// filter the identities
+	identities = identities.Filter(selector)
 
-		// get the latest finalized height
-		var boundary uint64
-		err = operation.RetrieveBoundary(&boundary)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve boundary: %w", err)
-		}
-
-		// if the target number is before finalized state, set it as new limit
-		if head.Height < boundary {
-			boundary = head.Height
-		}
-
-		// get finalized stakes within the boundary
-		deltas, err := computeFinalizedDeltas(tx, boundary, selector)
-		if err != nil {
-			return fmt.Errorf("could not compute finalized stakes: %w", err)
-		}
-
-		// if there are unfinalized blocks, retrieve stakes there
-		if head.Height > boundary {
-
-			// get the final block we want to reach
-			var finalID flow.Identifier
-			err = operation.RetrieveNumber(boundary, &finalID)(tx)
-			if err != nil {
-				return fmt.Errorf("could not get final hash: %w", err)
-			}
-
-			// track back from parent block to latest finalized block
-			parentID := head.ParentID
-			for parentID != finalID {
-
-				// get the stake deltas
-				// TODO: separate this from identities
-				var identities []*flow.Identity
-				err = procedure.RetrieveIdentities(parentID, &identities)(tx)
-				if err != nil {
-					return fmt.Errorf("could not add deltas: %w", err)
-				}
-
-				// manually add the deltas for valid ids
-				for _, identity := range identities {
-					if !selector(identity) {
-						continue
-					}
-					deltas[identity.NodeID] += int64(identity.Stake)
-				}
-
-				// get the next parent and forward pointer
-				var parent flow.Header
-				err = operation.RetrieveHeader(parentID, &parent)(tx)
-				if err != nil {
-					return fmt.Errorf("could not retrieve parent (%s): %w", parentID, err)
-				}
-				parentID = parent.ParentID
-			}
-
-		}
-
-		// get identity for each non-zero stake
-		for nodeID, delta := range deltas {
-
-			// retrieve the identity
-			var identity flow.Identity
-			err = operation.RetrieveIdentity(nodeID, &identity)(tx)
-			if err != nil {
-				return fmt.Errorf("could not retrieve identity (%x): %w", nodeID, err)
-			}
-
-			// set the stake for the node
-			identity.Stake = uint64(delta)
-
-			identities = append(identities, &identity)
-		}
-
-		// apply filters again to filter on stuff that wasn't available while
-		// running through the delta index in the key-value store
-		identities = identities.Filter(selector)
-
-		sort.Slice(identities, func(i int, j int) bool {
-			return order.ByNodeIDAsc(identities[i], identities[j])
-		})
-
-		return nil
+	// identities should always be deterministically storted
+	sort.Slice(identities, func(i int, j int) bool {
+		return order.ByNodeIDAsc(identities[i], identities[j])
 	})
 
 	return identities, err
@@ -192,12 +110,22 @@ func (s *Snapshot) Clusters() (*flow.ClusterList, error) {
 
 func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
+
 		err := procedure.RetrieveHeader(&s.number, &s.blockID, head)(tx)
-		// since the header model is shared between main consensus and cluster
-		// consensus, this check will ensure we are only dealing with main
-		// consensus blocks within the protocol state
-		if err == nil && head.ChainID != flow.DefaultChainID {
-			return fmt.Errorf("invalid chain id (%s)", head.ChainID)
+		if err != nil {
+			return fmt.Errorf("could not get snapshot header: %w", err)
+		}
+
+		// retrieve the finalized header to ensure we are only dealing with
+		// blocks from the main consensus-node chain within the protocol state
+		var final flow.Header
+		err = procedure.RetrieveLatestFinalizedHeader(&final)(tx)
+		if err != nil {
+			return fmt.Errorf("could not get chain ID: %w", err)
+		}
+
+		if head.ChainID != final.ChainID {
+			return fmt.Errorf("invalid chain id (got=%s expected=%s)", head.ChainID, final.ChainID)
 		}
 
 		return err
@@ -260,11 +188,11 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 	return seed, nil
 }
 
-func (s *Snapshot) Unfinalized() ([]flow.Identifier, error) {
-	var unfinalizedBlockIDs []flow.Identifier
+func (s *Snapshot) Pending() ([]flow.Identifier, error) {
+	var pendingBlockIDs []flow.Identifier
 	err := s.state.db.View(func(tx *badger.Txn) error {
 		var boundary uint64
-		// retrieve the current finalized view
+		// retrieve the current finalized height
 		err := operation.RetrieveBoundary(&boundary)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve boundary: %w", err)
@@ -277,29 +205,21 @@ func (s *Snapshot) Unfinalized() ([]flow.Identifier, error) {
 			return fmt.Errorf("could not retrieve head: %w", err)
 		}
 
-		// find all the unfinalized blocks that connect to the finalized block
+		// find all the pending blocks that connect to the finalized block
 		// the order guarantees that if a block requires certain blocks to connect to the
 		// finalized block, those connecting blocks must appear before this block.
-		operation.FindDescendants(boundary, headID, &unfinalizedBlockIDs)
+		// TODO: double check the pending blocks don't include invalid blocks with invalid payload
+		err = operation.FindDescendants(boundary, headID, &pendingBlockIDs)(tx)
+		if err != nil {
+			return fmt.Errorf("could not find descendants: %w", err)
+		}
 
 		return nil
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("could not find unfinalized block IDs: %w", err)
+		return nil, fmt.Errorf("could not find pending block IDs: %w", err)
 	}
 
-	return unfinalizedBlockIDs, nil
-}
-
-func computeFinalizedDeltas(tx *badger.Txn, boundary uint64, selector flow.IdentityFilter) (map[flow.Identifier]int64, error) {
-
-	// define start and end prefixes for the range scan
-	deltas := make(map[flow.Identifier]int64)
-	err := operation.TraverseDeltas(0, boundary, selector, func(nodeID flow.Identifier, delta int64) error {
-		deltas[nodeID] += delta
-		return nil
-	})(tx)
-
-	return deltas, err
+	return pendingBlockIDs, nil
 }

@@ -54,7 +54,7 @@ func NewBuilder(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Seal
 
 // BuildOn creates a new block header build on the provided parent, using the given view and applying the
 // custom setter function to allow the caller to make changes to the header before storing it.
-func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (*flow.Header, error) {
+func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
 	var header *flow.Header
 	err := b.db.Update(func(tx *badger.Txn) error {
 
@@ -281,7 +281,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		}
 
 		// apply the custom fields setter of the consensus algorithm
-		setter(header)
+		err = setter(header)
+		if err != nil {
+			return fmt.Errorf("could not set fields to header: %w", err)
+		}
 
 		// insert the header into the DB
 		err = operation.InsertHeader(header)(tx)

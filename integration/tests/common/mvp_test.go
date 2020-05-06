@@ -17,7 +17,6 @@ import (
 const defaultTimeout = time.Second * 10
 
 func TestMVP_Network(t *testing.T) {
-
 	colNode := testnet.NewNodeConfig(flow.RoleCollection)
 	exeNode := testnet.NewNodeConfig(flow.RoleExecution)
 
@@ -25,9 +24,9 @@ func TestMVP_Network(t *testing.T) {
 		colNode,
 		testnet.NewNodeConfig(flow.RoleCollection),
 		exeNode,
-		testnet.NewNodeConfig(flow.RoleConsensus),
-		testnet.NewNodeConfig(flow.RoleConsensus),
-		testnet.NewNodeConfig(flow.RoleConsensus),
+		testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithAdditionalFlag("--hotstuff-timeout=12s")),
+		testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithAdditionalFlag("--hotstuff-timeout=12s")),
+		testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithAdditionalFlag("--hotstuff-timeout=12s")),
 		testnet.NewNodeConfig(flow.RoleVerification),
 		testnet.NewNodeConfig(flow.RoleAccess),
 	}
@@ -45,8 +44,7 @@ func TestMVP_Network(t *testing.T) {
 }
 
 func TestMVP_Emulator(t *testing.T) {
-
-	//Start emulator manually for now, used for testing the test
+	// Start emulator manually for now, used for testing the test
 	// TODO - start an emulator instance
 	t.Skip()
 
@@ -99,6 +97,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
 	err = client.SendTransaction(ctx, tx)
 	cancel()
+
 	require.NoError(t, err)
 
 	// counter is created and incremented eventually

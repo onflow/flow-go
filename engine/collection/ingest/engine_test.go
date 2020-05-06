@@ -70,13 +70,13 @@ func TestInvalidTransaction(t *testing.T) {
 		// build enough blocks to make genesis an expired reference
 		blocks := storage.NewBlocks(node.DB)
 		parent := genesis
-		for i := 0; i < flow.DefaultTransactionExpiry; i++ {
+		for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
 			next := unittest.BlockWithParentFixture(parent)
 			err := blocks.Store(&next)
 			require.Nil(t, err)
 			err = node.DB.Update(procedure.FinalizeBlock(next.ID()))
 			require.Nil(t, err)
-			parent = &next.Header
+			parent = next.Header
 		}
 
 		tx := unittest.TransactionBodyFixture()

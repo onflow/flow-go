@@ -14,7 +14,6 @@ const (
 	// special database markers
 	codeBoundary             = 1 // latest finalized block number
 	codeFinalizedBlockNumber = 2 // lookup for block by number
-	codeDelta                = 3 // history of stake changes
 	codeView                 = 4 // persisting the latest view for hotstuff
 	codeMax                  = 5 // keeps track of the maximum key size
 
@@ -38,7 +37,6 @@ const (
 	codeTransactionResult          = 31
 	codeCollectionRefBlockID       = 32
 
-	codeIndexIdentity                = 100
 	codeIndexGuarantee               = 101
 	codeIndexSeal                    = 102
 	codeIndexCollection              = 104
@@ -47,6 +45,7 @@ const (
 	codeIndexCollectionByTransaction = 107
 	codeIndexHeaderByCollection      = 108
 	codeHighestExecutedBlockNumber   = 109 //highest executed block number
+	codeIndexChild                   = 110
 )
 
 func makePrefix(code byte, keys ...interface{}) []byte {

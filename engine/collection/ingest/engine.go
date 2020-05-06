@@ -38,7 +38,15 @@ type Engine struct {
 }
 
 // New creates a new collection ingest engine.
-func New(log zerolog.Logger, net module.Network, state protocol.State, metrics module.Metrics, me module.Local, pool mempool.Transactions) (*Engine, error) {
+func New(
+	log zerolog.Logger,
+	net module.Network,
+	state protocol.State,
+	metrics module.Metrics,
+	me module.Local,
+	pool mempool.Transactions,
+	expiryBuffer uint64,
+) (*Engine, error) {
 
 	logger := log.With().
 		Str("engine", "ingest").
@@ -51,9 +59,10 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, metrics m
 		me:      me,
 		state:   state,
 		pool:    pool,
-		// add 20 blocks of leeway -- this means a transaction has at minimum 20
-		// blocks to be included in a block before it expires
-		expiry: flow.DefaultTransactionExpiry - 20,
+		// add some expiry buffer -- this is how much time a transaction has
+		// to be included in a collection, then for that collection to be
+		// included in a block
+		expiry: flow.DefaultTransactionExpiry - expiryBuffer,
 	}
 
 	con, err := net.Register(engine.CollectionIngest, e)
@@ -210,7 +219,12 @@ func (e *Engine) ValidateTransaction(tx *flow.TransactionBody) error {
 		return fmt.Errorf("could not get reference block: %w", err)
 	}
 
-	if final.Height > ref.Height && final.Height-ref.Height > e.expiry {
+	diff := final.Height - ref.Height
+	// check for overflow
+	if ref.Height > final.Height {
+		diff = 0
+	}
+	if diff > e.expiry {
 		return ExpiredTransactionError{
 			RefHeight:   ref.Height,
 			FinalHeight: final.Height,

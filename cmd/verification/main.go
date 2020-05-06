@@ -133,7 +133,10 @@ func main() {
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rt := runtime.NewInterpreterRuntime()
-			vm := virtualmachine.New(rt)
+			vm, err := virtualmachine.New(rt)
+			if err != nil {
+				return nil, err
+			}
 			chunkVerifier := chunks.NewChunkVerifier(vm)
 			verifierEng, err = verifier.New(node.Logger, node.Network, node.State, node.Me, chunkVerifier, node.Metrics)
 			return verifierEng, err
@@ -165,6 +168,10 @@ func main() {
 			return ingestEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+
+			// initialize cleaner for DB
+			cleaner := storage.NewCleaner(node.Logger, node.DB)
+
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
 			final := finalizer.NewFinalizer(node.DB)
@@ -187,7 +194,7 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, final, verifier, ingestEng, &node.GenesisBlock.Header, node.GenesisQC)
+			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, final, verifier, ingestEng, node.GenesisBlock.Header, node.GenesisQC)
 			if err != nil {
 				// return nil, fmt.Errorf("could not create follower core logic: %w", err)
 				// TODO for now we ignore failures in follower
@@ -200,9 +207,10 @@ func main() {
 			followerEng, err := followereng.New(node.Logger,
 				node.Network,
 				node.Me,
-				node.State,
+				cleaner,
 				headerStorage,
 				conPayloads,
+				node.State,
 				conCache,
 				core)
 			if err != nil {

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/dgraph-io/badger/v2/options"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -71,41 +70,39 @@ func RequireReturnsBefore(t *testing.T, f func(), duration time.Duration) {
 func AssertErrSubstringMatch(t testing.TB, expected, actual error) {
 	require.NotNil(t, expected)
 	require.NotNil(t, actual)
-	assert.True(t, strings.Contains(actual.Error(), expected.Error()),
-		"expected error: '%s', got: '%s'", expected.Error(), actual.Error())
+	assert.True(
+		t,
+		strings.Contains(actual.Error(), expected.Error()) || strings.Contains(expected.Error(), actual.Error()),
+		"expected error: '%s', got: '%s'", expected.Error(), actual.Error(),
+	)
 }
 
-func TempDBDir(t testing.TB) string {
-	dir, err := ioutil.TempDir("", "flow-test-db")
+func TempDir(t testing.TB) string {
+	dir, err := ioutil.TempDir("", "flow-testing-temp-")
 	require.NoError(t, err)
 	return dir
 }
 
-func RunWithTempDBDir(t testing.TB, f func(string)) {
-	dbDir := TempDBDir(t)
+func RunWithTempDir(t testing.TB, f func(string)) {
+	dbDir := TempDir(t)
 	defer os.RemoveAll(dbDir)
-
 	f(dbDir)
 }
 
-func TempBadgerDB(t testing.TB) (*badger.DB, string) {
-
-	dir := TempDBDir(t)
-
-	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil).WithValueLogLoadingMode(options.FileIO))
-	require.Nil(t, err)
-
-	return db, dir
+func BadgerDB(t testing.TB, dir string) *badger.DB {
+	opts := badger.
+		LSMOnlyOptions(dir).
+		WithKeepL0InMemory(true).
+		WithLogger(nil)
+	db, err := badger.Open(opts)
+	require.NoError(t, err)
+	return db
 }
 
 func RunWithBadgerDB(t testing.TB, f func(*badger.DB)) {
-	RunWithTempDBDir(t, func(dir string) {
-		// Ref: https://github.com/dgraph-io/badger#memory-usage
-		db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil).WithValueLogLoadingMode(options.FileIO))
-		require.NoError(t, err)
-
+	RunWithTempDir(t, func(dir string) {
+		db := BadgerDB(t, dir)
+		defer db.Close()
 		f(db)
-
-		db.Close()
 	})
 }

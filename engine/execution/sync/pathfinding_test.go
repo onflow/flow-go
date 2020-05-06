@@ -25,12 +25,12 @@ func TestPathfinding(t *testing.T) {
 	*/
 
 	a := unittest.StateDeltaFixture()
-	c := unittest.StateDeltaWithParentFixture(&a.Block.Header)
-	b := unittest.StateDeltaWithParentFixture(&c.Block.Header)
-	d := unittest.StateDeltaWithParentFixture(&c.Block.Header)
-	e := unittest.StateDeltaWithParentFixture(&d.Block.Header)
-	f := unittest.StateDeltaWithParentFixture(&d.Block.Header)
-	g := unittest.StateDeltaWithParentFixture(&b.Block.Header)
+	c := unittest.StateDeltaWithParentFixture(a.Block.Header)
+	b := unittest.StateDeltaWithParentFixture(c.Block.Header)
+	d := unittest.StateDeltaWithParentFixture(c.Block.Header)
+	e := unittest.StateDeltaWithParentFixture(d.Block.Header)
+	f := unittest.StateDeltaWithParentFixture(d.Block.Header)
+	g := unittest.StateDeltaWithParentFixture(b.Block.Header)
 
 	executionStateMock := new(mock.ReadOnlyExecutionState)
 

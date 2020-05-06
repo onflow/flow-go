@@ -23,9 +23,10 @@ var (
 // ContainerConfig represents configuration for a node container in the network.
 type ContainerConfig struct {
 	bootstrap.NodeInfo
-	ContainerName string
-	LogLevel      zerolog.Level
-	Ghost         bool
+	ContainerName   string
+	LogLevel        zerolog.Level
+	Ghost           bool
+	AdditionalFlags []string
 }
 
 // ImageName returns the Docker image name for the given config.
@@ -96,7 +97,12 @@ func (c *Container) Name() string {
 // DB returns the node's database.
 func (c *Container) DB() (*badger.DB, error) {
 	dbPath := filepath.Join(c.datadir, DefaultFlowDBDir)
-	db, err := badger.Open(badger.DefaultOptions(dbPath).WithLogger(nil))
+	opts := badger.
+		LSMOnlyOptions(dbPath).
+		WithKeepL0InMemory(true).
+		WithLogger(nil)
+
+	db, err := badger.Open(opts)
 	return db, err
 }
 

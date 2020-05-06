@@ -1,12 +1,11 @@
 package chunks_test
 
 import (
-	"errors"
 	"math/rand"
 	"testing"
 	"time"
 
-	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
@@ -128,8 +127,8 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 	header := unittest.BlockHeaderFixture()
 	header.PayloadHash = payload.Hash()
 	block := flow.Block{
-		Header:  header,
-		Payload: payload,
+		Header:  &header,
+		Payload: &payload,
 	}
 
 	// registerTouch and State setup
@@ -148,7 +147,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 
 	var verifiableChunk verification.VerifiableChunk
 
-	unittest.RunWithTempDBDir(t, func(dbDir string) {
+	unittest.RunWithTempDir(t, func(dbDir string) {
 		f, _ := ledger.NewTrieStorage(dbDir)
 		startState, _ := f.UpdateRegisters(ids, values, f.EmptyStateCommitment())
 		regTs, _ := f.GetRegisterTouches(ids, startState)
@@ -217,7 +216,7 @@ func (bc *blockContextMock) ExecuteTransaction(
 		ledger.Set(id1, UpdatedValue1)
 		txRes = virtualmachine.TransactionResult{
 			TransactionID: unittest.IdentifierFixture(),
-			Events:        []runtime.Event{},
+			Events:        []cadence.Event{},
 			Logs:          []string{"log1", "log2"},
 			Error:         nil,
 			GasUsed:       0,
@@ -229,9 +228,9 @@ func (bc *blockContextMock) ExecuteTransaction(
 		ledger.Set(id1, UpdatedValue1)
 		txRes = virtualmachine.TransactionResult{
 			TransactionID: unittest.IdentifierFixture(),
-			Events:        []runtime.Event{},
+			Events:        []cadence.Event{},
 			Logs:          nil,
-			Error:         errors.New("runtime error"), // inside the runtime (e.g. div by zero, access account)
+			Error:         &virtualmachine.MissingPayerError{}, // inside the runtime (e.g. div by zero, access account)
 			GasUsed:       0,
 		}
 	default:
@@ -243,7 +242,7 @@ func (bc *blockContextMock) ExecuteTransaction(
 		ledger.Set(id2, UpdatedValue2)
 		txRes = virtualmachine.TransactionResult{
 			TransactionID: unittest.IdentifierFixture(),
-			Events:        []runtime.Event{},
+			Events:        []cadence.Event{},
 			Logs:          []string{"log1", "log2"},
 			Error:         nil,
 			GasUsed:       0,
@@ -272,4 +271,12 @@ func (vm *virtualMachineMock) NewBlockContext(header *flow.Header) virtualmachin
 		vm:     vm,
 		header: header,
 	}
+}
+
+func (vm *virtualMachineMock) ASTCache() virtualmachine.ASTCache {
+	cache, err := virtualmachine.NewLRUASTCache(64)
+	if err != nil {
+		return nil
+	}
+	return cache
 }

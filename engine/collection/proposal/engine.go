@@ -40,7 +40,7 @@ type Engine struct {
 	transactions storage.Transactions
 	headers      storage.Headers
 	payloads     storage.ClusterPayloads
-	cache        module.PendingClusterBlockBuffer // pending block cache
+	pending      module.PendingClusterBlockBuffer // pending block cache
 	participants flow.IdentityList                // consensus participants in our cluster
 
 	coldstuff module.ColdStuff
@@ -78,7 +78,7 @@ func New(
 		transactions: transactions,
 		headers:      headers,
 		payloads:     payloads,
-		cache:        cache,
+		pending:      cache,
 		participants: participants,
 	}
 
@@ -265,18 +265,21 @@ func (e *Engine) BroadcastCommit(commit *coldstuffmodel.Commit) error {
 // onBlockProposal handles proposals for new blocks.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
 
-	final, _ := e.clusterState.Final().Head()
+	header := proposal.Header
 
 	e.log.Debug().
-		Hex("block_id", logging.ID(proposal.Header.ID())).
-		Uint64("block_height", proposal.Header.Height).
-		Hex("parent_id", logging.ID(proposal.Header.ParentID)).
-		Hex("final_id", logging.ID(final.ID())).
-		Uint64("final_height", final.Height).
+		Hex("block_id", logging.ID(header.ID())).
+		Uint64("block_height", header.Height).
+		Str("chain_id", header.ChainID).
+		Hex("parent_id", logging.ID(header.ParentID)).
 		Msg("received proposal")
 
+	e.prunePendingCache()
+	e.metrics.PendingClusterBlocks(e.pending.Size())
+
 	// retrieve the parent block
-	parent, err := e.headers.ByBlockID(proposal.Header.ParentID)
+	// if the parent is not in storage, it has not yet been processed
+	parent, err := e.headers.ByBlockID(header.ParentID)
 	if errors.Is(err, storage.ErrNotFound) {
 		return e.processPendingProposal(originID, proposal)
 	}
@@ -284,7 +287,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 		return fmt.Errorf("could not retrieve proposal parent: %w", err)
 	}
 
-	blockID := proposal.Header.ID()
+	blockID := header.ID()
 	collection := proposal.Payload.Collection
 
 	// validate any transactions we haven't yet seen
@@ -298,17 +301,17 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 		}
 	}
 	if err := merr.ErrorOrNil(); err != nil {
-		return fmt.Errorf("cannot validate block proposal (id=%x) with invalid transactions: %w", proposal.Header.ID(), err)
+		return fmt.Errorf("cannot validate block proposal (id=%x) with invalid transactions: %w", header.ID(), err)
 	}
 
 	// store the payload
-	err = e.payloads.Store(proposal.Header, proposal.Payload)
+	err = e.payloads.Store(header, proposal.Payload)
 	if err != nil {
 		return fmt.Errorf("could not store payload: %w", err)
 	}
 
 	// store the header
-	err = e.headers.Store(proposal.Header)
+	err = e.headers.Store(header)
 	if err != nil {
 		return fmt.Errorf("could not store header: %w", err)
 	}
@@ -320,12 +323,12 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	}
 
 	// submit the proposal to hotstuff for processing
-	e.coldstuff.SubmitProposal(proposal.Header, parent.View)
+	e.coldstuff.SubmitProposal(header, parent.View)
 
 	// report proposed (case that we are follower)
 	e.metrics.CollectionProposed(proposal.Payload.Collection.Light())
 
-	children, ok := e.cache.ByParentID(blockID)
+	children, ok := e.pending.ByParentID(blockID)
 	if !ok {
 		return nil
 	}
@@ -342,7 +345,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	}
 
 	// remove children from cache
-	e.cache.DropForParent(blockID)
+	e.pending.DropForParent(blockID)
 
 	return result.ErrorOrNil()
 }
@@ -420,14 +423,14 @@ func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *mess
 	}
 
 	// cache the block
-	e.cache.Add(pendingBlock)
+	e.pending.Add(pendingBlock)
 
 	// request the missing block - typically this is the pending block's direct
 	// parent, but in general we walk the block's pending ancestors until we find
 	// the oldest one that is missing its parent.
 	missingID := proposal.Header.ParentID
 	for {
-		nextBlock, ok := e.cache.ByID(missingID)
+		nextBlock, ok := e.pending.ByID(missingID)
 		if !ok {
 			break
 		}
@@ -458,4 +461,15 @@ func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *mess
 	// limit on children we cache coming from a single other node
 
 	return nil
+}
+
+// prunePendingCache prunes the pending block cache.
+func (e *Engine) prunePendingCache() {
+	// retrieve the finalized height
+	final, err := e.clusterState.Final().Head()
+	if err != nil {
+		e.log.Warn().Err(err).Msg("could not get finalized head to prune pending blocks")
+		return
+	}
+	e.pending.PruneByHeight(final.Height)
 }
