@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
@@ -41,6 +43,24 @@ var (
 		Name:      "commitment_size_bytes",
 		Help:      "the storage size of a state commitment in bytes",
 	})
+	executionTransactionParseTimeHist = promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemVirtualMachine,
+		Name:      "transaction_parse_time_nanoseconds",
+		Help:      "the parse time for a transaction in nanoseconds",
+	})
+	executionTransactionCheckTimeHist = promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemVirtualMachine,
+		Name:      "transaction_check_time_nanoseconds",
+		Help:      "the checking time for a transaction in nanoseconds",
+	})
+	executionTransactionInterpretationTimeHist = promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemVirtualMachine,
+		Name:      "transaction_interpret_time_nanoseconds",
+		Help:      "the interpretation time for a transaction in nanoseconds",
+	})
 )
 
 // StartBlockReceivedToExecuted starts a span to trace the duration of a block
@@ -74,4 +94,19 @@ func (c *BaseMetrics) ExecutionStateStorageDiskTotal(bytes int64) {
 // ExecutionStorageStateCommitment reports the storage size of a state commitment
 func (c *BaseMetrics) ExecutionStorageStateCommitment(bytes int64) {
 	executionStorageStateCommitmentGauge.Set(float64(bytes))
+}
+
+// ExecutionTransactionParsed reports the parse time of a transaction
+func (c *Collector) ExecutionTransactionParsed(dur time.Duration) {
+	executionTransactionParseTimeHist.Observe(float64(dur))
+}
+
+// ExecutionTransactionChecked reports the checking time of a transaction
+func (c *Collector) ExecutionTransactionChecked(dur time.Duration) {
+	executionTransactionCheckTimeHist.Observe(float64(dur))
+}
+
+// ExecutionTransactionInterpreted reports the interpretation time of a transaction
+func (c *Collector) ExecutionTransactionInterpreted(dur time.Duration) {
+	executionTransactionInterpretationTimeHist.Observe(float64(dur))
 }

@@ -256,6 +256,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	computationEngine := computation.New(
 		node.Log,
+		node.Metrics,
 		node.Tracer,
 		node.Me,
 		node.State,

@@ -128,7 +128,7 @@ func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExe
 		view := delta.NewView(state.LedgerGetRegister(led, startStateCommitment))
 
 		// create BlockComputer
-		bc := computer.NewBlockComputer(vm, nil)
+		bc := computer.NewBlockComputer(vm, nil, nil)
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
 		completeColls[guarantee.ID()] = &entity.CompleteCollection{

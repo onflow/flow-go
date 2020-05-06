@@ -11,10 +11,11 @@ const (
 
 // Prometheus metric subsystems
 const (
-	subsystemBadger     = "badger"
-	subsystemProposal   = "proposal"
-	subsystemCompliance = "compliance"
-	subsystemNetwork    = "network"
+	subsystemBadger         = "badger"
+	subsystemProposal       = "proposal"
+	subsystemCompliance     = "compliance"
+	subsystemNetwork        = "network"
+	subsystemVirtualMachine = "virtualmachine"
 )
 
 // Execution Subsystems
