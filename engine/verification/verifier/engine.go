@@ -124,9 +124,10 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 	e.log.Info().
 		Timestamp().
 		Hex("origin", logging.ID(originID)).
-		Uint64("chunkIndex", chunk.ChunkIndex).
-		Hex("execution receipt", logging.Entity(chunk.Receipt)).
-		Msg("a verifiable chunk received by verifier engine")
+		Uint64("chunk_index", chunk.ChunkIndex).
+		Hex("chunk_id", logging.ID(chunk.ChunkDataPack.ChunkID)).
+		Hex("execution_receipt", logging.Entity(chunk.Receipt)).
+		Msg("verifiable chunk received by verifier engine")
 
 	// only accept internal calls
 	if originID != e.me.NodeID() {
@@ -207,8 +208,8 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 	e.log.Info().
 		Timestamp().
 		Hex("chunk_id", logging.ID(chunkID)).
-		Uint64("chunkIndex", chunk.ChunkIndex).
-		Hex("execution receipt", logging.Entity(chunk.Receipt)).
+		Uint64("chunk_index", chunk.ChunkIndex).
+		Hex("execution_receipt", logging.Entity(chunk.Receipt)).
 		Msg("result approval submitted")
 	// tracks number of emitted result approvals for this block
 	e.mc.OnResultApproval()

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -92,6 +93,12 @@ func TestHappyPath(t *testing.T) {
 // - dropping the ingestion of the ERs that share the same result once the verifiable chunk is submitted to verify engine
 // - broadcast of a matching result approval to consensus nodes for each assigned chunk
 func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
+	// to demarcate the debug logs
+	log.Debug().
+		Int("verification_nodes_count", verNodeCount).
+		Int("chunk_num", chunkNum).
+		Msg("TestHappyPath started")
+
 	// ingest engine parameters
 	// set based on following issue
 	// https://github.com/dapperlabs/flow-go/issues/3443
@@ -222,7 +229,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 		verNets = append(verNets, verNet)
 	}
 
-	unittest.RequireReturnsBefore(t, conWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second)
+	unittest.RequireReturnsBefore(t, conWG.Wait, time.Duration(chunkNum*verNodeCount*10)*time.Second)
 	// assert that the RA was received
 	conEngine.AssertExpectations(t)
 
@@ -269,6 +276,12 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 	colNode.Done()
 	conNode.Done()
 	exeNode.Done()
+
+	// to demarcate the debug logs
+	log.Debug().
+		Int("verification_nodes_count", verNodeCount).
+		Int("chunk_num", chunkNum).
+		Msg("TestHappyPath finishes")
 }
 
 // TestSingleCollectionProcessing checks the full happy
