@@ -136,12 +136,15 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 
 // CollectionNodes returns n collection nodes connected to the given hub.
 func CollectionNodes(t *testing.T, hub *stub.Hub, nNodes int, options ...func(*protocol.State)) []mock.CollectionNode {
-	identities := unittest.IdentityListFixture(nNodes, func(node *flow.Identity) {
-		node.Role = flow.RoleCollection
-	})
+	colIdentities := unittest.IdentityListFixture(nNodes, unittest.WithRole(flow.RoleCollection))
 
-	nodes := make([]mock.CollectionNode, 0, len(identities))
-	for _, identity := range identities {
+	// add some extra dummy identities so we have one of each role
+	others := unittest.IdentityListFixture(5, unittest.WithAllRolesExcept(flow.RoleCollection))
+
+	identities := append(colIdentities, others...)
+
+	nodes := make([]mock.CollectionNode, 0, len(colIdentities))
+	for _, identity := range colIdentities {
 		nodes = append(nodes, CollectionNode(t, hub, identity, identities, options...))
 	}
 
@@ -188,15 +191,18 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 }
 
 func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int) []mock.ConsensusNode {
-	identities := unittest.IdentityListFixture(nNodes, func(node *flow.Identity) {
-		node.Role = flow.RoleConsensus
-	})
-	for _, id := range identities {
+	conIdentities := unittest.IdentityListFixture(nNodes, unittest.WithRole(flow.RoleConsensus))
+	for _, id := range conIdentities {
 		t.Log(id.String())
 	}
 
-	nodes := make([]mock.ConsensusNode, 0, len(identities))
-	for _, identity := range identities {
+	// add some extra dummy identities so we have one of each role
+	others := unittest.IdentityListFixture(5, unittest.WithAllRolesExcept(flow.RoleConsensus))
+
+	identities := append(conIdentities, others...)
+
+	nodes := make([]mock.ConsensusNode, 0, len(conIdentities))
+	for _, identity := range conIdentities {
 		nodes = append(nodes, ConsensusNode(t, hub, identity, identities))
 	}
 
