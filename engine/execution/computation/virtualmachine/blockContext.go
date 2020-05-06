@@ -57,6 +57,7 @@ func (bc *blockContext) newTransactionContext(
 	ctx := &TransactionContext{
 		bc:                               bc,
 		astCache:                         bc.vm.cache,
+		Metrics:                          emptyMetricsCollector{},
 		ledger:                           NewLedgerDAL(ledger, bc.simpleAddresses),
 		signingAccounts:                  signingAccounts,
 		tx:                               tx,
@@ -81,6 +82,7 @@ func (bc *blockContext) newScriptContext(ledger Ledger) *TransactionContext {
 	return &TransactionContext{
 		bc:       bc,
 		astCache: bc.vm.cache,
+		Metrics:  emptyMetricsCollector{},
 		ledger:   NewLedgerDAL(ledger, bc.simpleAddresses),
 		header:   bc.header,
 		blocks:   bc.blocks,
@@ -171,6 +173,7 @@ func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte, arguments []
 
 	ctx := bc.newScriptContext(ledger)
 	value, err := bc.vm.executeScript(script, arguments, ctx, location)
+
 	if err != nil {
 		possibleRuntimeError := runtime.Error{}
 		if errors.As(err, &possibleRuntimeError) {
@@ -221,7 +224,6 @@ func (bc *blockContext) GetAccount(ledger Ledger, addr flow.Address) (*flow.Acco
 
 // ConvertEvents creates flow.Events from runtime.events
 func ConvertEvents(txIndex uint32, tr *TransactionResult) ([]flow.Event, error) {
-
 	flowEvents := make([]flow.Event, len(tr.Events))
 
 	for i, event := range tr.Events {

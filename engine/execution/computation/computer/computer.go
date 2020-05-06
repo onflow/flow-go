@@ -129,16 +129,18 @@ func (e *blockComputer) executeCollection(
 		gasUsed   uint64
 	)
 
+	metrics := virtualmachine.NewRuntimeMetrics()
+
 	for _, tx := range collection.Transactions {
 		err := func(tx *flow.TransactionBody) error {
 			if e.tracer != nil {
 				txSpan := e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
-				defer txSpan.Finish()
+				defer func() { txSpan.Finish() }()
 			}
 
 			txView := collectionView.NewChild()
 
-			result, err := blockCtx.ExecuteTransaction(txView, tx)
+			result, err := blockCtx.ExecuteTransaction(txView, tx, virtualmachine.WithMetrics(metrics))
 			if err != nil {
 				txIndex++
 				return fmt.Errorf("failed to execute transaction: %w", err)
