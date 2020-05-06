@@ -54,10 +54,13 @@ const (
 func main() {
 
 	var (
-		txLimit         uint
-		ingressConf     ingress.Config
+		txLimit             uint
+		maxCollectionSize   uint
+		ingressExpiryBuffer uint64
+		builderExpiryBuffer uint64
 		hotstuffTimeout time.Duration
 
+		ingressConf  ingress.Config
 		pool         mempool.Transactions
 		collections  *badger.Collections
 		transactions *badger.Transactions
@@ -84,7 +87,10 @@ func main() {
 
 	cmd.FlowNode("collection").
 		ExtraFlags(func(flags *pflag.FlagSet) {
-			flags.UintVar(&txLimit, "tx-limit", 10000, "maximum number of transactions in the memory pool")
+			flags.UintVar(&txLimit, "tx-limit", 50000, "maximum number of transactions in the memory pool")
+			flags.Uint64Var(&ingressExpiryBuffer, "ingress-expiry-buffer", 30, "expiry buffer for inbound transactions")
+			flags.Uint64Var(&builderExpiryBuffer, "builder-expiry-buffer", 15, "expiry buffer for transactions in proposed collections")
+			flags.UintVar(&maxCollectionSize, "max-collection-size", 100, "maximum number of transactions in proposed collections")
 			flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000", "the address the ingress server listens on")
 			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", proposalTimeout, "the initial timeout for the hotstuff pacemaker")
 		}).
@@ -203,7 +209,7 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, final, verifier, notifier, &node.GenesisBlock.Header, node.GenesisQC)
+			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, final, verifier, notifier, node.GenesisBlock.Header, node.GenesisQC)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
@@ -223,7 +229,7 @@ func main() {
 			return follower.WithSynchronization(sync), nil
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ing, err = ingest.New(node.Logger, node.Network, node.State, node.Metrics, node.Me, pool)
+			ing, err = ingest.New(node.Logger, node.Network, node.State, node.Metrics, node.Me, pool, ingressExpiryBuffer)
 			return ing, err
 		}).
 		Component("ingress server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -236,7 +242,10 @@ func main() {
 			return prov, err
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			build := builder.NewBuilder(node.DB, pool, clusterID)
+			build := builder.NewBuilder(node.DB, pool,
+				builder.WithMaxCollectionSize(maxCollectionSize),
+				builder.WithExpiryBuffer(builderExpiryBuffer),
+			)
 			final := colfinalizer.NewFinalizer(node.DB, pool, prov, node.Metrics, clusterID)
 
 			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, clusterState, node.Metrics, ing, pool, transactions, headers, colPayloads, colCache)

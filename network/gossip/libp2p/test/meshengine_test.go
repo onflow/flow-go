@@ -17,7 +17,9 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
+	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 // MeshNetTestSuite evaluates the message delivery functionality for the overlay
@@ -204,6 +206,70 @@ func (m *MeshNetTestSuite) TestTargetValidator() {
 		} else {
 			assert.Len(m.Suite.T(), e.event, 0, fmt.Sprintf("message received when none was expected %v", index))
 		}
+	}
+}
+
+// TestMaxMessageSize tests if a message of maximum permissible size can be sent successfully
+func (m *MeshNetTestSuite) TestMaxMessageSize() {
+	// creating engines
+	count := len(m.nets)
+	engs := make([]*MeshEngine, 0)
+	wg := sync.WaitGroup{}
+
+	for i := range m.nets {
+		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, 1)
+		engs = append(engs, eng)
+	}
+
+	// allow nodes to heartbeat and discover each other
+	time.Sleep(10 * time.Second)
+
+	allIds := m.ids.NodeIDs()
+	var targets = allIds[1:] // node 0 broadcasts a message to all the other nodes
+
+	// create an empty message
+	emptyEvent := &message.Echo{
+		Text: "",
+	}
+	codec := json.NewCodec()
+	empty, err := codec.Encode(emptyEvent)
+	require.NoError(m.T(), err)
+
+	// create a large message approximately equal to max message size
+	overhead := 500                                                       // approx 500 bytes overhead for message headers & encoding overhead
+	payloadSize := libp2p.DefaultMaxPubSubMsgSize - overhead - len(empty) // max possible payload size
+	payload := make([]byte, payloadSize)                                  // create a message of max possible payload size
+	for i := range payload {
+		payload[i] = 'a' // a utf-8 char that translates to 1-byte when converted to a string
+	}
+
+	event := emptyEvent
+	event.Text = string(payload)
+
+	// encode event the way the network would encode it to get the size of the message
+	encodedEvent, err := codec.Encode(event)
+	require.NoError(m.T(), err)
+
+	// check that message payload is approx equal to max size
+	require.InDelta(m.Suite.T(), len(encodedEvent), libp2p.DefaultMaxPubSubMsgSize, float64(overhead))
+
+	// submit the message
+	require.NoError(m.Suite.T(), engs[0].con.Submit(event, targets...))
+
+	// fires a goroutine for all engines to listens for the incoming message
+	for i := 1; i < len(allIds); i++ {
+		wg.Add(1)
+		go func(e *MeshEngine) {
+			<-e.received
+			wg.Done()
+		}(engs[i])
+	}
+
+	unittest.AssertReturnsBefore(m.Suite.T(), wg.Wait, 30*time.Second)
+
+	// evaluates that all messages are received
+	for index, e := range engs[1:] {
+		assert.Len(m.Suite.T(), e.event, 1, "message not received by engine %d", index+1)
 	}
 }
 

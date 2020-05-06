@@ -122,22 +122,40 @@ func (suite *CollectorSuite) Clusters() *flow.ClusterList {
 	return clusters
 }
 
-func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transaction {
+// NextTransaction returns a valid no-op transaction and updates the
+// account key sequence number.
+func (suite *CollectorSuite) NextTransaction(opts ...func(*sdk.Transaction)) *sdk.Transaction {
 	acct := suite.acct
 
 	tx := sdk.NewTransaction().
 		SetScript(unittest.NoopTxScript()).
-		SetReferenceBlockID(convert.ToSDKID(unittest.IdentifierFixture())).
+		SetReferenceBlockID(convert.ToSDKID(suite.net.Genesis().ID())).
 		SetProposalKey(acct.addr, acct.key.ID, acct.key.SequenceNumber).
 		SetPayer(acct.addr).
 		AddAuthorizer(acct.addr)
 
+	for _, apply := range opts {
+		apply(tx)
+	}
+
+	err := tx.SignEnvelope(acct.addr, acct.key.ID, acct.signer)
+	require.Nil(suite.T(), err)
+
+	suite.acct.key.SequenceNumber++
+
+	return tx
+}
+
+func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transaction {
+
+	acct := suite.acct
 	clusters := suite.Clusters()
+	tx := suite.NextTransaction()
 
 	// hash-grind the script until the transaction will be routed to target cluster
 	for {
 		tx.SetScript(append(tx.Script, '/', '/'))
-		err := tx.SignEnvelope(sdk.RootAddress, acct.key.ID, acct.signer)
+		err := tx.SignEnvelope(acct.addr, acct.key.ID, acct.signer)
 		require.Nil(suite.T(), err)
 		routed := clusters.ByTxID(convert.IDFromSDK(tx.ID()))
 		if routed.Fingerprint() == target.Fingerprint() {
@@ -234,21 +252,12 @@ func (suite *CollectorSuite) TestTransactionIngress_InvalidTransaction() {
 	client, err := sdkclient.New(col1.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
 	require.Nil(t, err)
 
-	acct := suite.acct
+	t.Run("missing reference block id", func(t *testing.T) {
+		malformed := suite.NextTransaction(func(tx *sdk.Transaction) {
+			tx.SetReferenceBlockID(sdk.ZeroID)
+		})
 
-	t.Run("missing reference block hash", func(t *testing.T) {
-		malformed := sdk.NewTransaction().
-			SetScript(unittest.NoopTxScript()).
-			SetProposalKey(acct.addr, acct.key.ID, acct.key.SequenceNumber).
-			SetPayer(acct.addr).
-			AddAuthorizer(acct.addr)
-
-		malformed.SetReferenceBlockID(sdk.ZeroID)
-
-		err = malformed.SignEnvelope(sdk.RootAddress, acct.key.ID, acct.signer)
-		require.Nil(t, err)
-
-		expected := ingest.ErrIncompleteTransaction{
+		expected := ingest.IncompleteTransactionError{
 			Missing: []string{flow.TransactionFieldRefBlockID.String()},
 		}
 
@@ -259,15 +268,11 @@ func (suite *CollectorSuite) TestTransactionIngress_InvalidTransaction() {
 	})
 
 	t.Run("missing script", func(t *testing.T) {
-		malformed := sdk.NewTransaction().
-			SetReferenceBlockID(sdk.Identifier{1}).
-			SetProposalKey(sdk.RootAddress, acct.key.ID, acct.key.SequenceNumber).
-			SetPayer(sdk.RootAddress).
-			AddAuthorizer(sdk.RootAddress)
+		malformed := suite.NextTransaction(func(tx *sdk.Transaction) {
+			tx.SetScript(nil)
+		})
 
-		malformed.SetScript(nil)
-
-		expected := ingest.ErrIncompleteTransaction{
+		expected := ingest.IncompleteTransactionError{
 			Missing: []string{flow.TransactionFieldScript.String()},
 		}
 
@@ -315,16 +320,7 @@ func (suite *CollectorSuite) TestTxIngress_SingleCluster() {
 	client, err := sdkclient.New(col1.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
 	require.Nil(t, err)
 
-	acct := suite.acct
-
-	tx := sdk.NewTransaction().
-		SetScript(unittest.NoopTxScript()).
-		SetReferenceBlockID(sdk.BytesToID([]byte{1})).
-		SetProposalKey(acct.addr, acct.key.ID, acct.key.SequenceNumber).
-		SetPayer(acct.addr).
-		AddAuthorizer(acct.addr)
-
-	err = tx.SignEnvelope(acct.addr, acct.key.ID, acct.signer)
+	tx := suite.NextTransaction()
 	require.Nil(t, err)
 
 	t.Log("sending transaction: ", tx.ID())

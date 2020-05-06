@@ -29,32 +29,32 @@ func New(signer hotstuff.Signer, committee hotstuff.Committee, builder module.Bu
 
 // MakeBlockProposal will build a proposal for the given view with the given QC
 func (bp *BlockProducer) MakeBlockProposal(qc *model.QuorumCertificate, view uint64) (*model.Proposal, error) {
-
-	// create the block for the view
-	block, err := bp.makeBlockForView(qc, view)
-	if err != nil {
-		return nil, fmt.Errorf("could not create block for view: %w", err)
-	}
-
-	// then sign the proposal
-	proposal, err := bp.signer.CreateProposal(block)
-	if err != nil {
-		return nil, fmt.Errorf("could not sign block proposal: %w", err)
-	}
-
-	return proposal, nil
-}
-
-// makeBlockForView gets the payload hash from mempool and build a block on top of the given qc for the given view.
-func (bp *BlockProducer) makeBlockForView(qc *model.QuorumCertificate, view uint64) (*model.Block, error) {
-
 	// the custom functions allows us to set some custom fields on the block;
 	// in hotstuff, we use this for view number and signature-related fields
-	setHotstuffFields := func(header *flow.Header) {
+	setHotstuffFields := func(header *flow.Header) error {
 		header.View = view
 		header.ParentVoterIDs = qc.SignerIDs
 		header.ParentVoterSig = qc.SigData
 		header.ProposerID = bp.committee.Self()
+
+		// turn the header into a block header proposal as known by hotstuff
+		block := model.Block{
+			BlockID:     header.ID(),
+			View:        view,
+			ProposerID:  header.ProposerID,
+			QC:          qc,
+			PayloadHash: header.PayloadHash,
+			Timestamp:   header.Timestamp,
+		}
+
+		// then sign the proposal
+		proposal, err := bp.signer.CreateProposal(&block)
+		if err != nil {
+			return fmt.Errorf("could not sign block proposal: %w", err)
+		}
+
+		header.ProposerSig = proposal.SigData
+		return nil
 	}
 
 	// retrieve a fully built block header from the builder
@@ -63,15 +63,8 @@ func (bp *BlockProducer) makeBlockForView(qc *model.QuorumCertificate, view uint
 		return nil, fmt.Errorf("could not build header: %w", err)
 	}
 
-	// turn the header into a block header proposal as known by hotstuff
-	block := model.Block{
-		BlockID:     header.ID(),
-		View:        view,
-		ProposerID:  header.ProposerID,
-		QC:          qc,
-		PayloadHash: header.PayloadHash,
-		Timestamp:   header.Timestamp,
-	}
+	// turn the signed flow header into a proposal
+	proposal := model.ProposalFromFlow(header, qc.View)
 
-	return &block, nil
+	return proposal, nil
 }

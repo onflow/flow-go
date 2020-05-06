@@ -137,7 +137,7 @@ func testJointFeldmanUnhappyPath(t *testing.T) {
 	dkgCommonTest(t, JointFeldman, processors)
 }
 
-func dkgCommonTest(t *testing.T, dkg DKGType, processors []testDKGProcessor) {
+func dkgCommonTest(t *testing.T, dkg DKGProtocol, processors []testDKGProcessor) {
 	log.Info("DKG protocol starts")
 	// number of nodes to test
 	n := len(processors)

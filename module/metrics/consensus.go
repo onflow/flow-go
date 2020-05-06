@@ -59,7 +59,18 @@ var (
 		Namespace: namespaceConsensus,
 		Help:      "the size of the seals mempool",
 	})
+	pendingBlocksGauge = promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespaceConsensus,
+		Subsystem: subsystemCompliance,
+		Name:      "pending_blocks_total",
+		Help:      "number of blocks in pending cache of compliance engine",
+	})
 )
+
+// PendingBlocks sets the number of blocks in the pending cache.
+func (c *Collector) PendingBlocks(n uint) {
+	pendingBlocksGauge.Set(float64(n))
+}
 
 // StartCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized Block
 func (c *BaseMetrics) StartCollectionToFinalized(collectionID flow.Identifier) {

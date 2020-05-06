@@ -48,7 +48,7 @@ func NewClient(addr string) (*Client, error) {
 
 // DeployContract submits a transaction to deploy a contract with the given
 // code to the root account.
-func (c *Client) DeployContract(ctx context.Context, contract dsl.CadenceCode) error {
+func (c *Client) DeployContract(ctx context.Context, refID flow.Identifier, contract dsl.CadenceCode) error {
 
 	code := dsl.Transaction{
 		Import: dsl.Import{},
@@ -57,7 +57,10 @@ func (c *Client) DeployContract(ctx context.Context, contract dsl.CadenceCode) e
 		},
 	}
 
-	tx := unittest.TransactionBodyFixture(unittest.WithTransactionDSL(code))
+	tx := unittest.TransactionBodyFixture(
+		unittest.WithTransactionDSL(code),
+		unittest.WithReferenceBlock(refID),
+	)
 
 	return c.SendTransaction(ctx, tx)
 }

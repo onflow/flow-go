@@ -119,7 +119,7 @@ func (h *Handler) deriveTransactionStatus(tx *flow.TransactionBody) (entities.Tr
 
 	// if the finalized block precedes the latest sealed block, then it can be safely assumed that it would have been
 	// sealed as well and the transaction can be considered sealed
-	if block.Height <= latestSealedBlock.Height {
+	if block.Header.Height <= latestSealedBlock.Height {
 		return entities.TransactionStatus_SEALED, nil
 	}
 	// otherwise, the finalized block of the transaction has not yet been sealed

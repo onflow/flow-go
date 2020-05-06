@@ -44,7 +44,7 @@ func TestPayloadNilSeals(t *testing.T) {
 		block := unittest.BlockFixture()
 		block.Payload.Seals = nil
 
-		check(t, db, &block.Header, &block.Payload)
+		check(t, db, block.Header, block.Payload)
 	})
 }
 
@@ -55,9 +55,9 @@ func TestPayloadEmptySeals(t *testing.T) {
 		block.Payload.Seals = make([]*flow.Seal, 0)
 
 		var retrievedPayload flow.Payload
-		saveAndRetrieve(t, db, &block.Header, &block.Payload, &retrievedPayload)
+		saveAndRetrieve(t, db, block.Header, block.Payload, &retrievedPayload)
 
-		//check(t, db, &block.Header, &block.Payload)
+		//check(t, db, block.Header, block.Payload)
 		assert.Equal(t, block.Payload.Hash(), retrievedPayload.Hash())
 		assert.Nil(t, retrievedPayload.Seals)
 	})
@@ -76,7 +76,7 @@ func TestPayloadOrderedSeals(t *testing.T) {
 			seal1, seal2, seal3,
 		}
 
-		check(t, db, &block.Header, &block.Payload)
+		check(t, db, block.Header, block.Payload)
 	})
 }
 
@@ -86,7 +86,7 @@ func TestPayloadNilGuarantees(t *testing.T) {
 		block := unittest.BlockFixture()
 		block.Payload.Guarantees = nil
 
-		check(t, db, &block.Header, &block.Payload)
+		check(t, db, block.Header, block.Payload)
 	})
 }
 
@@ -97,9 +97,9 @@ func TestPayloadEmptyGuarantees(t *testing.T) {
 		block.Payload.Guarantees = make([]*flow.CollectionGuarantee, 0)
 
 		var retrievedPayload flow.Payload
-		saveAndRetrieve(t, db, &block.Header, &block.Payload, &retrievedPayload)
+		saveAndRetrieve(t, db, block.Header, block.Payload, &retrievedPayload)
 
-		//check(t, db, &block.Header, &block.Payload)
+		//check(t, db, block.Header, block.Payload)
 		assert.Equal(t, block.Payload.Hash(), retrievedPayload.Hash())
 		assert.Nil(t, retrievedPayload.Guarantees)
 	})
@@ -111,7 +111,7 @@ func TestPayloadOrderedGuarantees(t *testing.T) {
 		block := unittest.BlockFixture()
 		block.Payload.Guarantees = unittest.CollectionGuaranteesFixture(5)
 
-		check(t, db, &block.Header, &block.Payload)
+		check(t, db, block.Header, block.Payload)
 	})
 }
 
@@ -121,7 +121,7 @@ func TestPayloadNilIdentities(t *testing.T) {
 		block := unittest.BlockFixture()
 		block.Payload.Identities = nil
 
-		check(t, db, &block.Header, &block.Payload)
+		check(t, db, block.Header, block.Payload)
 	})
 }
 
@@ -132,20 +132,10 @@ func TestPayloadEmptyIdentities(t *testing.T) {
 		block.Payload.Identities = make([]*flow.Identity, 0)
 
 		var retrievedPayload flow.Payload
-		saveAndRetrieve(t, db, &block.Header, &block.Payload, &retrievedPayload)
+		saveAndRetrieve(t, db, block.Header, block.Payload, &retrievedPayload)
 
-		//check(t, db, &block.Header, &block.Payload)
+		//check(t, db, block.Header, block.Payload)
 		assert.Equal(t, block.Payload.Hash(), retrievedPayload.Hash())
 		assert.Nil(t, retrievedPayload.Identities)
-	})
-}
-
-func TestPayloadOrderedIdentities(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-
-		block := unittest.BlockFixture()
-		block.Payload.Identities = unittest.IdentityListFixture(5)
-
-		check(t, db, &block.Header, &block.Payload)
 	})
 }

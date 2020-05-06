@@ -4,6 +4,8 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -65,8 +67,9 @@ func CreateCounterPanicTransaction() flow.TransactionBody {
 
 			transaction {
 				prepare(acc: AuthAccount) {
-					let existing <- acc.storage[Container.Counter] <- Container.createCounter(42)
-					destroy existing
+					if let existing <- acc.load<@Container.Counter>(from: /storage/counter) {
+						destroy existing
+            		}
 
 					panic("fail for testing purposes")
               	}
@@ -82,13 +85,48 @@ func AddToCounterTransaction() flow.TransactionBody {
 			
 			transaction {
 				prepare(acc: AuthAccount) {
-					let counter <- acc.load<@Container.Counter>(from: /storage/counter)
-			
+					let counter = acc.borrow<&Container.Counter>(from: /storage/counter)
 					counter?.add(2)
-			
-					acc.save(<-counter, to: /storage/counter)
 				}
 			}`),
 		Authorizers: []flow.Address{flow.RootAddress},
 	}
+}
+
+func SignTransactionByRoot(tx *flow.TransactionBody, seqNum uint64) error {
+
+	hasher, err := hash.NewHasher(flow.RootAccountPrivateKey.HashAlgo)
+	if err != nil {
+		return fmt.Errorf("cannot create hasher: %w", err)
+	}
+
+	err = tx.SetPayer(flow.RootAddress).
+		SetProposalKey(flow.RootAddress, 0, seqNum).
+		SignEnvelope(flow.RootAddress, 0, flow.RootAccountPrivateKey.PrivateKey, hasher)
+
+	if err != nil {
+		return fmt.Errorf("cannot sign tx: %w", err)
+	}
+
+	return nil
+}
+
+func RootBootstrappedLedger() (virtualmachine.Ledger, error) {
+	ledger := make(virtualmachine.MapLedger)
+
+	return ledger, BootstrapLedgerWithRootAccount(ledger)
+}
+
+func BootstrapLedgerWithRootAccount(ledger virtualmachine.Ledger) error {
+
+	ledgerAccess := virtualmachine.LedgerDAL{Ledger: ledger}
+
+	rootAccountPublicKey := flow.RootAccountPrivateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold)
+
+	_, err := ledgerAccess.CreateAccountInLedger([]flow.AccountPublicKey{rootAccountPublicKey})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

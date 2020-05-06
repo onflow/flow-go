@@ -124,7 +124,7 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, final, verifier, ingestEng, &node.GenesisBlock.Header, node.GenesisQC)
+			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, final, verifier, ingestEng, node.GenesisBlock.Header, node.GenesisQC)
 			if err != nil {
 				// TODO for now we ignore failures in follower
 				// this is necessary for integration tests to run, until they are

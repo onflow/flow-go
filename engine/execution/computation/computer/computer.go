@@ -46,7 +46,7 @@ func (e *blockComputer) executeBlock(
 	stateView *delta.View,
 ) (*execution.ComputationResult, error) {
 
-	blockCtx := e.vm.NewBlockContext(&block.Block.Header)
+	blockCtx := e.vm.NewBlockContext(block.Block.Header)
 
 	collections := block.Collections()
 
@@ -120,7 +120,7 @@ func (e *blockComputer) executeCollection(
 		}
 
 		if result.Error != nil {
-			txResult.ErrorMessage = result.Error.Error()
+			txResult.ErrorMessage = result.Error.ErrorMessage()
 		}
 
 		txResults = append(txResults, txResult)
