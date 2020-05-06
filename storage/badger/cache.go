@@ -38,7 +38,7 @@ func noRetrieve(flow.Identifier) (interface{}, error) {
 }
 
 type Cache struct {
-	sync.Mutex
+	sync.RWMutex
 	store    storeFunc
 	retrieve retrieveFunc
 	entities map[flow.Identifier]interface{}
@@ -61,11 +61,11 @@ func newCache(options ...func(*Cache)) *Cache {
 // Get will try to retrieve the entity from cache first, and then from the
 // injected
 func (c *Cache) Get(entityID flow.Identifier) (interface{}, error) {
-	c.Lock()
-	defer c.Unlock()
 
 	// check if we have it in the cache
+	c.RLock()
 	entity, cached := c.entities[entityID]
+	c.RUnlock()
 	if cached {
 		return entity, nil
 	}
@@ -77,16 +77,16 @@ func (c *Cache) Get(entityID flow.Identifier) (interface{}, error) {
 	}
 
 	// cache the entity and eject a random one if we reached limit
+	c.Lock()
 	c.entities[entityID] = entity
 	c.eject()
+	c.Unlock()
 
 	return entity, nil
 }
 
 // Put will add an entity to the cache with the given ID.
 func (c *Cache) Put(entityID flow.Identifier, entity interface{}) error {
-	c.Lock()
-	defer c.Unlock()
 
 	// try to store the entity
 	err := c.store(entityID, entity)
@@ -95,8 +95,10 @@ func (c *Cache) Put(entityID flow.Identifier, entity interface{}) error {
 	}
 
 	// cache the entity and eject a random one if we reached limit
+	c.Lock()
 	c.entities[entityID] = entity
 	c.eject()
+	c.Unlock()
 
 	return nil
 }
