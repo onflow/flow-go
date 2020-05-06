@@ -5,9 +5,9 @@ import (
 )
 
 type RuntimeMetrics struct {
-	parsed      TimeRange
-	checked     TimeRange
-	interpreted TimeRange
+	parsed      time.Duration
+	checked     time.Duration
+	interpreted time.Duration
 }
 
 func NewRuntimeMetrics() *RuntimeMetrics {
@@ -19,45 +19,36 @@ type TimeRange struct {
 	End   time.Time
 }
 
-func (m *RuntimeMetrics) Parsed() TimeRange      { return m.parsed }
-func (m *RuntimeMetrics) Checked() TimeRange     { return m.checked }
-func (m *RuntimeMetrics) Interpreted() TimeRange { return m.interpreted }
+func (m *RuntimeMetrics) Parsed() time.Duration      { return m.parsed }
+func (m *RuntimeMetrics) Checked() time.Duration     { return m.checked }
+func (m *RuntimeMetrics) Interpreted() time.Duration { return m.interpreted }
 
 type runtimeMetricsCollector struct {
 	*RuntimeMetrics
 }
 
-func (m runtimeMetricsCollector) ProgramParsed(start, end time.Time) {
-	if m.RuntimeMetrics == nil {
-		return
-	}
-	m.parsed = TimeRange{Start: start, End: end}
+func (m runtimeMetricsCollector) ProgramParsed(elapsed time.Duration) {
+	m.parsed = elapsed
 }
 
-func (m runtimeMetricsCollector) ProgramChecked(start, end time.Time) {
-	if m.RuntimeMetrics == nil {
-		return
-	}
-	m.checked = TimeRange{Start: start, End: end}
+func (m runtimeMetricsCollector) ProgramChecked(elapsed time.Duration) {
+	m.checked = elapsed
 }
 
-func (m runtimeMetricsCollector) ProgramInterpreted(start, end time.Time) {
-	if m.RuntimeMetrics == nil {
-		return
-	}
-	m.interpreted = TimeRange{Start: start, End: end}
+func (m runtimeMetricsCollector) ProgramInterpreted(elapsed time.Duration) {
+	m.interpreted = elapsed
 }
 
-func (m runtimeMetricsCollector) ValueEncoded(start, end time.Time) {}
-func (m runtimeMetricsCollector) ValueDecoded(start, end time.Time) {}
+func (m runtimeMetricsCollector) ValueEncoded(elapsed time.Duration) {}
+func (m runtimeMetricsCollector) ValueDecoded(elapsed time.Duration) {}
 
 type emptyMetricsCollector struct{}
 
-func (m emptyMetricsCollector) ProgramParsed(start, end time.Time) {}
+func (m emptyMetricsCollector) ProgramParsed(elapsed time.Duration) {}
 
-func (m emptyMetricsCollector) ProgramChecked(start, end time.Time) {}
+func (m emptyMetricsCollector) ProgramChecked(elapsed time.Duration) {}
 
-func (m emptyMetricsCollector) ProgramInterpreted(start, end time.Time) {}
+func (m emptyMetricsCollector) ProgramInterpreted(elapsed time.Duration) {}
 
-func (m emptyMetricsCollector) ValueEncoded(start, end time.Time) {}
-func (m emptyMetricsCollector) ValueDecoded(start, end time.Time) {}
+func (m emptyMetricsCollector) ValueEncoded(elapsed time.Duration) {}
+func (m emptyMetricsCollector) ValueDecoded(elapsed time.Duration) {}
