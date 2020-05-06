@@ -15,8 +15,8 @@ func GenerateGenesisClusterBlocks(clusters *flow.ClusterList) []*cluster.Block {
 }
 
 func GenerateGenesisClusterBlock(identities flow.IdentityList) *cluster.Block {
-	payload := cluster.EmptyPayload()
-	header := flow.Header{
+	payload := cluster.EmptyPayload(flow.ZeroID)
+	header := &flow.Header{
 		ChainID:        protocol.ChainIDForCluster(identities),
 		ParentID:       flow.ZeroID,
 		Height:         0,
@@ -31,6 +31,6 @@ func GenerateGenesisClusterBlock(identities flow.IdentityList) *cluster.Block {
 
 	return &cluster.Block{
 		Header:  header,
-		Payload: payload,
+		Payload: &payload,
 	}
 }

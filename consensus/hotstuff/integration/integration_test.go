@@ -15,7 +15,7 @@ import (
 
 // a pacemaker timeout to wait for proposals. Usually 10 ms is enough,
 // but for slow environment like CI, a longer one is needed.
-const safeTimeout = 10 * time.Second
+const safeTimeout = 200 * time.Millisecond
 
 func TestSingleInstance(t *testing.T) {
 
@@ -86,7 +86,7 @@ func TestThreeInstances(t *testing.T) {
 	in2 := instances[1]
 	in3 := instances[2]
 	// verify progress has been made
-	assert.Equal(t, finalView, in1.forks.FinalizedBlock().View, "the first instance 's finalized view should be four lower than current view")
+	assert.GreaterOrEqual(t, in1.forks.FinalizedBlock().View, finalView, "the first instance 's finalized view should be four lower than current view")
 	// verify same progresses have been made
 	assert.Equal(t, in1.forks.FinalizedBlock(), in2.forks.FinalizedBlock(), "second instance should have same finalized block as first instance")
 	assert.Equal(t, in1.forks.FinalizedBlock(), in3.forks.FinalizedBlock(), "third instance should have same finalized block as first instance")
@@ -95,6 +95,10 @@ func TestThreeInstances(t *testing.T) {
 }
 
 func TestSevenInstances(t *testing.T) {
+
+	if testing.Short() {
+		t.Skip("skipping time intensive test")
+	}
 
 	// test parameters
 	// NOTE: block finalization seems to be rather slow on CI at the moment,

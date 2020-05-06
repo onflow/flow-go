@@ -145,8 +145,8 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 
 	// process as proposal
 	proposal := &messages.BlockProposal{
-		Header:  &synced.Block.Header,
-		Payload: &synced.Block.Payload,
+		Header:  synced.Block.Header,
+		Payload: synced.Block.Payload,
 	}
 	return e.onBlockProposal(originID, proposal)
 }
@@ -258,11 +258,10 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 	log.Info().Msg("block proposal processed")
 
-	// this is a good time to run garbage collection; it means we will run
-	// garbage collection after processing a new block proposal, which is a
-	// moment where the database is a bit less busy - however, we will only
-	// run it around every 60 finalized blocks, which should be around once a
-	// minute at a one block per second rate
+	// most of the heavy database checks are done at this point, so this is a
+	// good moment to potentially kick-off a garbage collection of the DB
+	// NOTE: this is only effectively run every 1000th calls, which corresponds
+	// to every 1000th successfully processed block
 	e.cleaner.RunGC()
 
 	return nil

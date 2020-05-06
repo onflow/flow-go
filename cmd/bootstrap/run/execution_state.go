@@ -53,11 +53,8 @@ func bootstrapLedger(ledger storage.Ledger, priv flow.AccountPrivateKey) (flow.S
 }
 
 func createRootAccount(view *delta.View, privateKey flow.AccountPrivateKey) error {
-	publicKeyBytes, err := flow.EncodeAccountPublicKey(privateKey.PublicKey(1000))
-	if err != nil {
-		return fmt.Errorf("cannot encode public key of hardcoded private key: %w", err)
-	}
-	_, err = virtualmachine.CreateAccountInLedger(view, [][]byte{publicKeyBytes})
+	ledgerAccess := virtualmachine.LedgerDAL{Ledger: view}
+	_, err := ledgerAccess.CreateAccountInLedger([]flow.AccountPublicKey{privateKey.PublicKey(1000)})
 	if err != nil {
 		return fmt.Errorf("error while creating account in ledger: %w", err)
 	}

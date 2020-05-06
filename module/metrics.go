@@ -47,8 +47,14 @@ type Metrics interface {
 	// CollectionGuaranteed is called when a collection is finalized.
 	CollectionGuaranteed(collection flow.LightCollection)
 
+	// PendingClusterBlocks the number of cluster blocks in the pending cache.
+	PendingClusterBlocks(n uint)
+
 	// Consensus Metrics
 	//
+
+	// PendingBlocks the number of blocks in the pending cache.
+	PendingBlocks(n uint)
 
 	// StartCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized Block
 	StartCollectionToFinalized(collectionID flow.Identifier)

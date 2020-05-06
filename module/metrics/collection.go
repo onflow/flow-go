@@ -42,7 +42,18 @@ var (
 		Name:      "guarantee_size_transactions",
 		Help:      "number of transactions in guaranteed collections",
 	})
+	pendingClusterBlocksGauge = promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespaceCollection,
+		Subsystem: subsystemProposal,
+		Name:      "pending_blocks_total",
+		Help:      "number of cluster blocks in pending cache of collection proposal engine",
+	})
 )
+
+// PendingClusterBlocks sets the number of cluster blocks in the pending cache.
+func (c *BaseMetrics) PendingClusterBlocks(n uint) {
+	pendingClusterBlocksGauge.Set(float64(n))
+}
 
 // TransactionReceived starts a span to trace the duration of a transaction
 // from being created to being included as part of a collection.

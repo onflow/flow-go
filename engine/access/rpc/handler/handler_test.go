@@ -167,14 +167,14 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	collection := unittest.CollectionFixture(1)
 	transactionBody := collection.Transactions[0]
 	block := unittest.BlockFixture()
-	block.Height = 2
+	block.Header.Height = 2
 	headBlock := unittest.BlockFixture()
-	headBlock.Height = block.Height - 1 // head is behind the current block
+	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
 
 	seal := unittest.BlockSealFixture()
 	seal.BlockID = headBlock.ID()
 	suite.snapshot.On("Seal").Return(seal, nil)
-	suite.headers.On("ByBlockID", seal.BlockID).Return(&headBlock.Header, nil)
+	suite.headers.On("ByBlockID", seal.BlockID).Return(headBlock.Header, nil)
 
 	light := collection.Light()
 	// transaction storage returns the corresponding transaction
@@ -209,7 +209,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	suite.Assert().Equal(entities.TransactionStatus_FINALIZED, resp.GetStatus())
 
 	// now let the head block be finalized
-	headBlock.Height = block.Height + 1
+	headBlock.Header.Height = block.Header.Height + 1
 
 	// second call - when block under test is behind head
 	resp, err = handler.GetTransactionResult(ctx, req)
@@ -225,7 +225,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 	// setup the mocks
 	block := unittest.BlockFixture()
 	header := block.Header
-	suite.snapshot.On("Head").Return(&header, nil).Once()
+	suite.snapshot.On("Head").Return(header, nil).Once()
 	suite.blocks.On("ByID", header.ID()).Return(&block, nil).Once()
 	handler := NewHandler(suite.log, suite.state, nil, nil, suite.blocks, nil, nil, nil)
 

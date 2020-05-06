@@ -13,13 +13,6 @@ import (
 
 func InsertPayload(payload *flow.Payload) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
-		// insert the block identities
-		for _, identity := range payload.Identities {
-			err := operation.SkipDuplicates(operation.InsertIdentity(identity))(tx)
-			if err != nil {
-				return fmt.Errorf("could not insert identity (%x): %w", identity.NodeID, err)
-			}
-		}
 
 		// insert the block guarantees
 		for _, guarantee := range payload.Guarantees {
@@ -55,14 +48,8 @@ func IndexPayload(header *flow.Header, payload *flow.Payload) func(*badger.Txn) 
 		// the next scanned block is on the same fork, as they will all be out
 		// of order
 
-		// index identities
-		err := IndexIdentities(header.Height, blockID, header.ParentID, payload.Identities)(tx)
-		if err != nil {
-			return fmt.Errorf("could not index identities: %w", err)
-		}
-
 		// index guarantees
-		err = IndexGuarantees(header.Height, blockID, header.ParentID, payload.Guarantees)(tx)
+		err := IndexGuarantees(header.Height, blockID, header.ParentID, payload.Guarantees)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index guarantees: %w", err)
 		}
@@ -82,16 +69,9 @@ func RetrievePayload(blockID flow.Identifier, payload *flow.Payload) func(tx *ba
 		// make sure there is a nil value on error
 		*payload = flow.Payload{}
 
-		// get identities
-		var identities []*flow.Identity
-		err := RetrieveIdentities(blockID, &identities)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve identities: %w", err)
-		}
-
 		// get guarantees
 		var guarantees []*flow.CollectionGuarantee
-		err = RetrieveGuarantees(blockID, &guarantees)(tx)
+		err := RetrieveGuarantees(blockID, &guarantees)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve guarantees: %w", err)
 		}
@@ -105,7 +85,7 @@ func RetrievePayload(blockID flow.Identifier, payload *flow.Payload) func(tx *ba
 
 		// create the block content
 		*payload = flow.Payload{
-			Identities: identities,
+			Identities: nil,
 			Guarantees: guarantees,
 			Seals:      seals,
 		}

@@ -3,10 +3,8 @@ package computation
 import (
 	"fmt"
 
-	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
-
-	encoding "github.com/onflow/cadence/encoding/xdr"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
@@ -22,7 +20,6 @@ import (
 type ComputationManager interface {
 	ExecuteScript([]byte, *flow.Header, *delta.View) ([]byte, error)
 	ComputeBlock(block *entity.ExecutableBlock, view *delta.View) (*execution.ComputationResult, error)
-	GetAccount(address flow.Address, blockHeader *flow.Header, view *delta.View) (*flow.Account, error)
 }
 
 // Manager manages computation and execution
@@ -61,12 +58,10 @@ func (e *Manager) ExecuteScript(script []byte, blockHeader *flow.Header, view *d
 	}
 
 	if !result.Succeeded() {
-		return nil, fmt.Errorf("failed to execute script at block (%s): %w", blockHeader.ID(), result.Error)
+		return nil, fmt.Errorf("failed to execute script at block (%s): %s", blockHeader.ID(), result.Error.ErrorMessage())
 	}
 
-	value := cadence.ConvertValue(result.Value)
-
-	encodedValue, err := encoding.Encode(value)
+	encodedValue, err := jsoncdc.Encode(result.Value)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode runtime value: %w", err)
 	}
@@ -92,11 +87,5 @@ func (e *Manager) ComputeBlock(block *entity.ExecutableBlock, view *delta.View) 
 		Hex("block_id", logging.Entity(result.ExecutableBlock.Block)).
 		Msg("computed block result")
 
-	return result, nil
-}
-
-func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, view *delta.View) (*flow.Account, error) {
-
-	result := e.vm.NewBlockContext(blockHeader).GetAccount(view, address)
 	return result, nil
 }
