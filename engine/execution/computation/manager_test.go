@@ -59,7 +59,8 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	rt := runtime.NewInterpreterRuntime()
 
-	vm := virtualmachine.New(rt)
+	vm, err := virtualmachine.New(rt)
+	require.NoError(t, err)
 
 	blockComputer := computer.NewBlockComputer(vm)
 

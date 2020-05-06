@@ -16,6 +16,7 @@ type CheckerFunc func([]byte, runtime.Location) error
 
 type TransactionContext struct {
 	LedgerDAL
+	astCache          ASTCache
 	signingAccounts   []runtime.Address
 	checker           CheckerFunc
 	logs              []string
@@ -214,6 +215,16 @@ func (r *TransactionContext) ResolveImport(location runtime.Location) ([]byte, e
 	return code, nil
 }
 
+// GetCachedProgram attempts to get a parsed program from a cache.
+func (r *TransactionContext) GetCachedProgram(location ast.Location) (*ast.Program, error) {
+	return r.astCache.GetProgram(location)
+}
+
+// CacheProgram adds a parsed program to a cache.
+func (r *TransactionContext) CacheProgram(location ast.Location, program *ast.Program) error {
+	return r.astCache.SetProgram(location, program)
+}
+
 // Log captures a log message from the runtime.
 func (r *TransactionContext) Log(message string) {
 	r.logs = append(r.logs, message)
@@ -222,14 +233,6 @@ func (r *TransactionContext) Log(message string) {
 // EmitEvent is called when an event is emitted by the runtime.
 func (r *TransactionContext) EmitEvent(event cadence.Event) {
 	r.events = append(r.events, event)
-}
-
-func (r *TransactionContext) GetCachedProgram(runtime.Location) (*ast.Program, error) {
-	return nil, nil
-}
-
-func (r *TransactionContext) CacheProgram(runtime.Location, *ast.Program) error {
-	return nil
 }
 
 func (r *TransactionContext) GenerateUUID() uint64 {
