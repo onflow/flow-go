@@ -39,7 +39,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, options ...func(*protocol.State)) mock.GenericNode {
+func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, options ...func(*protocol.State)) mock.GenericNode {
 	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
 
 	dbDir := unittest.TempDir(t)
@@ -262,7 +262,7 @@ func WithVerifierEngine(eng network.Engine) VerificationOpt {
 	}
 }
 
-func VerificationNode(t *testing.T,
+func VerificationNode(t testing.TB,
 	hub *stub.Hub,
 	identity *flow.Identity,
 	identities []*flow.Identity,

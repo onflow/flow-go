@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -21,6 +22,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
+	"github.com/dapperlabs/flow-go/utils/logging"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -92,6 +94,12 @@ func TestHappyPath(t *testing.T) {
 // - dropping the ingestion of the ERs that share the same result once the verifiable chunk is submitted to verify engine
 // - broadcast of a matching result approval to consensus nodes for each assigned chunk
 func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
+	// to demarcate the debug logs
+	log.Debug().
+		Int("verification_nodes_count", verNodeCount).
+		Int("chunk_num", chunkNum).
+		Msg("TestHappyPath started")
+
 	// ingest engine parameters
 	// set based on following issue
 	// https://github.com/dapperlabs/flow-go/issues/3443
@@ -124,7 +132,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
 		assignees := make([]flow.Identifier, 0)
 		for _, verIdentity := range verIdentities {
-			if isAssigned(int(chunk.Index), chunkNum) {
+			if IsAssigned(chunk.Index) {
 				assignees = append(assignees, verIdentity.NodeID)
 			}
 		}
@@ -157,7 +165,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 	colNode := testutil.CollectionNode(t, hub, colIdentity, identities)
 	// injects the assigned collections into the collection node mempool
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
-		if isAssigned(int(chunk.Index), chunkNum) {
+		if IsAssigned(chunk.Index) {
 			err := colNode.Collections.Store(completeER.Collections[chunk.Index])
 			assert.Nil(t, err)
 		}
@@ -250,7 +258,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 			assert.False(t, verNode.AuthCollections.Has(completeER.Collections[i].ID()))
 			assert.False(t, verNode.PendingCollections.Has(completeER.Collections[i].ID()))
 			assert.False(t, verNode.ChunkDataPacks.Has(completeER.ChunkDataPacks[i].ID()))
-			if isAssigned(i, chunkNum) {
+			if IsAssigned(completeER.Receipt.ExecutionResult.Chunks[i].Index) {
 				// chunk ID of assigned chunks should be added to ingested chunks mempool
 				assert.True(t, verNode.IngestedChunkIDs.Has(completeER.Receipt.ExecutionResult.Chunks[i].ID()))
 			}
@@ -269,6 +277,12 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 	colNode.Done()
 	conNode.Done()
 	exeNode.Done()
+
+	// to demarcate the debug logs
+	log.Debug().
+		Int("verification_nodes_count", verNodeCount).
+		Int("chunk_num", chunkNum).
+		Msg("TestHappyPath finishes")
 }
 
 // TestSingleCollectionProcessing checks the full happy
@@ -393,6 +407,117 @@ func TestSingleCollectionProcessing(t *testing.T) {
 
 }
 
+// BenchmarkIngestEngine is only executed if the 'benchmark' environmental variable is
+// declared as TRUE.
+// BenchmarkIngestEngine benchmarks the happy path of ingest engine with sending
+// 10 execution receipts simultaneously where each receipt has 100 chunks in it.
+func BenchmarkIngestEngine(b *testing.B) {
+	if os.Getenv("benchmark") != "TRUE" {
+		fmt.Println("skips")
+		b.Skip("skips benchmarking ingest engine")
+	}
+	for i := 0; i < b.N; i++ {
+		ingestHappyPath(b, 10, 100)
+	}
+
+}
+
+// ingestHappyPath is used for benchmarking the happy path performance of ingest engine
+// on receiving `receiptCount`-many receipts each with `chunkCount`-many chunks.
+// It runs a single instance of verification node, with an actual ingest engine and a mocked
+// verify engine.
+// The execution receipts are sent to the node simultaneously assuming that it already has all the other
+// resources for them, i.e., collections, blocks, and chunk data packs.
+// The benchmark finishes when a verifiable chunk is sent for each assigned chunk from the ingest engine
+// to the verify engine.
+func ingestHappyPath(tb testing.TB, receiptCount int, chunkCount int) {
+	// ingest engine parameters
+	// set based on following issue
+	// https://github.com/dapperlabs/flow-go/issues/3443
+	requestInterval := uint(1000)
+	failureThreshold := uint(2)
+
+	// generates network hub
+	hub := stub.NewNetworkHub()
+
+	// generates identities of nodes, one of each type and `verCount` many verification node
+	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	exeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	conIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
+
+	identities := flow.IdentityList{colIdentity, conIdentity, exeIdentity}
+	identities = append(identities, verIdentity)
+
+	// Execution receipt and chunk assignment
+	//
+	ers := make([]verification.CompleteExecutionResult, receiptCount)
+	for i := 0; i < receiptCount; i++ {
+		ers[i] = CompleteExecutionResultFixture(tb, chunkCount)
+	}
+
+	fmt.Println("Chunks have been made")
+
+	// mocks the assignment to assign the single chunk to this verifier node
+	assigner := &mock.ChunkAssigner{}
+	a := chmodel.NewAssignment()
+
+	vChunks := make([]*verification.VerifiableChunk, 0)
+
+	// assigns some chunks based on isAssigned method to the verification node
+	for _, er := range ers {
+		for _, chunk := range er.Receipt.ExecutionResult.Chunks {
+			if IsAssigned(chunk.Index) {
+				a.Add(chunk, []flow.Identifier{verIdentity.NodeID})
+				vChunks = append(vChunks, VerifiableChunk(chunk.Index, er))
+			}
+		}
+		assigner.On("Assign",
+			testifymock.Anything,
+			er.Receipt.ExecutionResult.Chunks,
+			testifymock.Anything).
+			Return(a, nil)
+	}
+
+	// nodes and engines
+	//
+	// verification node
+	verifierEng, verifierEngWG := SetupMockVerifierEng(tb, vChunks)
+	verNode := testutil.VerificationNode(tb, hub, verIdentity, identities, assigner, requestInterval, failureThreshold,
+		testutil.WithVerifierEngine(verifierEng))
+
+	// starts the ingest engine
+	<-verNode.IngestEngine.Ready()
+
+	// assumes the verification node has received the block, collections, and chunk data pack associated
+	// with each receipt
+	for _, er := range ers {
+		// block
+		err := verNode.BlockStorage.Store(er.Block)
+		require.NoError(tb, err)
+
+		for _, chunk := range er.Receipt.ExecutionResult.Chunks {
+			// collection
+			err = verNode.AuthCollections.Add(er.Collections[chunk.Index])
+			require.NoError(tb, err)
+
+			// chunk
+			err = verNode.ChunkDataPacks.Add(er.ChunkDataPacks[chunk.Index])
+			require.NoError(tb, err)
+		}
+	}
+
+	for _, er := range ers {
+		go func(receipt *flow.ExecutionReceipt) {
+			err := verNode.IngestEngine.Process(exeIdentity.NodeID, receipt)
+			require.NoError(tb, err)
+		}(er.Receipt)
+	}
+
+	unittest.RequireReturnsBefore(tb, verifierEngWG.Wait, time.Duration(receiptCount)*time.Second)
+	verNode.Done()
+}
+
 // setupMockExeNode creates and returns an execution node and its registered engine in the network (hub)
 // it mocks the process method of execution node that on receiving a chunk data pack request from
 // a certain verifier node (verIdentity) about a chunk that is assigned to it, replies the chunk back
@@ -413,7 +538,7 @@ func setupMockExeNode(t *testing.T,
 	// determines the expected number of result chunk data pack requests
 	chunkDataPackCount := 0
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
-		if isAssigned(int(chunk.Index), len(completeER.ChunkDataPacks)) {
+		if IsAssigned(chunk.Index) {
 			chunkDataPackCount++
 		}
 	}
@@ -438,7 +563,10 @@ func setupMockExeNode(t *testing.T,
 						chunk, ok := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i))
 						require.True(t, ok, "chunk out of range requested")
 						chunkID := chunk.ID()
-						if isAssigned(i, chunkNum) && chunkID == req.ChunkID {
+						if chunkID == req.ChunkID {
+							if !IsAssigned(chunk.Index) {
+								require.Error(t, fmt.Errorf(" requested an unassigned chunk data pack %x", req))
+							}
 							// each assigned chunk data pack should be requested only once
 							_, ok := exeChunkDataSeen[originID][chunkID]
 							require.False(t, ok)
@@ -452,6 +580,12 @@ func setupMockExeNode(t *testing.T,
 							}
 							err := exeChunkDataConduit.Submit(res, originID)
 							assert.Nil(t, err)
+
+							log.Debug().
+								Hex("origin_id", logging.ID(originID)).
+								Hex("chunk_id", logging.ID(chunkID)).
+								Msg("chunk data pack request answered by execution node")
+
 							return
 						}
 					}
@@ -484,7 +618,7 @@ func setupMockConsensusNode(t *testing.T,
 	// determines the expected number of result approvals this node should receive
 	approvalsCount := 0
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
-		if isAssigned(int(chunk.Index), len(completeER.ChunkDataPacks)) {
+		if IsAssigned(chunk.Index) {
 			approvalsCount++
 		}
 	}
@@ -523,7 +657,7 @@ func setupMockConsensusNode(t *testing.T,
 			resultApprovalSeen[originID][resultApproval.ID()] = struct{}{}
 
 			// asserts that the result approval is assigned to the verifier
-			assert.True(t, isAssigned(int(resultApproval.Body.ChunkIndex), len(completeER.ChunkDataPacks)))
+			assert.True(t, IsAssigned(resultApproval.Body.ChunkIndex))
 
 			wg.Done()
 		}).Return(nil)
@@ -532,10 +666,4 @@ func setupMockConsensusNode(t *testing.T,
 	assert.Nil(t, err)
 
 	return &conNode, conEngine, wg
-}
-
-// isAssigned is a helper function that returns true for the even indices in [0, chunkNum-1]
-func isAssigned(index int, chunkNum int) bool {
-	answer := index >= 0 && index < chunkNum && index%2 == 0
-	return answer
 }
