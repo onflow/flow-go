@@ -142,6 +142,7 @@ func (e *Engine) onCollectionRequest(originID flow.Identifier, req *messages.Col
 
 	res := &messages.CollectionResponse{
 		Collection: *coll,
+		Nonce:      req.Nonce,
 	}
 	err = e.con.Submit(res, originID)
 	if err != nil {
