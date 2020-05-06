@@ -185,8 +185,7 @@ func SetupMockVerifierEng(t testing.TB, vChunks []*verification.VerifiableChunk)
 
 // isAssigned is a helper function that returns true for the even indices in [0, chunkNum-1]
 func IsAssigned(index uint64) bool {
-	answer := index >= 0 && index%2 == 0
-	return answer
+	return index%2 == 0
 }
 
 func VerifiableChunk(chunkIndex uint64, er verification.CompleteExecutionResult) *verification.VerifiableChunk {
