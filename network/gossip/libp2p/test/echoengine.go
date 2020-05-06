@@ -56,7 +56,12 @@ func (te *EchoEngine) SubmitLocal(event interface{}) {
 // Submit is implemented for a valid type assertion to Engine
 // any call to it fails the test
 func (te *EchoEngine) Submit(originID flow.Identifier, event interface{}) {
-	require.Fail(te.t, "not implemented")
+	go func() {
+		err := te.Process(originID, event)
+		if err != nil {
+			require.Fail(te.t, "could not process submitted event")
+		}
+	}()
 }
 
 // ProcessLocal is implemented for a valid type assertion to Engine

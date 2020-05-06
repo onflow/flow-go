@@ -175,12 +175,9 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 		return fmt.Errorf("could not decode event: %w", err)
 	}
 
-	// call the engine with the message payload
-	err = en.Process(senderID, decodedMessage)
-	if err != nil {
-		n.logger.Error().Str("sender", senderID.String()).Uint8("channel", channelID).Err(err)
-		return fmt.Errorf("failed to process message from %s: %w", senderID.String(), err)
-	}
+	// call the engine asynchronously with the message payload
+	en.Submit(senderID, decodedMessage)
+
 	return nil
 }
 
