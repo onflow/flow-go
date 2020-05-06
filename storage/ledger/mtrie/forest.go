@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"sync"
 
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
+// MForest is an in memory forest (collection of tries)
 type MForest struct {
 	tries       map[string]*MTrie
 	maxHeight   int // Height of the tree
@@ -64,7 +66,10 @@ func (f *MForest) Read(keys [][]byte, rootHash []byte) ([][]byte, [][]byte, erro
 }
 
 func (f *MForest) read(trie *MTrie, head *node, keys [][]byte) ([][]byte, error) {
-
+	// not found
+	if head == nil {
+		return [][]byte{[]byte{}}, nil
+	}
 	// If we are at a leaf node, we create the node
 	if len(keys) == 1 && head.lChild == nil && head.rChild == nil {
 		// not found
@@ -148,46 +153,28 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 func (f *MForest) update(trie *MTrie, parent *node, head *node, keys [][]byte, values [][]byte) error {
 	// parent has a key for this node (add key and insert)
 	if parent.key != nil {
-		nKeys := make([][]byte, 0, len(keys)+1)
-		nValues := make([][]byte, 0, len(values)+1)
-		for i, k := range keys {
-			comp := bytes.Compare(k, parent.key)
-			if comp == 0 {
-				nKeys = keys
-				nValues = values
-				break
-			}
-			if comp > 0 {
-				nKeys = append(nKeys, keys[:i]...)
-				nKeys = append(nKeys, [][]byte{parent.key}...)
-				nKeys = append(nKeys, keys[i:]...)
-				nValues = append(nValues, values[:i]...)
-				nValues = append(nValues, [][]byte{parent.value}...)
-				nValues = append(nValues, values[i:]...)
-				break
+		alreadyExist := false
+		// deduplicate
+		for _, k := range keys {
+			if bytes.Compare(k, parent.key) == 0 {
+				alreadyExist = true
 			}
 		}
-		// key bigger than all elements
-		if len(nKeys) == 0 {
+		if !alreadyExist {
 			keys = append(keys, parent.key)
 			values = append(values, parent.value)
-		} else {
-			keys = nKeys
-			values = nValues
 		}
-	}
 
+	}
 	// If we are at a leaf node, we create the node
 	if len(keys) == 1 && parent.lChild == nil && parent.rChild == nil {
 		head.key = keys[0]
-		// TODO at hash time compute the hash including the nodes under
 		head.value = values[0]
 		return nil
 	}
 
 	// Split the keys and values array so we can update the trie in parallel
-	lkeys, rkeys, splitIndex := utils.SplitKeys(keys, f.maxHeight-head.height-1)
-	lvalues, rvalues := values[:splitIndex], values[splitIndex:]
+	lkeys, lvalues, rkeys, rvalues := SplitKeyValues(keys, values, f.maxHeight-head.height-1)
 	if len(lkeys) != len(lvalues) {
 		return errors.New("left Key/Value Length mismatch")
 	}
@@ -195,47 +182,77 @@ func (f *MForest) update(trie *MTrie, parent *node, head *node, keys [][]byte, v
 		return errors.New("right Key/Value Length mismatch")
 	}
 
-	// no change needed on right side
-	if len(rkeys) == 0 {
-		if parent != nil {
-			head.rChild = parent.rChild
-		}
-	} else {
-		newN := newNode(head.height - 1)
-		if parent.rChild != nil {
-			err := f.update(trie, parent.rChild, newN, rkeys, rvalues)
-			if err != nil {
-				return err
-			}
-		} else {
-			err := f.update(trie, newN, newN, rkeys, rvalues)
-			if err != nil {
-				return err
-			}
-		}
-		head.rChild = newN
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+	var lupdate, rupdate *node
+	var err1, err2 error
+	if len(lkeys) > 0 && len(rkeys) > 0 && lkeys[0][0] == byte(uint8(138)) && rkeys[0][0] == byte(uint8(175)) {
+		fmt.Println(lkeys, rkeys)
 	}
+	go func() {
+		defer wg.Done()
+		// no change needed on the left side
+		if len(lkeys) == 0 {
+			lupdate = parent.lChild
+		} else {
+			newN := newNode(parent.height - 1)
+			if parent.lChild != nil {
+				err1 = f.update(trie, parent.lChild, newN, lkeys, lvalues)
+			} else {
+				err1 = f.update(trie, newNode(parent.height-1), newN, lkeys, lvalues)
+			}
+			lupdate = newN
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		// no change needed on right side
+		if len(rkeys) == 0 {
+			rupdate = parent.rChild
+		} else {
+			newN := newNode(head.height - 1)
+			if parent.rChild != nil {
+				err2 = f.update(trie, parent.rChild, newN, rkeys, rvalues)
+			} else {
+				err2 = f.update(trie, newNode(head.height-1), newN, rkeys, rvalues)
+			}
+			rupdate = newN
+		}
+	}()
+	wg.Wait()
 
-	// no change needed on the left side
-	if len(lkeys) == 0 {
-		head.lChild = parent.lChild
-	} else {
-		newN := newNode(parent.height - 1)
-		if parent.lChild != nil {
-			err := f.update(trie, parent.lChild, newN, lkeys, lvalues)
-			if err != nil {
-				return err
-			}
-		} else {
-			err := f.update(trie, newN, newN, lkeys, lvalues)
-			if err != nil {
-				return err
-			}
-		}
-		head.lChild = newN
+	if err1 != nil {
+		return err1
 	}
+	head.lChild = lupdate
+
+	if err2 != nil {
+		return err2
+	}
+	head.rChild = rupdate
 
 	return nil
+}
+
+// returns lkeys, lvalues, rkeys, rvalues
+func SplitKeyValues(keys [][]byte, values [][]byte, bitIndex int) ([][]byte, [][]byte, [][]byte, [][]byte) {
+
+	rkeys := make([][]byte, 0, len(keys))
+	rvalues := make([][]byte, 0, len(values))
+	lkeys := make([][]byte, 0, len(keys))
+	lvalues := make([][]byte, 0, len(values))
+
+	// splits keys at the smallest index i where keys[i] >= split
+	for i, key := range keys {
+		if utils.IsBitSet(key, bitIndex) {
+			rkeys = append(rkeys, key)
+			rvalues = append(rvalues, values[i])
+		} else {
+			lkeys = append(lkeys, key)
+			lvalues = append(lvalues, values[i])
+		}
+	}
+	return lkeys, lvalues, rkeys, rvalues
 }
 
 // ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.
