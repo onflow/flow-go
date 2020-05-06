@@ -12,6 +12,7 @@ const (
 	HotstuffEventTypeTimeout    = "timeout"
 	HotstuffEventTypeOnProposal = "onproposal"
 	HotstuffEventTypeOnVote     = "onvote"
+	HotstuffComponentNamespace  = "hotstuff"
 )
 
 // HotStuffMetrics implements only the metrics emitted by the HotStuff core logic.
@@ -31,19 +32,19 @@ type HotStuffMetrics struct {
 	blockProposalCounter  prometheus.Counter
 }
 
-func NewHotStuffMetrics(namespace string, committeeID string) *HotStuffMetrics {
+func NewHotStuffMetrics(committeeID string) HotStuffMetrics {
 	constLabels := map[string]string{"committee": committeeID}
-	return &HotStuffMetrics{
+	return HotStuffMetrics{
 		finalizedBlockCounter: promauto.NewCounter(prometheus.CounterOpts{
 			Name:        "finalized_blocks",
-			Namespace:   namespace,
+			Namespace:   namespaceCommon,
 			Subsystem:   subsystemHotStuff,
 			Help:        "The number of finalized blocks",
 			ConstLabels: constLabels,
 		}),
 		busyDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Name:        "busy_duration_seconds",
-			Namespace:   namespace,
+			Namespace:   namespaceCommon,
 			Subsystem:   subsystemHotStuff,
 			Help:        "the duration of how long hotstuff's event loop has been busy processing one event",
 			Buckets:     []float64{0.05, 0.2, 0.5, 1, 2, 5},
@@ -51,7 +52,7 @@ func NewHotStuffMetrics(namespace string, committeeID string) *HotStuffMetrics {
 		}, []string{"event_type"}),
 		idleDuration: promauto.NewHistogram(prometheus.HistogramOpts{
 			Name:        "idle_duration_seconds",
-			Namespace:   namespace,
+			Namespace:   namespaceCommon,
 			Subsystem:   subsystemHotStuff,
 			Help:        "the duration of how long hotstuff's event loop has been idle without processing any event",
 			Buckets:     []float64{0.05, 0.2, 0.5, 1, 2, 5},
@@ -59,7 +60,7 @@ func NewHotStuffMetrics(namespace string, committeeID string) *HotStuffMetrics {
 		}),
 		waitDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Name:        "wait_duration_seconds",
-			Namespace:   namespace,
+			Namespace:   namespaceCommon,
 			Subsystem:   subsystemHotStuff,
 			Help:        "the duration of how long an event has been waited in the hotstuff event loop queue before being processed.",
 			Buckets:     []float64{0.05, 0.2, 0.5, 1, 2, 5},
@@ -67,21 +68,21 @@ func NewHotStuffMetrics(namespace string, committeeID string) *HotStuffMetrics {
 		}, []string{"event_type"}),
 		newViewGauge: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:        "cur_view",
-			Namespace:   namespace,
+			Namespace:   namespaceCommon,
 			Subsystem:   subsystemHotStuff,
 			Help:        "the current view that the event handler has entered",
 			ConstLabels: constLabels,
 		}),
 		newestKnownQcGauge: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:        "view_of_newest_known_qc",
-			Namespace:   namespace,
+			Namespace:   namespaceCommon,
 			Subsystem:   subsystemHotStuff,
 			Help:        "The view of the newest known qc from hotstuff",
 			ConstLabels: constLabels,
 		}),
 		blockProposalCounter: promauto.NewCounter(prometheus.CounterOpts{
 			Name:        "block_proposals",
-			Namespace:   namespace,
+			Namespace:   namespaceCommon,
 			Subsystem:   subsystemHotStuff,
 			Help:        "the number of block proposals made",
 			ConstLabels: constLabels,

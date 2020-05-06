@@ -54,8 +54,8 @@ func NewCollector(log zerolog.Logger) (module.Metrics, error) {
 	return &metricsCollector, nil
 }
 
-// NewConsensusNodeCollector instantiates a new metrics Collector ONLY suitable for CONSENSUS NODES!
-func NewConsensusNodeCollector(log zerolog.Logger) (module.Metrics, error) {
+// NewConsensusCollector instantiates a new metrics Collector ONLY suitable for CONSENSUS NODES!
+func NewConsensusCollector(log zerolog.Logger) (module.Metrics, error) {
 	tracer, err := trace.NewTracer(log)
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func NewConsensusNodeCollector(log zerolog.Logger) (module.Metrics, error) {
 		HotStuffMetrics
 	}{
 		BaseMetrics:     BaseMetrics{tracer},
-		HotStuffMetrics: *NewHotStuffMetrics(namespaceConsensus, mainConsensusCommittee),
+		HotStuffMetrics: NewHotStuffMetrics(mainConsensusCommittee),
 	}
 	return &metricsCollector, nil
 }
@@ -85,7 +85,7 @@ func NewClusterCollector(log zerolog.Logger, clusterID string) (module.Metrics, 
 		HotStuffMetrics
 	}{
 		BaseMetrics:     BaseMetrics{tracer},
-		HotStuffMetrics: *NewHotStuffMetrics(namespaceCollection, clusterID),
+		HotStuffMetrics: NewHotStuffMetrics(clusterID),
 	}
 	return &metricsCollector, nil
 }
