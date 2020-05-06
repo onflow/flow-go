@@ -125,7 +125,6 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 		Timestamp().
 		Hex("origin", logging.ID(originID)).
 		Uint64("chunk_index", chunk.ChunkIndex).
-		Hex("chunk_id", logging.ID(chunk.ChunkDataPack.ChunkID)).
 		Hex("execution_receipt", logging.Entity(chunk.Receipt)).
 		Msg("verifiable chunk received by verifier engine")
 
