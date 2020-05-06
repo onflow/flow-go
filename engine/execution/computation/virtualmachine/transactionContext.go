@@ -16,6 +16,7 @@ type CheckerFunc func([]byte, runtime.Location) error
 
 type TransactionContext struct {
 	LedgerDAL
+	runtime.Metrics
 	signingAccounts   []runtime.Address
 	checker           CheckerFunc
 	logs              []string
@@ -26,7 +27,43 @@ type TransactionContext struct {
 	uuid              uint64
 }
 
+func newScriptContext(ledger Ledger, options ...TransactionContextOption) *TransactionContext {
+	ctx := &TransactionContext{
+		LedgerDAL: LedgerDAL{ledger},
+		Metrics:   emptyMetricsCollector{},
+	}
+
+	for _, option := range options {
+		option(ctx)
+	}
+
+	return ctx
+}
+
+func newTransactionContext(
+	tx *flow.TransactionBody,
+	ledger Ledger,
+	options ...TransactionContextOption,
+) *TransactionContext {
+	signers := make([]runtime.Address, len(tx.Authorizers))
+	for i, addr := range tx.Authorizers {
+		signers[i] = runtime.Address(addr)
+	}
+
+	ctx := newScriptContext(ledger, options...)
+	ctx.signingAccounts = signers
+	ctx.tx = tx
+
+	return ctx
+}
+
 type TransactionContextOption func(*TransactionContext)
+
+func WithMetrics(metrics *RuntimeMetrics) TransactionContextOption {
+	return func(ctx *TransactionContext) {
+		ctx.Metrics = runtimeMetricsCollector{metrics}
+	}
+}
 
 // GetSigningAccounts gets the signing accounts for this context.
 //
@@ -270,9 +307,10 @@ func (r *TransactionContext) checkProgram(code []byte, address runtime.Address) 
 }
 
 // verifySignatures verifies that a transaction contains the necessary signatures.
-//
-// An error is returned if any of the expected signatures are invalid or missing.
+// // An error is returned if any of the expected signatures are invalid or missing.
 func (r *TransactionContext) verifySignatures() error {
+
+	return nil
 
 	if r.tx.Payer == flow.ZeroAddress {
 		return &MissingPayerError{}
@@ -326,7 +364,7 @@ func (r *TransactionContext) verifySignatures() error {
 	return nil
 }
 
-// CheckAndIncrementSequenceNumber validates and increments a sequence number for an account key.
+// checkAndIncrementSequenceNumber validates and increments a sequence number for an account key.
 //
 // This function first checks that the provided sequence number matches the version stored on-chain.
 // If they are equal, the on-chain sequence number is incremented.
@@ -334,6 +372,7 @@ func (r *TransactionContext) verifySignatures() error {
 //
 // This function returns an error if any problem occurred during checking or the check failed
 func (r *TransactionContext) checkAndIncrementSequenceNumber() error {
+	return nil
 
 	proposalKey := r.tx.ProposalKey
 

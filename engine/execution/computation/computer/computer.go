@@ -126,16 +126,41 @@ func (e *blockComputer) executeCollection(
 		gasUsed   uint64
 	)
 
+	metrics := virtualmachine.NewRuntimeMetrics()
+
 	for _, tx := range collection.Transactions {
 		err := func(tx *flow.TransactionBody) error {
 			if e.tracer != nil {
 				txSpan := e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
-				defer txSpan.Finish()
+				defer func() {
+					parseSpan := e.tracer.StartSpanFromParent(
+						txSpan,
+						trace.EXEParseTransaction,
+						opentracing.StartTime(metrics.Parsed().Start),
+					)
+					parseSpan.FinishWithOptions(opentracing.FinishOptions{FinishTime: metrics.Parsed().End})
+
+					checkSpan := e.tracer.StartSpanFromParent(
+						txSpan,
+						trace.EXECheckTransaction,
+						opentracing.StartTime(metrics.Checked().Start),
+					)
+					checkSpan.FinishWithOptions(opentracing.FinishOptions{FinishTime: metrics.Checked().End})
+
+					interpSpan := e.tracer.StartSpanFromParent(
+						txSpan,
+						trace.EXEInterpretTransaction,
+						opentracing.StartTime(metrics.Interpreted().Start),
+					)
+					interpSpan.FinishWithOptions(opentracing.FinishOptions{FinishTime: metrics.Interpreted().End})
+
+					txSpan.Finish()
+				}()
 			}
 
 			txView := collectionView.NewChild()
 
-			result, err := blockCtx.ExecuteTransaction(txView, tx)
+			result, err := blockCtx.ExecuteTransaction(txView, tx, virtualmachine.WithMetrics(metrics))
 			if err != nil {
 				txIndex++
 				return fmt.Errorf("failed to execute transaction: %w", err)

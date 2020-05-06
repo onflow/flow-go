@@ -31,36 +31,6 @@ type blockContext struct {
 	header *flow.Header
 }
 
-func (bc *blockContext) newTransactionContext(
-	ledger Ledger,
-	tx *flow.TransactionBody,
-	options ...TransactionContextOption,
-) *TransactionContext {
-
-	signingAccounts := make([]runtime.Address, len(tx.Authorizers))
-	for i, addr := range tx.Authorizers {
-		signingAccounts[i] = runtime.Address(addr)
-	}
-
-	ctx := &TransactionContext{
-		LedgerDAL:       LedgerDAL{ledger},
-		signingAccounts: signingAccounts,
-		tx:              tx,
-	}
-
-	for _, option := range options {
-		option(ctx)
-	}
-
-	return ctx
-}
-
-func (bc *blockContext) newScriptContext(ledger Ledger) *TransactionContext {
-	return &TransactionContext{
-		LedgerDAL: LedgerDAL{ledger},
-	}
-}
-
 // ExecuteTransaction computes the result of a transaction.
 //
 // Register updates are recorded in the provided ledger view. An error is returned
@@ -75,7 +45,7 @@ func (bc *blockContext) ExecuteTransaction(
 	txID := tx.ID()
 	location := runtime.TransactionLocation(txID[:])
 
-	ctx := bc.newTransactionContext(ledger, tx, options...)
+	ctx := newTransactionContext(tx, ledger, options...)
 
 	err := ctx.verifySignatures()
 	if err != nil {
@@ -122,7 +92,7 @@ func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte) (*ScriptResu
 
 	location := runtime.ScriptLocation(scriptHash)
 
-	ctx := bc.newScriptContext(ledger)
+	ctx := newScriptContext(ledger)
 	value, err := bc.vm.executeScript(script, ctx, location)
 	if err != nil {
 		if errors.As(err, &runtime.Error{}) {
@@ -147,7 +117,6 @@ func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte) (*ScriptResu
 
 // ConvertEvents creates flow.Events from runtime.events
 func ConvertEvents(txIndex uint32, tr *TransactionResult) ([]flow.Event, error) {
-
 	flowEvents := make([]flow.Event, len(tr.Events))
 
 	for i, event := range tr.Events {
