@@ -96,14 +96,17 @@ func (suite *Suite) TestCollectionRequest() {
 		err := suite.colNode.Collections.Store(&coll)
 		suite.Assert().Nil(err)
 
+		nonce := rand.Uint64()
+
 		// expect that the requester will receive the collection
 		expectedRes := &messages.CollectionResponse{
 			Collection: coll,
+			Nonce:      nonce,
 		}
 		suite.reqEngine.On("Process", suite.colNode.Me.NodeID(), expectedRes).Return(nil).Once()
 
 		// send a request for the collection
-		req := messages.CollectionRequest{ID: coll.ID(), Nonce: rand.Uint64()}
+		req := messages.CollectionRequest{ID: coll.ID(), Nonce: nonce}
 		err = suite.conduit.Submit(&req, suite.colNode.Me.NodeID())
 		assert.NoError(t, err)
 
