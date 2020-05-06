@@ -310,10 +310,9 @@ func (r *TransactionContext) checkProgram(code []byte, address runtime.Address) 
 }
 
 // verifySignatures verifies that a transaction contains the necessary signatures.
-// // An error is returned if any of the expected signatures are invalid or missing.
+//
+// An error is returned if any of the expected signatures are invalid or missing.
 func (r *TransactionContext) verifySignatures() error {
-
-	return nil
 
 	if r.tx.Payer == flow.ZeroAddress {
 		return &MissingPayerError{}
@@ -375,7 +374,6 @@ func (r *TransactionContext) verifySignatures() error {
 //
 // This function returns an error if any problem occurred during checking or the check failed
 func (r *TransactionContext) checkAndIncrementSequenceNumber() error {
-	return nil
 
 	proposalKey := r.tx.ProposalKey
 
