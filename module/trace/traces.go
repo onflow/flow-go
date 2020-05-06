@@ -22,4 +22,8 @@ const (
 	EXERetrieveStateDelta                 = "state.retrieveStateDelta"
 	EXEUpdateHighestExecutedBlockIfHigher = "state.updateHighestExecutedBlockIfHigher"
 	EXEGetHighestExecutedBlockID          = "state.getHighestExecutedBlockID"
+
+	EXEParseDurationTag     = "runtime.parseTransactionDuration"
+	EXECheckDurationTag     = "runtime.checkTransactionDuration"
+	EXEInterpretDurationTag = "runtime.interpretTransactionDuration"
 )

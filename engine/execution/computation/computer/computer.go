@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/log"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
@@ -135,7 +136,21 @@ func (e *blockComputer) executeCollection(
 		err := func(tx *flow.TransactionBody) error {
 			if e.tracer != nil {
 				txSpan := e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
-				defer func() { txSpan.Finish() }()
+
+				defer func() {
+					// Attach runtime metrics to the transaction span.
+					//
+					// Each duration is the sum of all sub-programs in the transaction.
+					//
+					// For example, metrics.Parsed() returns the total time spent parsing the transaction itself,
+					// as well as any imported programs.
+					txSpan.LogFields(
+						log.Int64(trace.EXEParseDurationTag, int64(metrics.Parsed())),
+						log.Int64(trace.EXECheckDurationTag, int64(metrics.Checked())),
+						log.Int64(trace.EXEInterpretDurationTag, int64(metrics.Interpreted())),
+					)
+					txSpan.Finish()
+				}()
 			}
 
 			txView := collectionView.NewChild()
