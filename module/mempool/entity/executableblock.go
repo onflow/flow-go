@@ -14,8 +14,8 @@ type ExecutableBlock struct {
 }
 
 type BlocksByCollection struct {
-	CollectionID    flow.Identifier
-	ExecutableBlock *ExecutableBlock
+	CollectionID     flow.Identifier
+	ExecutableBlocks map[flow.Identifier]*ExecutableBlock
 }
 
 func (b *BlocksByCollection) ID() flow.Identifier {
