@@ -204,7 +204,12 @@ func (e *Engine) validateCollectionGuaranteeExpiry(guarantee *flow.CollectionGua
 
 	// if head has advanced beyond the block referenced by the collection guarantee by more than 'expiry' number of blocks,
 	// then reject the collection
-	if head.Height > ref.Height && head.Height-ref.Height > e.expiry {
+	diff := head.Height - ref.Height
+	// check for overflow
+	if ref.Height > head.Height {
+		diff = 0
+	}
+	if diff > e.expiry {
 		return fmt.Errorf("collection guarantee expired ref_height=%d final_height=%d", ref.Height, head.Height)
 	}
 
