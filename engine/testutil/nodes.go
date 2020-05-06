@@ -262,7 +262,7 @@ func WithVerifierEngine(eng network.Engine) VerificationOpt {
 	}
 }
 
-func VerificationNode(tb testing.TB,
+func VerificationNode(t testing.TB,
 	hub *stub.Hub,
 	identity *flow.Identity,
 	identities []*flow.Identity,
@@ -273,7 +273,7 @@ func VerificationNode(tb testing.TB,
 
 	var err error
 	node := mock.VerificationNode{
-		GenericNode: GenericNode(tb, hub, identity, identities),
+		GenericNode: GenericNode(t, hub, identity, identities),
 	}
 
 	for _, apply := range opts {
@@ -282,37 +282,37 @@ func VerificationNode(tb testing.TB,
 
 	if node.AuthReceipts == nil {
 		node.AuthReceipts, err = stdmap.NewReceipts(1000)
-		require.Nil(tb, err)
+		require.Nil(t, err)
 	}
 
 	if node.PendingReceipts == nil {
 		node.PendingReceipts, err = stdmap.NewPendingReceipts(1000)
-		require.Nil(tb, err)
+		require.Nil(t, err)
 	}
 
 	if node.AuthCollections == nil {
 		node.AuthCollections, err = stdmap.NewCollections(1000)
-		require.Nil(tb, err)
+		require.Nil(t, err)
 	}
 
 	if node.PendingCollections == nil {
 		node.PendingCollections, err = stdmap.NewPendingCollections(1000)
-		require.Nil(tb, err)
+		require.Nil(t, err)
 	}
 
 	if node.CollectionTrackers == nil {
 		node.CollectionTrackers, err = stdmap.NewCollectionTrackers(1000)
-		require.Nil(tb, err)
+		require.Nil(t, err)
 	}
 
 	if node.ChunkDataPacks == nil {
 		node.ChunkDataPacks, err = stdmap.NewChunkDataPacks(1000)
-		require.Nil(tb, err)
+		require.Nil(t, err)
 	}
 
 	if node.ChunkDataPackTrackers == nil {
 		node.ChunkDataPackTrackers, err = stdmap.NewChunkDataPackTrackers(1000)
-		require.Nil(tb, err)
+		require.Nil(t, err)
 	}
 
 	if node.BlockStorage == nil {
@@ -325,19 +325,19 @@ func VerificationNode(tb testing.TB,
 		require.NoError(t, err)
 		chunkVerifier := chunks.NewChunkVerifier(vm)
 
-		require.NoError(tb, err)
+		require.NoError(t, err)
 		node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me, chunkVerifier, node.Metrics)
-		require.Nil(tb, err)
+		require.Nil(t, err)
 	}
 
 	if node.IngestedChunkIDs == nil {
 		node.IngestedChunkIDs, err = stdmap.NewIdentifiers(1000)
-		require.Nil(tb, err)
+		require.Nil(t, err)
 	}
 
 	if node.IngestedResultIDs == nil {
 		node.IngestedResultIDs, err = stdmap.NewIdentifiers(1000)
-		require.Nil(tb, err)
+		require.Nil(t, err)
 	}
 
 	if node.IngestEngine == nil {
@@ -360,7 +360,7 @@ func VerificationNode(tb testing.TB,
 			requestIntervalMs,
 			failureThreshold,
 		)
-		require.Nil(tb, err)
+		require.Nil(t, err)
 	}
 
 	return node
