@@ -41,7 +41,7 @@ func TestTransactionASTCache(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
-		assert.NoError(t, result.Error)
+		assert.Nil(t, result.Error)
 
 		// Determine location of transaction
 		txID := tx.ID()
