@@ -11,13 +11,6 @@ import (
 	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
-// BlockTranslator is a support function for determining the protocol for the current hotstuff instance.
-// Only for the main consensus, their blocks can be directly used to retrieve protocol.state Snapshots.
-// Hence, For main consensus, this is an identity method f(x) = x.
-// For collector consensus, the collector Blocks need to be translated to some reference block on the main chain.
-// Ideally, it's the most recently finalized block on the main chain.
-type BlockTranslator func(blockID *flow.Identifier) (*flow.Identifier, error)
-
 // Committee accounts for the fact that we might have multiple HotStuff instances
 // (collector committees and main consensus committee). Each hostuff instance is supposed to
 // have a dedicated Committee state.
@@ -56,16 +49,19 @@ type Committee struct {
 //   * contains no duplicates.
 // The list of all legitimate HotStuff participants for the specified block can be obtained by using `filter.Any`
 func (c *Committee) Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {
-	mainConsensusBlockID, err := c.blockTranslator(&blockID)
+
+	mainConsensusBlockID, err := c.blockTranslator.Translate(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("error determining the protocol state for block %s: %w", blockID, err)
 	}
-	identities, err := c.protocolState.AtBlockID(*mainConsensusBlockID).Identities(
+
+	identities, err := c.protocolState.AtBlockID(mainConsensusBlockID).Identities(
 		filter.And(c.membersFilter, selector),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving consensus participants for block %s: %w", blockID, err)
 	}
+
 	return identities, nil
 }
 
@@ -74,11 +70,13 @@ func (c *Committee) Identities(blockID flow.Identifier, selector flow.IdentityFi
 // ERROR conditions:
 //    * ErrInvalidSigner if participantID does NOT correspond to a _staked_ HotStuff participant at the specified block.
 func (c *Committee) Identity(blockID flow.Identifier, participantID flow.Identifier) (*flow.Identity, error) {
-	mainConsensusBlockID, err := c.blockTranslator(&blockID)
+
+	mainConsensusBlockID, err := c.blockTranslator.Translate(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("error determining the protocol state for block %s: %w", blockID, err)
 	}
-	identity, err := c.protocolState.AtBlockID(*mainConsensusBlockID).Identity(participantID)
+
+	identity, err := c.protocolState.AtBlockID(mainConsensusBlockID).Identity(participantID)
 	if err != nil {
 		// ToDo: differentiate between internal error and participantID not being found
 		return nil, fmt.Errorf("%x is not a valid node ID at block %x: %w", participantID, blockID, model.ErrInvalidSigner)
@@ -140,6 +138,7 @@ func New(protocolState protocol.State, blockTranslator BlockTranslator, myID flo
 // For constructing committees for other HotStuff instances (such as collector HotStuff instances), please use the
 // generic `New` function.
 func NewMainConsensusCommitteeState(protocolState protocol.State, myID flow.Identifier) (hotstuff.Committee, error) {
+
 	// finding all consensus members
 	epochConsensusMembers, err := protocolState.Final().Identities(filter.HasRole(flow.RoleConsensus))
 	if err != nil {
@@ -149,7 +148,11 @@ func NewMainConsensusCommitteeState(protocolState protocol.State, myID flow.Iden
 		return nil, fmt.Errorf("require non-empty consensus member nodes to initialize ViewState")
 	}
 
-	blockTranslator := func(blockID *flow.Identifier) (*flow.Identifier, error) { return blockID, nil }
+	// we just use the identity function for main consensus block translation
+	var blockTranslator blockTranslatorFunc = func(blockID flow.Identifier) (flow.Identifier, error) {
+		return blockID, nil
+	}
+
 	consensusNodeFilter := filter.And(filter.HasRole(flow.RoleConsensus), filter.HasStake(true))
 	return New(protocolState, blockTranslator, myID, consensusNodeFilter, epochConsensusMembers.NodeIDs()), nil
 }

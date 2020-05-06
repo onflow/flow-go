@@ -1,32 +1,35 @@
 package badger
 
 import (
+	"fmt"
+
 	"github.com/dapperlabs/flow-go/model/flow"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
 // Translator is a translation layer that determines the reference block on
-// the main chain for a given cluster block. For now, just returns the genesis
-// block.
-//
-//TODO: Currently this always returns genesis ID, which will work until epochs
-// and in-epoch slashing are implemented. Need to update this to translate
-// based on the ReferenceBlockID specified in the cluster block.
+// the main chain for a given cluster block, using the reference block from
+// the cluster block's payload.
 type Translator struct {
-	// cache the genesis block ID and always return it for now
-	genesisID flow.Identifier
+	payloads *storage.ClusterPayloads
 }
 
 // NewTranslator returns a new block ID translator.
-func NewTranslator(genesisID flow.Identifier) *Translator {
+func NewTranslator(payloads *storage.ClusterPayloads) *Translator {
 	translator := &Translator{
-		genesisID: genesisID,
+		payloads: payloads,
 	}
 	return translator
 }
 
 // Translate retrieves the reference main-chain block ID for the given cluster
 // block ID.
-// TODO: update to use ReferenceBlockID
 func (t *Translator) Translate(blockID flow.Identifier) (flow.Identifier, error) {
-	return t.genesisID, nil
+
+	payload, err := t.payloads.ByBlockID(blockID)
+	if err != nil {
+		return flow.ZeroID, fmt.Errorf("could not retrieve reference block payload: %w", err)
+	}
+
+	return payload.ReferenceBlockID, nil
 }

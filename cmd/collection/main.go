@@ -283,13 +283,6 @@ func main() {
 
 // initClusterCommittee initializes the collector cluster's HotStuff committee state
 func initClusterCommittee(node *cmd.FlowNodeBuilder, colPayloads *badger.ClusterPayloads) (hotstuff.Committee, error) {
-	blockTranslator := func(blockID *flow.Identifier) (*flow.Identifier, error) {
-		payload, err := colPayloads.ByBlockID(*blockID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to retrive payload for cluster block %x: %w", blockID, err)
-		}
-		return &payload.ReferenceBlockID, nil
-	}
 
 	// create a filter for consensus members for our cluster
 	cluster, err := protocol.ClusterFor(node.State.Final(), node.Me.NodeID())
@@ -298,7 +291,9 @@ func initClusterCommittee(node *cmd.FlowNodeBuilder, colPayloads *badger.Cluster
 	}
 	selector := filter.And(filter.In(cluster), filter.HasStake(true))
 
-	return committee.New(node.State, blockTranslator, node.Me.NodeID(), selector, cluster.NodeIDs()), nil
+	translator := clusterkv.NewTranslator(colPayloads)
+
+	return committee.New(node.State, translator, node.Me.NodeID(), selector, cluster.NodeIDs()), nil
 }
 
 func loadClusterBlock(path string, clusterID string) (*cluster.Block, error) {
