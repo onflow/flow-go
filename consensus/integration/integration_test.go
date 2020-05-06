@@ -60,7 +60,7 @@ func Test5Nodes(t *testing.T) {
 	}
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
-	assertLiveness(t, allViews, 90)
+	assertLiveness(t, allViews, 60)
 
 	cleanupNodes(nodes)
 }
@@ -70,7 +70,7 @@ func TestMessagesLost(t *testing.T) {
 
 	nodes, stopper, hub := createNodes(t, 5, 100, 1000)
 
-	hub.WithFilter(blockNodesForFirstNMessages(100, nodes[0]))
+	hub.WithFilter(blockNodesForFirstNMessages(50, nodes[0]))
 	runNodes(nodes)
 
 	<-stopper.stopped
@@ -80,7 +80,7 @@ func TestMessagesLost(t *testing.T) {
 	}
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
-	assertLiveness(t, allViews, 90)
+	assertLiveness(t, allViews, 60)
 	cleanupNodes(nodes)
 }
 
@@ -121,7 +121,7 @@ func TestDelay(t *testing.T) {
 	}
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
-	assertLiveness(t, allViews, 90)
+	assertLiveness(t, allViews, 60)
 	cleanupNodes(nodes)
 }
 
@@ -145,7 +145,7 @@ func TestOneNodeBehind(t *testing.T) {
 	}
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
-	assertLiveness(t, allViews, 90)
+	assertLiveness(t, allViews, 60)
 	cleanupNodes(nodes)
 }
 

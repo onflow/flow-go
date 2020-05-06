@@ -52,14 +52,14 @@ func blockNodesForFirstNMessages(n int, blackList ...*Node) BlockOrDelayFunc {
 		switch m := event.(type) {
 		case *messages.BlockProposal:
 		case *messages.BlockVote:
-		// case *messages.SyncRequest:
-		// case *messages.SyncResponse:
-		// case *messages.RangeRequest:
-		// case *messages.BatchRequest:
 		case *messages.BlockResponse:
 			log := receiver.log.With().Int("blocks", len(m.Blocks)).Uint64("first", m.Blocks[0].Header.View).
 				Uint64("last", m.Blocks[len(m.Blocks)-1].Header.View).Logger()
 			log.Info().Msg("receives BlockResponse")
+		case *messages.SyncRequest:
+		case *messages.SyncResponse:
+		case *messages.RangeRequest:
+		case *messages.BatchRequest:
 		default:
 			return notBlock, 0
 		}
