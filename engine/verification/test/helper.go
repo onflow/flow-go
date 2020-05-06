@@ -48,17 +48,13 @@ func CompleteExecutionResultFixture(t testing.TB, chunkCount int) verification.C
 		unittest.RunWithTempDir(t, func(dir string) {
 			f, err := ledger.NewTrieStorage(dir)
 			defer f.Done()
-			if t != nil {
-				require.NoError(t, err)
-			}
+			require.NoError(t, err)
+
 			startState, err := f.UpdateRegisters(ids, values, f.EmptyStateCommitment())
-			if t != nil {
-				require.NoError(t, err)
-			}
+			require.NoError(t, err)
+
 			regTs, err := f.GetRegisterTouches(ids, startState)
-			if t != nil {
-				require.NoError(t, err)
-			}
+			require.NoError(t, err)
 
 			chunk := &flow.Chunk{
 				ChunkBody: flow.ChunkBody{
