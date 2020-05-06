@@ -35,8 +35,9 @@ type BuilderSuite struct {
 	genesis *model.Block
 	chainID string
 
-	headers *storage.Headers
-	blocks  *storage.Blocks
+	headers  *storage.Headers
+	payloads *storage.ClusterPayloads
+	blocks   *storage.Blocks
 
 	state   cluster.State
 	mutator cluster.Mutator
@@ -71,12 +72,13 @@ func (suite *BuilderSuite) SetupTest() {
 	headers, _, _, _, _, blocks := sutil.StorageLayer(suite.T(), suite.db)
 	suite.headers = headers
 	suite.blocks = blocks
+	suite.payloads = storage.NewClusterPayloads(suite.db)
 
 	suite.protoState = putil.ProtocolState(suite.T(), suite.db)
 
 	suite.Bootstrap()
 
-	suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.pool)
+	suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.payloads, suite.pool)
 }
 
 // runs after each test finishes
@@ -89,13 +91,8 @@ func (suite *BuilderSuite) TearDownTest() {
 
 func (suite *BuilderSuite) Bootstrap() {
 
-	// bootstrap main chain so we have valid reference blocks
-	role := flow.RoleCollection
 	// just bootstrap with a genesis block, we'll use this as reference
-	genesis := unittest.GenesisFixture(unittest.IdentityListFixture(5, func(id *flow.Identity) {
-		id.Role = role
-		role++
-	}))
+	genesis := unittest.GenesisFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
 	err := suite.protoState.Mutate().Bootstrap(flow.GenesisStateCommitment, genesis)
 	suite.Require().Nil(err)
 
@@ -312,7 +309,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 	// use a mempool with 2000 transactions, one per block
 	suite.pool, err = stdmap.NewTransactions(2000)
 	require.Nil(t, err)
-	suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.pool, builder.WithMaxCollectionSize(10000))
+	suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionSize(10000))
 
 	// get a valid reference block ID
 	final, err := suite.protoState.Final().Head()
@@ -386,7 +383,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 
 func (suite *BuilderSuite) TestBuildOn_MaxCollectionSize() {
 	// set the max collection size to 1
-	suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.pool, builder.WithMaxCollectionSize(1))
+	suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionSize(1))
 
 	// build a block
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
@@ -411,16 +408,17 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 	head := genesis
 	for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
 		block := unittest.BlockWithParentFixture(head)
-		suite.blocks.Store(&block)
+		err = suite.protoState.Mutate().Extend(&block)
 		suite.Require().Nil(err)
-		suite.FinalizeBlock(block.ID())
+		err = suite.protoState.Mutate().Finalize(block.ID())
+		suite.Require().Nil(err)
 		head = block.Header
 	}
 
 	// reset the pool and builder
 	suite.pool, err = stdmap.NewTransactions(10)
 	suite.Require().Nil(err)
-	suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.pool)
+	suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.payloads, suite.pool)
 
 	// insert a transaction referring genesis (now expired)
 	tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) {
@@ -521,6 +519,11 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		err = suite.mutator.Bootstrap(suite.genesis)
 		assert.Nil(b, err)
 
+		headers, _, _, _, _, blocks := sutil.StorageLayer(suite.T(), suite.db)
+		suite.headers = headers
+		suite.blocks = blocks
+		suite.payloads = storage.NewClusterPayloads(suite.db)
+
 		// add some transactions to transaction pool
 		for i := 0; i < 3; i++ {
 			tx := unittest.TransactionBodyFixture()
@@ -529,7 +532,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		}
 
 		// create the builder
-		suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.pool)
+		suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.payloads, suite.pool)
 	}
 
 	// create a block history to test performance against

@@ -24,7 +24,7 @@ type Builder struct {
 	db                *badger.DB
 	mainHeaders       storage.Headers
 	clusterHeaders    storage.Headers
-	collections       storage.Collections
+	payloads          storage.ClusterPayloads
 	transactions      mempool.Transactions
 	maxCollectionSize uint
 	expiryBuffer      uint
@@ -44,11 +44,13 @@ func WithExpiryBuffer(buf uint) Opt {
 	}
 }
 
-func NewBuilder(db *badger.DB, mainHeaders storage.Headers, transactions mempool.Transactions, opts ...Opt) *Builder {
+func NewBuilder(db *badger.DB, headers storage.Headers, payloads storage.ClusterPayloads, transactions mempool.Transactions, opts ...Opt) *Builder {
 
 	b := Builder{
 		db:                db,
-		mainHeaders:       mainHeaders,
+		mainHeaders:       headers,
+		clusterHeaders:    headers,
+		payloads:          payloads,
 		transactions:      transactions,
 		maxCollectionSize: 100,
 		expiryBuffer:      15,
@@ -107,37 +109,65 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		}
 
 		// STEP TWO: create a lookup of all previously used transactions on the
-		// part of the chain we care about
-
-		limit := clusterFinalized - 1000
-		if limit > clusterFinalized { // overflow check
-			limit = 0
-		}
+		// part of the chain we care about. We do this separately for
+		// un-finalized and finalized sections of the chain to decide whether to
+		// remove conflicting transactions from the mempool.
 
 		ancestorID := parentID
-		txLookup := make(map[flow.Identifier]struct{})
+		unfinalizedLookup := make(map[flow.Identifier]struct{})
 		for ancestorID != clusterFinalID {
 			ancestor, err := b.clusterHeaders.ByBlockID(ancestorID)
 			if err != nil {
 				return fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
 			}
-			if ancestor.Height <= limit {
+			if ancestor.Height <= clusterFinalized {
 				return fmt.Errorf("should always build on last finalized block")
 			}
-			payload, err := b.collections.ByID(ancestorID)
+			payload, err := b.payloads.ByBlockID(ancestorID)
 			if err != nil {
 				return fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
 			}
-			for _, tx := range payload.Transactions {
-				txLookup[tx.ID()] = struct{}{}
+
+			collection := payload.Collection
+			for _, tx := range collection.Transactions {
+				unfinalizedLookup[tx.ID()] = struct{}{}
 			}
 			ancestorID = ancestor.ParentID
 		}
 
+		// for now we check at most 1000 blocks of history
+		//TODO look back based on reference block ID and expiry
+		// ref: https://github.com/dapperlabs/flow-go/issues/3556
+
+		limit := clusterFinalized - 1000
+		if clusterFinalized < 1000 { // check underflow
+			limit = 0
+		}
+
+		finalizedLookup := make(map[flow.Identifier]struct{})
+		ancestorID = clusterFinal.ID()
+		ancestorHeight := clusterFinalized
+		for ancestorHeight > limit {
+			ancestor, err := b.clusterHeaders.ByBlockID(ancestorID)
+			if err != nil {
+				return fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
+			}
+			payload, err := b.payloads.ByBlockID(ancestorID)
+			if err != nil {
+				return fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
+			}
+
+			collection := payload.Collection
+			for _, tx := range collection.Transactions {
+				finalizedLookup[tx.ID()] = struct{}{}
+			}
+
+			ancestorID = ancestor.ParentID
+			ancestorHeight = ancestor.Height
+		}
+
 		// STEP THREE: build a payload of valid transactions, while at the same
 		// time figuring out the correct reference block ID for the collection.
-
-		// TODO make empty collections / limit size based on collection min/max size constraints
 
 		var minRefHeight uint64
 		var minRefID flow.Identifier
@@ -168,9 +198,17 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 				continue
 			}
 
-			// check that the transaction was not already used in this branch
-			_, duplicated := txLookup[txID]
+			// check that the transaction was not already used in un-finalized history
+			_, duplicated := unfinalizedLookup[txID]
 			if duplicated {
+				continue
+			}
+
+			// check that the transaction was not already included in finalized history.
+			_, duplicated = finalizedLookup[txID]
+			if duplicated {
+				// remove from mempool, conflicts with finalized block will never be valid
+				b.transactions.Rem(txID)
 				continue
 			}
 
