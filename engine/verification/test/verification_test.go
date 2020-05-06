@@ -393,8 +393,16 @@ func TestSingleCollectionProcessing(t *testing.T) {
 
 }
 
-//
+// BenchmarkIngestEngine is only executed if the LOCAL environmental variable is
+// declared as TRUE.
+// BenchmarkIngestEngine benchmarks the happy path of ingest engine with sending
+// 10 execution receipts simultaneously where each receipt has 100 chunks in it.
+// Although it tests for a single instance of ingest engine, but it considers the
+// existence of 6 verification nodes in the identity space.
 func BenchmarkIngestEngine(b *testing.B) {
+	if os.Getenv("LOCAL") != "TRUE" {
+		b.Skip()
+	}
 	for i := 0; i < b.N; i++ {
 		ingestHappyPath(b, 10, 100, 6)
 	}
