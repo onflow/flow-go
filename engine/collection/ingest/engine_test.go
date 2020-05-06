@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/storage/util"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -65,25 +67,26 @@ func TestInvalidTransaction(t *testing.T) {
 	})
 
 	t.Run("expired reference block ID", func(t *testing.T) {
+		util.RunWithStorageLayer(t, func(_ *badger.DB, _ *storage.Headers, _ *storage.Identities, _ *storage.Guarantees, _ *storage.Seals, _ *storage.Payloads, blocks *storage.Blocks) {
 
-		// build enough blocks to make genesis an expired reference
-		blocks := storage.NewBlocks(node.DB)
-		parent := genesis
-		for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
-			next := unittest.BlockWithParentFixture(parent)
-			err := blocks.Store(&next)
-			require.Nil(t, err)
-			err = node.State.Mutate().Finalize(next.ID())
-			require.Nil(t, err)
-			parent = next.Header
-		}
+			// build enough blocks to make genesis an expired reference
+			parent := genesis
+			for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
+				next := unittest.BlockWithParentFixture(parent)
+				err := blocks.Store(&next)
+				require.Nil(t, err)
+				err = node.State.Mutate().Finalize(next.ID())
+				require.Nil(t, err)
+				parent = next.Header
+			}
 
-		tx := unittest.TransactionBodyFixture()
-		tx.ReferenceBlockID = genesis.ID()
+			tx := unittest.TransactionBodyFixture()
+			tx.ReferenceBlockID = genesis.ID()
 
-		err := node.IngestionEngine.ProcessLocal(&tx)
-		t.Log(err)
-		assert.True(t, errors.Is(err, ingest.ExpiredTransactionError{}))
+			err := node.IngestionEngine.ProcessLocal(&tx)
+			t.Log(err)
+			assert.True(t, errors.Is(err, ingest.ExpiredTransactionError{}))
+		})
 	})
 }
 

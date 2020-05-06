@@ -78,6 +78,20 @@ func (mr *MockBlocksMockRecorder) ByID(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByID", reflect.TypeOf((*MockBlocks)(nil).ByID), arg0)
 }
 
+// IndexBlockForCollections mocks base method
+func (m *MockBlocks) IndexBlockForCollections(arg0 flow.Identifier, arg1 []flow.Identifier) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IndexBlockForCollections", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// IndexBlockForCollections indicates an expected call of IndexBlockForCollections
+func (mr *MockBlocksMockRecorder) IndexBlockForCollections(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IndexBlockForCollections", reflect.TypeOf((*MockBlocks)(nil).IndexBlockForCollections), arg0, arg1)
+}
+
 // Store mocks base method
 func (m *MockBlocks) Store(arg0 *flow.Block) error {
 	m.ctrl.T.Helper()

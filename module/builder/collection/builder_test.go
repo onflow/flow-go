@@ -18,8 +18,10 @@ import (
 	"github.com/dapperlabs/flow-go/state/cluster"
 	clusterkv "github.com/dapperlabs/flow-go/state/cluster/badger"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
+	putil "github.com/dapperlabs/flow-go/state/protocol/util"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
+	sutil "github.com/dapperlabs/flow-go/storage/util"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -34,6 +36,7 @@ type BuilderSuite struct {
 	chainID string
 
 	headers *storage.Headers
+	blocks  *storage.Blocks
 
 	state   cluster.State
 	mutator cluster.Mutator
@@ -65,12 +68,11 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.Require().Nil(err)
 	suite.mutator = suite.state.Mutate()
 
-	identities := storage.NewIdentities(suite.db)
-	suite.headers = storage.NewHeaders(suite.db)
-	payloads := storage.NewPayloads(suite.db)
-	seals := storage.NewSeals(suite.db)
-	suite.protoState, err = protocol.NewState(suite.db, identities, suite.headers, payloads, seals)
-	require.NoError(suite.T(), err)
+	headers, _, _, _, _, blocks := sutil.StorageLayer(suite.T(), suite.db)
+	suite.headers = headers
+	suite.blocks = blocks
+
+	suite.protoState = putil.ProtocolState(suite.T(), suite.db)
 
 	suite.Bootstrap()
 
@@ -409,7 +411,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 	head := genesis
 	for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
 		block := unittest.BlockWithParentFixture(head)
-		_ = suite.db.Update(procedure.InsertBlock(block.ID(), &block))
+		suite.blocks.Store(&block)
 		suite.Require().Nil(err)
 		suite.FinalizeBlock(block.ID())
 		head = block.Header

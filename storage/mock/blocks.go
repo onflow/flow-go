@@ -10,13 +10,13 @@ type Blocks struct {
 	mock.Mock
 }
 
-// ByCollectionID provides a mock function with given fields: collectionID
-func (_m *Blocks) ByCollectionID(collectionID flow.Identifier) (*flow.Block, error) {
-	ret := _m.Called(collectionID)
+// ByCollectionID provides a mock function with given fields: collID
+func (_m *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
+	ret := _m.Called(collID)
 
 	var r0 *flow.Block
 	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Block); ok {
-		r0 = rf(collectionID)
+		r0 = rf(collID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Block)
@@ -25,7 +25,7 @@ func (_m *Blocks) ByCollectionID(collectionID flow.Identifier) (*flow.Block, err
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(collectionID)
+		r1 = rf(collID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -77,6 +77,20 @@ func (_m *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 	}
 
 	return r0, r1
+}
+
+// IndexBlockForCollections provides a mock function with given fields: blockID, collIDs
+func (_m *Blocks) IndexBlockForCollections(blockID flow.Identifier, collIDs []flow.Identifier) error {
+	ret := _m.Called(blockID, collIDs)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier, []flow.Identifier) error); ok {
+		r0 = rf(blockID, collIDs)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // Store provides a mock function with given fields: block

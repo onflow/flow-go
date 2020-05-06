@@ -28,8 +28,9 @@ import (
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
-	bstorage "github.com/dapperlabs/flow-go/storage/badger"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/dapperlabs/flow-go/storage/util"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -72,8 +73,8 @@ func (suite *Suite) TestSendAndGetTransaction() {
 		transaction := unittest.TransactionFixture()
 
 		// create storage
-		collections := bstorage.NewCollections(db)
-		transactions := bstorage.NewTransactions(db)
+		collections := storage.NewCollections(db)
+		transactions := storage.NewTransactions(db)
 		handler := handler.NewHandler(suite.log, suite.state, nil, suite.collClient, nil, nil, collections, transactions)
 
 		expected := convert.TransactionToMessage(transaction.TransactionBody)
@@ -105,15 +106,13 @@ func (suite *Suite) TestSendAndGetTransaction() {
 
 func (suite *Suite) TestGetBlockByIDAndHeight() {
 
-	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+	util.RunWithStorageLayer(suite.T(), func(db *badger.DB, headers *storage.Headers, _ *storage.Identities, _ *storage.Guarantees, _ *storage.Seals, _ *storage.Payloads, blocks *storage.Blocks) {
 		// test block1 get by ID
 		block1 := unittest.BlockFixture()
 		// test block2 get by height
 		block2 := unittest.BlockFixture()
 		block2.Header.Height = 2
 
-		blocks := bstorage.NewBlocks(db)
-		headers := bstorage.NewHeaders(db)
 		require.NoError(suite.T(), blocks.Store(&block1))
 		require.NoError(suite.T(), blocks.Store(&block2))
 
@@ -192,7 +191,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 // TestGetSealedTransaction tests that transactions status of transaction that belongs to a sealed blocked
 // is reported as sealed
 func (suite *Suite) TestGetSealedTransaction() {
-	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+	util.RunWithStorageLayer(suite.T(), func(db *badger.DB, headers *storage.Headers, _ *storage.Identities, _ *storage.Guarantees, _ *storage.Seals, _ *storage.Payloads, blocks *storage.Blocks) {
 		// create block -> collection -> transactions
 		block, collection := suite.createChain()
 
@@ -214,10 +213,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 		suite.execClient.On("GetTransactionResult", mock.Anything, mock.Anything).Return(&exeEventResp, nil)
 
 		// initialize storage
-		blocks := bstorage.NewBlocks(db)
-		headers := bstorage.NewHeaders(db)
-		collections := bstorage.NewCollections(db)
-		transactions := bstorage.NewTransactions(db)
+		collections := storage.NewCollections(db)
+		transactions := storage.NewTransactions(db)
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, metrics, suite.me, blocks, headers, collections, transactions)
@@ -263,11 +260,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 // TestExecuteScript tests the three execute Script related calls to make sure that the execution api is called with
 // the correct block id
 func (suite *Suite) TestExecuteScript() {
-	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-
-		// initialize storage
-		blocks := bstorage.NewBlocks(db)
-		headers := bstorage.NewHeaders(db)
+	util.RunWithStorageLayer(suite.T(), func(db *badger.DB, headers *storage.Headers, _ *storage.Identities, _ *storage.Guarantees, _ *storage.Seals, _ *storage.Payloads, blocks *storage.Blocks) {
 
 		// create a block and a seal pointing to that block
 		lastBlock := unittest.BlockFixture()

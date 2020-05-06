@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
@@ -19,7 +18,6 @@ import (
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
 // Engine represents the ingestion engine, used to funnel data from other nodes
@@ -36,7 +34,6 @@ type Engine struct {
 
 	// storage
 	// FIX: remove direct DB access by substituting indexer module
-	db           *badger.DB
 	blocks       storage.Blocks
 	headers      storage.Headers
 	collections  storage.Collections
@@ -49,7 +46,6 @@ func New(log zerolog.Logger,
 	state protocol.State,
 	metrics module.Metrics,
 	me module.Local,
-	db *badger.DB,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
@@ -62,7 +58,6 @@ func New(log zerolog.Logger,
 		metrics:      metrics,
 		state:        state,
 		me:           me,
-		db:           db,
 		blocks:       blocks,
 		headers:      headers,
 		collections:  collections,
@@ -168,13 +163,9 @@ func (e *Engine) onBlockProposal(_ flow.Identifier, proposal *messages.BlockProp
 	// TODO: substitute an indexer module as layer between engine and storage
 
 	// index the block storage with each of the collection guarantee
-	blockID := proposal.Header.ID()
-	for _, guarantee := range proposal.Payload.Guarantees {
-		collID := guarantee.ID()
-		err := e.db.Update(operation.SkipDuplicates(operation.IndexCollectionBlock(guarantee.ID(), blockID)))
-		if err != nil {
-			return fmt.Errorf("could not index collection block (%x): %w", collID, err)
-		}
+	err := e.blocks.IndexBlockForCollections(proposal.Header.ID(), flow.GetIDs(proposal.Payload.Guarantees))
+	if err != nil {
+		return fmt.Errorf("could not index block for collections: %w", err)
 	}
 
 	// request each of the collections from the collection node

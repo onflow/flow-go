@@ -10,8 +10,6 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
 func ExpectPanic(expectedMsg string, t *testing.T) {
@@ -107,14 +105,4 @@ func RunWithBadgerDB(t testing.TB, f func(*badger.DB)) {
 		defer db.Close()
 		f(db)
 	})
-}
-
-func StorageLayer(t testing.TB, db *badger.DB) (*storage.Headers, *storage.Identities, *storage.Guarantees, *storage.Seals, *storage.Payloads, *storage.Blocks) {
-	headers := storage.NewHeaders(db)
-	identities := storage.NewIdentities(db)
-	guarantees := storage.NewGuarantees(db)
-	seals := storage.NewSeals(db)
-	payloads := storage.NewPayloads(db, identities, guarantees, seals)
-	blocks := storage.NewBlocks(db, headers, payloads)
-	return headers, identities, guarantees, seals, payloads, blocks
 }
