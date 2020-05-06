@@ -86,7 +86,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	events := storage.NewMockEvents(ctrl)
 	txResults := storage.NewMockTransactionResults(ctrl)
 
-	computationEngine := new(computation.ComputationManager)
+	computationManager := new(computation.ComputationManager)
 	providerEngine := new(provider.ProviderEngine)
 	protocolState := new(protocol.State)
 	executionState := new(state.ExecutionState)
@@ -97,7 +97,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	defer func() {
 		<-engine.Done()
 		ctrl.Finish()
-		computationEngine.AssertExpectations(t)
+		computationManager.AssertExpectations(t)
 		protocolState.AssertExpectations(t)
 		executionState.AssertExpectations(t)
 		providerEngine.AssertExpectations(t)
@@ -126,7 +126,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.ExecutionSync)), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 
-	engine, err = New(log, net, me, protocolState, blocks, payloads, collections, events, txResults, computationEngine, providerEngine, executionState, 21, metrics, false)
+	engine, err = New(log, net, me, protocolState, blocks, payloads, collections, events, txResults, computationManager, providerEngine, executionState, 21, metrics, false)
 	require.NoError(t, err)
 
 	f(testingContext{
@@ -137,7 +137,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		state:              protocolState,
 		conduit:            conduit,
 		collectionConduit:  collectionConduit,
-		computationManager: computationEngine,
+		computationManager: computationManager,
 		providerEngine:     providerEngine,
 		executionState:     executionState,
 		snapshot:           snapshot,

@@ -395,32 +395,33 @@ func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse)
 		if err != nil {
 			return err
 		}
-		executableBlock := blockByCollectionId.ExecutableBlock
+		executableBlocks := blockByCollectionId.ExecutableBlocks
 
-		completeCollection, ok := executableBlock.CompleteCollections[collID]
-		if !ok {
-			return fmt.Errorf("cannot handle collection: internal inconsistency - collection pointing to block which does not contain said collection")
-		}
-		// already received transactions for this collection
-		// TODO - check if data stored is the same
-		if completeCollection.Transactions != nil {
-			return nil
-		}
+		for _, executableBlock := range executableBlocks {
 
-		completeCollection.Transactions = collection.Transactions
-		if executableBlock.HasAllTransactions() {
-			e.clearCollectionsCache(executableBlock, backdata)
-		}
-
-		if executableBlock.IsComplete() {
-
-			e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("block complete - executing")
-			if e.extensiveLogging {
-				e.logExecutableBlock(executableBlock)
+			completeCollection, ok := executableBlock.CompleteCollections[collID]
+			if !ok {
+				return fmt.Errorf("cannot handle collection: internal inconsistency - collection pointing to block which does not contain said collection")
 			}
-			e.wg.Add(1)
-			go e.executeBlock(executableBlock)
+			// already received transactions for this collection
+			// TODO - check if data stored is the same
+			if completeCollection.Transactions != nil {
+				continue
+			}
+
+			completeCollection.Transactions = collection.Transactions
+
+			if executableBlock.IsComplete() {
+
+				e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("block complete - executing")
+				if e.extensiveLogging {
+					e.logExecutableBlock(executableBlock)
+				}
+				e.wg.Add(1)
+				go e.executeBlock(executableBlock)
+			}
 		}
+		backdata.Rem(collID)
 
 		return nil
 	})
@@ -486,12 +487,6 @@ func (e *Engine) onExecutionStateSyncRequest(originID flow.Identifier, req *mess
 	return nil
 }
 
-func (e *Engine) clearCollectionsCache(block *entity.ExecutableBlock, backdata *stdmap.BlockByCollectionBackdata) {
-	for _, collection := range block.Block.Payload.Guarantees {
-		backdata.Rem(collection.ID())
-	}
-}
-
 // tryEnqueue checks if a block fits somewhere into the already existing queues, and puts it there is so
 func tryEnqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, bool) {
 	for _, queue := range queues.All() {
@@ -523,15 +518,15 @@ func (e *Engine) sendCollectionsRequest(executableBlock *entity.ExecutableBlock,
 
 		// TODO - Once collection can map to multiple blocks
 		maybeBlockByCollection, err := backdata.ByID(guarantee.ID())
+
 		if err == mempool.ErrNotFound {
-			executableBlock.CompleteCollections[guarantee.ID()] = &entity.CompleteCollection{
-				Guarantee:    guarantee,
-				Transactions: nil,
+
+			maybeBlockByCollection = &entity.BlocksByCollection{
+				CollectionID:     guarantee.ID(),
+				ExecutableBlocks: make(map[flow.Identifier]*entity.ExecutableBlock),
 			}
-			err := backdata.Add(&entity.BlockByCollection{
-				CollectionID:    guarantee.ID(),
-				ExecutableBlock: executableBlock,
-			})
+
+			err := backdata.Add(maybeBlockByCollection)
 			if err != nil {
 				return fmt.Errorf("cannot save collection-block mapping: %w", err)
 			}
@@ -551,14 +546,21 @@ func (e *Engine) sendCollectionsRequest(executableBlock *entity.ExecutableBlock,
 				// TODO - this should be handled, maybe retried or put into some form of a queue
 				e.log.Err(err).Msg("cannot submit collection requests")
 			}
-			continue
-		}
-		if err != nil {
+
+		} else if err != nil {
 			return fmt.Errorf("cannot get an item from mempool: %w", err)
 		}
-		if maybeBlockByCollection.ID() != executableBlock.Block.ID() {
-			// Should not happen in MVP, but see TODO at beggining of the function
-			return fmt.Errorf("received block with same collection alredy pointing to different block ")
+
+		if _, exists := maybeBlockByCollection.ExecutableBlocks[executableBlock.ID()]; exists {
+			e.log.Info().Hex("block_id", logging.Entity(executableBlock)).Msg("requesting collections for block with already pending requests. Ignoring requests.")
+			continue
+		}
+
+		maybeBlockByCollection.ExecutableBlocks[executableBlock.ID()] = executableBlock
+
+		executableBlock.CompleteCollections[guarantee.ID()] = &entity.CompleteCollection{
+			Guarantee:    guarantee,
+			Transactions: nil,
 		}
 	}
 
