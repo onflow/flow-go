@@ -18,10 +18,27 @@ eg: under `hotstuff`: `follower`, `...`
 
 eg: under `storage`: `badger`, `trie`, `cache`
 
+### Naming
+The actual metric name should clearly identify what's actually being collected.
+The name should be like an inverse domain, and get more specific left to right.
+
+eg: `transaction_size_bytes` rather than `size_of_transaction`
+
+If the metric is in the form of a verb, it should be in the past tense.
+`finalized`, `issued`, `sent`
+
+Metrics should always be suffixed with the unit the metric is in, pluralized.
+`seconds`, `bytes`, `messages`, `transactions`, `chunks`
+
+If the metrics is an ever accumulating counter, it should be additionally suffixed with `total` after the unit.
+`seconds_total`, `transations_total`
+
+Do not repeat any of the terms used in `Namespace` or `Subsystem` in the metric name.
+
 ## Constant Labels
 Add labels for constant information
 
 Const Label | Value
 ------------|------
 node_role   | [collection, consensus, execution, verification, access]
-beta_metric | `true`
+beta_metric | `true` *only set if the metric is in beta
