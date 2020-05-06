@@ -15,7 +15,7 @@ import (
 
 func main() {
 	example.WithMetricsServer(func(logger zerolog.Logger) {
-		collector, err := metrics.NewCollector(logger)
+		collector, err := metrics.NewClusterCollector(logger, "someChainID")
 		if err != nil {
 			panic(err)
 		}
