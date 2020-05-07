@@ -25,8 +25,7 @@ func TestEmptyInsert(t *testing.T) {
 	values := [][]byte{v1}
 	rootHash, err := fStore.Update(keys, values, rootHash)
 	require.NoError(t, err)
-	retKeys, retValues, err := fStore.Read(keys, rootHash)
-	require.True(t, bytes.Equal(retKeys[0], keys[0]))
+	retValues, err := fStore.Read(keys, rootHash)
 	require.True(t, bytes.Equal(retValues[0], values[0]))
 }
 
@@ -71,12 +70,10 @@ func TestLeftEmptyInsert(t *testing.T) {
 	// 			14: ([129 1],41)[10]
 	// 			14: ([193 1],42)[11]
 
-	// order matters
-	keys = [][]byte{k3, k1, k2}
-	values = [][]byte{v3, v1, v2}
-	retKeys, retValues, err := fStore.Read(keys, rootHash3)
+	keys = [][]byte{k1, k2, k3}
+	values = [][]byte{v1, v2, v3}
+	retValues, err := fStore.Read(keys, rootHash3)
 	for i := range keys {
-		require.True(t, bytes.Equal(retKeys[i], keys[i]))
 		require.True(t, bytes.Equal(retValues[i], values[i]))
 	}
 }
@@ -122,12 +119,10 @@ func TestRightEmptyInsert(t *testing.T) {
 	// 			14: ([129 1],41)[10]
 	// 			14: ([193 1],42)[11]
 
-	// order matters
-	keys = [][]byte{k3, k1, k2}
-	values = [][]byte{v3, v1, v2}
-	retKeys, retValues, err := fStore.Read(keys, rootHash3)
+	keys = [][]byte{k1, k2, k3}
+	values = [][]byte{v1, v2, v3}
+	retValues, err := fStore.Read(keys, rootHash3)
 	for i := range keys {
-		require.True(t, bytes.Equal(retKeys[i], keys[i]))
 		require.True(t, bytes.Equal(retValues[i], values[i]))
 	}
 }
@@ -174,9 +169,8 @@ func TestExpansionInsert(t *testing.T) {
 
 	keys = [][]byte{k1, k2}
 	values = [][]byte{v1, v2}
-	retKeys, retValues, err := fStore.Read(keys, rootHash3)
+	retValues, err := fStore.Read(keys, rootHash3)
 	for i := range keys {
-		require.True(t, bytes.Equal(retKeys[i], keys[i]))
 		require.True(t, bytes.Equal(retValues[i], values[i]))
 	}
 }
@@ -224,12 +218,10 @@ func TestFullHouseInsert(t *testing.T) {
 	// 				13: ([160 1],43)[101]
 	// 			14: ([193 1],42)[11]
 
-	// order matters
-	keys = [][]byte{k1, k3, k2}
-	values = [][]byte{v1, v3, v2}
-	retKeys, retValues, err := fStore.Read(keys, rootHash3)
+	keys = [][]byte{k1, k2, k3}
+	values = [][]byte{v1, v2, v3}
+	retValues, err := fStore.Read(keys, rootHash3)
 	for i := range keys {
-		require.True(t, bytes.Equal(retKeys[i], keys[i]))
 		require.True(t, bytes.Equal(retValues[i], values[i]))
 	}
 }
@@ -265,9 +257,8 @@ func TestLeafInsert(t *testing.T) {
 	// 						0: ([1 0],41)[0000000100000000]
 	// 						0: ([1 1],42)[0000000100000001]
 
-	retKeys, retValues, err := fStore.Read(keys, rootHash2)
+	retValues, err := fStore.Read(keys, rootHash2)
 	for i := range keys {
-		require.True(t, bytes.Equal(retKeys[i], keys[i]))
 		require.True(t, bytes.Equal(retValues[i], values[i]))
 	}
 }
@@ -292,14 +283,55 @@ func TestSameKeyInsert(t *testing.T) {
 	rootHash, err = fStore.Update(keys, values, rootHash)
 	require.NoError(t, err)
 
-	retKeys, retValues, err := fStore.Read(keys, rootHash)
-	require.True(t, bytes.Equal(retKeys[0], keys[0]))
+	retValues, err := fStore.Read(keys, rootHash)
 	require.True(t, bytes.Equal(retValues[0], values[0]))
 }
 
 // TODO insert with duplicated keys
 
-// TODO Read tests
+func TestReadOrder(t *testing.T) {
+	trieHeight := 17 // should be key size (in bits) + 1
+	fStore := mtrie.NewMForest(trieHeight)
+	rootHash := fStore.GetEmptyRootHash()
+
+	k1 := []byte([]uint8{uint8(116), uint8(74)})
+	v1 := []byte{'A'}
+	k2 := []byte([]uint8{uint8(53), uint8(129)})
+	v2 := []byte{'B'}
+	keys := [][]byte{k1, k2}
+	values := [][]byte{v1, v2}
+	rootHash, err := fStore.Update(keys, values, rootHash)
+	require.NoError(t, err)
+
+	retValues, err := fStore.Read(keys, rootHash)
+	require.True(t, bytes.Equal(retValues[0], values[0]))
+	require.True(t, bytes.Equal(retValues[1], values[1]))
+}
+
+func TestReadWithDupplicatedKeys(t *testing.T) {
+	trieHeight := 17 // should be key size (in bits) + 1
+	fStore := mtrie.NewMForest(trieHeight)
+	rootHash := fStore.GetEmptyRootHash()
+
+	k1 := []byte([]uint8{uint8(53), uint8(74)})
+	v1 := []byte{'A'}
+	k2 := []byte([]uint8{uint8(116), uint8(129)})
+	v2 := []byte{'B'}
+	k3 := []byte([]uint8{uint8(53), uint8(74)})
+
+	keys := [][]byte{k1, k2}
+	values := [][]byte{v1, v2}
+	rootHash, err := fStore.Update(keys, values, rootHash)
+	require.NoError(t, err)
+
+	keys = [][]byte{k1, k2, k3}
+	values = [][]byte{v1, v2, v1}
+
+	retValues, err := fStore.Read(keys, rootHash)
+	require.True(t, bytes.Equal(retValues[0], values[0]))
+	require.True(t, bytes.Equal(retValues[1], values[1]))
+	require.True(t, bytes.Equal(retValues[2], values[2]))
+}
 
 func TestMForestAccuracy(t *testing.T) {
 	trieHeight := 17 // should be key size (in bits) + 1
@@ -347,8 +379,8 @@ func TestMForestAccuracy(t *testing.T) {
 		rootHash = newRootHash
 
 		// check values
-		retKeys, retValues, err := fStore.Read(keys, rootHash)
-		for i, k := range retKeys {
+		retValues, err := fStore.Read(keys, rootHash)
+		for i, k := range keys {
 			require.True(t, bytes.Equal(keyValueMap[string(k)], retValues[i]))
 		}
 

@@ -2,12 +2,11 @@ package mtrie
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"sort"
 	"sync"
-
-	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
 // MForest is an in memory forest (collection of tries)
@@ -17,6 +16,7 @@ type MForest struct {
 	keyByteSize int // acceptable number of bytes for key
 }
 
+// NewMForest returns a new instance of memory forest
 func NewMForest(maxHeight int) *MForest {
 	// add empty roothash
 	tries := make(map[string]*MTrie)
@@ -28,32 +28,37 @@ func NewMForest(maxHeight int) *MForest {
 		keyByteSize: (maxHeight - 1) / 8}
 }
 
+// GetEmptyRootHash returns the rootHash of empty forest
 func (f *MForest) GetEmptyRootHash() []byte {
 	newRoot := newNode(f.maxHeight - 1)
 	rootHash := f.ComputeNodeHash(newRoot)
 	return rootHash
 }
 
-// returns keys, values, error
-func (f *MForest) Read(keys [][]byte, rootHash []byte) ([][]byte, [][]byte, error) {
+// Read reads values for an slice of keys and returns values and error (if any)
+func (f *MForest) Read(keys [][]byte, rootHash []byte) ([][]byte, error) {
+
+	// lookup the trie by rootHash
 	trie, ok := f.tries[string(rootHash)]
 	if !ok {
-		return nil, nil, errors.New("root hash not found")
+		return nil, errors.New("root hash not found")
 	}
 
 	// sort keys and deduplicate keys
 	sortedKeys := make([][]byte, 0)
-	keyOrgIndex := make(map[string]int)
+	keyOrgIndex := make(map[string][]int)
 	for i, key := range keys {
 		// check key sizes
 		if len(key) != f.keyByteSize {
-			return nil, nil, fmt.Errorf("key size doesn't match the trie height: %x", key)
+			return nil, fmt.Errorf("key size doesn't match the trie height: %x", key)
 		}
-		// check if doesn't exist
-		if _, ok := keyOrgIndex[string(key)]; !ok {
-			//do something here
+		// only collect dupplicated keys once
+		if _, ok := keyOrgIndex[hex.EncodeToString(key)]; !ok {
 			sortedKeys = append(sortedKeys, key)
-			keyOrgIndex[string(key)] = i
+			keyOrgIndex[hex.EncodeToString(key)] = []int{i}
+		} else {
+			// handles duplicated keys
+			keyOrgIndex[hex.EncodeToString(key)] = append(keyOrgIndex[hex.EncodeToString(key)], i)
 		}
 	}
 
@@ -62,7 +67,18 @@ func (f *MForest) Read(keys [][]byte, rootHash []byte) ([][]byte, [][]byte, erro
 	})
 
 	values, err := f.read(trie, trie.root, sortedKeys)
-	return sortedKeys, values, err
+
+	if err != nil {
+		return nil, err
+	}
+	// reconstruct the values in the same key order that called the method
+	orderedValues := make([][]byte, len(keys))
+	for i, k := range sortedKeys {
+		for _, j := range keyOrgIndex[hex.EncodeToString(k)] {
+			orderedValues[j] = values[i]
+		}
+	}
+	return orderedValues, nil
 }
 
 func (f *MForest) read(trie *MTrie, head *node, keys [][]byte) ([][]byte, error) {
@@ -80,10 +96,12 @@ func (f *MForest) read(trie *MTrie, head *node, keys [][]byte) ([][]byte, error)
 		return [][]byte{head.value}, nil
 	}
 
-	// TODO change this
-	// Split the keys so we can lookup the trie in parallel
-	lkeys, rkeys, _ := utils.SplitKeys(keys, f.maxHeight-head.height-1)
+	lkeys, rkeys, err := SplitSortedKeys(keys, f.maxHeight-head.height-1)
+	if err != nil {
+		return nil, fmt.Errorf("can't read due to split key error: %v", err)
+	}
 
+	// TODO make this parallel
 	values := make([][]byte, 0)
 	if len(lkeys) > 0 {
 		v, err := f.read(trie, head.lChild, lkeys)
@@ -103,7 +121,7 @@ func (f *MForest) read(trie *MTrie, head *node, keys [][]byte) ([][]byte, error)
 	return values, nil
 }
 
-// returns new state commitment, error
+// Update updates the values for the registers and returns rootHash and error (if any)
 func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byte, error) {
 
 	// sort keys and deduplicate keys (we only consider the first occurance, and ignore the rest)
@@ -177,12 +195,9 @@ func (f *MForest) update(trie *MTrie, parent *node, head *node, keys [][]byte, v
 	}
 
 	// Split the keys and values array so we can update the trie in parallel
-	lkeys, lvalues, rkeys, rvalues := SplitKeyValues(keys, values, f.maxHeight-head.height-1)
-	if len(lkeys) != len(lvalues) {
-		return errors.New("left Key/Value Length mismatch")
-	}
-	if len(rkeys) != len(rvalues) {
-		return errors.New("right Key/Value Length mismatch")
+	lkeys, lvalues, rkeys, rvalues, err := SplitKeyValues(keys, values, f.maxHeight-head.height-1)
+	if err != nil {
+		return fmt.Errorf("error spliting key values: %v", err)
 	}
 
 	wg := sync.WaitGroup{}
@@ -238,21 +253,21 @@ func (f *MForest) update(trie *MTrie, parent *node, head *node, keys [][]byte, v
 	return nil
 }
 
-// GetBatchProof returns proof for a batch of keys
+// Proofs returns a batch proof for the given keys
 func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*BatchProof, error) {
 
 	// look up for non exisitng keys
 	notFoundKeys := make([][]byte, 0)
 	notFoundValues := make([][]byte, 0)
-	retKeys, retValues, err := f.Read(keys, rootHash)
+	retValues, err := f.Read(keys, rootHash)
 	if err != nil {
 		return nil, err
 	}
-	for i := range retKeys {
-		// non exist
+	for i, key := range keys {
 		// TODO figure out nil vs empty slice
+		// non exist
 		if retValues[i] == nil || len(retValues[i]) == 0 {
-			notFoundKeys = append(notFoundKeys, retKeys[i])
+			notFoundKeys = append(notFoundKeys, key)
 			notFoundValues = append(notFoundValues, []byte{})
 		}
 	}
@@ -291,17 +306,26 @@ func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*BatchProof, error) {
 			if bytes.Equal(curr.key, key) {
 				break
 			}
-			if utils.IsBitSet(key, i) {
+			bitIsSet, err := IsBitSet(key, i)
+			if err != nil {
+				return nil, fmt.Errorf("error generating batch proof - error calling IsBitSet : %v", err)
+			}
+			if bitIsSet {
 				if curr.lChild != nil {
-					utils.SetBit(flag, i)
-
+					err := SetBit(flag, i)
+					if err != nil {
+						return nil, fmt.Errorf("error generating batch proof - error calling SetBit: %v", err)
+					}
 					value = append(value, f.ComputeNodeHash(curr.lChild))
 				}
 				curr = curr.rChild
 				step++
 			} else {
 				if curr.rChild != nil {
-					utils.SetBit(flag, i)
+					err := SetBit(flag, i)
+					if err != nil {
+						return nil, fmt.Errorf("error generating batch proof - error calling SetBit: %v", err)
+					}
 					value = append(value, f.ComputeNodeHash(curr.rChild))
 				}
 				curr = curr.lChild
@@ -324,27 +348,6 @@ func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*BatchProof, error) {
 	return NewBatchProof(flags, values, inclusions, steps), nil
 }
 
-// returns lkeys, lvalues, rkeys, rvalues
-func SplitKeyValues(keys [][]byte, values [][]byte, bitIndex int) ([][]byte, [][]byte, [][]byte, [][]byte) {
-
-	rkeys := make([][]byte, 0, len(keys))
-	rvalues := make([][]byte, 0, len(values))
-	lkeys := make([][]byte, 0, len(keys))
-	lvalues := make([][]byte, 0, len(values))
-
-	// splits keys at the smallest index i where keys[i] >= split
-	for i, key := range keys {
-		if utils.IsBitSet(key, bitIndex) {
-			rkeys = append(rkeys, key)
-			rvalues = append(rvalues, values[i])
-		} else {
-			lkeys = append(lkeys, key)
-			lvalues = append(lvalues, values[i])
-		}
-	}
-	return lkeys, lvalues, rkeys, rvalues
-}
-
 // ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.
 func (f *MForest) ComputeCompactValue(n *node) []byte {
 	// if value is nil return default hash
@@ -354,7 +357,12 @@ func (f *MForest) ComputeCompactValue(n *node) []byte {
 	computedHash := HashLeaf(n.key, n.value)
 
 	for j := f.maxHeight - 2; j > f.maxHeight-n.height-2; j-- {
-		if utils.IsBitSet(n.key, j) { // right branching
+		bitIsSet, err := IsBitSet(n.key, j)
+		// this won't happen ever
+		if err != nil {
+			panic(err)
+		}
+		if bitIsSet { // right branching
 			computedHash = HashInterNode(GetDefaultHashForHeight(f.maxHeight-j-2), computedHash)
 		} else { // left branching
 			computedHash = HashInterNode(computedHash, GetDefaultHashForHeight(f.maxHeight-j-2))
@@ -363,6 +371,7 @@ func (f *MForest) ComputeCompactValue(n *node) []byte {
 	return computedHash
 }
 
+// ComputeNodeHash computes the hashValue for the given node
 func (f *MForest) ComputeNodeHash(n *node) []byte {
 	if n.hashValue != nil {
 		return n.hashValue
