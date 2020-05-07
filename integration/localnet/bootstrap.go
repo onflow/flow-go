@@ -25,6 +25,7 @@ const (
 	AccessAPIPort            = 3569
 	MetricsPort              = 8080
 	RPCPort                  = 9000
+	PprofPort                = 6000
 )
 
 var (
@@ -48,6 +49,7 @@ func main() {
 
 	fmt.Println("Bootstrapping a new FLITE network...")
 
+	fmt.Println()
 	fmt.Printf("Node counts:\n")
 	fmt.Printf("- Collection: %d\n", collectionCount)
 	fmt.Printf("- Consensus: %d\n", consensusCount)
@@ -92,8 +94,15 @@ func main() {
 
 	fmt.Print("Bootstrapping success!\n\n")
 
+	fmt.Println("Profilers:")
+	for i, c := range containers {
+		fmt.Printf("- %s pprof server will be accessible at localhost:%d\n", c.ContainerName, PprofPort+i)
+	}
+	fmt.Println()
+
+	fmt.Println("Access APIs:")
 	for i := 0; i < accessCount; i++ {
-		fmt.Printf("Access API %d will be accessible at localhost:%d\n", i+1, AccessAPIPort+i)
+		fmt.Printf("- access_%d gRPC API will be accessible at localhost:%d\n", i+1, AccessAPIPort+i)
 	}
 	fmt.Println()
 
@@ -161,22 +170,22 @@ func prepareServices(containers []testnet.ContainerConfig) Services {
 		numAccess       = 0
 	)
 
-	for _, container := range containers {
+	for i, container := range containers {
 		switch container.Role {
 		case flow.RoleConsensus:
-			services[container.ContainerName] = prepareService(container, numConsensus)
+			services[container.ContainerName] = prepareService(container, i, numConsensus)
 			numConsensus++
 		case flow.RoleCollection:
-			services[container.ContainerName] = prepareCollectionService(container, numCollection)
+			services[container.ContainerName] = prepareCollectionService(container, i, numCollection)
 			numCollection++
 		case flow.RoleExecution:
-			services[container.ContainerName] = prepareExecutionService(container, numExecution)
+			services[container.ContainerName] = prepareExecutionService(container, i, numExecution)
 			numExecution++
 		case flow.RoleVerification:
-			services[container.ContainerName] = prepareService(container, numVerification)
+			services[container.ContainerName] = prepareService(container, i, numVerification)
 			numVerification++
 		case flow.RoleAccess:
-			services[container.ContainerName] = prepareAccessService(container, numAccess)
+			services[container.ContainerName] = prepareAccessService(container, i, numAccess)
 			numAccess++
 		}
 	}
@@ -184,7 +193,7 @@ func prepareServices(containers []testnet.ContainerConfig) Services {
 	return services
 }
 
-func prepareService(container testnet.ContainerConfig, i int) Service {
+func prepareService(container testnet.ContainerConfig, serviceIndex, roleIndex int) Service {
 	service := Service{
 		Image: fmt.Sprintf("localnet-%s", container.Role),
 		Command: []string{
@@ -193,6 +202,7 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 			"--datadir=/flowdb",
 			"--loglevel=DEBUG",
 			"--nclusters=1",
+			"--pprofport=6000",
 		},
 		Volumes: []string{
 			fmt.Sprintf("%s:/bootstrap", BootstrapDir),
@@ -201,10 +211,13 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 			"JAEGER_AGENT_HOST=jaeger",
 			"JAEGER_AGENT_PORT=6831",
 		},
+		Ports: []string{
+			fmt.Sprintf("%d:%d", PprofPort+serviceIndex, PprofPort),
+		},
 	}
 
 	// only specify build config for first service of each role
-	if i == 0 {
+	if roleIndex == 0 {
 		service.Build = Build{
 			Context:    "../../",
 			Dockerfile: "cmd/Dockerfile",
@@ -223,8 +236,8 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 	return service
 }
 
-func prepareCollectionService(container testnet.ContainerConfig, i int) Service {
-	service := prepareService(container, i)
+func prepareCollectionService(container testnet.ContainerConfig, serviceIndex, roleIndex int) Service {
+	service := prepareService(container, serviceIndex, roleIndex)
 
 	service.Command = append(
 		service.Command,
@@ -234,8 +247,8 @@ func prepareCollectionService(container testnet.ContainerConfig, i int) Service 
 	return service
 }
 
-func prepareExecutionService(container testnet.ContainerConfig, i int) Service {
-	service := prepareService(container, i)
+func prepareExecutionService(container testnet.ContainerConfig, serviceIndex, roleIndex int) Service {
+	service := prepareService(container, serviceIndex, roleIndex)
 
 	service.Command = append(
 		service.Command,
@@ -245,8 +258,8 @@ func prepareExecutionService(container testnet.ContainerConfig, i int) Service {
 	return service
 }
 
-func prepareAccessService(container testnet.ContainerConfig, i int) Service {
-	service := prepareService(container, i)
+func prepareAccessService(container testnet.ContainerConfig, serviceIndex, roleIndex int) Service {
+	service := prepareService(container, serviceIndex, roleIndex)
 
 	service.Command = append(service.Command, []string{
 		fmt.Sprintf("--rpc-addr=%s:%d", container.ContainerName, RPCPort),
@@ -254,9 +267,7 @@ func prepareAccessService(container testnet.ContainerConfig, i int) Service {
 		fmt.Sprintf("--script-addr=execution_1:%d", RPCPort),
 	}...)
 
-	service.Ports = []string{
-		fmt.Sprintf("%d:%d", AccessAPIPort+i, RPCPort),
-	}
+	service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", AccessAPIPort+roleIndex, RPCPort))
 
 	return service
 }
