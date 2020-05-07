@@ -284,49 +284,40 @@ func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*BatchProof, error) {
 		return nil, errors.New("root hash not found")
 	}
 
-	// TODO make this parallel
-	// fatalErrors := make(chan error)
-	// wgDone := make(chan bool)
+	fatalErrors := make(chan error)
+	wgDone := make(chan bool)
 
-	// var wg sync.WaitGroup
+	var wg sync.WaitGroup
 
-	// fmt.Println("---------")
-	// fmt.Println(trie.root.FmtStr("", ""))
-	// fmt.Println(keys)
 	bp := NewBatchProofWithEmptyProofs(len(keys))
 	for i, key := range keys {
-		// fmt.Println(key)
-		// wg.Add(1)
-		// go func() {
-		err := f.proof(key, trie.root, bp.Proofs[i])
-		if err != nil {
-			return nil, err
-			// fatalErrors <- err
-		}
-		// 	wg.Done()
-		// }()
+		wg.Add(1)
+		go func(k []byte, p *Proof) {
+			err := f.proof(k, trie.root, p)
+			if err != nil {
+				fatalErrors <- err
+			}
+			wg.Done()
+		}(key, bp.Proofs[i])
 	}
 
-	// go func() {
-	// 	wg.Wait()
-	// 	close(wgDone)
-	// }()
+	wg.Wait()
+	close(wgDone)
 
-	// select {
-	// case <-wgDone:
-	// 	// carry on
-	// 	break
-	// case err := <-fatalErrors:
-	// 	close(fatalErrors)
-	// 	return nil, err
-	// }
+	select {
+	case <-wgDone:
+		// carry on
+		break
+	case err := <-fatalErrors:
+		close(fatalErrors)
+		return nil, err
+	}
 
 	return bp, nil
 }
 
 // TODO change this to recuresive version
 func (f *MForest) proof(key []byte, root *node, output *Proof) error {
-
 	output.inclusion = true
 
 	flag := make([]byte, f.keyByteSize)
