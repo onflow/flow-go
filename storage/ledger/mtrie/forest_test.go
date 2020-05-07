@@ -389,6 +389,7 @@ func TestMForestAccuracy(t *testing.T) {
 
 		// check values
 		retValues, err := fStore.Read(keys, rootHash)
+		require.NoError(t, err)
 		for i, k := range keys {
 			require.True(t, bytes.Equal(keyValueMap[string(k)], retValues[i]))
 		}
@@ -403,6 +404,7 @@ func TestMForestAccuracy(t *testing.T) {
 
 		// Test eqaulity to SMT
 		newRootHashForSMT, err := smt.Update(keys, values, rootHashForSMT)
+		require.NoError(t, err)
 		rootHashForSMT = newRootHashForSMT
 		require.True(t, bytes.Equal(newRootHashForSMT, newRootHash))
 	}
