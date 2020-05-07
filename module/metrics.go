@@ -157,4 +157,7 @@ type Metrics interface {
 
 	// ExecutionLastExecutedBlockView reports last executed block view
 	ExecutionLastExecutedBlockView(view uint64)
+
+	// ExecutionTotalExecutedTransactions adds num to the total number of executed transactions
+	ExecutionTotalExecutedTransactions(numExecuted int)
 }
