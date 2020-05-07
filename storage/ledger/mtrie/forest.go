@@ -22,7 +22,7 @@ func NewMForest(maxHeight int) *MForest {
 	tries := make(map[string]*MTrie)
 	newRoot := newNode(maxHeight - 1)
 	rootHash := GetDefaultHashForHeight(maxHeight - 1)
-	tries[string(rootHash)] = NewMTrie(newRoot)
+	tries[hex.EncodeToString(rootHash)] = NewMTrie(newRoot)
 	return &MForest{tries: tries,
 		maxHeight:   maxHeight,
 		keyByteSize: (maxHeight - 1) / 8}
@@ -39,7 +39,7 @@ func (f *MForest) GetEmptyRootHash() []byte {
 func (f *MForest) Read(keys [][]byte, rootHash []byte) ([][]byte, error) {
 
 	// lookup the trie by rootHash
-	trie, ok := f.tries[string(rootHash)]
+	trie, ok := f.tries[hex.EncodeToString(rootHash)]
 	if !ok {
 		return nil, errors.New("root hash not found")
 	}
@@ -133,10 +133,10 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 			return nil, fmt.Errorf("key size doesn't match the trie height: %x", key)
 		}
 		// check if doesn't exist
-		if _, ok := valueMap[string(key)]; !ok {
+		if _, ok := valueMap[hex.EncodeToString(key)]; !ok {
 			//do something here
 			sortedKeys = append(sortedKeys, key)
-			valueMap[string(key)] = values[i]
+			valueMap[hex.EncodeToString(key)] = values[i]
 		}
 	}
 
@@ -146,11 +146,11 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 
 	sortedValues := make([][]byte, 0)
 	for _, key := range sortedKeys {
-		sortedValues = append(sortedValues, valueMap[string(key)])
+		sortedValues = append(sortedValues, valueMap[hex.EncodeToString(key)])
 	}
 
 	// find trie
-	trie, ok := f.tries[string(rootHash)]
+	trie, ok := f.tries[hex.EncodeToString(rootHash)]
 	if !ok {
 		return nil, errors.New("trie with the given rootHash not found")
 	}
@@ -165,7 +165,7 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 	}
 
 	newRootHash := f.ComputeNodeHash(newRoot)
-	f.tries[string(newRootHash)] = newTrie
+	f.tries[hex.EncodeToString(newRootHash)] = newTrie
 	return newRootHash, nil
 }
 
@@ -279,7 +279,7 @@ func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*BatchProof, error) {
 		}
 	}
 
-	trie, ok := f.tries[string(rootHash)]
+	trie, ok := f.tries[hex.EncodeToString(rootHash)]
 	if !ok {
 		return nil, errors.New("root hash not found")
 	}
