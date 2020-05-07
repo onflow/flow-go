@@ -27,6 +27,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	dbmetrics "github.com/dapperlabs/flow-go/module/metrics/badger"
+	"github.com/dapperlabs/flow-go/module/pprof"
 	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/validators"
@@ -50,6 +51,7 @@ type BaseConfig struct {
 	datadir      string
 	level        string
 	metricsPort  uint
+	pprofPort    uint
 	nClusters    uint
 	BootstrapDir string
 }
@@ -123,6 +125,7 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", datadir, "directory to store the protocol state")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", "info", "level for logging output")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", 8080, "port for /metrics endpoint")
+	fnb.flags.UintVar(&fnb.BaseConfig.pprofPort, "pprofport", 0, "port for /debug/pprof endpoint")
 	fnb.flags.UintVar(&fnb.BaseConfig.nClusters, "nclusters", 2, "number of collection node clusters")
 }
 
@@ -175,6 +178,17 @@ func (fnb *FlowNodeBuilder) enqueueDBMetrics() {
 	fnb.Component("badger db metrics", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
 		monitor := dbmetrics.NewMonitor(fnb.Metrics, fnb.DB)
 		return monitor, nil
+	})
+}
+
+func (fnb *FlowNodeBuilder) enqueueProfiler() {
+	if fnb.BaseConfig.pprofPort == 0 {
+		return
+	}
+
+	fnb.Component("pprof server", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		server := pprof.NewProfiler(fnb.Logger, fnb.BaseConfig.pprofPort)
+		return server, nil
 	})
 }
 
@@ -463,10 +477,6 @@ func FlowNode(name string) *FlowNodeBuilder {
 
 	builder.enqueueNetworkInit()
 
-	builder.enqueueMetricsServerInit()
-
-	builder.enqueueDBMetrics()
-
 	return builder
 }
 
@@ -487,14 +497,16 @@ func (fnb *FlowNodeBuilder) Run(role string) {
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
 
+	// enqueue components
+	fnb.enqueueMetricsServerInit()
+	fnb.enqueueDBMetrics()
+	fnb.enqueueProfiler()
+
+	// initialize modules
 	fnb.initNodeInfo()
-
 	fnb.initLogger()
-
 	fnb.initMetrics()
-
 	fnb.initDatabase()
-
 	fnb.initState()
 
 	for _, f := range fnb.postInitFns {
