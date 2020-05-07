@@ -51,9 +51,7 @@ func TestRetryOnConflict(t *testing.T) {
 			goodOp := func(*badger.Txn) error {
 				return nil
 			}
-			err := RetryOnConflict(func() error {
-				return db.Update(goodOp)
-			})
+			err := RetryOnConflict(db.Update, goodOp)
 			require.NoError(t, err)
 		})
 
@@ -66,9 +64,7 @@ func TestRetryOnConflict(t *testing.T) {
 				}
 				return badger.ErrConflict
 			}
-			err := RetryOnConflict(func() error {
-				return db.Update(conflictOp)
-			})
+			err := RetryOnConflict(db.Update, conflictOp)
 			require.NoError(t, err)
 		})
 
@@ -81,9 +77,7 @@ func TestRetryOnConflict(t *testing.T) {
 				}
 				return fmt.Errorf("wrap error: %w", badger.ErrConflict)
 			}
-			err := RetryOnConflict(func() error {
-				return db.Update(conflictOp)
-			})
+			err := RetryOnConflict(db.Update, conflictOp)
 			require.NoError(t, err)
 		})
 
@@ -93,9 +87,7 @@ func TestRetryOnConflict(t *testing.T) {
 				return otherError
 			}
 
-			err := RetryOnConflict(func() error {
-				return db.Update(failOp)
-			})
+			err := RetryOnConflict(db.Update, failOp)
 			require.Equal(t, otherError, err)
 		})
 	})

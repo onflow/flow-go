@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications/pubsub"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -47,7 +48,6 @@ type Node struct {
 	hot           *hotstuff.EventLoop
 	state         *protocol.State
 	headers       *storage.Headers
-	views         *storage.Views
 	net           *Network
 	blockproposal int
 	blockvote     int
@@ -89,7 +89,14 @@ func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint) ([]*N
 func createNode(t *testing.T, index int, identity *flow.Identity, participants flow.IdentityList, genesis *flow.Block, hub *Hub, stopper *Stopper) *Node {
 	db, dbDir := unittest.TempBadgerDB(t)
 
-	state, err := protocol.NewState(db)
+	headersDB := storage.NewHeaders(db)
+	identitiesDB := storage.NewIdentities(db)
+	guaranteesDB := storage.NewGuarantees(db)
+	sealsDB := storage.NewSeals(db)
+	payloadsDB := storage.NewPayloads(db, identitiesDB, guaranteesDB, sealsDB)
+	blocksDB := storage.NewBlocks(db, headersDB, payloadsDB)
+
+	state, err := protocol.NewState(db, headersDB, identitiesDB, sealsDB, payloadsDB, blocksDB)
 	require.NoError(t, err)
 
 	err = state.Mutate().Bootstrap(flow.GenesisStateCommitment, genesis)
@@ -144,18 +151,14 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	// add a network for this node to the hub
 	net := hub.AddNetwork(localID, node)
 
-	headersDB := storage.NewHeaders(db)
-	payloadsDB := storage.NewPayloads(db)
-	blocksDB := storage.NewBlocks(db)
-	viewsDB := storage.NewViews(db)
-
-	guarantees, err := stdmap.NewGuarantees(10000)
+	guaranteeLimit, sealLimit := uint(1000), uint(1000)
+	guarantees, err := stdmap.NewGuarantees(guaranteeLimit)
 	require.NoError(t, err)
-	seals, err := stdmap.NewSeals(1000)
+	seals, err := stdmap.NewSeals(sealLimit)
 	require.NoError(t, err)
 
 	// initialize the block builder
-	build := builder.NewBuilder(db, guarantees, seals)
+	build := builder.NewBuilder(db, headersDB, sealsDB, payloadsDB, blocksDB, guarantees, seals)
 
 	signer := &Signer{identity.ID()}
 
@@ -180,7 +183,10 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	require.NoError(t, err)
 
 	// initialize the block finalizer
-	final := finalizer.NewFinalizer(db, guarantees, seals)
+	final := finalizer.NewFinalizer(db, headersDB, payloadsDB, state)
+
+	// initialize the persister
+	persist := persister.New(db)
 
 	prov := &networkmock.Engine{}
 	prov.On("SubmitLocal", mock.Anything).Return(nil)
@@ -196,7 +202,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	pending := []*flow.Header{}
 	// initialize the block finalizer
 	hot, err := consensus.NewParticipant(log, dis, metrics, headersDB,
-		viewsDB, com, build, final, signer, comp, rootHeader,
+		com, build, final, persist, signer, comp, rootHeader,
 		rootQC, rootHeader, pending, consensus.WithTimeout(hotstuffTimeout))
 
 	require.NoError(t, err)
@@ -208,7 +214,6 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	node.state = state
 	node.hot = hot
 	node.headers = headersDB
-	node.views = viewsDB
 	node.net = net
 	node.log = log
 
