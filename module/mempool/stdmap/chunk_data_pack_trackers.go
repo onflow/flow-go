@@ -44,7 +44,7 @@ func (c *ChunkDataPackTrackers) Rem(chunkID flow.Identifier) bool {
 	return c.Backend.Rem(chunkID)
 }
 
-// Inc atomically increases the counter of tracker by one and returns the counter
+// Inc atomically increases the counter of tracker by one and returns the updated tracker
 func (c *ChunkDataPackTrackers) Inc(chunkID flow.Identifier) (*tracker.ChunkDataPackTracker, error) {
 	c.Lock()
 	defer c.Unlock()

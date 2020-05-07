@@ -17,7 +17,7 @@ type ChunkDataPackTrackers interface {
 	// Rem removes tracker with the given chunk ID.
 	Rem(chunkID flow.Identifier) bool
 
-	// Inc atomically increases the counter of tracker by one and returns the counter
+	// Inc atomically increases the counter of tracker by one and returns the updated tracker
 	Inc(chunkID flow.Identifier) (*tracker.ChunkDataPackTracker, error)
 
 	// ByChunkID returns the chunk data pack tracker for the given chunk ID.

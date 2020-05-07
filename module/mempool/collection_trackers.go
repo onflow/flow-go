@@ -17,6 +17,9 @@ type CollectionTrackers interface {
 	// Rem removes tracker with the given collection ID.
 	Rem(collID flow.Identifier) bool
 
+	// Inc atomically increases the counter of tracker by one and returns the updated tracker
+	Inc(collID flow.Identifier) (*tracker.CollectionTracker, error)
+
 	// ByCollectionID returns the collection tracker for the given collection ID
 	ByCollectionID(collID flow.Identifier) (*tracker.CollectionTracker, error)
 

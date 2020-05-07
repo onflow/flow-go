@@ -374,12 +374,23 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 	return nil
 }
 
-// requestCollection submits a request for the given collection to collection nodes.
+// requestCollection submits a request for the given collection to collection nodes,
+// or drops and logs the request if the tracker associated with the request goes beyond the
+// failure threshold
 func (e *Engine) requestCollection(collID, blockID flow.Identifier) error {
 	// updates tracker for this request
-	err := e.updateCollectionTracker(collID, blockID)
+	ct, err := e.updateCollectionTracker(collID, blockID)
 	if err != nil {
 		return fmt.Errorf("could not update the collection tracker: %w", err)
+	}
+
+	// checks against maximum retries
+	if ct.Counter > e.failureThreshold {
+		// tracker met maximum retry chances
+		// no longer retried
+		// TODO raise a missing collection challenge
+		// TODO drop tracker from memory once the challenge gets accepted, or trackers has nonce
+		return fmt.Errorf("collection tracker met maximum retries, no longer retried, chunk ID: %x", collID)
 	}
 
 	// extracts list of collection nodes id
@@ -883,7 +894,6 @@ func (e *Engine) checkPendingCollections(collID, blockID flow.Identifier) {
 
 // updateChunkDataPackTracker performs the following
 // If there is a tracker for this chunk ID, it increases its counter by one in place
-
 // Else it creates a new empty tracker with counter value of one and stores it in the trackers mempool
 func (e *Engine) updateChunkDataPackTracker(chunkID flow.Identifier, blockID flow.Identifier) (*trackers.ChunkDataPackTracker, error) {
 	var cdpt *trackers.ChunkDataPackTracker
@@ -911,45 +921,27 @@ func (e *Engine) updateChunkDataPackTracker(chunkID flow.Identifier, blockID flo
 // updateCollectionTracker performs the following
 // If there is a tracker for this collection ID, it pulls it out of mempool, increases its counter by one, and returns it
 // Else it creates a new empty tracker for this collection with counter value of one and returns it.
-func (e *Engine) updateCollectionTracker(collectionID flow.Identifier, blockID flow.Identifier) error {
-	var tracker *trackers.CollectionTracker
+func (e *Engine) updateCollectionTracker(collectionID flow.Identifier, blockID flow.Identifier) (*trackers.CollectionTracker, error) {
+	var ct *trackers.CollectionTracker
+
 	if e.collectionTrackers.Has(collectionID) {
 		// there is a tracker for this collection
-		// pulls tracker out of mempool
-		t, err := e.collectionTrackers.ByCollectionID(collectionID)
+		// increases its counter
+		t, err := e.collectionTrackers.Inc(collectionID)
 		if err != nil {
-			return fmt.Errorf("could not retrieve chunk data pack tracker from mempool: %w", err)
+			return nil, fmt.Errorf("could not update collection tracker: %w", err)
 		}
-		tracker = t
-
-		removed := e.collectionTrackers.Rem(collectionID)
-		if !removed {
-			return fmt.Errorf("could not remove collection tracker from mempool")
-		}
-		// increases tracker retry counter
-		tracker.Counter += 1
-
+		ct = t
 	} else {
-		// creates and returns a new collection tracker
-		tracker = trackers.NewCollectionTracker(collectionID, blockID)
+		// creates a new collection tracker and stores in in memory
+		ct = trackers.NewCollectionTracker(collectionID, blockID)
+		err := e.collectionTrackers.Add(ct)
+		if err != nil {
+			return nil, fmt.Errorf("could not store tracker of collection request in mempool: %w", err)
+		}
 	}
 
-	if tracker.Counter > e.failureThreshold {
-		// tracker met maximum retry chances
-		// no longer retried
-		// TODO raise a missing collection
-		// TODO drop tracker from memory once the challenge gets accepted, or trackers has nonce
-		return fmt.Errorf("collection tracker met maximum retries, no longer retried, collection ID: %x", tracker.CollectionID)
-	}
-
-	// stores collection tracker in the memory
-	err := e.collectionTrackers.Add(tracker)
-	// Todo handle the case of duplicate trackers
-	if err != nil && err != mempool.ErrAlreadyExists {
-		return fmt.Errorf("could not store tracker of collection request in mempool: %w", err)
-	}
-
-	return nil
+	return ct, nil
 }
 
 // To implement FinalizationConsumer
