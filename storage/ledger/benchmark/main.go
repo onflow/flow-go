@@ -13,8 +13,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 	utils "github.com/dapperlabs/flow-go/storage/ledger/utils"
+	"github.com/dapperlabs/flow-go/storage/trie"
 )
 
 var dir = "./db/"
@@ -22,7 +22,7 @@ var dir = "./db/"
 // StorageBenchmark benchmarks the performance of the storage layer
 func StorageBenchmark() {
 	// number of collections
-	steps := 200 // 250
+	steps := 50 // 250
 	// assumption: 1000 key updates per collection
 	numInsPerStep := 1000
 	keyByteSize := 32
@@ -88,7 +88,6 @@ func StorageBenchmark() {
 			panic("failed to update register")
 		}
 		elapsed = time.Since(start)
-
 		start = time.Now()
 		// validate proofs as a batch
 		_, err = trie.NewPSMT(newState, trieHeight, keys, retValues, proofs)
