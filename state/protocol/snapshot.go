@@ -36,6 +36,7 @@ type Snapshot interface {
 	Head() (*flow.Header, error)
 
 	// Pending returns all children IDs for the snapshot head, which thus were
-	// potential extensions of the protocol state at this snapshot.
+	// potential extensions of the protocol state at this snapshot. The result
+	// is ordered such that parents are included before their children.
 	Pending() ([]flow.Identifier, error)
 }
