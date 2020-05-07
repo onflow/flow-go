@@ -121,20 +121,19 @@ func (suite *SnapshotSuite) TestFinalizedBlock() {
 
 	// create a new finalized block on genesis (height=1)
 	finalizedBlock1 := unittest.ClusterBlockWithParent(suite.genesis)
-	suite.InsertBlock(finalizedBlock1)
-	err := suite.mutator.Extend(finalizedBlock1.ID())
+	err := suite.mutator.Extend(&finalizedBlock1)
 	assert.Nil(t, err)
 
 	// create an un-finalized block on genesis (height=1)
 	unFinalizedBlock1 := unittest.ClusterBlockWithParent(suite.genesis)
-	suite.InsertBlock(unFinalizedBlock1)
-	err = suite.mutator.Extend(unFinalizedBlock1.ID())
+	err = suite.mutator.Extend(&unFinalizedBlock1)
 	assert.Nil(t, err)
 
 	// create a second un-finalized on top of the finalized block (height=2)
 	unFinalizedBlock2 := unittest.ClusterBlockWithParent(&finalizedBlock1)
-	suite.InsertBlock(unFinalizedBlock2)
-	err = suite.mutator.Extend(unFinalizedBlock2.ID())
+	t.Logf("header: %x", unFinalizedBlock2.Header.PayloadHash)
+	t.Logf("payload: %x", unFinalizedBlock2.Payload.Hash())
+	err = suite.mutator.Extend(&unFinalizedBlock2)
 	assert.Nil(t, err)
 
 	// finalize the block
