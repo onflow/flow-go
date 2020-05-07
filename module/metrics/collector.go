@@ -15,7 +15,7 @@ import (
 // A collector is composed of BaseMetrics in conjunction with different implementations for
 // collecting HotStuff metrics:
 //   * HotStuffNoopMetrics are used for nodes which don't actively participate in hotstuff
-//   * HotStuffMetrics are used for Conesnsus
+//   * HotStuffMetrics are used for Consensus
 //
 // This implementation takes a SHORT CUT:
 // [CONTEXT] We have multiple instances of HotStuff running within Flow: Consensus Nodes form
