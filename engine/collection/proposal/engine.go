@@ -159,6 +159,11 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // process processes events for the proposal engine on the collection node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+
+	// just process one event at a time for now
+	e.unit.Lock()
+	defer e.unit.Unlock()
+
 	switch ev := event.(type) {
 	case *messages.ClusterBlockProposal:
 		return e.onBlockProposal(originID, ev)
