@@ -2,6 +2,7 @@ package mtrie_test
 
 import (
 	"bytes"
+	"fmt"
 	"math/rand"
 	"os"
 	"testing"
@@ -398,7 +399,8 @@ func TestMForestAccuracy(t *testing.T) {
 		batchProof, err := fStore.Proofs(keys, rootHash)
 		require.NoError(t, err, "error generating proofs")
 
-		psmt, err := trie.NewPSMT(rootHash, trieHeight, keys, values, mtrie.EncodeProof(batchProof))
+		fmt.Println(batchProof)
+		psmt, err := trie.NewPSMT(rootHash, trieHeight, keys, values, mtrie.EncodeBatchProof(batchProof))
 		require.True(t, bytes.Equal(psmt.GetRootHash(), rootHash))
 		require.NoError(t, err, "error building partial trie")
 

@@ -22,7 +22,7 @@ func TestBatchProofEncoderDecoder(t *testing.T) {
 	batchProof, err := fStore.Proofs(keys, rootHash)
 	require.NoError(t, err)
 
-	p, err := mtrie.DecodeProof(mtrie.EncodeProof(batchProof))
+	p, err := mtrie.DecodeBatchProof(mtrie.EncodeBatchProof(batchProof))
 	require.NoError(t, err)
 	require.Equal(t, p, batchProof, "Proof encoder and/or decoder has an issue")
 

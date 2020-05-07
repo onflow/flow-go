@@ -284,64 +284,94 @@ func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*BatchProof, error) {
 		return nil, errors.New("root hash not found")
 	}
 
-	flags := make([][]byte, len(keys))
-	values := make([][][]byte, len(keys))
-	inclusions := make([]bool, len(keys))
-	steps := make([]uint8, len(keys))
+	// TODO make this parallel
+	// fatalErrors := make(chan error)
+	// wgDone := make(chan bool)
 
-	incl := true
+	// var wg sync.WaitGroup
+
+	// fmt.Println("---------")
+	// fmt.Println(trie.root.FmtStr("", ""))
+	// fmt.Println(keys)
+	bp := NewBatchProofWithEmptyProofs(len(keys))
 	for i, key := range keys {
-		// TODO flags can be optimized to use less space
-		flag := make([]byte, f.keyByteSize)
-		value := make([][]byte, 0)
-		step := uint8(0)
-
-		curr := trie.root
-
-		for i := 0; i < f.maxHeight-1; i++ {
-			if bytes.Equal(curr.key, key) {
-				break
-			}
-			bitIsSet, err := IsBitSet(key, i)
-			if err != nil {
-				return nil, fmt.Errorf("error generating batch proof - error calling IsBitSet : %v", err)
-			}
-			if bitIsSet {
-				if curr.lChild != nil {
-					err := SetBit(flag, i)
-					if err != nil {
-						return nil, fmt.Errorf("error generating batch proof - error calling SetBit: %v", err)
-					}
-					value = append(value, f.ComputeNodeHash(curr.lChild))
-				}
-				curr = curr.rChild
-				step++
-			} else {
-				if curr.rChild != nil {
-					err := SetBit(flag, i)
-					if err != nil {
-						return nil, fmt.Errorf("error generating batch proof - error calling SetBit: %v", err)
-					}
-					value = append(value, f.ComputeNodeHash(curr.rChild))
-				}
-				curr = curr.lChild
-				step++
-			}
-			if curr == nil {
-				// TODO error ??
-				incl = false
-				break
-			}
-
+		// fmt.Println(key)
+		// wg.Add(1)
+		// go func() {
+		err := f.proof(key, trie.root, bp.Proofs[i])
+		if err != nil {
+			return nil, err
+			// fatalErrors <- err
 		}
-
-		flags[i] = flag
-		values[i] = value
-		inclusions[i] = incl
-		steps[i] = step
+		// 	wg.Done()
+		// }()
 	}
 
-	return NewBatchProof(flags, values, inclusions, steps), nil
+	// go func() {
+	// 	wg.Wait()
+	// 	close(wgDone)
+	// }()
+
+	// select {
+	// case <-wgDone:
+	// 	// carry on
+	// 	break
+	// case err := <-fatalErrors:
+	// 	close(fatalErrors)
+	// 	return nil, err
+	// }
+
+	return bp, nil
+}
+
+// TODO change this to recuresive version
+func (f *MForest) proof(key []byte, root *node, output *Proof) error {
+
+	output.inclusion = true
+
+	flag := make([]byte, f.keyByteSize)
+	value := make([][]byte, 0)
+	step := uint8(0)
+
+	curr := root
+	for i := 0; i < f.maxHeight-1; i++ {
+		if bytes.Equal(curr.key, key) {
+			break
+		}
+		bitIsSet, err := IsBitSet(key, i)
+		if err != nil {
+			return fmt.Errorf("error generating batch proof - error calling IsBitSet : %v", err)
+		}
+		if bitIsSet {
+			if curr.lChild != nil {
+				err := SetBit(flag, i)
+				if err != nil {
+					return fmt.Errorf("error generating batch proof - error calling SetBit: %v", err)
+				}
+				value = append(value, f.ComputeNodeHash(curr.lChild))
+			}
+			curr = curr.rChild
+			step++
+		} else {
+			if curr.rChild != nil {
+				err := SetBit(flag, i)
+				if err != nil {
+					return fmt.Errorf("error generating batch proof - error calling SetBit: %v", err)
+				}
+				value = append(value, f.ComputeNodeHash(curr.rChild))
+			}
+			curr = curr.lChild
+			step++
+		}
+		if curr == nil {
+			output.inclusion = false
+			break
+		}
+	}
+	output.flags = flag
+	output.values = value
+	output.steps = step
+	return nil
 }
 
 // ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.
