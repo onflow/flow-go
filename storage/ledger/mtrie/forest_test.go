@@ -297,7 +297,9 @@ func TestSameKeyInsert(t *testing.T) {
 	require.True(t, bytes.Equal(retValues[0], values[0]))
 }
 
-// TODO test duplicated keys
+// TODO insert with duplicated keys
+
+// TODO Read tests
 
 func TestMForestAccuracy(t *testing.T) {
 	trieHeight := 17 // should be key size (in bits) + 1
@@ -317,7 +319,6 @@ func TestMForestAccuracy(t *testing.T) {
 	require.NoError(t, err)
 	rootHashForSMT := emptyTree
 	for e := 0; e < experimentRep; e++ {
-
 		// insert some values to an empty trie
 		keys := make([][]byte, 0)
 		values := make([][]byte, 0)
@@ -351,10 +352,17 @@ func TestMForestAccuracy(t *testing.T) {
 			require.True(t, bytes.Equal(keyValueMap[string(k)], retValues[i]))
 		}
 
+		// TODO test proofs for non-existing keys
+		batchProof, err := fStore.Proofs(keys, rootHash)
+		require.NoError(t, err, "error generating proofs")
+
+		psmt, err := trie.NewPSMT(rootHash, trieHeight, keys, values, mtrie.EncodeProof(batchProof))
+		require.True(t, bytes.Equal(psmt.GetRootHash(), rootHash))
+		require.NoError(t, err, "error building partial trie")
+
 		// Test eqaulity to SMT
 		newRootHashForSMT, err := smt.Update(keys, values, rootHashForSMT)
 		rootHashForSMT = newRootHashForSMT
 		require.True(t, bytes.Equal(newRootHashForSMT, newRootHash))
-
 	}
 }

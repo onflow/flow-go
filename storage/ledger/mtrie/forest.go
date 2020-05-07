@@ -80,6 +80,7 @@ func (f *MForest) read(trie *MTrie, head *node, keys [][]byte) ([][]byte, error)
 		return [][]byte{head.value}, nil
 	}
 
+	// TODO change this
 	// Split the keys so we can lookup the trie in parallel
 	lkeys, rkeys, _ := utils.SplitKeys(keys, f.maxHeight-head.height-1)
 
@@ -147,6 +148,7 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 
 	newRootHash := f.ComputeNodeHash(newRoot)
 	f.tries[string(newRootHash)] = newTrie
+	fmt.Println(newRoot.FmtStr("", ""))
 	return newRootHash, nil
 }
 
@@ -170,6 +172,7 @@ func (f *MForest) update(trie *MTrie, parent *node, head *node, keys [][]byte, v
 	if len(keys) == 1 && parent.lChild == nil && parent.rChild == nil {
 		head.key = keys[0]
 		head.value = values[0]
+		head.hashValue = f.ComputeNodeHash(head)
 		return nil
 	}
 
@@ -201,6 +204,7 @@ func (f *MForest) update(trie *MTrie, parent *node, head *node, keys [][]byte, v
 			} else {
 				err1 = f.update(trie, newNode(parent.height-1), newN, lkeys, lvalues)
 			}
+			// newN.hashValue = f.ComputeNodeHash(head)
 			lupdate = newN
 		}
 	}()
@@ -232,6 +236,92 @@ func (f *MForest) update(trie *MTrie, parent *node, head *node, keys [][]byte, v
 	head.rChild = rupdate
 
 	return nil
+}
+
+// GetBatchProof returns proof for a batch of keys
+func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*BatchProof, error) {
+
+	// look up for non exisitng keys
+	notFoundKeys := make([][]byte, 0)
+	notFoundValues := make([][]byte, 0)
+	retKeys, retValues, err := f.Read(keys, rootHash)
+	if err != nil {
+		return nil, err
+	}
+	for i := range retKeys {
+		// non exist
+		// TODO figure out nil vs empty slice
+		if retValues[i] == nil || len(retValues[i]) == 0 {
+			notFoundKeys = append(notFoundKeys, retKeys[i])
+			notFoundValues = append(notFoundValues, []byte{})
+		}
+	}
+
+	if len(notFoundKeys) > 0 {
+		newRootHash, err := f.Update(notFoundKeys, notFoundValues, rootHash)
+		if err != nil {
+			return nil, err
+		}
+		// rootHash shouldn't change
+		if !bytes.Equal(newRootHash, rootHash) {
+			return nil, errors.New("root hash has changed during the operation")
+		}
+	}
+
+	trie, ok := f.tries[string(rootHash)]
+	if !ok {
+		return nil, errors.New("root hash not found")
+	}
+
+	flags := make([][]byte, len(keys))
+	values := make([][][]byte, len(keys))
+	inclusions := make([]bool, len(keys))
+	steps := make([]uint8, len(keys))
+
+	incl := true
+	for i, key := range keys {
+		// TODO flags can be optimized to use less space
+		flag := make([]byte, f.keyByteSize)
+		value := make([][]byte, 0)
+		step := uint8(0)
+
+		curr := trie.root
+
+		for i := 0; i < f.maxHeight-1; i++ {
+			if bytes.Equal(curr.key, key) {
+				break
+			}
+			if utils.IsBitSet(key, i) {
+				if curr.lChild != nil {
+					utils.SetBit(flag, i)
+
+					value = append(value, f.ComputeNodeHash(curr.lChild))
+				}
+				curr = curr.rChild
+				step++
+			} else {
+				if curr.rChild != nil {
+					utils.SetBit(flag, i)
+					value = append(value, f.ComputeNodeHash(curr.rChild))
+				}
+				curr = curr.lChild
+				step++
+			}
+			if curr == nil {
+				// TODO error ??
+				incl = false
+				break
+			}
+
+		}
+
+		flags[i] = flag
+		values[i] = value
+		inclusions[i] = incl
+		steps[i] = step
+	}
+
+	return NewBatchProof(flags, values, inclusions, steps), nil
 }
 
 // returns lkeys, lvalues, rkeys, rvalues
@@ -274,7 +364,10 @@ func (f *MForest) ComputeCompactValue(n *node) []byte {
 }
 
 func (f *MForest) ComputeNodeHash(n *node) []byte {
-	// leaf node
+	if n.hashValue != nil {
+		return n.hashValue
+	}
+	// leaf node (this shouldn't happen)
 	if n.lChild == nil && n.rChild == nil {
 		if n.key != nil && n.value != nil {
 			return f.ComputeCompactValue(n)
