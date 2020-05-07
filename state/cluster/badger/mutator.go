@@ -102,12 +102,13 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 		// do this by tracing back until we see a parent block that is the
 		// latest finalized block, or reach height below the finalized boundary
 
-		// copy the header for the loop to avoid modifying the input block
-		loopHeader := *block.Header
-		for loopHeader.ParentID != lastFinalizedBlockID {
+		// start with the parent ID
+		var loopHeader flow.Header
+		parentID := block.Header.ParentID
+		for parentID != lastFinalizedBlockID {
 
 			// get the parent of current block
-			err = operation.RetrieveHeader(loopHeader.ParentID, &loopHeader)(tx)
+			err = operation.RetrieveHeader(parentID, &loopHeader)(tx)
 			if err != nil {
 				return fmt.Errorf("could not get parent (%x): %w", block.Header.ParentID, err)
 			}
@@ -117,6 +118,8 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 			if loopHeader.Height < boundary {
 				return fmt.Errorf("block doesn't connect to finalized state")
 			}
+
+			parentID = loopHeader.ParentID
 		}
 
 		// we go back at most 1k blocks to check payload for now
