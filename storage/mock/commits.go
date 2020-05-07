@@ -10,8 +10,8 @@ type Commits struct {
 	mock.Mock
 }
 
-// ByID provides a mock function with given fields: blockID
-func (_m *Commits) ByID(blockID flow.Identifier) ([]byte, error) {
+// ByBlockID provides a mock function with given fields: blockID
+func (_m *Commits) ByBlockID(blockID flow.Identifier) ([]byte, error) {
 	ret := _m.Called(blockID)
 
 	var r0 []byte

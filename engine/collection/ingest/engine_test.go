@@ -4,16 +4,18 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/testutil"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
+	"github.com/dapperlabs/flow-go/storage/util"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -21,10 +23,11 @@ import (
 // detected and should result in an error.
 func TestInvalidTransaction(t *testing.T) {
 
-	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+	identity := identities.Filter(filter.HasRole(flow.RoleCollection))[0]
 	hub := stub.NewNetworkHub()
 
-	node := testutil.CollectionNode(t, hub, identity, []*flow.Identity{identity})
+	node := testutil.CollectionNode(t, hub, identity, identities)
 	defer node.Done()
 
 	genesis, err := node.State.Final().Head()
@@ -66,25 +69,25 @@ func TestInvalidTransaction(t *testing.T) {
 	})
 
 	t.Run("expired reference block ID", func(t *testing.T) {
+		util.RunWithStorageLayer(t, func(_ *badger.DB, _ *storage.Headers, _ *storage.Identities, _ *storage.Guarantees, _ *storage.Seals, _ *storage.Payloads, blocks *storage.Blocks) {
 
-		// build enough blocks to make genesis an expired reference
-		blocks := storage.NewBlocks(node.DB)
-		parent := genesis
-		for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
-			next := unittest.BlockWithParentFixture(parent)
-			err := blocks.Store(&next)
-			require.Nil(t, err)
-			err = node.DB.Update(procedure.FinalizeBlock(next.ID()))
-			require.Nil(t, err)
-			parent = next.Header
-		}
+			// build enough blocks to make genesis an expired reference
+			parent := genesis
+			for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
+				next := unittest.BlockWithParentFixture(parent)
+				err = node.State.Mutate().Extend(&next)
+				require.Nil(t, err)
+				err = node.State.Mutate().Finalize(next.ID())
+				parent = next.Header
+			}
 
-		tx := unittest.TransactionBodyFixture()
-		tx.ReferenceBlockID = genesis.ID()
+			tx := unittest.TransactionBodyFixture()
+			tx.ReferenceBlockID = genesis.ID()
 
-		err := node.IngestionEngine.ProcessLocal(&tx)
-		t.Log(err)
-		assert.True(t, errors.Is(err, ingest.ExpiredTransactionError{}))
+			err := node.IngestionEngine.ProcessLocal(&tx)
+			t.Log(err)
+			assert.True(t, errors.Is(err, ingest.ExpiredTransactionError{}))
+		})
 	})
 }
 
@@ -106,7 +109,6 @@ func TestClusterRouting(t *testing.T) {
 
 		// name the various nodes
 		localNode, remoteNode, noopNode := nodes[0], nodes[1], nodes[2]
-
 		genesis, err := localNode.State.Final().Head()
 		require.Nil(t, err)
 

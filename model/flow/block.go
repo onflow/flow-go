@@ -18,6 +18,7 @@ func Genesis(identities IdentityList) *Block {
 		Height:      0,
 		PayloadHash: payload.Hash(),
 		Timestamp:   GenesisTime(),
+		View:        0,
 	}
 
 	// combine to block

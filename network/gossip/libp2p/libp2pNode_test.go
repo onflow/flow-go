@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -281,7 +282,7 @@ func (l *LibP2PNodeTestSuite) TestStreamClosing() {
 			for {
 				str, err := rw.ReadString('\n')
 				if err != nil {
-					if err == io.EOF {
+					if errors.Is(err, io.EOF) {
 						s.Close()
 						return
 					}

@@ -10,6 +10,6 @@ type Commits interface {
 	// Store will store a commit in the persistent storage.
 	Store(blockID flow.Identifier, commit flow.StateCommitment) error
 
-	// ByID will retrieve a commit by its ID from persistent storage.
-	ByID(blockID flow.Identifier) (flow.StateCommitment, error)
+	// ByBlockID will retrieve a commit by its ID from persistent storage.
+	ByBlockID(blockID flow.Identifier) (flow.StateCommitment, error)
 }

@@ -1,7 +1,6 @@
 package badger
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -9,16 +8,16 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	model "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/cluster"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	protocolkv "github.com/dapperlabs/flow-go/state/protocol/badger"
-	"github.com/dapperlabs/flow-go/storage"
+	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
+	"github.com/dapperlabs/flow-go/storage/util"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -31,7 +30,7 @@ type MutatorSuite struct {
 	chainID string
 
 	// protocol state for reference blocks for transactions
-	protoState protocol.State
+	protoState *protocol.State
 
 	state   cluster.State
 	mutator cluster.Mutator
@@ -54,8 +53,9 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.Assert().Nil(err)
 	suite.mutator = suite.state.Mutate()
 
-	suite.protoState, err = protocolkv.NewState(suite.db)
-	suite.Require().Nil(err)
+	headers, identities, _, seals, payloads, blocks := util.StorageLayer(suite.T(), suite.db)
+	suite.protoState, err = protocol.NewState(suite.db, headers, identities, seals, payloads, blocks)
+	require.NoError(suite.T(), err)
 }
 
 // runs after each test finishes
@@ -150,7 +150,7 @@ func (suite *MutatorSuite) TestBootstrap_Successful() {
 
 		// should index collection
 		collection = flow.LightCollection{} // reset the collection
-		err = operation.LookupCollectionPayload(suite.genesis.Header.Height, suite.genesis.ID(), suite.genesis.Header.ParentID, &collection.Transactions)(tx)
+		err = operation.LookupCollectionPayload(suite.genesis.ID(), &collection.Transactions)(tx)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.Payload.Collection.Light(), collection)
 
@@ -162,13 +162,13 @@ func (suite *MutatorSuite) TestBootstrap_Successful() {
 
 		// should insert block number -> ID lookup
 		var blockID flow.Identifier
-		err = operation.RetrieveNumberForCluster(suite.genesis.Header.ChainID, suite.genesis.Header.Height, &blockID)(tx)
+		err = operation.LookupClusterBlockHeight(suite.genesis.Header.ChainID, suite.genesis.Header.Height, &blockID)(tx)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.ID(), blockID)
 
 		// should insert boundary
 		var boundary uint64
-		err = operation.RetrieveBoundaryForCluster(suite.genesis.Header.ChainID, &boundary)(tx)
+		err = operation.RetrieveClusterFinalizedHeight(suite.genesis.Header.ChainID, &boundary)(tx)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.Header.Height, boundary)
 
@@ -287,8 +287,7 @@ func (suite *MutatorSuite) TestExtend_UnfinalizedBlockWithDupeTx() {
 
 	// should be unable to extend block 2, as it contains a dupe transaction
 	err = suite.mutator.Extend(block2.ID())
-	suite.T().Log(err)
-	suite.Assert().True(errors.Is(err, storage.ErrAlreadyIndexed))
+	suite.Assert().Error(err)
 }
 
 func (suite *MutatorSuite) TestExtend_FinalizedBlockWithDupeTx() {
@@ -318,8 +317,7 @@ func (suite *MutatorSuite) TestExtend_FinalizedBlockWithDupeTx() {
 
 	// should be unable to extend block 2, as it contains a dupe transaction
 	err = suite.mutator.Extend(block2.ID())
-	suite.T().Log(err)
-	suite.Assert().True(errors.Is(err, storage.ErrAlreadyIndexed))
+	suite.Assert().Error(err)
 }
 
 func (suite *MutatorSuite) TestExtend_ConflictingForkWithDupeTx() {
