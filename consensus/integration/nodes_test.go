@@ -193,10 +193,11 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	sync, err := synchronization.New(log, net, local, state, blocksDB, comp)
 	require.NoError(t, err)
 
+	pending := []*flow.Header{}
 	// initialize the block finalizer
 	hot, err := consensus.NewParticipant(log, dis, metrics, headersDB,
-		viewsDB, com, state, build, final, signer, comp, rootHeader,
-		rootQC, consensus.WithTimeout(hotstuffTimeout))
+		viewsDB, com, build, final, signer, comp, rootHeader,
+		rootQC, rootHeader, pending, consensus.WithTimeout(hotstuffTimeout))
 
 	require.NoError(t, err)
 
