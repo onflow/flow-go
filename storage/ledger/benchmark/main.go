@@ -13,8 +13,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/storage/ledger"
+	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 	utils "github.com/dapperlabs/flow-go/storage/ledger/utils"
-	"github.com/dapperlabs/flow-go/storage/trie"
 )
 
 var dir = "./db/"
