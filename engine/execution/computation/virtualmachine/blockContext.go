@@ -45,7 +45,7 @@ func (bc *blockContext) ExecuteTransaction(
 	txID := tx.ID()
 	location := runtime.TransactionLocation(txID[:])
 
-	ctx := newTransactionContext(tx, ledger, options...)
+	ctx := newTransactionContext(tx, ledger, bc.vm.cache, options...)
 
 	flowErr := ctx.verifySignatures()
 	if flowErr != nil {
@@ -98,7 +98,7 @@ func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte) (*ScriptResu
 
 	location := runtime.ScriptLocation(scriptHash)
 
-	ctx := newScriptContext(ledger)
+	ctx := newScriptContext(ledger, bc.vm.cache)
 	value, err := bc.vm.executeScript(script, ctx, location)
 	if err != nil {
 		possibleRuntimeError := runtime.Error{}

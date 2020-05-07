@@ -18,6 +18,7 @@ type CheckerFunc func([]byte, runtime.Location) error
 type TransactionContext struct {
 	LedgerDAL
 	runtime.Metrics
+	astCache          ASTCache
 	signingAccounts   []runtime.Address
 	checker           CheckerFunc
 	logs              []string
@@ -28,10 +29,11 @@ type TransactionContext struct {
 	uuid              uint64
 }
 
-func newScriptContext(ledger Ledger, options ...TransactionContextOption) *TransactionContext {
+func newScriptContext(ledger Ledger, astCache ASTCache, options ...TransactionContextOption) *TransactionContext {
 	ctx := &TransactionContext{
 		LedgerDAL: LedgerDAL{ledger},
 		Metrics:   emptyMetricsCollector{},
+		astCache:  astCache,
 	}
 
 	for _, option := range options {
@@ -44,6 +46,7 @@ func newScriptContext(ledger Ledger, options ...TransactionContextOption) *Trans
 func newTransactionContext(
 	tx *flow.TransactionBody,
 	ledger Ledger,
+	astCache ASTCache,
 	options ...TransactionContextOption,
 ) *TransactionContext {
 	signers := make([]runtime.Address, len(tx.Authorizers))
@@ -52,7 +55,7 @@ func newTransactionContext(
 		signers[i] = common.BytesToAddress(addr.Bytes())
 	}
 
-	ctx := newScriptContext(ledger, options...)
+	ctx := newScriptContext(ledger, astCache, options...)
 	ctx.signingAccounts = signers
 	ctx.tx = tx
 
@@ -254,6 +257,16 @@ func (r *TransactionContext) ResolveImport(location runtime.Location) ([]byte, e
 	return code, nil
 }
 
+// GetCachedProgram attempts to get a parsed program from a cache.
+func (r *TransactionContext) GetCachedProgram(location ast.Location) (*ast.Program, error) {
+	return r.astCache.GetProgram(location)
+}
+
+// CacheProgram adds a parsed program to a cache.
+func (r *TransactionContext) CacheProgram(location ast.Location, program *ast.Program) error {
+	return r.astCache.SetProgram(location, program)
+}
+
 // Log captures a log message from the runtime.
 func (r *TransactionContext) Log(message string) {
 	r.logs = append(r.logs, message)
@@ -262,14 +275,6 @@ func (r *TransactionContext) Log(message string) {
 // EmitEvent is called when an event is emitted by the runtime.
 func (r *TransactionContext) EmitEvent(event cadence.Event) {
 	r.events = append(r.events, event)
-}
-
-func (r *TransactionContext) GetCachedProgram(runtime.Location) (*ast.Program, error) {
-	return nil, nil
-}
-
-func (r *TransactionContext) CacheProgram(runtime.Location, *ast.Program) error {
-	return nil
 }
 
 func (r *TransactionContext) GenerateUUID() uint64 {
