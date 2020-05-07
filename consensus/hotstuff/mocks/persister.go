@@ -9,8 +9,50 @@ type Persister struct {
 	mock.Mock
 }
 
-// StartedView provides a mock function with given fields: view
-func (_m *Persister) StartedView(view uint64) error {
+// GetStarted provides a mock function with given fields:
+func (_m *Persister) GetStarted() (uint64, error) {
+	ret := _m.Called()
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetVoted provides a mock function with given fields:
+func (_m *Persister) GetVoted() (uint64, error) {
+	ret := _m.Called()
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// PutStarted provides a mock function with given fields: view
+func (_m *Persister) PutStarted(view uint64) error {
 	ret := _m.Called(view)
 
 	var r0 error
@@ -23,8 +65,8 @@ func (_m *Persister) StartedView(view uint64) error {
 	return r0
 }
 
-// VotedView provides a mock function with given fields: view
-func (_m *Persister) VotedView(view uint64) error {
+// PutVoted provides a mock function with given fields: view
+func (_m *Persister) PutVoted(view uint64) error {
 	ret := _m.Called(view)
 
 	var r0 error

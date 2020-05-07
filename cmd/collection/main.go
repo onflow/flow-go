@@ -25,7 +25,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/collection"
 	colfinalizer "github.com/dapperlabs/flow-go/module/finalizer/collection"
-	followerfinalizer "github.com/dapperlabs/flow-go/module/finalizer/follower"
+	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/ingress"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
@@ -46,17 +46,14 @@ func main() {
 	var (
 		txLimit             uint
 		maxCollectionSize   uint
-		ingressExpiryBuffer uint64
-		builderExpiryBuffer uint64
+		ingressExpiryBuffer uint
+		builderExpiryBuffer uint
 
 		ingressConf  ingress.Config
 		pool         mempool.Transactions
 		collections  *storage.Collections
 		transactions *storage.Transactions
-		headers      *storage.Headers
-		blocks       *storage.Blocks
 		colPayloads  *storage.ClusterPayloads
-		conPayloads  *storage.Payloads
 
 		colCache *buffer.PendingClusterBlocks // pending block cache for cluster consensus
 		conCache *buffer.PendingBlocks        // pending block cache for follower
@@ -72,8 +69,8 @@ func main() {
 	cmd.FlowNode("collection").
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&txLimit, "tx-limit", 50000, "maximum number of transactions in the memory pool")
-			flags.Uint64Var(&ingressExpiryBuffer, "ingress-expiry-buffer", 30, "expiry buffer for inbound transactions")
-			flags.Uint64Var(&builderExpiryBuffer, "builder-expiry-buffer", 15, "expiry buffer for transactions in proposed collections")
+			flags.UintVar(&ingressExpiryBuffer, "ingress-expiry-buffer", 30, "expiry buffer for inbound transactions")
+			flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", 15, "expiry buffer for transactions in proposed collections")
 			flags.UintVar(&maxCollectionSize, "max-collection-size", 100, "maximum number of transactions in proposed collections")
 			flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000", "the address the ingress server listens on")
 		}).
@@ -83,10 +80,7 @@ func main() {
 		}).
 		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
 			transactions = storage.NewTransactions(node.DB)
-			headers = storage.NewHeaders(node.DB)
-			blocks = storage.NewBlocks(node.DB)
 			colPayloads = storage.NewClusterPayloads(node.DB)
-			conPayloads = storage.NewPayloads(node.DB)
 			return nil
 		}).
 		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
@@ -132,7 +126,7 @@ func main() {
 
 			// create a finalizer that will handling updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := followerfinalizer.NewFinalizer(node.DB)
+			final := finalizer.NewFinalizer(node.DB, node.Headers, node.Payloads, node.State)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -165,14 +159,14 @@ func main() {
 				node.Logger.Debug().Err(err).Msg("ignoring failures in follower core")
 			}
 
-			follower, err := followereng.New(node.Logger, node.Network, node.Me, cleaner, headers, conPayloads, node.State, conCache, core)
+			follower, err := followereng.New(node.Logger, node.Network, node.Me, cleaner, node.Headers, node.Payloads, node.State, conCache, core)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
 
 			// create a block synchronization engine to handle follower getting
 			// out of sync
-			sync, err := synchronization.New(node.Logger, node.Network, node.Me, node.State, blocks, follower)
+			sync, err := synchronization.New(node.Logger, node.Network, node.Me, node.State, node.Blocks, follower)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
@@ -193,13 +187,13 @@ func main() {
 			return prov, err
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			build := builder.NewBuilder(node.DB, pool,
+			build := builder.NewBuilder(node.DB, node.Headers, colPayloads, pool,
 				builder.WithMaxCollectionSize(maxCollectionSize),
 				builder.WithExpiryBuffer(builderExpiryBuffer),
 			)
 			final := colfinalizer.NewFinalizer(node.DB, pool, prov, node.Metrics, clusterID)
 
-			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, clusterState, node.Metrics, ing, pool, transactions, headers, colPayloads, colCache)
+			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, clusterState, node.Metrics, ing, pool, transactions, node.Headers, colPayloads, colCache)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize engine: %w", err)
 			}

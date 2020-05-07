@@ -147,7 +147,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 		<-verNode.IngestEngine.Ready()
 
 		// assumes the verification node has received the block
-		err := verNode.BlockStorage.Store(completeER.Block)
+		err := verNode.Blocks.Store(completeER.Block)
 		assert.Nil(t, err)
 
 		verNodes = append(verNodes, verNode)
@@ -311,7 +311,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	// verification node
 	verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold)
 	// inject block
-	err := verNode.BlockStorage.Store(completeER.Block)
+	err := verNode.Blocks.Store(completeER.Block)
 	assert.Nil(t, err)
 
 	// collection node

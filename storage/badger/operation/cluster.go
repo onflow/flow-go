@@ -11,40 +11,40 @@ import (
 // for regular consensus, these functions include the cluster ID in order to
 // support storing multiple chains, for example during epoch switchover.
 
-// InsertNumberForCluster inserts a block number to block ID mapping for
+// IndexClusterBlockHeight inserts a block number to block ID mapping for
 // the given cluster.
-func InsertNumberForCluster(clusterID string, number uint64, blockID flow.Identifier) func(*badger.Txn) error {
-	return insert(makePrefix(codeFinalizedBlockNumber, clusterID, number), blockID)
+func IndexClusterBlockHeight(clusterID string, number uint64, blockID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeFinalizedCluster, clusterID, number), blockID)
 }
 
-// RetrieveNumberForCluster retrieves a block ID by number for the given cluster
-func RetrieveNumberForCluster(clusterID string, number uint64, blockID *flow.Identifier) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeFinalizedBlockNumber, clusterID, number), blockID)
+// LookupClusterBlockHeight retrieves a block ID by number for the given cluster
+func LookupClusterBlockHeight(clusterID string, number uint64, blockID *flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeFinalizedCluster, clusterID, number), blockID)
 }
 
-// InsertBoundaryForCluster inserts the finalized boundary for the given cluster.
-func InsertBoundaryForCluster(clusterID string, number uint64) func(*badger.Txn) error {
-	return insert(makePrefix(codeBoundary, clusterID), number)
+// InsertClusterFinalizedHeight inserts the finalized boundary for the given cluster.
+func InsertClusterFinalizedHeight(clusterID string, number uint64) func(*badger.Txn) error {
+	return insert(makePrefix(codeClusterHeight, clusterID), number)
 }
 
-// UpdateBoundaryForCluster updates the finalized boundary for the given cluster.
-func UpdateBoundaryForCluster(clusterID string, number uint64) func(*badger.Txn) error {
-	return update(makePrefix(codeBoundary, clusterID), number)
+// UpdateClusterFinalizedHeight updates the finalized boundary for the given cluster.
+func UpdateClusterFinalizedHeight(clusterID string, number uint64) func(*badger.Txn) error {
+	return update(makePrefix(codeClusterHeight, clusterID), number)
 }
 
-// RetrieveBoundaryForCluster retrieves the finalized boundary for the given cluster.
-func RetrieveBoundaryForCluster(clusterID string, number *uint64) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeBoundary, clusterID), number)
+// RetrieveClusterFinalizedHeight retrieves the finalized boundary for the given cluster.
+func RetrieveClusterFinalizedHeight(clusterID string, number *uint64) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeClusterHeight, clusterID), number)
 }
 
-// InsertClusterRefBlockID inserts the reference block ID for a cluster
+// IndexCollectionReference inserts the reference block ID for a cluster
 // block payload (ie. collection) keyed by the cluster block ID
-func InsertClusterRefBlockID(clusterBlockID, refID flow.Identifier) func(*badger.Txn) error {
-	return insert(makePrefix(codeCollectionRefBlockID, clusterBlockID), refID)
+func IndexCollectionReference(clusterBlockID, refID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeCollectionReference, clusterBlockID), refID)
 }
 
-// RetrieveClusterRefBlockID looks up the reference block ID for a cluster
+// LookupCollectionReference looks up the reference block ID for a cluster
 // block payload (ie. collection) keyed by the cluster block ID.
-func RetrieveClusterRefBlockID(clusterBlockID flow.Identifier, refID *flow.Identifier) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeCollectionRefBlockID, clusterBlockID), refID)
+func LookupCollectionReference(clusterBlockID flow.Identifier, refID *flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeCollectionReference, clusterBlockID), refID)
 }

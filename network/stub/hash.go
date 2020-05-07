@@ -27,10 +27,6 @@ func eventKey(from flow.Identifier, channelID uint8, event interface{}) (string,
 	}
 
 	hasher := hash.NewSHA3_256()
-	if err != nil {
-		return "", fmt.Errorf("could not create a hasher: %w", err)
-	}
-
 	_, err = hasher.Write(tag)
 	if err != nil {
 		return "", fmt.Errorf("could not write to hasher: %w", err)

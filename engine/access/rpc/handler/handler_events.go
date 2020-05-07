@@ -25,7 +25,7 @@ func (h *Handler) GetEventsForHeightRange(ctx context.Context, req *access.GetEv
 	}
 
 	// get the latest sealed block header
-	head, err := h.getLatestSealedHeader()
+	head, err := h.state.Sealed().Head()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, " failed to get events: %v", err)
 	}
@@ -102,9 +102,8 @@ func (h *Handler) getTransactionResultFromExecutionNode(ctx context.Context, blo
 		TransactionId: transactionID,
 	}
 
-	// call the execution node GRPC
+	// call the execution node gRPC
 	resp, err := h.executionRPC.GetTransactionResult(ctx, &req)
-
 	if err != nil {
 		return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
 	}

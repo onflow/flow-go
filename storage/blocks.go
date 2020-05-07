@@ -16,17 +16,14 @@ type Blocks interface {
 	// finalized and ambiguous blocks.
 	ByID(blockID flow.Identifier) (*flow.Block, error)
 
-	// Has returns true if the identified block is in the storage
-	Has(blockID flow.Identifier) bool
-
 	// ByHeight returns the block at the given height. It is only available
 	// for finalized blocks.
 	ByHeight(height uint64) (*flow.Block, error)
 
-	// ByCollectionID returns the block for a given guarantee ID. It is only available
-	// for finalized blocks.
-	ByCollectionID(collectionID flow.Identifier) (*flow.Block, error)
+	// ByCollectionID returns the block for the given collection ID.
+	ByCollectionID(collID flow.Identifier) (*flow.Block, error)
 
-	// IndexByGuarantees indexed the block for the given ID by guarantees
-	IndexByGuarantees(blockID flow.Identifier) error
+	// IndexBlockForCollections indexes the the block each collection was
+	// included in.
+	IndexBlockForCollections(blockID flow.Identifier, collIDs []flow.Identifier) error
 }
