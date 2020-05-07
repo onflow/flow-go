@@ -12,15 +12,22 @@ type TrieStorage struct {
 	// mForest *mtrie.MForest
 }
 
+const (
+	Height              = 257
+	Interval            = 1000
+	NumHistoricalStates = 1000000 // EVERYTHING FAILS WHEN THIS LIMIT IS REACHED
+	CacheSize           = 10      // MAX NUMBER OF OPEN LEVEL DBs
+)
+
 // NewTrieStorage creates a new trie-backed ledger storage.
 func NewTrieStorage(dbDir string) (*TrieStorage, error) {
 
 	tree, err := trie.NewSMT(
 		dbDir,
-		257,
-		1000,
-		1000000,
-		1000,
+		Height,
+		Interval,
+		NumHistoricalStates,
+		CacheSize,
 	)
 	if err != nil {
 		return nil, err
