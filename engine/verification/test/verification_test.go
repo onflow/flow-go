@@ -34,6 +34,7 @@ import (
 // NOTE: some test cases are meant to solely run locally when FLOWLOCAL environmental
 // variable is set to TRUE
 func TestHappyPath(t *testing.T) {
+	var mu sync.Mutex
 	testcases := []struct {
 		verNodeCount,
 		chunkCount int
@@ -77,6 +78,8 @@ func TestHappyPath(t *testing.T) {
 			continue
 		}
 		t.Run(fmt.Sprintf("%d-verification node %d-chunk number", tc.verNodeCount, tc.chunkCount), func(t *testing.T) {
+			mu.Lock()
+			defer mu.Unlock()
 			testHappyPath(t, tc.verNodeCount, tc.chunkCount)
 		})
 	}
