@@ -40,7 +40,7 @@ running the DKG for generating the random beacon keys, generating genesis execut
 
 		log.Info().Msg("✨ assembling network and staking keys")
 		stakingNodes := mergeNodeInfos(internalNodes, partnerNodes)
-		writeJSON(model.FilenameNodeInfosPub, model.ToPublicNodeInfoList(stakingNodes))
+		writeJSON(model.PathNodeInfosPub, model.ToPublicNodeInfoList(stakingNodes))
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ running DKG for consensus nodes")
@@ -97,7 +97,7 @@ func init() {
 		"max hash grinding iterations for collector generation")
 	finalizeCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", fmt.Sprintf("path to directory "+
 		"containing one JSON file ending with %v for every partner node (fields Role, Address, NodeID, "+
-		"NetworkPubKey, StakingPubKey)", model.FilenamePartnerNodeInfoSuffix))
+		"NetworkPubKey, StakingPubKey)", ""))
 	_ = finalizeCmd.MarkFlagRequired("partner-dir")
 	finalizeCmd.Flags().StringVar(&flagPartnerStakes, "partner-stakes", "", "path to a JSON file containing "+
 		"a map from partner node's NodeID to their stake")
@@ -172,7 +172,7 @@ func readPartnerNodes() []model.PartnerNodeInfoPub {
 	}
 	for _, f := range files {
 		// skip files that do not include node-infos
-		if !strings.HasSuffix(f, model.FilenamePartnerNodeInfoSuffix) {
+		if !strings.HasPrefix(f, model.PathPartnerNodeInfoPrefix) {
 			continue
 		}
 

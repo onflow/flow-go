@@ -20,9 +20,9 @@ import (
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 )
 
-const (
-	FilenameTransitKeyPub      = "%v.transit-key.pub"
-	FilenameTransitKeyPriv     = "%v.transit-key.priv"
+var (
+	FilenameTransitKeyPub      = "transit-key.pub.%v"
+	FilenameTransitKeyPriv     = "transit-key.priv.%v"
 	FilenameRandomBeaconCipher = bootstrap.FilenameRandomBeaconPriv + ".enc"
 )
 
@@ -33,12 +33,12 @@ const flowBucket = "flow-genesis-bootstrap"
 var (
 	filesToUpload = []string{
 		FilenameTransitKeyPub,
-		bootstrap.FilenameNodeInfoPub,
+		bootstrap.PathNodeInfoPub,
 	}
 	filesToDownload = []string{
-		bootstrap.FilenameDKGDataPub,
-		bootstrap.FilenameNodeInfosPub,
-		bootstrap.FilenameGenesisBlock,
+		bootstrap.PathDKGDataPub,
+		bootstrap.PathNodeInfosPub,
+		bootstrap.PathGenesisBlock,
 	}
 )
 
@@ -100,7 +100,7 @@ func main() {
 	}
 }
 
-// Read the NodeID file to build other filenames from
+// Read the NodeID file to build other paths from
 func fetchNodeId(bootdir string) (string, error) {
 	path := filepath.Join(bootdir, bootstrap.FilenameNodeId)
 	data, err := ioutil.ReadFile(path)

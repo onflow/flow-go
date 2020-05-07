@@ -496,35 +496,35 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) ([]Contain
 	}
 
 	// write common genesis bootstrap files
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameAccount0Priv), account)
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathAccount0Priv), account)
 	if err != nil {
 		return nil, err
 	}
 
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameGenesisCommit), commit)
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathGenesisCommit), commit)
 	if err != nil {
 		return nil, err
 	}
 
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameGenesisBlock), genesis)
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathGenesisBlock), genesis)
 	if err != nil {
 		return nil, err
 	}
 
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameGenesisQC), qc)
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathGenesisQC), qc)
 	if err != nil {
 		return nil, err
 	}
 
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameDKGDataPub), dkg.Public())
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathDKGDataPub), dkg.Public())
 	if err != nil {
 		return nil, err
 	}
 
 	// write private key files for each DKG participant
 	for _, part := range dkg.Participants {
-		filename := fmt.Sprintf(bootstrap.FilenameRandomBeaconPriv, part.NodeID)
-		err = writeJSON(filepath.Join(bootstrapDir, filename), part.Private())
+		path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, part.NodeID)
+		err = writeJSON(filepath.Join(bootstrapDir, path), part.Private())
 		if err != nil {
 			return nil, err
 		}
@@ -532,7 +532,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) ([]Contain
 
 	// write private key files for each node
 	for _, nodeConfig := range confs {
-		path := filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.FilenameNodeInfoPriv, nodeConfig.NodeID))
+		path := filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, nodeConfig.NodeID))
 
 		// retrieve private representation of the node
 		private, err := nodeConfig.NodeInfo.Private()

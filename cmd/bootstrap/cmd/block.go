@@ -10,7 +10,7 @@ func constructGenesisBlock(nodes []model.NodeInfo, dkg model.DKGData) *flow.Bloc
 	identityList := generateIdentityList(nodes, dkg)
 	block := run.GenerateRootBlock(identityList)
 
-	writeJSON(model.FilenameGenesisBlock, block)
+	writeJSON(model.PathGenesisBlock, block)
 
 	return block
 }

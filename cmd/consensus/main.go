@@ -182,9 +182,9 @@ func main() {
 		Run("consensus")
 }
 
-func loadDKGPrivateData(path string, myID flow.Identifier) (*bootstrap.DKGParticipantPriv, error) {
-	filename := fmt.Sprintf(bootstrap.FilenameRandomBeaconPriv, myID)
-	data, err := ioutil.ReadFile(filepath.Join(path, filename))
+func loadDKGPrivateData(dir string, myID flow.Identifier) (*bootstrap.DKGParticipantPriv, error) {
+	path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, myID)
+	data, err := ioutil.ReadFile(filepath.Join(dir, path))
 	if err != nil {
 		return nil, err
 	}
