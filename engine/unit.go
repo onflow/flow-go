@@ -57,6 +57,7 @@ func (u *Unit) Launch(f func()) {
 func (u *Unit) LaunchPeriodically(f func(), interval time.Duration) {
 	timer := time.NewTicker(interval)
 	u.wg.Add(1)
+	var mu sync.Mutex
 	go func() {
 		for {
 			select {
@@ -65,7 +66,9 @@ func (u *Unit) LaunchPeriodically(f func(), interval time.Duration) {
 				timer.Stop()
 				return
 			case <-timer.C:
+				mu.Lock() // ensures isolation
 				u.Launch(f)
+				mu.Unlock()
 			}
 		}
 	}()
