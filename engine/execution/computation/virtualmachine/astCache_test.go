@@ -1,6 +1,7 @@
 package virtualmachine_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/onflow/cadence/runtime"
@@ -87,4 +88,60 @@ func TestScriptASTCache(t *testing.T) {
 		assert.NoError(t, err)
 
 	})
+}
+
+func TestTransactionASTCache_PreBenchmark(t *testing.T) {
+	rt := runtime.NewInterpreterRuntime()
+	h := unittest.BlockHeaderFixture()
+	vm, err := virtualmachine.New(rt)
+	require.NoError(t, err)
+	bc := vm.NewBlockContext(&h)
+
+	deployContractTx := execTestutil.CreateDeployFTContractTransaction()
+	err = execTestutil.SignTransactionByRoot(&deployContractTx, 0)
+	require.NoError(t, err)
+
+	useImportTx := flow.TransactionBody{
+		Authorizers: []flow.Address{unittest.AddressFixture()},
+		Script: []byte(`
+				import FungibleToken from 0x1
+                transaction {
+				  prepare(signer: AuthAccount) {}
+				  execute {
+					  let v <- FungibleToken.createEmptyVault()
+					  log(v.balance)
+					  destroy v
+				  }
+                }
+            `),
+	}
+	err = execTestutil.SignTransactionByRoot(&useImportTx, 1)
+	require.NoError(t, err)
+
+	ledger, err := execTestutil.RootBootstrappedLedger()
+	require.NoError(t, err)
+
+	// Deploy FT contract
+	result, err := bc.ExecuteTransaction(ledger, &deployContractTx)
+
+	assert.NoError(t, err)
+	assert.True(t, result.Succeeded())
+	assert.Nil(t, result.Error)
+
+	// Use import (FT Vault resource)
+	result, err = bc.ExecuteTransaction(ledger, &useImportTx)
+	fmt.Println(result.Error.ErrorMessage())
+
+	assert.NoError(t, err)
+	assert.True(t, result.Succeeded())
+	assert.Nil(t, result.Error)
+
+	// Determine location of transaction
+	txID := useImportTx.ID()
+	location := runtime.TransactionLocation(txID[:])
+
+	// Get cached program
+	program, err := vm.ASTCache().GetProgram(location)
+	assert.NotNil(t, program)
+	assert.NoError(t, err)
 }
