@@ -381,7 +381,7 @@ func (e *Engine) executeBlock(executableBlock *entity.ExecutableBlock) {
 	e.log.Info().
 		Hex("block_id", logging.Entity(executableBlock.Block)).
 		Hex("final_state", finalState).
-		Msg("executing block")
+		Msg("block executed")
 }
 
 func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse) error {
@@ -523,7 +523,7 @@ func (e *Engine) sendCollectionsRequest(executableBlock *entity.ExecutableBlock,
 		// TODO - Once collection can map to multiple blocks
 		maybeBlockByCollection, err := backdata.ByID(guarantee.ID())
 
-		if err == mempool.ErrNotFound {
+		if errors.Is(err, mempool.ErrNotFound) {
 
 			maybeBlockByCollection = &entity.BlocksByCollection{
 				CollectionID:     guarantee.ID(),
@@ -862,7 +862,7 @@ func (e *Engine) handleExecutionStateDelta(executionStateDelta *messages.Executi
 		stateCommitment, err := e.execState.StateCommitmentByBlockID(executionStateDelta.ParentID())
 		// if state commitment doesn't exist and there are no known deltas which will produce
 		// it soon (sync queue) that we save it as orphaned
-		if err == storage.ErrNotFound {
+		if errors.Is(err, storage.ErrNotFound) {
 			_, err := enqueue(executionStateDelta, backdata)
 			if err != nil {
 				panic(fmt.Sprintf("cannot create new queue for sync delta: %s", err))

@@ -34,13 +34,6 @@ func TestCollections(t *testing.T) {
 			assert.Equal(t, expected, actual)
 		})
 
-		t.Run("Check", func(t *testing.T) {
-			var exists bool
-			err := db.Update(CheckCollection(expected.ID(), &exists))
-			require.NoError(t, err)
-			assert.True(t, exists)
-		})
-
 		t.Run("Remove", func(t *testing.T) {
 			err := db.Update(RemoveCollection(expected.ID()))
 			require.NoError(t, err)

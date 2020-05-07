@@ -229,7 +229,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	// in persistent storage, its direct parent is missing; cache the proposal
 	// and request the parent
 	_, err = e.headers.ByBlockID(header.ParentID)
-	if err == storage.ErrNotFound {
+	if errors.Is(err, storage.ErrNotFound) {
 
 		_ = e.pending.Add(originID, proposal)
 

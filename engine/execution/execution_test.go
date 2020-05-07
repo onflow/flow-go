@@ -26,9 +26,13 @@ func TestExecutionFlow(t *testing.T) {
 	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
-	identities := flow.IdentityList{colID, conID, exeID, verID}
+	identities := unittest.CompleteIdentitySet(colID, conID, exeID, verID)
 
-	genesis := unittest.GenesisFixture(identities)
+	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21)
+	defer exeNode.Done()
+
+	genesis, err := exeNode.State.AtHeight(0).Head()
+	require.NoError(t, err)
 
 	tx1 := flow.TransactionBody{
 		Script: []byte("transaction { execute { log(1) } }"),
@@ -54,7 +58,7 @@ func TestExecutionFlow(t *testing.T) {
 		col2.ID(): col2,
 	}
 
-	block := unittest.BlockWithParentFixture(genesis.Header)
+	block := unittest.BlockWithParentFixture(genesis)
 	block.Header.View = 42
 	block.SetPayload(flow.Payload{
 		Guarantees: []*flow.CollectionGuarantee{
@@ -71,12 +75,12 @@ func TestExecutionFlow(t *testing.T) {
 
 	proposal := unittest.ProposalFromBlock(&block)
 
-	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21)
-	defer exeNode.Done()
-
 	collectionNode := testutil.GenericNode(t, hub, colID, identities)
+	defer collectionNode.Done()
 	verificationNode := testutil.GenericNode(t, hub, verID, identities)
+	defer verificationNode.Done()
 	consensusNode := testutil.GenericNode(t, hub, conID, identities)
+	defer consensusNode.Done()
 
 	collectionEngine := new(network.Engine)
 	colConduit, _ := collectionNode.Net.Register(engine.CollectionProvider, collectionEngine)
@@ -130,7 +134,7 @@ func TestExecutionFlow(t *testing.T) {
 	// submit block from consensus node
 	exeNode.IngestionEngine.Submit(conID.NodeID, proposal)
 
-	assert.Eventually(t, func() bool {
+	require.Eventually(t, func() bool {
 		hub.DeliverAll()
 		return receipt != nil
 	}, time.Second*10, time.Millisecond*500)
@@ -138,11 +142,6 @@ func TestExecutionFlow(t *testing.T) {
 	collectionEngine.AssertExpectations(t)
 	verificationEngine.AssertExpectations(t)
 	consensusEngine.AssertExpectations(t)
-
-	collectionNode.Done()
-	verificationNode.Done()
-	consensusNode.Done()
-	exeNode.Done()
 }
 
 func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
@@ -152,33 +151,37 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 	con2ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 
-	identities := flow.IdentityList{con1ID, con2ID, exeID}
+	identities := unittest.CompleteIdentitySet(con1ID, con2ID, exeID)
 
-	genesis := unittest.GenesisFixture(identities)
+	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21)
+	defer exeNode.Done()
 
-	block1 := unittest.BlockWithParentFixture(genesis.Header)
-	block1.Header.View = 2
+	consensus1Node := testutil.GenericNode(t, hub, con1ID, identities)
+	defer consensus1Node.Done()
+	consensus2Node := testutil.GenericNode(t, hub, con2ID, identities)
+	defer consensus2Node.Done()
+
+	genesis, err := exeNode.State.AtHeight(0).Head()
+	require.NoError(t, err)
+
+	block1 := unittest.BlockWithParentFixture(genesis)
+	block1.Header.View = 1
 	block1.Header.ProposerID = con1ID.ID()
 	block1.SetPayload(flow.Payload{})
 
-	block1b := unittest.BlockWithParentFixture(genesis.Header)
-	block1b.Header.View = 2
+	block1b := unittest.BlockWithParentFixture(genesis)
+	block1b.Header.View = 1
 	block1b.Header.ProposerID = con2ID.ID()
 	block1b.SetPayload(flow.Payload{})
 
 	block2 := unittest.BlockWithParentFixture(block1.Header)
-	block2.Header.View = 3
+	block2.Header.View = 2
 	block2.Header.ProposerID = con2ID.ID()
 	block2.SetPayload(flow.Payload{})
 
 	proposal1 := unittest.ProposalFromBlock(&block1)
 	proposal1b := unittest.ProposalFromBlock(&block1b)
 	proposal2 := unittest.ProposalFromBlock(&block2)
-
-	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21)
-
-	consensus1Node := testutil.GenericNode(t, hub, con1ID, identities)
-	consensus2Node := testutil.GenericNode(t, hub, con2ID, identities)
 
 	actualCalls := 0
 
@@ -189,7 +192,7 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 		Run(func(args mock.Arguments) { actualCalls++ }).
 		Return(nil)
 
-	exeNode.AssertHighestExecutedBlock(t, genesis.Header)
+	exeNode.AssertHighestExecutedBlock(t, genesis)
 
 	exeNode.IngestionEngine.Submit(con1ID.NodeID, proposal1b)
 	exeNode.IngestionEngine.Submit(con1ID.NodeID, proposal2) // block 2 cannot be executed if parent (block1 is missing)
@@ -206,10 +209,6 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 	exeNode.AssertHighestExecutedBlock(t, block2.Header)
 
 	consensusEngine.AssertExpectations(t)
-
-	consensus1Node.Done()
-	consensus2Node.Done()
-	exeNode.Done()
 }
 
 // TODO merge this test with TestSyncFlow in engine/execution/sync_test.go
@@ -221,22 +220,30 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	exe1ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	exe2ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 
-	identities := flow.IdentityList{colID, conID, exe1ID, exe2ID}
+	identities := unittest.CompleteIdentitySet(colID, conID, exe1ID, exe2ID)
 
-	genesis := unittest.GenesisFixture(identities)
+	collectionNode := testutil.GenericNode(t, hub, colID, identities)
+	defer collectionNode.Done()
+	consensusNode := testutil.GenericNode(t, hub, conID, identities)
+	defer consensusNode.Done()
+	exe1Node := testutil.ExecutionNode(t, hub, exe1ID, identities, 27)
+	defer exe1Node.Done()
+
+	genesis, err := exe1Node.State.AtHeight(0).Head()
+	require.NoError(t, err)
 
 	// transaction that will change state and succeed, used to test that state commitment changes
 	tx1 := execTestutil.DeployCounterContractTransaction()
 
 	seq := uint64(0)
 
-	err := execTestutil.SignTransactionByRoot(&tx1, seq)
+	err = execTestutil.SignTransactionByRoot(&tx1, seq)
 	require.NoError(t, err)
 	seq++
 
 	col1 := flow.Collection{Transactions: []*flow.TransactionBody{&tx1}}
-	block1 := unittest.BlockWithParentFixture(genesis.Header)
-	block1.Header.View = 2
+	block1 := unittest.BlockWithParentFixture(genesis)
+	block1.Header.View = 1
 	block1.Header.ProposerID = conID.ID()
 	block1.SetPayload(flow.Payload{
 		Guarantees: []*flow.CollectionGuarantee{
@@ -253,7 +260,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	col2 := flow.Collection{Transactions: []*flow.TransactionBody{&tx2}}
 	block2 := unittest.BlockWithParentFixture(block1.Header)
-	block2.Header.View = 3
+	block2.Header.View = 2
 	block2.Header.ProposerID = conID.ID()
 	block2.SetPayload(flow.Payload{
 		Guarantees: []*flow.CollectionGuarantee{
@@ -263,12 +270,6 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	proposal2 := unittest.ProposalFromBlock(&block2)
 
 	// setup mocks and assertions
-	collectionNode := testutil.GenericNode(t, hub, colID, identities)
-	defer collectionNode.Done()
-	consensusNode := testutil.GenericNode(t, hub, conID, identities)
-	defer consensusNode.Done()
-	exe1Node := testutil.ExecutionNode(t, hub, exe1ID, identities, 27)
-	defer exe1Node.Done()
 	collectionEngine := new(network.Engine)
 	colConduit, _ := collectionNode.Net.Register(engine.CollectionProvider, collectionEngine)
 	collectionEngine.On("Submit", mock.Anything, mock.Anything).
@@ -322,7 +323,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	// start execution node 2 with sync threshold 0 so it starts state sync right away
 	exe2Node := testutil.ExecutionNode(t, hub, exe2ID, identities, 0)
 	defer exe2Node.Done()
-	exe2Node.AssertHighestExecutedBlock(t, genesis.Header)
+	exe2Node.AssertHighestExecutedBlock(t, genesis)
 
 	// submit block2 from consensus node to execution node 2 (who does not have block1), but not to execution node 1
 	exe2Node.IngestionEngine.Submit(conID.NodeID, proposal2)
@@ -358,20 +359,23 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	ver1ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	ver2ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
-	identities := flow.IdentityList{colID, exeID, ver1ID, ver2ID}
-
-	genesis := unittest.GenesisFixture(identities)
-
-	block := unittest.BlockWithParentFixture(genesis.Header)
-	block.Header.View = 42
-	block.SetPayload(flow.Payload{})
-	proposal := unittest.ProposalFromBlock(&block)
+	identities := unittest.CompleteIdentitySet(colID, exeID, ver1ID, ver2ID)
 
 	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21)
 	defer exeNode.Done()
 
 	verification1Node := testutil.GenericNode(t, hub, ver1ID, identities)
+	defer verification1Node.Done()
 	verification2Node := testutil.GenericNode(t, hub, ver2ID, identities)
+	defer verification2Node.Done()
+
+	genesis, err := exeNode.State.AtHeight(0).Head()
+	require.NoError(t, err)
+
+	block := unittest.BlockWithParentFixture(genesis)
+	block.Header.View = 42
+	block.SetPayload(flow.Payload{})
+	proposal := unittest.ProposalFromBlock(&block)
 
 	actualCalls := 0
 
@@ -383,7 +387,6 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	verificationEngine.On("Submit", exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			actualCalls++
-
 			receipt, _ = args[1].(*flow.ExecutionReceipt)
 
 			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
@@ -397,8 +400,4 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	})
 
 	verificationEngine.AssertExpectations(t)
-
-	verification1Node.Done()
-	verification2Node.Done()
-	exeNode.Done()
 }

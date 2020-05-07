@@ -32,11 +32,6 @@ func TestHeaderInsertCheckRetrieve(t *testing.T) {
 		err := db.Update(InsertHeader(expected.ID(), &expected))
 		require.Nil(t, err)
 
-		var exists bool
-		err = db.View(CheckHeader(blockID, &exists))
-		require.Nil(t, err)
-		require.True(t, exists)
-
 		var actual flow.Header
 		err = db.View(RetrieveHeader(blockID, &actual))
 		require.Nil(t, err)

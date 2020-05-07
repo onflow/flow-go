@@ -35,8 +35,7 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 		if err == nil {
 			return storage.ErrAlreadyExists
 		}
-
-		if !errors.Is(err, badger.ErrKeyNotFound) {
+		if err != badger.ErrKeyNotFound {
 			return fmt.Errorf("could not check key: %w", err)
 		}
 
@@ -52,24 +51,6 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 			return fmt.Errorf("could not store data: %w", err)
 		}
 
-		return nil
-	}
-}
-
-// check will simply check if the entry with the given key exists in the DB.
-func check(key []byte, exists *bool) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-
-		// retrieve the item from the key-value store
-		_, err := tx.Get(key)
-		if err == badger.ErrKeyNotFound {
-			*exists = false
-			return nil
-		}
-		if err != nil {
-			return fmt.Errorf("could not check existence: %w", err)
-		}
-		*exists = true
 		return nil
 	}
 }
@@ -111,8 +92,8 @@ func remove(key []byte) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		// retrieve the item from the key-value store
 		_, err := tx.Get(key)
-		if errors.Is(err, badger.ErrKeyNotFound) {
-			return fmt.Errorf("could not find key %x): %w", key, err)
+		if err == badger.ErrKeyNotFound {
+			return storage.ErrNotFound
 		}
 		if err != nil {
 			return fmt.Errorf("could not check key: %w", err)

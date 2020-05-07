@@ -470,6 +470,23 @@ func WithAllRolesExcept(except ...flow.Role) func(*flow.Identity) {
 	}
 }
 
+// CompleteIdentitySet takes a number of identities and completes the missing roles.
+func CompleteIdentitySet(identities ...*flow.Identity) flow.IdentityList {
+	required := map[flow.Role]struct{}{
+		flow.RoleCollection:   struct{}{},
+		flow.RoleConsensus:    struct{}{},
+		flow.RoleExecution:    struct{}{},
+		flow.RoleVerification: struct{}{},
+	}
+	for _, identity := range identities {
+		delete(required, identity.Role)
+	}
+	for role := range required {
+		identities = append(identities, IdentityFixture(WithRole(role)))
+	}
+	return identities
+}
+
 // IdentityListFixture returns a list of node identity objects. The identities
 // can be customized (ie. set their role) by passing in a function that modifies
 // the input identities as required.

@@ -26,6 +26,7 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 				ctrl := gomock.NewController(t)
 
 				stateCommitments := mocks.NewMockCommits(ctrl)
+				blocks := mocks.NewMockBlocks(ctrl)
 
 				stateCommitment := ls.EmptyStateCommitment()
 
@@ -35,7 +36,7 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 
 				executionResults := new(storage.ExecutionResults)
 
-				es := state.NewExecutionState(ls, stateCommitments, chunkDataPacks, executionResults, badgerDB)
+				es := state.NewExecutionState(ls, stateCommitments, blocks, chunkDataPacks, executionResults, badgerDB)
 
 				f(t, es)
 			})

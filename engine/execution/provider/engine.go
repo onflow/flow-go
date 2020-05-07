@@ -167,8 +167,7 @@ func (e *Engine) BroadcastExecutionReceipt(receipt *flow.ExecutionReceipt) error
 		return fmt.Errorf("could not get consensus and verification identities: %w", err)
 	}
 
-	nodeIDs := identities.NodeIDs()
-	err = e.receiptCon.Submit(receipt, nodeIDs...)
+	err = e.receiptCon.Submit(receipt, identities.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not submit execution receipts: %w", err)
 	}

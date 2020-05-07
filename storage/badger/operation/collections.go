@@ -16,10 +16,6 @@ func InsertCollection(collection *flow.LightCollection) func(*badger.Txn) error 
 	return insert(makePrefix(codeCollection, collection.ID()), collection)
 }
 
-func CheckCollection(collID flow.Identifier, exists *bool) func(*badger.Txn) error {
-	return check(makePrefix(codeCollection, collID), exists)
-}
-
 func RetrieveCollection(collID flow.Identifier, collection *flow.LightCollection) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeCollection, collID), collection)
 }

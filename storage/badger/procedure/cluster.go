@@ -1,12 +1,14 @@
 package procedure
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
@@ -203,14 +205,13 @@ func IndexClusterPayload(header *flow.Header, payload *cluster.Payload) func(*ba
 	return func(tx *badger.Txn) error {
 
 		// only index a collection if it exists
-		var exists bool
-		err := operation.CheckCollection(payload.Collection.ID(), &exists)(tx)
+		var collection flow.LightCollection
+		err := operation.RetrieveCollection(payload.Collection.ID(), &collection)(tx)
+		if errors.Is(err, storage.ErrNotFound) {
+			return fmt.Errorf("cannot index non-existent collection")
+		}
 		if err != nil {
 			return fmt.Errorf("could not check collection: %w", err)
-		}
-
-		if !exists {
-			return fmt.Errorf("cannot index non-existent collection")
 		}
 
 		// index the transaction IDs within the collection

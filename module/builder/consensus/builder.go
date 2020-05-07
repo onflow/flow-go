@@ -60,9 +60,7 @@ func NewBuilder(db *badger.DB, headers storage.Headers, seals storage.Seals, pay
 // custom setter function to allow the caller to make changes to the header before storing it.
 func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
 
-	// STEP ONE: Create a lookup of all collection guarantees included in one of
-	// the past 1000 blocks proceeding the proposal. We can then include all
-	// collection guarantees from the memory pool that are not in this lookup.
+	// STEP ONE: Load some things we need to do our work.
 
 	var finalized uint64
 	err := b.db.View(operation.RetrieveFinalizedHeight(&finalized))
@@ -75,18 +73,19 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not lookup finalized block: %w", err)
 	}
 
-	limit := finalized - 1000
-	if limit > finalized { // overflow check
-		limit = 0
-	}
+	// STEP TWO: Create a lookup of all previously used guarantees on the part
+	// of the chain we care about. We do this separately for unfinalized and
+	// finalized sections of the chain to decide whether removing guarantees
+	// from the memory pool is necessary.
+
 	ancestorID := parentID
-	gLookup := make(map[flow.Identifier]struct{})
+	pendingLookup := make(map[flow.Identifier]struct{})
 	for ancestorID != finalID {
 		ancestor, err := b.headers.ByBlockID(ancestorID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
 		}
-		if ancestor.Height <= limit {
+		if ancestor.Height <= finalized {
 			return nil, fmt.Errorf("should always build on last finalized block")
 		}
 		payload, err := b.payloads.ByBlockID(ancestorID)
@@ -94,24 +93,85 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			return nil, fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
 		}
 		for _, guarantee := range payload.Guarantees {
-			gLookup[guarantee.ID()] = struct{}{}
+			pendingLookup[guarantee.ID()] = struct{}{}
 		}
 		ancestorID = ancestor.ParentID
 	}
 
+	// for now, we check at most 1000 blocks of history
+	// TODO: look back based on referenc block ID and expiry
+
+	limit := finalized - 1000
+	if limit > finalized { // overflow check
+		limit = 0
+	}
+
+	finalLookup := make(map[flow.Identifier]struct{})
+	ancestorID = finalID
+	for {
+		ancestor, err := b.headers.ByBlockID(ancestorID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
+		}
+		payload, err := b.payloads.ByBlockID(ancestorID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
+		}
+		for _, guarantee := range payload.Guarantees {
+			finalLookup[guarantee.ID()] = struct{}{}
+		}
+		if ancestor.Height <= limit {
+			break
+		}
+		ancestorID = ancestor.ParentID
+	}
+
+	// STEP THREE: Build a valid guarantee payload.
+
 	var guarantees []*flow.CollectionGuarantee
 	for _, guarantee := range b.guarPool.All() {
-		_, duplicated := gLookup[guarantee.ID()]
+
+		// get the reference block for expiration
+		refHeader, err := b.headers.ByBlockID(guarantee.ReferenceBlockID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get reference block: %w", err)
+		}
+
+		// for now, we simply ignore unfinalized reference blocks
+		// TODO: decide on whether we should remove those guarantees and when
+		if finalized < refHeader.Height {
+			continue
+		}
+
+		// check if the reference block is already too old
+		collID := guarantee.ID()
+		if uint(finalized-refHeader.Height) > flow.DefaultTransactionExpiry {
+			_ = b.guarPool.Rem(collID)
+			continue
+		}
+
+		// check if the guarantee was already finalized in a block
+		_, duplicated := finalLookup[collID]
+		if duplicated {
+			_ = b.guarPool.Rem(collID)
+			continue
+		}
+
+		// check if the guarantee is pending on this branch; don't remove from
+		// memory pool yet, but skip for payload
+		_, duplicated = pendingLookup[collID]
 		if duplicated {
 			continue
 		}
+
 		guarantees = append(guarantees, guarantee)
 	}
 
-	// STEP TWO: Find the last sealed block on our branch of the blockchain. We
-	// can then use the associated seal to try and build a chain of seals from
-	// the memory pool.
+	// STEP FOUR: Get the block seal from the parent and see how far we can
+	// extend the chain of sealed blocks with the seals in the memory pool.
 
+	// we map each seal to the parent of its sealed block; that way, we can
+	// retrieve a valid seal that will *follow* each block's own seal
 	byParent := make(map[flow.Identifier]*flow.Seal)
 	for _, seal := range b.sealPool.All() {
 		sealed, err := b.headers.ByBlockID(seal.BlockID)
@@ -121,6 +181,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		byParent[sealed.ParentID] = seal
 	}
 
+	// starting at the paren't seal, we try to find a seal to extend the current
+	// last sealed block; if we do, we keep going until we don't
+	// we also execute a sanity check on whether the execution state of the next
+	// seal propely connects to the previous seal
 	lastSeal, err := b.seals.ByBlockID(parentID)
 	var seals []*flow.Seal
 	for len(byParent) > 0 {
@@ -136,8 +200,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		lastSeal = seal
 	}
 
-	// STEP THREE: we have the guarantees and seals we can validly include
-	// in the payload built on top of the given block. Now we need to build
+	// STEP FIVE: We now have guarantees and seals we can validly include
+	// in the payload built on top of the given parent. Now we need to build
 	// and store the block header, as well as index the payload contents.
 
 	// build the payload so we can get the hash
@@ -199,6 +263,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	if err != nil {
 		return nil, fmt.Errorf("could ot store proposal: %w", err)
 	}
+
+	// update protocol state index for the seal and initialize children index
 	blockID := proposal.ID()
 	err = operation.RetryOnConflict(b.db.Update, func(tx *badger.Txn) error {
 		err = operation.IndexBlockSeal(blockID, lastSeal.ID())(tx)
@@ -209,7 +275,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		if err != nil {
 			return fmt.Errorf("could not insert empty block children: %w", err)
 		}
-
 		return nil
 	})
 

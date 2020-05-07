@@ -73,6 +73,7 @@ type state struct {
 func NewExecutionState(
 	ls storage.Ledger,
 	commits storage.Commits,
+	blocks storage.Blocks,
 	chunkDataPacks storage.ChunkDataPacks,
 	executionResult storage.ExecutionResults,
 	db *badger.DB,
@@ -80,6 +81,7 @@ func NewExecutionState(
 	return &state{
 		ls:               ls,
 		commits:          commits,
+		blocks:           blocks,
 		chunkDataPacks:   chunkDataPacks,
 		executionResults: executionResult,
 		db:               db,

@@ -37,6 +37,9 @@ const (
 
 const DefaultMaxPubSubMsgSize = 1 << 21 //2mb
 
+// the inbound message queue size for One to One and One to K messages (each)
+const InboundMessageQueueSize = 100
+
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
 type Middleware struct {

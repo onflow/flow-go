@@ -164,7 +164,21 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 }
 
 func (s *Snapshot) Pending() ([]flow.Identifier, error) {
+	return s.pending(s.blockID)
+}
+
+func (s *Snapshot) pending(blockID flow.Identifier) ([]flow.Identifier, error) {
 	var pendingIDs []flow.Identifier
-	err := s.state.db.View(procedure.LookupBlockChildren(s.blockID, &pendingIDs))
-	return pendingIDs, err
+	err := s.state.db.View(procedure.LookupBlockChildren(blockID, &pendingIDs))
+	if err != nil {
+		return nil, fmt.Errorf("could not get pending children: %w", err)
+	}
+	for _, pendingID := range pendingIDs {
+		additionalIDs, err := s.pending(pendingID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get pending grandchildren: %w", err)
+		}
+		pendingIDs = append(pendingIDs, additionalIDs...)
+	}
+	return pendingIDs, nil
 }

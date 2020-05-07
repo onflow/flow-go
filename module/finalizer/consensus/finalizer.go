@@ -48,50 +48,43 @@ func NewFinalizer(db *badger.DB, headers storage.Headers, payloads storage.Paylo
 // pools and persistent storage.
 func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
-	// STEP ONE: Check if the block itself would conflict with finalized state.
+	// STEP ONE: This is an idempotent operation. In case we are trying to
+	// finalize a block that is already below finalized height, we want to do
+	// one of two things: if it conflicts with the block already finalized at
+	// that height, it's an invalid operation. Otherwise, it is a no-op.
 
-	// retrieve the finalized height
 	var finalized uint64
 	err := f.db.View(operation.RetrieveFinalizedHeight(&finalized))
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized height: %w", err)
 	}
 
-	// retrieve the pending block
 	pending, err := f.headers.ByBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve pending header: %w", err)
 	}
 
-	// Check to see if we are trying to finalize at a heigth that is already
-	// finalized; if so, compary the ID of the finalized block.
-	// 1) If it matches, this is a no-op.
-	// 2) If it doesn't match, this is an invalid operation.
 	if pending.Height <= finalized {
 		dup, err := f.headers.ByHeight(pending.Height)
 		if err != nil {
-			return fmt.Errorf("could not get non-pending alternative: %w", err)
+			return fmt.Errorf("could not retrieve finalized equivalent: %w", err)
 		}
 		if dup.ID() != blockID {
-			return fmt.Errorf("cannot finalize conflicting state (height: %d, pending: %x, finalized: %x)", pending.Height, blockID, dup.ID())
+			return fmt.Errorf("cannot finalize pending block conflicting with finalized state (height: %d, pending: %x, finalized: %x)", pending.Height, blockID, dup.ID())
 		}
 		return nil
 	}
 
-	// STEP TWO: Check if the block actually connects to the last finalized
-	// block through its ancestors - and keep a list while we are at it.
+	// STEP TWO: At least one block in the chain back to the finalized state is
+	// a valid candidate for finalization. Figure out all blocks between the
+	// to-be-finalized block and the last finalized block. If we can't trace
+	// back to the last finalized block, this is also an invalid call.
 
-	// get the finalized block ID
 	var finalID flow.Identifier
 	err = f.db.View(operation.LookupBlockHeight(finalized, &finalID))
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized header: %w", err)
 	}
-
-	// in order to validate the validity of all changes, we need to iterate
-	// through the blocks that need to be finalized from oldest to youngest;
-	// we thus start at the youngest and remember the intermediary steps
-	// while tracing back until we reach the finalized state
 	pendingIDs := []flow.Identifier{blockID}
 	ancestorID := pending.ParentID
 	for ancestorID != finalID {
@@ -100,15 +93,16 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			return fmt.Errorf("could not retrieve parent (%x): %w", ancestorID, err)
 		}
 		if ancestor.Height < finalized {
-			return fmt.Errorf("ancestor conflicts with finalized state (height: %d, finalized: %d)", ancestor.Height, finalized)
+			return fmt.Errorf("cannot finalize pending block unconnected to last finalized block (height: %d, finalized: %d)", ancestor.Height, finalized)
 		}
 		pendingIDs = append(pendingIDs, ancestorID)
 		ancestorID = ancestor.ParentID
 	}
 
-	// STEP 4: Now we can step backwards in order to go from oldest to youngest; for
-	// each header, we apply the changes to the protocol state and then clean
-	// up behind it.
+	// STEP THREE: We walk backwards through the collected ancestors, starting
+	// with the first block after finalizing state, and finalize them one by
+	// one in the protocol state.
+
 	for i := len(pendingIDs) - 1; i >= 0; i-- {
 		pendingID := pendingIDs[i]
 		err = f.proto.Mutate().Finalize(pendingID)

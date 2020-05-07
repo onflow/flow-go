@@ -51,7 +51,10 @@ func main() {
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
-			vm := virtualmachine.New(rt)
+			vm, err := virtualmachine.New(rt)
+			if err != nil {
+				return err
+			}
 			computationManager = computation.New(
 				node.Logger,
 				node.Me,
@@ -90,7 +93,7 @@ func main() {
 			chunkDataPacks := badger.NewChunkDataPacks(node.DB)
 			executionResults := badger.NewExecutionResults(node.DB)
 			stateCommitments := badger.NewCommits(node.DB)
-			executionState = state.NewExecutionState(ledgerStorage, stateCommitments, chunkDataPacks, executionResults, node.DB)
+			executionState = state.NewExecutionState(ledgerStorage, stateCommitments, node.Blocks, chunkDataPacks, executionResults, node.DB)
 			//registerDeltas := badger.NewRegisterDeltas(node.DB)
 			stateSync := sync.NewStateSynchronizer(executionState)
 			providerEngine, err = provider.New(

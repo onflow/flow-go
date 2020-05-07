@@ -79,6 +79,7 @@ func TestIdentity(t *testing.T) {
 		require.NoError(t, err)
 
 		err = db.Update(operation.IndexPayloadIdentities(blockID, []flow.Identifier{identity.NodeID}))
+		require.NoError(t, err)
 
 		actual, err := state.Final().Identity(identity.NodeID)
 		require.NoError(t, err)
@@ -133,6 +134,7 @@ func TestClusters(t *testing.T) {
 		}
 
 		err = db.Update(operation.IndexPayloadIdentities(blockID, flow.GetIDs(identities)))
+		require.NoError(t, err)
 
 		actual, err := state.Final().Clusters()
 		require.NoError(t, err)

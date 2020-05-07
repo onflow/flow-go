@@ -35,7 +35,7 @@ func TestBootstrapValid(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
 		commit := unittest.StateCommitmentFixture()
-		genesis := flow.Genesis(participants)
+		genesis := unittest.GenesisFixture(participants)
 		err := state.Mutate().Bootstrap(commit, genesis)
 		require.NoError(t, err)
 
@@ -72,11 +72,209 @@ func TestBootstrapValid(t *testing.T) {
 	})
 }
 
+func TestBootstrapDuplicateID(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		participants := flow.IdentityList{
+			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
+			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
+			{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
+			{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
+			{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
+		}
+
+		commit := unittest.StateCommitmentFixture()
+		genesis := unittest.GenesisFixture(participants)
+
+		err := state.Mutate().Bootstrap(commit, genesis)
+		require.Error(t, err)
+	})
+}
+
+func TestBootstrapZeroStake(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		participants := flow.IdentityList{
+			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 0},
+			{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
+			{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
+			{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
+		}
+
+		commit := unittest.StateCommitmentFixture()
+		genesis := unittest.GenesisFixture(participants)
+
+		err := state.Mutate().Bootstrap(commit, genesis)
+		require.Error(t, err)
+	})
+}
+
+func TestBootstrapNoCollection(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		participants := flow.IdentityList{
+			{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
+			{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
+			{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
+		}
+
+		commit := unittest.StateCommitmentFixture()
+		genesis := unittest.GenesisFixture(participants)
+
+		err := state.Mutate().Bootstrap(commit, genesis)
+		require.Error(t, err)
+	})
+}
+
+func TestBootstrapNoConsensus(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		participants := flow.IdentityList{
+			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
+			{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
+			{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
+		}
+
+		commit := unittest.StateCommitmentFixture()
+		genesis := unittest.GenesisFixture(participants)
+
+		err := state.Mutate().Bootstrap(commit, genesis)
+		require.Error(t, err)
+	})
+}
+
+func TestBootstrapNoExecution(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		participants := flow.IdentityList{
+			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
+			{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
+			{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
+		}
+
+		commit := unittest.StateCommitmentFixture()
+		genesis := unittest.GenesisFixture(participants)
+
+		err := state.Mutate().Bootstrap(commit, genesis)
+		require.Error(t, err)
+	})
+}
+
+func TestBootstrapNoVerification(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		participants := flow.IdentityList{
+			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
+			{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
+			{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
+		}
+
+		commit := unittest.StateCommitmentFixture()
+		genesis := unittest.GenesisFixture(participants)
+
+		err := state.Mutate().Bootstrap(commit, genesis)
+		require.Error(t, err)
+	})
+}
+
+func TestBootstrapExistingAddress(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		participants := flow.IdentityList{
+			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
+			{NodeID: flow.Identifier{0x02}, Address: "a1", Role: flow.RoleConsensus, Stake: 2},
+			{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
+			{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
+		}
+
+		commit := unittest.StateCommitmentFixture()
+		genesis := unittest.GenesisFixture(participants)
+
+		err := state.Mutate().Bootstrap(commit, genesis)
+		require.Error(t, err)
+	})
+}
+
+func TestBootstrapNonZeroHeight(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		commit := unittest.StateCommitmentFixture()
+		genesis := unittest.GenesisFixture(participants)
+		genesis.Header.Height = 42
+
+		err := state.Mutate().Bootstrap(commit, genesis)
+		require.Error(t, err)
+	})
+}
+
+func TestBootstrapNonZeroParent(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		commit := unittest.StateCommitmentFixture()
+		genesis := unittest.GenesisFixture(participants)
+		genesis.Header.ParentID = unittest.IdentifierFixture()
+
+		err := state.Mutate().Bootstrap(commit, genesis)
+		require.Error(t, err)
+	})
+}
+
+func TestBootstrapNonEmptyCollections(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		commit := unittest.StateCommitmentFixture()
+		genesis := unittest.GenesisFixture(participants)
+		genesis.Payload.Guarantees = unittest.CollectionGuaranteesFixture(1)
+		genesis.Header.PayloadHash = genesis.Payload.Hash()
+
+		err := state.Mutate().Bootstrap(commit, genesis)
+		require.Error(t, err)
+	})
+}
+
+func TestBootstrapWithSeal(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		commit := unittest.StateCommitmentFixture()
+		genesis := unittest.GenesisFixture(participants)
+		genesis.Payload.Seals = []*flow.Seal{unittest.BlockSealFixture()}
+		genesis.Header.PayloadHash = genesis.Payload.Hash()
+
+		err := state.Mutate().Bootstrap(commit, genesis)
+		require.Error(t, err)
+	})
+}
+
+func TestExtendValid(t *testing.T) {
+	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+		commit := unittest.StateCommitmentFixture()
+		genesis := unittest.GenesisFixture(participants)
+		err := state.Mutate().Bootstrap(commit, genesis)
+		require.NoError(t, err)
+
+		block := unittest.BlockFixture()
+		block.Payload.Guarantees = nil
+		block.Payload.Seals = nil
+		block.Header.Height = 1
+		block.Header.View = 1
+		block.Header.ParentID = genesis.ID()
+		block.Header.PayloadHash = block.Payload.Hash()
+
+		err = state.Mutate().Extend(&block)
+		require.NoError(t, err)
+
+		finalCommit, err := state.Final().Commit()
+		assert.NoError(t, err)
+		assert.Equal(t, commit, finalCommit)
+	})
+}
+
 func TestExtendSealedBoundary(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
 		commit := unittest.StateCommitmentFixture()
-		genesis := flow.Genesis(participants)
+		genesis := unittest.GenesisFixture(participants)
 		err := state.Mutate().Bootstrap(commit, genesis)
 		require.NoError(t, err)
 
@@ -133,209 +331,11 @@ func TestExtendSealedBoundary(t *testing.T) {
 	})
 }
 
-func TestBootstrapDuplicateID(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		participants := flow.IdentityList{
-			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
-			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
-			{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
-			{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-			{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-		}
-
-		commit := unittest.StateCommitmentFixture()
-		genesis := flow.Genesis(participants)
-
-		err := state.Mutate().Bootstrap(commit, genesis)
-		require.Error(t, err)
-	})
-}
-
-func TestBootstrapZeroStake(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		participants := flow.IdentityList{
-			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 0},
-			{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
-			{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-			{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-		}
-
-		commit := unittest.StateCommitmentFixture()
-		genesis := flow.Genesis(participants)
-
-		err := state.Mutate().Bootstrap(commit, genesis)
-		require.Error(t, err)
-	})
-}
-
-func TestBootstrapNoCollection(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		participants := flow.IdentityList{
-			{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
-			{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-			{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-		}
-
-		commit := unittest.StateCommitmentFixture()
-		genesis := flow.Genesis(participants)
-
-		err := state.Mutate().Bootstrap(commit, genesis)
-		require.Error(t, err)
-	})
-}
-
-func TestBootstrapNoConsensus(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		participants := flow.IdentityList{
-			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
-			{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-			{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-		}
-
-		commit := unittest.StateCommitmentFixture()
-		genesis := flow.Genesis(participants)
-
-		err := state.Mutate().Bootstrap(commit, genesis)
-		require.Error(t, err)
-	})
-}
-
-func TestBootstrapNoExecution(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		participants := flow.IdentityList{
-			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
-			{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
-			{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-		}
-
-		commit := unittest.StateCommitmentFixture()
-		genesis := flow.Genesis(participants)
-
-		err := state.Mutate().Bootstrap(commit, genesis)
-		require.Error(t, err)
-	})
-}
-
-func TestBootstrapNoVerification(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		participants := flow.IdentityList{
-			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
-			{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
-			{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-		}
-
-		commit := unittest.StateCommitmentFixture()
-		genesis := flow.Genesis(participants)
-
-		err := state.Mutate().Bootstrap(commit, genesis)
-		require.Error(t, err)
-	})
-}
-
-func TestBootstrapExistingAddress(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		participants := flow.IdentityList{
-			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
-			{NodeID: flow.Identifier{0x02}, Address: "a1", Role: flow.RoleConsensus, Stake: 2},
-			{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-			{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-		}
-
-		commit := unittest.StateCommitmentFixture()
-		genesis := flow.Genesis(participants)
-
-		err := state.Mutate().Bootstrap(commit, genesis)
-		require.Error(t, err)
-	})
-}
-
-func TestBootstrapNonZeroHeight(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		commit := unittest.StateCommitmentFixture()
-		genesis := flow.Genesis(participants)
-		genesis.Header.Height = 42
-
-		err := state.Mutate().Bootstrap(commit, genesis)
-		require.Error(t, err)
-	})
-}
-
-func TestBootstrapNonZeroParent(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		commit := unittest.StateCommitmentFixture()
-		genesis := flow.Genesis(participants)
-		genesis.Header.ParentID = unittest.IdentifierFixture()
-
-		err := state.Mutate().Bootstrap(commit, genesis)
-		require.Error(t, err)
-	})
-}
-
-func TestBootstrapNonEmptyCollections(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		commit := unittest.StateCommitmentFixture()
-		genesis := flow.Genesis(participants)
-		genesis.Payload.Guarantees = unittest.CollectionGuaranteesFixture(1)
-		genesis.Header.PayloadHash = genesis.Payload.Hash()
-
-		err := state.Mutate().Bootstrap(commit, genesis)
-		require.Error(t, err)
-	})
-}
-
-func TestBootstrapWithSeal(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		commit := unittest.StateCommitmentFixture()
-		genesis := flow.Genesis(participants)
-		genesis.Payload.Seals = []*flow.Seal{unittest.BlockSealFixture()}
-		genesis.Header.PayloadHash = genesis.Payload.Hash()
-
-		err := state.Mutate().Bootstrap(commit, genesis)
-		require.Error(t, err)
-	})
-}
-
-func TestExtendValid(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		commit := unittest.StateCommitmentFixture()
-		genesis := flow.Genesis(participants)
-		err := state.Mutate().Bootstrap(commit, genesis)
-		require.NoError(t, err)
-
-		block := unittest.BlockFixture()
-		block.Payload.Guarantees = nil
-		block.Payload.Seals = nil
-		block.Header.Height = 1
-		block.Header.View = 1
-		block.Header.ParentID = genesis.ID()
-		block.Header.PayloadHash = block.Payload.Hash()
-
-		err = state.Mutate().Extend(&block)
-		require.NoError(t, err)
-
-		finalCommit, err := state.Final().Commit()
-		assert.NoError(t, err)
-		assert.Equal(t, commit, finalCommit)
-	})
-}
-
 func TestExtendMissingParent(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
 		commit := unittest.StateCommitmentFixture()
-		genesis := flow.Genesis(participants)
+		genesis := unittest.GenesisFixture(participants)
 		err := state.Mutate().Bootstrap(commit, genesis)
 		require.NoError(t, err)
 
@@ -363,7 +363,7 @@ func TestExtendHeightTooSmall(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
 		commit := unittest.StateCommitmentFixture()
-		genesis := flow.Genesis(participants)
+		genesis := unittest.GenesisFixture(participants)
 		err := state.Mutate().Bootstrap(commit, genesis)
 		require.NoError(t, err)
 
@@ -396,7 +396,7 @@ func TestExtendHeightTooSmall(t *testing.T) {
 func TestExtendHeightTooLarge(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
-		genesis := flow.Genesis(participants)
+		genesis := unittest.GenesisFixture(participants)
 
 		block := unittest.BlockWithParentFixture(genesis.Header)
 		block.SetPayload(flow.Payload{})
@@ -412,7 +412,7 @@ func TestExtendBlockNotConnected(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
 		commit := unittest.StateCommitmentFixture()
-		genesis := flow.Genesis(participants)
+		genesis := unittest.GenesisFixture(participants)
 		err := state.Mutate().Bootstrap(commit, genesis)
 		require.NoError(t, err)
 
@@ -449,7 +449,7 @@ func TestExtendSealNotConnected(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
 		commit := unittest.StateCommitmentFixture()
-		genesis := flow.Genesis(participants)
+		genesis := unittest.GenesisFixture(participants)
 		err := state.Mutate().Bootstrap(commit, genesis)
 		require.NoError(t, err)
 
@@ -493,7 +493,7 @@ func TestExtendWrongIdentity(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
 		commit := unittest.StateCommitmentFixture()
-		genesis := flow.Genesis(participants)
+		genesis := unittest.GenesisFixture(participants)
 		err := state.Mutate().Bootstrap(commit, genesis)
 		require.NoError(t, err)
 
@@ -517,7 +517,7 @@ func TestExtendWrongIdentity(t *testing.T) {
 func TestExtendInvalidChainID(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
-		genesis := flow.Genesis(participants)
+		genesis := unittest.GenesisFixture(participants)
 		block := unittest.BlockWithParentFixture(genesis.Header)
 		block.SetPayload(flow.Payload{})
 		// use an invalid chain ID

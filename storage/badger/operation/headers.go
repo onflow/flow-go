@@ -12,10 +12,6 @@ func InsertHeader(headerID flow.Identifier, header *flow.Header) func(*badger.Tx
 	return insert(makePrefix(codeHeader, headerID), header)
 }
 
-func CheckHeader(blockID flow.Identifier, exists *bool) func(*badger.Txn) error {
-	return check(makePrefix(codeHeader, blockID), exists)
-}
-
 func RetrieveHeader(blockID flow.Identifier, header *flow.Header) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeHeader, blockID), header)
 }
