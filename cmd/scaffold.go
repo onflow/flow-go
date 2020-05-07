@@ -83,7 +83,7 @@ type FlowNodeBuilder struct {
 	flags          *pflag.FlagSet
 	name           string
 	Logger         zerolog.Logger
-	Metrics        *metrics.Collector
+	Metrics        module.Metrics
 	Me             *local.Local
 	DB             *badger.DB
 	Blocks         *storage.Blocks
@@ -250,12 +250,6 @@ func (fnb *FlowNodeBuilder) initDatabase() {
 	fnb.Seals = storage.NewSeals(db)
 	fnb.Payloads = storage.NewPayloads(db, fnb.Identities, fnb.Guarantees, fnb.Seals)
 	fnb.Blocks = storage.NewBlocks(db, fnb.Headers, fnb.Payloads)
-}
-
-func (fnb *FlowNodeBuilder) initMetrics() {
-	metrics, err := metrics.NewCollector(fnb.Logger)
-	fnb.MustNot(err).Msg("could not initialize metrics")
-	fnb.Metrics = metrics
 }
 
 func (fnb *FlowNodeBuilder) initState() {
@@ -490,8 +484,6 @@ func (fnb *FlowNodeBuilder) Run(role string) {
 	fnb.initNodeInfo()
 
 	fnb.initLogger()
-
-	fnb.initMetrics()
 
 	fnb.initDatabase()
 
