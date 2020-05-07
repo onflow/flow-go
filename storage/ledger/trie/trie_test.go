@@ -2766,11 +2766,13 @@ func withSMT(
 	height int,
 	interval uint64,
 	numHistoricalStates int,
-	numFullStates int, f func(t *testing.T, smt *SMT, emptyTree *tree)) {
+	cacheSize int,
+	f func(t *testing.T, smt *SMT, emptyTree *tree),
+) {
 
 	dbDir := unittest.TempDir(t)
 
-	trie, err := NewSMT(dbDir, height, interval, numHistoricalStates, numFullStates)
+	trie, err := NewSMT(dbDir, height, interval, numHistoricalStates, cacheSize)
 	require.NoError(t, err)
 
 	defer func() {

@@ -165,6 +165,8 @@ func (f forest) PrintCache() {
 
 func (f *forest) newTree(root Root, db databases.DAL) (*tree, error) {
 
+	fmt.Println("MAKING A NEW TREE", root)
+
 	deltaNumber, err := db.GetTrieDB(metadataHeight)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get delta number: %w", err)
@@ -192,26 +194,31 @@ type forest struct {
 	height int
 }
 
-func NewForest(dbDir string, maxSize int, maxFullSize int, height int) (*forest, error) {
+func NewForest(dbDir string, cacheSize, height int) (*forest, error) {
 	evict := func(key interface{}, value interface{}) {
 		tree, ok := value.(*tree)
 		if !ok {
 			panic(fmt.Sprintf("cache contains item of type %T", value))
 		}
+
+		fmt.Println("EVICTING DB", key)
 		_, _ = tree.database.SafeClose()
 	}
-	cache, err := lru.NewWithEvict(maxSize, evict)
+
+	cache, err := lru.NewWithEvict(cacheSize, evict)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create forest cache: %w", err)
 	}
-	//fullCache, err := lru.NewWithEvict(maxFullSize, evict)
-	//if err != nil {
+
+	// fullCache, err := lru.NewWithEvict(maxFullSize, evict)
+	// if err != nil {
 	//	return nil, fmt.Errorf("cannot create forest full cache: %w", err)
-	//}
+	// }
+
 	return &forest{
 		dbDir: dbDir,
 		cache: cache,
-		//fullCache: fullCache,
+		// fullCache: fullCache,
 		height: height,
 	}, nil
 }
@@ -240,13 +247,18 @@ func (f *forest) Get(root Root) (*tree, error) {
 	//}
 
 	if foundTree, ok := f.cache.Get(root.String()); ok {
+		fmt.Println("CACHE HIT!", root)
 		return foundTree.(*tree), nil
 	}
+
+	fmt.Println("CACHE MISS", root)
 
 	db, err := f.newDB(root)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create LevelDB: %w", err)
 	}
+
+	fmt.Println("RE-OPENED DB AFTER CACHE MISS", root)
 
 	tree, err := f.newTree(root, db)
 	if err != nil {
@@ -260,6 +272,8 @@ func (f *forest) Get(root Root) (*tree, error) {
 
 func (f *forest) newDB(root Root) (*leveldb.LevelDB, error) {
 	treePath := filepath.Join(f.dbDir, root.String())
+
+	fmt.Println("OPENING NEW DB", treePath)
 
 	db, err := leveldb.NewLevelDB(treePath)
 	return db, err
@@ -283,7 +297,6 @@ type SMT struct {
 	//historicalStateRoots deque.Deque              // FIFO queue of historical State Roots in historicalStates map
 	numHistoricalStates int    // Number of states to keep in historicalStates
 	snapshotInterval    uint64 // When removing full states from historical states interval between full states
-	numFullStates       int    // Number of Full States to keep in historicalStates
 	//lruCache             *lru.Cache               // LRU cache of stringified keys to proofs
 }
 
@@ -384,7 +397,7 @@ func NewSMT(
 	height int,
 	interval uint64,
 	numHistoricalStates int,
-	numFullStates int,
+	cacheSize int,
 ) (*SMT, error) {
 	if height < 1 {
 		return nil, errors.New("height of SMT must be at least 1")
@@ -411,11 +424,10 @@ func NewSMT(
 	//s.rootNode = newNode(GetDefaultHashForHeight(height-1), height-1)
 	//s.historicalStates = make(map[string]databases.DAL)
 	s.numHistoricalStates = numHistoricalStates
-	s.numFullStates = numFullStates
 	s.snapshotInterval = interval
 	//s.cachedBranches = make(map[string]*proofHolder)
 
-	forest, err := NewForest(dbDir, numHistoricalStates, numFullStates, height)
+	forest, err := NewForest(dbDir, cacheSize, height)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create forest: %w", err)
 	}
@@ -437,6 +449,19 @@ func NewSMT(
 		height:         0,
 		cachedBranches: make(map[string]*proofHolder),
 		forest:         forest,
+	}
+
+	batcher := emptyDB.NewBatcher()
+
+	height2 := make([]byte, 8)
+	binary.BigEndian.PutUint64(height2, newTree.height)
+
+	batcher.Put(metadataKeyPrevious, emptyHash)
+	batcher.Put(metadataHeight, height2)
+
+	err = emptyDB.UpdateTrieDB(batcher)
+	if err != nil {
+		return nil, err
 	}
 
 	forest.Add(newTree)
@@ -553,7 +578,7 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 	if !trusted {
 		if s.IsSnapshot(tree) {
 
-			//if bytes.Equal(root, currRoot) {
+			// if bytes.Equal(root, currRoot) {
 			for i, key := range keys {
 				k := hex.EncodeToString(key)
 				res := tree.cachedBranches[k]
@@ -580,7 +605,7 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 			for i, key := range keys {
 				flag, proof, size, inclusion, err := s.GetHistoricalProof(key, root, tree.database)
 				if err != nil {
-					return nil, nil, err
+					return nil, nil, fmt.Errorf("cannot get historical proof: %w", err)
 				}
 
 				flags[i] = flag
@@ -593,11 +618,19 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 
 	values := make([][]byte, len(keys))
 
+	tree, err = s.forest.Get(root)
+	if err != nil {
+		return nil, nil, fmt.Errorf("COULD NOT REOPEN TREE: %w", err)
+	}
+
 	for i, key := range keys {
-		res, err := tree.database.GetKVDB(key)
+		res, err1 := tree.database.GetKVDB(key)
 		if err != nil {
 
+			fmt.Println("STARTING SEARCH FOR SNAPSHOT")
+
 			localRoot := root
+			i := 0
 			for {
 				tree, err := s.forest.Get(localRoot)
 				if err != nil {
@@ -606,16 +639,25 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 
 				res, err = tree.database.GetKVDB(key)
 				if err == nil {
+					fmt.Printf("FOUND KEY in %s\n", localRoot)
 					break
+				} else if !errors.Is(err, databases.ErrNotFound) {
+					return nil, nil, fmt.Errorf("unexpected err (%s): %w", localRoot, err)
 				}
+
 				if s.IsSnapshot(tree) {
+					fmt.Println("THIS IS A SNAPSHOT", localRoot)
 					break
 				}
+
+				fmt.Println("CONTINUING SEARCH FOR SNAPSHOT", i)
+				i++
+
 				localRoot = tree.previous
 			}
 
-			if res == nil && !errors.Is(err, databases.ErrNotFound) {
-				return nil, nil, err
+			if res == nil && !errors.Is(err1, databases.ErrNotFound) {
+				return nil, nil, fmt.Errorf("cannot get key (%s): %w", tree.root, err)
 			}
 		}
 		values[i] = res
@@ -1119,6 +1161,7 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 	for i := 0; i < t.historicalStateRoots.Len(); i++ {
 		newHistoricalStatRoots.PushBack(t.historicalStateRoots.At(i))
 	}
+
 	newHistoricalStatRoots.PushBack(newRootNode.value)
 
 	newTree := &tree{
@@ -1136,6 +1179,7 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	err = db.UpdateTrieDB(batcher)
 	if err != nil {
 		return nil, err
