@@ -39,34 +39,10 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 			return fmt.Errorf("genesis collection should contain no transactions (got %d)", collSize)
 		}
 
-		// check payload integrity
-		if genesis.Header.PayloadHash != genesis.Payload.Hash() {
-			return fmt.Errorf("computed payload hash does not match header")
-		}
-
-		// store the block header
-		blockID := genesis.ID()
-		err := operation.InsertHeader(blockID, genesis.Header)(tx)
+		// insert the block
+		err := procedure.InsertClusterBlock(genesis)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert header: %w", err)
-		}
-
-		// insert the block payload
-		err = procedure.InsertClusterPayload(genesis.Header, genesis.Payload)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert payload: %w", err)
-		}
-
-		// index the block payload
-		err = procedure.IndexClusterPayload(genesis.Header, genesis.Payload)(tx)
-		if err != nil {
-			return fmt.Errorf("could not index payload: %w", err)
-		}
-
-		// start the new block with an empty child index
-		err = operation.InsertBlockChildren(blockID, nil)(tx)
-		if err != nil {
-			return fmt.Errorf("could not create empty child index: %w", err)
+			return fmt.Errorf("could not insert genesis block: %w", err)
 		}
 
 		// insert block number -> ID mapping
