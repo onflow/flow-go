@@ -88,7 +88,9 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 			lastSeal := &flow.Seal{}
 			err = procedure.LookupSealByBlock(block.Header.ParentID, lastSeal)(tx)
 			if err != nil {
-				return fmt.Errorf("could not retrieve parent seal: %w", err)
+				// TODO: HACK
+				return nil
+				// return fmt.Errorf("could not retrieve parent seal: %w", err)
 			}
 
 			// we keep connecting seals from the map until they are all gone or we
