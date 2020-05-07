@@ -16,6 +16,7 @@ type CheckerFunc func([]byte, runtime.Location) error
 
 type TransactionContext struct {
 	LedgerDAL
+	astCache          ASTCache
 	signingAccounts   []runtime.Address
 	checker           CheckerFunc
 	logs              []string
@@ -214,6 +215,16 @@ func (r *TransactionContext) ResolveImport(location runtime.Location) ([]byte, e
 	return code, nil
 }
 
+// GetCachedProgram attempts to get a parsed program from a cache.
+func (r *TransactionContext) GetCachedProgram(location ast.Location) (*ast.Program, error) {
+	return r.astCache.GetProgram(location)
+}
+
+// CacheProgram adds a parsed program to a cache.
+func (r *TransactionContext) CacheProgram(location ast.Location, program *ast.Program) error {
+	return r.astCache.SetProgram(location, program)
+}
+
 // Log captures a log message from the runtime.
 func (r *TransactionContext) Log(message string) {
 	r.logs = append(r.logs, message)
@@ -222,14 +233,6 @@ func (r *TransactionContext) Log(message string) {
 // EmitEvent is called when an event is emitted by the runtime.
 func (r *TransactionContext) EmitEvent(event cadence.Event) {
 	r.events = append(r.events, event)
-}
-
-func (r *TransactionContext) GetCachedProgram(runtime.Location) (*ast.Program, error) {
-	return nil, nil
-}
-
-func (r *TransactionContext) CacheProgram(runtime.Location, *ast.Program) error {
-	return nil
 }
 
 func (r *TransactionContext) GenerateUUID() uint64 {
@@ -272,7 +275,7 @@ func (r *TransactionContext) checkProgram(code []byte, address runtime.Address) 
 // verifySignatures verifies that a transaction contains the necessary signatures.
 //
 // An error is returned if any of the expected signatures are invalid or missing.
-func (r *TransactionContext) verifySignatures() error {
+func (r *TransactionContext) verifySignatures() FlowError {
 
 	if r.tx.Payer == flow.ZeroAddress {
 		return &MissingPayerError{}
@@ -299,11 +302,10 @@ func (r *TransactionContext) verifySignatures() error {
 	proposalKeyVerified := proposalKeyVerifiedInPayload || proposalKeyVerifiedInEnvelope
 
 	if !proposalKeyVerified {
-		return fmt.Errorf(
-			"missing signature for proposal key (address: %s, key: %d)",
-			r.tx.ProposalKey.Address,
-			r.tx.ProposalKey.KeyID,
-		)
+		return &MissingSignatureForProposalKeyError{
+			Address: r.tx.ProposalKey.Address,
+			KeyID:   r.tx.ProposalKey.KeyID,
+		}
 	}
 
 	for _, addr := range r.tx.Authorizers {
@@ -333,7 +335,7 @@ func (r *TransactionContext) verifySignatures() error {
 // If they are not equal, the on-chain sequence number is not incremented.
 //
 // This function returns an error if any problem occurred during checking or the check failed
-func (r *TransactionContext) checkAndIncrementSequenceNumber() error {
+func (r *TransactionContext) checkAndIncrementSequenceNumber() (FlowError, error) {
 
 	proposalKey := r.tx.ProposalKey
 
@@ -343,7 +345,7 @@ func (r *TransactionContext) checkAndIncrementSequenceNumber() error {
 		return &InvalidProposalKeyError{
 			Address: proposalKey.Address,
 			KeyID:   proposalKey.KeyID,
-		}
+		}, nil
 	}
 
 	accountKey := account.Keys[proposalKey.KeyID]
@@ -356,18 +358,18 @@ func (r *TransactionContext) checkAndIncrementSequenceNumber() error {
 			KeyID:             proposalKey.KeyID,
 			CurrentSeqNumber:  accountKey.SeqNumber,
 			ProvidedSeqNumber: proposalKey.SequenceNumber,
-		}
+		}, nil
 	}
 
 	accountKey.SeqNumber++
 
 	updatedAccountBytes, err := flow.EncodeAccountPublicKey(accountKey)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	r.setAccountPublicKey(account.Address.Bytes(), proposalKey.KeyID, updatedAccountBytes)
 
-	return nil
+	return nil, nil
 }
 
 func (r *TransactionContext) aggregateAccountSignatures(
@@ -377,7 +379,7 @@ func (r *TransactionContext) aggregateAccountSignatures(
 ) (
 	weights map[flow.Address]int,
 	proposalKeyVerified bool,
-	err error,
+	err FlowError,
 ) {
 	weights = make(map[flow.Address]int)
 
@@ -407,26 +409,34 @@ func (r *TransactionContext) aggregateAccountSignatures(
 func (r *TransactionContext) verifyAccountSignature(
 	txSig flow.TransactionSignature,
 	message []byte,
-) (accountKey *flow.AccountPublicKey, err error) {
+) (*flow.AccountPublicKey, FlowError) {
 	account := r.GetAccount(txSig.Address)
 	if account == nil {
-		return accountKey, &InvalidSignatureAccountError{Address: txSig.Address}
+		return nil, &InvalidSignatureAccountError{Address: txSig.Address}
 	}
 
 	if int(txSig.KeyID) >= len(account.Keys) {
-		return accountKey, &InvalidSignatureAccountError{Address: txSig.Address}
+		return nil, &InvalidSignatureAccountError{Address: txSig.Address}
 	}
 
-	accountKey = &account.Keys[txSig.KeyID]
+	accountKey := &account.Keys[txSig.KeyID]
 
 	hasher, err := hash.NewHasher(accountKey.HashAlgo)
 	if err != nil {
-		return accountKey, fmt.Errorf("public key specifies invalid hash algorithm")
+		return accountKey, &InvalidHashingAlgorithmError{
+			Address:          txSig.Address,
+			KeyID:            txSig.KeyID,
+			HashingAlgorithm: accountKey.HashAlgo,
+		}
 	}
 
 	valid, err := accountKey.PublicKey.Verify(txSig.Signature, message, hasher)
 	if err != nil {
-		return accountKey, fmt.Errorf("cannot verify public key")
+		return accountKey, &PublicKeyVerificationError{
+			Address: txSig.Address,
+			KeyID:   txSig.KeyID,
+			Err:     err,
+		}
 	}
 
 	if !valid {

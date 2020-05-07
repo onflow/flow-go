@@ -32,7 +32,8 @@ import (
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/validators"
 	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
-	"github.com/dapperlabs/flow-go/storage"
+	storerr "github.com/dapperlabs/flow-go/storage"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
@@ -83,8 +84,14 @@ type FlowNodeBuilder struct {
 	name           string
 	Logger         zerolog.Logger
 	Metrics        *metrics.Collector
-	DB             *badger.DB
 	Me             *local.Local
+	DB             *badger.DB
+	Blocks         *storage.Blocks
+	Headers        *storage.Headers
+	Payloads       *storage.Payloads
+	Identities     *storage.Identities
+	Guarantees     *storage.Guarantees
+	Seals          *storage.Seals
 	State          *protocol.State
 	DKGState       *wrapper.State
 	modules        []namedModuleFunc
@@ -135,7 +142,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			return nil, fmt.Errorf("could not initialize middleware: %w", err)
 		}
 
-		ids, err := fnb.State.Final().Identities(filter.Any)
+		participants, err := fnb.State.Final().Identities(filter.Any)
 		if err != nil {
 			return nil, fmt.Errorf("could not get network identities: %w", err)
 		}
@@ -147,7 +154,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		nodeRole := nodeID.Role
 		topology := libp2p.NewRandPermTopology(nodeRole)
 
-		net, err := libp2p.NewNetwork(fnb.Logger, codec, ids, fnb.Me, mw, 10e6, topology)
+		net, err := libp2p.NewNetwork(fnb.Logger, codec, participants, fnb.Me, mw, 10e6, topology)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize network: %w", err)
 		}
@@ -209,22 +216,20 @@ func (fnb *FlowNodeBuilder) initLogger() {
 	}
 	log = log.Level(lvl)
 
-	log.Info().Msg("initializing engine modules")
-
 	fnb.Logger = log
 }
 
 func (fnb *FlowNodeBuilder) initDatabase() {
 	//Pre-create DB path (Badger creates only one-level dirs)
 	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
-	fnb.MustNot(err).Msgf("could not create datadir %s", fnb.BaseConfig.datadir)
+	fnb.MustNot(err).Str("dir", fnb.BaseConfig.datadir).Msg("could not create datadir")
 
 	// we initialize the database with options that allow us to keep the maximum
 	// item size in the trie itself (up to 1MB) and where we keep all level zero
 	// tables in-memory as well; this slows down compaction and increases memory
 	// usage, but it improves overall performance and disk i/o
 	opts := badger.
-		LSMOnlyOptions(fnb.BaseConfig.datadir).
+		DefaultOptions(fnb.BaseConfig.datadir).
 		WithKeepL0InMemory(true).
 		WithLogger(nil)
 	db, err := badger.Open(opts)
@@ -239,6 +244,12 @@ func (fnb *FlowNodeBuilder) initDatabase() {
 	fnb.MustNot(err).Msg("could not initialize max tracker")
 
 	fnb.DB = db
+	fnb.Headers = storage.NewHeaders(db)
+	fnb.Identities = storage.NewIdentities(db)
+	fnb.Guarantees = storage.NewGuarantees(db)
+	fnb.Seals = storage.NewSeals(db)
+	fnb.Payloads = storage.NewPayloads(db, fnb.Identities, fnb.Guarantees, fnb.Seals)
+	fnb.Blocks = storage.NewBlocks(db, fnb.Headers, fnb.Payloads)
 }
 
 func (fnb *FlowNodeBuilder) initMetrics() {
@@ -248,12 +259,21 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 }
 
 func (fnb *FlowNodeBuilder) initState() {
-	state, err := protocol.NewState(fnb.DB, protocol.SetClusters(fnb.BaseConfig.nClusters))
+
+	state, err := protocol.NewState(
+		fnb.DB,
+		fnb.Headers,
+		fnb.Identities,
+		fnb.Seals,
+		fnb.Payloads,
+		fnb.Blocks,
+		protocol.SetClusters(fnb.BaseConfig.nClusters),
+	)
 	fnb.MustNot(err).Msg("could not initialize flow state")
 
 	// check if database is initialized
 	head, err := state.Final().Head()
-	if errors.Is(err, storage.ErrNotFound) {
+	if errors.Is(err, storerr.ErrNotFound) {
 		// Bootstrap!
 
 		fnb.Logger.Info().Msg("bootstrapping empty protocol state")
@@ -280,6 +300,8 @@ func (fnb *FlowNodeBuilder) initState() {
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
 		}
+
+		// TODO: this always needs to be available, so we need to persist it
 		fnb.DKGState = wrapper.NewState(dkgPubData)
 
 		err = state.Mutate().Bootstrap(fnb.GenesisCommit, fnb.GenesisBlock)
@@ -293,19 +315,33 @@ func (fnb *FlowNodeBuilder) initState() {
 			Hex("final_id", logging.ID(head.ID())).
 			Uint64("final_height", head.Height).
 			Msg("using existing database")
+
+		// Load the genesis info for recovery
+		fnb.GenesisBlock, err = loadGenesisBlock(fnb.BaseConfig.BootstrapDir)
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
+		}
+
+		// load genesis QC and DKG data from bootstrap files for recovery
+		fnb.GenesisQC, err = loadRootBlockQC(fnb.BaseConfig.BootstrapDir)
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
+		}
+
+		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
+		}
+		fnb.DKGState = wrapper.NewState(dkgPubData)
 	}
 
 	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
 	fnb.MustNot(err).Msg("could not parse node identifier")
 
-	allIdentities, err := state.Final().Identities(filter.Any)
-	fnb.MustNot(err).Msg("could not retrieve finalized identities")
-	fnb.Logger.Debug().Msgf("known nodes: %v", allIdentities)
-
-	id, err := state.Final().Identity(myID)
+	self, err := state.Final().Identity(myID)
 	fnb.MustNot(err).Msg("could not get identity")
 
-	fnb.Me, err = local.New(id, fnb.stakingKey)
+	fnb.Me, err = local.New(self, fnb.stakingKey)
 	fnb.MustNot(err).Msg("could not initialize local")
 
 	fnb.State = state

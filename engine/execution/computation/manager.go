@@ -58,7 +58,7 @@ func (e *Manager) ExecuteScript(script []byte, blockHeader *flow.Header, view *d
 	}
 
 	if !result.Succeeded() {
-		return nil, fmt.Errorf("failed to execute script at block (%s): %w", blockHeader.ID(), result.Error)
+		return nil, fmt.Errorf("failed to execute script at block (%s): %s", blockHeader.ID(), result.Error.ErrorMessage())
 	}
 
 	encodedValue, err := jsoncdc.Encode(result.Value)

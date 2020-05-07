@@ -23,7 +23,7 @@ type Mutator interface {
 	// us to execute fork-aware queries against ambiguous protocol state, while
 	// still checking that the given block is a valid extension of the protocol
 	// state.
-	Extend(blockID flow.Identifier) error
+	Extend(block *flow.Block) error
 
 	// Finalize finalizes the block with the given hash, and all of its parents
 	// up to the finalized protocol state. It modifies the persistent immutable

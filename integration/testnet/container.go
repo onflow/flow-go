@@ -98,7 +98,7 @@ func (c *Container) Name() string {
 func (c *Container) DB() (*badger.DB, error) {
 	dbPath := filepath.Join(c.datadir, DefaultFlowDBDir)
 	opts := badger.
-		LSMOnlyOptions(dbPath).
+		DefaultOptions(dbPath).
 		WithKeepL0InMemory(true).
 		WithLogger(nil)
 

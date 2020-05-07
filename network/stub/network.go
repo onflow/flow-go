@@ -143,7 +143,7 @@ func (mn *Network) sendToAllTargets(m *PendingMessage, recursive bool) error {
 		// Find the network of the targeted node
 		receiverNetwork, exist := mn.hub.GetNetwork(nodeID)
 		if !exist {
-			return errors.Errorf("Network can not find a node by ID %v", nodeID)
+			continue
 		}
 
 		// Check if the given engine already received the event.

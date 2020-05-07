@@ -1,6 +1,7 @@
 package collection
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
@@ -11,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
@@ -61,14 +63,14 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
 		// retrieve the current finalized cluster state boundary
 		var boundary uint64
-		err = operation.RetrieveBoundaryForCluster(f.chainID, &boundary)(tx)
+		err = operation.RetrieveClusterFinalizedHeight(f.chainID, &boundary)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve boundary: %w", err)
 		}
 
 		// retrieve the ID of the last finalized block as marker for stopping
 		var headID flow.Identifier
-		err = operation.RetrieveNumberForCluster(f.chainID, boundary, &headID)(tx)
+		err = operation.LookupClusterBlockHeight(f.chainID, boundary, &headID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve head: %w", err)
 		}
@@ -129,7 +131,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 				continue
 			}
 
-			// NOTE: when we incorporate HotStuff AND require BFT, the consensus
+			//TODO when we incorporate HotStuff AND require BFT, the consensus
 			// node will need to be able ensure finalization by checking a
 			// 3-chain of children for this block. Probably it will be simplest
 			// to have a follower engine configured for the cluster chain
@@ -142,13 +144,37 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			// https://github.com/dapperlabs/flow-go/issues/2711
 			f.prov.SubmitLocal(&messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
-					CollectionID: payload.Collection.ID(),
-					SignerIDs:    step.ParentVoterIDs,
-					Signature:    step.ParentVoterSig,
+					CollectionID:     payload.Collection.ID(),
+					ReferenceBlockID: payload.ReferenceBlockID,
+					SignerIDs:        step.ParentVoterIDs,
+					Signature:        step.ParentVoterSig,
 				},
 			})
 		}
 
 		return nil
 	})
+}
+
+// MakePending indexes a block by its parent. The index is useful for looking up the child block
+// of a finalized block.
+func (f *Finalizer) MakePending(blockID flow.Identifier) error {
+
+	// retrieve the header to get the parent
+	var header flow.Header
+	err := f.db.View(operation.RetrieveHeader(blockID, &header))
+	if err != nil {
+		return fmt.Errorf("could not retrieve header: %w", err)
+	}
+
+	// insert the child index into the DB
+	err = f.db.Update(procedure.IndexBlockChild(header.ParentID, blockID))
+	if errors.Is(err, storage.ErrAlreadyExists) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("could not index block child: %w", err)
+	}
+
+	return nil
 }

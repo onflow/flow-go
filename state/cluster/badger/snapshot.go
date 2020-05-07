@@ -70,13 +70,13 @@ func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
 
 			// get the boundary
 			var boundary uint64
-			err := operation.RetrieveBoundaryForCluster(s.state.chainID, &boundary)(tx)
+			err := operation.RetrieveClusterFinalizedHeight(s.state.chainID, &boundary)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve boundary (%s): %w", s.state.chainID, err)
 			}
 
 			// get the ID of the last finalized block
-			err = operation.RetrieveNumberForCluster(s.state.chainID, boundary, &s.blockID)(tx)
+			err = operation.LookupClusterBlockHeight(s.state.chainID, boundary, &s.blockID)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve block ID at boundary (%d): %w", boundary, err)
 			}

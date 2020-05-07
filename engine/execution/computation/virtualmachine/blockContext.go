@@ -43,6 +43,7 @@ func (bc *blockContext) newTransactionContext(
 	}
 
 	ctx := &TransactionContext{
+		astCache:        bc.vm.cache,
 		LedgerDAL:       LedgerDAL{ledger},
 		signingAccounts: signingAccounts,
 		tx:              tx,
@@ -57,6 +58,7 @@ func (bc *blockContext) newTransactionContext(
 
 func (bc *blockContext) newScriptContext(ledger Ledger) *TransactionContext {
 	return &TransactionContext{
+		astCache:  bc.vm.cache,
 		LedgerDAL: LedgerDAL{ledger},
 	}
 }
@@ -77,30 +79,36 @@ func (bc *blockContext) ExecuteTransaction(
 
 	ctx := bc.newTransactionContext(ledger, tx, options...)
 
-	err := ctx.verifySignatures()
-	if err != nil {
+	flowErr := ctx.verifySignatures()
+	if flowErr != nil {
 		return &TransactionResult{
 			TransactionID: txID,
-			Error:         err,
+			Error:         flowErr,
 		}, nil
 	}
 
-	err = ctx.checkAndIncrementSequenceNumber()
+	flowErr, err := ctx.checkAndIncrementSequenceNumber()
 	if err != nil {
+		return nil, err
+	}
+	if flowErr != nil {
 		return &TransactionResult{
 			TransactionID: txID,
-			Error:         err,
+			Error:         flowErr,
 		}, nil
 	}
 
 	err = bc.vm.executeTransaction(tx.Script, tx.Arguments, ctx, location)
 	if err != nil {
-		if errors.As(err, &runtime.Error{}) {
+		possibleRuntimeError := runtime.Error{}
+		if errors.As(err, &possibleRuntimeError) {
 			// runtime errors occur when the execution reverts
 			return &TransactionResult{
 				TransactionID: txID,
-				Error:         err,
-				Logs:          ctx.Logs(),
+				Error: &CodeExecutionError{
+					RuntimeError: possibleRuntimeError,
+				},
+				Logs: ctx.Logs(),
 			}, nil
 		}
 
@@ -125,12 +133,15 @@ func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte) (*ScriptResu
 	ctx := bc.newScriptContext(ledger)
 	value, err := bc.vm.executeScript(script, ctx, location)
 	if err != nil {
-		if errors.As(err, &runtime.Error{}) {
+		possibleRuntimeError := runtime.Error{}
+		if errors.As(err, &possibleRuntimeError) {
 			// runtime errors occur when the execution reverts
 			return &ScriptResult{
 				ScriptID: flow.HashToID(scriptHash),
-				Error:    err,
-				Logs:     ctx.Logs(),
+				Error: &CodeExecutionError{
+					RuntimeError: possibleRuntimeError,
+				},
+				Logs: ctx.Logs(),
 			}, nil
 		}
 
