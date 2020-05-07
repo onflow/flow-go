@@ -125,7 +125,7 @@ func main() {
 				node.Logger.Debug().Err(err).Msg("ignoring failures in follower core")
 			}
 
-			follower, err := followereng.New(node.Logger, node.Network, node.Me, cleaner, headers, payloads, node.State, conCache, core)
+			follower, err := followereng.New(node.Logger, node.Network, node.Me, cleaner, headers, payloads, node.State, conCache, core, node.Metrics)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}

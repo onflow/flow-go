@@ -71,7 +71,10 @@ func (r *Receipts) ByBlockID(blockID flow.Identifier) []*flow.ExecutionReceipt {
 	}
 	receipts := make([]*flow.ExecutionReceipt, 0, len(byBlock))
 	for receiptID := range byBlock {
-		entity, _ := r.Backend.ByID(receiptID)
+		entity, err := r.Backend.ByID(receiptID)
+		if err != nil || entity == nil {
+			continue
+		}
 		receipts = append(receipts, entity.(*flow.ExecutionReceipt))
 	}
 	return receipts

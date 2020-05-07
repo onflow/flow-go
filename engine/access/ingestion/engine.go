@@ -155,7 +155,6 @@ func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 // onBlock handles an incoming block.
 // TODO this will be an event triggered by the follower node when a new finalized or sealed block is received
 func (e *Engine) onBlockProposal(_ flow.Identifier, proposal *messages.BlockProposal) error {
-	e.metrics.NewestKnownQC(proposal.Header.View)
 	// index the block storage with each of the collection guarantee
 	err := e.blocks.IndexByGuarantees(proposal.Header.ID())
 	if err != nil {

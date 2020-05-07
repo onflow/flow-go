@@ -209,7 +209,9 @@ func main() {
 				conPayloads,
 				node.State,
 				conCache,
-				core)
+				core,
+				node.Metrics,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}

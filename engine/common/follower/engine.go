@@ -29,6 +29,7 @@ type Engine struct {
 	follower module.HotStuffFollower
 	con      network.Conduit
 	sync     module.Synchronization
+	metrics  module.Metrics
 }
 
 func New(
@@ -41,6 +42,7 @@ func New(
 	state protocol.State,
 	pending module.PendingBlockBuffer,
 	follower module.HotStuffFollower,
+	metrics module.Metrics,
 ) (*Engine, error) {
 
 	e := &Engine{
@@ -53,6 +55,7 @@ func New(
 		state:    state,
 		pending:  pending,
 		follower: follower,
+		metrics:  metrics,
 	}
 
 	con, err := net.Register(engine.BlockProvider, e)
@@ -153,6 +156,7 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 
 // onBlockProposal handles incoming block proposals.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
+	e.metrics.NewestKnownQC(proposal.Header.View)
 
 	blockID := proposal.Header.ID()
 	log := e.log.With().
@@ -298,7 +302,13 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 		return fmt.Errorf("could not retrieve proposal parent: %w", err)
 	}
 
-	log.Info().Msg("forwarding block proposal to hotstuff follower")
+	log.Info().
+		Uint64("block_view", proposal.Header.View).
+		Hex("block_id", blockID[:]).
+		Uint64("block_height", proposal.Header.Height).
+		Hex("parent_id", proposal.Header.ParentID[:]).
+		Hex("signer", proposal.Header.ProposerID[:]).
+		Msg("forwarding block proposal to hotstuff follower")
 
 	// submit the model to hotstuffFollower for processing
 	e.follower.SubmitProposal(proposal.Header, parent.View)
