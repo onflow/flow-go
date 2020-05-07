@@ -145,6 +145,7 @@ func (ss *SyncSuite) SetupTest() {
 	e, err := New(log, ss.net, ss.me, ss.state, ss.blocks, ss.comp)
 	require.NoError(ss.T(), err, "should pass engine initialization")
 
+	e.tolerance = 0 // make sure we always sync on difference in heights
 	ss.e = e
 }
 

@@ -12,8 +12,9 @@ import (
 func handleError(err error, t interface{}) error {
 	if err != nil {
 		if errors.Is(err, badger.ErrKeyNotFound) {
-			return fmt.Errorf("could not retrieve %T: %w", t, storage.ErrNotFound)
+			return storage.ErrNotFound
 		}
+
 		return fmt.Errorf("could not retrieve %T: %w", t, err)
 	}
 	return nil
