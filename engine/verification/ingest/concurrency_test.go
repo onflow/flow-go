@@ -35,7 +35,7 @@ import (
 func TestConcurrency(t *testing.T) {
 	// TODO broken test
 	// will be addressed in
-	// https://github.com/dapperlabs/flow-go/issues/3592
+	// https://github.com/dapperlabs/flow-go/issues/3613
 
 	testcases := []struct {
 		erCount, // number of execution receipts
