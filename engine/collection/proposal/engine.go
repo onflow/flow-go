@@ -11,7 +11,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
-	clustermodel "github.com/dapperlabs/flow-go/model/cluster"
+	"github.com/dapperlabs/flow-go/model/cluster"
 	coldstuffmodel "github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -19,7 +19,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/state/cluster"
+	clusterkv "github.com/dapperlabs/flow-go/state/cluster"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -33,8 +33,8 @@ type Engine struct {
 	metrics      module.Metrics
 	con          network.Conduit
 	me           module.Local
-	protoState   protocol.State // flow-wide protocol chain state
-	clusterState cluster.State  // cluster-specific chain state
+	protoState   protocol.State  // flow-wide protocol chain state
+	clusterState clusterkv.State // cluster-specific chain state
 	validator    module.TransactionValidator
 	pool         mempool.Transactions
 	transactions storage.Transactions
@@ -51,7 +51,7 @@ func New(
 	net module.Network,
 	me module.Local,
 	protoState protocol.State,
-	clusterState cluster.State,
+	clusterState clusterkv.State,
 	metrics module.Metrics,
 	validator module.TransactionValidator,
 	pool mempool.Transactions,
@@ -266,6 +266,7 @@ func (e *Engine) BroadcastCommit(commit *coldstuffmodel.Commit) error {
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
 
 	header := proposal.Header
+	payload := proposal.Payload
 
 	e.log.Debug().
 		Hex("block_id", logging.ID(header.ID())).
@@ -287,12 +288,9 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 		return fmt.Errorf("could not retrieve proposal parent: %w", err)
 	}
 
-	blockID := header.ID()
-	collection := proposal.Payload.Collection
-
 	// validate any transactions we haven't yet seen
 	var merr *multierror.Error
-	for _, tx := range collection.Transactions {
+	for _, tx := range payload.Collection.Transactions {
 		if !e.pool.Has(tx.ID()) {
 			err = e.validator.ValidateTransaction(tx)
 			if err != nil {
@@ -304,20 +302,15 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 		return fmt.Errorf("cannot validate block proposal (id=%x) with invalid transactions: %w", header.ID(), err)
 	}
 
-	// store the payload
-	err = e.payloads.Store(header, proposal.Payload)
-	if err != nil {
-		return fmt.Errorf("could not store payload: %w", err)
+	// create a cluster block representing the proposal
+	block := cluster.Block{
+		Header:  header,
+		Payload: payload,
 	}
 
-	// store the header
-	err = e.headers.Store(header)
-	if err != nil {
-		return fmt.Errorf("could not store header: %w", err)
-	}
-
-	// ensure the block is a valid extension of cluster state
-	err = e.clusterState.Mutate().Extend(blockID)
+	// extend the state with the proposal -- if it is an invalid extension,
+	// we will throw an error here
+	err = e.clusterState.Mutate().Extend(&block)
 	if err != nil {
 		return fmt.Errorf("could not extend cluster state: %w", err)
 	}
@@ -327,6 +320,8 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 
 	// report proposed (case that we are follower)
 	e.metrics.CollectionProposed(proposal.Payload.Collection.Light())
+
+	blockID := header.ID()
 
 	children, ok := e.pending.ByParentID(blockID)
 	if !ok {
@@ -416,7 +411,7 @@ func (e *Engine) onBlockCommit(originID flow.Identifier, commit *coldstuffmodel.
 // processPendingProposal handles proposals where the parent is missing.
 func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
 
-	pendingBlock := &clustermodel.PendingBlock{
+	pendingBlock := &cluster.PendingBlock{
 		OriginID: originID,
 		Header:   proposal.Header,
 		Payload:  proposal.Payload,
