@@ -46,6 +46,9 @@ func (s *LevelDB) GetTrieDB(key []byte) ([]byte, error) {
 // NewLevelDB creates a new LevelDB database.
 func NewLevelDB(path string) (*LevelDB, error) {
 
+	fmt.Println("OPENING DB:", path)
+	fmt.Println()
+
 	kvdbPath := filepath.Join(path, kvdbPrefix)
 	tdbPath := filepath.Join(path, triePrefix)
 
@@ -92,6 +95,7 @@ func (s *LevelDB) PutIntoBatcher(key []byte, value []byte) {
 
 // SafeClose is a helper function that closes databases safely.
 func (s *LevelDB) SafeClose() (error, error) {
+	fmt.Println("SAFE CLOSING DB:", s.path)
 	return s.kvdb.Close(), s.tdb.Close()
 }
 

@@ -719,7 +719,7 @@ func (e *Engine) saveExecutionResults(
 		values, proofs, err := e.execState.GetRegistersWithProofs(childCtx, chunk.StartState, allRegisters)
 		if err != nil {
 			return nil, fmt.Errorf(
-				"error reading registers with proofs for chunk number [%v] of block [%x] ", i, block.ID(),
+				"error reading registers with proofs for chunk number [%v] of block [%x]: %w", i, block.ID(), err,
 			)
 		}
 
