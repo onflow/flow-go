@@ -160,4 +160,13 @@ type Metrics interface {
 
 	// ExecutionTotalExecutedTransactions adds num to the total number of executed transactions
 	ExecutionTotalExecutedTransactions(numExecuted int)
+
+	// ExecutionTransactionParsed reports the parse time of a transaction
+	ExecutionTransactionParsed(dur time.Duration)
+
+	// ExecutionTransactionChecked reports the checking time of a transaction
+	ExecutionTransactionChecked(dur time.Duration)
+
+	// ExecutionTransactionInterpreted reports the interpretation time of a transaction
+	ExecutionTransactionInterpreted(dur time.Duration)
 }

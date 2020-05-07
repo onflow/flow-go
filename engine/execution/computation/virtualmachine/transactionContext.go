@@ -7,6 +7,7 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -16,6 +17,7 @@ type CheckerFunc func([]byte, runtime.Location) error
 
 type TransactionContext struct {
 	LedgerDAL
+	runtime.Metrics
 	signingAccounts   []runtime.Address
 	checker           CheckerFunc
 	logs              []string
@@ -26,7 +28,44 @@ type TransactionContext struct {
 	uuid              uint64
 }
 
+func newScriptContext(ledger Ledger, options ...TransactionContextOption) *TransactionContext {
+	ctx := &TransactionContext{
+		LedgerDAL: LedgerDAL{ledger},
+		Metrics:   emptyMetricsCollector{},
+	}
+
+	for _, option := range options {
+		option(ctx)
+	}
+
+	return ctx
+}
+
+func newTransactionContext(
+	tx *flow.TransactionBody,
+	ledger Ledger,
+	options ...TransactionContextOption,
+) *TransactionContext {
+	signers := make([]runtime.Address, len(tx.Authorizers))
+	for i, addr := range tx.Authorizers {
+		// TODO: replace with proper conversion
+		signers[i] = common.BytesToAddress(addr.Bytes())
+	}
+
+	ctx := newScriptContext(ledger, options...)
+	ctx.signingAccounts = signers
+	ctx.tx = tx
+
+	return ctx
+}
+
 type TransactionContextOption func(*TransactionContext)
+
+func WithMetrics(metrics *RuntimeMetrics) TransactionContextOption {
+	return func(ctx *TransactionContext) {
+		ctx.Metrics = runtimeMetricsCollector{metrics}
+	}
+}
 
 // GetSigningAccounts gets the signing accounts for this context.
 //
@@ -95,7 +134,8 @@ func (r *TransactionContext) CreateAccount(publicKeysBytes [][]byte) (runtime.Ad
 	accountAddress, err := r.CreateAccountInLedger(publicKeys)
 	r.Log(fmt.Sprintf("Created new account with address: %x", accountAddress))
 
-	return runtime.Address(accountAddress), err
+	// TODO: replace with proper conversion
+	return common.BytesToAddress(accountAddress.Bytes()), err
 }
 
 // AddAccountKey adds a public key to an existing account.
@@ -325,7 +365,7 @@ func (r *TransactionContext) verifySignatures() FlowError {
 	return nil
 }
 
-// CheckAndIncrementSequenceNumber validates and increments a sequence number for an account key.
+// checkAndIncrementSequenceNumber validates and increments a sequence number for an account key.
 //
 // This function first checks that the provided sequence number matches the version stored on-chain.
 // If they are equal, the on-chain sequence number is incremented.

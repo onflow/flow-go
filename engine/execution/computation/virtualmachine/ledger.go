@@ -45,6 +45,7 @@ func fullKey(owner, controller, key string) string {
 	// https://en.wikipedia.org/wiki/C0_and_C1_control_codes#Field_separators
 	return strings.Join([]string{owner, controller, key}, "\x1F")
 }
+
 func fullKeyHash(owner, controller, key string) flow.RegisterID {
 	h := sha256.New()
 	_, _ = h.Write([]byte(fullKey(owner, controller, key)))

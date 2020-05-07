@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -32,7 +33,7 @@ func TestCollectionRequests(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
 
 		block := unittest.BlockFixture()
-		//To make sure we always have collection if the block fixture changes
+		// To make sure we always have collection if the block fixture changes
 		guarantees := unittest.CollectionGuaranteesFixture(3)
 
 		guarantees[0].SignerIDs = []flow.Identifier{collection1Identity.NodeID, collection3Identity.NodeID}
@@ -60,7 +61,9 @@ func TestCollectionRequests(t *testing.T) {
 			gomock.Eq([]flow.Identifier{collection2Identity.NodeID, collection3Identity.NodeID}),
 		)
 
-		ctx.executionState.On("StateCommitmentByBlockID", block.Header.ParentID).Return(unittest.StateCommitmentFixture(), nil)
+		ctx.executionState.
+			On("StateCommitmentByBlockID", mock.Anything, block.Header.ParentID).
+			Return(unittest.StateCommitmentFixture(), nil)
 
 		proposal := unittest.ProposalFromBlock(&block)
 		err := ctx.engine.ProcessLocal(proposal)
@@ -74,7 +77,7 @@ func TestNoCollectionRequestsIfParentMissing(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
 
 		block := unittest.BlockFixture()
-		//To make sure we always have collection if the block fixture changes
+		// To make sure we always have collection if the block fixture changes
 		guarantees := unittest.CollectionGuaranteesFixture(3)
 
 		guarantees[0].SignerIDs = []flow.Identifier{collection1Identity.NodeID, collection3Identity.NodeID}
@@ -89,7 +92,9 @@ func TestNoCollectionRequestsIfParentMissing(t *testing.T) {
 
 		ctx.collectionConduit.EXPECT().Submit(gomock.Any(), gomock.Any()).Times(0)
 
-		ctx.executionState.On("StateCommitmentByBlockID", block.Header.ParentID).Return(nil, realStorage.ErrNotFound)
+		ctx.executionState.
+			On("StateCommitmentByBlockID", mock.Anything, block.Header.ParentID).
+			Return(nil, realStorage.ErrNotFound)
 
 		proposal := unittest.ProposalFromBlock(&block)
 		err := ctx.engine.ProcessLocal(proposal)
@@ -115,7 +120,10 @@ func TestValidatingCollectionResponse(t *testing.T) {
 			&colReqMatcher{req: &messages.CollectionRequest{ID: id, Nonce: rand.Uint64()}},
 			gomock.Eq(collection1Identity.NodeID),
 		).Return(nil)
-		ctx.executionState.On("StateCommitmentByBlockID", executableBlock.Block.Header.ParentID).Return(executableBlock.StartState, nil)
+
+		ctx.executionState.
+			On("StateCommitmentByBlockID", mock.Anything, executableBlock.Block.Header.ParentID).
+			Return(executableBlock.StartState, nil)
 
 		proposal := unittest.ProposalFromBlock(executableBlock.Block)
 		err := ctx.engine.ProcessLocal(proposal)
@@ -168,7 +176,9 @@ func TestNoBlockExecutedUntilAllCollectionsArePosted(t *testing.T) {
 		ctx.state.On("AtBlockID", executableBlock.ID()).Return(ctx.snapshot)
 
 		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlock.Block))
-		ctx.executionState.On("StateCommitmentByBlockID", executableBlock.Block.Header.ParentID).Return(unittest.StateCommitmentFixture(), nil)
+		ctx.executionState.
+			On("StateCommitmentByBlockID", mock.Anything, executableBlock.Block.Header.ParentID).
+			Return(unittest.StateCommitmentFixture(), nil)
 
 		proposal := unittest.ProposalFromBlock(executableBlock.Block)
 		err := ctx.engine.ProcessLocal(proposal)

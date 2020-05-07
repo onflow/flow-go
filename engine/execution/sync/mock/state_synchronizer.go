@@ -2,6 +2,7 @@
 
 package mock
 
+import context "context"
 import flow "github.com/dapperlabs/flow-go/model/flow"
 import messages "github.com/dapperlabs/flow-go/model/messages"
 import mock "github.com/stretchr/testify/mock"
@@ -11,13 +12,13 @@ type StateSynchronizer struct {
 	mock.Mock
 }
 
-// DeltaRange provides a mock function with given fields: startID, endID, onDelta
-func (_m *StateSynchronizer) DeltaRange(startID flow.Identifier, endID flow.Identifier, onDelta func(*messages.ExecutionStateDelta) error) error {
-	ret := _m.Called(startID, endID, onDelta)
+// DeltaRange provides a mock function with given fields: ctx, startID, endID, onDelta
+func (_m *StateSynchronizer) DeltaRange(ctx context.Context, startID flow.Identifier, endID flow.Identifier, onDelta func(*messages.ExecutionStateDelta) error) error {
+	ret := _m.Called(ctx, startID, endID, onDelta)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.Identifier, func(*messages.ExecutionStateDelta) error) error); ok {
-		r0 = rf(startID, endID, onDelta)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.Identifier, func(*messages.ExecutionStateDelta) error) error); ok {
+		r0 = rf(ctx, startID, endID, onDelta)
 	} else {
 		r0 = ret.Error(0)
 	}

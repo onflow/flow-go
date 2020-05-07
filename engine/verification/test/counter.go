@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"testing"
@@ -126,7 +127,7 @@ func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExe
 		view := delta.NewView(state.LedgerGetRegister(led, startStateCommitment))
 
 		// create BlockComputer
-		bc := computer.NewBlockComputer(vm)
+		bc := computer.NewBlockComputer(vm, nil, nil)
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
 		completeColls[guarantee.ID()] = &entity.CompleteCollection{
@@ -141,7 +142,7 @@ func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExe
 		}
 
 		// *execution.ComputationResult, error
-		_, err = bc.ExecuteBlock(executableBlock, view)
+		_, err = bc.ExecuteBlock(context.Background(), executableBlock, view)
 		require.NoError(t, err, "error executing block")
 
 		ids, values := view.Delta().RegisterUpdates()

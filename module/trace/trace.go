@@ -1,14 +1,15 @@
 package trace
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"sync"
 
-	opentracing "github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 	"github.com/uber/jaeger-client-go"
-	config "github.com/uber/jaeger-client-go/config"
+	"github.com/uber/jaeger-client-go/config"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -35,25 +36,29 @@ func (t traceLogger) Infof(msg string, args ...interface{}) {
 	t.Debug().Msgf(msg, args...)
 }
 
-// NewTracer creates a new tracer
-func NewTracer(log zerolog.Logger) (*OpenTracer, error) {
+// NewTracer creates a new tracer.
+func NewTracer(log zerolog.Logger, serviceName string) (*OpenTracer, error) {
 	cfg, err := config.FromEnv()
 	if err != nil {
 		return nil, err
 	}
+
 	if cfg.ServiceName == "" {
-		cfg.ServiceName = "tracer"
+		cfg.ServiceName = serviceName
 	}
+
 	tracer, closer, err := cfg.NewTracer(config.Logger(traceLogger{log}))
 	if err != nil {
 		return nil, err
 	}
+
 	t := &OpenTracer{
 		Tracer:    tracer,
 		closer:    closer,
 		log:       log,
 		openSpans: map[string]opentracing.Span{},
 	}
+
 	return t, nil
 }
 
@@ -106,6 +111,23 @@ func (t *OpenTracer) GetSpan(entityID flow.Identifier, spanName string) (opentra
 	key := spanKey(entityID, spanName)
 	span, exists := t.openSpans[key]
 	return span, exists
+}
+
+func (t *OpenTracer) StartSpanFromContext(
+	ctx context.Context,
+	operationName string,
+	opts ...opentracing.StartSpanOption,
+) (opentracing.Span, context.Context) {
+	return opentracing.StartSpanFromContextWithTracer(ctx, t.Tracer, operationName, opts...)
+}
+
+func (t *OpenTracer) StartSpanFromParent(
+	span opentracing.Span,
+	operationName string,
+	opts ...opentracing.StartSpanOption,
+) opentracing.Span {
+	opts = append(opts, opentracing.FollowsFrom(span.Context()))
+	return t.Tracer.StartSpan(operationName, opts...)
 }
 
 // in order to avoid different spans using the same entityID as the key, which creates a conflict,

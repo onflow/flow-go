@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 
 	"github.com/onflow/cadence/runtime"
-
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/cmd"
@@ -54,8 +53,11 @@ func main() {
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
 			vm := virtualmachine.New(rt)
+
 			computationManager = computation.New(
 				node.Logger,
+				node.Metrics,
+				node.Tracer,
 				node.Me,
 				node.State,
 				vm,
@@ -63,7 +65,7 @@ func main() {
 
 			return nil
 		}).
-		//Trie storage is required to bootstrap, but also shout be handled while shutting down
+		// Trie storage is required to bootstrap, but also shout be handled while shutting down
 		Module("ledger storage", func(node *cmd.FlowNodeBuilder) error {
 			ledgerStorage, err = ledger.NewTrieStorage(triedir)
 			return err
@@ -74,7 +76,7 @@ func main() {
 				panic(fmt.Sprintf("error while bootstrapping execution state: %s", err))
 			}
 			if !bytes.Equal(bootstrappedStateCommitment, flow.GenesisStateCommitment) {
-				panic("error while boostrapping execution state - resulting state is different than precalculated!")
+				panic("error while bootstrapping execution state - resulting state is different than precalculated!")
 			}
 			if !bytes.Equal(flow.GenesisStateCommitment, node.GenesisCommit) {
 				panic(fmt.Sprintf("genesis seal state commitment (%x) different from precalculated (%x)", node.GenesisCommit, flow.GenesisStateCommitment))
@@ -92,11 +94,21 @@ func main() {
 			chunkDataPacks := badger.NewChunkDataPacks(node.DB)
 			executionResults := badger.NewExecutionResults(node.DB)
 			stateCommitments = badger.NewCommits(node.DB)
-			executionState = state.NewExecutionState(ledgerStorage, stateCommitments, chunkDataPacks, executionResults, node.DB)
-			//registerDeltas := badger.NewRegisterDeltas(node.DB)
+
+			executionState = state.NewExecutionState(
+				ledgerStorage,
+				stateCommitments,
+				chunkDataPacks,
+				executionResults,
+				node.DB,
+				node.Tracer,
+			)
+
 			stateSync := sync.NewStateSynchronizer(executionState)
+
 			providerEngine, err = provider.New(
 				node.Logger,
+				node.Tracer,
 				node.Network,
 				node.State,
 				node.Me,
@@ -128,8 +140,9 @@ func main() {
 				computationManager,
 				providerEngine,
 				executionState,
-				6, //TODO - config param maybe?
+				6, // TODO - config param maybe?
 				node.Metrics,
+				node.Tracer,
 				true,
 			)
 			return ingestionEng, err
