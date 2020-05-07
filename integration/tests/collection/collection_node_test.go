@@ -171,13 +171,12 @@ func (suite *CollectorSuite) AwaitTransactionIncluded(txID flow.Identifier) {
 	// the height at which the collection is included
 	var colID flow.Identifier
 
-	waitFor := time.Second * 30
+	waitFor := time.Second * 10
 	deadline := time.Now().Add(waitFor)
 	for time.Now().Before(deadline) {
 
 		_, msg, err := suite.reader.Next()
 		require.Nil(suite.T(), err, "could not read next message")
-		suite.T().Logf("ghost recv: %T", msg)
 
 		switch val := msg.(type) {
 		case *messages.ClusterBlockProposal:
@@ -185,14 +184,19 @@ func (suite *CollectorSuite) AwaitTransactionIncluded(txID flow.Identifier) {
 			collection := val.Payload.Collection
 			suite.T().Logf("got proposal height=%d col_id=%x size=%d", header.Height, collection.ID(), collection.Len())
 
+			for _, tid := range collection.Light().Transactions {
+				suite.T().Logf(">> tx_id=%x", tid)
+			}
 			// note the collection where the transaction is included
 			//TODO this will only work for single-tx collections
 			// need to update in https://github.com/dapperlabs/flow-go/pull/3546
 			if collection.Light().Has(txID) {
+				suite.T().Logf(">> collection has %x", txID)
 				colID = collection.ID()
 			}
 
 		case *flow.CollectionGuarantee:
+			suite.T().Logf("got guarantee id=%x\n", val.CollectionID)
 			if val.CollectionID == colID {
 				return
 			}
@@ -322,6 +326,7 @@ func (suite *CollectorSuite) TestTxIngress_SingleCluster() {
 	require.Nil(t, err)
 
 	t.Log("sending transaction: ", tx.ID())
+	t.Log("flow tx id: ", convert.TxFromSDK(*tx).ID())
 
 	ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
 	err = client.SendTransaction(ctx, *tx)
