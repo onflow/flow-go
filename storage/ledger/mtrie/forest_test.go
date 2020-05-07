@@ -173,6 +173,7 @@ func TestExpansionInsert(t *testing.T) {
 	keys = [][]byte{k1, k2}
 	values = [][]byte{v1, v2}
 	retValues, err := fStore.Read(keys, rootHash3)
+	require.NoError(t, err)
 	for i := range keys {
 		require.True(t, bytes.Equal(retValues[i], values[i]))
 	}
@@ -224,6 +225,7 @@ func TestFullHouseInsert(t *testing.T) {
 	keys = [][]byte{k1, k2, k3}
 	values = [][]byte{v1, v2, v3}
 	retValues, err := fStore.Read(keys, rootHash3)
+	require.NoError(t, err)
 	for i := range keys {
 		require.True(t, bytes.Equal(retValues[i], values[i]))
 	}
@@ -261,6 +263,7 @@ func TestLeafInsert(t *testing.T) {
 	// 						0: ([1 1],42)[0000000100000001]
 
 	retValues, err := fStore.Read(keys, rootHash2)
+	require.NoError(t, err)
 	for i := range keys {
 		require.True(t, bytes.Equal(retValues[i], values[i]))
 	}
