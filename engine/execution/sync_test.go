@@ -61,7 +61,7 @@ func TestSyncFlow(t *testing.T) {
 	col2 := flow.Collection{Transactions: []*flow.TransactionBody{&tx2}}
 	col4 := flow.Collection{Transactions: []*flow.TransactionBody{&tx4}}
 
-	//Create three blocks, with one tx each
+	// Create three blocks, with one tx each
 	block1 := unittest.BlockWithParentFixture(genesis.Header)
 	block1.Header.View = 42
 	block1.SetPayload(flow.Payload{

@@ -302,7 +302,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	// submit block2 from consensus node to execution node 1
 	exe1Node.IngestionEngine.Submit(conID.NodeID, proposal2)
 
-	// esure block has been executed
+	// ensure block has been executed
 	hub.Eventually(t, equal(1, &receiptsReceived))
 	exe1Node.AssertHighestExecutedBlock(t, block2.Header)
 
