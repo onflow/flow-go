@@ -62,7 +62,7 @@ func (f *TrieStorage) GetRegisters(
 	values []flow.RegisterValue,
 	err error,
 ) {
-	_, values, err = f.mForest.Read(registerIDs, stateCommitment)
+	values, err = f.mForest.Read(registerIDs, stateCommitment)
 	// values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
 	return values, err
 }
@@ -110,18 +110,21 @@ func (f *TrieStorage) GetRegistersWithProof(
 	err error,
 ) {
 
-	values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
+	values, err = f.mForest.Read(registerIDs, stateCommitment)
+
+	// values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Could not get register values: %w", err)
 	}
 
-	proofHldr, err := f.tree.GetBatchProof(registerIDs, stateCommitment)
+	batchProof, err := f.mForest.Proofs(registerIDs, stateCommitment)
+	// batchProof, err := f.tree.GetBatchProof(registerIDs, stateCommitment)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Could not get proofs: %w", err)
 	}
 
-	proofs = trie.EncodeProof(proofHldr)
-	return values, proofs, err
+	proofToGo := mtrie.EncodeProof(batchProof)
+	return values, proofToGo, err
 }
 
 func (f *TrieStorage) GetRegisterTouches(

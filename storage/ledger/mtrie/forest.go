@@ -157,7 +157,7 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 
 	newRoot := newNode(f.maxHeight - 1)
 	newTrie := NewMTrie(newRoot)
-	newTrie.parent = trie
+	newTrie.SetParent(trie)
 
 	err := f.update(newTrie, trie.root, newRoot, sortedKeys, sortedValues)
 	if err != nil {

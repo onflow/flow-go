@@ -7,7 +7,8 @@ import (
 )
 
 // BatchProof is a struct that holds the proofs for several keys
-// TODO (add key values to batch proof and make it self-included)
+// TODO (add key values to batch proof and make it self-included),
+// so there is no need for two calls (read, proofs)
 //  keys       [][][]byte // keys in this
 //	values     [][][]byte // values
 type BatchProof struct {

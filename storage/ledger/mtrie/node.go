@@ -27,16 +27,6 @@ func newNode(height int) *node {
 	return n
 }
 
-// GetValue returns the value of the node.
-func (n *node) GetValue() []byte {
-	return n.value
-}
-
-// GetHeight returns the height of the node.
-func (n *node) GetHeight() int {
-	return n.height
-}
-
 // FmtStr provides formated string represntation of the node and sub tree
 func (n node) FmtStr(prefix string, path string) string {
 	right := ""
@@ -50,7 +40,7 @@ func (n node) FmtStr(prefix string, path string) string {
 	return fmt.Sprintf("%v%v: (%v,%v)[%s] %v %v ", prefix, n.height, n.key, hex.EncodeToString(n.value), path, left, right)
 }
 
-// return a deep copy of the node (including deep copy of children)
+// DeepCopy returns a deep copy of the node (including deep copy of children)
 func (n *node) DeepCopy() *node {
 	newNode := &node{height: n.height}
 
