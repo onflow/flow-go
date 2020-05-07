@@ -36,7 +36,7 @@ func (s *Snapshot) Collection() (*flow.Collection, error) {
 
 		// get the payload
 		var payload cluster.Payload
-		err = procedure.RetrieveClusterPayload(&header, &payload)(tx)
+		err = procedure.RetrieveClusterPayload(header.ID(), &payload)(tx)
 		if err != nil {
 			return fmt.Errorf("failed to get snapshot payload: %w", err)
 		}
@@ -70,13 +70,13 @@ func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
 
 			// get the boundary
 			var boundary uint64
-			err := operation.RetrieveBoundaryForCluster(s.state.chainID, &boundary)(tx)
+			err := operation.RetrieveClusterFinalizedHeight(s.state.chainID, &boundary)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve boundary (%s): %w", s.state.chainID, err)
 			}
 
 			// get the ID of the last finalized block
-			err = operation.RetrieveNumberForCluster(s.state.chainID, boundary, &s.blockID)(tx)
+			err = operation.LookupClusterBlockHeight(s.state.chainID, boundary, &s.blockID)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve block ID at boundary (%d): %w", boundary, err)
 			}

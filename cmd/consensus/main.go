@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
@@ -34,7 +35,7 @@ import (
 	consensusmetrics "github.com/dapperlabs/flow-go/module/metrics/consensus"
 	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage/badger"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
 func main() {
@@ -94,7 +95,7 @@ func main() {
 			return err
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			results := badger.NewExecutionResults(node.DB)
+			results := storage.NewExecutionResults(node.DB)
 			return matching.New(node.Logger, node.Network, node.State, node.Me, results, receipts, approvals, seals)
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -118,37 +119,33 @@ func main() {
 			// TODO: we should probably find a way to initialize mutually dependent engines separately
 
 			// initialize the entity database accessors
-			cleaner := badger.NewCleaner(node.Logger, node.DB)
-			headersDB := badger.NewHeaders(node.DB)
-			payloadsDB := badger.NewPayloads(node.DB)
-			blocksDB := badger.NewBlocks(node.DB)
-			guaranteesDB := badger.NewGuarantees(node.DB)
-			sealsDB := badger.NewSeals(node.DB)
-			viewsDB := badger.NewViews(node.DB)
+			cleaner := storage.NewCleaner(node.Logger, node.DB)
 
 			// initialize the pending blocks cache
 			cache := buffer.NewPendingBlocks()
 
 			// initialize the compliance engine
-			comp, err := compliance.New(node.Logger, node.Network, node.Me, cleaner, headersDB, payloadsDB, node.State, prov, cache, node.Metrics)
+			comp, err := compliance.New(node.Logger, node.Network, node.Me, cleaner, node.Headers, node.Payloads, node.State, prov, cache, node.Metrics)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
 
 			// initialize the synchronization engine
-			sync, err = synchronization.New(node.Logger, node.Network, node.Me, node.State, blocksDB, comp)
+			sync, err = synchronization.New(node.Logger, node.Network, node.Me, node.State, node.Blocks, comp)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 			}
 
 			// initialize the block builder
-			build := builder.NewBuilder(node.DB, guarantees, seals,
+			build := builder.NewBuilder(node.DB, node.Headers, node.Seals, node.Payloads, node.Blocks, guarantees, seals,
 				builder.WithMinInterval(minInterval),
 				builder.WithMaxInterval(maxInterval),
 			)
 
 			// initialize the block finalizer
-			final := finalizer.NewFinalizer(node.DB, guarantees, seals)
+			finalize := finalizer.NewFinalizer(node.DB, node.Headers, node.Payloads, node.State,
+				finalizer.WithCleanup(finalizer.CleanupMempools(node.Payloads, guarantees, seals)),
+			)
 
 			// initialize the aggregating signature module for staking signatures
 			staking := signature.NewAggregationProvider(encoding.ConsensusVoteTag, node.Me)
@@ -166,21 +163,24 @@ func main() {
 			}
 
 			// initialize the combined signer for hotstuff
-			signer := verification.NewCombinedSigner(committee, node.DKGState, staking, beacon, merger, node.Me.NodeID())
+			signer := verification.NewCombinedSigner(committee, node.DKGState, staking, beacon, merger, node.NodeID)
 
 			// initialize a logging notifier for hotstuff
-			notifier := createNotifier(node.Logger, node.Metrics, guaranteesDB, sealsDB)
+			notifier := createNotifier(node.Logger, node.Metrics, node.Payloads)
+
+			// initialize the persister
+			persist := persister.New(node.DB)
 
 			// query the last finalized block and pending blocks for recovery
-			finalized, pending, err := findLatest(node.State, headersDB, node.GenesisBlock.Header)
+			finalized, pending, err := findLatest(node.State, node.Headers, node.GenesisBlock.Header)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks: %w", err)
 			}
 
 			// initialize hotstuff consensus algorithm
 			hot, err := consensus.NewParticipant(
-				node.Logger, notifier, node.Metrics, headersDB, viewsDB, committee,
-				build, final, signer, comp, node.GenesisBlock.Header, node.GenesisQC,
+				node.Logger, notifier, node.Metrics, node.Headers, committee, build, finalize,
+				persist, signer, comp, node.GenesisBlock.Header, node.GenesisQC,
 				finalized, pending,
 				consensus.WithTimeout(hotstuffTimeout),
 			)
@@ -209,7 +209,7 @@ func loadDKGPrivateData(path string, myID flow.Identifier) (*bootstrap.DKGPartic
 	return &priv, nil
 }
 
-func findLatest(state protocol.State, headers *badger.Headers, rootHeader *flow.Header) (*flow.Header, []*flow.Header, error) {
+func findLatest(state protocol.State, headers *storage.Headers, rootHeader *flow.Header) (*flow.Header, []*flow.Header, error) {
 	// find finalized block
 	finalized, err := state.Final().Head()
 

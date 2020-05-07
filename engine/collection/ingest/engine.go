@@ -34,7 +34,7 @@ type Engine struct {
 
 	// the number of blocks that can be between the reference block and the
 	// finalized head before we consider the transaction expired
-	expiry uint64
+	expiry uint
 }
 
 // New creates a new collection ingest engine.
@@ -45,7 +45,7 @@ func New(
 	metrics module.Metrics,
 	me module.Local,
 	pool mempool.Transactions,
-	expiryBuffer uint64,
+	expiryBuffer uint,
 ) (*Engine, error) {
 
 	logger := log.With().
@@ -222,7 +222,7 @@ func (e *Engine) ValidateTransaction(tx *flow.TransactionBody) error {
 	if ref.Height > final.Height {
 		diff = 0
 	}
-	if diff > e.expiry {
+	if uint(diff) > e.expiry {
 		return ExpiredTransactionError{
 			RefHeight:   ref.Height,
 			FinalHeight: final.Height,
