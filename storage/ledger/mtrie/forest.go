@@ -166,7 +166,6 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 
 	newRootHash := f.ComputeNodeHash(newRoot)
 	f.tries[string(newRootHash)] = newTrie
-	fmt.Println(newRoot.FmtStr("", ""))
 	return newRootHash, nil
 }
 
@@ -204,9 +203,6 @@ func (f *MForest) update(trie *MTrie, parent *node, head *node, keys [][]byte, v
 	wg.Add(2)
 	var lupdate, rupdate *node
 	var err1, err2 error
-	if len(lkeys) > 0 && len(rkeys) > 0 && lkeys[0][0] == byte(uint8(138)) && rkeys[0][0] == byte(uint8(175)) {
-		fmt.Println(lkeys, rkeys)
-	}
 	go func() {
 		defer wg.Done()
 		// no change needed on the left side
