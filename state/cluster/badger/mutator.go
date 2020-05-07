@@ -103,8 +103,7 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 		// latest finalized block, or reach height below the finalized boundary
 
 		// copy the header for the loop to avoid modifying the input block
-		var loopHeader flow.Header
-		loopHeader = *block.Header
+		loopHeader := *block.Header
 		for loopHeader.ParentID != lastFinalizedBlockID {
 
 			// get the parent of current block
