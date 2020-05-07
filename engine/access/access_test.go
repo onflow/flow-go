@@ -205,6 +205,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		suite.collectionsConduit.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(len(block.Payload.Guarantees))
 		metrics := &mockmodule.Metrics{}
 		metrics.On("FinalizedBlocks", mock.Anything).Return()
+		metrics.On("NewestKnownQC", mock.Anything).Return()
 
 		exeEventResp := execution.GetTransactionResultResponse{
 			Events: nil,
