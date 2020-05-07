@@ -65,8 +65,11 @@ func NewBuilder(db *badger.DB, headers storage.Headers, payloads storage.Cluster
 // BuildOn creates a new block built on the given parent. It produces a payload
 // that is valid with respect to the un-finalized chain it extends.
 func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
-	var proposal flow.Header
-	err := b.db.Update(func(tx *badger.Txn) error {
+	var proposal cluster.Block
+
+	// first we construct a proposal in-memory, ensuring it is a valid extension
+	// of chain state -- this can be done in a read-only transaction
+	err := b.db.View(func(tx *badger.Txn) error {
 
 		// STEP ONE: Load some things we need to do our work.
 
@@ -223,13 +226,12 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 		// STEP FOUR: we have a set of transactions that are valid to include
 		// on this fork. Now we need to create the collection that will be
-		// used in the payload, store and index it in storage, and insert the
-		// header.
+		// used in the payload and construct the final proposal model
 
 		// build the payload from the transactions
 		payload := cluster.PayloadFromTransactions(minRefID, transactions...)
 
-		proposal = flow.Header{
+		header := flow.Header{
 			ChainID:     parent.ChainID,
 			ParentID:    parentID,
 			Height:      parent.Height + 1,
@@ -245,28 +247,14 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		}
 
 		// set fields specific to the consensus algorithm
-		err = setter(&proposal)
+		err = setter(&header)
 		if err != nil {
 			return fmt.Errorf("could not set fields to header: %w", err)
 		}
 
-		// insert the header for the newly built block
-		err = operation.InsertHeader(proposal.ID(), &proposal)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert cluster proposal: %w", err)
-		}
-
-		// insert the payload
-		// this inserts the collection AND all constituent transactions
-		err = procedure.InsertClusterPayload(&proposal, &payload)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert cluster payload: %w", err)
-		}
-
-		// index the payload by block ID
-		err = procedure.IndexClusterPayload(&proposal, &payload)(tx)
-		if err != nil {
-			return fmt.Errorf("could not index cluster payload: %w", err)
+		proposal = cluster.Block{
+			Header:  &header,
+			Payload: &payload,
 		}
 
 		return nil
@@ -275,5 +263,20 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not build block: %w", err)
 	}
 
-	return &proposal, nil
+	// finally we insert the block in a write transaction
+	err = operation.RetryOnConflict(b.db.Update, func(tx *badger.Txn) error {
+		err := procedure.InsertClusterBlock(&proposal)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert built block: %w", err)
+		}
+
+		err = operation.InsertBlockChildren(proposal.ID(), nil)(tx)
+		if err != nil {
+			return fmt.Errorf("could not create empty child index for built block: %w", err)
+		}
+
+		return nil
+	})
+
+	return proposal.Header, err
 }
