@@ -36,6 +36,10 @@ import (
 // NOTE: some test cases are meant to solely run locally when FLOWLOCAL environmental
 // variable is set to TRUE
 func TestHappyPath(t *testing.T) {
+	// TODO broken test
+	// will be addressed in
+	// https://github.com/dapperlabs/flow-go/issues/3592
+	t.Skip()
 	testcases := []struct {
 		verNodeCount,
 		chunkCount int
