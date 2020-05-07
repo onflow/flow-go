@@ -47,10 +47,6 @@ func SplitKeyValues(keys [][]byte, values [][]byte, bitIndex int) ([][]byte, [][
 
 // SplitSortedKeys splits a set of ordered keys based on the value of bit (bitIndex)
 func SplitSortedKeys(keys [][]byte, bitIndex int) ([][]byte, [][]byte, error) {
-
-	if len(keys) == 0 {
-		return nil, nil, fmt.Errorf("keys are empty: (keys:%v) (index: %d)", keys, bitIndex)
-	}
 	for i, key := range keys {
 		bitIsSet, err := IsBitSet(key, bitIndex)
 		if err != nil {

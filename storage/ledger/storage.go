@@ -123,7 +123,7 @@ func (f *TrieStorage) GetRegistersWithProof(
 		return nil, nil, fmt.Errorf("Could not get proofs: %w", err)
 	}
 
-	proofToGo := mtrie.EncodeProof(batchProof)
+	proofToGo := mtrie.EncodeBatchProof(batchProof)
 	return values, proofToGo, err
 }
 
