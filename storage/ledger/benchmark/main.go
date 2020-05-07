@@ -10,21 +10,24 @@ import (
 	"runtime/pprof"
 	"time"
 
-	"github.com/dapperlabs/flow-go/storage/ledger"
-	utils "github.com/dapperlabs/flow-go/storage/ledger/utils"
 	"github.com/rs/zerolog"
+
+	"github.com/dapperlabs/flow-go/storage/ledger"
+	"github.com/dapperlabs/flow-go/storage/ledger/trie"
+	utils "github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
 var dir = "./db/"
 
+// StorageBenchmark benchmarks the performance of the storage layer
 func StorageBenchmark() {
 	// number of collections
-	steps := 100 // 250
+	steps := 200 // 250
 	// assumption: 1000 key updates per collection
 	numInsPerStep := 1000
 	keyByteSize := 32
 	valueMaxByteSize := 32
-	// trieHeight := keyByteSize*8 + 1 // 257
+	trieHeight := keyByteSize*8 + 1 // 257
 
 	f, err := os.Create("./logs.txt")
 	if err != nil {
@@ -53,7 +56,7 @@ func StorageBenchmark() {
 		start := time.Now()
 		newState, err := led.UpdateRegisters(keys, values, stateCommitment)
 		if err != nil {
-			panic("failed to update register")
+			panic(err)
 		}
 		elapsed := time.Since(start)
 
@@ -78,28 +81,28 @@ func StorageBenchmark() {
 			Dur("read_time_ms", elapsed).
 			Msg("read register")
 
-		// start = time.Now()
-		// // validate proofs (check individual proof and batch proof)
-		// retValues, proofs, err := led.GetRegistersWithProof(keys, newState)
-		// if err != nil {
-		// 	panic("failed to update register")
-		// }
-		// elapsed = time.Since(start)
+		start = time.Now()
+		// validate proofs (check individual proof and batch proof)
+		retValues, proofs, err := led.GetRegistersWithProof(keys, newState)
+		if err != nil {
+			panic("failed to update register")
+		}
+		elapsed = time.Since(start)
 
-		// start = time.Now()
-		// // validate proofs as a batch
-		// _, err = trie.NewPSMT(newState, trieHeight, keys, retValues, proofs)
-		// if err != nil {
-		// 	panic("failed to create PSMT")
-		// }
-		// elapsed2 := time.Since(start)
-		// logger.Info().
-		// 	Int64("read_time_per_reg_ms", int64(elapsed/time.Millisecond)/int64(len(keys))).
-		// 	Int("reg_count", len(keys)).
-		// 	Dur("read_time_ms", elapsed).
-		// 	Dur("time_to_const_psmt_ms", elapsed2).
-		// 	Int64("time_to_const_psmt_per_reg_ms", int64(elapsed2/time.Millisecond)/int64(len(keys))).
-		// 	Msg("read register with proof")
+		start = time.Now()
+		// validate proofs as a batch
+		_, err = trie.NewPSMT(newState, trieHeight, keys, retValues, proofs)
+		if err != nil {
+			panic("failed to create PSMT")
+		}
+		elapsed2 := time.Since(start)
+		logger.Info().
+			Int64("read_time_per_reg_ms", int64(elapsed/time.Millisecond)/int64(len(keys))).
+			Int("reg_count", len(keys)).
+			Dur("read_time_ms", elapsed).
+			Dur("time_to_const_psmt_ms", elapsed2).
+			Int64("time_to_const_psmt_per_reg_ms", int64(elapsed2/time.Millisecond)/int64(len(keys))).
+			Msg("read register with proof")
 		stateCommitment = newState
 
 	}
