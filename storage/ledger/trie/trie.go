@@ -8,15 +8,13 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
-	"sync"
-	"time"
 
 	"github.com/gammazero/deque"
 	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
-	"github.com/dapperlabs/flow-go/storage/ledger/databases/inmemdb"
+	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 	"github.com/dapperlabs/flow-go/utils/io"
 )
@@ -247,7 +245,7 @@ func (f *forest) Get(root Root) (*tree, error) {
 
 	db, err := f.newDB(root)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create DB: %w", err)
+		return nil, fmt.Errorf("cannot create LevelDB: %w", err)
 	}
 
 	tree, err := f.newTree(root, db)
@@ -263,8 +261,7 @@ func (f *forest) Get(root Root) (*tree, error) {
 func (f *forest) newDB(root Root) (databases.DAL, error) {
 	treePath := filepath.Join(f.dbDir, root.String())
 
-	// db, err := leveldb.NewLevelDB(treePath)
-	db, err := inmemdb.NewInMemDB(treePath)
+	db, err := leveldb.NewLevelDB(treePath)
 	return db, err
 }
 
@@ -1060,16 +1057,11 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 	if len(keys) < 1 {
 		return root, nil
 	}
-	fmt.Println("step0- update is called")
-	start := time.Now()
-	updateStart := time.Now()
 
 	t, err := s.forest.Get(root)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get tree: %w", err)
 	}
-	fmt.Println("step1- trie lookup is done", time.Since(start).Milliseconds())
-	start = time.Now()
 
 	// sort keys and deduplicate keys (we only consider the first occurance, and ignore the rest)
 	sortedKeys := make([][]byte, 0)
@@ -1086,8 +1078,6 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 			valueMap[string(key)] = values[i]
 		}
 	}
-	fmt.Println("step2- deduplication is done", time.Since(start).Milliseconds())
-	start = time.Now()
 
 	sort.Slice(sortedKeys, func(i, j int) bool {
 		return bytes.Compare(sortedKeys[i], sortedKeys[j]) < 0
@@ -1097,9 +1087,6 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 	for _, key := range sortedKeys {
 		sortedValues = append(sortedValues, valueMap[string(key)])
 	}
-
-	fmt.Println("step3- key sorting is done", time.Since(start).Milliseconds())
-	start = time.Now()
 
 	// use sorted keys
 	keys = sortedKeys
@@ -1111,15 +1098,8 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 	}
 
 	newTreeRoot := treeRoot.deepCopy()
-
-	fmt.Println("step4- deep copy of trie is done", time.Since(start).Milliseconds())
-	start = time.Now()
-
 	batcher := t.database.NewBatcher()
 	newRootNode, err := s.UpdateAtomically(newTreeRoot, keys, values, s.height-1, batcher, t.database)
-
-	fmt.Println("step5- update atomically is done", time.Since(start).Milliseconds())
-	start = time.Now()
 
 	if err != nil {
 		return nil, err
@@ -1130,7 +1110,7 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 		return newRootNode.value, nil
 	}
 
-	db, err := inmemdb.NewInMemDB(filepath.Join(s.forest.dbDir, newRootNode.value.String()))
+	db, err := leveldb.NewLevelDB(filepath.Join(s.forest.dbDir, newRootNode.value.String()))
 	if err != nil {
 		return nil, fmt.Errorf("cannot create new DB: %w", err)
 	}
@@ -1140,9 +1120,6 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 		newHistoricalStatRoots.PushBack(t.historicalStateRoots.At(i))
 	}
 	newHistoricalStatRoots.PushBack(newRootNode.value)
-
-	fmt.Println("step6- historic state queue push is done", time.Since(start).Milliseconds())
-	start = time.Now()
 
 	newTree := &tree{
 		root:                 newRootNode.value,
@@ -1155,37 +1132,22 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 		historicalStateRoots: newHistoricalStatRoots,
 	}
 
-	fmt.Println("step7- new tree creation is done", time.Since(start).Milliseconds())
-	start = time.Now()
-
 	err = s.updateHistoricalStates(t, newTree, batcher)
 	if err != nil {
 		return nil, err
 	}
-
-	fmt.Println("step8- updateHistoricalStates is done", time.Since(start).Milliseconds())
-	start = time.Now()
 
 	err = db.UpdateTrieDB(batcher)
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println("step9- UpdateTrieDB is done", time.Since(start).Milliseconds())
-	start = time.Now()
-
 	err = db.UpdateKVDB(keys, values)
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println("step10- UpdateKVDB is done", time.Since(start).Milliseconds())
-	start = time.Now()
-
-	// go db.Persist()
 	s.forest.Add(newTree)
-
-	fmt.Println("end of update, total time:", time.Since(updateStart).Seconds())
 	return newRootNode.value, nil
 }
 
@@ -1237,9 +1199,7 @@ func (s *SMT) insertIntoKeys(database databases.DAL, insert []byte, keys [][]byt
 // UpdateAtomically updates the trie atomically and returns the state rootNode
 // NOTE: This function assumes keys and values are sorted and haves indexes mapping to each other
 func (s *SMT) UpdateAtomically(rootNode *node, keys [][]byte, values [][]byte, height int, batcher databases.Batcher, database databases.DAL) (*node, error) {
-
 	var err error
-
 	if rootNode.value != nil {
 		batcher.Put(rootNode.value, nil)
 	}
@@ -1292,25 +1252,8 @@ func (s *SMT) UpdateAtomically(rootNode *node, keys [][]byte, values [][]byte, h
 // updateParallel updates both the left and right subtrees and computes a new rootNode
 func (s *SMT) updateParallel(lnode *node, rnode *node, rootNode *node, keys [][]byte, values [][]byte, lkeys [][]byte, rkeys [][]byte, lvalues [][]byte, rvalues [][]byte, height int, batcher databases.Batcher, database databases.DAL) (*node, error) {
 
-	wg := sync.WaitGroup{}
-	var lupdate, rupdate *node
-	var err1, err2 error
-
-	lbatcher := inmemdb.NewInMemBatcher()
-	rbatcher := inmemdb.NewInMemBatcher()
-
-	f1 := func() {
-		defer wg.Done()
-		lupdate, err1 = s.UpdateAtomically(lnode, lkeys, lvalues, height-1, lbatcher, database)
-	}
-	f2 := func() {
-		defer wg.Done()
-		rupdate, err2 = s.UpdateAtomically(rnode, rkeys, rvalues, height-1, rbatcher, database)
-	}
-	wg.Add(2)
-	go f1()
-	go f2()
-	wg.Wait()
+	lupdate, err1 := s.UpdateAtomically(lnode, lkeys, lvalues, height-1, batcher, database)
+	rupdate, err2 := s.UpdateAtomically(rnode, rkeys, rvalues, height-1, batcher, database)
 
 	if err1 != nil {
 		return nil, err1
@@ -1318,8 +1261,6 @@ func (s *SMT) updateParallel(lnode *node, rnode *node, rootNode *node, keys [][]
 	if err2 != nil {
 		return nil, err2
 	}
-	batcher.Merge(lbatcher)
-	batcher.Merge(rbatcher)
 
 	return s.ComputeRootNode(lupdate, rupdate, rootNode, keys, values, height, batcher), nil
 }
