@@ -1,9 +1,5 @@
 package mtrie
 
-import (
-	"sync"
-)
-
 // MTrie is a fully in memory trie with option to persist to disk
 type MTrie struct {
 	root           *node
@@ -11,7 +7,6 @@ type MTrie struct {
 	values         map[string][]byte
 	rootHash       []byte
 	parentRootHash []byte
-	lock           sync.Mutex
 }
 
 // SetParent sets parents for this trie

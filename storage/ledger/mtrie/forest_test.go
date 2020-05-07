@@ -290,6 +290,7 @@ func TestSameKeyInsert(t *testing.T) {
 	require.NoError(t, err)
 
 	retValues, err := fStore.Read(keys, rootHash)
+	require.NoError(t, err)
 	require.True(t, bytes.Equal(retValues[0], values[0]))
 }
 
@@ -310,6 +311,7 @@ func TestReadOrder(t *testing.T) {
 	require.NoError(t, err)
 
 	retValues, err := fStore.Read(keys, rootHash)
+	require.NoError(t, err)
 	require.True(t, bytes.Equal(retValues[0], values[0]))
 	require.True(t, bytes.Equal(retValues[1], values[1]))
 }
@@ -334,6 +336,7 @@ func TestReadWithDupplicatedKeys(t *testing.T) {
 	values = [][]byte{v1, v2, v1}
 
 	retValues, err := fStore.Read(keys, rootHash)
+	require.NoError(t, err)
 	require.True(t, bytes.Equal(retValues[0], values[0]))
 	require.True(t, bytes.Equal(retValues[1], values[1]))
 	require.True(t, bytes.Equal(retValues[2], values[2]))
