@@ -264,19 +264,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 
 	// finally we insert the block in a write transaction
-	err = operation.RetryOnConflict(b.db.Update, func(tx *badger.Txn) error {
-		err := procedure.InsertClusterBlock(&proposal)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert built block: %w", err)
-		}
-
-		err = operation.InsertBlockChildren(proposal.ID(), nil)(tx)
-		if err != nil {
-			return fmt.Errorf("could not create empty child index for built block: %w", err)
-		}
-
-		return nil
-	})
+	err = operation.RetryOnConflict(b.db.Update, procedure.InsertClusterBlock(&proposal))
+	if err != nil {
+		return nil, fmt.Errorf("could not insert built block: %w", err)
+	}
 
 	return proposal.Header, err
 }
