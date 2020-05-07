@@ -17,5 +17,5 @@ type Finalizer interface {
 
 	// MakePending will declare a block has passed all the validation, and is
 	// incorporated to a certain branch that is waiting to be finalized.
-	MakePending(blockID flow.Identifier, parentID flow.Identifier) error
+	MakePending(blockID flow.Identifier) error
 }

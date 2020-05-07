@@ -24,13 +24,13 @@ func (_m *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	return r0
 }
 
-// MakePending provides a mock function with given fields: blockID, parentID
-func (_m *Finalizer) MakePending(blockID flow.Identifier, parentID flow.Identifier) error {
-	ret := _m.Called(blockID, parentID)
+// MakePending provides a mock function with given fields: blockID
+func (_m *Finalizer) MakePending(blockID flow.Identifier) error {
+	ret := _m.Called(blockID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.Identifier) error); ok {
-		r0 = rf(blockID, parentID)
+	if rf, ok := ret.Get(0).(func(flow.Identifier) error); ok {
+		r0 = rf(blockID)
 	} else {
 		r0 = ret.Error(0)
 	}
