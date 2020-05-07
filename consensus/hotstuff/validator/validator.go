@@ -43,7 +43,7 @@ func (v *Validator) ValidateQC(qc *model.QuorumCertificate, block *model.Block) 
 	// IdentityList returned by hotstuff.Committee contains only legitimate consensus participants for the specified block (must have positive stake)
 	allParticipants, err := v.committee.Identities(block.BlockID, filter.Any)
 	if err != nil {
-		return fmt.Errorf("could not get consensus participants for blcok %s: %w", block.BlockID, err)
+		return fmt.Errorf("could not get consensus participants for block %s: %w", block.BlockID, err)
 	}
 	signers := allParticipants.Filter(filter.HasNodeID(qc.SignerIDs...)) // resulting IdentityList contains no duplicates
 	if len(signers) < len(qc.SignerIDs) {
@@ -149,7 +149,7 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 		case errors.Is(err, model.ErrInvalidSigner):
 			return nil, newInvalidVoteError(vote, err)
 		default:
-			return nil, fmt.Errorf("cannot verify signature for vote (%s): %w", vote.ID(), err.Error())
+			return nil, fmt.Errorf("cannot verify signature for vote (%x): %w", vote.ID(), err)
 		}
 	}
 	if !valid {

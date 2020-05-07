@@ -53,7 +53,7 @@ func (v *Voter) ProduceVoteIfVotable(block *model.Block, curView uint64) (*model
 	// vote for the current view has been produced, update lastVotedView
 	// to prevent from voting for the same view again
 	v.lastVotedView = curView
-	err = v.persist.VotedView(curView)
+	err = v.persist.PutVoted(curView)
 	if err != nil {
 		return nil, fmt.Errorf("could not persist last voted: %w", err)
 	}

@@ -11,7 +11,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 // ReadOnlyExecutionState allows to read the execution state
@@ -64,6 +63,7 @@ type ExecutionState interface {
 type state struct {
 	ls               storage.Ledger
 	commits          storage.Commits
+	blocks           storage.Blocks
 	chunkDataPacks   storage.ChunkDataPacks
 	executionResults storage.ExecutionResults
 	db               *badger.DB
@@ -73,6 +73,7 @@ type state struct {
 func NewExecutionState(
 	ls storage.Ledger,
 	commits storage.Commits,
+	blocks storage.Blocks,
 	chunkDataPacks storage.ChunkDataPacks,
 	executionResult storage.ExecutionResults,
 	db *badger.DB,
@@ -80,6 +81,7 @@ func NewExecutionState(
 	return &state{
 		ls:               ls,
 		commits:          commits,
+		blocks:           blocks,
 		chunkDataPacks:   chunkDataPacks,
 		executionResults: executionResult,
 		db:               db,
@@ -139,7 +141,7 @@ func (s *state) GetRegistersWithProofs(
 }
 
 func (s *state) StateCommitmentByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {
-	return s.commits.ByID(blockID)
+	return s.commits.ByBlockID(blockID)
 }
 
 func (s *state) PersistStateCommitment(blockID flow.Identifier, commit flow.StateCommitment) error {
@@ -175,17 +177,18 @@ func (s *state) PersistStateInteractions(blockID flow.Identifier, views []*delta
 }
 
 func (s *state) RetrieveStateDelta(blockID flow.Identifier) (*messages.ExecutionStateDelta, error) {
-	var block flow.Block
+
+	block, err := s.blocks.ByID(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("cannot retrieve block: %w", err)
+	}
+
 	var startStateCommitment flow.StateCommitment
 	var endStateCommitment flow.StateCommitment
 	var stateInteractions []*delta.Snapshot
 	var events []flow.Event
 	var txResults []flow.TransactionResult
-	err := s.db.View(func(txn *badger.Txn) error {
-		err := procedure.RetrieveBlock(blockID, &block)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot retrieve block: %w", err)
-		}
+	err = s.db.View(func(txn *badger.Txn) error {
 
 		err = operation.LookupStateCommitment(blockID, &endStateCommitment)(txn)
 		if err != nil {
@@ -218,7 +221,7 @@ func (s *state) RetrieveStateDelta(blockID flow.Identifier) (*messages.Execution
 		return nil, err
 	}
 	return &messages.ExecutionStateDelta{
-		Block:              &block,
+		Block:              block,
 		StateInteractions:  stateInteractions,
 		StartState:         startStateCommitment,
 		EndState:           endStateCommitment,
@@ -229,32 +232,45 @@ func (s *state) RetrieveStateDelta(blockID flow.Identifier) (*messages.Execution
 
 func (s *state) UpdateHighestExecutedBlockIfHigher(header *flow.Header) error {
 	return s.db.Update(func(txn *badger.Txn) error {
-		var number uint64
 		var blockID flow.Identifier
-		err := operation.RetrieveHighestExecutedBlockNumber(&number, &blockID)(txn)
+		err := operation.RetrieveExecutedBlock(&blockID)(txn)
 		if err != nil {
-			return fmt.Errorf("cannot retrieve highest executed block: %w", err)
+			return fmt.Errorf("cannot lookup executed block: %w", err)
 		}
-		if number < header.Height {
-			err = operation.UpdateHighestExecutedBlockNumber(header.Height, header.ID())(txn)
-			if err != nil {
-				return fmt.Errorf("cannot update highest executed block: %w", err)
-			}
+		var highest flow.Header
+		err = operation.RetrieveHeader(blockID, &highest)(txn)
+		if err != nil {
+			return fmt.Errorf("cannot retrieve executed header: %w", err)
+		}
+		if header.Height <= highest.Height {
+			return nil
+		}
+		err = operation.UpdateExecutedBlock(header.ID())(txn)
+		if err != nil {
+			return fmt.Errorf("cannot update highest executed block: %w", err)
 		}
 		return nil
 	})
 }
 
 func (s *state) GetHighestExecutedBlockID() (uint64, flow.Identifier, error) {
-	var height uint64
 	var blockID flow.Identifier
-	err := s.db.View(func(txn *badger.Txn) error {
-		return operation.RetrieveHighestExecutedBlockNumber(&height, &blockID)(txn)
+	var highest flow.Header
+	err := s.db.View(func(tx *badger.Txn) error {
+		err := operation.RetrieveExecutedBlock(&blockID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not lookup executed block: %w", err)
+		}
+		err = operation.RetrieveHeader(blockID, &highest)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve executed header: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
 		return 0, flow.ZeroID, err
 	}
-	return height, blockID, nil
+	return highest.Height, blockID, nil
 }
 
 func (s *state) Size() (int64, error) {
