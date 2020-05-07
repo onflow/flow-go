@@ -29,6 +29,12 @@ var (
 		Name:      "block_state_reads",
 		Help:      "count of state access/read operations performed per block",
 	})
+	executionTotalExecutedTransactionsCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "total_executed_transactions",
+		Help:      "the total number of transactions that have been executed",
+	})
 	executionStateStorageDiskTotalGauge = promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemStateStorage,
@@ -74,4 +80,14 @@ func (c *BaseMetrics) ExecutionStateStorageDiskTotal(bytes int64) {
 // ExecutionStorageStateCommitment reports the storage size of a state commitment
 func (c *BaseMetrics) ExecutionStorageStateCommitment(bytes int64) {
 	executionStorageStateCommitmentGauge.Set(float64(bytes))
+}
+
+// ExecutionLastExecutedBlockView reports last executed block view
+func (c *Collector) ExecutionLastExecutedBlockView(view uint64) {
+	executionLastExecutedBlockViewGauge.Set(float64(view))
+}
+
+// ExecutionTotalExecutedTransactions reports total executed transactions
+func (c *Collector) ExecutionTotalExecutedTransactions(numberOfTx int) {
+	executionTotalExecutedTransactionsCounter.Add(float64(numberOfTx))
 }

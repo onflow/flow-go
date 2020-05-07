@@ -154,4 +154,10 @@ type Metrics interface {
 
 	// ExecutionStorageStateCommitment reports the storage size of a state commitment in bytes
 	ExecutionStorageStateCommitment(bytes int64)
+
+	// ExecutionLastExecutedBlockView reports last executed block view
+	ExecutionLastExecutedBlockView(view uint64)
+
+	// ExecutionTotalExecutedTransactions adds num to the total number of executed transactions
+	ExecutionTotalExecutedTransactions(numExecuted int)
 }
