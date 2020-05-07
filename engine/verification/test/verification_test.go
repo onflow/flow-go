@@ -493,7 +493,7 @@ func ingestHappyPath(tb testing.TB, receiptCount int, chunkCount int) {
 	// with each receipt
 	for _, er := range ers {
 		// block
-		err := verNode.BlockStorage.Store(er.Block)
+		err := verNode.Blocks.Store(er.Block)
 		require.NoError(tb, err)
 
 		for _, chunk := range er.Receipt.ExecutionResult.Chunks {
