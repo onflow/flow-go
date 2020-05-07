@@ -4,6 +4,7 @@ package consensus
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"time"
 
@@ -175,8 +176,11 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	byParent := make(map[flow.Identifier]*flow.Seal)
 	for _, seal := range b.sealPool.All() {
 		sealed, err := b.headers.ByBlockID(seal.BlockID)
+		if errors.Is(err, storage.ErrNotFound) {
+			continue
+		}
 		if err != nil {
-			return nil, fmt.Errorf("could not retrieve sealed header: %w", err)
+			return nil, fmt.Errorf("could not retrieve sealed header (%x): %w", seal.BlockID, err)
 		}
 		byParent[sealed.ParentID] = seal
 	}

@@ -271,7 +271,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	for _, seal := range candidate.Payload.Seals {
 		sealed, err := m.state.headers.ByBlockID(seal.BlockID)
 		if err != nil {
-			return fmt.Errorf("could not retrieve sealed header: %w", err)
+			return fmt.Errorf("could not retrieve sealed header (%x): %w", seal.BlockID, err)
 		}
 		byParent[sealed.ParentID] = seal
 	}

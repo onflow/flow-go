@@ -6,6 +6,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
@@ -23,7 +24,7 @@ func IndexBlockChild(blockID flow.Identifier, childID flow.Identifier) func(*bad
 		// check we don't add a duplicate
 		for _, dupID := range childrenIDs {
 			if childID == dupID {
-				return fmt.Errorf("cannot index duplicate child")
+				return storage.ErrAlreadyExists
 			}
 		}
 
