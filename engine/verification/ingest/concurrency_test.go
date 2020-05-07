@@ -33,6 +33,10 @@ import (
 // - for each assigned chunk ingest engine emits a single result approval to verify engine only once
 // (even in presence of duplication)
 func TestConcurrency(t *testing.T) {
+	// TODO broken test
+	// will be addressed in
+	// https://github.com/dapperlabs/flow-go/issues/3592
+
 	testcases := []struct {
 		erCount, // number of execution receipts
 		senderCount, // number of (concurrent) senders for each execution receipt
