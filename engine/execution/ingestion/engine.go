@@ -655,6 +655,8 @@ func (e *Engine) handleComputationResult(
 	e.log.Debug().
 		Hex("block_id", logging.ID(result.ExecutableBlock.Block.ID())).
 		Msg("received computation result")
+	// There is one result per transaction
+	e.mc.ExecutionTotalExecutedTransactions(len(result.TransactionResult))
 
 	receipt, err := e.saveExecutionResults(
 		ctx,
