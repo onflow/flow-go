@@ -26,6 +26,7 @@ func TestEmptyInsert(t *testing.T) {
 	rootHash, err := fStore.Update(keys, values, rootHash)
 	require.NoError(t, err)
 	retValues, err := fStore.Read(keys, rootHash)
+	require.NoError(t, err)
 	require.True(t, bytes.Equal(retValues[0], values[0]))
 }
 
@@ -73,6 +74,7 @@ func TestLeftEmptyInsert(t *testing.T) {
 	keys = [][]byte{k1, k2, k3}
 	values = [][]byte{v1, v2, v3}
 	retValues, err := fStore.Read(keys, rootHash3)
+	require.NoError(t, err)
 	for i := range keys {
 		require.True(t, bytes.Equal(retValues[i], values[i]))
 	}
@@ -122,6 +124,7 @@ func TestRightEmptyInsert(t *testing.T) {
 	keys = [][]byte{k1, k2, k3}
 	values = [][]byte{v1, v2, v3}
 	retValues, err := fStore.Read(keys, rootHash3)
+	require.NoError(t, err)
 	for i := range keys {
 		require.True(t, bytes.Equal(retValues[i], values[i]))
 	}

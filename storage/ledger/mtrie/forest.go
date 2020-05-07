@@ -175,7 +175,7 @@ func (f *MForest) update(trie *MTrie, parent *node, head *node, keys [][]byte, v
 		alreadyExist := false
 		// deduplicate
 		for _, k := range keys {
-			if bytes.Compare(k, parent.key) == 0 {
+			if bytes.Equal(k, parent.key) {
 				alreadyExist = true
 			}
 		}
