@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine"
 	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
@@ -28,7 +29,7 @@ func TestExecutionFlow(t *testing.T) {
 
 	identities := flow.IdentityList{colID, conID, exeID, verID}
 
-	genesis := flow.Genesis(identities)
+	genesis := unittest.GenesisFixture(identities)
 
 	tx1 := flow.TransactionBody{
 		Script: []byte("transaction { execute { log(1) } }"),
@@ -54,26 +55,22 @@ func TestExecutionFlow(t *testing.T) {
 		col2.ID(): col2,
 	}
 
-	block := &flow.Block{
-		Header: &flow.Header{
-			ParentID: genesis.ID(),
-			View:     42,
-		},
-		Payload: &flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{
-				{
-					CollectionID: col1.ID(),
-					SignerIDs:    []flow.Identifier{colID.NodeID},
-				},
-				{
-					CollectionID: col2.ID(),
-					SignerIDs:    []flow.Identifier{colID.NodeID},
-				},
+	block := unittest.BlockWithParentFixture(genesis.Header)
+	block.Header.View = 42
+	block.SetPayload(flow.Payload{
+		Guarantees: []*flow.CollectionGuarantee{
+			{
+				CollectionID: col1.ID(),
+				SignerIDs:    []flow.Identifier{colID.NodeID},
+			},
+			{
+				CollectionID: col2.ID(),
+				SignerIDs:    []flow.Identifier{colID.NodeID},
 			},
 		},
-	}
+	})
 
-	proposal := unittest.ProposalFromBlock(block)
+	proposal := unittest.ProposalFromBlock(&block)
 
 	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21)
 	defer exeNode.Done()
@@ -158,39 +155,26 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 
 	identities := flow.IdentityList{con1ID, con2ID, exeID}
 
-	genesis := flow.Genesis(identities)
+	genesis := unittest.GenesisFixture(identities)
 
-	block2 := &flow.Block{
-		Header: &flow.Header{
-			ParentID:   genesis.ID(),
-			View:       2,
-			Height:     2,
-			ProposerID: con1ID.ID(),
-		},
-		Payload: &flow.Payload{},
-	}
-	fork := &flow.Block{
-		Header: &flow.Header{
-			ParentID:   genesis.ID(),
-			View:       2,
-			Height:     2,
-			ProposerID: con2ID.ID(),
-		},
-		Payload: &flow.Payload{},
-	}
-	block3 := &flow.Block{
-		Header: &flow.Header{
-			ParentID:   block2.ID(),
-			View:       3,
-			Height:     3,
-			ProposerID: con2ID.ID(),
-		},
-		Payload: &flow.Payload{},
-	}
+	block2 := unittest.BlockWithParentFixture(genesis.Header)
+	block2.Header.View = 2
+	block2.Header.ProposerID = con1ID.ID()
+	block2.SetPayload(flow.Payload{})
 
-	proposal2 := unittest.ProposalFromBlock(block2)
-	proposal2alt := unittest.ProposalFromBlock(fork)
-	proposal3 := unittest.ProposalFromBlock(block3)
+	fork := unittest.BlockWithParentFixture(genesis.Header)
+	fork.Header.View = 2
+	fork.Header.ProposerID = con2ID.ID()
+	fork.SetPayload(flow.Payload{})
+
+	block3 := unittest.BlockWithParentFixture(block2.Header)
+	block3.Header.View = 3
+	block3.Header.ProposerID = con2ID.ID()
+	block3.SetPayload(flow.Payload{})
+
+	proposal2 := unittest.ProposalFromBlock(&block2)
+	proposal2alt := unittest.ProposalFromBlock(&fork)
+	proposal3 := unittest.ProposalFromBlock(&block3)
 
 	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21)
 
@@ -236,45 +220,44 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	identities := flow.IdentityList{colID, conID, exe1ID, exe2ID}
 
-	genesis := flow.Genesis(identities)
+	genesis := unittest.GenesisFixture(identities)
 
 	// transaction that will change state and succeed, used to test that state commitment changes
 	tx1 := execTestutil.DeployCounterContractTransaction()
+
+	seq := uint64(0)
+
+	err := execTestutil.SignTransactionByRoot(&tx1, seq)
+	require.NoError(t, err)
+	seq++
+
 	col1 := flow.Collection{Transactions: []*flow.TransactionBody{&tx1}}
-	block2 := &flow.Block{
-		Header: &flow.Header{
-			ParentID:   genesis.ID(),
-			View:       2,
-			Height:     2,
-			ProposerID: conID.ID(),
+	block2 := unittest.BlockWithParentFixture(genesis.Header)
+	block2.Header.View = 2
+	block2.Header.ProposerID = conID.ID()
+	block2.SetPayload(flow.Payload{
+		Guarantees: []*flow.CollectionGuarantee{
+			{CollectionID: col1.ID(), SignerIDs: []flow.Identifier{colID.NodeID}},
 		},
-		Payload: &flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{
-				{CollectionID: col1.ID(), SignerIDs: []flow.Identifier{colID.NodeID}},
-			},
-		},
-	}
-	block2.Header.PayloadHash = block2.Payload.Hash()
-	proposal2 := unittest.ProposalFromBlock(block2)
+	})
+
+	proposal2 := unittest.ProposalFromBlock(&block2)
 
 	// transaction that will change state but then panic and revert, used to test that state commitment stays identical
 	tx2 := execTestutil.CreateCounterPanicTransaction()
+	err = execTestutil.SignTransactionByRoot(&tx2, seq)
+	require.NoError(t, err)
+
 	col2 := flow.Collection{Transactions: []*flow.TransactionBody{&tx2}}
-	block3 := &flow.Block{
-		Header: &flow.Header{
-			ParentID:   block2.ID(),
-			View:       3,
-			Height:     3,
-			ProposerID: conID.ID(),
+	block3 := unittest.BlockWithParentFixture(block2.Header)
+	block3.Header.View = 3
+	block3.Header.ProposerID = conID.ID()
+	block3.SetPayload(flow.Payload{
+		Guarantees: []*flow.CollectionGuarantee{
+			{CollectionID: col2.ID(), SignerIDs: []flow.Identifier{colID.NodeID}},
 		},
-		Payload: &flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{
-				{CollectionID: col2.ID(), SignerIDs: []flow.Identifier{colID.NodeID}},
-			},
-		},
-	}
-	block3.Header.PayloadHash = block3.Payload.Hash()
-	proposal3 := unittest.ProposalFromBlock(block3)
+	})
+	proposal3 := unittest.ProposalFromBlock(&block3)
 
 	// setup mocks and assertions
 	collectionNode := testutil.GenericNode(t, hub, colID, identities)
@@ -366,16 +349,12 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 
 	identities := flow.IdentityList{colID, exeID, ver1ID, ver2ID}
 
-	genesis := flow.Genesis(identities)
+	genesis := unittest.GenesisFixture(identities)
 
-	block := &flow.Block{
-		Header: &flow.Header{
-			ParentID: genesis.ID(),
-			View:     42,
-		},
-		Payload: &flow.Payload{},
-	}
-	proposal := unittest.ProposalFromBlock(block)
+	block := unittest.BlockWithParentFixture(genesis.Header)
+	block.Header.View = 42
+	block.SetPayload(flow.Payload{})
+	proposal := unittest.ProposalFromBlock(&block)
 
 	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21)
 	defer exeNode.Done()

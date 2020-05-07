@@ -36,6 +36,12 @@ type Block struct {
 	Payload *Payload
 }
 
+// SetPayload sets the payload and updates the payload hash.
+func (b *Block) SetPayload(payload Payload) {
+	b.Payload = &payload
+	b.Header.PayloadHash = b.Payload.Hash()
+}
+
 // Valid will check whether the block is valid bottom-up.
 func (b Block) Valid() bool {
 	return b.Header.PayloadHash == b.Payload.Hash()

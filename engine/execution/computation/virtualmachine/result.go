@@ -11,7 +11,7 @@ type TransactionResult struct {
 	TransactionID flow.Identifier
 	Events        []cadence.Event
 	Logs          []string
-	Error         error
+	Error         FlowError
 	GasUsed       uint64
 }
 
@@ -24,7 +24,8 @@ type ScriptResult struct {
 	ScriptID flow.Identifier
 	Value    cadence.Value
 	Logs     []string
-	Error    error
+	Error    FlowError
+	Events   []cadence.Event
 }
 
 func (r ScriptResult) Succeeded() bool {

@@ -20,7 +20,6 @@ import (
 type ComputationManager interface {
 	ExecuteScript([]byte, *flow.Header, *delta.View) ([]byte, error)
 	ComputeBlock(block *entity.ExecutableBlock, view *delta.View) (*execution.ComputationResult, error)
-	GetAccount(address flow.Address, blockHeader *flow.Header, view *delta.View) (*flow.Account, error)
 }
 
 // Manager manages computation and execution
@@ -59,7 +58,7 @@ func (e *Manager) ExecuteScript(script []byte, blockHeader *flow.Header, view *d
 	}
 
 	if !result.Succeeded() {
-		return nil, fmt.Errorf("failed to execute script at block (%s): %w", blockHeader.ID(), result.Error)
+		return nil, fmt.Errorf("failed to execute script at block (%s): %s", blockHeader.ID(), result.Error.ErrorMessage())
 	}
 
 	encodedValue, err := jsoncdc.Encode(result.Value)
@@ -88,11 +87,5 @@ func (e *Manager) ComputeBlock(block *entity.ExecutableBlock, view *delta.View) 
 		Hex("block_id", logging.Entity(result.ExecutableBlock.Block)).
 		Msg("computed block result")
 
-	return result, nil
-}
-
-func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, view *delta.View) (*flow.Account, error) {
-
-	result := e.vm.NewBlockContext(blockHeader).GetAccount(view, address)
 	return result, nil
 }

@@ -41,13 +41,8 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 			return fmt.Errorf("genesis collection should contain no transactions (got %d)", collSize)
 		}
 
-		err := procedure.InsertClusterPayload(genesis.Payload)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert genesis cluster payload: %w", err)
-		}
-
 		// insert block
-		err = procedure.InsertClusterBlock(genesis)(tx)
+		err := procedure.InsertClusterBlock(genesis)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis block: %w", err)
 		}

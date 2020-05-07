@@ -36,3 +36,15 @@ func UpdateBoundaryForCluster(clusterID string, number uint64) func(*badger.Txn)
 func RetrieveBoundaryForCluster(clusterID string, number *uint64) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeBoundary, clusterID), number)
 }
+
+// InsertClusterRefBlockID inserts the reference block ID for a cluster
+// block payload (ie. collection) keyed by the cluster block ID
+func InsertClusterRefBlockID(clusterBlockID, refID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeCollectionRefBlockID, clusterBlockID), refID)
+}
+
+// RetrieveClusterRefBlockID looks up the reference block ID for a cluster
+// block payload (ie. collection) keyed by the cluster block ID.
+func RetrieveClusterRefBlockID(clusterBlockID flow.Identifier, refID *flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeCollectionRefBlockID, clusterBlockID), refID)
+}
