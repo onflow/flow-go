@@ -407,12 +407,22 @@ func (e *Engine) requestCollection(collID, blockID flow.Identifier) error {
 	return nil
 }
 
-// requestChunkDataPack submits a request for the given chunk ID to the execution nodes.
+// requestChunkDataPack submits a request for the given chunk ID to the execution nodes,
+// or drops and logs the request if the tracker associated with the request goes beyond the
+// failure threshold
 func (e *Engine) requestChunkDataPack(chunkID, blockID flow.Identifier) error {
 	// updates tracker for this request
-	err := e.updateChunkDataPackTracker(chunkID, blockID)
+	cdpt, err := e.updateChunkDataPackTracker(chunkID, blockID)
 	if err != nil {
 		return fmt.Errorf("could not update the chunk data pack tracker: %w", err)
+	}
+	// checks against maximum retries
+	if cdpt.Counter > e.failureThreshold {
+		// tracker met maximum retry chances
+		// no longer retried
+		// TODO raise a missing chunk data pack challenge
+		// TODO drop tracker from memory once the challenge gets accepted, or trackers has nonce
+		return fmt.Errorf("chunk data pack tracker met maximum retries, no longer retried, chunk ID: %x", chunkID)
 	}
 
 	// extracts list of execution nodes
@@ -872,46 +882,30 @@ func (e *Engine) checkPendingCollections(collID, blockID flow.Identifier) {
 }
 
 // updateChunkDataPackTracker performs the following
-// If there is a tracker for this chunk ID, it pulls it out of mempool, increases its counter by one, and returns it
-// Else it creates a new empty tracker with counter value of one and returns it
-func (e *Engine) updateChunkDataPackTracker(chunkID flow.Identifier, blockID flow.Identifier) error {
-	var tracker *trackers.ChunkDataPackTracker
+// If there is a tracker for this chunk ID, it increases its counter by one in place
+
+// Else it creates a new empty tracker with counter value of one and stores it in the trackers mempool
+func (e *Engine) updateChunkDataPackTracker(chunkID flow.Identifier, blockID flow.Identifier) (*trackers.ChunkDataPackTracker, error) {
+	var cdpt *trackers.ChunkDataPackTracker
+
 	if e.chunkDataPackTackers.Has(chunkID) {
 		// there is a tracker for this chunk
-		// pulls tracker out of mempool
-		t, err := e.chunkDataPackTackers.ByChunkID(chunkID)
+		// increases its counter
+		t, err := e.chunkDataPackTackers.Inc(chunkID)
 		if err != nil {
-			return fmt.Errorf("could not retrieve chunk data pack tracker from mempool: %w", err)
+			return nil, fmt.Errorf("could not update chunk data pack tracker: %w", err)
 		}
-		tracker = t
-
-		removed := e.chunkDataPackTackers.Rem(tracker.ChunkID)
-		if !removed {
-			return fmt.Errorf("could not remove data pack tracker from mempool")
-		}
-		// increases tracker retry counter
-		tracker.Counter += 1
+		cdpt = t
 	} else {
-		// creates a new chunk data pack tracker
-		tracker = trackers.NewChunkDataPackTracker(chunkID, blockID)
+		// creates a new chunk data pack tracker and stores in in memory
+		cdpt = trackers.NewChunkDataPackTracker(chunkID, blockID)
+		err := e.chunkDataPackTackers.Add(cdpt)
+		if err != nil {
+			return nil, fmt.Errorf("could not store tracker of chunk data pack request in mempool: %w", err)
+		}
 	}
 
-	if tracker.Counter > e.failureThreshold {
-		// tracker met maximum retry chances
-		// no longer retried
-		// TODO raise a missing chunk data pack challenge
-		// TODO drop tracker from memory once the challenge gets accepted, or trackers has nonce
-		return fmt.Errorf("chunk data pack tracker met maximum retries, no longer retried, chunk ID: %x", chunkID)
-	}
-
-	// stores tracker back in the mempool
-	err := e.chunkDataPackTackers.Add(tracker)
-	// TODO handle the case of duplicate trackers
-	if err != nil && err != mempool.ErrAlreadyExists {
-		return fmt.Errorf("could not store tracker of chunk data pack request in mempool: %w", err)
-	}
-
-	return nil
+	return cdpt, nil
 }
 
 // updateCollectionTracker performs the following
