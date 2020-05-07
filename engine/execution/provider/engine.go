@@ -121,10 +121,13 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) onChunkDataPackRequest(originID flow.Identifier, req *messages.ChunkDataPackRequest) error {
 	// extracts list of verifier nodes id
 	chunkID := req.ChunkID
-	e.log.Info().
+
+	log := e.log.With().
 		Hex("origin_id", logging.ID(originID)).
 		Hex("chunk_id", logging.ID(chunkID)).
-		Msg("received chunk data pack request")
+		Logger()
+
+	log.Debug().Msg("received chunk data pack request")
 
 	origin, err := e.state.Final().Identity(originID)
 	if err != nil {
@@ -144,6 +147,8 @@ func (e *Engine) onChunkDataPackRequest(originID flow.Identifier, req *messages.
 	response := &messages.ChunkDataPackResponse{
 		Data: *cdp,
 	}
+
+	log.Debug().Msg("sending chunk data pack response")
 
 	// sends requested chunk data pack to the requester
 	err = e.chunksConduit.Submit(response, originID)
