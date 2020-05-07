@@ -5,8 +5,8 @@ go 1.13
 require (
 	cloud.google.com/go/storage v1.6.0
 	github.com/btcsuite/btcd v0.20.1-beta
+	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
 	github.com/dapperlabs/flow-go/crypto v0.3.2-0.20200312195452-df4550a863b7
-	github.com/dapperlabs/flow-go/integration v0.0.0-00010101000000-000000000000 // indirect
 	github.com/dgraph-io/badger/v2 v2.0.2
 	github.com/ethereum/go-ethereum v1.9.9
 	github.com/gammazero/deque v0.0.0-20200310222745-50fa758af896
@@ -27,6 +27,8 @@ require (
 	github.com/multiformats/go-multiaddr v0.2.0
 	github.com/onflow/cadence v0.1.1-0.20200429063251-116d638b2d80
 	github.com/onflow/flow/protobuf/go/flow v0.1.4
+	github.com/onsi/ginkgo v1.10.1 // indirect
+	github.com/onsi/gomega v1.7.0 // indirect
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.3.0
