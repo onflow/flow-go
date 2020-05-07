@@ -651,7 +651,9 @@ func (e *Engine) saveExecutionResults(block *flow.Block, stateInteractions []*de
 		values, proofs, err := e.execState.GetRegistersWithProofs(chunk.StartState, allRegisters)
 
 		if err != nil {
-			return nil, fmt.Errorf("error reading registers with proofs for chunk number [%v] of block [%x] ", i, block.ID())
+			return nil, fmt.Errorf(
+				"error reading registers with proofs for chunk number [%v] of block [%x]: %w", i, block.ID(), err,
+			)
 		}
 
 		chdp := generateChunkDataPack(chunk, allRegisters, values, proofs)
