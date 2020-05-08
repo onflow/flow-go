@@ -268,8 +268,7 @@ func (suite *IngestTestSuite) TestHandleReceipt_MissingCollection() {
 	// starts engine
 	<-eng.Ready()
 
-	// starts timer for submitting retries
-	// expects `failureThreshold`-many requests each sent at `requestInterval` milliseconds time interval
+	// starts timer for submitting request
 	unittest.RequireReturnsBefore(suite.T(), submitWG.Wait,
 		time.Duration(int64(suite.failureThreshold*suite.requestInterval))*time.Millisecond)
 
@@ -352,8 +351,7 @@ func (suite *IngestTestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	// starts engine
 	<-eng.Ready()
 
-	// starts timer for submitting retries
-	// expects `failureThreshold`-many requests each sent at `requestInterval` milliseconds time interval
+	// starts timer for submitting request
 	unittest.RequireReturnsBefore(suite.T(), submitWG.Wait,
 		time.Duration(int64(suite.failureThreshold*suite.requestInterval))*time.Millisecond)
 
