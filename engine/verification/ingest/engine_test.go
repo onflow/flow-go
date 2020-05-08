@@ -338,11 +338,26 @@ func (suite *IngestTestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	// mocks the functionality of adding receipt to the mempool
 	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
 
+	var submitWG sync.WaitGroup
+	submitWG.Add(1)
 	suite.chunksConduit.
-		On("Submit", testifymock.AnythingOfType("*messages.ChunkDataPackRequest"), execIdentities[0].NodeID).Return(nil).Once()
+		On("Submit", testifymock.AnythingOfType("*messages.ChunkDataPackRequest"), execIdentities[0].NodeID).Run(func(args testifymock.Arguments) {
+		submitWG.Done()
+	}).Return(nil).Once()
 
 	err := eng.Process(execIdentities[0].NodeID, suite.receipt)
 	suite.Assert().Nil(err)
+
+	// starts engine
+	<-eng.Ready()
+
+	// starts timer for submitting retries
+	// expects `failureThreshold`-many requests each sent at `requestInterval` milliseconds time interval
+	unittest.RequireReturnsBefore(suite.T(), submitWG.Wait,
+		time.Duration(int64(suite.failureThreshold*suite.requestInterval))*time.Millisecond)
+
+	// waits for the engine to get shutdown
+	<-eng.Done()
 
 	// asserts necessary calls
 	suite.chunksConduit.AssertExpectations(suite.T())
@@ -390,7 +405,7 @@ func (suite *IngestTestSuite) TestHandleReceipt_RetryMissingCollection() {
 	suite.collectionTrackers.On("ByCollectionID", suite.collTracker.ID()).Return(suite.collTracker, nil)
 	suite.collectionTrackers.On("Rem", suite.collTracker.ID()).Return(true)
 
-	// no chunl data pack tracjer
+	// no chunk data pack tacker
 	suite.chunkDataPackTrackers.On("All").Return(nil)
 
 	// mocks expectation
@@ -459,9 +474,6 @@ func (suite *IngestTestSuite) TestHandleReceipt_RetryMissingChunkDataPack() {
 
 	// presence of block associated with the receipt
 	suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil)
-
-	// chunk assigner
-	suite.assigner.On("Assign").Return(flow.ChunkList{})
 
 	// mocks expectation
 	//
