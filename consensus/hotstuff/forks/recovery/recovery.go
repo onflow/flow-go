@@ -36,6 +36,7 @@ func (fr *ForksRecovery) SubmitProposal(proposalHeader *flow.Header, parentView 
 	if errors.Is(err, model.ErrorInvalidBlock{}) {
 		fr.log.Warn().
 			Hex("block_id", logging.ID(proposal.Block.BlockID)).
+			Err(err).
 			Msg("invalid proposal")
 		return nil
 	}

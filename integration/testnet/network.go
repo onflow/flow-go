@@ -16,7 +16,6 @@ import (
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/testingdock"
@@ -67,6 +66,7 @@ type FlowNetwork struct {
 	network     *testingdock.Network
 	Containers  map[string]*Container
 	AccessPorts map[string]string
+	genesis     flow.Block
 }
 
 // Identities returns a list of identities, one for each node in the network.
@@ -76,6 +76,11 @@ func (net *FlowNetwork) Identities() flow.IdentityList {
 		il = append(il, c.Config.Identity())
 	}
 	return il
+}
+
+// Genesis returns the genesis block generated for the network.
+func (net *FlowNetwork) Genesis() flow.Block {
+	return net.genesis
 }
 
 // Start starts the network.
@@ -90,19 +95,18 @@ func (net *FlowNetwork) Start(ctx context.Context) {
 // If you need to restart containers, use `Stop` instead, which does not remove containers.
 func (net *FlowNetwork) Remove() {
 
-	defer net.Cleanup()          // defer to ensure it runs, even if stop fails
-	defer net.RemoveContainers() // defer to ensure it runs, even if stop fails
 	net.StopContainers()
+	net.RemoveContainers()
+	net.Cleanup()
 }
 
 // StopContainers stops all containers in the network, without removing them. This allows containers to be
 // restarted. To remove them, call `RemoveContainers`.
 func (net *FlowNetwork) StopContainers() {
 
-	fmt.Println("<<<< stopping network: ", net.config.Name)
 	err := net.suite.Close()
-	if !assert.Nil(net.t, err, "failed to stop network") {
-		defer net.t.FailNow()
+	if err != nil {
+		net.t.Log("failed to stop network", err)
 	}
 }
 
@@ -110,8 +114,8 @@ func (net *FlowNetwork) StopContainers() {
 func (net *FlowNetwork) RemoveContainers() {
 
 	err := net.suite.Remove()
-	if !assert.Nil(net.t, err, "failed to remove containers") {
-		defer net.t.FailNow()
+	if err != nil {
+
 	}
 }
 
@@ -121,8 +125,8 @@ func (net *FlowNetwork) Cleanup() {
 	// remove data directories
 	for _, c := range net.Containers {
 		err := os.RemoveAll(c.datadir)
-		if !assert.Nil(net.t, err, "failed to cleanup") {
-			defer net.t.FailNow()
+		if err != nil {
+			net.t.Log("failed to cleanup", err)
 		}
 	}
 }
@@ -301,7 +305,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	bootstrapDir, err := ioutil.TempDir(TmpRoot, "flow-integration-bootstrap")
 	require.Nil(t, err)
 
-	confs, err := BootstrapNetwork(networkConf, bootstrapDir)
+	genesis, confs, err := BootstrapNetwork(networkConf, bootstrapDir)
 	require.Nil(t, err)
 
 	flowNetwork := &FlowNetwork{
@@ -312,6 +316,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		network:     network,
 		Containers:  make(map[string]*Container, nNodes),
 		AccessPorts: make(map[string]string),
+		genesis:     *genesis,
 	}
 
 	// add each node to the network
@@ -455,11 +460,11 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	return nil
 }
 
-func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) ([]ContainerConfig, error) {
+func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Block, []ContainerConfig, error) {
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
 	if nNodes == 0 {
-		return nil, fmt.Errorf("must specify at least one node")
+		return nil, nil, fmt.Errorf("must specify at least one node")
 	}
 
 	// Sort so that access nodes start up last
@@ -468,30 +473,30 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) ([]Contain
 	// generate staking and networking keys for each configured node
 	confs, err := setupKeys(networkConf)
 	if err != nil {
-		return nil, fmt.Errorf("failed to setup keys: %w", err)
+		return nil, nil, fmt.Errorf("failed to setup keys: %w", err)
 	}
 
 	// run DKG for all consensus nodes
 	dkg, err := runDKG(confs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to run DKG: %w", err)
+		return nil, nil, fmt.Errorf("failed to run DKG: %w", err)
 	}
 
 	// generate the root account
 	hardcoded, err := hex.DecodeString(flow.RootAccountPrivateKeyHex)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	account, err := flow.DecodeAccountPrivateKey(hardcoded)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// generate the initial execution state
 	commit, err := run.GenerateExecutionState(filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState), account)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// generate genesis block
@@ -503,33 +508,33 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) ([]Contain
 
 	qc, err := bootstraprun.GenerateGenesisQC(signerData, genesis)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// write common genesis bootstrap files
 	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameAccount0Priv), account)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameGenesisCommit), commit)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameGenesisBlock), genesis)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameGenesisQC), qc)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameDKGDataPub), dkg.Public())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// write private key files for each DKG participant
@@ -537,7 +542,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) ([]Contain
 		filename := fmt.Sprintf(bootstrap.FilenameRandomBeaconPriv, part.NodeID)
 		err = writeJSON(filepath.Join(bootstrapDir, filename), part.Private())
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
@@ -548,16 +553,16 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) ([]Contain
 		// retrieve private representation of the node
 		private, err := nodeConfig.NodeInfo.Private()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		err = writeJSON(path, private)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
-	return confs, nil
+	return genesis, confs, nil
 }
 
 // setupKeys generates private staking and networking keys for each configured

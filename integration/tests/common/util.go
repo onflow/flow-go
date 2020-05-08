@@ -19,15 +19,8 @@ import (
 )
 
 var (
-	CounterOwner      = "0x01"
-	CounterController = "Testing.Counter"
-	CounterKey        = "count"
-)
-
-// DeployCounter deploys a counter contract using the given client.
-func DeployCounter(ctx context.Context, client *testnet.Client) error {
-
-	contract := dsl.Contract{
+	// a simple counter contract in Cadence
+	CounterContract = dsl.Contract{
 		Name: "Testing",
 		Members: []dsl.CadenceCode{
 			dsl.Resource{
@@ -50,14 +43,29 @@ func DeployCounter(ctx context.Context, client *testnet.Client) error {
 		},
 	}
 
-	return client.DeployContract(ctx, contract)
-}
+	// a transaction script for creating an instance of the counter in the
+	// account storage of the authorizing account
+	// NOTE: the counter contract must be deployed first
+	createCounterTx = dsl.Transaction{
+		Import: dsl.Import{Address: flow.RootAddress},
+		Content: dsl.Prepare{
+			Content: dsl.Code(`
+				var maybeCounter <- signer.load<@Testing.Counter>(from: /storage/counter)
 
-// readCounter executes a script to read the value of a counter. The counter
-// must have been deployed and created.
-func readCounter(ctx context.Context, client *testnet.Client) (int, error) {
+				if maybeCounter == nil {
+					maybeCounter <-! Testing.createCounter()
+				}
 
-	script := dsl.Main{
+				maybeCounter?.add(2)
+				signer.save(<-maybeCounter!, to: /storage/counter)
+
+				signer.link<&Testing.Counter>(/public/counter, target: /storage/counter)
+				`),
+		},
+	}
+
+	// a read-only script for reading the current value of the counter contract
+	readCounterScript = dsl.Main{
 		ReturnType: "Int",
 		Code: `
 			let account = getAccount(0x01)
@@ -66,8 +74,13 @@ func readCounter(ctx context.Context, client *testnet.Client) (int, error) {
 			}
 			return -3`,
 	}
+)
 
-	res, err := client.ExecuteScript(ctx, script)
+// readCounter executes a script to read the value of a counter. The counter
+// must have been deployed and created.
+func readCounter(ctx context.Context, client *testnet.Client) (int, error) {
+
+	res, err := client.ExecuteScript(ctx, readCounterScript)
 	if err != nil {
 		return 0, err
 	}
@@ -78,88 +91,6 @@ func readCounter(ctx context.Context, client *testnet.Client) (int, error) {
 	}
 
 	return v.(cadence.Int).Int(), nil
-}
-
-// createCounter creates a counter instance in the root account. The counter
-// contract must first have been deployed.
-func createCounter(ctx context.Context, client *testnet.Client) error {
-	txDSL := dsl.Transaction{
-		Import: dsl.Import{Address: flow.RootAddress},
-		Content: dsl.Prepare{
-			Content: dsl.Code(`
-				var maybeCounter <- signer.load<@Testing.Counter>(from: /storage/counter)
-
-				if maybeCounter == nil {
-					maybeCounter <-! Testing.createCounter()
-				}
-
-				maybeCounter?.add(2)
-				signer.save(<-maybeCounter!, to: /storage/counter)
-
-				signer.link<&Testing.Counter>(/public/counter, target: /storage/counter)
-				`),
-		},
-	}
-
-	tx := unittest.TransactionBodyFixture(unittest.WithTransactionDSL(txDSL))
-	return client.SendTransaction(ctx, tx)
-}
-
-// CreateCounterPanic creates a counter instance in the root account, but panics after manipulating state. The counter
-// contract must first have been deployed. It can be used to test whether execution state stays untouched/will revert.
-func CreateCounterPanic(ctx context.Context, client *testnet.Client) error {
-	txDSL := dsl.Transaction{
-		Import: dsl.Import{Address: flow.RootAddress},
-		Content: dsl.Prepare{
-			Content: dsl.Code(`
-				var maybeCounter <- signer.load<@Testing.Counter>(from: /storage/counter)
-
-				if maybeCounter == nil {
-					maybeCounter <-! Testing.createCounter()
-				}
-
-				maybeCounter?.add(2)
-				signer.save(<-maybeCounter!, to: /storage/counter)
-
-				signer.link<&Testing.Counter>(/public/counter, target: /storage/counter)
-
-				panic("fail for testing purposes")
-				`),
-		},
-	}
-
-	tx := unittest.TransactionBodyFixture(unittest.WithTransactionDSL(txDSL))
-	return client.SendTransaction(ctx, tx)
-}
-
-// CreateCounterWrongSig creates a counter instance in the root account, but uses a wrong signature. The counter
-// contract must first have been deployed. It can be used to test whether wrongly signed txs are not executed.
-func CreateCounterWrongSig(ctx context.Context, client *testnet.Client) error {
-	txDSL := dsl.Transaction{
-		Import: dsl.Import{Address: flow.RootAddress},
-		Content: dsl.Prepare{
-			Content: dsl.Code(`
-				var maybeCounter <- signer.load<@Testing.Counter>(from: /storage/counter)
-
-				if maybeCounter == nil {
-					maybeCounter <-! Testing.createCounter()
-				}
-
-				maybeCounter?.add(2)
-				signer.save(<-maybeCounter!, to: /storage/counter)
-
-				signer.link<&Testing.Counter>(/public/counter, target: /storage/counter)
-				`),
-		},
-	}
-
-	tx := unittest.TransactionBodyFixture(unittest.WithTransactionDSL(txDSL))
-
-	// remove signatures
-	tx.PayloadSignatures = nil
-	tx.EnvelopeSignatures = nil
-
-	return client.SendTransaction(ctx, tx)
 }
 
 func GetGhostClient(ghostContainer *testnet.Container) (*client.GhostClient, error) {

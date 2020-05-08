@@ -4,12 +4,11 @@ package operation
 
 import (
 	"bytes"
-	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
@@ -21,14 +20,6 @@ import (
 func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 
 	return func(tx *badger.Txn) error {
-
-		// initialize the maximum key size if this is the first insert
-		if max == maxKey {
-			err := InitMax(tx)
-			if err != nil {
-				return fmt.Errorf("could not init max tracker: %w", err)
-			}
-		}
 
 		// update the maximum key size if the inserted key is bigger
 		if uint32(len(key)) > max {
@@ -44,13 +35,12 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 		if err == nil {
 			return storage.ErrAlreadyExists
 		}
-
-		if !errors.Is(err, badger.ErrKeyNotFound) {
+		if err != badger.ErrKeyNotFound {
 			return fmt.Errorf("could not check key: %w", err)
 		}
 
 		// serialize the entity data
-		val, err := json.Marshal(entity)
+		val, err := msgpack.Marshal(entity)
 		if err != nil {
 			return fmt.Errorf("could not encode entity: %w", err)
 		}
@@ -65,24 +55,6 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 	}
 }
 
-// check will simply check if the entry with the given key exists in the DB.
-func check(key []byte, exists *bool) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-
-		// retrieve the item from the key-value store
-		_, err := tx.Get(key)
-		if err == badger.ErrKeyNotFound {
-			*exists = false
-			return nil
-		}
-		if err != nil {
-			return fmt.Errorf("could not check existence: %w", err)
-		}
-		*exists = true
-		return nil
-	}
-}
-
 // update will encode the given entity with JSON and update the binary data
 // under the given key in the badger DB. It will error if the key does not exist
 // yet.
@@ -91,7 +63,7 @@ func update(key []byte, entity interface{}) func(*badger.Txn) error {
 
 		// retrieve the item from the key-value store
 		_, err := tx.Get(key)
-		if err == badger.ErrKeyNotFound {
+		if errors.Is(err, badger.ErrKeyNotFound) {
 			return storage.ErrNotFound
 		}
 		if err != nil {
@@ -99,7 +71,7 @@ func update(key []byte, entity interface{}) func(*badger.Txn) error {
 		}
 
 		// serialize the entity data
-		val, err := json.Marshal(entity)
+		val, err := msgpack.Marshal(entity)
 		if err != nil {
 			return fmt.Errorf("could not encode entity: %w", err)
 		}
@@ -121,7 +93,7 @@ func remove(key []byte) func(*badger.Txn) error {
 		// retrieve the item from the key-value store
 		_, err := tx.Get(key)
 		if err == badger.ErrKeyNotFound {
-			return fmt.Errorf("could not find key %x): %w", key, err)
+			return storage.ErrNotFound
 		}
 		if err != nil {
 			return fmt.Errorf("could not check key: %w", err)
@@ -140,16 +112,16 @@ func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 
 		// retrieve the item from the key-value store
 		item, err := tx.Get(key)
+		if errors.Is(err, badger.ErrKeyNotFound) {
+			return storage.ErrNotFound
+		}
 		if err != nil {
-			if err == badger.ErrKeyNotFound {
-				return storage.ErrNotFound
-			}
 			return fmt.Errorf("could not load data: %w", err)
 		}
 
 		// get the value from the item
 		err = item.Value(func(val []byte) error {
-			err := json.Unmarshal(val, entity)
+			err := msgpack.Unmarshal(val, entity)
 			return err
 		})
 		if err != nil {
@@ -174,9 +146,6 @@ type createFunc func() interface{}
 // pair during a badger iteration. It should be called after the key was checked
 // and the entity was decoded.
 type handleFunc func() error
-
-// handleKeyFunc is a function that process the current key during a badger iteration.
-type handleKeyFunc func(key []byte)
 
 // iterationFunc is a function provided to our low-level iteration function that
 // allows us to pass badger efficiencies across badger boundaries. By calling it
@@ -298,7 +267,7 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn
 
 				// decode into the entity
 				entity := create()
-				err := json.Unmarshal(val, entity)
+				err := msgpack.Unmarshal(val, entity)
 				if err != nil {
 					return fmt.Errorf("could not decode entity: %w", err)
 				}
@@ -360,7 +329,7 @@ func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 
 				// decode into the entity
 				entity := create()
-				err := json.Unmarshal(val, entity)
+				err := msgpack.Unmarshal(val, entity)
 				if err != nil {
 					return fmt.Errorf("could not decode entity: %w", err)
 				}
@@ -379,197 +348,5 @@ func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 		}
 
 		return nil
-	}
-}
-
-// payloadIterRange determines start and end prefixes for an iteration through
-// a range of block heights within a payload index created using `toPayloadIndex`
-// `from` and `to` are the endpoints of the iteration range. Both will be
-// included in the iteration.
-func payloadIterRange(code uint8, from, to uint64) (start, end []byte) {
-	start = makePrefix(code, from)
-	end = makePrefix(code, to)
-	return
-}
-
-func toPayloadIndex(code uint8, height uint64, blockID flow.Identifier, parentID flow.Identifier) []byte {
-	return makePrefix(code, height, blockID, parentID)
-}
-
-func fromPayloadIndex(key []byte) (uint64, flow.Identifier, flow.Identifier) {
-	height := binary.BigEndian.Uint64(key[1:9])
-	blockID := flow.HashToID(key[9:41])
-	parentID := flow.HashToID(key[41:73])
-	return height, blockID, parentID
-}
-
-// validatepayload creates an iteration function used for ensuring no entities in
-// a new payload have already been included in an ancestor payload. The input
-// set of entity IDs represents the IDs of all entities in the candidate block
-// payload. If any of these candidate entities have already been included in an
-// ancestor block, a sentinel error is returned.
-//
-// This is useful for verifying an existing payload, for example in a block
-// proposal from another node, where the desired output is accept/reject.
-//
-// Use `payloadIterRange` to obtain start/end prefixes for iterations using
-// this function.
-func validatepayload(blockID flow.Identifier, checkIDs []flow.Identifier) iterationFunc {
-
-	// build lookup table for payload entities
-	lookup := make(map[flow.Identifier]struct{})
-	for _, checkID := range checkIDs {
-		lookup[checkID] = struct{}{}
-	}
-
-	return func() (checkFunc, createFunc, handleFunc) {
-
-		// check will check whether we are on the next block we want to check
-		// if we are not on the block we care about, we ignore the entry
-		// otherwise, we forward to the next parent and check the entry
-		check := func(key []byte) bool {
-			_, currentID, nextID := fromPayloadIndex(key)
-			if currentID != blockID {
-				return false
-			}
-			blockID = nextID
-			return true
-		}
-
-		// create returns a slice of IDs to decode the payload index entry into
-		var entityIDs []flow.Identifier
-		create := func() interface{} {
-			return &entityIDs
-		}
-
-		// handle will check the payload index entry entity IDs against the
-		// entity IDs we are checking as a new payload; if any of them matches,
-		// the payload is not valid, as it contains a duplicate entity
-		handle := func() error {
-			for _, entityID := range entityIDs {
-				_, ok := lookup[entityID]
-				if ok {
-					return fmt.Errorf("duplicate payload entity (%s): %w", entityID, storage.ErrAlreadyIndexed)
-				}
-			}
-			return nil
-		}
-
-		return check, create, handle
-	}
-}
-
-// searchduplicates creates an iteration function similar to validatepayload. Rather
-// than returning an error when ANY duplicate IDs are found, searchduplicates
-// tracks any duplicate IDs and populates a map containing all invalid IDs
-// from the candidate set.
-//
-// This is useful when building a payload locally, where we want to know which
-// entities are valid for inclusion so we can produce a valid block proposal.
-//
-// Use `payloadIterRange` to obtain start/end prefixes for iterations using
-// this function.
-func searchduplicates(blockID flow.Identifier, candidateIDs []flow.Identifier, invalidIDs *map[flow.Identifier]struct{}) iterationFunc {
-
-	// build lookup table for candidate payload entities
-	lookup := make(map[flow.Identifier]struct{})
-	for _, id := range candidateIDs {
-		lookup[id] = struct{}{}
-	}
-
-	// ensure the map is instantiated and empty
-	*invalidIDs = make(map[flow.Identifier]struct{})
-
-	return func() (checkFunc, createFunc, handleFunc) {
-
-		// check will check whether we are on the next block we want to check
-		// if we are not on the block we care about, we ignore the entry
-		// otherwise, we forward to the next parent and check the entry
-		check := func(key []byte) bool {
-			_, currentID, nextID := fromPayloadIndex(key)
-			if currentID != blockID {
-				return false
-			}
-			blockID = nextID
-			return true
-		}
-
-		// create returns a slice of IDs to decode the payload index entry into
-		var entityIDs []flow.Identifier
-		create := func() interface{} {
-			return &entityIDs
-		}
-
-		// handle will check the payload index entry entity IDs against the
-		// entity IDs we are checking as a new payload; if any of them matches,
-		// the payload is not valid, as it contains a duplicate entity
-		handle := func() error {
-			for _, entityID := range entityIDs {
-				_, isInvalid := lookup[entityID]
-				if isInvalid {
-					(*invalidIDs)[entityID] = struct{}{}
-				}
-			}
-			return nil
-		}
-
-		return check, create, handle
-	}
-}
-
-// finddescendant returns an handleKey function for iteration. It iterates keys in badger
-// and find the descendants blocks (blocks with higher view) that connected to the block
-// by the given blockID.
-func finddescendant(blockID flow.Identifier, descendants *[]flow.Identifier) handleKeyFunc {
-	incorporated := make(map[flow.Identifier]struct{})
-
-	// set the input block as incorporated. (The scenario for the input block is usually the
-	// finalized block)
-	incorporated[blockID] = struct{}{}
-
-	return func(key []byte) {
-		_, blockID, parentID := fromPayloadIndex(key)
-
-		_, ok := incorporated[parentID]
-		if ok {
-			// if parent is incorporated, then this block is incorporated too.
-			// adding it to the descendants list.
-			(*descendants) = append((*descendants), blockID)
-			incorporated[blockID] = struct{}{}
-		}
-
-		// if a block's parent isn't found in the incorporated list, then it's not incorporated.
-		// And it will never be incorporated, because we are traversing blocks with height in
-		// the increasing order. So future blocks will have higher height, and is not possible
-		// to fill the gap between this block and any existing incorporated block. Even if there is,
-		// that block must be an invalid block anyway, which is fine not being included in the
-		// descendants list.
-	}
-}
-
-// keyonly returns an iterationFunc that only iterate keys of the index.
-// It is useful to traverse through the index when the data needed are all included in the
-// key itself without reading the value.
-func keyonly(handleKey handleKeyFunc) iterationFunc {
-	return func() (checkFunc, createFunc, handleFunc) {
-		// the check function has side effect which passes the key to the handleKey function
-		// for processing
-		check := func(key []byte) bool {
-			handleKey(key)
-
-			// return false to stop parsing the value of the key
-			return false
-		}
-
-		// create and handle won't be called in the iteration, simply return nil
-		create := func() interface{} {
-			return nil
-		}
-
-		handle := func() error {
-			return nil
-		}
-
-		return check, create, handle
 	}
 }

@@ -146,7 +146,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 
 	// program the builder module behaviour
 	in.builder.On("BuildOn", mock.Anything, mock.Anything).Return(
-		func(parentID flow.Identifier, setter func(*flow.Header)) *flow.Header {
+		func(parentID flow.Identifier, setter func(*flow.Header) error) *flow.Header {
 			parent, ok := in.headers.Load(parentID)
 			if !ok {
 				return nil
@@ -162,7 +162,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 			in.headers.Store(header.ID(), header)
 			return header
 		},
-		func(parentID flow.Identifier, setter func(*flow.Header)) error {
+		func(parentID flow.Identifier, setter func(*flow.Header) error) error {
 			_, ok := in.headers.Load(parentID)
 			if !ok {
 				return fmt.Errorf("parent block not found (parent: %x)", parentID)
@@ -172,8 +172,8 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	)
 
 	// check on stop condition, stop the tests as soon as entering a certain view
-	in.persist.On("StartedView", mock.Anything).Return(nil)
-	in.persist.On("VotedView", mock.Anything).Return(nil)
+	in.persist.On("PutStarted", mock.Anything).Return(nil)
+	in.persist.On("PutVoted", mock.Anything).Return(nil)
 
 	// program the hotstuff signer behaviour
 	in.signer.On("CreateProposal", mock.Anything).Return(
@@ -266,6 +266,8 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 			return nil
 		},
 	)
+
+	in.finalizer.On("MakePending", mock.Anything).Return(nil)
 
 	// initialize error handling and logging
 	var err error

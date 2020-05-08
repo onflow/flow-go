@@ -22,6 +22,7 @@ type ReceiptState struct {
 
 func (rs *ReceiptState) Add(er *flow.ExecutionReceipt) {
 	if rs.receipts == nil {
+		// TODO: initialize this map in constructor
 		rs.receipts = make(map[flow.Identifier]map[flow.Identifier]*flow.ExecutionReceipt)
 	}
 

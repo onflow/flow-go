@@ -33,6 +33,7 @@ type Engine struct {
 	collectionConduit network.Conduit
 
 	// storage
+	// FIX: remove direct DB access by substituting indexer module
 	blocks       storage.Blocks
 	headers      storage.Headers
 	collections  storage.Collections
@@ -137,14 +138,16 @@ func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 		block, err := e.blocks.ByID(id)
 		if err != nil {
 			e.log.Error().Err(err).Hex("block_id", id[:]).Msg("failed to lookup block")
+			return
 		}
 		proposal := &messages.BlockProposal{
-			Header:  &block.Header,
-			Payload: &block.Payload,
+			Header:  block.Header,
+			Payload: block.Payload,
 		}
 		err = e.ProcessLocal(proposal)
 		if err != nil {
 			e.log.Error().Err(err).Hex("block_id", id[:]).Msg("failed to process block")
+			return
 		}
 		e.metrics.FinalizedBlocks(1)
 	})
@@ -154,10 +157,15 @@ func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 // TODO this will be an event triggered by the follower node when a new finalized or sealed block is received
 func (e *Engine) onBlockProposal(_ flow.Identifier, proposal *messages.BlockProposal) error {
 
+	// FIX: we can't index guarantees here, as we might have more than one block
+	// with the same collection as long as it is not finalized
+
+	// TODO: substitute an indexer module as layer between engine and storage
+
 	// index the block storage with each of the collection guarantee
-	err := e.blocks.IndexByGuarantees(proposal.Header.ID())
+	err := e.blocks.IndexBlockForCollections(proposal.Header.ID(), flow.GetIDs(proposal.Payload.Guarantees))
 	if err != nil {
-		return err
+		return fmt.Errorf("could not index block for collections: %w", err)
 	}
 
 	// request each of the collections from the collection node
@@ -168,6 +176,9 @@ func (e *Engine) onBlockProposal(_ flow.Identifier, proposal *messages.BlockProp
 func (e *Engine) handleCollectionResponse(originID flow.Identifier, response *messages.CollectionResponse) error {
 	collection := response.Collection
 	light := collection.Light()
+
+	// FIX: we can't index guarantees here, as we might have more than one block
+	// with the same collection as long as it is not finalized
 
 	// store the light collection (collection minus the transaction body - those are stored separately)
 	// and add transaction ids as index

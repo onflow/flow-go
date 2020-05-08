@@ -13,7 +13,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/storage/ledger"
 )
 
 var (
@@ -99,19 +98,12 @@ func (c *Container) Name() string {
 func (c *Container) DB() (*badger.DB, error) {
 	dbPath := filepath.Join(c.datadir, DefaultFlowDBDir)
 	opts := badger.
-		LSMOnlyOptions(dbPath).
+		DefaultOptions(dbPath).
 		WithKeepL0InMemory(true).
 		WithLogger(nil)
 
 	db, err := badger.Open(opts)
 	return db, err
-}
-
-// ExecutionLedgerStorage returns the execution node's ledger storage/trie DB.
-func (c *Container) ExecutionLedgerStorage() (*ledger.TrieStorage, error) {
-	dbPath := filepath.Join(c.datadir, DefaultExecutionRootDir)
-	ledgerStorage, err := ledger.NewTrieStorage(dbPath)
-	return ledgerStorage, err
 }
 
 // Pause stops this container temporarily, preserving its state. It can be

@@ -27,13 +27,13 @@ func (_m *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
 	return r0
 }
 
-// AtNumber provides a mock function with given fields: number
-func (_m *State) AtNumber(number uint64) protocol.Snapshot {
-	ret := _m.Called(number)
+// AtHeight provides a mock function with given fields: height
+func (_m *State) AtHeight(height uint64) protocol.Snapshot {
+	ret := _m.Called(height)
 
 	var r0 protocol.Snapshot
 	if rf, ok := ret.Get(0).(func(uint64) protocol.Snapshot); ok {
-		r0 = rf(number)
+		r0 = rf(height)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(protocol.Snapshot)
@@ -69,6 +69,22 @@ func (_m *State) Mutate() protocol.Mutator {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(protocol.Mutator)
+		}
+	}
+
+	return r0
+}
+
+// Sealed provides a mock function with given fields:
+func (_m *State) Sealed() protocol.Snapshot {
+	ret := _m.Called()
+
+	var r0 protocol.Snapshot
+	if rf, ok := ret.Get(0).(func() protocol.Snapshot); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(protocol.Snapshot)
 		}
 	}
 

@@ -126,7 +126,7 @@ func (gs *ExecutionSuite) TestStateSyncAfterNetworkPartition() {
 	gs.T().Logf("got erExe1BlockA with SC %x", erExe1BlockA.ExecutionResult.FinalStateCommit)
 
 	// send transaction
-	err = common.DeployCounter(context.Background(), gs.AccessClient())
+	err = gs.AccessClient().DeployContract(context.Background(), gs.net.Genesis().ID(), common.CounterContract)
 	require.NoError(gs.T(), err, "could not deploy counter")
 
 	// wait until we see a different state commitment for a finalized block, call that block blockB
