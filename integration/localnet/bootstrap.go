@@ -25,7 +25,7 @@ const (
 	AccessAPIPort            = 3569
 	MetricsPort              = 8080
 	RPCPort                  = 9000
-	PprofPort                = 6000
+	PprofPort                = 7000
 )
 
 var (
@@ -96,7 +96,7 @@ func main() {
 
 	fmt.Println("Profilers:")
 	for i, c := range containers {
-		fmt.Printf("- %s pprof server will be accessible at localhost:%d\n", c.ContainerName, PprofPort+i)
+		fmt.Printf("- %s pprof server will be accessible at localhost:%d/debug/pprof\n", c.ContainerName, PprofPort+i)
 	}
 	fmt.Println()
 
@@ -201,7 +201,7 @@ func prepareService(container testnet.ContainerConfig, serviceIndex, roleIndex i
 			"--datadir=/flowdb",
 			"--loglevel=DEBUG",
 			"--nclusters=1",
-			"--pprofport=6000",
+			fmt.Sprintf("--pprofport=%d", PprofPort),
 		},
 		Volumes: []string{
 			fmt.Sprintf("%s:/bootstrap", BootstrapDir),
