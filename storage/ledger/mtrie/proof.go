@@ -7,6 +7,9 @@ import (
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
+// Proof includes all the information needed to walk
+// through a trie branch from an specific leaf node (key)
+// up to the root of the trie.
 type Proof struct {
 	values    [][]byte // the non-default intermediate nodes in the proof
 	inclusion bool     // flag indicating if this is an inclusion or exclusion
@@ -24,7 +27,8 @@ func NewProof() *Proof {
 	return p
 }
 
-// Verify verifies the proof
+// Verify verifies the proof, by constructing all the
+// hash from the leaf to the root and comparing the rootHash
 func (p *Proof) Verify(key []byte, value []byte, rootHash []byte, trieMaxHeight int) bool {
 	// get index of proof we start our calculations from
 	proofIndex := 0
@@ -82,10 +86,9 @@ func (p *Proof) Export() ([]byte, [][]byte, bool, uint8) {
 }
 
 // BatchProof is a struct that holds the proofs for several keys
+//
 // TODO (add key values to batch proof and make it self-included),
 // so there is no need for two calls (read, proofs)
-//  keys       [][][]byte // keys in this
-//	values     [][][]byte // values
 type BatchProof struct {
 	Proofs []*Proof
 }
@@ -97,6 +100,8 @@ func NewBatchProof() *BatchProof {
 	return bp
 }
 
+// NewBatchProofWithEmptyProofs creates an instance of Batchproof
+// filled with n newly created proofs (empty)
 func NewBatchProofWithEmptyProofs(numberOfProofs int) *BatchProof {
 	bp := NewBatchProof()
 	for i := 0; i < numberOfProofs; i++ {
@@ -105,7 +110,7 @@ func NewBatchProofWithEmptyProofs(numberOfProofs int) *BatchProof {
 	return bp
 }
 
-// GetSize returns number of proofs
+// Size returns the number of proofs
 func (bp *BatchProof) Size() int {
 	return len(bp.Proofs)
 }
@@ -141,33 +146,31 @@ func (bp *BatchProof) MergeInto(dest *BatchProof) {
 	}
 }
 
-// EncodeProof encodes a proof holder into an array of byte arrays
-// The following code is the encoding logic
-// Each slice in the proofHolder is stored as a byte array, and the whole thing is stored
-// as a [][]byte
-// First we have a byte, and set the first bit to 1 if it is an inclusion proof
-// Then the size is encoded as a single byte
-// Then the flag is encoded (size is defined by size)
-// Finally the proofs are encoded one at a time, and is stored as a byte array
+// EncodeBatchProof encodes all the content of a batch proof into an array of byte arrays
 func EncodeBatchProof(bp *BatchProof) [][]byte {
 	proofs := make([][]byte, 0)
+	// for each proof we create a byte array
 	for _, p := range bp.Proofs {
-		flag, singleProof, inclusion, size := p.Export()
-		byteSize := []byte{size}
+		flag, values, inclusion, steps := p.Export()
+
+		// 1. set the first bit to 1 if it is an inclusion proof
 		byteInclusion := make([]byte, 1)
 		if inclusion {
 			utils.SetBit(byteInclusion, 0)
 		}
-		proof := append(byteInclusion, byteSize...)
+		// 2. steps is encoded as a single byte
+		byteSteps := []byte{steps}
+		proof := append(byteInclusion, byteSteps...)
 
+		// 3. include flag size first and then all the flags
 		flagSize := []byte{uint8(len(flag))}
 		proof = append(proof, flagSize...)
 		proof = append(proof, flag...)
 
-		for _, p := range singleProof {
-			proof = append(proof, p...)
+		// 4. and finally include all the hash values
+		for _, v := range values {
+			proof = append(proof, v...)
 		}
-		// ledgerStorage is a struct that holds our SM
 		proofs = append(proofs, proof)
 	}
 	return proofs

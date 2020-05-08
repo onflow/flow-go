@@ -98,7 +98,7 @@ func (f *MForest) read(trie *MTrie, head *node, keys [][]byte) ([][]byte, error)
 
 	lkeys, rkeys, err := SplitSortedKeys(keys, f.maxHeight-head.height-1)
 	if err != nil {
-		return nil, fmt.Errorf("can't read due to split key error: %v", err)
+		return nil, fmt.Errorf("can't read due to split key error: %w", err)
 	}
 
 	// TODO make this parallel
@@ -199,7 +199,7 @@ func (f *MForest) update(trie *MTrie, parent *node, head *node, keys [][]byte, v
 	// Split the keys and values array so we can update the trie in parallel
 	lkeys, lvalues, rkeys, rvalues, err := SplitKeyValues(keys, values, f.maxHeight-head.height-1)
 	if err != nil {
-		return fmt.Errorf("error spliting key values: %v", err)
+		return fmt.Errorf("error spliting key values: %w", err)
 	}
 
 	wg := sync.WaitGroup{}
@@ -293,7 +293,7 @@ func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*BatchProof, error) {
 		p.inclusion = false
 	}
 
-	err = f.proof(trie.root, keys, bp.Proofs)
+	err = f.proofs(trie.root, keys, bp.Proofs)
 	if err != nil {
 		return nil, err
 	}
@@ -301,27 +301,30 @@ func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*BatchProof, error) {
 	return bp, nil
 }
 
-func (f *MForest) proof(head *node, keys [][]byte, proofs []*Proof) error {
-	// not found
+func (f *MForest) proofs(head *node, keys [][]byte, proofs []*Proof) error {
+	// we've reached the end of a trie
+	// and key is not found (noninclusion proof)
 	if head == nil {
 		return nil
 	}
-	// reached key
+
+	// we've reached a leaf that has a key
 	if head.key != nil {
+		// value matches (inclusion proof)
 		if bytes.Equal(head.key, keys[0]) {
 			proofs[0].inclusion = true
 		}
 		return nil
 	}
 
-	// increment steps
+	// increment steps for all the proofs
 	for _, p := range proofs {
 		p.steps++
 	}
-
+	// split keys based on the value of i-th bit (i = trie height - node height)
 	lkeys, lproofs, rkeys, rproofs, err := SplitKeyProofs(keys, proofs, f.maxHeight-head.height-1)
 	if err != nil {
-		return fmt.Errorf("can't generate proofs due to split key error: %v", err)
+		return fmt.Errorf("proof generation failed, split key error: %w", err)
 	}
 
 	if len(lkeys) > 0 {
@@ -329,29 +332,32 @@ func (f *MForest) proof(head *node, keys [][]byte, proofs []*Proof) error {
 			nodeHash := f.GetNodeHash(head.rChild)
 			isDef := bytes.Equal(nodeHash, GetDefaultHashForHeight(head.rChild.height))
 			for _, p := range lproofs {
+				// we skip default values
 				if !isDef {
 					SetBit(p.flags, f.maxHeight-head.height-1)
 					p.values = append(p.values, nodeHash)
 				}
 			}
 		}
-		err := f.proof(head.lChild, lkeys, lproofs)
+		err := f.proofs(head.lChild, lkeys, lproofs)
 		if err != nil {
 			return err
 		}
 	}
+
 	if len(rkeys) > 0 {
 		if head.lChild != nil {
 			nodeHash := f.GetNodeHash(head.lChild)
 			isDef := bytes.Equal(nodeHash, GetDefaultHashForHeight(head.lChild.height))
 			for _, p := range rproofs {
+				// we skip default values
 				if !isDef {
 					SetBit(p.flags, f.maxHeight-head.height-1)
 					p.values = append(p.values, nodeHash)
 				}
 			}
 		}
-		err := f.proof(head.rChild, rkeys, rproofs)
+		err := f.proofs(head.rChild, rkeys, rproofs)
 		if err != nil {
 			return err
 		}
@@ -364,7 +370,10 @@ func (f *MForest) GetCompactValue(n *node) []byte {
 	return ComputeCompactValue(n.key, n.value, n.height, f.maxHeight)
 }
 
-// it only does it for inner nodes
+// PopulateNodeHashValues recursively update nodes with
+// the hash values for intermediate nodes (leafs already has values after update)
+// we only use this function to speed up proof generation,
+// for less memory usage we can skip this function
 func (f *MForest) PopulateNodeHashValues(n *node) []byte {
 	if n.hashValue != nil {
 		return n.hashValue

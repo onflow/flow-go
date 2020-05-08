@@ -22,7 +22,7 @@ var dir = "./db/"
 // StorageBenchmark benchmarks the performance of the storage layer
 func StorageBenchmark() {
 	// number of collections
-	steps := 50 // 250
+	steps := 250 // 1000
 	// assumption: 1000 key updates per collection
 	numInsPerStep := 1000
 	keyByteSize := 32

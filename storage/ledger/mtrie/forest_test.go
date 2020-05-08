@@ -11,6 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
+	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -294,6 +295,32 @@ func TestSameKeyInsert(t *testing.T) {
 	require.True(t, bytes.Equal(retValues[0], values[0]))
 }
 
+func TestUpdateWithWrongKeySize(t *testing.T) {
+	trieHeight := 17 // should be key size (in bits) + 1
+	fStore := mtrie.NewMForest(trieHeight)
+	rootHash := fStore.GetEmptyRootHash()
+
+	// short key
+	key1 := make([]byte, 1)
+	utils.SetBit(key1, 5)
+	value1 := []byte{'a'}
+	keys := [][]byte{key1}
+	values := [][]byte{value1}
+
+	rootHash, err := fStore.Update(keys, values, rootHash)
+	require.Error(t, err)
+
+	// long key
+	key2 := make([]byte, 33)
+	utils.SetBit(key2, 5)
+	value2 := []byte{'a'}
+	keys = [][]byte{key2}
+	values = [][]byte{value2}
+
+	rootHash, err = fStore.Update(keys, values, rootHash)
+	require.Error(t, err)
+}
+
 // TODO insert with duplicated keys
 
 func TestReadOrder(t *testing.T) {
@@ -342,7 +369,49 @@ func TestReadWithDupplicatedKeys(t *testing.T) {
 	require.True(t, bytes.Equal(retValues[2], values[2]))
 }
 
-// TODO test non existing read
+func TestReadNonExistKey(t *testing.T) {
+	trieHeight := 17 // should be key size (in bits) + 1
+	fStore := mtrie.NewMForest(trieHeight)
+	rootHash := fStore.GetEmptyRootHash()
+
+	k1 := []byte([]uint8{uint8(53), uint8(74)})
+	v1 := []byte{'A'}
+	keys := [][]byte{k1}
+	values := [][]byte{v1}
+	rootHash, err := fStore.Update(keys, values, rootHash)
+	require.NoError(t, err)
+
+	k2 := []byte([]uint8{uint8(116), uint8(129)})
+	v2 := []byte{'B'}
+
+	keys = [][]byte{k2}
+	values = [][]byte{v2}
+	retValues, err := fStore.Read(keys, rootHash)
+	require.NoError(t, err)
+	require.Equal(t, len(retValues[0]), 0)
+}
+
+func TestReadWithWrongKeySize(t *testing.T) {
+	trieHeight := 17 // should be key size (in bits) + 1
+	fStore := mtrie.NewMForest(trieHeight)
+	rootHash := fStore.GetEmptyRootHash()
+
+	// setup
+	key1 := make([]byte, 2)
+	utils.SetBit(key1, 5)
+	value1 := []byte{'a'}
+	keys := [][]byte{key1}
+	values := [][]byte{value1}
+	rootHash, err := fStore.Update(keys, values, rootHash)
+	require.NoError(t, err)
+
+	// wrong key size
+	key2 := make([]byte, 33)
+	utils.SetBit(key2, 5)
+	keys = [][]byte{key2}
+	_, err = fStore.Read(keys, rootHash)
+	require.Error(t, err)
+}
 
 func TestProofGenerationInclusion(t *testing.T) {
 	trieHeight := 17
