@@ -25,7 +25,7 @@ import (
 
 const (
 	// the default timeout for individual actions (eg. send a transaction)
-	defaultTimeout = 10 * time.Second
+	defaultTimeout = 30 * time.Second
 )
 
 // CollectorSuite represents a test suite for collector nodes.
@@ -167,15 +167,14 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transac
 	return tx
 }
 
-// AwaitClusterBlocks waits to observe the given number of cluster blocks,
+// AwaitProposals waits to observe the given number of cluster block proposals
 // and returns them.
-func (suite *CollectorSuite) AwaitClusterBlocks(n uint) []cluster.Block {
+func (suite *CollectorSuite) AwaitProposals(n uint) []cluster.Block {
 
 	blocks := make([]cluster.Block, 0, n)
-
 	suite.T().Logf("awaiting %d cluster blocks", n)
 
-	waitFor := time.Second*15 + time.Duration(n)*time.Millisecond*50
+	waitFor := defaultTimeout + time.Duration(n)*2*time.Second
 	deadline := time.Now().Add(waitFor)
 	for time.Now().Before(deadline) {
 
@@ -219,11 +218,11 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 
 	suite.T().Logf("awaiting %d transactions included", len(txIDs))
 
-	waitFor := time.Second*15 + time.Duration(len(lookup))*100*time.Millisecond
+	waitFor := defaultTimeout + time.Duration(len(lookup))*100*time.Millisecond
 	deadline := time.Now().Add(waitFor)
 	for time.Now().Before(deadline) {
 
-		_, msg, err := suite.reader.Next()
+		originID, msg, err := suite.reader.Next()
 		require.Nil(suite.T(), err, "could not read next message")
 
 		switch val := msg.(type) {
@@ -248,6 +247,12 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 
 		case *flow.TransactionBody:
 			suite.T().Log("got tx: ", val.ID())
+
+		case *messages.ClusterBlockRequest:
+			suite.T().Logf("got block req: %x from=%x", val.BlockID, originID)
+
+		case *messages.ClusterBlockResponse:
+			suite.T().Logf("got block req: %x %d", val.Proposal.Header.ID(), val.Proposal.Header.Height)
 		}
 	}
 

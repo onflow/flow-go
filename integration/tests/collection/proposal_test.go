@@ -193,11 +193,8 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 // the node. It should be able to catch up.
 func (suite *CollectorSuite) TestProposal_Recovery() {
 
-	// skipping - this will fail until HotStuff is integrated
-	suite.T().SkipNow()
-
 	var (
-		nNodes        = 6
+		nNodes        = 5
 		nTransactions = 30
 		err           error
 	)
@@ -217,15 +214,17 @@ func (suite *CollectorSuite) TestProposal_Recovery() {
 	// send a bunch of transactions
 	txIDs := make([]flow.Identifier, 0, nTransactions)
 	for i := 0; i < nTransactions; i++ {
-		tx := suite.NextTransaction()
 
+		tx := suite.NextTransaction()
 		// round-robin transactions between nodes
 		target := clients[i%len(clients)]
 
-		ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
-		err = target.SendTransaction(ctx, *tx)
-		suite.Require().Nil(err)
-		cancel()
+		go func() {
+			ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
+			err = target.SendTransaction(ctx, *tx)
+			suite.Require().Nil(err)
+			cancel()
+		}()
 
 		txIDs = append(txIDs, convert.IDFromSDK(tx.ID()))
 	}
@@ -234,8 +233,9 @@ func (suite *CollectorSuite) TestProposal_Recovery() {
 	suite.AwaitTransactionsIncluded(txIDs...)
 
 	// stop one of the nodes
+	suite.T().Logf("stopping COL1")
 	col1 := suite.Collector(0, 0)
-	err = col1.Pause()
+	err = col1.Disconnect()
 	suite.Require().Nil(err)
 
 	// send some more transactions
@@ -254,14 +254,48 @@ func (suite *CollectorSuite) TestProposal_Recovery() {
 		txIDs = append(txIDs, convert.IDFromSDK(tx.ID()))
 	}
 
-	// wait for the transactions to be included (5/6 nodes can make progress)
+	// wait for the transactions to be included (4/5 nodes can make progress)
 	suite.AwaitTransactionsIncluded(txIDs...)
 
-	// restart the paused collector
-	err = col1.Start()
+	// stop another node
+	suite.T().Logf("stopping COL2")
+	col2 := suite.Collector(0, 1)
+	err = col2.Disconnect()
 	suite.Require().Nil(err)
 
-	// TODO check that it has recovered
-	// should be able to check this be looking for its signature on a
-	// sufficiently high block proposal
+	// send some more transactions
+	txIDs = make([]flow.Identifier, 0, nTransactions)
+	for i := 0; i < nTransactions; i++ {
+		tx := suite.NextTransaction()
+
+		// round-robin transactions between collectors (except the paused ones)
+		target := clients[2:][i%(len(clients)-2)]
+
+		ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
+		err = target.SendTransaction(ctx, *tx)
+		suite.Require().Nil(err)
+		cancel()
+
+		txIDs = append(txIDs, convert.IDFromSDK(tx.ID()))
+	}
+
+	// ensure no progress was made (3/5 nodes cannot make progress)
+	proposals := suite.AwaitProposals(10)
+	height := proposals[0].Header.Height
+	for _, prop := range proposals {
+		suite.Assert().LessOrEqual(prop.Header.Height, height+2)
+	}
+
+	// restart the paused collectors
+	suite.T().Logf("restarting COL1")
+	err = col1.Connect()
+	suite.Require().Nil(err)
+
+	suite.T().Logf("restarting COL2")
+	err = col2.Connect()
+	suite.Require().Nil(err)
+
+	// now we can make progress again, but the paused collectors need to catch
+	// up to the current chain state first
+	suite.AwaitTransactionsIncluded(txIDs...)
 }
