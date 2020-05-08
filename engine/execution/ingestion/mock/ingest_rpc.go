@@ -2,6 +2,7 @@
 
 package mock
 
+import context "context"
 import flow "github.com/dapperlabs/flow-go/model/flow"
 
 import mock "github.com/stretchr/testify/mock"
@@ -11,13 +12,13 @@ type IngestRPC struct {
 	mock.Mock
 }
 
-// ExecuteScriptAtBlockID provides a mock function with given fields: script, blockID
-func (_m *IngestRPC) ExecuteScriptAtBlockID(script []byte, blockID flow.Identifier) ([]byte, error) {
-	ret := _m.Called(script, blockID)
+// ExecuteScriptAtBlockID provides a mock function with given fields: ctx, script, blockID
+func (_m *IngestRPC) ExecuteScriptAtBlockID(ctx context.Context, script []byte, blockID flow.Identifier) ([]byte, error) {
+	ret := _m.Called(ctx, script, blockID)
 
 	var r0 []byte
-	if rf, ok := ret.Get(0).(func([]byte, flow.Identifier) []byte); ok {
-		r0 = rf(script, blockID)
+	if rf, ok := ret.Get(0).(func(context.Context, []byte, flow.Identifier) []byte); ok {
+		r0 = rf(ctx, script, blockID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
@@ -25,8 +26,8 @@ func (_m *IngestRPC) ExecuteScriptAtBlockID(script []byte, blockID flow.Identifi
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func([]byte, flow.Identifier) error); ok {
-		r1 = rf(script, blockID)
+	if rf, ok := ret.Get(1).(func(context.Context, []byte, flow.Identifier) error); ok {
+		r1 = rf(ctx, script, blockID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -34,13 +35,13 @@ func (_m *IngestRPC) ExecuteScriptAtBlockID(script []byte, blockID flow.Identifi
 	return r0, r1
 }
 
-// GetAccount provides a mock function with given fields: address, blockID
-func (_m *IngestRPC) GetAccount(address flow.Address, blockID flow.Identifier) (*flow.Account, error) {
-	ret := _m.Called(address, blockID)
+// GetAccount provides a mock function with given fields: ctx, address, blockID
+func (_m *IngestRPC) GetAccount(ctx context.Context, address flow.Address, blockID flow.Identifier) (*flow.Account, error) {
+	ret := _m.Called(ctx, address, blockID)
 
 	var r0 *flow.Account
-	if rf, ok := ret.Get(0).(func(flow.Address, flow.Identifier) *flow.Account); ok {
-		r0 = rf(address, blockID)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, flow.Identifier) *flow.Account); ok {
+		r0 = rf(ctx, address, blockID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Account)
@@ -48,8 +49,8 @@ func (_m *IngestRPC) GetAccount(address flow.Address, blockID flow.Identifier) (
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Address, flow.Identifier) error); ok {
-		r1 = rf(address, blockID)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, flow.Identifier) error); ok {
+		r1 = rf(ctx, address, blockID)
 	} else {
 		r1 = ret.Error(1)
 	}

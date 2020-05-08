@@ -1,6 +1,7 @@
 package mock
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -32,6 +33,7 @@ import (
 type GenericNode struct {
 	Log        zerolog.Logger
 	Metrics    module.Metrics
+	Tracer     module.Tracer
 	DB         *badger.DB
 	Headers    storage.Headers
 	Identities storage.Identities
@@ -48,6 +50,8 @@ type GenericNode struct {
 func (g *GenericNode) Done() {
 	_ = g.DB.Close()
 	_ = os.RemoveAll(g.DBDir)
+
+	<-g.Tracer.Done()
 }
 
 // Closes closes the badger database of the node
@@ -100,7 +104,7 @@ func (en ExecutionNode) Done() {
 
 func (en ExecutionNode) AssertHighestExecutedBlock(t *testing.T, header *flow.Header) {
 
-	height, blockID, err := en.ExecutionState.GetHighestExecutedBlockID()
+	height, blockID, err := en.ExecutionState.GetHighestExecutedBlockID(context.Background())
 	require.NoError(t, err)
 
 	require.Equal(t, header.ID(), blockID)
