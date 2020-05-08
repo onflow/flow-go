@@ -20,7 +20,7 @@ import (
 
 var (
 	// a simple counter contract in Cadence
-	counterContract = dsl.Contract{
+	CounterContract = dsl.Contract{
 		Name: "Testing",
 		Members: []dsl.CadenceCode{
 			dsl.Resource{
