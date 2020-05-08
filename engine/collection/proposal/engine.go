@@ -12,7 +12,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	clustermodel "github.com/dapperlabs/flow-go/model/cluster"
-	coldstuffmodel "github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -43,7 +42,7 @@ type Engine struct {
 	pending      module.PendingClusterBlockBuffer // pending block cache
 	participants flow.IdentityList                // consensus participants in our cluster
 
-	coldstuff module.ColdStuff
+	hotstuff module.HotStuff
 }
 
 func New(
@@ -93,8 +92,8 @@ func New(
 
 // WithConsensus adds the consensus algorithm to the engine. This must be
 // called before the engine can start.
-func (e *Engine) WithConsensus(cold module.ColdStuff) *Engine {
-	e.coldstuff = cold
+func (e *Engine) WithConsensus(hot module.HotStuff) *Engine {
+	e.hotstuff = hot
 	return e
 }
 
@@ -102,19 +101,19 @@ func (e *Engine) WithConsensus(cold module.ColdStuff) *Engine {
 // started. For proposal engine, this is true once the underlying consensus
 // algorithm has started.
 func (e *Engine) Ready() <-chan struct{} {
-	if e.coldstuff == nil {
+	if e.hotstuff == nil {
 		panic("cannot start proposal engine without consensus algorithm")
 	}
 
 	return e.unit.Ready(func() {
-		<-e.coldstuff.Ready()
+		<-e.hotstuff.Ready()
 	})
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
-		<-e.coldstuff.Done()
+		<-e.hotstuff.Done()
 	})
 }
 
@@ -150,8 +149,8 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 		// but ultimately we should start receiving over the network only
 		// once all the engines are ready.
 
-		if e.coldstuff == nil {
-			return fmt.Errorf("missing coldstuff dependency")
+		if e.hotstuff == nil {
+			return fmt.Errorf("missing hotstuff dependency")
 		}
 		return e.process(originID, event)
 	})
@@ -168,8 +167,6 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		return e.onBlockRequest(originID, ev)
 	case *messages.ClusterBlockResponse:
 		return e.onBlockResponse(originID, ev)
-	case *coldstuffmodel.Commit:
-		return e.onBlockCommit(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -201,6 +198,18 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	if header.ProposerID != e.me.NodeID() {
 		return fmt.Errorf("cannot broadcast proposal with non-local proposer (%x)", header.ProposerID)
 	}
+
+	// get the parent of the block
+	parent, err := e.headers.ByBlockID(header.ParentID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve proposal parent: %w", err)
+	}
+
+	// fill in the fields that can't be populated by HotStuff
+	//TODO clean this up - currently we set these fields in builder, then lose
+	// them in HotStuff, then need to set them again here
+	header.ChainID = parent.ChainID
+	header.Height = parent.Height + 1
 
 	// retrieve the payload for the block
 	payload, err := e.payloads.ByBlockID(header.ID())
@@ -239,27 +248,6 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	e.metrics.CollectionProposed(payload.Collection.Light())
 
 	return nil
-}
-
-// BroadcastCommit broadcasts a commit message to all collection nodes in our
-// cluster.
-func (e *Engine) BroadcastCommit(commit *coldstuffmodel.Commit) error {
-
-	// retrieve all collection nodes in our cluster
-	recipients, err := e.protoState.Final().Identities(filter.And(
-		filter.In(e.participants),
-		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	))
-	if err != nil {
-		return fmt.Errorf("could not get cluster members: %w", err)
-	}
-
-	err = e.con.Submit(commit, recipients.NodeIDs()...)
-	if err != nil {
-		return fmt.Errorf("could not send commit message: %w", err)
-	}
-
-	return err
 }
 
 // onBlockProposal handles proposals for new blocks.
@@ -323,7 +311,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	}
 
 	// submit the proposal to hotstuff for processing
-	e.coldstuff.SubmitProposal(header, parent.View)
+	e.hotstuff.SubmitProposal(header, parent.View)
 
 	// report proposed (case that we are follower)
 	e.metrics.CollectionProposed(proposal.Payload.Collection.Light())
@@ -353,7 +341,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 // onBlockVote handles votes for blocks by passing them to the core consensus
 // algorithm
 func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.ClusterBlockVote) error {
-	e.coldstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.SigData)
+	e.hotstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.SigData)
 	return nil
 }
 
@@ -400,16 +388,6 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.Cluster
 		return fmt.Errorf("could not process block response: %w", err)
 	}
 
-	return nil
-}
-
-// onBlockCommit handles incoming block commits by passing them to the core
-// consensus algorithm.
-//
-// NOTE: This is only necessary for ColdStuff and can be removed when we switch
-// to HotStuff.
-func (e *Engine) onBlockCommit(originID flow.Identifier, commit *coldstuffmodel.Commit) error {
-	e.coldstuff.SubmitCommit(commit)
 	return nil
 }
 

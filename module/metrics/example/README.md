@@ -12,6 +12,9 @@ go run module/metrics/example/execution/main.go
 ```
 go run module/metrics/example/verification/main.go
 ```
+```
+go run module/metrics/example/consensus/main.go
+```
 The above commands each launch a metrics server on localhost with port 9090
 
 2. Install the prometheus server

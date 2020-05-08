@@ -6,6 +6,10 @@ import (
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 
+	"github.com/dapperlabs/flow-go/model/flow"
+
+	"github.com/dapperlabs/flow-go/module/metrics"
+
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
@@ -79,6 +83,10 @@ func main() {
 			conCache = buffer.NewPendingBlocks()
 			return nil
 		}).
+		Module("metrics collector", func(node *cmd.FlowNodeBuilder) error {
+			node.Metrics, err = metrics.NewCollector(node.Logger)
+			return err
+		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Metrics, node.Me, node.Blocks, node.Headers, collections, transactions)
 			return ingestEng, err
@@ -137,5 +145,5 @@ func main() {
 			rpcEng := rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, node.Blocks, node.Headers, collections, transactions)
 			return rpcEng, nil
 		}).
-		Run("access")
+		Run(flow.RoleAccess.String())
 }
