@@ -21,12 +21,9 @@ var (
 
 // LevelDB is a levelDB implementation of the DAL interface
 type LevelDB struct {
-	//kvdbPath string
-	//tdbPath  string
-	path    string
-	kvdb    *leveldb.DB    // The key-value database
-	tdb     *leveldb.DB    // The trie database
-	batcher *leveldb.Batch // A batcher used for atomic updates of trie DB
+	path string
+	kvdb *leveldb.DB // The key-value database
+	tdb  *leveldb.DB // The trie database
 }
 
 // GetKVDB calls a get on the key-value database
@@ -45,10 +42,6 @@ func (s *LevelDB) GetTrieDB(key []byte) ([]byte, error) {
 
 // NewLevelDB creates a new LevelDB database.
 func NewLevelDB(path string) (*LevelDB, error) {
-
-	fmt.Println("OPENING DB:", path)
-	fmt.Println()
-
 	kvdbPath := filepath.Join(path, kvdbPrefix)
 	tdbPath := filepath.Join(path, triePrefix)
 
@@ -65,43 +58,24 @@ func NewLevelDB(path string) (*LevelDB, error) {
 	}
 
 	return &LevelDB{
-		path:    path,
-		kvdb:    kvdb,
-		tdb:     tdb,
-		batcher: new(leveldb.Batch),
+		path: path,
+		kvdb: kvdb,
+		tdb:  tdb,
 	}, nil
 }
 
-// NewBackupLevelDB creates a new LevelDB database interface at the specified path db/stateRootIndex
-//func NewBackupLevelDB(kvdbPath, tdbPath, stateRootIndex string) (*LevelDB, error) {
-//	kvdbPath = filepath.Join(kvdbPath, stateRootIndex)
-//	tdbPath = filepath.Join(tdbPath, stateRootIndex)
-//
-//	return NewLevelDB(kvdbPath, tdbPath)
-//}
-
-// newBatch creates a new batch, effectively clearing the old batch
+// NewBatcher creates a new batch, effectively clearing the old batch
 func (s *LevelDB) NewBatcher() databases.Batcher {
 	return new(leveldb.Batch)
 }
 
-// PutIntoBatcher inserts or Deletes a KV pair into the batcher.
-func (s *LevelDB) PutIntoBatcher(key []byte, value []byte) {
-	if value == nil {
-		s.batcher.Delete(key)
-	}
-	s.batcher.Put(key, value)
-}
-
 // SafeClose is a helper function that closes databases safely.
 func (s *LevelDB) SafeClose() (error, error) {
-	fmt.Println("SAFE CLOSING DB:", s.path)
 	return s.kvdb.Close(), s.tdb.Close()
 }
 
 // UpdateKVDB updates the provided key-value pairs in the key-value database.
 func (s *LevelDB) UpdateKVDB(keys [][]byte, values [][]byte) error {
-
 	kvBatcher := new(leveldb.Batch)
 	for i := 0; i < len(keys); i++ {
 		kvBatcher.Put(keys[i], values[i])

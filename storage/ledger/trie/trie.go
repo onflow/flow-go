@@ -19,7 +19,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/io"
 )
 
-var nilChild []byte = make([]byte, 32)
+var nilChild = make([]byte, 32)
 
 var hashLength = 32
 var childHashLen = hashLength + 1
@@ -41,6 +41,10 @@ func (k Key) String() string {
 	return hex.EncodeToString(k)
 }
 
+func openDB(path string) (databases.DAL, error) {
+	return leveldb.NewLevelDB(path)
+}
+
 // node is a struct for constructing our Tree
 type node struct {
 	value  Root   // Hash
@@ -58,17 +62,21 @@ func (n *node) deepCopy() *node {
 		copy(value, n.value)
 		newNode.value = value
 	}
+
 	if n.key != nil {
 		key := make([]byte, len(n.key))
 		copy(key, n.key)
 		newNode.key = key
 	}
+
 	if n.lChild != nil {
 		newNode.lChild = n.lChild.deepCopy()
 	}
+
 	if n.rChild != nil {
 		newNode.rChild = n.rChild.deepCopy()
 	}
+
 	return newNode
 }
 
@@ -201,7 +209,6 @@ func NewForest(dbDir string, cacheSize, height int) (*forest, error) {
 			panic(fmt.Sprintf("cache contains item of type %T", value))
 		}
 
-		fmt.Println("EVICTING DB", key)
 		_, _ = tree.database.SafeClose()
 	}
 
@@ -228,10 +235,12 @@ func (f *forest) Add(t *tree) {
 	//	f.fullCache.Add(tree.root.String(), tree)
 	//	return
 	//}
+
 	// if db is already here safe close it before overriding
 	if foundTree, ok := f.cache.Get(t.root.String()); ok {
 		foundTree.(*tree).database.SafeClose()
 	}
+
 	f.cache.Add(t.root.String(), t)
 }
 
@@ -247,18 +256,13 @@ func (f *forest) Get(root Root) (*tree, error) {
 	//}
 
 	if foundTree, ok := f.cache.Get(root.String()); ok {
-		fmt.Println("CACHE HIT!", root)
 		return foundTree.(*tree), nil
 	}
-
-	fmt.Println("CACHE MISS", root)
 
 	db, err := f.newDB(root)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create LevelDB: %w", err)
 	}
-
-	fmt.Println("RE-OPENED DB AFTER CACHE MISS", root)
 
 	tree, err := f.newTree(root, db)
 	if err != nil {
@@ -270,12 +274,10 @@ func (f *forest) Get(root Root) (*tree, error) {
 	return tree, nil
 }
 
-func (f *forest) newDB(root Root) (*leveldb.LevelDB, error) {
+func (f *forest) newDB(root Root) (databases.DAL, error) {
 	treePath := filepath.Join(f.dbDir, root.String())
 
-	fmt.Println("OPENING NEW DB", treePath)
-
-	db, err := leveldb.NewLevelDB(treePath)
+	db, err := openDB(treePath)
 	return db, err
 }
 
@@ -1152,7 +1154,7 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 		return newRootNode.value, nil
 	}
 
-	db, err := leveldb.NewLevelDB(filepath.Join(s.forest.dbDir, newRootNode.value.String()))
+	db, err := openDB(filepath.Join(s.forest.dbDir, newRootNode.value.String()))
 	if err != nil {
 		return nil, fmt.Errorf("cannot create new DB: %w", err)
 	}

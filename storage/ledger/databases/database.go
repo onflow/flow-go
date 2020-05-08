@@ -5,10 +5,6 @@ import "errors"
 var ErrNotFound = errors.New("trie kv: not found")
 
 type DAL interface {
-	// PutIntoBatcher puts key-value pairs into a batcher.
-	//PutIntoBatcher(key []byte, value []byte)
-	//
-
 	// NewBatcher creates a new batcher to be used while updating
 	NewBatcher() Batcher
 
@@ -32,6 +28,7 @@ type DAL interface {
 	// SafeClose attempts to safely close the databases.
 	SafeClose() (error, error)
 }
+
 type Batcher interface {
 	Put(key []byte, value []byte)
 }
