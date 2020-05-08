@@ -14,7 +14,7 @@ import (
 
 var _ databases.DAL = &LevelDB{}
 
-var (
+const (
 	kvdbPrefix = "kvdb"
 	triePrefix = "trie"
 )
