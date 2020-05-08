@@ -39,7 +39,7 @@ func TestHappyPath(t *testing.T) {
 	// TODO broken test
 	// will be addressed in
 	// https://github.com/dapperlabs/flow-go/issues/3613
-	t.Skip()
+	t.SkipNow()
 	testcases := []struct {
 		verNodeCount,
 		chunkCount int
