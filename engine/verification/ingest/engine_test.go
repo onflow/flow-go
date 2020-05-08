@@ -900,6 +900,8 @@ func (suite *IngestTestSuite) TestVerifyReady() {
 			//
 			// verifier engine should get called locally by a verifiable chunk
 			// also checks the end state of verifiable chunks about edge cases
+			var receivedWG sync.WaitGroup
+			receivedWG.Add(1)
 			suite.verifierEng.On("ProcessLocal", testifymock.AnythingOfType("*verification.VerifiableChunk")).
 				Run(func(args testifymock.Arguments) {
 					// the received entity should be a verifiable chunk
@@ -914,6 +916,8 @@ func (suite *IngestTestSuite) TestVerifyReady() {
 						assert.Fail(suite.T(), "last chunk in receipt should take the final state commitment")
 					}
 
+					receivedWG.Done()
+
 				}).
 				Return(nil)
 
@@ -921,6 +925,15 @@ func (suite *IngestTestSuite) TestVerifyReady() {
 			received := testcase.getResource(suite)
 			err := eng.Process(testcase.from.NodeID, received)
 			suite.Assert().Nil(err)
+
+			// starts engine
+			<-eng.Ready()
+
+			unittest.RequireReturnsBefore(suite.T(), receivedWG.Wait,
+				time.Duration(int64(suite.failureThreshold*suite.requestInterval))*time.Millisecond)
+
+			// waits for the engine to get shutdown
+			<-eng.Done()
 
 			// asserts verifier engine gets the call with a verifiable chunk
 			suite.verifierEng.AssertExpectations(suite.T())
@@ -1000,11 +1013,7 @@ func (suite *IngestTestSuite) TestChunkDataPackTracker_HappyPath() {
 	suite.chunkDataPackTrackers.On("Rem", chunkDataPack.ChunkID).Return(true).Once()
 
 	// engine has not yet ingested this chunk
-	suite.ingestedChunkIDs.On("Has", chunkDataPack.ChunkID).Return(false)
-	// suite.ingestedChunkIDs.On("Add", chunk).Return(nil)
-
-	// terminates call to checkPendingChunks as it is out of this test's scope
-	suite.authReceipts.On("All").Return(nil).Once()
+	suite.ingestedChunkIDs.On("Has", chunkDataPack.ChunkID).Return(false).Once()
 
 	err := eng.Process(execIdentity.NodeID, chunkDataPackResponse)
 
@@ -1012,7 +1021,7 @@ func (suite *IngestTestSuite) TestChunkDataPackTracker_HappyPath() {
 	suite.Assert().Nil(err)
 	suite.chunkDataPackTrackers.AssertExpectations(suite.T())
 	suite.chunkDataPacks.AssertExpectations(suite.T())
+	suite.ingestedChunkIDs.AssertExpectations(suite.T())
 	suite.state.AssertExpectations(suite.T())
 	suite.ss.AssertExpectations(suite.T())
-	suite.authReceipts.AssertExpectations(suite.T())
 }
