@@ -168,7 +168,7 @@ func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader 
 		// a finalized block must have a valid child, if err happens, we exit
 		return nil, fmt.Errorf("could not get children for finalized block: %w", err)
 	}
-	if len(children) < 0 {
+	if len(children) == 0 {
 		return nil, fmt.Errorf("finalized block has no children")
 	}
 
