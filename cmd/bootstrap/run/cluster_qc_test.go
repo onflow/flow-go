@@ -37,9 +37,9 @@ func TestGenerateClusterGenesisQC(t *testing.T) {
 			ParentID: flow.ZeroID,
 			View:     42,
 		},
-		Payload: cluster.EmptyPayload(),
 	}
-	clusterBlock.Header.PayloadHash = clusterBlock.Payload.Hash()
+	payload := cluster.EmptyPayload(flow.ZeroID)
+	clusterBlock.SetPayload(payload)
 
 	_, err := GenerateClusterGenesisQC(participants, &block, &clusterBlock)
 	require.NoError(t, err)

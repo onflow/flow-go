@@ -75,7 +75,7 @@ func (n *Network) Ready() <-chan struct{} {
 	go func() {
 		err := n.mw.Start(n)
 		if err != nil {
-			n.logger.Err(err).Msg("failed to start middleware")
+			n.logger.Fatal().Err(err).Msg("failed to start middleware")
 		}
 		close(ready)
 	}()
@@ -156,8 +156,8 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 	// checks the cache for deduplication
 	if n.rcache.Seen(message.EventID, message.ChannelID) {
 		// drops duplicate message
-		n.logger.Debug().Bytes("event ID", message.EventID).
-			Msg(" dropping message due to duplication")
+		n.logger.Debug().Hex("event ID", message.EventID).
+			Msg("dropping message due to duplication")
 		return nil
 	}
 	n.rcache.Add(message.EventID, message.ChannelID)
@@ -175,12 +175,9 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 		return fmt.Errorf("could not decode event: %w", err)
 	}
 
-	// call the engine with the message payload
-	err = en.Process(senderID, decodedMessage)
-	if err != nil {
-		n.logger.Error().Str("sender", senderID.String()).Uint8("channel", channelID).Err(err)
-		return fmt.Errorf("failed to process message from %s: %w", senderID.String(), err)
-	}
+	// call the engine asynchronously with the message payload
+	en.Submit(senderID, decodedMessage)
+
 	return nil
 }
 

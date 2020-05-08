@@ -40,13 +40,33 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, options ...func(*protocol.State)) mock.GenericNode {
-	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
+func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participants []*flow.Identity, options ...func(*protocol.State)) mock.GenericNode {
+
+	var index int
+	var participant *flow.Identity
+	for index, participant = range participants {
+		if identity.NodeID == participant.NodeID {
+			break
+		}
+	}
+
+	log := zerolog.New(os.Stderr).With().Int("index", index).Hex("node_id", identity.NodeID[:]).Logger()
 
 	dbDir := unittest.TempDir(t)
 	db := unittest.BadgerDB(t, dbDir)
 
-	state, err := UncheckedState(db, flow.GenesisStateCommitment, identities)
+	identities := storage.NewIdentities(db)
+	guarantees := storage.NewGuarantees(db)
+	seals := storage.NewSeals(db)
+	headers := storage.NewHeaders(db)
+	payloads := storage.NewPayloads(db, identities, guarantees, seals)
+	blocks := storage.NewBlocks(db, headers, payloads)
+
+	state, err := protocol.NewState(db, headers, identities, seals, payloads, blocks)
+	require.NoError(t, err)
+
+	genesis := flow.Genesis(participants)
+	err = state.Mutate().Bootstrap(flow.GenesisStateCommitment, genesis)
 	require.NoError(t, err)
 
 	for _, option := range options {
@@ -75,14 +95,20 @@ func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identitie
 	require.NoError(t, err)
 
 	return mock.GenericNode{
-		Log:     log,
-		Metrics: mc,
-		Tracer:  tracer,
-		DB:      db,
-		State:   state,
-		Me:      me,
-		Net:     stubnet,
-		DBDir:   dbDir,
+		Log:        log,
+		Metrics:    mc,
+		Tracer:     tracer,
+		DB:         db,
+		Headers:    headers,
+		Identities: identities,
+		Guarantees: guarantees,
+		Seals:      seals,
+		Payloads:   payloads,
+		Blocks:     blocks,
+		State:      state,
+		Me:         me,
+		Net:        stubnet,
+		DBDir:      dbDir,
 	}
 }
 
@@ -97,7 +123,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 	collections := storage.NewCollections(node.DB)
 	transactions := storage.NewTransactions(node.DB)
 
-	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Me, pool)
+	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Me, pool, 0)
 	require.Nil(t, err)
 
 	providerEngine, err := provider.New(node.Log, node.Net, node.State, node.Metrics, node.Me, pool, collections, transactions)
@@ -115,12 +141,15 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 
 // CollectionNodes returns n collection nodes connected to the given hub.
 func CollectionNodes(t *testing.T, hub *stub.Hub, nNodes int, options ...func(*protocol.State)) []mock.CollectionNode {
-	identities := unittest.IdentityListFixture(nNodes, func(node *flow.Identity) {
-		node.Role = flow.RoleCollection
-	})
+	colIdentities := unittest.IdentityListFixture(nNodes, unittest.WithRole(flow.RoleCollection))
 
-	nodes := make([]mock.CollectionNode, 0, len(identities))
-	for _, identity := range identities {
+	// add some extra dummy identities so we have one of each role
+	others := unittest.IdentityListFixture(5, unittest.WithAllRolesExcept(flow.RoleCollection))
+
+	identities := append(colIdentities, others...)
+
+	nodes := make([]mock.CollectionNode, 0, len(colIdentities))
+	for _, identity := range colIdentities {
 		nodes = append(nodes, CollectionNode(t, hub, identity, identities, options...))
 	}
 
@@ -167,15 +196,18 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 }
 
 func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int) []mock.ConsensusNode {
-	identities := unittest.IdentityListFixture(nNodes, func(node *flow.Identity) {
-		node.Role = flow.RoleConsensus
-	})
-	for _, id := range identities {
+	conIdentities := unittest.IdentityListFixture(nNodes, unittest.WithRole(flow.RoleConsensus))
+	for _, id := range conIdentities {
 		t.Log(id.String())
 	}
 
-	nodes := make([]mock.ConsensusNode, 0, len(identities))
-	for _, identity := range identities {
+	// add some extra dummy identities so we have one of each role
+	others := unittest.IdentityListFixture(5, unittest.WithAllRolesExcept(flow.RoleConsensus))
+
+	identities := append(conIdentities, others...)
+
+	nodes := make([]mock.ConsensusNode, 0, len(conIdentities))
+	for _, identity := range conIdentities {
 		nodes = append(nodes, ConsensusNode(t, hub, identity, identities))
 	}
 
@@ -185,8 +217,6 @@ func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int) []mock.ConsensusNod
 func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, syncThreshold uint64) mock.ExecutionNode {
 	node := GenericNode(t, hub, identity, identities)
 
-	blocksStorage := storage.NewBlocks(node.DB)
-	payloadsStorage := storage.NewPayloads(node.DB)
 	collectionsStorage := storage.NewCollections(node.DB)
 	eventsStorage := storage.NewEvents(node.DB)
 	txResultStorage := storage.NewTransactionResults(node.DB)
@@ -202,19 +232,14 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	genesisHead, err := node.State.Final().Head()
 	require.NoError(t, err)
 
-	_, err = bootstrap.BootstrapLedger(ls)
+	commit, err := bootstrap.BootstrapLedger(ls)
 	require.NoError(t, err)
 
-	err = bootstrap.BootstrapExecutionDatabase(node.DB, genesisHead)
+	err = bootstrap.BootstrapExecutionDatabase(node.DB, commit, genesisHead)
 	require.NoError(t, err)
 
 	execState := state.NewExecutionState(
-		ls,
-		commitsStorage,
-		chunkDataPackStorage,
-		executionResults,
-		node.DB,
-		node.Tracer,
+		ls, commitsStorage, node.Blocks, chunkDataPackStorage, executionResults, node.DB, node.Tracer,
 	)
 
 	stateSync := sync.NewStateSynchronizer(execState)
@@ -225,7 +250,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	rt := runtime.NewInterpreterRuntime()
-	vm := virtualmachine.New(rt)
+	vm, err := virtualmachine.New(rt)
 
 	require.NoError(t, err)
 
@@ -243,8 +268,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Net,
 		node.Me,
 		node.State,
-		blocksStorage,
-		payloadsStorage,
+		node.Blocks,
+		node.Payloads,
 		collectionsStorage,
 		eventsStorage,
 		txResultStorage,
@@ -279,7 +304,7 @@ func WithVerifierEngine(eng network.Engine) VerificationOpt {
 	}
 }
 
-func VerificationNode(t *testing.T,
+func VerificationNode(t testing.TB,
 	hub *stub.Hub,
 	identity *flow.Identity,
 	identities []*flow.Identity,
@@ -332,13 +357,10 @@ func VerificationNode(t *testing.T,
 		require.Nil(t, err)
 	}
 
-	if node.BlockStorage == nil {
-		node.BlockStorage = storage.NewBlocks(node.DB)
-	}
-
 	if node.VerifierEngine == nil {
 		rt := runtime.NewInterpreterRuntime()
-		vm := virtualmachine.New(rt)
+		vm, err := virtualmachine.New(rt)
+		require.NoError(t, err)
 		chunkVerifier := chunks.NewChunkVerifier(vm)
 
 		require.NoError(t, err)
@@ -371,7 +393,8 @@ func VerificationNode(t *testing.T,
 			node.ChunkDataPackTrackers,
 			node.IngestedChunkIDs,
 			node.IngestedResultIDs,
-			node.BlockStorage,
+			node.Headers,
+			node.Blocks,
 			assigner,
 			requestIntervalMs,
 			failureThreshold,

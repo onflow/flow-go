@@ -44,7 +44,7 @@ func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration) {
 
 // RequireReturnBefore requires that the given function returns before the
 // duration expires.
-func RequireReturnsBefore(t *testing.T, f func(), duration time.Duration) {
+func RequireReturnsBefore(t testing.TB, f func(), duration time.Duration) {
 	done := make(chan struct{})
 
 	go func() {
@@ -70,8 +70,11 @@ func RequireReturnsBefore(t *testing.T, f func(), duration time.Duration) {
 func AssertErrSubstringMatch(t testing.TB, expected, actual error) {
 	require.NotNil(t, expected)
 	require.NotNil(t, actual)
-	assert.True(t, strings.Contains(actual.Error(), expected.Error()),
-		"expected error: '%s', got: '%s'", expected.Error(), actual.Error())
+	assert.True(
+		t,
+		strings.Contains(actual.Error(), expected.Error()) || strings.Contains(expected.Error(), actual.Error()),
+		"expected error: '%s', got: '%s'", expected.Error(), actual.Error(),
+	)
 }
 
 func TempDir(t testing.TB) string {
@@ -88,7 +91,7 @@ func RunWithTempDir(t testing.TB, f func(string)) {
 
 func BadgerDB(t testing.TB, dir string) *badger.DB {
 	opts := badger.
-		LSMOnlyOptions(dir).
+		DefaultOptions(dir).
 		WithKeepL0InMemory(true).
 		WithLogger(nil)
 	db, err := badger.Open(opts)

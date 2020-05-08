@@ -156,7 +156,7 @@ func (e *blockComputer) executeCollection(
 			}
 
 			if result.Error != nil {
-				txResult.ErrorMessage = result.Error.Error()
+				txResult.ErrorMessage = result.Error.ErrorMessage()
 			}
 
 			txResults = append(txResults, txResult)

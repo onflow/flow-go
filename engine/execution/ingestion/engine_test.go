@@ -88,7 +88,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	events := storage.NewMockEvents(ctrl)
 	txResults := storage.NewMockTransactionResults(ctrl)
 
-	computationEngine := new(computation.ComputationManager)
+	computationManager := new(computation.ComputationManager)
 	providerEngine := new(provider.ProviderEngine)
 	protocolState := new(protocol.State)
 	executionState := new(state.ExecutionState)
@@ -99,7 +99,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	defer func() {
 		<-engine.Done()
 		ctrl.Finish()
-		computationEngine.AssertExpectations(t)
+		computationManager.AssertExpectations(t)
 		protocolState.AssertExpectations(t)
 		executionState.AssertExpectations(t)
 		providerEngine.AssertExpectations(t)
@@ -142,7 +142,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		collections,
 		events,
 		txResults,
-		computationEngine,
+		computationManager,
 		providerEngine,
 		executionState,
 		21,
@@ -160,7 +160,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		state:              protocolState,
 		conduit:            conduit,
 		collectionConduit:  collectionConduit,
-		computationManager: computationEngine,
+		computationManager: computationManager,
 		providerEngine:     providerEngine,
 		executionState:     executionState,
 		snapshot:           snapshot,

@@ -3,11 +3,11 @@ package ingestion
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
@@ -115,17 +115,17 @@ func New(
 
 	con, err := net.Register(engine.BlockProvider, &eng)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not register engine")
+		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 
 	collConduit, err := net.Register(engine.CollectionProvider, &eng)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not register collection provider engine")
+		return nil, fmt.Errorf("could not register collection provider engine: %w", err)
 	}
 
 	syncConduit, err := net.Register(engine.ExecutionSync, &eng)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not register execution sync engine")
+		return nil, fmt.Errorf("could not register execution sync engine: %w", err)
 	}
 
 	eng.conduit = con
@@ -174,22 +174,32 @@ func (e *Engine) Wait() {
 
 func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
+		log := e.log.With().Hex("origin", logging.ID(originID)).Logger()
 		ctx := context.Background()
+
 		var err error
 		switch v := event.(type) {
 		case *messages.BlockProposal:
+			log.Debug().Hex("block_id", logging.Entity(v.Header)).
+				Uint64("block_view", v.Header.View).
+				Hex("block_proposal", logging.Entity(v.Header)).Msg("received block proposal")
 			err = e.handleBlockProposal(ctx, v)
 		case *messages.CollectionResponse:
+			log.Debug().Hex("collection_id", logging.Entity(v.Collection)).Msg("received collection response")
 			err = e.handleCollectionResponse(ctx, v)
 		case *messages.ExecutionStateDelta:
+			log.Debug().Hex("block_id", logging.Entity(v.Block)).Msg("received block delta")
 			err = e.handleExecutionStateDelta(ctx, v, originID)
 		case *messages.ExecutionStateSyncRequest:
+			log.Debug().Hex("current_block_id", logging.ID(v.CurrentBlockID)).
+				Hex("target_block_id", logging.ID(v.TargetBlockID)).
+				Msg("received execution state sync request")
 			return e.onExecutionStateSyncRequest(ctx, originID, v)
 		default:
-			err = errors.Errorf("invalid event type (%T)", event)
+			err = fmt.Errorf("invalid event type (%T)", event)
 		}
 		if err != nil {
-			return errors.Wrap(err, "could not process event")
+			return fmt.Errorf("could not process event (%T): %w", event, err)
 		}
 		return nil
 	})
@@ -204,11 +214,6 @@ func (e *Engine) handleBlockProposal(ctx context.Context, proposal *messages.Blo
 		Payload: proposal.Payload,
 	}
 
-	e.log.Debug().
-		Hex("block_id", logging.Entity(block)).
-		Uint64("block_view", block.Header.View).
-		Msg("received block")
-
 	e.mc.StartBlockReceivedToExecuted(block.ID())
 
 	executableBlock := &entity.ExecutableBlock{
@@ -222,7 +227,6 @@ func (e *Engine) handleBlockProposal(ctx context.Context, proposal *messages.Blo
 			executionQueues *stdmap.QueuesBackdata,
 			orphanQueues *stdmap.QueuesBackdata,
 		) error {
-
 			// synchronize DB writing to avoid tx conflicts with multiple blocks arriving fast
 			err := e.blocks.Store(block)
 			if err != nil {
@@ -231,92 +235,77 @@ func (e *Engine) handleBlockProposal(ctx context.Context, proposal *messages.Blo
 
 			// if block fits into execution queue, that's it
 			if queue, added := tryEnqueue(executableBlock, executionQueues); added {
-				e.log.Debug().
-					Hex("block_id", logging.Entity(executableBlock.Block)).
-					Msg("added block to existing execution queue")
-
+				e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("added block to existing execution queue")
 				e.tryRequeueOrphans(executableBlock, queue, orphanQueues)
 				return nil
 			}
 
 			// if block fits into orphan queues
 			if queue, added := tryEnqueue(executableBlock, orphanQueues); added {
-				e.log.
-					Debug().
-					Hex("block_id", logging.Entity(executableBlock.Block)).
-					Msg("added block to existing orphan queue")
-
+				e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("added block to existing orphan queue")
 				e.tryRequeueOrphans(executableBlock, queue, orphanQueues)
-
 				// this is only queue which grew and could trigger threshold
-				if !e.syncInProgress.Load() && queue.Height() >= e.syncModeThreshold {
-					e.syncInProgress.Store(true)
-					// Start sync mode - initializing would require DB operation and
-					// will stop processing blocks here which is exactly what we want
+				if queue.Height() < e.syncModeThreshold {
+					return nil
+				}
+				if e.syncInProgress.CAS(false, true) {
+					// Start sync mode - initializing would require DB operation and will stop processing blocks here
+					// which is exactly what we want
 					e.StartSync(ctx, queue.Head.Item.(*entity.ExecutableBlock))
 				}
-
 				return nil
 			}
 
 			stateCommitment, err := e.execState.StateCommitmentByBlockID(ctx, block.Header.ParentID)
 			// if state commitment doesn't exist and there are no known blocks which will produce
 			// it soon (execution queue) that we save it as orphaned
-			if err == storage.ErrNotFound {
+			if errors.Is(err, storage.ErrNotFound) {
 				queue, err := enqueue(executableBlock, orphanQueues)
 				if err != nil {
 					panic(fmt.Sprintf("cannot add orphaned block: %s", err))
 				}
-
 				e.tryRequeueOrphans(executableBlock, queue, orphanQueues)
-
-				e.log.Debug().
-					Hex("block_id", logging.Entity(executableBlock.Block)).
-					Msg("added block to new orphan queue")
-
+				e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("added block to new orphan queue")
 				// special case when sync threshold is reached
-				if queue.Height() >= e.syncModeThreshold && !e.syncInProgress.Load() {
-					e.syncInProgress.Store(true)
-					// Start sync mode - initializing would require DB operation and
-					// will stop processing blocks here which is exactly what we want
+				if queue.Height() < e.syncModeThreshold {
+					return nil
+				}
+				if e.syncInProgress.CAS(false, true) {
+					// Start sync mode - initializing would require DB operation and will stop processing blocks here
+					// which is exactly what we want
 					e.StartSync(ctx, queue.Head.Item.(*entity.ExecutableBlock))
 				}
-
 				return nil
 			}
-
 			// any other error while accessing storage - panic
 			if err != nil {
 				panic(fmt.Sprintf("unexpected error while accessing storage, shutting down: %v", err))
 			}
 
-			// if block has state commitment, it has all parents blocks
+			//if block has state commitment, it has all parents blocks
 			err = e.sendCollectionsRequest(executableBlock, blockByCollection)
 			if err != nil {
 				return fmt.Errorf("cannot send collection requests: %w", err)
 			}
 
 			executableBlock.StartState = stateCommitment
-			// TODO - redundant? - should always produce new queue (otherwise it would be enqueued at the beginning
-			newQueue, err := enqueue(executableBlock, executionQueues)
+			newQueue, err := enqueue(executableBlock, executionQueues) // TODO - redundant? - should always produce new queue (otherwise it would be enqueued at the beginning)
 			if err != nil {
 				panic(fmt.Sprintf("cannot enqueue block for execution: %s", err))
 			}
-
-			e.log.Debug().
-				Hex("block_id", logging.Entity(executableBlock.Block)).
-				Msg("added block to execution queue")
+			e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("added block to execution queue")
 
 			e.tryRequeueOrphans(executableBlock, newQueue, orphanQueues)
 
 			// If the block was empty
 			if executableBlock.IsComplete() {
 				e.wg.Add(1)
-				go e.executeBlock(context.Background(), executableBlock)
+				go e.executeBlock(ctx, executableBlock)
 			}
 
 			return nil
-		})
+		},
+	)
 }
 
 // tryRequeueOrphans tries to put orphaned queue into other queues after a new block has been added
@@ -421,57 +410,54 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	e.log.Info().
 		Hex("block_id", logging.Entity(executableBlock.Block)).
 		Hex("final_state", finalState).
-		Msg("executing block")
+		Msg("block executed")
 }
 
 func (e *Engine) handleCollectionResponse(ctx context.Context, response *messages.CollectionResponse) error {
 
 	collection := response.Collection
-
-	e.log.Debug().
-		Hex("collection_id", logging.Entity(collection)).
-		Msg("received collection")
-
 	collID := collection.ID()
 
-	return e.mempool.BlockByCollection.Run(func(backdata *stdmap.BlockByCollectionBackdata) error {
-		blockByCollectionId, err := backdata.ByID(collID)
-		if err != nil {
-			return err
-		}
-		executableBlock := blockByCollectionId.ExecutableBlock
-
-		completeCollection, ok := executableBlock.CompleteCollections[collID]
-		if !ok {
-			return fmt.Errorf("cannot handle collection: internal inconsistency - collection pointing to block which does not contain said collection")
-		}
-
-		// already received transactions for this collection
-		// TODO - check if data stored is the same
-		if completeCollection.Transactions != nil {
-			return nil
-		}
-
-		completeCollection.Transactions = collection.Transactions
-		if executableBlock.HasAllTransactions() {
-			e.clearCollectionsCache(executableBlock, backdata)
-		}
-
-		if executableBlock.IsComplete() {
-			e.log.Debug().
-				Hex("block_id", logging.Entity(executableBlock.Block)).
-				Msg("block complete - executing")
-
-			if e.extensiveLogging {
-				e.logExecutableBlock(executableBlock)
+	return e.mempool.BlockByCollection.Run(
+		func(backdata *stdmap.BlockByCollectionBackdata) error {
+			blockByCollectionId, err := backdata.ByID(collID)
+			if err != nil {
+				return err
 			}
+			executableBlocks := blockByCollectionId.ExecutableBlocks
 
-			e.wg.Add(1)
-			go e.executeBlock(context.Background(), executableBlock)
-		}
+			for _, executableBlock := range executableBlocks {
 
-		return nil
-	})
+				completeCollection, ok := executableBlock.CompleteCollections[collID]
+				if !ok {
+					return fmt.Errorf("cannot handle collection: internal inconsistency - collection pointing to block which does not contain said collection")
+				}
+				// already received transactions for this collection
+				// TODO - check if data stored is the same
+				if completeCollection.Transactions != nil {
+					continue
+				}
+
+				completeCollection.Transactions = collection.Transactions
+
+				if executableBlock.IsComplete() {
+
+					e.log.Debug().
+						Hex("block_id", logging.Entity(executableBlock.Block)).
+						Msg("block complete - executing")
+
+					if e.extensiveLogging {
+						e.logExecutableBlock(executableBlock)
+					}
+					e.wg.Add(1)
+					go e.executeBlock(ctx, executableBlock)
+				}
+			}
+			backdata.Rem(collID)
+
+			return nil
+		},
+	)
 }
 
 func (e *Engine) findCollectionNodesForGuarantee(
@@ -505,13 +491,6 @@ func (e *Engine) onExecutionStateSyncRequest(
 	originID flow.Identifier,
 	req *messages.ExecutionStateSyncRequest,
 ) error {
-
-	e.log.Info().
-		Hex("origin_id", logging.ID(originID)).
-		Hex("current_block_id", logging.ID(req.CurrentBlockID)).
-		Hex("target_block_id", logging.ID(req.TargetBlockID)).
-		Msg("received execution state synchronization request")
-
 	id, err := e.state.Final().Identity(originID)
 	if err != nil {
 		return fmt.Errorf("invalid origin id (%s): %w", id, err)
@@ -544,12 +523,6 @@ func (e *Engine) onExecutionStateSyncRequest(
 	}
 
 	return nil
-}
-
-func (e *Engine) clearCollectionsCache(block *entity.ExecutableBlock, backdata *stdmap.BlockByCollectionBackdata) {
-	for _, collection := range block.Block.Payload.Guarantees {
-		backdata.Rem(collection.ID())
-	}
 }
 
 // tryEnqueue checks if a block fits somewhere into the already existing queues, and puts it there is so
@@ -586,15 +559,15 @@ func (e *Engine) sendCollectionsRequest(
 
 		// TODO: once collection can map to multiple blocks
 		maybeBlockByCollection, err := backdata.ByID(guarantee.ID())
-		if err == mempool.ErrNotFound {
-			executableBlock.CompleteCollections[guarantee.ID()] = &entity.CompleteCollection{
-				Guarantee:    guarantee,
-				Transactions: nil,
+
+		if errors.Is(err, mempool.ErrNotFound) {
+
+			maybeBlockByCollection = &entity.BlocksByCollection{
+				CollectionID:     guarantee.ID(),
+				ExecutableBlocks: make(map[flow.Identifier]*entity.ExecutableBlock),
 			}
-			err := backdata.Add(&entity.BlockByCollection{
-				CollectionID:    guarantee.ID(),
-				ExecutableBlock: executableBlock,
-			})
+
+			err := backdata.Add(maybeBlockByCollection)
 			if err != nil {
 				return fmt.Errorf("cannot save collection-block mapping: %w", err)
 			}
@@ -623,14 +596,21 @@ func (e *Engine) sendCollectionsRequest(
 				// TODO - this should be handled, maybe retried or put into some form of a queue
 				e.log.Err(err).Msg("cannot submit collection requests")
 			}
-			continue
-		}
-		if err != nil {
+
+		} else if err != nil {
 			return fmt.Errorf("cannot get an item from mempool: %w", err)
 		}
-		if maybeBlockByCollection.ID() != executableBlock.Block.ID() {
-			// Should not happen in MVP, but see TODO at beggining of the function
-			return fmt.Errorf("received block with same collection alredy pointing to different block ")
+
+		if _, exists := maybeBlockByCollection.ExecutableBlocks[executableBlock.ID()]; exists {
+			e.log.Info().Hex("block_id", logging.Entity(executableBlock)).Msg("requesting collections for block with already pending requests. Ignoring requests.")
+			continue
+		}
+
+		maybeBlockByCollection.ExecutableBlocks[executableBlock.ID()] = executableBlock
+
+		executableBlock.CompleteCollections[guarantee.ID()] = &entity.CompleteCollection{
+			Guarantee:    guarantee,
+			Transactions: nil,
 		}
 	}
 
@@ -802,11 +782,6 @@ func (e *Engine) saveExecutionResults(
 		Hex("final_state", endState).
 		Msg("saved computation results")
 
-	err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
-	if err != nil {
-		return nil, fmt.Errorf("could not send broadcast order: %w", err)
-	}
-
 	return receipt, nil
 }
 
@@ -949,14 +924,18 @@ func (e *Engine) StartSync(ctx context.Context, firstKnown *entity.ExecutableBlo
 	// TODO - ability to sync from multiple servers
 	otherNodeIdentity := otherNodes[rand.Intn(len(otherNodes))]
 
-	e.log.Debug().
-		Hex("target_node", logging.Entity(otherNodeIdentity)).
-		Msg("requesting sync from node")
-
-	err = e.syncConduit.Submit(&messages.ExecutionStateSyncRequest{
+	exeStateReq := messages.ExecutionStateSyncRequest{
 		CurrentBlockID: lastExecutedBlockID,
 		TargetBlockID:  targetBlockID,
-	}, otherNodeIdentity.NodeID)
+	}
+
+	e.log.Debug().
+		Hex("target_node", logging.Entity(otherNodeIdentity)).
+		Hex("current_block_id", logging.ID(exeStateReq.CurrentBlockID)).
+		Hex("target_block_id", logging.ID(exeStateReq.TargetBlockID)).
+		Msg("requesting execution state sync")
+
+	err = e.syncConduit.Submit(&exeStateReq, otherNodeIdentity.NodeID)
 
 	if err != nil {
 		e.log.Fatal().
@@ -971,8 +950,6 @@ func (e *Engine) handleExecutionStateDelta(
 	executionStateDelta *messages.ExecutionStateDelta,
 	originID flow.Identifier,
 ) error {
-
-	e.log.Debug().Hex("block_id", logging.Entity(executionStateDelta.Block)).Msg("received sync delta")
 
 	return e.mempool.SyncQueues.Run(func(backdata *stdmap.QueuesBackdata) error {
 
@@ -989,7 +966,7 @@ func (e *Engine) handleExecutionStateDelta(
 		stateCommitment, err := e.execState.StateCommitmentByBlockID(ctx, executionStateDelta.ParentID())
 		// if state commitment doesn't exist and there are no known deltas which will produce
 		// it soon (sync queue) that we save it as orphaned
-		if err == storage.ErrNotFound {
+		if errors.Is(err, storage.ErrNotFound) {
 			_, err := enqueue(executionStateDelta, backdata)
 			if err != nil {
 				panic(fmt.Sprintf("cannot create new queue for sync delta: %s", err))

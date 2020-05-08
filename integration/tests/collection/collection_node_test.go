@@ -6,7 +6,7 @@ import (
 	"time"
 
 	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/client"
+	sdkclient "github.com/onflow/flow-go-sdk/client"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -21,7 +21,7 @@ import (
 	"github.com/dapperlabs/flow-go/integration/tests/common"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
-	clusterstate "github.com/dapperlabs/flow-go/state/cluster/badger"
+	cluster "github.com/dapperlabs/flow-go/state/cluster/badger"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -122,22 +122,40 @@ func (suite *CollectorSuite) Clusters() *flow.ClusterList {
 	return clusters
 }
 
-func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transaction {
+// NextTransaction returns a valid no-op transaction and updates the
+// account key sequence number.
+func (suite *CollectorSuite) NextTransaction(opts ...func(*sdk.Transaction)) *sdk.Transaction {
 	acct := suite.acct
 
 	tx := sdk.NewTransaction().
 		SetScript(unittest.NoopTxScript()).
-		SetReferenceBlockID(convert.ToSDKID(unittest.IdentifierFixture())).
+		SetReferenceBlockID(convert.ToSDKID(suite.net.Genesis().ID())).
 		SetProposalKey(acct.addr, acct.key.ID, acct.key.SequenceNumber).
 		SetPayer(acct.addr).
 		AddAuthorizer(acct.addr)
 
+	for _, apply := range opts {
+		apply(tx)
+	}
+
+	err := tx.SignEnvelope(acct.addr, acct.key.ID, acct.signer)
+	require.Nil(suite.T(), err)
+
+	suite.acct.key.SequenceNumber++
+
+	return tx
+}
+
+func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transaction {
+
+	acct := suite.acct
 	clusters := suite.Clusters()
+	tx := suite.NextTransaction()
 
 	// hash-grind the script until the transaction will be routed to target cluster
 	for {
 		tx.SetScript(append(tx.Script, '/', '/'))
-		err := tx.SignEnvelope(sdk.RootAddress, acct.key.ID, acct.signer)
+		err := tx.SignEnvelope(acct.addr, acct.key.ID, acct.signer)
 		require.Nil(suite.T(), err)
 		routed := clusters.ByTxID(convert.IDFromSDK(tx.ID()))
 		if routed.Fingerprint() == target.Fingerprint() {
@@ -151,7 +169,7 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transac
 func (suite *CollectorSuite) AwaitTransactionIncluded(txID flow.Identifier) {
 
 	// the height at which the collection is included
-	var height uint64
+	var colID flow.Identifier
 
 	waitFor := time.Second * 30
 	deadline := time.Now().Add(waitFor)
@@ -167,19 +185,17 @@ func (suite *CollectorSuite) AwaitTransactionIncluded(txID flow.Identifier) {
 			collection := val.Payload.Collection
 			suite.T().Logf("got proposal height=%d col_id=%x size=%d", header.Height, collection.ID(), collection.Len())
 
-			// note the height when transaction is includedj
+			// note the collection where the transaction is included
+			//TODO this will only work for single-tx collections
+			// need to update in https://github.com/dapperlabs/flow-go/pull/3546
 			if collection.Light().Has(txID) {
-				height = header.Height
-			}
-
-			// use building two blocks as an indication of inclusion
-			// TODO replace this with finalization by listening to guarantees
-			if height > 0 && header.Height-height >= 2 {
-				return
+				colID = collection.ID()
 			}
 
 		case *flow.CollectionGuarantee:
-			// TODO use this as indication of finalization w/ HotStuff
+			if val.CollectionID == colID {
+				return
+			}
 		}
 	}
 
@@ -203,7 +219,7 @@ func (suite *CollectorSuite) Collector(clusterIdx, nodeIdx uint) *testnet.Contai
 
 // ClusterStateFor returns a cluster state instance for the collector node
 // with the given ID.
-func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstate.State {
+func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *cluster.State {
 
 	myCluster, ok := suite.Clusters().ByNodeID(id)
 	require.True(suite.T(), ok, "could not get node %s in clusters", id)
@@ -214,7 +230,7 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstate.S
 	db, err := node.DB()
 	require.Nil(suite.T(), err, "could not get node db")
 
-	state, err := clusterstate.NewState(db, chainID)
+	state, err := cluster.NewState(db, chainID)
 	require.Nil(suite.T(), err, "could not get cluster state")
 
 	return state
@@ -231,24 +247,15 @@ func (suite *CollectorSuite) TestTransactionIngress_InvalidTransaction() {
 	// pick a collector to test against
 	col1 := suite.Collector(0, 0)
 
-	client, err := client.New(col1.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
+	client, err := sdkclient.New(col1.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
 	require.Nil(t, err)
 
-	acct := suite.acct
+	t.Run("missing reference block id", func(t *testing.T) {
+		malformed := suite.NextTransaction(func(tx *sdk.Transaction) {
+			tx.SetReferenceBlockID(sdk.ZeroID)
+		})
 
-	t.Run("missing reference block hash", func(t *testing.T) {
-		malformed := sdk.NewTransaction().
-			SetScript(unittest.NoopTxScript()).
-			SetProposalKey(acct.addr, acct.key.ID, acct.key.SequenceNumber).
-			SetPayer(acct.addr).
-			AddAuthorizer(acct.addr)
-
-		malformed.SetReferenceBlockID(sdk.ZeroID)
-
-		err = malformed.SignEnvelope(sdk.RootAddress, acct.key.ID, acct.signer)
-		require.Nil(t, err)
-
-		expected := ingest.ErrIncompleteTransaction{
+		expected := ingest.IncompleteTransactionError{
 			Missing: []string{flow.TransactionFieldRefBlockID.String()},
 		}
 
@@ -259,15 +266,11 @@ func (suite *CollectorSuite) TestTransactionIngress_InvalidTransaction() {
 	})
 
 	t.Run("missing script", func(t *testing.T) {
-		malformed := sdk.NewTransaction().
-			SetReferenceBlockID(sdk.Identifier{1}).
-			SetProposalKey(sdk.RootAddress, acct.key.ID, acct.key.SequenceNumber).
-			SetPayer(sdk.RootAddress).
-			AddAuthorizer(sdk.RootAddress)
+		malformed := suite.NextTransaction(func(tx *sdk.Transaction) {
+			tx.SetScript(nil)
+		})
 
-		malformed.SetScript(nil)
-
-		expected := ingest.ErrIncompleteTransaction{
+		expected := ingest.IncompleteTransactionError{
 			Missing: []string{flow.TransactionFieldScript.String()},
 		}
 
@@ -312,19 +315,10 @@ func (suite *CollectorSuite) TestTxIngress_SingleCluster() {
 	// pick a collector to test against
 	col1 := suite.Collector(0, 0)
 
-	client, err := client.New(col1.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
+	client, err := sdkclient.New(col1.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
 	require.Nil(t, err)
 
-	acct := suite.acct
-
-	tx := sdk.NewTransaction().
-		SetScript(unittest.NoopTxScript()).
-		SetReferenceBlockID(sdk.BytesToID([]byte{1})).
-		SetProposalKey(acct.addr, acct.key.ID, acct.key.SequenceNumber).
-		SetPayer(acct.addr).
-		AddAuthorizer(acct.addr)
-
-	err = tx.SignEnvelope(acct.addr, acct.key.ID, acct.signer)
+	tx := suite.NextTransaction()
 	require.Nil(t, err)
 
 	t.Log("sending transaction: ", tx.ID())
@@ -372,7 +366,7 @@ func (suite *CollectorSuite) TestTxIngressMultiCluster_CorrectCluster() {
 	targetNode := suite.Collector(0, 0)
 
 	// get a client pointing to the cluster member
-	client, err := client.New(targetNode.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
+	client, err := sdkclient.New(targetNode.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
 	require.Nil(t, err)
 
 	tx := suite.TxForCluster(targetCluster)
@@ -446,7 +440,7 @@ func (suite *CollectorSuite) TestTxIngressMultiCluster_OtherCluster() {
 	otherNode := suite.Collector(1, 0)
 
 	// create clients pointing to each other node
-	client, err := client.New(otherNode.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
+	client, err := sdkclient.New(otherNode.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
 	require.Nil(t, err)
 
 	// create a transaction that will be routed to the target cluster

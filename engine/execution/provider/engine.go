@@ -132,10 +132,13 @@ func (e *Engine) onChunkDataPackRequest(
 
 	// extracts list of verifier nodes id
 	chunkID := req.ChunkID
-	e.log.Info().
+
+	log := e.log.With().
 		Hex("origin_id", logging.ID(originID)).
 		Hex("chunk_id", logging.ID(chunkID)).
-		Msg("received chunk data pack request")
+		Logger()
+
+	log.Debug().Msg("received chunk data pack request")
 
 	origin, err := e.state.Final().Identity(originID)
 	if err != nil {
@@ -156,6 +159,8 @@ func (e *Engine) onChunkDataPackRequest(
 		Data: *cdp,
 	}
 
+	log.Debug().Msg("sending chunk data pack response")
+
 	// sends requested chunk data pack to the requester
 	err = e.chunksConduit.Submit(response, originID)
 	if err != nil {
@@ -173,6 +178,7 @@ func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.Ex
 	e.log.Debug().
 		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).
 		Hex("receipt_id", logging.Entity(receipt)).
+		Hex("final_state", receipt.ExecutionResult.FinalStateCommit).
 		Msg("broadcasting execution receipt")
 
 	identities, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus, flow.RoleVerification))
@@ -180,8 +186,7 @@ func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.Ex
 		return fmt.Errorf("could not get consensus and verification identities: %w", err)
 	}
 
-	nodeIDs := identities.NodeIDs()
-	err = e.receiptCon.Submit(receipt, nodeIDs...)
+	err = e.receiptCon.Submit(receipt, identities.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not submit execution receipts: %w", err)
 	}

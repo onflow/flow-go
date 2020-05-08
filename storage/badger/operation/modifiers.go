@@ -18,9 +18,9 @@ func SkipDuplicates(op func(*badger.Txn) error) func(tx *badger.Txn) error {
 	}
 }
 
-func RetryOnConflict(action func() error) error {
+func RetryOnConflict(action func(func(*badger.Txn) error) error, op func(tx *badger.Txn) error) error {
 	for {
-		err := action()
+		err := action(op)
 		if errors.Is(err, badger.ErrConflict) {
 			continue
 		}

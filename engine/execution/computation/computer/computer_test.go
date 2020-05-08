@@ -68,7 +68,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm.On("NewBlockContext", block.Block.Header).Return(bc)
 
 		bc.On("ExecuteTransaction", mock.Anything, mock.Anything).
-			Return(&virtualmachine.TransactionResult{Events: events, Error: fmt.Errorf("runtime error")}, nil).
+			Return(&virtualmachine.TransactionResult{Events: events, Error: &virtualmachine.MissingPayerError{}}, nil).
 			Times(totalTransactionCount)
 
 		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
@@ -100,7 +100,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			for _, t := range c.Transactions {
 				txResult := flow.TransactionResult{
 					TransactionID: t.ID(),
-					ErrorMessage:  "runtime error",
+					ErrorMessage:  "no payer address provided",
 				}
 				expectedResults = append(expectedResults, txResult)
 			}

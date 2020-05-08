@@ -27,22 +27,18 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 				ctrl := gomock.NewController(t)
 
 				stateCommitments := mocks.NewMockCommits(ctrl)
+				blocks := mocks.NewMockBlocks(ctrl)
 
 				stateCommitment := ls.EmptyStateCommitment()
 
-				stateCommitments.EXPECT().ByID(gomock.Any()).Return(stateCommitment, nil)
+				stateCommitments.EXPECT().ByBlockID(gomock.Any()).Return(stateCommitment, nil)
 
 				chunkDataPacks := new(storage.ChunkDataPacks)
 
 				executionResults := new(storage.ExecutionResults)
 
 				es := state.NewExecutionState(
-					ls,
-					stateCommitments,
-					chunkDataPacks,
-					executionResults,
-					badgerDB,
-					nil,
+					ls, stateCommitments, blocks, chunkDataPacks, executionResults, badgerDB, nil,
 				)
 
 				f(t, es)

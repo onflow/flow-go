@@ -107,8 +107,12 @@ func WithoutIdentities(payload *flow.Payload) {
 	payload.Identities = nil
 }
 
+func WithoutSeals(payload *flow.Payload) {
+	payload.Seals = nil
+}
+
 func BlockWithParentFixture(parent *flow.Header) flow.Block {
-	payload := PayloadFixture(WithoutIdentities)
+	payload := PayloadFixture(WithoutIdentities, WithoutSeals)
 	header := BlockHeaderWithParentFixture(parent)
 	header.PayloadHash = payload.Hash()
 	return flow.Block{
@@ -130,11 +134,17 @@ func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDe
 	}
 }
 
+func GenesisFixture(identities flow.IdentityList) *flow.Block {
+	genesis := flow.Genesis(identities)
+	genesis.Header.ChainID = flow.TestingChainID
+	return genesis
+}
+
 func BlockHeaderFixture() flow.Header {
 	height := rand.Uint64()
 	view := height + uint64(rand.Intn(1000))
 	return BlockHeaderWithParentFixture(&flow.Header{
-		ChainID:  "testing_chain",
+		ChainID:  flow.TestingChainID,
 		ParentID: IdentifierFixture(),
 		Height:   height,
 		View:     view,
@@ -164,7 +174,8 @@ func ClusterPayloadFixture(n int) *cluster.Payload {
 		tx := TransactionBodyFixture()
 		transactions[i] = &tx
 	}
-	return cluster.PayloadFromTransactions(transactions...)
+	payload := cluster.PayloadFromTransactions(flow.ZeroID, transactions...)
+	return &payload
 }
 
 func ClusterBlockFixture() cluster.Block {
@@ -432,6 +443,50 @@ func WithRandomPublicKeys() func(*flow.Identity) {
 	}
 }
 
+// WithAllRoles can be used used to ensure an IdentityList fixtures contains
+// all the roles required for a valid genesis block.
+func WithAllRoles() func(*flow.Identity) {
+	return WithAllRolesExcept()
+}
+
+// Same as above, but omitting a certain role for cases where we are manually
+// setting up nodes or a particular role.
+func WithAllRolesExcept(except ...flow.Role) func(*flow.Identity) {
+	i := 0
+	roles := flow.Roles()
+
+	// remove omitted roles
+	for _, omitRole := range except {
+		for i, role := range roles {
+			if role == omitRole {
+				roles = append(roles[:i], roles[i+1:]...)
+			}
+		}
+	}
+
+	return func(id *flow.Identity) {
+		id.Role = roles[i%len(roles)]
+		i++
+	}
+}
+
+// CompleteIdentitySet takes a number of identities and completes the missing roles.
+func CompleteIdentitySet(identities ...*flow.Identity) flow.IdentityList {
+	required := map[flow.Role]struct{}{
+		flow.RoleCollection:   struct{}{},
+		flow.RoleConsensus:    struct{}{},
+		flow.RoleExecution:    struct{}{},
+		flow.RoleVerification: struct{}{},
+	}
+	for _, identity := range identities {
+		delete(required, identity.Role)
+	}
+	for role := range required {
+		identities = append(identities, IdentityFixture(WithRole(role)))
+	}
+	return identities
+}
+
 // IdentityListFixture returns a list of node identity objects. The identities
 // can be customized (ie. set their role) by passing in a function that modifies
 // the input identities as required.
@@ -440,7 +495,7 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 
 	for i := 0; i < n; i++ {
 		identity := IdentityFixture()
-		identity.Address = fmt.Sprintf("address-%d", i+1)
+		identity.Address = fmt.Sprintf("%x@flow.com", identity.NodeID)
 		for _, opt := range opts {
 			opt(identity)
 		}
@@ -508,6 +563,12 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 func WithTransactionDSL(txDSL dsl.Transaction) func(tx *flow.TransactionBody) {
 	return func(tx *flow.TransactionBody) {
 		tx.Script = []byte(txDSL.ToCadence())
+	}
+}
+
+func WithReferenceBlock(id flow.Identifier) func(tx *flow.TransactionBody) {
+	return func(tx *flow.TransactionBody) {
+		tx.ReferenceBlockID = id
 	}
 }
 
