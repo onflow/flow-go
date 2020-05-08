@@ -106,6 +106,12 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 
 	log.Info().Msg("proposal forwarded from compliance engine")
 
+	// ignore stale proposals
+	if block.View < e.forks.FinalizedView() {
+		log.Info().Msg("stale proposal")
+		return nil
+	}
+
 	// validate the block. exit if the proposal is invalid
 	err := e.validator.ValidateProposal(proposal)
 	if errors.Is(err, model.ErrorInvalidBlock{}) {
