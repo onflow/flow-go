@@ -2,6 +2,7 @@ package test
 
 import (
 	"bytes"
+	"fmt"
 	"sync"
 	"testing"
 
@@ -9,9 +10,11 @@ import (
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/crypto/random"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/engine/verification"
+	chmodel "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/storage/ledger"
@@ -215,4 +218,27 @@ func VerifiableChunk(chunkIndex uint64, er verification.CompleteExecutionResult)
 		Collection:    er.Collections[chunkIndex],
 		ChunkDataPack: er.ChunkDataPacks[chunkIndex],
 	}
+}
+
+type MockAssigner struct {
+	me flow.Identifier
+}
+
+func NewMockAssigner(id flow.Identifier) *MockAssigner {
+	return &MockAssigner{me: id}
+}
+
+// Assign assigns all input chunks to the verifier node
+func (m *MockAssigner) Assign(ids flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chmodel.Assignment, error) {
+	if len(chunks) == 0 {
+		return nil, fmt.Errorf("assigner called with empty chunk list")
+	}
+	a := chmodel.NewAssignment()
+	for _, c := range chunks {
+		if IsAssigned(c.Index) {
+			a.Add(c, flow.IdentifierList{m.me})
+		}
+	}
+
+	return a, nil
 }

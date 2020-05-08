@@ -1,37 +1,51 @@
 package computer
 
 import (
+	"context"
 	"fmt"
+
+	"github.com/opentracing/opentracing-go"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
+	"github.com/dapperlabs/flow-go/module/trace"
 )
 
 // A BlockComputer executes the transactions in a block.
 type BlockComputer interface {
-	ExecuteBlock(*entity.ExecutableBlock, *delta.View) (*execution.ComputationResult, error)
+	ExecuteBlock(context.Context, *entity.ExecutableBlock, *delta.View) (*execution.ComputationResult, error)
 }
 
 type blockComputer struct {
-	vm virtualmachine.VirtualMachine
+	tracer module.Tracer
+	vm     virtualmachine.VirtualMachine
 }
 
 // NewBlockComputer creates a new block executor.
-func NewBlockComputer(vm virtualmachine.VirtualMachine) BlockComputer {
+func NewBlockComputer(vm virtualmachine.VirtualMachine, tracer module.Tracer) BlockComputer {
 	return &blockComputer{
-		vm: vm,
+		tracer: tracer,
+		vm:     vm,
 	}
 }
 
 // ExecuteBlock executes a block and returns the resulting chunks.
 func (e *blockComputer) ExecuteBlock(
+	ctx context.Context,
 	block *entity.ExecutableBlock,
 	stateView *delta.View,
 ) (*execution.ComputationResult, error) {
-	results, err := e.executeBlock(block, stateView)
+
+	if e.tracer != nil {
+		span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEComputeBlock)
+		defer span.Finish()
+	}
+
+	results, err := e.executeBlock(ctx, block, stateView)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute transactions: %w", err)
 	}
@@ -42,6 +56,7 @@ func (e *blockComputer) ExecuteBlock(
 }
 
 func (e *blockComputer) executeBlock(
+	ctx context.Context,
 	block *entity.ExecutableBlock,
 	stateView *delta.View,
 ) (*execution.ComputationResult, error) {
@@ -63,7 +78,9 @@ func (e *blockComputer) executeBlock(
 
 		collectionView := stateView.NewChild()
 
-		collEvents, txResults, nextIndex, gas, err := e.executeCollection(txIndex, blockCtx, collectionView, collection)
+		collEvents, txResults, nextIndex, gas, err := e.executeCollection(
+			ctx, txIndex, blockCtx, collectionView, collection,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute collection: %w", err)
 		}
@@ -90,43 +107,69 @@ func (e *blockComputer) executeBlock(
 }
 
 func (e *blockComputer) executeCollection(
+	ctx context.Context,
 	txIndex uint32,
 	blockCtx virtualmachine.BlockContext,
 	collectionView *delta.View,
 	collection *entity.CompleteCollection,
 ) ([]flow.Event, []flow.TransactionResult, uint32, uint64, error) {
-	var events []flow.Event
-	var txResults []flow.TransactionResult
-	var gasUsed uint64
+
+	var colSpan opentracing.Span
+	if e.tracer != nil {
+		colSpan, _ = e.tracer.StartSpanFromContext(ctx, trace.EXEComputeCollection)
+		defer colSpan.Finish()
+	}
+
+	var (
+		events    []flow.Event
+		txResults []flow.TransactionResult
+		gasUsed   uint64
+	)
+
 	for _, tx := range collection.Transactions {
-		txView := collectionView.NewChild()
+		err := func(tx *flow.TransactionBody) error {
+			if e.tracer != nil {
+				txSpan := e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
+				defer txSpan.Finish()
+			}
 
-		result, err := blockCtx.ExecuteTransaction(txView, tx)
-		if err != nil {
+			txView := collectionView.NewChild()
+
+			result, err := blockCtx.ExecuteTransaction(txView, tx)
+			if err != nil {
+				txIndex++
+				return fmt.Errorf("failed to execute transaction: %w", err)
+			}
+
+			txEvents, err := virtualmachine.ConvertEvents(txIndex, result)
 			txIndex++
-			return nil, nil, txIndex, 0, fmt.Errorf("failed to execute transaction: %w", err)
-		}
-		txEvents, err := virtualmachine.ConvertEvents(txIndex, result)
-		txIndex++
-		gasUsed += result.GasUsed
+			gasUsed += result.GasUsed
+
+			if err != nil {
+				return fmt.Errorf("failed to create flow events: %w", err)
+			}
+
+			events = append(events, txEvents...)
+
+			txResult := flow.TransactionResult{
+				TransactionID: tx.ID(),
+			}
+
+			if result.Error != nil {
+				txResult.ErrorMessage = result.Error.ErrorMessage()
+			}
+
+			txResults = append(txResults, txResult)
+
+			if result.Succeeded() {
+				collectionView.MergeView(txView)
+			}
+
+			return nil
+		}(tx)
 
 		if err != nil {
-			return nil, nil, txIndex, 0, fmt.Errorf("failed to create flow events: %w", err)
-		}
-		events = append(events, txEvents...)
-
-		txResult := flow.TransactionResult{
-			TransactionID: tx.ID(),
-		}
-
-		if result.Error != nil {
-			txResult.ErrorMessage = result.Error.ErrorMessage()
-		}
-
-		txResults = append(txResults, txResult)
-
-		if result.Succeeded() {
-			collectionView.MergeView(txView)
+			return nil, nil, txIndex, 0, err
 		}
 	}
 

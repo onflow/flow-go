@@ -2,6 +2,7 @@
 
 package mock
 
+import context "context"
 import delta "github.com/dapperlabs/flow-go/engine/execution/state/delta"
 import entity "github.com/dapperlabs/flow-go/module/mempool/entity"
 import execution "github.com/dapperlabs/flow-go/engine/execution"
@@ -13,13 +14,13 @@ type ComputationManager struct {
 	mock.Mock
 }
 
-// ComputeBlock provides a mock function with given fields: block, view
-func (_m *ComputationManager) ComputeBlock(block *entity.ExecutableBlock, view *delta.View) (*execution.ComputationResult, error) {
-	ret := _m.Called(block, view)
+// ComputeBlock provides a mock function with given fields: ctx, block, view
+func (_m *ComputationManager) ComputeBlock(ctx context.Context, block *entity.ExecutableBlock, view *delta.View) (*execution.ComputationResult, error) {
+	ret := _m.Called(ctx, block, view)
 
 	var r0 *execution.ComputationResult
-	if rf, ok := ret.Get(0).(func(*entity.ExecutableBlock, *delta.View) *execution.ComputationResult); ok {
-		r0 = rf(block, view)
+	if rf, ok := ret.Get(0).(func(context.Context, *entity.ExecutableBlock, *delta.View) *execution.ComputationResult); ok {
+		r0 = rf(ctx, block, view)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*execution.ComputationResult)
@@ -27,8 +28,8 @@ func (_m *ComputationManager) ComputeBlock(block *entity.ExecutableBlock, view *
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(*entity.ExecutableBlock, *delta.View) error); ok {
-		r1 = rf(block, view)
+	if rf, ok := ret.Get(1).(func(context.Context, *entity.ExecutableBlock, *delta.View) error); ok {
+		r1 = rf(ctx, block, view)
 	} else {
 		r1 = ret.Error(1)
 	}

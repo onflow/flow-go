@@ -64,7 +64,7 @@ func (suite *Suite) SetupTest() {
 	metrics, err := metrics.NewCollector(log)
 	require.NoError(suite.T(), err)
 
-	me := unittest.IdentityFixture(func(idty *flow.Identity) { idty.Role = flow.RoleCollection })
+	me := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 
 	// mock out protocol state
 	suite.proto.state = new(protocol.State)
@@ -135,7 +135,7 @@ func (suite *Suite) TestHandleProposal() {
 	suite.payloads.On("Store", mock.Anything, mock.Anything).Return(nil).Once()
 	suite.headers.On("Store", mock.Anything).Return(nil).Once()
 	// should extend state with new block
-	suite.cluster.mutator.On("Extend", block.ID()).Return(nil).Once()
+	suite.cluster.mutator.On("Extend", &block).Return(nil).Once()
 	// should submit to consensus algo
 	suite.coldstuff.On("SubmitProposal", proposal.Header, parent.Header.View).Once()
 	// we don't have any cached children
@@ -168,11 +168,8 @@ func (suite *Suite) TestHandleProposalWithUnknownValidTransactions() {
 		suite.validator.On("ValidateTransaction", tx).Return(nil).Once()
 	}
 
-	// should store payload and header
-	suite.payloads.On("Store", mock.Anything, mock.Anything).Return(nil).Once()
-	suite.headers.On("Store", mock.Anything).Return(nil).Once()
 	// should extend state with new block
-	suite.cluster.mutator.On("Extend", block.ID()).Return(nil).Once()
+	suite.cluster.mutator.On("Extend", &block).Return(nil).Once()
 	// should submit to consensus algo
 	suite.coldstuff.On("SubmitProposal", proposal.Header, parent.Header.View).Once()
 	// we don't have any cached children
@@ -283,8 +280,8 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	suite.payloads.On("Store", mock.Anything, mock.Anything).Return(nil).Twice()
 	suite.headers.On("Store", mock.Anything).Return(nil).Twice()
 	// should extend state with new block
-	suite.cluster.mutator.On("Extend", block.ID()).Return(nil).Once()
-	suite.cluster.mutator.On("Extend", child.ID()).Return(nil).Once()
+	suite.cluster.mutator.On("Extend", &block).Return(nil).Once()
+	suite.cluster.mutator.On("Extend", &child).Return(nil).Once()
 	// should submit to consensus algo
 	suite.coldstuff.On("SubmitProposal", mock.Anything, mock.Anything).Twice()
 	// should return the pending child

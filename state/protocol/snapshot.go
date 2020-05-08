@@ -21,8 +21,8 @@ type Snapshot interface {
 	// selected point of the protocol state history. It will error if it doesn't exist.
 	Identity(nodeID flow.Identifier) (*flow.Identity, error)
 
-	// Seal return the highest seal at the selected snapshot.
-	Seal() (*flow.Seal, error)
+	// Commit return the sealed execution state commitment at this block.
+	Commit() (flow.StateCommitment, error)
 
 	// Cluster selects the given cluster from the node selection. You have to
 	// manually filter the identities to the desired set of nodes before
@@ -35,7 +35,8 @@ type Snapshot interface {
 	// we should build the next block in the context of the selected state.
 	Head() (*flow.Header, error)
 
-	// Pending returns the pending block IDs that connect to the finalized
-	// block.
+	// Pending returns all children IDs for the snapshot head, which thus were
+	// potential extensions of the protocol state at this snapshot. The result
+	// is ordered such that parents are included before their children.
 	Pending() ([]flow.Identifier, error)
 }

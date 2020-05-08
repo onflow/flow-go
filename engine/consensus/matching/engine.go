@@ -106,6 +106,9 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+	e.unit.Lock()
+	defer e.unit.Unlock()
+
 	switch entity := event.(type) {
 	case *flow.ExecutionReceipt:
 		return e.onReceipt(originID, entity)

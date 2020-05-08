@@ -22,7 +22,6 @@ import (
 	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
 	"github.com/libp2p/go-tcp-transport"
 	"github.com/multiformats/go-multiaddr"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 )
 
@@ -93,7 +92,7 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 		transport,
 	)
 	if err != nil {
-		return errors.Wrapf(err, "could not construct libp2p host for %s", p.name)
+		return fmt.Errorf("could not create libp2p host: %w", err)
 	}
 
 	p.libP2PHost = host
@@ -103,7 +102,7 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 	// Creating a new PubSub instance of the type GossipSub with psOption
 	p.ps, err = pubsub.NewGossipSub(ctx, p.libP2PHost, psOption...)
 	if err != nil {
-		return errors.Wrapf(err, "unable to start pubsub %s", p.name)
+		return fmt.Errorf("could not create libp2p pubsub: %w", err)
 	}
 
 	p.topics = make(map[string]*pubsub.Topic)
@@ -196,7 +195,7 @@ func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stre
 	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath if it exists)
 	stream, err := p.tryCreateNewStream(ctx, n, peerID, maxConnectAttempt)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create stream for %s: %w", peerID.String(), err)
+		return nil, fmt.Errorf("could not create stream (name: %s, address: %s:%s): %w", n.Name, n.IP, n.Port, err)
 	}
 	return stream, nil
 }
@@ -297,7 +296,7 @@ func (p *P2PNode) Subscribe(ctx context.Context, topic string) (*pubsub.Subscrip
 	if !found {
 		tp, err = p.ps.Join(topic)
 		if err != nil {
-			return nil, fmt.Errorf("failed to join topic %s: %w", topic, err)
+			return nil, fmt.Errorf("could not join topic (%s): %w", topic, err)
 		}
 		p.topics[topic] = tp
 	}
@@ -305,7 +304,7 @@ func (p *P2PNode) Subscribe(ctx context.Context, topic string) (*pubsub.Subscrip
 	// Create a new subscription
 	s, err := tp.Subscribe()
 	if err != nil {
-		return s, fmt.Errorf("failed to create subscription for topic %s: %w", topic, err)
+		return s, fmt.Errorf("could not subscribe to topic (%s): %w", topic, err)
 	}
 
 	// Add the subscription to the cache
@@ -328,14 +327,14 @@ func (p *P2PNode) UnSubscribe(topic string) error {
 
 	tp, found := p.topics[topic]
 	if !found {
-		err := fmt.Errorf("topic %s not subscribed to", topic)
+		err := fmt.Errorf("could not find topic (%s)", topic)
 		return err
 	}
 
 	// attempt to close the topic
 	err := tp.Close()
 	if err != nil {
-		err = errors.Wrapf(err, "unable to close topic %s", topic)
+		err = fmt.Errorf("could not close topic (%s): %w", topic, err)
 		return err
 	}
 	p.topics[topic] = nil
@@ -346,14 +345,14 @@ func (p *P2PNode) UnSubscribe(topic string) error {
 }
 
 // Publish publishes the given payload on the topic
-func (p *P2PNode) Publish(ctx context.Context, t string, data []byte) error {
-	ps, found := p.topics[t]
+func (p *P2PNode) Publish(ctx context.Context, topic string, data []byte) error {
+	ps, found := p.topics[topic]
 	if !found {
-		return fmt.Errorf("topic not found:%s", t)
+		return fmt.Errorf("could not find topic (%s)", topic)
 	}
 	err := ps.Publish(ctx, data)
 	if err != nil {
-		return fmt.Errorf("failed to publish to topic %s: %w", t, err)
+		return fmt.Errorf("could not publish top topic (%s): %w", topic, err)
 	}
 	return nil
 }

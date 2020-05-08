@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification"
 	chmodel "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
@@ -158,7 +159,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 		<-verNode.IngestEngine.Ready()
 
 		// assumes the verification node has received the block
-		err := verNode.BlockStorage.Store(completeER.Block)
+		err := verNode.Blocks.Store(completeER.Block)
 		assert.Nil(t, err)
 
 		verNodes = append(verNodes, verNode)
@@ -328,7 +329,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	// verification node
 	verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold)
 	// inject block
-	err := verNode.BlockStorage.Store(completeER.Block)
+	err := verNode.Blocks.Store(completeER.Block)
 	assert.Nil(t, err)
 
 	// collection node
@@ -410,15 +411,9 @@ func TestSingleCollectionProcessing(t *testing.T) {
 
 }
 
-// BenchmarkIngestEngine is only executed if the 'benchmark' environmental variable is
-// declared as TRUE.
 // BenchmarkIngestEngine benchmarks the happy path of ingest engine with sending
 // 10 execution receipts simultaneously where each receipt has 100 chunks in it.
 func BenchmarkIngestEngine(b *testing.B) {
-	if os.Getenv("benchmark") != "TRUE" {
-		fmt.Println("skips")
-		b.Skip("skips benchmarking ingest engine")
-	}
 	for i := 0; i < b.N; i++ {
 		ingestHappyPath(b, 10, 100)
 	}
@@ -444,13 +439,9 @@ func ingestHappyPath(tb testing.TB, receiptCount int, chunkCount int) {
 	hub := stub.NewNetworkHub()
 
 	// generates identities of nodes, one of each type and `verCount` many verification node
-	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	exeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-	conIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-
-	identities := flow.IdentityList{colIdentity, conIdentity, exeIdentity}
-	identities = append(identities, verIdentity)
+	identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+	verIdentity := identities.Filter(filter.HasRole(flow.RoleVerification))[0]
+	exeIdentity := identities.Filter(filter.HasRole(flow.RoleExecution))[0]
 
 	// Execution receipt and chunk assignment
 	//
@@ -462,24 +453,17 @@ func ingestHappyPath(tb testing.TB, receiptCount int, chunkCount int) {
 	fmt.Println("Chunks have been made")
 
 	// mocks the assignment to assign the single chunk to this verifier node
-	assigner := &mock.ChunkAssigner{}
-	a := chmodel.NewAssignment()
+	assigner := NewMockAssigner(verIdentity.NodeID)
 
 	vChunks := make([]*verification.VerifiableChunk, 0)
 
-	// assigns some chunks based on isAssigned method to the verification node
+	// collects assigned chunks to verification node in vChunks
 	for _, er := range ers {
 		for _, chunk := range er.Receipt.ExecutionResult.Chunks {
 			if IsAssigned(chunk.Index) {
-				a.Add(chunk, []flow.Identifier{verIdentity.NodeID})
 				vChunks = append(vChunks, VerifiableChunk(chunk.Index, er))
 			}
 		}
-		assigner.On("Assign",
-			testifymock.Anything,
-			er.Receipt.ExecutionResult.Chunks,
-			testifymock.Anything).
-			Return(a, nil)
 	}
 
 	// nodes and engines
@@ -496,7 +480,7 @@ func ingestHappyPath(tb testing.TB, receiptCount int, chunkCount int) {
 	// with each receipt
 	for _, er := range ers {
 		// block
-		err := verNode.BlockStorage.Store(er.Block)
+		err := verNode.Blocks.Store(er.Block)
 		require.NoError(tb, err)
 
 		for _, chunk := range er.Receipt.ExecutionResult.Chunks {

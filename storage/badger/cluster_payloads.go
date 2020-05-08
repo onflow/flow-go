@@ -55,7 +55,7 @@ func (cp *ClusterPayloads) ByBlockID(blockID flow.Identifier) (*cluster.Payload,
 			return fmt.Errorf("could not get header: %w", err)
 		}
 
-		err = procedure.RetrieveClusterPayload(&header, &payload)(tx)
+		err = procedure.RetrieveClusterPayload(blockID, &payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not get payload: %w", err)
 		}

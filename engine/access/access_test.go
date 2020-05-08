@@ -28,8 +28,9 @@ import (
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
-	bstorage "github.com/dapperlabs/flow-go/storage/badger"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/dapperlabs/flow-go/storage/util"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -55,6 +56,7 @@ func (suite *Suite) SetupTest() {
 	suite.log = zerolog.New(os.Stderr)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
@@ -71,8 +73,8 @@ func (suite *Suite) TestSendAndGetTransaction() {
 		transaction := unittest.TransactionFixture()
 
 		// create storage
-		collections := bstorage.NewCollections(db)
-		transactions := bstorage.NewTransactions(db)
+		collections := storage.NewCollections(db)
+		transactions := storage.NewTransactions(db)
 		handler := handler.NewHandler(suite.log, suite.state, nil, suite.collClient, nil, nil, collections, transactions)
 
 		expected := convert.TransactionToMessage(transaction.TransactionBody)
@@ -104,20 +106,18 @@ func (suite *Suite) TestSendAndGetTransaction() {
 
 func (suite *Suite) TestGetBlockByIDAndHeight() {
 
-	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+	util.RunWithStorageLayer(suite.T(), func(db *badger.DB, headers *storage.Headers, _ *storage.Identities, _ *storage.Guarantees, _ *storage.Seals, _ *storage.Payloads, blocks *storage.Blocks) {
 		// test block1 get by ID
 		block1 := unittest.BlockFixture()
 		// test block2 get by height
 		block2 := unittest.BlockFixture()
 		block2.Header.Height = 2
 
-		blocks := bstorage.NewBlocks(db)
-		headers := bstorage.NewHeaders(db)
 		require.NoError(suite.T(), blocks.Store(&block1))
 		require.NoError(suite.T(), blocks.Store(&block2))
 
 		// the follower logic should update height index on the block storage when a block is finalized
-		err := db.Update(operation.InsertNumber(block2.Header.Height, block2.ID()))
+		err := db.Update(operation.IndexBlockHeight(block2.Header.Height, block2.ID()))
 		require.NoError(suite.T(), err)
 
 		handler := handler.NewHandler(suite.log, suite.state, nil, suite.collClient, blocks, headers, nil, nil)
@@ -191,9 +191,9 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 // TestGetSealedTransaction tests that transactions status of transaction that belongs to a sealed blocked
 // is reported as sealed
 func (suite *Suite) TestGetSealedTransaction() {
-	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		// create block -> collection -> transactions and seal
-		block, collection, seal := suite.createChain()
+	util.RunWithStorageLayer(suite.T(), func(db *badger.DB, headers *storage.Headers, _ *storage.Identities, _ *storage.Guarantees, _ *storage.Seals, _ *storage.Payloads, blocks *storage.Blocks) {
+		// create block -> collection -> transactions
+		block, collection := suite.createChain()
 
 		// setup mocks
 		originID := unittest.IdentifierFixture()
@@ -213,10 +213,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 		suite.execClient.On("GetTransactionResult", mock.Anything, mock.Anything).Return(&exeEventResp, nil)
 
 		// initialize storage
-		blocks := bstorage.NewBlocks(db)
-		headers := bstorage.NewHeaders(db)
-		collections := bstorage.NewCollections(db)
-		transactions := bstorage.NewTransactions(db)
+		collections := storage.NewCollections(db)
+		transactions := storage.NewTransactions(db)
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, metrics, suite.me, blocks, headers, collections, transactions)
@@ -228,7 +226,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
 		err = blocks.Store(&block)
 		require.NoError(suite.T(), err)
-		suite.snapshot.On("Seal").Return(&seal, nil).Once()
+		suite.snapshot.On("Head").Return(block.Header, nil).Once()
 
 		// 2. Ingest engine was notified by the follower engine about a new block.
 		// Follower engine --> Ingest engine
@@ -262,30 +260,23 @@ func (suite *Suite) TestGetSealedTransaction() {
 // TestExecuteScript tests the three execute Script related calls to make sure that the execution api is called with
 // the correct block id
 func (suite *Suite) TestExecuteScript() {
-	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-
-		// initialize storage
-		blocks := bstorage.NewBlocks(db)
-		headers := bstorage.NewHeaders(db)
+	util.RunWithStorageLayer(suite.T(), func(db *badger.DB, headers *storage.Headers, _ *storage.Identities, _ *storage.Guarantees, _ *storage.Seals, _ *storage.Payloads, blocks *storage.Blocks) {
 
 		// create a block and a seal pointing to that block
 		lastBlock := unittest.BlockFixture()
 		lastBlock.Header.Height = 2
-		seal := flow.Seal{
-			BlockID: lastBlock.ID(),
-		}
 		err := blocks.Store(&lastBlock)
 		require.NoError(suite.T(), err)
-		err = db.Update(operation.InsertNumber(lastBlock.Header.Height, lastBlock.ID()))
+		err = db.Update(operation.IndexBlockHeight(lastBlock.Header.Height, lastBlock.ID()))
 		require.NoError(suite.T(), err)
-		suite.snapshot.On("Seal").Return(&seal, nil).Once()
+		suite.snapshot.On("Head").Return(lastBlock.Header, nil).Once()
 
 		// create another block as a predecessor of the block created earlier
 		prevBlock := unittest.BlockFixture()
 		prevBlock.Header.Height = lastBlock.Header.Height - 1
 		err = blocks.Store(&prevBlock)
 		require.NoError(suite.T(), err)
-		err = db.Update(operation.InsertNumber(prevBlock.Header.Height, prevBlock.ID()))
+		err = db.Update(operation.IndexBlockHeight(prevBlock.Header.Height, prevBlock.ID()))
 		require.NoError(suite.T(), err)
 
 		ctx := context.Background()
@@ -351,7 +342,7 @@ func (suite *Suite) TestExecuteScript() {
 	})
 }
 
-func (suite *Suite) createChain() (flow.Block, flow.Collection, flow.Seal) {
+func (suite *Suite) createChain() (flow.Block, flow.Collection) {
 	collection := unittest.CollectionFixture(10)
 	cg := &flow.CollectionGuarantee{
 		CollectionID: collection.ID(),
@@ -360,9 +351,5 @@ func (suite *Suite) createChain() (flow.Block, flow.Collection, flow.Seal) {
 	block := unittest.BlockFixture()
 	block.Payload.Guarantees = []*flow.CollectionGuarantee{cg}
 
-	seal := flow.Seal{
-		BlockID: block.ID(),
-	}
-
-	return block, collection, seal
+	return block, collection
 }

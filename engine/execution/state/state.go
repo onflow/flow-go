@@ -1,17 +1,19 @@
 package state
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/trace"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 // ReadOnlyExecutionState allows to read the execution state
@@ -19,20 +21,29 @@ type ReadOnlyExecutionState interface {
 	// NewView creates a new ready-only view at the given state commitment.
 	NewView(flow.StateCommitment) *delta.View
 
-	GetRegisters(flow.StateCommitment, []flow.RegisterID) ([]flow.RegisterValue, error)
-	GetRegistersWithProofs(flow.StateCommitment, []flow.RegisterID) ([]flow.RegisterValue, []flow.StorageProof, error)
+	GetRegisters(
+		context.Context,
+		flow.StateCommitment,
+		[]flow.RegisterID,
+	) ([]flow.RegisterValue, error)
+
+	GetRegistersWithProofs(
+		context.Context,
+		flow.StateCommitment,
+		[]flow.RegisterID,
+	) ([]flow.RegisterValue, []flow.StorageProof, error)
 
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
-	StateCommitmentByBlockID(flow.Identifier) (flow.StateCommitment, error)
+	StateCommitmentByBlockID(context.Context, flow.Identifier) (flow.StateCommitment, error)
 
 	// ChunkDataPackByChunkID retrieve a chunk data pack given the chunk ID.
-	ChunkDataPackByChunkID(flow.Identifier) (*flow.ChunkDataPack, error)
+	ChunkDataPackByChunkID(context.Context, flow.Identifier) (*flow.ChunkDataPack, error)
 
-	GetExecutionResultID(blockID flow.Identifier) (flow.Identifier, error)
+	GetExecutionResultID(context.Context, flow.Identifier) (flow.Identifier, error)
 
-	RetrieveStateDelta(blockID flow.Identifier) (*messages.ExecutionStateDelta, error)
+	RetrieveStateDelta(context.Context, flow.Identifier) (*messages.ExecutionStateDelta, error)
 
-	GetHighestExecutedBlockID() (uint64, flow.Identifier, error)
+	GetHighestExecutedBlockID(context.Context) (uint64, flow.Identifier, error)
 
 	Size() (int64, error)
 }
@@ -46,24 +57,26 @@ type ExecutionState interface {
 	ReadOnlyExecutionState
 
 	// CommitDelta commits a register delta and returns the new state commitment.
-	CommitDelta(delta.Delta, flow.StateCommitment) (flow.StateCommitment, error)
+	CommitDelta(context.Context, delta.Delta, flow.StateCommitment) (flow.StateCommitment, error)
 
 	// PersistStateCommitment saves a state commitment by the given block ID.
-	PersistStateCommitment(flow.Identifier, flow.StateCommitment) error
+	PersistStateCommitment(context.Context, flow.Identifier, flow.StateCommitment) error
 
 	// PersistChunkDataPack stores a chunk data pack by chunk ID.
-	PersistChunkDataPack(*flow.ChunkDataPack) error
+	PersistChunkDataPack(context.Context, *flow.ChunkDataPack) error
 
-	PersistExecutionResult(blockID flow.Identifier, result flow.ExecutionResult) error
+	PersistExecutionResult(context.Context, flow.Identifier, flow.ExecutionResult) error
 
-	PersistStateInteractions(blockID flow.Identifier, views []*delta.Snapshot) error
+	PersistStateInteractions(context.Context, flow.Identifier, []*delta.Snapshot) error
 
-	UpdateHighestExecutedBlockIfHigher(header *flow.Header) error
+	UpdateHighestExecutedBlockIfHigher(context.Context, *flow.Header) error
 }
 
 type state struct {
+	tracer           module.Tracer
 	ls               storage.Ledger
 	commits          storage.Commits
+	blocks           storage.Blocks
 	chunkDataPacks   storage.ChunkDataPacks
 	executionResults storage.ExecutionResults
 	db               *badger.DB
@@ -73,13 +86,17 @@ type state struct {
 func NewExecutionState(
 	ls storage.Ledger,
 	commits storage.Commits,
+	blocks storage.Blocks,
 	chunkDataPacks storage.ChunkDataPacks,
 	executionResult storage.ExecutionResults,
 	db *badger.DB,
+	tracer module.Tracer,
 ) ExecutionState {
 	return &state{
+		tracer:           tracer,
 		ls:               ls,
 		commits:          commits,
+		blocks:           blocks,
 		chunkDataPacks:   chunkDataPacks,
 		executionResults: executionResult,
 		db:               db,
@@ -120,45 +137,85 @@ func CommitDelta(ledger storage.Ledger, delta delta.Delta, baseState flow.StateC
 	return commit, nil
 }
 
-func (s *state) CommitDelta(delta delta.Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
+func (s *state) CommitDelta(ctx context.Context, delta delta.Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
+	if s.tracer != nil {
+		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXECommitDelta)
+		defer span.Finish()
+	}
+
 	return CommitDelta(s.ls, delta, baseState)
 }
 
 func (s *state) GetRegisters(
+	ctx context.Context,
 	commit flow.StateCommitment,
 	registerIDs []flow.RegisterID,
 ) ([]flow.RegisterValue, error) {
+	if s.tracer != nil {
+		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetRegisters)
+		defer span.Finish()
+	}
+
 	return s.ls.GetRegisters(registerIDs, commit)
 }
 
 func (s *state) GetRegistersWithProofs(
+	ctx context.Context,
 	commit flow.StateCommitment,
 	registerIDs []flow.RegisterID,
 ) ([]flow.RegisterValue, []flow.StorageProof, error) {
+	if s.tracer != nil {
+		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetRegistersWithProofs)
+		defer span.Finish()
+	}
+
 	return s.ls.GetRegistersWithProof(registerIDs, commit)
 }
 
-func (s *state) StateCommitmentByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {
-	return s.commits.ByID(blockID)
+func (s *state) StateCommitmentByBlockID(ctx context.Context, blockID flow.Identifier) (flow.StateCommitment, error) {
+	return s.commits.ByBlockID(blockID)
 }
 
-func (s *state) PersistStateCommitment(blockID flow.Identifier, commit flow.StateCommitment) error {
+func (s *state) PersistStateCommitment(ctx context.Context, blockID flow.Identifier, commit flow.StateCommitment) error {
+	if s.tracer != nil {
+		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistStateCommitment)
+		defer span.Finish()
+	}
+
 	return s.commits.Store(blockID, commit)
 }
 
-func (s *state) ChunkDataPackByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
+func (s *state) ChunkDataPackByChunkID(ctx context.Context, chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
+	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistStateCommitment)
+	defer span.Finish()
+
 	return s.chunkDataPacks.ByChunkID(chunkID)
 }
 
-func (s *state) PersistChunkDataPack(c *flow.ChunkDataPack) error {
+func (s *state) PersistChunkDataPack(ctx context.Context, c *flow.ChunkDataPack) error {
+	if s.tracer != nil {
+		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistChunkDataPack)
+		defer span.Finish()
+	}
+
 	return s.chunkDataPacks.Store(c)
 }
 
-func (s *state) GetExecutionResultID(blockID flow.Identifier) (flow.Identifier, error) {
+func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifier) (flow.Identifier, error) {
+	if s.tracer != nil {
+		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetExecutionResultID)
+		defer span.Finish()
+	}
+
 	return s.executionResults.Lookup(blockID)
 }
 
-func (s *state) PersistExecutionResult(blockID flow.Identifier, result flow.ExecutionResult) error {
+func (s *state) PersistExecutionResult(ctx context.Context, blockID flow.Identifier, result flow.ExecutionResult) error {
+	if s.tracer != nil {
+		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistExecutionResult)
+		defer span.Finish()
+	}
+
 	err := s.executionResults.Store(&result)
 	if err != nil {
 		return fmt.Errorf("could not persist execution result: %w", err)
@@ -168,25 +225,30 @@ func (s *state) PersistExecutionResult(blockID flow.Identifier, result flow.Exec
 	return s.executionResults.Index(blockID, result.ID())
 }
 
-func (s *state) PersistStateInteractions(blockID flow.Identifier, views []*delta.Snapshot) error {
+func (s *state) PersistStateInteractions(ctx context.Context, blockID flow.Identifier, views []*delta.Snapshot) error {
+	if s.tracer != nil {
+		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistStateInteractions)
+		defer span.Finish()
+	}
+
 	return s.db.Update(func(txn *badger.Txn) error {
 		return operation.InsertExecutionStateInteractions(blockID, views)(txn)
 	})
 }
 
-func (s *state) RetrieveStateDelta(blockID flow.Identifier) (*messages.ExecutionStateDelta, error) {
-	var block flow.Block
+func (s *state) RetrieveStateDelta(ctx context.Context, blockID flow.Identifier) (*messages.ExecutionStateDelta, error) {
+	block, err := s.blocks.ByID(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("cannot retrieve block: %w", err)
+	}
+
 	var startStateCommitment flow.StateCommitment
 	var endStateCommitment flow.StateCommitment
 	var stateInteractions []*delta.Snapshot
 	var events []flow.Event
 	var txResults []flow.TransactionResult
-	err := s.db.View(func(txn *badger.Txn) error {
-		err := procedure.RetrieveBlock(blockID, &block)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot retrieve block: %w", err)
-		}
 
+	err = s.db.View(func(txn *badger.Txn) error {
 		err = operation.LookupStateCommitment(blockID, &endStateCommitment)(txn)
 		if err != nil {
 			return fmt.Errorf("cannot lookup state commitment: %w", err)
@@ -217,8 +279,9 @@ func (s *state) RetrieveStateDelta(blockID flow.Identifier) (*messages.Execution
 	if err != nil {
 		return nil, err
 	}
+
 	return &messages.ExecutionStateDelta{
-		Block:              &block,
+		Block:              block,
 		StateInteractions:  stateInteractions,
 		StartState:         startStateCommitment,
 		EndState:           endStateCommitment,
@@ -227,34 +290,56 @@ func (s *state) RetrieveStateDelta(blockID flow.Identifier) (*messages.Execution
 	}, nil
 }
 
-func (s *state) UpdateHighestExecutedBlockIfHigher(header *flow.Header) error {
+func (s *state) UpdateHighestExecutedBlockIfHigher(ctx context.Context, header *flow.Header) error {
+	if s.tracer != nil {
+		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEUpdateHighestExecutedBlockIfHigher)
+		defer span.Finish()
+	}
+
 	return s.db.Update(func(txn *badger.Txn) error {
-		var number uint64
 		var blockID flow.Identifier
-		err := operation.RetrieveHighestExecutedBlockNumber(&number, &blockID)(txn)
+		err := operation.RetrieveExecutedBlock(&blockID)(txn)
 		if err != nil {
-			return fmt.Errorf("cannot retrieve highest executed block: %w", err)
+			return fmt.Errorf("cannot lookup executed block: %w", err)
 		}
-		if number < header.Height {
-			err = operation.UpdateHighestExecutedBlockNumber(header.Height, header.ID())(txn)
-			if err != nil {
-				return fmt.Errorf("cannot update highest executed block: %w", err)
-			}
+
+		var highest flow.Header
+		err = operation.RetrieveHeader(blockID, &highest)(txn)
+		if err != nil {
+			return fmt.Errorf("cannot retrieve executed header: %w", err)
 		}
+
+		if header.Height <= highest.Height {
+			return nil
+		}
+		err = operation.UpdateExecutedBlock(header.ID())(txn)
+		if err != nil {
+			return fmt.Errorf("cannot update highest executed block: %w", err)
+		}
+
 		return nil
 	})
 }
 
-func (s *state) GetHighestExecutedBlockID() (uint64, flow.Identifier, error) {
-	var height uint64
+func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Identifier, error) {
 	var blockID flow.Identifier
-	err := s.db.View(func(txn *badger.Txn) error {
-		return operation.RetrieveHighestExecutedBlockNumber(&height, &blockID)(txn)
+	var highest flow.Header
+	err := s.db.View(func(tx *badger.Txn) error {
+		err := operation.RetrieveExecutedBlock(&blockID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not lookup executed block: %w", err)
+		}
+		err = operation.RetrieveHeader(blockID, &highest)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve executed header: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
 		return 0, flow.ZeroID, err
 	}
-	return height, blockID, nil
+
+	return highest.Height, blockID, nil
 }
 
 func (s *state) Size() (int64, error) {
