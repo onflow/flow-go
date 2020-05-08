@@ -101,8 +101,13 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 }
 
 func (suite *CollectorSuite) TearDownTest() {
-	defer suite.cancel()
-	suite.net.Remove()
+	// avoid nil pointer errors for skipped tests
+	if suite.cancel != nil {
+		defer suite.cancel()
+	}
+	if suite.net != nil {
+		suite.net.Remove()
+	}
 }
 
 // Ghost returns a client for the ghost node.
