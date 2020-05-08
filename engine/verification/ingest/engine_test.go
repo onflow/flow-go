@@ -475,9 +475,6 @@ func (suite *IngestTestSuite) TestHandleReceipt_RetryMissingChunkDataPack() {
 	exeIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleExecution))
 
 	// mocking state
-	//
-	// mocks state snapshot to return collIdentities as identity list of staked collection nodes
-	suite.state.On("Final").Return(suite.ss, nil)
 	suite.ss.On("Identities", testifymock.AnythingOfType("flow.IdentityFilter")).Return(exeIdentities, nil)
 
 	// mocks functionalities
