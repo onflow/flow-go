@@ -5,6 +5,10 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/dapperlabs/flow-go/model/flow"
+
+	"github.com/dapperlabs/flow-go/module/metrics"
+
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/cmd"
@@ -119,6 +123,10 @@ func main() {
 			conCache = buffer.NewPendingBlocks()
 			return nil
 		}).
+		Module("metrics collector", func(node *cmd.FlowNodeBuilder) error {
+			node.Metrics, err = metrics.NewCollector(node.Logger)
+			return err
+		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rt := runtime.NewInterpreterRuntime()
 			vm, err := virtualmachine.New(rt)
@@ -220,5 +228,5 @@ func main() {
 
 			return followerEng.WithSynchronization(sync), nil
 		}).
-		Run("verification")
+		Run(flow.RoleVerification.String())
 }

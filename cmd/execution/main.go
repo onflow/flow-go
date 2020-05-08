@@ -8,6 +8,8 @@ import (
 
 	"github.com/onflow/cadence/runtime"
 
+	"github.com/dapperlabs/flow-go/module/metrics"
+
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/cmd"
@@ -67,6 +69,10 @@ func main() {
 		//Trie storage is required to bootstrap, but also should be handled while shutting down
 		Module("ledger storage", func(node *cmd.FlowNodeBuilder) error {
 			ledgerStorage, err = ledger.NewTrieStorage(triedir)
+			return err
+		}).
+		Module("metrics collector", func(node *cmd.FlowNodeBuilder) error {
+			node.Metrics, err = metrics.NewCollector(node.Logger)
 			return err
 		}).
 		GenesisHandler(func(node *cmd.FlowNodeBuilder, block *flow.Block) {
@@ -136,6 +142,6 @@ func main() {
 		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Blocks, events, txResults)
 			return rpcEng, nil
-		}).Run("execution")
+		}).Run(flow.RoleExecution.String())
 
 }
