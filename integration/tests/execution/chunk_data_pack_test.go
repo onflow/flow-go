@@ -2,7 +2,6 @@ package execution
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -10,7 +9,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/ghost/client"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/integration/tests/common"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -21,34 +19,14 @@ import (
 )
 
 func TestExecutionChunkDataPacks(t *testing.T) {
-	suite.Run(t, new(ExecutionSuite2))
+	suite.Run(t, new(ExecutionChunkDataPacksSuite))
 }
 
-type ExecutionSuite2 struct {
-	suite.Suite
-	common.TestnetStateTracker
-	cancel  context.CancelFunc
-	net     *testnet.FlowNetwork
-	nodeIDs []flow.Identifier
-	ghostID flow.Identifier
-	exe1ID  flow.Identifier
-	verID   flow.Identifier
+type ExecutionChunkDataPacksSuite struct {
+	Suite
 }
 
-func (gs *ExecutionSuite2) Ghost() *client.GhostClient {
-	ghost := gs.net.ContainerByID(gs.ghostID)
-	client, err := common.GetGhostClient(ghost)
-	require.NoError(gs.T(), err, "could not get ghost client")
-	return client
-}
-
-func (gs *ExecutionSuite2) AccessClient() *testnet.Client {
-	client, err := testnet.NewClient(fmt.Sprintf(":%s", gs.net.AccessPorts[testnet.AccessNodeAPIPort]))
-	require.NoError(gs.T(), err, "could not get access client")
-	return client
-}
-
-func (gs *ExecutionSuite2) SetupTest() {
+func (s *ExecutionChunkDataPacksSuite) SetupTest() {
 
 	// to collect node configs...
 	var nodeConfigs []testnet.NodeConfig
@@ -58,8 +36,8 @@ func (gs *ExecutionSuite2) SetupTest() {
 	nodeConfigs = append(nodeConfigs, acsConfig)
 
 	// generate the three consensus identities
-	gs.nodeIDs = unittest.IdentifierListFixture(3)
-	for _, nodeID := range gs.nodeIDs {
+	s.nodeIDs = unittest.IdentifierListFixture(3)
+	for _, nodeID := range s.nodeIDs {
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithID(nodeID),
 			testnet.WithLogLevel(zerolog.FatalLevel),
 			testnet.WithAdditionalFlag("--hotstuff-timeout=12s"))
@@ -67,14 +45,14 @@ func (gs *ExecutionSuite2) SetupTest() {
 	}
 
 	// need one execution nodes
-	gs.exe1ID = unittest.IdentifierFixture()
-	exe1Config := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithID(gs.exe1ID),
+	s.exe1ID = unittest.IdentifierFixture()
+	exe1Config := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithID(s.exe1ID),
 		testnet.WithLogLevel(zerolog.InfoLevel))
 	nodeConfigs = append(nodeConfigs, exe1Config)
 
 	// need one verification node
-	gs.verID = unittest.IdentifierFixture()
-	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithID(gs.verID),
+	s.verID = unittest.IdentifierFixture()
+	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithID(s.verID),
 		testnet.WithLogLevel(zerolog.InfoLevel))
 	nodeConfigs = append(nodeConfigs, verConfig)
 
@@ -83,8 +61,8 @@ func (gs *ExecutionSuite2) SetupTest() {
 	nodeConfigs = append(nodeConfigs, collConfig)
 
 	// add the ghost node config
-	gs.ghostID = unittest.IdentifierFixture()
-	ghostConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithID(gs.ghostID), testnet.AsGhost(),
+	s.ghostID = unittest.IdentifierFixture()
+	ghostConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithID(s.ghostID), testnet.AsGhost(),
 		testnet.WithLogLevel(zerolog.InfoLevel))
 	nodeConfigs = append(nodeConfigs, ghostConfig)
 
@@ -92,23 +70,18 @@ func (gs *ExecutionSuite2) SetupTest() {
 	netConfig := testnet.NewNetworkConfig("execution_tests", nodeConfigs)
 
 	// initialize the network
-	gs.net = testnet.PrepareFlowNetwork(gs.T(), netConfig)
+	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig)
 
 	// start the network
 	ctx, cancel := context.WithCancel(context.Background())
-	gs.cancel = cancel
-	gs.net.Start(ctx)
+	s.cancel = cancel
+	s.net.Start(ctx)
 
 	// start tracking blocks
-	gs.Track(gs.T(), ctx, gs.Ghost())
+	s.Track(s.T(), ctx, s.Ghost())
 }
 
-func (gs *ExecutionSuite2) TearDownTest() {
-	gs.net.Remove()
-	gs.cancel()
-}
-
-func (gs *ExecutionSuite2) TestVerificationNodesRequestChunkDataPacks() {
+func (gs *ExecutionChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 
 	// wait for first finalized block, called blockA
 	blockA := gs.BlockState.WaitForFirstFinalized(gs.T())
