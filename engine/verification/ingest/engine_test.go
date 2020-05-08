@@ -399,8 +399,6 @@ func (suite *IngestTestSuite) TestHandleReceipt_RetryMissingCollection() {
 		// +1 accounts for updating the trackers counter
 		suite.collTracker.Counter += 1
 	}).Return(suite.collTracker, nil)
-	suite.collectionTrackers.On("ByCollectionID", suite.collTracker.ID()).Return(suite.collTracker, nil)
-	suite.collectionTrackers.On("Rem", suite.collTracker.ID()).Return(true)
 
 	// no chunk data pack tacker
 	suite.chunkDataPackTrackers.On("All").Return(nil)
@@ -464,43 +462,60 @@ func (suite *IngestTestSuite) TestHandleReceipt_RetryMissingChunkDataPack() {
 	// mocks identities
 	//
 	// required roles
-	execIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleExecution))
+	exeIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleExecution))
 
-	// mocks state
+	// mocking state
 	//
-	// mocks state snapshot to return exeIdentities as identity list of staked execution nodes
+	// mocks state snapshot to return collIdentities as identity list of staked collection nodes
 	suite.state.On("Final").Return(suite.ss, nil)
-	suite.ss.On("Identities", testifymock.AnythingOfType("flow.IdentityFilter")).Return(execIdentities, nil)
+	suite.ss.On("Identities", testifymock.AnythingOfType("flow.IdentityFilter")).Return(exeIdentities, nil)
 
+	// mocks functionalities
+	//
 	// mocks tracker check
 	// presence of tracker in the trackers mempool
 	suite.chunkDataPackTrackers.On("Has", suite.chunkDataPack.ID()).Return(true)
 	suite.chunkDataPackTrackers.On("All").Return([]*tracker.ChunkDataPackTracker{suite.chunkTracker})
+	suite.chunkDataPackTrackers.On("Add", suite.chunkTracker).Return(nil)
 	// update functionality for the present tracker
-	suite.chunkDataPackTrackers.On("Add", suite.chunkTracker).Run(func(args testifymock.Arguments) {
+	suite.chunkDataPackTrackers.On("Inc", suite.chunkDataPack.ID()).Run(func(args testifymock.Arguments) {
 		// +1 accounts for updating the trackers counter
 		suite.chunkTracker.Counter += 1
-	}).Return(nil)
-	suite.chunkDataPackTrackers.On("ByChunkID", suite.chunkTracker.ChunkID).Return(suite.chunkTracker, nil).Once()
-	suite.chunkDataPackTrackers.On("Rem", suite.chunkTracker.ChunkID).Return(true).Once()
+	}).Return(suite.chunkTracker, nil)
 
-	// presence of receipt in the authenticated receipts
-	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt})
+	// no collection tracker
+	suite.collectionTrackers.On("All").Return(nil)
 
-	// presence of block associated with the receipt
+	// mocks the existence of receipt
+	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
+
+	// mocks the existence of block
 	suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil)
+
+	// mock existence of collection
+	suite.authCollections.On("Has", suite.collection.ID()).Return(true)
+	suite.authCollections.On("ByCollectionID", suite.collection.ID()).Return(suite.collection, nil)
+	suite.pendingCollections.On("Has", suite.collection.ID()).Return(false)
+
+	// engine has not yet ingested the result of this receipt as well as its chunks yet
+	suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
+	suite.ingestedChunkIDs.On("Has", suite.chunk.ID()).Return(false)
+
+	// engine does not have the chunk data pack
+	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(false)
 
 	// mocks expectation
 	//
-	// expect that the chunk data pack is requested from execution nodes `failureThreshold` - 1 many times
+	// expect that the collection is requested from collection nodes `failureThreshold` - 1 many times
 	// the -1 is to exclude the initial request submission made before adding tracker to mempool
 	submitWG := sync.WaitGroup{}
 	submitWG.Add(int(suite.failureThreshold) - 1)
 	suite.chunksConduit.
-		On("Submit", testifymock.AnythingOfType("*messages.ChunkDataPackRequest"), execIdentities[0].NodeID).
+		On("Submit", testifymock.AnythingOfType("*messages.ChunkDataPackRequest"), exeIdentities[0].NodeID).
 		Run(func(args testifymock.Arguments) {
 			submitWG.Done()
-		}).Return(nil).Once()
+		}).
+		Return(nil)
 
 	// starts engine
 	<-eng.Ready()
