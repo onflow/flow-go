@@ -31,7 +31,8 @@ import (
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	consensusMetrics "github.com/dapperlabs/flow-go/module/metrics/consensus"
+	"github.com/dapperlabs/flow-go/module/metrics"
+	consensusmetrics "github.com/dapperlabs/flow-go/module/metrics/consensus"
 	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
@@ -89,6 +90,10 @@ func main() {
 			seals, err = stdmap.NewSeals(sealLimit)
 			return err
 		}).
+		Module("metrics collector", func(node *cmd.FlowNodeBuilder) error {
+			node.Metrics, err = metrics.NewConsensusCollector(node.Logger)
+			return err
+		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			results := storage.NewExecutionResults(node.DB)
 			return matching.New(node.Logger, node.Network, node.State, node.Me, results, receipts, approvals, seals)
@@ -106,7 +111,7 @@ func main() {
 			return ing, err
 		}).
 		Component("mempool metrics monitor", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			monitor := consensusMetrics.NewMonitor(node.Metrics, guarantees, receipts, approvals, seals)
+			monitor := consensusmetrics.NewMonitor(node.Metrics, guarantees, receipts, approvals, seals)
 			return monitor, nil
 		}).
 		Component("consensus components", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -161,7 +166,7 @@ func main() {
 			signer := verification.NewCombinedSigner(committee, node.DKGState, staking, beacon, merger, node.NodeID)
 
 			// initialize a logging notifier for hotstuff
-			notifier := consensus.CreateNotifier(node.Logger, node.Metrics, node.Payloads)
+			notifier := createNotifier(node.Logger, node.Metrics, node.Payloads)
 
 			// initialize the persister
 			persist := persister.New(node.DB)
@@ -186,7 +191,7 @@ func main() {
 			comp = comp.WithSynchronization(sync).WithConsensus(hot)
 			return comp, nil
 		}).
-		Run("consensus")
+		Run(flow.RoleConsensus.String())
 }
 
 func loadDKGPrivateData(path string, myID flow.Identifier) (*bootstrap.DKGParticipantPriv, error) {
