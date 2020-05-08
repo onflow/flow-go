@@ -9,6 +9,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -38,9 +39,10 @@ type Engine struct {
 	pollInterval  time.Duration
 	scanInterval  time.Duration
 	retryInterval time.Duration
-	maxAttempts   uint
-	maxSize       uint
-	maxRequests   uint
+	tolerance     uint // tolerance determines how big of a difference in block heights we tolerated before actively syncing with range requests
+	maxAttempts   uint // maxAttempts is the maximum number of attempts to sync we make for each requested block/height before discarding
+	maxSize       uint // maxSize is the maximum number of blocks we request in the same block request message
+	maxRequests   uint // maxRequests is the maximum number of requests we send during each scanning period
 }
 
 // New creates a new consensus propagation engine.
@@ -67,6 +69,7 @@ func New(
 		pollInterval:  8 * time.Second,
 		scanInterval:  1 * time.Second,
 		retryInterval: 4 * time.Second,
+		tolerance:     10,
 		maxAttempts:   5,
 		maxSize:       64,
 		maxRequests:   3,
@@ -169,9 +172,13 @@ func (e *Engine) onSyncRequest(originID flow.Identifier, req *messages.SyncReque
 		return fmt.Errorf("could not get finalized head: %w", err)
 	}
 
-	// compare the height and see if we can bail early
-	// TODO: we probably want to add some tolerance here
-	if req.Height == final.Height {
+	// if we are within the tolerance threshold we do nothing
+	lower := final.Height - uint64(e.tolerance)
+	if lower > final.Height { // overflow check
+		lower = 0
+	}
+	upper := final.Height + uint64(e.tolerance)
+	if req.Height >= lower && req.Height <= upper {
 		return nil
 	}
 
@@ -200,18 +207,19 @@ func (e *Engine) onSyncRequest(originID flow.Identifier, req *messages.SyncReque
 func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResponse) error {
 
 	// get the header at the latest finalized state
-	head, err := e.state.Final().Head()
+	final, err := e.state.Final().Head()
 	if err != nil {
 		return fmt.Errorf("could not get finalized head: %w", err)
 	}
 
-	// if the height is the same or smaller, there is nothing to do
-	if res.Height <= head.Height {
+	// if we are within the tolerance threshold we do nothing
+	upper := final.Height + uint64(e.tolerance)
+	if res.Height <= upper {
 		return nil
 	}
 
 	// mark the missing height
-	for height := head.Height + 1; height <= res.Height; height++ {
+	for height := final.Height + 1; height <= res.Height; height++ {
 		e.queueByHeight(height)
 	}
 
@@ -369,14 +377,14 @@ func (e *Engine) processIncomingBlock(originID flow.Identifier, block *flow.Bloc
 
 	// check if we still need to process this block or it is stale already
 	blockID := block.ID()
-	_, wantHeight := e.heights[block.Height]
+	_, wantHeight := e.heights[block.Header.Height]
 	_, wantBlockID := e.blockIDs[blockID]
 	if !wantHeight && !wantBlockID {
 		return
 	}
 
 	// delete from the queue and forward
-	delete(e.heights, block.Height)
+	delete(e.heights, block.Header.Height)
 	delete(e.blockIDs, blockID)
 
 	synced := &events.SyncedBlock{
@@ -442,6 +450,7 @@ func (e *Engine) pollHeight() error {
 		return fmt.Errorf("could not send get consensus identities: %w", err)
 	}
 
+	var errs error
 	// send the request for synchronization
 	for _, targetID := range identities.Sample(3).NodeIDs() {
 		req := &messages.SyncRequest{
@@ -450,11 +459,11 @@ func (e *Engine) pollHeight() error {
 		}
 		err := e.con.Submit(req, targetID)
 		if err != nil {
-			return fmt.Errorf("could not send sync request: %w", err)
+			errs = multierror.Append(errs, fmt.Errorf("could not send sync request: %w", err))
 		}
 	}
 
-	return nil
+	return errs
 }
 
 // scanPending will check which items shall be requested.

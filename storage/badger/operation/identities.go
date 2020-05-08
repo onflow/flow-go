@@ -8,22 +8,18 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func InsertIdentity(identity *flow.Identity) func(*badger.Txn) error {
-	return insert(makePrefix(codeIdentity, identity.NodeID), identity)
-}
-
-func CheckIdentity(nodeID flow.Identifier, exists *bool) func(*badger.Txn) error {
-	return check(makePrefix(codeIdentity, nodeID), exists)
+func InsertIdentity(nodeID flow.Identifier, identity *flow.Identity) func(*badger.Txn) error {
+	return insert(makePrefix(codeIdentity, nodeID), identity)
 }
 
 func RetrieveIdentity(nodeID flow.Identifier, identity *flow.Identity) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeIdentity, nodeID), identity)
 }
 
-func IndexIdentityPayload(height uint64, blockID flow.Identifier, parentID flow.Identifier, nodeIDs []flow.Identifier) func(*badger.Txn) error {
-	return insert(toPayloadIndex(codeIndexIdentity, height, blockID, parentID), nodeIDs)
+func IndexPayloadIdentities(blockID flow.Identifier, nodeIDs []flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codePayloadIdentities, blockID), nodeIDs)
 }
 
-func LookupIdentityPayload(height uint64, blockID flow.Identifier, parentID flow.Identifier, nodeIDs *[]flow.Identifier) func(*badger.Txn) error {
-	return retrieve(toPayloadIndex(codeIndexIdentity, height, blockID, parentID), nodeIDs)
+func LookupPayloadIdentities(blockID flow.Identifier, nodeIDs *[]flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codePayloadIdentities, blockID), nodeIDs)
 }

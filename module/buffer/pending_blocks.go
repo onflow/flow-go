@@ -52,6 +52,19 @@ func (b *PendingBlocks) ByParentID(parentID flow.Identifier) ([]*flow.PendingBlo
 	return blocks, true
 }
 
-func (b *PendingBlocks) DropForParent(parentID flow.Identifier) {
-	b.backend.dropForParent(parentID)
+func (b *PendingBlocks) DropForParent(parent *flow.Header) {
+	for blockID, pending := range b.backend.byID {
+		if pending.header.Height <= parent.Height {
+			delete(b.backend.byID, blockID)
+		}
+	}
+	b.backend.dropForParent(parent.ID())
+}
+
+func (b *PendingBlocks) PruneByHeight(height uint64) {
+	b.backend.pruneByHeight(height)
+}
+
+func (b *PendingBlocks) Size() uint {
+	return uint(len(b.backend.byID))
 }

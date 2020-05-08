@@ -1,7 +1,9 @@
 package collection_test
 
 import (
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -23,8 +25,11 @@ import (
 func TestFinalizer(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
+		// seed the RNG
+		rand.Seed(time.Now().UnixNano())
+
 		genesis := model.Genesis()
-		chainID := genesis.ChainID
+		chainID := genesis.Header.ChainID
 
 		state, err := cluster.NewState(db, chainID)
 		require.NoError(t, err)
@@ -86,7 +91,7 @@ func TestFinalizer(t *testing.T) {
 
 			// create a new block on genesis
 			block := unittest.ClusterBlockWithParent(genesis)
-			block.SetPayload(model.PayloadFromTransactions(&tx1))
+			block.SetPayload(model.PayloadFromTransactions(flow.ZeroID, &tx1))
 			insert(block)
 
 			// finalize the block
@@ -108,7 +113,7 @@ func TestFinalizer(t *testing.T) {
 
 			// create a new block that isn't connected to a parent
 			block := unittest.ClusterBlockWithParent(genesis)
-			block.ParentID = unittest.IdentifierFixture()
+			block.Header.ParentID = unittest.IdentifierFixture()
 			insert(block)
 
 			// try to finalize - this should fail
@@ -125,7 +130,7 @@ func TestFinalizer(t *testing.T) {
 
 			// create a block with empty payload on genesis
 			block := unittest.ClusterBlockWithParent(genesis)
-			block.SetPayload(model.EmptyPayload())
+			block.SetPayload(model.EmptyPayload(flow.ZeroID))
 			insert(block)
 
 			// finalize the block
@@ -158,7 +163,7 @@ func TestFinalizer(t *testing.T) {
 
 			// create a block containing tx1 on top of genesis
 			block := unittest.ClusterBlockWithParent(genesis)
-			block.SetPayload(model.PayloadFromTransactions(&tx1))
+			block.SetPayload(model.PayloadFromTransactions(flow.ZeroID, &tx1))
 			insert(block)
 
 			// finalize the block
@@ -180,8 +185,8 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block.Payload.Collection.ID(),
-					SignerIDs:    block.ParentVoterIDs,
-					Signature:    block.ParentVoterSig,
+					SignerIDs:    block.Header.ParentVoterIDs,
+					Signature:    block.Header.ParentVoterSig,
 				},
 			})
 		})
@@ -205,12 +210,12 @@ func TestFinalizer(t *testing.T) {
 
 			// create a block containing tx1 on top of genesis
 			block1 := unittest.ClusterBlockWithParent(genesis)
-			block1.SetPayload(model.PayloadFromTransactions(&tx1))
+			block1.SetPayload(model.PayloadFromTransactions(flow.ZeroID, &tx1))
 			insert(block1)
 
 			// create a block containing tx2 on top of block1
 			block2 := unittest.ClusterBlockWithParent(&block1)
-			block2.SetPayload(model.PayloadFromTransactions(&tx2))
+			block2.SetPayload(model.PayloadFromTransactions(flow.ZeroID, &tx2))
 			insert(block2)
 
 			// finalize block2 (should indirectly finalize block1 as well)
@@ -231,15 +236,15 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block1.Payload.Collection.ID(),
-					SignerIDs:    block1.ParentVoterIDs,
-					Signature:    block1.ParentVoterSig,
+					SignerIDs:    block1.Header.ParentVoterIDs,
+					Signature:    block1.Header.ParentVoterSig,
 				},
 			})
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block2.Payload.Collection.ID(),
-					SignerIDs:    block2.ParentVoterIDs,
-					Signature:    block2.ParentVoterSig,
+					SignerIDs:    block2.Header.ParentVoterIDs,
+					Signature:    block2.Header.ParentVoterSig,
 				},
 			})
 		})
@@ -261,12 +266,12 @@ func TestFinalizer(t *testing.T) {
 
 			// create a block containing tx1 on top of genesis
 			block1 := unittest.ClusterBlockWithParent(genesis)
-			block1.SetPayload(model.PayloadFromTransactions(&tx1))
+			block1.SetPayload(model.PayloadFromTransactions(flow.ZeroID, &tx1))
 			insert(block1)
 
 			// create a block containing tx2 on top of block1
 			block2 := unittest.ClusterBlockWithParent(&block1)
-			block2.SetPayload(model.PayloadFromTransactions(&tx2))
+			block2.SetPayload(model.PayloadFromTransactions(flow.ZeroID, &tx2))
 			insert(block2)
 
 			// finalize block1 (should NOT finalize block2)
@@ -288,8 +293,8 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block1.Payload.Collection.ID(),
-					SignerIDs:    block1.ParentVoterIDs,
-					Signature:    block1.ParentVoterSig,
+					SignerIDs:    block1.Header.ParentVoterIDs,
+					Signature:    block1.Header.ParentVoterSig,
 				},
 			})
 		})
@@ -313,12 +318,12 @@ func TestFinalizer(t *testing.T) {
 
 			// create a block containing tx1 on top of genesis
 			block1 := unittest.ClusterBlockWithParent(genesis)
-			block1.SetPayload(model.PayloadFromTransactions(&tx1))
+			block1.SetPayload(model.PayloadFromTransactions(flow.ZeroID, &tx1))
 			insert(block1)
 
 			// create a block containing tx2 on top of genesis (conflicting with block1)
 			block2 := unittest.ClusterBlockWithParent(genesis)
-			block2.SetPayload(model.PayloadFromTransactions(&tx2))
+			block2.SetPayload(model.PayloadFromTransactions(flow.ZeroID, &tx2))
 			insert(block2)
 
 			// finalize block2
@@ -340,8 +345,8 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block1.Payload.Collection.ID(),
-					SignerIDs:    block1.ParentVoterIDs,
-					Signature:    block1.ParentVoterSig,
+					SignerIDs:    block1.Header.ParentVoterIDs,
+					Signature:    block1.Header.ParentVoterSig,
 				},
 			})
 		})

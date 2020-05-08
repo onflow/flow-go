@@ -16,14 +16,14 @@ type Mutator interface {
 	// genesis block. A genesis block requires a number of zero, a hash of 32
 	// zero bytes and an empty collection guarantees slice. The provided new
 	// identities will be the initial staked nodes on the network.
-	Bootstrap(genesis *flow.Block) error
+	Bootstrap(state flow.StateCommitment, genesis *flow.Block) error
 
 	// Extend introduces the block with the given ID into the persistent
 	// protocol state without modifying the current finalized state. It allows
 	// us to execute fork-aware queries against ambiguous protocol state, while
 	// still checking that the given block is a valid extension of the protocol
 	// state.
-	Extend(blockID flow.Identifier) error
+	Extend(block *flow.Block) error
 
 	// Finalize finalizes the block with the given hash, and all of its parents
 	// up to the finalized protocol state. It modifies the persistent immutable

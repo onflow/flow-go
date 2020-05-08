@@ -12,11 +12,6 @@ type Metrics struct {
 	mock.Mock
 }
 
-// BadgerDBSize provides a mock function with given fields: sizeBytes
-func (_m *Metrics) BadgerDBSize(sizeBytes int64) {
-	_m.Called(sizeBytes)
-}
-
 // CollectionGuaranteed provides a mock function with given fields: collection
 func (_m *Metrics) CollectionGuaranteed(collection flow.LightCollection) {
 	_m.Called(collection)
@@ -92,9 +87,39 @@ func (_m *Metrics) HotStuffWaitDuration(duration time.Duration, event string) {
 	_m.Called(duration, event)
 }
 
-// NetworkMessageSent provides a mock function with given fields: sizeBytes
-func (_m *Metrics) NetworkMessageSent(sizeBytes int) {
-	_m.Called(sizeBytes)
+// MadeBlockProposal provides a mock function with given fields:
+func (_m *Metrics) MadeBlockProposal() {
+	_m.Called()
+}
+
+// MempoolApprovalsSize provides a mock function with given fields: size
+func (_m *Metrics) MempoolApprovalsSize(size uint) {
+	_m.Called(size)
+}
+
+// MempoolGuaranteesSize provides a mock function with given fields: size
+func (_m *Metrics) MempoolGuaranteesSize(size uint) {
+	_m.Called(size)
+}
+
+// MempoolReceiptsSize provides a mock function with given fields: size
+func (_m *Metrics) MempoolReceiptsSize(size uint) {
+	_m.Called(size)
+}
+
+// MempoolSealsSize provides a mock function with given fields: size
+func (_m *Metrics) MempoolSealsSize(size uint) {
+	_m.Called(size)
+}
+
+// NetworkMessageReceived provides a mock function with given fields: sizeBytes, topic
+func (_m *Metrics) NetworkMessageReceived(sizeBytes int, topic string) {
+	_m.Called(sizeBytes, topic)
+}
+
+// NetworkMessageSent provides a mock function with given fields: sizeBytes, topic
+func (_m *Metrics) NetworkMessageSent(sizeBytes int, topic string) {
+	_m.Called(sizeBytes, topic)
 }
 
 // NewestKnownQC provides a mock function with given fields: view
@@ -125,6 +150,16 @@ func (_m *Metrics) OnChunkVerificationStarted(chunkID flow.Identifier) {
 // OnResultApproval provides a mock function with given fields:
 func (_m *Metrics) OnResultApproval() {
 	_m.Called()
+}
+
+// PendingBlocks provides a mock function with given fields: n
+func (_m *Metrics) PendingBlocks(n uint) {
+	_m.Called(n)
+}
+
+// PendingClusterBlocks provides a mock function with given fields: n
+func (_m *Metrics) PendingClusterBlocks(n uint) {
+	_m.Called(n)
 }
 
 // SealsInFinalizedBlock provides a mock function with given fields: count

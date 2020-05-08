@@ -19,23 +19,24 @@ import (
 func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T) {
 	return func(t *testing.T) {
 		unittest.RunWithBadgerDB(t, func(badgerDB *badger.DB) {
-			unittest.RunWithTempDBDir(t, func(dbDir string) {
+			unittest.RunWithTempDir(t, func(dbDir string) {
 				ls, err := ledger.NewTrieStorage(dbDir)
 				require.NoError(t, err)
 
 				ctrl := gomock.NewController(t)
 
 				stateCommitments := mocks.NewMockCommits(ctrl)
+				blocks := mocks.NewMockBlocks(ctrl)
 
 				stateCommitment := ls.EmptyStateCommitment()
 
-				stateCommitments.EXPECT().ByID(gomock.Any()).Return(stateCommitment, nil)
+				stateCommitments.EXPECT().ByBlockID(gomock.Any()).Return(stateCommitment, nil)
 
 				chunkDataPacks := new(storage.ChunkDataPacks)
 
 				executionResults := new(storage.ExecutionResults)
 
-				es := state.NewExecutionState(ls, stateCommitments, chunkDataPacks, executionResults, badgerDB)
+				es := state.NewExecutionState(ls, stateCommitments, blocks, chunkDataPacks, executionResults, badgerDB)
 
 				f(t, es)
 			})
@@ -118,6 +119,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		// set initial value
 		view1 := es.NewView(sc1)
 		view1.Set(registerID1, flow.RegisterValue("apple"))
+		view1.Set(registerID2, flow.RegisterValue("apple"))
 
 		sc2, err := es.CommitDelta(view1.Delta(), sc1)
 		assert.NoError(t, err)

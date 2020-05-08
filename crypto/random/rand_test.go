@@ -12,7 +12,7 @@ import (
 
 // math/random is only used to randomize test inputs
 
-// The only purpose of this function is unit testing. It also implements a very basic tandomness test.
+// The only purpose of this function is unit testing. It also implements a very basic randomness test.
 // it doesn't evaluate randomness of the random function and doesn't perform advanced statistical tests
 // just making sure code works on edge cases
 func TestRandInt(t *testing.T) {
@@ -24,10 +24,10 @@ func TestRandInt(t *testing.T) {
 		0x6A, 0x53, 0x40, 0xB7, 0x80, 0xE4, 0x64, 0x5C,
 		0x66, 0x53, 0x41, 0xB7, 0x80, 0xE1, 0x64, 0x51,
 		0xAA, 0x53, 0x40, 0xB7, 0x80, 0xE4, 0x64, 0x50}
-	rand, err := NewRand(seed)
+	rng, err := NewRand(seed)
 	require.NoError(t, err)
 	for i := 0; i < sampleSize; i++ {
-		r, _ := rand.IntN(sampleSpace)
+		r, _ := rng.IntN(sampleSpace)
 		distribution[r] += 1.0
 	}
 	stdev := stat.StdDev(distribution, nil)

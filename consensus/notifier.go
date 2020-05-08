@@ -11,9 +11,9 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-func CreateNotifier(log zerolog.Logger, metrics module.Metrics, guarantees storage.Guarantees, seals storage.Seals) hotstuff.Consumer {
+func CreateNotifier(log zerolog.Logger, metrics module.Metrics, payloads storage.Payloads) hotstuff.Consumer {
 	logConsumer := notifications.NewLogConsumer(log)
-	metricsConsumer := consensusmetrics.NewMetricsConsumer(metrics, guarantees, seals)
+	metricsConsumer := consensusmetrics.NewMetricsConsumer(metrics, payloads)
 	dis := pubsub.NewDistributor()
 	dis.AddConsumer(logConsumer)
 	dis.AddConsumer(metricsConsumer)

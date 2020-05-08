@@ -116,7 +116,7 @@ func CreateMiddleware(log zerolog.Logger, identities []*flow.Identity) ([]*libp2
 		}
 
 		// creating middleware of nodes
-		mw, err := libp2p.NewMiddleware(log, json.NewCodec(), "0.0.0.0:0", identities[i].NodeID, key, metrics)
+		mw, err := libp2p.NewMiddleware(log, json.NewCodec(), "0.0.0.0:0", identities[i].NodeID, key, metrics, libp2p.DefaultMaxPubSubMsgSize)
 		if err != nil {
 			return nil, err
 		}
@@ -159,6 +159,7 @@ func GenerateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
 
 func SetupMetrics() *mock.Metrics {
 	metrics := &mock.Metrics{}
-	metrics.On("NetworkMessageSent", mockery.Anything).Return()
+	metrics.On("NetworkMessageSent", mockery.Anything, mockery.Anything).Return()
+	metrics.On("NetworkMessageReceived", mockery.Anything, mockery.Anything).Return()
 	return metrics
 }

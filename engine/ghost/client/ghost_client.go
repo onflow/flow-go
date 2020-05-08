@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -90,7 +91,7 @@ type FlowMessageStreamReader struct {
 
 func (fmsr *FlowMessageStreamReader) Next() (flow.Identifier, interface{}, error) {
 	msg, err := fmsr.stream.Recv()
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		// read done.
 		return flow.ZeroID, nil, fmt.Errorf("end of stream reached: %w", err)
 	}

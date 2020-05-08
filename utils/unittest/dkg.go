@@ -27,7 +27,7 @@ type message struct {
 // implements DKGProcessor interface
 type TestDKGProcessor struct {
 	current int
-	dkg     crypto.DKGstate
+	dkg     crypto.DKGState
 	chans   []chan *message
 	msgType int
 	pkBytes []byte
@@ -48,7 +48,7 @@ func (proc *TestDKGProcessor) honestSend(dest int, data []byte) {
 
 // This is a testing function
 // it simulates sending a message from one node to another
-func (proc *TestDKGProcessor) Send(dest int, data []byte) {
+func (proc *TestDKGProcessor) PrivateSend(dest int, data []byte) {
 	proc.honestSend(dest, data)
 }
 
@@ -100,7 +100,7 @@ func RunDKG(t *testing.T, n int) ([]crypto.PrivateKey, crypto.PublicKey, []crypt
 
 	wg.Add(n)
 	for current := 0; current < n; current++ {
-		err := processors[current].dkg.StartDKG(seed)
+		err := processors[current].dkg.Start(seed)
 		require.NoError(t, err)
 		go tsDkgRunChan(&processors[current], &wg, t, 2)
 	}
@@ -142,7 +142,7 @@ func tsDkgRunChan(proc *TestDKGProcessor,
 				err := proc.dkg.NextTimeout()
 				assert.Nil(t, err)
 			case 2:
-				sk, groupPK, nodesPK, err := proc.dkg.EndDKG()
+				sk, groupPK, nodesPK, err := proc.dkg.End()
 				assert.NotNil(t, sk)
 				assert.NotNil(t, groupPK)
 				assert.NotNil(t, nodesPK)

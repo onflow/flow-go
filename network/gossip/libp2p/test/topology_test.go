@@ -51,7 +51,7 @@ func (n *TopologyTestSuite) SetupTest() {
 	metrics := SetupMetrics()
 
 	// creates a middleware instance
-	mw, err := libp2p.NewMiddleware(logger, json.NewCodec(), "0.0.0.0:0", me.NodeID, key, metrics)
+	mw, err := libp2p.NewMiddleware(logger, json.NewCodec(), "0.0.0.0:0", me.NodeID, key, metrics, libp2p.DefaultMaxPubSubMsgSize)
 	require.NoError(n.Suite.T(), err)
 
 	// creates and mocks a network instance

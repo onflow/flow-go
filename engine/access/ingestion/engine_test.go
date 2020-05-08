@@ -94,10 +94,10 @@ func (suite *Suite) TestHandleBlock() {
 	suite.proto.snapshot.On("Identities", mock.Anything).Return(cNodeIdentities, nil).Once()
 
 	// expect that the block storage is indexed with each of the collection guarantee
-	suite.blocks.On("IndexByGuarantees", block.ID()).Return(nil).Once()
+	suite.blocks.On("IndexBlockForCollections", block.ID(), flow.GetIDs(block.Payload.Guarantees)).Return(nil).Once()
 
 	// expect that the collection is requested
-	suite.collectionsConduit.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(len(block.Guarantees))
+	suite.collectionsConduit.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(len(block.Payload.Guarantees))
 
 	err := suite.eng.Process(originID, proposal)
 	require.NoError(suite.T(), err)

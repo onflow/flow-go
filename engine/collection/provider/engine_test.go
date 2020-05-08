@@ -2,6 +2,7 @@ package provider_test
 
 import (
 	"errors"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/testutil"
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
@@ -40,10 +42,11 @@ func (suite *Suite) SetupTest() {
 
 	suite.hub = stub.NewNetworkHub()
 
-	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	conIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-	reqIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	suite.identities = flow.IdentityList{colIdentity, conIdentity, reqIdentity}
+	// add some dummy identities so we have one of each role
+	suite.identities = unittest.IdentityListFixture(5, unittest.WithAllRoles())
+	colIdentity := suite.identities.Filter(filter.HasRole(flow.RoleCollection))[0]
+	conIdentity := suite.identities.Filter(filter.HasRole(flow.RoleConsensus))[0]
+	reqIdentity := suite.identities.Filter(filter.HasRole(flow.RoleExecution))[0]
 
 	suite.colNode = testutil.CollectionNode(suite.T(), suite.hub, colIdentity, suite.identities)
 	suite.conNode = testutil.ConsensusNode(suite.T(), suite.hub, conIdentity, suite.identities)
@@ -95,14 +98,17 @@ func (suite *Suite) TestCollectionRequest() {
 		err := suite.colNode.Collections.Store(&coll)
 		suite.Assert().Nil(err)
 
+		nonce := rand.Uint64()
+
 		// expect that the requester will receive the collection
 		expectedRes := &messages.CollectionResponse{
 			Collection: coll,
+			Nonce:      nonce,
 		}
 		suite.reqEngine.On("Process", suite.colNode.Me.NodeID(), expectedRes).Return(nil).Once()
 
 		// send a request for the collection
-		req := messages.CollectionRequest{ID: coll.ID()}
+		req := messages.CollectionRequest{ID: coll.ID(), Nonce: nonce}
 		err = suite.conduit.Submit(&req, suite.colNode.Me.NodeID())
 		assert.NoError(t, err)
 
@@ -124,7 +130,7 @@ func (suite *Suite) TestCollectionRequest() {
 		t := suite.T()
 
 		// create request with invalid/nonexistent fingerprint
-		req := &messages.CollectionRequest{ID: unittest.IdentifierFixture()}
+		req := &messages.CollectionRequest{ID: unittest.IdentifierFixture(), Nonce: rand.Uint64()}
 
 		// provider should return error
 		err := suite.colNode.ProviderEngine.ProcessLocal(req)

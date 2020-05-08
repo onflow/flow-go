@@ -20,7 +20,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	"github.com/dapperlabs/flow-go/module/chunks"
-	finalizer "github.com/dapperlabs/flow-go/module/finalizer/follower"
+	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/signature"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
@@ -58,9 +58,6 @@ func main() {
 		err                  error
 		authReceipts         *stdmap.Receipts
 		pendingReceipts      *stdmap.PendingReceipts
-		blockStorage         *storage.Blocks
-		headerStorage        *storage.Headers
-		conPayloads          *storage.Payloads
 		conCache             *buffer.PendingBlocks
 		authCollections      *stdmap.Collections
 		pendingCollections   *stdmap.PendingCollections
@@ -75,10 +72,10 @@ func main() {
 
 	cmd.FlowNode("verification").
 		ExtraFlags(func(flags *pflag.FlagSet) {
-			flags.UintVar(&receiptLimit, "receipt-limit", 100000, "maximum number of execution receipts in the memory pool")
-			flags.UintVar(&collectionLimit, "collection-limit", 100000, "maximum number of authCollections in the memory pool")
-			flags.UintVar(&blockLimit, "block-limit", 100000, "maximum number of result blocks in the memory pool")
-			flags.UintVar(&chunkLimit, "chunk-limit", 100000, "maximum number of chunk states in the memory pool")
+			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
+			flags.UintVar(&collectionLimit, "collection-limit", 1000, "maximum number of authCollections in the memory pool")
+			flags.UintVar(&blockLimit, "block-limit", 1000, "maximum number of result blocks in the memory pool")
+			flags.UintVar(&chunkLimit, "chunk-limit", 10000, "maximum number of chunk states in the memory pool")
 			flags.UintVar(&alpha, "alpha", 10, "maximum number of chunk states in the memory pool")
 		}).
 		Module("execution authenticated receipts mempool", func(node *cmd.FlowNodeBuilder) error {
@@ -100,15 +97,6 @@ func main() {
 		Module("collection trackers mempool", func(node *cmd.FlowNodeBuilder) error {
 			collectionTrackers, err = stdmap.NewCollectionTrackers(collectionLimit)
 			return err
-		}).
-		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
-			// creates a block storage for the node
-			// to reflect incoming blocks on state
-			blockStorage = storage.NewBlocks(node.DB)
-			// headers and consensus storage for consensus follower engine
-			headerStorage = storage.NewHeaders(node.DB)
-			conPayloads = storage.NewPayloads(node.DB)
-			return nil
 		}).
 		Module("chunk data pack mempool", func(node *cmd.FlowNodeBuilder) error {
 			chunkDataPacks, err = stdmap.NewChunkDataPacks(chunkLimit)
@@ -133,7 +121,10 @@ func main() {
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rt := runtime.NewInterpreterRuntime()
-			vm := virtualmachine.New(rt)
+			vm, err := virtualmachine.New(rt)
+			if err != nil {
+				return nil, err
+			}
 			chunkVerifier := chunks.NewChunkVerifier(vm)
 			verifierEng, err = verifier.New(node.Logger, node.Network, node.State, node.Me, chunkVerifier, node.Metrics)
 			return verifierEng, err
@@ -158,16 +149,21 @@ func main() {
 				chunkDataPackTracker,
 				ingestedChunkIDs,
 				ingestedResultIDs,
-				blockStorage,
+				node.Headers,
+				node.Blocks,
 				assigner,
 				requestIntervalMs,
 				failureThreshold)
 			return ingestEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+
+			// initialize cleaner for DB
+			cleaner := storage.NewCleaner(node.Logger, node.DB)
+
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB)
+			final := finalizer.NewFinalizer(node.DB, node.Headers, node.Payloads, node.State)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -187,7 +183,7 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, final, verifier, ingestEng, &node.GenesisBlock.Header, node.GenesisQC)
+			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, final, verifier, ingestEng, node.GenesisBlock.Header, node.GenesisQC)
 			if err != nil {
 				// return nil, fmt.Errorf("could not create follower core logic: %w", err)
 				// TODO for now we ignore failures in follower
@@ -200,9 +196,10 @@ func main() {
 			followerEng, err := followereng.New(node.Logger,
 				node.Network,
 				node.Me,
+				cleaner,
+				node.Headers,
+				node.Payloads,
 				node.State,
-				headerStorage,
-				conPayloads,
 				conCache,
 				core)
 			if err != nil {
@@ -215,7 +212,7 @@ func main() {
 				node.Network,
 				node.Me,
 				node.State,
-				blockStorage,
+				node.Blocks,
 				followerEng)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)

@@ -1,14 +1,17 @@
 package badger
 
 import (
+	"math/rand"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
 	model "github.com/dapperlabs/flow-go/model/cluster"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/cluster"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -30,10 +33,14 @@ type SnapshotSuite struct {
 func (suite *SnapshotSuite) SetupTest() {
 	var err error
 
-	suite.genesis = model.Genesis()
-	suite.chainID = suite.genesis.ChainID
+	// seed the RNG
+	rand.Seed(time.Now().UnixNano())
 
-	suite.db, suite.dbdir = unittest.TempBadgerDB(suite.T())
+	suite.genesis = model.Genesis()
+	suite.chainID = suite.genesis.Header.ChainID
+
+	suite.dbdir = unittest.TempDir(suite.T())
+	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
 
 	suite.state, err = NewState(suite.db, suite.chainID)
 	suite.Assert().Nil(err)
@@ -85,7 +92,7 @@ func (suite *SnapshotSuite) TestAtBlockID() {
 	// ensure collection is correct
 	coll, err := snapshot.Collection()
 	assert.Nil(t, err)
-	assert.Equal(t, &suite.genesis.Collection, coll)
+	assert.Equal(t, &suite.genesis.Payload.Collection, coll)
 
 	// ensure head is correct
 	head, err := snapshot.Head()
@@ -98,7 +105,7 @@ func (suite *SnapshotSuite) TestEmptyCollection() {
 
 	// create a block with an empty collection
 	block := unittest.ClusterBlockWithParent(suite.genesis)
-	block.SetPayload(model.EmptyPayload())
+	block.SetPayload(model.EmptyPayload(flow.ZeroID))
 	suite.InsertBlock(block)
 
 	snapshot := suite.state.AtBlockID(block.ID())
@@ -106,7 +113,7 @@ func (suite *SnapshotSuite) TestEmptyCollection() {
 	// ensure collection is correct
 	coll, err := snapshot.Collection()
 	assert.Nil(t, err)
-	assert.Equal(t, &block.Collection, coll)
+	assert.Equal(t, &block.Payload.Collection, coll)
 }
 
 func (suite *SnapshotSuite) TestFinalizedBlock() {
@@ -140,7 +147,7 @@ func (suite *SnapshotSuite) TestFinalizedBlock() {
 	// ensure collection is correct
 	coll, err := snapshot.Collection()
 	assert.Nil(t, err)
-	assert.Equal(t, &finalizedBlock1.Collection, coll)
+	assert.Equal(t, &finalizedBlock1.Payload.Collection, coll)
 
 	// ensure head is correct
 	head, err := snapshot.Head()
