@@ -101,8 +101,8 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 }
 
 func (suite *CollectorSuite) TearDownTest() {
+	defer suite.cancel()
 	suite.net.Remove()
-	suite.cancel()
 }
 
 // Ghost returns a client for the ghost node.
@@ -124,7 +124,7 @@ func (suite *CollectorSuite) NextTransaction(opts ...func(*sdk.Transaction)) *sd
 
 	tx := sdk.NewTransaction().
 		SetScript(unittest.NoopTxScript()).
-		SetReferenceBlockID(sdk.BytesToID([]byte{1})).
+		SetReferenceBlockID(convert.ToSDKID(suite.net.Genesis().ID())).
 		SetProposalKey(acct.addr, acct.key.ID, acct.key.SequenceNumber).
 		SetPayer(acct.addr).
 		AddAuthorizer(acct.addr)
@@ -144,12 +144,7 @@ func (suite *CollectorSuite) NextTransaction(opts ...func(*sdk.Transaction)) *sd
 func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transaction {
 	acct := suite.acct
 
-	tx := sdk.NewTransaction().
-		SetScript(unittest.NoopTxScript()).
-		SetReferenceBlockID(convert.ToSDKID(unittest.IdentifierFixture())).
-		SetProposalKey(acct.addr, acct.key.ID, acct.key.SequenceNumber).
-		SetPayer(acct.addr).
-		AddAuthorizer(acct.addr)
+	tx := suite.NextTransaction()
 
 	clusters := suite.Clusters()
 
@@ -206,57 +201,58 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 	var (
 		// for quickly looking up tx IDs
 		lookup = make(map[flow.Identifier]struct{}, len(txIDs))
-		// for keeping track of which transactions we've seen
-		seen = make(map[flow.Identifier]struct{}, len(txIDs))
+		// for keeping track of which transactions have been included in
+		// a finalized collection
+		finalized = make(map[flow.Identifier]struct{}, len(txIDs))
+		// for keeping track of proposals we've seen, and which transactions
+		// they contain
+		proposals = make(map[flow.Identifier][]flow.Identifier)
 	)
 	for _, txID := range txIDs {
 		lookup[txID] = struct{}{}
 	}
 
-	// the height at which the collection is included
-	height := uint64(0)
-
 	suite.T().Logf("awaiting %d transactions included", len(txIDs))
 
-	waitFor := time.Second * 30
+	waitFor := time.Second * 15
 	deadline := time.Now().Add(waitFor)
 	for time.Now().Before(deadline) {
 
 		_, msg, err := suite.reader.Next()
 		require.Nil(suite.T(), err, "could not read next message")
-		suite.T().Logf("ghost recv: %T", msg)
 
 		switch val := msg.(type) {
 		case *messages.ClusterBlockProposal:
 			header := val.Header
 			collection := val.Payload.Collection
 			suite.T().Logf("got proposal height=%d col_id=%x size=%d", header.Height, collection.ID(), collection.Len())
+			proposals[collection.ID()] = collection.Light().Transactions
 
-			for _, txID := range collection.Light().Transactions {
-				if _, exists := lookup[txID]; exists {
-					seen[txID] = struct{}{}
-					height = header.Height
-				}
+		case *flow.CollectionGuarantee:
+			finalizedTxIDs, ok := proposals[val.CollectionID]
+			if !ok {
+				suite.T().Logf("got unseen guarantee (id=%x)", val.CollectionID)
+			}
+			for _, txID := range finalizedTxIDs {
+				finalized[txID] = struct{}{}
 			}
 
-			// once we have seen all the transactions, and 2 blocks have proposed
-			// above the highest, we know they are incorporated (w/ Coldstuff)
-			// TODO replace this with finalization by listening to guarantees
-			if len(seen) == len(lookup) && header.Height-height >= 2 {
+			if len(finalized) == len(lookup) {
 				return
 			}
 
-		case *flow.CollectionGuarantee:
-		// TODO use this as indication of finalization w/ HotStuff
 		case *flow.TransactionBody:
-			suite.T().Log("ghost recv tx: ", val.ID())
+			suite.T().Log("got tx: ", val.ID())
 		}
 	}
 
-	suite.T().Logf("timed out waiting for inclusion (timeout=%s, saw=%d, expected=%d)", waitFor.String(), len(seen), len(lookup))
+	suite.T().Logf(
+		"timed out waiting for inclusion (timeout=%s, finalized=%d, expected=%d)",
+		waitFor.String(), len(finalized), len(lookup),
+	)
 	var missing []flow.Identifier
 	for id := range lookup {
-		if _, ok := seen[id]; !ok {
+		if _, ok := finalized[id]; !ok {
 			missing = append(missing, id)
 		}
 	}
