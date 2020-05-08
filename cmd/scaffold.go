@@ -26,7 +26,6 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/metrics"
-	dbmetrics "github.com/dapperlabs/flow-go/module/metrics/badger"
 	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/validators"
@@ -162,11 +161,8 @@ func (fnb *FlowNodeBuilder) enqueueMetricsServerInit() {
 	})
 }
 
-func (fnb *FlowNodeBuilder) enqueueDBMetrics() {
-	fnb.Component("badger db metrics", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
-		monitor := dbmetrics.NewMonitor(fnb.Metrics, fnb.DB)
-		return monitor, nil
-	})
+func (fnb *FlowNodeBuilder) registerBadgerMetrics() {
+	metrics.RegisterBadgerMetrics()
 }
 
 func (fnb *FlowNodeBuilder) initNodeInfo() {
@@ -405,7 +401,7 @@ func FlowNode(name string) *FlowNodeBuilder {
 
 	builder.enqueueMetricsServerInit()
 
-	builder.enqueueDBMetrics()
+	builder.registerBadgerMetrics()
 
 	return builder
 }
