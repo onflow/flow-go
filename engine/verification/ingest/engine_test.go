@@ -566,12 +566,9 @@ func (suite *IngestTestSuite) TestIngestedChunk() {
 
 	eng := suite.TestNewEngine()
 
-	// creates a chunk fixture, its data pack, and the data pack response
-	chunk := unittest.ChunkFixture()
-	chunkDataPack := unittest.ChunkDataPackFixture(chunk.ID())
-	chunkDataPackResponse := &messages.ChunkDataPackResponse{Data: chunkDataPack}
+	chunkDataPackResponse := &messages.ChunkDataPackResponse{Data: *suite.chunkDataPack}
 	// mocks this chunk id
-	suite.ingestedChunkIDs.On("Has", chunkDataPack.ChunkID).Return(true)
+	suite.ingestedChunkIDs.On("Has", suite.chunkDataPack.ChunkID).Return(true)
 
 	// nothing else is mocked, hence the process should simply return nil
 	err := eng.Process(unittest.IdentifierFixture(), chunkDataPackResponse)
