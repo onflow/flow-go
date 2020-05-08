@@ -439,13 +439,8 @@ func ingestHappyPath(tb testing.TB, receiptCount int, chunkCount int) {
 	hub := stub.NewNetworkHub()
 
 	// generates identities of nodes, one of each type and `verCount` many verification node
-	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	exeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-	conIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-
-	identities := flow.IdentityList{colIdentity, conIdentity, exeIdentity}
-	identities = append(identities, verIdentity)
+	identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+	verIdentity := identities.Filter(filter.HasRole(flow.RoleVerification))[0]
 
 	// Execution receipt and chunk assignment
 	//
