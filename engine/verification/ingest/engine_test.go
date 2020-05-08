@@ -386,16 +386,8 @@ func (suite *IngestTestSuite) TestHandleReceipt_RetryMissingCollection() {
 
 	eng := suite.TestNewEngine()
 
-	// mocks identities
-	//
-	// required roles
-	collIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
-
 	// mocking state
-	//
-	// mocks state snapshot to return collIdentities as identity list of staked collection nodes
-	suite.state.On("Final").Return(suite.ss, nil)
-	suite.ss.On("Identities", testifymock.AnythingOfType("flow.IdentityFilter")).Return(collIdentities, nil)
+	suite.ss.On("Identities", testifymock.AnythingOfType("flow.IdentityFilter")).Return(flow.IdentityList{suite.collIdentity}, nil)
 
 	// mocks functionalities
 	//
@@ -438,7 +430,7 @@ func (suite *IngestTestSuite) TestHandleReceipt_RetryMissingCollection() {
 	submitWG := sync.WaitGroup{}
 	submitWG.Add(int(suite.failureThreshold) - 1)
 	suite.collectionsConduit.
-		On("Submit", testifymock.AnythingOfType("*messages.CollectionRequest"), collIdentities[0].NodeID).
+		On("Submit", testifymock.AnythingOfType("*messages.CollectionRequest"), suite.collIdentity.NodeID).
 		Run(func(args testifymock.Arguments) {
 			submitWG.Done()
 		}).
