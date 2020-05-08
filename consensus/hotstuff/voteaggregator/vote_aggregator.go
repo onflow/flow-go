@@ -133,7 +133,10 @@ func (va *VoteAggregator) BuildQCOnReceivedBlock(block *model.Block) (*model.Quo
 		return nil, false, nil
 	}
 
-	// accumulate leader vote first to ensure leader's vote is always included in the QC
+	// accumulate proposer's vote first to ensure proposer's vote is always included in the QC.
+	// a consensus node is rewarded by having proposed block being included in the finalized chain.
+	// Including the proposer's vote first guarantees that the proposer will get rewarded if the block
+	// is finalized. It incentivizes an honest leader to propose block.
 	valid, err := va.validateAndStoreIncorporatedVote(proposerVote, block)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not validate proposer vote: %w", err)
