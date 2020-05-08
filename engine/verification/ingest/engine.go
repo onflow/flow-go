@@ -554,13 +554,6 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 		return coll, true
 	}
 
-	// checks collection trackers mempool
-	//
-	if e.collectionTrackers.Has(collID) {
-		// collection has been already requested from network
-		return nil, false
-	}
-
 	// requests the collection from network
 	err := e.requestCollection(collID, block.ID())
 	if err != nil {

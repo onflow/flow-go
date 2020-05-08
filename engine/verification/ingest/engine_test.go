@@ -150,8 +150,7 @@ func (suite *IngestTestSuite) SetupTest() {
 		testifymock.Anything,
 		testifymock.Anything,
 		testifymock.Anything).
-		Return(a, nil).
-		Once()
+		Return(a, nil)
 }
 
 // TestNewEngine verifies the establishment of the network registration upon
@@ -298,9 +297,6 @@ func (suite *IngestTestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	//
 	// required roles
 	execIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleExecution))
-	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-	// mocks identity of the verification node
-	suite.me.On("NodeID").Return(verIdentity.NodeID)
 
 	// mocks state snapshot
 	//
@@ -328,20 +324,6 @@ func (suite *IngestTestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	// engine has not yet ingested the result of this receipt as well as its chunks yet
 	suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
 	suite.ingestedChunkIDs.On("Has", suite.chunk.ID()).Return(false)
-
-	// mocks chunk assignment
-	//
-	// assigns all chunks in the receipt to this node through mocking
-	a := chmodel.NewAssignment()
-	for _, chunk := range suite.receipt.ExecutionResult.Chunks {
-		a.Add(chunk, []flow.Identifier{verIdentity.NodeID})
-	}
-	suite.assigner.On("Assign",
-		testifymock.Anything,
-		testifymock.Anything,
-		testifymock.Anything).
-		Return(a, nil).
-		Once()
 
 	// mocks functionalities
 	//
@@ -378,7 +360,6 @@ func (suite *IngestTestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	// asserts necessary calls
 	suite.chunksConduit.AssertExpectations(suite.T())
 	suite.chunkDataPackTrackers.AssertExpectations(suite.T())
-	suite.assigner.AssertExpectations(suite.T())
 	suite.ss.AssertExpectations(suite.T())
 	suite.state.AssertExpectations(suite.T())
 
@@ -387,8 +368,7 @@ func (suite *IngestTestSuite) TestHandleReceipt_MissingChunkDataPack() {
 }
 
 // TestHandleReceipt_RetryMissingCollection evaluates that when ingest engine has a missing collections with
-// a tracker registered, it retries its request (`failureThreshold` - 1)-many times and then drops it.
-// The -1 is to account for the initial request of the collection directly without registering the tracker.
+// a tracker registered, it retries its request (`failureThreshold`)-many times and then drops it.
 func (suite *IngestTestSuite) TestHandleReceipt_RetryMissingCollection() {
 	// locks to run the test sequentially
 	suite.Lock()
@@ -400,7 +380,6 @@ func (suite *IngestTestSuite) TestHandleReceipt_RetryMissingCollection() {
 	//
 	// required roles
 	collIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
-	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
 	// mocking state
 	//
@@ -414,11 +393,12 @@ func (suite *IngestTestSuite) TestHandleReceipt_RetryMissingCollection() {
 	// presence of tracker in the trackers mempool
 	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(true)
 	suite.collectionTrackers.On("All").Return([]*tracker.CollectionTracker{suite.collTracker})
+	suite.collectionTrackers.On("Add", suite.collTracker).Return(nil)
 	// update functionality for the present tracker
-	suite.collectionTrackers.On("Add", suite.collTracker).Run(func(args testifymock.Arguments) {
+	suite.collectionTrackers.On("Inc", suite.collection.ID()).Run(func(args testifymock.Arguments) {
 		// +1 accounts for updating the trackers counter
 		suite.collTracker.Counter += 1
-	}).Return(nil)
+	}).Return(suite.collTracker, nil)
 	suite.collectionTrackers.On("ByCollectionID", suite.collTracker.ID()).Return(suite.collTracker, nil)
 	suite.collectionTrackers.On("Rem", suite.collTracker.ID()).Return(true)
 
@@ -426,24 +406,22 @@ func (suite *IngestTestSuite) TestHandleReceipt_RetryMissingCollection() {
 	suite.chunkDataPackTrackers.On("All").Return(nil)
 
 	// mocks the existence of receipt
-	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
+	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
 
 	// mocks the existence of block
-	suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil).Once()
+	suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil)
 
-	// mocks chunk assignment
-	//
-	// assigns the chunk of receipt to the verification node
-	a := chmodel.NewAssignment()
-	for _, chunk := range suite.receipt.ExecutionResult.Chunks {
-		a.Add(chunk, []flow.Identifier{verIdentity.NodeID})
-	}
-	suite.assigner.On("Assign",
-		testifymock.Anything,
-		testifymock.Anything,
-		testifymock.Anything).
-		Return(a, nil).
-		Once()
+	// mock existence of chunk data pack
+	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
+	suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
+
+	// engine has not yet ingested the result of this receipt as well as its chunks yet
+	suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
+	suite.ingestedChunkIDs.On("Has", suite.chunk.ID()).Return(false)
+
+	// engine does not have the collection pending or authenticated
+	suite.pendingCollections.On("Has", suite.collection.ID()).Return(false)
+	suite.authCollections.On("Has", suite.collection.ID()).Return(false)
 
 	// mocks expectation
 	//
