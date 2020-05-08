@@ -4,7 +4,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func CreateDeployFTContractTransaction() flow.TransactionBody {
+func CreateDeployFungibleTokenContractInterfaceTransaction(authorizer flow.Address) flow.TransactionBody {
 	return CreateContractDeploymentTransaction(`
 	pub contract interface FungibleToken {
 		pub var totalSupply: UFix64
@@ -64,5 +64,5 @@ func CreateDeployFTContractTransaction() flow.TransactionBody {
 				result.balance == UFix64(0): "The newly created Vault must have zero balance"
 			}
 		}
-	}`, flow.RootAddress)
+	}`, authorizer)
 }

@@ -102,31 +102,45 @@ func TestTransactionWithImportASTCache(t *testing.T) {
 	ledger, err := execTestutil.RootBootstrappedLedger()
 	require.NoError(t, err)
 
-	deployContractTx := execTestutil.CreateDeployFTContractTransaction()
-	err = execTestutil.SignTransactionByRoot(&deployContractTx, 0)
+	// Create FungibleToken deployment transaction
+	deployFungibleTokenContractTx := execTestutil.CreateDeployFungibleTokenContractInterfaceTransaction(flow.RootAddress)
+	err = execTestutil.SignTransactionByRoot(&deployFungibleTokenContractTx, 0)
 	require.NoError(t, err)
 
+	// Create FlowToken deployment transaction
+	deployFlowTokenContractTx := execTestutil.CreateDeployFlowTokenContractTransaction(flow.RootAddress, flow.BytesToAddress([]byte{0}))
+	err = execTestutil.SignTransactionByRoot(&deployFlowTokenContractTx, 1)
+	require.NoError(t, err)
+
+	// Create deployment transaction that imports the FlowToken contract
 	useImportTx := flow.TransactionBody{
-		Authorizers: []flow.Address{unittest.AddressFixture()},
-		Script: []byte(`
-				import FungibleToken from 0x1
+		Authorizers: []flow.Address{flow.RootAddress},
+		Script: []byte(fmt.Sprintf(`
+				import FlowToken from 0x%s
                 transaction {
 				  prepare(signer: AuthAccount) {}
 				  execute {
-					  let v <- FungibleToken.createEmptyVault()
+					  let v <- FlowToken.createEmptyVault()
 					  destroy v
 				  }
                 }
-            `),
+            `, flowTokenAddress),
 	}
-	err = execTestutil.SignTransactionByRoot(&useImportTx, 1)
+	err = execTestutil.SignTransactionByRoot(&useImportTx, 2)
 	require.NoError(t, err)
 
-	// Deploy FT contract
-	result, err := bc.ExecuteTransaction(ledger, &deployContractTx)
-
+	// Deploy the FungibleToken contract interface
+	result, err := bc.ExecuteTransaction(ledger, &deployFungibleTokenContractTx)
 	assert.NoError(t, err)
 	assert.True(t, result.Succeeded())
+	assert.Nil(t, result.Error)
+
+	// Deploy the FlowToken contract
+	result, err = bc.ExecuteTransaction(ledger, &deployFlowTokenContractTx)
+	assert.NoError(t, err)
+	// fmt.Println(result.Error.ErrorMessage())
+	assert.True(t, result.Succeeded())
+	fmt.Println(result.Error.ErrorMessage())
 	assert.Nil(t, result.Error)
 
 	// Use import (FT Vault resource)
@@ -134,64 +148,6 @@ func TestTransactionWithImportASTCache(t *testing.T) {
 	if result.Error != nil {
 		fmt.Println(result.Error.ErrorMessage())
 	}
-
-	assert.NoError(t, err)
-	assert.True(t, result.Succeeded())
-	assert.Nil(t, result.Error)
-
-	// Determine location of transaction
-	txID := useImportTx.ID()
-	location := runtime.TransactionLocation(txID[:])
-
-	// Get cached program
-	program, err := vm.ASTCache().GetProgram(location)
-	assert.NotNil(t, program)
-	assert.NoError(t, err)
-}
-
-func BenchmarkTransactionWithImportASTCache(t *testing.B) {
-	rt := runtime.NewInterpreterRuntime()
-	h := unittest.BlockHeaderFixture()
-
-	vm, err := virtualmachine.New(rt)
-	require.NoError(t, err)
-
-	bc := vm.NewBlockContext(&h)
-
-	ledger, err := execTestutil.RootBootstrappedLedger()
-	require.NoError(t, err)
-
-	deployContractTx := execTestutil.CreateDeployFTContractTransaction()
-	err = execTestutil.SignTransactionByRoot(&deployContractTx, 0)
-	require.NoError(t, err)
-
-	useImportTx := flow.TransactionBody{
-		Authorizers: []flow.Address{unittest.AddressFixture()},
-		Script: []byte(`
-				import FungibleToken from 0x1
-                transaction {
-				  prepare(signer: AuthAccount) {}
-				  execute {
-				  }
-                }
-            `),
-	}
-	err = execTestutil.SignTransactionByRoot(&useImportTx, 1)
-	require.NoError(t, err)
-
-	// Deploy FT contract
-	result, err := bc.ExecuteTransaction(ledger, &deployContractTx)
-
-	assert.NoError(t, err)
-	assert.True(t, result.Succeeded())
-	assert.Nil(t, result.Error)
-
-	t.ResetTimer()
-
-	// Use import (FT Vault resource)
-	result, err = bc.ExecuteTransaction(ledger, &useImportTx)
-
-	t.StopTimer()
 
 	assert.NoError(t, err)
 	assert.True(t, result.Succeeded())

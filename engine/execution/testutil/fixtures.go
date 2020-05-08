@@ -9,9 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// Create a transaction that will deploy the provided contract
-// to the specified address.
-func CreateContractDeploymentTransaction(contract string, address flow.Address) flow.TransactionBody {
+func CreateContractDeploymentTransaction(contract string, authorizer flow.Address) flow.TransactionBody {
 	encoded := hex.EncodeToString([]byte(contract))
 	return flow.TransactionBody{
 		Script: []byte(fmt.Sprintf(`transaction {
@@ -19,7 +17,7 @@ func CreateContractDeploymentTransaction(contract string, address flow.Address) 
                 signer.setCode("%s".decodeHex())
               }
             }`, encoded)),
-		Authorizers: []flow.Address{address},
+		Authorizers: []flow.Address{authorizer},
 	}
 }
 
