@@ -457,24 +457,17 @@ func ingestHappyPath(tb testing.TB, receiptCount int, chunkCount int) {
 	fmt.Println("Chunks have been made")
 
 	// mocks the assignment to assign the single chunk to this verifier node
-	assigner := &mock.ChunkAssigner{}
-	a := chmodel.NewAssignment()
+	assigner := NewMockAssigner(verIdentity.NodeID)
 
 	vChunks := make([]*verification.VerifiableChunk, 0)
 
-	// assigns some chunks based on isAssigned method to the verification node
+	// collects assigned chunks to verification node in vChunks
 	for _, er := range ers {
 		for _, chunk := range er.Receipt.ExecutionResult.Chunks {
 			if IsAssigned(chunk.Index) {
-				a.Add(chunk, []flow.Identifier{verIdentity.NodeID})
 				vChunks = append(vChunks, VerifiableChunk(chunk.Index, er))
 			}
 		}
-		assigner.On("Assign",
-			testifymock.Anything,
-			er.Receipt.ExecutionResult.Chunks,
-			testifymock.Anything).
-			Return(a, nil)
 	}
 
 	// nodes and engines

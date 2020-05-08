@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/crypto/random"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
@@ -146,7 +145,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	// set up mock verifier engine that asserts each receipt is submitted
 	// to the verifier exactly once.
 	verifierEng, verifierEngWG := test.SetupMockVerifierEng(t, vChunks)
-	assigner := NewMockAssigner(verID.NodeID)
+	assigner := test.NewMockAssigner(verID.NodeID)
 	verNode := testutil.VerificationNode(t, hub, verID, identities, assigner, requestInterval, failureThreshold,
 		testutil.WithVerifierEngine(verifierEng))
 
@@ -298,27 +297,4 @@ func setupMockExeNode(t *testing.T, node mock.GenericNode, verID flow.Identifier
 		}).
 		Return(nil)
 
-}
-
-type MockAssigner struct {
-	me flow.Identifier
-}
-
-func NewMockAssigner(id flow.Identifier) *MockAssigner {
-	return &MockAssigner{me: id}
-}
-
-// Assign assigns all input chunks to the verifier node
-func (m *MockAssigner) Assign(ids flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chmodel.Assignment, error) {
-	if len(chunks) == 0 {
-		return nil, fmt.Errorf("assigner called with empty chunk list")
-	}
-	a := chmodel.NewAssignment()
-	for _, c := range chunks {
-		if test.IsAssigned(c.Index) {
-			a.Add(c, flow.IdentifierList{m.me})
-		}
-	}
-
-	return a, nil
 }
