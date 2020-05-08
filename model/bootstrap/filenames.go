@@ -17,11 +17,12 @@ var (
 	PathNodeInfosPub          = filepath.Join("public-genesis-information", "node-infos.pub.json")
 	PathNodeInfoPub           = filepath.Join("public-genesis-information", "node-info.pub.%v.json") // %v will be replaced by NodeID
 	PathPartnerNodeInfoPrefix = filepath.Join("public-genesis-information", "node-info.pub.")
+	// The Node ID file is used as a helper by the transit scripts
+	FilenameNodeId = "node-id"
+	PathNodeId     = filepath.Join("public-genesis-information", FilenameNodeId) // %v will be replaced by NodeID
 
 	// private genesis information
 	PathAccount0Priv         = filepath.Join("private-genesis-information", "account-0.priv.json")
-	FilenameNodeId           = "node-id"
-	PathNodeId               = filepath.Join("private-genesis-information", "private-node-info_%v", FilenameNodeId)        // %v will be replaced by NodeID
 	PathNodeInfoPriv         = filepath.Join("private-genesis-information", "private-node-info_%v", "node-info.priv.json") // %v will be replaced by NodeID
 	FilenameRandomBeaconPriv = "random-beacon.priv.json"
 	PathRandomBeaconPriv     = filepath.Join("private-genesis-information", "private-node-info_%v", FilenameRandomBeaconPriv) // %v will be replaced by NodeID
