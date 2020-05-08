@@ -37,6 +37,7 @@ func TestConcurrency(t *testing.T) {
 	// will be addressed in
 	// https://github.com/dapperlabs/flow-go/issues/3613
 
+	t.SkipNow()
 	testcases := []struct {
 		erCount, // number of execution receipts
 		senderCount, // number of (concurrent) senders for each execution receipt
