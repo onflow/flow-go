@@ -144,6 +144,9 @@ func (suite *IngestTestSuite) SetupTest() {
 		Return(suite.chunksConduit, nil).
 		Once()
 
+	suite.state.On("Final").Return(suite.ss)
+	suite.state.On("AtBlockID", suite.block.ID()).Return(suite.ss, nil)
+
 	// mocks identity of the verification node
 	suite.me.On("NodeID").Return(suite.verIdentity.NodeID)
 
@@ -745,8 +748,6 @@ func (suite *IngestTestSuite) TestHandleCollection_UnstakedSender() {
 
 	// mock the receipt coming from an unstaked node
 	unstakedIdentity := unittest.IdentifierFixture()
-	suite.state.On("Final").Return(suite.ss).Once()
-	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 	suite.ss.On("Identity", unstakedIdentity).Return(nil, errors.New("")).Once()
 
 	// mocks a tracker for the collection
@@ -942,19 +943,15 @@ func (suite *IngestTestSuite) TestChunkDataPackTracker_UntrackedChunkDataPack() 
 	suite.SetupTest()
 	eng := suite.TestNewEngine()
 
-	execIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-
 	// creates a chunk fixture, its data pack, and the data pack response
-	chunk := unittest.ChunkFixture()
-	chunkDataPack := unittest.ChunkDataPackFixture(chunk.ID())
-	chunkDataPackResponse := &messages.ChunkDataPackResponse{Data: chunkDataPack}
+	chunkDataPackResponse := &messages.ChunkDataPackResponse{Data: *suite.chunkDataPack}
 
 	// mocks absence of chunk data pack tracker
-	suite.chunkDataPackTrackers.On("Has", chunkDataPack.ChunkID).Return(false)
+	suite.chunkDataPackTrackers.On("Has", suite.chunkDataPack.ChunkID).Return(false)
 	// engine has not yet ingested this chunk
-	suite.ingestedChunkIDs.On("Has", chunkDataPack.ChunkID).Return(false)
+	suite.ingestedChunkIDs.On("Has", suite.chunkDataPack.ChunkID).Return(false)
 
-	err := eng.Process(execIdentity.NodeID, chunkDataPackResponse)
+	err := eng.Process(suite.execIdentity.NodeID, chunkDataPackResponse)
 
 	// asserts that process of an untracked chunk data pack return no error
 	// since the data pack is simply dropped
