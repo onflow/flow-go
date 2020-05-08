@@ -442,8 +442,6 @@ func (suite *IngestTestSuite) TestHandleReceipt_RetryMissingChunkDataPack() {
 	suite.state.On("Final").Return(suite.ss, nil)
 	suite.ss.On("Identities", testifymock.AnythingOfType("flow.IdentityFilter")).Return(execIdentities, nil)
 
-	// mocks functionalities
-	//
 	// mocks tracker check
 	// presence of tracker in the trackers mempool
 	suite.chunkDataPackTrackers.On("Has", suite.chunkDataPack.ID()).Return(true)
@@ -456,8 +454,14 @@ func (suite *IngestTestSuite) TestHandleReceipt_RetryMissingChunkDataPack() {
 	suite.chunkDataPackTrackers.On("ByChunkID", suite.chunkTracker.ChunkID).Return(suite.chunkTracker, nil).Once()
 	suite.chunkDataPackTrackers.On("Rem", suite.chunkTracker.ChunkID).Return(true).Once()
 
-	// no collection tracker
-	suite.collectionTrackers.On("All").Return(nil)
+	// presence of receipt in the authenticated receipts
+	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt})
+
+	// presence of block associated with the receipt
+	suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil)
+
+	// chunk assigner
+	suite.assigner.On("Assign").Return(flow.ChunkList{})
 
 	// mocks expectation
 	//
