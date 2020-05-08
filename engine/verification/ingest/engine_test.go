@@ -710,18 +710,16 @@ func (suite *IngestTestSuite) TestHandleCollection_Untracked() {
 
 	eng := suite.TestNewEngine()
 
-	// mock the collection coming from an collection node
-	collIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(false).Once()
 	// mocks a pending collection
 	pcoll := &verificationmodel.PendingCollection{
 		Collection: suite.collection,
-		OriginID:   collIdentity.NodeID,
+		OriginID:   suite.collIdentity.NodeID,
 	}
 	// expects the the collection to be added to pending receipts
 	suite.pendingCollections.On("Add", pcoll).Return(nil).Once()
 
-	err := eng.Process(collIdentity.NodeID, suite.collection)
+	err := eng.Process(suite.collIdentity.NodeID, suite.collection)
 	suite.Assert().Nil(err)
 
 	suite.authCollections.AssertExpectations(suite.T())
