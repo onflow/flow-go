@@ -31,6 +31,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
@@ -85,14 +86,18 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	me, err := local.New(identity, sk)
 	require.NoError(t, err)
 
-	stub := stub.NewNetwork(state, me, hub)
+	stubnet := stub.NewNetwork(state, me, hub)
 
-	metrics, err := metrics.NewCollector(log)
+	mc, err := metrics.NewCollector(log)
+	require.NoError(t, err)
+
+	tracer, err := trace.NewTracer(log, "test")
 	require.NoError(t, err)
 
 	return mock.GenericNode{
 		Log:        log,
-		Metrics:    metrics,
+		Metrics:    mc,
+		Tracer:     tracer,
 		DB:         db,
 		Headers:    headers,
 		Identities: identities,
@@ -102,7 +107,7 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 		Blocks:     blocks,
 		State:      state,
 		Me:         me,
-		Net:        stub,
+		Net:        stubnet,
 		DBDir:      dbDir,
 	}
 }
@@ -233,11 +238,15 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	err = bootstrap.BootstrapExecutionDatabase(node.DB, commit, genesisHead)
 	require.NoError(t, err)
 
-	execState := state.NewExecutionState(ls, commitsStorage, node.Blocks, chunkDataPackStorage, executionResults, node.DB)
+	execState := state.NewExecutionState(
+		ls, commitsStorage, node.Blocks, chunkDataPackStorage, executionResults, node.DB, node.Tracer,
+	)
 
 	stateSync := sync.NewStateSynchronizer(execState)
 
-	providerEngine, err := executionprovider.New(node.Log, node.Net, node.State, node.Me, execState, stateSync)
+	providerEngine, err := executionprovider.New(
+		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, stateSync,
+	)
 	require.NoError(t, err)
 
 	rt := runtime.NewInterpreterRuntime()
@@ -247,13 +256,15 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	computationEngine := computation.New(
 		node.Log,
+		node.Tracer,
 		node.Me,
 		node.State,
 		vm,
 	)
 	require.NoError(t, err)
 
-	ingestionEngine, err := ingestion.New(node.Log,
+	ingestionEngine, err := ingestion.New(
+		node.Log,
 		node.Net,
 		node.Me,
 		node.State,
@@ -267,6 +278,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		execState,
 		syncThreshold,
 		node.Metrics,
+		node.Tracer,
 		false,
 	)
 	require.NoError(t, err)

@@ -134,12 +134,13 @@ type Network struct {
 type Services map[string]Service
 
 type Service struct {
-	Build     Build `yaml:"build,omitempty"`
-	Image     string
-	DependsOn []string `yaml:"depends_on,omitempty"`
-	Command   []string
-	Volumes   []string
-	Ports     []string `yaml:"ports,omitempty"`
+	Build       Build `yaml:"build,omitempty"`
+	Image       string
+	DependsOn   []string `yaml:"depends_on,omitempty"`
+	Command     []string
+	Environment []string `yaml:"environment,omitempty"`
+	Volumes     []string
+	Ports       []string `yaml:"ports,omitempty"`
 }
 
 type Build struct {
@@ -195,6 +196,10 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 		},
 		Volumes: []string{
 			fmt.Sprintf("%s:/bootstrap", BootstrapDir),
+		},
+		Environment: []string{
+			"JAEGER_AGENT_HOST=jaeger",
+			"JAEGER_AGENT_PORT=6831",
 		},
 	}
 

@@ -27,6 +27,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	dbmetrics "github.com/dapperlabs/flow-go/module/metrics/badger"
+	"github.com/dapperlabs/flow-go/module/trace"
 	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/validators"
@@ -84,8 +85,9 @@ type FlowNodeBuilder struct {
 	name           string
 	Logger         zerolog.Logger
 	Metrics        module.Metrics
-	Me             *local.Local
+	Tracer         *trace.OpenTracer
 	DB             *badger.DB
+	Me             *local.Local
 	Blocks         *storage.Blocks
 	Headers        *storage.Headers
 	Payloads       *storage.Payloads
@@ -94,11 +96,11 @@ type FlowNodeBuilder struct {
 	Seals          *storage.Seals
 	State          *protocol.State
 	DKGState       *wrapper.State
+	Network        *libp2p.Network
 	modules        []namedModuleFunc
 	components     []namedComponentFunc
 	doneObject     []namedDoneObject
 	sig            chan os.Signal
-	Network        *libp2p.Network
 	genesisHandler func(node *FlowNodeBuilder, block *flow.Block)
 	postInitFns    []func(*FlowNodeBuilder)
 	stakingKey     crypto.PrivateKey
@@ -178,6 +180,12 @@ func (fnb *FlowNodeBuilder) enqueueDBMetrics() {
 	})
 }
 
+func (fnb *FlowNodeBuilder) enqueueTracer() {
+	fnb.Component("tracer", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		return fnb.Tracer, nil
+	})
+}
+
 func (fnb *FlowNodeBuilder) initNodeInfo() {
 	if fnb.BaseConfig.nodeIDHex == notSet {
 		fnb.Logger.Fatal().Msg("cannot start without node ID")
@@ -220,7 +228,7 @@ func (fnb *FlowNodeBuilder) initLogger() {
 }
 
 func (fnb *FlowNodeBuilder) initDatabase() {
-	//Pre-create DB path (Badger creates only one-level dirs)
+	// Pre-create DB path (Badger creates only one-level dirs)
 	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
 	fnb.MustNot(err).Str("dir", fnb.BaseConfig.datadir).Msg("could not create datadir")
 
@@ -250,6 +258,18 @@ func (fnb *FlowNodeBuilder) initDatabase() {
 	fnb.Seals = storage.NewSeals(db)
 	fnb.Payloads = storage.NewPayloads(db, fnb.Identities, fnb.Guarantees, fnb.Seals)
 	fnb.Blocks = storage.NewBlocks(db, fnb.Headers, fnb.Payloads)
+}
+
+func (fnb *FlowNodeBuilder) initMetrics() {
+	mc, err := metrics.NewCollector(fnb.Logger)
+	fnb.MustNot(err).Msg("could not initialize metrics")
+	fnb.Metrics = mc
+}
+
+func (fnb *FlowNodeBuilder) initTracer() {
+	tracer, err := trace.NewTracer(fnb.Logger, fnb.name)
+	fnb.MustNot(err).Msg("could not initialize metrics")
+	fnb.Tracer = tracer
 }
 
 func (fnb *FlowNodeBuilder) initState() {
@@ -461,6 +481,8 @@ func FlowNode(name string) *FlowNodeBuilder {
 
 	builder.enqueueDBMetrics()
 
+	builder.enqueueTracer()
+
 	return builder
 }
 
@@ -484,6 +506,10 @@ func (fnb *FlowNodeBuilder) Run(role string) {
 	fnb.initNodeInfo()
 
 	fnb.initLogger()
+
+	fnb.initMetrics()
+
+	fnb.initTracer()
 
 	fnb.initDatabase()
 
@@ -524,7 +550,6 @@ func (fnb *FlowNodeBuilder) Run(role string) {
 	fnb.Logger.Info().Msgf("%s node shutdown complete", fnb.name)
 
 	os.Exit(0)
-
 }
 
 func (fnb *FlowNodeBuilder) handlePostInit(f func(node *FlowNodeBuilder)) {

@@ -7,9 +7,6 @@ import (
 	"path/filepath"
 
 	"github.com/onflow/cadence/runtime"
-
-	"github.com/dapperlabs/flow-go/module/metrics"
-
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/cmd"
@@ -23,6 +20,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/ledger"
@@ -57,8 +55,10 @@ func main() {
 			if err != nil {
 				return err
 			}
+
 			computationManager = computation.New(
 				node.Logger,
+				node.Tracer,
 				node.Me,
 				node.State,
 				vm,
@@ -66,7 +66,7 @@ func main() {
 
 			return nil
 		}).
-		//Trie storage is required to bootstrap, but also shout be handled while shutting down
+		// Trie storage is required to bootstrap, but also shout be handled while shutting down
 		Module("ledger storage", func(node *cmd.FlowNodeBuilder) error {
 			ledgerStorage, err = ledger.NewTrieStorage(triedir)
 			return err
@@ -81,7 +81,7 @@ func main() {
 				panic(fmt.Sprintf("error while bootstrapping execution state: %s", err))
 			}
 			if !bytes.Equal(bootstrappedStateCommitment, flow.GenesisStateCommitment) {
-				panic("error while boostrapping execution state - resulting state is different than precalculated!")
+				panic("error while bootstrapping execution state - resulting state is different than precalculated!")
 			}
 			if !bytes.Equal(flow.GenesisStateCommitment, node.GenesisCommit) {
 				panic(fmt.Sprintf("genesis seal state commitment (%x) different from precalculated (%x)", node.GenesisCommit, flow.GenesisStateCommitment))
@@ -99,11 +99,22 @@ func main() {
 			chunkDataPacks := badger.NewChunkDataPacks(node.DB)
 			executionResults := badger.NewExecutionResults(node.DB)
 			stateCommitments := badger.NewCommits(node.DB)
-			executionState = state.NewExecutionState(ledgerStorage, stateCommitments, node.Blocks, chunkDataPacks, executionResults, node.DB)
-			//registerDeltas := badger.NewRegisterDeltas(node.DB)
+
+			executionState = state.NewExecutionState(
+				ledgerStorage,
+				stateCommitments,
+				node.Blocks,
+				chunkDataPacks,
+				executionResults,
+				node.DB,
+				node.Tracer,
+			)
+
 			stateSync := sync.NewStateSynchronizer(executionState)
+
 			providerEngine, err = provider.New(
 				node.Logger,
+				node.Tracer,
 				node.Network,
 				node.State,
 				node.Me,
@@ -117,7 +128,7 @@ func main() {
 			// Only needed for ingestion engine
 			collections := badger.NewCollections(node.DB)
 
-			// Needed for grpc server, make sure to assign to main scoped vars
+			// Needed for gRPC server, make sure to assign to main scoped vars
 			events = badger.NewEvents(node.DB)
 			txResults = badger.NewTransactionResults(node.DB)
 			ingestionEng, err = ingestion.New(
@@ -133,8 +144,9 @@ func main() {
 				computationManager,
 				providerEngine,
 				executionState,
-				6, //TODO - config param maybe?
+				6, // TODO - config param maybe?
 				node.Metrics,
+				node.Tracer,
 				true,
 			)
 			return ingestionEng, err

@@ -43,6 +43,7 @@ make logs
 You can view realtime metrics while the network is running:
 
 - Prometheus: http://localhost:9090/
+- Traces (Jaeger): http://localhost:16686/
 - Grafana: http://localhost:3000/
   - Username: `admin`
   - Password: `admin`
