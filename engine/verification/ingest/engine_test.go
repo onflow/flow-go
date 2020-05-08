@@ -589,13 +589,8 @@ func (suite *IngestTestSuite) TestHandleReceipt_UnstakedSender() {
 
 	eng := suite.TestNewEngine()
 
-	myIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-	suite.me.On("NodeID").Return(myIdentity.NodeID).Once()
-
 	// mock the receipt coming from an unstaked node
 	unstakedIdentity := unittest.IdentifierFixture()
-	suite.state.On("Final").Return(suite.ss).Once()
-	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil).Once()
 	suite.ss.On("Identity", unstakedIdentity).Return(nil, fmt.Errorf("unstaked node")).Once()
 	// engine has not yet ingested the result of this receipt
 	suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
