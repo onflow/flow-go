@@ -2,6 +2,7 @@ package mtrie
 
 import (
 	"fmt"
+	"math/rand"
 )
 
 // IsBitSet returns if the bit at position i in the byte array b is set to 1 (big endian)
@@ -83,4 +84,42 @@ func SplitKeyProofs(keys [][]byte, proofs []*Proof, bitIndex int) ([][]byte, []*
 		}
 	}
 	return lkeys, lproofs, rkeys, rproofs, nil
+}
+
+// GetRandomKeysRandN generate m random keys (key size: byteSize),
+// the number of keys generates, m, is also randomly selected from the range [1, maxN]
+func GetRandomKeysRandN(maxN int, byteSize int) [][]byte {
+	numberOfKeys := rand.Intn(maxN) + 1
+	return GetRandomKeysFixedN(numberOfKeys, byteSize)
+}
+
+// GetRandomKeysFixedN generates n random (no repetition) fixed sized (byteSize) keys
+func GetRandomKeysFixedN(n int, byteSize int) [][]byte {
+	keys := make([][]byte, 0, n)
+	alreadySelectKeys := make(map[string]bool)
+	i := 0
+	for i < n {
+		key := make([]byte, byteSize)
+		rand.Read(key)
+		// deduplicate
+		if _, found := alreadySelectKeys[string(key)]; !found {
+			keys = append(keys, key)
+			alreadySelectKeys[string(key)] = true
+			i++
+		}
+	}
+	return keys
+}
+
+// GetRandomValues generate an slice (len n) of
+// random values (byte slice) of random size from the range [1, maxByteSize]
+func GetRandomValues(n int, maxByteSize int) [][]byte {
+	values := make([][]byte, 0, n)
+	for i := 0; i < n; i++ {
+		byteSize := rand.Intn(maxByteSize) + 1
+		value := make([]byte, byteSize)
+		rand.Read(value)
+		values = append(values, value)
+	}
+	return values
 }

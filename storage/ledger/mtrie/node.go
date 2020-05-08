@@ -1,6 +1,7 @@
 package mtrie
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 )
@@ -17,17 +18,17 @@ type node struct {
 
 // newNode creates a new node with the provided value and no children
 func newNode(height int) *node {
-	n := new(node)
-	n.height = height
-	n.lChild = nil
-	n.rChild = nil
-	n.key = nil
-	n.value = nil
-	n.hashValue = nil
-	return n
+	return &node{
+		lChild:    nil,
+		rChild:    nil,
+		height:    height,
+		key:       nil,
+		value:     nil,
+		hashValue: nil,
+	}
 }
 
-// FmtStr provides formated string represntation of the node and sub tree
+// FmtStr provides formatted string representation of the node and sub tree
 func (n node) FmtStr(prefix string, path string) string {
 	right := ""
 	if n.rChild != nil {
@@ -61,4 +62,57 @@ func (n *node) DeepCopy() *node {
 		newNode.rChild = n.rChild.DeepCopy()
 	}
 	return newNode
+}
+
+// Equals compares two nodes and all subsequent children
+// this is an expensive call and should only be used
+// for limited cases (e.g. testing)
+func (n *node) Equals(o *node) bool {
+
+	// height don't match
+	if n.height != o.height {
+		return false
+	}
+
+	// values don't match
+	if (n.value == nil) != (o.value == nil) {
+		return false
+	}
+	if n.value != nil && o.value != nil && !bytes.Equal(n.value, o.value) {
+		return false
+	}
+
+	// keys don't match
+	if (n.key == nil) != (o.key == nil) {
+		return false
+	}
+	if n.key != nil && o.key != nil && !bytes.Equal(n.key, o.key) {
+		return false
+	}
+
+	// hashValues don't match
+	if (n.hashValue == nil) != (o.hashValue == nil) {
+		return false
+	}
+	if n.hashValue != nil && o.hashValue != nil && !bytes.Equal(n.hashValue, o.hashValue) {
+		return false
+	}
+
+	// left children don't match
+	if (n.lChild == nil) != (o.lChild == nil) {
+		return false
+	}
+	if n.lChild != nil && o.lChild != nil && !n.lChild.Equals(o.lChild) {
+		return false
+	}
+
+	// right children don't match
+	if (n.rChild == nil) != (o.rChild == nil) {
+		return false
+	}
+	if n.rChild != nil && o.rChild != nil && !n.rChild.Equals(o.rChild) {
+		return false
+	}
+
+	return true
 }

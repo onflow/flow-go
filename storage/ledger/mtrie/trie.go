@@ -19,3 +19,7 @@ func (mt *MTrie) SetParent(pt *MTrie) {
 func NewMTrie(root *node) *MTrie {
 	return &MTrie{root: root, values: make(map[string][]byte)}
 }
+
+func (mt *MTrie) String() string {
+	return mt.root.FmtStr("", "")
+}

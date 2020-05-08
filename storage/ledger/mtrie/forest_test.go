@@ -413,6 +413,80 @@ func TestReadWithWrongKeySize(t *testing.T) {
 	require.Error(t, err)
 }
 
+// TODO test read (multiple non exist in a branch)
+
+func TestRandomUpdateReadProof(t *testing.T) {
+	keyByteSize := 2
+	trieHeight := keyByteSize*8 + 1
+	rep := 100
+	maxNumKeysPerStep := 10
+	maxValueSize := 6 // bytes
+	rand.Seed(time.Now().UnixNano())
+	fStore := mtrie.NewMForest(trieHeight)
+	rootHash := fStore.GetEmptyRootHash()
+	// map store
+	latestValueByKey := make(map[string][]byte, 0)
+
+	for e := 0; e < rep; e++ {
+		keys := mtrie.GetRandomKeysRandN(maxNumKeysPerStep, keyByteSize)
+		values := mtrie.GetRandomValues(len(keys), maxValueSize)
+
+		// update map store with key values
+		// we use this at the end of each step to check all existing keys
+		for i, k := range keys {
+			latestValueByKey[string(k)] = values[i]
+		}
+
+		// test reading for non-existing keys
+		nonExistingKeys := make([][]byte, 0)
+		for _, k := range keys {
+			if _, ok := latestValueByKey[string(k)]; !ok {
+				nonExistingKeys = append(nonExistingKeys, k)
+			}
+		}
+		retValues, err := fStore.Read(nonExistingKeys, rootHash)
+		require.NoError(t, err, "error reading - non existing keys")
+		for i := range retValues {
+			require.True(t, len(retValues[i]) == 0)
+		}
+
+		// test update
+		rootHash, err = fStore.Update(keys, values, rootHash)
+		require.NoError(t, err, "error updating")
+
+		// test read
+		retValues, err = fStore.Read(keys, rootHash)
+		require.NoError(t, err, "error reading")
+		for i := range values {
+			require.True(t, bytes.Equal(values[i], retValues[i]))
+		}
+
+		// test proof
+		batchProof, err := fStore.Proofs(keys, rootHash)
+		require.NoError(t, err, "error generating proofs")
+		require.True(t, batchProof.Verify(keys, values, rootHash, trieHeight))
+
+		psmt, err := trie.NewPSMT(rootHash, trieHeight, keys, values, mtrie.EncodeBatchProof(batchProof))
+		require.True(t, bytes.Equal(psmt.GetRootHash(), rootHash))
+		require.NoError(t, err, "error building partial trie")
+
+		// check values for all existing keys
+		allKeys := make([][]byte, 0, len(latestValueByKey))
+		allValues := make([][]byte, 0, len(latestValueByKey))
+		for k, v := range latestValueByKey {
+			allKeys = append(allKeys, []byte(k))
+			allValues = append(allValues, v)
+		}
+		retValues, err = fStore.Read(allKeys, rootHash)
+		for i, v := range allValues {
+			require.True(t, bytes.Equal(v, retValues[i]))
+		}
+
+		// TODO test mix of proofs (existing and non existing)
+
+	}
+}
+
 func TestProofGenerationInclusion(t *testing.T) {
 	trieHeight := 17
 	fStore := mtrie.NewMForest(trieHeight)

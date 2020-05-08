@@ -31,7 +31,7 @@ func NewMForest(maxHeight int) *MForest {
 // GetEmptyRootHash returns the rootHash of empty forest
 func (f *MForest) GetEmptyRootHash() []byte {
 	newRoot := newNode(f.maxHeight - 1)
-	rootHash := f.ComputeNodeHash(newRoot)
+	rootHash := f.ComputeNodeHash(newRoot, false)
 	return rootHash
 }
 
@@ -39,9 +39,9 @@ func (f *MForest) GetEmptyRootHash() []byte {
 func (f *MForest) Read(keys [][]byte, rootHash []byte) ([][]byte, error) {
 
 	// lookup the trie by rootHash
-	trie, ok := f.tries[hex.EncodeToString(rootHash)]
-	if !ok {
-		return nil, errors.New("root hash not found")
+	trie, err := f.GetTrie(rootHash)
+	if err != nil {
+		return nil, err
 	}
 
 	// sort keys and deduplicate keys
@@ -71,6 +71,7 @@ func (f *MForest) Read(keys [][]byte, rootHash []byte) ([][]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	// reconstruct the values in the same key order that called the method
 	orderedValues := make([][]byte, len(keys))
 	for i, k := range sortedKeys {
@@ -84,7 +85,11 @@ func (f *MForest) Read(keys [][]byte, rootHash []byte) ([][]byte, error) {
 func (f *MForest) read(trie *MTrie, head *node, keys [][]byte) ([][]byte, error) {
 	// not found
 	if head == nil {
-		return [][]byte{[]byte{}}, nil
+		res := make([][]byte, 0)
+		for _ = range keys {
+			res = append(res, []byte{})
+		}
+		return res, nil
 	}
 	// If we are at a leaf node, we create the node
 	if len(keys) == 1 && head.lChild == nil && head.rChild == nil {
@@ -149,17 +154,16 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 		sortedValues = append(sortedValues, valueMap[hex.EncodeToString(key)])
 	}
 
-	// find trie
-	trie, ok := f.tries[hex.EncodeToString(rootHash)]
-	if !ok {
-		return nil, errors.New("trie with the given rootHash not found")
+	trie, err := f.GetTrie(rootHash)
+	if err != nil {
+		return nil, err
 	}
 
 	newRoot := newNode(f.maxHeight - 1)
 	newTrie := NewMTrie(newRoot)
 	newTrie.SetParent(trie)
 
-	err := f.update(newTrie, trie.root, newRoot, sortedKeys, sortedValues)
+	err = f.update(newTrie, trie.root, newRoot, sortedKeys, sortedValues)
 	if err != nil {
 		return nil, err
 	}
@@ -208,8 +212,9 @@ func (f *MForest) update(trie *MTrie, parent *node, head *node, keys [][]byte, v
 	var err1, err2 error
 	go func() {
 		defer wg.Done()
-		// no change needed on the left side
+		// no change needed on the left side,
 		if len(lkeys) == 0 {
+			// reuse the node from previous trie
 			lupdate = parent.lChild
 		} else {
 			newN := newNode(parent.height - 1)
@@ -225,6 +230,7 @@ func (f *MForest) update(trie *MTrie, parent *node, head *node, keys [][]byte, v
 		defer wg.Done()
 		// no change needed on right side
 		if len(rkeys) == 0 {
+			// reuse the node from previous trie
 			rupdate = parent.rChild
 		} else {
 			newN := newNode(head.height - 1)
@@ -281,9 +287,9 @@ func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*BatchProof, error) {
 		}
 	}
 
-	trie, ok := f.tries[hex.EncodeToString(rootHash)]
-	if !ok {
-		return nil, errors.New("root hash not found")
+	trie, err := f.GetTrie(rootHash)
+	if err != nil {
+		return nil, err
 	}
 
 	bp := NewBatchProofWithEmptyProofs(len(keys))
@@ -365,9 +371,58 @@ func (f *MForest) proofs(head *node, keys [][]byte, proofs []*Proof) error {
 	return nil
 }
 
+// GetTrie returns trie at specific rootHash
+// warning, use this function for read-only operation
+func (f *MForest) GetTrie(rootHash []byte) (*MTrie, error) {
+	trie, ok := f.tries[hex.EncodeToString(rootHash)]
+	if !ok {
+		return nil, fmt.Errorf("trie with the given rootHash [%v] not found", hex.EncodeToString(rootHash))
+	}
+	return trie, nil
+}
+
 // GetCompactValue computes the value for the node considering the sub tree to only include this value and default values.
 func (f *MForest) GetCompactValue(n *node) []byte {
 	return ComputeCompactValue(n.key, n.value, n.height, f.maxHeight)
+}
+
+// GetNodeHash computes the hashValue for the given node
+func (f *MForest) GetNodeHash(n *node) []byte {
+	if n.hashValue != nil {
+		return n.hashValue
+	}
+	return f.ComputeNodeHash(n, false)
+}
+
+// ComputeNodeHash computes the hashValue for the given node
+// if forced it set it won't trust hash values of children and
+// recomputes it.
+func (f *MForest) ComputeNodeHash(n *node, forced bool) []byte {
+	// leaf node (this shouldn't happen)
+	if n.lChild == nil && n.rChild == nil {
+		if n.key != nil && n.value != nil {
+			return f.GetCompactValue(n)
+		}
+		return GetDefaultHashForHeight(n.height)
+	}
+	// otherwise compute
+	h1 := GetDefaultHashForHeight(n.height - 1)
+	if n.lChild != nil {
+		if forced {
+			h1 = f.ComputeNodeHash(n.lChild, forced)
+		} else {
+			h1 = f.GetNodeHash(n.lChild)
+		}
+	}
+	h2 := GetDefaultHashForHeight(n.height - 1)
+	if n.rChild != nil {
+		if forced {
+			h2 = f.ComputeNodeHash(n.rChild, forced)
+		} else {
+			h2 = f.GetNodeHash(n.rChild)
+		}
+	}
+	return HashInterNode(h1, h2)
 }
 
 // PopulateNodeHashValues recursively update nodes with
@@ -390,33 +445,4 @@ func (f *MForest) PopulateNodeHashValues(n *node) []byte {
 	n.hashValue = HashInterNode(h1, h2)
 
 	return n.hashValue
-}
-
-// GetNodeHash computes the hashValue for the given node
-func (f *MForest) GetNodeHash(n *node) []byte {
-	if n.hashValue != nil {
-		return n.hashValue
-	}
-	return f.ComputeNodeHash(n)
-}
-
-// ComputeNodeHash computes the hashValue for the given node
-func (f *MForest) ComputeNodeHash(n *node) []byte {
-	// leaf node (this shouldn't happen)
-	if n.lChild == nil && n.rChild == nil {
-		if n.key != nil && n.value != nil {
-			return f.GetCompactValue(n)
-		}
-		return GetDefaultHashForHeight(n.height)
-	}
-	// otherwise compute
-	h1 := GetDefaultHashForHeight(n.height - 1)
-	if n.lChild != nil {
-		h1 = f.GetNodeHash(n.lChild)
-	}
-	h2 := GetDefaultHashForHeight(n.height - 1)
-	if n.rChild != nil {
-		h2 = f.GetNodeHash(n.rChild)
-	}
-	return HashInterNode(h1, h2)
 }
