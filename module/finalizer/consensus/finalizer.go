@@ -59,10 +59,12 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized height: %w", err)
 	}
+
 	pending, err := f.headers.ByBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve pending header: %w", err)
 	}
+
 	if pending.Height <= finalized {
 		dup, err := f.headers.ByHeight(pending.Height)
 		if err != nil {

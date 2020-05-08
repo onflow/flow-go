@@ -68,23 +68,13 @@ func (suite *MutatorSuite) TearDownTest() {
 
 func (suite *MutatorSuite) Bootstrap() {
 
-	// bootstrap main chain so we have valid reference blocks
-	role := flow.RoleCollection
 	// just bootstrap with a genesis block, we'll use this as reference
-	genesis := unittest.GenesisFixture(unittest.IdentityListFixture(5, func(id *flow.Identity) {
-		id.Role = role
-		role++
-	}))
+	genesis := unittest.GenesisFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
 	err := suite.protoState.Mutate().Bootstrap(flow.GenesisStateCommitment, genesis)
 	suite.Require().Nil(err)
 
 	// bootstrap cluster chain
 	err = suite.mutator.Bootstrap(suite.genesis)
-	suite.Assert().Nil(err)
-}
-
-func (suite *MutatorSuite) InsertBlock(block model.Block) {
-	err := suite.db.Update(procedure.InsertClusterBlock(&block))
 	suite.Assert().Nil(err)
 }
 
@@ -179,19 +169,7 @@ func (suite *MutatorSuite) TestBootstrap_Successful() {
 
 func (suite *MutatorSuite) TestExtend_WithoutBootstrap() {
 	block := unittest.ClusterBlockWithParent(suite.genesis)
-	suite.InsertBlock(block)
-
-	err := suite.mutator.Extend(block.ID())
-	suite.Assert().Error(err)
-}
-
-func (suite *MutatorSuite) TestExtend_NonexistentBlock() {
-	suite.Bootstrap()
-
-	// ID of a non-existent block
-	blockID := unittest.IdentifierFixture()
-
-	err := suite.mutator.Extend(blockID)
+	err := suite.mutator.Extend(&block)
 	suite.Assert().Error(err)
 }
 
@@ -201,9 +179,8 @@ func (suite *MutatorSuite) TestExtend_InvalidChainID() {
 	block := unittest.ClusterBlockWithParent(suite.genesis)
 	// change the chain ID
 	block.Header.ChainID = fmt.Sprintf("%s-invalid", block.Header.ChainID)
-	suite.InsertBlock(block)
 
-	err := suite.mutator.Extend(block.ID())
+	err := suite.mutator.Extend(&block)
 	suite.Assert().Error(err)
 }
 
@@ -213,9 +190,8 @@ func (suite *MutatorSuite) TestExtend_InvalidBlockNumber() {
 	block := unittest.ClusterBlockWithParent(suite.genesis)
 	// change the block number
 	block.Header.Height = block.Header.Height - 1
-	suite.InsertBlock(block)
 
-	err := suite.mutator.Extend(block.ID())
+	err := suite.mutator.Extend(&block)
 	suite.Assert().Error(err)
 }
 
@@ -224,8 +200,7 @@ func (suite *MutatorSuite) TestExtend_OnParentOfFinalized() {
 
 	// build one block on top of genesis
 	block1 := unittest.ClusterBlockWithParent(suite.genesis)
-	suite.InsertBlock(block1)
-	err := suite.mutator.Extend(block1.ID())
+	err := suite.mutator.Extend(&block1)
 	suite.Assert().Nil(err)
 
 	// finalize the block
@@ -235,10 +210,9 @@ func (suite *MutatorSuite) TestExtend_OnParentOfFinalized() {
 	// insert another block on top of genesis
 	// since we have already finalized block 1, this is invalid
 	block2 := unittest.ClusterBlockWithParent(suite.genesis)
-	suite.InsertBlock(block2)
 
 	// try to extend with the invalid block
-	err = suite.mutator.Extend(block2.ID())
+	err = suite.mutator.Extend(&block2)
 	suite.Assert().Error(err)
 }
 
@@ -246,10 +220,14 @@ func (suite *MutatorSuite) TestExtend_Success() {
 	suite.Bootstrap()
 
 	block := unittest.ClusterBlockWithParent(suite.genesis)
-	suite.InsertBlock(block)
-
-	err := suite.mutator.Extend(block.ID())
+	err := suite.mutator.Extend(&block)
 	suite.Assert().Nil(err)
+
+	var extended model.Block
+	err = suite.db.View(procedure.RetrieveClusterBlock(block.ID(), &extended))
+	suite.Assert().Nil(err)
+
+	suite.Assert().Equal(*block.Payload, *extended.Payload)
 }
 
 func (suite *MutatorSuite) TestExtend_WithEmptyCollection() {
@@ -258,9 +236,7 @@ func (suite *MutatorSuite) TestExtend_WithEmptyCollection() {
 	block := unittest.ClusterBlockWithParent(suite.genesis)
 	// set an empty collection as the payload
 	block.SetPayload(model.EmptyPayload(flow.ZeroID))
-	suite.InsertBlock(block)
-
-	err := suite.mutator.Extend(block.ID())
+	err := suite.mutator.Extend(&block)
 	suite.Assert().Nil(err)
 }
 
@@ -273,20 +249,18 @@ func (suite *MutatorSuite) TestExtend_UnfinalizedBlockWithDupeTx() {
 	block1 := unittest.ClusterBlockWithParent(suite.genesis)
 	payload1 := suite.Payload(&tx1)
 	block1.SetPayload(payload1)
-	suite.InsertBlock(block1)
 
 	// should be able to extend block 1
-	err := suite.mutator.Extend(block1.ID())
+	err := suite.mutator.Extend(&block1)
 	suite.Assert().Nil(err)
 
 	// create a block building on block1 ALSO containing tx1
 	block2 := unittest.ClusterBlockWithParent(&block1)
 	payload2 := suite.Payload(&tx1)
 	block2.SetPayload(payload2)
-	suite.InsertBlock(block2)
 
 	// should be unable to extend block 2, as it contains a dupe transaction
-	err = suite.mutator.Extend(block2.ID())
+	err = suite.mutator.Extend(&block2)
 	suite.Assert().Error(err)
 }
 
@@ -299,10 +273,9 @@ func (suite *MutatorSuite) TestExtend_FinalizedBlockWithDupeTx() {
 	block1 := unittest.ClusterBlockWithParent(suite.genesis)
 	payload1 := suite.Payload(&tx1)
 	block1.SetPayload(payload1)
-	suite.InsertBlock(block1)
 
 	// should be able to extend block 1
-	err := suite.mutator.Extend(block1.ID())
+	err := suite.mutator.Extend(&block1)
 	suite.Assert().Nil(err)
 
 	// should be able to finalize block 1
@@ -313,10 +286,9 @@ func (suite *MutatorSuite) TestExtend_FinalizedBlockWithDupeTx() {
 	block2 := unittest.ClusterBlockWithParent(&block1)
 	payload2 := suite.Payload(&tx1)
 	block2.SetPayload(payload2)
-	suite.InsertBlock(block2)
 
 	// should be unable to extend block 2, as it contains a dupe transaction
-	err = suite.mutator.Extend(block2.ID())
+	err = suite.mutator.Extend(&block2)
 	suite.Assert().Error(err)
 }
 
@@ -329,20 +301,18 @@ func (suite *MutatorSuite) TestExtend_ConflictingForkWithDupeTx() {
 	block1 := unittest.ClusterBlockWithParent(suite.genesis)
 	payload1 := suite.Payload(&tx1)
 	block1.SetPayload(payload1)
-	suite.InsertBlock(block1)
 
 	// should be able to extend block 1
-	err := suite.mutator.Extend(block1.ID())
+	err := suite.mutator.Extend(&block1)
 	suite.Assert().Nil(err)
 
 	// create a block ALSO extending genesis ALSO containing tx1
 	block2 := unittest.ClusterBlockWithParent(suite.genesis)
 	payload2 := suite.Payload(&tx1)
 	block2.SetPayload(payload2)
-	suite.InsertBlock(block2)
 
 	// should be able to extend block2, although it conflicts with block1,
 	// it is on a different fork
-	err = suite.mutator.Extend(block2.ID())
+	err = suite.mutator.Extend(&block2)
 	suite.Assert().Nil(err)
 }
