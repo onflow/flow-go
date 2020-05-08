@@ -1,6 +1,7 @@
 package ingest
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -47,12 +48,13 @@ type Engine struct {
 	chunkDataPackTackers mempool.ChunkDataPackTrackers // keeps track of chunk data pack requests that this engine made
 	ingestedResultIDs    mempool.Identifiers           // keeps ids of ingested execution results
 	ingestedChunkIDs     mempool.Identifiers           // keeps ids of ingested chunks
-	blockStorage         storage.Blocks
-	checkChunksLock      sync.Mutex           // protects the checkPendingChunks method to prevent double-verifying
-	checkTrackerLock     sync.Mutex           // provides mutual exclusion for checkTrackers method to prevent race condition
-	assigner             module.ChunkAssigner // used to determine chunks this node needs to verify
-	requestInterval      uint                 // determines time in milliseconds for retrying tracked requests
-	failureThreshold     uint                 // determines number of retries for tracked requests before raising a challenge
+	headerStorage        storage.Headers               // used to check block existence to improve performance
+	blockStorage         storage.Blocks                // used to retrieve blocks
+	checkChunksLock      sync.Mutex                    // protects the checkPendingChunks method to prevent double-verifying
+	checkTrackerLock     sync.Mutex                    // provides mutual exclusion for checkTrackers method to prevent race condition
+	assigner             module.ChunkAssigner          // used to determine chunks this node needs to verify
+	requestInterval      uint                          // determines time in milliseconds for retrying tracked requests
+	failureThreshold     uint                          // determines number of retries for tracked requests before raising a challenge
 }
 
 // New creates and returns a new instance of the ingest engine.
@@ -71,6 +73,7 @@ func New(
 	chunkDataPackTrackers mempool.ChunkDataPackTrackers,
 	ingestedChunkIDs mempool.Identifiers,
 	ingestedResultIDs mempool.Identifiers,
+	headerStorage storage.Headers,
 	blockStorage storage.Blocks,
 	assigner module.ChunkAssigner,
 	requestIntervalMs uint,
@@ -92,6 +95,7 @@ func New(
 		chunkDataPackTackers: chunkDataPackTrackers,
 		ingestedChunkIDs:     ingestedChunkIDs,
 		ingestedResultIDs:    ingestedResultIDs,
+		headerStorage:        headerStorage,
 		blockStorage:         blockStorage,
 		assigner:             assigner,
 		failureThreshold:     failureThreshold,
@@ -540,7 +544,7 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 	collIndex := int(chunk.CollectionIndex)
 
 	// ensure the collection index specified by the ER is valid
-	if len(block.Guarantees) <= collIndex {
+	if len(block.Payload.Guarantees) <= collIndex {
 		log.Error().
 			Int("collection_index", collIndex).
 			Msg("could not get collections - invalid collection index")
@@ -549,7 +553,7 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 		return nil, false
 	}
 
-	collID := block.Guarantees[collIndex].ID()
+	collID := block.Payload.Guarantees[collIndex].ID()
 
 	// updates pending collection
 	e.checkPendingCollections(collID, block.ID())
@@ -1034,11 +1038,19 @@ func (e *Engine) OnBlockIncorporated(*model.Block) {
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 func (e *Engine) OnFinalizedBlock(block *model.Block) {
+
 	// block should be in the storage
-	if !e.blockStorage.Has(block.BlockID) {
+	_, err := e.headerStorage.ByBlockID(block.BlockID)
+	if errors.Is(err, storage.ErrNotFound) {
 		e.log.Error().
 			Hex("block_id", logging.ID(block.BlockID)).
-			Msg("expected block is not available in the storage")
+			Msg("block is not available in storage")
+		return
+	}
+	if err != nil {
+		e.log.Error().
+			Hex("block_id", logging.ID(block.BlockID)).
+			Msg("could not check block availability in storage")
 		return
 	}
 

@@ -21,11 +21,11 @@ func NewBlockByCollections() *BlockByCollections {
 	return &BlockByCollections{NewBackend(WithEject(EjectPanic))}
 }
 
-func (b *BlockByCollections) Add(block *entity.BlockByCollection) error {
+func (b *BlockByCollections) Add(block *entity.BlocksByCollection) error {
 	return b.Backend.Add(block)
 }
 
-func (b *BlockByCollections) Get(id flow.Identifier) (*entity.BlockByCollection, error) {
+func (b *BlockByCollections) Get(id flow.Identifier) (*entity.BlocksByCollection, error) {
 	backdata := &BlockByCollectionBackdata{&b.Backdata}
 	return backdata.ByID(id)
 }
@@ -41,12 +41,12 @@ func (b *BlockByCollections) Run(f func(backdata *BlockByCollectionBackdata) err
 	return nil
 }
 
-func (b *BlockByCollectionBackdata) ByID(id flow.Identifier) (*entity.BlockByCollection, error) {
+func (b *BlockByCollectionBackdata) ByID(id flow.Identifier) (*entity.BlocksByCollection, error) {
 	e, err := b.Backdata.ByID(id)
 	if err != nil {
 		return nil, err
 	}
-	block, ok := e.(*entity.BlockByCollection)
+	block, ok := e.(*entity.BlocksByCollection)
 	if !ok {
 		panic(fmt.Sprintf("invalid entity in complete block mempool (%T)", e))
 	}

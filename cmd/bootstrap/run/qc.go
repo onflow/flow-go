@@ -21,6 +21,7 @@ import (
 	"github.com/dapperlabs/flow-go/state/dkg"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	protoBadger "github.com/dapperlabs/flow-go/state/protocol/badger"
+	storeBadger "github.com/dapperlabs/flow-go/storage/badger"
 )
 
 type Participant struct {
@@ -47,11 +48,11 @@ func GenerateGenesisQC(participantData ParticipantData, block *flow.Block) (*mod
 
 	hotBlock := model.Block{
 		BlockID:     block.ID(),
-		View:        block.View,
-		ProposerID:  block.ProposerID,
+		View:        block.Header.View,
+		ProposerID:  block.Header.ProposerID,
 		QC:          nil,
-		PayloadHash: block.PayloadHash,
-		Timestamp:   block.Timestamp,
+		PayloadHash: block.Header.PayloadHash,
+		Timestamp:   block.Header.Timestamp,
 	}
 
 	votes := make([]*model.Vote, 0, len(signers))
@@ -132,7 +133,7 @@ func NewProtocolState(block *flow.Block) (*protoBadger.State, *badger.DB, error)
 	}
 
 	opts := badger.
-		LSMOnlyOptions(dir).
+		DefaultOptions(dir).
 		WithKeepL0InMemory(true).
 		WithLogger(nil)
 
@@ -141,7 +142,14 @@ func NewProtocolState(block *flow.Block) (*protoBadger.State, *badger.DB, error)
 		return nil, nil, err
 	}
 
-	state, err := protoBadger.NewState(db)
+	headers := storeBadger.NewHeaders(db)
+	identities := storeBadger.NewIdentities(db)
+	guarantees := storeBadger.NewGuarantees(db)
+	seals := storeBadger.NewSeals(db)
+	payloads := storeBadger.NewPayloads(db, identities, guarantees, seals)
+	blocks := storeBadger.NewBlocks(db, headers, payloads)
+
+	state, err := protoBadger.NewState(db, headers, identities, seals, payloads, blocks)
 	if err != nil {
 		return nil, nil, err
 	}

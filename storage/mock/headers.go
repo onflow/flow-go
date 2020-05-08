@@ -33,13 +33,13 @@ func (_m *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
 	return r0, r1
 }
 
-// ByNumber provides a mock function with given fields: number
-func (_m *Headers) ByNumber(number uint64) (*flow.Header, error) {
-	ret := _m.Called(number)
+// ByHeight provides a mock function with given fields: height
+func (_m *Headers) ByHeight(height uint64) (*flow.Header, error) {
+	ret := _m.Called(height)
 
 	var r0 *flow.Header
 	if rf, ok := ret.Get(0).(func(uint64) *flow.Header); ok {
-		r0 = rf(number)
+		r0 = rf(height)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Header)
@@ -48,7 +48,30 @@ func (_m *Headers) ByNumber(number uint64) (*flow.Header, error) {
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(uint64) error); ok {
-		r1 = rf(number)
+		r1 = rf(height)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ByParentID provides a mock function with given fields: parentID
+func (_m *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
+	ret := _m.Called(parentID)
+
+	var r0 []*flow.Header
+	if rf, ok := ret.Get(0).(func(flow.Identifier) []*flow.Header); ok {
+		r0 = rf(parentID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*flow.Header)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(parentID)
 	} else {
 		r1 = ret.Error(1)
 	}

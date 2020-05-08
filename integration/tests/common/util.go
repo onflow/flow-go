@@ -19,15 +19,8 @@ import (
 )
 
 var (
-	CounterOwner      = "0x01"
-	CounterController = "Testing.Counter"
-	CounterKey        = "count"
-)
-
-// DeployCounter deploys a counter contract using the given client.
-func DeployCounter(ctx context.Context, client *testnet.Client) error {
-
-	contract := dsl.Contract{
+	// a simple counter contract in Cadence
+	counterContract = dsl.Contract{
 		Name: "Testing",
 		Members: []dsl.CadenceCode{
 			dsl.Resource{
@@ -50,40 +43,10 @@ func DeployCounter(ctx context.Context, client *testnet.Client) error {
 		},
 	}
 
-	return client.DeployContract(ctx, contract)
-}
-
-// readCounter executes a script to read the value of a counter. The counter
-// must have been deployed and created.
-func readCounter(ctx context.Context, client *testnet.Client) (int, error) {
-
-	script := dsl.Main{
-		ReturnType: "Int",
-		Code: `
-			let account = getAccount(0x01)
-			if let cap = account.getCapability(/public/counter) {
-				return cap.borrow<&Testing.Counter>()?.count ?? -3
-			}
-			return -3`,
-	}
-
-	res, err := client.ExecuteScript(ctx, script)
-	if err != nil {
-		return 0, err
-	}
-
-	v, err := jsoncdc.Decode(res)
-	if err != nil {
-		return 0, err
-	}
-
-	return v.(cadence.Int).Int(), nil
-}
-
-// createCounter creates a counter instance in the root account. The counter
-// contract must first have been deployed.
-func createCounter(ctx context.Context, client *testnet.Client) error {
-	txDSL := dsl.Transaction{
+	// a transaction script for creating an instance of the counter in the
+	// account storage of the authorizing account
+	// NOTE: the counter contract must be deployed first
+	createCounterTx = dsl.Transaction{
 		Import: dsl.Import{Address: flow.RootAddress},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
@@ -101,8 +64,33 @@ func createCounter(ctx context.Context, client *testnet.Client) error {
 		},
 	}
 
-	tx := unittest.TransactionBodyFixture(unittest.WithTransactionDSL(txDSL))
-	return client.SendTransaction(ctx, tx)
+	// a read-only script for reading the current value of the counter contract
+	readCounterScript = dsl.Main{
+		ReturnType: "Int",
+		Code: `
+			let account = getAccount(0x01)
+			if let cap = account.getCapability(/public/counter) {
+				return cap.borrow<&Testing.Counter>()?.count ?? -3
+			}
+			return -3`,
+	}
+)
+
+// readCounter executes a script to read the value of a counter. The counter
+// must have been deployed and created.
+func readCounter(ctx context.Context, client *testnet.Client) (int, error) {
+
+	res, err := client.ExecuteScript(ctx, readCounterScript)
+	if err != nil {
+		return 0, err
+	}
+
+	v, err := jsoncdc.Decode(res)
+	if err != nil {
+		return 0, err
+	}
+
+	return v.(cadence.Int).Int(), nil
 }
 
 func GetGhostClient(ghostContainer *testnet.Container) (*client.GhostClient, error) {

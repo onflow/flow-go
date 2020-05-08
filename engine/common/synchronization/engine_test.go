@@ -145,6 +145,7 @@ func (ss *SyncSuite) SetupTest() {
 	e, err := New(log, ss.net, ss.me, ss.state, ss.blocks, ss.comp)
 	require.NoError(ss.T(), err, "should pass engine initialization")
 
+	e.tolerance = 0 // make sure we always sync on difference in heights
 	ss.e = e
 }
 
@@ -222,7 +223,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 	ref := ss.head.Height
 	for height := ref; height >= ref-4; height-- {
 		block := unittest.BlockFixture()
-		block.Height = height
+		block.Header.Height = height
 		ss.heights[height] = &block
 	}
 
@@ -312,7 +313,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 
 	// a non-empty request for existing block IDs should send right response
 	block := unittest.BlockFixture()
-	block.Height = ss.head.Height + 1 // this should work, even if it should never happen
+	block.Header.Height = ss.head.Height + 1 // this should work, even if it should never happen
 	req.BlockIDs = []flow.Identifier{block.ID()}
 	ss.blockIDs[block.ID()] = &block
 	ss.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Run(
@@ -339,7 +340,7 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 
 	// check if we want the block by height
 	block1 := unittest.BlockFixture()
-	ss.e.heights[block1.Height] = nil
+	ss.e.heights[block1.Header.Height] = nil
 	res.Blocks = []*flow.Block{&block1}
 	err := ss.e.onBlockResponse(originID, res)
 	require.NoError(ss.T(), err, "should pass block response (by height)")
@@ -429,7 +430,7 @@ func (ss *SyncSuite) TestProcessIncomingBlock() {
 	for n := 0; n < 3; n++ {
 		block := unittest.BlockFixture()
 		blocks = append(blocks, &block)
-		ss.e.heights[block.Height] = nil
+		ss.e.heights[block.Header.Height] = nil
 	}
 
 	// generate 3 by block ID blocks
@@ -459,7 +460,7 @@ func (ss *SyncSuite) TestProcessIncomingBlock() {
 	// assert the maps have right size and elements
 	assert.Len(ss.T(), ss.e.heights, 2)
 	for _, block := range blocks[0:3] {
-		assert.NotContains(ss.T(), ss.e.heights, block.Height, "should not contain blocks by height anymore")
+		assert.NotContains(ss.T(), ss.e.heights, block.Header.Height, "should not contain blocks by height anymore")
 	}
 	assert.Len(ss.T(), ss.e.blockIDs, 2)
 	for _, block := range blocks[3:6] {

@@ -19,5 +19,5 @@ type Builder interface {
 	// being built upon, with the view being provided by the consensus algorithm.
 	// The builder stores the block and validates it against the protocol state
 	// before returning it.
-	BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (*flow.Header, error)
+	BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error)
 }
