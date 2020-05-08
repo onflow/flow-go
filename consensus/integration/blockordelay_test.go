@@ -1,3 +1,5 @@
+// +build timesensitivetest
+
 package integration_test
 
 import (
@@ -11,13 +13,6 @@ import (
 // This file includes functions to simulate network conditions.
 // The network conditions are simulated by defining whether a message sent to a receiver should be
 // blocked or delayed.
-
-type BlockOrDelayFunc func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration)
-
-// block nothing
-func blockNothing(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
-	return false, 0
-}
 
 // block all messages sent by or received by a list of black listed nodes
 func blockNodes(blackList ...*Node) BlockOrDelayFunc {

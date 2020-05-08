@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -112,4 +113,11 @@ func chainViews(t *testing.T, node *Node) []uint64 {
 		low2high = append(low2high, views[i])
 	}
 	return low2high
+}
+
+type BlockOrDelayFunc func(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration)
+
+// block nothing
+func blockNothing(channelID uint8, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+	return false, 0
 }
