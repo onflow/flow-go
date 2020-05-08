@@ -7,6 +7,7 @@ import (
 	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/encoding/rlp"
 )
 
 // Header contains all meta-data for a block, as well as a hash representing
@@ -32,7 +33,7 @@ func (h Header) Body() interface{} {
 		ParentID       Identifier
 		Height         uint64
 		PayloadHash    Identifier
-		Timestamp      time.Time
+		Timestamp      uint64
 		View           uint64
 		ParentVoterIDs []Identifier
 		ParentVoterSig crypto.Signature
@@ -42,12 +43,17 @@ func (h Header) Body() interface{} {
 		ParentID:       h.ParentID,
 		Height:         h.Height,
 		PayloadHash:    h.PayloadHash,
-		Timestamp:      h.Timestamp,
+		Timestamp:      uint64(h.Timestamp.UnixNano()),
 		View:           h.View,
 		ParentVoterIDs: h.ParentVoterIDs,
 		ParentVoterSig: h.ParentVoterSig,
 		ProposerID:     h.ProposerID,
 	}
+}
+
+// Encode returns the canonical RLP byte representation of this header
+func (h Header) Encode() []byte {
+	return rlp.NewEncoder().MustEncode(h.Body())
 }
 
 // ID returns a unique ID to singularly identify the header and its block
@@ -58,7 +64,7 @@ func (h Header) ID() Identifier {
 	if h.Timestamp.Location() != time.UTC {
 		h.Timestamp = h.Timestamp.UTC()
 	}
-	return MakeID(h.Body())
+	return MakeID(h)
 }
 
 // Checksum returns the checksum of the header.
