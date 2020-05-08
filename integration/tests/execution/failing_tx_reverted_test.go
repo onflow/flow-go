@@ -111,7 +111,7 @@ func (gs *ExecutionSuite3) TestExecutionFailingTxReverted() {
 	gs.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
 
 	// send transaction
-	err := common.DeployCounter(context.Background(), gs.AccessClient())
+	err := gs.AccessClient().DeployContract(context.Background(), gs.net.Genesis().ID(), common.CounterContract)
 	require.NoError(gs.T(), err, "could not deploy counter")
 
 	// wait until we see a different state commitment for a finalized block, call that block blockB
@@ -119,11 +119,21 @@ func (gs *ExecutionSuite3) TestExecutionFailingTxReverted() {
 	gs.T().Logf("got blockB height %v ID %v", blockB.Header.Height, blockB.Header.ID())
 
 	// send transaction that panics and should revert
-	err = common.CreateCounterPanic(context.Background(), gs.AccessClient())
+	tx := unittest.TransactionBodyFixture(
+		unittest.WithTransactionDSL(common.CreateCounterPanicTx),
+		unittest.WithReferenceBlock(gs.net.Genesis().ID()),
+	)
+	err = gs.AccessClient().SendTransaction(context.Background(), tx)
 	require.NoError(gs.T(), err, "could not send tx to create counter that should panic")
 
 	// send transaction that has no sigs and should not execute
-	err = common.CreateCounterWrongSig(context.Background(), gs.AccessClient())
+	tx = unittest.TransactionBodyFixture(
+		unittest.WithTransactionDSL(common.CreateCounterTx),
+		unittest.WithReferenceBlock(gs.net.Genesis().ID()),
+	)
+	tx.PayloadSignatures = nil
+	tx.EnvelopeSignatures = nil
+	err = gs.AccessClient().SendTransaction(context.Background(), tx)
 	require.NoError(gs.T(), err, "could not send tx to create counter with wrong sig")
 
 	// wait until the next proposed block is finalized, called blockC

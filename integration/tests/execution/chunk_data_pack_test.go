@@ -123,7 +123,7 @@ func (gs *ExecutionSuite2) TestVerificationNodesRequestChunkDataPacks() {
 		"expected no ChunkDataPackRequest to be sent before a transaction existed")
 
 	// send transaction
-	err := common.DeployCounter(context.Background(), gs.AccessClient())
+	err := gs.AccessClient().DeployContract(context.Background(), gs.net.Genesis().ID(), common.CounterContract)
 	require.NoError(gs.T(), err, "could not deploy counter")
 
 	// wait until we see a different state commitment for a finalized block, call that block blockB
