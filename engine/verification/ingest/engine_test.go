@@ -645,9 +645,7 @@ func (suite *IngestTestSuite) TestHandleReceipt_SenderWithWrongRole() {
 
 			// mock the receipt coming from the invalid role
 			invalidIdentity := unittest.IdentityFixture(unittest.WithRole(role))
-			suite.state.On("Final").Return(suite.ss)
-			suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
-			suite.ss.On("Identity", invalidIdentity.NodeID).Return(invalidIdentity, nil).Once()
+			suite.ss.On("Identity", invalidIdentity.NodeID).Return(invalidIdentity, nil)
 
 			receipt := unittest.ExecutionReceiptFixture()
 
@@ -674,24 +672,19 @@ func (suite *IngestTestSuite) TestHandleCollection_Tracked() {
 
 	eng := suite.TestNewEngine()
 
-	// mock the collection coming from an collection node
-	collIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
 	suite.pendingReceipts.On("All").Return([]*verificationmodel.PendingReceipt{}, nil)
-	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(true)
-	suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, nil)
-	suite.state.On("Final").Return(suite.ss).Once()
-	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
-	suite.ss.On("Identity", collIdentity.NodeID).Return(collIdentity, nil).Once()
+	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(true).Once()
+	suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, nil).Once()
+	suite.ss.On("Identity", suite.collIdentity.NodeID).Return(suite.collIdentity, nil)
 
 	// expect that the collection be added to the mempool
 	suite.authCollections.On("Add", suite.collection).Return(nil).Once()
 
 	// expect that the collection tracker is removed
-	suite.collectionTrackers.On("Rem", suite.collection.ID()).Return(true).Once()
+	suite.collectionTrackers.On("Rem", suite.collection.ID()).Return(true)
 
-	err := eng.Process(collIdentity.NodeID, suite.collection)
+	err := eng.Process(suite.collIdentity.NodeID, suite.collection)
 	suite.Assert().Nil(err)
 
 	suite.authCollections.AssertExpectations(suite.T())
