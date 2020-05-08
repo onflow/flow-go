@@ -411,15 +411,9 @@ func TestSingleCollectionProcessing(t *testing.T) {
 
 }
 
-// BenchmarkIngestEngine is only executed if the 'benchmark' environmental variable is
-// declared as TRUE.
 // BenchmarkIngestEngine benchmarks the happy path of ingest engine with sending
 // 10 execution receipts simultaneously where each receipt has 100 chunks in it.
 func BenchmarkIngestEngine(b *testing.B) {
-	if os.Getenv("benchmark") != "TRUE" {
-		fmt.Println("skips")
-		b.Skip("skips benchmarking ingest engine")
-	}
 	for i := 0; i < b.N; i++ {
 		ingestHappyPath(b, 10, 100)
 	}
