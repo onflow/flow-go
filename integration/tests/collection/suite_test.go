@@ -219,7 +219,7 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 
 	suite.T().Logf("awaiting %d transactions included", len(txIDs))
 
-	waitFor := time.Second * 15
+	waitFor := time.Second*15 + time.Duration(len(lookup))*100*time.Millisecond
 	deadline := time.Now().Add(waitFor)
 	for time.Now().Before(deadline) {
 
