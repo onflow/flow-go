@@ -53,3 +53,7 @@ Here's an example of a Prometheus query that filters by the `consensus` role:
 ```
 avg(rate(consensus_finalized_blocks{role="consensus"}[2m]))
 ```
+
+## Profiling
+
+Each node exposes a server compatible with the `pprof` profiling tool. This [blog post](https://klotzandrew.com/blog/golang-finding-memory-leaks) walks through a simple example of how to use the tool to diagnose memory leaks.
