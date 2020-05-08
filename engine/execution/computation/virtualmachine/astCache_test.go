@@ -90,12 +90,17 @@ func TestScriptASTCache(t *testing.T) {
 	})
 }
 
-func TestTransactionASTCache_PreBenchmark(t *testing.T) {
+func TestTransactionWithImportASTCache(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
+
 	vm, err := virtualmachine.New(rt)
 	require.NoError(t, err)
+
 	bc := vm.NewBlockContext(&h)
+
+	ledger, err := execTestutil.RootBootstrappedLedger()
+	require.NoError(t, err)
 
 	deployContractTx := execTestutil.CreateDeployFTContractTransaction()
 	err = execTestutil.SignTransactionByRoot(&deployContractTx, 0)
@@ -109,16 +114,12 @@ func TestTransactionASTCache_PreBenchmark(t *testing.T) {
 				  prepare(signer: AuthAccount) {}
 				  execute {
 					  let v <- FungibleToken.createEmptyVault()
-					  log(v.balance)
 					  destroy v
 				  }
                 }
             `),
 	}
 	err = execTestutil.SignTransactionByRoot(&useImportTx, 1)
-	require.NoError(t, err)
-
-	ledger, err := execTestutil.RootBootstrappedLedger()
 	require.NoError(t, err)
 
 	// Deploy FT contract
@@ -130,7 +131,67 @@ func TestTransactionASTCache_PreBenchmark(t *testing.T) {
 
 	// Use import (FT Vault resource)
 	result, err = bc.ExecuteTransaction(ledger, &useImportTx)
-	fmt.Println(result.Error.ErrorMessage())
+	if result.Error != nil {
+		fmt.Println(result.Error.ErrorMessage())
+	}
+
+	assert.NoError(t, err)
+	assert.True(t, result.Succeeded())
+	assert.Nil(t, result.Error)
+
+	// Determine location of transaction
+	txID := useImportTx.ID()
+	location := runtime.TransactionLocation(txID[:])
+
+	// Get cached program
+	program, err := vm.ASTCache().GetProgram(location)
+	assert.NotNil(t, program)
+	assert.NoError(t, err)
+}
+
+func BenchmarkTransactionWithImportASTCache(t *testing.B) {
+	rt := runtime.NewInterpreterRuntime()
+	h := unittest.BlockHeaderFixture()
+
+	vm, err := virtualmachine.New(rt)
+	require.NoError(t, err)
+
+	bc := vm.NewBlockContext(&h)
+
+	ledger, err := execTestutil.RootBootstrappedLedger()
+	require.NoError(t, err)
+
+	deployContractTx := execTestutil.CreateDeployFTContractTransaction()
+	err = execTestutil.SignTransactionByRoot(&deployContractTx, 0)
+	require.NoError(t, err)
+
+	useImportTx := flow.TransactionBody{
+		Authorizers: []flow.Address{unittest.AddressFixture()},
+		Script: []byte(`
+				import FungibleToken from 0x1
+                transaction {
+				  prepare(signer: AuthAccount) {}
+				  execute {
+				  }
+                }
+            `),
+	}
+	err = execTestutil.SignTransactionByRoot(&useImportTx, 1)
+	require.NoError(t, err)
+
+	// Deploy FT contract
+	result, err := bc.ExecuteTransaction(ledger, &deployContractTx)
+
+	assert.NoError(t, err)
+	assert.True(t, result.Succeeded())
+	assert.Nil(t, result.Error)
+
+	t.ResetTimer()
+
+	// Use import (FT Vault resource)
+	result, err = bc.ExecuteTransaction(ledger, &useImportTx)
+
+	t.StopTimer()
 
 	assert.NoError(t, err)
 	assert.True(t, result.Succeeded())
