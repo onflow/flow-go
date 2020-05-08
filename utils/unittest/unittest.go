@@ -44,7 +44,7 @@ func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration) {
 
 // RequireReturnBefore requires that the given function returns before the
 // duration expires.
-func RequireReturnsBefore(t *testing.T, f func(), duration time.Duration) {
+func RequireReturnsBefore(t testing.TB, f func(), duration time.Duration) {
 	done := make(chan struct{})
 
 	go func() {
