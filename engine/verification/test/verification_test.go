@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification"
 	chmodel "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
@@ -441,6 +442,7 @@ func ingestHappyPath(tb testing.TB, receiptCount int, chunkCount int) {
 	// generates identities of nodes, one of each type and `verCount` many verification node
 	identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	verIdentity := identities.Filter(filter.HasRole(flow.RoleVerification))[0]
+	exeIdentity := identities.Filter(filter.HasRole(flow.RoleExecution))[0]
 
 	// Execution receipt and chunk assignment
 	//
