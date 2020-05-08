@@ -53,14 +53,6 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 	// continue with processing of messages in the background
 	go func() {
 		for {
-			select {
-			// return if context cancelled
-			case <-ctx.Done():
-				return
-			default:
-				// continue with this iteration of the loop
-			}
-
 			sender, msg, err := reader.Next()
 
 			select {

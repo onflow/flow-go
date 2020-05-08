@@ -16,7 +16,6 @@ import (
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/testingdock"
@@ -96,19 +95,18 @@ func (net *FlowNetwork) Start(ctx context.Context) {
 // If you need to restart containers, use `Stop` instead, which does not remove containers.
 func (net *FlowNetwork) Remove() {
 
-	defer net.Cleanup()          // defer to ensure it runs, even if stop fails
-	defer net.RemoveContainers() // defer to ensure it runs, even if stop fails
 	net.StopContainers()
+	net.RemoveContainers()
+	net.Cleanup()
 }
 
 // StopContainers stops all containers in the network, without removing them. This allows containers to be
 // restarted. To remove them, call `RemoveContainers`.
 func (net *FlowNetwork) StopContainers() {
 
-	fmt.Println("<<<< stopping network: ", net.config.Name)
 	err := net.suite.Close()
-	if !assert.Nil(net.t, err, "failed to stop network") {
-		defer net.t.FailNow()
+	if err != nil {
+		net.t.Log("failed to stop network", err)
 	}
 }
 
@@ -116,8 +114,8 @@ func (net *FlowNetwork) StopContainers() {
 func (net *FlowNetwork) RemoveContainers() {
 
 	err := net.suite.Remove()
-	if !assert.Nil(net.t, err, "failed to remove containers") {
-		defer net.t.FailNow()
+	if err != nil {
+
 	}
 }
 
@@ -127,8 +125,8 @@ func (net *FlowNetwork) Cleanup() {
 	// remove data directories
 	for _, c := range net.Containers {
 		err := os.RemoveAll(c.datadir)
-		if !assert.Nil(net.t, err, "failed to cleanup") {
-			defer net.t.FailNow()
+		if err != nil {
+			net.t.Log("failed to cleanup", err)
 		}
 	}
 }

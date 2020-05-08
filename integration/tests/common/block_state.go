@@ -21,9 +21,10 @@ type BlockState struct {
 	highestProposed   uint64
 }
 
+// TODO refactor to remove deep indentation
 func (bs *BlockState) Add(b *messages.BlockProposal) {
 	if bs.blocksByID == nil {
-		bs.blocksByID = make(map[flow.Identifier]*messages.BlockProposal)
+		bs.blocksByID = make(map[flow.Identifier]*messages.BlockProposal) // TODO: initialize this map in constructor
 	}
 	bs.blocksByID[b.Header.ID()] = b
 	bs.highestProposed = b.Header.Height
@@ -32,7 +33,7 @@ func (bs *BlockState) Add(b *messages.BlockProposal) {
 	confirmsHeight := b.Header.Height - 3
 	if b.Header.Height >= 3 && confirmsHeight > bs.highestFinalized {
 		if bs.finalizedByHeight == nil {
-			bs.finalizedByHeight = make(map[uint64]*messages.BlockProposal)
+			bs.finalizedByHeight = make(map[uint64]*messages.BlockProposal) // TODO: initialize this map in constructor
 		}
 		// put all ancestors into `finalizedByHeight`
 		ancestor, ok := b, true
@@ -67,7 +68,7 @@ func (bs *BlockState) WaitForFirstFinalized(t *testing.T) *messages.BlockProposa
 	}, blockStateTimeout, 100*time.Millisecond,
 		fmt.Sprintf("did not receive first finalized block within %v seconds", blockStateTimeout))
 
-	return bs.finalizedByHeight[bs.highestFinalized]
+	return bs.finalizedByHeight[1]
 }
 
 // WaitForNextFinalized waits until the next block is finalized: If the latest proposed block has height 13, and the
@@ -110,8 +111,8 @@ func (bs *BlockState) WaitForFinalizedChild(t *testing.T, parent *messages.Block
 	return bs.finalizedByHeight[parent.Header.Height+1]
 }
 
-// HighestFinalized returns the highest finalized block and a boolean indicating whether a highest finalized block
-// exists
+// HighestFinalized returns the highest finalized block after genesis and a boolean indicating whether a highest
+// finalized block exists
 func (bs *BlockState) HighestFinalized() (*messages.BlockProposal, bool) {
 	if bs.highestFinalized == 0 {
 		return nil, false
