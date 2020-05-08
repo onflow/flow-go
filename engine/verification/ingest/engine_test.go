@@ -74,6 +74,10 @@ type IngestTestSuite struct {
 	collTracker      *tracker.CollectionTracker
 	requestInterval  uint
 	failureThreshold uint
+	// identities
+	verIdentity  *flow.Identity // verification node
+	execIdentity *flow.Identity // execution node
+	collIdentity *flow.Identity // collection node
 }
 
 // TestIngestEngine executes all IngestTestSuite tests.
@@ -116,6 +120,10 @@ func (suite *IngestTestSuite) SetupTest() {
 	suite.collTracker = tracker.NewCollectionTracker(suite.collection.ID(), suite.block.ID())
 	suite.chunkTracker = tracker.NewChunkDataPackTracker(suite.chunk.ID(), suite.block.ID())
 
+	suite.verIdentity = unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	suite.execIdentity = unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	suite.collIdentity = unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+
 	// parameters set based on following issue
 	// https://github.com/dapperlabs/flow-go/issues/3443
 	suite.failureThreshold = 2
@@ -136,17 +144,15 @@ func (suite *IngestTestSuite) SetupTest() {
 		Return(suite.chunksConduit, nil).
 		Once()
 
-	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-
 	// mocks identity of the verification node
-	suite.me.On("NodeID").Return(verIdentity.NodeID)
+	suite.me.On("NodeID").Return(suite.verIdentity.NodeID)
 
 	// mocks chunk assignment
 	//
 	// assigns all chunks in the receipt to this node through mocking
 	a := chmodel.NewAssignment()
 	for _, chunk := range suite.receipt.ExecutionResult.Chunks {
-		a.Add(chunk, []flow.Identifier{verIdentity.NodeID})
+		a.Add(chunk, []flow.Identifier{suite.verIdentity.NodeID})
 	}
 	suite.assigner.On("Assign",
 		testifymock.Anything,
@@ -793,13 +799,6 @@ func (suite *IngestTestSuite) TestHandleCollection_SenderWithWrongRole() {
 // TestVerifyReady evaluates that a verifiable chunk is locally passed to the verifier engine
 // whenever all of its relevant resources are ready regardless of the order in which dependent resources are received.
 func (suite *IngestTestSuite) TestVerifyReady() {
-	// Mocking identities
-	//
-	// required roles
-	execIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	collIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-
 	testcases := []struct {
 		getResource func(*IngestTestSuite) interface{}
 		from        *flow.Identity
@@ -807,11 +806,11 @@ func (suite *IngestTestSuite) TestVerifyReady() {
 	}{
 		{
 			getResource: func(s *IngestTestSuite) interface{} { return s.receipt },
-			from:        execIdentity,
+			from:        suite.execIdentity,
 			label:       "received receipt",
 		}, {
 			getResource: func(s *IngestTestSuite) interface{} { return s.collection },
-			from:        collIdentity,
+			from:        suite.collIdentity,
 			label:       "received collection",
 		},
 	}
@@ -829,9 +828,7 @@ func (suite *IngestTestSuite) TestVerifyReady() {
 			suite.state.On("Final").Return(suite.ss, nil)
 			suite.state.On("AtBlockID", suite.block.ID()).Return(suite.ss, nil)
 			// mocks state snapshot to return identity of this verifier node for chunk assignment
-			suite.ss.On("Identities", testifymock.AnythingOfType("flow.IdentityFilter")).Return(flow.IdentityList{verIdentity}, nil)
-			// mocks state snapshot to return id of this verifier node
-			suite.me.On("NodeID").Return(verIdentity.NodeID)
+			suite.ss.On("Identities", testifymock.AnythingOfType("flow.IdentityFilter")).Return(flow.IdentityList{suite.verIdentity}, nil)
 
 			// mocks identity of the origin id of test case
 			suite.ss.On("Identity", testcase.from.NodeID).Return(testcase.from, nil)
@@ -928,9 +925,9 @@ func (suite *IngestTestSuite) TestVerifyReady() {
 			suite.verifierEng.AssertExpectations(suite.T())
 
 			// asserts the collection should not be requested
-			suite.collectionsConduit.AssertNotCalled(suite.T(), "Submit", testifymock.Anything, collIdentity)
+			suite.collectionsConduit.AssertNotCalled(suite.T(), "Submit", testifymock.Anything, suite.collIdentity)
 			// asserts the chunk state should not be requested
-			suite.statesConduit.AssertNotCalled(suite.T(), "Submit", testifymock.Anything, execIdentity)
+			suite.statesConduit.AssertNotCalled(suite.T(), "Submit", testifymock.Anything, suite.execIdentity)
 		})
 	}
 }
@@ -971,46 +968,36 @@ func (suite *IngestTestSuite) TestChunkDataPackTracker_HappyPath() {
 	suite.Lock()
 	defer suite.Unlock()
 
-	suite.SetupTest()
 	eng := suite.TestNewEngine()
 
-	execIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-
-	// creates a block
-	block := unittest.BlockFixture()
-	// creates a chunk fixture, its data pack, and the data pack response for the block
-	chunk := unittest.ChunkFixture()
-	chunkDataPack := unittest.ChunkDataPackFixture(chunk.ID())
-	chunkDataPackResponse := &messages.ChunkDataPackResponse{Data: chunkDataPack}
+	chunkDataPackResponse := &messages.ChunkDataPackResponse{Data: *suite.chunkDataPack}
 
 	// creates a tracker for chunk data pack that binds it to the block
 	track := &tracker.ChunkDataPackTracker{
-		BlockID: block.ID(),
-		ChunkID: chunkDataPack.ChunkID,
+		BlockID: suite.block.ID(),
+		ChunkID: suite.chunkDataPack.ChunkID,
 	}
 
 	// mocks tracker to return the tracker for the chunk data pack
-	suite.chunkDataPackTrackers.On("Has", chunkDataPack.ChunkID).Return(true).Once()
-	suite.chunkDataPackTrackers.On("ByChunkID", chunkDataPack.ChunkID).Return(track, nil).Once()
+	suite.chunkDataPackTrackers.On("Has", suite.chunkDataPack.ChunkID).Return(true).Once()
+	suite.chunkDataPackTrackers.On("ByChunkID", suite.chunkDataPack.ChunkID).Return(track, nil).Once()
 
 	// mocks state of ingest engine to return execution node ID
 	suite.state.On("AtBlockID", track.BlockID).Return(suite.ss, nil).Once()
-	suite.ss.On("Identity", execIdentity.NodeID).Return(execIdentity, nil).Once()
+	suite.ss.On("Identity", suite.execIdentity.NodeID).Return(suite.execIdentity, nil).Once()
 
 	// chunk data pack should be successfully added to mempool and the tracker should be removed
-	suite.chunkDataPacks.On("Add", &chunkDataPack).Return(nil).Once()
-	suite.chunkDataPackTrackers.On("Rem", chunkDataPack.ChunkID).Return(true).Once()
+	suite.chunkDataPacks.On("Add", suite.chunkDataPack).Return(nil).Once()
+	suite.chunkDataPackTrackers.On("Rem", suite.chunkDataPack.ChunkID).Return(true).Once()
 
 	// engine has not yet ingested this chunk
-	suite.ingestedChunkIDs.On("Has", chunkDataPack.ChunkID).Return(false).Once()
+	suite.ingestedChunkIDs.On("Has", suite.chunkDataPack.ChunkID).Return(false).Once()
 
-	err := eng.Process(execIdentity.NodeID, chunkDataPackResponse)
+	err := eng.Process(suite.execIdentity.NodeID, chunkDataPackResponse)
 
 	// asserts that process of a tracked chunk data pack should return no error
 	suite.Assert().Nil(err)
 	suite.chunkDataPackTrackers.AssertExpectations(suite.T())
 	suite.chunkDataPacks.AssertExpectations(suite.T())
 	suite.ingestedChunkIDs.AssertExpectations(suite.T())
-	suite.state.AssertExpectations(suite.T())
-	suite.ss.AssertExpectations(suite.T())
 }
