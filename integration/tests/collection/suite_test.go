@@ -175,8 +175,7 @@ func (suite *CollectorSuite) AwaitClusterBlocks(n uint) []cluster.Block {
 
 	suite.T().Logf("awaiting %d cluster blocks", n)
 
-	// allow 5 seconds for each block
-	waitFor := time.Duration(n) * time.Second * 5
+	waitFor := time.Second*15 + time.Duration(n)*time.Millisecond*50
 	deadline := time.Now().Add(waitFor)
 	for time.Now().Before(deadline) {
 

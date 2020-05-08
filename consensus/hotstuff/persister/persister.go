@@ -1,29 +1,45 @@
 package persister
 
 import (
-	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dgraph-io/badger/v2"
+
+	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
 // Persister can persist relevant information for hotstuff.
 type Persister struct {
-	views storage.Views
+	db *badger.DB
 }
 
 // New creates a nev persister using the injected stores to persist
 // relevant hotstuff data.
-func New(views storage.Views) *Persister {
+func New(db *badger.DB) *Persister {
 	p := &Persister{
-		views: views,
+		db: db,
 	}
 	return p
 }
 
-// StartedView persists the view when we start it in hotstuff.
-func (p *Persister) StartedView(view uint64) error {
-	return p.views.Store(ActionStarted, view)
+// GetStarted returns the last persisted started view.
+func (p *Persister) GetStarted() (uint64, error) {
+	var view uint64
+	err := p.db.View(operation.RetrieveStartedView(&view))
+	return view, err
 }
 
-// VotedView persist the view when we voted in hotstuff.
-func (p *Persister) VotedView(view uint64) error {
-	return p.views.Store(ActionVoted, view)
+// GetVoted returns the last persisted started view.
+func (p *Persister) GetVoted() (uint64, error) {
+	var view uint64
+	err := p.db.View(operation.RetrieveVotedView(&view))
+	return view, err
+}
+
+// PutStarted persists the view when we start it in hotstuff.
+func (p *Persister) PutStarted(view uint64) error {
+	return p.db.Update(operation.UpdateStartedView(view))
+}
+
+// PutVoted persist the view when we voted in hotstuff.
+func (p *Persister) PutVoted(view uint64) error {
+	return p.db.Update(operation.UpdateVotedView(view))
 }

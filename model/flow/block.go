@@ -18,6 +18,7 @@ func Genesis(identities IdentityList) *Block {
 		Height:      0,
 		PayloadHash: payload.Hash(),
 		Timestamp:   GenesisTime(),
+		View:        0,
 	}
 
 	// combine to block
@@ -34,6 +35,12 @@ func Genesis(identities IdentityList) *Block {
 type Block struct {
 	Header  *Header
 	Payload *Payload
+}
+
+// SetPayload sets the payload and updates the payload hash.
+func (b *Block) SetPayload(payload Payload) {
+	b.Payload = &payload
+	b.Header.PayloadHash = b.Payload.Hash()
 }
 
 // Valid will check whether the block is valid bottom-up.

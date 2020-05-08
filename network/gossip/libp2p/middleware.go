@@ -37,6 +37,9 @@ const (
 
 const DefaultMaxPubSubMsgSize = 1 << 21 //2mb
 
+// the inbound message queue size for One to One and One to K messages (each)
+const InboundMessageQueueSize = 100
+
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
@@ -150,7 +153,6 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 
 	// start the libp2p node
 	err = m.libP2PNode.Start(m.ctx, nodeAddress, m.log, libp2pKey, m.handleIncomingStream, psOptions...)
-
 	if err != nil {
 		return fmt.Errorf("failed to start libp2p node: %w", err)
 	}

@@ -10,9 +10,6 @@ type Guarantees interface {
 	// Store inserts the collection guarantee.
 	Store(guarantee *flow.CollectionGuarantee) error
 
-	// ByID retrieves the collection guarantee by collection ID.
-	ByID(collID flow.Identifier) (*flow.CollectionGuarantee, error)
-
-	// ByBlockID returns guarantees from a block.
-	ByBlockID(blockID flow.Identifier) ([]*flow.CollectionGuarantee, error)
+	// ByCollectionID retrieves the collection guarantee by collection ID.
+	ByCollectionID(collID flow.Identifier) (*flow.CollectionGuarantee, error)
 }
