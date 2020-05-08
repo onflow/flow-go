@@ -118,7 +118,13 @@ func (s *Stopper) stopAll() {
 			// TODO better to wait until it's done, but needs to figure out why hotstuff.Done doesn't finish
 			s.nodes[i].compliance.Done()
 			s.nodes[i].hot.Done()
-			time.Sleep(1 * time.Second)
+			// 2 seconds waiting is more than enough for local, but sometime still not enough on slow CI environment.
+			// if there is error like this, it means we didn't wait long enough before closing the database
+			// panic: runtime error: invalid memory address or nil pointer dereference
+			// [signal SIGSEGV: segmentation violation code=0x1 addr=0x10 pc=0x94fc7a]
+			// goroutine 147 [running]:
+			// github.com/dgraph-io/badger/v2/skl.(*Skiplist).IncrRef(...)
+			time.Sleep(2 * time.Second)
 			wg.Done()
 		}(i)
 	}
