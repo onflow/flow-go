@@ -128,6 +128,9 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 func (e *Engine) process(originID flow.Identifier, input interface{}) error {
+	e.unit.Lock()
+	defer e.unit.Unlock()
+
 	switch v := input.(type) {
 	case *events.SyncedBlock:
 		return e.onSyncedBlock(originID, v)
