@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	module "github.com/dapperlabs/flow-go/module/mock"
-	"github.com/rs/zerolog"
 )
 
 func TestReadyDone(t *testing.T) {
