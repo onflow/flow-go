@@ -60,3 +60,27 @@ func SplitSortedKeys(keys [][]byte, bitIndex int) ([][]byte, [][]byte, error) {
 	// all keys have unset bit at bitIndex
 	return keys, nil, nil
 }
+
+// SplitKeyProofs splits a set of unordered key and proof pairs based on the value of bit (bitIndex)
+func SplitKeyProofs(keys [][]byte, proofs []*Proof, bitIndex int) ([][]byte, []*Proof, [][]byte, []*Proof, error) {
+
+	rkeys := make([][]byte, 0, len(keys))
+	rproofs := make([]*Proof, 0, len(proofs))
+	lkeys := make([][]byte, 0, len(keys))
+	lproofs := make([]*Proof, 0, len(proofs))
+
+	for i, key := range keys {
+		bitIsSet, err := IsBitSet(key, bitIndex)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("can't split key proof pairs , error: %v", err)
+		}
+		if bitIsSet {
+			rkeys = append(rkeys, key)
+			rproofs = append(rproofs, proofs[i])
+		} else {
+			lkeys = append(lkeys, key)
+			lproofs = append(lproofs, proofs[i])
+		}
+	}
+	return lkeys, lproofs, rkeys, rproofs, nil
+}

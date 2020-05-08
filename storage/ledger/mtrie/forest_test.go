@@ -2,7 +2,6 @@ package mtrie_test
 
 import (
 	"bytes"
-	"fmt"
 	"math/rand"
 	"os"
 	"testing"
@@ -343,6 +342,34 @@ func TestReadWithDupplicatedKeys(t *testing.T) {
 	require.True(t, bytes.Equal(retValues[2], values[2]))
 }
 
+// TODO test non existing read
+
+func TestProofGenerationInclusion(t *testing.T) {
+	trieHeight := 17
+	fStore := mtrie.NewMForest(trieHeight)
+	rootHash := fStore.GetEmptyRootHash()
+
+	k1 := []byte([]uint8{uint8(1), uint8(74)})
+	v1 := []byte{'A'}
+
+	k2 := []byte([]uint8{uint8(2), uint8(74)})
+	v2 := []byte{'B'}
+
+	k3 := []byte([]uint8{uint8(130), uint8(74)})
+	v3 := []byte{'C'}
+
+	k4 := []byte([]uint8{uint8(131), uint8(74)})
+	v4 := []byte{'D'}
+
+	keys := [][]byte{k1, k2, k3, k4}
+	values := [][]byte{v1, v2, v3, v4}
+	rootHash, err := fStore.Update(keys, values, rootHash)
+	require.NoError(t, err)
+	proof, err := fStore.Proofs(keys, rootHash)
+	require.NoError(t, err)
+	require.True(t, proof.Verify(keys, values, rootHash, trieHeight))
+}
+
 func TestMForestAccuracy(t *testing.T) {
 	trieHeight := 17 // should be key size (in bits) + 1
 	experimentRep := 10
@@ -395,19 +422,29 @@ func TestMForestAccuracy(t *testing.T) {
 			require.True(t, bytes.Equal(keyValueMap[string(k)], retValues[i]))
 		}
 
-		// TODO test proofs for non-existing keys
-		batchProof, err := fStore.Proofs(keys, rootHash)
-		require.NoError(t, err, "error generating proofs")
-
-		fmt.Println(batchProof)
-		psmt, err := trie.NewPSMT(rootHash, trieHeight, keys, values, mtrie.EncodeBatchProof(batchProof))
-		require.True(t, bytes.Equal(psmt.GetRootHash(), rootHash))
-		require.NoError(t, err, "error building partial trie")
-
 		// Test eqaulity to SMT
 		newRootHashForSMT, err := smt.Update(keys, values, rootHashForSMT)
 		require.NoError(t, err)
 		rootHashForSMT = newRootHashForSMT
 		require.True(t, bytes.Equal(newRootHashForSMT, newRootHash))
+
+		// TODO test proofs for non-existing keys
+		batchProof, err := fStore.Proofs(keys, rootHash)
+		require.NoError(t, err, "error generating proofs")
+
+		batchProofSMT, err := smt.GetBatchProof(keys, rootHashForSMT)
+		require.NoError(t, err, "error generating proofs (SMT)")
+
+		encodedProof := mtrie.EncodeBatchProof(batchProof)
+		encodedProofSMT := trie.EncodeProof(batchProofSMT)
+
+		for i := range encodedProof {
+			require.True(t, bytes.Equal(encodedProof[i], encodedProofSMT[i]))
+		}
+
+		psmt, err := trie.NewPSMT(rootHash, trieHeight, keys, values, encodedProof)
+		require.True(t, bytes.Equal(psmt.GetRootHash(), rootHash))
+		require.NoError(t, err, "error building partial trie")
+
 	}
 }

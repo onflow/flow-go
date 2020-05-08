@@ -164,8 +164,11 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 		return nil, err
 	}
 
-	newRootHash := f.ComputeNodeHash(newRoot)
+	f.PopulateNodeHashValues(trie.root)
+	newRootHash := f.GetNodeHash(newRoot)
 	f.tries[hex.EncodeToString(newRootHash)] = newTrie
+	// TODO remove me
+	// fmt.Println(newTrie.root.FmtStr("", ""))
 	return newRootHash, nil
 }
 
@@ -189,7 +192,7 @@ func (f *MForest) update(trie *MTrie, parent *node, head *node, keys [][]byte, v
 	if len(keys) == 1 && parent.lChild == nil && parent.rChild == nil {
 		head.key = keys[0]
 		head.value = values[0]
-		head.hashValue = f.ComputeNodeHash(head)
+		head.hashValue = f.GetNodeHash(head)
 		return nil
 	}
 
@@ -215,7 +218,6 @@ func (f *MForest) update(trie *MTrie, parent *node, head *node, keys [][]byte, v
 			} else {
 				err1 = f.update(trie, newNode(parent.height-1), newN, lkeys, lvalues)
 			}
-			// newN.hashValue = f.ComputeNodeHash(head)
 			lupdate = newN
 		}
 	}()
@@ -284,130 +286,128 @@ func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*BatchProof, error) {
 		return nil, errors.New("root hash not found")
 	}
 
-	fatalErrors := make(chan error)
-	wgDone := make(chan bool)
-
-	var wg sync.WaitGroup
-
 	bp := NewBatchProofWithEmptyProofs(len(keys))
-	for i, key := range keys {
-		wg.Add(1)
-		go func(k []byte, p *Proof) {
-			err := f.proof(k, trie.root, p)
-			if err != nil {
-				fatalErrors <- err
-			}
-			wg.Done()
-		}(key, bp.Proofs[i])
+
+	for _, p := range bp.Proofs {
+		p.flags = make([]byte, f.keyByteSize)
+		p.inclusion = false
 	}
 
-	wg.Wait()
-	close(wgDone)
-
-	select {
-	case <-wgDone:
-		// carry on
-		break
-	case err := <-fatalErrors:
-		close(fatalErrors)
+	err = f.proof(trie.root, keys, bp.Proofs)
+	if err != nil {
 		return nil, err
 	}
 
 	return bp, nil
 }
 
-// TODO change this to recuresive version
-func (f *MForest) proof(key []byte, root *node, output *Proof) error {
-	output.inclusion = true
-
-	flag := make([]byte, f.keyByteSize)
-	value := make([][]byte, 0)
-	step := uint8(0)
-
-	curr := root
-	for i := 0; i < f.maxHeight-1; i++ {
-		if bytes.Equal(curr.key, key) {
-			break
+func (f *MForest) proof(head *node, keys [][]byte, proofs []*Proof) error {
+	// not found
+	if head == nil {
+		return nil
+	}
+	// reached key
+	if head.key != nil {
+		if bytes.Equal(head.key, keys[0]) {
+			proofs[0].inclusion = true
 		}
-		bitIsSet, err := IsBitSet(key, i)
+		return nil
+	}
+
+	// increment steps
+	for _, p := range proofs {
+		p.steps++
+	}
+
+	lkeys, lproofs, rkeys, rproofs, err := SplitKeyProofs(keys, proofs, f.maxHeight-head.height-1)
+	if err != nil {
+		return fmt.Errorf("can't generate proofs due to split key error: %v", err)
+	}
+
+	if len(lkeys) > 0 {
+		if head.rChild != nil {
+			nodeHash := f.GetNodeHash(head.rChild)
+			isDef := bytes.Equal(nodeHash, GetDefaultHashForHeight(head.rChild.height))
+			for _, p := range lproofs {
+				if !isDef {
+					SetBit(p.flags, f.maxHeight-head.height-1)
+					p.values = append(p.values, nodeHash)
+				}
+			}
+		}
+		err := f.proof(head.lChild, lkeys, lproofs)
 		if err != nil {
-			return fmt.Errorf("error generating batch proof - error calling IsBitSet : %v", err)
-		}
-		if bitIsSet {
-			if curr.lChild != nil {
-				err := SetBit(flag, i)
-				if err != nil {
-					return fmt.Errorf("error generating batch proof - error calling SetBit: %v", err)
-				}
-				value = append(value, f.ComputeNodeHash(curr.lChild))
-			}
-			curr = curr.rChild
-			step++
-		} else {
-			if curr.rChild != nil {
-				err := SetBit(flag, i)
-				if err != nil {
-					return fmt.Errorf("error generating batch proof - error calling SetBit: %v", err)
-				}
-				value = append(value, f.ComputeNodeHash(curr.rChild))
-			}
-			curr = curr.lChild
-			step++
-		}
-		if curr == nil {
-			output.inclusion = false
-			break
+			return err
 		}
 	}
-	output.flags = flag
-	output.values = value
-	output.steps = step
+	if len(rkeys) > 0 {
+		if head.lChild != nil {
+			nodeHash := f.GetNodeHash(head.lChild)
+			isDef := bytes.Equal(nodeHash, GetDefaultHashForHeight(head.lChild.height))
+			for _, p := range rproofs {
+				if !isDef {
+					SetBit(p.flags, f.maxHeight-head.height-1)
+					p.values = append(p.values, nodeHash)
+				}
+			}
+		}
+		err := f.proof(head.rChild, rkeys, rproofs)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
-// ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.
-func (f *MForest) ComputeCompactValue(n *node) []byte {
-	// if value is nil return default hash
-	if len(n.value) == 0 {
-		return GetDefaultHashForHeight(n.height)
-	}
-	computedHash := HashLeaf(n.key, n.value)
+// GetCompactValue computes the value for the node considering the sub tree to only include this value and default values.
+func (f *MForest) GetCompactValue(n *node) []byte {
+	return ComputeCompactValue(n.key, n.value, n.height, f.maxHeight)
+}
 
-	for j := f.maxHeight - 2; j > f.maxHeight-n.height-2; j-- {
-		bitIsSet, err := IsBitSet(n.key, j)
-		// this won't happen ever
-		if err != nil {
-			panic(err)
-		}
-		if bitIsSet { // right branching
-			computedHash = HashInterNode(GetDefaultHashForHeight(f.maxHeight-j-2), computedHash)
-		} else { // left branching
-			computedHash = HashInterNode(computedHash, GetDefaultHashForHeight(f.maxHeight-j-2))
-		}
+// it only does it for inner nodes
+func (f *MForest) PopulateNodeHashValues(n *node) []byte {
+	if n.hashValue != nil {
+		return n.hashValue
 	}
-	return computedHash
+	// otherwise compute
+	h1 := GetDefaultHashForHeight(n.height - 1)
+	if n.lChild != nil {
+		h1 = f.PopulateNodeHashValues(n.lChild)
+	}
+	h2 := GetDefaultHashForHeight(n.height - 1)
+	if n.rChild != nil {
+		h2 = f.PopulateNodeHashValues(n.rChild)
+	}
+	n.hashValue = HashInterNode(h1, h2)
+
+	return n.hashValue
+}
+
+// GetNodeHash computes the hashValue for the given node
+func (f *MForest) GetNodeHash(n *node) []byte {
+	if n.hashValue != nil {
+		return n.hashValue
+	}
+	return f.ComputeNodeHash(n)
 }
 
 // ComputeNodeHash computes the hashValue for the given node
 func (f *MForest) ComputeNodeHash(n *node) []byte {
-	if n.hashValue != nil {
-		return n.hashValue
-	}
 	// leaf node (this shouldn't happen)
 	if n.lChild == nil && n.rChild == nil {
 		if n.key != nil && n.value != nil {
-			return f.ComputeCompactValue(n)
+			return f.GetCompactValue(n)
 		}
 		return GetDefaultHashForHeight(n.height)
 	}
 	// otherwise compute
 	h1 := GetDefaultHashForHeight(n.height - 1)
 	if n.lChild != nil {
-		h1 = f.ComputeNodeHash(n.lChild)
+		h1 = f.GetNodeHash(n.lChild)
 	}
 	h2 := GetDefaultHashForHeight(n.height - 1)
 	if n.rChild != nil {
-		h2 = f.ComputeNodeHash(n.rChild)
+		h2 = f.GetNodeHash(n.rChild)
 	}
 	return HashInterNode(h1, h2)
 }

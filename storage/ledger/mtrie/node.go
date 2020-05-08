@@ -37,7 +37,7 @@ func (n node) FmtStr(prefix string, path string) string {
 	if n.lChild != nil {
 		left = fmt.Sprintf("\n%v", n.lChild.FmtStr(prefix+"\t", path+"0"))
 	}
-	return fmt.Sprintf("%v%v: (%v,%v)[%s] %v %v ", prefix, n.height, n.key, hex.EncodeToString(n.value), path, left, right)
+	return fmt.Sprintf("%v%v: (%v,%v,%v)[%s] %v %v ", prefix, n.height, n.key, hex.EncodeToString(n.value), hex.EncodeToString(n.hashValue), path, left, right)
 }
 
 // DeepCopy returns a deep copy of the node (including deep copy of children)

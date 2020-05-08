@@ -1,6 +1,7 @@
 package mtrie
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
@@ -21,6 +22,37 @@ func NewProof() *Proof {
 	p.flags = make([]byte, 0)
 	p.steps = 0
 	return p
+}
+
+// Verify verifies the proof
+func (p *Proof) Verify(key []byte, value []byte, rootHash []byte, trieMaxHeight int) bool {
+	// get index of proof we start our calculations from
+	proofIndex := 0
+
+	if len(p.values) != 0 {
+		proofIndex = len(p.values) - 1
+	}
+	// base case at the bottom of the trie
+	computed := ComputeCompactValue(key, value, trieMaxHeight-int(p.steps)-1, trieMaxHeight)
+	for i := int(p.steps) - 1; i > -1; i-- {
+		// hashing is order dependant
+		if utils.IsBitSet(key, i) {
+			if !utils.IsBitSet(p.flags, i) {
+				computed = HashInterNode(GetDefaultHashForHeight((trieMaxHeight-i)-2), computed)
+			} else {
+				computed = HashInterNode(p.values[proofIndex], computed)
+				proofIndex--
+			}
+		} else {
+			if !utils.IsBitSet(p.flags, i) {
+				computed = HashInterNode(computed, GetDefaultHashForHeight((trieMaxHeight-i)-2))
+			} else {
+				computed = HashInterNode(computed, p.values[proofIndex])
+				proofIndex--
+			}
+		}
+	}
+	return bytes.Equal(computed, rootHash) == p.inclusion
 }
 
 func (p *Proof) String() string {
@@ -76,6 +108,17 @@ func NewBatchProofWithEmptyProofs(numberOfProofs int) *BatchProof {
 // GetSize returns number of proofs
 func (bp *BatchProof) Size() int {
 	return len(bp.Proofs)
+}
+
+// Verify verifies all the proof inside the batchproof
+func (bp *BatchProof) Verify(keys [][]byte, values [][]byte, rootHash []byte, trieMaxHeight int) bool {
+	for i, p := range bp.Proofs {
+		// any invalid proof
+		if !p.Verify(keys[i], values[i], rootHash, trieMaxHeight) {
+			return false
+		}
+	}
+	return true
 }
 
 func (bp *BatchProof) String() string {
