@@ -5,6 +5,10 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/dapperlabs/flow-go/model/flow"
+
+	"github.com/dapperlabs/flow-go/module/metrics"
+
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/cmd"
@@ -20,7 +24,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	"github.com/dapperlabs/flow-go/module/chunks"
-	finalizer "github.com/dapperlabs/flow-go/module/finalizer/follower"
+	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/signature"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
@@ -58,9 +62,6 @@ func main() {
 		err                  error
 		authReceipts         *stdmap.Receipts
 		pendingReceipts      *stdmap.PendingReceipts
-		blockStorage         *storage.Blocks
-		headerStorage        *storage.Headers
-		conPayloads          *storage.Payloads
 		conCache             *buffer.PendingBlocks
 		authCollections      *stdmap.Collections
 		pendingCollections   *stdmap.PendingCollections
@@ -101,15 +102,6 @@ func main() {
 			collectionTrackers, err = stdmap.NewCollectionTrackers(collectionLimit)
 			return err
 		}).
-		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
-			// creates a block storage for the node
-			// to reflect incoming blocks on state
-			blockStorage = storage.NewBlocks(node.DB)
-			// headers and consensus storage for consensus follower engine
-			headerStorage = storage.NewHeaders(node.DB)
-			conPayloads = storage.NewPayloads(node.DB)
-			return nil
-		}).
 		Module("chunk data pack mempool", func(node *cmd.FlowNodeBuilder) error {
 			chunkDataPacks, err = stdmap.NewChunkDataPacks(chunkLimit)
 			return err
@@ -130,6 +122,10 @@ func main() {
 			// consensus cache for follower engine
 			conCache = buffer.NewPendingBlocks()
 			return nil
+		}).
+		Module("metrics collector", func(node *cmd.FlowNodeBuilder) error {
+			node.Metrics, err = metrics.NewCollector(node.Logger)
+			return err
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rt := runtime.NewInterpreterRuntime()
@@ -161,7 +157,8 @@ func main() {
 				chunkDataPackTracker,
 				ingestedChunkIDs,
 				ingestedResultIDs,
-				blockStorage,
+				node.Headers,
+				node.Blocks,
 				assigner,
 				requestIntervalMs,
 				failureThreshold)
@@ -174,7 +171,7 @@ func main() {
 
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB)
+			final := finalizer.NewFinalizer(node.DB, node.Headers, node.Payloads, node.State)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -208,8 +205,8 @@ func main() {
 				node.Network,
 				node.Me,
 				cleaner,
-				headerStorage,
-				conPayloads,
+				node.Headers,
+				node.Payloads,
 				node.State,
 				conCache,
 				core)
@@ -223,7 +220,7 @@ func main() {
 				node.Network,
 				node.Me,
 				node.State,
-				blockStorage,
+				node.Blocks,
 				followerEng)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
@@ -231,5 +228,5 @@ func main() {
 
 			return followerEng.WithSynchronization(sync), nil
 		}).
-		Run("verification")
+		Run(flow.RoleVerification.String())
 }

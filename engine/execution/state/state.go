@@ -14,7 +14,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 // ReadOnlyExecutionState allows to read the execution state
@@ -77,6 +76,7 @@ type state struct {
 	tracer           module.Tracer
 	ls               storage.Ledger
 	commits          storage.Commits
+	blocks           storage.Blocks
 	chunkDataPacks   storage.ChunkDataPacks
 	executionResults storage.ExecutionResults
 	db               *badger.DB
@@ -86,6 +86,7 @@ type state struct {
 func NewExecutionState(
 	ls storage.Ledger,
 	commits storage.Commits,
+	blocks storage.Blocks,
 	chunkDataPacks storage.ChunkDataPacks,
 	executionResult storage.ExecutionResults,
 	db *badger.DB,
@@ -95,6 +96,7 @@ func NewExecutionState(
 		tracer:           tracer,
 		ls:               ls,
 		commits:          commits,
+		blocks:           blocks,
 		chunkDataPacks:   chunkDataPacks,
 		executionResults: executionResult,
 		db:               db,
@@ -171,7 +173,7 @@ func (s *state) GetRegistersWithProofs(
 }
 
 func (s *state) StateCommitmentByBlockID(ctx context.Context, blockID flow.Identifier) (flow.StateCommitment, error) {
-	return s.commits.ByID(blockID)
+	return s.commits.ByBlockID(blockID)
 }
 
 func (s *state) PersistStateCommitment(ctx context.Context, blockID flow.Identifier, commit flow.StateCommitment) error {
@@ -235,26 +237,18 @@ func (s *state) PersistStateInteractions(ctx context.Context, blockID flow.Ident
 }
 
 func (s *state) RetrieveStateDelta(ctx context.Context, blockID flow.Identifier) (*messages.ExecutionStateDelta, error) {
-	if s.tracer != nil {
-		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXERetrieveStateDelta)
-		defer span.Finish()
+	block, err := s.blocks.ByID(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("cannot retrieve block: %w", err)
 	}
 
-	var (
-		block                flow.Block
-		startStateCommitment flow.StateCommitment
-		endStateCommitment   flow.StateCommitment
-		stateInteractions    []*delta.Snapshot
-		events               []flow.Event
-		txResults            []flow.TransactionResult
-	)
+	var startStateCommitment flow.StateCommitment
+	var endStateCommitment flow.StateCommitment
+	var stateInteractions []*delta.Snapshot
+	var events []flow.Event
+	var txResults []flow.TransactionResult
 
-	err := s.db.View(func(txn *badger.Txn) error {
-		err := procedure.RetrieveBlock(blockID, &block)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot retrieve block: %w", err)
-		}
-
+	err = s.db.View(func(txn *badger.Txn) error {
 		err = operation.LookupStateCommitment(blockID, &endStateCommitment)(txn)
 		if err != nil {
 			return fmt.Errorf("cannot lookup state commitment: %w", err)
@@ -287,7 +281,7 @@ func (s *state) RetrieveStateDelta(ctx context.Context, blockID flow.Identifier)
 	}
 
 	return &messages.ExecutionStateDelta{
-		Block:              &block,
+		Block:              block,
 		StateInteractions:  stateInteractions,
 		StartState:         startStateCommitment,
 		EndState:           endStateCommitment,
@@ -303,21 +297,24 @@ func (s *state) UpdateHighestExecutedBlockIfHigher(ctx context.Context, header *
 	}
 
 	return s.db.Update(func(txn *badger.Txn) error {
-		var (
-			number  uint64
-			blockID flow.Identifier
-		)
-
-		err := operation.RetrieveHighestExecutedBlockNumber(&number, &blockID)(txn)
+		var blockID flow.Identifier
+		err := operation.RetrieveExecutedBlock(&blockID)(txn)
 		if err != nil {
-			return fmt.Errorf("cannot retrieve highest executed block: %w", err)
+			return fmt.Errorf("cannot lookup executed block: %w", err)
 		}
 
-		if number < header.Height {
-			err = operation.UpdateHighestExecutedBlockNumber(header.Height, header.ID())(txn)
-			if err != nil {
-				return fmt.Errorf("cannot update highest executed block: %w", err)
-			}
+		var highest flow.Header
+		err = operation.RetrieveHeader(blockID, &highest)(txn)
+		if err != nil {
+			return fmt.Errorf("cannot retrieve executed header: %w", err)
+		}
+
+		if header.Height <= highest.Height {
+			return nil
+		}
+		err = operation.UpdateExecutedBlock(header.ID())(txn)
+		if err != nil {
+			return fmt.Errorf("cannot update highest executed block: %w", err)
 		}
 
 		return nil
@@ -325,24 +322,24 @@ func (s *state) UpdateHighestExecutedBlockIfHigher(ctx context.Context, header *
 }
 
 func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Identifier, error) {
-	if s.tracer != nil {
-		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetHighestExecutedBlockID)
-		defer span.Finish()
-	}
-
-	var (
-		height  uint64
-		blockID flow.Identifier
-	)
-
-	err := s.db.View(func(txn *badger.Txn) error {
-		return operation.RetrieveHighestExecutedBlockNumber(&height, &blockID)(txn)
+	var blockID flow.Identifier
+	var highest flow.Header
+	err := s.db.View(func(tx *badger.Txn) error {
+		err := operation.RetrieveExecutedBlock(&blockID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not lookup executed block: %w", err)
+		}
+		err = operation.RetrieveHeader(blockID, &highest)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve executed header: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
 		return 0, flow.ZeroID, err
 	}
 
-	return height, blockID, nil
+	return highest.Height, blockID, nil
 }
 
 func (s *state) Size() (int64, error) {

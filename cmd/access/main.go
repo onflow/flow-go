@@ -6,6 +6,10 @@ import (
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 
+	"github.com/dapperlabs/flow-go/model/flow"
+
+	"github.com/dapperlabs/flow-go/module/metrics"
+
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
@@ -20,7 +24,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
-	followerfinalizer "github.com/dapperlabs/flow-go/module/finalizer/follower"
+	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/signature"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
@@ -36,9 +40,6 @@ func main() {
 		collectionRPC   access.AccessAPIClient
 		executionRPC    execution.ExecutionAPIClient
 		err             error
-		blocks          *storage.Blocks
-		headers         *storage.Headers
-		payloads        *storage.Payloads
 		collections     *storage.Collections
 		transactions    *storage.Transactions
 		conCache        *buffer.PendingBlocks // pending block cache for follower
@@ -74,19 +75,20 @@ func main() {
 			return nil
 		}).
 		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
-			blocks = storage.NewBlocks(node.DB)
-			headers = storage.NewHeaders(node.DB)
 			collections = storage.NewCollections(node.DB)
 			transactions = storage.NewTransactions(node.DB)
-			payloads = storage.NewPayloads(node.DB)
 			return nil
 		}).
 		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
 			conCache = buffer.NewPendingBlocks()
 			return nil
 		}).
+		Module("metrics collector", func(node *cmd.FlowNodeBuilder) error {
+			node.Metrics, err = metrics.NewCollector(node.Logger)
+			return err
+		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Metrics, node.Me, blocks, headers, collections, transactions)
+			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Metrics, node.Me, node.Blocks, node.Headers, collections, transactions)
 			return ingestEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -96,7 +98,7 @@ func main() {
 
 			// create a finalizer that will handle updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := followerfinalizer.NewFinalizer(node.DB)
+			final := finalizer.NewFinalizer(node.DB, node.Headers, node.Payloads, node.State)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -125,14 +127,14 @@ func main() {
 				node.Logger.Debug().Err(err).Msg("ignoring failures in follower core")
 			}
 
-			follower, err := followereng.New(node.Logger, node.Network, node.Me, cleaner, headers, payloads, node.State, conCache, core)
+			follower, err := followereng.New(node.Logger, node.Network, node.Me, cleaner, node.Headers, node.Payloads, node.State, conCache, core)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
 
 			// create a block synchronization engine to handle follower getting
 			// out of sync
-			sync, err := synchronization.New(node.Logger, node.Network, node.Me, node.State, blocks, follower)
+			sync, err := synchronization.New(node.Logger, node.Network, node.Me, node.State, node.Blocks, follower)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
@@ -140,8 +142,8 @@ func main() {
 			return follower.WithSynchronization(sync), nil
 		}).
 		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, blocks, headers, collections, transactions)
+			rpcEng := rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, node.Blocks, node.Headers, collections, transactions)
 			return rpcEng, nil
 		}).
-		Run("access")
+		Run(flow.RoleAccess.String())
 }

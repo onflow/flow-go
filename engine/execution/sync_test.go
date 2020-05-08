@@ -27,24 +27,28 @@ func TestSyncFlow(t *testing.T) {
 	exe2ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
-	identities := flow.IdentityList{colID, conID, exe1ID, exe2ID, verID}
+	identities := unittest.CompleteIdentitySet(colID, conID, exe1ID, exe2ID, verID)
 
 	// exe1 will sync from exe2 after exe2 executes transactions
 	exeNode1 := testutil.ExecutionNode(t, hub, exe1ID, identities, 1)
-	exeNode2 := testutil.ExecutionNode(t, hub, exe2ID, identities, 21)
 	defer exeNode1.Done()
+	exeNode2 := testutil.ExecutionNode(t, hub, exe2ID, identities, 21)
 	defer exeNode2.Done()
 
 	collectionNode := testutil.GenericNode(t, hub, colID, identities)
+	defer collectionNode.Done()
 	verificationNode := testutil.GenericNode(t, hub, verID, identities)
+	defer verificationNode.Done()
 	consensusNode := testutil.GenericNode(t, hub, conID, identities)
+	defer consensusNode.Done()
 
-	genesis := unittest.GenesisFixture(identities)
+	genesis, err := exeNode1.State.AtHeight(0).Head()
+	require.NoError(t, err)
 
 	seq := uint64(0)
 
 	tx1 := execTestutil.DeployCounterContractTransaction()
-	err := execTestutil.SignTransactionByRoot(&tx1, seq)
+	err = execTestutil.SignTransactionByRoot(&tx1, seq)
 	require.NoError(t, err)
 	seq++
 
@@ -62,7 +66,7 @@ func TestSyncFlow(t *testing.T) {
 	col4 := flow.Collection{Transactions: []*flow.TransactionBody{&tx4}}
 
 	// Create three blocks, with one tx each
-	block1 := unittest.BlockWithParentFixture(genesis.Header)
+	block1 := unittest.BlockWithParentFixture(genesis)
 	block1.Header.View = 42
 	block1.SetPayload(flow.Payload{
 		Guarantees: []*flow.CollectionGuarantee{
@@ -104,7 +108,7 @@ func TestSyncFlow(t *testing.T) {
 	proposal3 := unittest.ProposalFromBlock(&block3)
 	proposal4 := unittest.ProposalFromBlock(&block4)
 
-	fmt.Printf("block0 ID %x parent %x\n", genesis.ID(), genesis.Header.ParentID)
+	fmt.Printf("block0 ID %x parent %x\n", genesis.ID(), genesis.ParentID)
 	fmt.Printf("block1 ID %x parent %x\n", block1.ID(), block1.Header.ParentID)
 	fmt.Printf("block2 ID %x parent %x\n", block2.ID(), block2.Header.ParentID)
 	fmt.Printf("block3 ID %x parent %x\n", block3.ID(), block3.Header.ParentID)
@@ -161,7 +165,7 @@ func TestSyncFlow(t *testing.T) {
 	})
 
 	// make sure exe1 didn't get any blocks
-	exeNode1.AssertHighestExecutedBlock(t, genesis.Header)
+	exeNode1.AssertHighestExecutedBlock(t, genesis)
 	exeNode2.AssertHighestExecutedBlock(t, block2.Header)
 
 	// submit block3 and block4 to exe1 which should trigger sync

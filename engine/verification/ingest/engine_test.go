@@ -61,6 +61,7 @@ type IngestTestSuite struct {
 	chunkDataPackTrackers *mempool.ChunkDataPackTrackers
 	ingestedChunkIDs      *mempool.Identifiers
 	ingestedResultIDs     *mempool.Identifiers
+	headerStorage         *storage.Headers
 	blockStorage          *storage.Blocks
 	// resources fixtures
 	collection       *flow.Collection
@@ -93,6 +94,7 @@ func (suite *IngestTestSuite) SetupTest() {
 	suite.state = &protocol.State{}
 	suite.me = &module.Local{}
 	suite.ss = &protocol.Snapshot{}
+	suite.headerStorage = &storage.Headers{}
 	suite.blockStorage = &storage.Blocks{}
 	suite.authReceipts = &mempool.Receipts{}
 	suite.pendingReceipts = &mempool.PendingReceipts{}
@@ -153,6 +155,7 @@ func (suite *IngestTestSuite) TestNewEngine() *ingest.Engine {
 		suite.chunkDataPackTrackers,
 		suite.ingestedChunkIDs,
 		suite.ingestedResultIDs,
+		suite.headerStorage,
 		suite.blockStorage,
 		suite.assigner,
 		suite.requestInterval,
