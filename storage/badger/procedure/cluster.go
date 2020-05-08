@@ -16,9 +16,6 @@ import (
 
 // InsertClusterBlock inserts a cluster consensus block, updating all
 // associated indexes.
-//
-// NOTE: since this updates the parent's child index, this cannot be used for
-// the genesis block
 func InsertClusterBlock(block *cluster.Block) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
