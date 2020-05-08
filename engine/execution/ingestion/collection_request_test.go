@@ -231,8 +231,13 @@ func TestCollectionSharedByMultipleBlocks(t *testing.T) {
 			gomock.Any(),
 		).Times(1)
 
-		ctx.executionState.On("StateCommitmentByBlockID", blockA.Header.ParentID).Return(executableBlockA.StartState, nil)
-		ctx.executionState.On("StateCommitmentByBlockID", blockB.Header.ParentID).Return(executableBlockB.StartState, nil)
+		ctx.executionState.
+			On("StateCommitmentByBlockID", mock.Anything, blockA.Header.ParentID).
+			Return(executableBlockA.StartState, nil)
+
+		ctx.executionState.
+			On("StateCommitmentByBlockID", mock.Anything, blockB.Header.ParentID).
+			Return(executableBlockB.StartState, nil)
 
 		proposalA := unittest.ProposalFromBlock(executableBlockA.Block)
 		err := ctx.engine.ProcessLocal(proposalA)
