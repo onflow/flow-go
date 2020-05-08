@@ -379,7 +379,10 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNextLeader(block *model.Blo
 	if !shouldVote {
 		// even if we are not voting for the block, we will still check if a QC can be built for this block.
 		err := e.tryBuildQCForBlock(block)
-		return fmt.Errorf("failed to process QC for block when not voting: %w", err)
+		if err != nil {
+			return fmt.Errorf("failed to process QC for block when not voting: %w", err)
+		}
+		return nil
 	}
 
 	log.Debug().Msg("processing own vote as next leader")
