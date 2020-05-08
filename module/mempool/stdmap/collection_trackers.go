@@ -79,9 +79,6 @@ func (c *CollectionTrackers) Inc(collID flow.Identifier) (*tracker.CollectionTra
 // byCollectionID is the non-concurrency safe version that
 // returns the collection tracker for the given collection ID.
 func (c *CollectionTrackers) byCollectionID(collID flow.Identifier) (*tracker.CollectionTracker, error) {
-	c.Lock()
-	defer c.Unlock()
-
 	entity, err := c.Backend.ByID(collID)
 	if err != nil {
 		return nil, err

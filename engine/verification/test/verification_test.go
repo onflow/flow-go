@@ -535,6 +535,8 @@ func setupMockExeNode(t *testing.T,
 	exeNode := testutil.GenericNode(t, hub, exeIdentity, othersIdentity)
 	exeEngine := new(network.Engine)
 
+	var mu sync.Mutex // to secure the mutual exclusion of process method
+
 	// determines the expected number of result chunk data pack requests
 	chunkDataPackCount := 0
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
@@ -556,6 +558,9 @@ func setupMockExeNode(t *testing.T,
 
 	exeEngine.On("Process", testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
+			mu.Lock()
+			defer mu.Unlock()
+
 			if originID, ok := args[0].(flow.Identifier); ok {
 				if req, ok := args[1].(*messages.ChunkDataPackRequest); ok {
 					require.True(t, ok)
