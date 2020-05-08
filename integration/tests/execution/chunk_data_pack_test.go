@@ -4,84 +4,26 @@ import (
 	"context"
 	"testing"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/integration/tests/common"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
-	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestExecutionChunkDataPacks(t *testing.T) {
-	suite.Run(t, new(ExecutionChunkDataPacksSuite))
+	suite.Run(t, new(ChunkDataPacksSuite))
 }
 
-type ExecutionChunkDataPacksSuite struct {
+type ChunkDataPacksSuite struct {
 	Suite
 }
 
-func (s *ExecutionChunkDataPacksSuite) SetupTest() {
-
-	// to collect node configs...
-	var nodeConfigs []testnet.NodeConfig
-
-	// need one access node
-	acsConfig := testnet.NewNodeConfig(flow.RoleAccess)
-	nodeConfigs = append(nodeConfigs, acsConfig)
-
-	// generate the three consensus identities
-	s.nodeIDs = unittest.IdentifierListFixture(3)
-	for _, nodeID := range s.nodeIDs {
-		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithID(nodeID),
-			testnet.WithLogLevel(zerolog.FatalLevel),
-			testnet.WithAdditionalFlag("--hotstuff-timeout=12s"))
-		nodeConfigs = append(nodeConfigs, nodeConfig)
-	}
-
-	// need one execution nodes
-	s.exe1ID = unittest.IdentifierFixture()
-	exe1Config := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithID(s.exe1ID),
-		testnet.WithLogLevel(zerolog.InfoLevel))
-	nodeConfigs = append(nodeConfigs, exe1Config)
-
-	// need one verification node
-	s.verID = unittest.IdentifierFixture()
-	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithID(s.verID),
-		testnet.WithLogLevel(zerolog.InfoLevel))
-	nodeConfigs = append(nodeConfigs, verConfig)
-
-	// need one collection node
-	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel))
-	nodeConfigs = append(nodeConfigs, collConfig)
-
-	// add the ghost node config
-	s.ghostID = unittest.IdentifierFixture()
-	ghostConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithID(s.ghostID), testnet.AsGhost(),
-		testnet.WithLogLevel(zerolog.InfoLevel))
-	nodeConfigs = append(nodeConfigs, ghostConfig)
-
-	// generate the network config
-	netConfig := testnet.NewNetworkConfig("execution_tests", nodeConfigs)
-
-	// initialize the network
-	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig)
-
-	// start the network
-	ctx, cancel := context.WithCancel(context.Background())
-	s.cancel = cancel
-	s.net.Start(ctx)
-
-	// start tracking blocks
-	s.Track(s.T(), ctx, s.Ghost())
-}
-
-func (gs *ExecutionChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
+func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 
 	// wait for first finalized block, called blockA
 	blockA := gs.BlockState.WaitForFirstFinalized(gs.T())
