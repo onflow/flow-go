@@ -133,6 +133,25 @@ func (suite *IngestTestSuite) SetupTest() {
 	suite.net.On("Register", uint8(engine.ChunkDataPackProvider), testifymock.Anything).
 		Return(suite.chunksConduit, nil).
 		Once()
+
+	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+
+	// mocks identity of the verification node
+	suite.me.On("NodeID").Return(verIdentity.NodeID)
+
+	// mocks chunk assignment
+	//
+	// assigns all chunks in the receipt to this node through mocking
+	a := chmodel.NewAssignment()
+	for _, chunk := range suite.receipt.ExecutionResult.Chunks {
+		a.Add(chunk, []flow.Identifier{verIdentity.NodeID})
+	}
+	suite.assigner.On("Assign",
+		testifymock.Anything,
+		testifymock.Anything,
+		testifymock.Anything).
+		Return(a, nil).
+		Once()
 }
 
 // TestNewEngine verifies the establishment of the network registration upon
@@ -189,11 +208,7 @@ func (suite *IngestTestSuite) TestHandleReceipt_MissingCollection() {
 	//
 	// required roles
 	execIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	collIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
-
-	// mocks identity of the verification node
-	suite.me.On("NodeID").Return(verIdentity.NodeID)
 
 	// mocks state snapshot to validate identity of execution node as an staked origin id at the `suite.block` height
 	suite.state.On("Final").Return(suite.ss, nil)
@@ -237,26 +252,27 @@ func (suite *IngestTestSuite) TestHandleReceipt_MissingCollection() {
 	// there is no tracker registered for the collection, i.e., the collection has not been requested yet
 	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(false)
 
+	var submitWG sync.WaitGroup
+	submitWG.Add(1)
 	suite.collectionsConduit.
 		On("Submit", testifymock.AnythingOfType("*messages.CollectionRequest"), collIdentities[0].NodeID).
-		Return(nil).Once()
-
-	// mocks chunk assignment
-	//
-	// assigns all chunks in the receipt to this node through mocking
-	a := chmodel.NewAssignment()
-	for _, chunk := range suite.receipt.ExecutionResult.Chunks {
-		a.Add(chunk, []flow.Identifier{verIdentity.NodeID})
-	}
-	suite.assigner.On("Assign",
-		testifymock.Anything,
-		testifymock.Anything,
-		testifymock.Anything).
-		Return(a, nil).
-		Once()
+		Run(func(args testifymock.Arguments) {
+			submitWG.Done()
+		}).Return(nil).Once()
 
 	err := eng.Process(execIdentity.NodeID, suite.receipt)
 	suite.Assert().Nil(err)
+
+	// starts engine
+	<-eng.Ready()
+
+	// starts timer for submitting retries
+	// expects `failureThreshold`-many requests each sent at `requestInterval` milliseconds time interval
+	unittest.RequireReturnsBefore(suite.T(), submitWG.Wait,
+		time.Duration(int64(suite.failureThreshold*suite.requestInterval))*time.Millisecond)
+
+	// waits for the engine to get shutdown
+	<-eng.Done()
 
 	// asserts necessary calls
 	suite.authReceipts.AssertExpectations(suite.T())
@@ -384,6 +400,7 @@ func (suite *IngestTestSuite) TestHandleReceipt_RetryMissingCollection() {
 	//
 	// required roles
 	collIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
+	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
 	// mocking state
 	//
@@ -407,6 +424,26 @@ func (suite *IngestTestSuite) TestHandleReceipt_RetryMissingCollection() {
 
 	// no chunk data pack tacker
 	suite.chunkDataPackTrackers.On("All").Return(nil)
+
+	// mocks the existence of receipt
+	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
+
+	// mocks the existence of block
+	suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil).Once()
+
+	// mocks chunk assignment
+	//
+	// assigns the chunk of receipt to the verification node
+	a := chmodel.NewAssignment()
+	for _, chunk := range suite.receipt.ExecutionResult.Chunks {
+		a.Add(chunk, []flow.Identifier{verIdentity.NodeID})
+	}
+	suite.assigner.On("Assign",
+		testifymock.Anything,
+		testifymock.Anything,
+		testifymock.Anything).
+		Return(a, nil).
+		Once()
 
 	// mocks expectation
 	//
