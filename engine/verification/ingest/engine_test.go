@@ -884,18 +884,6 @@ func (suite *IngestTestSuite) TestVerifyReady() {
 			// mocks removing receipt from pending mempool
 			suite.pendingReceipts.On("Rem", suite.receipt.ID()).Return(true)
 
-			// mocks chunk assignment
-			//
-			// assigns the only chunk of the receipt to this verification node
-			a := chmodel.NewAssignment()
-			chunk, ok := suite.receipt.ExecutionResult.Chunks.ByIndex(0)
-			require.True(suite.T(), ok, "chunk out of range requested")
-			a.Add(chunk, flow.IdentifierList{verIdentity.NodeID})
-			suite.assigner.On("Assign",
-				testifymock.Anything,
-				testifymock.Anything,
-				testifymock.Anything).Return(a, nil)
-
 			// mocks test expectation
 			//
 			// verifier engine should get called locally by a verifiable chunk
