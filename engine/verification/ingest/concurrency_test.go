@@ -33,6 +33,7 @@ import (
 // - for each assigned chunk ingest engine emits a single result approval to verify engine only once
 // (even in presence of duplication)
 func TestConcurrency(t *testing.T) {
+	var mu sync.Mutex
 	testcases := []struct {
 		erCount, // number of execution receipts
 		senderCount, // number of (concurrent) senders for each execution receipt
@@ -71,8 +72,12 @@ func TestConcurrency(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
+
 		t.Run(fmt.Sprintf("%d-ers/%d-senders/%d-chunks", tc.erCount, tc.senderCount, tc.chunksNum), func(t *testing.T) {
+			mu.Lock()
+			defer mu.Unlock()
 			testConcurrency(t, tc.erCount, tc.senderCount, tc.chunksNum)
+
 		})
 	}
 }
