@@ -772,11 +772,7 @@ func (suite *IngestTestSuite) TestVerifyReady() {
 
 			suite.SetupTest()
 			eng := suite.TestNewEngine()
-			// mocks state snapshot to validate identity of test case origin
-			// as an staked origin id at the `suite.block` height
-			suite.state.On("Final").Return(suite.ss, nil)
-			suite.state.On("AtBlockID", suite.block.ID()).Return(suite.ss, nil)
-			// mocks state snapshot to return identity of this verifier node for chunk assignment
+			// mocks state
 			suite.ss.On("Identities", testifymock.AnythingOfType("flow.IdentityFilter")).Return(flow.IdentityList{suite.verIdentity}, nil)
 
 			// mocks identity of the origin id of test case
@@ -888,7 +884,6 @@ func (suite *IngestTestSuite) TestChunkDataPackTracker_UntrackedChunkDataPack() 
 	suite.Lock()
 	defer suite.Unlock()
 
-	suite.SetupTest()
 	eng := suite.TestNewEngine()
 
 	// creates a chunk fixture, its data pack, and the data pack response
@@ -926,10 +921,7 @@ func (suite *IngestTestSuite) TestChunkDataPackTracker_HappyPath() {
 	// mocks tracker to return the tracker for the chunk data pack
 	suite.chunkDataPackTrackers.On("Has", suite.chunkDataPack.ChunkID).Return(true).Once()
 	suite.chunkDataPackTrackers.On("ByChunkID", suite.chunkDataPack.ChunkID).Return(track, nil).Once()
-
-	// mocks state of ingest engine to return execution node ID
-	suite.state.On("AtBlockID", track.BlockID).Return(suite.ss, nil).Once()
-	suite.ss.On("Identity", suite.execIdentity.NodeID).Return(suite.execIdentity, nil).Once()
+	suite.ss.On("Identity", suite.execIdentity.NodeID).Return(suite.execIdentity, nil)
 
 	// chunk data pack should be successfully added to mempool and the tracker should be removed
 	suite.chunkDataPacks.On("Add", suite.chunkDataPack).Return(nil).Once()
