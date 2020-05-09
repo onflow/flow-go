@@ -29,8 +29,7 @@ func createVoter(t *testing.T, blockView uint64, lastVotedView uint64, isBlockSa
 	forks.On("IsSafeBlock", block).Return(isBlockSafe)
 
 	persist := &mocks.Persister{}
-	persist.On("StartedView", mock.Anything).Return(nil)
-	persist.On("VotedView", mock.Anything).Return(nil)
+	persist.On("PutVoted", mock.Anything).Return(nil)
 
 	signer := &mocks.Signer{}
 	signer.On("CreateVote", mock.Anything).Return(expectVote, nil)

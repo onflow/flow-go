@@ -1,18 +1,21 @@
 package procedure
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
 // This file implements storage functions for blocks in cluster consensus.
 
-// InsertClusterBlock inserts a cluster consensus block.
+// InsertClusterBlock inserts a cluster consensus block, updating all
+// associated indexes.
 func InsertClusterBlock(block *cluster.Block) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
@@ -22,7 +25,8 @@ func InsertClusterBlock(block *cluster.Block) func(*badger.Txn) error {
 		}
 
 		// store the block header
-		err := operation.InsertHeader(block.Header)(tx)
+		blockID := block.ID()
+		err := operation.InsertHeader(blockID, block.Header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert header: %w", err)
 		}
@@ -37,6 +41,12 @@ func InsertClusterBlock(block *cluster.Block) func(*badger.Txn) error {
 		err = IndexClusterPayload(block.Header, block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index payload: %w", err)
+		}
+
+		// start the new block with an empty child index
+		err = operation.InsertBlockChildren(blockID, nil)(tx)
+		if err != nil {
+			return fmt.Errorf("could not create empty child index: %w", err)
 		}
 
 		return nil
@@ -56,7 +66,7 @@ func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*b
 
 		// retrieve payload
 		var payload cluster.Payload
-		err = RetrieveClusterPayload(&header, &payload)(tx)
+		err = RetrieveClusterPayload(blockID, &payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve payload: %w", err)
 		}
@@ -76,13 +86,13 @@ func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*b
 func RetrieveLatestFinalizedClusterHeader(chainID string, final *flow.Header) func(tx *badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		var boundary uint64
-		err := operation.RetrieveBoundaryForCluster(chainID, &boundary)(tx)
+		err := operation.RetrieveClusterFinalizedHeight(chainID, &boundary)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve boundary: %w", err)
 		}
 
 		var finalID flow.Identifier
-		err = operation.RetrieveNumberForCluster(chainID, boundary, &finalID)(tx)
+		err = operation.LookupClusterBlockHeight(chainID, boundary, &finalID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve final ID: %w", err)
 		}
@@ -112,14 +122,14 @@ func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
 
 		// retrieve the current finalized state boundary
 		var boundary uint64
-		err = operation.RetrieveBoundaryForCluster(chainID, &boundary)(tx)
+		err = operation.RetrieveClusterFinalizedHeight(chainID, &boundary)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve boundary: %w", err)
 		}
 
 		// retrieve the ID of the boundary head
 		var headID flow.Identifier
-		err = operation.RetrieveNumberForCluster(chainID, boundary, &headID)(tx)
+		err = operation.LookupClusterBlockHeight(chainID, boundary, &headID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve head: %w", err)
 		}
@@ -130,13 +140,13 @@ func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
 		}
 
 		// insert block view -> ID mapping
-		err = operation.InsertNumberForCluster(chainID, header.Height, header.ID())(tx)
+		err = operation.IndexClusterBlockHeight(chainID, header.Height, header.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert view->ID mapping: %w", err)
 		}
 
 		// update the finalized boundary
-		err = operation.UpdateBoundaryForCluster(chainID, header.Height)(tx)
+		err = operation.UpdateClusterFinalizedHeight(chainID, header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not update finalized boundary: %w", err)
 		}
@@ -172,7 +182,7 @@ func InsertClusterPayload(header *flow.Header, payload *cluster.Payload) func(*b
 		}
 
 		// insert the reference block ID
-		err = operation.InsertClusterRefBlockID(header.ID(), payload.ReferenceBlockID)(tx)
+		err = operation.IndexCollectionReference(header.ID(), payload.ReferenceBlockID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert reference block ID: %w", err)
 		}
@@ -186,19 +196,18 @@ func IndexClusterPayload(header *flow.Header, payload *cluster.Payload) func(*ba
 	return func(tx *badger.Txn) error {
 
 		// only index a collection if it exists
-		var exists bool
-		err := operation.CheckCollection(payload.Collection.ID(), &exists)(tx)
+		var collection flow.LightCollection
+		err := operation.RetrieveCollection(payload.Collection.ID(), &collection)(tx)
+		if errors.Is(err, storage.ErrNotFound) {
+			return fmt.Errorf("cannot index non-existent collection")
+		}
 		if err != nil {
 			return fmt.Errorf("could not check collection: %w", err)
 		}
 
-		if !exists {
-			return fmt.Errorf("cannot index non-existent collection")
-		}
-
 		// index the transaction IDs within the collection
 		txIDs := payload.Collection.Light().Transactions
-		err = operation.SkipDuplicates(operation.IndexCollectionPayload(header.Height, header.ID(), header.ParentID, txIDs))(tx)
+		err = operation.SkipDuplicates(operation.IndexCollectionPayload(header.ID(), txIDs))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index collection: %w", err)
 		}
@@ -208,19 +217,19 @@ func IndexClusterPayload(header *flow.Header, payload *cluster.Payload) func(*ba
 }
 
 // RetrieveClusterPayload retrieves a cluster consensus block payload by block ID.
-func RetrieveClusterPayload(header *flow.Header, payload *cluster.Payload) func(*badger.Txn) error {
+func RetrieveClusterPayload(blockID flow.Identifier, payload *cluster.Payload) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// lookup the reference block ID
 		var refID flow.Identifier
-		err := operation.RetrieveClusterRefBlockID(header.ID(), &refID)(tx)
+		err := operation.LookupCollectionReference(blockID, &refID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve reference block ID: %w", err)
 		}
 
 		// lookup collection transaction IDs
 		var txIDs []flow.Identifier
-		err = operation.LookupCollectionPayload(header.Height, header.ID(), header.ParentID, &txIDs)(tx)
+		err = operation.LookupCollectionPayload(blockID, &txIDs)(tx)
 		if err != nil {
 			return fmt.Errorf("could not look up collection payload: %w", err)
 		}

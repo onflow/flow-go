@@ -16,13 +16,12 @@ type Headers interface {
 	// finalized and ambiguous blocks.
 	ByBlockID(blockID flow.Identifier) (*flow.Header, error)
 
-	// ByNumber returns the block with the given number. It is only available
+	// ByHeight returns the block with the given number. It is only available
 	// for finalized blocks.
-	ByNumber(number uint64) (*flow.Header, error)
+	ByHeight(height uint64) (*flow.Header, error)
 
-	// Find a valid child block by parent block. The child block might not
-	// be a finalized block.
-	// when there is no valid child for the given parent, storage.ErrNotFound
-	// will be returned
-	ByParentID(parentID flow.Identifier) (*flow.Header, error)
+	// Find all children for the given parent block. The returned headers might
+	// be unfinalized; if there is more than one, at least one of them has to
+	// be unfinalized.
+	ByParentID(parentID flow.Identifier) ([]*flow.Header, error)
 }

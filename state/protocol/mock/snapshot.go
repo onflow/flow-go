@@ -33,6 +33,29 @@ func (_m *Snapshot) Clusters() (*flow.ClusterList, error) {
 	return r0, r1
 }
 
+// Commit provides a mock function with given fields:
+func (_m *Snapshot) Commit() ([]byte, error) {
+	ret := _m.Called()
+
+	var r0 []byte
+	if rf, ok := ret.Get(0).(func() []byte); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]byte)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Head provides a mock function with given fields:
 func (_m *Snapshot) Head() (*flow.Header, error) {
 	ret := _m.Called()
@@ -112,29 +135,6 @@ func (_m *Snapshot) Pending() ([]flow.Identifier, error) {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]flow.Identifier)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// Seal provides a mock function with given fields:
-func (_m *Snapshot) Seal() (*flow.Seal, error) {
-	ret := _m.Called()
-
-	var r0 *flow.Seal
-	if rf, ok := ret.Get(0).(func() *flow.Seal); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Seal)
 		}
 	}
 

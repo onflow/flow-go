@@ -113,8 +113,11 @@ func (e *Engine) Ready() <-chan struct{} {
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
+		e.log.Debug().Msg("shutting down synchronization engine")
 		<-e.sync.Done()
+		e.log.Debug().Msg("shutting down hotstuff eventloop")
 		<-e.hotstuff.Done()
+		e.log.Debug().Msg("all components have been shut down")
 	})
 }
 
@@ -130,7 +133,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+			e.log.Error().Err(err).Msg("compliance could not process submitted event")
 		}
 	})
 }
@@ -193,6 +196,8 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	}
 
 	// fill in the fields that can't be populated by HotStuff
+	//TODO clean this up - currently we set these fields in builder, then lose
+	// them in HotStuff, then need to set them again here
 	header.ChainID = parent.ChainID
 	header.Height = parent.Height + 1
 
@@ -330,24 +335,13 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		return nil
 	}
 	if !errors.Is(err, storage.ErrNotFound) {
-		return fmt.Errorf("could not retrieve header: %w", err)
+		return fmt.Errorf("could not check proposal: %w", err)
 	}
 
-	// get the latest finalized block
-	final, err := e.state.Final().Head()
-	if err != nil {
-		return fmt.Errorf("could not get final block: %w", err)
-	}
-
-	// ignore proposals that can no longer become valid
-	if header.Height <= final.Height {
-		log.Debug().Msg("skipping already outdated proposal")
-		return nil
-	}
-
-	// from here on out, there are two possibilities:
+	// there are two possibilities if the proposal is neither already pending
+	// processing in the cache, nor has already been processed:
 	// 1) the proposal is unverifiable because parent or ancestor is unknown
-	// => in each case, we cache the proposal and request the missing link
+	// => we cache the proposal and request the missing link
 	// 2) the proposal is connected to finalized state through an unbroken chain
 	// => we verify the proposal and forward it to hotstuff if valid
 
@@ -380,7 +374,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	// in persistent storage, its direct parent is missing; cache the proposal
 	// and request the parent
 	_, err = e.headers.ByBlockID(header.ParentID)
-	if err == storage.ErrNotFound {
+	if errors.Is(err, storage.ErrNotFound) {
 
 		_ = e.pending.Add(originID, proposal)
 
@@ -391,7 +385,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("could not get parent: %w", err)
+		return fmt.Errorf("could not check parent: %w", err)
 	}
 
 	// at this point, we should be able to connect the proposal to the finalized
@@ -432,22 +426,14 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 
 	log.Info().Msg("processing block proposal")
 
-	// store the proposal block payload
-	err := e.payloads.Store(header, proposal.Payload)
-	if err != nil {
-		return fmt.Errorf("could not store proposal payload: %w", err)
-	}
-
-	// store the proposal block header
-	err = e.headers.Store(header)
-	if err != nil {
-		return fmt.Errorf("could not store proposal header: %w", err)
-	}
-
 	// see if the block is a valid extension of the protocol state
-	err = e.state.Mutate().Extend(header.ID())
+	block := &flow.Block{
+		Header:  proposal.Header,
+		Payload: proposal.Payload,
+	}
+	err := e.state.Mutate().Extend(block)
 	if err != nil {
-		return fmt.Errorf("could not extend protocol state: %w", err)
+		return fmt.Errorf("could not extend protocol state for block (%v) at view %v: %w", header.ID(), header.View, err)
 	}
 
 	// retrieve the parent

@@ -1,7 +1,6 @@
 package badger
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -9,16 +8,16 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	model "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/cluster"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	protocolkv "github.com/dapperlabs/flow-go/state/protocol/badger"
-	"github.com/dapperlabs/flow-go/storage"
+	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
+	"github.com/dapperlabs/flow-go/storage/util"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -31,7 +30,7 @@ type MutatorSuite struct {
 	chainID string
 
 	// protocol state for reference blocks for transactions
-	protoState protocol.State
+	protoState *protocol.State
 
 	state   cluster.State
 	mutator cluster.Mutator
@@ -54,8 +53,9 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.Assert().Nil(err)
 	suite.mutator = suite.state.Mutate()
 
-	suite.protoState, err = protocolkv.NewState(suite.db)
-	suite.Require().Nil(err)
+	headers, identities, _, seals, payloads, blocks := util.StorageLayer(suite.T(), suite.db)
+	suite.protoState, err = protocol.NewState(suite.db, headers, identities, seals, payloads, blocks)
+	require.NoError(suite.T(), err)
 }
 
 // runs after each test finishes
@@ -68,23 +68,13 @@ func (suite *MutatorSuite) TearDownTest() {
 
 func (suite *MutatorSuite) Bootstrap() {
 
-	// bootstrap main chain so we have valid reference blocks
-	role := flow.RoleCollection
 	// just bootstrap with a genesis block, we'll use this as reference
-	genesis := unittest.GenesisFixture(unittest.IdentityListFixture(5, func(id *flow.Identity) {
-		id.Role = role
-		role++
-	}))
+	genesis := unittest.GenesisFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
 	err := suite.protoState.Mutate().Bootstrap(flow.GenesisStateCommitment, genesis)
 	suite.Require().Nil(err)
 
 	// bootstrap cluster chain
 	err = suite.mutator.Bootstrap(suite.genesis)
-	suite.Assert().Nil(err)
-}
-
-func (suite *MutatorSuite) InsertBlock(block model.Block) {
-	err := suite.db.Update(procedure.InsertClusterBlock(&block))
 	suite.Assert().Nil(err)
 }
 
@@ -150,7 +140,7 @@ func (suite *MutatorSuite) TestBootstrap_Successful() {
 
 		// should index collection
 		collection = flow.LightCollection{} // reset the collection
-		err = operation.LookupCollectionPayload(suite.genesis.Header.Height, suite.genesis.ID(), suite.genesis.Header.ParentID, &collection.Transactions)(tx)
+		err = operation.LookupCollectionPayload(suite.genesis.ID(), &collection.Transactions)(tx)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.Payload.Collection.Light(), collection)
 
@@ -162,13 +152,13 @@ func (suite *MutatorSuite) TestBootstrap_Successful() {
 
 		// should insert block number -> ID lookup
 		var blockID flow.Identifier
-		err = operation.RetrieveNumberForCluster(suite.genesis.Header.ChainID, suite.genesis.Header.Height, &blockID)(tx)
+		err = operation.LookupClusterBlockHeight(suite.genesis.Header.ChainID, suite.genesis.Header.Height, &blockID)(tx)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.ID(), blockID)
 
 		// should insert boundary
 		var boundary uint64
-		err = operation.RetrieveBoundaryForCluster(suite.genesis.Header.ChainID, &boundary)(tx)
+		err = operation.RetrieveClusterFinalizedHeight(suite.genesis.Header.ChainID, &boundary)(tx)
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.Header.Height, boundary)
 
@@ -179,19 +169,7 @@ func (suite *MutatorSuite) TestBootstrap_Successful() {
 
 func (suite *MutatorSuite) TestExtend_WithoutBootstrap() {
 	block := unittest.ClusterBlockWithParent(suite.genesis)
-	suite.InsertBlock(block)
-
-	err := suite.mutator.Extend(block.ID())
-	suite.Assert().Error(err)
-}
-
-func (suite *MutatorSuite) TestExtend_NonexistentBlock() {
-	suite.Bootstrap()
-
-	// ID of a non-existent block
-	blockID := unittest.IdentifierFixture()
-
-	err := suite.mutator.Extend(blockID)
+	err := suite.mutator.Extend(&block)
 	suite.Assert().Error(err)
 }
 
@@ -201,9 +179,8 @@ func (suite *MutatorSuite) TestExtend_InvalidChainID() {
 	block := unittest.ClusterBlockWithParent(suite.genesis)
 	// change the chain ID
 	block.Header.ChainID = fmt.Sprintf("%s-invalid", block.Header.ChainID)
-	suite.InsertBlock(block)
 
-	err := suite.mutator.Extend(block.ID())
+	err := suite.mutator.Extend(&block)
 	suite.Assert().Error(err)
 }
 
@@ -213,9 +190,8 @@ func (suite *MutatorSuite) TestExtend_InvalidBlockNumber() {
 	block := unittest.ClusterBlockWithParent(suite.genesis)
 	// change the block number
 	block.Header.Height = block.Header.Height - 1
-	suite.InsertBlock(block)
 
-	err := suite.mutator.Extend(block.ID())
+	err := suite.mutator.Extend(&block)
 	suite.Assert().Error(err)
 }
 
@@ -224,8 +200,7 @@ func (suite *MutatorSuite) TestExtend_OnParentOfFinalized() {
 
 	// build one block on top of genesis
 	block1 := unittest.ClusterBlockWithParent(suite.genesis)
-	suite.InsertBlock(block1)
-	err := suite.mutator.Extend(block1.ID())
+	err := suite.mutator.Extend(&block1)
 	suite.Assert().Nil(err)
 
 	// finalize the block
@@ -235,10 +210,9 @@ func (suite *MutatorSuite) TestExtend_OnParentOfFinalized() {
 	// insert another block on top of genesis
 	// since we have already finalized block 1, this is invalid
 	block2 := unittest.ClusterBlockWithParent(suite.genesis)
-	suite.InsertBlock(block2)
 
 	// try to extend with the invalid block
-	err = suite.mutator.Extend(block2.ID())
+	err = suite.mutator.Extend(&block2)
 	suite.Assert().Error(err)
 }
 
@@ -246,10 +220,14 @@ func (suite *MutatorSuite) TestExtend_Success() {
 	suite.Bootstrap()
 
 	block := unittest.ClusterBlockWithParent(suite.genesis)
-	suite.InsertBlock(block)
-
-	err := suite.mutator.Extend(block.ID())
+	err := suite.mutator.Extend(&block)
 	suite.Assert().Nil(err)
+
+	var extended model.Block
+	err = suite.db.View(procedure.RetrieveClusterBlock(block.ID(), &extended))
+	suite.Assert().Nil(err)
+
+	suite.Assert().Equal(*block.Payload, *extended.Payload)
 }
 
 func (suite *MutatorSuite) TestExtend_WithEmptyCollection() {
@@ -258,9 +236,7 @@ func (suite *MutatorSuite) TestExtend_WithEmptyCollection() {
 	block := unittest.ClusterBlockWithParent(suite.genesis)
 	// set an empty collection as the payload
 	block.SetPayload(model.EmptyPayload(flow.ZeroID))
-	suite.InsertBlock(block)
-
-	err := suite.mutator.Extend(block.ID())
+	err := suite.mutator.Extend(&block)
 	suite.Assert().Nil(err)
 }
 
@@ -273,22 +249,19 @@ func (suite *MutatorSuite) TestExtend_UnfinalizedBlockWithDupeTx() {
 	block1 := unittest.ClusterBlockWithParent(suite.genesis)
 	payload1 := suite.Payload(&tx1)
 	block1.SetPayload(payload1)
-	suite.InsertBlock(block1)
 
 	// should be able to extend block 1
-	err := suite.mutator.Extend(block1.ID())
+	err := suite.mutator.Extend(&block1)
 	suite.Assert().Nil(err)
 
 	// create a block building on block1 ALSO containing tx1
 	block2 := unittest.ClusterBlockWithParent(&block1)
 	payload2 := suite.Payload(&tx1)
 	block2.SetPayload(payload2)
-	suite.InsertBlock(block2)
 
 	// should be unable to extend block 2, as it contains a dupe transaction
-	err = suite.mutator.Extend(block2.ID())
-	suite.T().Log(err)
-	suite.Assert().True(errors.Is(err, storage.ErrAlreadyIndexed))
+	err = suite.mutator.Extend(&block2)
+	suite.Assert().Error(err)
 }
 
 func (suite *MutatorSuite) TestExtend_FinalizedBlockWithDupeTx() {
@@ -300,10 +273,9 @@ func (suite *MutatorSuite) TestExtend_FinalizedBlockWithDupeTx() {
 	block1 := unittest.ClusterBlockWithParent(suite.genesis)
 	payload1 := suite.Payload(&tx1)
 	block1.SetPayload(payload1)
-	suite.InsertBlock(block1)
 
 	// should be able to extend block 1
-	err := suite.mutator.Extend(block1.ID())
+	err := suite.mutator.Extend(&block1)
 	suite.Assert().Nil(err)
 
 	// should be able to finalize block 1
@@ -314,12 +286,10 @@ func (suite *MutatorSuite) TestExtend_FinalizedBlockWithDupeTx() {
 	block2 := unittest.ClusterBlockWithParent(&block1)
 	payload2 := suite.Payload(&tx1)
 	block2.SetPayload(payload2)
-	suite.InsertBlock(block2)
 
 	// should be unable to extend block 2, as it contains a dupe transaction
-	err = suite.mutator.Extend(block2.ID())
-	suite.T().Log(err)
-	suite.Assert().True(errors.Is(err, storage.ErrAlreadyIndexed))
+	err = suite.mutator.Extend(&block2)
+	suite.Assert().Error(err)
 }
 
 func (suite *MutatorSuite) TestExtend_ConflictingForkWithDupeTx() {
@@ -331,20 +301,18 @@ func (suite *MutatorSuite) TestExtend_ConflictingForkWithDupeTx() {
 	block1 := unittest.ClusterBlockWithParent(suite.genesis)
 	payload1 := suite.Payload(&tx1)
 	block1.SetPayload(payload1)
-	suite.InsertBlock(block1)
 
 	// should be able to extend block 1
-	err := suite.mutator.Extend(block1.ID())
+	err := suite.mutator.Extend(&block1)
 	suite.Assert().Nil(err)
 
 	// create a block ALSO extending genesis ALSO containing tx1
 	block2 := unittest.ClusterBlockWithParent(suite.genesis)
 	payload2 := suite.Payload(&tx1)
 	block2.SetPayload(payload2)
-	suite.InsertBlock(block2)
 
 	// should be able to extend block2, although it conflicts with block1,
 	// it is on a different fork
-	err = suite.mutator.Extend(block2.ID())
+	err = suite.mutator.Extend(&block2)
 	suite.Assert().Nil(err)
 }

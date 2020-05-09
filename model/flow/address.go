@@ -12,7 +12,7 @@ import (
 
 const (
 	// AddressLength is the size of an account address.
-	AddressLength = 20
+	AddressLength = 8
 )
 
 func init() {

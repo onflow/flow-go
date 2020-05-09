@@ -11,23 +11,23 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestChilds(t *testing.T) {
+func TestBlockChildrenIndexUpdateLookup(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		parent, child, notExist := flow.Identifier{0x11}, flow.Identifier{0x22}, flow.Identifier{0x33}
+		blockID := unittest.IdentifierFixture()
+		childrenIDs := unittest.IdentifierListFixture(8)
+		var retrievedIDs []flow.Identifier
 
-		// retrieve non exist should return not found
-		var neverRetrieved flow.Identifier
-		err := db.View(LookupBlockIDByParentID(notExist, &neverRetrieved))
-		require.Error(t, err, badger.ErrKeyNotFound)
+		err := db.Update(InsertBlockChildren(blockID, childrenIDs))
+		require.NoError(t, err)
+		err = db.View(RetrieveBlockChildren(blockID, &retrievedIDs))
+		require.NoError(t, err)
+		assert.Equal(t, retrievedIDs, childrenIDs)
 
-		err = db.Update(IndexBlockByParentID(parent, child))
-		require.Nil(t, err)
-
-		// should be able to retrieve back after indexed
-		var retrieved flow.Identifier
-		err = db.View(LookupBlockIDByParentID(parent, &retrieved))
-		require.Nil(t, err)
-
-		assert.Equal(t, child, retrieved)
+		altIDs := unittest.IdentifierListFixture(4)
+		err = db.Update(UpdateBlockChildren(blockID, altIDs))
+		require.NoError(t, err)
+		err = db.View(RetrieveBlockChildren(blockID, &retrievedIDs))
+		require.NoError(t, err)
+		assert.Equal(t, retrievedIDs, altIDs)
 	})
 }

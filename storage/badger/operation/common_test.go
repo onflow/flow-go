@@ -114,36 +114,6 @@ func TestInsertEncodingError(t *testing.T) {
 	})
 }
 
-func TestCheckTrue(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		e := Entity{ID: 1337}
-		key := []byte{0x01, 0x02, 0x03}
-		val, _ := msgpack.Marshal(e)
-
-		_ = db.Update(func(tx *badger.Txn) error {
-			err := tx.Set(key, val)
-			require.NoError(t, err)
-			return nil
-		})
-
-		var exists bool
-		err := db.View(check(key, &exists))
-		require.NoError(t, err)
-		require.True(t, exists)
-	})
-}
-
-func TestCheckFalse(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		key := []byte{0x01, 0x02, 0x03}
-
-		var exists bool
-		err := db.View(check(key, &exists))
-		require.NoError(t, err)
-		require.False(t, exists)
-	})
-}
-
 func TestUpdateValid(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		e := Entity{ID: 1337}

@@ -87,54 +87,54 @@ var (
 
 // Badger DB size can be calculated by LSM plus VLog size
 // BadgerLSMSize
-func (c *Collector) BadgerLSMSize(sizeBytes int64) {
+func (c *BaseMetrics) BadgerLSMSize(sizeBytes int64) {
 	badgerLSMSizeGauge.Set(float64(sizeBytes))
 }
 
-func (c *Collector) BadgerVLogSize(sizeBytes int64) {
+func (c *BaseMetrics) BadgerVLogSize(sizeBytes int64) {
 	badgerVLogSizeGauge.Set(float64(sizeBytes))
 }
 
-func (c *Collector) BadgerNumReads(n int64) {
+func (c *BaseMetrics) BadgerNumReads(n int64) {
 	badgerDBNumReads.Set(float64(n))
 }
 
-func (c *Collector) BadgerNumWrites(n int64) {
+func (c *BaseMetrics) BadgerNumWrites(n int64) {
 	badgerDBNumWrites.Set(float64(n))
 }
 
-func (c *Collector) BadgerNumBytesRead(n int64) {
+func (c *BaseMetrics) BadgerNumBytesRead(n int64) {
 	badgerDBNumBytesRead.Set(float64(n))
 }
 
-func (c *Collector) BadgerNumBytesWritten(n int64) {
+func (c *BaseMetrics) BadgerNumBytesWritten(n int64) {
 	badgerDBNumBytesWritten.Set(float64(n))
 }
 
-func (c *Collector) BadgerNumGets(n int64) {
+func (c *BaseMetrics) BadgerNumGets(n int64) {
 	badgerDBNumGets.Set(float64(n))
 }
 
-func (c *Collector) BadgerNumPuts(n int64) {
+func (c *BaseMetrics) BadgerNumPuts(n int64) {
 	badgerDBNumPuts.Set(float64(n))
 }
 
-func (c *Collector) BadgerNumBlockedPuts(n int64) {
+func (c *BaseMetrics) BadgerNumBlockedPuts(n int64) {
 	badgerDBNumBlockedPuts.Set(float64(n))
 }
 
-func (c *Collector) BadgerNumMemtableGets(n int64) {
+func (c *BaseMetrics) BadgerNumMemtableGets(n int64) {
 	badgerDBNumMemtableGets.Set(float64(n))
 }
 
 // NetworkMessageSent tracks the message size of the last message sent out on the wire
 // in bytes for the given topic
-func (c *Collector) NetworkMessageSent(sizeBytes int, topic string) {
+func (c *BaseMetrics) NetworkMessageSent(sizeBytes int, topic string) {
 	networkOutboundMessageSizeHist.WithLabelValues(topic).Observe(float64(sizeBytes))
 }
 
 // NetworkMessageReceived tracks the message size of the last message received on the wire
 // in bytes for the given topic
-func (c *Collector) NetworkMessageReceived(sizeBytes int, topic string) {
+func (c *BaseMetrics) NetworkMessageReceived(sizeBytes int, topic string) {
 	networkInboundMessageSizeHist.WithLabelValues(topic).Observe(float64(sizeBytes))
 }

@@ -145,6 +145,7 @@ func (ss *SyncSuite) SetupTest() {
 	e, err := New(log, ss.net, ss.me, ss.state, ss.blocks, ss.comp)
 	require.NoError(ss.T(), err, "should pass engine initialization")
 
+	e.tolerance = 0 // make sure we always sync on difference in heights
 	ss.e = e
 }
 
@@ -808,4 +809,11 @@ func (ss *SyncSuite) TestSendRequestsBlockIDs() {
 	require.NoError(ss.T(), err, "should pass three block ID batches")
 	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 3)
 
+}
+
+// test a synchronization engine can be started and stopped
+func (ss *SyncSuite) TestStartStop() {
+	<-ss.e.Ready()
+	time.Sleep(2 * time.Second)
+	<-ss.e.Done()
 }

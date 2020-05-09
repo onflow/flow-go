@@ -44,7 +44,7 @@ func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration) {
 
 // RequireReturnBefore requires that the given function returns before the
 // duration expires.
-func RequireReturnsBefore(t *testing.T, f func(), duration time.Duration) {
+func RequireReturnsBefore(t testing.TB, f func(), duration time.Duration) {
 	done := make(chan struct{})
 
 	go func() {
@@ -91,7 +91,7 @@ func RunWithTempDir(t testing.TB, f func(string)) {
 
 func BadgerDB(t testing.TB, dir string) *badger.DB {
 	opts := badger.
-		LSMOnlyOptions(dir).
+		DefaultOptions(dir).
 		WithKeepL0InMemory(true).
 		WithLogger(nil)
 	db, err := badger.Open(opts)
@@ -105,4 +105,10 @@ func RunWithBadgerDB(t testing.TB, f func(*badger.DB)) {
 		defer db.Close()
 		f(db)
 	})
+}
+
+func TempBadgerDB(t testing.TB) (*badger.DB, string) {
+	dir := TempDir(t)
+	db := BadgerDB(t, dir)
+	return db, dir
 }
