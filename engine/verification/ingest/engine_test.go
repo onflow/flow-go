@@ -730,8 +730,6 @@ func (suite *IngestTestSuite) TestHandleCollection_SenderWithWrongRole() {
 
 		// mock the collection coming from the invalid role
 		invalidIdentity := unittest.IdentityFixture(unittest.WithRole(role))
-		suite.state.On("Final").Return(suite.ss).Once()
-		suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 		suite.ss.On("Identity", invalidIdentity.NodeID).Return(invalidIdentity, nil).Once()
 		// mocks a tracker for the collection
 		suite.collectionTrackers.On("Has", suite.collection.ID()).Return(true)
