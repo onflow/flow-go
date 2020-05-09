@@ -148,6 +148,7 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 		}
 	}
 
+	// TODO we might be able to remove this
 	sort.Slice(sortedKeys, func(i, j int) bool {
 		return bytes.Compare(sortedKeys[i], sortedKeys[j]) < 0
 	})
@@ -197,6 +198,7 @@ func (f *MForest) update(trie *MTrie, parent *node, head *node, keys [][]byte, v
 	if len(keys) == 1 && parent.lChild == nil && parent.rChild == nil {
 		head.key = keys[0]
 		head.value = values[0]
+		// ????
 		head.hashValue = f.GetNodeHash(head)
 		return nil
 	}
@@ -224,6 +226,7 @@ func (f *MForest) update(trie *MTrie, parent *node, head *node, keys [][]byte, v
 			} else {
 				err1 = f.update(trie, newNode(parent.height-1), newN, lkeys, lvalues)
 			}
+			f.PopulateNodeHashValues(newN)
 			lupdate = newN
 		}
 	}()
@@ -240,6 +243,7 @@ func (f *MForest) update(trie *MTrie, parent *node, head *node, keys [][]byte, v
 			} else {
 				err2 = f.update(trie, newNode(head.height-1), newN, rkeys, rvalues)
 			}
+			f.PopulateNodeHashValues(newN)
 			rupdate = newN
 		}
 	}()
@@ -278,6 +282,7 @@ func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*BatchProof, error) {
 	}
 
 	if len(notFoundKeys) > 0 {
+		// TODO change this to lowercase (needs some prepration, just don't persist it)
 		newRootHash, err := f.Update(notFoundKeys, notFoundValues, rootHash)
 		if err != nil {
 			return nil, err
@@ -401,7 +406,7 @@ func (f *MForest) GetNodeHash(n *node) []byte {
 func (f *MForest) ComputeNodeHash(n *node, forced bool) []byte {
 	// leaf node (this shouldn't happen)
 	if n.lChild == nil && n.rChild == nil {
-		if n.key != nil && n.value != nil {
+		if len(n.value) > 0 {
 			return f.GetCompactValue(n)
 		}
 		return GetDefaultHashForHeight(n.height)
@@ -434,6 +439,7 @@ func (f *MForest) PopulateNodeHashValues(n *node) []byte {
 	if n.hashValue != nil {
 		return n.hashValue
 	}
+
 	// otherwise compute
 	h1 := GetDefaultHashForHeight(n.height - 1)
 	if n.lChild != nil {

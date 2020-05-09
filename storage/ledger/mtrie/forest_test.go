@@ -447,9 +447,9 @@ func TestReadWithWrongKeySize(t *testing.T) {
 func TestRandomUpdateReadProof(t *testing.T) {
 	keyByteSize := 2
 	trieHeight := keyByteSize*8 + 1
-	rep := 100
-	maxNumKeysPerStep := 2 // 10
-	maxValueSize := 6      // bytes
+	rep := 50
+	maxNumKeysPerStep := 10
+	maxValueSize := 6 // bytes
 	rand.Seed(time.Now().UnixNano())
 	fStore := mtrie.NewMForest(trieHeight)
 	rootHash := fStore.GetEmptyRootHash()
@@ -497,8 +497,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 			proofValues = append(proofValues, values[i])
 		}
 
-		otherKeys := mtrie.GetRandomKeysRandN(maxNumKeysPerStep, keyByteSize)
-		for _, k := range otherKeys {
+		for _, k := range nonExistingKeys {
 			proofKeys = append(proofKeys, k)
 			proofValues = append(proofValues, []byte{})
 		}
@@ -508,8 +507,8 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		require.True(t, batchProof.Verify(proofKeys, proofValues, rootHash, trieHeight))
 
 		psmt, err := trie.NewPSMT(rootHash, trieHeight, proofKeys, proofValues, mtrie.EncodeBatchProof(batchProof))
-		require.True(t, bytes.Equal(psmt.GetRootHash(), rootHash))
 		require.NoError(t, err, "error building partial trie")
+		require.True(t, bytes.Equal(psmt.GetRootHash(), rootHash))
 
 		// check values for all existing keys
 		allKeys := make([][]byte, 0, len(latestValueByKey))
@@ -522,7 +521,6 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		for i, v := range allValues {
 			require.True(t, bytes.Equal(v, retValues[i]))
 		}
-
 	}
 }
 
