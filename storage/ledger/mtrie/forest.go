@@ -83,22 +83,25 @@ func (f *MForest) Read(keys [][]byte, rootHash []byte) ([][]byte, error) {
 }
 
 func (f *MForest) read(trie *MTrie, head *node, keys [][]byte) ([][]byte, error) {
-	// not found
+	// keys not found
 	if head == nil {
-		res := make([][]byte, 0)
+		res := make([][]byte, 0, len(keys))
 		for _ = range keys {
 			res = append(res, []byte{})
 		}
 		return res, nil
 	}
-	// If we are at a leaf node, we create the node
-	if len(keys) == 1 && head.lChild == nil && head.rChild == nil {
-		// not found
-		if head.key == nil || !bytes.Equal(head.key, keys[0]) {
-			return [][]byte{[]byte{}}, nil
+	// reached a leaf node
+	if head.key != nil {
+		res := make([][]byte, 0)
+		for _, k := range keys {
+			if bytes.Equal(head.key, k) {
+				res = append(res, head.value)
+			} else {
+				res = append(res, []byte{})
+			}
 		}
-		// found
-		return [][]byte{head.value}, nil
+		return res, nil
 	}
 
 	lkeys, rkeys, err := SplitSortedKeys(keys, f.maxHeight-head.height-1)
@@ -171,8 +174,6 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 	f.PopulateNodeHashValues(trie.root)
 	newRootHash := f.GetNodeHash(newRoot)
 	f.tries[hex.EncodeToString(newRootHash)] = newTrie
-	// TODO remove me
-	// fmt.Println(newTrie.root.FmtStr("", ""))
 	return newRootHash, nil
 }
 

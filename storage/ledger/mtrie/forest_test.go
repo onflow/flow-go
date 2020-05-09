@@ -343,6 +343,35 @@ func TestReadOrder(t *testing.T) {
 	require.True(t, bytes.Equal(retValues[1], values[1]))
 }
 
+func TestMixRead(t *testing.T) {
+	trieHeight := 17 // should be key size (in bits) + 1
+	fStore := mtrie.NewMForest(trieHeight)
+	rootHash := fStore.GetEmptyRootHash()
+
+	k1 := []byte([]uint8{uint8(125), uint8(23)})
+	v1 := []byte{'A'}
+	k2 := []byte([]uint8{uint8(178), uint8(152)})
+	v2 := []byte{'B'}
+	keys := [][]byte{k1, k2}
+	values := [][]byte{v1, v2}
+	rootHash2, err := fStore.Update(keys, values, rootHash)
+	require.NoError(t, err)
+
+	k3 := []byte([]uint8{uint8(110), uint8(48)})
+	v3 := []byte{}
+	k4 := []byte([]uint8{uint8(23), uint8(82)})
+	v4 := []byte{}
+
+	keys = [][]byte{k1, k2, k3, k4}
+	values = [][]byte{v1, v2, v3, v4}
+
+	retValues, err := fStore.Read(keys, rootHash2)
+	require.NoError(t, err)
+	for i := range keys {
+		require.True(t, bytes.Equal(retValues[i], values[i]))
+	}
+}
+
 func TestReadWithDupplicatedKeys(t *testing.T) {
 	trieHeight := 17 // should be key size (in bits) + 1
 	fStore := mtrie.NewMForest(trieHeight)
@@ -419,13 +448,12 @@ func TestRandomUpdateReadProof(t *testing.T) {
 	keyByteSize := 2
 	trieHeight := keyByteSize*8 + 1
 	rep := 100
-	maxNumKeysPerStep := 10
-	maxValueSize := 6 // bytes
+	maxNumKeysPerStep := 2 // 10
+	maxValueSize := 6      // bytes
 	rand.Seed(time.Now().UnixNano())
 	fStore := mtrie.NewMForest(trieHeight)
 	rootHash := fStore.GetEmptyRootHash()
-	// map store
-	latestValueByKey := make(map[string][]byte, 0)
+	latestValueByKey := make(map[string][]byte, 0) // map store
 
 	for e := 0; e < rep; e++ {
 		keys := mtrie.GetRandomKeysRandN(maxNumKeysPerStep, keyByteSize)
@@ -461,12 +489,25 @@ func TestRandomUpdateReadProof(t *testing.T) {
 			require.True(t, bytes.Equal(values[i], retValues[i]))
 		}
 
-		// test proof
-		batchProof, err := fStore.Proofs(keys, rootHash)
-		require.NoError(t, err, "error generating proofs")
-		require.True(t, batchProof.Verify(keys, values, rootHash, trieHeight))
+		// test proof (mix of existing and non existing keys)
+		proofKeys := make([][]byte, 0)
+		proofValues := make([][]byte, 0)
+		for i, k := range keys {
+			proofKeys = append(proofKeys, k)
+			proofValues = append(proofValues, values[i])
+		}
 
-		psmt, err := trie.NewPSMT(rootHash, trieHeight, keys, values, mtrie.EncodeBatchProof(batchProof))
+		otherKeys := mtrie.GetRandomKeysRandN(maxNumKeysPerStep, keyByteSize)
+		for _, k := range otherKeys {
+			proofKeys = append(proofKeys, k)
+			proofValues = append(proofValues, []byte{})
+		}
+
+		batchProof, err := fStore.Proofs(proofKeys, rootHash)
+		require.NoError(t, err, "error generating proofs")
+		require.True(t, batchProof.Verify(proofKeys, proofValues, rootHash, trieHeight))
+
+		psmt, err := trie.NewPSMT(rootHash, trieHeight, proofKeys, proofValues, mtrie.EncodeBatchProof(batchProof))
 		require.True(t, bytes.Equal(psmt.GetRootHash(), rootHash))
 		require.NoError(t, err, "error building partial trie")
 
@@ -481,8 +522,6 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		for i, v := range allValues {
 			require.True(t, bytes.Equal(v, retValues[i]))
 		}
-
-		// TODO test mix of proofs (existing and non existing)
 
 	}
 }
