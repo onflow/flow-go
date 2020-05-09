@@ -125,6 +125,72 @@ func CompleteExecutionResultFixture(t testing.TB, chunkCount int) verification.C
 	}
 }
 
+// LightExecutionResultFixture returns a light mocked version of execution result with an
+// execution receipt referencing the block/collections. In the light version of execution result,
+// everything is wired properly, but with the minimum viable content provided. This version is basically used
+// for profiling.
+func LightExecutionResultFixture(chunkCount int) verification.CompleteExecutionResult {
+	chunks := make([]*flow.Chunk, 0)
+	collections := make([]*flow.Collection, 0, chunkCount)
+	guarantees := make([]*flow.CollectionGuarantee, 0, chunkCount)
+	chunkDataPacks := make([]*flow.ChunkDataPack, 0, chunkCount)
+
+	for i := 0; i < chunkCount; i++ {
+		// creates one guaranteed collection per chunk
+		coll := unittest.CollectionFixture(1)
+		guarantee := coll.Guarantee()
+		collections = append(collections, &coll)
+		guarantees = append(guarantees, &guarantee)
+
+		chunk := &flow.Chunk{
+			ChunkBody: flow.ChunkBody{
+				CollectionIndex: uint(i),
+				EventCollection: unittest.IdentifierFixture(),
+			},
+			Index: uint64(i),
+		}
+		chunks = append(chunks, chunk)
+
+		// creates a chunk data pack for the chunk
+		chunkDataPack := flow.ChunkDataPack{
+			ChunkID: chunk.ID(),
+		}
+		chunkDataPacks = append(chunkDataPacks, &chunkDataPack)
+	}
+
+	payload := flow.Payload{
+		Identities: nil,
+		Guarantees: guarantees,
+	}
+
+	header := unittest.BlockHeaderFixture()
+	header.Height = 0
+	header.PayloadHash = payload.Hash()
+
+	block := flow.Block{
+		Header:  &header,
+		Payload: &payload,
+	}
+
+	result := flow.ExecutionResult{
+		ExecutionResultBody: flow.ExecutionResultBody{
+			BlockID: block.ID(),
+			Chunks:  chunks,
+		},
+	}
+
+	receipt := flow.ExecutionReceipt{
+		ExecutionResult: result,
+	}
+
+	return verification.CompleteExecutionResult{
+		Receipt:        &receipt,
+		Block:          &block,
+		Collections:    collections,
+		ChunkDataPacks: chunkDataPacks,
+	}
+}
+
 // SetupMockVerifierEng sets up a mock verifier engine that asserts the followings:
 // - that a set of chunks are delivered to it.
 // - that each chunk is delivered exactly once

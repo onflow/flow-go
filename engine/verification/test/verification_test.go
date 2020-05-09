@@ -447,7 +447,7 @@ func ingestHappyPath(tb testing.TB, receiptCount int, chunkCount int) {
 	//
 	ers := make([]verification.CompleteExecutionResult, receiptCount)
 	for i := 0; i < receiptCount; i++ {
-		ers[i] = CompleteExecutionResultFixture(tb, chunkCount)
+		ers[i] = LightExecutionResultFixture(chunkCount)
 	}
 
 	fmt.Println("Chunks have been made")
