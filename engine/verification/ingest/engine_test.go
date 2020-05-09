@@ -304,34 +304,25 @@ func (suite *IngestTestSuite) TestHandleReceipt_MissingChunkDataPack() {
 
 	eng := suite.TestNewEngine()
 
-	// mocks identities
-	//
-	// required roles
-	execIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleExecution))
-
 	// mocks state snapshot
-	//
-	// mocks state snapshot to validate identity of execution node as an staked origin id at the `suite.block` height
-	suite.state.On("Final").Return(suite.ss, nil)
-	suite.state.On("AtBlockID", suite.block.ID()).Return(suite.ss, nil).Once()
-	suite.ss.On("Identity", execIdentities[0].NodeID).Return(execIdentities[0], nil).Once()
+	suite.ss.On("Identity", suite.execIdentity.NodeID).Return(suite.execIdentity, nil)
 	// mocks state snapshot to return exeIdentities as identity list of staked collection nodes
-	suite.ss.On("Identities", testifymock.AnythingOfType("flow.IdentityFilter")).Return(execIdentities, nil).Twice()
+	suite.ss.On("Identities", testifymock.AnythingOfType("flow.IdentityFilter")).Return(flow.IdentityList{suite.execIdentity}, nil)
 
 	// mocks existing resources at the engine's disposal
 	//
 	// block
-	suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil).Once()
+	suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil)
 	// collection
-	suite.authCollections.On("Has", suite.collection.ID()).Return(true).Once()
+	suite.authCollections.On("Has", suite.collection.ID()).Return(true)
 	// receipt in the authenticated mempool
-	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
-	suite.pendingReceipts.On("All").Return([]*verificationmodel.PendingReceipt{}).Once()
+	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
+	suite.pendingReceipts.On("All").Return([]*verificationmodel.PendingReceipt{})
 
 	// mocks missing resources
 	//
 	// absence of chunk data pack itself
-	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(false).Once()
+	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(false)
 	// engine has not yet ingested the result of this receipt as well as its chunks yet
 	suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
 	suite.ingestedChunkIDs.On("Has", suite.chunk.ID()).Return(false)
@@ -350,11 +341,11 @@ func (suite *IngestTestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	var submitWG sync.WaitGroup
 	submitWG.Add(1)
 	suite.chunksConduit.
-		On("Submit", testifymock.AnythingOfType("*messages.ChunkDataPackRequest"), execIdentities[0].NodeID).Run(func(args testifymock.Arguments) {
+		On("Submit", testifymock.AnythingOfType("*messages.ChunkDataPackRequest"), suite.execIdentity.NodeID).Run(func(args testifymock.Arguments) {
 		submitWG.Done()
 	}).Return(nil).Once()
 
-	err := eng.Process(execIdentities[0].NodeID, suite.receipt)
+	err := eng.Process(suite.execIdentity.NodeID, suite.receipt)
 	suite.Assert().Nil(err)
 
 	// starts engine
@@ -370,8 +361,6 @@ func (suite *IngestTestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	// asserts necessary calls
 	suite.chunksConduit.AssertExpectations(suite.T())
 	suite.chunkDataPackTrackers.AssertExpectations(suite.T())
-	suite.ss.AssertExpectations(suite.T())
-	suite.state.AssertExpectations(suite.T())
 
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
