@@ -135,7 +135,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		// get the reference block for expiration
 		refHeader, err := b.headers.ByBlockID(guarantee.ReferenceBlockID)
 		if err != nil {
-			return nil, fmt.Errorf("could not get reference block: %w", err)
+			return nil, fmt.Errorf("could not get reference block %s: %w", guarantee.ReferenceBlockID, err)
 		}
 
 		// for now, we simply ignore unfinalized reference blocks
@@ -171,29 +171,41 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// STEP FOUR: Get the block seal from the parent and see how far we can
 	// extend the chain of sealed blocks with the seals in the memory pool.
 
+	fmt.Println()
+	fmt.Println("SEALS IN POOl")
 	// we map each seal to the parent of its sealed block; that way, we can
 	// retrieve a valid seal that will *follow* each block's own seal
+	heights := make(map[flow.Identifier]uint64)
 	byParent := make(map[flow.Identifier]*flow.Seal)
 	for _, seal := range b.sealPool.All() {
+		fmt.Println("- SEAL FOR", seal.BlockID)
 		sealed, err := b.headers.ByBlockID(seal.BlockID)
 		if errors.Is(err, storage.ErrNotFound) {
+			fmt.Println("ERROR! BLOCK NOT FOUND", seal.BlockID)
 			continue
 		}
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve sealed header (%x): %w", seal.BlockID, err)
 		}
 		byParent[sealed.ParentID] = seal
+		heights[sealed.ID()] = sealed.Height
 	}
 
-	// starting at the paren't seal, we try to find a seal to extend the current
+	fmt.Println()
+
+	fmt.Println("BY PARENT LEN", len(byParent))
+
+	// starting at the parent seal, we try to find a seal to extend the current
 	// last sealed block; if we do, we keep going until we don't
 	// we also execute a sanity check on whether the execution state of the next
-	// seal propely connects to the previous seal
+	// seal properly connects to the previous seal
+	lastSealedHeight := heights[parentID]
 	lastSeal, err := b.seals.ByBlockID(parentID)
 	var seals []*flow.Seal
 	for len(byParent) > 0 {
 		seal, found := byParent[lastSeal.BlockID]
 		if !found {
+			fmt.Println("NO SEAL AFTER", lastSeal.BlockID)
 			break
 		}
 		if !bytes.Equal(seal.InitialState, lastSeal.FinalState) {
@@ -202,6 +214,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		delete(byParent, lastSeal.BlockID)
 		seals = append(seals, seal)
 		lastSeal = seal
+		lastSealedHeight = heights[seal.BlockID]
 	}
 
 	// STEP FIVE: We now have guarantees and seals we can validly include
@@ -212,7 +225,26 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	payload := &flow.Payload{
 		Identities: nil,
 		Guarantees: guarantees,
-		Seals:      seals,
+	}
+
+	var finalizedHeight uint64
+
+	err = b.db.View(operation.RetrieveFinalizedHeight(&finalizedHeight))
+	if err != nil {
+		fmt.Println("ERROR1:", err)
+		return nil, err
+	}
+
+	fmt.Println("LAST SEALED HEIGHT", lastSealedHeight)
+	fmt.Println("FINALIZED HEIGHT", finalizedHeight)
+
+	// ONLY INCLUDE SEALS IF YOU SHOULD
+	if finalizedHeight >= lastSealedHeight {
+		fmt.Println("CHAIN OF SEALS")
+		for _, seal := range seals {
+			fmt.Printf("%s,%s\n", seal.BlockID)
+		}
+		payload.Seals = seals
 	}
 
 	// retrieve the parent to set the height
@@ -265,22 +297,35 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 	err = b.blocks.Store(proposal)
 	if err != nil {
-		return nil, fmt.Errorf("could ot store proposal: %w", err)
+		return nil, fmt.Errorf("could not store proposal: %w", err)
 	}
 
 	// update protocol state index for the seal and initialize children index
 	blockID := proposal.ID()
 	err = operation.RetryOnConflict(b.db.Update, func(tx *badger.Txn) error {
-		err = operation.IndexBlockSeal(blockID, lastSeal.ID())(tx)
+		var finalizedHeight uint64
+		err = operation.RetrieveFinalizedHeight(&finalizedHeight)(tx)
 		if err != nil {
-			return fmt.Errorf("could not index proposal seal: %w", err)
+			return err
 		}
+
+		if finalizedHeight >= lastSealedHeight {
+			err = operation.IndexBlockSeal(blockID, lastSeal.ID())(tx)
+			if err != nil {
+				return fmt.Errorf("could not index proposal seal: %w", err)
+			}
+		}
+
 		err = operation.InsertBlockChildren(blockID, nil)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert empty block children: %w", err)
 		}
 		return nil
 	})
+
+	if err != nil {
+		fmt.Println("ERROR", err)
+	}
 
 	return header, err
 }
