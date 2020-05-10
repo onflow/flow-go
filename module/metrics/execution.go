@@ -109,26 +109,26 @@ func (c *BaseMetrics) ExecutionStorageStateCommitment(bytes int64) {
 }
 
 // ExecutionLastExecutedBlockView reports last executed block view
-func (c *Collector) ExecutionLastExecutedBlockView(view uint64) {
+func (c *BaseMetrics) ExecutionLastExecutedBlockView(view uint64) {
 	executionLastExecutedBlockViewGauge.Set(float64(view))
 }
 
 // ExecutionTotalExecutedTransactions reports total executed transactions
-func (c *Collector) ExecutionTotalExecutedTransactions(numberOfTx int) {
+func (c *BaseMetrics) ExecutionTotalExecutedTransactions(numberOfTx int) {
 	executionTotalExecutedTransactionsCounter.Add(float64(numberOfTx))
 }
 
 // ExecutionTransactionParsed reports the parse time of a transaction
-func (c *Collector) ExecutionTransactionParsed(dur time.Duration) {
+func (c *BaseMetrics) ExecutionTransactionParsed(dur time.Duration) {
 	executionTransactionParseTimeHist.Observe(float64(dur))
 }
 
 // ExecutionTransactionChecked reports the checking time of a transaction
-func (c *Collector) ExecutionTransactionChecked(dur time.Duration) {
+func (c *BaseMetrics) ExecutionTransactionChecked(dur time.Duration) {
 	executionTransactionCheckTimeHist.Observe(float64(dur))
 }
 
 // ExecutionTransactionInterpreted reports the interpretation time of a transaction
-func (c *Collector) ExecutionTransactionInterpreted(dur time.Duration) {
+func (c *BaseMetrics) ExecutionTransactionInterpreted(dur time.Duration) {
 	executionTransactionInterpretationTimeHist.Observe(float64(dur))
 }
