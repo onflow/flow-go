@@ -92,7 +92,7 @@ func (is *InclusionSuite) SetupTest() {
 }
 
 func (is *InclusionSuite) TearDownTest() {
-	is.net.Remove()
+	is.net.Stop()
 	is.cancel()
 }
 
@@ -147,13 +147,14 @@ InclusionLoop:
 			continue
 		}
 		guarantees := proposal.Payload.Guarantees
+		is.T().Logf("block proposal received: %x", proposalID)
 
 		// if the collection guarantee is included, we add the block to those we
 		// monitor for confirmations
 		for _, guarantee := range guarantees {
 			if guarantee.CollectionID == sentinel.CollectionID {
 				confirmations[proposalID] = 0
-				is.T().Logf("%x: collection guarantee included!", proposalID)
+				is.T().Log("collection guarantee included!")
 				continue InclusionLoop
 			}
 		}
@@ -164,7 +165,7 @@ InclusionLoop:
 		n, ok := confirmations[proposal.Header.ParentID]
 		if ok {
 			confirmations[proposalID] = n + 1
-			is.T().Logf("%x: collection guarantee confirmed! (count: %d)", proposalID, n+1)
+			is.T().Logf("collection guarantee confirmed! (count: %d)", confirmations[proposalID])
 		}
 
 		// if we reached three or more confirmations, we are done!
