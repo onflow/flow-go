@@ -13,6 +13,7 @@ import (
 
 	model "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/state/cluster"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
@@ -53,8 +54,9 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.Assert().Nil(err)
 	suite.mutator = suite.state.Mutate()
 
-	headers, identities, _, seals, payloads, blocks := util.StorageLayer(suite.T(), suite.db)
-	suite.protoState, err = protocol.NewState(suite.db, headers, identities, seals, payloads, blocks)
+	metrics := metrics.NewNoopCollector()
+	headers, identities, _, seals, _, payloads, blocks := util.StorageLayer(suite.T(), suite.db)
+	suite.protoState, err = protocol.NewState(metrics, suite.db, headers, identities, seals, payloads, blocks)
 	require.NoError(suite.T(), err)
 }
 

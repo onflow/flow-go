@@ -7,13 +7,12 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/dapperlabs/flow-go/module"
-	consensusmetrics "github.com/dapperlabs/flow-go/module/metrics/consensus"
-	"github.com/dapperlabs/flow-go/storage"
+	metricsconsumer "github.com/dapperlabs/flow-go/module/metrics/hotstuff"
 )
 
-func createNotifier(log zerolog.Logger, metrics module.Metrics, payloads storage.Payloads) hotstuff.Consumer {
+func createNotifier(log zerolog.Logger, metrics module.HotstuffMetrics) hotstuff.Consumer {
 	logConsumer := notifications.NewLogConsumer(log)
-	metricsConsumer := consensusmetrics.NewMetricsConsumer(metrics, payloads)
+	metricsConsumer := metricsconsumer.NewMetricsConsumer(metrics)
 	dis := pubsub.NewDistributor()
 	dis.AddConsumer(logConsumer)
 	dis.AddConsumer(metricsConsumer)

@@ -11,7 +11,9 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
@@ -19,6 +21,7 @@ import (
 // Builder is the builder for consensus block payloads. Upon providing a payload
 // hash, it also memorizes which entities were included into the payload.
 type Builder struct {
+	metrics  module.MempoolMetrics
 	db       *badger.DB
 	seals    storage.Seals
 	headers  storage.Headers
@@ -30,7 +33,7 @@ type Builder struct {
 }
 
 // NewBuilder creates a new block builder.
-func NewBuilder(db *badger.DB, headers storage.Headers, seals storage.Seals, payloads storage.Payloads, blocks storage.Blocks, guarPool mempool.Guarantees, sealPool mempool.Seals, options ...func(*Config)) *Builder {
+func NewBuilder(metrics module.MempoolMetrics, db *badger.DB, headers storage.Headers, seals storage.Seals, payloads storage.Payloads, blocks storage.Blocks, guarPool mempool.Guarantees, sealPool mempool.Seals, options ...func(*Config)) *Builder {
 
 	// initialize default config
 	cfg := Config{
@@ -45,6 +48,7 @@ func NewBuilder(db *badger.DB, headers storage.Headers, seals storage.Seals, pay
 	}
 
 	b := &Builder{
+		metrics:  metrics,
 		db:       db,
 		headers:  headers,
 		seals:    seals,
@@ -168,8 +172,19 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		guarantees = append(guarantees, guarantee)
 	}
 
+	b.metrics.MempoolEntries(metrics.ResourceGuarantee, b.guarPool.Size())
+
 	// STEP FOUR: Get the block seal from the parent and see how far we can
 	// extend the chain of sealed blocks with the seals in the memory pool.
+
+	lastSeal, err := b.seals.ByBlockID(parentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get last seal: %w", err)
+	}
+	lastSealed, err := b.headers.ByBlockID(lastSeal.BlockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get last sealed: %w", err)
+	}
 
 	// we map each seal to the parent of its sealed block; that way, we can
 	// retrieve a valid seal that will *follow* each block's own seal
@@ -182,14 +197,19 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve sealed header (%x): %w", seal.BlockID, err)
 		}
+		if sealed.Height < lastSealed.Height {
+			_ = b.sealPool.Rem(seal.ID())
+			continue
+		}
 		byParent[sealed.ParentID] = seal
 	}
+
+	b.metrics.MempoolEntries(metrics.ResourceSeal, b.sealPool.Size())
 
 	// starting at the paren't seal, we try to find a seal to extend the current
 	// last sealed block; if we do, we keep going until we don't
 	// we also execute a sanity check on whether the execution state of the next
 	// seal propely connects to the previous seal
-	lastSeal, err := b.seals.ByBlockID(parentID)
 	var seals []*flow.Seal
 	for len(byParent) > 0 {
 		seal, found := byParent[lastSeal.BlockID]

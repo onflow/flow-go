@@ -4,6 +4,8 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
@@ -12,7 +14,7 @@ type Identities struct {
 	cache *Cache
 }
 
-func NewIdentities(db *badger.DB) *Identities {
+func NewIdentities(collector module.CacheMetrics, db *badger.DB) *Identities {
 
 	store := func(nodeID flow.Identifier, identity interface{}) error {
 		return db.Update(operation.SkipDuplicates(operation.InsertIdentity(nodeID, identity.(*flow.Identity))))
@@ -25,8 +27,13 @@ func NewIdentities(db *badger.DB) *Identities {
 	}
 
 	i := &Identities{
-		db:    db,
-		cache: newCache(withLimit(100), withStore(store), withRetrieve(retrieve)),
+		db: db,
+		cache: newCache(collector,
+			withLimit(100),
+			withStore(store),
+			withRetrieve(retrieve),
+			withResource(metrics.ResourceIdentity),
+		),
 	}
 	return i
 }

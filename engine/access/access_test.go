@@ -106,7 +106,7 @@ func (suite *Suite) TestSendAndGetTransaction() {
 
 func (suite *Suite) TestGetBlockByIDAndHeight() {
 
-	util.RunWithStorageLayer(suite.T(), func(db *badger.DB, headers *storage.Headers, _ *storage.Identities, _ *storage.Guarantees, _ *storage.Seals, _ *storage.Payloads, blocks *storage.Blocks) {
+	util.RunWithStorageLayer(suite.T(), func(db *badger.DB, headers *storage.Headers, _ *storage.Identities, _ *storage.Guarantees, _ *storage.Seals, _ *storage.Index, _ *storage.Payloads, blocks *storage.Blocks) {
 		// test block1 get by ID
 		block1 := unittest.BlockFixture()
 		// test block2 get by height
@@ -191,7 +191,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 // TestGetSealedTransaction tests that transactions status of transaction that belongs to a sealed blocked
 // is reported as sealed
 func (suite *Suite) TestGetSealedTransaction() {
-	util.RunWithStorageLayer(suite.T(), func(db *badger.DB, headers *storage.Headers, _ *storage.Identities, _ *storage.Guarantees, _ *storage.Seals, _ *storage.Payloads, blocks *storage.Blocks) {
+	util.RunWithStorageLayer(suite.T(), func(db *badger.DB, headers *storage.Headers, _ *storage.Identities, _ *storage.Guarantees, _ *storage.Seals, _ *storage.Index, _ *storage.Payloads, blocks *storage.Blocks) {
 		// create block -> collection -> transactions
 		block, collection := suite.createChain()
 
@@ -203,8 +203,6 @@ func (suite *Suite) TestGetSealedTransaction() {
 		colIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
 		suite.snapshot.On("Identities", mock.Anything).Return(colIdentities, nil).Once()
 		suite.collectionsConduit.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(len(block.Payload.Guarantees))
-		metrics := &mockmodule.Metrics{}
-		metrics.On("FinalizedBlocks", mock.Anything).Return()
 
 		exeEventResp := execution.GetTransactionResultResponse{
 			Events: nil,
@@ -217,7 +215,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		transactions := storage.NewTransactions(db)
 
 		// create the ingest engine
-		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, metrics, suite.me, blocks, headers, collections, transactions)
+		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, blocks, headers, collections, transactions)
 		require.NoError(suite.T(), err)
 
 		// create the handler (called by the grpc engine)
@@ -260,7 +258,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 // TestExecuteScript tests the three execute Script related calls to make sure that the execution api is called with
 // the correct block id
 func (suite *Suite) TestExecuteScript() {
-	util.RunWithStorageLayer(suite.T(), func(db *badger.DB, headers *storage.Headers, _ *storage.Identities, _ *storage.Guarantees, _ *storage.Seals, _ *storage.Payloads, blocks *storage.Blocks) {
+	util.RunWithStorageLayer(suite.T(), func(db *badger.DB, headers *storage.Headers, _ *storage.Identities, _ *storage.Guarantees, _ *storage.Seals, _ *storage.Index, _ *storage.Payloads, blocks *storage.Blocks) {
 
 		// create a block and a seal pointing to that block
 		lastBlock := unittest.BlockFixture()

@@ -39,13 +39,13 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 	}
 
 	// retrieve identities from storage
-	identities, err := s.state.payloads.IdentitiesFor(genesisID)
+	payload, err := s.state.payloads.ByBlockID(genesisID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get identities for block: %w", err)
 	}
 
 	// apply the filter to the identities
-	identities = identities.Filter(selector)
+	identities := payload.Identities.Filter(selector)
 
 	// apply a deterministic sort to the identities
 	sort.Slice(identities, func(i int, j int) bool {

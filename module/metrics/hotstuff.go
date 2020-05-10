@@ -14,134 +14,135 @@ const (
 	HotstuffEventTypeOnVote     = "onvote"
 )
 
-// HotStuffMetrics implements only the metrics emitted by the HotStuff core logic.
+// HotstuffCollector implements only the metrics emitted by the HotStuff core logic.
 // We have multiple instances of HotStuff running within Flow: Consensus Nodes form
 // the main consensus committee. In addition each Collector Node cluster runs their
 // own HotStuff instance. Depending on the node role, the name space is different. Furthermore,
 // even within the `collection` name space, we need to separate metrics between the different
 // clusters. We do this by adding the label `committeeID` to the HotStuff metrics and
 // allowing for configurable name space.
-type HotStuffMetrics struct {
-	finalizedBlockCounter prometheus.Counter
-	busyDuration          *prometheus.HistogramVec
-	idleDuration          prometheus.Histogram
-	waitDuration          *prometheus.HistogramVec
-	newViewGauge          prometheus.Gauge
-	newestKnownQcGauge    prometheus.Gauge
-	blockProposalCounter  prometheus.Counter
+type HotstuffCollector struct {
+	busyDuration    *prometheus.HistogramVec
+	idleDuration    prometheus.Histogram
+	waitDuration    *prometheus.HistogramVec
+	curView         prometheus.Gauge
+	qcView          prometheus.Gauge
+	skips           prometheus.Counter
+	timeouts        prometheus.Counter
+	timeoutDuration prometheus.Gauge
 }
 
-func NewHotStuffMetrics(labels map[string]string) HotStuffMetrics {
-	return HotStuffMetrics{
-		finalizedBlockCounter: promauto.NewCounter(prometheus.CounterOpts{
-			Name:        "finalized_blocks",
-			Namespace:   hotStuffModuleNamespace,
-			Subsystem:   hotStuffParticipantSubsystem,
-			Help:        "The number of finalized blocks",
-			ConstLabels: labels,
-		}),
+func NewHotstuffCollector(chain string) *HotstuffCollector {
+
+	hc := &HotstuffCollector{
+
 		busyDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Name:        "busy_duration_seconds",
-			Namespace:   hotStuffModuleNamespace,
-			Subsystem:   hotStuffParticipantSubsystem,
+			Namespace:   namespaceConsensus,
+			Subsystem:   subsystemHotstuff,
 			Help:        "the duration of how long hotstuff's event loop has been busy processing one event",
 			Buckets:     []float64{0.05, 0.2, 0.5, 1, 2, 5},
-			ConstLabels: labels,
+			ConstLabels: prometheus.Labels{LabelChain: chain},
 		}, []string{"event_type"}),
+
 		idleDuration: promauto.NewHistogram(prometheus.HistogramOpts{
 			Name:        "idle_duration_seconds",
-			Namespace:   hotStuffModuleNamespace,
-			Subsystem:   hotStuffParticipantSubsystem,
+			Namespace:   namespaceConsensus,
+			Subsystem:   subsystemHotstuff,
 			Help:        "the duration of how long hotstuff's event loop has been idle without processing any event",
 			Buckets:     []float64{0.05, 0.2, 0.5, 1, 2, 5},
-			ConstLabels: labels,
+			ConstLabels: prometheus.Labels{LabelChain: chain},
 		}),
+
 		waitDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Name:        "wait_duration_seconds",
-			Namespace:   hotStuffModuleNamespace,
-			Subsystem:   hotStuffParticipantSubsystem,
+			Namespace:   namespaceConsensus,
+			Subsystem:   subsystemHotstuff,
 			Help:        "the duration of how long an event has been waited in the hotstuff event loop queue before being processed.",
 			Buckets:     []float64{0.05, 0.2, 0.5, 1, 2, 5},
-			ConstLabels: labels,
+			ConstLabels: prometheus.Labels{LabelChain: chain},
 		}, []string{"event_type"}),
-		newViewGauge: promauto.NewGauge(prometheus.GaugeOpts{
+
+		curView: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:        "cur_view",
-			Namespace:   hotStuffModuleNamespace,
-			Subsystem:   hotStuffParticipantSubsystem,
+			Namespace:   namespaceConsensus,
+			Subsystem:   subsystemHotstuff,
 			Help:        "the current view that the event handler has entered",
-			ConstLabels: labels,
+			ConstLabels: prometheus.Labels{LabelChain: chain},
 		}),
-		newestKnownQcGauge: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:        "view_of_newest_known_qc",
-			Namespace:   hotStuffModuleNamespace,
-			Subsystem:   hotStuffParticipantSubsystem,
+
+		qcView: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:        "qc_view",
+			Namespace:   namespaceConsensus,
+			Subsystem:   subsystemHotstuff,
 			Help:        "The view of the newest known qc from hotstuff",
-			ConstLabels: labels,
+			ConstLabels: prometheus.Labels{LabelChain: chain},
 		}),
-		blockProposalCounter: promauto.NewCounter(prometheus.CounterOpts{
-			Name:        "block_proposals",
-			Namespace:   hotStuffModuleNamespace,
-			Subsystem:   hotStuffParticipantSubsystem,
-			Help:        "the number of block proposals made",
-			ConstLabels: labels,
+
+		skips: promauto.NewCounter(prometheus.CounterOpts{
+			Name:        "skips_total",
+			Namespace:   namespaceConsensus,
+			Subsystem:   subsystemHotstuff,
+			Help:        "The number of times we skipped ahead some views",
+			ConstLabels: prometheus.Labels{LabelChain: chain},
+		}),
+
+		timeouts: promauto.NewCounter(prometheus.CounterOpts{
+			Name:        "timeouts_total",
+			Namespace:   namespaceConsensus,
+			Subsystem:   subsystemHotstuff,
+			Help:        "The number of times we timed out during a view",
+			ConstLabels: prometheus.Labels{LabelChain: chain},
+		}),
+
+		timeoutDuration: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:        "timeout_seconds",
+			Namespace:   namespaceConsensus,
+			Subsystem:   subsystemHotstuff,
+			Help:        "The current length of the timeout",
+			ConstLabels: prometheus.Labels{LabelChain: chain},
 		}),
 	}
+
+	return hc
 }
 
 // HotStuffBusyDuration reports Metrics C6 HotStuff Busy Duration
-func (c *HotStuffMetrics) HotStuffBusyDuration(duration time.Duration, event string) {
-	c.busyDuration.WithLabelValues(event).Observe(duration.Seconds())
+func (hc *HotstuffCollector) HotStuffBusyDuration(duration time.Duration, event string) {
+	hc.busyDuration.WithLabelValues(event).Observe(duration.Seconds())
 }
 
 // HotStuffIdleDuration reports Metrics C6 HotStuff Idle Duration
-func (c *HotStuffMetrics) HotStuffIdleDuration(duration time.Duration) {
-	c.idleDuration.Observe(duration.Seconds())
+func (hc *HotstuffCollector) HotStuffIdleDuration(duration time.Duration) {
+	hc.idleDuration.Observe(duration.Seconds())
 }
 
 // HotStuffWaitDuration reports Metrics C6 HotStuff Wait Duration
-func (c *HotStuffMetrics) HotStuffWaitDuration(duration time.Duration, event string) {
-	c.waitDuration.WithLabelValues(event).Observe(duration.Seconds())
+func (hc *HotstuffCollector) HotStuffWaitDuration(duration time.Duration, event string) {
+	hc.waitDuration.WithLabelValues(event).Observe(duration.Seconds())
 }
 
-// FinalizedBlocks reports Metric C7: Number of Blocks Finalized (per second)
-func (c *HotStuffMetrics) FinalizedBlocks(count int) {
-	c.finalizedBlockCounter.Add(float64(count))
-}
-
-// HotStuffMetrics reports Metrics C8: Current View
-func (c *HotStuffMetrics) StartNewView(view uint64) {
-	c.newViewGauge.Set(float64(view))
+// HotstuffCollector reports Metrics C8: Current View
+func (hc *HotstuffCollector) SetCurView(view uint64) {
+	hc.curView.Set(float64(view))
 }
 
 // NewestKnownQC reports Metrics C9: View of Newest Known QC
-func (c *HotStuffMetrics) NewestKnownQC(view uint64) {
-	c.newestKnownQcGauge.Set(float64(view))
+func (hc *HotstuffCollector) SetQCView(view uint64) {
+	hc.qcView.Set(float64(view))
 }
 
-// MadeBlockProposal reports that a block proposal has been made
-func (c *HotStuffMetrics) MadeBlockProposal() {
-	c.blockProposalCounter.Inc()
+// CountSkipped counts the number of skips we did.
+func (hc *HotstuffCollector) CountSkipped() {
+	hc.skips.Inc()
 }
 
-type HotStuffNoopMetrics struct{}
+// CountTimeout counts the number of timeouts we had.
+func (hc *HotstuffCollector) CountTimeout() {
+	hc.timeouts.Inc()
+}
 
-// HotStuffBusyDuration reports Metrics C6 HotStuff Busy Duration
-func (c *HotStuffNoopMetrics) HotStuffBusyDuration(time.Duration, string) {}
-
-// HotStuffIdleDuration reports Metrics C6 HotStuff Idle Duration
-func (c *HotStuffNoopMetrics) HotStuffIdleDuration(time.Duration) {}
-
-// HotStuffWaitDuration reports Metrics C6 HotStuff Wait Duration
-func (c *HotStuffNoopMetrics) HotStuffWaitDuration(time.Duration, string) {}
-
-// FinalizedBlocks reports Metric C7: Number of Blocks Finalized (per second)
-func (c *HotStuffNoopMetrics) FinalizedBlocks(int) {}
-
-// HotStuffNoopMetrics reports Metrics C8: Current View
-func (c *HotStuffNoopMetrics) StartNewView(uint64) {}
-
-// NewestKnownQC reports Metrics C9: View of Newest Known QC
-func (c *HotStuffNoopMetrics) NewestKnownQC(uint64) {}
-
-// MadeBlockProposal reports that a block proposal has been made
-func (c *HotStuffNoopMetrics) MadeBlockProposal() {}
+// SetTimeout sets the current timeout duration.
+func (hc *HotstuffCollector) SetTimeout(duration time.Duration) {
+	hc.timeoutDuration.Set(duration.Seconds())
+}
