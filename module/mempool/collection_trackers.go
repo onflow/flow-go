@@ -18,9 +18,8 @@ type CollectionTrackers interface {
 	// Rem removes tracker with the given collection ID.
 	Rem(collID flow.Identifier) bool
 
-	// ByCollectionID retrieve the collection tracker with the given collection
-	// ID from the memory pool. It will return false if it was not found in the
-	// mempool.
+	// ByID retrieve the collection tracker with the given collection ID from
+	// the memory pool. It will return false if it was not found in the mempool.
 	ByCollectionID(collID flow.Identifier) (*tracker.CollectionTracker, bool)
 
 	// All will return a list of collection trackers in mempool.

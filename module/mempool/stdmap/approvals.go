@@ -25,7 +25,15 @@ func NewApprovals(limit uint) (*Approvals, error) {
 
 // Add adds an result approval to the mempool.
 func (a *Approvals) Add(approval *flow.ResultApproval) bool {
+
+	// we need to register all of our lookups first, so that the hook triggered
+	// when ejecting entities can properly remove them in case it selects the
+	// just added entity
+	a.register(approval)
+
+	// then, we can add the entity to the backend
 	added := a.Backend.Add(approval)
+
 	return added
 }
 
@@ -33,6 +41,15 @@ func (a *Approvals) Add(approval *flow.ResultApproval) bool {
 func (a *Approvals) Rem(approvalID flow.Identifier) bool {
 	removed := a.Backend.Rem(approvalID)
 	return removed
+}
+
+	// we need the approval to do full cleanup of lookups
+	entity, removed := a.Backend.ByID(approvalID)
+	if !removed {
+		return false
+	}
+	approval := entity.(*flow.ResultApproval)
+	return approval, true
 }
 
 // ByID will retrieve an approval by ID.
@@ -55,7 +72,7 @@ func (a *Approvals) All() []*flow.ResultApproval {
 	return approvals
 }
 
-// ByResultID returns an approval by receipt ID.
+// ByResultID returns an approval by approval ID.
 func (a *Approvals) ByResultID(resultID flow.Identifier) []*flow.ResultApproval {
 	forResult, hasResult := a.byResult[resultID]
 	if !hasResult {

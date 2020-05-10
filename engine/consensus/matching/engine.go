@@ -168,13 +168,9 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return fmt.Errorf("invalid executor node role (%s)", identity.Role)
 	}
 
-	// check that the origin is an execution node
-	if identity.Role != flow.RoleExecution {
-		return fmt.Errorf("invalid executor node role (%s)", identity.Role)
-	}
-
 	// check if the result of this receipt is already in the dB
-	_, err = e.results.ByID(receipt.ExecutionResult.ID())
+	result := receipt.ExecutionResult
+	_, err = e.results.ByID(result.ID())
 	if err == nil {
 		log.Debug().Msg("discarding receipt for existing result")
 		return nil
@@ -183,10 +179,11 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return fmt.Errorf("could not check result: %w", err)
 	}
 
-	// store in the memory pool
-	err = e.receipts.Add(receipt)
-	if err != nil {
-		return fmt.Errorf("could not store receipt: %w", err)
+	// store the receipt in the memory pool
+	added := e.receipts.Add(receipt)
+	if !added {
+		log.Debug().Msg("discarding receipt already in mempool")
+		return nil
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
@@ -438,9 +435,9 @@ func (e *Engine) createSeal(result *flow.ExecutionResult) (bool, error) {
 		InitialState: previous.FinalStateCommit,
 		FinalState:   result.FinalStateCommit,
 	}
-	err = e.seals.Add(seal)
-	if err != nil {
-		return false, fmt.Errorf("could not add seal to pool: %w", err)
+	added := e.seals.Add(seal)
+	if !added {
+		return false, nil
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceSeal, e.seals.Size())
