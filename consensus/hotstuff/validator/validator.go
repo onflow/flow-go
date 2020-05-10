@@ -47,6 +47,14 @@ func (v *Validator) ValidateQC(qc *model.QuorumCertificate, block *model.Block) 
 	}
 	signers := allParticipants.Filter(filter.HasNodeID(qc.SignerIDs...)) // resulting IdentityList contains no duplicates
 	if len(signers) < len(qc.SignerIDs) {
+		fmt.Println("QC signers")
+		for _, signer := range qc.SignerIDs {
+			fmt.Println("QC SIGNER", signer)
+		}
+		fmt.Println("Valid Signers")
+		for _, signer := range signers {
+			fmt.Println("valid signer", signer)
+		}
 		return newInvalidBlockError(block, fmt.Errorf("some qc signers are not valid consensus participants at block %x: %w", block.BlockID, model.ErrInvalidSigner))
 	}
 
