@@ -177,7 +177,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		var minRefHeight uint64
 		var minRefID flow.Identifier
 		var transactions []*flow.TransactionBody
-		for _, tx := range b.transactions.All() {
 		for i, tx := range b.transactions.All() {
 
 			// if we have reached maximum number of transactions, stop
