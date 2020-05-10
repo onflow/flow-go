@@ -176,6 +176,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		var minRefID flow.Identifier
 		var transactions []*flow.TransactionBody
 		for _, tx := range b.transactions.All() {
+		for i, tx := range b.transactions.All() {
 
 			// if we have reached maximum number of transactions, stop
 			if uint(len(transactions)) >= b.maxCollectionSize {
@@ -186,6 +187,11 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			refHeader, err := b.mainHeaders.ByBlockID(tx.ReferenceBlockID)
 			if err != nil {
 				return fmt.Errorf("could not retrieve reference header: %w", err)
+			}
+
+			if i == 0 {
+				minRefHeight = refHeader.Height
+				minRefID = tx.ReferenceBlockID
 			}
 
 			// for now, disallow un-finalized reference blocks
