@@ -26,6 +26,7 @@ const (
 	AccessAPIPort            = 3569
 	MetricsPort              = 8080
 	RPCPort                  = 9000
+	PprofPort                = 6060
 )
 
 var (
@@ -233,6 +234,10 @@ func prepareCollectionService(container testnet.ContainerConfig, i int) Service 
 		service.Command,
 		fmt.Sprintf("--ingress-addr=%s:%d", container.ContainerName, RPCPort),
 	)
+
+	service.Ports = []string{
+		fmt.Sprintf("%d:%d", PprofPort+i, PprofPort),
+	}
 
 	return service
 }

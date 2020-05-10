@@ -5,8 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"path/filepath"
 	"time"
+
+	_ "net/http/pprof"
 
 	"github.com/spf13/pflag"
 
@@ -169,6 +172,12 @@ func main() {
 
 			// otherwise, we already have cluster state on-disk, no bootstrapping needed
 
+			return nil
+		}).
+		Module("TODO temporary profiler", func(node *cmd.FlowNodeBuilder) error {
+			go func() {
+				node.Logger.Error().Err(http.ListenAndServe(":6060", nil)).Msg("profiler exit")
+			}()
 			return nil
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
