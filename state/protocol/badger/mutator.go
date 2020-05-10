@@ -420,7 +420,7 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 
 	// FOURTH: metrics
 
-	m.state.metrics.FinalizedHeight(header.Height)
+	m.state.metrics.FinalizedHeight(pending.Height)
 	m.state.metrics.SealedHeight(sealed.Height)
 
 	// get the finalized block for finalized metrics
