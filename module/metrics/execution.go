@@ -35,6 +35,12 @@ var (
 		Name:      "total_executed_transactions",
 		Help:      "the total number of transactions that have been executed",
 	})
+	executionLastExecutedBlockViewGauge = promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "last_executed_block_view",
+		Help:      "the last view that was executed",
+	})
 	executionStateStorageDiskTotalGauge = promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemStateStorage,
@@ -83,11 +89,11 @@ func (c *BaseMetrics) ExecutionStorageStateCommitment(bytes int64) {
 }
 
 // ExecutionLastExecutedBlockView reports last executed block view
-func (c *Collector) ExecutionLastExecutedBlockView(view uint64) {
+func (c *BaseMetrics) ExecutionLastExecutedBlockView(view uint64) {
 	executionLastExecutedBlockViewGauge.Set(float64(view))
 }
 
 // ExecutionTotalExecutedTransactions reports total executed transactions
-func (c *Collector) ExecutionTotalExecutedTransactions(numberOfTx int) {
+func (c *BaseMetrics) ExecutionTotalExecutedTransactions(numberOfTx int) {
 	executionTotalExecutedTransactionsCounter.Add(float64(numberOfTx))
 }

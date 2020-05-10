@@ -411,6 +411,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		Hex("block_id", logging.Entity(executableBlock.Block)).
 		Hex("final_state", finalState).
 		Msg("block executed")
+	e.mc.ExecutionLastExecutedBlockView(executableBlock.Block.Header.View)
 }
 
 func (e *Engine) handleCollectionResponse(ctx context.Context, response *messages.CollectionResponse) error {
