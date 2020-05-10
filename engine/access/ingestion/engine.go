@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // Engine represents the ingestion engine, used to funnel data from other nodes
@@ -167,6 +168,9 @@ func (e *Engine) onBlockProposal(_ flow.Identifier, proposal *messages.BlockProp
 	if err != nil {
 		return fmt.Errorf("could not index block for collections: %w", err)
 	}
+	e.log.Debug().
+		Hex("block_id", logging.Entity(proposal.Header)).
+		Msg("requesting collections")
 
 	// request each of the collections from the collection node
 	return e.requestCollections(proposal.Payload.Guarantees...)
@@ -176,7 +180,9 @@ func (e *Engine) onBlockProposal(_ flow.Identifier, proposal *messages.BlockProp
 func (e *Engine) handleCollectionResponse(originID flow.Identifier, response *messages.CollectionResponse) error {
 	collection := response.Collection
 	light := collection.Light()
-
+	e.log.Debug().
+		Hex("collection_id", logging.Entity(collection)).
+		Msg("got collection response")
 	// FIX: we can't index guarantees here, as we might have more than one block
 	// with the same collection as long as it is not finalized
 
@@ -193,6 +199,10 @@ func (e *Engine) handleCollectionResponse(originID flow.Identifier, response *me
 
 	// now store each of the transaction body
 	for _, tx := range collection.Transactions {
+		e.log.Debug().
+			Hex("collection_id", logging.Entity(collection)).
+			Hex("tx_id", logging.Entity(tx)).
+			Msg("storing transactions")
 		err := e.transactions.Store(tx)
 		if err != nil {
 			return err
@@ -210,6 +220,11 @@ func (e *Engine) requestCollections(guarantees ...*flow.CollectionGuarantee) err
 
 	// Request all the collections for this block
 	for _, g := range guarantees {
+		e.log.Debug().
+			Hex("collection_id", logging.Entity(g)).
+			Int("num_collection_nodes", len(ids)).
+			Msg("requesting guarantee")
+
 		err := e.collectionConduit.Submit(&messages.CollectionRequest{ID: g.ID(), Nonce: rand.Uint64()}, ids...)
 		if err != nil {
 			return err

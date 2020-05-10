@@ -78,7 +78,7 @@ func (h *Handler) GetCollectionByID(_ context.Context, req *access.GetCollection
 	// retrieve the collection from the collection storage
 	cl, err := h.collections.LightByID(id)
 	if err != nil {
-		err = convertStorageError(err)
+		err = convertStorageError(err, "could not get light collection by id")
 		return nil, err
 	}
 
@@ -88,7 +88,7 @@ func (h *Handler) GetCollectionByID(_ context.Context, req *access.GetCollection
 	for i, txID := range cl.Transactions {
 		tx, err := h.transactions.ByID(txID)
 		if err != nil {
-			err = convertStorageError(err)
+			err = convertStorageError(err, "could not get collection transactions by id")
 			return nil, err
 		}
 		transactions[i] = tx
@@ -100,7 +100,7 @@ func (h *Handler) GetCollectionByID(_ context.Context, req *access.GetCollection
 	// convert flow collection object to protobuf entity
 	ce, err := convert.CollectionToMessage(collection)
 	if err != nil {
-		err = convertStorageError(err)
+		err = convertStorageError(err, "could not convert collection to message")
 		return nil, err
 	}
 
@@ -120,7 +120,9 @@ func (h *Handler) GetAccount(ctx context.Context, req *access.GetAccountRequest)
 	}
 
 	// get the latest sealed header
-	latestHeader, err := h.state.Sealed().Head()
+	// latestHeader, err := h.state.Sealed().Head()
+	// Use final for now
+	latestHeader, err := h.state.Final().Head()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get latest sealed header: %v", err)
 	}
@@ -149,9 +151,15 @@ func (h *Handler) GetAccount(ctx context.Context, req *access.GetAccountRequest)
 
 }
 
-func convertStorageError(err error) error {
+func convertStorageError(err error, msgs ...string) error {
+	var newErr error
 	if errors.Is(err, storage.ErrNotFound) {
-		return status.Errorf(codes.NotFound, "not found: %v", err)
+		newErr = status.Errorf(codes.NotFound, "not found: %v", err)
+	} else {
+		newErr = status.Errorf(codes.Internal, "failed to find: %v", err)
 	}
-	return status.Errorf(codes.Internal, "failed to find: %v", err)
+	for _, msg := range msgs {
+		newErr = fmt.Errorf("%s: %w", msg, newErr)
+	}
+	return newErr
 }

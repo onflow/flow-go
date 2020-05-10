@@ -66,7 +66,7 @@ func (h *Handler) GetTransactionResult(ctx context.Context, req *access.GetTrans
 	// look up transaction from storage
 	tx, err := h.transactions.ByID(id)
 	if err != nil {
-		return nil, convertStorageError(err)
+		return nil, convertStorageError(err, fmt.Sprintf("failed to get transaction by id (%s)", id))
 	}
 
 	txID := tx.ID()
@@ -74,13 +74,13 @@ func (h *Handler) GetTransactionResult(ctx context.Context, req *access.GetTrans
 	// get events for the transaction
 	events, statusCode, txError, err := h.lookupTransactionResult(ctx, txID)
 	if err != nil {
-		return nil, convertStorageError(err)
+		return nil, convertStorageError(err, fmt.Sprintf("could not get transaction events (%s)", txID))
 	}
 
 	// derive status of the transaction
 	status, err := h.deriveTransactionStatus(tx)
 	if err != nil {
-		return nil, convertStorageError(err)
+		return nil, convertStorageError(err, fmt.Sprintf("failed to derive transaction status (%s)", txID))
 	}
 
 	// TODO: Set correct values for StatusCode and ErrorMessage
