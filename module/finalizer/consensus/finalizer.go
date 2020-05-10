@@ -49,6 +49,8 @@ func NewFinalizer(db *badger.DB, headers storage.Headers, payloads storage.Paylo
 // pools and persistent storage.
 func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
+	fmt.Println("-----")
+	fmt.Println("FINALIZING BLOCK", blockID)
 	// STEP ONE: This is an idempotent operation. In case we are trying to
 	// finalize a block that is already below finalized height, we want to do
 	// one of two things: if it conflicts with the block already finalized at
@@ -64,6 +66,9 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve pending header: %w", err)
 	}
+
+	fmt.Println("AT HEIGHT", pending.Height)
+	fmt.Println("-----")
 
 	if pending.Height <= finalized {
 		dup, err := f.headers.ByHeight(pending.Height)
