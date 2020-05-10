@@ -216,6 +216,10 @@ func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) 
 	if err != nil {
 		return fmt.Errorf("could not submit collection guarantee: %w", err)
 	}
+	e.log.Debug().
+		Err(err).
+		Hex("guarantee_id", logging.ID(guarantee.ID())).
+		Msgf("submitted guarantee to %d consensus nodes", len(consensusNodes))
 
 	return nil
 }
