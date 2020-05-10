@@ -82,6 +82,8 @@ func (e *Manager) ComputeBlock(
 	view *delta.View,
 ) (*execution.ComputationResult, error) {
 
+	fmt.Printf("%s, %s\n", block.Block.ID(), block.Block.Header.ParentID)
+
 	e.log.Debug().
 		Hex("block_id", logging.Entity(block.Block)).
 		Msg("received complete block")
