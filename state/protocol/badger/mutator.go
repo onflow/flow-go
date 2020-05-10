@@ -283,42 +283,52 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	// create a mapping of all payload seals to their sealed block
 	byBlock := make(map[flow.Identifier]*flow.Seal)
 	for _, seal := range payload.Seals {
-		byBlock[seal.BlockID] = seal
+
+		// get the sealed header so we can map the seal to the parent
+		// NOTE: by definition, we only try to insert blocks into the protocol
+		// state where we have the parent, and we can seal at most up to the
+		// parent, so we should never face an unknown sealed block
+		sealedHeader, err := m.state.headers.ByBlockID(seal.BlockID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve sealed header (%x): %w", seal.BlockID, err)
+		}
+
+		byParent[sealedHeader.ParentID] = seal
 	}
 	if len(payload.Seals) > len(byBlock) {
 		return fmt.Errorf("multiple seals for the same block")
 	}
 
-	// create a list of ancestors from parent to just before last sealed
+	// starting at the parent seal, we then try to build a chain of seals that
+	// validly extends the execution state, using up all of the seals
 	last, err := m.state.seals.ByBlockID(header.ParentID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve parent seal (%x): %w", header.ParentID, err)
 	}
-	lastID := lastSeal.ID()
-	sealedID := lastSeal.BlockID
-	prevState := lastSeal.FinalState
-	for sealedID != header.ParentID {
+
+	// we try to map all the seals in the payload to a chain that starts with
+	// the last seal from the parent, and goes at most up to sealing the parent
+	// itself
+	for last.BlockID != header.ParentID {
 
 		// check if we can find a valid subsequent seal for the last seal on the chain
-		next, found := byParent[sealedID]
+		next, found := byParent[last.BlockID]
 		if !found {
-			return fmt.Errorf("could not find connecting seal (sealed: %x)", sealedID)
+			return fmt.Errorf("could not find connecting seal (sealed: %x)", last.BlockID)
 		}
 
 		// check that the state transition actually matches
-		if !bytes.Equal(next.InitialState, prevState) {
+		if !bytes.Equal(next.InitialState, last.FinalState) {
 			return fmt.Errorf("seal execution states do not connect")
 		}
 
 		// if it does, remove the seal from the to-be-added seals
-		delete(byParent, sealedID)
+		delete(byParent, last.BlockID)
 		if len(byParent) == 0 {
 			break
 		}
 
-		lastID = next.ID()
-		sealedID = next.BlockID
-		prevState = next.FinalState
+		last = next
 	}
 
 	// check that we used up all the seals before reaching the parent seal
@@ -336,7 +346,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	}
 	blockID := candidate.ID()
 	err = operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
-		err := operation.IndexBlockSeal(blockID, lastID)(tx)
+		err := operation.IndexBlockSeal(blockID, last.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index candidate seal: %w", err)
 		}

@@ -117,6 +117,7 @@ func main() {
 				node.State,
 				node.Me,
 				resultsDB,
+				node.Storage.Headers,
 				results,
 				receipts,
 				approvals,

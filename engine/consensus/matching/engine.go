@@ -34,6 +34,7 @@ type Engine struct {
 	state     protocol.State           // used to access the  protocol state
 	me        module.Local             // used to access local node information
 	resultsDB storage.ExecutionResults // used to permanently store results
+	headersDB storage.Headers          // used to check sealed headers
 	results   mempool.Results          // holds execution results in memory
 	receipts  mempool.Receipts         // holds execution receipts in memory
 	approvals mempool.Approvals        // holds result approvals in memory
@@ -41,7 +42,7 @@ type Engine struct {
 }
 
 // New creates a new collection propagation engine.
-func New(log zerolog.Logger, metrics module.EngineMetrics, mempool module.MempoolMetrics, net module.Network, state protocol.State, me module.Local, resultsDB storage.ExecutionResults, results mempool.Results, receipts mempool.Receipts, approvals mempool.Approvals, seals mempool.Seals) (*Engine, error) {
+func New(log zerolog.Logger, metrics module.EngineMetrics, mempool module.MempoolMetrics, net module.Network, state protocol.State, me module.Local, resultsDB storage.ExecutionResults, headersDB storage.Headers, results mempool.Results, receipts mempool.Receipts, approvals mempool.Approvals, seals mempool.Seals) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
@@ -52,6 +53,7 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, mempool module.Mempoo
 		state:     state,
 		me:        me,
 		resultsDB: resultsDB,
+		headersDB: headersDB,
 		results:   results,
 		receipts:  receipts,
 		approvals: approvals,
@@ -265,7 +267,7 @@ func (e *Engine) checkSealing() {
 	// get all results that are sealable
 	results, err := e.sealableResults()
 	if err != nil {
-		e.log.Error().Err(err).Msg("could not get results results")
+		e.log.Error().Err(err).Msg("could not get sealable execution results")
 		return
 	}
 
@@ -278,19 +280,28 @@ func (e *Engine) checkSealing() {
 
 	// process the results results
 	for _, result := range results {
-		sealed, err := e.sealResult(result)
-		if !sealed {
-			e.log.Debug().Msg("skipped sealable result missing info")
+
+		log := e.log.With().
+			Hex("result_id", logging.Entity(result)).
+			Hex("previous_id", result.PreviousResultID[:]).
+			Hex("block_id", result.BlockID[:]).
+			Logger()
+
+		err := e.sealResult(result)
+		if err == errUnknownBlock {
+			log.Debug().Msg("skipping sealable result with unknown sealed block")
+			continue
+		}
+		if err == errUnknownPrevious {
+			log.Debug().Msg("skipping sealable result with unknown previous result")
 			continue
 		}
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not seal sealable results")
+			log.Error().Err(err).Msg("could not seal result")
 			continue
 		}
-		e.log.Info().
-			Hex("result_id", logging.Entity(result)).
-			Hex("block_id", result.BlockID[:]).
-			Msg("sealed execution result")
+
+		log.Info().Msg("sealed execution result")
 	}
 }
 
@@ -313,10 +324,11 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 
 	// go through all results and check which ones we have enough approvals for
 	for _, result := range e.results.All() {
-		resultID := result.ID()
 
 		// get the node IDs for all approvers of this result
-		approverIDs := make([]flow.Identifier, 0, len(approvals))
+		// TODO: check for duplicate approver
+		var approverIDs []flow.Identifier
+		resultID := result.ID()
 		for _, approval := range approvals {
 			if approval.Body.ExecutionResultID == resultID {
 				approverIDs = append(approverIDs, approval.Body.ApproverID)
@@ -332,7 +344,7 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 		voted := approvers.TotalStake()
 		if voted <= threshold { // nolint: emptybranch
 			// NOTE: we are currently generating a seal for every result, regardless of approvals
-			// e.log.Debug().Msg("skipping result with insufficient verification")
+			// e.log.Debug().Msg("ignoring result with insufficient verification")
 			// continue
 		}
 
@@ -343,7 +355,16 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 	return results, nil
 }
 
-func (e *Engine) sealResult(result *flow.ExecutionResult) (bool, error) {
+func (e *Engine) sealResult(result *flow.ExecutionResult) error {
+
+	// check if we know the block the result pertains to
+	_, err := e.headersDB.ByBlockID(result.BlockID)
+	if errors.Is(err, storage.ErrNotFound) {
+		return errUnknownBlock
+	}
+	if err != nil {
+		return fmt.Errorf("could not check sealed header: %w", err)
+	}
 
 	// get the previous result from our mempool or storage
 	previousID := result.PreviousResultID
@@ -352,17 +373,17 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) (bool, error) {
 		var err error
 		previous, err = e.resultsDB.ByID(previousID)
 		if errors.Is(err, storage.ErrNotFound) {
-			return false, nil
+			return errUnknownPrevious
 		}
 		if err != nil {
-			return false, fmt.Errorf("could not get previous result: %w", err)
+			return fmt.Errorf("could not get previous result: %w", err)
 		}
 	}
 
 	// store the result to make it persistent for later checks
-	err := e.resultsDB.Store(result)
+	err = e.resultsDB.Store(result)
 	if err != nil {
-		return false, fmt.Errorf("could not store sealing result: %w", err)
+		return fmt.Errorf("could not store sealing result: %w", err)
 	}
 
 	// generate & store seal
@@ -374,12 +395,13 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) (bool, error) {
 	}
 	added := e.seals.Add(seal)
 	if !added {
-		return false, nil
+		return fmt.Errorf("could not add seal to mempool")
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceSeal, e.seals.Size())
 
 	// clear up the caches
+	// TODO: find nice way to prune results/approvals for outdated heights
 	resultIDs := e.results.DropForBlock(result.BlockID)
 	e.receipts.DropForBlock(result.BlockID)
 	for _, resultID := range resultIDs {
@@ -390,5 +412,5 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) (bool, error) {
 	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
 	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
 
-	return true, nil
+	return nil
 }

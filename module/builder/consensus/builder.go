@@ -4,7 +4,6 @@ package consensus
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"time"
 
@@ -73,6 +72,11 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	err := b.db.View(operation.RetrieveFinalizedHeight(&finalized))
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve finalized height: %w", err)
+	}
+	var sealed uint64
+	err = b.db.View(operation.RetrieveSealedHeight(&sealed))
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve sealed height: %w", err)
 	}
 	var finalID flow.Identifier
 	err = b.db.View(operation.LookupBlockHeight(finalized, &finalID))
@@ -176,66 +180,62 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// find one. This creates a valid chain of seals from the last sealed block
 	// to at most the parent.
 
-	// create a mapping of block to seal for all seals in our pool
-	byBlock := make(map[flow.Identifier]*flow.Seal)
+	// we map each seal to the parent of its sealed block; that way, we can
+	// retrieve a valid seal that will *follow* each block's seal
+	byParent := make(map[flow.Identifier]*flow.Seal)
 	for _, seal := range b.sealPool.All() {
-		byBlock[seal.BlockID] = seal
-	}
-	if int(b.sealPool.Size()) > len(byBlock) {
-		return nil, fmt.Errorf("multiple seals for the same block")
-	}
 
-	// create a list of ancestors from parent to just before last sealed
-	last, err := b.seals.ByBlockID(parentID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve parent seal: %w", err)
-	}
-	ancestorID = parentID
-	var sealableIDs []flow.Identifier
-	for ancestorID != last.BlockID {
-		sealableIDs = append(sealableIDs, ancestorID)
-		ancestor, err := b.headers.ByBlockID(ancestorID)
+		// try to get the header that was sealed by the seal
+		// NOTE: we only generate seals for blocks we already know
+		sealedHeader, err := b.headers.ByBlockID(seal.BlockID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get sealable ancestor (%x): %w", ancestorID, err)
 		}
-		ancestorID = ancestor.ParentID
+
+		// remove all seals from the pool that are at or below sealed height
+		if sealedHeader.Height <= sealed {
+			_ = b.sealPool.Rem(seal.ID())
+			continue
+		}
+
+		byParent[sealedHeader.ParentID] = seal
 	}
 
-	// iterate backwards from just after last sealed to parent and build a chain
-	// of seals for those blocks that is as big as possible
+	b.metrics.MempoolEntries(metrics.ResourceSeal, b.sealPool.Size())
+
+	// get the last seal in the current chain of seals by getting the seal on
+	// the header, which we can then build on
+	last, err := b.seals.ByBlockID(parentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve last seal: %w", err)
+	}
+
+	// starting at the last seal in the chain of seals, which was mapped to the
+	// parent, we try to build a chain of valid seals, up to at most a seal that
+	// seals the parent (we can't seal the block we are building obviously)
 	var seals []*flow.Seal
-	lastID := lastSeal.ID()
-	sealedID := lastSeal.BlockID
-	prevState := lastSeal.FinalState
-	for len(byParent) > 0 {
+	for last.BlockID != parentID {
 
 		// if we don't find the next seal, we are done building the chain
-		next, found := byParent[sealedID]
+		next, found := byParent[last.BlockID]
 		if !found {
 			break
 		}
 
 		// if the states mismatch between two subsequent seals, it's an error
-		if !bytes.Equal(next.InitialState, prevState) {
+		if !bytes.Equal(next.InitialState, last.FinalState) {
 			return nil, fmt.Errorf("seal execution states do not connect")
 		}
 
-		// add seal to payload seals and delete from parent lookup
+		// add seal to payload seals and delete from parent lookup; if no seals
+		// are left, stop
 		seals = append(seals, next)
-		delete(byParent, lastSeal.BlockID)
+		delete(byParent, last.BlockID)
 		if len(byParent) == 0 {
 			break
 		}
 
-		// if we have reached the seal for the parent, we are also done
-		if next.BlockID == parentID {
-			break
-		}
-
-		// try looking for next seal
-		lastID = next.ID()
-		sealedID = next.BlockID
-		prevState = next.FinalState
+		last = next
 	}
 
 	// STEP FOUR: We now have guarantees and seals we can validly include
@@ -299,7 +299,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// update protocol state index for the seal and initialize children index
 	blockID := proposal.ID()
 	err = operation.RetryOnConflict(b.db.Update, func(tx *badger.Txn) error {
-		err = operation.IndexBlockSeal(blockID, lastID)(tx)
+		err = operation.IndexBlockSeal(blockID, last.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index proposal seal: %w", err)
 		}
