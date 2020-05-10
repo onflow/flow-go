@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"context"
+	"encoding/hex"
 	"math/rand"
 	"testing"
 	"time"
@@ -112,7 +113,6 @@ func (ss *SealingSuite) TestBlockSealCreation() {
 
 	// first, we listen to see which block proposal is the first one to be
 	// confirmed three times (finalized)
-	// NOTE: we use genesis block for now, as we need to create its seal first
 	var targetID flow.Identifier
 	parents := make(map[flow.Identifier]flow.Identifier)
 	confirmations := make(map[flow.Identifier]uint)
@@ -132,28 +132,24 @@ SearchLoop:
 			continue
 		}
 
-		// we register the proposal with zero confirmations
+		// make sure we skip duplicates
 		proposalID := proposal.Header.ID()
+		_, processed := confirmations[proposalID]
+		if processed {
+			continue
+		}
 		confirmations[proposalID] = 0
 
 		// we map the proposal to its parent for later
 		parentID := proposal.Header.ParentID
 		parents[proposalID] = parentID
 
-		// NOTE: for now, we can only seal the genesis block, so let's try that;
-		// each block without tracked parent has the genesis block as parent ID
-		_, ok = confirmations[parentID]
-		if !ok {
-			targetID = parentID
-			break
-		}
-
 		// we add one confirmation for each ancestor
 		for {
 
 			// check if we keep track of the parent
-			_, ok := confirmations[parentID]
-			if !ok {
+			_, tracked := confirmations[parentID]
+			if !tracked {
 				break
 			}
 
@@ -162,14 +158,13 @@ SearchLoop:
 
 			// check if we reached three confirmations
 			if confirmations[parentID] >= 3 {
-				// TODO: use first finalized block instead of genesis block
-				// targetID = parentID
+				targetID = parentID
 				break SearchLoop
 			}
 
 			// check if there is another ancestor
-			parentID, ok = parents[parentID]
-			if !ok {
+			parentID, tracked = parents[parentID]
+			if !tracked {
 				break
 			}
 		}
@@ -178,7 +173,7 @@ SearchLoop:
 	// make sure we found a target block to seal
 	require.NotEqual(ss.T(), flow.ZeroID, targetID, "should have found target block")
 
-	ss.T().Logf("target block found: %x", targetID)
+	ss.T().Logf("target for sealing found (block: %x)", targetID)
 
 	// create a chunk for the execution result
 	chunk := flow.Chunk{
@@ -193,18 +188,21 @@ SearchLoop:
 		EndState: unittest.StateCommitmentFixture(), // random end execution state
 	}
 
+	// hard-coded genesis result
+	resultID, _ := hex.DecodeString("80ef756372ebde1b6b873ba16522b7b132d74f46610aea34fc3f9a4dfd04f5fc")
+
 	// create the execution result for the target block
 	result := flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: flow.ZeroID,            // genesis seal has no result
-			BlockID:          targetID,               // refer the target block
-			FinalStateCommit: chunk.EndState,         // end state of only chunk
-			Chunks:           flow.ChunkList{&chunk}, // include only chunk
+			PreviousResultID: flow.HashToID(resultID), // need genesis result
+			BlockID:          targetID,                // refer the target block
+			FinalStateCommit: chunk.EndState,          // end state of only chunk
+			Chunks:           flow.ChunkList{&chunk},  // include only chunk
 		},
 		Signatures: nil,
 	}
 
-	ss.T().Logf("execution result generated: %x", result.ID())
+	ss.T().Logf("execution result generated (result: %x)", result.ID())
 
 	// create the execution receipt for the only execution node
 	receipt := flow.ExecutionReceipt{
@@ -213,8 +211,6 @@ SearchLoop:
 		Spocks:            nil,      // ignored
 		ExecutorSignature: nil,      // ignored
 	}
-
-	ss.T().Logf("execution receipt generated: %x", receipt.ID())
 
 	// keep trying to send execution receipt to the first consensus node
 ReceiptLoop:
@@ -229,6 +225,8 @@ ReceiptLoop:
 		}
 		break ReceiptLoop
 	}
+
+	ss.T().Logf("execution receipt submitted (receipt: %x, result: %x)", receipt.ID(), receipt.ExecutionResult.ID())
 
 	// create the result approval for the only verification node
 	approval := flow.ResultApproval{
@@ -245,8 +243,6 @@ ReceiptLoop:
 		VerifierSignature: nil, // ignored
 	}
 
-	ss.T().Logf("result approval generated: %x", result.ID())
-
 	// keep trying to send result approval to the first consensus node
 ApprovalLoop:
 	for time.Now().Before(deadline) {
@@ -260,6 +256,8 @@ ApprovalLoop:
 		}
 		break ApprovalLoop
 	}
+
+	ss.T().Logf("result approval submitted (approval: %x, result: %x)", approval.ID(), approval.Body.ExecutionResultID)
 
 	// we try to find a block with the guarantee included and three confirmations
 	found := false
@@ -282,14 +280,13 @@ SealingLoop:
 		// log the proposal details
 		proposalID := proposal.Header.ID()
 		seals := proposal.Payload.Seals
-		ss.T().Logf("block proposal received: %x", proposalID)
 
 		// if the block seal is included, we add the block to those we
 		// monitor for confirmations
 		for _, seal := range seals {
 			if seal.ResultID == result.ID() {
 				found = true
-				ss.T().Log("block seal included!")
+				ss.T().Logf("%x: block seal included!", proposalID)
 				break SealingLoop
 			}
 		}

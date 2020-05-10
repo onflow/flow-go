@@ -28,7 +28,4 @@ type Approvals interface {
 
 	// All will return a list of all approvals in the memory pool.
 	All() []*flow.ResultApproval
-
-	// DropForResult will drop the approvals for the given result..
-	DropForResult(resultID flow.Identifier) []flow.Identifier
 }

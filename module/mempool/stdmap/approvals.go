@@ -55,6 +55,20 @@ func (a *Approvals) All() []*flow.ResultApproval {
 	return approvals
 }
 
+// ByResultID returns an approval by receipt ID.
+func (a *Approvals) ByResultID(resultID flow.Identifier) []*flow.ResultApproval {
+	forResult, hasResult := a.byResult[resultID]
+	if !hasResult {
+		return nil
+	}
+	approvals := make([]*flow.ResultApproval, 0, len(forResult))
+	for approvalID := range forResult {
+		entity, _ := a.Backend.ByID(approvalID)
+		approvals = append(approvals, entity.(*flow.ResultApproval))
+	}
+	return approvals
+}
+
 // DropForResult drops all execution receipts for the given block.
 func (a *Approvals) DropForResult(resultID flow.Identifier) []flow.Identifier {
 	var approvalIDs []flow.Identifier
