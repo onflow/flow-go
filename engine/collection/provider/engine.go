@@ -130,7 +130,9 @@ func (e *Engine) onSubmitCollectionGuarantee(originID flow.Identifier, req *mess
 	if originID != e.me.NodeID() {
 		return fmt.Errorf("invalid remote request to submit collection guarantee (from=%x)", originID)
 	}
-
+	e.log.Debug().
+		Hex("guarantee_id", logging.ID(req.Guarantee.ID())).
+		Msg("submitting guarantee")
 	return e.SubmitCollectionGuarantee(&req.Guarantee)
 }
 
@@ -217,7 +219,6 @@ func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) 
 		return fmt.Errorf("could not submit collection guarantee: %w", err)
 	}
 	e.log.Debug().
-		Err(err).
 		Hex("guarantee_id", logging.ID(guarantee.ID())).
 		Msgf("submitted guarantee to %d consensus nodes", len(consensusNodes))
 

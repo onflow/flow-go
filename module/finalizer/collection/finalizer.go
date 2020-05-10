@@ -127,7 +127,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			f.metrics.CollectionGuaranteed(payload.Collection.Light())
 
 			// don't bother submitting empty collections
-			if len(payload.Collection.Transactions) == 0 {
+			if payload.Collection.Len() == 0 {
 				continue
 			}
 
