@@ -154,6 +154,10 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 			return fmt.Errorf("could not insert sealed height: %w", err)
 		}
 
+		m.state.metrics.BlockProposed(genesis)
+		m.state.metrics.BlockFinalized(genesis)
+		m.state.metrics.BlockSealed(genesis)
+
 		return nil
 	})
 }
@@ -320,6 +324,10 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		return fmt.Errorf("could not execute state extension: %w", err)
 	}
 
+	// SEVENTH: Metrics.
+
+	m.state.metrics.BlockProposed(candidate)
+
 	return nil
 }
 
@@ -386,6 +394,27 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	})
 	if err != nil {
 		return fmt.Errorf("could not execute finalization: %w", err)
+	}
+
+	// FOURTH: metrics
+
+	// get the finalized block for finalized metrics
+	final, err := m.state.blocks.ByID(blockID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve finalized block: %w", err)
+	}
+
+	m.state.metrics.BlockFinalized(final)
+
+	for _, seal := range final.Payload.Seals {
+
+		// get each sealed block for sealed metrics
+		sealed, err := m.state.blocks.ByID(seal.BlockID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve sealed block (%x): %w", seal.BlockID, err)
+		}
+
+		m.state.metrics.BlockSealed(sealed)
 	}
 
 	return nil

@@ -42,27 +42,30 @@ import (
 
 func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participants []*flow.Identity, options ...func(*protocol.State)) mock.GenericNode {
 
-	var index int
+	var i int
 	var participant *flow.Identity
-	for index, participant = range participants {
+	for i, participant = range participants {
 		if identity.NodeID == participant.NodeID {
 			break
 		}
 	}
 
-	log := zerolog.New(os.Stderr).With().Int("index", index).Hex("node_id", identity.NodeID[:]).Logger()
+	log := zerolog.New(os.Stderr).With().Int("index", i).Hex("node_id", identity.NodeID[:]).Logger()
 
 	dbDir := unittest.TempDir(t)
 	db := unittest.BadgerDB(t, dbDir)
 
-	identities := storage.NewIdentities(db)
-	guarantees := storage.NewGuarantees(db)
-	seals := storage.NewSeals(db)
-	headers := storage.NewHeaders(db)
-	payloads := storage.NewPayloads(db, identities, guarantees, seals)
+	metrics := metrics.NewNoopCollector()
+
+	identities := storage.NewIdentities(metrics, db)
+	guarantees := storage.NewGuarantees(metrics, db)
+	seals := storage.NewSeals(metrics, db)
+	headers := storage.NewHeaders(metrics, db)
+	index := storage.NewIndex(metrics, db)
+	payloads := storage.NewPayloads(index, identities, guarantees, seals)
 	blocks := storage.NewBlocks(db, headers, payloads)
 
-	state, err := protocol.NewState(db, headers, identities, seals, payloads, blocks)
+	state, err := protocol.NewState(metrics, db, headers, identities, seals, payloads, blocks)
 	require.NoError(t, err)
 
 	genesis := flow.Genesis(participants)
@@ -88,15 +91,12 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 
 	stubnet := stub.NewNetwork(state, me, hub)
 
-	mc, err := metrics.NewCollector(log)
-	require.NoError(t, err)
-
 	tracer, err := trace.NewTracer(log, "test")
 	require.NoError(t, err)
 
 	return mock.GenericNode{
 		Log:        log,
-		Metrics:    mc,
+		Metrics:    metrics,
 		Tracer:     tracer,
 		DB:         db,
 		Headers:    headers,
@@ -174,13 +174,13 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	seals, err := stdmap.NewSeals(1000)
 	require.NoError(t, err)
 
-	propagationEngine, err := propagation.New(node.Log, node.Net, node.State, node.Me, guarantees)
+	propagationEngine, err := propagation.New(node.Log, node.Metrics, node.Metrics, node.Metrics, node.Net, node.State, node.Me, guarantees)
 	require.NoError(t, err)
 
-	ingestionEngine, err := consensusingest.New(node.Log, node.Net, propagationEngine, node.State, node.Metrics, node.Me)
+	ingestionEngine, err := consensusingest.New(node.Log, node.Metrics, node.Net, propagationEngine, node.State, node.Me)
 	require.Nil(t, err)
 
-	matchingEngine, err := matching.New(node.Log, node.Net, node.State, node.Me, results, receipts, approvals, seals)
+	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Metrics, node.Net, node.State, node.Me, results, receipts, approvals, seals)
 	require.Nil(t, err)
 
 	return mock.ConsensusNode{
@@ -220,7 +220,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	collectionsStorage := storage.NewCollections(node.DB)
 	eventsStorage := storage.NewEvents(node.DB)
 	txResultStorage := storage.NewTransactionResults(node.DB)
-	commitsStorage := storage.NewCommits(node.DB)
+	commitsStorage := storage.NewCommits(node.Metrics, node.DB)
 	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
 	executionResults := storage.NewExecutionResults(node.DB)
 
@@ -364,7 +364,7 @@ func VerificationNode(t testing.TB,
 		chunkVerifier := chunks.NewChunkVerifier(vm)
 
 		require.NoError(t, err)
-		node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me, chunkVerifier, node.Metrics)
+		node.VerifierEngine, err = verifier.New(node.Log, node.Metrics, node.Net, node.State, node.Me, chunkVerifier)
 		require.Nil(t, err)
 	}
 

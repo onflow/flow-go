@@ -69,7 +69,7 @@ func TestInvalidTransaction(t *testing.T) {
 	})
 
 	t.Run("expired reference block ID", func(t *testing.T) {
-		util.RunWithStorageLayer(t, func(_ *badger.DB, _ *storage.Headers, _ *storage.Identities, _ *storage.Guarantees, _ *storage.Seals, _ *storage.Payloads, blocks *storage.Blocks) {
+		util.RunWithStorageLayer(t, func(_ *badger.DB, _ *storage.Headers, _ *storage.Identities, _ *storage.Guarantees, _ *storage.Seals, _ *storage.Index, _ *storage.Payloads, blocks *storage.Blocks) {
 
 			// build enough blocks to make genesis an expired reference
 			parent := genesis

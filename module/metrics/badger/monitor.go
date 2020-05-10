@@ -16,12 +16,12 @@ const checkInterval = 5 * time.Second
 // Monitor implements passive monitoring of Badger database metrics.
 type Monitor struct {
 	unit    *engine.Unit
-	metrics module.Metrics
+	metrics module.BadgerMetrics
 	db      *badger.DB
 }
 
 // NewMonitor returns a new monitor for reporting Badger metrics.
-func NewMonitor(metrics module.Metrics, db *badger.DB) *Monitor {
+func NewMonitor(metrics module.BadgerMetrics, db *badger.DB) *Monitor {
 	monitor := &Monitor{
 		unit:    engine.NewUnit(),
 		metrics: metrics,

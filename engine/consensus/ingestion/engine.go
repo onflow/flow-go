@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -22,19 +23,20 @@ import (
 // link between collection nodes and consensus nodes and has a counterpart with
 // the same engine ID in the collection node.
 type Engine struct {
-	unit    *engine.Unit   // used to manage concurrency & shutdown
-	log     zerolog.Logger // used to log relevant actions with context
-	metrics module.Metrics // used to report metrics
-	prop    network.Engine // used to process & propagate collections
-	state   protocol.State // used to access the  protocol state
-	me      module.Local   // used to access local node information
+	unit    *engine.Unit            // used to manage concurrency & shutdown
+	log     zerolog.Logger          // used to log relevant actions with context
+	metrics module.EngineMetrics    // used to track sent & received messages
+	spans   module.ConsensusMetrics // used to track consensus spans
+	prop    network.Engine          // used to process & propagate collections
+	state   protocol.State          // used to access the  protocol state
+	me      module.Local            // used to access local node information
 	// the number of blocks that can be between the reference block and the
 	// finalized head before we consider the transaction expired
 	expiry uint64
 }
 
 // New creates a new collection propagation engine.
-func New(log zerolog.Logger, net module.Network, prop network.Engine, state protocol.State, metrics module.Metrics, me module.Local) (*Engine, error) {
+func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, prop network.Engine, state protocol.State, me module.Local) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
@@ -103,9 +105,10 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // to this function originate within the expulsion engine on the node with the
 // given origin ID.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch entity := event.(type) {
+	switch ev := event.(type) {
 	case *flow.CollectionGuarantee:
-		return e.onCollectionGuarantee(originID, entity)
+		e.metrics.MessageReceived(metrics.EngineIngestion, metrics.MessageCollectionGuarantee)
+		return e.onCollectionGuarantee(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -184,8 +187,6 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	// we could just validate it here and add it to the memory pool directly,
 	// but then we would duplicate the validation logic
 	e.prop.SubmitLocal(guarantee)
-
-	e.metrics.StartCollectionToFinalized(guarantee.ID())
 
 	return nil
 }

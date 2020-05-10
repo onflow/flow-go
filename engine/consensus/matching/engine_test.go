@@ -15,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
@@ -27,6 +28,7 @@ var reachedEnd = errors.New("reached end of test")
 func TestNewEngine(t *testing.T) {
 
 	log := zerolog.New(ioutil.Discard)
+	metrics := metrics.NewNoopCollector()
 
 	net := &module.Network{}
 	net.On("Register", uint8(engine.ExecutionReceiptProvider), mock.Anything).Return(&network.Conduit{}, nil).Once()
@@ -39,7 +41,7 @@ func TestNewEngine(t *testing.T) {
 	approvals := &mempool.Approvals{}
 	seals := &mempool.Seals{}
 
-	e, err := New(log, net, state, me, results, receipts, approvals, seals)
+	e, err := New(log, metrics, metrics, net, state, me, results, receipts, approvals, seals)
 	require.NoError(t, err)
 
 	assert.NotNil(t, e.unit)
@@ -56,6 +58,8 @@ func TestNewEngine(t *testing.T) {
 
 func TestOnReceiptValid(t *testing.T) {
 
+	metrics := metrics.NewNoopCollector()
+
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	receipt := unittest.ExecutionReceiptFixture()
 	receipt.ExecutorID = identity.NodeID
@@ -71,11 +75,13 @@ func TestOnReceiptValid(t *testing.T) {
 	state.On("AtBlockID", mock.Anything).Return(boundary)
 	snapshot.On("Identity", mock.Anything).Return(identity, nil)
 	receipts.On("Add", mock.Anything).Return(nil)
+	receipts.On("Size").Return(uint(0))
 	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
-	// TODO temp
 	snapshot.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
+		metrics:   metrics,
+		mempool:   metrics,
 		state:     state,
 		approvals: approvals,
 		receipts:  receipts,
@@ -90,6 +96,8 @@ func TestOnReceiptValid(t *testing.T) {
 }
 
 func TestOnReceiptWrongExecutor(t *testing.T) {
+
+	metrics := metrics.NewNoopCollector()
 
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	receipt := unittest.ExecutionReceiptFixture()
@@ -106,11 +114,13 @@ func TestOnReceiptWrongExecutor(t *testing.T) {
 	state.On("AtBlockID", mock.Anything).Return(boundary)
 	snapshot.On("Identity", mock.Anything).Return(identity, nil)
 	receipts.On("Add", mock.Anything).Return(nil)
+	receipts.On("Size").Return(uint(0))
 	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
-	// TODO temp
 	snapshot.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
+		metrics:   metrics,
+		mempool:   metrics,
 		state:     state,
 		approvals: approvals,
 		receipts:  receipts,
@@ -124,6 +134,8 @@ func TestOnReceiptWrongExecutor(t *testing.T) {
 }
 
 func TestOnReceiptMissingIdentity(t *testing.T) {
+
+	metrics := metrics.NewNoopCollector()
 
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	receipt := unittest.ExecutionReceiptFixture()
@@ -140,11 +152,13 @@ func TestOnReceiptMissingIdentity(t *testing.T) {
 	state.On("AtBlockID", mock.Anything).Return(boundary)
 	snapshot.On("Identity", mock.Anything).Return(nil, errors.New("identity missing"))
 	receipts.On("Add", mock.Anything).Return(nil)
+	receipts.On("Size").Return(uint(0))
 	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
-	// TODO temp
 	snapshot.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
+		metrics:   metrics,
+		mempool:   metrics,
 		state:     state,
 		approvals: approvals,
 		receipts:  receipts,
@@ -158,6 +172,8 @@ func TestOnReceiptMissingIdentity(t *testing.T) {
 }
 
 func TestOnReceiptZeroStake(t *testing.T) {
+
+	metrics := metrics.NewNoopCollector()
 
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	receipt := unittest.ExecutionReceiptFixture()
@@ -175,11 +191,13 @@ func TestOnReceiptZeroStake(t *testing.T) {
 	state.On("AtBlockID", mock.Anything).Return(boundary)
 	snapshot.On("Identity", mock.Anything).Return(identity, nil)
 	receipts.On("Add", mock.Anything).Return(nil)
+	receipts.On("Size").Return(uint(0))
 	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
-	// TODO temp
 	snapshot.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
+		metrics:   metrics,
+		mempool:   metrics,
 		state:     state,
 		approvals: approvals,
 		receipts:  receipts,
@@ -193,6 +211,8 @@ func TestOnReceiptZeroStake(t *testing.T) {
 }
 
 func TestOnReceiptWrongRole(t *testing.T) {
+
+	metrics := metrics.NewNoopCollector()
 
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 	receipt := unittest.ExecutionReceiptFixture()
@@ -209,11 +229,13 @@ func TestOnReceiptWrongRole(t *testing.T) {
 	state.On("AtBlockID", mock.Anything).Return(boundary)
 	snapshot.On("Identity", mock.Anything).Return(identity, nil)
 	receipts.On("Add", mock.Anything).Return(nil)
+	receipts.On("Size").Return(uint(0))
 	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
-	// TODO temp
 	snapshot.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
+		metrics:   metrics,
+		mempool:   metrics,
 		state:     state,
 		approvals: approvals,
 		receipts:  receipts,
@@ -227,6 +249,8 @@ func TestOnReceiptWrongRole(t *testing.T) {
 }
 
 func TestOnApprovalValid(t *testing.T) {
+
+	metrics := metrics.NewNoopCollector()
 
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	approval := unittest.ResultApprovalFixture()
@@ -243,14 +267,16 @@ func TestOnApprovalValid(t *testing.T) {
 	state.On("AtBlockID", mock.Anything).Return(boundary)
 	snapshot.On("Identity", mock.Anything).Return(identity, nil)
 	approvals.On("Add", mock.Anything).Return(nil)
+	approvals.On("Size").Return(uint(0))
 	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
-	// TODO temp
 	snapshot.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
+		metrics:   metrics,
+		mempool:   metrics,
 		state:     state,
-		receipts:  receipts,
 		approvals: approvals,
+		receipts:  receipts,
 	}
 
 	err := e.onApproval(identity.NodeID, approval)
@@ -262,6 +288,8 @@ func TestOnApprovalValid(t *testing.T) {
 }
 
 func TestOnApprovalWrongApprover(t *testing.T) {
+
+	metrics := metrics.NewNoopCollector()
 
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	approval := unittest.ResultApprovalFixture()
@@ -278,14 +306,16 @@ func TestOnApprovalWrongApprover(t *testing.T) {
 	state.On("AtBlockID", mock.Anything).Return(boundary)
 	snapshot.On("Identity", mock.Anything).Return(identity, nil)
 	approvals.On("Add", mock.Anything).Return(nil)
+	approvals.On("Size").Return(uint(0))
 	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
-	// TODO temp
 	snapshot.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
+		metrics:   metrics,
+		mempool:   metrics,
 		state:     state,
-		receipts:  receipts,
 		approvals: approvals,
+		receipts:  receipts,
 	}
 
 	err := e.onApproval(identity.NodeID, approval)
@@ -296,6 +326,8 @@ func TestOnApprovalWrongApprover(t *testing.T) {
 }
 
 func TestOnApprovalMissingIdentity(t *testing.T) {
+
+	metrics := metrics.NewNoopCollector()
 
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	approval := unittest.ResultApprovalFixture()
@@ -311,14 +343,16 @@ func TestOnApprovalMissingIdentity(t *testing.T) {
 	state.On("AtBlockID", mock.Anything).Return(boundary)
 	snapshot.On("Identity", mock.Anything).Return(nil, errors.New("identity missing"))
 	approvals.On("Add", mock.Anything).Return(nil)
+	approvals.On("Size").Return(uint(0))
 	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
-	// TODO temp
 	snapshot.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
+		metrics:   metrics,
+		mempool:   metrics,
 		state:     state,
-		receipts:  receipts,
 		approvals: approvals,
+		receipts:  receipts,
 	}
 
 	err := e.onApproval(identity.NodeID, approval)
@@ -329,6 +363,8 @@ func TestOnApprovalMissingIdentity(t *testing.T) {
 }
 
 func TestOnApprovalZeroStake(t *testing.T) {
+
+	metrics := metrics.NewNoopCollector()
 
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	approval := unittest.ResultApprovalFixture()
@@ -345,14 +381,16 @@ func TestOnApprovalZeroStake(t *testing.T) {
 	state.On("AtBlockID", mock.Anything).Return(boundary)
 	snapshot.On("Identity", mock.Anything).Return(identity, nil)
 	approvals.On("Add", mock.Anything).Return(nil)
+	approvals.On("Size").Return(uint(0))
 	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
-	// TODO temp
 	snapshot.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
+		metrics:   metrics,
+		mempool:   metrics,
 		state:     state,
-		receipts:  receipts,
 		approvals: approvals,
+		receipts:  receipts,
 	}
 
 	err := e.onApproval(identity.NodeID, approval)
@@ -363,6 +401,8 @@ func TestOnApprovalZeroStake(t *testing.T) {
 }
 
 func TestOnApprovalWrongRole(t *testing.T) {
+
+	metrics := metrics.NewNoopCollector()
 
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 	approval := unittest.ResultApprovalFixture()
@@ -378,14 +418,16 @@ func TestOnApprovalWrongRole(t *testing.T) {
 	state.On("AtBlockID", mock.Anything).Return(boundary)
 	snapshot.On("Identity", mock.Anything).Return(identity, nil)
 	approvals.On("Add", mock.Anything).Return(nil)
+	approvals.On("Size").Return(uint(0))
 	boundary.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
-	// TODO temp
 	snapshot.On("Identities", mock.Anything, mock.Anything).Return(nil, reachedEnd)
 
 	e := Engine{
+		metrics:   metrics,
+		mempool:   metrics,
 		state:     state,
-		receipts:  receipts,
 		approvals: approvals,
+		receipts:  receipts,
 	}
 
 	err := e.onApproval(identity.NodeID, approval)

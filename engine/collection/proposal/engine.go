@@ -29,7 +29,7 @@ import (
 type Engine struct {
 	unit         *engine.Unit
 	log          zerolog.Logger
-	metrics      module.Metrics
+	metrics      module.CollectionMetrics
 	con          network.Conduit
 	me           module.Local
 	protoState   protocol.State  // flow-wide protocol chain state
@@ -51,7 +51,7 @@ func New(
 	me module.Local,
 	protoState protocol.State,
 	clusterState clusterkv.State,
-	metrics module.Metrics,
+	metrics module.CollectionMetrics,
 	validator module.TransactionValidator,
 	pool mempool.Transactions,
 	transactions storage.Transactions,
