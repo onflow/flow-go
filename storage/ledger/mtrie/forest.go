@@ -272,25 +272,29 @@ func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*BatchProof, error) {
 	if err != nil {
 		return nil, err
 	}
-	for i, key := range keys {
-		// TODO figure out nil vs empty slice
-		// non exist
-		if retValues[i] == nil || len(retValues[i]) == 0 {
-			notFoundKeys = append(notFoundKeys, key)
-			notFoundValues = append(notFoundValues, []byte{})
-		}
-	}
 
-	if len(notFoundKeys) > 0 {
-		// TODO change this to lowercase (needs some prepration, just don't persist it)
-		newRootHash, err := f.Update(notFoundKeys, notFoundValues, rootHash)
-		if err != nil {
-			return nil, err
+	sortedKeys := make([][]byte, 0)
+	keyOrgIndex := make(map[string][]int)
+	for i, key := range keys {
+		// check key sizes
+		if len(key) != f.keyByteSize {
+			return nil, fmt.Errorf("key size doesn't match the trie height: %x", key)
 		}
-		// rootHash shouldn't change
-		if !bytes.Equal(newRootHash, rootHash) {
-			return nil, errors.New("root hash has changed during the operation")
+		// only collect dupplicated keys once
+		if _, ok := keyOrgIndex[hex.EncodeToString(key)]; !ok {
+			sortedKeys = append(sortedKeys, key)
+			keyOrgIndex[hex.EncodeToString(key)] = []int{i}
+
+			// add it only once
+			if len(retValues[i]) == 0 {
+				notFoundKeys = append(notFoundKeys, key)
+				notFoundValues = append(notFoundValues, []byte{})
+			}
+		} else {
+			// handles duplicated keys
+			keyOrgIndex[hex.EncodeToString(key)] = append(keyOrgIndex[hex.EncodeToString(key)], i)
 		}
+
 	}
 
 	trie, err := f.GetTrie(rootHash)
@@ -298,19 +302,52 @@ func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*BatchProof, error) {
 		return nil, err
 	}
 
-	bp := NewBatchProofWithEmptyProofs(len(keys))
+	// if we have to insert empty values
+	if len(notFoundKeys) > 0 {
+		newRoot := newNode(f.maxHeight - 1)
+		newTrie := NewMTrie(newRoot)
+
+		sort.Slice(notFoundKeys, func(i, j int) bool {
+			return bytes.Compare(notFoundKeys[i], notFoundKeys[j]) < 0
+		})
+
+		err = f.update(newTrie, trie.root, newRoot, notFoundKeys, notFoundValues)
+		if err != nil {
+			return nil, err
+		}
+
+		// rootHash shouldn't change
+		if !bytes.Equal(f.GetNodeHash(newRoot), rootHash) {
+			return nil, errors.New("root hash has changed during the operation")
+		}
+		trie = newTrie
+	}
+
+	sort.Slice(sortedKeys, func(i, j int) bool {
+		return bytes.Compare(sortedKeys[i], sortedKeys[j]) < 0
+	})
+
+	bp := NewBatchProofWithEmptyProofs(len(sortedKeys))
 
 	for _, p := range bp.Proofs {
 		p.flags = make([]byte, f.keyByteSize)
 		p.inclusion = false
 	}
 
-	err = f.proofs(trie.root, keys, bp.Proofs)
+	err = f.proofs(trie.root, sortedKeys, bp.Proofs)
 	if err != nil {
 		return nil, err
 	}
 
-	return bp, nil
+	// reconstruct the proofs in the same key order that called the method
+	retbp := NewBatchProofWithEmptyProofs(len(keys))
+	for i, k := range sortedKeys {
+		for _, j := range keyOrgIndex[hex.EncodeToString(k)] {
+			retbp.Proofs[j] = bp.Proofs[i]
+		}
+	}
+
+	return retbp, nil
 }
 
 func (f *MForest) proofs(head *node, keys [][]byte, proofs []*Proof) error {

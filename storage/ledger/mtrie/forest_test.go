@@ -444,6 +444,42 @@ func TestReadWithWrongKeySize(t *testing.T) {
 
 // TODO test read (multiple non exist in a branch)
 
+func TestUpdatePrevStates(t *testing.T) {
+	trieHeight := 17 // should be key size (in bits) + 1
+	fStore := mtrie.NewMForest(trieHeight)
+	rootHash := fStore.GetEmptyRootHash()
+
+	k1 := []byte([]uint8{uint8(53), uint8(74)})
+	v1 := []byte{'A'}
+	k2 := []byte([]uint8{uint8(116), uint8(129)})
+	v2 := []byte{'B'}
+	keys := [][]byte{k1, k2}
+	values := [][]byte{v1, v2}
+	rootHash21, err := fStore.Update(keys, values, rootHash)
+	require.NoError(t, err)
+
+	v1p := []byte{'C'}
+	k3 := []byte([]uint8{uint8(116), uint8(22)})
+	v3 := []byte{'D'}
+	keys = [][]byte{k1, k3}
+	values = [][]byte{v1p, v3}
+	rootHash22, err := fStore.Update(keys, values, rootHash)
+	require.NoError(t, err)
+
+	keys = [][]byte{k1, k2, k3}
+	retValues, err := fStore.Read(keys, rootHash21)
+	require.NoError(t, err)
+	require.True(t, bytes.Equal(retValues[0], v1))
+	require.True(t, bytes.Equal(retValues[1], v2))
+	require.True(t, bytes.Equal(retValues[2], []byte{}))
+
+	retValues, err = fStore.Read(keys, rootHash22)
+	require.NoError(t, err)
+	require.True(t, bytes.Equal(retValues[0], v1p))
+	require.True(t, bytes.Equal(retValues[1], []byte{}))
+	require.True(t, bytes.Equal(retValues[2], v3))
+}
+
 func TestRandomUpdateReadProof(t *testing.T) {
 	keyByteSize := 2
 	trieHeight := keyByteSize*8 + 1
