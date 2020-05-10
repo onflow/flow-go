@@ -138,31 +138,45 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 	})
 }
 
-func (c *Collections) LightByTransactionID(txID flow.Identifier) (*flow.LightCollection, error) {
-	var collection flow.LightCollection
+func (c *Collections) CollectionIDsByTransactionID(txID flow.Identifier) ([]flow.Identifier, error) {
+	collIDs := new([]flow.Identifier)
+
 	err := c.db.View(func(tx *badger.Txn) error {
-		collID := &flow.Identifier{}
-		err := operation.RetrieveCollectionID(txID, collID)(tx)
+		err := operation.RetrieveCollectionIDs(txID, collIDs)(tx)
 		if err != nil {
 			if errors.Is(err, badger.ErrKeyNotFound) {
 				return storage.ErrNotFound
 			}
-			return fmt.Errorf("could not retrieve collection id: %w", err)
+			return fmt.Errorf("could not retrieve collection ids: %w", err)
 		}
-
-		err = operation.RetrieveCollection(*collID, &collection)(tx)
-		if err != nil {
-			if errors.Is(err, badger.ErrKeyNotFound) {
-				return storage.ErrNotFound
-			}
-			return fmt.Errorf("could not retrieve collection: %w", err)
-		}
-
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	return &collection, nil
+	return *collIDs, nil
+}
+
+func (c *Collections) MarkAsFinalized(collID, blockID flow.Identifier) error {
+	return c.db.Update(operation.SetCollectionFinalized(collID, blockID))
+}
+
+func (c *Collections) IsFinalizedByID(collID flow.Identifier) (flow.Identifier, error) {
+	var blockID flow.Identifier
+	err := c.db.View(func(txn *badger.Txn) error {
+		err := operation.LookupCollectionFinalized(collID, &blockID)(txn)
+		if err != nil {
+			if errors.Is(err, badger.ErrKeyNotFound) {
+				return storage.ErrNotFound
+			}
+			return fmt.Errorf("could not retrieve collection finalized: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return flow.Identifier{}, err
+	}
+
+	return blockID, nil
 }

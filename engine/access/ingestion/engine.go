@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // Engine represents the ingestion engine, used to funnel data from other nodes
@@ -150,7 +151,27 @@ func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 			return
 		}
 		e.metrics.FinalizedBlocks(1)
+
+		err = e.indexFinalizedCollections(block.ID(), block.Payload.Guarantees)
+		if err != nil {
+			e.log.Error().
+				Err(err).
+				Hex("block_id", logging.Entity(block)).
+				Msg("failed to mark collections as finalized")
+			return
+		}
 	})
+}
+
+func (e *Engine) indexFinalizedCollections(blockID flow.Identifier, guarantees []*flow.CollectionGuarantee) error {
+	for _, guarantee := range guarantees {
+		err := e.collections.MarkAsFinalized(guarantee.CollectionID, blockID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // onBlock handles an incoming block.
@@ -177,9 +198,6 @@ func (e *Engine) onBlockProposal(_ flow.Identifier, proposal *messages.BlockProp
 func (e *Engine) handleCollectionResponse(originID flow.Identifier, response *messages.CollectionResponse) error {
 	collection := response.Collection
 	light := collection.Light()
-
-	// FIX: we can't index guarantees here, as we might have more than one block
-	// with the same collection as long as it is not finalized
 
 	// store the light collection (collection minus the transaction body - those are stored separately)
 	// and add transaction ids as index

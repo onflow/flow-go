@@ -19,6 +19,8 @@ import (
 // SendTransaction forwards the transaction to the collection node
 func (h *Handler) SendTransaction(ctx context.Context, req *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {
 
+	fmt.Println("GOT TRANSACTION", req.Transaction)
+
 	// send the transaction to the collection node
 	resp, err := h.collectionRPC.SendTransaction(ctx, req)
 	if err != nil {
@@ -30,6 +32,8 @@ func (h *Handler) SendTransaction(ctx context.Context, req *access.SendTransacti
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to convert transaction: %v", err))
 	}
+
+	fmt.Println("GOT TRANSACTION 2", tx)
 
 	// store the transaction locally
 	err = h.transactions.Store(&tx)
@@ -71,14 +75,14 @@ func (h *Handler) GetTransactionResult(ctx context.Context, req *access.GetTrans
 
 	txID := tx.ID()
 
-	// get events for the transaction
-	events, statusCode, txError, err := h.lookupTransactionResult(ctx, txID)
+	// derive status of the transaction
+	status, err := h.deriveTransactionStatus(tx)
 	if err != nil {
 		return nil, convertStorageError(err)
 	}
 
-	// derive status of the transaction
-	status, err := h.deriveTransactionStatus(tx)
+	// get events for the transaction
+	events, statusCode, txError, err := h.lookupTransactionResult(ctx, txID)
 	if err != nil {
 		return nil, convertStorageError(err)
 	}
@@ -93,6 +97,8 @@ func (h *Handler) GetTransactionResult(ctx context.Context, req *access.GetTrans
 		ErrorMessage: txError,
 	}
 
+	fmt.Println("TX STATUS", resp)
+
 	return resp, nil
 }
 
@@ -100,45 +106,55 @@ func (h *Handler) GetTransactionResult(ctx context.Context, req *access.GetTrans
 func (h *Handler) deriveTransactionStatus(tx *flow.TransactionBody) (entities.TransactionStatus, error) {
 
 	block, err := h.lookupBlock(tx.ID())
-	if errors.Is(err, storage.ErrNotFound) {
-		// tx found in transaction storage and collection storage but not in block storage
-		// However, this will not happen as of now since the ingestion engine doesn't subscribe
-		// for collections
+	if err != nil {
+		return entities.TransactionStatus_UNKNOWN, err
+	}
+
+	if block == nil {
 		return entities.TransactionStatus_PENDING, nil
 	}
+
+	contains, err := h.state.Sealed().Contains(block.ID())
 	if err != nil {
 		return entities.TransactionStatus_UNKNOWN, err
 	}
 
-	// get the latest sealed block from the state
-	sealed, err := h.state.Sealed().Head()
-	if err != nil {
-		return entities.TransactionStatus_UNKNOWN, err
-	}
-
-	// if the finalized block precedes the latest sealed block, then it can be safely assumed that it would have been
-	// sealed as well and the transaction can be considered sealed
-	if block.Header.Height <= sealed.Height {
+	if contains {
 		return entities.TransactionStatus_SEALED, nil
 	}
-	// otherwise, the finalized block of the transaction has not yet been sealed
-	// hence the transaction is finalized but not sealed
+
 	return entities.TransactionStatus_FINALIZED, nil
 }
 
 func (h *Handler) lookupBlock(txID flow.Identifier) (*flow.Block, error) {
-
-	collection, err := h.collections.LightByTransactionID(txID)
+	collectionIDs, err := h.collections.CollectionIDsByTransactionID(txID)
 	if err != nil {
 		return nil, err
 	}
 
-	block, err := h.blocks.ByCollectionID(collection.ID())
-	if err != nil {
-		return nil, err
+	for _, collectionID := range collectionIDs {
+		blockID, err := h.collections.IsFinalizedByID(collectionID)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				continue
+			}
+
+			return nil, err
+		}
+
+		fmt.Println("TX IS FINALIZED", txID)
+
+		block, err := h.blocks.ByID(blockID)
+		if err != nil {
+			return nil, err
+		}
+
+		return block, nil
 	}
 
-	return block, nil
+	fmt.Println("TX IS NOT FINALIZED", txID)
+
+	return nil, nil
 }
 
 func (h *Handler) lookupTransactionResult(ctx context.Context, txID flow.Identifier) ([]*entities.Event, uint32, string, error) {
@@ -146,11 +162,11 @@ func (h *Handler) lookupTransactionResult(ctx context.Context, txID flow.Identif
 	// find the block ID for the transaction
 	block, err := h.lookupBlock(txID)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			// access node may not have the block if it hasn't yet been finalized
-			return nil, 0, "", nil
-		}
 		return nil, 0, "", convertStorageError(err)
+	}
+
+	if block == nil {
+		return nil, 0, "", nil
 	}
 
 	blockID := block.ID()

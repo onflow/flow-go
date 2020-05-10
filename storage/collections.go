@@ -30,7 +30,9 @@ type Collections interface {
 	// for each of the transactions within the collection
 	StoreLightAndIndexByTransaction(collection *flow.LightCollection) error
 
-	// LightByTransactionID returns the collection for the given transaction ID. Only retrieves
-	// transaction hashes.
-	LightByTransactionID(txID flow.Identifier) (*flow.LightCollection, error)
+	CollectionIDsByTransactionID(txID flow.Identifier) ([]flow.Identifier, error)
+
+	MarkAsFinalized(collID, blockID flow.Identifier) error
+
+	IsFinalizedByID(collID flow.Identifier) (flow.Identifier, error)
 }

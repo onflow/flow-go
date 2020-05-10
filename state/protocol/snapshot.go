@@ -39,4 +39,6 @@ type Snapshot interface {
 	// potential extensions of the protocol state at this snapshot. The result
 	// is ordered such that parents are included before their children.
 	Pending() ([]flow.Identifier, error)
+
+	Contains(blockID flow.Identifier) (bool, error)
 }

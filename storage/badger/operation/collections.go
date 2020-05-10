@@ -37,10 +37,37 @@ func LookupCollectionPayload(blockID flow.Identifier, txIDs *[]flow.Identifier) 
 
 // IndexCollectionByTransaction inserts a collection id keyed by a transaction id
 func IndexCollectionByTransaction(txID flow.Identifier, collectionID flow.Identifier) func(*badger.Txn) error {
-	return insert(makePrefix(codeIndexCollectionByTransaction, txID), collectionID)
+	return insert(makePrefix(codeIndexCollectionByTransaction, txID, collectionID), collectionID)
 }
 
 // LookupCollectionID retrieves a collection id by transaction id
-func RetrieveCollectionID(txID flow.Identifier, collectionID *flow.Identifier) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeIndexCollectionByTransaction, txID), collectionID)
+func RetrieveCollectionIDs(txID flow.Identifier, collectionIDs *[]flow.Identifier) func(*badger.Txn) error {
+	iterationFunc := collectionIterationFunc(collectionIDs)
+	return traverse(makePrefix(codeIndexCollectionByTransaction, txID), iterationFunc)
+}
+
+func SetCollectionFinalized(collID, blockID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeIndexCollectionFinalized, collID), blockID)
+
+}
+
+func LookupCollectionFinalized(collID flow.Identifier, blockID *flow.Identifier) func(txn *badger.Txn) error {
+	return retrieve(makePrefix(codeIndexCollectionFinalized, collID), blockID)
+}
+
+func collectionIterationFunc(collectionIDs *[]flow.Identifier) func() (checkFunc, createFunc, handleFunc) {
+	return func() (checkFunc, createFunc, handleFunc) {
+		check := func(key []byte) bool {
+			return true
+		}
+		var val flow.Identifier
+		create := func() interface{} {
+			return &val
+		}
+		handle := func() error {
+			*collectionIDs = append(*collectionIDs, val)
+			return nil
+		}
+		return check, create, handle
+	}
 }

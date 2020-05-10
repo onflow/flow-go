@@ -187,3 +187,30 @@ func (s *Snapshot) pending(blockID flow.Identifier) ([]flow.Identifier, error) {
 	}
 	return pendingIDs, nil
 }
+
+func (s *Snapshot) Contains(blockID flow.Identifier) (bool, error) {
+	fmt.Printf("IS %s A CHILD OF %s?\n", s.blockID, blockID)
+
+	var childIDs []flow.Identifier
+	err := s.state.db.View(procedure.LookupBlockChildren(blockID, &childIDs))
+	if err != nil {
+		return false, fmt.Errorf("could not get block children: %w", err)
+	}
+
+	parentID := s.blockID
+
+	for parentID != flow.ZeroID {
+		if parentID == blockID {
+			return true, nil
+		}
+
+		block, err := s.state.headers.ByBlockID(parentID)
+		if err != nil {
+			return false, err
+		}
+
+		parentID = block.ParentID
+	}
+
+	return false, nil
+}
