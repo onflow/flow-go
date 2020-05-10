@@ -237,15 +237,17 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 	fmt.Println("LAST SEALED HEIGHT", lastSealedHeight)
 	fmt.Println("FINALIZED HEIGHT", finalizedHeight)
+	//
+	// // ONLY INCLUDE SEALS IF YOU SHOULD
+	// if finalizedHeight >= lastSealedHeight {
+	// 	fmt.Println("CHAIN OF SEALS")
+	// 	for _, seal := range seals {
+	// 		fmt.Printf("%s,%s\n", seal.BlockID)
+	// 	}
+	// 	payload.Seals = seals
+	// }
 
-	// ONLY INCLUDE SEALS IF YOU SHOULD
-	if finalizedHeight >= lastSealedHeight {
-		fmt.Println("CHAIN OF SEALS")
-		for _, seal := range seals {
-			fmt.Printf("%s,%s\n", seal.BlockID)
-		}
-		payload.Seals = seals
-	}
+	payload.Seals = seals
 
 	// retrieve the parent to set the height
 	parent, err := b.headers.ByBlockID(parentID)
