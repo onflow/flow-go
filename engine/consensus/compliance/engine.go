@@ -319,7 +319,6 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	// first, we reject all blocks that we don't need to process:
 	// 1) blocks already in the cache; they will already be processed later
 	// 2) blocks already on disk; they were processed and await finalization
-	// 3) blocks at a height below finalized height; they can not be finalized
 
 	// ignore proposals that are already cached
 	_, cached := e.pending.ByID(header.ID())

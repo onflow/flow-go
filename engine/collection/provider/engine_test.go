@@ -74,8 +74,11 @@ func (suite *Suite) TestSubmitCollectionGuarantee() {
 	guarantee := unittest.CollectionGuaranteeFixture()
 	guarantee.SignerIDs = []flow.Identifier{suite.colNode.Me.NodeID()}
 	guarantee.Signature = unittest.SignatureFixture()
+	genesis, err := suite.conNode.State.Final().Head()
+	assert.NoError(t, err)
+	guarantee.ReferenceBlockID = genesis.ID()
 
-	err := suite.colNode.ProviderEngine.SubmitCollectionGuarantee(guarantee)
+	err = suite.colNode.ProviderEngine.SubmitCollectionGuarantee(guarantee)
 	assert.NoError(t, err)
 
 	// flush messages from the collection node

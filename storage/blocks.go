@@ -23,7 +23,7 @@ type Blocks interface {
 	// ByCollectionID returns the block for the given collection ID.
 	ByCollectionID(collID flow.Identifier) (*flow.Block, error)
 
-	// IndexBlockForCollections indexes the the block each collection was
+	// IndexBlockForCollections indexes the block each collection was
 	// included in.
 	IndexBlockForCollections(blockID flow.Identifier, collIDs []flow.Identifier) error
 }
