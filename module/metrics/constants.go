@@ -38,5 +38,5 @@ const (
 const (
 	hotStuffModuleNamespace      = "hotstuff"
 	hotStuffParticipantSubsystem = "Participant"
-	// hotStuffFollowerSubsystem    = "Follower" // will be used later
+	hotStuffFollowerSubsystem    = "follower" // will be used later
 )

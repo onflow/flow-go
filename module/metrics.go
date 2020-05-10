@@ -86,6 +86,8 @@ type Metrics interface {
 	// HotStuffWaitDuration reports Metrics C6 HotStuff Idle Duration
 	HotStuffWaitDuration(duration time.Duration, event string)
 
+	FollowerFinalizedBlockHeight(height uint64)
+
 	// FinalizedBlocks reports Metric C7: Number of Blocks Finalized (per second)
 	FinalizedBlocks(count int)
 

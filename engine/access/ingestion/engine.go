@@ -149,7 +149,7 @@ func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 			e.log.Error().Err(err).Hex("block_id", id[:]).Msg("failed to process block")
 			return
 		}
-		e.metrics.FinalizedBlocks(1)
+		e.metrics.FollowerFinalizedBlockHeight(hb.View)
 	})
 }
 
