@@ -66,9 +66,12 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 		return nil, fmt.Errorf("could not recover last voted: %w", err)
 	}
 
+	// initialize the vote aggregator
+	aggregator := voteaggregator.New(notifier, 0, committee, validator, signer)
+
 	// recover the hotstuff state, mainly to recover all pending blocks
 	// in forks
-	err = Recover(log, forks, validator, finalized, pending)
+	err = Recover(log, forks, aggregator, validator, finalized, pending)
 	if err != nil {
 		return nil, fmt.Errorf("could not recover hotstuff state: %w", err)
 	}
@@ -100,9 +103,6 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 
 	// initialize the voter
 	voter := voter.New(signer, forks, persist, voted)
-
-	// initialize the vote aggregator
-	aggregator := voteaggregator.New(notifier, 0, committee, validator, signer)
 
 	// initialize the event handler
 	handler, err := eventhandler.New(log, pacemaker, producer, forks, persist, communicator, committee, aggregator, voter, validator, notifier)

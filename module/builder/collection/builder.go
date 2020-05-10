@@ -14,7 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
-// Builder is the b for collection block payloads. Upon providing a
+// Builder is the builder for collection block payloads. Upon providing a
 // payload hash, it also memorizes the payload contents.
 //
 // NOTE: Builder is NOT safe for use with multiple goroutines. Since the
@@ -78,6 +78,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		if err != nil {
 			return fmt.Errorf("could not retrieve parent: %w", err)
 		}
+
+		// retrieve the finalized head ON THE MAIN CHAIN
 		var mainFinalized uint64
 		err = operation.RetrieveFinalizedHeight(&mainFinalized)(tx)
 		if err != nil {

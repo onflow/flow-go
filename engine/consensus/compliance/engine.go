@@ -113,8 +113,11 @@ func (e *Engine) Ready() <-chan struct{} {
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
+		e.log.Debug().Msg("shutting down synchronization engine")
 		<-e.sync.Done()
+		e.log.Debug().Msg("shutting down hotstuff eventloop")
 		<-e.hotstuff.Done()
+		e.log.Debug().Msg("all components have been shut down")
 	})
 }
 
@@ -130,7 +133,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+			e.log.Error().Err(err).Msg("compliance could not process submitted event")
 		}
 	})
 }
@@ -316,7 +319,6 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	// first, we reject all blocks that we don't need to process:
 	// 1) blocks already in the cache; they will already be processed later
 	// 2) blocks already on disk; they were processed and await finalization
-	// 3) blocks at a height below finalized height; they can not be finalized
 
 	// ignore proposals that are already cached
 	_, cached := e.pending.ByID(header.ID())
@@ -430,7 +432,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	}
 	err := e.state.Mutate().Extend(block)
 	if err != nil {
-		return fmt.Errorf("could not extend protocol state: %w", err)
+		return fmt.Errorf("could not extend protocol state for block (%v) at view %v: %w", header.ID(), header.View, err)
 	}
 
 	// retrieve the parent

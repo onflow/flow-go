@@ -125,14 +125,22 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 	}
 
 	// get the current state snapshot head
-	head, err := s.state.headers.ByBlockID(s.blockID)
+	var childrenIDs []flow.Identifier
+	err := s.state.db.View(procedure.LookupBlockChildren(s.blockID, &childrenIDs))
+	if err != nil {
+		return nil, fmt.Errorf("could not look up children: %w", err)
+	}
+
+	// check we have at least one child
+	if len(childrenIDs) == 0 {
+		return nil, fmt.Errorf("block doesn't have children yet")
+	}
+
+	// get the header of the first child (they all have the same threshold sig)
+	head, err := s.state.headers.ByBlockID(childrenIDs[0])
 	if err != nil {
 		return nil, fmt.Errorf("could not get head: %w", err)
 	}
-
-	// TODO: apparently, we need to get a child of the block here in order to
-	// use the parent signatures contained within it; this is non-trivial, so
-	// I will defer that to a different task
 
 	// create the key used for the KMAC by concatenating all indices
 	key := make([]byte, 4*len(indices))

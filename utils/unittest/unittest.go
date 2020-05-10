@@ -106,3 +106,9 @@ func RunWithBadgerDB(t testing.TB, f func(*badger.DB)) {
 		f(db)
 	})
 }
+
+func TempBadgerDB(t testing.TB) (*badger.DB, string) {
+	dir := TempDir(t)
+	db := BadgerDB(t, dir)
+	return db, dir
+}
