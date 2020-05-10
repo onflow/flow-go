@@ -154,29 +154,37 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 		return err
 	}
 
-	clusters, err := final.Clusters()
-	if err != nil {
-		return fmt.Errorf("could not get clusters: %w", err)
-	}
+	// TODO turn back on
+	// clusters, err := final.Clusters()
+	// if err != nil {
+	// 	return fmt.Errorf("could not get clusters: %w", err)
+	// }
 
-	cluster, ok := clusters.ByNodeID(guarantors[0])
-	if !ok {
-		return fmt.Errorf("guarantor (id=%s) does not exist in any cluster", guarantors[0])
-	}
+	// cluster, ok := clusters.ByNodeID(guarantors[0])
+	// if !ok {
+	// 	return fmt.Errorf("guarantor (id=%s) does not exist in any cluster", guarantors[0])
+	// }
 
-	// NOTE: Eventually we should check the signatures, ensure a quorum of the
-	// cluster, and ensure HotStuff finalization rules. Likely a cluster-specific
-	// version of the follower will be a good fit for this. For now, collection
-	// nodes independently decide when a collection is finalized and we only check
-	// that the guarantors are all from the same cluster.
+	// log.Debug().
+	// 	Int("cluster_size", len(cluster)).
+	// 	Interface("cluster", cluster).
+	// 	Msg("checking cluster")
 
-	// ensure the guarantors are from the same cluster
-	for _, guarantorID := range guarantors {
-		_, exists := cluster.ByNodeID(guarantorID)
-		if !exists {
-			return fmt.Errorf("inconsistent guarantors from different clusters")
-		}
-	}
+	// // NOTE: Eventually we should check the signatures, ensure a quorum of the
+	// // cluster, and ensure HotStuff finalization rules. Likely a cluster-specific
+	// // version of the follower will be a good fit for this. For now, collection
+	// // nodes independently decide when a collection is finalized and we only check
+	// // that the guarantors are all from the same cluster.
+
+	// // ensure the guarantors are from the same cluster
+	// for _, guarantorID := range guarantors {
+	// 	log.Debug().Int("cluster_size", len(cluster)).Msgf("checking node %x", guarantorID)
+
+	// 	_, exists := cluster.ByNodeID(guarantorID)
+	// 	if !exists {
+	// 		return fmt.Errorf("inconsistent guarantors from different clusters")
+	// 	}
+	// }
 
 	log.Info().Msg("forwarding collection guarantee to propagation engine")
 

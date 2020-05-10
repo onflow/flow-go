@@ -218,7 +218,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			}
 
 			// ensure we find the lowest reference block height
-			if refHeader.Height < minRefHeight {
+			if refHeader.Height < minRefHeight || minRefHeight == 0 {
 				minRefHeight = refHeader.Height
 				minRefID = tx.ReferenceBlockID
 			}
@@ -229,7 +229,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		// STEP FOUR: we have a set of transactions that are valid to include
 		// on this fork. Now we need to create the collection that will be
 		// used in the payload and construct the final proposal model
-
+		fmt.Println("guarantee reference:", minRefID)
 		// build the payload from the transactions
 		payload := cluster.PayloadFromTransactions(minRefID, transactions...)
 

@@ -123,13 +123,14 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			if err != nil {
 				return fmt.Errorf("could not finalize block: %w", err)
 			}
-
+			fmt.Println("FINALIZING GUARANTEE")
 			f.metrics.CollectionGuaranteed(payload.Collection.Light())
 
 			// don't bother submitting empty collections
 			if payload.Collection.Len() == 0 {
 				continue
 			}
+			fmt.Println("FINALIZING GUARANTEE 2")
 
 			//TODO when we incorporate HotStuff AND require BFT, the consensus
 			// node will need to be able ensure finalization by checking a

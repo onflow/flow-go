@@ -132,6 +132,7 @@ func (e *Engine) onSubmitCollectionGuarantee(originID flow.Identifier, req *mess
 	}
 	e.log.Debug().
 		Hex("guarantee_id", logging.ID(req.Guarantee.ID())).
+		Hex("ref_block_id", logging.ID(req.Guarantee.ReferenceBlockID)).
 		Msg("submitting guarantee")
 	return e.SubmitCollectionGuarantee(&req.Guarantee)
 }
@@ -220,6 +221,7 @@ func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) 
 	}
 	e.log.Debug().
 		Hex("guarantee_id", logging.ID(guarantee.ID())).
+		Hex("ref_block_id", logging.ID(guarantee.ReferenceBlockID)).
 		Msgf("submitted guarantee to %d consensus nodes", len(consensusNodes))
 
 	return nil
