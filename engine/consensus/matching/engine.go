@@ -34,7 +34,6 @@ type Engine struct {
 	state     protocol.State           // used to access the  protocol state
 	me        module.Local             // used to access local node information
 	resultsDB storage.ExecutionResults // used to permanently store results
-	headersDB storage.Headers          // used to check sealed headers
 	results   mempool.Results          // holds execution results in memory
 	receipts  mempool.Receipts         // holds execution receipts in memory
 	approvals mempool.Approvals        // holds result approvals in memory
@@ -42,7 +41,7 @@ type Engine struct {
 }
 
 // New creates a new collection propagation engine.
-func New(log zerolog.Logger, metrics module.EngineMetrics, mempool module.MempoolMetrics, net module.Network, state protocol.State, me module.Local, resultsDB storage.ExecutionResults, headersDB storage.Headers, results mempool.Results, receipts mempool.Receipts, approvals mempool.Approvals, seals mempool.Seals) (*Engine, error) {
+func New(log zerolog.Logger, metrics module.EngineMetrics, mempool module.MempoolMetrics, net module.Network, state protocol.State, me module.Local, resultsDB storage.ExecutionResults, results mempool.Results, receipts mempool.Receipts, approvals mempool.Approvals, seals mempool.Seals) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
@@ -53,7 +52,6 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, mempool module.Mempoo
 		state:     state,
 		me:        me,
 		resultsDB: resultsDB,
-		headersDB: headersDB,
 		results:   results,
 		receipts:  receipts,
 		approvals: approvals,
@@ -169,8 +167,8 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	}
 
 	// check if the result of this receipt is already in the dB
-	result := receipt.ExecutionResult
-	_, err = e.results.ByID(result.ID())
+	result := &receipt.ExecutionResult
+	_, err = e.resultsDB.ByID(result.ID())
 	if err == nil {
 		log.Debug().Msg("discarding receipt for existing result")
 		return nil
@@ -188,20 +186,19 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
 
+	// store the result belonging to the receipt in the memory pool
+	added = e.results.Add(result)
+	if !added {
+		log.Debug().Msg("skipping sealing check on duplicate result")
+		return nil
+	}
+
+	e.mempool.MempoolEntries(metrics.ResourceResult, e.results.Size())
+
 	log.Info().Msg("execution receipt processed")
 
-	// go through the memory pool and see if there are any results that we can
-	// create valid seals for
-	results, err := e.findValidResults()
-	if err != nil {
-		return fmt.Errorf("could not check for valid results: %w", err)
-	}
-
-	// try to create the seals for the given results
-	err = e.createSeals(results)
-	if err != nil {
-		return fmt.Errorf("could not create seals for results: %w", err)
-	}
+	// kick off a check for potential seal formation
+	go e.checkSealing()
 
 	return nil
 }
@@ -234,7 +231,7 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	}
 
 	// check if the result of this approval is already in the dB
-	_, err = e.results.ByID(approval.Body.ExecutionResultID)
+	_, err = e.resultsDB.ByID(approval.Body.ExecutionResultID)
 	if err == nil {
 		log.Debug().Msg("discarding approval for existing result")
 		return nil
@@ -254,178 +251,118 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 
 	log.Info().Msg("result approval processed")
 
-	// go through the memory pool and see if there are any results that we can
-	// create valid seals for
-	results, err := e.findValidResults()
+	// kick off a check for potential seal formation
+	go e.checkSealing()
+
+	return nil
+}
+
+// checkSealing checks if there is anything worth sealing at the moment.
+func (e *Engine) checkSealing() {
+	e.unit.Lock()
+	defer e.unit.Unlock()
+
+	// get all results that are sealable
+	results, err := e.sealableResults()
 	if err != nil {
-		return fmt.Errorf("could not check for valid results: %w", err)
+		e.log.Error().Err(err).Msg("could not get results results")
+		return
 	}
 
-	// try to create the seals for the given results
-	err = e.createSeals(results)
-	if err != nil {
-		return fmt.Errorf("could not create seals for results: %w", err)
+	// skip if no results can be sealed yet
+	if len(results) == 0 {
+		return
 	}
 
 	e.log.Info().Int("num_results", len(results)).Msg("identified sealable execution results")
 
 	// process the results results
 	for _, result := range results {
-
-		log := e.log.With().
-			Hex("result_id", logging.Entity(result)).
-			Hex("previous_id", result.PreviousResultID[:]).
-			Hex("block_id", result.BlockID[:]).
-			Logger()
-
-		err := e.sealResult(result)
-		if err == errUnknownBlock {
-			log.Debug().Msg("skipping sealable result with unknown sealed block")
-			continue
-		}
-		if err == errUnknownPrevious {
-			log.Debug().Msg("skipping sealable result with unknown previous result")
+		sealed, err := e.sealResult(result)
+		if !sealed {
+			e.log.Debug().Msg("skipped sealable result missing info")
 			continue
 		}
 		if err != nil {
-			log.Error().Err(err).Msg("could not seal result")
+			e.log.Error().Err(err).Msg("could not seal sealable results")
 			continue
 		}
-
-		log.Info().Msg("sealed execution result")
+		e.log.Info().
+			Hex("result_id", logging.Entity(result)).
+			Hex("block_id", result.BlockID[:]).
+			Msg("sealed execution result")
 	}
 }
 
-// findValidResults will attempt to identify seals that can now be built.
-func (e *Engine) findValidResults() ([]*flow.ExecutionResult, error) {
+func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 
-	// list of result IDs that can have a valid seal created
 	var results []*flow.ExecutionResult
 
-	// get all approvers to calculate needed stake
-	approvers, err := e.state.Final().Identities(filter.And(
+	// get all approvers so we have the vote threshold
+	verifiers, err := e.state.Final().Identities(filter.And(
 		filter.HasStake(true),
 		filter.HasRole(flow.RoleVerification),
 	))
 	if err != nil {
-		return nil, fmt.Errorf("could not get approvers: %w", err)
+		return nil, fmt.Errorf("could not get verifiers: %w", err)
 	}
-	threshold := approvers.TotalStake() / 3 * 2
+	threshold := verifiers.TotalStake() / 3 * 2
 
-	// get all receipts and result approvals from the pools
-	receipts := e.receipts.All()
+	// get all available approvals once
 	approvals := e.approvals.All()
 
-	// make a list of all execution receipts by block
-	byBlock := make(map[flow.Identifier][]*flow.ExecutionReceipt)
-	for _, receipt := range receipts {
-		blockID := receipt.ExecutionResult.BlockID
-		byBlock[blockID] = append(byBlock[blockID], receipt)
-	}
+	// go through all results and check which ones we have enough approvals for
+	for _, result := range e.results.All() {
+		resultID := result.ID()
 
-	e.log.Debug().Int("blocks", len(byBlock)).Msg("blocks with pending receipts")
-
-	// go through the list of execution receipts and approvals for each block
-	for _, blockReceipts := range byBlock {
-
-		// first, make a list of available result IDs for this block
-		resultByBlock := make(map[flow.Identifier]*flow.ExecutionResult)
-		for _, receipt := range blockReceipts {
-			resultByBlock[receipt.ExecutionResult.ID()] = &receipt.ExecutionResult
-		}
-
-		// then, gather the approvals by result ID as well
-		approvalsByResult := make(map[flow.Identifier][]*flow.ResultApproval)
+		// get the node IDs for all approvers of this result
+		approverIDs := make([]flow.Identifier, 0, len(approvals))
 		for _, approval := range approvals {
-			resultID := approval.Body.ExecutionResultID
-			approvalsByResult[resultID] = append(approvalsByResult[resultID], approval)
+			if approval.Body.ExecutionResultID == resultID {
+				approverIDs = append(approverIDs, approval.Body.ApproverID)
+			}
 		}
 
-		// finally, for each available result, check if we have an approval majority
-		for resultID, result := range resultByBlock {
-
-			// get the approvals for this result
-			resultApprovals, ok := approvalsByResult[resultID]
-			if !ok {
-				continue
-			}
-
-			// get the approver IDs
-			voterIDs := make([]flow.Identifier, 0, len(resultApprovals))
-			for _, approval := range resultApprovals {
-				voterIDs = append(voterIDs, approval.Body.ApproverID)
-			}
-
-			// check if we have sufficient stake
-			voters := approvers.Filter(filter.HasNodeID(voterIDs...))
-			if voters.TotalStake() <= threshold {
-				continue
-			}
-
-			results = append(results, result)
+		// get all of the approver identities and check threshold
+		approvers := verifiers.Filter(filter.And(
+			filter.HasRole(flow.RoleVerification),
+			filter.HasStake(true),
+			filter.HasNodeID(approverIDs...),
+		))
+		voted := approvers.TotalStake()
+		if voted <= threshold { // nolint: emptybranch
+			// NOTE: we are currently generating a seal for every result, regardless of approvals
+			// e.log.Debug().Msg("skipping result with insufficient verification")
+			// continue
 		}
 
-	return results, nil
-}
-
-// createSeals creates seals for the given execution results.
-func (e *Engine) createSeals(results []*flow.ExecutionResult) error {
-
-	// map ech result to its children, so we can process chains of results
-	children := make(map[flow.Identifier][]*flow.ExecutionResult)
-	for _, result := range results {
-		children[result.PreviousResultID] = append(children[result.PreviousResultID], result)
-	}
-
-	// make a list of results that don't depend on one of the others
-	var independent []*flow.ExecutionResult
-	for _, result := range results {
-		_, dependent := children[result.ID()]
-		if dependent {
-			continue
-		}
-		independent = append(independent, result)
-	}
-
-	// process these results recursively
-	for len(independent) != 0 {
-
-		// create seal for all independent results and collect the children that
-		// are now free to be processed as well
-		var unblocked []*flow.ExecutionResult
-		for _, result := range independent {
-			created, err := e.createSeal(result)
-			if err != nil {
-				return fmt.Errorf("could not create seal: %w", err)
-			}
-			if !created {
-				continue
-			}
-			unblocked = append(unblocked, children[result.ID()]...)
-		}
-
-		// update the independent slice with the newly freed children
-		independent = unblocked
+		// add the result to the results that should be sealed
+		results = append(results, result)
 	}
 
 	return results, nil
 }
 
-func (e *Engine) createSeal(result *flow.ExecutionResult) (bool, error) {
+func (e *Engine) sealResult(result *flow.ExecutionResult) (bool, error) {
 
-	// we skip results that depend on a missing result
-	previous, err := e.results.ByID(result.PreviousResultID)
-	if errors.Is(err, storage.ErrNotFound) {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("could not check previous result: %w", err)
+	// get the previous result from our mempool or storage
+	previousID := result.PreviousResultID
+	previous, found := e.results.ByID(previousID)
+	if !found {
+		var err error
+		previous, err = e.resultsDB.ByID(previousID)
+		if errors.Is(err, storage.ErrNotFound) {
+			return false, nil
+		}
+		if err != nil {
+			return false, fmt.Errorf("could not get previous result: %w", err)
+		}
 	}
 
-	// store the result
-	err = e.results.Store(result)
+	// store the result to make it persistent for later checks
+	err := e.resultsDB.Store(result)
 	if err != nil {
-		return false, fmt.Errorf("could not store result: %w", err)
+		return false, fmt.Errorf("could not store sealing result: %w", err)
 	}
 
 	// generate & store seal
@@ -443,13 +380,13 @@ func (e *Engine) createSeal(result *flow.ExecutionResult) (bool, error) {
 	e.mempool.MempoolEntries(metrics.ResourceSeal, e.seals.Size())
 
 	// clear up the caches
-	// TODO: find nice way to prune results/approvals for outdated heights
 	resultIDs := e.results.DropForBlock(result.BlockID)
 	e.receipts.DropForBlock(result.BlockID)
 	for _, resultID := range resultIDs {
 		e.approvals.DropForResult(resultID)
 	}
 
+	e.mempool.MempoolEntries(metrics.ResourceResult, e.results.Size())
 	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
 	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
 

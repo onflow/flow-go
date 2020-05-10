@@ -23,15 +23,12 @@ type Approvals interface {
 	// It will return false if it was not found in the mempool.
 	ByID(approvalID flow.Identifier) (*flow.ResultApproval, bool)
 
-	// ByResultID will retrieve the approval by receipt ID.
-	ByResultID(resultID flow.Identifier) []*flow.ResultApproval
-
-	// Drop will drop the approvals for the given block.
-	DropForBlock(blockID flow.Identifier)
-
 	// Size will return the current size of the memory pool.
 	Size() uint
 
 	// All will return a list of all approvals in the memory pool.
 	All() []*flow.ResultApproval
+
+	// DropForResult will drop the approvals for the given block.
+	DropForResult(resultID flow.Identifier) []flow.Identifier
 }

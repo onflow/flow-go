@@ -23,12 +23,6 @@ type Receipts interface {
 	// pool. It will return false if it was not found in the mempool.
 	ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, bool)
 
-	// ByBlockID will return all execution receipts for the given block.
-	ByBlockID(blockID flow.Identifier) []*flow.ExecutionReceipt
-
-	// DropForBlock will drop all receipts for the given block ID.
-	DropForBlock(blockID flow.Identifier)
-
 	// Size will return the current size of the memory pool.
 	Size() uint
 

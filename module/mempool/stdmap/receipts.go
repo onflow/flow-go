@@ -26,47 +26,13 @@ func NewReceipts(limit uint) (*Receipts, error) {
 // Add adds an execution receipt to the mempool.
 func (r *Receipts) Add(receipt *flow.ExecutionReceipt) bool {
 	added := r.Backend.Add(receipt)
-	if !added {
-		return false
-	}
-	r.register(receipt)
-	return true
+	return added
 }
 
 // Rem will remove a receipt by ID.
 func (r *Receipts) Rem(receiptID flow.Identifier) bool {
-	entity, exists := r.Backend.ByID(receiptID)
-	if !exists {
-		return false
-	}
-	_ = r.Backend.Rem(receiptID)
-	receipt := entity.(*flow.ExecutionReceipt)
-	r.cleanup(receiptID, receipt)
-	return true
-}
-
-// ByID will retrieve an approval by ID.
-func (r *Receipts) ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, bool) {
-	entity, exists := r.Backend.ByID(receiptID)
-	if !exists {
-		return nil, false
-	}
-	receipt := entity.(*flow.ExecutionReceipt)
-	return receipt, true
-}
-
-// ByBlockID returns an execution receipt by approval ID.
-func (r *Receipts) ByBlockID(blockID flow.Identifier) []*flow.ExecutionReceipt {
-	byBlock, ok := r.byBlock[blockID]
-	if !ok {
-		return nil
-	}
-	receipts := make([]*flow.ExecutionReceipt, 0, len(byBlock))
-	for receiptID := range byBlock {
-		entity, _ := r.Backend.ByID(receiptID)
-		receipts = append(receipts, entity.(*flow.ExecutionReceipt))
-	}
-	return receipts
+	removed := r.Backend.Rem(receiptID)
+	return removed
 }
 
 // ByID will retrieve an approval by ID.
