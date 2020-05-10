@@ -204,25 +204,38 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// iterate backwards from just after last sealed to parent and build a chain
 	// of seals for those blocks that is as big as possible
 	var seals []*flow.Seal
-	for i := len(sealableIDs) - 1; i >= 0; i-- {
-		sealableID := sealableIDs[i]
+	lastID := lastSeal.ID()
+	sealedID := lastSeal.BlockID
+	prevState := lastSeal.FinalState
+	for len(byParent) > 0 {
 
 		// if we don't find the next seal, we are done building the chain
-		next, found := byBlock[sealableID]
+		next, found := byParent[sealedID]
 		if !found {
 			break
 		}
 
 		// if the states mismatch between two subsequent seals, it's an error
-		if !bytes.Equal(next.InitialState, last.FinalState) {
+		if !bytes.Equal(next.InitialState, prevState) {
 			return nil, fmt.Errorf("seal execution states do not connect")
 		}
 
-		// add seal to the payload
+		// add seal to payload seals and delete from parent lookup
 		seals = append(seals, next)
+		delete(byParent, lastSeal.BlockID)
+		if len(byParent) == 0 {
+			break
+		}
 
-		// keep track of last seal to check state connection
-		last = next
+		// if we have reached the seal for the parent, we are also done
+		if next.BlockID == parentID {
+			break
+		}
+
+		// try looking for next seal
+		lastID = next.ID()
+		sealedID = next.BlockID
+		prevState = next.FinalState
 	}
 
 	// STEP FOUR: We now have guarantees and seals we can validly include
@@ -286,7 +299,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// update protocol state index for the seal and initialize children index
 	blockID := proposal.ID()
 	err = operation.RetryOnConflict(b.db.Update, func(tx *badger.Txn) error {
-		err = operation.IndexBlockSeal(blockID, last.ID())(tx)
+		err = operation.IndexBlockSeal(blockID, lastID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index proposal seal: %w", err)
 		}

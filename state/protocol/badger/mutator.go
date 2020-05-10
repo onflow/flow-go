@@ -294,43 +294,36 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve parent seal (%x): %w", header.ParentID, err)
 	}
-	ancestorID = header.ParentID
-	var sealableIDs []flow.Identifier
-	for ancestorID != last.BlockID {
-		sealableIDs = append(sealableIDs, ancestorID)
-		ancestor, err := m.state.headers.ByBlockID(ancestorID)
-		if err != nil {
-			return fmt.Errorf("could not get sealable ancestor (%x): %w", ancestorID, err)
-		}
-		ancestorID = ancestor.ParentID
-	}
+	lastID := lastSeal.ID()
+	sealedID := lastSeal.BlockID
+	prevState := lastSeal.FinalState
+	for sealedID != header.ParentID {
 
-	// iterate backwards from just after the last sealed to parent and build a
-	// chain for the payload seals until we fail or all are used up
-	for i := len(sealableIDs) - 1; i >= 0; i-- {
-		sealableID := sealableIDs[i]
-
-		// if no seals are left, we successfully matched them all
-		if len(byBlock) == 0 {
-			break
-		}
-
-		// if we don't find a next seal, we fail the check
-		next, found := byBlock[sealableID]
+		// check if we can find a valid subsequent seal for the last seal on the chain
+		next, found := byParent[sealedID]
 		if !found {
-			return fmt.Errorf("not all seals matched to chain")
+			return fmt.Errorf("could not find connecting seal (sealed: %x)", sealedID)
 		}
 
 		// check that the state transition actually matches
-		if !bytes.Equal(next.InitialState, last.FinalState) {
+		if !bytes.Equal(next.InitialState, prevState) {
 			return fmt.Errorf("seal execution states do not connect")
 		}
 
 		// if it does, remove the seal from the to-be-added seals
-		delete(byBlock, sealableID)
+		delete(byParent, sealedID)
+		if len(byParent) == 0 {
+			break
+		}
 
-		// keep track of last seal to check state connection
-		last = next
+		lastID = next.ID()
+		sealedID = next.BlockID
+		prevState = next.FinalState
+	}
+
+	// check that we used up all the seals before reaching the parent seal
+	if len(byParent) > 0 {
+		return fmt.Errorf("dangling block seals after building chain (count: %d)", len(byParent))
 	}
 
 	// SIXTH: Both the header itself and its payload are in compliance with the
@@ -343,7 +336,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	}
 	blockID := candidate.ID()
 	err = operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
-		err := operation.IndexBlockSeal(blockID, last.ID())(tx)
+		err := operation.IndexBlockSeal(blockID, lastID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index candidate seal: %w", err)
 		}
