@@ -29,6 +29,7 @@ type StubEngineTestSuite struct {
 	nets []*libp2p.Network    // used to keep track of the networks
 	mws  []*libp2p.Middleware // used to keep track of the middlewares associated with networks
 	ids  flow.IdentityList    // used to keep track of the identifiers associated with networks
+	log  zerolog.Logger
 }
 
 // TestStubEngineTestSuite runs all the test methods in this test suit
@@ -42,6 +43,7 @@ func (s *StubEngineTestSuite) SetupTest() {
 	s.ids = CreateIDs(count)
 
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
+	s.log = logger
 	mws, err := CreateMiddleware(logger, s.ids)
 	require.NoError(s.Suite.T(), err)
 	s.mws = mws
@@ -318,6 +320,10 @@ func (s *StubEngineTestSuite) multiMessageSync(echo bool, count int) {
 	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1, echo)
 
 	for i := 0; i < count; i++ {
+
+		msg := fmt.Sprintf("hello%d", i)
+		s.log.Debug().Msg("sent " + msg)
+
 		// Send the message to receiver
 		event := &message.Echo{
 			Text: fmt.Sprintf("hello%d", i),
@@ -339,9 +345,11 @@ func (s *StubEngineTestSuite) multiMessageSync(echo bool, count int) {
 			require.True(s.Suite.T(), ok)
 			// evaluates content of received message
 			assert.Equal(s.Suite.T(), event, rcvEvent)
+			s.log.Debug().Msg("rcvd " + rcvEvent.Text)
 
 		case <-time.After(2 * time.Second):
-			assert.Fail(s.Suite.T(), "sender failed to send a message to receiver")
+			require.Fail(s.Suite.T(), "sender failed to send a message to receiver")
+			break
 		}
 
 		// evaluates echo back
