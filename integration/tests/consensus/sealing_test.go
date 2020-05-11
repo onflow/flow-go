@@ -102,7 +102,7 @@ func (ss *SealingSuite) SetupTest() {
 }
 
 func (ss *SealingSuite) TearDownTest() {
-	ss.net.Stop()
+	ss.net.Remove()
 	ss.cancel()
 }
 

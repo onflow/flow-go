@@ -92,7 +92,7 @@ func (is *InclusionSuite) SetupTest() {
 }
 
 func (is *InclusionSuite) TearDownTest() {
-	is.net.Stop()
+	is.net.Remove()
 	is.cancel()
 }
 
