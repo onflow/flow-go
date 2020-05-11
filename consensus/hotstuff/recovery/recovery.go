@@ -13,16 +13,18 @@ import (
 )
 
 type ForksRecovery struct {
-	forks     hotstuff.Forks
-	validator hotstuff.Validator
-	log       zerolog.Logger
+	forks          hotstuff.Forks
+	voteAggregator hotstuff.VoteAggregator
+	validator      hotstuff.Validator
+	log            zerolog.Logger
 }
 
-func NewForksRecovery(log zerolog.Logger, forks hotstuff.Forks, validator hotstuff.Validator) (*ForksRecovery, error) {
+func NewForksRecovery(log zerolog.Logger, forks hotstuff.Forks, voteAggregator hotstuff.VoteAggregator, validator hotstuff.Validator) (*ForksRecovery, error) {
 	return &ForksRecovery{
-		log:       log,
-		forks:     forks,
-		validator: validator,
+		log:            log,
+		forks:          forks,
+		voteAggregator: voteAggregator,
+		validator:      validator,
 	}, nil
 }
 
@@ -59,6 +61,9 @@ func (fr *ForksRecovery) SubmitProposal(proposalHeader *flow.Header, parentView 
 	if err != nil {
 		return fmt.Errorf("could not add block to forks: %w", err)
 	}
+
+	// recovery the proposer's vote
+	_ = fr.voteAggregator.StoreProposerVote(proposal.ProposerVote())
 
 	return nil
 }

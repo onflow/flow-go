@@ -67,7 +67,6 @@ github.com/antlr/antlr4 v0.0.0-20200503195918-621b933c7a7f h1:0cEys61Sr2hUBEXfNV
 github.com/antlr/antlr4 v0.0.0-20200503195918-621b933c7a7f/go.mod h1:T7PbCXFs94rrTttyxjbyT5+/1V8T2TYDejxUfHJjw1Y=
 github.com/aristanetworks/goarista v0.0.0-20170210015632-ea17b1a17847/go.mod h1:D/tb0zPVXnP7fmsLZjtdUhSsumbK/ij54UXjjVgMGxQ=
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
-github.com/axw/gocov v1.0.0/go.mod h1:LvQpEYiwwIb2nYkXY2fDWhg9/AsYqkhmrCshjlUJECE=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
@@ -550,12 +549,6 @@ github.com/naoina/toml v0.1.2-0.20170918210437-9fafd6967416/go.mod h1:NBIhNtsFMo
 github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn4U=
 github.com/olekukonko/tablewriter v0.0.1/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
 github.com/olekukonko/tablewriter v0.0.2-0.20190409134802-7e037d187b0c/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
-github.com/onflow/cadence v0.0.0-20200419191218-7825e473e791/go.mod h1:T2EWFkpigNIK4Kwn0zWcQbDXrVpjstyRXML/lK8qltY=
-github.com/onflow/cadence v0.1.1-0.20200429063251-116d638b2d80 h1:5K+4gxhIgSSrKqE93q2tLFnH4VxKty2U8Cjba8ZWM/E=
-github.com/onflow/cadence v0.1.1-0.20200429063251-116d638b2d80/go.mod h1:W3ykbuy2rzqMBC6U4UIn5+1Y45fEs6W1++b+xw+Gc/s=
-github.com/onflow/cadence v0.1.1-0.20200506174742-ee027d0a0afd/go.mod h1:GaLQ7IsJi5bqpH66GprNs8uoQtperK/xbXXIOq11nZw=
-github.com/onflow/cadence v0.1.1-0.20200506184220-7418eb94c4b4/go.mod h1:GaLQ7IsJi5bqpH66GprNs8uoQtperK/xbXXIOq11nZw=
-github.com/onflow/cadence v0.1.1-0.20200506191700-3536ca21ba58/go.mod h1:GaLQ7IsJi5bqpH66GprNs8uoQtperK/xbXXIOq11nZw=
 github.com/onflow/cadence v0.2.0 h1:Y4f7npDXcVraAF6a81KAcNMCe/5+lK7ZeEyYpGaNyZs=
 github.com/onflow/cadence v0.2.0/go.mod h1:GaLQ7IsJi5bqpH66GprNs8uoQtperK/xbXXIOq11nZw=
 github.com/onflow/flow-go-sdk v0.1.2-0.20200507214414-a33d38d32156 h1:hXr1Y6XchyILlurPlgOV5lyHu95g38o9pRQQwuxQ0rM=
@@ -904,7 +897,6 @@ golang.org/x/tools v0.0.0-20190425163242-31fd60d6bfdc/go.mod h1:RgjU9mgBXZiqYHBn
 golang.org/x/tools v0.0.0-20190506145303-2d16b83fe98c/go.mod h1:RgjU9mgBXZiqYHBnxXauZ1Gv1EHHAz9KjViQ78xBX0Q=
 golang.org/x/tools v0.0.0-20190524140312-2c0ae7006135/go.mod h1:RgjU9mgBXZiqYHBnxXauZ1Gv1EHHAz9KjViQ78xBX0Q=
 golang.org/x/tools v0.0.0-20190606124116-d0a3d012864b/go.mod h1:/rFqwRUd4F7ZHNgwSSTFct+R/Kf4OFW1sUzUTQQTgfc=
-golang.org/x/tools v0.0.0-20190617190820-da514acc4774/go.mod h1:/rFqwRUd4F7ZHNgwSSTFct+R/Kf4OFW1sUzUTQQTgfc=
 golang.org/x/tools v0.0.0-20190621195816-6e04913cbbac/go.mod h1:/rFqwRUd4F7ZHNgwSSTFct+R/Kf4OFW1sUzUTQQTgfc=
 golang.org/x/tools v0.0.0-20190628153133-6cdbf07be9d0/go.mod h1:/rFqwRUd4F7ZHNgwSSTFct+R/Kf4OFW1sUzUTQQTgfc=
 golang.org/x/tools v0.0.0-20190816200558-6889da9d5479/go.mod h1:b+2E5dAYhXwXZwtnZ6UAqBI28+e2cm9otk0dWdXHAEo=

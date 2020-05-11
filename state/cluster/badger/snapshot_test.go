@@ -13,6 +13,7 @@ import (
 	model "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/cluster"
+	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -65,6 +66,23 @@ func (suite *SnapshotSuite) Bootstrap() {
 func (suite *SnapshotSuite) InsertBlock(block model.Block) {
 	err := suite.db.Update(procedure.InsertClusterBlock(&block))
 	suite.Assert().Nil(err)
+}
+
+// InsertSubtree recursively inserts chain state as a subtree of the parent
+// block. The subtree has the given depth and `fanout` children at each node.
+// All child indices are updated.
+func (suite *SnapshotSuite) InsertSubtree(parent model.Block, depth, fanout int) {
+	if depth == 0 {
+		return
+	}
+
+	for i := 0; i < fanout; i++ {
+		block := unittest.ClusterBlockWithParent(&parent)
+		suite.InsertBlock(block)
+		err := suite.db.Update(procedure.IndexBlockChild(parent.ID(), block.ID()))
+		suite.Require().Nil(err)
+		suite.InsertSubtree(block, depth-1, fanout)
+	}
 }
 
 func TestSnapshot(t *testing.T) {
@@ -121,20 +139,19 @@ func (suite *SnapshotSuite) TestFinalizedBlock() {
 
 	// create a new finalized block on genesis (height=1)
 	finalizedBlock1 := unittest.ClusterBlockWithParent(suite.genesis)
-	suite.InsertBlock(finalizedBlock1)
-	err := suite.mutator.Extend(finalizedBlock1.ID())
+	err := suite.mutator.Extend(&finalizedBlock1)
 	assert.Nil(t, err)
 
 	// create an un-finalized block on genesis (height=1)
 	unFinalizedBlock1 := unittest.ClusterBlockWithParent(suite.genesis)
-	suite.InsertBlock(unFinalizedBlock1)
-	err = suite.mutator.Extend(unFinalizedBlock1.ID())
+	err = suite.mutator.Extend(&unFinalizedBlock1)
 	assert.Nil(t, err)
 
 	// create a second un-finalized on top of the finalized block (height=2)
 	unFinalizedBlock2 := unittest.ClusterBlockWithParent(&finalizedBlock1)
-	suite.InsertBlock(unFinalizedBlock2)
-	err = suite.mutator.Extend(unFinalizedBlock2.ID())
+	t.Logf("header: %x", unFinalizedBlock2.Header.PayloadHash)
+	t.Logf("payload: %x", unFinalizedBlock2.Payload.Hash())
+	err = suite.mutator.Extend(&unFinalizedBlock2)
 	assert.Nil(t, err)
 
 	// finalize the block
@@ -153,4 +170,82 @@ func (suite *SnapshotSuite) TestFinalizedBlock() {
 	head, err := snapshot.Head()
 	assert.Nil(t, err)
 	assert.Equal(t, finalizedBlock1.ID(), head.ID())
+}
+
+// test that no pending blocks are returned when there are none
+func (suite *SnapshotSuite) TestPending_NoPendingBlocks() {
+
+	// first, check that a freshly bootstrapped state has no pending blocks
+	suite.Run("freshly bootstrapped state", func() {
+		pending, err := suite.state.Final().Pending()
+		suite.Require().Nil(err)
+		suite.Assert().Len(pending, 0)
+	})
+
+	// check with some finalized blocks
+	suite.Run("with some chain history", func() {
+		parent := suite.genesis
+		for i := 0; i < 10; i++ {
+			next := unittest.ClusterBlockWithParent(parent)
+			suite.InsertBlock(next)
+			parent = &next
+		}
+
+		pending, err := suite.state.Final().Pending()
+		suite.Require().Nil(err)
+		suite.Assert().Len(pending, 0)
+	})
+}
+
+// test that the appropriate pending blocks are included
+func (suite *SnapshotSuite) TestPending_WithPendingBlocks() {
+
+	// build a block that wasn't validated by hotstuff, thus wasn't indexed as a child
+	unvalidated := unittest.ClusterBlockWithParent(suite.genesis)
+	suite.InsertBlock(unvalidated)
+
+	// build a block that was validated by hotstuff, is indexed as a child
+	validated := unittest.ClusterBlockWithParent(suite.genesis)
+	suite.InsertBlock(validated)
+	err := suite.db.Update(procedure.IndexBlockChild(suite.genesis.ID(), validated.ID()))
+	suite.Assert().Nil(err)
+
+	// only the validated block should be included
+	pending, err := suite.state.Final().Pending()
+	suite.Require().Nil(err)
+	suite.Require().Len(pending, 1)
+	suite.Assert().Equal(validated.ID(), pending[0])
+}
+
+// ensure that pending blocks are included, even they aren't direct children
+// of the finalized head
+func (suite *SnapshotSuite) TestPending_Grandchildren() {
+
+	// create 3 levels of children
+	suite.InsertSubtree(*suite.genesis, 3, 3)
+
+	pending, err := suite.state.Final().Pending()
+	suite.Require().Nil(err)
+
+	// we should have 3 + 3^2 + 3^3 = 39 total children
+	suite.Assert().Len(pending, 39)
+
+	// the result must be ordered so that we see parents before their children
+	parents := make(map[flow.Identifier]struct{})
+	// initialize with the latest finalized block, which is the parent of the
+	// first level of children
+	parents[suite.genesis.ID()] = struct{}{}
+
+	for _, blockID := range pending {
+		var header flow.Header
+		err := suite.db.View(operation.RetrieveHeader(blockID, &header))
+		suite.Require().Nil(err)
+
+		// we must have already seen the parent
+		_, seen := parents[header.ParentID]
+		suite.Assert().True(seen, "pending list contained child (%x) before parent (%x)", header.ID(), header.ParentID)
+
+		// mark this block as seen
+		parents[header.ID()] = struct{}{}
+	}
 }

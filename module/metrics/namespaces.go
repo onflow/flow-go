@@ -2,19 +2,32 @@ package metrics
 
 // Prometheus metric namespaces
 const (
-	namespaceCommon       = "common"
+	namespaceNetwork      = "network"
+	namespaceStorage      = "storage"
 	namespaceCollection   = "collection"
 	namespaceConsensus    = "consensus"
 	namespaceVerification = "verification"
 	namespaceExecution    = "execution"
 )
 
-// Prometheus metric subsystems
+// Network subsystems represent the various layers of networking.
 const (
-	subsystemBadger     = "badger"
-	subsystemProposal   = "proposal"
+	// subsystemLibp2p = "libp2p"
+	subsystemGossip = "gossip"
+	subsystemEngine = "engine"
+)
+
+// Storage subsystems represent the various components of the storage layer.
+const (
+	subsystemBadger  = "badger"
+	subsystemMempool = "mempool"
+	subsystemCache   = "cache"
+)
+
+// Consensus subsystems represent the different components of the consensus algorithm.
+const (
 	subsystemCompliance = "compliance"
-	subsystemNetwork    = "network"
+	subsystemHotstuff   = "hotstuff"
 )
 
 // Execution Subsystems
@@ -33,10 +46,3 @@ const (
 // Constant Labels:
 //    * node_role: [collection, consensus, execution, verification, access]
 //    * beta_metric: true
-
-// Namespaces for HotStuff:
-const (
-	hotStuffModuleNamespace      = "hotstuff"
-	hotStuffParticipantSubsystem = "Participant"
-	// hotStuffFollowerSubsystem    = "Follower" // will be used later
-)

@@ -56,7 +56,7 @@ type Middleware struct {
 	host             string
 	port             string
 	key              crypto.PrivateKey
-	metrics          module.Metrics
+	metrics          module.NetworkMetrics
 	maxPubSubMsgSize int
 	validators       []validators.MessageValidator
 }
@@ -64,7 +64,7 @@ type Middleware struct {
 // NewMiddleware creates a new middleware instance with the given config and using the
 // given codec to encode/decode messages to our peers.
 func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flowID flow.Identifier,
-	key crypto.PrivateKey, metrics module.Metrics, maxPubSubMsgSize int, validators ...validators.MessageValidator) (*Middleware, error) {
+	key crypto.PrivateKey, metrics module.NetworkMetrics, maxPubSubMsgSize int, validators ...validators.MessageValidator) (*Middleware, error) {
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
@@ -278,7 +278,7 @@ func (m *Middleware) sendDirect(targetID flow.Identifier, msg *message.Message) 
 	go helpers.FullClose(stream)
 
 	// OneToOne communication metrics are reported with topic OneToOne
-	go m.reportOutboundMsgSize(byteCount, metrics.TopicLabelOneToOne)
+	go m.reportOutboundMsgSize(byteCount, metrics.ChannelNone)
 
 	return nil
 }
@@ -350,7 +350,7 @@ ProcessLoop:
 			}
 
 			msgSize := msg.Size()
-			m.reportInboundMsgSize(msgSize, metrics.TopicLabelOneToOne)
+			m.reportInboundMsgSize(msgSize, metrics.ChannelNone)
 
 			m.processMessage(msg)
 			continue ProcessLoop
@@ -462,12 +462,12 @@ func (m *Middleware) publish(channelID uint8, msg *message.Message) error {
 	return nil
 }
 
-func (m *Middleware) reportOutboundMsgSize(size int, topic string) {
-	m.metrics.NetworkMessageSent(size, topic)
+func (m *Middleware) reportOutboundMsgSize(size int, channel string) {
+	m.metrics.NetworkMessageSent(size, channel)
 }
 
-func (m *Middleware) reportInboundMsgSize(size int, topic string) {
-	m.metrics.NetworkMessageReceived(size, topic)
+func (m *Middleware) reportInboundMsgSize(size int, channel string) {
+	m.metrics.NetworkMessageReceived(size, channel)
 }
 
 // topicFromChannelID converts a Flow channel ID to LibP2P pub-sub topic id e.g. 10 -> "10"

@@ -25,12 +25,12 @@ type Finalizer struct {
 	db           *badger.DB
 	transactions mempool.Transactions
 	prov         network.Engine
-	metrics      module.Metrics
+	metrics      module.CollectionMetrics
 	chainID      string // aka cluster ID
 }
 
 // NewFinalizer creates a new finalizer for collection nodes.
-func NewFinalizer(db *badger.DB, transactions mempool.Transactions, prov network.Engine, metrics module.Metrics, chainID string) *Finalizer {
+func NewFinalizer(db *badger.DB, transactions mempool.Transactions, prov network.Engine, metrics module.CollectionMetrics, chainID string) *Finalizer {
 	f := &Finalizer{
 		db:           db,
 		transactions: transactions,

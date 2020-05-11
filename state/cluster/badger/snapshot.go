@@ -13,18 +13,18 @@ import (
 
 // Snapshot represents a snapshot of chain state anchored at a particular
 // reference block.
-//
-// If final is true, the reference is the latest finalized block. If final is
-// false and blockID is set, the reference is the block with the given ID.
 type Snapshot struct {
+	err     error
 	state   *State
 	blockID flow.Identifier
-	final   bool
 }
 
 func (s *Snapshot) Collection() (*flow.Collection, error) {
-	var collection flow.Collection
+	if s.err != nil {
+		return nil, s.err
+	}
 
+	var collection flow.Collection
 	err := s.state.db.View(func(tx *badger.Txn) error {
 
 		// get the header for this snapshot
@@ -46,14 +46,15 @@ func (s *Snapshot) Collection() (*flow.Collection, error) {
 
 		return nil
 	})
-	if err != nil {
-		return nil, err
-	}
 
-	return &collection, nil
+	return &collection, err
 }
 
 func (s *Snapshot) Head() (*flow.Header, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+
 	var head flow.Header
 	err := s.state.db.View(func(tx *badger.Txn) error {
 		return s.head(&head)(tx)
@@ -61,26 +62,16 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 	return &head, err
 }
 
+func (s *Snapshot) Pending() ([]flow.Identifier, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.pending(s.blockID)
+}
+
 // head finds the header referenced by the snapshot.
 func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
-
-		// if final is set and block ID is empty, set block ID to last finalized
-		if s.final && s.blockID == flow.ZeroID {
-
-			// get the boundary
-			var boundary uint64
-			err := operation.RetrieveClusterFinalizedHeight(s.state.chainID, &boundary)(tx)
-			if err != nil {
-				return fmt.Errorf("could not retrieve boundary (%s): %w", s.state.chainID, err)
-			}
-
-			// get the ID of the last finalized block
-			err = operation.LookupClusterBlockHeight(s.state.chainID, boundary, &s.blockID)(tx)
-			if err != nil {
-				return fmt.Errorf("could not retrieve block ID at boundary (%d): %w", boundary, err)
-			}
-		}
 
 		// get the snapshot header
 		err := operation.RetrieveHeader(s.blockID, head)(tx)
@@ -90,4 +81,22 @@ func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
 
 		return nil
 	}
+}
+
+func (s *Snapshot) pending(blockID flow.Identifier) ([]flow.Identifier, error) {
+
+	var pendingIDs []flow.Identifier
+	err := s.state.db.View(procedure.LookupBlockChildren(blockID, &pendingIDs))
+	if err != nil {
+		return nil, fmt.Errorf("could not get pending children: %w", err)
+	}
+
+	for _, pendingID := range pendingIDs {
+		additionalIDs, err := s.pending(pendingID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get pending grandchildren: %w", err)
+		}
+		pendingIDs = append(pendingIDs, additionalIDs...)
+	}
+	return pendingIDs, nil
 }
