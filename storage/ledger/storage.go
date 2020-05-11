@@ -22,7 +22,7 @@ func NewTrieStorage(dbDir string) (*TrieStorage, error) {
 		return nil, fmt.Errorf("cannot create WAL: %w", err)
 	}
 
-	mForest := mtrie.NewMForest(257)
+	mForest := mtrie.NewMForest(257, dbDir, 1000)
 	trie := &TrieStorage{
 		mForest: mForest,
 		wal:     w,
