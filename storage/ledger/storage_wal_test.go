@@ -51,7 +51,7 @@ func Test_WAL(t *testing.T) {
 		// random map iteration order is a benefit here
 		for stateCommitment, data := range savedData {
 
-			keys := make([][]byte, len(data))
+			keys := make([][]byte, 0, len(data))
 			for keyString := range data {
 				key := []byte(keyString)
 				keys = append(keys, key)
@@ -65,5 +65,7 @@ func Test_WAL(t *testing.T) {
 				assert.Equal(t, data[string(key)], registerValue)
 			}
 		}
+
+		<-f2.Done()
 	})
 }

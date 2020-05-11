@@ -23,11 +23,17 @@ func NewTrieStorage(dbDir string) (*TrieStorage, error) {
 	}
 
 	mForest := mtrie.NewMForest(257)
-
-	return &TrieStorage{
+	trie := &TrieStorage{
 		mForest: mForest,
 		wal:     w,
-	}, nil
+	}
+
+	err = w.Reply(func(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
+		_, err := trie.UpdateRegisters(keys, values, stateCommitment)
+		return err
+	})
+
+	return trie, nil
 }
 
 func (f *TrieStorage) Ready() <-chan struct{} {

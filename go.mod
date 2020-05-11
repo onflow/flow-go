@@ -14,6 +14,7 @@ require (
 	github.com/getlantern/golog v0.0.0-20190830074920-4ef2e798c2d7 // indirect
 	github.com/getlantern/ops v0.0.0-20200403153110-8476b16edcd6 // indirect
 	github.com/getlantern/wal v0.0.0-20190827183637-031c253cf0ae
+	github.com/go-kit/kit v0.9.0
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/mock v1.4.3
 	github.com/golang/protobuf v1.4.0

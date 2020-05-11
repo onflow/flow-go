@@ -46,6 +46,38 @@ func (w *WAL) RecordDelete(stateCommitment flow.StateCommitment) error {
 	return nil
 }
 
+func (w *WAL) Reply(updateFn func(flow.StateCommitment, [][]byte, [][]byte) error) error {
+
+	sr, err := prometheusWAL.NewSegmentsReader(w.w.Dir())
+	if err != nil {
+		return fmt.Errorf("cannot create segment reader: %w", err)
+	}
+
+	reader := prometheusWAL.NewReader(sr)
+
+	for reader.Next() {
+		record := reader.Record()
+		operation, commitment, keys, values, err := Decode(record)
+		if err != nil {
+			return fmt.Errorf("cannot decode WAL record: %w", err)
+		}
+
+		switch operation {
+		case WALUpdate:
+			err = updateFn(commitment, keys, values)
+		}
+
+		if err != nil {
+			return fmt.Errorf("error while processing WAL update: %w", err)
+		}
+		err = reader.Err()
+		if err != nil {
+			return fmt.Errorf("cannot read WAL: %w", err)
+		}
+	}
+	return nil
+}
+
 func (w *WAL) Close() error {
 	return w.w.Close()
 }
