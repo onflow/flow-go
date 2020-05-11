@@ -14,43 +14,22 @@ import (
 
 var _ databases.DAL = &LevelDB{}
 
-var (
-	kvdbPrefix = "kvdb"
-	triePrefix = "trie"
+const (
+	kvdbSuffix = "kvdb"
+	trieSuffix = "trie"
 )
 
-// LevelDB is a levelDB implementation of the DAL interface
+// LevelDB is a LevelDB implementation of the DAL interface.
 type LevelDB struct {
-	//kvdbPath string
-	//tdbPath  string
-	path    string
-	kvdb    *leveldb.DB    // The key-value database
-	tdb     *leveldb.DB    // The trie database
-	batcher *leveldb.Batch // A batcher used for atomic updates of trie DB
-}
-
-// GetKVDB calls a get on the key-value database
-func (s *LevelDB) GetKVDB(key []byte) ([]byte, error) {
-	value, err := s.kvdb.Get(key, nil)
-	if errors.Is(err, leveldb.ErrNotFound) {
-		return value, databases.ErrNotFound
-	}
-	return value, err
-}
-
-// GetTrieDB calls Get on the TrieDB in the interface
-func (s *LevelDB) GetTrieDB(key []byte) ([]byte, error) {
-	return s.tdb.Get(key, nil)
+	path string
+	kvdb *leveldb.DB // The key-value database
+	tdb  *leveldb.DB // The trie database
 }
 
 // NewLevelDB creates a new LevelDB database.
 func NewLevelDB(path string) (*LevelDB, error) {
-
-	fmt.Println("OPENING DB:", path)
-	fmt.Println()
-
-	kvdbPath := filepath.Join(path, kvdbPrefix)
-	tdbPath := filepath.Join(path, triePrefix)
+	kvdbPath := filepath.Join(path, kvdbSuffix)
+	tdbPath := filepath.Join(path, trieSuffix)
 
 	// open the key-value database
 	kvdb, err := leveldb.OpenFile(kvdbPath, nil)
@@ -65,37 +44,34 @@ func NewLevelDB(path string) (*LevelDB, error) {
 	}
 
 	return &LevelDB{
-		path:    path,
-		kvdb:    kvdb,
-		tdb:     tdb,
-		batcher: new(leveldb.Batch),
+		path: path,
+		kvdb: kvdb,
+		tdb:  tdb,
 	}, nil
 }
 
-// NewBackupLevelDB creates a new LevelDB database interface at the specified path db/stateRootIndex
-//func NewBackupLevelDB(kvdbPath, tdbPath, stateRootIndex string) (*LevelDB, error) {
-//	kvdbPath = filepath.Join(kvdbPath, stateRootIndex)
-//	tdbPath = filepath.Join(tdbPath, stateRootIndex)
-//
-//	return NewLevelDB(kvdbPath, tdbPath)
-//}
+// GetKVDB calls a get on the key-value database.
+func (s *LevelDB) GetKVDB(key []byte) ([]byte, error) {
+	value, err := s.kvdb.Get(key, nil)
+	if errors.Is(err, leveldb.ErrNotFound) {
+		return value, databases.ErrNotFound
+	}
 
-// newBatch creates a new batch, effectively clearing the old batch
+	return value, err
+}
+
+// GetTrieDB calls a get on the trie database.
+func (s *LevelDB) GetTrieDB(key []byte) ([]byte, error) {
+	return s.tdb.Get(key, nil)
+}
+
+// NewBatcher returns a new batcher.
 func (s *LevelDB) NewBatcher() databases.Batcher {
 	return new(leveldb.Batch)
 }
 
-// PutIntoBatcher inserts or Deletes a KV pair into the batcher.
-func (s *LevelDB) PutIntoBatcher(key []byte, value []byte) {
-	if value == nil {
-		s.batcher.Delete(key)
-	}
-	s.batcher.Put(key, value)
-}
-
 // SafeClose is a helper function that closes databases safely.
 func (s *LevelDB) SafeClose() (error, error) {
-	fmt.Println("SAFE CLOSING DB:", s.path)
 	return s.kvdb.Close(), s.tdb.Close()
 }
 
@@ -115,7 +91,7 @@ func (s *LevelDB) UpdateKVDB(keys [][]byte, values [][]byte) error {
 	return nil
 }
 
-// UpdateTrieDB updates the trie DB with the new paths in the update
+// UpdateTrieDB updates the trie database with the new paths in the update.
 func (s *LevelDB) UpdateTrieDB(batcher databases.Batcher) error {
 	levelDBBatcher, ok := batcher.(*leveldb.Batch)
 	if !ok {
@@ -130,28 +106,27 @@ func (s *LevelDB) UpdateTrieDB(batcher databases.Batcher) error {
 	return nil
 }
 
-func (s *LevelDB) CopyTo(to databases.DAL) error {
-	levelDB, ok := to.(*LevelDB)
+func (s *LevelDB) CopyTo(dest databases.DAL) error {
+	destDB, ok := dest.(*LevelDB)
 	if !ok {
 		return fmt.Errorf("copy supported between the same databases only - make sure you supply instance of LevelDB here")
 	}
 
-	err := s.copyKVDB(levelDB)
-
+	err := copyDB(s.kvdb, destDB.kvdb)
 	if err != nil {
-		return fmt.Errorf("error while copying KVDB: %w", err)
+		return fmt.Errorf("failed to copy key-value database: %w", err)
 	}
 
-	err = s.copyTDB(levelDB)
-
+	err = copyDB(s.tdb, destDB.tdb)
 	if err != nil {
-		return fmt.Errorf("error while copying TrieDB: %w", err)
+		return fmt.Errorf("failed to copy trie database: %w", err)
 	}
 
 	return nil
 }
 
-// PruneDB takes the current LevelDB instance and removes any key-value pairs that also appear in the next LevelDB instance.
+// PruneDB takes the current LevelDB instance and removes any key-value pairs that also
+// appear in the next LevelDB instance.
 func (s *LevelDB) PruneDB(next databases.DAL) error {
 	nextLevelDB, ok := next.(*LevelDB)
 	if !ok {
@@ -220,57 +195,30 @@ func (s *LevelDB) PruneDB(next databases.DAL) error {
 	return nil
 }
 
-// Size returns the size of the current LevelDB on disk in bytes
+// Size returns the size of the current LevelDB on disk in bytes.
 func (s *LevelDB) Size() (int64, error) {
 	return io.DirSize(s.path)
 }
 
-// TODO Replace copyKVDB and copyTDB with a single function
-func (s *LevelDB) copyKVDB(copy *LevelDB) error {
-	iter := s.kvdb.NewIterator(nil, nil)
+// copyDB copies the contents of one LevelDB instance to another.
+func copyDB(src, dest *leveldb.DB) error {
+	iter := src.NewIterator(nil, nil)
 	defer iter.Release()
 
 	for iter.Next() {
 		key := iter.Key()
 		value := iter.Value()
 
-		err := copy.kvdb.Put(key, value, nil)
-
+		err := dest.Put(key, value, nil)
 		if err != nil {
 			return err
 		}
 	}
 
 	err := iter.Error()
-
 	if err != nil {
 		return err
 	}
 
 	return nil
-}
-
-func (s *LevelDB) copyTDB(copy *LevelDB) error {
-	iter := s.tdb.NewIterator(nil, nil)
-	defer iter.Release()
-
-	for iter.Next() {
-		key := iter.Key()
-		value := iter.Value()
-
-		err := copy.tdb.Put(key, value, nil)
-
-		if err != nil {
-			return err
-		}
-	}
-
-	err := iter.Error()
-
-	if err != nil {
-		return err
-	}
-
-	return nil
-
 }
