@@ -5,33 +5,28 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
-	"github.com/dapperlabs/flow-go/storage/ledger/trie"
+	"github.com/dapperlabs/flow-go/storage/ledger/wal"
 )
 
 type TrieStorage struct {
-	tree    *trie.SMT
 	mForest *mtrie.MForest
+	wal     *wal.WAL
 }
 
 // NewTrieStorage creates a new trie-backed ledger storage.
 func NewTrieStorage(dbDir string) (*TrieStorage, error) {
 
-	tree, err := trie.NewSMT(
-		dbDir,
-		257,
-		1000,
-		1000000,
-		1000,
-	)
+	w, err := wal.NewWAL(nil, nil, dbDir)
+
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot create WAL: %w", err)
 	}
 
 	mForest := mtrie.NewMForest(257)
 
 	return &TrieStorage{
-		tree:    tree,
 		mForest: mForest,
+		wal:     w,
 	}, nil
 }
 
@@ -42,7 +37,7 @@ func (f *TrieStorage) Ready() <-chan struct{} {
 }
 
 func (f *TrieStorage) Done() <-chan struct{} {
-	f.tree.SafeClose()
+	_ = f.wal.Close()
 	done := make(chan struct{})
 	close(done)
 	return done
@@ -88,6 +83,11 @@ func (f *TrieStorage) UpdateRegisters(
 	if len(ids) == 0 {
 		// return current state root unchanged
 		return stateCommitment, nil
+	}
+
+	err = f.wal.RecordUpdate(stateCommitment, ids, values)
+	if err != nil {
+		return nil, fmt.Errorf("cannot update state, error while writing WAL: %w", err)
 	}
 
 	newStateCommitment, err = f.mForest.Update(ids, values, stateCommitment)
@@ -172,9 +172,9 @@ func (f *TrieStorage) UpdateRegistersWithProof(
 
 // CloseStorage closes the DB
 func (f *TrieStorage) CloseStorage() {
-	f.tree.SafeClose()
+	_ = f.wal.Close()
 }
 
 func (f *TrieStorage) Size() (int64, error) {
-	return f.tree.Size()
+	return int64(f.mForest.Size()), nil
 }

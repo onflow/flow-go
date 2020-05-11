@@ -10,8 +10,8 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	mtrieWAL "github.com/dapperlabs/flow-go/storage/ledger/mtrie/wal"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
+	mtrieWAL "github.com/dapperlabs/flow-go/storage/ledger/wal"
 
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
