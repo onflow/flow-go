@@ -176,7 +176,7 @@ func EncodeBatchProof(bp *BatchProof) [][]byte {
 	return proofs
 }
 
-// DecodeProof takes in an encodes array of byte arrays an converts them into a proofHolder
+// DecodeBatchProof takes in an encodes array of byte arrays an converts them into a BatchProof
 func DecodeBatchProof(proofs [][]byte) (*BatchProof, error) {
 	bp := NewBatchProof()
 	// The decode logic is as follows:
@@ -184,7 +184,7 @@ func DecodeBatchProof(proofs [][]byte) (*BatchProof, error) {
 	// The second byte is size, needs to be converted to uint8
 	// The next 32 bytes are the flag
 	// Each subsequent 32 bytes are the proofs needed for the verifier
-	// Each result is put into their own array and put into a proofHolder
+	// Each result is put into their own array and put into a BatchProof
 	for _, proof := range proofs {
 		if len(proof) < 4 {
 			return nil, fmt.Errorf("error decoding the proof: proof size too small")
