@@ -462,9 +462,29 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 	suite.Assert().False(suite.pool.Has(tx1.ID()))
 }
 
-// TODO specify behaviour for empty mempools
 func (suite *BuilderSuite) TestBuildOn_EmptyMempool() {
-	suite.T().Skip()
+
+	// start with an empty mempool
+	var err error
+	suite.pool, err = stdmap.NewTransactions(1000)
+	suite.Require().Nil(err)
+	suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.payloads, suite.pool)
+
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
+	suite.Require().Nil(err)
+
+	var built model.Block
+	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+	suite.Require().Nil(err)
+
+	// should reference a valid reference block
+	// (since genesis is the only block, it's the only valid reference)
+	mainGenesis, err := suite.protoState.AtHeight(0).Head()
+	suite.Assert().Nil(err)
+	suite.Assert().Equal(mainGenesis.ID(), built.Payload.ReferenceBlockID)
+
+	// the payload should be empty
+	suite.Assert().Equal(0, built.Payload.Collection.Len())
 }
 
 // helper to check whether a collection contains each of the given transactions.
