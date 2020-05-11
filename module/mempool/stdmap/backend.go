@@ -49,21 +49,21 @@ func (b *Backdata) Rem(entityID flow.Identifier) bool {
 }
 
 // Adjust will adjust the value item using the given function if the given key can be found.
-// Returns a bool which indicates whether the value was updated.
-func (b *Backdata) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity) bool {
+// Returns a bool which indicates whether the value was updated as well as the updated value
+func (b *Backdata) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity) (flow.Entity, bool) {
 	entity, ok := b.entities[entityID]
 	if !ok {
-		return false
+		return nil, false
 	}
 	newentity := f(entity)
 	newentityID := newentity.ID()
 	if newentityID == entityID {
 		// item is not adjusted
-		return false
+		return nil, false
 	}
 	delete(b.entities, entityID)
 	b.entities[newentityID] = newentity
-	return true
+	return newentity, true
 }
 
 // ByID returns the given item from the pool.
@@ -142,7 +142,7 @@ func (b *Backend) Rem(entityID flow.Identifier) bool {
 
 // Adjust will adjust the value item using the given function if the given key can be found.
 // Returns a bool which indicates whether the value was updated.
-func (b *Backend) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity) bool {
+func (b *Backend) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity) (flow.Entity, bool) {
 	b.Lock()
 	defer b.Unlock()
 	return b.Backdata.Adjust(entityID, f)

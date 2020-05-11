@@ -2,7 +2,6 @@ package stdmap
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/verification/tracker"
@@ -10,7 +9,6 @@ import (
 
 // CollectionTrackers implements the CollectionTrackers memory pool.
 type CollectionTrackers struct {
-	sync.Mutex // used to provide atomic update functionality
 	*Backend
 }
 
@@ -23,10 +21,7 @@ func NewCollectionTrackers(limit uint) (*CollectionTrackers, error) {
 }
 
 // Add adds a CollectionTracker to the mempool.
-func (c *CollectionTrackers) Add(ct *tracker.CollectionTracker) error {
-	c.Lock()
-	defer c.Unlock()
-
+func (c *CollectionTrackers) Add(ct *tracker.CollectionTracker) bool {
 	return c.Backend.Add(ct)
 }
 
@@ -41,58 +36,35 @@ func (c *CollectionTrackers) Has(collID flow.Identifier) bool {
 
 // Rem removes tracker with the given collection Id.
 func (c *CollectionTrackers) Rem(collID flow.Identifier) bool {
-	c.Lock()
-	defer c.Unlock()
-
 	return c.Backend.Rem(collID)
 }
 
 // Inc atomically increases the counter of tracker by one and returns the updated tracker
 func (c *CollectionTrackers) Inc(collID flow.Identifier) (*tracker.CollectionTracker, error) {
-	c.Lock()
-	defer c.Unlock()
+	updated, ok := c.Backend.Adjust(collID, func(entity flow.Entity) flow.Entity {
+		ct := entity.(*tracker.CollectionTracker)
+		return &tracker.CollectionTracker{
+			CollectionID: ct.CollectionID,
+			BlockID:      ct.BlockID,
+			Counter:      ct.Counter + 1,
+		}
+	})
 
-	// retrieves tracker from mempool
-	ct, err := c.byCollectionID(collID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve chunk data pack tracker from mempool: %w", err)
+	if !ok {
+		return nil, fmt.Errorf("could not update tracker in backend")
 	}
 
-	// removes it
-	removed := c.Backend.Rem(collID)
-	if !removed {
-		return nil, fmt.Errorf("could not remove collection tracker from mempool")
-	}
-
-	// increases tracker retry counter
-	ct.Counter += 1
-
-	// inserts it back in the mempool
-	err = c.Backend.Add(ct)
-	if err != nil {
-		return nil, fmt.Errorf("could not store tracker of collection request in mempool: %w", err)
-	}
-
-	return ct, nil
-}
-
-// byCollectionID is the non-concurrency safe version that
-// returns the collection tracker for the given collection ID.
-func (c *CollectionTrackers) byCollectionID(collID flow.Identifier) (*tracker.CollectionTracker, error) {
-	entity, err := c.Backend.ByID(collID)
-	if err != nil {
-		return nil, err
-	}
-	collectionTracker := entity.(*tracker.CollectionTracker)
-	return collectionTracker, true
+	return updated.(*tracker.CollectionTracker), nil
 }
 
 // ByCollectionID returns the collection tracker for the given collection ID.
 func (c *CollectionTrackers) ByCollectionID(collID flow.Identifier) (*tracker.CollectionTracker, error) {
-	c.Lock()
-	defer c.Unlock()
-
-	return c.byCollectionID(collID)
+	entity, ok := c.Backend.ByID(collID)
+	if !ok {
+		return nil, fmt.Errorf("could not retrieve collection tracker from mempool")
+	}
+	collectionTracker := entity.(*tracker.CollectionTracker)
+	return collectionTracker, nil
 }
 
 // All returns all collection trackers from the pool.

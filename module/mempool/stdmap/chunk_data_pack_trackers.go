@@ -2,7 +2,6 @@ package stdmap
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/verification/tracker"
@@ -10,7 +9,6 @@ import (
 
 // ChunkDataPackTrackers implements the ChunkDataPackTrackers memory pool.
 type ChunkDataPackTrackers struct {
-	sync.Mutex // used for preserving mutual exclusion during update
 	*Backend
 }
 
@@ -23,73 +21,47 @@ func NewChunkDataPackTrackers(limit uint) (*ChunkDataPackTrackers, error) {
 }
 
 // Add adds a ChunkDataPackTracker to the mempool.
-func (c *ChunkDataPackTrackers) Add(cdpt *tracker.ChunkDataPackTracker) error {
-	c.Lock()
-	defer c.Unlock()
+func (c *ChunkDataPackTrackers) Add(cdpt *tracker.ChunkDataPackTracker) bool {
 	return c.Backend.Add(cdpt)
 }
 
 // Has checks whether the ChunkDataPackTracker with the given chunkID is currently in
 // the memory pool.
 func (c *ChunkDataPackTrackers) Has(chunkID flow.Identifier) bool {
-	c.Lock()
-	defer c.Unlock()
 	return c.Backend.Has(chunkID)
 }
 
 // Rem removes tracker with the given chunk ID.
 func (c *ChunkDataPackTrackers) Rem(chunkID flow.Identifier) bool {
-	c.Lock()
-	defer c.Unlock()
 	return c.Backend.Rem(chunkID)
 }
 
 // Inc atomically increases the counter of tracker by one and returns the updated tracker
 func (c *ChunkDataPackTrackers) Inc(chunkID flow.Identifier) (*tracker.ChunkDataPackTracker, error) {
-	c.Lock()
-	defer c.Unlock()
+	updated, ok := c.Backend.Adjust(chunkID, func(entity flow.Entity) flow.Entity {
+		cdpt := entity.(*tracker.ChunkDataPackTracker)
+		return &tracker.ChunkDataPackTracker{
+			ChunkID: cdpt.ChunkID,
+			BlockID: cdpt.BlockID,
+			Counter: cdpt.Counter + 1,
+		}
+	})
 
-	// retrieves the chunk data pack
-	t, err := c.byChunkID(chunkID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve chunk data pack tracker from mempool: %w", err)
+	if !ok {
+		return nil, fmt.Errorf("could not update tracker in backend")
 	}
 
-	// removes it from memory
-	removed := c.Backend.Rem(chunkID)
-	if !removed {
-		return nil, fmt.Errorf("could not remove data pack tracker from mempool")
-	}
-
-	// increases tracker retry counter
-	t.Counter += 1
-
-	// stores tracker back in the mempool
-	err = c.Backend.Add(t)
-	if err != nil {
-		return nil, fmt.Errorf("could not store tracker of chunk data pack request in mempool: %w", err)
-	}
-
-	return t, nil
-}
-
-// byChunkID is the non-concurrency safe version that is used internally
-// it returns the chunk data pack tracker for the given chunk ID.
-func (c *ChunkDataPackTrackers) byChunkID(chunkID flow.Identifier) (*tracker.ChunkDataPackTracker, error) {
-	entity, err := c.Backend.ByID(chunkID)
-	if err != nil {
-		return nil, err
-	}
-	chunkDataPackTracker := entity.(*tracker.ChunkDataPackTracker)
-	return chunkDataPackTracker, true
+	return updated.(*tracker.ChunkDataPackTracker), nil
 }
 
 // ByChunkID returns the chunk data pack tracker for the given chunk ID.
 func (c *ChunkDataPackTrackers) ByChunkID(chunkID flow.Identifier) (*tracker.ChunkDataPackTracker, error) {
-	c.Lock()
-	defer c.Unlock()
-
-	return c.byChunkID(chunkID)
+	entity, ok := c.Backend.ByID(chunkID)
+	if !ok {
+		return nil, fmt.Errorf("could not retrieve tracker from backend")
+	}
+	chunkDataPackTracker := entity.(*tracker.ChunkDataPackTracker)
+	return chunkDataPackTracker, nil
 }
 
 // All returns all chunk data pack trackers from the pool.
