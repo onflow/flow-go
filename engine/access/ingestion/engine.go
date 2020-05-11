@@ -130,7 +130,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 	e.unit.Launch(func() {
 		id := hb.BlockID
-		err := e.processBlock(id)
+		err := e.processFinalizedBlock(id)
 		if err != nil {
 			e.log.Error().Err(err).Hex("block_id", id[:]).Msg("failed to process block")
 			return
