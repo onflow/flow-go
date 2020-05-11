@@ -572,6 +572,7 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 
 	values := make([][]byte, len(keys))
 
+	// TODO: make cache eviction smarter, should not need to re-open this tree
 	tree, err = s.forest.Get(root)
 	if err != nil {
 		return nil, nil, fmt.Errorf("COULD NOT REOPEN TREE: %w", err)
