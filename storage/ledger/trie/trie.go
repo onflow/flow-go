@@ -571,7 +571,6 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 		if err != nil {
 
 			localRoot := root
-			i := 0
 			for {
 				tree, err := s.forest.Get(localRoot)
 				if err != nil {
@@ -588,8 +587,6 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 				if s.IsSnapshot(tree) {
 					break
 				}
-
-				i++
 
 				localRoot = tree.previous
 			}
