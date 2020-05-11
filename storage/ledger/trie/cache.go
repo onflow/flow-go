@@ -3,6 +3,7 @@ package trie
 import (
 	"container/list"
 	"errors"
+	"sync"
 )
 
 type treeCache interface {
@@ -13,6 +14,7 @@ type treeCache interface {
 }
 
 type lruTreeCache struct {
+	lock      sync.RWMutex
 	size      int
 	evictList *list.List
 	items     map[string]*list.Element
@@ -38,9 +40,11 @@ func newLRUTreeCache(size int) (*lruTreeCache, error) {
 }
 
 func (c *lruTreeCache) Add(r Root, t *tree) (evicted bool) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	key := keyForRoot(r)
 
-	// Check for existing item
 	if ent, ok := c.items[key]; ok {
 		c.evictList.MoveToFront(ent)
 		ent.Value.(*entry).value = t
@@ -56,27 +60,35 @@ func (c *lruTreeCache) Add(r Root, t *tree) (evicted bool) {
 
 	// Verify size not exceeded
 	if evict {
-		return c.removeOldest()
+		evicted = c.removeOldest()
 	}
 
 	return
 }
 
 func (c *lruTreeCache) Get(r Root) (t *tree, ok bool) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	key := keyForRoot(r)
 
 	if ent, ok := c.items[key]; ok {
 		c.evictList.MoveToFront(ent)
+
 		if ent.Value.(*entry) == nil {
 			return nil, false
 		}
+
 		return ent.Value.(*entry).value, true
 	}
 
-	return
+	return nil, false
 }
 
 func (c *lruTreeCache) Purge() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	for _, e := range c.items {
 		c.removeElement(e)
 	}
@@ -87,12 +99,15 @@ func (c *lruTreeCache) Purge() {
 }
 
 func (c *lruTreeCache) Contains(r Root) (ok bool) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
 	key := keyForRoot(r)
 	_, ok = c.items[key]
+
 	return ok
 }
 
-// removeOldest removes the oldest item from the cache.
 func (c *lruTreeCache) removeOldest() (evicted bool) {
 	ent := c.evictList.Back()
 	if ent != nil {
@@ -125,15 +140,15 @@ func (c *lruTreeCache) removeElement(e *list.Element) bool {
 	c.evictList.Remove(e)
 	delete(c.items, kv.key)
 
-	c.onEvict(kv.key, kv.value)
+	c.onEvict(kv.value)
 
 	return true
 }
 
-func (c *lruTreeCache) onEvict(key string, t *tree) {
+func (c *lruTreeCache) onEvict(t *tree) {
 	_, _ = t.database.SafeClose()
 }
 
 func keyForRoot(r Root) string {
-	return string(r)
+	return r.String()
 }
