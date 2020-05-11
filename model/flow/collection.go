@@ -1,5 +1,7 @@
 package flow
 
+import "github.com/dapperlabs/flow-go/model/encoding/rlp"
+
 // Collection is set of transactions.
 type Collection struct {
 	Transactions []*TransactionBody
@@ -56,6 +58,11 @@ func (lc LightCollection) ID() Identifier {
 
 func (lc LightCollection) Checksum() Identifier {
 	return MakeID(lc)
+}
+
+// Encode returns the canonical RLP byte representation of this light collection
+func (lc LightCollection) Encode() []byte {
+	return rlp.NewEncoder().MustEncode(lc)
 }
 
 func (lc LightCollection) Len() int {

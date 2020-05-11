@@ -5,7 +5,7 @@ package flow
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/model/encoding"
+	"github.com/dapperlabs/flow-go/model/encoding/rlp"
 )
 
 // List of built-in account event types.
@@ -46,11 +46,11 @@ func (e *Event) Body() interface{} {
 	return wrapEvent(*e)
 }
 
-// Encode returns the canonical encoding of the event, containing only the
-// fields necessary to uniquely identify it.
+// Encode returns the canonical RLP byte representation of this event, containing only the fields necessary to uniquely
+// identify it.
 func (e Event) Encode() []byte {
 	w := wrapEvent(e)
-	return encoding.DefaultEncoder.MustEncode(w)
+	return rlp.NewEncoder().MustEncode(w)
 }
 
 // Defines only the fields needed to uniquely identify an event.
