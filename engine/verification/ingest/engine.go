@@ -193,9 +193,13 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	e.log.Info().
 		Hex("origin_id", logging.ID(originID)).
 		Hex("receipt_id", logging.Entity(receipt)).
-		Msg("execution receipt received")
+		Msg("execution receipt received at ingest engine")
 
 	if e.ingestedResultIDs.Has(receipt.ExecutionResult.ID()) {
+		e.log.Debug().
+			Hex("origin_id", logging.ID(originID)).
+			Hex("receipt_id", logging.Entity(receipt)).
+			Msg("execution receipt with already ingested result discarded")
 		// discards the receipt if its result has already been ingested
 		return nil
 	}
@@ -214,6 +218,10 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		if err != nil && err != mempool.ErrAlreadyExists {
 			return fmt.Errorf("could not store execution receipt in pending pool: %w", err)
 		}
+		e.log.Debug().
+			Hex("origin_id", logging.ID(originID)).
+			Hex("receipt_id", logging.Entity(receipt)).
+			Msg("execution receipt successfully added to pending mempool")
 
 	} else {
 		// execution results are only valid from execution nodes
@@ -228,6 +236,10 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		if err != nil && err != mempool.ErrAlreadyExists {
 			return fmt.Errorf("could not store execution receipt: %w", err)
 		}
+		e.log.Debug().
+			Hex("origin_id", logging.ID(originID)).
+			Hex("receipt_id", logging.Entity(receipt)).
+			Msg("execution receipt successfully added to authenticated mempool")
 
 	}
 	return nil
@@ -580,6 +592,8 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 //
 // NOTE: this method is protected by mutex to prevent double-verifying ERs.
 func (e *Engine) checkPendingChunks() {
+	e.log.Debug().
+		Msg("check pending chunks background service started")
 
 	// checks the current authenticated receipts for their resources
 	// ready for verification
@@ -769,6 +783,10 @@ func (e *Engine) myUningestedChunks(res *flow.ExecutionResult) (flow.ChunkList, 
 // if originID is evaluated successfully, the receipt is added to authenticated receipts mempool
 // Otherwise it is dropped completely
 func (e *Engine) checkPendingReceipts(blockID flow.Identifier) {
+	e.log.Info().
+		Hex("block_id", logging.ID(blockID)).
+		Msg("pending receipts are checking against finalized block")
+
 	for _, p := range e.pendingReceipts.All() {
 		if blockID == p.Receipt.ExecutionResult.BlockID {
 			// removes receipt from pending receipts pool
