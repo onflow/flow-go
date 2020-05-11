@@ -8,7 +8,7 @@ test:
 
 # Run the integration test suite
 .PHONY: integration-test
-integration-test: collection-tests consensus-tests common-tests
+integration-test: collection-tests consensus-tests common-tests execution-tests
 
 .PHONY: collection-tests
 collection-tests:
@@ -21,3 +21,7 @@ consensus-tests:
 .PHONY: common-tests
 common-tests:
 	GO111MODULE=on go test -tags relic -count=1 ./tests/common
+
+.PHONY: execution-tests
+execution-tests:
+	GO111MODULE=on go test -tags relic -count=1 ./tests/execution
