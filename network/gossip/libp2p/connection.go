@@ -3,10 +3,13 @@
 package libp2p
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/libp2p/go-libp2p-core/helpers"
+	"github.com/libp2p/go-libp2p-core/mux"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-yamux"
 	"github.com/rs/zerolog"
 )
 
@@ -42,8 +45,8 @@ func NewConnection(log zerolog.Logger, stream libp2pnetwork.Stream) *Connection 
 func (c *Connection) stop() {
 	c.once.Do(func() {
 		close(c.done)
-		// Close the underlying libp2p stream
-		if err := helpers.FullClose(c.stream); err != nil {
+		// Close the underlying libp2p stream (only log errors other than the expected ErrReset error for the mux type)
+		if err := helpers.FullClose(c.stream); err != nil && !errors.Is(err, mux.ErrReset) && !errors.Is(err, yamux.ErrConnectionReset) {
 			c.log.Err(err).Msg("error resetting connection stream")
 		}
 	})
