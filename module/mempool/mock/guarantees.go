@@ -12,14 +12,14 @@ type Guarantees struct {
 }
 
 // Add provides a mock function with given fields: guarantee
-func (_m *Guarantees) Add(guarantee *flow.CollectionGuarantee) error {
+func (_m *Guarantees) Add(guarantee *flow.CollectionGuarantee) bool {
 	ret := _m.Called(guarantee)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.CollectionGuarantee) error); ok {
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(*flow.CollectionGuarantee) bool); ok {
 		r0 = rf(guarantee)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0
@@ -42,7 +42,7 @@ func (_m *Guarantees) All() []*flow.CollectionGuarantee {
 }
 
 // ByID provides a mock function with given fields: collID
-func (_m *Guarantees) ByID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
+func (_m *Guarantees) ByID(collID flow.Identifier) (*flow.CollectionGuarantee, bool) {
 	ret := _m.Called(collID)
 
 	var r0 *flow.CollectionGuarantee
@@ -54,11 +54,11 @@ func (_m *Guarantees) ByID(collID flow.Identifier) (*flow.CollectionGuarantee, e
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
 		r1 = rf(collID)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(bool)
 	}
 
 	return r0, r1

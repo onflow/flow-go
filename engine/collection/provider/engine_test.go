@@ -16,7 +16,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	mocknetwork "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
@@ -147,8 +146,8 @@ func (suite *Suite) TestTransactionRequest() {
 
 		// create a transaction to request
 		tx := unittest.TransactionBodyFixture()
-		err := suite.colNode.Pool.Add(&tx)
-		assert.NoError(t, err)
+		added := suite.colNode.Pool.Add(&tx)
+		assert.True(t, added)
 
 		// expect that the requester will receive the collection
 		expectedRes := &messages.TransactionResponse{
@@ -158,7 +157,7 @@ func (suite *Suite) TestTransactionRequest() {
 
 		// send a request for the collection
 		req := messages.TransactionRequest{ID: tx.ID()}
-		err = suite.conduit.Submit(&req, suite.colNode.Me.NodeID())
+		err := suite.conduit.Submit(&req, suite.colNode.Me.NodeID())
 		assert.NoError(t, err)
 
 		// flush the request
@@ -216,6 +215,6 @@ func (suite *Suite) TestTransactionRequest() {
 
 		// provider should return error
 		err := suite.colNode.ProviderEngine.ProcessLocal(req)
-		assert.True(t, errors.Is(err, storage.ErrNotFound) || errors.Is(err, mempool.ErrNotFound))
+		assert.Error(t, err)
 	})
 }

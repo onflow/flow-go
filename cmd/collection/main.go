@@ -143,7 +143,7 @@ func main() {
 		Module("cluster state", func(node *cmd.FlowNodeBuilder) error {
 
 			// initialize cluster state
-			clusterState, err = clusterkv.NewState(node.DB, clusterID)
+			clusterState, err = clusterkv.NewState(node.DB, clusterID, node.Storage.Headers, colPayloads)
 			if err != nil {
 				return fmt.Errorf("could not create cluster state: %w", err)
 			}

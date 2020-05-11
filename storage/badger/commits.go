@@ -5,6 +5,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
@@ -26,8 +27,13 @@ func NewCommits(collector module.CacheMetrics, db *badger.DB) *Commits {
 	}
 
 	c := &Commits{
-		db:    db,
-		cache: newCache(collector, withStore(store), withRetrieve(retrieve)),
+		db: db,
+		cache: newCache(collector,
+			withLimit(100),
+			withStore(store),
+			withRetrieve(retrieve),
+			withResource(metrics.ResourceCommit),
+		),
 	}
 
 	return c

@@ -16,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/state/cluster"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/storage/util"
@@ -50,13 +51,15 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.dbdir = unittest.TempDir(suite.T())
 	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
 
-	suite.state, err = NewState(suite.db, suite.chainID)
+	metrics := metrics.NewNoopCollector()
+	headers, identities, _, seals, _, conPayloads, blocks := util.StorageLayer(suite.T(), suite.db)
+	colPayloads := storage.NewClusterPayloads(suite.db)
+
+	suite.state, err = NewState(suite.db, suite.chainID, headers, colPayloads)
 	suite.Assert().Nil(err)
 	suite.mutator = suite.state.Mutate()
 
-	metrics := metrics.NewNoopCollector()
-	headers, identities, _, seals, _, payloads, blocks := util.StorageLayer(suite.T(), suite.db)
-	suite.protoState, err = protocol.NewState(metrics, suite.db, headers, identities, seals, payloads, blocks)
+	suite.protoState, err = protocol.NewState(metrics, suite.db, headers, identities, seals, conPayloads, blocks)
 	require.NoError(suite.T(), err)
 }
 

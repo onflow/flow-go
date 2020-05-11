@@ -13,14 +13,14 @@ type PendingCollections struct {
 }
 
 // Add provides a mock function with given fields: pcoll
-func (_m *PendingCollections) Add(pcoll *verification.PendingCollection) error {
+func (_m *PendingCollections) Add(pcoll *verification.PendingCollection) bool {
 	ret := _m.Called(pcoll)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*verification.PendingCollection) error); ok {
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(*verification.PendingCollection) bool); ok {
 		r0 = rf(pcoll)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0
@@ -42,24 +42,24 @@ func (_m *PendingCollections) All() []*verification.PendingCollection {
 	return r0
 }
 
-// ByID provides a mock function with given fields: pcollID
-func (_m *PendingCollections) ByID(pcollID flow.Identifier) (*verification.PendingCollection, error) {
-	ret := _m.Called(pcollID)
+// ByID provides a mock function with given fields: collID
+func (_m *PendingCollections) ByID(collID flow.Identifier) (*verification.PendingCollection, bool) {
+	ret := _m.Called(collID)
 
 	var r0 *verification.PendingCollection
 	if rf, ok := ret.Get(0).(func(flow.Identifier) *verification.PendingCollection); ok {
-		r0 = rf(pcollID)
+		r0 = rf(collID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*verification.PendingCollection)
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(pcollID)
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
+		r1 = rf(collID)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(bool)
 	}
 
 	return r0, r1

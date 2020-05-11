@@ -16,11 +16,13 @@ const (
 )
 
 type ExecutionCollector struct {
-	tracer                 *trace.OpenTracer
-	gasUsedPerBlock        prometheus.Histogram
-	stateReadsPerBlock     prometheus.Histogram
-	stateStorageDiskTotal  prometheus.Gauge
-	storageStateCommitment prometheus.Gauge
+	tracer                           *trace.OpenTracer
+	gasUsedPerBlock                  prometheus.Histogram
+	stateReadsPerBlock               prometheus.Histogram
+	totalExecutedTransactionsCounter prometheus.Counter
+	lastExecutedBlockViewGauge       prometheus.Gauge
+	stateStorageDiskTotal            prometheus.Gauge
+	storageStateCommitment           prometheus.Gauge
 }
 
 func NewExecutionCollector(tracer *trace.OpenTracer) *ExecutionCollector {
@@ -42,6 +44,20 @@ func NewExecutionCollector(tracer *trace.OpenTracer) *ExecutionCollector {
 			Buckets:   []float64{5, 10, 50, 100, 500},
 			Name:      "block_state_reads",
 			Help:      "count of state access/read operations performed per block",
+		}),
+
+		totalExecutedTransactionsCounter: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "total_executed_transactions",
+			Help:      "the total number of transactions that have been executed",
+		}),
+
+		lastExecutedBlockViewGauge: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "last_executed_block_view",
+			Help:      "the last view that was executed",
 		}),
 
 		stateStorageDiskTotal: promauto.NewGauge(prometheus.GaugeOpts{
@@ -92,4 +108,14 @@ func (ec *ExecutionCollector) ExecutionStateStorageDiskTotal(bytes int64) {
 // ExecutionStorageStateCommitment reports the storage size of a state commitment
 func (ec *ExecutionCollector) ExecutionStorageStateCommitment(bytes int64) {
 	ec.storageStateCommitment.Set(float64(bytes))
+}
+
+// ExecutionLastExecutedBlockView reports last executed block view
+func (ec *ExecutionCollector) ExecutionLastExecutedBlockView(view uint64) {
+	ec.lastExecutedBlockViewGauge.Set(float64(view))
+}
+
+// ExecutionTotalExecutedTransactions reports total executed transactions
+func (ec *ExecutionCollector) ExecutionTotalExecutedTransactions(numberOfTx int) {
+	ec.totalExecutedTransactionsCounter.Add(float64(numberOfTx))
 }

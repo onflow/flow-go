@@ -3,8 +3,6 @@
 package stdmap
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 )
@@ -21,13 +19,13 @@ func NewBlockByCollections() *BlockByCollections {
 	return &BlockByCollections{NewBackend(WithEject(EjectPanic))}
 }
 
-func (b *BlockByCollections) Add(block *entity.BlocksByCollection) error {
+func (b *BlockByCollections) Add(block *entity.BlocksByCollection) bool {
 	return b.Backend.Add(block)
 }
 
-func (b *BlockByCollections) Get(id flow.Identifier) (*entity.BlocksByCollection, error) {
+func (b *BlockByCollections) Get(collID flow.Identifier) (*entity.BlocksByCollection, bool) {
 	backdata := &BlockByCollectionBackdata{&b.Backdata}
-	return backdata.ByID(id)
+	return backdata.ByID(collID)
 }
 
 func (b *BlockByCollections) Run(f func(backdata *BlockByCollectionBackdata) error) error {
@@ -41,14 +39,11 @@ func (b *BlockByCollections) Run(f func(backdata *BlockByCollectionBackdata) err
 	return nil
 }
 
-func (b *BlockByCollectionBackdata) ByID(id flow.Identifier) (*entity.BlocksByCollection, error) {
-	e, err := b.Backdata.ByID(id)
-	if err != nil {
-		return nil, err
+func (b *BlockByCollectionBackdata) ByID(id flow.Identifier) (*entity.BlocksByCollection, bool) {
+	e, exists := b.Backdata.ByID(id)
+	if !exists {
+		return nil, false
 	}
-	block, ok := e.(*entity.BlocksByCollection)
-	if !ok {
-		panic(fmt.Sprintf("invalid entity in complete block mempool (%T)", e))
-	}
-	return block, nil
+	block := e.(*entity.BlocksByCollection)
+	return block, true
 }

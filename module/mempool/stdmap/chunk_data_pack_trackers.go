@@ -1,8 +1,6 @@
 package stdmap
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/verification/tracker"
 )
@@ -21,7 +19,7 @@ func NewChunkDataPackTrackers(limit uint) (*ChunkDataPackTrackers, error) {
 }
 
 // Add adds a ChunkDataPackTracker to the mempool.
-func (c *ChunkDataPackTrackers) Add(cdpt *tracker.ChunkDataPackTracker) error {
+func (c *ChunkDataPackTrackers) Add(cdpt *tracker.ChunkDataPackTracker) bool {
 	return c.Backend.Add(cdpt)
 }
 
@@ -37,16 +35,13 @@ func (c *ChunkDataPackTrackers) Rem(chunkID flow.Identifier) bool {
 }
 
 // ByChunkID returns the chunk data pack tracker for the given chunk ID.
-func (c *ChunkDataPackTrackers) ByChunkID(chunkID flow.Identifier) (*tracker.ChunkDataPackTracker, error) {
-	entity, err := c.Backend.ByID(chunkID)
-	if err != nil {
-		return nil, err
+func (c *ChunkDataPackTrackers) ByChunkID(chunkID flow.Identifier) (*tracker.ChunkDataPackTracker, bool) {
+	entity, exists := c.Backend.ByID(chunkID)
+	if !exists {
+		return nil, false
 	}
-	chunkDataPackTracker, ok := entity.(*tracker.ChunkDataPackTracker)
-	if !ok {
-		return nil, fmt.Errorf("invalid entity in chunk data pack tracker pool (%T)", entity)
-	}
-	return chunkDataPackTracker, nil
+	chunkDataPackTracker := entity.(*tracker.ChunkDataPackTracker)
+	return chunkDataPackTracker, true
 }
 
 // All returns all chunk data pack trackers from the pool.

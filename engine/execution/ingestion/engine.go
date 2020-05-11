@@ -27,7 +27,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/module/mempool/queue"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
@@ -260,9 +259,9 @@ func (e *Engine) handleBlockProposal(ctx context.Context, proposal *messages.Blo
 			// if state commitment doesn't exist and there are no known blocks which will produce
 			// it soon (execution queue) that we save it as orphaned
 			if errors.Is(err, storage.ErrNotFound) {
-				queue, err := enqueue(executableBlock, orphanQueues)
-				if err != nil {
-					panic(fmt.Sprintf("cannot add orphaned block: %s", err))
+				queue, added := enqueue(executableBlock, orphanQueues)
+				if !added {
+					panic(fmt.Sprintf("could not enqueue orphaned block"))
 				}
 				e.tryRequeueOrphans(executableBlock, queue, orphanQueues)
 				e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("added block to new orphan queue")
@@ -289,9 +288,9 @@ func (e *Engine) handleBlockProposal(ctx context.Context, proposal *messages.Blo
 			}
 
 			executableBlock.StartState = stateCommitment
-			newQueue, err := enqueue(executableBlock, executionQueues) // TODO - redundant? - should always produce new queue (otherwise it would be enqueued at the beginning)
-			if err != nil {
-				panic(fmt.Sprintf("cannot enqueue block for execution: %s", err))
+			newQueue, added := enqueue(executableBlock, executionQueues) // TODO - redundant? - should always produce new queue (otherwise it would be enqueued at the beginning)
+			if !added {
+				panic(fmt.Sprintf("could enqueue block for execution: %s", err))
 			}
 			e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("added block to execution queue")
 
@@ -369,9 +368,9 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 			executionQueues *stdmap.QueuesBackdata,
 			_ *stdmap.QueuesBackdata,
 		) error {
-			executionQueue, err := executionQueues.ByID(executableBlock.Block.ID())
-			if err != nil {
-				return fmt.Errorf("fatal error - executed block not present in execution queue: %w", err)
+			executionQueue, exists := executionQueues.ByID(executableBlock.Block.ID())
+			if !exists {
+				return fmt.Errorf("fatal error - executed block not present in execution queue")
 			}
 
 			_, newQueues := executionQueue.Dismount()
@@ -380,14 +379,14 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 				newExecutableBlock := queue.Head.Item.(*entity.ExecutableBlock)
 				newExecutableBlock.StartState = finalState
 
-				err = e.sendCollectionsRequest(newExecutableBlock, blockByCollection)
+				err := e.sendCollectionsRequest(newExecutableBlock, blockByCollection)
 				if err != nil {
 					return fmt.Errorf("cannot send collection requests: %w", err)
 				}
 
-				err := executionQueues.Add(queue)
-				if err != nil {
-					return fmt.Errorf("fatal error cannot add children block to execution queue: %w", err)
+				added := executionQueues.Add(queue)
+				if !added {
+					return fmt.Errorf("fatal error - child block already in execution queue")
 				}
 
 				if newExecutableBlock.IsComplete() {
@@ -411,6 +410,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		Hex("block_id", logging.Entity(executableBlock.Block)).
 		Hex("final_state", finalState).
 		Msg("block executed")
+	e.metrics.ExecutionLastExecutedBlockView(executableBlock.Block.Header.View)
 }
 
 func (e *Engine) handleCollectionResponse(ctx context.Context, response *messages.CollectionResponse) error {
@@ -420,9 +420,9 @@ func (e *Engine) handleCollectionResponse(ctx context.Context, response *message
 
 	return e.mempool.BlockByCollection.Run(
 		func(backdata *stdmap.BlockByCollectionBackdata) error {
-			blockByCollectionId, err := backdata.ByID(collID)
-			if err != nil {
-				return err
+			blockByCollectionId, exists := backdata.ByID(collID)
+			if !exists {
+				return fmt.Errorf("could not find block for collection")
 			}
 			executableBlocks := blockByCollectionId.ExecutableBlocks
 
@@ -534,16 +534,16 @@ func tryEnqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.
 	return nil, false
 }
 
-func newQueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, error) {
+func newQueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, bool) {
 	q := queue.NewQueue(blockify)
 	return q, queues.Add(q)
 }
 
 // enqueue inserts block into matching queue or creates a new one
-func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, error) {
+func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, bool) {
 	for _, queue := range queues.All() {
 		if queue.TryAdd(blockify) {
-			return queue, nil
+			return queue, true
 		}
 	}
 	return newQueue(blockify, queues)
@@ -557,18 +557,18 @@ func (e *Engine) sendCollectionsRequest(
 	for _, guarantee := range executableBlock.Block.Payload.Guarantees {
 
 		// TODO: once collection can map to multiple blocks
-		maybeBlockByCollection, err := backdata.ByID(guarantee.ID())
+		maybeBlockByCollection, exists := backdata.ByID(guarantee.ID())
 
-		if errors.Is(err, mempool.ErrNotFound) {
+		if !exists {
 
 			maybeBlockByCollection = &entity.BlocksByCollection{
 				CollectionID:     guarantee.ID(),
 				ExecutableBlocks: make(map[flow.Identifier]*entity.ExecutableBlock),
 			}
 
-			err := backdata.Add(maybeBlockByCollection)
-			if err != nil {
-				return fmt.Errorf("cannot save collection-block mapping: %w", err)
+			added := backdata.Add(maybeBlockByCollection)
+			if !added {
+				return fmt.Errorf("collection already mapped to block")
 			}
 
 			collectionGuaranteesIdentifiers, err := e.findCollectionNodesForGuarantee(
@@ -596,8 +596,6 @@ func (e *Engine) sendCollectionsRequest(
 				e.log.Err(err).Msg("cannot submit collection requests")
 			}
 
-		} else if err != nil {
-			return fmt.Errorf("cannot get an item from mempool: %w", err)
 		}
 
 		if _, exists := maybeBlockByCollection.ExecutableBlocks[executableBlock.ID()]; exists {
@@ -654,6 +652,8 @@ func (e *Engine) handleComputationResult(
 	e.log.Debug().
 		Hex("block_id", logging.ID(result.ExecutableBlock.Block.ID())).
 		Msg("received computation result")
+	// There is one result per transaction
+	e.metrics.ExecutionTotalExecutedTransactions(len(result.TransactionResult))
 
 	receipt, err := e.saveExecutionResults(
 		ctx,
@@ -966,8 +966,8 @@ func (e *Engine) handleExecutionStateDelta(
 		// if state commitment doesn't exist and there are no known deltas which will produce
 		// it soon (sync queue) that we save it as orphaned
 		if errors.Is(err, storage.ErrNotFound) {
-			_, err := enqueue(executionStateDelta, backdata)
-			if err != nil {
+			_, added := enqueue(executionStateDelta, backdata)
+			if !added {
 				panic(fmt.Sprintf("cannot create new queue for sync delta: %s", err))
 			}
 			return nil
@@ -976,8 +976,8 @@ func (e *Engine) handleExecutionStateDelta(
 			panic(fmt.Sprintf("unexpected error while accessing storage for sync deltas, shutting down: %v", err))
 		}
 
-		newQueue, err := enqueue(executionStateDelta, backdata) // TODO - redundant? - should always produce new queue (otherwise it would be enqueued at the beginning)
-		if err != nil {
+		newQueue, added := enqueue(executionStateDelta, backdata) // TODO - redundant? - should always produce new queue (otherwise it would be enqueued at the beginning)
+		if !added {
 			panic(fmt.Sprintf("cannot enqueue sync delta: %s", err))
 		}
 
@@ -1063,8 +1063,8 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 				}
 
 				if executableBlock.IsComplete() {
-					err = executionQueues.Add(syncedQueue)
-					if err != nil {
+					added := executionQueues.Add(syncedQueue)
+					if !added {
 						panic(fmt.Sprintf("cannot add queue to execution queues"))
 					}
 
@@ -1086,9 +1086,9 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 
 	err = e.mempool.SyncQueues.Run(func(backdata *stdmap.QueuesBackdata) error {
 
-		executionQueue, err := backdata.ByID(executionStateDelta.Block.ID())
-		if err != nil {
-			return fmt.Errorf("fatal error - synced delta not present in sync queue: %w", err)
+		executionQueue, exists := backdata.ByID(executionStateDelta.Block.ID())
+		if !exists {
+			return fmt.Errorf("fatal error - synced delta not present in sync queue")
 		}
 		_, newQueues := executionQueue.Dismount()
 		for _, queue := range newQueues {
@@ -1099,9 +1099,9 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 				return fmt.Errorf("internal incosistency with delta - state commitment for after applying delta different from start state of next one! ")
 			}
 
-			err := backdata.Add(queue)
-			if err != nil {
-				return fmt.Errorf("fatal error cannot add children block to sync queue: %w", err)
+			added := backdata.Add(queue)
+			if !added {
+				return fmt.Errorf("fatal error cannot add children block to sync queue")
 			}
 
 			e.syncWg.Add(1)

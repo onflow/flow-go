@@ -12,7 +12,9 @@ import (
 
 	model "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/state/cluster"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -43,7 +45,10 @@ func (suite *SnapshotSuite) SetupTest() {
 	suite.dbdir = unittest.TempDir(suite.T())
 	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
 
-	suite.state, err = NewState(suite.db, suite.chainID)
+	headers := storage.NewHeaders(metrics.NewNoopCollector(), suite.db)
+	payloads := storage.NewClusterPayloads(suite.db)
+
+	suite.state, err = NewState(suite.db, suite.chainID, headers, payloads)
 	suite.Assert().Nil(err)
 	suite.mutator = suite.state.Mutate()
 
