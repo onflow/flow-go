@@ -4,6 +4,7 @@ package consensus
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"time"
 

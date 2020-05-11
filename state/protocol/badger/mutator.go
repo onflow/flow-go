@@ -310,6 +310,11 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	for i := len(sealableIDs) - 1; i >= 0; i-- {
 		sealableID := sealableIDs[i]
 
+		// if no seals are left, we successfully matched them all
+		if len(byBlock) == 0 {
+			break
+		}
+
 		// if we don't find a next seal, we fail the check
 		next, found := byBlock[sealableID]
 		if !found {
@@ -323,9 +328,6 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 
 		// if it does, remove the seal from the to-be-added seals
 		delete(byBlock, sealableID)
-		if len(byBlock) == 0 {
-			break
-		}
 
 		// keep track of last seal to check state connection
 		last = next
