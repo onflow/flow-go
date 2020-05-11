@@ -155,17 +155,7 @@ func LoadNode(value Root, height int, db databases.DAL) (*node, error) {
 	}, nil
 }
 
-func (f forest) PrintCache() {
-	for _, key := range f.cache.Keys() {
-		k, _ := hex.DecodeString(key.(string))
-		t, _ := f.Get(Root(k))
-		fmt.Println(key, t.rootNode.FmtStr("", ""))
-	}
-}
-
 func (f *forest) newTree(root Root, db databases.DAL) (*tree, error) {
-
-	fmt.Println("MAKING A NEW TREE", root)
 
 	deltaNumber, err := db.GetTrieDB(metadataHeight)
 	if err != nil {
