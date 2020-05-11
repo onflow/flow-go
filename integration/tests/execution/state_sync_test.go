@@ -33,7 +33,7 @@ func (s *StateSyncSuite) SetupTest() {
 		testnet.WithLogLevel(zerolog.ErrorLevel))
 	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 
-	s.SetupTest()
+	s.Suite.SetupTest()
 }
 
 func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
