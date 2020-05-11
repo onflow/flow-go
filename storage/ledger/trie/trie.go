@@ -10,7 +10,6 @@ import (
 	"sort"
 
 	"github.com/gammazero/deque"
-	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
@@ -84,6 +83,19 @@ type tree struct {
 	// In-memory only, used for tracking snapshots. Can be reconstructed from disk if needed
 	// Frequent eviction of a tree/restarting might mean database not gets pruned as frequent
 	historicalStateRoots deque.Deque
+	isLocked             bool
+}
+
+func (t *tree) Lock() {
+	t.isLocked = true
+}
+
+func (t *tree) Unlock() {
+	t.isLocked = false
+}
+
+func (t *tree) IsLocked() bool {
+	return t.isLocked
 }
 
 func (t *tree) Root() (*node, error) {
@@ -180,21 +192,12 @@ func (f *forest) newTree(root Root, db databases.DAL) (*tree, error) {
 
 type forest struct {
 	dbDir  string
-	cache  *lru.Cache
+	cache  treeCache
 	height int
 }
 
 func NewForest(dbDir string, cacheSize, height int) (*forest, error) {
-	evict := func(key interface{}, value interface{}) {
-		tree, ok := value.(*tree)
-		if !ok {
-			panic(fmt.Sprintf("cache contains item of type %T", value))
-		}
-
-		_, _ = tree.database.SafeClose()
-	}
-
-	cache, err := lru.NewWithEvict(cacheSize, evict)
+	cache, err := newLRUTreeCache(cacheSize)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create forest cache: %w", err)
 	}
@@ -207,22 +210,22 @@ func NewForest(dbDir string, cacheSize, height int) (*forest, error) {
 }
 
 func (f *forest) Add(t *tree) {
-	// if db is already here safe close it before overriding
-	if foundTree, ok := f.cache.Get(t.root.String()); ok {
-		foundTree.(*tree).database.SafeClose()
+	// if DB is already here, safe close it before overriding
+	if foundTree, ok := f.cache.Get(t.root); ok {
+		_, _ = foundTree.database.SafeClose()
 	}
-	f.cache.Add(t.root.String(), t)
+
+	f.cache.Add(t.root, t)
 }
 
 func (f *forest) Has(root Root) bool {
-	_, ok := f.cache.Get(root.String())
-	return ok
+	return f.cache.Contains(root)
 }
 
 func (f *forest) Get(root Root) (*tree, error) {
 
-	if foundTree, ok := f.cache.Get(root.String()); ok {
-		return foundTree.(*tree), nil
+	if foundTree, ok := f.cache.Get(root); ok {
+		return foundTree, nil
 	}
 
 	db, err := f.newDB(root)
@@ -519,10 +522,12 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 		return nil, nil, fmt.Errorf("invalid historical state: %w", err)
 	}
 
+	// lock tree to prevent cache eviction
+	tree.Lock()
+	defer tree.Unlock()
+
 	if !trusted {
 		if s.IsSnapshot(tree) {
-
-			// if bytes.Equal(root, currRoot) {
 			for i, key := range keys {
 				k := hex.EncodeToString(key)
 				res := tree.cachedBranches[k]
@@ -545,7 +550,6 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 				tree.updateCache(key, flags[i], proofs[i], inclusions[i], sizes[i])
 			}
 		} else {
-
 			for i, key := range keys {
 				flag, proof, size, inclusion, err := s.GetHistoricalProof(key, root, tree.database)
 				if err != nil {
@@ -561,12 +565,6 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 	}
 
 	values := make([][]byte, len(keys))
-
-	// TODO: make cache eviction smarter, should not need to re-open this tree
-	tree, err = s.forest.Get(root)
-	if err != nil {
-		return nil, nil, fmt.Errorf("COULD NOT REOPEN TREE: %w", err)
-	}
 
 	for i, key := range keys {
 		res, err1 := tree.database.GetKVDB(key)
@@ -603,8 +601,6 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 		values[i] = res
 	}
 
-	//}
-
 	if trusted {
 		return values, nil, nil
 	}
@@ -613,7 +609,8 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 }
 
 // Print writes the structure of the tree to the stdout.
-// Warning this should only be used for debugging
+//
+// Warning: this function should only be used for debugging.
 func (s *SMT) Print(root Root) error {
 	t, err := s.forest.Get(root)
 	if err != nil {
@@ -663,7 +660,8 @@ func (s *SMT) verifyInclusionFlag(key []byte, flag []byte, root Root) (bool, err
 	return true, nil
 }
 
-// GetBatchProof returns proof for a batch of keys
+// GetBatchProof returns proof for a batch of keys.
+//
 // no duplicated keys are allowed for this method
 // split key with trie has some issues.
 func (s *SMT) GetBatchProof(keys [][]byte, root Root) (*proofHolder, error) {
@@ -698,6 +696,7 @@ func (s *SMT) GetBatchProof(keys [][]byte, root Root) (*proofHolder, error) {
 
 	if len(notFoundKeys) > 0 {
 		batcher := tree.database.NewBatcher()
+
 		// sort keys before update
 		sort.Slice(notFoundKeys, func(i, j int) bool {
 			return bytes.Compare(notFoundKeys[i], notFoundKeys[j]) < 0
@@ -708,7 +707,6 @@ func (s *SMT) GetBatchProof(keys [][]byte, root Root) (*proofHolder, error) {
 			return nil, err
 		}
 		// TODO assert new Root is the same
-		// if bytes.Equal(new)
 	}
 
 	incl := true
@@ -788,6 +786,7 @@ func (s *SMT) GetProof(key []byte, rootNode *node) ([]byte, [][]byte, uint8, boo
 
 			nextKey = curr.lChild
 		}
+
 		if nextKey == nil { // nonInclusion proof
 			return flag, proof, proofLen, false, nil
 		} else {
