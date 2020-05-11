@@ -411,7 +411,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		Hex("block_id", logging.Entity(executableBlock.Block)).
 		Hex("final_state", finalState).
 		Msg("block executed")
-	e.mc.ExecutionLastExecutedBlockView(executableBlock.Block.Header.View)
+	e.metrics.ExecutionLastExecutedBlockView(executableBlock.Block.Header.View)
 }
 
 func (e *Engine) handleCollectionResponse(ctx context.Context, response *messages.CollectionResponse) error {
@@ -656,7 +656,7 @@ func (e *Engine) handleComputationResult(
 		Hex("block_id", logging.ID(result.ExecutableBlock.Block.ID())).
 		Msg("received computation result")
 	// There is one result per transaction
-	e.mc.ExecutionTotalExecutedTransactions(len(result.TransactionResult))
+	e.metrics.ExecutionTotalExecutedTransactions(len(result.TransactionResult))
 
 	receipt, err := e.saveExecutionResults(
 		ctx,

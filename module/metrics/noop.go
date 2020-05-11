@@ -62,3 +62,5 @@ func (nc *NoopCollector) ExecutionGasUsedPerBlock(gas uint64)                   
 func (nc *NoopCollector) ExecutionStateReadsPerBlock(reads uint64)                  {}
 func (nc *NoopCollector) ExecutionStateStorageDiskTotal(bytes int64)                {}
 func (nc *NoopCollector) ExecutionStorageStateCommitment(bytes int64)               {}
+func (nc *NoopCollector) ExecutionLastExecutedBlockView(view uint64)                {}
+func (ec *NoopCollector) ExecutionTotalExecutedTransactions(numberOfTx int)         {}
