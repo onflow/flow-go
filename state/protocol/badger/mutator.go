@@ -283,38 +283,37 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	// create a mapping of all payload seals to their sealed block
 	byBlock := make(map[flow.Identifier]*flow.Seal)
 	for _, seal := range payload.Seals {
-
-		// get the sealed header so we can map the seal to the parent
-		// NOTE: by definition, we only try to insert blocks into the protocol
-		// state where we have the parent, and we can seal at most up to the
-		// parent, so we should never face an unknown sealed block
-		sealedHeader, err := m.state.headers.ByBlockID(seal.BlockID)
-		if err != nil {
-			return fmt.Errorf("could not retrieve sealed header (%x): %w", seal.BlockID, err)
-		}
-
-		byParent[sealedHeader.ParentID] = seal
+		byBlock[seal.BlockID] = seal
 	}
 	if len(payload.Seals) > len(byBlock) {
 		return fmt.Errorf("multiple seals for the same block")
 	}
 
-	// starting at the parent seal, we then try to build a chain of seals that
-	// validly extends the execution state, using up all of the seals
+	// create a list of ancestors from parent to just before last sealed
 	last, err := m.state.seals.ByBlockID(header.ParentID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve parent seal (%x): %w", header.ParentID, err)
 	}
+	ancestorID = header.ParentID
+	var sealableIDs []flow.Identifier
+	for ancestorID != last.BlockID {
+		sealableIDs = append(sealableIDs, ancestorID)
+		ancestor, err := m.state.headers.ByBlockID(ancestorID)
+		if err != nil {
+			return fmt.Errorf("could not get sealable ancestor (%x): %w", ancestorID, err)
+		}
+		ancestorID = ancestor.ParentID
+	}
 
-	// we try to map all the seals in the payload to a chain that starts with
-	// the last seal from the parent, and goes at most up to sealing the parent
-	// itself
-	for last.BlockID != header.ParentID {
+	// iterate backwards from just after the last sealed to parent and build a
+	// chain for the payload seals until we fail or all are used up
+	for i := len(sealableIDs) - 1; i >= 0; i-- {
+		sealableID := sealableIDs[i]
 
-		// check if we can find a valid subsequent seal for the last seal on the chain
-		next, found := byParent[last.BlockID]
+		// if we don't find a next seal, we fail the check
+		next, found := byBlock[sealableID]
 		if !found {
-			return fmt.Errorf("could not find connecting seal (sealed: %x)", last.BlockID)
+			return fmt.Errorf("not all seals matched to chain")
 		}
 
 		// check that the state transition actually matches
@@ -323,17 +322,13 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		}
 
 		// if it does, remove the seal from the to-be-added seals
-		delete(byParent, last.BlockID)
-		if len(byParent) == 0 {
+		delete(byBlock, sealableID)
+		if len(byBlock) == 0 {
 			break
 		}
 
+		// keep track of last seal to check state connection
 		last = next
-	}
-
-	// check that we used up all the seals before reaching the parent seal
-	if len(byParent) > 0 {
-		return fmt.Errorf("dangling block seals after building chain (count: %d)", len(byParent))
 	}
 
 	// SIXTH: Both the header itself and its payload are in compliance with the
@@ -430,7 +425,7 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 
 	// FOURTH: metrics
 
-	m.state.metrics.FinalizedHeight(pending.Height)
+	m.state.metrics.FinalizedHeight(header.Height)
 	m.state.metrics.SealedHeight(sealed.Height)
 
 	// get the finalized block for finalized metrics

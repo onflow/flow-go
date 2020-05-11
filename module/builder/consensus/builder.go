@@ -73,11 +73,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve finalized height: %w", err)
 	}
-	var sealed uint64
-	err = b.db.View(operation.RetrieveSealedHeight(&sealed))
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve sealed height: %w", err)
-	}
 	var finalID flow.Identifier
 	err = b.db.View(operation.LookupBlockHeight(finalized, &finalID))
 	if err != nil {
@@ -180,44 +175,39 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// find one. This creates a valid chain of seals from the last sealed block
 	// to at most the parent.
 
-	// we map each seal to the parent of its sealed block; that way, we can
-	// retrieve a valid seal that will *follow* each block's seal
-	byParent := make(map[flow.Identifier]*flow.Seal)
+	// create a mapping of block to seal for all seals in our pool
+	byBlock := make(map[flow.Identifier]*flow.Seal)
 	for _, seal := range b.sealPool.All() {
+		byBlock[seal.BlockID] = seal
+	}
+	if int(b.sealPool.Size()) > len(byBlock) {
+		return nil, fmt.Errorf("multiple seals for the same block")
+	}
 
-		// try to get the header that was sealed by the seal
-		// NOTE: we only generate seals for blocks we already know
-		sealedHeader, err := b.headers.ByBlockID(seal.BlockID)
+	// create a list of ancestors from parent to just before last sealed
+	last, err := b.seals.ByBlockID(parentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve parent seal: %w", err)
+	}
+	ancestorID = parentID
+	var sealableIDs []flow.Identifier
+	for ancestorID != last.BlockID {
+		sealableIDs = append(sealableIDs, ancestorID)
+		ancestor, err := b.headers.ByBlockID(ancestorID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get sealable ancestor (%x): %w", ancestorID, err)
 		}
-
-		// remove all seals from the pool that are at or below sealed height
-		if sealedHeader.Height <= sealed {
-			_ = b.sealPool.Rem(seal.ID())
-			continue
-		}
-
-		byParent[sealedHeader.ParentID] = seal
+		ancestorID = ancestor.ParentID
 	}
 
-	b.metrics.MempoolEntries(metrics.ResourceSeal, b.sealPool.Size())
-
-	// get the last seal in the current chain of seals by getting the seal on
-	// the header, which we can then build on
-	last, err := b.seals.ByBlockID(parentID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve last seal: %w", err)
-	}
-
-	// starting at the last seal in the chain of seals, which was mapped to the
-	// parent, we try to build a chain of valid seals, up to at most a seal that
-	// seals the parent (we can't seal the block we are building obviously)
+	// iterate backwards from just after last sealed to parent and build a chain
+	// of seals for those blocks that is as big as possible
 	var seals []*flow.Seal
-	for last.BlockID != parentID {
+	for i := len(sealableIDs) - 1; i >= 0; i-- {
+		sealableID := sealableIDs[i]
 
 		// if we don't find the next seal, we are done building the chain
-		next, found := byParent[last.BlockID]
+		next, found := byBlock[sealableID]
 		if !found {
 			break
 		}
@@ -227,14 +217,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			return nil, fmt.Errorf("seal execution states do not connect")
 		}
 
-		// add seal to payload seals and delete from parent lookup; if no seals
-		// are left, stop
+		// add seal to the payload
 		seals = append(seals, next)
-		delete(byParent, last.BlockID)
-		if len(byParent) == 0 {
-			break
-		}
 
+		// keep track of last seal to check state connection
 		last = next
 	}
 
