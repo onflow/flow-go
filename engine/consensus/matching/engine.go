@@ -168,6 +168,11 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return fmt.Errorf("invalid executor node role (%s)", identity.Role)
 	}
 
+	// check if the identity has a stake
+	if identity.Stake == 0 {
+		return fmt.Errorf("executor has zero stake (%x)", identity.NodeID)
+	}
+
 	// check if the result of this receipt is already in the dB
 	result := &receipt.ExecutionResult
 	_, err = e.resultsDB.ByID(result.ID())
@@ -230,6 +235,11 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	// check that the origin is a verification node
 	if identity.Role != flow.RoleVerification {
 		return fmt.Errorf("invalid approver node role (%s)", identity.Role)
+	}
+
+	// check if the identity has a stake
+	if identity.Stake == 0 {
+		return fmt.Errorf("verifier has zero stake (%x)", identity.NodeID)
 	}
 
 	// check if the result of this approval is already in the dB
