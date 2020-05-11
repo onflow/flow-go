@@ -96,6 +96,9 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		// retrieve the finalized boundary ON THE CLUSTER CHAIN
 		var clusterFinal flow.Header
 		err = procedure.RetrieveLatestFinalizedClusterHeader(parent.ChainID, &clusterFinal)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve cluster final: %w", err)
+		}
 
 		// STEP TWO: create a lookup of all previously used transactions on the
 		// part of the chain we care about. We do this separately for
