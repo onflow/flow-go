@@ -1,3 +1,4 @@
+// +build timesensitivetest
 package integration_test
 
 import (
