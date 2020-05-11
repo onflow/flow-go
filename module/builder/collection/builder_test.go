@@ -408,6 +408,8 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 	head := genesis
 	for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
 		block := unittest.BlockWithParentFixture(head)
+		block.Payload.Guarantees = nil
+		block.Header.PayloadHash = block.Payload.Hash()
 		err = suite.protoState.Mutate().Extend(&block)
 		suite.Require().Nil(err)
 		err = suite.protoState.Mutate().Finalize(block.ID())

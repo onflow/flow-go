@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/metrics"
 	mocknetwork "github.com/dapperlabs/flow-go/network/mock"
 	mockprotocol "github.com/dapperlabs/flow-go/state/protocol/mock"
+	mockstorage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -21,11 +22,13 @@ func TestOnCollectionGuaranteeValid(t *testing.T) {
 	prop := &mocknetwork.Engine{}
 	state := &mockprotocol.State{}
 	final := &mockprotocol.Snapshot{}
+	headers := &mockstorage.Headers{}
 	metrics := metrics.NewNoopCollector()
 
 	e := &Engine{
 		prop:    prop,
 		state:   state,
+		headers: headers,
 		metrics: metrics,
 		spans:   metrics,
 	}
@@ -41,10 +44,10 @@ func TestOnCollectionGuaranteeValid(t *testing.T) {
 	clusters.Add(0, identity)
 
 	header := unittest.BlockHeaderFixture()
-	state.On("Final").Return(final).Once()
-	state.On("AtBlockID", mock.Anything).Return(final).Once()
+	state.On("Final").Return(final).Times(3)
+	headers.On("ByBlockID", mock.Anything).Return(&header, nil).Once()
+	final.On("Head").Return(&header, nil).Once()
 	final.On("Identity", originID).Return(identity, nil).Once()
-	final.On("Head").Return(&header, nil).Twice()
 	final.On("Clusters").Return(clusters, nil).Once()
 	prop.On("SubmitLocal", guarantee).Return().Once()
 
@@ -126,12 +129,13 @@ func TestOnCollectionGuaranteeExpired(t *testing.T) {
 	prop := &mocknetwork.Engine{}
 	state := &mockprotocol.State{}
 	final := &mockprotocol.Snapshot{}
-	past := &mockprotocol.Snapshot{}
+	headers := &mockstorage.Headers{}
 	metrics := metrics.NewNoopCollector()
 
 	e := &Engine{
 		prop:    prop,
 		state:   state,
+		headers: headers,
 		metrics: metrics,
 		spans:   metrics,
 	}
@@ -153,13 +157,11 @@ func TestOnCollectionGuaranteeExpired(t *testing.T) {
 	refBlk.Height = 0
 	guarantee.ReferenceBlockID = refBlk.ID() // guarantee points to a reference block in the past and is expired
 
-	state.On("Final").Return(final).Once()
-	state.On("AtBlockID", refBlk.ID()).Return(past).Once()
+	state.On("Final").Return(final).Twice()
+	headers.On("ByBlockID", refBlk.ID()).Return(&refBlk, nil).Once()
 
 	final.On("Identity", originID).Return(identity, nil).Once()
 	final.On("Head").Return(&finalBlk, nil).Once()
-
-	past.On("Head").Return(&refBlk, nil).Once()
 
 	err := e.onCollectionGuarantee(originID, guarantee)
 	require.Error(t, err)

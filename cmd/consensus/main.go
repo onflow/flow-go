@@ -143,9 +143,11 @@ func main() {
 			ing, err := ingestion.New(
 				node.Logger,
 				node.Metrics.Engine,
+				conMetrics,
 				node.Network,
 				prop,
 				node.State,
+				node.Storage.Headers,
 				node.Me,
 			)
 			return ing, err

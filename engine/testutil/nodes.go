@@ -177,7 +177,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	propagationEngine, err := propagation.New(node.Log, node.Metrics, node.Metrics, node.Metrics, node.Net, node.State, node.Me, guarantees)
 	require.NoError(t, err)
 
-	ingestionEngine, err := consensusingest.New(node.Log, node.Metrics, node.Net, propagationEngine, node.State, node.Me)
+	ingestionEngine, err := consensusingest.New(node.Log, node.Metrics, node.Metrics, node.Net, propagationEngine, node.State, node.Headers, node.Me)
 	require.Nil(t, err)
 
 	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Metrics, node.Net, node.State, node.Me, results, receipts, approvals, seals)
