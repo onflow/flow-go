@@ -16,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/order"
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
@@ -28,12 +29,15 @@ func TestOnCollectionGuarantee(t *testing.T) {
 	state := &protocol.State{}
 	ss := &protocol.Snapshot{}
 	me := &module.Local{}
-	pool := &mempool.Guarantees{}
+	guarantees := &mempool.Guarantees{}
+	metrics := metrics.NewNoopCollector()
 	e := &Engine{
-		con:   con,
-		state: state,
-		me:    me,
-		pool:  pool,
+		metrics:    metrics,
+		mempool:    metrics,
+		con:        con,
+		state:      state,
+		me:         me,
+		guarantees: guarantees,
 	}
 
 	rand.Seed(time.Now().UnixNano())
@@ -49,7 +53,8 @@ func TestOnCollectionGuarantee(t *testing.T) {
 	// happy path; anything else would be redundant
 
 	// check that we propagate if collection is new
-	pool.On("Add", mock.Anything).Return(nil).Once()
+	guarantees.On("Add", mock.Anything).Return(nil).Once()
+	guarantees.On("Size").Return(uint(0))
 	me.On("NodeID").Return(flow.Identifier{}).Once()
 	state.On("Final").Return(ss).Once()
 	ss.On("Identities", mock.Anything, mock.Anything).Return(flow.IdentityList{}, nil).Once()
@@ -59,13 +64,13 @@ func TestOnCollectionGuarantee(t *testing.T) {
 	con.AssertExpectations(t)
 
 	// check that we don't propagate if processing fails
-	pool.On("Add", mock.Anything).Return(errors.New("dummy")).Once()
+	guarantees.On("Add", mock.Anything).Return(errors.New("dummy")).Once()
 	err = e.onGuarantee(flow.Identifier{}, coll)
 	assert.NotNil(t, err)
 	con.AssertExpectations(t)
 
 	// check that we error if propagation fails
-	pool.On("Add", mock.Anything).Return(nil).Once()
+	guarantees.On("Add", mock.Anything).Return(nil).Once()
 	me.On("NodeID").Return(flow.Identifier{}).Once()
 	state.On("Final").Return(ss).Once()
 	ss.On("Identities", mock.Anything, mock.Anything).Return(flow.IdentityList{}, nil).Once()
@@ -78,9 +83,12 @@ func TestOnCollectionGuarantee(t *testing.T) {
 func TestProcessCollectionGuarantee(t *testing.T) {
 
 	// initialize mocks and engine
-	pool := &mempool.Guarantees{}
+	guarantees := &mempool.Guarantees{}
+	metrics := metrics.NewNoopCollector()
+	guarantees.On("Size").Return(uint(0))
 	e := Engine{
-		pool: pool,
+		mempool:    metrics,
+		guarantees: guarantees,
 	}
 
 	rand.Seed(time.Now().UnixNano())
@@ -96,25 +104,25 @@ func TestProcessCollectionGuarantee(t *testing.T) {
 
 	// test storing of collections for the first time
 	for i, coll := range collections {
-		pool.On("Add", coll).Return(nil).Once()
+		guarantees.On("Add", coll).Return(nil).Once()
 		err := e.storeGuarantee(coll)
 		assert.Nilf(t, err, "collection %d", i)
 	}
 
 	// test storing of collections for the second time
 	for i, coll := range collections {
-		pool.On("Add", coll).Return(errors.New("dummy")).Once()
+		guarantees.On("Add", coll).Return(errors.New("dummy")).Once()
 		err := e.storeGuarantee(coll)
 		assert.NotNilf(t, err, "collection %d", i)
 	}
 
 	// check that we only had the expected calls
-	pool.AssertExpectations(t)
+	guarantees.AssertExpectations(t)
 
 	// test storing of collections when the mempool fails
 	for i, coll := range collections {
-		pool.On("Has", coll.ID()).Return(false)
-		pool.On("Add", coll).Return(errors.New("dummy"))
+		guarantees.On("Has", coll.ID()).Return(false)
+		guarantees.On("Add", coll).Return(errors.New("dummy"))
 		err := e.storeGuarantee(coll)
 		assert.NotNilf(t, err, "collection %d", i)
 	}
@@ -129,10 +137,12 @@ func TestPropagateCollectionGuarantee(t *testing.T) {
 	ss := &protocol.Snapshot{}
 	me := &module.Local{}
 	con := &network.Conduit{}
+	metrics := metrics.NewNoopCollector()
 	e := Engine{
-		state: state,
-		con:   con,
-		me:    me,
+		metrics: metrics,
+		state:   state,
+		con:     con,
+		me:      me,
 	}
 
 	// generate random collections

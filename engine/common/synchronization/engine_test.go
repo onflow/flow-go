@@ -19,6 +19,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	netint "github.com/dapperlabs/flow-go/network"
 	network "github.com/dapperlabs/flow-go/network/mock"
@@ -142,7 +143,8 @@ func (ss *SyncSuite) SetupTest() {
 
 	// initialize the engine
 	log := zerolog.New(ioutil.Discard)
-	e, err := New(log, ss.net, ss.me, ss.state, ss.blocks, ss.comp)
+	metrics := metrics.NewNoopCollector()
+	e, err := New(log, metrics, ss.net, ss.me, ss.state, ss.blocks, ss.comp)
 	require.NoError(ss.T(), err, "should pass engine initialization")
 
 	e.tolerance = 0 // make sure we always sync on difference in heights

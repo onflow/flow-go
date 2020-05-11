@@ -4,6 +4,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
@@ -12,7 +13,7 @@ type Commits struct {
 	cache *Cache
 }
 
-func NewCommits(db *badger.DB) *Commits {
+func NewCommits(collector module.CacheMetrics, db *badger.DB) *Commits {
 
 	store := func(blockID flow.Identifier, commit interface{}) error {
 		return db.Update(operation.IndexStateCommitment(blockID, commit.(flow.StateCommitment)))
@@ -26,7 +27,7 @@ func NewCommits(db *badger.DB) *Commits {
 
 	c := &Commits{
 		db:    db,
-		cache: newCache(withStore(store), withRetrieve(retrieve)),
+		cache: newCache(collector, withStore(store), withRetrieve(retrieve)),
 	}
 
 	return c

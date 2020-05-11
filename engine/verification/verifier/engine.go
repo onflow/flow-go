@@ -24,34 +24,34 @@ import (
 // constructing a partial trie, executing transactions and check the final state commitment and
 // other chunk meta data (e.g. tx count)
 type Engine struct {
-	unit    *engine.Unit         // used to control startup/shutdown
-	log     zerolog.Logger       // used to log relevant actions
-	conduit network.Conduit      // used to propagate result approvals
-	me      module.Local         // used to access local node information
-	state   protocol.State       // used to access the protocol state
-	rah     hash.Hasher          // used as hasher to sign the result approvals
-	chVerif module.ChunkVerifier // used to verify chunks
-	mc      module.Metrics       // used to capture the performance metrics
+	unit    *engine.Unit               // used to control startup/shutdown
+	log     zerolog.Logger             // used to log relevant actions
+	metrics module.VerificationMetrics // used to capture the performance metrics
+	conduit network.Conduit            // used to propagate result approvals
+	me      module.Local               // used to access local node information
+	state   protocol.State             // used to access the protocol state
+	rah     hash.Hasher                // used as hasher to sign the result approvals
+	chVerif module.ChunkVerifier       // used to verify chunks
 }
 
 // New creates and returns a new instance of a verifier engine.
 func New(
 	log zerolog.Logger,
+	metrics module.VerificationMetrics,
 	net module.Network,
 	state protocol.State,
 	me module.Local,
 	chVerif module.ChunkVerifier,
-	mc module.Metrics,
 ) (*Engine, error) {
 
 	e := &Engine{
 		unit:    engine.NewUnit(),
 		log:     log,
+		metrics: metrics,
 		state:   state,
 		me:      me,
 		chVerif: chVerif,
 		rah:     utils.NewResultApprovalHasher(),
-		mc:      mc,
 	}
 
 	var err error
@@ -211,7 +211,7 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 		Hex("execution_receipt", logging.Entity(chunk.Receipt)).
 		Msg("result approval submitted")
 	// tracks number of emitted result approvals for this block
-	e.mc.OnResultApproval()
+	e.metrics.OnResultApproval()
 
 	return nil
 }
@@ -264,13 +264,13 @@ func (e *Engine) GenerateResultApproval(chunkIndex uint64, execResultID flow.Ide
 func (e *Engine) verifyWithMetrics(originID flow.Identifier, ch *verification.VerifiableChunk) error {
 	// starts verification performance metrics trackers
 	if ch.ChunkDataPack != nil {
-		e.mc.OnChunkVerificationStarted(ch.ChunkDataPack.ChunkID)
+		e.metrics.OnChunkVerificationStarted(ch.ChunkDataPack.ChunkID)
 	}
 	// starts verification of chunk
 	err := e.verify(originID, ch)
 	// closes verification performance metrics trackers
 	if ch.ChunkDataPack != nil {
-		e.mc.OnChunkVerificationFinished(ch.ChunkDataPack.ChunkID)
+		e.metrics.OnChunkVerificationFinished(ch.ChunkDataPack.ChunkID)
 	}
 	return err
 }

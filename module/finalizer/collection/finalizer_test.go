@@ -15,7 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/finalizer/collection"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	modulemock "github.com/dapperlabs/flow-go/module/mock"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
 	cluster "github.com/dapperlabs/flow-go/state/cluster/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
@@ -38,8 +38,7 @@ func TestFinalizer(t *testing.T) {
 		pool, err := stdmap.NewTransactions(1000)
 		require.NoError(t, err)
 
-		metrics := &modulemock.Metrics{}
-		metrics.On("CollectionGuaranteed", mock.Anything).Return()
+		metrics := metrics.NewNoopCollector()
 
 		// a helper function to clean up shared state between tests
 		cleanup := func() {

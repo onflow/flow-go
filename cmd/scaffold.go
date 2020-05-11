@@ -33,8 +33,9 @@ import (
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/validators"
 	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
+	"github.com/dapperlabs/flow-go/storage"
 	storerr "github.com/dapperlabs/flow-go/storage"
-	storage "github.com/dapperlabs/flow-go/storage/badger"
+	bstorage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
@@ -53,6 +54,25 @@ type BaseConfig struct {
 	metricsPort  uint
 	nClusters    uint
 	BootstrapDir string
+}
+
+type Metrics struct {
+	Network    module.NetworkMetrics
+	Engine     module.EngineMetrics
+	Badger     module.BadgerMetrics
+	Compliance module.ComplianceMetrics
+	Cache      module.CacheMetrics
+	Mempool    module.MempoolMetrics
+}
+
+type Storage struct {
+	Headers    storage.Headers
+	Index      storage.Index
+	Identities storage.Identities
+	Guarantees storage.Guarantees
+	Seals      storage.Seals
+	Payloads   storage.Payloads
+	Blocks     storage.Blocks
 }
 
 type namedModuleFunc struct {
@@ -84,16 +104,11 @@ type FlowNodeBuilder struct {
 	flags          *pflag.FlagSet
 	name           string
 	Logger         zerolog.Logger
-	Metrics        module.Metrics
-	Tracer         *trace.OpenTracer
-	DB             *badger.DB
 	Me             *local.Local
-	Blocks         *storage.Blocks
-	Headers        *storage.Headers
-	Payloads       *storage.Payloads
-	Identities     *storage.Identities
-	Guarantees     *storage.Guarantees
-	Seals          *storage.Seals
+	Tracer         *trace.OpenTracer
+	Metrics        Metrics
+	DB             *badger.DB
+	Storage        Storage
 	State          *protocol.State
 	DKGState       *wrapper.State
 	Network        *libp2p.Network
@@ -139,7 +154,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		}
 
 		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, myAddr, fnb.Me.NodeID(),
-			fnb.networkKey, fnb.Metrics, libp2p.DefaultMaxPubSubMsgSize, fnb.MsgValidators...)
+			fnb.networkKey, fnb.Metrics.Network, libp2p.DefaultMaxPubSubMsgSize, fnb.MsgValidators...)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize middleware: %w", err)
 		}
@@ -175,7 +190,7 @@ func (fnb *FlowNodeBuilder) enqueueMetricsServerInit() {
 
 func (fnb *FlowNodeBuilder) enqueueDBMetrics() {
 	fnb.Component("badger db metrics", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
-		monitor := dbmetrics.NewMonitor(fnb.Metrics, fnb.DB)
+		monitor := dbmetrics.NewMonitor(fnb.Metrics.Badger, fnb.DB)
 		return monitor, nil
 	})
 }
@@ -227,7 +242,21 @@ func (fnb *FlowNodeBuilder) initLogger() {
 	fnb.Logger = log
 }
 
-func (fnb *FlowNodeBuilder) initDatabase() {
+func (fnb *FlowNodeBuilder) initMetrics() {
+	tracer, err := trace.NewTracer(fnb.Logger, fnb.name)
+	fnb.MustNot(err).Msg("could not initialize tracer")
+	fnb.Tracer = tracer
+	fnb.Metrics = Metrics{
+		Network:    metrics.NewNetworkCollector(),
+		Engine:     metrics.NewEngineCollector(),
+		Badger:     metrics.NewBadgerCollector(),
+		Compliance: metrics.NewComplianceCollector(),
+		Cache:      metrics.NewCacheCollector(),
+		Mempool:    metrics.NewMempoolCollector(),
+	}
+}
+
+func (fnb *FlowNodeBuilder) initStorage() {
 	// Pre-create DB path (Badger creates only one-level dirs)
 	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
 	fnb.MustNot(err).Str("dir", fnb.BaseConfig.datadir).Msg("could not create datadir")
@@ -251,36 +280,36 @@ func (fnb *FlowNodeBuilder) initDatabase() {
 	})
 	fnb.MustNot(err).Msg("could not initialize max tracker")
 
+	headers := bstorage.NewHeaders(fnb.Metrics.Cache, db)
+	identities := bstorage.NewIdentities(fnb.Metrics.Cache, db)
+	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, db)
+	seals := bstorage.NewSeals(fnb.Metrics.Cache, db)
+	index := bstorage.NewIndex(fnb.Metrics.Cache, db)
+	payloads := bstorage.NewPayloads(index, identities, guarantees, seals)
+	blocks := bstorage.NewBlocks(db, headers, payloads)
+
 	fnb.DB = db
-	fnb.Headers = storage.NewHeaders(db)
-	fnb.Identities = storage.NewIdentities(db)
-	fnb.Guarantees = storage.NewGuarantees(db)
-	fnb.Seals = storage.NewSeals(db)
-	fnb.Payloads = storage.NewPayloads(db, fnb.Identities, fnb.Guarantees, fnb.Seals)
-	fnb.Blocks = storage.NewBlocks(db, fnb.Headers, fnb.Payloads)
-}
-
-func (fnb *FlowNodeBuilder) initMetrics() {
-	mc, err := metrics.NewCollector(fnb.Logger)
-	fnb.MustNot(err).Msg("could not initialize metrics")
-	fnb.Metrics = mc
-}
-
-func (fnb *FlowNodeBuilder) initTracer() {
-	tracer, err := trace.NewTracer(fnb.Logger, fnb.name)
-	fnb.MustNot(err).Msg("could not initialize metrics")
-	fnb.Tracer = tracer
+	fnb.Storage = Storage{
+		Headers:    headers,
+		Identities: identities,
+		Guarantees: guarantees,
+		Seals:      seals,
+		Index:      index,
+		Payloads:   payloads,
+		Blocks:     blocks,
+	}
 }
 
 func (fnb *FlowNodeBuilder) initState() {
 
 	state, err := protocol.NewState(
+		fnb.Metrics.Compliance,
 		fnb.DB,
-		fnb.Headers,
-		fnb.Identities,
-		fnb.Seals,
-		fnb.Payloads,
-		fnb.Blocks,
+		fnb.Storage.Headers,
+		fnb.Storage.Identities,
+		fnb.Storage.Seals,
+		fnb.Storage.Payloads,
+		fnb.Storage.Blocks,
 		protocol.SetClusters(fnb.BaseConfig.nClusters),
 	)
 	fnb.MustNot(err).Msg("could not initialize flow state")
@@ -509,9 +538,7 @@ func (fnb *FlowNodeBuilder) Run(role string) {
 
 	fnb.initMetrics()
 
-	fnb.initTracer()
-
-	fnb.initDatabase()
+	fnb.initStorage()
 
 	fnb.initState()
 

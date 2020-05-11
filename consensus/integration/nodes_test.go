@@ -27,7 +27,7 @@ import (
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	module "github.com/dapperlabs/flow-go/module/mock"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
@@ -89,14 +89,17 @@ func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint) ([]*N
 func createNode(t *testing.T, index int, identity *flow.Identity, participants flow.IdentityList, genesis *flow.Block, hub *Hub, stopper *Stopper) *Node {
 	db, dbDir := unittest.TempBadgerDB(t)
 
-	headersDB := storage.NewHeaders(db)
-	identitiesDB := storage.NewIdentities(db)
-	guaranteesDB := storage.NewGuarantees(db)
-	sealsDB := storage.NewSeals(db)
-	payloadsDB := storage.NewPayloads(db, identitiesDB, guaranteesDB, sealsDB)
+	metrics := metrics.NewNoopCollector()
+
+	headersDB := storage.NewHeaders(metrics, db)
+	identitiesDB := storage.NewIdentities(metrics, db)
+	guaranteesDB := storage.NewGuarantees(metrics, db)
+	sealsDB := storage.NewSeals(metrics, db)
+	indexDB := storage.NewIndex(metrics, db)
+	payloadsDB := storage.NewPayloads(indexDB, identitiesDB, guaranteesDB, sealsDB)
 	blocksDB := storage.NewBlocks(db, headersDB, payloadsDB)
 
-	state, err := protocol.NewState(db, headersDB, identitiesDB, sealsDB, payloadsDB, blocksDB)
+	state, err := protocol.NewState(metrics, db, headersDB, identitiesDB, sealsDB, payloadsDB, blocksDB)
 	require.NoError(t, err)
 
 	err = state.Mutate().Bootstrap(flow.GenesisStateCommitment, genesis)
@@ -133,13 +136,6 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	dis.AddConsumer(counterConsumer)
 	dis.AddConsumer(notifier)
 
-	// initialize no-op metrics mock
-	metrics := &module.Metrics{}
-	metrics.On("HotStuffBusyDuration", mock.Anything, mock.Anything)
-	metrics.On("HotStuffIdleDuration", mock.Anything, mock.Anything)
-	metrics.On("HotStuffWaitDuration", mock.Anything, mock.Anything)
-	metrics.On("PendingBlocks", mock.Anything)
-
 	cleaner := &storagemock.Cleaner{}
 	cleaner.On("RunGC")
 
@@ -158,7 +154,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	require.NoError(t, err)
 
 	// initialize the block builder
-	build := builder.NewBuilder(db, headersDB, sealsDB, payloadsDB, blocksDB, guarantees, seals)
+	build := builder.NewBuilder(metrics, db, headersDB, sealsDB, payloadsDB, blocksDB, guarantees, seals)
 
 	signer := &Signer{identity.ID()}
 
@@ -192,11 +188,11 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	prov.On("SubmitLocal", mock.Anything).Return(nil)
 
 	// initialize the compliance engine
-	comp, err := compliance.New(log, net, local, cleaner, headersDB, payloadsDB, state, prov, cache, metrics)
+	comp, err := compliance.New(log, metrics, metrics, metrics, net, local, cleaner, headersDB, payloadsDB, state, prov, cache)
 	require.NoError(t, err)
 
 	// initialize the synchronization engine
-	sync, err := synchronization.New(log, net, local, state, blocksDB, comp)
+	sync, err := synchronization.New(log, metrics, net, local, state, blocksDB, comp)
 	require.NoError(t, err)
 
 	pending := []*flow.Header{}

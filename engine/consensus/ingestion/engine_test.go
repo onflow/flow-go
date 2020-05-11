@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	mockmodule "github.com/dapperlabs/flow-go/module/mock"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	mocknetwork "github.com/dapperlabs/flow-go/network/mock"
 	mockprotocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -21,13 +21,13 @@ func TestOnCollectionGuaranteeValid(t *testing.T) {
 	prop := &mocknetwork.Engine{}
 	state := &mockprotocol.State{}
 	final := &mockprotocol.Snapshot{}
-	metrics := &mockmodule.Metrics{}
-	metrics.On("StartCollectionToFinalized", mock.Anything).Return()
+	metrics := metrics.NewNoopCollector()
 
 	e := &Engine{
 		prop:    prop,
 		state:   state,
 		metrics: metrics,
+		spans:   metrics,
 	}
 
 	originID := unittest.IdentifierFixture()
@@ -127,13 +127,13 @@ func TestOnCollectionGuaranteeExpired(t *testing.T) {
 	state := &mockprotocol.State{}
 	final := &mockprotocol.Snapshot{}
 	past := &mockprotocol.Snapshot{}
-	metrics := &mockmodule.Metrics{}
-	metrics.On("StartCollectionToFinalized", mock.Anything).Return()
+	metrics := metrics.NewNoopCollector()
 
 	e := &Engine{
 		prop:    prop,
 		state:   state,
 		metrics: metrics,
+		spans:   metrics,
 	}
 
 	originID := unittest.IdentifierFixture()

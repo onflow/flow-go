@@ -15,13 +15,4 @@ type Payloads interface {
 	// ByBlockID returns the payload with the given hash. It is available for
 	// finalized and ambiguous blocks.
 	ByBlockID(blockID flow.Identifier) (*flow.Payload, error)
-
-	// IdentitiesFor will return the identities for a black.
-	IdentitiesFor(blockID flow.Identifier) (flow.IdentityList, error)
-
-	// GuaranteesFor will return the for a block.
-	GuaranteesFor(blockID flow.Identifier) ([]*flow.CollectionGuarantee, error)
-
-	// SealsFor will return the seals for a block.
-	SealsFor(blockID flow.Identifier) ([]*flow.Seal, error)
 }

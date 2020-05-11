@@ -63,7 +63,7 @@ type Engine struct {
 	syncInProgress     *atomic.Bool
 	syncTargetBlockID  atomic.Value
 	stateSync          executionSync.StateSynchronizer
-	mc                 module.Metrics
+	metrics            module.ExecutionMetrics
 	tracer             module.Tracer
 	extensiveLogging   bool
 }
@@ -82,7 +82,7 @@ func New(
 	providerEngine provider.ProviderEngine,
 	execState state.ExecutionState,
 	syncThreshold uint64,
-	mc module.Metrics,
+	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
 	extLog bool,
 ) (*Engine, error) {
@@ -108,7 +108,7 @@ func New(
 		syncModeThreshold:  syncThreshold,
 		syncInProgress:     atomic.NewBool(false),
 		stateSync:          executionSync.NewStateSynchronizer(execState),
-		mc:                 mc,
+		metrics:            metrics,
 		tracer:             tracer,
 		extensiveLogging:   extLog,
 	}
@@ -214,7 +214,7 @@ func (e *Engine) handleBlockProposal(ctx context.Context, proposal *messages.Blo
 		Payload: proposal.Payload,
 	}
 
-	e.mc.StartBlockReceivedToExecuted(block.ID())
+	e.metrics.StartBlockReceivedToExecuted(block.ID())
 
 	executableBlock := &entity.ExecutableBlock{
 		Block:               block,
@@ -343,9 +343,9 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		return
 	}
 
-	e.mc.FinishBlockReceivedToExecuted(executableBlock.Block.ID())
-	e.mc.ExecutionGasUsedPerBlock(computationResult.GasUsed)
-	e.mc.ExecutionStateReadsPerBlock(computationResult.StateReads)
+	e.metrics.FinishBlockReceivedToExecuted(executableBlock.Block.ID())
+	e.metrics.ExecutionGasUsedPerBlock(computationResult.GasUsed)
+	e.metrics.ExecutionStateReadsPerBlock(computationResult.StateReads)
 
 	finalState, err := e.handleComputationResult(ctx, computationResult, executableBlock.StartState)
 	if err != nil {
@@ -360,8 +360,8 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		e.log.Err(err).Msg("could not get execution state disk size")
 	}
 
-	e.mc.ExecutionStateStorageDiskTotal(diskTotal)
-	e.mc.ExecutionStorageStateCommitment(int64(len(finalState)))
+	e.metrics.ExecutionStateStorageDiskTotal(diskTotal)
+	e.metrics.ExecutionStorageStateCommitment(int64(len(finalState)))
 
 	err = e.mempool.Run(
 		func(
@@ -474,9 +474,8 @@ func (e *Engine) findCollectionNodesForGuarantee(
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve identities (%s): %w", blockID, err)
 	}
-
 	if len(identities) < 1 {
-		return nil, fmt.Errorf("no Collection identity found")
+		return nil, fmt.Errorf("no collection identity found")
 	}
 
 	identifiers := make([]flow.Identifier, len(identities))

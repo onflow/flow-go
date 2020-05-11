@@ -61,8 +61,7 @@ func TestProposalEngine(t *testing.T) {
 
 func (suite *Suite) SetupTest() {
 	log := zerolog.New(os.Stderr)
-	metrics, err := metrics.NewCollector(log)
-	require.NoError(suite.T(), err)
+	metrics := metrics.NewNoopCollector()
 
 	me := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 
