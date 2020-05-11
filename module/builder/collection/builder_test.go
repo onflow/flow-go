@@ -69,7 +69,7 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.Require().Nil(err)
 	suite.mutator = suite.state.Mutate()
 
-	headers, _, _, _, _, blocks := sutil.StorageLayer(suite.T(), suite.db)
+	headers, _, _, _, _, _, blocks := sutil.StorageLayer(suite.T(), suite.db)
 	suite.headers = headers
 	suite.blocks = blocks
 	suite.payloads = storage.NewClusterPayloads(suite.db)
@@ -408,6 +408,8 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 	head := genesis
 	for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
 		block := unittest.BlockWithParentFixture(head)
+		block.Payload.Guarantees = nil
+		block.Header.PayloadHash = block.Payload.Hash()
 		err = suite.protoState.Mutate().Extend(&block)
 		suite.Require().Nil(err)
 		err = suite.protoState.Mutate().Finalize(block.ID())
@@ -519,7 +521,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		err = suite.mutator.Bootstrap(suite.genesis)
 		assert.Nil(b, err)
 
-		headers, _, _, _, _, blocks := sutil.StorageLayer(suite.T(), suite.db)
+		headers, _, _, _, _, _, blocks := sutil.StorageLayer(suite.T(), suite.db)
 		suite.headers = headers
 		suite.blocks = blocks
 		suite.payloads = storage.NewClusterPayloads(suite.db)

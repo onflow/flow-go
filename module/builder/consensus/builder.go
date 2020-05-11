@@ -11,7 +11,9 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
@@ -19,6 +21,7 @@ import (
 // Builder is the builder for consensus block payloads. Upon providing a payload
 // hash, it also memorizes which entities were included into the payload.
 type Builder struct {
+	metrics  module.MempoolMetrics
 	db       *badger.DB
 	seals    storage.Seals
 	headers  storage.Headers
@@ -30,13 +33,13 @@ type Builder struct {
 }
 
 // NewBuilder creates a new block builder.
-func NewBuilder(db *badger.DB, headers storage.Headers, seals storage.Seals, payloads storage.Payloads, blocks storage.Blocks, guarPool mempool.Guarantees, sealPool mempool.Seals, options ...func(*Config)) *Builder {
+func NewBuilder(metrics module.MempoolMetrics, db *badger.DB, headers storage.Headers, seals storage.Seals, payloads storage.Payloads, blocks storage.Blocks, guarPool mempool.Guarantees, sealPool mempool.Seals, options ...func(*Config)) *Builder {
 
 	// initialize default config
 	cfg := Config{
-		minInterval:  500 * time.Millisecond,
-		maxInterval:  10 * time.Second,
-		expiryBlocks: 64,
+		minInterval: 500 * time.Millisecond,
+		maxInterval: 10 * time.Second,
+		expiry:      flow.DefaultTransactionExpiry,
 	}
 
 	// apply option parameters
@@ -45,6 +48,7 @@ func NewBuilder(db *badger.DB, headers storage.Headers, seals storage.Seals, pay
 	}
 
 	b := &Builder{
+		metrics:  metrics,
 		db:       db,
 		headers:  headers,
 		seals:    seals,
@@ -61,7 +65,9 @@ func NewBuilder(db *badger.DB, headers storage.Headers, seals storage.Seals, pay
 // custom setter function to allow the caller to make changes to the header before storing it.
 func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
 
-	// STEP ONE: Load some things we need to do our work.
+	// STEP ONE: Create a lookup of all previously used guarantees on the part
+	// of the chain that we are building on. We do this separately for pending
+	// and finalized ancestors, so we can differentiate what to do about it.
 
 	var finalized uint64
 	err := b.db.View(operation.RetrieveFinalizedHeight(&finalized))
@@ -73,11 +79,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	if err != nil {
 		return nil, fmt.Errorf("could not lookup finalized block: %w", err)
 	}
-
-	// STEP TWO: Create a lookup of all previously used guarantees on the part
-	// of the chain we care about. We do this separately for unfinalized and
-	// finalized sections of the chain to decide whether removing guarantees
-	// from the memory pool is necessary.
 
 	ancestorID := parentID
 	pendingLookup := make(map[flow.Identifier]struct{})
@@ -99,16 +100,21 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		ancestorID = ancestor.ParentID
 	}
 
-	// for now, we check at most 1000 blocks of history
-	// TODO: look back based on referenc block ID and expiry
-
-	limit := finalized - 1000
-	if limit > finalized { // overflow check
+	// we look back only as far as the expiry limit for the current height we
+	// are building for; any guarantee with a reference block before that can
+	// not be included anymore anyway
+	parent, err := b.headers.ByBlockID(parentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve parent: %w", err)
+	}
+	height := parent.Height + 1
+	limit := height - uint64(b.cfg.expiry)
+	if limit > height { // overflow check
 		limit = 0
 	}
 
-	finalLookup := make(map[flow.Identifier]struct{})
 	ancestorID = finalID
+	finalLookup := make(map[flow.Identifier]struct{})
 	for {
 		ancestor, err := b.headers.ByBlockID(ancestorID)
 		if err != nil {
@@ -127,49 +133,55 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		ancestorID = ancestor.ParentID
 	}
 
-	// STEP THREE: Build a valid guarantee payload.
+	// STEP TWO: Go through the guarantees in our memory pool.
+	// 1) If it was already included on the finalized part of the chain, remove
+	// it from the memory pool and skip.
+	// 2) If the reference block has an expired height, also remove it from the
+	// memory pool and skip.
+	// 3) If it was already included on the pending part of the chain, skip, but
+	// keep in memory pool for now.
+	// 4) Otherwise, this guarantee can be included in the payload.
 
 	var guarantees []*flow.CollectionGuarantee
 	for _, guarantee := range b.guarPool.All() {
-
-		// get the reference block for expiration
-		refHeader, err := b.headers.ByBlockID(guarantee.ReferenceBlockID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get reference block: %w", err)
-		}
-
-		// for now, we simply ignore unfinalized reference blocks
-		// TODO: decide on whether we should remove those guarantees and when
-		if finalized < refHeader.Height {
-			continue
-		}
-
-		// check if the reference block is already too old
 		collID := guarantee.ID()
-		if uint(finalized-refHeader.Height) > flow.DefaultTransactionExpiry {
-			_ = b.guarPool.Rem(collID)
-			continue
-		}
-
-		// check if the guarantee was already finalized in a block
 		_, duplicated := finalLookup[collID]
 		if duplicated {
 			_ = b.guarPool.Rem(collID)
 			continue
 		}
-
-		// check if the guarantee is pending on this branch; don't remove from
-		// memory pool yet, but skip for payload
+		ref, err := b.headers.ByBlockID(guarantee.ReferenceBlockID)
+		if errors.Is(err, storage.ErrNotFound) {
+			_ = b.guarPool.Rem(collID)
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("could not get reference block: %w", err)
+		}
+		if ref.Height < limit {
+			_ = b.guarPool.Rem(collID)
+			continue
+		}
 		_, duplicated = pendingLookup[collID]
 		if duplicated {
 			continue
 		}
-
 		guarantees = append(guarantees, guarantee)
 	}
 
+	b.metrics.MempoolEntries(metrics.ResourceGuarantee, b.guarPool.Size())
+
 	// STEP FOUR: Get the block seal from the parent and see how far we can
 	// extend the chain of sealed blocks with the seals in the memory pool.
+
+	lastSeal, err := b.seals.ByBlockID(parentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get last seal: %w", err)
+	}
+	lastSealed, err := b.headers.ByBlockID(lastSeal.BlockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get last sealed: %w", err)
+	}
 
 	// we map each seal to the parent of its sealed block; that way, we can
 	// retrieve a valid seal that will *follow* each block's own seal
@@ -182,14 +194,19 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve sealed header (%x): %w", seal.BlockID, err)
 		}
+		if sealed.Height < lastSealed.Height {
+			_ = b.sealPool.Rem(seal.ID())
+			continue
+		}
 		byParent[sealed.ParentID] = seal
 	}
+
+	b.metrics.MempoolEntries(metrics.ResourceSeal, b.sealPool.Size())
 
 	// starting at the paren't seal, we try to find a seal to extend the current
 	// last sealed block; if we do, we keep going until we don't
 	// we also execute a sanity check on whether the execution state of the next
 	// seal propely connects to the previous seal
-	lastSeal, err := b.seals.ByBlockID(parentID)
 	var seals []*flow.Seal
 	for len(byParent) > 0 {
 		seal, found := byParent[lastSeal.BlockID]
@@ -204,7 +221,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		lastSeal = seal
 	}
 
-	// STEP FIVE: We now have guarantees and seals we can validly include
+	// STEP FOUR: We now have guarantees and seals we can validly include
 	// in the payload built on top of the given parent. Now we need to build
 	// and store the block header, as well as index the payload contents.
 
@@ -213,12 +230,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		Identities: nil,
 		Guarantees: guarantees,
 		Seals:      seals,
-	}
-
-	// retrieve the parent to set the height
-	parent, err := b.headers.ByBlockID(parentID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve parent: %w", err)
 	}
 
 	// calculate the timestamp and cutoffs
@@ -238,7 +249,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	header := &flow.Header{
 		ChainID:     parent.ChainID,
 		ParentID:    parentID,
-		Height:      parent.Height + 1,
+		Height:      height,
 		Timestamp:   timestamp,
 		PayloadHash: payload.Hash(),
 

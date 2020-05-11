@@ -106,6 +106,12 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 
 	log.Info().Msg("proposal forwarded from compliance engine")
 
+	// ignore stale proposals
+	if block.View < e.forks.FinalizedView() {
+		log.Info().Msg("stale proposal")
+		return nil
+	}
+
 	// validate the block. exit if the proposal is invalid
 	err := e.validator.ValidateProposal(proposal)
 	if errors.Is(err, model.ErrorInvalidBlock{}) {
@@ -146,21 +152,9 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 		return nil
 	}
 
-	// if the block is not for the current view, try to build QC from votes for this block
-	qc, built, err := e.voteAggregator.BuildQCOnReceivedBlock(block)
+	err = e.tryBuildQCForBlock(block)
 	if err != nil {
-		return fmt.Errorf("building qc for block (%x) failed: %w", block.BlockID, err)
-	}
-
-	if !built {
-		// if we don't have enough votes to build QC for this block, proceed with block.qc instead
-		qc = block.QC
-	}
-
-	// process the QC
-	err = e.processQC(qc)
-	if err != nil {
-		return fmt.Errorf("failed processing qc from block (%x): %w", block.BlockID, err)
+		return fmt.Errorf("failed processing qc from block: %w", err)
 	}
 
 	newView := e.paceMaker.CurView() // in case we skipped ahead
@@ -390,7 +384,11 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNextLeader(block *model.Blo
 
 	if !shouldVote {
 		// even if we are not voting for the block, we will still check if a QC can be built for this block.
-		return e.tryBuildQCForBlock(block)
+		err := e.tryBuildQCForBlock(block)
+		if err != nil {
+			return fmt.Errorf("failed to process QC for block when not voting: %w", err)
+		}
+		return nil
 	}
 
 	log.Debug().Msg("processing own vote as next leader")
@@ -454,13 +452,18 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *model.
 // tryBuildQCForBlock checks whether there are enough votes to build a QC for the given block,
 // and process the QC if a QC was built.
 func (e *EventHandler) tryBuildQCForBlock(block *model.Block) error {
+	// if the block is not for the current view, try to build QC from votes for this block
 	qc, built, err := e.voteAggregator.BuildQCOnReceivedBlock(block)
 	if err != nil {
-		return fmt.Errorf("building qc for block failed: %w", err)
+		return fmt.Errorf("building qc for block (%x) failed: %w", block.BlockID, err)
 	}
+
 	if !built {
-		return nil
+		// if we don't have enough votes to build QC for this block, proceed with block.qc instead
+		qc = block.QC
 	}
+
+	// process the QC
 	return e.processQC(qc)
 }
 

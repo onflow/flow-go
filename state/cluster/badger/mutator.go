@@ -39,7 +39,7 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 			return fmt.Errorf("genesis collection should contain no transactions (got %d)", collSize)
 		}
 
-		// insert block
+		// insert the block
 		err := procedure.InsertClusterBlock(genesis)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis block: %w", err)
@@ -61,22 +61,70 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 	})
 }
 
-func (m *Mutator) Extend(blockID flow.Identifier) error {
-	return m.state.db.View(func(tx *badger.Txn) error {
-
-		// retrieve the block
-		var block cluster.Block
-		err := procedure.RetrieveClusterBlock(blockID, &block)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve block: %w", err)
-		}
+func (m *Mutator) Extend(block *cluster.Block) error {
+	return m.state.db.Update(func(tx *badger.Txn) error {
 
 		// check chain ID
 		if block.Header.ChainID != m.state.chainID {
 			return fmt.Errorf("new block chain ID (%s) does not match configured (%s)", block.Header.ChainID, m.state.chainID)
 		}
 
+		// get the chain ID, which determines which cluster state to query
+		chainID := block.Header.ChainID
+
+		// get finalized state boundary
+		var boundary uint64
+		err := operation.RetrieveClusterFinalizedHeight(chainID, &boundary)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve boundary: %w", err)
+		}
+
+		// get the hash of the latest finalized block
+		var lastFinalizedBlockID flow.Identifier
+		err = operation.LookupClusterBlockHeight(chainID, boundary, &lastFinalizedBlockID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve latest finalized ID: %w", err)
+		}
+
+		// get the header of the parent of the new block
+		var parent flow.Header
+		err = operation.RetrieveHeader(block.Header.ParentID, &parent)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve latest finalized header: %w", err)
+		}
+
+		// if the new block has a lower number than its parent, we can't add it
+		if block.Header.Height != parent.Height+1 {
+			return fmt.Errorf("extending block height (%d) must be parent height + 1 (%d)", block.Header.Height, parent.Height)
+		}
+
+		// ensure that the extending block connects to the finalized state, we
+		// do this by tracing back until we see a parent block that is the
+		// latest finalized block, or reach height below the finalized boundary
+
+		// start with the parent ID
+		var loopHeader flow.Header
+		parentID := block.Header.ParentID
+		for parentID != lastFinalizedBlockID {
+
+			// get the parent of current block
+			err = operation.RetrieveHeader(parentID, &loopHeader)(tx)
+			if err != nil {
+				return fmt.Errorf("could not get parent (%x): %w", block.Header.ParentID, err)
+			}
+
+			// if its number is below current boundary, the block does not connect
+			// to the finalized protocol state and would break database consistency
+			if loopHeader.Height < boundary {
+				return fmt.Errorf("block doesn't connect to finalized state")
+			}
+
+			parentID = loopHeader.ParentID
+		}
+
 		// we go back at most 1k blocks to check payload for now
+		//TODO look back based on reference block ID and expiry
+		// ref: https://github.com/dapperlabs/flow-go/issues/3556
 		limit := block.Header.Height - 1000
 		if limit > block.Header.Height { // overflow check
 			limit = 0
@@ -118,50 +166,10 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 			return fmt.Errorf("payload includes duplicate transactions (duplicates: %s)", duplicateTxIDs)
 		}
 
-		// get the chain ID, which determines which cluster state to query
-		chainID := block.Header.ChainID
-
-		// get finalized state boundary
-		var boundary uint64
-		err = operation.RetrieveClusterFinalizedHeight(chainID, &boundary)(tx)
+		// insert the block
+		err = procedure.InsertClusterBlock(block)(tx)
 		if err != nil {
-			return fmt.Errorf("could not retrieve boundary: %w", err)
-		}
-
-		// get the hash of the latest finalized block
-		var lastFinalizedBlockID flow.Identifier
-		err = operation.LookupClusterBlockHeight(chainID, boundary, &lastFinalizedBlockID)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve latest finalized ID: %w", err)
-		}
-
-		// get the header of the parent of the new block
-		var parent flow.Header
-		err = operation.RetrieveHeader(block.Header.ParentID, &parent)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve latest finalized header: %w", err)
-		}
-
-		// if the new block has a lower number than its parent, we can't add it
-		if block.Header.Height != parent.Height+1 {
-			return fmt.Errorf("extending block height (%d) must be parent height + 1 (%d)", block.Header.Height, parent.Height)
-		}
-
-		// trace back from new block until we find a block that has the latest
-		// finalized block as its parent
-		for block.Header.ParentID != lastFinalizedBlockID {
-
-			// get the parent of current block
-			err = operation.RetrieveHeader(block.Header.ParentID, block.Header)(tx)
-			if err != nil {
-				return fmt.Errorf("could not get parent (%x): %w", block.Header.ParentID, err)
-			}
-
-			// if its number is below current boundary, the block does not connect
-			// to the finalized protocol state and would break database consistency
-			if block.Header.Height < boundary {
-				return fmt.Errorf("block doesn't connect to finalized state")
-			}
+			return fmt.Errorf("could not insert extending block: %w", err)
 		}
 
 		return nil

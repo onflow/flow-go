@@ -23,11 +23,10 @@ import (
 // Engine represents the ingestion engine, used to funnel data from other nodes
 // to a centralized location that can be queried by a user
 type Engine struct {
-	unit    *engine.Unit   // used to manage concurrency & shutdown
-	log     zerolog.Logger // used to log relevant actions with context
-	metrics module.Metrics // used to collect metrics
-	state   protocol.State // used to access the  protocol state
-	me      module.Local   // used to access local node information
+	unit  *engine.Unit   // used to manage concurrency & shutdown
+	log   zerolog.Logger // used to log relevant actions with context
+	state protocol.State // used to access the  protocol state
+	me    module.Local   // used to access local node information
 
 	// Conduits
 	collectionConduit network.Conduit
@@ -44,7 +43,6 @@ type Engine struct {
 func New(log zerolog.Logger,
 	net module.Network,
 	state protocol.State,
-	metrics module.Metrics,
 	me module.Local,
 	blocks storage.Blocks,
 	headers storage.Headers,
@@ -55,7 +53,6 @@ func New(log zerolog.Logger,
 	eng := &Engine{
 		unit:         engine.NewUnit(),
 		log:          log.With().Str("engine", "ingestion").Logger(),
-		metrics:      metrics,
 		state:        state,
 		me:           me,
 		blocks:       blocks,
@@ -149,7 +146,6 @@ func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 			e.log.Error().Err(err).Hex("block_id", id[:]).Msg("failed to process block")
 			return
 		}
-		e.metrics.FinalizedBlocks(1)
 	})
 }
 
@@ -226,7 +222,7 @@ func (e *Engine) findCollectionNodes() ([]flow.Identifier, error) {
 		return nil, fmt.Errorf("could not retrieve identities: %w", err)
 	}
 	if len(identities) < 1 {
-		return nil, fmt.Errorf("no Collection identity found")
+		return nil, fmt.Errorf("no collection identity found")
 	}
 	identifiers := flow.GetIDs(identities)
 	return identifiers, nil

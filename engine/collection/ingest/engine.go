@@ -26,7 +26,7 @@ import (
 type Engine struct {
 	unit    *engine.Unit
 	log     zerolog.Logger
-	metrics module.Metrics
+	metrics module.CollectionMetrics
 	con     network.Conduit
 	me      module.Local
 	state   protocol.State
@@ -42,7 +42,7 @@ func New(
 	log zerolog.Logger,
 	net module.Network,
 	state protocol.State,
-	metrics module.Metrics,
+	metrics module.CollectionMetrics,
 	me module.Local,
 	pool mempool.Transactions,
 	expiryBuffer uint,
@@ -77,13 +77,11 @@ func New(
 
 // Ready returns a ready channel that is closed once the engine has fully
 // started.
-// TODO describe condition for ingest engine being ready
 func (e *Engine) Ready() <-chan struct{} {
 	return e.unit.Ready()
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
-// TODO describe conditions under which engine is done
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
 }

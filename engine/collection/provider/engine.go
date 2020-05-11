@@ -25,7 +25,7 @@ import (
 type Engine struct {
 	unit         *engine.Unit
 	log          zerolog.Logger
-	metrics      module.Metrics
+	metrics      module.CollectionMetrics
 	con          network.Conduit
 	me           module.Local
 	state        protocol.State
@@ -34,7 +34,7 @@ type Engine struct {
 	transactions storage.Transactions
 }
 
-func New(log zerolog.Logger, net module.Network, state protocol.State, metrics module.Metrics, me module.Local, pool mempool.Transactions, collections storage.Collections, transactions storage.Transactions) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, state protocol.State, metrics module.CollectionMetrics, me module.Local, pool mempool.Transactions, collections storage.Collections, transactions storage.Transactions) (*Engine, error) {
 	e := &Engine{
 		unit:         engine.NewUnit(),
 		log:          log.With().Str("engine", "provider").Logger(),

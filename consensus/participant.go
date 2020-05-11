@@ -24,7 +24,7 @@ import (
 )
 
 // NewParticipant initialize the EventLoop instance and recover the forks' state with all pending block
-func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics module.Metrics, headers storage.Headers,
+func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics module.HotstuffMetrics, headers storage.Headers,
 	committee hotstuff.Committee, builder module.Builder, updater module.Finalizer, persist hotstuff.Persister,
 	signer hotstuff.Signer, communicator hotstuff.Communicator, rootHeader *flow.Header, rootQC *model.QuorumCertificate,
 	finalized *flow.Header, pending []*flow.Header, options ...Option) (*hotstuff.EventLoop, error) {
@@ -66,9 +66,12 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 		return nil, fmt.Errorf("could not recover last voted: %w", err)
 	}
 
+	// initialize the vote aggregator
+	aggregator := voteaggregator.New(notifier, 0, committee, validator, signer)
+
 	// recover the hotstuff state, mainly to recover all pending blocks
 	// in forks
-	err = Recover(log, forks, validator, finalized, pending)
+	err = Recover(log, forks, aggregator, validator, finalized, pending)
 	if err != nil {
 		return nil, fmt.Errorf("could not recover hotstuff state: %w", err)
 	}
@@ -100,9 +103,6 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 
 	// initialize the voter
 	voter := voter.New(signer, forks, persist, voted)
-
-	// initialize the vote aggregator
-	aggregator := voteaggregator.New(notifier, 0, committee, validator, signer)
 
 	// initialize the event handler
 	handler, err := eventhandler.New(log, pacemaker, producer, forks, persist, communicator, committee, aggregator, voter, validator, notifier)
@@ -168,7 +168,7 @@ func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader 
 		// a finalized block must have a valid child, if err happens, we exit
 		return nil, fmt.Errorf("could not get children for finalized block: %w", err)
 	}
-	if len(children) < 0 {
+	if len(children) == 0 {
 		return nil, fmt.Errorf("finalized block has no children")
 	}
 

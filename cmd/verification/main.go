@@ -5,6 +5,8 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/dapperlabs/flow-go/model/flow"
+
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/cmd"
@@ -22,6 +24,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/chunks"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
@@ -68,6 +71,7 @@ func main() {
 		ingestedResultIDs    *stdmap.Identifiers
 		verifierEng          *verifier.Engine
 		ingestEng            *ingest.Engine
+		collector            module.VerificationMetrics
 	)
 
 	cmd.FlowNode("verification").
@@ -119,6 +123,10 @@ func main() {
 			conCache = buffer.NewPendingBlocks()
 			return nil
 		}).
+		Module("verification metrics", func(node *cmd.FlowNodeBuilder) error {
+			collector = metrics.NewNoopCollector()
+			return nil
+		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rt := runtime.NewInterpreterRuntime()
 			vm, err := virtualmachine.New(rt)
@@ -126,7 +134,7 @@ func main() {
 				return nil, err
 			}
 			chunkVerifier := chunks.NewChunkVerifier(vm)
-			verifierEng, err = verifier.New(node.Logger, node.Network, node.State, node.Me, chunkVerifier, node.Metrics)
+			verifierEng, err = verifier.New(node.Logger, collector, node.Network, node.State, node.Me, chunkVerifier)
 			return verifierEng, err
 		}).
 		Component("ingest engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -149,8 +157,8 @@ func main() {
 				chunkDataPackTracker,
 				ingestedChunkIDs,
 				ingestedResultIDs,
-				node.Headers,
-				node.Blocks,
+				node.Storage.Headers,
+				node.Storage.Blocks,
 				assigner,
 				requestIntervalMs,
 				failureThreshold)
@@ -163,7 +171,7 @@ func main() {
 
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Headers, node.Payloads, node.State)
+			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, node.Storage.Payloads, node.State)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -197,8 +205,8 @@ func main() {
 				node.Network,
 				node.Me,
 				cleaner,
-				node.Headers,
-				node.Payloads,
+				node.Storage.Headers,
+				node.Storage.Payloads,
 				node.State,
 				conCache,
 				core)
@@ -209,10 +217,11 @@ func main() {
 			// create a block synchronization engine to handle follower getting
 			// out of sync
 			sync, err := synchronization.New(node.Logger,
+				node.Metrics.Engine,
 				node.Network,
 				node.Me,
 				node.State,
-				node.Blocks,
+				node.Storage.Blocks,
 				followerEng)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
@@ -220,5 +229,5 @@ func main() {
 
 			return followerEng.WithSynchronization(sync), nil
 		}).
-		Run("verification")
+		Run(flow.RoleVerification.String())
 }

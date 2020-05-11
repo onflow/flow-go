@@ -6,7 +6,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-type Metrics interface {
+type NetworkMetrics interface {
 	// Network Metrics
 	// NetworkMessageSent size in bytes and count of the network message sent
 	NetworkMessageSent(sizeBytes int, topic string)
@@ -14,10 +14,56 @@ type Metrics interface {
 	// Network Metrics
 	// NetworkMessageReceived size in bytes and count of the network message received
 	NetworkMessageReceived(sizeBytes int, topic string)
+}
 
-	// Collection Metrics
-	//
+type EngineMetrics interface {
+	MessageSent(engine string, message string)
+	MessageReceived(engine string, message string)
+}
 
+type ComplianceMetrics interface {
+	BlockProposed(*flow.Block)
+	BlockFinalized(*flow.Block)
+	BlockSealed(*flow.Block)
+}
+
+type CacheMetrics interface {
+	CacheEntries(resource string, entries uint)
+	CacheHit(resource string)
+	CacheMiss(resource string)
+}
+
+type MempoolMetrics interface {
+	MempoolEntries(resource string, entries uint)
+}
+
+type HotstuffMetrics interface {
+	// HotStuffBusyDuration reports Metrics C6 HotStuff Busy Duration
+	HotStuffBusyDuration(duration time.Duration, event string)
+
+	// HotStuffIdleDuration reports Metrics C6 HotStuff Idle Duration
+	HotStuffIdleDuration(duration time.Duration)
+
+	// HotStuffWaitDuration reports Metrics C6 HotStuff Idle Duration
+	HotStuffWaitDuration(duration time.Duration, event string)
+
+	// SetCurView reports Metrics C8: Current View
+	SetCurView(view uint64)
+
+	// SetQCView reports Metrics C9: View of Newest Known QC
+	SetQCView(view uint64)
+
+	// CountSkipped reports the number of times we skipped ahead.
+	CountSkipped()
+
+	// CountTimeout reports the number of times we timed out.
+	CountTimeout()
+
+	// SetTimeout sets the current timeout duration
+	SetTimeout(duration time.Duration)
+}
+
+type CollectionMetrics interface {
 	// TransactionReceived is called when a new transaction is ingested by the
 	// node. It increments the total count of ingested transactions and starts
 	// a tx->col span for the transaction.
@@ -32,70 +78,23 @@ type Metrics interface {
 
 	// PendingClusterBlocks the number of cluster blocks in the pending cache.
 	PendingClusterBlocks(n uint)
+}
 
-	// Consensus Metrics
-	//
-
-	// PendingBlocks the number of blocks in the pending cache.
-	PendingBlocks(n uint)
-
+type ConsensusMetrics interface {
 	// StartCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized Block
 	StartCollectionToFinalized(collectionID flow.Identifier)
 
 	// FinishCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized Block
 	FinishCollectionToFinalized(collectionID flow.Identifier)
 
-	// CollectionsInFinalizedBlock reports Metric C2: Counter: Number of Collections included in finalized Blocks (per second)
-	CollectionsInFinalizedBlock(count int)
-
-	// CollectionsPerBlock reports Metric C3: Gauge type: number of Collections per incorporated Block
-	CollectionsPerBlock(count int)
-
 	// StartBlockToSeal reports Metrics C4: Block Received by CCL → Block Seal in finalized block
 	StartBlockToSeal(blockID flow.Identifier)
 
 	// FinishBlockToSeal reports Metrics C4: Block Received by CCL → Block Seal in finalized block
 	FinishBlockToSeal(blockID flow.Identifier)
+}
 
-	// SealsInFinalizedBlock reports Metrics C5 Number of Blocks which are sealed by finalized blocks (per second)
-	SealsInFinalizedBlock(count int)
-
-	// HotStuffBusyDuration reports Metrics C6 HotStuff Busy Duration
-	HotStuffBusyDuration(duration time.Duration, event string)
-
-	// HotStuffIdleDuration reports Metrics C6 HotStuff Idle Duration
-	HotStuffIdleDuration(duration time.Duration)
-
-	// HotStuffWaitDuration reports Metrics C6 HotStuff Idle Duration
-	HotStuffWaitDuration(duration time.Duration, event string)
-
-	// FinalizedBlocks reports Metric C7: Number of Blocks Finalized (per second)
-	FinalizedBlocks(count int)
-
-	// StartNewView reports Metrics C8: Current View
-	StartNewView(view uint64)
-
-	// NewestKnownQC reports Metrics C9: View of Newest Known QC
-	NewestKnownQC(view uint64)
-
-	// MadeBlockProposal reports that a block proposal has been made
-	MadeBlockProposal()
-
-	// MempoolGuaranteesSize reports the size of the guarantees mempool
-	MempoolGuaranteesSize(size uint)
-
-	// MempoolReceiptsSize reports the size of the receipts mempool
-	MempoolReceiptsSize(size uint)
-
-	// MempoolApprovalsSize reports the size of the approvals mempool
-	MempoolApprovalsSize(size uint)
-
-	// MempoolSealsSize reports the size of the seals mempool
-	MempoolSealsSize(size uint)
-
-	// Verification Metrics
-	//
-
+type VerificationMetrics interface {
 	// OnChunkVerificationStarted is called whenever the verification of a chunk is started
 	// it starts the timer to record the execution time
 	OnChunkVerificationStarted(chunkID flow.Identifier)
@@ -115,9 +114,9 @@ type Metrics interface {
 	// OnChunkDataRemoved is called whenever something is removed that is related to chunkID from the in-memory mempools
 	// of verification node. It records the size of stored object.
 	OnChunkDataRemoved(chunkID flow.Identifier, size float64)
+}
 
-	// Execution Metrics
-
+type ExecutionMetrics interface {
 	// StartBlockReceivedToExecuted starts a span to trace the duration of a block
 	// from being received for execution to execution being finished
 	StartBlockReceivedToExecuted(blockID flow.Identifier)
