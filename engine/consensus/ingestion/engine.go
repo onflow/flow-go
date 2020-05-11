@@ -28,25 +28,24 @@ type Engine struct {
 	metrics module.EngineMetrics    // used to track sent & received messages
 	spans   module.ConsensusMetrics // used to track consensus spans
 	prop    network.Engine          // used to process & propagate collections
-	state   protocol.State          // used to access the  protocol state
+	state   protocol.State          // used to access the protocol state
+	headers storage.Headers         // used to retrieve headers
 	me      module.Local            // used to access local node information
-	// the number of blocks that can be between the reference block and the
-	// finalized head before we consider the transaction expired
-	expiry uint64
 }
 
 // New creates a new collection propagation engine.
-func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, prop network.Engine, state protocol.State, me module.Local) (*Engine, error) {
+func New(log zerolog.Logger, metrics module.EngineMetrics, spans module.ConsensusMetrics, net module.Network, prop network.Engine, state protocol.State, headers storage.Headers, me module.Local) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		unit:    engine.NewUnit(),
 		log:     log.With().Str("engine", "ingestion").Logger(),
 		metrics: metrics,
+		spans:   spans,
 		prop:    prop,
 		state:   state,
+		headers: headers,
 		me:      me,
-		expiry:  flow.DefaultTransactionExpiry,
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -126,18 +125,15 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 
 	log.Info().Msg("collection guarantee received from collection cluster")
 
-	final := e.state.Final()
-
-	guarantors := guarantee.SignerIDs
-
 	// ensure there is at least one guarantor
+	guarantors := guarantee.SignerIDs
 	if len(guarantors) == 0 {
 		return fmt.Errorf("invalid collection guarantee with no guarantors")
 	}
 
 	// get the identity of the origin node, so we can check if it's a valid
 	// source for a collection guarantee (usually collection nodes)
-	id, err := final.Identity(originID)
+	identity, err := e.state.Final().Identity(originID)
 	if err != nil {
 		return fmt.Errorf("could not get origin node identity: %w", err)
 	}
@@ -147,21 +143,21 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	// should use the propagation engine, which is for exchange of collections
 	// between consensus nodes anyway; we do no processing or validation in this
 	// engine beyond validating the origin
-	if id.Role != flow.RoleCollection {
-		return fmt.Errorf("invalid origin node role (%s)", id.Role)
+	if identity.Role != flow.RoleCollection {
+		return fmt.Errorf("invalid origin node role (%s)", identity.Role)
 	}
 
 	// ensure that collection has not expired
-	err = e.validateCollectionGuaranteeExpiry(guarantee, final)
+	err = e.validateExpiry(guarantee)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not validate guarantee expiry: %w", err)
 	}
 
-	clusters, err := final.Clusters()
+	// get the clusters to assign the guarantee and check if the guarantor is part of it
+	clusters, err := e.state.Final().Clusters()
 	if err != nil {
 		return fmt.Errorf("could not get clusters: %w", err)
 	}
-
 	cluster, ok := clusters.ByNodeID(guarantors[0])
 	if !ok {
 		return fmt.Errorf("guarantor (id=%s) does not exist in any cluster", guarantors[0])
@@ -191,27 +187,27 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	return nil
 }
 
-func (e *Engine) validateCollectionGuaranteeExpiry(guarantee *flow.CollectionGuarantee, snapshot protocol.Snapshot) error {
+func (e *Engine) validateExpiry(guarantee *flow.CollectionGuarantee) error {
 
-	head, err := snapshot.Head()
+	// get the last finalized header and the reference block header
+	final, err := e.state.Final().Head()
 	if err != nil {
 		return fmt.Errorf("could not get finalized header: %w", err)
 	}
-
-	ref, err := e.state.AtBlockID(guarantee.ReferenceBlockID).Head()
+	ref, err := e.headers.ByBlockID(guarantee.ReferenceBlockID)
 	if errors.Is(err, storage.ErrNotFound) {
 		return fmt.Errorf("collection guarantee refers to an unknown block: %x", guarantee.ReferenceBlockID)
 	}
 
 	// if head has advanced beyond the block referenced by the collection guarantee by more than 'expiry' number of blocks,
 	// then reject the collection
-	diff := head.Height - ref.Height
+	diff := final.Height - ref.Height
 	// check for overflow
-	if ref.Height > head.Height {
+	if diff > final.Height {
 		diff = 0
 	}
-	if diff > e.expiry {
-		return fmt.Errorf("collection guarantee expired ref_height=%d final_height=%d", ref.Height, head.Height)
+	if diff > flow.DefaultTransactionExpiry {
+		return fmt.Errorf("collection guarantee expired ref_height=%d final_height=%d", ref.Height, final.Height)
 	}
 
 	return nil

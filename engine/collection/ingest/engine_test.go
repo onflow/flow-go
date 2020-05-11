@@ -75,6 +75,8 @@ func TestInvalidTransaction(t *testing.T) {
 			parent := genesis
 			for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
 				next := unittest.BlockWithParentFixture(parent)
+				next.Payload.Guarantees = nil
+				next.Header.PayloadHash = next.Payload.Hash()
 				err = node.State.Mutate().Extend(&next)
 				require.Nil(t, err)
 				err = node.State.Mutate().Finalize(next.ID())

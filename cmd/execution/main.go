@@ -67,7 +67,7 @@ func main() {
 
 			return nil
 		}).
-		// Trie storage is required to bootstrap, but also shout be handled while shutting down
+		// Trie storage is required to bootstrap, but also should be handled while shutting down
 		Module("ledger storage", func(node *cmd.FlowNodeBuilder) error {
 			ledgerStorage, err = ledger.NewTrieStorage(triedir)
 			return err

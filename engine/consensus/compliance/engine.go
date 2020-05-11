@@ -61,7 +61,7 @@ func New(
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		unit:     engine.NewUnit(),
-		log:      log.With().Str("engine", "consensus").Logger(),
+		log:      log.With().Str("engine", "compliance").Logger(),
 		metrics:  metrics,
 		mempool:  mempool,
 		spans:    spans,

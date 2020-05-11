@@ -65,14 +65,14 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.dbdir = unittest.TempDir(suite.T())
 	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
 
-	suite.state, err = clusterkv.NewState(suite.db, suite.chainID)
-	suite.Require().Nil(err)
-	suite.mutator = suite.state.Mutate()
-
 	headers, _, _, _, _, _, blocks := sutil.StorageLayer(suite.T(), suite.db)
 	suite.headers = headers
 	suite.blocks = blocks
 	suite.payloads = storage.NewClusterPayloads(suite.db)
+
+	suite.state, err = clusterkv.NewState(suite.db, suite.chainID, suite.headers, suite.payloads)
+	suite.Require().Nil(err)
+	suite.mutator = suite.state.Mutate()
 
 	suite.protoState = putil.ProtocolState(suite.T(), suite.db)
 
@@ -160,6 +160,12 @@ func (suite *BuilderSuite) TestBuildOn_Success() {
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
 	suite.Assert().Nil(err)
 	builtCollection := built.Payload.Collection
+
+	// should reference a valid reference block
+	// (since genesis is the only block, it's the only valid reference)
+	mainGenesis, err := suite.protoState.AtHeight(0).Head()
+	suite.Assert().Nil(err)
+	suite.Assert().Equal(mainGenesis.ID(), built.Payload.ReferenceBlockID)
 
 	// payload should include only items from mempool
 	mempoolTransactions := suite.pool.All()
@@ -408,6 +414,8 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 	head := genesis
 	for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
 		block := unittest.BlockWithParentFixture(head)
+		block.Payload.Guarantees = nil
+		block.Header.PayloadHash = block.Payload.Hash()
 		err = suite.protoState.Mutate().Extend(&block)
 		suite.Require().Nil(err)
 		err = suite.protoState.Mutate().Finalize(block.ID())
@@ -456,9 +464,29 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 	suite.Assert().False(suite.pool.Has(tx1.ID()))
 }
 
-// TODO specify behaviour for empty mempools
 func (suite *BuilderSuite) TestBuildOn_EmptyMempool() {
-	suite.T().Skip()
+
+	// start with an empty mempool
+	var err error
+	suite.pool, err = stdmap.NewTransactions(1000)
+	suite.Require().Nil(err)
+	suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.payloads, suite.pool)
+
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
+	suite.Require().Nil(err)
+
+	var built model.Block
+	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+	suite.Require().Nil(err)
+
+	// should reference a valid reference block
+	// (since genesis is the only block, it's the only valid reference)
+	mainGenesis, err := suite.protoState.AtHeight(0).Head()
+	suite.Assert().Nil(err)
+	suite.Assert().Equal(mainGenesis.ID(), built.Payload.ReferenceBlockID)
+
+	// the payload should be empty
+	suite.Assert().Equal(0, built.Payload.Collection.Len())
 }
 
 // helper to check whether a collection contains each of the given transactions.
@@ -512,17 +540,17 @@ func benchmarkBuildOn(b *testing.B, size int) {
 			assert.Nil(b, err)
 		}()
 
-		suite.state, err = clusterkv.NewState(suite.db, suite.chainID)
+		headers, _, _, _, _, _, blocks := sutil.StorageLayer(suite.T(), suite.db)
+		suite.headers = headers
+		suite.blocks = blocks
+		suite.payloads = storage.NewClusterPayloads(suite.db)
+
+		suite.state, err = clusterkv.NewState(suite.db, suite.chainID, suite.headers, suite.payloads)
 		assert.Nil(b, err)
 		suite.mutator = suite.state.Mutate()
 
 		err = suite.mutator.Bootstrap(suite.genesis)
 		assert.Nil(b, err)
-
-		headers, _, _, _, _, _, blocks := sutil.StorageLayer(suite.T(), suite.db)
-		suite.headers = headers
-		suite.blocks = blocks
-		suite.payloads = storage.NewClusterPayloads(suite.db)
 
 		// add some transactions to transaction pool
 		for i := 0; i < 3; i++ {

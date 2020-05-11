@@ -35,7 +35,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-const hotstuffTimeout = 200 * time.Millisecond
+const hotstuffTimeout = 2 * time.Second
 
 type Node struct {
 	db            *badger.DB

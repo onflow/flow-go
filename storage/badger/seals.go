@@ -33,7 +33,7 @@ func NewSeals(collector module.CacheMetrics, db *badger.DB) *Seals {
 	s := &Seals{
 		db: db,
 		cache: newCache(collector,
-			withLimit(1000),
+			withLimit(flow.DefaultTransactionExpiry),
 			withStore(store),
 			withRetrieve(retrieve),
 			withResource(metrics.ResourceSeal),

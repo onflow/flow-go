@@ -1,7 +1,6 @@
 package integration_test
 
 import (
-	"fmt"
 	"sort"
 	"testing"
 	"time"
@@ -92,7 +91,7 @@ func printState(t *testing.T, nodes []*Node, i int) {
 		Int("rangereq", n.rangereq).
 		Int("batchreq", n.batchreq).
 		Int("batchresp", n.batchresp).
-		Str("finalViews", fmt.Sprintf("%v", chainViews(t, nodes[i]))).Msg("stats")
+		Msg("stats")
 }
 
 func chainViews(t *testing.T, node *Node) []uint64 {

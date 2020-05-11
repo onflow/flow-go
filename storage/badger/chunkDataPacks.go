@@ -22,7 +22,7 @@ func NewChunkDataPacks(db *badger.DB) *ChunkDataPacks {
 
 func (ch *ChunkDataPacks) Store(c *flow.ChunkDataPack) error {
 	return ch.db.Update(func(btx *badger.Txn) error {
-		err := operation.InsertChunkDataPack(c)(btx)
+		err := operation.SkipDuplicates(operation.InsertChunkDataPack(c))(btx)
 		if err != nil {
 			return fmt.Errorf("could not insert chunk data pack: %w", err)
 		}
