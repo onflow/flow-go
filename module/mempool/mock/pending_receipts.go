@@ -13,14 +13,14 @@ type PendingReceipts struct {
 }
 
 // Add provides a mock function with given fields: preceipt
-func (_m *PendingReceipts) Add(preceipt *verification.PendingReceipt) error {
+func (_m *PendingReceipts) Add(preceipt *verification.PendingReceipt) bool {
 	ret := _m.Called(preceipt)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*verification.PendingReceipt) error); ok {
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(*verification.PendingReceipt) bool); ok {
 		r0 = rf(preceipt)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0

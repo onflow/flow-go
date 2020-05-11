@@ -3,8 +3,6 @@
 package stdmap
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -23,21 +21,18 @@ func NewBlocks(limit uint) (*Blocks, error) {
 }
 
 // Add adds an block to the mempool.
-func (a *Blocks) Add(block *flow.Block) error {
+func (a *Blocks) Add(block *flow.Block) bool {
 	return a.Backend.Add(block)
 }
 
 // ByID returns the block with the given ID from the mempool.
-func (a *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
-	entity, err := a.Backend.ByID(blockID)
-	if err != nil {
-		return nil, err
+func (a *Blocks) ByID(blockID flow.Identifier) (*flow.Block, bool) {
+	entity, exists := a.Backend.ByID(blockID)
+	if !exists {
+		return nil, false
 	}
-	block, ok := entity.(*flow.Block)
-	if !ok {
-		panic(fmt.Sprintf("invalid entity in block pool (%T)", entity))
-	}
-	return block, nil
+	block := entity.(*flow.Block)
+	return block, true
 }
 
 // All returns all blocks from the pool.

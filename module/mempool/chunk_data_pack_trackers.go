@@ -8,17 +8,19 @@ import (
 // ChunkDataPackTrackers represents a concurrency-safe memory pool of chunk data pack trackers
 type ChunkDataPackTrackers interface {
 
-	// Add will add the given chunk data pack tracker.
-	Add(cdpt *tracker.ChunkDataPackTracker) error
-
 	// Has checks if the given chunkID has a tracker in mempool.
 	Has(chunkID flow.Identifier) bool
+
+	// Add will add the given chunk datapack tracker to the memory pool. It will
+	// return  false if it was already in the mempool.
+	Add(cdpt *tracker.ChunkDataPackTracker) bool
 
 	// Rem removes tracker with the given chunk ID.
 	Rem(chunkID flow.Identifier) bool
 
-	// ByChunkID returns the chunk data pack tracker for the given chunk ID.
-	ByChunkID(chunkID flow.Identifier) (*tracker.ChunkDataPackTracker, error)
+	// ByID retrieve the chonk datapack tracker with the given chunk ID from the
+	// memory pool. It will return false if it was not found in the mempool.
+	ByChunkID(chunkID flow.Identifier) (*tracker.ChunkDataPackTracker, bool)
 
 	// All will return a list of chunk data pack trackers in mempool.
 	All() []*tracker.ChunkDataPackTracker

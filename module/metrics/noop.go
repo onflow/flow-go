@@ -28,6 +28,8 @@ func (nc *NoopCollector) BadgerNumGets(n int64)                                 
 func (nc *NoopCollector) BadgerNumPuts(n int64)                                     {}
 func (nc *NoopCollector) BadgerNumBlockedPuts(n int64)                              {}
 func (nc *NoopCollector) BadgerNumMemtableGets(n int64)                             {}
+func (nc *NoopCollector) FinalizedHeight(height uint64)                             {}
+func (nc *NoopCollector) SealedHeight(height uint64)                                {}
 func (nc *NoopCollector) BlockProposed(*flow.Block)                                 {}
 func (nc *NoopCollector) BlockFinalized(*flow.Block)                                {}
 func (nc *NoopCollector) BlockSealed(*flow.Block)                                   {}

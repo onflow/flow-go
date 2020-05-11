@@ -38,7 +38,8 @@ type BadgerMetrics interface {
 }
 
 type ComplianceMetrics interface {
-	BlockProposed(*flow.Block)
+	FinalizedHeight(height uint64)
+	SealedHeight(height uint64)
 	BlockFinalized(*flow.Block)
 	BlockSealed(*flow.Block)
 }

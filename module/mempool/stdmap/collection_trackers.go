@@ -1,8 +1,6 @@
 package stdmap
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/verification/tracker"
 )
@@ -21,7 +19,7 @@ func NewCollectionTrackers(limit uint) (*CollectionTrackers, error) {
 }
 
 // Add adds a CollectionTracker to the mempool.
-func (c *CollectionTrackers) Add(ct *tracker.CollectionTracker) error {
+func (c *CollectionTrackers) Add(ct *tracker.CollectionTracker) bool {
 	return c.Backend.Add(ct)
 }
 
@@ -37,16 +35,13 @@ func (c *CollectionTrackers) Rem(collID flow.Identifier) bool {
 }
 
 // ByCollectionID returns the collection tracker for the given collection ID.
-func (c *CollectionTrackers) ByCollectionID(collID flow.Identifier) (*tracker.CollectionTracker, error) {
-	entity, err := c.Backend.ByID(collID)
-	if err != nil {
-		return nil, err
+func (c *CollectionTrackers) ByCollectionID(collID flow.Identifier) (*tracker.CollectionTracker, bool) {
+	entity, exists := c.Backend.ByID(collID)
+	if !exists {
+		return nil, false
 	}
-	collectionTracker, ok := entity.(*tracker.CollectionTracker)
-	if !ok {
-		return nil, fmt.Errorf("invalid entity in collection tracker pool (%T)", entity)
-	}
-	return collectionTracker, nil
+	collectionTracker := entity.(*tracker.CollectionTracker)
+	return collectionTracker, true
 }
 
 // All returns all collection trackers from the pool.

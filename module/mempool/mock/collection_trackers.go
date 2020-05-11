@@ -13,14 +13,14 @@ type CollectionTrackers struct {
 }
 
 // Add provides a mock function with given fields: collt
-func (_m *CollectionTrackers) Add(collt *tracker.CollectionTracker) error {
+func (_m *CollectionTrackers) Add(collt *tracker.CollectionTracker) bool {
 	ret := _m.Called(collt)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*tracker.CollectionTracker) error); ok {
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(*tracker.CollectionTracker) bool); ok {
 		r0 = rf(collt)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0
@@ -43,7 +43,7 @@ func (_m *CollectionTrackers) All() []*tracker.CollectionTracker {
 }
 
 // ByCollectionID provides a mock function with given fields: collID
-func (_m *CollectionTrackers) ByCollectionID(collID flow.Identifier) (*tracker.CollectionTracker, error) {
+func (_m *CollectionTrackers) ByCollectionID(collID flow.Identifier) (*tracker.CollectionTracker, bool) {
 	ret := _m.Called(collID)
 
 	var r0 *tracker.CollectionTracker
@@ -55,11 +55,11 @@ func (_m *CollectionTrackers) ByCollectionID(collID flow.Identifier) (*tracker.C
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
 		r1 = rf(collID)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(bool)
 	}
 
 	return r0, r1

@@ -55,20 +55,21 @@ func (p *PublicAssignment) Assign(identities flow.IdentityList, chunks flow.Chun
 
 	// checks cache against this assignment
 	assignmentFingerprint := flow.HashToID(hash)
-	if p.assignments.Has(assignmentFingerprint) {
-		return p.assignments.ByID(assignmentFingerprint)
+	a, exists := p.assignments.ByID(assignmentFingerprint)
+	if exists {
+		return a, nil
 	}
 
 	// otherwise, it computes the assignment and caches it for future calls
-	a, err := chunkAssignment(ids, chunks, rng, p.alpha)
+	a, err = chunkAssignment(ids, chunks, rng, p.alpha)
 	if err != nil {
 		return nil, fmt.Errorf("could not complete chunk assignment: %w", err)
 	}
 
 	// adds assignment to mempool
-	err = p.assignments.Add(assignmentFingerprint, a)
-	if err != nil {
-		return nil, fmt.Errorf("could not add generated assignment to mempool: %w", err)
+	added := p.assignments.Add(assignmentFingerprint, a)
+	if !added {
+		return nil, fmt.Errorf("could not add generated assignment to mempool")
 	}
 
 	return a, nil

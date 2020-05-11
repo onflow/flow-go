@@ -172,9 +172,9 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// if our cluster is responsible for the transaction, store it
 	if localCluster.Fingerprint() == txCluster.Fingerprint() {
 		log.Debug().Msg("adding transaction to pool")
-		err := e.pool.Add(tx)
-		if err != nil {
-			return fmt.Errorf("could not add transaction to mempool: %w", err)
+		added := e.pool.Add(tx)
+		if !added {
+			return fmt.Errorf("transaction already in mempool")
 		}
 	}
 

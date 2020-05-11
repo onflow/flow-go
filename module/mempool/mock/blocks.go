@@ -12,14 +12,14 @@ type Blocks struct {
 }
 
 // Add provides a mock function with given fields: block
-func (_m *Blocks) Add(block *flow.Block) error {
+func (_m *Blocks) Add(block *flow.Block) bool {
 	ret := _m.Called(block)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.Block) error); ok {
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(*flow.Block) bool); ok {
 		r0 = rf(block)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0
@@ -42,7 +42,7 @@ func (_m *Blocks) All() []*flow.Block {
 }
 
 // ByID provides a mock function with given fields: blockID
-func (_m *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
+func (_m *Blocks) ByID(blockID flow.Identifier) (*flow.Block, bool) {
 	ret := _m.Called(blockID)
 
 	var r0 *flow.Block
@@ -54,11 +54,11 @@ func (_m *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
 		r1 = rf(blockID)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(bool)
 	}
 
 	return r0, r1

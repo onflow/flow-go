@@ -28,8 +28,10 @@ func TestAddRem(t *testing.T) {
 
 	t.Run("should be able to add and rem", func(t *testing.T) {
 		pool := NewBackend()
-		_ = pool.Add(item1)
-		_ = pool.Add(item2)
+		added := pool.Add(item1)
+		require.True(t, added)
+		added = pool.Add(item2)
+		require.True(t, added)
 
 		t.Run("should be able to get size", func(t *testing.T) {
 			size := pool.Size()
@@ -37,14 +39,14 @@ func TestAddRem(t *testing.T) {
 		})
 
 		t.Run("should be able to get first", func(t *testing.T) {
-			gotItem, err := pool.ByID(item1.ID())
-			assert.NoError(t, err)
+			gotItem, exists := pool.ByID(item1.ID())
+			assert.True(t, exists)
 			assert.Equal(t, item1, gotItem)
 		})
 
 		t.Run("should be able to remove first", func(t *testing.T) {
-			ok := pool.Rem(item1.ID())
-			assert.True(t, ok)
+			removed := pool.Rem(item1.ID())
+			assert.True(t, removed)
 			size := pool.Size()
 			assert.EqualValues(t, uint(1), size)
 		})
