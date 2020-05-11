@@ -19,7 +19,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/io"
 )
 
-var nilChild []byte = make([]byte, 32)
+var nilChild = make([]byte, 32)
 
 var hashLength = 32
 var childHashLen = hashLength + 1
@@ -79,7 +79,7 @@ type tree struct {
 	previous       Root
 	cachedBranches map[string]*proofHolder // Map of string representations of keys to proofs
 	forest         *forest
-	height         uint64 //similar to block height, useful for snapshotting
+	height         uint64 // similar to block height, useful for snapshotting
 	// FIFO queue of ordered historical State Roots
 	// In-memory only, used for tracking snapshots. Can be reconstructed from disk if needed
 	// Frequent eviction of a tree/restarting might mean database not gets pruned as frequent
@@ -201,7 +201,6 @@ func NewForest(dbDir string, cacheSize, height int) (*forest, error) {
 			panic(fmt.Sprintf("cache contains item of type %T", value))
 		}
 
-		fmt.Println("EVICTING DB", key)
 		_, _ = tree.database.SafeClose()
 	}
 
@@ -210,24 +209,14 @@ func NewForest(dbDir string, cacheSize, height int) (*forest, error) {
 		return nil, fmt.Errorf("cannot create forest cache: %w", err)
 	}
 
-	// fullCache, err := lru.NewWithEvict(maxFullSize, evict)
-	// if err != nil {
-	//	return nil, fmt.Errorf("cannot create forest full cache: %w", err)
-	// }
-
 	return &forest{
-		dbDir: dbDir,
-		cache: cache,
-		// fullCache: fullCache,
+		dbDir:  dbDir,
+		cache:  cache,
 		height: height,
 	}, nil
 }
 
 func (f *forest) Add(t *tree) {
-	//if tree.numDeltas == 0 {
-	//	f.fullCache.Add(tree.root.String(), tree)
-	//	return
-	//}
 	// if db is already here safe close it before overriding
 	if foundTree, ok := f.cache.Get(t.root.String()); ok {
 		foundTree.(*tree).database.SafeClose()
@@ -242,23 +231,14 @@ func (f *forest) Has(root Root) bool {
 
 func (f *forest) Get(root Root) (*tree, error) {
 
-	//if foundFullTree, ok := f.fullCache.Get(root.String()); ok {
-	//	return foundFullTree.(*tree), nil
-	//}
-
 	if foundTree, ok := f.cache.Get(root.String()); ok {
-		fmt.Println("CACHE HIT!", root)
 		return foundTree.(*tree), nil
 	}
-
-	fmt.Println("CACHE MISS", root)
 
 	db, err := f.newDB(root)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create LevelDB: %w", err)
 	}
-
-	fmt.Println("RE-OPENED DB AFTER CACHE MISS", root)
 
 	tree, err := f.newTree(root, db)
 	if err != nil {
@@ -273,8 +253,6 @@ func (f *forest) Get(root Root) (*tree, error) {
 func (f *forest) newDB(root Root) (*leveldb.LevelDB, error) {
 	treePath := filepath.Join(f.dbDir, root.String())
 
-	fmt.Println("OPENING NEW DB", treePath)
-
 	db, err := leveldb.NewLevelDB(treePath)
 	return db, err
 }
@@ -286,18 +264,11 @@ func (f *forest) Size() (int64, error) {
 
 // SMT is a Basic Sparse Merkle Tree struct
 type SMT struct {
-	forest *forest
-
-	//rootNode                 *node                    // Root
-	height      int // Height of the tree
-	keyByteSize int // acceptable number of bytes for key
-	//database             databases.DAL            // The Database Interface for the trie
-	//historicalStates     map[string]databases.DAL // Map of string representations of Historical States to Historical Database references
-	//cachedBranches       map[string]*proofHolder  // Map of string representations of keys to proofs
-	//historicalStateRoots deque.Deque              // FIFO queue of historical State Roots in historicalStates map
+	forest              *forest
+	height              int    // Height of the tree
+	keyByteSize         int    // acceptable number of bytes for key
 	numHistoricalStates int    // Number of states to keep in historicalStates
 	snapshotInterval    uint64 // When removing full states from historical states interval between full states
-	//lruCache             *lru.Cache               // LRU cache of stringified keys to proofs
 }
 
 // HashLeaf generates hash value for leaf nodes (SHA3-256).
@@ -416,16 +387,11 @@ func NewSMT(
 
 	s := new(SMT)
 
-	//s.database = db
 	s.height = height
 	s.keyByteSize = (height - 1) / 8
 
-	// Set rootNode to the highest level default node
-	//s.rootNode = newNode(GetDefaultHashForHeight(height-1), height-1)
-	//s.historicalStates = make(map[string]databases.DAL)
 	s.numHistoricalStates = numHistoricalStates
 	s.snapshotInterval = interval
-	//s.cachedBranches = make(map[string]*proofHolder)
 
 	forest, err := NewForest(dbDir, cacheSize, height)
 	if err != nil {
@@ -451,6 +417,8 @@ func NewSMT(
 		forest:         forest,
 	}
 
+	// TODO: improve this
+
 	batcher := emptyDB.NewBatcher()
 
 	height2 := make([]byte, 8)
@@ -467,12 +435,6 @@ func NewSMT(
 	forest.Add(newTree)
 
 	s.forest = forest
-	//lruCache, err := lru.New(cacheSize)
-	//if err != nil {
-	//	return nil, err
-	//}
-
-	//s.lruCache = lruCache
 
 	return s, nil
 }
@@ -538,17 +500,12 @@ func (p proofHolder) String() string {
 	return res
 }
 
-// updateCache takes a key and all relevant parts of the proof and insterts in into the cache, removing values if needed
+// updateCache takes a key and all relevant parts of the proof and inserts in into the cache, removing values if needed
 func (t *tree) updateCache(key Key, flag []byte, proof [][]byte, inclusion bool, size uint8) {
 	holder := newProofHolder([][]byte{flag}, [][][]byte{proof}, []bool{inclusion}, []uint8{size})
 	k := key.String()
-	//s.lruCache.Add(k, nil)
 	t.cachedBranches[k] = holder
 }
-
-//func (t *tree) isSnapshot() bool {
-//	return t.height == 0
-//}
 
 // Read takes the keys given and return the values from the database
 // If the trusted flag is true, it is just a read from the database
@@ -566,9 +523,6 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 	proofs := make([][][]byte, len(keys))
 	inclusions := make([]bool, len(keys))
 	sizes := make([]uint8, len(keys))
-
-	//currRoot := s.GetRoot().value
-	//stringRoot := root.String()
 
 	tree, err := s.forest.Get(root)
 	if err != nil {
@@ -627,8 +581,6 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 		res, err1 := tree.database.GetKVDB(key)
 		if err != nil {
 
-			fmt.Println("STARTING SEARCH FOR SNAPSHOT")
-
 			localRoot := root
 			i := 0
 			for {
@@ -639,18 +591,15 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 
 				res, err = tree.database.GetKVDB(key)
 				if err == nil {
-					fmt.Printf("FOUND KEY in %s\n", localRoot)
 					break
 				} else if !errors.Is(err, databases.ErrNotFound) {
 					return nil, nil, fmt.Errorf("unexpected err (%s): %w", localRoot, err)
 				}
 
 				if s.IsSnapshot(tree) {
-					fmt.Println("THIS IS A SNAPSHOT", localRoot)
 					break
 				}
 
-				fmt.Println("CONTINUING SEARCH FOR SNAPSHOT", i)
 				i++
 
 				localRoot = tree.previous
@@ -724,7 +673,7 @@ func (s *SMT) verifyInclusionFlag(key []byte, flag []byte, root Root) (bool, err
 }
 
 // GetBatchProof returns proof for a batch of keys
-// no dupplicated keys are allowed for this method
+// no duplicated keys are allowed for this method
 // split key with trie has some issues.
 func (s *SMT) GetBatchProof(keys [][]byte, root Root) (*proofHolder, error) {
 
@@ -865,17 +814,6 @@ func (s *SMT) GetProof(key []byte, rootNode *node) ([]byte, [][]byte, uint8, boo
 	}
 	return flag, proof, proofLen, true, nil
 }
-
-// getStateIndex returns the index of a stateroot in the historical state roots buffer
-//func (s *SMT) getStateIndex(stateRoot string) int {
-//	for i := 0; i < s.historicalStateRoots.Len(); i++ {
-//		if fmt.Sprintf("%v", s.historicalStateRoots.At(i)) == stateRoot {
-//			return i
-//		}
-//	}
-//
-//	return -1
-//}
 
 // GetHistoricalProof reconstructs a proof of inclusion or exclusion for a value in a historical database then returns the flag and proof
 func (s *SMT) GetHistoricalProof(key []byte, root Root, database databases.DAL) ([]byte, [][]byte, uint8, bool, error) {
@@ -1240,6 +1178,7 @@ func (s *SMT) insertIntoKeys(database databases.DAL, insert []byte, keys [][]byt
 }
 
 // UpdateAtomically updates the trie atomically and returns the state rootNode
+//
 // NOTE: This function assumes keys and values are sorted and haves indexes mapping to each other
 func (s *SMT) UpdateAtomically(rootNode *node, keys [][]byte, values [][]byte, height int, batcher databases.Batcher, database databases.DAL) (*node, error) {
 	var err error
@@ -1251,7 +1190,6 @@ func (s *SMT) UpdateAtomically(rootNode *node, keys [][]byte, values [][]byte, h
 		if err != nil {
 			return nil, err
 		}
-		//s.invalidateCache([][]byte{rootNode.key})
 		rootNode.key = nil
 	}
 
@@ -1264,7 +1202,7 @@ func (s *SMT) UpdateAtomically(rootNode *node, keys [][]byte, values [][]byte, h
 		return s.ComputeRootNode(nil, nil, rootNode, keys, values, height, batcher), nil
 	}
 
-	//We initialize the nodes as empty to prevent nil pointer exceptions later
+	// We initialize the nodes as empty to prevent nil pointer exceptions later
 	lnode, rnode := rootNode.GetandSetChildren(GetDefaultHashes())
 
 	// Split the keys and values array so we can update the trie in parallel
@@ -1397,7 +1335,6 @@ func (s *SMT) SafeClose() {
 
 	// Purge calls eviction method, which closes the DB
 	s.forest.cache.Purge()
-	//s.forest.fullCache.Purge()
 }
 
 func (s *SMT) IsSnapshot(t *tree) bool {
@@ -1465,6 +1402,7 @@ func DecodeProof(proofs [][]byte) (*proofHolder, error) {
 	newProofs := make([][][]byte, 0)
 	inclusions := make([]bool, 0)
 	sizes := make([]uint8, 0)
+
 	// The decode logic is as follows:
 	// The first byte in the array is the inclusion flag, with the first bit set as the inclusion (1 = inclusion, 0 = non-inclusion)
 	// The second byte is size, needs to be converted to uint8
@@ -1496,5 +1434,6 @@ func DecodeProof(proofs [][]byte) (*proofHolder, error) {
 		}
 		newProofs = append(newProofs, byteProofs)
 	}
+
 	return newProofHolder(flags, newProofs, inclusions, sizes), nil
 }
