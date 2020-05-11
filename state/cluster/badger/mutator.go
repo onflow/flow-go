@@ -96,11 +96,10 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 
 		// start with the extending block's parent
 		parentID := block.Header.ParentID
-		var ancestor *flow.Header
 		for parentID != final.ID() {
 
 			// get the parent of current block
-			ancestor, err = m.state.headers.ByBlockID(parentID)
+			ancestor, err := m.state.headers.ByBlockID(parentID)
 			if err != nil {
 				return fmt.Errorf("could not get parent (%x): %w", block.Header.ParentID, err)
 			}
@@ -163,7 +162,7 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 		return nil
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("could not validate extending block: %w", err)
 	}
 
 	// insert the block
