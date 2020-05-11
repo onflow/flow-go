@@ -58,3 +58,55 @@ func TestAddRem(t *testing.T) {
 		})
 	})
 }
+
+func TestAdjust(t *testing.T) {
+	item1 := fake("DEAD")
+	item2 := fake("AGAIN")
+
+	t.Run("should not adjust if not exist", func(t *testing.T) {
+		pool := NewBackend()
+		_ = pool.Add(item1)
+
+		// item2 doesn't exist
+		updated := pool.Adjust(item2.ID(), func(old flow.Entity) flow.Entity {
+			return item2
+		})
+
+		assert.False(t, updated)
+
+		_, found := pool.ByID(item2.ID())
+		assert.False(t, found)
+	})
+
+	t.Run("should not adjust if item didn't change", func(t *testing.T) {
+		pool := NewBackend()
+		_ = pool.Add(item1)
+
+		updated := pool.Adjust(item1.ID(), func(old flow.Entity) flow.Entity {
+			// item 1 exist, but got replaced with item1 again, nothing was changed
+			return item1
+		})
+
+		assert.False(t, updated)
+
+		value1, found := pool.ByID(item1.ID())
+		assert.True(t, found)
+		assert.Equal(t, value1, item1)
+	})
+
+	t.Run("should adjust if exists", func(t *testing.T) {
+		pool := NewBackend()
+		_ = pool.Add(item1)
+
+		updated := pool.Adjust(item1.ID(), func(old flow.Entity) flow.Entity {
+			// item 1 exist, got replaced with item2, the value was updated
+			return item2
+		})
+
+		assert.True(t, updated)
+
+		value2, found := pool.ByID(item2.ID())
+		assert.True(t, found)
+		assert.Equal(t, value2, item2)
+	})
+}
