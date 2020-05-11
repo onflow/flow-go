@@ -189,13 +189,57 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 	})
 }
 
+// minimal case
+func (suite *CollectorSuite) TestRecovery() {
+
+	suite.SetupTest("col_recovery", 3, 1)
+
+	client, err := client.New(
+		suite.Collector(0, 1).Addr(testnet.ColNodeAPIPort),
+		grpc.WithInsecure(),
+	)
+	suite.Require().Nil(err)
+
+	sendTx := func() flow.Identifier {
+		// send a transaction
+		tx := suite.NextTransaction()
+		ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
+		err = client.SendTransaction(ctx, *tx)
+		suite.Require().Nil(err)
+		cancel()
+		return convert.IDFromSDK(tx.ID())
+	}
+
+	txID := sendTx()
+
+	// wait for the transactions to be incorporated
+	suite.AwaitTransactionsIncluded(txID)
+
+	// stop one of the nodes
+	suite.T().Logf("stopping COL1")
+	col1 := suite.Collector(0, 0)
+	err = col1.Pause()
+	suite.Require().Nil(err)
+
+	// wait for some proposals
+	suite.AwaitProposals(5)
+
+	// restart the node
+	suite.T().Log("restarting COL1")
+	err = col1.Start()
+	suite.Require().Nil(err)
+
+	// send a transaction
+	txID = sendTx()
+
+	// wait for the transactions to be incorporated
+	suite.AwaitTransactionsIncluded(txID)
+
+}
+
 // Start consensus, pause a node, allow consensus to continue, then restart
 // the node. It should be able to catch up.
 func (suite *CollectorSuite) TestProposal_Recovery() {
-
-	// TODO this doesn't quite work with network disconnect/connect for some
-	// reason, skipping for now
-	suite.T().SkipNow()
 
 	var (
 		nNodes        = 5
@@ -239,7 +283,7 @@ func (suite *CollectorSuite) TestProposal_Recovery() {
 	// stop one of the nodes
 	suite.T().Logf("stopping COL1")
 	col1 := suite.Collector(0, 0)
-	err = col1.Disconnect()
+	err = col1.Pause()
 	suite.Require().Nil(err)
 
 	// send some more transactions
@@ -264,7 +308,7 @@ func (suite *CollectorSuite) TestProposal_Recovery() {
 	// stop another node
 	suite.T().Logf("stopping COL2")
 	col2 := suite.Collector(0, 1)
-	err = col2.Disconnect()
+	err = col2.Pause()
 	suite.Require().Nil(err)
 
 	// send some more transactions
@@ -284,19 +328,15 @@ func (suite *CollectorSuite) TestProposal_Recovery() {
 	}
 
 	// ensure no progress was made (3/5 nodes cannot make progress)
-	proposals := suite.AwaitProposals(10)
+	proposals := suite.AwaitProposals(5)
 	height := proposals[0].Header.Height
 	for _, prop := range proposals {
 		suite.Assert().LessOrEqual(prop.Header.Height, height+2)
 	}
 
-	// restart the paused collectors
+	// restart the first paused collector
 	suite.T().Logf("restarting COL1")
-	err = col1.Connect()
-	suite.Require().Nil(err)
-
-	suite.T().Logf("restarting COL2")
-	err = col2.Connect()
+	err = col1.Start()
 	suite.Require().Nil(err)
 
 	// now we can make progress again, but the paused collectors need to catch

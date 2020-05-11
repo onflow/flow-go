@@ -218,7 +218,7 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 
 	suite.T().Logf("awaiting %d transactions included", len(txIDs))
 
-	waitFor := defaultTimeout + time.Duration(len(lookup))*100*time.Millisecond
+	waitFor := defaultTimeout + time.Duration(len(lookup))*500*time.Millisecond
 	deadline := time.Now().Add(waitFor)
 	for time.Now().Before(deadline) {
 
@@ -229,7 +229,10 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 		case *messages.ClusterBlockProposal:
 			header := val.Header
 			collection := val.Payload.Collection
-			suite.T().Logf("got proposal height=%d col_id=%x size=%d", header.Height, collection.ID(), collection.Len())
+			suite.T().Logf(
+				"got proposal height=%d col_id=%x size=%d qc_signers=%d",
+				header.Height, collection.ID(), collection.Len(), len(header.ParentVoterIDs),
+			)
 			proposals[collection.ID()] = collection.Light().Transactions
 
 		case *flow.CollectionGuarantee:

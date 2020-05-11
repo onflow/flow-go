@@ -267,6 +267,12 @@ func main() {
 				return nil, fmt.Errorf("could not retrieve finalized/pending headers: %w", err)
 			}
 
+			node.Logger.Debug().
+				Hex("final_id", logging.ID(finalized.ID())).
+				Uint64("final_height", finalized.Height).
+				Int("pending", len(pending)).
+				Msg("hotstuff recovery")
+
 			hot, err := consensus.NewParticipant(
 				node.Logger,
 				notifier,

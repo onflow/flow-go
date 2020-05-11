@@ -1,8 +1,10 @@
 package testnet
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"path/filepath"
 	"time"
 
@@ -143,6 +145,47 @@ func (c *Container) Start() error {
 		return fmt.Errorf("error waiting for container to stop: %w", err)
 	}
 
+	// start a new logger goroutine since the one started by testingdock will
+	// have exited
+	go func() {
+		reader, err := c.net.cli.ContainerLogs(context.Background(), c.ID, types.ContainerLogsOptions{
+			ShowStdout: true,
+			ShowStderr: true,
+			Follow:     true,
+		})
+		if err != nil {
+			c.net.t.Fatal("xxx container logging failure: ", err.Error())
+		}
+
+		fmt.Println("*** container logging started: ", c.ID, c.Name())
+
+		scanner := bufio.NewScanner(reader)
+		for scanner.Scan() { // scanner loop
+			if line := scanner.Text(); len(line) > 0 {
+				fmt.Printf("(%s) - %s\n", c.Name(), line)
+			}
+		}
+
+		serr := scanner.Err()
+		if serr != nil {
+			// exit gracefully on EOF
+			if serr == io.EOF {
+				fmt.Printf("(loggi ) %-25s (%s) - %s", c.Name, c.ID, "EOF reached, stopping logging")
+				return
+			}
+
+			// exit gracefully if the context was cancelled
+			select {
+			case <-ctx.Done():
+				fmt.Printf("loggi ) %-25s (%s) - %s", c.Name, c.ID, "context cancelled, stopping loggin")
+				return
+			default:
+			}
+
+			// unknown error, log as fatal
+			c.net.t.Fatalf("container logging failure: %s", serr.Error())
+		}
+	}()
 	return nil
 }
 
