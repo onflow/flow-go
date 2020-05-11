@@ -26,6 +26,10 @@ func TestEndToEnd(t *testing.T) {
 	// Create test files
 	//bootcmd.WriteText(filepath.Join(bootdir, bootstrap.PathNodeId), []byte(nodeID)
 	randomBeaconPath := filepath.Join(bootdir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID))
+	err := os.MkdirAll(filepath.Dir(randomBeaconPath), 0755)
+	if err != nil {
+		t.Fatalf("Failed to write dir for random beacon file: %s", err)
+	}
 	err = ioutil.WriteFile(randomBeaconPath, []byte("test data"), 0644)
 	if err != nil {
 		t.Fatalf("Failed to write random beacon file: %s", err)
