@@ -1,6 +1,7 @@
 package timeout
 
 import (
+	"fmt"
 	"math"
 	"time"
 
@@ -100,9 +101,11 @@ func (t *Controller) VoteCollectionTimeout() time.Duration {
 // OnTimeout indicates to the Controller that the timeout was reached
 func (t *Controller) OnTimeout() {
 	t.cfg.ReplicaTimeout = math.Min(t.cfg.ReplicaTimeout*t.cfg.TimeoutIncrease, timeoutCap)
+	fmt.Printf("OnTimeout: t.cfg.ReplicaTimeout: %v\n", t.cfg.ReplicaTimeout)
 }
 
 // OnProgressBeforeTimeout indicates to the Controller that progress was made _before_ the timeout was reached
 func (t *Controller) OnProgressBeforeTimeout() {
 	t.cfg.ReplicaTimeout = math.Max(t.cfg.ReplicaTimeout-t.cfg.TimeoutDecrease, t.cfg.MinReplicaTimeout)
+	fmt.Printf("OnTimeout: t.cfg.ReplicaTimeout: %v\n", t.cfg.ReplicaTimeout)
 }
