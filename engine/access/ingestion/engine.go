@@ -139,7 +139,7 @@ func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 }
 
 // processBlock handles an incoming finalized block.
-func (e *Engine) processBlock(id flow.Identifier) error {
+func (e *Engine) processFinalizedBlock(id flow.Identifier) error {
 
 	block, err := e.blocks.ByID(id)
 	if err != nil {
