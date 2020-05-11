@@ -167,7 +167,7 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 	}
 
 	// insert the block
-	err = m.state.db.Update(procedure.InsertClusterBlock(block))
+	err = operation.RetryOnConflict(m.state.db.Update, procedure.InsertClusterBlock(block))
 	if err != nil {
 		return fmt.Errorf("could not insert extending block: %w", err)
 	}

@@ -161,6 +161,12 @@ func (suite *BuilderSuite) TestBuildOn_Success() {
 	suite.Assert().Nil(err)
 	builtCollection := built.Payload.Collection
 
+	// should reference a valid reference block
+	// (since genesis is the only block, it's the only valid reference)
+	mainGenesis, err := suite.protoState.AtHeight(0).Head()
+	suite.Assert().Nil(err)
+	suite.Assert().Equal(mainGenesis.ID(), built.Payload.ReferenceBlockID)
+
 	// payload should include only items from mempool
 	mempoolTransactions := suite.pool.All()
 	suite.Assert().Len(builtCollection.Transactions, 3)
