@@ -5,27 +5,59 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
 )
 
 // MForest is an in memory forest (collection of tries)
 type MForest struct {
-	tries       map[string]*MTrie
-	maxHeight   int // Height of the tree
-	keyByteSize int // acceptable number of bytes for key
+	tries         map[string]*MTrie
+	dir           string
+	rootHashQueue chan string
+	cacheSize     int
+	maxHeight     int // Height of the tree
+	keyByteSize   int // acceptable number of bytes for key
 }
 
 // NewMForest returns a new instance of memory forest
-func NewMForest(maxHeight int) *MForest {
+func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int) *MForest {
 	// add empty roothash
 	tries := make(map[string]*MTrie)
-	newRoot := newNode(maxHeight - 1)
 	rootHash := GetDefaultHashForHeight(maxHeight - 1)
-	tries[hex.EncodeToString(rootHash)] = NewMTrie(newRoot)
+	rootHashQueue := make(chan string, trieCacheSize+1)
+	emptyTrie := NewMTrie(maxHeight)
+	emptyTrie.number = uint64(0)
+	tries[hex.EncodeToString(rootHash)] = emptyTrie
 	return &MForest{tries: tries,
-		maxHeight:   maxHeight,
-		keyByteSize: (maxHeight - 1) / 8}
+		maxHeight:     maxHeight,
+		dir:           trieStorageDir,
+		rootHashQueue: rootHashQueue,
+		cacheSize:     trieCacheSize,
+		keyByteSize:   (maxHeight - 1) / 8}
+}
+
+// GetTrie returns trie at specific rootHash
+// warning, use this function for read-only operation
+func (f *MForest) GetTrie(rootHash []byte) (*MTrie, error) {
+	trie, ok := f.tries[hex.EncodeToString(rootHash)]
+	if !ok {
+		return nil, fmt.Errorf("trie with the given rootHash [%v] not found", hex.EncodeToString(rootHash))
+	}
+	return trie, nil
+}
+
+// AddTrie adds a trie to the forest
+func (f *MForest) AddTrie(trie *MTrie) error {
+	// TODO check if not exist
+	encoded := hex.EncodeToString(trie.rootHash)
+	f.tries[encoded] = trie
+	f.rootHashQueue <- encoded
+	f.Purge()
+	return nil
 }
 
 // GetEmptyRootHash returns the rootHash of empty forest
@@ -37,6 +69,11 @@ func (f *MForest) GetEmptyRootHash() []byte {
 
 // Read reads values for an slice of keys and returns values and error (if any)
 func (f *MForest) Read(keys [][]byte, rootHash []byte) ([][]byte, error) {
+
+	// no key no change
+	if len(keys) == 0 {
+		return [][]byte{}, nil
+	}
 
 	// lookup the trie by rootHash
 	trie, err := f.GetTrie(rootHash)
@@ -132,6 +169,11 @@ func (f *MForest) read(trie *MTrie, head *node, keys [][]byte) ([][]byte, error)
 // Update updates the values for the registers and returns rootHash and error (if any)
 func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byte, error) {
 
+	// no key no change
+	if len(keys) == 0 {
+		return rootHash, nil
+	}
+
 	// sort keys and deduplicate keys (we only consider the first occurance, and ignore the rest)
 	sortedKeys := make([][]byte, 0)
 	valueMap := make(map[string][]byte)
@@ -163,18 +205,19 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 		return nil, err
 	}
 
-	newRoot := newNode(f.maxHeight - 1)
-	newTrie := NewMTrie(newRoot)
-	newTrie.SetParent(trie)
+	newTrie := NewMTrie(f.maxHeight)
+	newTrie.parentRootHash = f.GetNodeHash(trie.root)
+	newTrie.number = trie.number + 1
 
-	err = f.update(newTrie, trie.root, newRoot, sortedKeys, sortedValues)
+	err = f.update(newTrie, trie.root, newTrie.root, sortedKeys, sortedValues)
 	if err != nil {
 		return nil, err
 	}
 
-	f.PopulateNodeHashValues(trie.root)
-	newRootHash := f.GetNodeHash(newRoot)
-	f.tries[hex.EncodeToString(newRootHash)] = newTrie
+	f.PopulateNodeHashValues(newTrie.root)
+	newRootHash := f.GetNodeHash(newTrie.root)
+	newTrie.rootHash = newRootHash
+	f.AddTrie(newTrie)
 	return newRootHash, nil
 }
 
@@ -265,6 +308,11 @@ func (f *MForest) update(trie *MTrie, parent *node, head *node, keys [][]byte, v
 // Proofs returns a batch proof for the given keys
 func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*BatchProof, error) {
 
+	// no key, empty batchproof
+	if len(keys) == 0 {
+		return NewBatchProof(), nil
+	}
+
 	// look up for non exisitng keys
 	notFoundKeys := make([][]byte, 0)
 	notFoundValues := make([][]byte, 0)
@@ -304,8 +352,8 @@ func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*BatchProof, error) {
 
 	// if we have to insert empty values
 	if len(notFoundKeys) > 0 {
-		newRoot := newNode(f.maxHeight - 1)
-		newTrie := NewMTrie(newRoot)
+		newTrie := NewMTrie(f.maxHeight)
+		newRoot := newTrie.root
 
 		sort.Slice(notFoundKeys, func(i, j int) bool {
 			return bytes.Compare(notFoundKeys[i], notFoundKeys[j]) < 0
@@ -414,16 +462,6 @@ func (f *MForest) proofs(head *node, keys [][]byte, proofs []*Proof) error {
 	return nil
 }
 
-// GetTrie returns trie at specific rootHash
-// warning, use this function for read-only operation
-func (f *MForest) GetTrie(rootHash []byte) (*MTrie, error) {
-	trie, ok := f.tries[hex.EncodeToString(rootHash)]
-	if !ok {
-		return nil, fmt.Errorf("trie with the given rootHash [%v] not found", hex.EncodeToString(rootHash))
-	}
-	return trie, nil
-}
-
 // GetCompactValue computes the value for the node considering the sub tree to only include this value and default values.
 func (f *MForest) GetCompactValue(n *node) []byte {
 	return ComputeCompactValue(n.key, n.value, n.height, f.maxHeight)
@@ -489,4 +527,82 @@ func (f *MForest) PopulateNodeHashValues(n *node) []byte {
 	n.hashValue = HashInterNode(h1, h2)
 
 	return n.hashValue
+}
+
+// StoreTrie stores a trie on disk
+func (f *MForest) StoreTrie(rootHash []byte, path string) error {
+	trie, err := f.GetTrie(rootHash)
+	if err != nil {
+		return err
+	}
+	return trie.Store(path)
+}
+
+// LoadTrie loads a trie from the disk
+func (f *MForest) LoadTrie(path string) error {
+	trie := NewMTrie(f.maxHeight)
+	err := trie.Load(path)
+	if err != nil {
+		return err
+	}
+	f.PopulateNodeHashValues(trie.root)
+	if !bytes.Equal(trie.rootHash, f.GetNodeHash(trie.root)) {
+		return errors.New("error loading a trie, rootHash doesn't match")
+	}
+	f.AddTrie(trie)
+	return nil
+}
+
+// Purge cleans old tries
+func (f *MForest) Purge() error {
+	if len(f.rootHashQueue) < f.cacheSize {
+		return nil
+	}
+
+	encRootHash := <-f.rootHashQueue
+	trie, ok := f.tries[encRootHash]
+	if !ok {
+		return errors.New("failed for purge the trie, root not found")
+	}
+
+	go trie.Store(filepath.Join(f.dir, strconv.FormatUint(trie.number, 10)+"-"+encRootHash))
+
+	delete(f.tries, encRootHash)
+	return nil
+}
+
+// Load loads a forest from latest trie snapshots
+func (f *MForest) Load() error {
+	// scan dir
+	files, err := ioutil.ReadDir(f.dir)
+	if err != nil {
+		return err
+	}
+
+	maxNumber := -1
+	for _, file := range files {
+		s := strings.Split(file.Name(), "-")
+		num, err := strconv.Atoi(s[0])
+		if err != nil {
+			continue
+		}
+		if num > maxNumber {
+			maxNumber = num
+		}
+	}
+
+	// we do this in two phase to load
+	// all possible latest same height forks
+	// TODO make this smarter by traversing the old tries
+	for _, file := range files {
+		s := strings.Split(file.Name(), "-")
+		num, err := strconv.Atoi(s[0])
+		if err != nil {
+			continue
+		}
+		if num == maxNumber {
+			f.LoadTrie(file.Name())
+		}
+	}
+	return nil
 }

@@ -27,7 +27,7 @@ func NewTrieStorage(dbDir string) (*TrieStorage, error) {
 		return nil, err
 	}
 
-	mForest := mtrie.NewMForest(257)
+	mForest := mtrie.NewMForest(257, dbDir, 1000)
 
 	return &TrieStorage{
 		tree:    tree,
