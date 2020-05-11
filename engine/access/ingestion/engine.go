@@ -151,10 +151,18 @@ func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 
 // onBlock handles an incoming block.
 // TODO this will be an event triggered by the follower node when a new finalized or sealed block is received
-func (e *Engine) onBlockProposal(_ flow.Identifier, proposal *messages.BlockProposal) error {
+func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
 	// FIX: we can't index guarantees here, as we might have more than one block
 	// with the same collection as long as it is not finalized
+
+	if originID != e.me.NodeID() {
+		// if the proposal isn't from us, we can't be sure it's finalized
+		e.log.Debug().
+			Hex("block_id", logging.Entity(proposal.Header)).
+			Msg("received block proposal not from own follower engine")
+		return nil
+	}
 
 	// TODO: substitute an indexer module as layer between engine and storage
 
