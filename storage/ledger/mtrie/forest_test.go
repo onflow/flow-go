@@ -489,7 +489,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
 	fStore := mtrie.NewMForest(trieHeight)
 	rootHash := fStore.GetEmptyRootHash()
-	latestValueByKey := make(map[string][]byte, 0) // map store
+	latestValueByKey := make(map[string][]byte) // map store
 
 	for e := 0; e < rep; e++ {
 		keys := mtrie.GetRandomKeysRandN(maxNumKeysPerStep, keyByteSize)

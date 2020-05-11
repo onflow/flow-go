@@ -26,7 +26,7 @@ func Test_WAL(t *testing.T) {
 		var stateCommitment = f.EmptyStateCommitment()
 
 		//saved data after updates
-		savedData := make(map[string]map[string][]byte, 0)
+		savedData := make(map[string]map[string][]byte)
 
 		for i := 0; i < size; i++ {
 			keys := utils.GetRandomKeysFixedN(numInsPerStep, keyByteSize)

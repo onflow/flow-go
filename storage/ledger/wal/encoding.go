@@ -39,7 +39,7 @@ func headerSize(stateCommitment flow.StateCommitment) int {
 func updateSize(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) int {
 	size := headerSize(stateCommitment) + 4 + 2 //records count + key size
 
-	for i, _ := range keys {
+	for i := range keys {
 		size += len(keys[i]) + 4 + len(values[i]) //2 bytes to encode value length
 	}
 
@@ -111,7 +111,7 @@ func EncodeUpdate(stateCommitment flow.StateCommitment, keys [][]byte, values []
 	binary.BigEndian.PutUint16(buf[pos:], uint16(len(keys[0])))
 	pos += 2
 
-	for i, _ := range keys {
+	for i := range keys {
 		pos = writeData(buf, pos, keys[i])
 		pos = writeLongData(buf, pos, values[i])
 	}

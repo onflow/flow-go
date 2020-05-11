@@ -33,6 +33,10 @@ func NewTrieStorage(dbDir string) (*TrieStorage, error) {
 		return err
 	})
 
+	if err != nil {
+		return nil, fmt.Errorf("cannot restore WAL: %w", err)
+	}
+
 	return trie, nil
 }
 

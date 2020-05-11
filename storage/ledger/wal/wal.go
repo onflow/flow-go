@@ -14,6 +14,7 @@ type WAL struct {
 	w *prometheusWAL.WAL
 }
 
+// TODO use real loger and metrics, but that would require passing them to Trie storage
 func NewWAL(logger log.Logger, reg prometheus.Registerer, dir string) (*WAL, error) {
 	w, err := prometheusWAL.New(logger, reg, dir)
 	if err != nil {
