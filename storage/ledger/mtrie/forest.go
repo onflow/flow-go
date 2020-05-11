@@ -420,3 +420,7 @@ func (f *MForest) ComputeNodeHash(n *node) []byte {
 	}
 	return HashInterNode(h1, h2)
 }
+
+func (f *MForest) Size() int {
+	return len(f.tries)
+}
