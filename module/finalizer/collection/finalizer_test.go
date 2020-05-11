@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/metrics"
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
 	cluster "github.com/dapperlabs/flow-go/state/cluster/badger"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -31,7 +32,10 @@ func TestFinalizer(t *testing.T) {
 		genesis := model.Genesis()
 		chainID := genesis.Header.ChainID
 
-		state, err := cluster.NewState(db, chainID)
+		headers := storage.NewHeaders(metrics.NewNoopCollector(), db)
+		payloads := storage.NewClusterPayloads(db)
+
+		state, err := cluster.NewState(db, chainID, headers, payloads)
 		require.NoError(t, err)
 		mutator := state.Mutate()
 

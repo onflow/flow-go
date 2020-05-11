@@ -65,14 +65,14 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.dbdir = unittest.TempDir(suite.T())
 	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
 
-	suite.state, err = clusterkv.NewState(suite.db, suite.chainID)
-	suite.Require().Nil(err)
-	suite.mutator = suite.state.Mutate()
-
 	headers, _, _, _, _, _, blocks := sutil.StorageLayer(suite.T(), suite.db)
 	suite.headers = headers
 	suite.blocks = blocks
 	suite.payloads = storage.NewClusterPayloads(suite.db)
+
+	suite.state, err = clusterkv.NewState(suite.db, suite.chainID, suite.headers, suite.payloads)
+	suite.Require().Nil(err)
+	suite.mutator = suite.state.Mutate()
 
 	suite.protoState = putil.ProtocolState(suite.T(), suite.db)
 
@@ -512,17 +512,17 @@ func benchmarkBuildOn(b *testing.B, size int) {
 			assert.Nil(b, err)
 		}()
 
-		suite.state, err = clusterkv.NewState(suite.db, suite.chainID)
+		headers, _, _, _, _, _, blocks := sutil.StorageLayer(suite.T(), suite.db)
+		suite.headers = headers
+		suite.blocks = blocks
+		suite.payloads = storage.NewClusterPayloads(suite.db)
+
+		suite.state, err = clusterkv.NewState(suite.db, suite.chainID, suite.headers, suite.payloads)
 		assert.Nil(b, err)
 		suite.mutator = suite.state.Mutate()
 
 		err = suite.mutator.Bootstrap(suite.genesis)
 		assert.Nil(b, err)
-
-		headers, _, _, _, _, _, blocks := sutil.StorageLayer(suite.T(), suite.db)
-		suite.headers = headers
-		suite.blocks = blocks
-		suite.payloads = storage.NewClusterPayloads(suite.db)
 
 		// add some transactions to transaction pool
 		for i := 0; i < 3; i++ {
