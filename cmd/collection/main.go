@@ -301,7 +301,7 @@ func initClusterCommittee(node *cmd.FlowNodeBuilder, colPayloads *storage.Cluste
 }
 
 func loadClusterBlock(path string, clusterID string) (*cluster.Block, error) {
-	filename := fmt.Sprintf(bootstrap.FilenameGenesisClusterBlock, clusterID)
+	filename := fmt.Sprintf(bootstrap.PathGenesisClusterBlock, clusterID)
 	data, err := ioutil.ReadFile(filepath.Join(path, filename))
 	if err != nil {
 		return nil, err
@@ -316,7 +316,7 @@ func loadClusterBlock(path string, clusterID string) (*cluster.Block, error) {
 }
 
 func loadClusterQC(path string, clusterID string) (*hotstuffmodels.QuorumCertificate, error) {
-	filename := fmt.Sprintf(bootstrap.FilenameGenesisClusterQC, clusterID)
+	filename := fmt.Sprintf(bootstrap.PathGenesisClusterQC, clusterID)
 	data, err := ioutil.ReadFile(filepath.Join(path, filename))
 	if err != nil {
 		return nil, err
