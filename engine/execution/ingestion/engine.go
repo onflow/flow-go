@@ -21,7 +21,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	executionSync "github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/engine/execution/utils"
-	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -787,11 +786,8 @@ func (e *Engine) generateExecutionReceipt(result *flow.ExecutionResult) (*flow.E
 	}
 
 	// generates a signature over the execution result
-	b, err := encoding.DefaultEncoder.Encode(receipt.Body())
-	if err != nil {
-		return nil, fmt.Errorf("could not encode execution result: %w", err)
-	}
-	sig, err := e.me.Sign(b, e.receiptHasher)
+	id := receipt.ID()
+	sig, err := e.me.Sign(id[:], e.receiptHasher)
 	if err != nil {
 		return nil, fmt.Errorf("could not sign execution result: %w", err)
 	}

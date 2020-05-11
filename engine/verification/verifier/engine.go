@@ -10,7 +10,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	chmodels "github.com/dapperlabs/flow-go/model/chunks"
-	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
@@ -227,11 +226,8 @@ func (e *Engine) GenerateResultApproval(chunkIndex uint64, execResultID flow.Ide
 	}
 
 	// generates a signature over the attestation part of approval
-	batst, err := encoding.DefaultEncoder.Encode(atst)
-	if err != nil {
-		return nil, fmt.Errorf("could encode attestation: %w", err)
-	}
-	atstSign, err := e.me.Sign(batst, e.rah)
+	atstID := atst.ID()
+	atstSign, err := e.me.Sign(atstID[:], e.rah)
 	if err != nil {
 		return nil, fmt.Errorf("could not sign attestation: %w", err)
 	}
@@ -245,11 +241,8 @@ func (e *Engine) GenerateResultApproval(chunkIndex uint64, execResultID flow.Ide
 	}
 
 	// generates a signature over result approval body
-	bbody, err := encoding.DefaultEncoder.Encode(body)
-	if err != nil {
-		return nil, fmt.Errorf("could encode result approval body: %w", err)
-	}
-	bodySign, err := e.me.Sign(bbody, e.rah)
+	bodyID := body.ID()
+	bodySign, err := e.me.Sign(bodyID[:], e.rah)
 	if err != nil {
 		return nil, fmt.Errorf("could not sign result approval body: %w", err)
 	}
