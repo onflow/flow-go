@@ -605,6 +605,16 @@ func (e *Engine) checkPendingChunks() {
 			continue
 		}
 
+		if receipt.ExecutionResult.Chunks.Len() == 0 {
+			// TODO potential attack on availability
+			e.log.Error().
+				Hex("receipt_id", logging.Entity(receipt)).
+				Hex("result_id", logging.Entity(receipt.ExecutionResult)).
+				Msg("could not ingest execution result with zero chunks")
+
+			continue
+		}
+
 		mychunks, err := e.myUningestedChunks(&receipt.ExecutionResult)
 		// extracts list of chunks assigned to this Verification node
 		if err != nil {
@@ -614,6 +624,13 @@ func (e *Engine) checkPendingChunks() {
 				Msg("could not fetch assigned chunks")
 			continue
 		}
+
+		e.log.Debug().
+			Hex("receipt_id", logging.Entity(receipt)).
+			Hex("result_id", logging.Entity(receipt.ExecutionResult)).
+			Int("total_chunks", receipt.ExecutionResult.Chunks.Len()).
+			Int("assigned_chunks", len(mychunks)).
+			Msg("chunk assignment is done")
 
 		for _, chunk := range mychunks {
 
