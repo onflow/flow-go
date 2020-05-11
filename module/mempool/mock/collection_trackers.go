@@ -43,7 +43,7 @@ func (_m *CollectionTrackers) All() []*tracker.CollectionTracker {
 }
 
 // ByCollectionID provides a mock function with given fields: collID
-func (_m *CollectionTrackers) ByCollectionID(collID flow.Identifier) (*tracker.CollectionTracker, bool) {
+func (_m *CollectionTrackers) ByCollectionID(collID flow.Identifier) (*tracker.CollectionTracker, error) {
 	ret := _m.Called(collID)
 
 	var r0 *tracker.CollectionTracker
@@ -55,11 +55,11 @@ func (_m *CollectionTrackers) ByCollectionID(collID flow.Identifier) (*tracker.C
 		}
 	}
 
-	var r1 bool
-	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
 		r1 = rf(collID)
 	} else {
-		r1 = ret.Get(1).(bool)
+		r1 = ret.Error(1)
 	}
 
 	return r0, r1

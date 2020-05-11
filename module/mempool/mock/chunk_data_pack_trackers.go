@@ -43,7 +43,7 @@ func (_m *ChunkDataPackTrackers) All() []*tracker.ChunkDataPackTracker {
 }
 
 // ByChunkID provides a mock function with given fields: chunkID
-func (_m *ChunkDataPackTrackers) ByChunkID(chunkID flow.Identifier) (*tracker.ChunkDataPackTracker, bool) {
+func (_m *ChunkDataPackTrackers) ByChunkID(chunkID flow.Identifier) (*tracker.ChunkDataPackTracker, error) {
 	ret := _m.Called(chunkID)
 
 	var r0 *tracker.ChunkDataPackTracker
@@ -55,11 +55,11 @@ func (_m *ChunkDataPackTrackers) ByChunkID(chunkID flow.Identifier) (*tracker.Ch
 		}
 	}
 
-	var r1 bool
-	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
 		r1 = rf(chunkID)
 	} else {
-		r1 = ret.Get(1).(bool)
+		r1 = ret.Error(1)
 	}
 
 	return r0, r1
