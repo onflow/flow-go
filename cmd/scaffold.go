@@ -58,7 +58,6 @@ type BaseConfig struct {
 type Metrics struct {
 	Network    module.NetworkMetrics
 	Engine     module.EngineMetrics
-	Badger     module.BadgerMetrics
 	Compliance module.ComplianceMetrics
 	Cache      module.CacheMetrics
 	Mempool    module.MempoolMetrics
@@ -245,7 +244,6 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 	fnb.Metrics = Metrics{
 		Network:    metrics.NewNetworkCollector(),
 		Engine:     metrics.NewEngineCollector(),
-		Badger:     metrics.NewBadgerCollector(),
 		Compliance: metrics.NewComplianceCollector(),
 		Cache:      metrics.NewCacheCollector(),
 		Mempool:    metrics.NewMempoolCollector(),
