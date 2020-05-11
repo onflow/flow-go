@@ -454,6 +454,7 @@ func TestExtendSealNotConnected(t *testing.T) {
 		require.NoError(t, err)
 
 		block := unittest.BlockFixture()
+		block.Payload.Identities = nil
 		block.Payload.Guarantees = nil
 		block.Payload.Seals = nil
 		block.Header.Height = 1
@@ -473,6 +474,7 @@ func TestExtendSealNotConnected(t *testing.T) {
 
 		sealing := unittest.BlockFixture()
 		sealing.Payload.Identities = nil
+		sealing.Payload.Guarantees = nil
 		sealing.Payload.Seals = []*flow.Seal{seal}
 		sealing.Header.Height = 2
 		sealing.Header.View = 2

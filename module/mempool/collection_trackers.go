@@ -8,11 +8,12 @@ import (
 // CollectionTrackers represents a concurrency-safe memory pool of collection trackers
 type CollectionTrackers interface {
 
-	// Add will add the given collection tracker.
-	Add(collt *tracker.CollectionTracker) error
-
 	// Has checks if the given collection ID has a tracker in mempool.
 	Has(collID flow.Identifier) bool
+
+	// Add will add the given collection tracker to the memory pool. It will
+	// return false if it was already in the mempool.
+	Add(collt *tracker.CollectionTracker) bool
 
 	// Rem removes tracker with the given collection ID.
 	Rem(collID flow.Identifier) bool

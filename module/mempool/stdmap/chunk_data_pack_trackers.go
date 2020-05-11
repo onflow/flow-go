@@ -80,11 +80,8 @@ func (c *ChunkDataPackTrackers) byChunkID(chunkID flow.Identifier) (*tracker.Chu
 	if err != nil {
 		return nil, err
 	}
-	chunkDataPackTracker, ok := entity.(*tracker.ChunkDataPackTracker)
-	if !ok {
-		return nil, fmt.Errorf("invalid entity in chunk data pack tracker pool (%T)", entity)
-	}
-	return chunkDataPackTracker, nil
+	chunkDataPackTracker := entity.(*tracker.ChunkDataPackTracker)
+	return chunkDataPackTracker, true
 }
 
 // ByChunkID returns the chunk data pack tracker for the given chunk ID.

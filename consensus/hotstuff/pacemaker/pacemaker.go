@@ -70,6 +70,7 @@ func (p *FlowPaceMaker) UpdateCurViewWithQC(qc *model.QuorumCertificate) (*model
 	// 2/3 of replicas have already voted for round p.currentView + k, hence proceeded past currentView
 	// => 2/3 of replicas are at least in view qc.view + 1.
 	// => replica can skip ahead to view qc.view + 1
+	p.timeoutControl.OnProgressBeforeTimeout()
 	return p.gotoView(qc.View + 1), true
 }
 
@@ -100,6 +101,7 @@ func (p *FlowPaceMaker) UpdateCurViewWithBlock(block *model.Block, isLeaderForNe
 }
 
 func (p *FlowPaceMaker) actOnBlockForCurView(isLeaderForNextView bool) (*model.NewViewEvent, bool) {
+	p.timeoutControl.OnProgressBeforeTimeout()
 	if isLeaderForNextView {
 		timerInfo := p.timeoutControl.StartTimeout(model.VoteCollectionTimeout, p.currentView)
 		p.notifier.OnStartingTimeout(timerInfo)
@@ -110,6 +112,7 @@ func (p *FlowPaceMaker) actOnBlockForCurView(isLeaderForNextView bool) (*model.N
 
 func (p *FlowPaceMaker) OnTimeout() *model.NewViewEvent {
 	p.emitTimeoutNotifications(p.timeoutControl.TimerInfo())
+	p.timeoutControl.OnTimeout()
 	return p.gotoView(p.currentView + 1)
 }
 

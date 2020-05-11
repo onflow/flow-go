@@ -39,6 +39,7 @@ func main() {
 		err                error
 		executionState     state.ExecutionState
 		triedir            string
+		collector          module.ExecutionMetrics
 	)
 
 	cmd.FlowNode("execution").
@@ -66,14 +67,14 @@ func main() {
 
 			return nil
 		}).
-		// Trie storage is required to bootstrap, but also shout be handled while shutting down
+		// Trie storage is required to bootstrap, but also should be handled while shutting down
 		Module("ledger storage", func(node *cmd.FlowNodeBuilder) error {
 			ledgerStorage, err = ledger.NewTrieStorage(triedir)
 			return err
 		}).
-		Module("metrics collector", func(node *cmd.FlowNodeBuilder) error {
-			node.Metrics, err = metrics.NewCollector(node.Logger)
-			return err
+		Module("execution metrics", func(node *cmd.FlowNodeBuilder) error {
+			collector = metrics.NewExecutionCollector(node.Tracer)
+			return nil
 		}).
 		GenesisHandler(func(node *cmd.FlowNodeBuilder, block *flow.Block) {
 			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage)
@@ -98,12 +99,12 @@ func main() {
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			chunkDataPacks := badger.NewChunkDataPacks(node.DB)
 			executionResults := badger.NewExecutionResults(node.DB)
-			stateCommitments := badger.NewCommits(node.DB)
+			stateCommitments := badger.NewCommits(node.Metrics.Cache, node.DB)
 
 			executionState = state.NewExecutionState(
 				ledgerStorage,
 				stateCommitments,
-				node.Blocks,
+				node.Storage.Blocks,
 				chunkDataPacks,
 				executionResults,
 				node.DB,
@@ -136,8 +137,8 @@ func main() {
 				node.Network,
 				node.Me,
 				node.State,
-				node.Blocks,
-				node.Payloads,
+				node.Storage.Blocks,
+				node.Storage.Payloads,
 				collections,
 				events,
 				txResults,
@@ -145,14 +146,14 @@ func main() {
 				providerEngine,
 				executionState,
 				6, // TODO - config param maybe?
-				node.Metrics,
+				collector,
 				node.Tracer,
 				true,
 			)
 			return ingestionEng, err
 		}).
 		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Blocks, events, txResults)
+			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, events, txResults)
 			return rpcEng, nil
 		}).Run(flow.RoleExecution.String())
 

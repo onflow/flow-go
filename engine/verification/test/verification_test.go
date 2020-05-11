@@ -485,12 +485,12 @@ func ingestHappyPath(tb testing.TB, receiptCount int, chunkCount int) {
 
 		for _, chunk := range er.Receipt.ExecutionResult.Chunks {
 			// collection
-			err = verNode.AuthCollections.Add(er.Collections[chunk.Index])
-			require.NoError(tb, err)
+			added := verNode.AuthCollections.Add(er.Collections[chunk.Index])
+			require.True(tb, added)
 
 			// chunk
-			err = verNode.ChunkDataPacks.Add(er.ChunkDataPacks[chunk.Index])
-			require.NoError(tb, err)
+			added = verNode.ChunkDataPacks.Add(er.ChunkDataPacks[chunk.Index])
+			require.True(tb, added)
 		}
 	}
 

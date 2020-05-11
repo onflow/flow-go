@@ -83,11 +83,8 @@ func (c *CollectionTrackers) byCollectionID(collID flow.Identifier) (*tracker.Co
 	if err != nil {
 		return nil, err
 	}
-	collectionTracker, ok := entity.(*tracker.CollectionTracker)
-	if !ok {
-		return nil, fmt.Errorf("invalid entity in collection tracker pool (%T)", entity)
-	}
-	return collectionTracker, nil
+	collectionTracker := entity.(*tracker.CollectionTracker)
+	return collectionTracker, true
 }
 
 // ByCollectionID returns the collection tracker for the given collection ID.

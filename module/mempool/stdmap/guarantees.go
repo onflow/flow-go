@@ -3,8 +3,6 @@
 package stdmap
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -24,21 +22,18 @@ func NewGuarantees(limit uint) (*Guarantees, error) {
 }
 
 // Add adds a collection guarantee guarantee to the mempool.
-func (g *Guarantees) Add(guarantee *flow.CollectionGuarantee) error {
+func (g *Guarantees) Add(guarantee *flow.CollectionGuarantee) bool {
 	return g.Backend.Add(guarantee)
 }
 
 // ByID returns the collection guarantee with the given ID from the mempool.
-func (g *Guarantees) ByID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
-	entity, err := g.Backend.ByID(collID)
-	if err != nil {
-		return nil, err
+func (g *Guarantees) ByID(collID flow.Identifier) (*flow.CollectionGuarantee, bool) {
+	entity, exists := g.Backend.ByID(collID)
+	if !exists {
+		return nil, false
 	}
-	guarantee, ok := entity.(*flow.CollectionGuarantee)
-	if !ok {
-		panic(fmt.Sprintf("invalid entity in guarantee pool (%T)", entity))
-	}
-	return guarantee, nil
+	guarantee := entity.(*flow.CollectionGuarantee)
+	return guarantee, true
 }
 
 // All returns all collection guarantees from the mempool.

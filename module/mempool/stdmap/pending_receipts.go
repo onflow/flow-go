@@ -26,7 +26,7 @@ func NewPendingReceipts(limit uint) (*PendingReceipts, error) {
 }
 
 // Add adds a pending execution receipt to the mempool.
-func (p *PendingReceipts) Add(preceipt *verification.PendingReceipt) error {
+func (p *PendingReceipts) Add(preceipt *verification.PendingReceipt) bool {
 	return p.Backend.Add(preceipt)
 }
 

@@ -2,8 +2,6 @@
 package stdmap
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -28,7 +26,7 @@ func (c *ChunkDataPacks) Has(chunkID flow.Identifier) bool {
 }
 
 // Add adds an chunkDataPack to the mempool.
-func (c *ChunkDataPacks) Add(cdp *flow.ChunkDataPack) error {
+func (c *ChunkDataPacks) Add(cdp *flow.ChunkDataPack) bool {
 	return c.Backend.Add(cdp)
 }
 
@@ -38,16 +36,13 @@ func (c *ChunkDataPacks) Rem(chunkID flow.Identifier) bool {
 }
 
 // ByChunkID returns the chunk data pack with the given chunkID from the mempool.
-func (c *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
-	entity, err := c.Backend.ByID(chunkID)
-	if err != nil {
-		return nil, err
+func (c *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, bool) {
+	entity, exists := c.Backend.ByID(chunkID)
+	if !exists {
+		return nil, false
 	}
-	chunkDataPack, ok := entity.(*flow.ChunkDataPack)
-	if !ok {
-		return nil, fmt.Errorf("invalid entity in chunk data pack pool (%T)", entity)
-	}
-	return chunkDataPack, nil
+	chunkDataPack := entity.(*flow.ChunkDataPack)
+	return chunkDataPack, true
 }
 
 // Size will return the current size of the memory pool.

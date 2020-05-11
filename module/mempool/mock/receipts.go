@@ -12,14 +12,14 @@ type Receipts struct {
 }
 
 // Add provides a mock function with given fields: receipt
-func (_m *Receipts) Add(receipt *flow.ExecutionReceipt) error {
+func (_m *Receipts) Add(receipt *flow.ExecutionReceipt) bool {
 	ret := _m.Called(receipt)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.ExecutionReceipt) error); ok {
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(*flow.ExecutionReceipt) bool); ok {
 		r0 = rf(receipt)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0
@@ -41,25 +41,43 @@ func (_m *Receipts) All() []*flow.ExecutionReceipt {
 	return r0
 }
 
-// ByBlockID provides a mock function with given fields: blockID
-func (_m *Receipts) ByBlockID(blockID flow.Identifier) []*flow.ExecutionReceipt {
+// ByID provides a mock function with given fields: receiptID
+func (_m *Receipts) ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, bool) {
+	ret := _m.Called(receiptID)
+
+	var r0 *flow.ExecutionReceipt
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.ExecutionReceipt); ok {
+		r0 = rf(receiptID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.ExecutionReceipt)
+		}
+	}
+
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
+		r1 = rf(receiptID)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	return r0, r1
+}
+
+// DropForBlock provides a mock function with given fields: blockID
+func (_m *Receipts) DropForBlock(blockID flow.Identifier) []flow.Identifier {
 	ret := _m.Called(blockID)
 
-	var r0 []*flow.ExecutionReceipt
-	if rf, ok := ret.Get(0).(func(flow.Identifier) []*flow.ExecutionReceipt); ok {
+	var r0 []flow.Identifier
+	if rf, ok := ret.Get(0).(func(flow.Identifier) []flow.Identifier); ok {
 		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*flow.ExecutionReceipt)
+			r0 = ret.Get(0).([]flow.Identifier)
 		}
 	}
 
 	return r0
-}
-
-// DropForBlock provides a mock function with given fields: blockID
-func (_m *Receipts) DropForBlock(blockID flow.Identifier) {
-	_m.Called(blockID)
 }
 
 // Has provides a mock function with given fields: receiptID

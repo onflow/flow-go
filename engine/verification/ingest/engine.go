@@ -272,10 +272,9 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		return nil
 	}
 
-	tracker, err := e.chunkDataPackTackers.ByChunkID(chunkDataPack.ChunkID)
-	if err != nil {
+	tracker, exists := e.chunkDataPackTackers.ByChunkID(chunkDataPack.ChunkID)
+	if !exists {
 		e.log.Debug().
-			Err(err).
 			Hex("origin_id", logging.ID(originID)).
 			Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
 			Msg("cannot retrieve tracker for received chunk data pack")
@@ -307,8 +306,8 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 
 	// store the chunk data pack in the store of the engine
 	// this will fail if the receipt already exists in the store
-	err = e.chunkDataPacks.Add(chunkDataPack)
-	if err != nil {
+	added := e.chunkDataPacks.Add(chunkDataPack)
+	if !added {
 		e.log.Debug().
 			Err(err).
 			Hex("origin_id", logging.ID(originID)).
@@ -340,8 +339,8 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 
 	if e.collectionTrackers.Has(collID) {
 		// this event is a reply to a prior request
-		tracker, err := e.collectionTrackers.ByCollectionID(collID)
-		if err != nil {
+		tracker, exists := e.collectionTrackers.ByCollectionID(collID)
+		if !exists {
 			return fmt.Errorf("could not retrieve collection tracker from mempool")
 		}
 
@@ -357,9 +356,9 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 		}
 
 		// adds collection to authenticated mempool
-		err = e.authCollections.Add(coll)
-		if err != nil {
-			return fmt.Errorf("could not add collection to mempool: %w", err)
+		added := e.authCollections.Add(coll)
+		if !added {
+			return fmt.Errorf("could not add collection to mempool")
 		}
 
 		// removes tracker
@@ -376,10 +375,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 			Collection: coll,
 			OriginID:   originID,
 		}
-		err := e.pendingCollections.Add(pcoll)
-		if err != nil && err != mempool.ErrAlreadyExists {
-			return fmt.Errorf("could not store collection in pending pool: %w", err)
-		}
+		_ = e.pendingCollections.Add(pcoll)
 
 		e.log.Debug().
 			Hex("origin_id", logging.ID(originID)).
@@ -504,12 +500,10 @@ func (e *Engine) getChunkDataPackForReceipt(receipt *flow.ExecutionReceipt, chun
 	//
 	if e.chunkDataPacks.Has(chunkID) {
 		// chunk data pack exists and retrieved and returned
-		chunkDataPack, err := e.chunkDataPacks.ByChunkID(chunkID)
-		if err != nil {
+		chunkDataPack, exists := e.chunkDataPacks.ByChunkID(chunkID)
+		if !exists {
 			// couldn't get chunk state from mempool, the chunk cannot yet be verified
-			log.Error().
-				Err(err).
-				Msg("could not get chunk data pack from mempool")
+			log.Error().Msg("could not get chunk data pack from mempool")
 			return nil, false
 		}
 		return chunkDataPack, true
@@ -558,11 +552,10 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 	//
 	//
 	if e.authCollections.Has(collID) {
-		coll, err := e.authCollections.ByID(collID)
-		if err != nil {
+		coll, exists := e.authCollections.ByID(collID)
+		if !exists {
 			// couldn't get the collection from mempool
 			log.Error().
-				Err(err).
 				Hex("collection_id", logging.ID(collID)).
 				Msg("could not get collection from authenticated pool")
 			return nil, false
@@ -695,10 +688,9 @@ func (e *Engine) checkPendingChunks() {
 // It cleans up all resources associated with this chunk
 func (e *Engine) onChunkIngested(vc *verification.VerifiableChunk) {
 	// marks this chunk as ingested
-	err := e.ingestedChunkIDs.Add(vc.ChunkDataPack.ChunkID)
-	if err != nil {
+	added := e.ingestedChunkIDs.Add(vc.ChunkDataPack.ChunkID)
+	if !added {
 		e.log.Error().
-			Err(err).
 			Hex("chunk_id", logging.ID(vc.ChunkDataPack.ChunkID)).
 			Msg("could not add chunk to ingested chunks mempool")
 	}
@@ -720,11 +712,10 @@ func (e *Engine) onChunkIngested(vc *verification.VerifiableChunk) {
 	if len(mychunks) == 0 {
 		// no un-ingested chunk remains with this receipt
 		// marks execution result as ingested
-		err := e.ingestedResultIDs.Add(vc.Receipt.ExecutionResult.ID())
+		added := e.ingestedResultIDs.Add(vc.Receipt.ExecutionResult.ID())
 
-		if err != nil {
+		if !added {
 			e.log.Error().
-				Err(err).
 				Hex("result_id", logging.Entity(vc.Receipt.ExecutionResult)).
 				Msg("could add ingested result to mempool")
 		}
@@ -837,16 +828,7 @@ func (e *Engine) checkPendingReceipts(blockID flow.Identifier) {
 
 			// store the execution receipt in the authenticated mempool of the engine
 			// this will fail if the receipt already exists in the store
-			err = e.authReceipts.Add(p.Receipt)
-			if err != nil && err != mempool.ErrAlreadyExists {
-				// TODO potential memory leakage
-				e.log.Error().
-					Err(err).
-					Hex("receipt_id", logging.ID(p.Receipt.ID())).
-					Hex("origin_id", logging.ID(origin.NodeID)).
-					Msg("could not store authenticated receipt in mempool")
-				continue
-			}
+			_ = e.authReceipts.Add(p.Receipt)
 
 			e.log.Debug().
 				Hex("receipt_id", logging.ID(p.Receipt.ID())).
@@ -870,10 +852,9 @@ func (e *Engine) checkPendingCollections(collID, blockID flow.Identifier) {
 	}
 
 	// retrieves collection from mempool
-	pcoll, err := e.pendingCollections.ByID(collID)
-	if err != nil {
+	pcoll, exists := e.pendingCollections.ByID(collID)
+	if !exists {
 		e.log.Error().
-			Err(err).
 			Hex("collection_id", logging.ID(collID)).
 			Msg("could not retrieve collection from pending mempool")
 	}
@@ -906,17 +887,7 @@ func (e *Engine) checkPendingCollections(collID, blockID flow.Identifier) {
 	}
 	// store the collection in the authenticated collections mempool
 	// this will fail if the collection already exists in the store
-	err = e.authCollections.Add(pcoll.Collection)
-	if err != nil && err != mempool.ErrAlreadyExists {
-		// TODO potential memory leakage
-		e.log.Error().
-			Err(err).
-			Hex("collection_id", logging.ID(pcoll.ID())).
-			Hex("origin_id", logging.ID(pcoll.OriginID)).
-			Str("origin_role", origin.Role.String()).
-			Msg("could not store authenticated collection in mempool")
-		return
-	}
+	_ = e.authCollections.Add(pcoll.Collection)
 
 	e.log.Debug().
 		Hex("collection_id", logging.ID(collID)).

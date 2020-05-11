@@ -4,11 +4,11 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
-	mockery "github.com/stretchr/testify/mock"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
@@ -105,7 +105,7 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 
 // CreateMiddleware receives an ids slice and creates and initializes a middleware instances for each id
 func CreateMiddleware(log zerolog.Logger, identities []*flow.Identity) ([]*libp2p.Middleware, error) {
-	metrics := SetupMetrics()
+	metrics := metrics.NewNoopCollector()
 	count := len(identities)
 	mws := make([]*libp2p.Middleware, 0)
 	for i := 0; i < count; i++ {
@@ -155,11 +155,4 @@ func GenerateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
 	seed := make([]byte, crypto.KeyGenSeedMinLenECDSASecp256k1)
 	copy(seed, s[:])
 	return crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
-}
-
-func SetupMetrics() *mock.Metrics {
-	metrics := &mock.Metrics{}
-	metrics.On("NetworkMessageSent", mockery.Anything, mockery.Anything).Return()
-	metrics.On("NetworkMessageReceived", mockery.Anything, mockery.Anything).Return()
-	return metrics
 }

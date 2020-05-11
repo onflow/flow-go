@@ -81,6 +81,12 @@ func TestIdentity(t *testing.T) {
 		err = db.Update(operation.IndexPayloadIdentities(blockID, []flow.Identifier{identity.NodeID}))
 		require.NoError(t, err)
 
+		err = db.Update(operation.IndexPayloadGuarantees(blockID, nil))
+		require.NoError(t, err)
+
+		err = db.Update(operation.IndexPayloadSeals(blockID, nil))
+		require.NoError(t, err)
+
 		actual, err := state.Final().Identity(identity.NodeID)
 		require.NoError(t, err)
 		assert.EqualValues(t, identity, actual)
@@ -110,6 +116,12 @@ func TestIdentities(t *testing.T) {
 		err = db.Update(operation.IndexPayloadIdentities(blockID, flow.GetIDs(identities)))
 		require.NoError(t, err)
 
+		err = db.Update(operation.IndexPayloadGuarantees(blockID, nil))
+		require.NoError(t, err)
+
+		err = db.Update(operation.IndexPayloadSeals(blockID, nil))
+		require.NoError(t, err)
+
 		actual, err := state.Final().Identities(filter.Any)
 		require.NoError(t, err)
 		assert.ElementsMatch(t, identities, actual)
@@ -134,6 +146,12 @@ func TestClusters(t *testing.T) {
 		}
 
 		err = db.Update(operation.IndexPayloadIdentities(blockID, flow.GetIDs(identities)))
+		require.NoError(t, err)
+
+		err = db.Update(operation.IndexPayloadGuarantees(blockID, nil))
+		require.NoError(t, err)
+
+		err = db.Update(operation.IndexPayloadSeals(blockID, nil))
 		require.NoError(t, err)
 
 		actual, err := state.Final().Clusters()
