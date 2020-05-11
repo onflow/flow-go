@@ -164,12 +164,11 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		// STEP THREE: build a payload of valid transactions, while at the same
 		// time figuring out the correct reference block ID for the collection.
 
-		var (
-			minRefHeight uint64 = math.MaxUint64
-			minRefID     flow.Identifier
-			transactions []*flow.TransactionBody
-		)
+		minRefHeight := uint64(math.MaxUint64)
+		// start with the finalized reference ID (longest expiry time)
+		minRefID := refChainFinalizedID
 
+		var transactions []*flow.TransactionBody
 		for _, tx := range b.transactions.All() {
 
 			// if we have reached maximum number of transactions, stop
@@ -217,11 +216,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			}
 
 			transactions = append(transactions, tx)
-		}
-
-		// use the longest possible transaction expiry for empty collections
-		if len(transactions) == 0 {
-			minRefID = refChainFinalizedID
 		}
 
 		// STEP FOUR: we have a set of transactions that are valid to include
