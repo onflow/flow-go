@@ -275,11 +275,6 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Uint("index", index).Hex("local_id", in.localID[:]).Logger()
 	notifier := notifications.NewLogConsumer(log)
 
-	// initialize no-op metrics mock
-	metrics := &module.Metrics{}
-	metrics.On("HotStuffBusyDuration", mock.Anything)
-	metrics.On("HotStuffIdleDuration", mock.Anything)
-
 	// initialize the pacemaker
 	controller := timeout.NewController(cfg.Timeouts)
 	in.pacemaker, err = pacemaker.New(DefaultStart(), controller, notifier)

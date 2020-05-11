@@ -12,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -22,6 +23,8 @@ import (
 type Engine struct {
 	unit      *engine.Unit             // used to control startup/shutdown
 	log       zerolog.Logger           // used to log relevant actions with context
+	metrics   module.EngineMetrics     // used to track sent and received messages
+	mempool   module.MempoolMetrics    // used to track mempool size
 	state     protocol.State           // used to access the  protocol state
 	me        module.Local             // used to access local node information
 	results   storage.ExecutionResults // used to permanently store results
@@ -31,12 +34,14 @@ type Engine struct {
 }
 
 // New creates a new collection propagation engine.
-func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, results storage.ExecutionResults, receipts mempool.Receipts, approvals mempool.Approvals, seals mempool.Seals) (*Engine, error) {
+func New(log zerolog.Logger, metrics module.EngineMetrics, mempool module.MempoolMetrics, net module.Network, state protocol.State, me module.Local, results storage.ExecutionResults, receipts mempool.Receipts, approvals mempool.Approvals, seals mempool.Seals) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		unit:      engine.NewUnit(),
 		log:       log.With().Str("engine", "matching").Logger(),
+		metrics:   metrics,
+		mempool:   mempool,
 		state:     state,
 		me:        me,
 		results:   results,
@@ -109,11 +114,13 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
-	switch entity := event.(type) {
+	switch ev := event.(type) {
 	case *flow.ExecutionReceipt:
-		return e.onReceipt(originID, entity)
+		e.metrics.MessageReceived(metrics.EngineMatching, metrics.MessageExecutionReceipt)
+		return e.onReceipt(originID, ev)
 	case *flow.ResultApproval:
-		return e.onApproval(originID, entity)
+		e.metrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
+		return e.onApproval(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -154,6 +161,8 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	if err != nil {
 		return fmt.Errorf("could not store receipt: %w", err)
 	}
+
+	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
 
 	// see if we can build a seal with what's in the mempools now
 	err = e.tryBuildSeal(receipt.ExecutionResult.BlockID)
@@ -204,6 +213,8 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	if err != nil {
 		return fmt.Errorf("could not store approval: %w", err)
 	}
+
+	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
 
 	// check if we can build a seal by first matching receipts
 	// NOTE: this is not super efficient, so it makes sense to integrate a step
@@ -316,13 +327,13 @@ func (e *Engine) createSeal(result *flow.ExecutionResult) error {
 	}
 
 	// create and store the seal
-	seal := flow.Seal{
+	seal := &flow.Seal{
 		BlockID:      result.BlockID,
 		ResultID:     result.ID(),
 		InitialState: previous.FinalStateCommit,
 		FinalState:   result.FinalStateCommit,
 	}
-	err = e.seals.Add(&seal)
+	err = e.seals.Add(seal)
 	if err != nil {
 		return fmt.Errorf("could not cache seal: %w", err)
 	}
@@ -330,6 +341,10 @@ func (e *Engine) createSeal(result *flow.ExecutionResult) error {
 	// clear up the caches
 	e.receipts.DropForBlock(result.BlockID)
 	e.approvals.DropForBlock(result.BlockID)
+
+	e.mempool.MempoolEntries(metrics.ResourceSeal, e.seals.Size())
+	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
+	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
 
 	// TODO: consider what receipts & approvals to accept going forward
 

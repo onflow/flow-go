@@ -9,6 +9,7 @@ import (
 
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
 var (
@@ -65,7 +66,7 @@ running the DKG for generating the random beacon keys, generating genesis execut
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ computing collector clusters")
-		clusters := computeCollectorClusters(stakingNodes)
+		clusters := protocol.Clusters(uint(flagCollectionClusters), model.ToIdentityList(stakingNodes))
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ constructing genesis blocks for collector clusters")

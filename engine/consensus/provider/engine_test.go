@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/module/metrics"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
@@ -21,13 +22,13 @@ func TestOnBlockProposalValid(t *testing.T) {
 	state := &protocol.State{}
 	final := &protocol.Snapshot{}
 	con := &network.Conduit{}
-	metrics := newMetrics()
+	metrics := metrics.NewNoopCollector()
 
 	e := &Engine{
 		me:      me,
 		state:   state,
 		con:     con,
-		metrics: metrics,
+		message: metrics,
 	}
 
 	proposal := unittest.ProposalFixture()
@@ -59,15 +60,14 @@ func TestOnBlockProposalRemoteOrigin(t *testing.T) {
 	state := &protocol.State{}
 	final := &protocol.Snapshot{}
 	con := &network.Conduit{}
-	metrics := newMetrics()
+	metrics := metrics.NewNoopCollector()
 
 	e := &Engine{
 		me:      me,
 		state:   state,
 		con:     con,
-		metrics: metrics,
+		message: metrics,
 	}
-
 	proposal := unittest.ProposalFixture()
 	identities := unittest.IdentityListFixture(100)
 	localID := identities[0].NodeID
@@ -90,15 +90,14 @@ func TestOnBlockProposalIdentitiesError(t *testing.T) {
 	state := &protocol.State{}
 	final := &protocol.Snapshot{}
 	con := &network.Conduit{}
-	metrics := newMetrics()
+	metrics := metrics.NewNoopCollector()
 
 	e := &Engine{
 		me:      me,
 		state:   state,
 		con:     con,
-		metrics: metrics,
+		message: metrics,
 	}
-
 	proposal := unittest.ProposalFixture()
 	identities := unittest.IdentityListFixture(100)
 	localID := identities[0].NodeID
@@ -122,15 +121,14 @@ func TestOnBlockProposalSubmitFail(t *testing.T) {
 	state := &protocol.State{}
 	final := &protocol.Snapshot{}
 	con := &network.Conduit{}
-	metrics := newMetrics()
+	metrics := metrics.NewNoopCollector()
 
 	e := &Engine{
 		me:      me,
 		state:   state,
 		con:     con,
-		metrics: metrics,
+		message: metrics,
 	}
-
 	proposal := unittest.ProposalFixture()
 	identities := unittest.IdentityListFixture(100)
 	localID := identities[0].NodeID
@@ -152,10 +150,4 @@ func TestOnBlockProposalSubmitFail(t *testing.T) {
 	state.AssertExpectations(t)
 	final.AssertExpectations(t)
 	con.AssertExpectations(t)
-}
-
-func newMetrics() *module.Metrics {
-	metrics := &module.Metrics{}
-	metrics.On("StartBlockToSeal", mock.Anything).Return()
-	return metrics
 }

@@ -6,7 +6,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks/recovery"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/recovery"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -15,13 +15,14 @@ import (
 func Recover(
 	log zerolog.Logger,
 	forks hotstuff.Forks,
+	voteAggregator hotstuff.VoteAggregator,
 	validator hotstuff.Validator,
 	finalized *flow.Header,
 	pending []*flow.Header,
 ) error {
 
 	// create the recovery component
-	recovery, err := recovery.NewForksRecovery(log, forks, validator)
+	recovery, err := recovery.NewForksRecovery(log, forks, voteAggregator, validator)
 	if err != nil {
 		return fmt.Errorf("could not initialize recovery: %w", err)
 	}
