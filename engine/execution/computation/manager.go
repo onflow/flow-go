@@ -1,6 +1,7 @@
 package computation
 
 import (
+	"context"
 	"fmt"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -19,7 +20,11 @@ import (
 
 type ComputationManager interface {
 	ExecuteScript([]byte, *flow.Header, *delta.View) ([]byte, error)
-	ComputeBlock(block *entity.ExecutableBlock, view *delta.View) (*execution.ComputationResult, error)
+	ComputeBlock(
+		ctx context.Context,
+		block *entity.ExecutableBlock,
+		view *delta.View,
+	) (*execution.ComputationResult, error)
 }
 
 // Manager manages computation and execution
@@ -33,6 +38,7 @@ type Manager struct {
 
 func New(
 	logger zerolog.Logger,
+	tracer module.Tracer,
 	me module.Local,
 	protoState protocol.State,
 	vm virtualmachine.VirtualMachine,
@@ -44,7 +50,7 @@ func New(
 		me:            me,
 		protoState:    protoState,
 		vm:            vm,
-		blockComputer: computer.NewBlockComputer(vm),
+		blockComputer: computer.NewBlockComputer(vm, tracer),
 	}
 
 	return &e
@@ -69,12 +75,17 @@ func (e *Manager) ExecuteScript(script []byte, blockHeader *flow.Header, view *d
 	return encodedValue, nil
 }
 
-func (e *Manager) ComputeBlock(block *entity.ExecutableBlock, view *delta.View) (*execution.ComputationResult, error) {
+func (e *Manager) ComputeBlock(
+	ctx context.Context,
+	block *entity.ExecutableBlock,
+	view *delta.View,
+) (*execution.ComputationResult, error) {
+
 	e.log.Debug().
 		Hex("block_id", logging.Entity(block.Block)).
 		Msg("received complete block")
 
-	result, err := e.blockComputer.ExecuteBlock(block, view)
+	result, err := e.blockComputer.ExecuteBlock(ctx, block, view)
 	if err != nil {
 		e.log.Error().
 			Hex("block_id", logging.Entity(block.Block)).

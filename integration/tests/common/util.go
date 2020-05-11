@@ -20,7 +20,7 @@ import (
 
 var (
 	// a simple counter contract in Cadence
-	counterContract = dsl.Contract{
+	CounterContract = dsl.Contract{
 		Name: "Testing",
 		Members: []dsl.CadenceCode{
 			dsl.Resource{
@@ -51,14 +51,14 @@ var (
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
 				var maybeCounter <- signer.load<@Testing.Counter>(from: /storage/counter)
-				
+
 				if maybeCounter == nil {
 					maybeCounter <-! Testing.createCounter()
 				}
-				
+
 				maybeCounter?.add(2)
 				signer.save(<-maybeCounter!, to: /storage/counter)
-				
+
 				signer.link<&Testing.Counter>(/public/counter, target: /storage/counter)
 				`),
 		},

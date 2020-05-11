@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -27,6 +28,7 @@ import (
 type Engine struct {
 	unit     *engine.Unit
 	log      zerolog.Logger
+	metrics  module.EngineMetrics
 	me       module.Local
 	state    protocol.State
 	con      network.Conduit
@@ -39,14 +41,16 @@ type Engine struct {
 	pollInterval  time.Duration
 	scanInterval  time.Duration
 	retryInterval time.Duration
-	maxAttempts   uint
-	maxSize       uint
-	maxRequests   uint
+	tolerance     uint // tolerance determines how big of a difference in block heights we tolerated before actively syncing with range requests
+	maxAttempts   uint // maxAttempts is the maximum number of attempts to sync we make for each requested block/height before discarding
+	maxSize       uint // maxSize is the maximum number of blocks we request in the same block request message
+	maxRequests   uint // maxRequests is the maximum number of requests we send during each scanning period
 }
 
 // New creates a new consensus propagation engine.
 func New(
 	log zerolog.Logger,
+	metrics module.EngineMetrics,
 	net module.Network,
 	me module.Local,
 	state protocol.State,
@@ -58,6 +62,7 @@ func New(
 	e := &Engine{
 		unit:     engine.NewUnit(),
 		log:      log.With().Str("engine", "consensus").Logger(),
+		metrics:  metrics,
 		me:       me,
 		state:    state,
 		blocks:   blocks,
@@ -68,6 +73,7 @@ func New(
 		pollInterval:  8 * time.Second,
 		scanInterval:  1 * time.Second,
 		retryInterval: 4 * time.Second,
+		tolerance:     10,
 		maxAttempts:   5,
 		maxSize:       64,
 		maxRequests:   3,
@@ -109,7 +115,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+			e.log.Error().Err(err).Msg("synchronization could not process submitted event")
 		}
 	})
 }
@@ -145,14 +151,19 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 	switch ev := event.(type) {
 	case *messages.SyncRequest:
+		e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageSyncRequest)
 		return e.onSyncRequest(originID, ev)
 	case *messages.SyncResponse:
+		e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageSyncResponse)
 		return e.onSyncResponse(originID, ev)
 	case *messages.RangeRequest:
+		e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageRangeRequest)
 		return e.onRangeRequest(originID, ev)
 	case *messages.BatchRequest:
+		e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageBatchRequest)
 		return e.onBatchRequest(originID, ev)
 	case *messages.BlockResponse:
+		e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageBlockResponse)
 		return e.onBlockResponse(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
@@ -170,9 +181,13 @@ func (e *Engine) onSyncRequest(originID flow.Identifier, req *messages.SyncReque
 		return fmt.Errorf("could not get finalized head: %w", err)
 	}
 
-	// compare the height and see if we can bail early
-	// TODO: we probably want to add some tolerance here
-	if req.Height == final.Height {
+	// if we are within the tolerance threshold we do nothing
+	lower := final.Height - uint64(e.tolerance)
+	if lower > final.Height { // overflow check
+		lower = 0
+	}
+	upper := final.Height + uint64(e.tolerance)
+	if req.Height >= lower && req.Height <= upper {
 		return nil
 	}
 
@@ -194,6 +209,8 @@ func (e *Engine) onSyncRequest(originID flow.Identifier, req *messages.SyncReque
 		return fmt.Errorf("could not send sync response: %w", err)
 	}
 
+	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageSyncResponse)
+
 	return nil
 }
 
@@ -201,18 +218,19 @@ func (e *Engine) onSyncRequest(originID flow.Identifier, req *messages.SyncReque
 func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResponse) error {
 
 	// get the header at the latest finalized state
-	head, err := e.state.Final().Head()
+	final, err := e.state.Final().Head()
 	if err != nil {
 		return fmt.Errorf("could not get finalized head: %w", err)
 	}
 
-	// if the height is the same or smaller, there is nothing to do
-	if res.Height <= head.Height {
+	// if we are within the tolerance threshold we do nothing
+	upper := final.Height + uint64(e.tolerance)
+	if res.Height <= upper {
 		return nil
 	}
 
 	// mark the missing height
-	for height := head.Height + 1; height <= res.Height; height++ {
+	for height := final.Height + 1; height <= res.Height; height++ {
 		e.queueByHeight(height)
 	}
 
@@ -263,6 +281,8 @@ func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeReq
 		return fmt.Errorf("could not send range response: %w", err)
 	}
 
+	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBlockResponse)
+
 	return nil
 }
 
@@ -309,6 +329,8 @@ func (e *Engine) onBatchRequest(originID flow.Identifier, req *messages.BatchReq
 	if err != nil {
 		return fmt.Errorf("could not send batch response: %w", err)
 	}
+
+	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBlockResponse)
 
 	return nil
 }
@@ -446,6 +468,7 @@ func (e *Engine) pollHeight() error {
 	var errs error
 	// send the request for synchronization
 	for _, targetID := range identities.Sample(3).NodeIDs() {
+
 		req := &messages.SyncRequest{
 			Nonce:  rand.Uint64(),
 			Height: final.Height,
@@ -454,6 +477,8 @@ func (e *Engine) pollHeight() error {
 		if err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("could not send sync request: %w", err))
 		}
+
+		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageSyncRequest)
 	}
 
 	return errs
@@ -596,6 +621,8 @@ func (e *Engine) sendRequests(heights []uint64, blockIDs []flow.Identifier) erro
 			return fmt.Errorf("could not send range request: %w", err)
 		}
 
+		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageRangeRequest)
+
 		// mark all of the heights as requested; these should always be there as
 		// we call this right after the scan and nothing else can delete keys
 		for height := ran.From; height <= ran.To; height++ {
@@ -629,6 +656,8 @@ func (e *Engine) sendRequests(heights []uint64, blockIDs []flow.Identifier) erro
 		if err != nil {
 			return fmt.Errorf("could not send batch request: %w", err)
 		}
+
+		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBatchRequest)
 
 		// mark all of the blocks as requested; these should always be there as
 		// we call this right after the scan and nothing else can delete keys

@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"errors"
 	"net"
 
 	"github.com/rs/zerolog"
@@ -107,7 +108,7 @@ func (h *handler) ExecuteScriptAtBlockID(
 ) (*execution.ExecuteScriptAtBlockIDResponse, error) {
 	blockID := flow.HashToID(req.GetBlockId())
 
-	value, err := h.engine.ExecuteScriptAtBlockID(req.Script, blockID)
+	value, err := h.engine.ExecuteScriptAtBlockID(ctx, req.Script, blockID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to execute script: %v", err)
 	}
@@ -159,8 +160,10 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 	}, nil
 }
 
-func (h *handler) GetTransactionResult(_ context.Context,
-	req *execution.GetTransactionResultRequest) (*execution.GetTransactionResultResponse, error) {
+func (h *handler) GetTransactionResult(
+	_ context.Context,
+	req *execution.GetTransactionResultRequest,
+) (*execution.GetTransactionResultResponse, error) {
 
 	reqBlockID := req.GetBlockId()
 	if reqBlockID == nil {
@@ -189,7 +192,11 @@ func (h *handler) GetTransactionResult(_ context.Context,
 	// lookup any transaction error that might have occurred
 	txResult, err := h.transactionResults.ByBlockIDTransactionID(blockID, txID)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get transaction error: %v", err)
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Error(codes.NotFound, "transaction result not found")
+		}
+
+		return nil, status.Errorf(codes.Internal, "failed to get transaction result: %v", err)
 	}
 	if txResult.ErrorMessage != "" {
 		statusCode = 1 // for now a statusCode of 1 indicates an error and 0 indicates no error
@@ -224,8 +231,10 @@ func (h *handler) eventResult(blockID flow.Identifier,
 	}, nil
 }
 
-func (h *handler) GetAccountAtBlockID(_ context.Context,
-	req *execution.GetAccountAtBlockIDRequest) (*execution.GetAccountAtBlockIDResponse, error) {
+func (h *handler) GetAccountAtBlockID(
+	ctx context.Context,
+	req *execution.GetAccountAtBlockIDRequest,
+) (*execution.GetAccountAtBlockIDResponse, error) {
 
 	blockID := req.GetBlockId()
 	if blockID == nil {
@@ -239,9 +248,13 @@ func (h *handler) GetAccountAtBlockID(_ context.Context,
 	}
 	flowAddress := flow.BytesToAddress(address)
 
-	value, err := h.engine.GetAccount(flowAddress, blockFlowID)
+	value, err := h.engine.GetAccount(ctx, flowAddress, blockFlowID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get account: %v", err)
+	}
+
+	if value == nil {
+		return nil, status.Errorf(codes.NotFound, "account with address %s does not exist", flowAddress)
 	}
 
 	account, err := convert.AccountToMessage(value)
