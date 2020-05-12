@@ -35,11 +35,13 @@ func NewMTrieStorage(dbDir string) (*MTrieStorage, error) {
 
 	err = w.Reply(
 		func(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
-			_, err := trie.UpdateRegisters(keys, values, stateCommitment)
+			_, err = trie.mForest.Update(keys, values, stateCommitment)
+			// _, err := trie.UpdateRegisters(keys, values, stateCommitment)
 			return err
 		},
 		func(stateCommitment flow.StateCommitment) error {
-			return nil //no need to do anything, mForest should prune trees in deterministic order
+			trie.mForest.RemoveTrie(stateCommitment)
+			return nil
 		},
 	)
 
