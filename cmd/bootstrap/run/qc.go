@@ -17,6 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/local"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/state/dkg"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -142,14 +143,17 @@ func NewProtocolState(block *flow.Block) (*protoBadger.State, *badger.DB, error)
 		return nil, nil, err
 	}
 
-	headers := storeBadger.NewHeaders(db)
-	identities := storeBadger.NewIdentities(db)
-	guarantees := storeBadger.NewGuarantees(db)
-	seals := storeBadger.NewSeals(db)
-	payloads := storeBadger.NewPayloads(db, identities, guarantees, seals)
+	metrics := metrics.NewNoopCollector()
+
+	headers := storeBadger.NewHeaders(metrics, db)
+	identities := storeBadger.NewIdentities(metrics, db)
+	guarantees := storeBadger.NewGuarantees(metrics, db)
+	seals := storeBadger.NewSeals(metrics, db)
+	index := storeBadger.NewIndex(metrics, db)
+	payloads := storeBadger.NewPayloads(index, identities, guarantees, seals)
 	blocks := storeBadger.NewBlocks(db, headers, payloads)
 
-	state, err := protoBadger.NewState(db, headers, identities, seals, payloads, blocks)
+	state, err := protoBadger.NewState(metrics, db, headers, identities, seals, payloads, blocks)
 	if err != nil {
 		return nil, nil, err
 	}

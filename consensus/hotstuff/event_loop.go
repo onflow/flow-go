@@ -16,7 +16,7 @@ import (
 type EventLoop struct {
 	log          zerolog.Logger
 	eventHandler EventHandler
-	metrics      module.Metrics
+	metrics      module.HotstuffMetrics
 	proposals    chan *model.Proposal
 	votes        chan *model.Vote
 
@@ -24,7 +24,7 @@ type EventLoop struct {
 }
 
 // NewEventLoop creates an instance of EventLoop.
-func NewEventLoop(log zerolog.Logger, metrics module.Metrics, eventHandler EventHandler) (*EventLoop, error) {
+func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler EventHandler) (*EventLoop, error) {
 	proposals := make(chan *model.Proposal)
 	votes := make(chan *model.Vote)
 

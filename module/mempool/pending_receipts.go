@@ -8,8 +8,9 @@ import (
 // PendingReceipts represents a concurrency-safe memory pool for pending execution receipts.
 type PendingReceipts interface {
 
-	// Add will add the given pending receipt for the node with the given ID.
-	Add(preceipt *verification.PendingReceipt) error
+	// Add will add the given pending receipt to the memory pool. It will return
+	// false if it was already in the mempool.
+	Add(preceipt *verification.PendingReceipt) bool
 
 	// Has checks if the given receipt is part of the memory pool.
 	Has(preceiptID flow.Identifier) bool

@@ -13,17 +13,17 @@ type Transactions interface {
 	// the memory pool.
 	Has(txID flow.Identifier) bool
 
-	// Add will add the given transaction to the memory pool; it will error if
-	// the transaction is already in the memory pool.
-	Add(tx *flow.TransactionBody) error
+	// Add will add the given transaction body to the memory pool. It will
+	// return false if it was already in the mempool.
+	Add(tx *flow.TransactionBody) bool
 
 	// Rem will remove the given transaction from the memory pool; it will
 	// will return true if the transaction was known and removed.
 	Rem(txID flow.Identifier) bool
 
-	// ByID will retrieve the given transaction from the memory pool; it will
-	// error if the transaction is not in the memory pool.
-	ByID(txID flow.Identifier) (*flow.TransactionBody, error)
+	// ByID retrieve the transaction with the given ID from the memory
+	// pool. It will return false if it was not found in the mempool.
+	ByID(txID flow.Identifier) (*flow.TransactionBody, bool)
 
 	// Size will return the current size of the memory pool.
 	Size() uint

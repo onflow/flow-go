@@ -4,6 +4,8 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
@@ -13,7 +15,7 @@ type Guarantees struct {
 	cache *Cache
 }
 
-func NewGuarantees(db *badger.DB) *Guarantees {
+func NewGuarantees(collector module.CacheMetrics, db *badger.DB) *Guarantees {
 
 	store := func(collID flow.Identifier, guarantee interface{}) error {
 		return db.Update(operation.SkipDuplicates(operation.InsertGuarantee(collID, guarantee.(*flow.CollectionGuarantee))))
@@ -26,8 +28,13 @@ func NewGuarantees(db *badger.DB) *Guarantees {
 	}
 
 	g := &Guarantees{
-		db:    db,
-		cache: newCache(withLimit(10000), withStore(store), withRetrieve(retrieve)),
+		db: db,
+		cache: newCache(collector,
+			withLimit(10*flow.DefaultTransactionExpiry),
+			withStore(store),
+			withRetrieve(retrieve),
+			withResource(metrics.ResourceGuarantee),
+		),
 	}
 
 	return g

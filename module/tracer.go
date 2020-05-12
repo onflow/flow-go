@@ -1,16 +1,19 @@
-package trace
+package module
 
 import (
-	opentracing "github.com/opentracing/opentracing-go"
+	"context"
+
+	"github.com/opentracing/opentracing-go"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
 )
 
 // Tracer interface for tracers in flow. Uses open tracing span definitions
 type Tracer interface {
-	module.ReadyDoneAware
+	ReadyDoneAware
 	StartSpan(entity flow.Identifier, spanName string, opts ...opentracing.StartSpanOption) opentracing.Span
 	FinishSpan(entity flow.Identifier, spanName string)
 	GetSpan(entity flow.Identifier, spanName string) (opentracing.Span, bool)
+	StartSpanFromContext(ctx context.Context, operationName string) (opentracing.Span, context.Context)
+	StartSpanFromParent(span opentracing.Span, operationName string) opentracing.Span
 }

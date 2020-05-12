@@ -13,16 +13,17 @@ type Assignments interface {
 	// the memory pool.
 	Has(assignmentID flow.Identifier) bool
 
-	// ByID retrieves the chunk assignment from mempool based on provided ID
-	ByID(assignmentID flow.Identifier) (*chunkmodels.Assignment, error)
-
-	// Add will add the given Assignment to the memory pool; it will error if
-	// the Assignment is already in the memory pool.
-	Add(assignmentFingerprint flow.Identifier, assignment *chunkmodels.Assignment) error
+	// Add will add the given assignment to the memory pool. It will return
+	// false if it was already in the mempool.
+	Add(assignmentFingerprint flow.Identifier, assignment *chunkmodels.Assignment) bool
 
 	// Rem will remove the given Assignment from the memory pool; it will
 	// return true if the Assignment was known and removed.
 	Rem(assignmentID flow.Identifier) bool
+
+	// ByID retrieve the chunk assigment with the given ID from the memory pool.
+	// It will return false if it was not found in the mempool.
+	ByID(assignmentID flow.Identifier) (*chunkmodels.Assignment, bool)
 
 	// Size will return the current size of the memory pool.
 	Size() uint

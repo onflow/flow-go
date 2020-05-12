@@ -1,6 +1,7 @@
 package computation
 
 import (
+	"context"
 	"testing"
 
 	"github.com/onflow/cadence/runtime"
@@ -62,7 +63,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	vm, err := virtualmachine.New(rt)
 	require.NoError(t, err)
 
-	blockComputer := computer.NewBlockComputer(vm)
+	blockComputer := computer.NewBlockComputer(vm, nil)
 
 	engine := &Manager{
 		blockComputer: blockComputer,
@@ -73,7 +74,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	require.Empty(t, view.Delta())
 
-	returnedComputationResult, err := engine.ComputeBlock(executableBlock, view)
+	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, view)
 	require.NoError(t, err)
 
 	require.NotEmpty(t, view.Delta())

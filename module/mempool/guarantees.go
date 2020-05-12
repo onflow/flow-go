@@ -13,17 +13,17 @@ type Guarantees interface {
 	// currently in the memory pool.
 	Has(collID flow.Identifier) bool
 
-	// Add will add the given collection guarantee to the memory pool; it will
-	// error if the collection guarantee is already in the memory pool.
-	Add(guarantee *flow.CollectionGuarantee) error
+	// Add will add the given collection guarantee to the memory pool. It will
+	// return false if it was already in the mempool.
+	Add(guarantee *flow.CollectionGuarantee) bool
 
 	// Rem will remove the given collection guarantees from the memory pool; it
 	// will return true if the collection guarantees was known and removed.
 	Rem(collID flow.Identifier) bool
 
-	// ByID will retrieve the given collection guarantees from the memory pool;
-	// it will error if the collection guarantee is not in the memory pool.
-	ByID(collID flow.Identifier) (*flow.CollectionGuarantee, error)
+	// ByID retrieve the collection guarantee with the given ID from the memory
+	// pool. It will return false if it was not found in the mempool.
+	ByID(collID flow.Identifier) (*flow.CollectionGuarantee, bool)
 
 	// Size will return the current size of the memory pool.
 	Size() uint

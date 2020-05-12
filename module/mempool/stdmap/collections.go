@@ -3,8 +3,6 @@
 package stdmap
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -23,21 +21,18 @@ func NewCollections(limit uint) (*Collections, error) {
 }
 
 // Add adds a collection to the mempool.
-func (g *Collections) Add(coll *flow.Collection) error {
+func (g *Collections) Add(coll *flow.Collection) bool {
 	return g.Backend.Add(coll)
 }
 
 // ByID returns the collection with the given ID from the mempool.
-func (g *Collections) ByID(collID flow.Identifier) (*flow.Collection, error) {
-	entity, err := g.Backend.ByID(collID)
-	if err != nil {
-		return nil, err
+func (g *Collections) ByID(collID flow.Identifier) (*flow.Collection, bool) {
+	entity, exists := g.Backend.ByID(collID)
+	if !exists {
+		return nil, false
 	}
-	coll, ok := entity.(*flow.Collection)
-	if !ok {
-		panic(fmt.Sprintf("invalid entity in collection pool (%T)", entity))
-	}
-	return coll, nil
+	coll := entity.(*flow.Collection)
+	return coll, true
 }
 
 // All returns all collections from the mempool.

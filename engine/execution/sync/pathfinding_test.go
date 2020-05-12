@@ -1,12 +1,14 @@
 package sync
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/execution/state/mock"
+	state "github.com/dapperlabs/flow-go/engine/execution/state/mock"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -32,12 +34,14 @@ func TestPathfinding(t *testing.T) {
 	f := unittest.StateDeltaWithParentFixture(d.Block.Header)
 	g := unittest.StateDeltaWithParentFixture(b.Block.Header)
 
-	executionStateMock := new(mock.ReadOnlyExecutionState)
+	executionStateMock := new(state.ReadOnlyExecutionState)
 
 	allStateDeltas := []*messages.ExecutionStateDelta{a, b, c, d, e, f, g}
 
 	for _, delta := range allStateDeltas {
-		executionStateMock.On("RetrieveStateDelta", delta.Block.ID()).Return(delta, nil).Maybe()
+		executionStateMock.
+			On("RetrieveStateDelta", mock.Anything, delta.Block.ID()).
+			Return(delta, nil).Maybe()
 	}
 
 	sync := &stateSync{
@@ -46,7 +50,7 @@ func TestPathfinding(t *testing.T) {
 
 	testPath := func(start *messages.ExecutionStateDelta, end *messages.ExecutionStateDelta, expectedPath []*messages.ExecutionStateDelta) func(t *testing.T) {
 		return func(t *testing.T) {
-			deltas, err := sync.findDeltasToSend(start.Block.ID(), end.Block.ID())
+			deltas, err := sync.findDeltasToSend(context.Background(), start.Block.ID(), end.Block.ID())
 			require.NoError(t, err)
 			assert.Equal(t, expectedPath, deltas)
 		}
@@ -54,7 +58,7 @@ func TestPathfinding(t *testing.T) {
 
 	testError := func(start *messages.ExecutionStateDelta, end *messages.ExecutionStateDelta) func(t *testing.T) {
 		return func(t *testing.T) {
-			_, err := sync.findDeltasToSend(start.Block.ID(), end.Block.ID())
+			_, err := sync.findDeltasToSend(context.Background(), start.Block.ID(), end.Block.ID())
 			require.Error(t, err)
 		}
 	}
@@ -65,7 +69,7 @@ func TestPathfinding(t *testing.T) {
 
 	t.Run("empty path", testPath(b, b, nil))
 
-	//path e-d-c is omitted as it must exist on target node for e to be its starting state
+	// path e-d-c is omitted as it must exist on target node for e to be its starting state
 	t.Run("leaves", testPath(d, g, []*messages.ExecutionStateDelta{b, g}))
 	t.Run("leaves reversed", testPath(g, d, []*messages.ExecutionStateDelta{d}))
 

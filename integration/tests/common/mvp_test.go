@@ -75,7 +75,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 
 	// deploy the contract
 	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
-	err = client.DeployContract(childCtx, genesis.ID(), counterContract)
+	err = client.DeployContract(childCtx, genesis.ID(), CounterContract)
 	cancel()
 	require.NoError(t, err)
 

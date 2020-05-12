@@ -141,7 +141,7 @@ func GenesisFixture(identities flow.IdentityList) *flow.Block {
 }
 
 func BlockHeaderFixture() flow.Header {
-	height := rand.Uint64()
+	height := uint64(rand.Uint32())
 	view := height + uint64(rand.Intn(1000))
 	return BlockHeaderWithParentFixture(&flow.Header{
 		ChainID:  flow.TestingChainID,
@@ -212,24 +212,31 @@ func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
 	return block
 }
 
-func CollectionGuaranteeFixture() *flow.CollectionGuarantee {
-	return &flow.CollectionGuarantee{
+func WithCollRef(refID flow.Identifier) func(*flow.CollectionGuarantee) {
+	return func(guarantee *flow.CollectionGuarantee) {
+		guarantee.ReferenceBlockID = refID
+	}
+}
+
+func CollectionGuaranteeFixture(options ...func(*flow.CollectionGuarantee)) *flow.CollectionGuarantee {
+	guarantee := &flow.CollectionGuarantee{
 		CollectionID: IdentifierFixture(),
 		SignerIDs:    IdentifierListFixture(16),
 		Signature:    SignatureFixture(),
 	}
+	for _, option := range options {
+		option(guarantee)
+	}
+	return guarantee
 }
 
-func CollectionGuaranteesFixture(n int) []*flow.CollectionGuarantee {
-	ret := make([]*flow.CollectionGuarantee, 0, n)
+func CollectionGuaranteesFixture(n int, options ...func(*flow.CollectionGuarantee)) []*flow.CollectionGuarantee {
+	guarantees := make([]*flow.CollectionGuarantee, 0, n)
 	for i := 1; i <= n; i++ {
-		cg := flow.CollectionGuarantee{
-			CollectionID: IdentifierFixture(),
-			Signature:    SignatureFixture(),
-		}
-		ret = append(ret, &cg)
+		guarantee := CollectionGuaranteeFixture(options...)
+		guarantees = append(guarantees, guarantee)
 	}
-	return ret
+	return guarantees
 }
 
 func BlockSealFixture() *flow.Seal {
