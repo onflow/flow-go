@@ -579,13 +579,13 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		// cluster ID is equivalent to chain ID
 		clusterID := clusterGenesis.Header.ChainID
 
-		clusterGenesisPath := fmt.Sprintf(bootstrap.FilenameGenesisClusterBlock, clusterID)
+		clusterGenesisPath := fmt.Sprintf(bootstrap.PathGenesisClusterBlock, clusterID)
 		err = writeJSON(filepath.Join(bootstrapDir, clusterGenesisPath), clusterGenesis)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		clusterQCPath := fmt.Sprintf(bootstrap.FilenameGenesisClusterQC, clusterID)
+		clusterQCPath := fmt.Sprintf(bootstrap.PathGenesisClusterQC, clusterID)
 		err = writeJSON(filepath.Join(bootstrapDir, clusterQCPath), clusterQC)
 		if err != nil {
 			return nil, nil, err

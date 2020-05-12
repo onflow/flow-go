@@ -63,10 +63,8 @@ func main() {
 	conf := testnet.NewNetworkConfig("localnet", nodes, testnet.WithClusters(nClusters))
 
 	err := os.RemoveAll(BootstrapDir)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			panic(err)
-		}
+	if err != nil && !os.IsNotExist(err) {
+		panic(err)
 	}
 
 	err = os.Mkdir(BootstrapDir, 0755)
