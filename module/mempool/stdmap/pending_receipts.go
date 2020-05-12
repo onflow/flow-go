@@ -3,8 +3,6 @@
 package stdmap
 
 import (
-	"sync"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/verification"
 )
@@ -12,7 +10,6 @@ import (
 // PendingReceipts implements the execution receipts memory pool of the consensus node,
 // used to store execution receipts and to generate block seals.
 type PendingReceipts struct {
-	sync.Mutex
 	*Backend
 }
 
