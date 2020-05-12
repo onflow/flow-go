@@ -4,36 +4,36 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/ledger/trie"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
 )
 
 type TrieStorage struct {
-	tree *trie.SMT
-	// mForest *mtrie.MForest
+	// tree *trie.SMT
+	mForest *mtrie.MForest
 }
 
 // NewTrieStorage creates a new trie-backed ledger storage.
 func NewTrieStorage(dbDir string) (*TrieStorage, error) {
 
-	tree, err := trie.NewSMT(
-		dbDir,
-		257,
-		1000,
-		1000000,
-		1000,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	// mForest, err := mtrie.NewMForest(257, dbDir, 1000)
+	// tree, err := trie.NewSMT(
+	// 	dbDir,
+	// 	257,
+	// 	1000,
+	// 	1000000,
+	// 	1000,
+	// )
 	// if err != nil {
 	// 	return nil, err
 	// }
 
+	mForest, err := mtrie.NewMForest(257, dbDir, 1000)
+	if err != nil {
+		return nil, err
+	}
+
 	return &TrieStorage{
-		tree: tree,
-		// mForest: mForest,
+		// tree: tree,
+		mForest: mForest,
 	}, nil
 }
 
@@ -44,15 +44,15 @@ func (f *TrieStorage) Ready() <-chan struct{} {
 }
 
 func (f *TrieStorage) Done() <-chan struct{} {
-	f.tree.SafeClose()
+	// f.tree.SafeClose()
 	done := make(chan struct{})
 	close(done)
 	return done
 }
 
 func (f *TrieStorage) EmptyStateCommitment() flow.StateCommitment {
-	// return f.mForest.GetEmptyRootHash()
-	return trie.GetDefaultHashForHeight(f.tree.GetHeight() - 1)
+	return f.mForest.GetEmptyRootHash()
+	// return trie.GetDefaultHashForHeight(f.tree.GetHeight() - 1)
 }
 
 // GetRegisters read the values at the given registers at the given flow.StateCommitment
@@ -64,8 +64,8 @@ func (f *TrieStorage) GetRegisters(
 	values []flow.RegisterValue,
 	err error,
 ) {
-	// values, err = f.mForest.Read(registerIDs, stateCommitment)
-	values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
+	values, err = f.mForest.Read(registerIDs, stateCommitment)
+	// values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
 	return values, err
 }
 
@@ -92,8 +92,8 @@ func (f *TrieStorage) UpdateRegisters(
 		return stateCommitment, nil
 	}
 
-	// newStateCommitment, err = f.mForest.Update(ids, values, stateCommitment)
-	newStateCommitment, err = f.tree.Update(ids, values, stateCommitment)
+	newStateCommitment, err = f.mForest.Update(ids, values, stateCommitment)
+	// newStateCommitment, err = f.tree.Update(ids, values, stateCommitment)
 	if err != nil {
 		return nil, fmt.Errorf("cannot update state: %w", err)
 	}
@@ -112,20 +112,20 @@ func (f *TrieStorage) GetRegistersWithProof(
 	err error,
 ) {
 
-	// values, err = f.mForest.Read(registerIDs, stateCommitment)
-	values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
+	values, err = f.mForest.Read(registerIDs, stateCommitment)
+	// values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Could not get register values: %w", err)
 	}
 
-	// batchProof, err := f.mForest.Proofs(registerIDs, stateCommitment)
-	batchProof, err := f.tree.GetBatchProof(registerIDs, stateCommitment)
+	batchProof, err := f.mForest.Proofs(registerIDs, stateCommitment)
+	// batchProof, err := f.tree.GetBatchProof(registerIDs, stateCommitment)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Could not get proofs: %w", err)
 	}
 
-	// proofToGo := mtrie.EncodeBatchProof(batchProof)
-	proofToGo := trie.EncodeProof(batchProof)
+	proofToGo := mtrie.EncodeBatchProof(batchProof)
+	// proofToGo := trie.EncodeProof(batchProof)
 	return values, proofToGo, err
 }
 
@@ -174,9 +174,10 @@ func (f *TrieStorage) UpdateRegistersWithProof(
 
 // CloseStorage closes the DB
 func (f *TrieStorage) CloseStorage() {
-	f.tree.SafeClose()
+	// f.tree.SafeClose()
 }
 
 func (f *TrieStorage) Size() (int64, error) {
-	return f.tree.Size()
+	// return f.tree.Size()
+	return 0, nil
 }
