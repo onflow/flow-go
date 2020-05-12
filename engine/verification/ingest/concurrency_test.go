@@ -32,11 +32,7 @@ import (
 // - for each assigned chunk ingest engine emits a single result approval to verify engine only once
 // (even in presence of duplication)
 func TestConcurrency(t *testing.T) {
-	// TODO broken test
-	// will be addressed in
-	// https://github.com/dapperlabs/flow-go/issues/3613
-
-	t.SkipNow()
+	var mu sync.Mutex
 	testcases := []struct {
 		erCount, // number of execution receipts
 		senderCount, // number of (concurrent) senders for each execution receipt
@@ -75,8 +71,12 @@ func TestConcurrency(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
+
 		t.Run(fmt.Sprintf("%d-ers/%d-senders/%d-chunks", tc.erCount, tc.senderCount, tc.chunksNum), func(t *testing.T) {
+			mu.Lock()
+			defer mu.Unlock()
 			testConcurrency(t, tc.erCount, tc.senderCount, tc.chunksNum)
+
 		})
 	}
 }
@@ -116,7 +116,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	// ingest only sends the assigned chunks to verifier
 
 	for i := 0; i < erCount; i++ {
-		er := test.CompleteExecutionResultFixture(t, chunksNum)
+		er := test.LightExecutionResultFixture(chunksNum)
 		ers = append(ers, er)
 		// assigns all chunks to the verifier node
 		for j, chunk := range er.Receipt.ExecutionResult.Chunks {
@@ -231,8 +231,8 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	}
 
 	// wait for all ERs to be sent to VER
-	unittest.RequireReturnsBefore(t, senderWG.Wait, time.Duration(senderCount*chunksNum*erCount)*time.Second)
-	unittest.RequireReturnsBefore(t, verifierEngWG.Wait, time.Duration(senderCount*chunksNum*erCount)*time.Second)
+	unittest.RequireReturnsBefore(t, senderWG.Wait, time.Duration(senderCount*chunksNum*erCount*5)*time.Second)
+	unittest.RequireReturnsBefore(t, verifierEngWG.Wait, time.Duration(senderCount*chunksNum*erCount*5)*time.Second)
 
 	// stops ingest engine of verification node
 	// Note: this should be done prior to any evaluation to make sure that

@@ -1,6 +1,8 @@
 package stdmap
 
 import (
+	"fmt"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/verification/tracker"
 )
@@ -34,10 +36,28 @@ func (c *ChunkDataPackTrackers) Rem(chunkID flow.Identifier) bool {
 	return c.Backend.Rem(chunkID)
 }
 
+// Inc atomically increases the counter of tracker by one and returns the updated tracker
+func (c *ChunkDataPackTrackers) Inc(chunkID flow.Identifier) (*tracker.ChunkDataPackTracker, error) {
+	updated, ok := c.Backend.Adjust(chunkID, func(entity flow.Entity) flow.Entity {
+		cdpt := entity.(*tracker.ChunkDataPackTracker)
+		return &tracker.ChunkDataPackTracker{
+			ChunkID: cdpt.ChunkID,
+			BlockID: cdpt.BlockID,
+			Counter: cdpt.Counter + 1,
+		}
+	})
+
+	if !ok {
+		return nil, fmt.Errorf("could not update tracker in backend")
+	}
+
+	return updated.(*tracker.ChunkDataPackTracker), nil
+}
+
 // ByChunkID returns the chunk data pack tracker for the given chunk ID.
 func (c *ChunkDataPackTrackers) ByChunkID(chunkID flow.Identifier) (*tracker.ChunkDataPackTracker, bool) {
-	entity, exists := c.Backend.ByID(chunkID)
-	if !exists {
+	entity, ok := c.Backend.ByID(chunkID)
+	if !ok {
 		return nil, false
 	}
 	chunkDataPackTracker := entity.(*tracker.ChunkDataPackTracker)
@@ -46,6 +66,9 @@ func (c *ChunkDataPackTrackers) ByChunkID(chunkID flow.Identifier) (*tracker.Chu
 
 // All returns all chunk data pack trackers from the pool.
 func (c *ChunkDataPackTrackers) All() []*tracker.ChunkDataPackTracker {
+	c.Lock()
+	defer c.Unlock()
+
 	entities := c.Backend.All()
 	chunkDataPackTrackers := make([]*tracker.ChunkDataPackTracker, 0, len(entities))
 	for _, entity := range entities {

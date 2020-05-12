@@ -79,6 +79,29 @@ func (_m *CollectionTrackers) Has(collID flow.Identifier) bool {
 	return r0
 }
 
+// Inc provides a mock function with given fields: collID
+func (_m *CollectionTrackers) Inc(collID flow.Identifier) (*tracker.CollectionTracker, error) {
+	ret := _m.Called(collID)
+
+	var r0 *tracker.CollectionTracker
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *tracker.CollectionTracker); ok {
+		r0 = rf(collID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*tracker.CollectionTracker)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(collID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Rem provides a mock function with given fields: collID
 func (_m *CollectionTrackers) Rem(collID flow.Identifier) bool {
 	ret := _m.Called(collID)
