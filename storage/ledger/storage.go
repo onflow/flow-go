@@ -15,8 +15,8 @@ type TrieStorage struct {
 const (
 	Height              = 257
 	Interval            = 1000
+	CacheSize           = 25      // Max number of open databases
 	NumHistoricalStates = 1000000 // EVERYTHING FAILS WHEN THIS LIMIT IS REACHED
-	CacheSize           = 10      // MAX NUMBER OF OPEN LEVEL DBs
 )
 
 // NewTrieStorage creates a new trie-backed ledger storage.
