@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/opt"
 
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
 	"github.com/dapperlabs/flow-go/utils/io"
@@ -83,7 +84,7 @@ func (s *LevelDB) UpdateKVDB(keys [][]byte, values [][]byte) error {
 		kvBatcher.Put(keys[i], values[i])
 	}
 
-	err := s.kvdb.Write(kvBatcher, nil)
+	err := s.kvdb.Write(kvBatcher, &opt.WriteOptions{Sync: true})
 	if err != nil {
 		return err
 	}
@@ -98,7 +99,7 @@ func (s *LevelDB) UpdateTrieDB(batcher databases.Batcher) error {
 		return fmt.Errorf("supplied batcher is not of type leveldb.Batch - make sure you supply batcher produced by NewBatcher")
 	}
 
-	err := s.tdb.Write(levelDBBatcher, nil)
+	err := s.tdb.Write(levelDBBatcher, &opt.WriteOptions{Sync: true})
 	if err != nil {
 		return err
 	}
@@ -209,7 +210,7 @@ func copyDB(src, dest *leveldb.DB) error {
 		key := iter.Key()
 		value := iter.Value()
 
-		err := dest.Put(key, value, nil)
+		err := dest.Put(key, value, &opt.WriteOptions{Sync: true})
 		if err != nil {
 			return err
 		}
