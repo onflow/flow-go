@@ -558,6 +558,12 @@ func (e *Engine) getCollectionForChunk(block *flow.Block, receipt *flow.Executio
 				Msg("could not get collection from authenticated pool")
 			return nil, false
 		}
+
+		log.Debug().
+			Hex("collection_id", logging.ID(collID)).
+			Hex("chunk_id", logging.ID(chunk.ID())).
+			Msg("collection is resolved from authenticated mempool")
+
 		return coll, true
 	}
 

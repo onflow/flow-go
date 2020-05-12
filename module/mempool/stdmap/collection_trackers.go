@@ -28,9 +28,6 @@ func (c *CollectionTrackers) Add(ct *tracker.CollectionTracker) bool {
 // Has checks whether the CollectionTracker with the given collection ID is currently in
 // the memory pool.
 func (c *CollectionTrackers) Has(collID flow.Identifier) bool {
-	c.Lock()
-	defer c.Unlock()
-
 	return c.Backend.Has(collID)
 }
 
