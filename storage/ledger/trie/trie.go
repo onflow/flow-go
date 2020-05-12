@@ -569,7 +569,7 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 	values := make([][]byte, len(keys))
 
 	for i, key := range keys {
-		res, err1 := tree.database.GetKVDB(key)
+		res, err := tree.database.GetKVDB(key)
 		if err != nil {
 
 			localRoot := root
@@ -582,8 +582,6 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 				res, err = tree.database.GetKVDB(key)
 				if err == nil {
 					break
-				} else if !errors.Is(err, databases.ErrNotFound) {
-					return nil, nil, fmt.Errorf("unexpected err (%s): %w", localRoot, err)
 				}
 
 				if s.IsSnapshot(tree) {
@@ -593,10 +591,11 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 				localRoot = tree.previous
 			}
 
-			if res == nil && !errors.Is(err1, databases.ErrNotFound) {
-				return nil, nil, fmt.Errorf("cannot get key (%s): %w", tree.root, err)
+			if res == nil && !errors.Is(err, databases.ErrNotFound) {
+				return nil, nil, err
 			}
 		}
+
 		values[i] = res
 	}
 
