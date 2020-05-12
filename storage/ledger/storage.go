@@ -2,12 +2,14 @@ package ledger
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 )
 
 type TrieStorage struct {
+	lock sync.Mutex
 	tree *trie.SMT
 	// mForest *mtrie.MForest
 }
@@ -71,7 +73,8 @@ func (f *TrieStorage) GetRegisters(
 	values []flow.RegisterValue,
 	err error,
 ) {
-	// values, err = f.mForest.Read(registerIDs, stateCommitment)
+	f.lock.Lock()
+	defer f.lock.Unlock()
 	values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
 	return values, err
 }
@@ -79,6 +82,20 @@ func (f *TrieStorage) GetRegisters(
 // UpdateRegisters updates the values at the given registers
 // This is trusted so no proof is generated
 func (f *TrieStorage) UpdateRegisters(
+	ids []flow.RegisterID,
+	values []flow.RegisterValue,
+	stateCommitment flow.StateCommitment,
+) (
+	newStateCommitment flow.StateCommitment,
+	err error,
+) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	return f.updateRegisters(ids, values, stateCommitment)
+}
+
+func (f *TrieStorage) updateRegisters(
 	ids []flow.RegisterID,
 	values []flow.RegisterValue,
 	stateCommitment flow.StateCommitment,
@@ -118,8 +135,20 @@ func (f *TrieStorage) GetRegistersWithProof(
 	proofs []flow.StorageProof,
 	err error,
 ) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
 
-	// values, err = f.mForest.Read(registerIDs, stateCommitment)
+	return f.getRegistersWithProof(registerIDs, stateCommitment)
+}
+
+func (f *TrieStorage) getRegistersWithProof(
+	registerIDs []flow.RegisterID,
+	stateCommitment flow.StateCommitment,
+) (
+	values []flow.RegisterValue,
+	proofs []flow.StorageProof,
+	err error,
+) {
 	values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Could not get register values: %w", err)
@@ -143,10 +172,14 @@ func (f *TrieStorage) GetRegisterTouches(
 	[]flow.RegisterTouch,
 	error,
 ) {
-	values, proofs, err := f.GetRegistersWithProof(registerIDs, stateCommitment)
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	values, proofs, err := f.getRegistersWithProof(registerIDs, stateCommitment)
 	if err != nil {
 		return nil, err
 	}
+
 	rets := make([]flow.RegisterTouch, 0, len(registerIDs))
 	for i, reg := range registerIDs {
 		rt := flow.RegisterTouch{
@@ -156,6 +189,7 @@ func (f *TrieStorage) GetRegisterTouches(
 		}
 		rets = append(rets, rt)
 	}
+
 	return rets, nil
 }
 
@@ -170,12 +204,15 @@ func (f *TrieStorage) UpdateRegistersWithProof(
 	proofs []flow.StorageProof,
 	err error,
 ) {
-	newStateCommitment, err = f.UpdateRegisters(ids, values, stateCommitment)
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	newStateCommitment, err = f.updateRegisters(ids, values, stateCommitment)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	_, proofs, err = f.GetRegistersWithProof(ids, newStateCommitment)
+	_, proofs, err = f.getRegistersWithProof(ids, newStateCommitment)
 	return newStateCommitment, proofs, err
 }
 
