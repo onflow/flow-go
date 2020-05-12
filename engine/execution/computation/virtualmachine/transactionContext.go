@@ -242,7 +242,7 @@ func (r *TransactionContext) GenerateUUID() uint64 {
 
 func (r *TransactionContext) GetComputationLimit() uint64 {
 	// TODO: implement me
-	return 100
+	return 1000000
 }
 
 func (r *TransactionContext) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {
