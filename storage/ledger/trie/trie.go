@@ -183,7 +183,7 @@ func (f *forest) newTree(root Root, db databases.DAL) (*tree, error) {
 
 	deltaNumber, err := db.GetTrieDB(metadataHeight)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get delta number: %w", err)
+		return nil, fmt.Errorf("cannot get delta number (%s): %w", root, err)
 	}
 
 	previousRoot, err := db.GetTrieDB(metadataKeyPrevious)
