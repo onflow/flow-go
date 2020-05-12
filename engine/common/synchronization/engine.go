@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -27,6 +28,7 @@ import (
 type Engine struct {
 	unit     *engine.Unit
 	log      zerolog.Logger
+	metrics  module.EngineMetrics
 	me       module.Local
 	state    protocol.State
 	con      network.Conduit
@@ -48,6 +50,7 @@ type Engine struct {
 // New creates a new consensus propagation engine.
 func New(
 	log zerolog.Logger,
+	metrics module.EngineMetrics,
 	net module.Network,
 	me module.Local,
 	state protocol.State,
@@ -58,7 +61,8 @@ func New(
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		unit:     engine.NewUnit(),
-		log:      log.With().Str("engine", "consensus").Logger(),
+		log:      log.With().Str("engine", "synchronization").Logger(),
+		metrics:  metrics,
 		me:       me,
 		state:    state,
 		blocks:   blocks,
@@ -111,7 +115,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+			e.log.Error().Err(err).Msg("synchronization could not process submitted event")
 		}
 	})
 }
@@ -147,14 +151,19 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 	switch ev := event.(type) {
 	case *messages.SyncRequest:
+		e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageSyncRequest)
 		return e.onSyncRequest(originID, ev)
 	case *messages.SyncResponse:
+		e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageSyncResponse)
 		return e.onSyncResponse(originID, ev)
 	case *messages.RangeRequest:
+		e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageRangeRequest)
 		return e.onRangeRequest(originID, ev)
 	case *messages.BatchRequest:
+		e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageBatchRequest)
 		return e.onBatchRequest(originID, ev)
 	case *messages.BlockResponse:
+		e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageBlockResponse)
 		return e.onBlockResponse(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
@@ -199,6 +208,8 @@ func (e *Engine) onSyncRequest(originID flow.Identifier, req *messages.SyncReque
 	if err != nil {
 		return fmt.Errorf("could not send sync response: %w", err)
 	}
+
+	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageSyncResponse)
 
 	return nil
 }
@@ -270,6 +281,8 @@ func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeReq
 		return fmt.Errorf("could not send range response: %w", err)
 	}
 
+	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBlockResponse)
+
 	return nil
 }
 
@@ -316,6 +329,8 @@ func (e *Engine) onBatchRequest(originID flow.Identifier, req *messages.BatchReq
 	if err != nil {
 		return fmt.Errorf("could not send batch response: %w", err)
 	}
+
+	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBlockResponse)
 
 	return nil
 }
@@ -453,6 +468,7 @@ func (e *Engine) pollHeight() error {
 	var errs error
 	// send the request for synchronization
 	for _, targetID := range identities.Sample(3).NodeIDs() {
+
 		req := &messages.SyncRequest{
 			Nonce:  rand.Uint64(),
 			Height: final.Height,
@@ -461,6 +477,8 @@ func (e *Engine) pollHeight() error {
 		if err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("could not send sync request: %w", err))
 		}
+
+		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageSyncRequest)
 	}
 
 	return errs
@@ -603,11 +621,18 @@ func (e *Engine) sendRequests(heights []uint64, blockIDs []flow.Identifier) erro
 			return fmt.Errorf("could not send range request: %w", err)
 		}
 
-		// mark all of the heights as requested; these should always be there as
-		// we call this right after the scan and nothing else can delete keys
+		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageRangeRequest)
+
+		// mark all of the heights as requested
 		for height := ran.From; height <= ran.To; height++ {
-			e.heights[height].Requested = time.Now()
-			e.heights[height].Attempts++
+			// NOTE: during the short window between scan and send, we could
+			// have received a block and removed a key
+			status, needed := e.heights[height]
+			if !needed {
+				continue
+			}
+			status.Requested = time.Now()
+			status.Attempts++
 		}
 
 		// check if we reached the maximum number of requests for this period
@@ -637,11 +662,18 @@ func (e *Engine) sendRequests(heights []uint64, blockIDs []flow.Identifier) erro
 			return fmt.Errorf("could not send batch request: %w", err)
 		}
 
-		// mark all of the blocks as requested; these should always be there as
-		// we call this right after the scan and nothing else can delete keys
+		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBatchRequest)
+
+		// mark all of the blocks as requested
 		for _, blockID := range requestIDs {
-			e.blockIDs[blockID].Requested = time.Now()
-			e.blockIDs[blockID].Attempts++
+			// NOTE: during the short window between scan and send, we could
+			// have received a block and removed a key
+			status, needed := e.blockIDs[blockID]
+			if !needed {
+				continue
+			}
+			status.Requested = time.Now()
+			status.Attempts++
 		}
 
 		// check if we reached maximum requests
@@ -650,9 +682,6 @@ func (e *Engine) sendRequests(heights []uint64, blockIDs []flow.Identifier) erro
 			return nil
 		}
 	}
-
-	// TODO: when not requesting batches/ranges, make sure we don't add an
-	// attempt and we don't restart the retry timeout
 
 	return nil
 }

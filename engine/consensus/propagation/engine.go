@@ -3,7 +3,6 @@
 package propagation
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -13,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -21,24 +21,30 @@ import (
 // Engine is the propagation engine, which makes sure that new collections are
 // propagated to the other consensus nodes on the network.
 type Engine struct {
-	unit  *engine.Unit       // used to control startup/shutdown
-	log   zerolog.Logger     // used to log relevant actions with context
-	con   network.Conduit    // used to talk to other nodes on the network
-	state protocol.State     // used to access the  protocol state
-	me    module.Local       // used to access local node information
-	pool  mempool.Guarantees // holds collection guarantees in memory
+	unit       *engine.Unit            // used to control startup/shutdown
+	log        zerolog.Logger          // used to log relevant actions with context
+	metrics    module.EngineMetrics    // used to track sent & received messages
+	mempool    module.MempoolMetrics   // used to track mempool sizes
+	spans      module.ConsensusMetrics // used to track timespans
+	con        network.Conduit         // used to talk to other nodes on the network
+	state      protocol.State          // used to access the  protocol state
+	me         module.Local            // used to access local node information
+	guarantees mempool.Guarantees      // holds collection guarantees in memory
 }
 
 // New creates a new collection propagation engine.
-func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, pool mempool.Guarantees) (*Engine, error) {
+func New(log zerolog.Logger, metrics module.EngineMetrics, mempool module.MempoolMetrics, spans module.ConsensusMetrics, net module.Network, state protocol.State, me module.Local, guarantees mempool.Guarantees) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:  engine.NewUnit(),
-		log:   log.With().Str("engine", "propagation").Logger(),
-		state: state,
-		me:    me,
-		pool:  pool,
+		unit:       engine.NewUnit(),
+		log:        log.With().Str("engine", "propagation").Logger(),
+		metrics:    metrics,
+		mempool:    mempool,
+		spans:      spans,
+		state:      state,
+		me:         me,
+		guarantees: guarantees,
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -98,9 +104,10 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch entity := event.(type) {
+	switch ev := event.(type) {
 	case *flow.CollectionGuarantee:
-		return e.onGuarantee(originID, entity)
+		e.metrics.MessageReceived(metrics.EnginePropagation, metrics.MessageCollectionGuarantee)
+		return e.onGuarantee(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -118,49 +125,18 @@ func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.Collectio
 
 	log.Info().Msg("collection guarantee received")
 
-	err := e.storeGuarantee(guarantee)
-	if err != nil {
-		if errors.Is(err, mempool.ErrAlreadyExists) {
-			return nil
-		}
-
-		return fmt.Errorf("could not store guarantee: %w", err)
+	added := e.guarantees.Add(guarantee)
+	if !added {
+		log.Debug().Msg("discarding guarantee already in mempool")
+		return nil
 	}
+
+	e.mempool.MempoolEntries(metrics.ResourceGuarantee, e.guarantees.Size())
 
 	log.Info().Msg("collection guarantee processed")
 
-	// propagate the collection guarantee to other relevant nodes
-	err = e.propagateGuarantee(guarantee)
-	if err != nil {
-		return fmt.Errorf("could not broadcast guarantee: %w", err)
-	}
-
-	log.Info().Msg("collection guarantee propagated to consensus nodes")
-
-	return nil
-}
-
-// storeGuarantee will store a collection guarantee within the
-// context of our local protocol state and memory pool.
-func (e *Engine) storeGuarantee(guarantee *flow.CollectionGuarantee) error {
-
-	// TODO: validate the collection guarantee signature
-
-	// add the collection guarantee to our memory pool (also checks existence)
-	err := e.pool.Add(guarantee)
-	if err != nil {
-		return fmt.Errorf("could not add guarantee to mempool: %w", err)
-	}
-
-	return nil
-}
-
-// propagateGuarantee will submit the collection guarantee to the
-// network layer with all other consensus nodes as desired recipients.
-func (e *Engine) propagateGuarantee(guarantee *flow.CollectionGuarantee) error {
-
 	// select all the collection nodes on the network as our targets
-	ids, err := e.state.Final().Identities(filter.And(
+	identities, err := e.state.Final().Identities(filter.And(
 		filter.HasRole(flow.RoleConsensus),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
 	))
@@ -169,11 +145,14 @@ func (e *Engine) propagateGuarantee(guarantee *flow.CollectionGuarantee) error {
 	}
 
 	// send the collection guarantee to all consensus identities
-	targetIDs := ids.NodeIDs()
-	err = e.con.Submit(guarantee, targetIDs...)
+	err = e.con.Submit(guarantee, identities.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not send collection guarantee: %w", err)
 	}
+
+	e.metrics.MessageSent(metrics.EnginePropagation, metrics.MessageCollectionGuarantee)
+
+	log.Info().Msg("collection guarantee propagated to consensus nodes")
 
 	return nil
 }

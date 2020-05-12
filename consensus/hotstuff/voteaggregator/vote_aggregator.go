@@ -47,7 +47,7 @@ func New(notifier hotstuff.Consumer, highestPrunedView uint64, committee hotstuf
 func (va *VoteAggregator) StorePendingVote(vote *model.Vote) bool {
 	// check if the vote is for a view that has already been pruned (and is thus stale)
 	// cannot store vote for already pruned view
-	if va.isStale(vote) {
+	if va.isVoteStale(vote) {
 		return false
 	}
 	// add vote, return false if the vote is not successfully added (already existed)
@@ -71,7 +71,7 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *model.Vote, block *model.Blo
 		return oldQC, true, nil
 	}
 	// ignore stale votes
-	if va.isStale(vote) {
+	if va.isVoteStale(vote) {
 		return nil, false, nil
 	}
 	// validate the vote and adding it to the accumulated voting status
@@ -95,7 +95,7 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *model.Vote, block *model.Blo
 // StoreProposerVote stores the vote for a block that was proposed.
 func (va *VoteAggregator) StoreProposerVote(vote *model.Vote) bool {
 	// check if the proposer vote is for a view that has already been pruned (and is thus stale)
-	if va.isStale(vote) { // cannot store vote for already pruned view
+	if va.isVoteStale(vote) { // cannot store vote for already pruned view
 		return false
 	}
 	// add proposer vote, return false if it exists
@@ -113,12 +113,18 @@ func (va *VoteAggregator) StoreProposerVote(vote *model.Vote) bool {
 // It assumes the block has been validated.
 // It returns (qc, true, nil) if a QC is built
 // It returns (nil, false, nil) if not enough votes to build a QC.
+// It returns (nil, false, nil) if the block is stale
 // It returns (nil, false, err) if there is an unknown error
 func (va *VoteAggregator) BuildQCOnReceivedBlock(block *model.Block) (*model.QuorumCertificate, bool, error) {
 	// return the QC that was built before if exists
 	oldQC, exists := va.createdQC[block.BlockID]
 	if exists {
 		return oldQC, true, nil
+	}
+
+	// if the block is stale, we just return nil
+	if va.isBlockStale(block) {
+		return nil, false, nil
 	}
 
 	// proposer vote is the first to be accumulated
@@ -129,11 +135,10 @@ func (va *VoteAggregator) BuildQCOnReceivedBlock(block *model.Block) (*model.Quo
 		return nil, false, fmt.Errorf("could not get proposer vote for block: %x", block.BlockID)
 	}
 
-	if va.isStale(proposerVote) {
-		return nil, false, nil
-	}
-
-	// accumulate leader vote first to ensure leader's vote is always included in the QC
+	// accumulate proposer's vote first to ensure proposer's vote is always included in the QC.
+	// a consensus node is rewarded by having proposed block being included in the finalized chain.
+	// Including the proposer's vote first guarantees that the proposer will get rewarded if the block
+	// is finalized. It incentivizes an honest leader to propose block.
 	valid, err := va.validateAndStoreIncorporatedVote(proposerVote, block)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not validate proposer vote: %w", err)
@@ -312,6 +317,10 @@ func (va *VoteAggregator) canBuildQC(blockID flow.Identifier) bool {
 	return votingStatus.CanBuildQC()
 }
 
-func (va *VoteAggregator) isStale(vote *model.Vote) bool {
+func (va *VoteAggregator) isVoteStale(vote *model.Vote) bool {
 	return vote.View <= va.highestPrunedView
+}
+
+func (va *VoteAggregator) isBlockStale(block *model.Block) bool {
+	return block.View <= va.highestPrunedView
 }

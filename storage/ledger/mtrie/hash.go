@@ -2,8 +2,8 @@ package mtrie
 
 import "github.com/dapperlabs/flow-go/crypto/hash"
 
-var EmptySlice []byte
-var defaultLeafHash []byte = HashLeaf([]byte("default:"), EmptySlice)
+var emptySlice []byte
+var defaultLeafHash = HashLeaf([]byte("default:"), emptySlice)
 
 // we are currently supporting keys of a size up to 32 bytes. I.e. path length from the rootNode of a fully expanded tree to the leaf node is 256. A path of length k is comprised of k+1 vertices. Hence, we need 257 default hashes.
 var defaultHashes [257][]byte

@@ -8,6 +8,8 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
@@ -16,10 +18,10 @@ type Seals struct {
 	cache *Cache
 }
 
-func NewSeals(db *badger.DB) *Seals {
+func NewSeals(collector module.CacheMetrics, db *badger.DB) *Seals {
 
 	store := func(sealID flow.Identifier, seal interface{}) error {
-		return db.Update(operation.SkipDuplicates(operation.InsertSeal(sealID, seal.(*flow.Seal))))
+		return operation.RetryOnConflict(db.Update, operation.SkipDuplicates(operation.InsertSeal(sealID, seal.(*flow.Seal))))
 	}
 
 	retrieve := func(sealID flow.Identifier) (interface{}, error) {
@@ -29,8 +31,13 @@ func NewSeals(db *badger.DB) *Seals {
 	}
 
 	s := &Seals{
-		db:    db,
-		cache: newCache(withLimit(1000), withStore(store), withRetrieve(retrieve)),
+		db: db,
+		cache: newCache(collector,
+			withLimit(flow.DefaultTransactionExpiry),
+			withStore(store),
+			withRetrieve(retrieve),
+			withResource(metrics.ResourceSeal),
+		),
 	}
 
 	return s

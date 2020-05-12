@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -14,7 +15,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/dapperlabs/flow-go/engine/common/convert"
-	"github.com/dapperlabs/flow-go/engine/execution/ingestion/mock"
+	ingestion "github.com/dapperlabs/flow-go/engine/execution/ingestion/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -172,7 +173,7 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 		Address: rootAddress,
 	}
 
-	mockEngine := new(mock.IngestRPC)
+	mockEngine := new(ingestion.IngestRPC)
 
 	// create the handler
 	handler := &handler{
@@ -189,7 +190,7 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 	suite.Run("happy path with valid request", func() {
 
 		// setup mock expectations
-		mockEngine.On("GetAccount", rootAddress, id).Return(&rootAccount, nil).Once()
+		mockEngine.On("GetAccount", mock.Anything, rootAddress, id).Return(&rootAccount, nil).Once()
 
 		req := createReq(id[:], rootAddress.Bytes())
 
@@ -244,7 +245,7 @@ func (suite *Suite) TestGetTransactionResult() {
 	suite.events.On("ByBlockIDTransactionID", bID, txID).Return(eventsForTx, nil)
 
 	// expect a call to lookup each block
-	suite.blocks.On("ByID", block.ID()).Return(&block, nil)
+	suite.blocks.On("ByID", block.ID()).Return(&block, true)
 
 	// create the handler
 	createHandler := func(txResults *storage.TransactionResults) *handler {

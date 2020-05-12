@@ -23,7 +23,7 @@ func NewClusterPayloads(db *badger.DB) *ClusterPayloads {
 }
 
 func (cp *ClusterPayloads) Store(header *flow.Header, payload *cluster.Payload) error {
-	return cp.db.Update(func(tx *badger.Txn) error {
+	return operation.RetryOnConflict(cp.db.Update, func(tx *badger.Txn) error {
 
 		if header.PayloadHash != payload.Hash() {
 			return fmt.Errorf("payload integrity check failed")

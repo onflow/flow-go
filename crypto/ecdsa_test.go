@@ -7,8 +7,8 @@ import (
 	"crypto/rand"
 	"math/big"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -104,19 +104,19 @@ func TestECDSAUtils(t *testing.T) {
 	}
 }
 
-// TestScalarMult is a unit test of the scalar multiplication 
-// This is only a sanity check meant to make sure the curve implemented 
-// is checked against an independant test vector 
+// TestScalarMult is a unit test of the scalar multiplication
+// This is only a sanity check meant to make sure the curve implemented
+// is checked against an independant test vector
 func TestScalarMult(t *testing.T) {
 	secp256k1 := newECDSASecp256k1().curve
 	p256 := newECDSAP256().curve
 	genericMultTests := []struct {
 		curve elliptic.Curve
-		Px  string
-		Py  string
-		k  string
-		Qx string
-		Qy string
+		Px    string
+		Py    string
+		k     string
+		Qx    string
+		Qy    string
 	}{
 		{
 			secp256k1,
@@ -138,9 +138,9 @@ func TestScalarMult(t *testing.T) {
 
 	baseMultTests := []struct {
 		curve elliptic.Curve
-		k  string
-		Qx string
-		Qy string
+		k     string
+		Qx    string
+		Qy    string
 	}{
 		{
 			secp256k1,
@@ -164,7 +164,7 @@ func TestScalarMult(t *testing.T) {
 		Qy, _ := new(big.Int).SetString(test.Qy, 16)
 		Rx, Ry := test.curve.ScalarMult(Px, Py, k.Bytes())
 		assert.Equal(t, Rx.Cmp(Qx), 0)
-		assert.Equal(t, Ry.Cmp(Qy), 0) 
+		assert.Equal(t, Ry.Cmp(Qy), 0)
 	}
 	for _, test := range baseMultTests {
 		k, _ := new(big.Int).SetString(test.k, 16)
@@ -173,12 +173,12 @@ func TestScalarMult(t *testing.T) {
 		// base mult
 		Rx, Ry := test.curve.ScalarBaseMult(k.Bytes())
 		assert.Equal(t, Rx.Cmp(Qx), 0)
-		assert.Equal(t, Ry.Cmp(Qy), 0) 
+		assert.Equal(t, Ry.Cmp(Qy), 0)
 		// generic mult with base point
 		Px := new(big.Int).Set(test.curve.Params().Gx)
 		Py := new(big.Int).Set(test.curve.Params().Gy)
 		Rx, Ry = test.curve.ScalarMult(Px, Py, k.Bytes())
 		assert.Equal(t, Rx.Cmp(Qx), 0)
-		assert.Equal(t, Ry.Cmp(Qy), 0) 
+		assert.Equal(t, Ry.Cmp(Qy), 0)
 	}
 }

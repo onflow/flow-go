@@ -20,16 +20,13 @@ func NewQueues() *Queues {
 	return &Queues{NewBackend(WithEject(EjectPanic))}
 }
 
-func (b *QueuesBackdata) ByID(id flow.Identifier) (*queue.Queue, error) {
-	entity, err := b.Backdata.ByID(id)
-	if err != nil {
-		return nil, err
+func (b *QueuesBackdata) ByID(queueID flow.Identifier) (*queue.Queue, bool) {
+	entity, exists := b.Backdata.ByID(queueID)
+	if !exists {
+		return nil, false
 	}
-	block, ok := entity.(*queue.Queue)
-	if !ok {
-		panic(fmt.Sprintf("invalid entity in complete block mempool (%T)", entity))
-	}
-	return block, nil
+	queue := entity.(*queue.Queue)
+	return queue, true
 }
 
 func (b *QueuesBackdata) All() []*queue.Queue {
@@ -46,13 +43,13 @@ func (b *QueuesBackdata) All() []*queue.Queue {
 	return queues
 }
 
-func (b *Queues) Add(queue *queue.Queue) error {
+func (b *Queues) Add(queue *queue.Queue) bool {
 	return b.Backend.Add(queue)
 }
 
-func (b *Queues) Get(id flow.Identifier) (*queue.Queue, error) {
+func (b *Queues) Get(queueID flow.Identifier) (*queue.Queue, bool) {
 	backdata := &QueuesBackdata{&b.Backdata}
-	return backdata.ByID(id)
+	return backdata.ByID(queueID)
 }
 
 func (b *Queues) Run(f func(backdata *QueuesBackdata) error) error {

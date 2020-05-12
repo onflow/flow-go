@@ -124,7 +124,6 @@ func main() {
 		}
 		defer pprof.StopCPUProfile()
 	}
-	StorageBenchmark()
 	if *memprofile != "" {
 		f, err := os.Create(*memprofile)
 		if err != nil {
@@ -136,4 +135,8 @@ func main() {
 			log.Fatal("could not write memory profile: ", err)
 		}
 	}
+
+	// goroutine
+	StorageBenchmark()
+
 }

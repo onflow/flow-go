@@ -13,21 +13,17 @@ type Seals interface {
 	// the memory pool.
 	Has(sealID flow.Identifier) bool
 
-	// Add will add the given block seal to the memory pool; it will error if
-	// the block seal is already in the memory pool.
-	Add(seal *flow.Seal) error
+	// Add will add the given block seal to the memory pool. It will return
+	// false if it was already in the mempool.
+	Add(seal *flow.Seal) bool
 
 	// Rem will remove the given block seal from the memory pool; it will
 	// will return true if the block seal was known and removed.
 	Rem(sealID flow.Identifier) bool
 
-	// ByID will retrieve the given block seal from the memory pool; it will
-	// error if the block seal is not in the memory pool.
-	ByID(sealID flow.Identifier) (*flow.Seal, error)
-
-	// ByBlockID retrieves the seal associated with the given sealed block; it
-	// will error if no seal for the given block was found.
-	ByBlockID(blockID flow.Identifier) (*flow.Seal, error)
+	// ByID retrieve the block seal with the given ID from the memory
+	// pool. It will return false if it was not found in the mempool.
+	ByID(sealID flow.Identifier) (*flow.Seal, bool)
 
 	// Size will return the current size of the memory pool.
 	Size() uint

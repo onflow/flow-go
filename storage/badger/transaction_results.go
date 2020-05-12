@@ -21,27 +21,20 @@ func NewTransactionResults(db *badger.DB) *TransactionResults {
 
 // Store will store the transaction result for the given block ID
 func (tr *TransactionResults) Store(blockID flow.Identifier, transactionResult *flow.TransactionResult) error {
-	return tr.db.Update(func(btx *badger.Txn) error {
-		err := operation.InsertTransactionResult(blockID, transactionResult)(btx)
-		if err != nil {
-			return fmt.Errorf("could not insert event: %w", err)
-		}
-
-		return nil
-	})
+	err := operation.RetryOnConflict(tr.db.Update, operation.InsertTransactionResult(blockID, transactionResult))
+	if err != nil {
+		return fmt.Errorf("could not insert transaction result: %w", err)
+	}
+	return nil
 }
 
 // ByBlockIDTransactionID returns the runtime transaction result for the given block ID and transaction ID
 func (tr *TransactionResults) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) (*flow.TransactionResult, error) {
 
 	var txResult flow.TransactionResult
-	err := tr.db.View(func(btx *badger.Txn) error {
-		err := operation.RetrieveTransactionResult(blockID, txID, &txResult)(btx)
-		return handleError(err, flow.TransactionResult{})
-	})
-
+	err := tr.db.View(operation.RetrieveTransactionResult(blockID, txID, &txResult))
 	if err != nil {
-		return nil, err
+		return nil, handleError(err, flow.TransactionResult{})
 	}
 
 	return &txResult, nil

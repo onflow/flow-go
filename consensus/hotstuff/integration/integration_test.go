@@ -15,16 +15,17 @@ import (
 
 // a pacemaker timeout to wait for proposals. Usually 10 ms is enough,
 // but for slow environment like CI, a longer one is needed.
-const safeTimeout = 200 * time.Millisecond
+const safeTimeout = 2 * time.Second
+const safeDecrease = 200 * time.Millisecond
 
 func TestSingleInstance(t *testing.T) {
 
-	// set up a single instance to run4
+	// set up a single instance to run
 	// NOTE: currently, the HotStuff logic will infinitely call back on itself
 	// with a single instance, leading to a boundlessly growing call stack,
 	// which slows down the mocks significantly due to splitting the callstack
 	// to find the calling function name; we thus keep it low for now
-	finalView := uint64(100)
+	finalView := uint64(10)
 	in := NewInstance(t,
 		WithStopCondition(ViewFinalized(finalView)),
 	)
@@ -50,7 +51,7 @@ func TestThreeInstances(t *testing.T) {
 	// generate three hotstuff participants
 	participants := unittest.IdentityListFixture(num)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, 0.5, 1.5, 1*time.Second)
+	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, 0.5, 1.5, safeDecrease)
 	require.NoError(t, err)
 
 	// set up three instances that are exactly the same
@@ -96,10 +97,6 @@ func TestThreeInstances(t *testing.T) {
 
 func TestSevenInstances(t *testing.T) {
 
-	if testing.Short() {
-		t.Skip("skipping time intensive test")
-	}
-
 	// test parameters
 	// NOTE: block finalization seems to be rather slow on CI at the moment,
 	// needing around 1 minute on Travis for 1000 blocks and 10 minutes on
@@ -113,7 +110,7 @@ func TestSevenInstances(t *testing.T) {
 	participants := unittest.IdentityListFixture(numPass + numFail)
 	instances := make([]*Instance, 0, numPass+numFail)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, 0.5, 1.5, 1*time.Second)
+	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, 0.5, 1.5, safeDecrease)
 	require.NoError(t, err)
 
 	// set up five instances that work fully

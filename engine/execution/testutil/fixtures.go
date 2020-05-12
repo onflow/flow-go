@@ -41,17 +41,17 @@ func CreateCounterTransaction() flow.TransactionBody {
 	return flow.TransactionBody{
 		Script: []byte(`
 			import 0x01
-			
+
 			transaction {
 				prepare(acc: AuthAccount) {
 					var maybeCounter <- acc.load<@Container.Counter>(from: /storage/counter)
-			
+
 					if maybeCounter == nil {
-						maybeCounter <-! Container.createCounter(3)		
+						maybeCounter <-! Container.createCounter(3)
 					}
-			
+
 					acc.save(<-maybeCounter!, to: /storage/counter)
-				}   	
+				}
 			}`),
 		Authorizers: []flow.Address{flow.RootAddress},
 	}
@@ -62,7 +62,6 @@ func CreateCounterTransaction() flow.TransactionBody {
 func CreateCounterPanicTransaction() flow.TransactionBody {
 	return flow.TransactionBody{
 		Script: []byte(`
-
 			import 0x01
 
 			transaction {
@@ -82,7 +81,7 @@ func AddToCounterTransaction() flow.TransactionBody {
 	return flow.TransactionBody{
 		Script: []byte(`
 			import 0x01
-			
+
 			transaction {
 				prepare(acc: AuthAccount) {
 					let counter = acc.borrow<&Container.Counter>(from: /storage/counter)

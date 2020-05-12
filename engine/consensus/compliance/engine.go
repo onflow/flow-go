@@ -15,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -26,6 +27,9 @@ import (
 type Engine struct {
 	unit     *engine.Unit   // used to control startup/shutdown
 	log      zerolog.Logger // used to log relevant actions with context
+	metrics  module.EngineMetrics
+	mempool  module.MempoolMetrics
+	spans    module.ConsensusMetrics
 	me       module.Local
 	cleaner  storage.Cleaner
 	headers  storage.Headers
@@ -36,12 +40,14 @@ type Engine struct {
 	pending  module.PendingBlockBuffer // pending block cache
 	sync     module.Synchronization
 	hotstuff module.HotStuff
-	metrics  module.Metrics
 }
 
 // New creates a new consensus propagation engine.
 func New(
 	log zerolog.Logger,
+	metrics module.EngineMetrics,
+	mempool module.MempoolMetrics,
+	spans module.ConsensusMetrics,
 	net module.Network,
 	me module.Local,
 	cleaner storage.Cleaner,
@@ -50,13 +56,15 @@ func New(
 	state protocol.State,
 	prov network.Engine,
 	pending module.PendingBlockBuffer,
-	metrics module.Metrics,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		unit:     engine.NewUnit(),
-		log:      log.With().Str("engine", "consensus").Logger(),
+		log:      log.With().Str("engine", "compliance").Logger(),
+		metrics:  metrics,
+		mempool:  mempool,
+		spans:    spans,
 		me:       me,
 		cleaner:  cleaner,
 		headers:  headers,
@@ -64,7 +72,6 @@ func New(
 		state:    state,
 		prov:     prov,
 		pending:  pending,
-		metrics:  metrics,
 		sync:     nil, // use `WithSynchronization`
 		hotstuff: nil, // use `WithConsensus`
 	}
@@ -113,8 +120,11 @@ func (e *Engine) Ready() <-chan struct{} {
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
+		e.log.Debug().Msg("shutting down synchronization engine")
 		<-e.sync.Done()
+		e.log.Debug().Msg("shutting down hotstuff eventloop")
 		<-e.hotstuff.Done()
+		e.log.Debug().Msg("all components have been shut down")
 	})
 }
 
@@ -130,7 +140,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+			e.log.Error().Err(err).Msg("compliance could not process submitted event")
 		}
 	})
 }
@@ -172,6 +182,8 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		return fmt.Errorf("could not send vote: %w", err)
 	}
 
+	e.metrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockVote)
+
 	log.Info().Msg("block vote transmitted")
 
 	return nil
@@ -193,6 +205,8 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	}
 
 	// fill in the fields that can't be populated by HotStuff
+	//TODO clean this up - currently we set these fields in builder, then lose
+	// them in HotStuff, then need to set them again here
 	header.ChainID = parent.ChainID
 	header.Height = parent.Height + 1
 
@@ -228,28 +242,30 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	// NOTE: some fields are not needed for the message
 	// - proposer ID is conveyed over the network message
 	// - the payload hash is deduced from the payload
-	msg := &messages.BlockProposal{
+	proposal := &messages.BlockProposal{
 		Header:  header,
 		Payload: payload,
 	}
 
 	// broadcast the proposal to consensus nodes
-	err = e.con.Submit(msg, recipients.NodeIDs()...)
+	err = e.con.Submit(proposal, recipients.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not send proposal message: %w", err)
 	}
+
+	e.metrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockProposal)
 
 	log.Info().Msg("block proposal broadcasted")
 
 	// submit the proposal to the provider engine to forward it to other
 	// node roles
-	e.prov.SubmitLocal(msg)
+	e.prov.SubmitLocal(proposal)
 
 	return nil
 }
 
 // process processes events for the propagation engine on the consensus node.
-func (e *Engine) process(originID flow.Identifier, input interface{}) error {
+func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 	// process one event at a time for now
 	e.unit.Lock()
@@ -260,15 +276,17 @@ func (e *Engine) process(originID flow.Identifier, input interface{}) error {
 		return fmt.Errorf("still initializing")
 	}
 
-	switch v := input.(type) {
+	switch ev := event.(type) {
 	case *events.SyncedBlock:
-		return e.onSyncedBlock(originID, v)
+		return e.onSyncedBlock(originID, ev)
 	case *messages.BlockProposal:
-		return e.onBlockProposal(originID, v)
+		e.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
+		return e.onBlockProposal(originID, ev)
 	case *messages.BlockVote:
-		return e.onBlockVote(originID, v)
+		e.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockVote)
+		return e.onBlockVote(originID, ev)
 	default:
-		return fmt.Errorf("invalid event type (%T)", v)
+		return fmt.Errorf("invalid event type (%T)", event)
 	}
 }
 
@@ -309,12 +327,10 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	log.Info().Msg("block proposal received")
 
 	e.prunePendingCache()
-	e.metrics.PendingBlocks(e.pending.Size())
 
 	// first, we reject all blocks that we don't need to process:
 	// 1) blocks already in the cache; they will already be processed later
 	// 2) blocks already on disk; they were processed and await finalization
-	// 3) blocks at a height below finalized height; they can not be finalized
 
 	// ignore proposals that are already cached
 	_, cached := e.pending.ByID(header.ID())
@@ -348,6 +364,8 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		// add the block to the cache
 		_ = e.pending.Add(originID, proposal)
 
+		e.mempool.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
+
 		// go to the first missing ancestor
 		ancestorID := ancestor.Header.ParentID
 		for {
@@ -372,6 +390,8 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	if errors.Is(err, storage.ErrNotFound) {
 
 		_ = e.pending.Add(originID, proposal)
+
+		e.mempool.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
 
 		log.Debug().Msg("requesting missing parent for proposal")
 
@@ -428,7 +448,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	}
 	err := e.state.Mutate().Extend(block)
 	if err != nil {
-		return fmt.Errorf("could not extend protocol state: %w", err)
+		return fmt.Errorf("could not extend protocol state (block: %x, height: %d): %w", header.ID(), header.Height, err)
 	}
 
 	// retrieve the parent
@@ -497,16 +517,23 @@ func (e *Engine) processPendingChildren(header *flow.Header) error {
 	// drop all of the children that should have been processed now
 	e.pending.DropForParent(header)
 
+	e.mempool.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
+
 	return result.ErrorOrNil()
 }
 
 // prunePendingCache prunes the pending block cache.
 func (e *Engine) prunePendingCache() {
+
 	// retrieve the finalized height
 	final, err := e.state.Final().Head()
 	if err != nil {
 		e.log.Warn().Err(err).Msg("could not get finalized head to prune pending blocks")
 		return
 	}
+
+	// remove everything at or below final height
 	e.pending.PruneByHeight(final.Height)
+
+	e.mempool.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
 }

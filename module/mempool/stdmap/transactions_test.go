@@ -23,13 +23,13 @@ func TestTransactionPool(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("should be able to add first", func(t *testing.T) {
-		err = pool.Add(item1)
-		assert.NoError(t, err)
+		added := pool.Add(item1)
+		assert.True(t, added)
 	})
 
 	t.Run("should be able to add second", func(t *testing.T) {
-		err = pool.Add(item2)
-		assert.NoError(t, err)
+		added := pool.Add(item2)
+		assert.True(t, added)
 	})
 
 	t.Run("should be able to get size", func(t *testing.T) {
@@ -38,8 +38,8 @@ func TestTransactionPool(t *testing.T) {
 	})
 
 	t.Run("should be able to get first", func(t *testing.T) {
-		got, err := pool.ByID(item1.ID())
-		assert.NoError(t, err)
+		got, exists := pool.ByID(item1.ID())
+		assert.True(t, exists)
 		assert.Equal(t, item1, got)
 	})
 
