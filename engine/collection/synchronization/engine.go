@@ -13,6 +13,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/events"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -33,8 +34,8 @@ type Engine struct {
 	metrics  module.EngineMetrics
 	me       module.Local
 	state    protocol.State
+	blocks   storage.ClusterBlocks
 	con      network.Conduit
-	blocks   storage.Blocks
 	prop     network.Engine // proposal engine
 	heights  map[uint64]*Status
 	blockIDs map[flow.Identifier]*Status
@@ -56,22 +57,21 @@ func New(
 	net module.Network,
 	me module.Local,
 	state protocol.State,
-	blocks storage.Blocks,
-	comp network.Engine,
+	blocks storage.ClusterBlocks,
+	prop network.Engine,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:     engine.NewUnit(),
-		log:      log.With().Str("engine", "consensus").Logger(),
-		metrics:  metrics,
-		me:       me,
-		state:    state,
-		blocks:   blocks,
-		prop:     comp,
-		heights:  make(map[uint64]*Status),
-		blockIDs: make(map[flow.Identifier]*Status),
-
+		unit:          engine.NewUnit(),
+		log:           log.With().Str("engine", "consensus").Logger(),
+		metrics:       metrics,
+		me:            me,
+		state:         state,
+		prop:          prop,
+		heights:       make(map[uint64]*Status),
+		blockIDs:      make(map[flow.Identifier]*Status),
+		blocks:        blocks,
 		pollInterval:  8 * time.Second,
 		scanInterval:  1 * time.Second,
 		retryInterval: 4 * time.Second,
@@ -211,7 +211,7 @@ func (e *Engine) onSyncRequest(originID flow.Identifier, req *messages.SyncReque
 		return fmt.Errorf("could not send sync response: %w", err)
 	}
 
-	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageSyncResponse)
+	e.metrics.MessageSent(metrics.EngineClusterSynchronization, metrics.MessageSyncResponse)
 
 	return nil
 }
@@ -254,7 +254,7 @@ func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeReq
 	}
 
 	// get all of the blocks, one by one
-	blocks := make([]*flow.Block, 0, req.ToHeight-req.FromHeight+1)
+	blocks := make([]*cluster.Block, 0, req.ToHeight-req.FromHeight+1)
 	for height := req.FromHeight; height <= req.ToHeight; height++ {
 		block, err := e.blocks.ByHeight(height)
 		if errors.Is(err, storage.ErrNotFound) {
@@ -274,7 +274,7 @@ func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeReq
 	}
 
 	// send the response
-	res := &messages.BlockResponse{
+	res := &messages.ClusterBlockResponse{
 		Nonce:  req.Nonce,
 		Blocks: blocks,
 	}
@@ -283,7 +283,7 @@ func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeReq
 		return fmt.Errorf("could not send range response: %w", err)
 	}
 
-	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBlockResponse)
+	e.metrics.MessageSent(metrics.EngineClusterSynchronization, metrics.MessageBlockResponse)
 
 	return nil
 }
@@ -303,7 +303,7 @@ func (e *Engine) onBatchRequest(originID flow.Identifier, req *messages.BatchReq
 	}
 
 	// try to get all the blocks by ID
-	blocks := make([]*flow.Block, 0, len(blockIDs))
+	blocks := make([]*cluster.Block, 0, len(blockIDs))
 	for blockID := range blockIDs {
 		block, err := e.blocks.ByID(blockID)
 		if errors.Is(err, storage.ErrNotFound) {
@@ -323,7 +323,7 @@ func (e *Engine) onBatchRequest(originID flow.Identifier, req *messages.BatchReq
 	}
 
 	// send the response
-	res := &messages.BlockResponse{
+	res := &messages.ClusterBlockResponse{
 		Nonce:  req.Nonce,
 		Blocks: blocks,
 	}
@@ -332,7 +332,7 @@ func (e *Engine) onBatchRequest(originID flow.Identifier, req *messages.BatchReq
 		return fmt.Errorf("could not send batch response: %w", err)
 	}
 
-	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBlockResponse)
+	e.metrics.MessageSent(metrics.EngineClusterSynchronization, metrics.MessageBlockResponse)
 
 	return nil
 }
@@ -480,7 +480,7 @@ func (e *Engine) pollHeight() error {
 			errs = multierror.Append(errs, fmt.Errorf("could not send sync request: %w", err))
 		}
 
-		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageSyncRequest)
+		e.metrics.MessageSent(metrics.EngineClusterSynchronization, metrics.MessageSyncRequest)
 	}
 
 	return errs
@@ -623,7 +623,7 @@ func (e *Engine) sendRequests(heights []uint64, blockIDs []flow.Identifier) erro
 			return fmt.Errorf("could not send range request: %w", err)
 		}
 
-		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageRangeRequest)
+		e.metrics.MessageSent(metrics.EngineClusterSynchronization, metrics.MessageRangeRequest)
 
 		// mark all of the heights as requested; these should always be there as
 		// we call this right after the scan and nothing else can delete keys
@@ -659,7 +659,7 @@ func (e *Engine) sendRequests(heights []uint64, blockIDs []flow.Identifier) erro
 			return fmt.Errorf("could not send batch request: %w", err)
 		}
 
-		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBatchRequest)
+		e.metrics.MessageSent(metrics.EngineClusterSynchronization, metrics.MessageBatchRequest)
 
 		// mark all of the blocks as requested; these should always be there as
 		// we call this right after the scan and nothing else can delete keys

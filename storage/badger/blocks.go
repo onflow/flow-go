@@ -11,7 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
-// Blocks implements a simple read-only block storage around a badger DB.
+// Blocks implements a simple block storage around a badger DB.
 type Blocks struct {
 	db       *badger.DB
 	headers  *Headers
