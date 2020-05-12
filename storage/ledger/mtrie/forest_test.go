@@ -14,7 +14,6 @@ import (
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
-	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestEmptyInsert(t *testing.T) {
@@ -712,83 +711,84 @@ func TestTrieStoreAndLoad(t *testing.T) {
 	}
 }
 
-func TestMForestAccuracy(t *testing.T) {
-	trieHeight := 17 // should be key size (in bits) + 1
-	experimentRep := 10
+// TODO comment out this for now
+// func TestMForestAccuracy(t *testing.T) {
+// 	trieHeight := 17 // should be key size (in bits) + 1
+// 	experimentRep := 10
 
-	dbDir := unittest.TempDir(t)
-	smt, err := trie.NewSMT(dbDir, trieHeight, 10, 100, experimentRep)
-	require.NoError(t, err)
-	defer func() {
-		smt.SafeClose()
-		os.RemoveAll(dbDir)
-	}()
+// 	dbDir := unittest.TempDir(t)
+// 	smt, err := trie.NewSMT(dbDir, trieHeight, 10, 100, experimentRep)
+// 	require.NoError(t, err)
+// 	defer func() {
+// 		smt.SafeClose()
+// 		os.RemoveAll(dbDir)
+// 	}()
 
-	fStore, err := mtrie.NewMForest(trieHeight, dbDir, 5)
-	require.NoError(t, err)
-	rootHash := fStore.GetEmptyRootHash()
+// 	fStore, err := mtrie.NewMForest(trieHeight, dbDir, 5)
+// 	require.NoError(t, err)
+// 	rootHash := fStore.GetEmptyRootHash()
 
-	emptyTree := trie.GetDefaultHashForHeight(trieHeight - 1)
-	require.NoError(t, err)
-	rootHashForSMT := emptyTree
-	for e := 0; e < experimentRep; e++ {
-		// insert some values to an empty trie
-		keys := make([][]byte, 0)
-		values := make([][]byte, 0)
-		rand.Seed(time.Now().UnixNano())
+// 	emptyTree := trie.GetDefaultHashForHeight(trieHeight - 1)
+// 	require.NoError(t, err)
+// 	rootHashForSMT := emptyTree
+// 	for e := 0; e < experimentRep; e++ {
+// 		// insert some values to an empty trie
+// 		keys := make([][]byte, 0)
+// 		values := make([][]byte, 0)
+// 		rand.Seed(time.Now().UnixNano())
 
-		// rejection sampling
-		numberOfKeys := rand.Intn(20) + 1
-		keyValueMap := make(map[string][]byte)
-		i := 0
-		for i < numberOfKeys {
-			key := make([]byte, 2)
-			rand.Read(key)
-			// deduplicate
-			if _, found := keyValueMap[string(key)]; !found {
-				keys = append(keys, key)
-				value := make([]byte, 4)
-				rand.Read(value)
-				keyValueMap[string(key)] = value
-				values = append(values, value)
-				i++
-			}
-		}
+// 		// rejection sampling
+// 		numberOfKeys := rand.Intn(20) + 1
+// 		keyValueMap := make(map[string][]byte)
+// 		i := 0
+// 		for i < numberOfKeys {
+// 			key := make([]byte, 2)
+// 			rand.Read(key)
+// 			// deduplicate
+// 			if _, found := keyValueMap[string(key)]; !found {
+// 				keys = append(keys, key)
+// 				value := make([]byte, 4)
+// 				rand.Read(value)
+// 				keyValueMap[string(key)] = value
+// 				values = append(values, value)
+// 				i++
+// 			}
+// 		}
 
-		newRootHash, err := fStore.Update(keys, values, rootHash)
-		require.NoError(t, err, "error commiting changes")
-		rootHash = newRootHash
+// 		newRootHash, err := fStore.Update(keys, values, rootHash)
+// 		require.NoError(t, err, "error commiting changes")
+// 		rootHash = newRootHash
 
-		// check values
-		retValues, err := fStore.Read(keys, rootHash)
-		require.NoError(t, err)
-		for i, k := range keys {
-			require.True(t, bytes.Equal(keyValueMap[string(k)], retValues[i]))
-		}
+// 		// check values
+// 		retValues, err := fStore.Read(keys, rootHash)
+// 		require.NoError(t, err)
+// 		for i, k := range keys {
+// 			require.True(t, bytes.Equal(keyValueMap[string(k)], retValues[i]))
+// 		}
 
-		// Test eqaulity to SMT
-		newRootHashForSMT, err := smt.Update(keys, values, rootHashForSMT)
-		require.NoError(t, err)
-		rootHashForSMT = newRootHashForSMT
-		require.True(t, bytes.Equal(newRootHashForSMT, newRootHash))
+// 		// Test eqaulity to SMT
+// 		newRootHashForSMT, err := smt.Update(keys, values, rootHashForSMT)
+// 		require.NoError(t, err)
+// 		rootHashForSMT = newRootHashForSMT
+// 		require.True(t, bytes.Equal(newRootHashForSMT, newRootHash))
 
-		// TODO test proofs for non-existing keys
-		batchProof, err := fStore.Proofs(keys, rootHash)
-		require.NoError(t, err, "error generating proofs")
+// 		// TODO test proofs for non-existing keys
+// 		batchProof, err := fStore.Proofs(keys, rootHash)
+// 		require.NoError(t, err, "error generating proofs")
 
-		batchProofSMT, err := smt.GetBatchProof(keys, rootHashForSMT)
-		require.NoError(t, err, "error generating proofs (SMT)")
+// 		batchProofSMT, err := smt.GetBatchProof(keys, rootHashForSMT)
+// 		require.NoError(t, err, "error generating proofs (SMT)")
 
-		encodedProof := mtrie.EncodeBatchProof(batchProof)
-		encodedProofSMT := trie.EncodeProof(batchProofSMT)
+// 		encodedProof := mtrie.EncodeBatchProof(batchProof)
+// 		encodedProofSMT := trie.EncodeProof(batchProofSMT)
 
-		for i := range encodedProof {
-			require.True(t, bytes.Equal(encodedProof[i], encodedProofSMT[i]))
-		}
+// 		for i := range encodedProof {
+// 			require.True(t, bytes.Equal(encodedProof[i], encodedProofSMT[i]))
+// 		}
 
-		psmt, err := trie.NewPSMT(rootHash, trieHeight, keys, values, encodedProof)
-		require.True(t, bytes.Equal(psmt.GetRootHash(), rootHash))
-		require.NoError(t, err, "error building partial trie")
+// 		psmt, err := trie.NewPSMT(rootHash, trieHeight, keys, values, encodedProof)
+// 		require.True(t, bytes.Equal(psmt.GetRootHash(), rootHash))
+// 		require.NoError(t, err, "error building partial trie")
 
-	}
-}
+// 	}
+// }
