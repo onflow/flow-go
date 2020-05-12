@@ -9,7 +9,7 @@ import (
 type PendingReceipt struct {
 	Receipt  *flow.ExecutionReceipt
 	OriginID flow.Identifier
-	Counter  uint // keeps track of number of retries
+	Counter  uint64 // keeps track of number of retries
 }
 
 // ID returns the unique identifier for the pending receipt which is the

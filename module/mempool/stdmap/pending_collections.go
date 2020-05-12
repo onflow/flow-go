@@ -1,6 +1,7 @@
 package stdmap
 
 import (
+	"math"
 	"sync"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -11,14 +12,14 @@ import (
 type PendingCollections struct {
 	*Backend
 	counterMU sync.Mutex // provides atomic updates for the counter
-	counter   uint       // keeps number of added items to the mempool
+	counter   uint64     // keeps number of added items to the mempool
 }
 
 // NewCollections creates a new memory pool for pending collection.
 func NewPendingCollections(limit uint) (*PendingCollections, error) {
 	p := &PendingCollections{
 		counter: 0,
-		Backend: NewBackend(WithLimit(limit), WithEject(ejectOldestPendingCollection)),
+		Backend: NewBackend(WithLimit(limit), WithEject(pendingCollectionLRUEject)),
 	}
 
 	return p, nil
@@ -59,17 +60,17 @@ func (p *PendingCollections) All() []*verification.PendingCollection {
 	return pcolls
 }
 
-// ejectOldestPendingCollection is the ejection function for pending collections, it finds and returns
-// the entry with the largest counter value
-func ejectOldestPendingCollection(entities map[flow.Identifier]flow.Entity) (flow.Identifier, flow.Entity) {
+// pendingCollectionLRUEject is the ejection function for pending collections, it finds and returns
+// the entry with the largest counter value, i.e., the least recently added
+func pendingCollectionLRUEject(entities map[flow.Identifier]flow.Entity) (flow.Identifier, flow.Entity) {
 	var oldestEntityID flow.Identifier
 	var oldestEntity flow.Entity
 
-	var maxCounter uint = 0
+	var minCounter uint64 = math.MaxUint64
 	for entityID, entity := range entities {
 		pc := entity.(*verification.PendingCollection)
-		if pc.Counter > maxCounter {
-			maxCounter = pc.Counter
+		if pc.Counter < minCounter {
+			minCounter = pc.Counter
 			oldestEntity = entity
 			oldestEntityID = entityID
 		}

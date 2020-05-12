@@ -3,6 +3,7 @@
 package stdmap
 
 import (
+	"math"
 	"sync"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -14,7 +15,7 @@ import (
 type PendingReceipts struct {
 	*Backend
 	counterMU sync.Mutex // provides atomic updates for the counter
-	counter   uint       // keeps number of added items to the mempool
+	counter   uint64     // keeps number of added items to the mempool
 }
 
 // NewReceipts creates a new memory pool for execution receipts.
@@ -58,11 +59,11 @@ func ejectOldestPendingReceipt(entities map[flow.Identifier]flow.Entity) (flow.I
 	var oldestEntityID flow.Identifier
 	var oldestEntity flow.Entity
 
-	var maxCounter uint = 0
+	var minCounter uint64 = math.MaxUint64
 	for entityID, entity := range entities {
 		pc := entity.(*verification.PendingReceipt)
-		if pc.Counter > maxCounter {
-			maxCounter = pc.Counter
+		if pc.Counter < minCounter {
+			minCounter = pc.Counter
 			oldestEntity = entity
 			oldestEntityID = entityID
 		}
