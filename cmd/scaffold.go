@@ -26,7 +26,6 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/metrics"
-	dbmetrics "github.com/dapperlabs/flow-go/module/metrics/badger"
 	"github.com/dapperlabs/flow-go/module/trace"
 	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
@@ -59,7 +58,6 @@ type BaseConfig struct {
 type Metrics struct {
 	Network    module.NetworkMetrics
 	Engine     module.EngineMetrics
-	Badger     module.BadgerMetrics
 	Compliance module.ComplianceMetrics
 	Cache      module.CacheMetrics
 	Mempool    module.MempoolMetrics
@@ -188,11 +186,8 @@ func (fnb *FlowNodeBuilder) enqueueMetricsServerInit() {
 	})
 }
 
-func (fnb *FlowNodeBuilder) enqueueDBMetrics() {
-	fnb.Component("badger db metrics", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
-		monitor := dbmetrics.NewMonitor(fnb.Metrics.Badger, fnb.DB)
-		return monitor, nil
-	})
+func (fnb *FlowNodeBuilder) registerBadgerMetrics() {
+	metrics.RegisterBadgerMetrics()
 }
 
 func (fnb *FlowNodeBuilder) enqueueTracer() {
@@ -249,7 +244,6 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 	fnb.Metrics = Metrics{
 		Network:    metrics.NewNetworkCollector(),
 		Engine:     metrics.NewEngineCollector(),
-		Badger:     metrics.NewBadgerCollector(),
 		Compliance: metrics.NewComplianceCollector(),
 		Cache:      metrics.NewCacheCollector(),
 		Mempool:    metrics.NewMempoolCollector(),
@@ -508,7 +502,7 @@ func FlowNode(name string) *FlowNodeBuilder {
 
 	builder.enqueueMetricsServerInit()
 
-	builder.enqueueDBMetrics()
+	builder.registerBadgerMetrics()
 
 	builder.enqueueTracer()
 

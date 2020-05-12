@@ -1,117 +1,44 @@
 package metrics
 
 import (
+	// _ "github.com/dgraph-io/badger/v2" // TODO this might be needed for servers just testing metrics
+	"fmt"
+
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-type BadgerCollector struct {
-	lsmSize         prometheus.Gauge
-	vlogSize        prometheus.Gauge
-	numReads        prometheus.Gauge
-	numWrites       prometheus.Gauge
-	numBytesRead    prometheus.Gauge
-	numBytesWritten prometheus.Gauge
-	numGets         prometheus.Gauge
-	numPuts         prometheus.Gauge
-	numBlockedPuts  prometheus.Gauge
-	numMemtableGets prometheus.Gauge
-}
+func RegisterBadgerMetrics() {
+	expvarCol := prometheus.NewExpvarCollector(map[string]*prometheus.Desc{
+		fmt.Sprintf("%s_%s_disk_reads_total", namespaceStorage, subsystemBadger): prometheus.NewDesc(
+			"badger_disk_reads_total", "cumulative number of reads", nil, nil),
+		fmt.Sprintf("%s_%s_disk_writes_total", namespaceStorage, subsystemBadger): prometheus.NewDesc(
+			"badger_disk_writes_total", "cumulative number of writes", nil, nil),
+		fmt.Sprintf("%s_%s_read_bytes", namespaceStorage, subsystemBadger): prometheus.NewDesc(
+			"badger_read_bytes", "cumulative number of bytes read", nil, nil),
+		fmt.Sprintf("%s_%s_written_bytes", namespaceStorage, subsystemBadger): prometheus.NewDesc(
+			"badger_written_bytes", "cumulative number of bytes written", nil, nil),
+		fmt.Sprintf("%s_%s_gets_total", namespaceStorage, subsystemBadger): prometheus.NewDesc(
+			"badger_gets_total", "number of gets", nil, nil),
+		fmt.Sprintf("%s_%s_memtable_gets_total", namespaceStorage, subsystemBadger): prometheus.NewDesc(
+			"badger_memtable_gets_total", "number of memtable gets", nil, nil),
+		fmt.Sprintf("%s_%s_puts_total", namespaceStorage, subsystemBadger): prometheus.NewDesc(
+			"badger_puts_total", "number of puts", nil, nil),
+		fmt.Sprintf("%s_%s_blocked_puts_total", namespaceStorage, subsystemBadger): prometheus.NewDesc(
+			"badger_blocked_puts_total", "number of blocked puts", nil, nil),
+		fmt.Sprintf("%s_%s_pending_writes_total", namespaceStorage, subsystemBadger): prometheus.NewDesc(
+			"badger_pending_writes_total", "tracks the number of pending writes", []string{"path"}, nil),
+		fmt.Sprintf("%s_%s_lsm_bloom_hits_total", namespaceStorage, subsystemBadger): prometheus.NewDesc(
+			"badger_lsm_bloom_hits_total", "number of LSM bloom hits", []string{"path"}, nil),
+		fmt.Sprintf("%s_%s_lsm_level_gets_total", namespaceStorage, subsystemBadger): prometheus.NewDesc(
+			"badger_lsm_level_gets_total", "number of LSM gets", []string{"path"}, nil),
+		fmt.Sprintf("%s_%s_lsm_size_bytes", namespaceStorage, subsystemBadger): prometheus.NewDesc(
+			"badger_lsm_size_bytes", "size of the LSM in bytes", []string{"path"}, nil),
+		fmt.Sprintf("%s_%s_vlog_size_bytes", namespaceStorage, subsystemBadger): prometheus.NewDesc(
+			"badger_vlog_size_bytes", "size of the value log in bytes", []string{"path"}, nil),
+	})
 
-func NewBadgerCollector() *BadgerCollector {
-
-	bc := &BadgerCollector{
-		lsmSize: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespaceStorage,
-			Subsystem: subsystemBadger,
-			Name:      "lsm_bytes",
-		}),
-		vlogSize: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespaceStorage,
-			Subsystem: subsystemBadger,
-			Name:      "vlog_bytes",
-		}),
-		numReads: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespaceStorage,
-			Subsystem: subsystemBadger,
-			Name:      "num_reads",
-		}),
-		numWrites: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespaceStorage,
-			Subsystem: subsystemBadger,
-			Name:      "num_writes",
-		}),
-		numBytesRead: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespaceStorage,
-			Subsystem: subsystemBadger,
-			Name:      "num_bytes_read",
-		}),
-		numBytesWritten: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespaceStorage,
-			Subsystem: subsystemBadger,
-			Name:      "num_bytes_written",
-		}),
-		numGets: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespaceStorage,
-			Subsystem: subsystemBadger,
-			Name:      "num_gets",
-		}),
-		numPuts: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespaceStorage,
-			Subsystem: subsystemBadger,
-			Name:      "num_puts",
-		}),
-		numBlockedPuts: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespaceStorage,
-			Subsystem: subsystemBadger,
-			Name:      "num_blocked_puts",
-		}),
-		numMemtableGets: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespaceStorage,
-			Subsystem: subsystemBadger,
-			Name:      "num_memtable_gets",
-		}),
+	err := prometheus.Register(expvarCol)
+	if err != nil {
+		panic(err)
 	}
-
-	return bc
-}
-
-func (bc *BadgerCollector) BadgerLSMSize(sizeBytes int64) {
-	bc.lsmSize.Set(float64(sizeBytes))
-}
-
-func (bc *BadgerCollector) BadgerVLogSize(sizeBytes int64) {
-	bc.vlogSize.Set(float64(sizeBytes))
-}
-
-func (bc *BadgerCollector) BadgerNumReads(n int64) {
-	bc.numReads.Set(float64(n))
-}
-
-func (bc *BadgerCollector) BadgerNumWrites(n int64) {
-	bc.numWrites.Set(float64(n))
-}
-
-func (bc *BadgerCollector) BadgerNumBytesRead(n int64) {
-	bc.numBytesRead.Set(float64(n))
-}
-
-func (bc *BadgerCollector) BadgerNumBytesWritten(n int64) {
-	bc.numBytesWritten.Set(float64(n))
-}
-
-func (bc *BadgerCollector) BadgerNumGets(n int64) {
-	bc.numGets.Set(float64(n))
-}
-
-func (bc *BadgerCollector) BadgerNumPuts(n int64) {
-	bc.numPuts.Set(float64(n))
-}
-
-func (bc *BadgerCollector) BadgerNumBlockedPuts(n int64) {
-	bc.numBlockedPuts.Set(float64(n))
-}
-
-func (bc *BadgerCollector) BadgerNumMemtableGets(n int64) {
-	bc.numMemtableGets.Set(float64(n))
 }
