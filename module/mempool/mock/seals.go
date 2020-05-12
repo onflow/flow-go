@@ -41,29 +41,6 @@ func (_m *Seals) All() []*flow.Seal {
 	return r0
 }
 
-// ByBlockID provides a mock function with given fields: blockID
-func (_m *Seals) ByBlockID(blockID flow.Identifier) (*flow.Seal, bool) {
-	ret := _m.Called(blockID)
-
-	var r0 *flow.Seal
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Seal); ok {
-		r0 = rf(blockID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Seal)
-		}
-	}
-
-	var r1 bool
-	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
-		r1 = rf(blockID)
-	} else {
-		r1 = ret.Get(1).(bool)
-	}
-
-	return r0, r1
-}
-
 // ByID provides a mock function with given fields: sealID
 func (_m *Seals) ByID(sealID flow.Identifier) (*flow.Seal, bool) {
 	ret := _m.Called(sealID)
