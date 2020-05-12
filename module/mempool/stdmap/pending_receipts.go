@@ -3,6 +3,8 @@
 package stdmap
 
 import (
+	"fmt"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/verification"
 )
@@ -11,6 +13,7 @@ import (
 // used to store execution receipts and to generate block seals.
 type PendingReceipts struct {
 	*Backend
+	counter uint // keeps number of added items to the mempool
 }
 
 // NewReceipts creates a new memory pool for execution receipts.
@@ -30,6 +33,24 @@ func (p *PendingReceipts) Add(preceipt *verification.PendingReceipt) bool {
 // Rem will remove a pending receipt by ID.
 func (p *PendingReceipts) Rem(preceiptID flow.Identifier) bool {
 	return p.Backend.Rem(preceiptID)
+}
+
+// Inc atomically increases the counter of pending receipt by one and returns the updated receipt
+func (p *PendingReceipts) Inc(preceiptID flow.Identifier) (*verification.PendingReceipt, error) {
+	updated, ok := p.Backend.Adjust(preceiptID, func(entity flow.Entity) flow.Entity {
+		pc := entity.(*verification.PendingReceipt)
+		return &verification.PendingReceipt{
+			Receipt:  pc.Receipt,
+			OriginID: pc.OriginID,
+			Counter:  pc.Counter + 1,
+		}
+	})
+
+	if !ok {
+		return nil, fmt.Errorf("could not update pending receipt in backend")
+	}
+
+	return updated.(*verification.PendingReceipt), nil
 }
 
 // All will return all pending execution receipts in the memory pool.

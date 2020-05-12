@@ -21,6 +21,9 @@ type PendingCollections interface {
 	// return true if the collection was known and removed.
 	Rem(pcollID flow.Identifier) bool
 
+	// Inc atomically increases the counter of pending collection by one and returns the updated collection
+	Inc(chunkID flow.Identifier) (*verification.PendingCollection, error)
+
 	// ByID retrieve the pending collection with the given ID from the memory
 	// pool. It will return false if it was not found in the mempool.
 	ByID(collID flow.Identifier) (*verification.PendingCollection, bool)

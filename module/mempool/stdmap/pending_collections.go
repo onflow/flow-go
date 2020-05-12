@@ -1,6 +1,8 @@
 package stdmap
 
 import (
+	"fmt"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/verification"
 )
@@ -27,6 +29,24 @@ func (p *PendingCollections) Add(pcoll *verification.PendingCollection) bool {
 // Rem removes a pending collection by ID from memory
 func (p *PendingCollections) Rem(collID flow.Identifier) bool {
 	return p.Backend.Rem(collID)
+}
+
+// Inc atomically increases the counter of pending collection by one and returns the updated collection
+func (p *PendingCollections) Inc(collID flow.Identifier) (*verification.PendingCollection, error) {
+	updated, ok := p.Backend.Adjust(collID, func(entity flow.Entity) flow.Entity {
+		pc := entity.(*verification.PendingCollection)
+		return &verification.PendingCollection{
+			Collection: pc.Collection,
+			OriginID:   pc.OriginID,
+			Counter:    pc.Counter + 1,
+		}
+	})
+
+	if !ok {
+		return nil, fmt.Errorf("could not update pending collection in backend")
+	}
+
+	return updated.(*verification.PendingCollection), nil
 }
 
 // ByID returns the pending collection with the given ID from the mempool.

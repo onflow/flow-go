@@ -18,6 +18,9 @@ type PendingReceipts interface {
 	// Rem will remove a receipt by ID.
 	Rem(preceiptID flow.Identifier) bool
 
+	// Inc atomically increases the counter of pending receipt by one and returns the updated receipt
+	Inc(chunkID flow.Identifier) (*verification.PendingReceipt, error)
+
 	// All will return a list of all receipts in the memory pool.
 	All() []*verification.PendingReceipt
 }
