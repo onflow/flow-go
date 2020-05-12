@@ -12,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -22,6 +23,7 @@ type Engine struct {
 	unit     *engine.Unit
 	log      zerolog.Logger
 	me       module.Local
+	metrics  module.EngineMetrics
 	cleaner  storage.Cleaner
 	headers  storage.Headers
 	payloads storage.Payloads
@@ -36,6 +38,7 @@ func New(
 	log zerolog.Logger,
 	net module.Network,
 	me module.Local,
+	metrics module.EngineMetrics,
 	cleaner storage.Cleaner,
 	headers storage.Headers,
 	payloads storage.Payloads,
@@ -129,10 +132,13 @@ func (e *Engine) process(originID flow.Identifier, input interface{}) error {
 	// process one event at a time for now
 	e.unit.Lock()
 	defer e.unit.Unlock()
+
 	switch v := input.(type) {
 	case *events.SyncedBlock:
+		e.metrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlock)
 		return e.onSyncedBlock(originID, v)
 	case *messages.BlockProposal:
+		e.metrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlock)
 		return e.onBlockProposal(originID, v)
 	default:
 		return fmt.Errorf("invalid event type (%T)", input)

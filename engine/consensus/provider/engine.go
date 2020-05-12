@@ -146,7 +146,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		return errors.Wrap(err, "could not broadcast block")
 	}
 
-	e.message.MessageSent(metrics.EngineProvider, metrics.MessageBlockProposal)
+	e.message.MessageSent(metrics.EngineConsensusProvider, metrics.MessageBlockProposal)
 
 	log.Info().Msg("block proposal propagated to non-consensus nodes")
 
