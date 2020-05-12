@@ -223,7 +223,7 @@ func main() {
 			return follower.WithSynchronization(sync), nil
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ing, err = ingest.New(node.Logger, node.Network, node.State, colMetrics, node.Me, pool, ingressExpiryBuffer)
+			ing, err = ingest.New(node.Logger, node.Network, node.State, node.Metrics.Engine, colMetrics, node.Me, pool, ingressExpiryBuffer)
 			return ing, err
 		}).
 		Component("ingress server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {

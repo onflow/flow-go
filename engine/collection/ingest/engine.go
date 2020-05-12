@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -24,13 +25,14 @@ import (
 // transactions are delegated to the correct collection cluster, and prepared
 // to be included in a collection.
 type Engine struct {
-	unit    *engine.Unit
-	log     zerolog.Logger
-	metrics module.CollectionMetrics
-	con     network.Conduit
-	me      module.Local
-	state   protocol.State
-	pool    mempool.Transactions
+	unit       *engine.Unit
+	log        zerolog.Logger
+	engMetrics module.EngineMetrics
+	colMetrics module.CollectionMetrics
+	con        network.Conduit
+	me         module.Local
+	state      protocol.State
+	pool       mempool.Transactions
 
 	// the number of blocks that can be between the reference block and the
 	// finalized head before we consider the transaction expired
@@ -42,7 +44,8 @@ func New(
 	log zerolog.Logger,
 	net module.Network,
 	state protocol.State,
-	metrics module.CollectionMetrics,
+	engMetrics module.EngineMetrics,
+	colMetrics module.CollectionMetrics,
 	me module.Local,
 	pool mempool.Transactions,
 	expiryBuffer uint,
@@ -53,12 +56,13 @@ func New(
 		Logger()
 
 	e := &Engine{
-		unit:    engine.NewUnit(),
-		log:     logger,
-		metrics: metrics,
-		me:      me,
-		state:   state,
-		pool:    pool,
+		unit:       engine.NewUnit(),
+		log:        logger,
+		engMetrics: engMetrics,
+		colMetrics: colMetrics,
+		me:         me,
+		state:      state,
+		pool:       pool,
 		// add some expiry buffer -- this is how much time a transaction has
 		// to be included in a collection, then for that collection to be
 		// included in a block
@@ -96,7 +100,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // a potential processing error internally when done.
 func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
-		err := e.Process(originID, event)
+		err := e.process(originID, event)
 		if err != nil {
 			e.log.Error().Err(err).Msg("could not process submitted event")
 		}
@@ -123,6 +127,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
 	case *flow.TransactionBody:
+		e.engMetrics.MessageReceived(metrics.EngineCollectionIngest, metrics.MessageTransaction)
 		return e.onTransaction(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
@@ -139,9 +144,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 		Logger()
 
 	log.Debug().Msg("transaction message received")
-
-	// report Metrics Transaction from received to being included in a collection guarantee
-	e.metrics.TransactionReceived(tx.ID())
+	e.colMetrics.TransactionReceived(tx.ID())
 
 	// short-circuit if we have already stored the transaction
 	if e.pool.Has(tx.ID()) {
@@ -181,18 +184,23 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 		log.Debug().Msg("added transaction to pool")
 	}
 
-	// propagate the transaction to 2 responsible nodes
-	targetIDs := txCluster.
-		Filter(filter.Not(filter.HasNodeID(localID))).
-		Sample(2)
+	// if the message was submitted internally (ie. via the Access API)
+	// propagate it to all members of the responsible cluster
+	if originID == localID {
+		targetIDs := txCluster.
+			Filter(filter.Not(filter.HasNodeID(localID))).
+			Sample(2)
 
-	log.Debug().
-		Str("recipients", fmt.Sprintf("%v", targetIDs.NodeIDs())).
-		Msg("propagating transaction to cluster")
+		log.Debug().
+			Str("recipients", fmt.Sprintf("%v", targetIDs.NodeIDs())).
+			Msg("propagating transaction to cluster")
 
-	err = e.con.Submit(tx, targetIDs.NodeIDs()...)
-	if err != nil {
-		return fmt.Errorf("could not route transaction to cluster: %w", err)
+		err = e.con.Submit(tx, targetIDs.NodeIDs()...)
+		if err != nil {
+			return fmt.Errorf("could not route transaction to cluster: %w", err)
+		}
+
+		e.engMetrics.MessageSent(metrics.EngineCollectionIngest, metrics.MessageTransaction)
 	}
 
 	log.Info().Msg("transaction processed")

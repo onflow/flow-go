@@ -58,4 +58,5 @@ const (
 	MessageClusterBlockVote     = "cluster_vote"
 	MessageClusterBlockRequest  = "cluster_block_request"
 	MessageClusterBlockResponse = "cluster_block_response"
+	MessageTransaction          = "transaction"
 )
