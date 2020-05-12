@@ -9,6 +9,7 @@ import (
 type PendingCollection struct {
 	Collection *flow.Collection
 	OriginID   flow.Identifier
+	Counter    uint // keeps track of number of retries
 }
 
 // ID returns the unique identifier for the pending receipt which is the
@@ -20,4 +21,14 @@ func (p *PendingCollection) ID() flow.Identifier {
 // Checksum returns the checksum of the pending collection.
 func (p *PendingCollection) Checksum() flow.Identifier {
 	return flow.MakeID(p)
+}
+
+// NewPendingCollection creates a new PendingCollection structure out of the collection and
+// its originID. It also sets the counter value of receipt to one.
+func NewPendingCollection(collection *flow.Collection, originID flow.Identifier) *PendingCollection {
+	return &PendingCollection{
+		Collection: collection,
+		OriginID:   originID,
+		Counter:    1,
+	}
 }

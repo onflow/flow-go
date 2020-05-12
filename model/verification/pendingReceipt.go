@@ -9,6 +9,7 @@ import (
 type PendingReceipt struct {
 	Receipt  *flow.ExecutionReceipt
 	OriginID flow.Identifier
+	Counter  uint // keeps track of number of retries
 }
 
 // ID returns the unique identifier for the pending receipt which is the
@@ -20,4 +21,14 @@ func (p *PendingReceipt) ID() flow.Identifier {
 // Checksum returns the checksum of the pending receipt.
 func (p *PendingReceipt) Checksum() flow.Identifier {
 	return flow.MakeID(p)
+}
+
+// NewPendingReceipt creates a new PendingReceipt structure out of the receipt and
+// its originID. It also sets the counter value of receipt to one.
+func NewPendingReceipt(receipt *flow.ExecutionReceipt, originID flow.Identifier) *PendingReceipt {
+	return &PendingReceipt{
+		Receipt:  receipt,
+		OriginID: originID,
+		Counter:  1,
+	}
 }

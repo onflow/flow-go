@@ -450,8 +450,6 @@ func ingestHappyPath(tb testing.TB, receiptCount int, chunkCount int) {
 		ers[i] = LightExecutionResultFixture(chunkCount)
 	}
 
-	fmt.Println("Chunks have been made")
-
 	// mocks the assignment to assign the single chunk to this verifier node
 	assigner := NewMockAssigner(verIdentity.NodeID)
 
