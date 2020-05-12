@@ -47,7 +47,10 @@ func (w *WAL) RecordDelete(stateCommitment flow.StateCommitment) error {
 	return nil
 }
 
-func (w *WAL) Reply(updateFn func(flow.StateCommitment, [][]byte, [][]byte) error) error {
+func (w *WAL) Reply(
+	updateFn func(flow.StateCommitment, [][]byte, [][]byte) error,
+	deleteFn func(flow.StateCommitment) error,
+) error {
 
 	sr, err := prometheusWAL.NewSegmentsReader(w.w.Dir())
 	if err != nil {
@@ -66,11 +69,16 @@ func (w *WAL) Reply(updateFn func(flow.StateCommitment, [][]byte, [][]byte) erro
 		switch operation {
 		case WALUpdate:
 			err = updateFn(commitment, keys, values)
+			if err != nil {
+				return fmt.Errorf("error while processing WAL update: %w", err)
+			}
+		case WALDelete:
+			err = deleteFn(commitment)
+			if err != nil {
+				return fmt.Errorf("error while processing WAL deletion: %w", err)
+			}
 		}
 
-		if err != nil {
-			return fmt.Errorf("error while processing WAL update: %w", err)
-		}
 		err = reader.Err()
 		if err != nil {
 			return fmt.Errorf("cannot read WAL: %w", err)

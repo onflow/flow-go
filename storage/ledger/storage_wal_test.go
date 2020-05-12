@@ -1,6 +1,7 @@
 package ledger_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,6 +36,8 @@ func Test_WAL(t *testing.T) {
 			stateCommitment, err = f.UpdateRegisters(keys, values, stateCommitment)
 			require.NoError(t, err)
 
+			fmt.Printf("Updated with %x\n", stateCommitment)
+
 			data := make(map[string][]byte, len(keys))
 			for j, key := range keys {
 				data[string(key)] = values[j]
@@ -56,6 +59,9 @@ func Test_WAL(t *testing.T) {
 				key := []byte(keyString)
 				keys = append(keys, key)
 			}
+
+			fmt.Printf("Querying with %x\n", stateCommitment)
+
 			registerValues, err := f2.GetRegisters(keys, []byte(stateCommitment))
 			require.NoError(t, err)
 

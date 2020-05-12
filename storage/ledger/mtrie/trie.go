@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // MTrie is a fully in memory trie with option to persist to disk
@@ -26,8 +28,16 @@ func NewMTrie(maxHeight int) *MTrie {
 		maxHeight: maxHeight}
 }
 
+func (mt *MTrie) StringRootHash() string {
+	return hex.EncodeToString(mt.rootHash)
+}
+
+func (mt *MTrie) StateCommitment() flow.StateCommitment {
+	return mt.rootHash
+}
+
 func (mt *MTrie) String() string {
-	trieStr := fmt.Sprintf("Trie number:%v hash:%v parent: %v\n", mt.number, hex.EncodeToString(mt.rootHash), hex.EncodeToString(mt.parentRootHash))
+	trieStr := fmt.Sprintf("Trie number:%v hash:%v parent: %v\n", mt.number, mt.StringRootHash(), hex.EncodeToString(mt.parentRootHash))
 	return trieStr + mt.root.FmtStr("", "")
 }
 

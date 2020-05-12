@@ -22,16 +22,23 @@ func NewTrieStorage(dbDir string) (*TrieStorage, error) {
 		return nil, fmt.Errorf("cannot create WAL: %w", err)
 	}
 
-	mForest := mtrie.NewMForest(257, dbDir, 1000)
+	mForest := mtrie.NewMForest(257, dbDir, 1000, func(evictedTrie *mtrie.MTrie) error {
+		return w.RecordDelete(evictedTrie.StateCommitment())
+	})
 	trie := &TrieStorage{
 		mForest: mForest,
 		wal:     w,
 	}
 
-	err = w.Reply(func(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
-		_, err := trie.UpdateRegisters(keys, values, stateCommitment)
-		return err
-	})
+	err = w.Reply(
+		func(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
+			_, err := trie.UpdateRegisters(keys, values, stateCommitment)
+			return err
+		},
+		func(stateCommitment flow.StateCommitment) error {
+			return nil //no need to do anything, mForest should prune trees in deterministic order
+		},
+	)
 
 	if err != nil {
 		return nil, fmt.Errorf("cannot restore WAL: %w", err)

@@ -21,10 +21,11 @@ type MForest struct {
 	cacheSize     int
 	maxHeight     int // Height of the tree
 	keyByteSize   int // acceptable number of bytes for key
+	onTreeEvicted func(tree *MTrie) error
 }
 
 // NewMForest returns a new instance of memory forest
-func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int) *MForest {
+func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int, onTreeEvicted func(tree *MTrie) error) *MForest {
 	// add empty roothash
 	tries := make(map[string]*MTrie)
 	rootHash := GetDefaultHashForHeight(maxHeight - 1)
@@ -37,7 +38,9 @@ func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int) *MFores
 		dir:           trieStorageDir,
 		rootHashQueue: rootHashQueue,
 		cacheSize:     trieCacheSize,
-		keyByteSize:   (maxHeight - 1) / 8}
+		keyByteSize:   (maxHeight - 1) / 8,
+		onTreeEvicted: onTreeEvicted,
+	}
 }
 
 // GetTrie returns trie at specific rootHash
@@ -53,7 +56,7 @@ func (f *MForest) GetTrie(rootHash []byte) (*MTrie, error) {
 // AddTrie adds a trie to the forest
 func (f *MForest) AddTrie(trie *MTrie) error {
 	// TODO check if not exist
-	encoded := hex.EncodeToString(trie.rootHash)
+	encoded := trie.StringRootHash()
 	f.tries[encoded] = trie
 	f.rootHashQueue <- encoded
 	f.Purge()
@@ -567,6 +570,12 @@ func (f *MForest) Purge() error {
 
 	go trie.Store(filepath.Join(f.dir, strconv.FormatUint(trie.number, 10)+"-"+encRootHash))
 
+	if f.onTreeEvicted != nil {
+		err := f.onTreeEvicted(trie)
+		if err != nil {
+			return fmt.Errorf("error while handling eviction notification: %w", err)
+		}
+	}
 	delete(f.tries, encRootHash)
 	return nil
 }

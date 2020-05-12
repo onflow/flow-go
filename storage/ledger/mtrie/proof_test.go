@@ -10,7 +10,7 @@ import (
 
 func TestBatchProofEncoderDecoder(t *testing.T) {
 	trieHeight := 9
-	fStore := mtrie.NewMForest(trieHeight, "", 5)
+	fStore := mtrie.NewMForest(trieHeight, "", 5, nil)
 	rootHash := fStore.GetEmptyRootHash()
 
 	k1 := []byte([]uint8{uint8(1)})
