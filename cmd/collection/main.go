@@ -11,7 +11,6 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
-	"github.com/dapperlabs/flow-go/module/metrics"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -40,6 +39,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/ingress"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
 	clusterkv "github.com/dapperlabs/flow-go/state/cluster/badger"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -69,16 +69,19 @@ func main() {
 		colCache *buffer.PendingClusterBlocks // pending block cache for cluster consensus
 		conCache *buffer.PendingBlocks        // pending block cache for follower
 
-		clusterID    string           // chain ID for the cluster
-		clusterState *clusterkv.State // chain state for the cluster
+		myCluster    flow.IdentityList // cluster identity list
+		clusterID    string            // chain ID for the cluster
+		clusterState *clusterkv.State  // chain state for the cluster
 
 		// from bootstrap files
 		clusterGenesis *cluster.Block                    // genesis block for the cluster
 		clusterQC      *hotstuffmodels.QuorumCertificate // QC for the cluster
 
-		prov *provider.Engine
-		ing  *ingest.Engine
-		err  error
+		prov           *provider.Engine
+		ing            *ingest.Engine
+		collMetrics    module.CollectionMetrics
+		clusterMetrics module.HotstuffMetrics
+		err            error
 	)
 
 	cmd.FlowNode("collection").
@@ -104,15 +107,25 @@ func main() {
 			conCache = buffer.NewPendingBlocks()
 			return nil
 		}).
-		// regardless of whether we are starting from scratch or from an
-		// existing state, we load the genesis files
-		Module("cluster consensus bootstrapping", func(node *cmd.FlowNodeBuilder) error {
-			myCluster, err := protocol.ClusterFor(node.State.Final(), node.Me.NodeID())
+		Module("collection cluster ID", func(node *cmd.FlowNodeBuilder) error {
+			myCluster, err = protocol.ClusterFor(node.State.Final(), node.Me.NodeID())
 			if err != nil {
 				return fmt.Errorf("could not get my cluster: %w", err)
 			}
-
 			clusterID = protocol.ChainIDForCluster(myCluster)
+			return nil
+		}).
+		Module("collection node metrics", func(node *cmd.FlowNodeBuilder) error {
+			collMetrics = metrics.NewCollectionCollector(node.Tracer)
+			return nil
+		}).
+		Module("hotstuff cluster metrics", func(node *cmd.FlowNodeBuilder) error {
+			clusterMetrics = metrics.NewHotstuffCollector(clusterID)
+			return nil
+		}).
+		// regardless of whether we are starting from scratch or from an
+		// existing state, we load the genesis files
+		Module("cluster consensus bootstrapping", func(node *cmd.FlowNodeBuilder) error {
 
 			// read cluster bootstrapping files from standard bootstrap directory
 			clusterGenesis, err = loadClusterBlock(node.BaseConfig.BootstrapDir, clusterID)
@@ -127,21 +140,12 @@ func main() {
 
 			return nil
 		}).
-		Module("metrics collector", func(node *cmd.FlowNodeBuilder) error {
-			node.Metrics, err = metrics.NewClusterCollector(node.Logger, clusterID)
-			return err
-		}).
 		// if a genesis cluster block already exists in the database, discard
 		// the loaded bootstrap files and use the existing cluster state
 		Module("cluster state", func(node *cmd.FlowNodeBuilder) error {
-			myCluster, err := protocol.ClusterFor(node.State.Final(), node.Me.NodeID())
-			if err != nil {
-				return fmt.Errorf("could not get my cluster: %w", err)
-			}
 
-			// determine the chain ID for my cluster and create cluster state
-			clusterID = protocol.ChainIDForCluster(myCluster)
-			clusterState, err = clusterkv.NewState(node.DB, clusterID)
+			// initialize cluster state
+			clusterState, err = clusterkv.NewState(node.DB, clusterID, node.Storage.Headers, colPayloads)
 			if err != nil {
 				return fmt.Errorf("could not create cluster state: %w", err)
 			}
@@ -178,7 +182,7 @@ func main() {
 
 			// create a finalizer that will handling updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Headers, node.Payloads, node.State)
+			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, node.Storage.Payloads, node.State)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -206,14 +210,14 @@ func main() {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
 
-			follower, err := followereng.New(node.Logger, node.Network, node.Me, cleaner, node.Headers, node.Payloads, node.State, conCache, core)
+			follower, err := followereng.New(node.Logger, node.Network, node.Me, cleaner, node.Storage.Headers, node.Storage.Payloads, node.State, conCache, core)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
 
 			// create a block synchronization engine to handle follower getting
 			// out of sync
-			sync, err := synchronization.New(node.Logger, node.Network, node.Me, node.State, node.Blocks, follower)
+			sync, err := synchronization.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State, node.Storage.Blocks, follower)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
@@ -221,7 +225,7 @@ func main() {
 			return follower.WithSynchronization(sync), nil
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ing, err = ingest.New(node.Logger, node.Network, node.State, node.Metrics, node.Me, pool, ingressExpiryBuffer)
+			ing, err = ingest.New(node.Logger, node.Network, node.State, collMetrics, node.Me, pool, ingressExpiryBuffer)
 			return ing, err
 		}).
 		Component("ingress server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -230,17 +234,17 @@ func main() {
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			collections := storage.NewCollections(node.DB)
-			prov, err = provider.New(node.Logger, node.Network, node.State, node.Metrics, node.Me, pool, collections, transactions)
+			prov, err = provider.New(node.Logger, node.Network, node.State, collMetrics, node.Me, pool, collections, transactions)
 			return prov, err
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			build := builder.NewBuilder(node.DB, node.Headers, colPayloads, pool,
+			build := builder.NewBuilder(node.DB, node.Storage.Headers, colPayloads, pool,
 				builder.WithMaxCollectionSize(maxCollectionSize),
 				builder.WithExpiryBuffer(builderExpiryBuffer),
 			)
-			final := colfinalizer.NewFinalizer(node.DB, pool, prov, node.Metrics, clusterID)
+			final := colfinalizer.NewFinalizer(node.DB, pool, prov, collMetrics, clusterID)
 
-			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, clusterState, node.Metrics, ing, pool, transactions, node.Headers, colPayloads, colCache)
+			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, clusterState, collMetrics, ing, pool, transactions, node.Storage.Headers, colPayloads, colCache)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize engine: %w", err)
 			}
@@ -256,7 +260,7 @@ func main() {
 			signer := verification.NewSingleSigner(committee, staking, node.Me.NodeID())
 
 			// initialize logging notifier for hotstuff
-			notifier := createNotifier(node.Logger, node.Metrics)
+			notifier := createNotifier(node.Logger, clusterMetrics)
 
 			persist := persister.New(node.DB)
 
@@ -266,7 +270,7 @@ func main() {
 			pendingBlocks := []*flow.Header{}
 
 			hot, err := consensus.NewParticipant(
-				node.Logger, notifier, node.Metrics, node.Headers,
+				node.Logger, notifier, clusterMetrics, node.Storage.Headers,
 				committee, build, final, persist,
 				signer, prop, clusterGenesis.Header, clusterQC,
 				latestFinalizedBlock, pendingBlocks, consensus.WithTimeout(hotstuffTimeout),

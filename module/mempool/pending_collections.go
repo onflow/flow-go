@@ -13,17 +13,17 @@ type PendingCollections interface {
 	// the memory pool.
 	Has(pcollID flow.Identifier) bool
 
-	// Add will add the given pending collection to the memory pool; it will error if
-	// the collection is already in the memory pool.
-	Add(pcoll *verification.PendingCollection) error
+	// Add will add the given pending collection to the memory pool. It will
+	// return false if it was already in the mempool.
+	Add(pcoll *verification.PendingCollection) bool
 
 	// Rem will remove the given pending collection from the memory pool; it will
 	// return true if the collection was known and removed.
 	Rem(pcollID flow.Identifier) bool
 
-	// ByID will retrieve the given collection from the memory pool; it will
-	// error if the collection is not in the memory pool.
-	ByID(pcollID flow.Identifier) (*verification.PendingCollection, error)
+	// ByID retrieve the pending collection with the given ID from the memory
+	// pool. It will return false if it was not found in the mempool.
+	ByID(collID flow.Identifier) (*verification.PendingCollection, bool)
 
 	// All will retrieve all pending collections that are currently in the memory pool
 	// as a slice.

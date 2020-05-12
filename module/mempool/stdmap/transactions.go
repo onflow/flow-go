@@ -24,21 +24,21 @@ func NewTransactions(limit uint) (*Transactions, error) {
 }
 
 // Add adds a transaction to the mempool.
-func (t *Transactions) Add(tx *flow.TransactionBody) error {
+func (t *Transactions) Add(tx *flow.TransactionBody) bool {
 	return t.Backend.Add(tx)
 }
 
 // ByID returns the transaction with the given ID from the mempool.
-func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error) {
-	entity, err := t.Backend.ByID(txID)
-	if err != nil {
-		return nil, err
+func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, bool) {
+	entity, exists := t.Backend.ByID(txID)
+	if !exists {
+		return nil, false
 	}
 	tx, ok := entity.(*flow.TransactionBody)
 	if !ok {
 		panic(fmt.Sprintf("invalid entity in transaction pool (%T)", entity))
 	}
-	return tx, nil
+	return tx, true
 }
 
 // All returns all transactions from the mempool.

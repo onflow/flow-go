@@ -15,9 +15,10 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/finalizer/collection"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	modulemock "github.com/dapperlabs/flow-go/module/mock"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
 	cluster "github.com/dapperlabs/flow-go/state/cluster/badger"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -31,15 +32,17 @@ func TestFinalizer(t *testing.T) {
 		genesis := model.Genesis()
 		chainID := genesis.Header.ChainID
 
-		state, err := cluster.NewState(db, chainID)
+		headers := storage.NewHeaders(metrics.NewNoopCollector(), db)
+		payloads := storage.NewClusterPayloads(db)
+
+		state, err := cluster.NewState(db, chainID, headers, payloads)
 		require.NoError(t, err)
 		mutator := state.Mutate()
 
 		pool, err := stdmap.NewTransactions(1000)
 		require.NoError(t, err)
 
-		metrics := &modulemock.Metrics{}
-		metrics.On("CollectionGuaranteed", mock.Anything).Return()
+		metrics := metrics.NewNoopCollector()
 
 		// a helper function to clean up shared state between tests
 		cleanup := func() {
@@ -87,7 +90,7 @@ func TestFinalizer(t *testing.T) {
 
 			// tx1 is included in the finalized block
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
-			assert.Nil(t, pool.Add(&tx1))
+			assert.True(t, pool.Add(&tx1))
 
 			// create a new block on genesis
 			block := unittest.ClusterBlockWithParent(genesis)
@@ -156,10 +159,10 @@ func TestFinalizer(t *testing.T) {
 
 			// tx1 is included in the finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
-			assert.Nil(t, pool.Add(&tx1))
+			assert.True(t, pool.Add(&tx1))
 			// tx2 is only in the mempool
 			tx2 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 2 })
-			assert.Nil(t, pool.Add(&tx2))
+			assert.True(t, pool.Add(&tx2))
 
 			// create a block containing tx1 on top of genesis
 			block := unittest.ClusterBlockWithParent(genesis)
@@ -203,10 +206,10 @@ func TestFinalizer(t *testing.T) {
 
 			// tx1 is included in the first finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
-			assert.Nil(t, pool.Add(&tx1))
+			assert.True(t, pool.Add(&tx1))
 			// tx2 is included in the second finalized block and mempool
 			tx2 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 2 })
-			assert.Nil(t, pool.Add(&tx2))
+			assert.True(t, pool.Add(&tx2))
 
 			// create a block containing tx1 on top of genesis
 			block1 := unittest.ClusterBlockWithParent(genesis)
@@ -259,10 +262,10 @@ func TestFinalizer(t *testing.T) {
 
 			// tx1 is included in the finalized parent block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
-			assert.Nil(t, pool.Add(&tx1))
+			assert.True(t, pool.Add(&tx1))
 			// tx2 is included in the un-finalized block and mempool
 			tx2 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 2 })
-			assert.Nil(t, pool.Add(&tx2))
+			assert.True(t, pool.Add(&tx2))
 
 			// create a block containing tx1 on top of genesis
 			block1 := unittest.ClusterBlockWithParent(genesis)
@@ -311,10 +314,10 @@ func TestFinalizer(t *testing.T) {
 
 			// tx1 is included in the finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
-			assert.Nil(t, pool.Add(&tx1))
+			assert.True(t, pool.Add(&tx1))
 			// tx2 is included in the conflicting block and mempool
 			tx2 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 2 })
-			assert.Nil(t, pool.Add(&tx2))
+			assert.True(t, pool.Add(&tx2))
 
 			// create a block containing tx1 on top of genesis
 			block1 := unittest.ClusterBlockWithParent(genesis)

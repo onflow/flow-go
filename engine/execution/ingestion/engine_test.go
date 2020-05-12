@@ -122,8 +122,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	payloads.EXPECT().Store(gomock.Any(), gomock.Any()).AnyTimes()
 
 	log := zerolog.Logger{}
-	metrics, err := metrics.NewCollector(log)
-	require.NoError(t, err)
+	metrics := metrics.NewNoopCollector()
 
 	tracer, err := trace.NewTracer(log, "test")
 	require.NoError(t, err)

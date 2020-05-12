@@ -2,6 +2,7 @@ package collection
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -14,7 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
-// Builder is the b for collection block payloads. Upon providing a
+// Builder is the builder for collection block payloads. Upon providing a
 // payload hash, it also memorizes the payload contents.
 //
 // NOTE: Builder is NOT safe for use with multiple goroutines. Since the
@@ -78,37 +79,25 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		if err != nil {
 			return fmt.Errorf("could not retrieve parent: %w", err)
 		}
-		var mainFinalized uint64
-		err = operation.RetrieveFinalizedHeight(&mainFinalized)(tx)
+
+		// retrieve the height and ID of the latest finalized block ON THE MAIN CHAIN
+		// this is used as the reference point for transaction expiry
+		var refChainFinalizedHeight uint64
+		err = operation.RetrieveFinalizedHeight(&refChainFinalizedHeight)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve main finalized height: %w", err)
 		}
-		var mainFinalID flow.Identifier
-		err = operation.LookupBlockHeight(mainFinalized, &mainFinalID)(tx)
+		var refChainFinalizedID flow.Identifier
+		err = operation.LookupBlockHeight(refChainFinalizedHeight, &refChainFinalizedID)(tx)
 		if err != nil {
-			return fmt.Errorf("could not look up main finalized block: %w", err)
-		}
-		var mainFinal flow.Header
-		err = operation.RetrieveHeader(mainFinalID, &mainFinal)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve main final header: %w", err)
+			return fmt.Errorf("could not retrieve main finalized ID: %w", err)
 		}
 
 		// retrieve the finalized boundary ON THE CLUSTER CHAIN
-		var clusterFinalized uint64
-		err = operation.RetrieveClusterFinalizedHeight(parent.ChainID, &clusterFinalized)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve cluster finalized height: %w", err)
-		}
-		var clusterFinalID flow.Identifier
-		err = operation.LookupClusterBlockHeight(parent.ChainID, clusterFinalized, &clusterFinalID)(tx)
-		if err != nil {
-			return fmt.Errorf("could not look up cluster finalized block: %w", err)
-		}
 		var clusterFinal flow.Header
-		err = operation.RetrieveHeader(clusterFinalID, &clusterFinal)(tx)
+		err = procedure.RetrieveLatestFinalizedClusterHeader(parent.ChainID, &clusterFinal)(tx)
 		if err != nil {
-			return fmt.Errorf("could not get final header: %w", err)
+			return fmt.Errorf("could not retrieve cluster final: %w", err)
 		}
 
 		// STEP TWO: create a lookup of all previously used transactions on the
@@ -116,16 +105,19 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		// un-finalized and finalized sections of the chain to decide whether to
 		// remove conflicting transactions from the mempool.
 
+		// look up previously included transactions in UN-FINALIZED ancestors
 		ancestorID := parentID
 		unfinalizedLookup := make(map[flow.Identifier]struct{})
-		for ancestorID != clusterFinalID {
+		for ancestorID != clusterFinal.ID() {
 			ancestor, err := b.clusterHeaders.ByBlockID(ancestorID)
 			if err != nil {
 				return fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
 			}
-			if ancestor.Height <= clusterFinalized {
+
+			if ancestor.Height <= clusterFinal.Height {
 				return fmt.Errorf("should always build on last finalized block")
 			}
+
 			payload, err := b.payloads.ByBlockID(ancestorID)
 			if err != nil {
 				return fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
@@ -138,18 +130,18 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			ancestorID = ancestor.ParentID
 		}
 
-		// for now we check at most 1000 blocks of history
-		//TODO look back based on reference block ID and expiry
+		//TODO for now we check at most 1000 finalized ancestors - we should
+		// instead look back based on reference block ID and expiry
 		// ref: https://github.com/dapperlabs/flow-go/issues/3556
-
-		limit := clusterFinalized - 1000
-		if clusterFinalized < 1000 { // check underflow
+		limit := clusterFinal.Height - 1000
+		if clusterFinal.Height < 1000 { // check underflow
 			limit = 0
 		}
 
+		// look up previously included transactions in FINALIZED ancestors
 		finalizedLookup := make(map[flow.Identifier]struct{})
 		ancestorID = clusterFinal.ID()
-		ancestorHeight := clusterFinalized
+		ancestorHeight := clusterFinal.Height
 		for ancestorHeight > limit {
 			ancestor, err := b.clusterHeaders.ByBlockID(ancestorID)
 			if err != nil {
@@ -172,8 +164,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		// STEP THREE: build a payload of valid transactions, while at the same
 		// time figuring out the correct reference block ID for the collection.
 
-		var minRefHeight uint64
-		var minRefID flow.Identifier
+		minRefHeight := uint64(math.MaxUint64)
+		// start with the finalized reference ID (longest expiry time)
+		minRefID := refChainFinalizedID
+
 		var transactions []*flow.TransactionBody
 		for _, tx := range b.transactions.All() {
 
@@ -189,13 +183,13 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			}
 
 			// for now, disallow un-finalized reference blocks
-			if mainFinal.Height < refHeader.Height {
+			if refChainFinalizedHeight < refHeader.Height {
 				continue
 			}
 
 			// ensure the reference block is not too old
 			txID := tx.ID()
-			if mainFinal.Height-refHeader.Height > uint64(flow.DefaultTransactionExpiry-b.expiryBuffer) {
+			if refChainFinalizedHeight-refHeader.Height > uint64(flow.DefaultTransactionExpiry-b.expiryBuffer) {
 				// the transaction is expired, it will never be valid
 				b.transactions.Rem(txID)
 				continue
@@ -238,12 +232,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			PayloadHash: payload.Hash(),
 			Timestamp:   time.Now().UTC(),
 
-			// the following fields should be set by the provided setter function
-			View:           0,
-			ParentVoterIDs: nil,
-			ParentVoterSig: nil,
-			ProposerID:     flow.ZeroID,
-			ProposerSig:    nil,
+			// NOTE: we rely on the HotStuff-provided setter to set the other
+			// fields, which are related to signatures and HotStuff internals
 		}
 
 		// set fields specific to the consensus algorithm

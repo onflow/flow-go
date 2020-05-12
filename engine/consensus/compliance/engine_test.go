@@ -16,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	real "github.com/dapperlabs/flow-go/module/buffer"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	netint "github.com/dapperlabs/flow-go/network"
 	network "github.com/dapperlabs/flow-go/network/mock"
@@ -46,6 +47,7 @@ type ComplianceSuite struct {
 
 	// mocked dependencies
 	me       *module.Local
+	metrics  *metrics.NoopCollector
 	cleaner  *storage.Cleaner
 	headers  *storage.Headers
 	payloads *storage.Payloads
@@ -58,7 +60,6 @@ type ComplianceSuite struct {
 	pending  *module.PendingBlockBuffer
 	hotstuff *module.HotStuff
 	sync     *module.Synchronization
-	metrics  *module.Metrics
 
 	// engine under test
 	e *Engine
@@ -231,12 +232,12 @@ func (cs *ComplianceSuite) SetupTest() {
 	cs.sync = &module.Synchronization{}
 	cs.sync.On("RequestBlock", mock.Anything).Return(nil)
 
-	cs.metrics = &module.Metrics{}
-	cs.metrics.On("PendingBlocks", mock.Anything).Return()
+	// set up no-op metrics mock
+	cs.metrics = metrics.NewNoopCollector()
 
 	// initialize the engine
 	log := zerolog.New(os.Stderr)
-	e, err := New(log, cs.net, cs.me, cs.cleaner, cs.headers, cs.payloads, cs.state, cs.prov, cs.pending, cs.metrics)
+	e, err := New(log, cs.metrics, cs.metrics, cs.metrics, cs.net, cs.me, cs.cleaner, cs.headers, cs.payloads, cs.state, cs.prov, cs.pending)
 	require.NoError(cs.T(), err, "engine initialization should pass")
 
 	// assign engine with consensus & synchronization

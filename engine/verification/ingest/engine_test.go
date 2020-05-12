@@ -211,7 +211,7 @@ func (suite *IngestTestSuite) TestHandleReceipt_MissingCollection() {
 	suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil).Once()
 	// mocks the possession of chunk data pack associated with the `suite.block`
 	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true).Once()
-	suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil).Once()
+	suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, true).Once()
 
 	// mocks missing collection
 	//
@@ -230,13 +230,13 @@ func (suite *IngestTestSuite) TestHandleReceipt_MissingCollection() {
 	// expect that we already have the receipt in the authenticated receipts mempool
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
 	suite.pendingReceipts.On("All").Return([]*verificationmodel.PendingReceipt{}).Once()
-	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
+	suite.authReceipts.On("Add", suite.receipt).Return(true).Once()
 
 	// mocks functionalities
 	//
 	// adding functionality of chunk tracker to trackers mempool
 	// mocks initial insertion of tracker into mempool
-	suite.collectionTrackers.On("Add", suite.collTracker).Return(nil).Once()
+	suite.collectionTrackers.On("Add", suite.collTracker).Return(true).Once()
 	// there is no tracker registered for the collection, i.e., the collection has not been requested yet
 	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(false)
 
@@ -334,12 +334,12 @@ func (suite *IngestTestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	//
 	// adding functionality of chunk tracker to trackers mempool
 	// mocks initial insertion of tracker into mempool
-	suite.chunkDataPackTrackers.On("Add", suite.chunkTracker).Return(nil).Once()
+	suite.chunkDataPackTrackers.On("Add", suite.chunkTracker).Return(true).Once()
 	// mocks tracker check
 	// absence of a tracker for chunk data pack
 	suite.chunkDataPackTrackers.On("Has", suite.chunkDataPack.ID()).Return(false)
 	// mocks the functionality of adding receipt to the mempool
-	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
+	suite.authReceipts.On("Add", suite.receipt).Return(true).Once()
 
 	suite.chunksConduit.
 		On("Submit", testifymock.AnythingOfType("*messages.ChunkDataPackRequest"), execIdentities[0].NodeID).Return(nil).Once()
@@ -389,8 +389,8 @@ func (suite *IngestTestSuite) TestHandleReceipt_RetryMissingCollection() {
 	suite.collectionTrackers.On("Add", suite.collTracker).Run(func(args testifymock.Arguments) {
 		// +1 accounts for updating the trackers counter
 		suite.collTracker.Counter += 1
-	}).Return(nil)
-	suite.collectionTrackers.On("ByCollectionID", suite.collTracker.ID()).Return(suite.collTracker, nil)
+	}).Return(true)
+	suite.collectionTrackers.On("ByCollectionID", suite.collTracker.ID()).Return(suite.collTracker, true)
 	suite.collectionTrackers.On("Rem", suite.collTracker.ID()).Return(true)
 
 	// no chunl data pack tracjer
@@ -455,8 +455,8 @@ func (suite *IngestTestSuite) TestHandleReceipt_RetryMissingChunkDataPack() {
 	suite.chunkDataPackTrackers.On("Add", suite.chunkTracker).Run(func(args testifymock.Arguments) {
 		// +1 accounts for updating the trackers counter
 		suite.chunkTracker.Counter += 1
-	}).Return(nil)
-	suite.chunkDataPackTrackers.On("ByChunkID", suite.chunkTracker.ChunkID).Return(suite.chunkTracker, nil).Once()
+	}).Return(true)
+	suite.chunkDataPackTrackers.On("ByChunkID", suite.chunkTracker.ChunkID).Return(suite.chunkTracker, true).Once()
 	suite.chunkDataPackTrackers.On("Rem", suite.chunkTracker.ChunkID).Return(true).Once()
 
 	// no collection tracker
@@ -548,7 +548,7 @@ func (suite *IngestTestSuite) TestHandleReceipt_UnstakedSender() {
 	suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
 
 	// receipt should go to the pending receipts mempool
-	suite.pendingReceipts.On("Add", suite.receipt).Return(nil).Once()
+	suite.pendingReceipts.On("Add", suite.receipt).Return(true).Once()
 
 	// creates and mocks a pending receipt for the unstaked node
 	p := &verificationmodel.PendingReceipt{
@@ -558,10 +558,10 @@ func (suite *IngestTestSuite) TestHandleReceipt_UnstakedSender() {
 	preceipts := []*verificationmodel.PendingReceipt{p}
 
 	// receipt should go to the pending receipts mempool
-	suite.pendingReceipts.On("Add", p).Return(nil).Once()
+	suite.pendingReceipts.On("Add", p).Return(true).Once()
 	suite.pendingReceipts.On("All").Return(preceipts).Once()
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}).Once()
-	suite.blockStorage.On("ByID", suite.block.ID()).Return(nil, fmt.Errorf("block does not exist")).Once()
+	suite.blockStorage.On("ByID", suite.block.ID()).Return(nil, errors.New("dummy error")).Once()
 
 	err := eng.Process(unstakedIdentity, suite.receipt)
 	require.NoError(suite.T(), err)
@@ -627,13 +627,13 @@ func (suite *IngestTestSuite) TestHandleCollection_Tracked() {
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
 	suite.pendingReceipts.On("All").Return([]*verificationmodel.PendingReceipt{}, nil)
 	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(true)
-	suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, nil)
+	suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, true)
 	suite.state.On("Final").Return(suite.ss).Once()
 	suite.state.On("AtBlockID", testifymock.Anything).Return(suite.ss, nil)
 	suite.ss.On("Identity", collIdentity.NodeID).Return(collIdentity, nil).Once()
 
 	// expect that the collection be added to the mempool
-	suite.authCollections.On("Add", suite.collection).Return(nil).Once()
+	suite.authCollections.On("Add", suite.collection).Return(true).Once()
 
 	// expect that the collection tracker is removed
 	suite.collectionTrackers.On("Rem", suite.collection.ID()).Return(true).Once()
@@ -666,7 +666,7 @@ func (suite *IngestTestSuite) TestHandleCollection_Untracked() {
 		OriginID:   collIdentity.NodeID,
 	}
 	// expects the the collection to be added to pending receipts
-	suite.pendingCollections.On("Add", pcoll).Return(nil).Once()
+	suite.pendingCollections.On("Add", pcoll).Return(true).Once()
 
 	err := eng.Process(collIdentity.NodeID, suite.collection)
 	suite.Assert().Nil(err)
@@ -701,7 +701,7 @@ func (suite *IngestTestSuite) TestHandleCollection_UnstakedSender() {
 
 	// mocks a tracker for the collection
 	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(true)
-	suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, nil)
+	suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, true)
 
 	err := eng.Process(unstakedIdentity, suite.collection)
 	suite.Assert().Error(err)
@@ -734,7 +734,7 @@ func (suite *IngestTestSuite) TestHandleCollection_SenderWithWrongRole() {
 		suite.ss.On("Identity", invalidIdentity.NodeID).Return(invalidIdentity, nil).Once()
 		// mocks a tracker for the collection
 		suite.collectionTrackers.On("Has", suite.collection.ID()).Return(true)
-		suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, nil)
+		suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, true)
 
 		err := eng.Process(invalidIdentity.NodeID, suite.collection)
 		suite.Assert().Error(err)
@@ -793,7 +793,7 @@ func (suite *IngestTestSuite) TestVerifyReady() {
 			suite.ss.On("Identity", testcase.from.NodeID).Return(testcase.from, nil)
 
 			// mocks the functionality of adding collection to the mempool
-			suite.authCollections.On("Add", suite.collection).Return(nil)
+			suite.authCollections.On("Add", suite.collection).Return(true)
 
 			// mocks missing resources
 			//
@@ -802,7 +802,7 @@ func (suite *IngestTestSuite) TestVerifyReady() {
 				Return(false).Once()
 			for _, chunk := range suite.receipt.ExecutionResult.Chunks {
 				suite.ingestedChunkIDs.On("Has", chunk.ID()).Return(false)
-				suite.ingestedChunkIDs.On("Add", chunk.ID()).Return(nil)
+				suite.ingestedChunkIDs.On("Add", chunk.ID()).Return(true)
 			}
 
 			// mocks available resources at engine's disposal
@@ -812,15 +812,15 @@ func (suite *IngestTestSuite) TestVerifyReady() {
 			// collection
 			suite.authCollections.On("Has", suite.collection.ID()).Return(true)
 			suite.pendingCollections.On("Has", suite.collection.ID()).Return(false)
-			suite.authCollections.On("ByID", suite.collection.ID()).Return(suite.collection, nil)
+			suite.authCollections.On("ByID", suite.collection.ID()).Return(suite.collection, true)
 			// tracker for the collection
 			suite.collectionTrackers.On("Has", suite.collection.ID()).Return(true)
-			suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, nil)
+			suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, true)
 			// chunk data pack in mempool
 			suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
-			suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
+			suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, true)
 			// execution receipt in authenticated pool
-			suite.authReceipts.On("Add", suite.receipt).Return(nil)
+			suite.authReceipts.On("Add", suite.receipt).Return(true)
 			suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
 			// pending receipt for the test case in mempool
 			p := &verificationmodel.PendingReceipt{
@@ -946,19 +946,19 @@ func (suite *IngestTestSuite) TestChunkDataPackTracker_HappyPath() {
 
 	// mocks tracker to return the tracker for the chunk data pack
 	suite.chunkDataPackTrackers.On("Has", chunkDataPack.ChunkID).Return(true).Once()
-	suite.chunkDataPackTrackers.On("ByChunkID", chunkDataPack.ChunkID).Return(track, nil).Once()
+	suite.chunkDataPackTrackers.On("ByChunkID", chunkDataPack.ChunkID).Return(track, true).Once()
 
 	// mocks state of ingest engine to return execution node ID
 	suite.state.On("AtBlockID", track.BlockID).Return(suite.ss, nil).Once()
 	suite.ss.On("Identity", execIdentity.NodeID).Return(execIdentity, nil).Once()
 
 	// chunk data pack should be successfully added to mempool and the tracker should be removed
-	suite.chunkDataPacks.On("Add", &chunkDataPack).Return(nil).Once()
+	suite.chunkDataPacks.On("Add", &chunkDataPack).Return(true).Once()
 	suite.chunkDataPackTrackers.On("Rem", chunkDataPack.ChunkID).Return(true).Once()
 
 	// engine has not yet ingested this chunk
 	suite.ingestedChunkIDs.On("Has", chunkDataPack.ChunkID).Return(false)
-	// suite.ingestedChunkIDs.On("Add", chunk).Return(nil)
+	// suite.ingestedChunkIDs.On("Add", chunk).Return(true)
 
 	// terminates call to checkPendingChunks as it is out of this test's scope
 	suite.authReceipts.On("All").Return(nil).Once()

@@ -22,6 +22,7 @@ const (
 	DefaultExecutionCount    = 1
 	DefaultVerificationCount = 1
 	DefaultAccessCount       = 1
+	DefaultNClusters         = 1
 	AccessAPIPort            = 3569
 	MetricsPort              = 8080
 	RPCPort                  = 9000
@@ -33,6 +34,7 @@ var (
 	executionCount    int
 	verificationCount int
 	accessCount       int
+	nClusters         uint
 )
 
 func init() {
@@ -41,6 +43,7 @@ func init() {
 	flag.IntVar(&executionCount, "execution", DefaultExecutionCount, "number of execution nodes")
 	flag.IntVar(&verificationCount, "verification", DefaultVerificationCount, "number of verification nodes")
 	flag.IntVar(&accessCount, "access", DefaultAccessCount, "number of access nodes")
+	flag.UintVar(&nClusters, "nclusters", DefaultNClusters, "number of collector clusters")
 }
 
 func main() {
@@ -57,7 +60,7 @@ func main() {
 
 	nodes := prepareNodes()
 
-	conf := testnet.NewNetworkConfig("localnet", nodes)
+	conf := testnet.NewNetworkConfig("localnet", nodes, testnet.WithClusters(nClusters))
 
 	err := os.RemoveAll(BootstrapDir)
 	if err != nil {
@@ -192,7 +195,7 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 			"--bootstrapdir=/bootstrap",
 			"--datadir=/flowdb",
 			"--loglevel=DEBUG",
-			"--nclusters=1",
+			fmt.Sprintf("--nclusters=%d", nClusters),
 		},
 		Volumes: []string{
 			fmt.Sprintf("%s:/bootstrap", BootstrapDir),

@@ -8,6 +8,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/metrics/example"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -15,27 +16,36 @@ import (
 // increases result approvals counter and checked chunks counter 100 times each
 func main() {
 	example.WithMetricsServer(func(logger zerolog.Logger) {
-		metrics, err := metrics.NewCollector(logger)
+		tracer, err := trace.NewTracer(logger, "collection")
 		if err != nil {
 			panic(err)
+		}
+		collector := struct {
+			*metrics.HotstuffCollector
+			*metrics.ExecutionCollector
+			*metrics.NetworkCollector
+		}{
+			HotstuffCollector:  metrics.NewHotstuffCollector("some_chain_id"),
+			ExecutionCollector: metrics.NewExecutionCollector(tracer),
+			NetworkCollector:   metrics.NewNetworkCollector(),
 		}
 		diskTotal := rand.Int63n(1024 ^ 3)
 		for i := 0; i < 1000; i++ {
 			blockID := unittest.BlockFixture().ID()
-			metrics.StartBlockReceivedToExecuted(blockID)
+			collector.StartBlockReceivedToExecuted(blockID)
 
 			// adds a random delay for execution duration, between 0 and 2 seconds
 			time.Sleep(time.Duration(rand.Int31n(2000)) * time.Millisecond)
 
-			metrics.ExecutionGasUsedPerBlock(uint64(rand.Int63n(1e6)))
-			metrics.ExecutionStateReadsPerBlock(uint64(rand.Int63n(1e6)))
+			collector.ExecutionGasUsedPerBlock(uint64(rand.Int63n(1e6)))
+			collector.ExecutionStateReadsPerBlock(uint64(rand.Int63n(1e6)))
 
 			diskIncrease := rand.Int63n(1024 ^ 2)
 			diskTotal += diskIncrease
-			metrics.ExecutionStateStorageDiskTotal(diskTotal)
-			metrics.ExecutionStorageStateCommitment(diskIncrease)
+			collector.ExecutionStateStorageDiskTotal(diskTotal)
+			collector.ExecutionStorageStateCommitment(diskIncrease)
 
-			metrics.FinishBlockReceivedToExecuted(blockID)
+			collector.FinishBlockReceivedToExecuted(blockID)
 		}
 	})
 }

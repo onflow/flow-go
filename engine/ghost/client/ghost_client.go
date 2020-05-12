@@ -50,7 +50,7 @@ func (c *GhostClient) Close() error {
 	return c.close()
 }
 
-func (c *GhostClient) Send(ctx context.Context, channelID uint8, targetIDs []flow.Identifier, event interface{}) error {
+func (c *GhostClient) Send(ctx context.Context, channelID uint8, event interface{}, targetIDs ...flow.Identifier) error {
 
 	message, err := c.codec.Encode(event)
 	if err != nil {

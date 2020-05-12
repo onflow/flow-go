@@ -14,3 +14,13 @@ func (p Payload) Hash() Identifier {
 	sealHash := MerkleRoot(GetIDs(p.Seals)...)
 	return ConcatSum(idHash, collHash, sealHash)
 }
+
+// Index returns the index for the payload.
+func (p Payload) Index() Index {
+	idx := Index{
+		NodeIDs:       GetIDs(p.Identities),
+		CollectionIDs: GetIDs(p.Guarantees),
+		SealIDs:       GetIDs(p.Seals),
+	}
+	return idx
+}

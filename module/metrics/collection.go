@@ -6,9 +6,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/trace"
 )
 
-// Collection Metrics
+// Collection spans.
 const (
 
 	// span from a transaction being received to being included in a block
@@ -19,78 +20,97 @@ const (
 	spanCollectionToGuarantee = "collection_to_guarantee"
 )
 
-var (
-	transactionsIngestedCounter = promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: namespaceCollection,
-		Name:      "ingested_transactions_total",
-		Help:      "count of transactions ingested by this node",
-	})
-	proposalsCounter = promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: namespaceCollection,
-		Name:      "proposals_total",
-		Help:      "count of collection proposals",
-	})
-	proposalSizeGauge = promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceCollection,
-		Buckets:   []float64{5, 10, 50, 100}, //TODO(andrew) update once collection limits are known
-		Name:      "proposal_size_transactions",
-		Help:      "number of transactions in proposed collections",
-	})
-	guaranteedCollectionSizeGauge = promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceCollection,
-		Buckets:   []float64{5, 10, 50, 100}, //TODO(andrew) update once collection limits are known
-		Name:      "guarantee_size_transactions",
-		Help:      "number of transactions in guaranteed collections",
-	})
-	pendingClusterBlocksGauge = promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceCollection,
-		Subsystem: subsystemProposal,
-		Name:      "pending_blocks_total",
-		Help:      "number of cluster blocks in pending cache of collection proposal engine",
-	})
-)
+type CollectionCollector struct {
+	tracer                   *trace.OpenTracer
+	transactionsIngested     prometheus.Counter
+	proposals                prometheus.Counter
+	proposalSize             prometheus.Histogram
+	guaranteedCollectionSize prometheus.Histogram
+	pendingClusterBlocks     prometheus.Gauge
+}
 
-// PendingClusterBlocks sets the number of cluster blocks in the pending cache.
-func (c *BaseMetrics) PendingClusterBlocks(n uint) {
-	pendingClusterBlocksGauge.Set(float64(n))
+func NewCollectionCollector(tracer *trace.OpenTracer) *CollectionCollector {
+
+	cc := &CollectionCollector{
+		tracer: tracer,
+
+		transactionsIngested: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceCollection,
+			Name:      "ingested_transactions_total",
+			Help:      "count of transactions ingested by this node",
+		}),
+
+		proposals: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceCollection,
+			Name:      "proposals_total",
+			Help:      "count of collection proposals",
+		}),
+
+		proposalSize: promauto.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceCollection,
+			Buckets:   []float64{5, 10, 50, 100}, //TODO(andrew) update once collection limits are known
+			Name:      "proposal_size_transactions",
+			Help:      "number of transactions in proposed collections",
+		}),
+
+		guaranteedCollectionSize: promauto.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceCollection,
+			Buckets:   []float64{5, 10, 50, 100}, //TODO(andrew) update once collection limits are known
+			Name:      "guarantee_size_transactions",
+			Help:      "number of transactions in guaranteed collections",
+		}),
+
+		pendingClusterBlocks: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceCollection,
+			Name:      "pending_blocks_total",
+			Help:      "number of cluster blocks in pending cache of collection proposal engine",
+		}),
+	}
+
+	return cc
 }
 
 // TransactionReceived starts a span to trace the duration of a transaction
 // from being created to being included as part of a collection.
-func (c *BaseMetrics) TransactionReceived(txID flow.Identifier) {
-	transactionsIngestedCounter.Inc()
-	c.tracer.StartSpan(txID, spanTransactionToCollection)
+func (cc *CollectionCollector) TransactionReceived(txID flow.Identifier) {
+	cc.transactionsIngested.Inc()
+	cc.tracer.StartSpan(txID, spanTransactionToCollection)
 }
 
 // CollectionProposed tracks the size and number of proposals.
-func (c *BaseMetrics) CollectionProposed(collection flow.LightCollection) {
-	proposalSizeGauge.Observe(float64(collection.Len()))
-	proposalsCounter.Inc()
+func (cc *CollectionCollector) CollectionProposed(collection flow.LightCollection) {
+	cc.proposalSize.Observe(float64(collection.Len()))
+	cc.proposals.Inc()
 }
 
 // CollectionGuaranteed updates the guaranteed collection size gauge and
 // finishes the tx->collection span for each constituent transaction.
-func (c *BaseMetrics) CollectionGuaranteed(collection flow.LightCollection) {
-	guaranteedCollectionSizeGauge.Observe(float64(collection.Len()))
+func (cc *CollectionCollector) CollectionGuaranteed(collection flow.LightCollection) {
+	cc.guaranteedCollectionSize.Observe(float64(collection.Len()))
 	for _, txID := range collection.Transactions {
-		c.tracer.FinishSpan(txID, spanTransactionToCollection)
+		cc.tracer.FinishSpan(txID, spanTransactionToCollection)
 	}
+}
+
+// PendingClusterBlocks sets the number of cluster blocks in the pending cache.
+func (cc *CollectionCollector) PendingClusterBlocks(n uint) {
+	cc.pendingClusterBlocks.Set(float64(n))
 }
 
 // StartCollectionToGuarantee starts a span to trace the duration of a collection
 // from being created to being submitted as a collection guarantee
 // TODO not used, revisit once HotStuff is in use
-func (c *BaseMetrics) StartCollectionToGuarantee(collection flow.LightCollection) {
+func (cc *CollectionCollector) StartCollectionToGuarantee(collection flow.LightCollection) {
 
 	followsFrom := make([]opentracing.StartSpanOption, 0, len(collection.Transactions))
 	for _, txID := range collection.Transactions {
-		if txSpan, exists := c.tracer.GetSpan(txID, spanTransactionToCollection); exists {
+		if txSpan, exists := cc.tracer.GetSpan(txID, spanTransactionToCollection); exists {
 			// link its transactions' spans
 			followsFrom = append(followsFrom, opentracing.FollowsFrom(txSpan.Context()))
 		}
 	}
 
-	c.tracer.StartSpan(collection.ID(), spanCollectionToGuarantee, followsFrom...).
+	cc.tracer.StartSpan(collection.ID(), spanCollectionToGuarantee, followsFrom...).
 		SetTag("collection_id", collection.ID().String()).
 		SetTag("collection_txs", collection.Transactions)
 }
@@ -98,6 +118,6 @@ func (c *BaseMetrics) StartCollectionToGuarantee(collection flow.LightCollection
 // FinishCollectionToGuarantee finishes a span to trace the duration of a collection
 // from being proposed to being finalized (eg. guaranteed).
 // TODO not used, revisit once HotStuff is in use
-func (c *BaseMetrics) FinishCollectionToGuarantee(collectionID flow.Identifier) {
-	c.tracer.FinishSpan(collectionID, spanCollectionToGuarantee)
+func (cc *CollectionCollector) FinishCollectionToGuarantee(collectionID flow.Identifier) {
+	cc.tracer.FinishSpan(collectionID, spanCollectionToGuarantee)
 }

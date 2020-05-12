@@ -135,12 +135,12 @@ func (c *Container) Start() error {
 
 	err := c.net.cli.ContainerStart(ctx, c.ID, types.ContainerStartOptions{})
 	if err != nil {
-		return fmt.Errorf("could not stop container: %w", err)
+		return fmt.Errorf("could not start container: %w", err)
 	}
 
 	err = c.waitForCondition(ctx, containerRunning)
 	if err != nil {
-		return fmt.Errorf("error waiting for container to stop: %w", err)
+		return fmt.Errorf("error waiting for container to start: %w", err)
 	}
 
 	return nil
