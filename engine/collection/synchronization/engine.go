@@ -64,7 +64,7 @@ func New(
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		unit:          engine.NewUnit(),
-		log:           log.With().Str("engine", "consensus").Logger(),
+		log:           log.With().Str("engine", "cluster_sync").Logger(),
 		metrics:       metrics,
 		me:            me,
 		state:         state,
