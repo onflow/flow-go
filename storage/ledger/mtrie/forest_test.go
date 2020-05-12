@@ -18,7 +18,12 @@ import (
 
 func TestEmptyInsert(t *testing.T) {
 	trieHeight := 17
-	fStore, err := mtrie.NewMForest(trieHeight, "", 5)
+
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
@@ -41,7 +46,11 @@ func TestLeftEmptyInsert(t *testing.T) {
 	//    (X)  [~]      //
 	//////////////////////
 	trieHeight := 17
-	fStore, err := mtrie.NewMForest(trieHeight, "", 5)
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5)
 	require.NoError(t, err)
 	rootHash1 := fStore.GetEmptyRootHash()
 	// key: 1000...
@@ -91,7 +100,11 @@ func TestRightEmptyInsert(t *testing.T) {
 	//    [~]  (X)       //
 	///////////////////////
 	trieHeight := 17
-	fStore, err := mtrie.NewMForest(trieHeight, "", 5)
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5)
 	require.NoError(t, err)
 	rootHash1 := fStore.GetEmptyRootHash()
 
@@ -143,7 +156,11 @@ func TestExpansionInsert(t *testing.T) {
 	//////////////////////
 
 	trieHeight := 17
-	fStore, err := mtrie.NewMForest(trieHeight, "", 5)
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5)
 	require.NoError(t, err)
 	rootHash1 := fStore.GetEmptyRootHash()
 
@@ -193,7 +210,11 @@ func TestFullHouseInsert(t *testing.T) {
 	///////////////////////
 
 	trieHeight := 17
-	fStore, err := mtrie.NewMForest(trieHeight, "", 5)
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5)
 	require.NoError(t, err)
 	rootHash1 := fStore.GetEmptyRootHash()
 
@@ -247,7 +268,11 @@ func TestLeafInsert(t *testing.T) {
 	//         ()  ()    //
 	///////////////////////
 	trieHeight := 17
-	fStore, err := mtrie.NewMForest(trieHeight, "", 5)
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5)
 	require.NoError(t, err)
 	rootHash1 := fStore.GetEmptyRootHash()
 
@@ -278,7 +303,11 @@ func TestLeafInsert(t *testing.T) {
 
 func TestSameKeyInsert(t *testing.T) {
 	trieHeight := 17 // should be key size (in bits) + 1
-	fStore, err := mtrie.NewMForest(trieHeight, "", 5)
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
@@ -304,7 +333,11 @@ func TestSameKeyInsert(t *testing.T) {
 
 func TestUpdateWithWrongKeySize(t *testing.T) {
 	trieHeight := 17 // should be key size (in bits) + 1
-	fStore, err := mtrie.NewMForest(trieHeight, "", 5)
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
@@ -333,7 +366,11 @@ func TestUpdateWithWrongKeySize(t *testing.T) {
 
 func TestReadOrder(t *testing.T) {
 	trieHeight := 17 // should be key size (in bits) + 1
-	fStore, err := mtrie.NewMForest(trieHeight, "", 5)
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
@@ -354,7 +391,11 @@ func TestReadOrder(t *testing.T) {
 
 func TestMixRead(t *testing.T) {
 	trieHeight := 17 // should be key size (in bits) + 1
-	fStore, err := mtrie.NewMForest(trieHeight, "", 5)
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
@@ -384,7 +425,11 @@ func TestMixRead(t *testing.T) {
 
 func TestReadWithDupplicatedKeys(t *testing.T) {
 	trieHeight := 17 // should be key size (in bits) + 1
-	fStore, err := mtrie.NewMForest(trieHeight, "", 5)
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
@@ -411,7 +456,11 @@ func TestReadWithDupplicatedKeys(t *testing.T) {
 
 func TestReadNonExistKey(t *testing.T) {
 	trieHeight := 17 // should be key size (in bits) + 1
-	fStore, err := mtrie.NewMForest(trieHeight, "", 5)
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
@@ -431,7 +480,11 @@ func TestReadNonExistKey(t *testing.T) {
 
 func TestReadWithWrongKeySize(t *testing.T) {
 	trieHeight := 17 // should be key size (in bits) + 1
-	fStore, err := mtrie.NewMForest(trieHeight, "", 5)
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
@@ -456,7 +509,11 @@ func TestReadWithWrongKeySize(t *testing.T) {
 
 func TestUpdatePrevStates(t *testing.T) {
 	trieHeight := 17 // should be key size (in bits) + 1
-	fStore, err := mtrie.NewMForest(trieHeight, "", 5)
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
@@ -498,7 +555,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 	maxNumKeysPerStep := 10
 	maxValueSize := 6 // bytes
 	rand.Seed(time.Now().UnixNano())
-	dir, err := ioutil.TempDir("", "test-mtrie")
+	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir) // clean up
 
@@ -579,7 +636,11 @@ func TestRandomUpdateReadProof(t *testing.T) {
 
 func TestProofGenerationInclusion(t *testing.T) {
 	trieHeight := 17
-	fStore, err := mtrie.NewMForest(trieHeight, "", 5)
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
@@ -669,7 +730,11 @@ func TestPurgeAndLoad(t *testing.T) {
 
 func TestTrieStoreAndLoad(t *testing.T) {
 	trieHeight := 17
-	fStore, err := mtrie.NewMForest(trieHeight, "", 5)
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
