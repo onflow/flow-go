@@ -55,13 +55,13 @@ func (c *ChunkDataPackTrackers) Inc(chunkID flow.Identifier) (*tracker.ChunkData
 }
 
 // ByChunkID returns the chunk data pack tracker for the given chunk ID.
-func (c *ChunkDataPackTrackers) ByChunkID(chunkID flow.Identifier) (*tracker.ChunkDataPackTracker, error) {
+func (c *ChunkDataPackTrackers) ByChunkID(chunkID flow.Identifier) (*tracker.ChunkDataPackTracker, bool) {
 	entity, ok := c.Backend.ByID(chunkID)
 	if !ok {
-		return nil, fmt.Errorf("could not retrieve tracker from backend")
+		return nil, false
 	}
 	chunkDataPackTracker := entity.(*tracker.ChunkDataPackTracker)
-	return chunkDataPackTracker, nil
+	return chunkDataPackTracker, true
 }
 
 // All returns all chunk data pack trackers from the pool.

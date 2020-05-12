@@ -22,7 +22,7 @@ type CollectionTrackers interface {
 	Inc(collID flow.Identifier) (*tracker.CollectionTracker, error)
 
 	// ByCollectionID returns the collection tracker for the given collection ID
-	ByCollectionID(collID flow.Identifier) (*tracker.CollectionTracker, error)
+	ByCollectionID(collID flow.Identifier) (*tracker.CollectionTracker, bool)
 
 	// All will return a list of collection trackers in mempool.
 	All() []*tracker.CollectionTracker

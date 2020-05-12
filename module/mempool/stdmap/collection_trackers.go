@@ -58,13 +58,13 @@ func (c *CollectionTrackers) Inc(collID flow.Identifier) (*tracker.CollectionTra
 }
 
 // ByCollectionID returns the collection tracker for the given collection ID.
-func (c *CollectionTrackers) ByCollectionID(collID flow.Identifier) (*tracker.CollectionTracker, error) {
+func (c *CollectionTrackers) ByCollectionID(collID flow.Identifier) (*tracker.CollectionTracker, bool) {
 	entity, ok := c.Backend.ByID(collID)
 	if !ok {
-		return nil, fmt.Errorf("could not retrieve collection tracker from mempool")
+		return nil, false
 	}
 	collectionTracker := entity.(*tracker.CollectionTracker)
-	return collectionTracker, nil
+	return collectionTracker, true
 }
 
 // All returns all collection trackers from the pool.

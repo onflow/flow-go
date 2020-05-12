@@ -22,7 +22,7 @@ type ChunkDataPackTrackers interface {
 	Inc(chunkID flow.Identifier) (*tracker.ChunkDataPackTracker, error)
 
 	// ByChunkID returns the chunk data pack tracker for the given chunk ID.
-	ByChunkID(chunkID flow.Identifier) (*tracker.ChunkDataPackTracker, error)
+	ByChunkID(chunkID flow.Identifier) (*tracker.ChunkDataPackTracker, bool)
 
 	// All will return a list of chunk data pack trackers in mempool.
 	All() []*tracker.ChunkDataPackTracker

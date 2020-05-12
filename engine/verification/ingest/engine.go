@@ -214,14 +214,14 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 			Receipt:  receipt,
 			OriginID: originID,
 		}
-		err = e.pendingReceipts.Add(preceipt)
-		if err != nil && err != mempool.ErrAlreadyExists {
-			return fmt.Errorf("could not store execution receipt in pending pool: %w", err)
-		}
+
+		ok := e.pendingReceipts.Add(preceipt)
+
 		e.log.Debug().
 			Hex("origin_id", logging.ID(originID)).
 			Hex("receipt_id", logging.Entity(receipt)).
-			Msg("execution receipt successfully added to pending mempool")
+			Bool("mempool_insertion", ok).
+			Msg("execution receipt added to pending mempool")
 
 	} else {
 		// execution results are only valid from execution nodes
@@ -232,13 +232,11 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 
 		// store the execution receipt in the store of the engine
 		// this will fail if the receipt already exists in the store
-		err = e.authReceipts.Add(receipt)
-		if err != nil && err != mempool.ErrAlreadyExists {
-			return fmt.Errorf("could not store execution receipt: %w", err)
-		}
+		ok := e.authReceipts.Add(receipt)
 		e.log.Debug().
 			Hex("origin_id", logging.ID(originID)).
 			Hex("receipt_id", logging.Entity(receipt)).
+			Bool("mempool_insertion", ok).
 			Msg("execution receipt successfully added to authenticated mempool")
 
 	}
@@ -272,8 +270,8 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		return nil
 	}
 
-	tracker, exists := e.chunkDataPackTackers.ByChunkID(chunkDataPack.ChunkID)
-	if !exists {
+	tracker, ok := e.chunkDataPackTackers.ByChunkID(chunkDataPack.ChunkID)
+	if !ok {
 		e.log.Debug().
 			Hex("origin_id", logging.ID(originID)).
 			Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
@@ -339,8 +337,8 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 
 	if e.collectionTrackers.Has(collID) {
 		// this event is a reply to a prior request
-		tracker, exists := e.collectionTrackers.ByCollectionID(collID)
-		if !exists {
+		tracker, ok := e.collectionTrackers.ByCollectionID(collID)
+		if !ok {
 			return fmt.Errorf("could not retrieve collection tracker from mempool")
 		}
 
@@ -912,9 +910,9 @@ func (e *Engine) updateChunkDataPackTracker(chunkID flow.Identifier, blockID flo
 	} else {
 		// creates a new chunk data pack tracker and stores in in memory
 		cdpt = trackers.NewChunkDataPackTracker(chunkID, blockID)
-		err := e.chunkDataPackTackers.Add(cdpt)
-		if err != nil {
-			return nil, fmt.Errorf("could not store tracker of chunk data pack request in mempool: %w", err)
+		ok := e.chunkDataPackTackers.Add(cdpt)
+		if !ok {
+			return nil, fmt.Errorf("could not store tracker of chunk data pack request in mempool")
 		}
 	}
 
@@ -938,9 +936,9 @@ func (e *Engine) updateCollectionTracker(collectionID flow.Identifier, blockID f
 	} else {
 		// creates a new collection tracker and stores in in memory
 		ct = trackers.NewCollectionTracker(collectionID, blockID)
-		err := e.collectionTrackers.Add(ct)
-		if err != nil {
-			return nil, fmt.Errorf("could not store tracker of collection request in mempool: %w", err)
+		ok := e.collectionTrackers.Add(ct)
+		if !ok {
+			return nil, fmt.Errorf("could not store tracker of collection request in mempool")
 		}
 	}
 

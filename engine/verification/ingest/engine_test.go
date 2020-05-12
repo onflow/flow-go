@@ -226,7 +226,7 @@ func (suite *IngestTestSuite) TestHandleReceipt_MissingCollection() {
 	suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil)
 	// mocks the possession of chunk data pack associated with the `suite.block`
 	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
-	suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
+	suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, true)
 
 	// mocks missing collection
 	//
@@ -243,7 +243,7 @@ func (suite *IngestTestSuite) TestHandleReceipt_MissingCollection() {
 	}
 
 	// expect that we already have the receipt in the authenticated receipts mempool
-	suite.authReceipts.On("Add", suite.receipt).Return(nil).Once()
+	suite.authReceipts.On("Add", suite.receipt).Return(true).Once()
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
 	suite.pendingReceipts.On("All").Return([]*verificationmodel.PendingReceipt{})
 
@@ -391,7 +391,7 @@ func (suite *IngestTestSuite) TestHandleReceipt_RetryMissingCollection() {
 
 	// mock existence of chunk data pack
 	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
-	suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, nil)
+	suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, true)
 
 	// engine has not yet ingested the result of this receipt as well as its chunks yet
 	suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
@@ -634,7 +634,7 @@ func (suite *IngestTestSuite) TestHandleCollection_Tracked() {
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
 	suite.pendingReceipts.On("All").Return([]*verificationmodel.PendingReceipt{}, nil)
 	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(true).Once()
-	suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, nil).Once()
+	suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, true).Once()
 	suite.ss.On("Identity", suite.collIdentity.NodeID).Return(suite.collIdentity, nil)
 
 	// expect that the collection be added to the mempool
@@ -920,11 +920,11 @@ func (suite *IngestTestSuite) TestChunkDataPackTracker_HappyPath() {
 
 	// mocks tracker to return the tracker for the chunk data pack
 	suite.chunkDataPackTrackers.On("Has", suite.chunkDataPack.ChunkID).Return(true).Once()
-	suite.chunkDataPackTrackers.On("ByChunkID", suite.chunkDataPack.ChunkID).Return(track, nil).Once()
+	suite.chunkDataPackTrackers.On("ByChunkID", suite.chunkDataPack.ChunkID).Return(track, true).Once()
 	suite.ss.On("Identity", suite.execIdentity.NodeID).Return(suite.execIdentity, nil)
 
 	// chunk data pack should be successfully added to mempool and the tracker should be removed
-	suite.chunkDataPacks.On("Add", suite.chunkDataPack).Return(nil).Once()
+	suite.chunkDataPacks.On("Add", suite.chunkDataPack).Return(true).Once()
 	suite.chunkDataPackTrackers.On("Rem", suite.chunkDataPack.ChunkID).Return(true).Once()
 
 	// engine has not yet ingested this chunk
