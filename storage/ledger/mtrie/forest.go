@@ -75,7 +75,6 @@ func (f *MForest) AddTrie(trie *MTrie) error {
 	// TODO check if not exist
 	encoded := hex.EncodeToString(trie.rootHash)
 	f.tries.Add(encoded, trie)
-	// f.Purge()
 	return nil
 }
 
@@ -193,7 +192,7 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 		return rootHash, nil
 	}
 
-	// sort keys and deduplicate keys (we only consider the first occurance, and ignore the rest)
+	// sort keys and deduplicate keys (we only consider the last occurrence, and ignore the rest)
 	sortedKeys := make([][]byte, 0)
 	valueMap := make(map[string][]byte)
 	for i, key := range keys {
@@ -206,6 +205,8 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 			//do something here
 			sortedKeys = append(sortedKeys, key)
 			valueMap[hex.EncodeToString(key)] = values[i]
+		} else {
+			valueMap[hex.EncodeToString(key)] = values[i]
 		}
 	}
 
@@ -214,7 +215,7 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 		return bytes.Compare(sortedKeys[i], sortedKeys[j]) < 0
 	})
 
-	sortedValues := make([][]byte, 0)
+	sortedValues := make([][]byte, 0, len(sortedKeys))
 	for _, key := range sortedKeys {
 		sortedValues = append(sortedValues, valueMap[hex.EncodeToString(key)])
 	}
@@ -571,21 +572,3 @@ func (f *MForest) LoadTrie(path string) (*MTrie, error) {
 	f.AddTrie(trie)
 	return trie, nil
 }
-
-// // Purge cleans old tries
-// func (f *MForest) Purge() error {
-// 	if len(f.rootHashQueue) < f.cacheSize {
-// 		return nil
-// 	}
-
-// 	encRootHash := <-f.rootHashQueue
-// 	trie, ok := f.tries[encRootHash]
-// 	if !ok {
-// 		return errors.New("failed for purge the trie, root not found")
-// 	}
-
-// 	go trie.Store(filepath.Join(f.dir, encRootHash))
-
-// 	delete(f.tries, encRootHash)
-// 	return nil
-// }
