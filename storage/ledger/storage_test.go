@@ -204,6 +204,8 @@ func TestTrieStorage_CrashResistance(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Equal(t, values, loadedValues)
+			currentRoot = newRoot
+			f.CloseStorage()
 		}
 	})
 }
