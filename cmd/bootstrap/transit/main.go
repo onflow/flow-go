@@ -129,7 +129,7 @@ func runPush(ctx context.Context, bootdir, token, nodeId string) {
 }
 
 func runPull(ctx context.Context, bootdir, token, nodeId string) {
-	filesToDownload = append(filesToDownload, fmt.Sprintf(FilenameRandomBeaconCipher, nodeId))
+	filesToDownload = append(filesToDownload, FilenameRandomBeaconCipher)
 	log.Println("Running pull")
 	var err error
 	for _, file := range filesToDownload {
@@ -180,7 +180,7 @@ func unwrapFile(bootdir, nodeId string) error {
 
 	pubKeyPath := filepath.Join(bootdir, fmt.Sprintf(FilenameTransitKeyPub, nodeId))
 	privKeyPath := filepath.Join(bootdir, fmt.Sprintf(FilenameTransitKeyPriv, nodeId))
-	ciphertextPath := filepath.Join(bootdir, fmt.Sprintf(FilenameRandomBeaconCipher, nodeId))
+	ciphertextPath := filepath.Join(bootdir, FilenameRandomBeaconCipher)
 	plaintextPath := filepath.Join(bootdir, fmt.Sprintf(bootstrap.FilenameRandomBeaconPriv, nodeId))
 
 	ciphertext, err := ioutil.ReadFile(ciphertextPath)
@@ -219,8 +219,8 @@ func unwrapFile(bootdir, nodeId string) error {
 
 func wrapFile(bootdir, nodeId string) error {
 	pubKeyPath := filepath.Join(bootdir, fmt.Sprintf(FilenameTransitKeyPub, nodeId))
-	plaintextPath := filepath.Join(bootdir, fmt.Sprintf(bootstrap.FilenameRandomBeaconPriv, nodeId))
-	ciphertextPath := filepath.Join(bootdir, fmt.Sprintf(FilenameRandomBeaconCipher, nodeId))
+	plaintextPath := filepath.Join(bootdir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID))
+	ciphertextPath := filepath.Join(bootdir, FilenameRandomBeaconCipher)
 
 	plaintext, err := ioutil.ReadFile(plaintextPath)
 	if err != nil {
