@@ -423,7 +423,7 @@ func TestMixRead(t *testing.T) {
 	}
 }
 
-func TestReadWithDupplicatedKeys(t *testing.T) {
+func TestReadWithDuplicatedKeys(t *testing.T) {
 	trieHeight := 17 // should be key size (in bits) + 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
