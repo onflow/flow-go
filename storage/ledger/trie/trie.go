@@ -86,6 +86,18 @@ type tree struct {
 	isLocked             bool
 }
 
+func (t *tree) init() error {
+	batcher := t.database.NewBatcher()
+
+	heightBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(heightBytes, t.height)
+
+	batcher.Put(metadataKeyPrevious, []byte{})
+	batcher.Put(metadataHeight, heightBytes)
+
+	return t.database.UpdateTrieDB(batcher)
+}
+
 func (t *tree) Lock() {
 	t.isLocked = true
 }
@@ -410,19 +422,9 @@ func NewSMT(
 		forest:         forest,
 	}
 
-	// TODO: improve this
-
-	batcher := emptyDB.NewBatcher()
-
-	height2 := make([]byte, 8)
-	binary.BigEndian.PutUint64(height2, newTree.height)
-
-	batcher.Put(metadataKeyPrevious, emptyHash)
-	batcher.Put(metadataHeight, height2)
-
-	err = emptyDB.UpdateTrieDB(batcher)
+	err = newTree.init()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to initialize base tree: %w", err)
 	}
 
 	forest.Add(newTree)
