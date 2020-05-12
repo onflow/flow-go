@@ -108,19 +108,12 @@ func (c *lruTreeCache) Contains(r Root) (ok bool) {
 
 func (c *lruTreeCache) removeOldest() (evicted bool) {
 	ent := c.evictList.Back()
-	if ent != nil {
+	for ent != nil {
 		if c.removeElement(ent, false) {
 			return true
 		}
 
-		prev := ent.Prev()
-		for prev != nil {
-			if c.removeElement(ent, false) {
-				return true
-			}
-
-			prev = prev.Prev()
-		}
+		ent = ent.Prev()
 	}
 
 	return false
