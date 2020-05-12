@@ -326,7 +326,7 @@ func TestUpdateWithWrongKeySize(t *testing.T) {
 	keys = [][]byte{key2}
 	values = [][]byte{value2}
 
-	rootHash, err = fStore.Update(keys, values, rootHash)
+	_, err = fStore.Update(keys, values, rootHash)
 	require.Error(t, err)
 }
 
@@ -424,10 +424,7 @@ func TestReadNonExistKey(t *testing.T) {
 	require.NoError(t, err)
 
 	k2 := []byte([]uint8{uint8(116), uint8(129)})
-	v2 := []byte{'B'}
-
 	keys = [][]byte{k2}
-	values = [][]byte{v2}
 	retValues, err := fStore.Read(keys, rootHash)
 	require.NoError(t, err)
 	require.Equal(t, len(retValues[0]), 0)
@@ -574,6 +571,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 			allValues = append(allValues, v)
 		}
 		retValues, err = fStore.Read(allKeys, rootHash)
+		require.NoError(t, err)
 		for i, v := range allValues {
 			require.True(t, bytes.Equal(v, retValues[i]))
 		}

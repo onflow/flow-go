@@ -237,7 +237,10 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 	f.PopulateNodeHashValues(newTrie.root)
 	newRootHash := f.GetNodeHash(newTrie.root)
 	newTrie.rootHash = newRootHash
-	f.AddTrie(newTrie)
+	err = f.AddTrie(newTrie)
+	if err != nil {
+		return nil, err
+	}
 	return newRootHash, nil
 }
 
@@ -451,7 +454,10 @@ func (f *MForest) proofs(head *node, keys [][]byte, proofs []*Proof) error {
 			for _, p := range lproofs {
 				// we skip default values
 				if !isDef {
-					SetBit(p.flags, f.maxHeight-head.height-1)
+					err := SetBit(p.flags, f.maxHeight-head.height-1)
+					if err != nil {
+						return err
+					}
 					p.values = append(p.values, nodeHash)
 				}
 			}
@@ -469,7 +475,10 @@ func (f *MForest) proofs(head *node, keys [][]byte, proofs []*Proof) error {
 			for _, p := range rproofs {
 				// we skip default values
 				if !isDef {
-					SetBit(p.flags, f.maxHeight-head.height-1)
+					err := SetBit(p.flags, f.maxHeight-head.height-1)
+					if err != nil {
+						return err
+					}
 					p.values = append(p.values, nodeHash)
 				}
 			}
@@ -569,6 +578,10 @@ func (f *MForest) LoadTrie(path string) (*MTrie, error) {
 	if !bytes.Equal(trie.rootHash, f.GetNodeHash(trie.root)) {
 		return nil, errors.New("error loading a trie, rootHash doesn't match")
 	}
-	f.AddTrie(trie)
+	err = f.AddTrie(trie)
+	if err != nil {
+		return nil, err
+	}
+
 	return trie, nil
 }
