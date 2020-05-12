@@ -77,7 +77,7 @@ func main() {
 
 		prov           *provider.Engine
 		ing            *ingest.Engine
-		collMetrics    module.CollectionMetrics
+		colMetrics     module.CollectionMetrics
 		clusterMetrics module.HotstuffMetrics
 		err            error
 	)
@@ -114,7 +114,7 @@ func main() {
 			return nil
 		}).
 		Module("collection node metrics", func(node *cmd.FlowNodeBuilder) error {
-			collMetrics = metrics.NewCollectionCollector(node.Tracer)
+			colMetrics = metrics.NewCollectionCollector(node.Tracer)
 			return nil
 		}).
 		Module("hotstuff cluster metrics", func(node *cmd.FlowNodeBuilder) error {
@@ -208,7 +208,7 @@ func main() {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
 
-			follower, err := followereng.New(node.Logger, node.Network, node.Me, cleaner, node.Storage.Headers, node.Storage.Payloads, node.State, conCache, core)
+			follower, err := followereng.New(node.Logger, node.Network, node.Me, node.Metrics.Engine, cleaner, node.Storage.Headers, node.Storage.Payloads, node.State, conCache, core)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
@@ -223,7 +223,7 @@ func main() {
 			return follower.WithSynchronization(sync), nil
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ing, err = ingest.New(node.Logger, node.Network, node.State, collMetrics, node.Me, pool, ingressExpiryBuffer)
+			ing, err = ingest.New(node.Logger, node.Network, node.State, colMetrics, node.Me, pool, ingressExpiryBuffer)
 			return ing, err
 		}).
 		Component("ingress server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -232,7 +232,7 @@ func main() {
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			collections := storagekv.NewCollections(node.DB)
-			prov, err = provider.New(node.Logger, node.Network, node.State, collMetrics, node.Me, pool, collections, transactions)
+			prov, err = provider.New(node.Logger, node.Network, node.State, colMetrics, node.Me, pool, collections, transactions)
 			return prov, err
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -240,9 +240,9 @@ func main() {
 				builder.WithMaxCollectionSize(maxCollectionSize),
 				builder.WithExpiryBuffer(builderExpiryBuffer),
 			)
-			finalizer := colfinalizer.NewFinalizer(node.DB, pool, prov, collMetrics, clusterID)
+			finalizer := colfinalizer.NewFinalizer(node.DB, pool, prov, colMetrics, clusterID)
 
-			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, clusterState, collMetrics, ing, pool, transactions, node.Storage.Headers, colPayloads, colCache)
+			prop, err := proposal.New(node.Logger, node.Network, node.Me, colMetrics, node.Metrics.Engine, node.State, clusterState, ing, pool, transactions, node.Storage.Headers, colPayloads, colCache)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize engine: %w", err)
 			}
