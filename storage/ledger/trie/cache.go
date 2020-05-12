@@ -90,12 +90,10 @@ func (c *lruTreeCache) Purge() {
 	defer c.lock.Unlock()
 
 	for _, e := range c.items {
-		c.removeElement(e)
+		c.removeElement(e, true)
 	}
 
-	if len(c.items) == 0 {
-		c.evictList.Init()
-	}
+	c.evictList.Init()
 }
 
 func (c *lruTreeCache) Contains(r Root) (ok bool) {
@@ -111,13 +109,13 @@ func (c *lruTreeCache) Contains(r Root) (ok bool) {
 func (c *lruTreeCache) removeOldest() (evicted bool) {
 	ent := c.evictList.Back()
 	if ent != nil {
-		if c.removeElement(ent) {
+		if c.removeElement(ent, false) {
 			return true
 		}
 
 		prev := ent.Prev()
 		for prev != nil {
-			if c.removeElement(ent) {
+			if c.removeElement(ent, false) {
 				return true
 			}
 
@@ -129,10 +127,10 @@ func (c *lruTreeCache) removeOldest() (evicted bool) {
 }
 
 // removeElement is used to remove a given list element from the cache
-func (c *lruTreeCache) removeElement(e *list.Element) bool {
+func (c *lruTreeCache) removeElement(e *list.Element, ignoreLock bool) bool {
 	kv := e.Value.(*entry)
 
-	if kv.value.IsLocked() {
+	if !ignoreLock && kv.value.IsLocked() {
 		// tree is still in use, do not remove
 		return false
 	}
