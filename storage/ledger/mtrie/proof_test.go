@@ -1,6 +1,8 @@
 package mtrie_test
 
 import (
+	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -10,7 +12,11 @@ import (
 
 func TestBatchProofEncoderDecoder(t *testing.T) {
 	trieHeight := 9
-	fStore, err := mtrie.NewMForest(trieHeight, "", 5)
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
