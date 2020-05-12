@@ -11,7 +11,7 @@ import (
 )
 
 type WAL struct {
-	w *prometheusWAL.WAL
+	wal *prometheusWAL.WAL
 }
 
 // TODO use real loger and metrics, but that would require passing them to Trie storage
@@ -21,14 +21,14 @@ func NewWAL(logger log.Logger, reg prometheus.Registerer, dir string) (*WAL, err
 		return nil, err
 	}
 	return &WAL{
-		w: w,
+		wal: w,
 	}, nil
 }
 
 func (w *WAL) RecordUpdate(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
 	bytes := EncodeUpdate(stateCommitment, keys, values)
 
-	err := w.w.Log(bytes)
+	err := w.wal.Log(bytes)
 
 	if err != nil {
 		return fmt.Errorf("error while recording update in WAL: %w", err)
@@ -39,7 +39,7 @@ func (w *WAL) RecordUpdate(stateCommitment flow.StateCommitment, keys [][]byte, 
 func (w *WAL) RecordDelete(stateCommitment flow.StateCommitment) error {
 	bytes := EncodeDelete(stateCommitment)
 
-	err := w.w.Log(bytes)
+	err := w.wal.Log(bytes)
 
 	if err != nil {
 		return fmt.Errorf("error while recording delete in WAL: %w", err)
@@ -52,7 +52,7 @@ func (w *WAL) Reply(
 	deleteFn func(flow.StateCommitment) error,
 ) error {
 
-	sr, err := prometheusWAL.NewSegmentsReader(w.w.Dir())
+	sr, err := prometheusWAL.NewSegmentsReader(w.wal.Dir())
 	if err != nil {
 		return fmt.Errorf("cannot create segment reader: %w", err)
 	}
@@ -88,5 +88,5 @@ func (w *WAL) Reply(
 }
 
 func (w *WAL) Close() error {
-	return w.w.Close()
+	return w.wal.Close()
 }
