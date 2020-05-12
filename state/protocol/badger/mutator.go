@@ -18,7 +18,7 @@ type Mutator struct {
 }
 
 func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) error {
-	return m.state.db.Update(func(tx *badger.Txn) error {
+	return operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
 
 		// FIRST: execute all the validity checks on the genesis block
 

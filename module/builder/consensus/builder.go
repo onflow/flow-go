@@ -280,7 +280,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 	err = b.blocks.Store(proposal)
 	if err != nil {
-		return nil, fmt.Errorf("could ot store proposal: %w", err)
+		return nil, fmt.Errorf("could not store proposal: %w", err)
 	}
 
 	// update protocol state index for the seal and initialize children index

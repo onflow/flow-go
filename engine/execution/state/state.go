@@ -231,9 +231,7 @@ func (s *state) PersistStateInteractions(ctx context.Context, blockID flow.Ident
 		defer span.Finish()
 	}
 
-	return s.db.Update(func(txn *badger.Txn) error {
-		return operation.InsertExecutionStateInteractions(blockID, views)(txn)
-	})
+	return operation.RetryOnConflict(s.db.Update, operation.InsertExecutionStateInteractions(blockID, views))
 }
 
 func (s *state) RetrieveStateDelta(ctx context.Context, blockID flow.Identifier) (*messages.ExecutionStateDelta, error) {
@@ -296,7 +294,7 @@ func (s *state) UpdateHighestExecutedBlockIfHigher(ctx context.Context, header *
 		defer span.Finish()
 	}
 
-	return s.db.Update(func(txn *badger.Txn) error {
+	return operation.RetryOnConflict(s.db.Update, func(txn *badger.Txn) error {
 		var blockID flow.Identifier
 		err := operation.RetrieveExecutedBlock(&blockID)(txn)
 		if err != nil {

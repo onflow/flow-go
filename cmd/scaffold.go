@@ -275,7 +275,7 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	// in order to void long iterations with big keys when initializing with an
 	// already populated database, we bootstrap the initial maximum key size
 	// upon starting
-	err = db.Update(func(tx *badger.Txn) error {
+	err = operation.RetryOnConflict(db.Update, func(tx *badger.Txn) error {
 		return operation.InitMax(tx)
 	})
 	fnb.MustNot(err).Msg("could not initialize max tracker")
