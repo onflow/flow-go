@@ -68,11 +68,12 @@ func TestAdjust(t *testing.T) {
 		_ = pool.Add(item1)
 
 		// item2 doesn't exist
-		updated := pool.Adjust(item2.ID(), func(old flow.Entity) flow.Entity {
+		updatedItem, updated := pool.Adjust(item2.ID(), func(old flow.Entity) flow.Entity {
 			return item2
 		})
 
 		assert.False(t, updated)
+		assert.Nil(t, updatedItem)
 
 		_, found := pool.ByID(item2.ID())
 		assert.False(t, found)
@@ -82,7 +83,7 @@ func TestAdjust(t *testing.T) {
 		pool := NewBackend()
 		_ = pool.Add(item1)
 
-		updated := pool.Adjust(item1.ID(), func(old flow.Entity) flow.Entity {
+		_, updated := pool.Adjust(item1.ID(), func(old flow.Entity) flow.Entity {
 			// item 1 exist, but got replaced with item1 again, nothing was changed
 			return item1
 		})
@@ -98,12 +99,13 @@ func TestAdjust(t *testing.T) {
 		pool := NewBackend()
 		_ = pool.Add(item1)
 
-		updated := pool.Adjust(item1.ID(), func(old flow.Entity) flow.Entity {
+		updatedItem, ok := pool.Adjust(item1.ID(), func(old flow.Entity) flow.Entity {
 			// item 1 exist, got replaced with item2, the value was updated
 			return item2
 		})
 
-		assert.True(t, updated)
+		assert.True(t, ok)
+		assert.Equal(t, updatedItem, item2)
 
 		value2, found := pool.ByID(item2.ID())
 		assert.True(t, found)

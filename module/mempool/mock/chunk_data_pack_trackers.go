@@ -79,6 +79,29 @@ func (_m *ChunkDataPackTrackers) Has(chunkID flow.Identifier) bool {
 	return r0
 }
 
+// Inc provides a mock function with given fields: chunkID
+func (_m *ChunkDataPackTrackers) Inc(chunkID flow.Identifier) (*tracker.ChunkDataPackTracker, error) {
+	ret := _m.Called(chunkID)
+
+	var r0 *tracker.ChunkDataPackTracker
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *tracker.ChunkDataPackTracker); ok {
+		r0 = rf(chunkID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*tracker.ChunkDataPackTracker)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(chunkID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Rem provides a mock function with given fields: chunkID
 func (_m *ChunkDataPackTrackers) Rem(chunkID flow.Identifier) bool {
 	ret := _m.Called(chunkID)
