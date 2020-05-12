@@ -13,17 +13,17 @@ type Collections interface {
 	// the memory pool.
 	Has(collID flow.Identifier) bool
 
-	// Add will add the given collection to the memory pool; it will error if
-	// the collection is already in the memory pool.
-	Add(coll *flow.Collection) error
+	// Add will add the given collection to the memory pool. It will return
+	// false if it was already in the mempool.
+	Add(coll *flow.Collection) bool
 
 	// Rem will remove the given collection from the memory pool; it will
 	// return true if the collection was known and removed.
 	Rem(collID flow.Identifier) bool
 
-	// Get will retrieve the given collection from the memory pool; it will
-	// error if the collection is not in the memory pool.
-	ByID(collID flow.Identifier) (*flow.Collection, error)
+	// ByID retrieve the collection with the given ID from the memory pool.
+	// It will return false if it was not found in the mempool.
+	ByID(collID flow.Identifier) (*flow.Collection, bool)
 
 	// Size will return the current size of the memory pool.
 	Size() uint

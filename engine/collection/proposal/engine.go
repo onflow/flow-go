@@ -261,12 +261,14 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	header := proposal.Header
 	payload := proposal.Payload
 
-	e.log.Debug().
+	log := e.log.With().
 		Hex("block_id", logging.ID(header.ID())).
 		Uint64("block_height", header.Height).
 		Str("chain_id", header.ChainID).
 		Hex("parent_id", logging.ID(header.ParentID)).
-		Msg("received proposal")
+		Logger()
+
+	log.Debug().Msg("received proposal")
 
 	e.prunePendingCache()
 	e.metrics.PendingClusterBlocks(e.pending.Size())
@@ -275,6 +277,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	// if the parent is not in storage, it has not yet been processed
 	parent, err := e.headers.ByBlockID(header.ParentID)
 	if errors.Is(err, storage.ErrNotFound) {
+		log.Debug().Msg("processing block as pending")
 		return e.processPendingProposal(originID, proposal)
 	}
 	if err != nil {
@@ -349,6 +352,11 @@ func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.ClusterBlo
 // We always respond to these requests if we have the block in question.
 func (e *Engine) onBlockRequest(originID flow.Identifier, req *messages.ClusterBlockRequest) error {
 
+	e.log.Debug().
+		Hex("origin_id", logging.ID(originID)).
+		Hex("req_block_id", logging.ID(req.BlockID)).
+		Msg("received block request")
+
 	// retrieve the block header
 	header, err := e.headers.ByBlockID(req.BlockID)
 	if err != nil {
@@ -381,6 +389,12 @@ func (e *Engine) onBlockRequest(originID flow.Identifier, req *messages.ClusterB
 
 // onBlockResponse handles responses to queries for particular blocks we have made.
 func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.ClusterBlockResponse) error {
+
+	header := res.Proposal.Header
+	e.log.Debug().
+		Hex("block_id", logging.ID(header.ID())).
+		Uint64("block_height", header.Height).
+		Msg("received block response")
 
 	// process the block response as we would a regular proposal
 	err := e.onBlockProposal(originID, res.Proposal)
@@ -424,7 +438,7 @@ func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *mess
 	// always including the sender of the pending block
 	recipients := e.participants.
 		Filter(filter.Not(filter.HasNodeID(originID, e.me.NodeID()))).
-		Sample(2).
+		Sample(1).
 		NodeIDs()
 	recipients = append(recipients, originID)
 

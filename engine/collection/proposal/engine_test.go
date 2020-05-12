@@ -128,7 +128,7 @@ func (suite *Suite) TestHandleProposal() {
 	// we have all transactions
 	suite.pool.On("Has", mock.Anything).Return(true)
 	// should store transactions
-	suite.pool.On("ByID", mock.Anything).Return(&tx, nil)
+	suite.pool.On("ByID", mock.Anything).Return(&tx, true)
 	suite.transactions.On("Store", mock.Anything).Return(nil)
 	// should store payload and header
 	suite.payloads.On("Store", mock.Anything, mock.Anything).Return(nil).Once()
@@ -273,7 +273,7 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	// we have all transactions
 	suite.pool.On("Has", mock.Anything).Return(true)
 	// should store transactions
-	suite.pool.On("ByID", mock.Anything).Return(&tx, nil)
+	suite.pool.On("ByID", mock.Anything).Return(&tx, true)
 	suite.transactions.On("Store", mock.Anything).Return(nil)
 	// should store payload and header
 	suite.payloads.On("Store", mock.Anything, mock.Anything).Return(nil).Twice()

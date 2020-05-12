@@ -28,9 +28,11 @@ const (
 	ResourceIndex     = "index"
 	ResourceIdentity  = "identity"
 	ResourceGuarantee = "guarantee"
+	ResourceResult    = "result"
 	ResourceReceipt   = "receipt"
 	ResourceApproval  = "approval"
 	ResourceSeal      = "seal"
+	ResourceCommit    = "commit"
 )
 
 const (

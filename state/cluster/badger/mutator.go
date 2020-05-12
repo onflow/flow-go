@@ -62,7 +62,7 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 }
 
 func (m *Mutator) Extend(block *cluster.Block) error {
-	return m.state.db.Update(func(tx *badger.Txn) error {
+	err := m.state.db.View(func(tx *badger.Txn) error {
 
 		// check chain ID
 		if block.Header.ChainID != m.state.chainID {
@@ -72,28 +72,20 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 		// get the chain ID, which determines which cluster state to query
 		chainID := block.Header.ChainID
 
-		// get finalized state boundary
-		var boundary uint64
-		err := operation.RetrieveClusterFinalizedHeight(chainID, &boundary)(tx)
+		// get the latest finalized block
+		var final flow.Header
+		err := procedure.RetrieveLatestFinalizedClusterHeader(chainID, &final)(tx)
 		if err != nil {
-			return fmt.Errorf("could not retrieve boundary: %w", err)
-		}
-
-		// get the hash of the latest finalized block
-		var lastFinalizedBlockID flow.Identifier
-		err = operation.LookupClusterBlockHeight(chainID, boundary, &lastFinalizedBlockID)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve latest finalized ID: %w", err)
+			return fmt.Errorf("could not retrieve finalized head: %w", err)
 		}
 
 		// get the header of the parent of the new block
-		var parent flow.Header
-		err = operation.RetrieveHeader(block.Header.ParentID, &parent)(tx)
+		parent, err := m.state.headers.ByBlockID(block.Header.ParentID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve latest finalized header: %w", err)
 		}
 
-		// if the new block has a lower number than its parent, we can't add it
+		// the extending block must increase height by 1 from parent
 		if block.Header.Height != parent.Height+1 {
 			return fmt.Errorf("extending block height (%d) must be parent height + 1 (%d)", block.Header.Height, parent.Height)
 		}
@@ -102,24 +94,23 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 		// do this by tracing back until we see a parent block that is the
 		// latest finalized block, or reach height below the finalized boundary
 
-		// start with the parent ID
-		var loopHeader flow.Header
+		// start with the extending block's parent
 		parentID := block.Header.ParentID
-		for parentID != lastFinalizedBlockID {
+		for parentID != final.ID() {
 
 			// get the parent of current block
-			err = operation.RetrieveHeader(parentID, &loopHeader)(tx)
+			ancestor, err := m.state.headers.ByBlockID(parentID)
 			if err != nil {
 				return fmt.Errorf("could not get parent (%x): %w", block.Header.ParentID, err)
 			}
 
 			// if its number is below current boundary, the block does not connect
 			// to the finalized protocol state and would break database consistency
-			if loopHeader.Height < boundary {
+			if ancestor.Height < final.Height {
 				return fmt.Errorf("block doesn't connect to finalized state")
 			}
 
-			parentID = loopHeader.ParentID
+			parentID = ancestor.ParentID
 		}
 
 		// we go back at most 1k blocks to check payload for now
@@ -135,22 +126,24 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 		for _, tx := range block.Payload.Collection.Transactions {
 			txLookup[tx.ID()] = struct{}{}
 		}
+
 		var duplicateTxIDs flow.IdentifierList
 		ancestorID := block.Header.ParentID
 		for {
-			var ancestor flow.Header
-			err := m.state.db.View(operation.RetrieveHeader(ancestorID, &ancestor))
+			ancestor, err := m.state.headers.ByBlockID(ancestorID)
 			if err != nil {
 				return fmt.Errorf("could not retrieve ancestor header: %w", err)
 			}
+
 			if ancestor.Height <= limit {
 				break
 			}
-			var payload cluster.Payload
-			err = m.state.db.View(procedure.RetrieveClusterPayload(ancestorID, &payload))
+
+			payload, err := m.state.payloads.ByBlockID(ancestorID)
 			if err != nil {
 				return fmt.Errorf("could not retrieve ancestor payload: %w", err)
 			}
+
 			for _, tx := range payload.Collection.Transactions {
 				txID := tx.ID()
 				_, duplicated := txLookup[txID]
@@ -166,12 +159,17 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 			return fmt.Errorf("payload includes duplicate transactions (duplicates: %s)", duplicateTxIDs)
 		}
 
-		// insert the block
-		err = procedure.InsertClusterBlock(block)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert extending block: %w", err)
-		}
-
 		return nil
 	})
+	if err != nil {
+		return fmt.Errorf("could not validate extending block: %w", err)
+	}
+
+	// insert the block
+	err = operation.RetryOnConflict(m.state.db.Update, procedure.InsertClusterBlock(block))
+	if err != nil {
+		return fmt.Errorf("could not insert extending block: %w", err)
+	}
+
+	return nil
 }

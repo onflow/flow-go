@@ -28,6 +28,8 @@ func (nc *NoopCollector) BadgerNumGets(n int64)                                 
 func (nc *NoopCollector) BadgerNumPuts(n int64)                                     {}
 func (nc *NoopCollector) BadgerNumBlockedPuts(n int64)                              {}
 func (nc *NoopCollector) BadgerNumMemtableGets(n int64)                             {}
+func (nc *NoopCollector) FinalizedHeight(height uint64)                             {}
+func (nc *NoopCollector) SealedHeight(height uint64)                                {}
 func (nc *NoopCollector) BlockProposed(*flow.Block)                                 {}
 func (nc *NoopCollector) BlockFinalized(*flow.Block)                                {}
 func (nc *NoopCollector) BlockSealed(*flow.Block)                                   {}
@@ -62,3 +64,5 @@ func (nc *NoopCollector) ExecutionGasUsedPerBlock(gas uint64)                   
 func (nc *NoopCollector) ExecutionStateReadsPerBlock(reads uint64)                  {}
 func (nc *NoopCollector) ExecutionStateStorageDiskTotal(bytes int64)                {}
 func (nc *NoopCollector) ExecutionStorageStateCommitment(bytes int64)               {}
+func (nc *NoopCollector) ExecutionLastExecutedBlockView(view uint64)                {}
+func (ec *NoopCollector) ExecutionTotalExecutedTransactions(numberOfTx int)         {}

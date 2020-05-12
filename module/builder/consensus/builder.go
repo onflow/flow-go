@@ -171,54 +171,58 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 	b.metrics.MempoolEntries(metrics.ResourceGuarantee, b.guarPool.Size())
 
-	// STEP FOUR: Get the block seal from the parent and see how far we can
-	// extend the chain of sealed blocks with the seals in the memory pool.
+	// STEP FOUR: We try to get all ancestors from last sealed block all the way
+	// to the parent. Then we try to get seals for each of them until we don't
+	// find one. This creates a valid chain of seals from the last sealed block
+	// to at most the parent.
 
-	lastSeal, err := b.seals.ByBlockID(parentID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get last seal: %w", err)
-	}
-	lastSealed, err := b.headers.ByBlockID(lastSeal.BlockID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get last sealed: %w", err)
-	}
-
-	// we map each seal to the parent of its sealed block; that way, we can
-	// retrieve a valid seal that will *follow* each block's own seal
-	byParent := make(map[flow.Identifier]*flow.Seal)
+	// create a mapping of block to seal for all seals in our pool
+	byBlock := make(map[flow.Identifier]*flow.Seal)
 	for _, seal := range b.sealPool.All() {
-		sealed, err := b.headers.ByBlockID(seal.BlockID)
-		if errors.Is(err, storage.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("could not retrieve sealed header (%x): %w", seal.BlockID, err)
-		}
-		if sealed.Height < lastSealed.Height {
-			_ = b.sealPool.Rem(seal.ID())
-			continue
-		}
-		byParent[sealed.ParentID] = seal
+		byBlock[seal.BlockID] = seal
+	}
+	if int(b.sealPool.Size()) > len(byBlock) {
+		return nil, fmt.Errorf("multiple seals for the same block")
 	}
 
-	b.metrics.MempoolEntries(metrics.ResourceSeal, b.sealPool.Size())
+	// create a list of ancestors from parent to just before last sealed
+	last, err := b.seals.ByBlockID(parentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve parent seal: %w", err)
+	}
+	ancestorID = parentID
+	var sealableIDs []flow.Identifier
+	for ancestorID != last.BlockID {
+		sealableIDs = append(sealableIDs, ancestorID)
+		ancestor, err := b.headers.ByBlockID(ancestorID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get sealable ancestor (%x): %w", ancestorID, err)
+		}
+		ancestorID = ancestor.ParentID
+	}
 
-	// starting at the paren't seal, we try to find a seal to extend the current
-	// last sealed block; if we do, we keep going until we don't
-	// we also execute a sanity check on whether the execution state of the next
-	// seal propely connects to the previous seal
+	// iterate backwards from just after last sealed to parent and build a chain
+	// of seals for those blocks that is as big as possible
 	var seals []*flow.Seal
-	for len(byParent) > 0 {
-		seal, found := byParent[lastSeal.BlockID]
+	for i := len(sealableIDs) - 1; i >= 0; i-- {
+		sealableID := sealableIDs[i]
+
+		// if we don't find the next seal, we are done building the chain
+		next, found := byBlock[sealableID]
 		if !found {
 			break
 		}
-		if !bytes.Equal(seal.InitialState, lastSeal.FinalState) {
+
+		// if the states mismatch between two subsequent seals, it's an error
+		if !bytes.Equal(next.InitialState, last.FinalState) {
 			return nil, fmt.Errorf("seal execution states do not connect")
 		}
-		delete(byParent, lastSeal.BlockID)
-		seals = append(seals, seal)
-		lastSeal = seal
+
+		// add seal to the payload
+		seals = append(seals, next)
+
+		// keep track of last seal to check state connection
+		last = next
 	}
 
 	// STEP FOUR: We now have guarantees and seals we can validly include
@@ -282,7 +286,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// update protocol state index for the seal and initialize children index
 	blockID := proposal.ID()
 	err = operation.RetryOnConflict(b.db.Update, func(tx *badger.Txn) error {
-		err = operation.IndexBlockSeal(blockID, lastSeal.ID())(tx)
+		err = operation.IndexBlockSeal(blockID, last.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index proposal seal: %w", err)
 		}

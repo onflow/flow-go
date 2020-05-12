@@ -25,7 +25,7 @@ func TestSingleInstance(t *testing.T) {
 	// with a single instance, leading to a boundlessly growing call stack,
 	// which slows down the mocks significantly due to splitting the callstack
 	// to find the calling function name; we thus keep it low for now
-	finalView := uint64(20)
+	finalView := uint64(10)
 	in := NewInstance(t,
 		WithStopCondition(ViewFinalized(finalView)),
 	)

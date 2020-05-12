@@ -50,8 +50,7 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 	ctx := context.Background()
 
 	net.Start(ctx)
-	defer net.Cleanup()
-	defer net.Stop()
+	defer net.Remove()
 
 	// get the ghost container
 	ghostContainer := net.ContainerByID(ghostExeNode.Identifier)
@@ -122,8 +121,7 @@ func TestGhostNodeExample_Send(t *testing.T) {
 	ctx := context.Background()
 
 	net.Start(ctx)
-	defer net.Cleanup()
-	defer net.Stop()
+	defer net.Remove()
 
 	// get the ghost container
 	ghostContainer := net.ContainerByID(ghostCollNode.Identifier)
@@ -136,7 +134,7 @@ func TestGhostNodeExample_Send(t *testing.T) {
 	tx := generateTransaction(t, net, realCollNode.Identifier)
 
 	// send the transaction as an event to the real collection node
-	err = ghostClient.Send(ctx, engine.CollectionIngest, []flow.Identifier{realCollNode.Identifier}, &tx)
+	err = ghostClient.Send(ctx, engine.CollectionIngest, &tx, realCollNode.Identifier)
 	assert.NoError(t, err)
 }
 
