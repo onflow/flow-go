@@ -97,8 +97,8 @@ func init() {
 	finalizeCmd.Flags().UintVar(&flagCollectorGenerationMaxHashGrindingIterations, "collector-gen-max-iter", 1000,
 		"max hash grinding iterations for collector generation")
 	finalizeCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", fmt.Sprintf("path to directory "+
-		"containing one JSON file ending with %v for every partner node (fields Role, Address, NodeID, "+
-		"NetworkPubKey, StakingPubKey)", ""))
+		"containing one JSON file starting with %v for every partner node (fields Role, Address, NodeID, "+
+		"NetworkPubKey, StakingPubKey)", model.PathPartnerNodeInfoPrefix))
 	_ = finalizeCmd.MarkFlagRequired("partner-dir")
 	finalizeCmd.Flags().StringVar(&flagPartnerStakes, "partner-stakes", "", "path to a JSON file containing "+
 		"a map from partner node's NodeID to their stake")
