@@ -631,7 +631,6 @@ func (s *SMT) verifyInclusionFlag(key []byte, flag []byte, root Root) (bool, err
 	curr := tree.rootNode
 	if curr == nil || bytes.Equal(curr.key, key) {
 		return bytes.Equal(eflag, flag), nil
-
 	}
 
 	var flagMatches bool
@@ -1192,7 +1191,7 @@ func (s *SMT) UpdateAtomically(rootNode *node, keys [][]byte, values [][]byte, h
 	}
 
 	// We initialize the nodes as empty to prevent nil pointer exceptions later
-	lnode, rnode := rootNode.GetandSetChildren(GetDefaultHashes())
+	lnode, rnode := rootNode.GetAndSetChildren(GetDefaultHashes())
 
 	// Split the keys and values array so we can update the trie in parallel
 	lkeys, rkeys, splitIndex := utils.SplitKeys(keys, s.height-height-1)
@@ -1219,9 +1218,9 @@ func (s *SMT) UpdateAtomically(rootNode *node, keys [][]byte, values [][]byte, h
 	return rootNode, nil
 }
 
-// GetandSetChildren checks if any of the children are nill and creates them as a default node if they are, otherwise
+// GetAndSetChildren checks if any of the children are nil and creates them as a default node if they are, otherwise
 // we just return the children
-func (n *node) GetandSetChildren(hashes [257]Root) (*node, *node) {
+func (n *node) GetAndSetChildren(hashes [257]Root) (*node, *node) {
 	if n.lChild == nil {
 		n.lChild = newNode(nil, n.height-1)
 	}
