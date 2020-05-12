@@ -549,6 +549,14 @@ github.com/naoina/toml v0.1.2-0.20170918210437-9fafd6967416/go.mod h1:NBIhNtsFMo
 github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn4U=
 github.com/olekukonko/tablewriter v0.0.1/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
 github.com/olekukonko/tablewriter v0.0.2-0.20190409134802-7e037d187b0c/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
+github.com/onflow/cadence v0.0.0-20200419191218-7825e473e791/go.mod h1:T2EWFkpigNIK4Kwn0zWcQbDXrVpjstyRXML/lK8qltY=
+github.com/onflow/cadence v0.1.1-0.20200429063251-116d638b2d80 h1:5K+4gxhIgSSrKqE93q2tLFnH4VxKty2U8Cjba8ZWM/E=
+github.com/onflow/cadence v0.1.1-0.20200429063251-116d638b2d80/go.mod h1:W3ykbuy2rzqMBC6U4UIn5+1Y45fEs6W1++b+xw+Gc/s=
+github.com/onflow/flow-go-sdk v0.1.1 h1:+B3boX2msebZc9JnuS0VjaYHG0+USu4dngM+njj1bHQ=
+github.com/onflow/flow-go-sdk v0.1.1/go.mod h1:ShDDEC0Nb1PXtb3sGhwnFnbu+Hmib5uDfuC8H383PNE=
+github.com/onflow/cadence v0.1.1-0.20200506174742-ee027d0a0afd/go.mod h1:GaLQ7IsJi5bqpH66GprNs8uoQtperK/xbXXIOq11nZw=
+github.com/onflow/cadence v0.1.1-0.20200506184220-7418eb94c4b4/go.mod h1:GaLQ7IsJi5bqpH66GprNs8uoQtperK/xbXXIOq11nZw=
+github.com/onflow/cadence v0.1.1-0.20200506191700-3536ca21ba58/go.mod h1:GaLQ7IsJi5bqpH66GprNs8uoQtperK/xbXXIOq11nZw=
 github.com/onflow/cadence v0.2.0 h1:Y4f7npDXcVraAF6a81KAcNMCe/5+lK7ZeEyYpGaNyZs=
 github.com/onflow/cadence v0.2.0/go.mod h1:GaLQ7IsJi5bqpH66GprNs8uoQtperK/xbXXIOq11nZw=
 github.com/onflow/flow-go-sdk v0.1.2-0.20200507214414-a33d38d32156 h1:hXr1Y6XchyILlurPlgOV5lyHu95g38o9pRQQwuxQ0rM=

@@ -42,7 +42,7 @@ func New(net module.Network, log zerolog.Logger, me module.Local, config Config)
 	log = log.With().Str("engine", "rpc").Logger()
 
 	// create a channel to buffer messages in case the consumer is slow
-	messages := make(chan ghost.FlowMessage, 100)
+	messages := make(chan ghost.FlowMessage, 1000)
 
 	codec := jsoncodec.NewCodec()
 

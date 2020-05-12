@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -83,12 +86,13 @@ func (suite *Suite) SetupTest() {
 
 // TestHandleBlock checks that when a block is received, a request for each individual collection is made
 func (suite *Suite) TestHandleBlock() {
-	originID := unittest.IdentifierFixture()
+
 	block := unittest.BlockFixture()
-	proposal := unittest.ProposalFromBlock(&block)
 
 	cNodeIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
 	suite.proto.snapshot.On("Identities", mock.Anything).Return(cNodeIdentities, nil).Once()
+
+	suite.blocks.On("ByID", block.ID()).Return(&block, nil).Once()
 
 	// expect that the block storage is indexed with each of the collection guarantee
 	suite.blocks.On("IndexBlockForCollections", block.ID(), flow.GetIDs(block.Payload.Guarantees)).Return(nil).Once()
@@ -96,8 +100,24 @@ func (suite *Suite) TestHandleBlock() {
 	// expect that the collection is requested
 	suite.collectionsConduit.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(len(block.Payload.Guarantees))
 
-	err := suite.eng.Process(originID, proposal)
-	require.NoError(suite.T(), err)
+	// create a model.Block with the block ID (other fields of model.block are not needed)
+	modelBlock := model.Block{
+		BlockID: block.ID(),
+	}
+
+	// simulate the follower engine calling the ingest engine with the model block
+	suite.eng.OnFinalizedBlock(&modelBlock)
+
+	done := suite.eng.unit.Done()
+	assert.Eventually(suite.T(), func() bool {
+		select {
+		case <-done:
+			return true
+		default:
+			return false
+		}
+	}, time.Second, time.Millisecond)
+
 	suite.proto.snapshot.AssertExpectations(suite.T())
 	suite.headers.AssertExpectations(suite.T())
 	suite.collectionsConduit.AssertExpectations(suite.T())

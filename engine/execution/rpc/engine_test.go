@@ -245,7 +245,7 @@ func (suite *Suite) TestGetTransactionResult() {
 	suite.events.On("ByBlockIDTransactionID", bID, txID).Return(eventsForTx, nil)
 
 	// expect a call to lookup each block
-	suite.blocks.On("ByID", block.ID()).Return(&block, nil)
+	suite.blocks.On("ByID", block.ID()).Return(&block, true)
 
 	// create the handler
 	createHandler := func(txResults *storage.TransactionResults) *handler {

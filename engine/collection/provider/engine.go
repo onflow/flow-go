@@ -157,14 +157,11 @@ func (e *Engine) onTransactionRequest(originID flow.Identifier, req *messages.Tr
 
 	// check the mempool first
 	if e.pool.Has(req.ID) {
-		tx, err := e.pool.ByID(req.ID)
-		if err != nil {
-			return fmt.Errorf("could not get transaction from pool: %w", err)
-		}
+		tx, _ := e.pool.ByID(req.ID)
 
 		res := &messages.TransactionResponse{Transaction: *tx}
 
-		err = e.con.Submit(res, originID)
+		err := e.con.Submit(res, originID)
 		if err != nil {
 			return fmt.Errorf("could not submit transaction response: %w", err)
 		}
@@ -192,12 +189,11 @@ func (e *Engine) onTransactionRequest(originID flow.Identifier, req *messages.Tr
 // transaction by adding the transaction
 func (e *Engine) onTransactionResponse(originID flow.Identifier, res *messages.TransactionResponse) error {
 
-	err := e.pool.Add(&res.Transaction)
-	if err != nil {
+	added := e.pool.Add(&res.Transaction)
+	if !added {
 		e.log.Debug().
-			Err(err).
 			Hex("tx_id", logging.ID(res.Transaction.ID())).
-			Msg("could not add transaction to mempool")
+			Msg("transaction already in mempool")
 	}
 
 	return nil

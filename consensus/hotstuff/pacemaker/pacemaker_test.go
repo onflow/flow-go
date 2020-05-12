@@ -312,11 +312,11 @@ func Test_ReplicaTimeoutAgain(t *testing.T) {
 	assert.GreaterOrEqual(t, actualTimeout, startRepTimeout, "the actual timeout should be greater or equal to the init timeout")
 	assert.Less(t, actualTimeout, 2*startRepTimeout, "the actual timeout was too long")
 
-	// trigger view change and restart the pacemaker timer. The next timeout should take 1.5 longer
-	_ = pm.OnTimeout()
-
 	// reset timer
 	start = time.Now()
+
+	// trigger view change and restart the pacemaker timer. The next timeout should take 1.5 longer
+	_ = pm.OnTimeout()
 
 	// wait until the timeout is hit again
 	select {
@@ -348,13 +348,17 @@ func Test_ReplicaTimeoutAgain(t *testing.T) {
 	case <-pm.TimeoutChannel():
 		break
 	case <-time.After(time.Duration(0.1 * startRepTimeout)):
+		// start the timer before the UpdateCurViewWithBlock is called, which starts the internal timer.
+		// This is required to make the tests more accurate, because when it's running on CI,
+		// there might be some delay for time.Now() gets called, which impact the accuracy of the actual timeout
+		// measurement
+
+		start = time.Now()
 		nv, changed = pm.UpdateCurViewWithBlock(makeBlock(nv.View-1, nv.View), false)
 		break
 	}
 
 	require.True(t, changed)
-
-	start = time.Now()
 
 	// wait until the timeout is hit again
 	select {

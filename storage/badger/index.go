@@ -65,7 +65,7 @@ func NewIndex(collector module.CacheMetrics, db *badger.DB) *Index {
 	p := &Index{
 		db: db,
 		index: newCache(collector,
-			withLimit(1000),
+			withLimit(flow.DefaultTransactionExpiry),
 			withStore(storeIndex),
 			withRetrieve(retrieveIndex),
 			withResource(metrics.ResourceIndex),

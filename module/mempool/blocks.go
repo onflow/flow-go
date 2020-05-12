@@ -13,17 +13,17 @@ type Blocks interface {
 	// the memory pool.
 	Has(blockID flow.Identifier) bool
 
-	// Add will add the given block to the memory pool; it will error if
-	// the block is already in the memory pool.
-	Add(block *flow.Block) error
+	// Add will add the given block to the memory pool. It will return
+	// false if it was already in the mempool.
+	Add(block *flow.Block) bool
 
 	// Rem will remove the given block from the memory pool; it will
 	// will return true if the block was known and removed.
 	Rem(blockID flow.Identifier) bool
 
-	// Get will retrieve the given block from the memory pool; it will
-	// error if the block is not in the memory pool.
-	ByID(blockID flow.Identifier) (*flow.Block, error)
+	// ByID retrieve the block with the given ID from the memory pool.
+	// It will return false if it was not found in the mempool.
+	ByID(blockID flow.Identifier) (*flow.Block, bool)
 
 	// Size will return the current size of the memory pool.
 	Size() uint

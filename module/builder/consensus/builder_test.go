@@ -26,7 +26,7 @@ func TestConsensusBuilder(t *testing.T) {
 type BuilderSuite struct {
 	suite.Suite
 
-	// test parameters
+	// test helpers
 	firstID      flow.Identifier   // first block in the range we look at
 	finalID      flow.Identifier   // last finalized block
 	parentID     flow.Identifier   // parent block we build on
@@ -64,6 +64,22 @@ type BuilderSuite struct {
 	build *Builder
 }
 
+func (bs *BuilderSuite) chainSeal(blockID flow.Identifier) {
+	initial := bs.last.FinalState
+	final := unittest.StateCommitmentFixture()
+	if len(bs.chain) > 0 {
+		initial = bs.chain[len(bs.chain)-1].FinalState
+	}
+	seal := &flow.Seal{
+		BlockID:      blockID,
+		ResultID:     flow.ZeroID, // we don't care
+		InitialState: initial,
+		FinalState:   final,
+	}
+	bs.chain = append(bs.chain, seal)
+	fmt.Printf("%d: %x = %x -> %x\n", len(bs.chain), blockID, initial, final)
+}
+
 func (bs *BuilderSuite) SetupTest() {
 
 	// set up no-op dependencies
@@ -73,10 +89,13 @@ func (bs *BuilderSuite) SetupTest() {
 	numFinalized := 4
 	numPending := 4
 
-	// initialize the storage
+	// reset test helpers
 	bs.pendingIDs = nil
 	bs.finalizedIDs = nil
 	bs.chain = nil
+
+	// initialize the storage
+	bs.last = nil
 	bs.guarantees = nil
 	bs.seals = nil
 	bs.headers = make(map[flow.Identifier]*flow.Header)
@@ -94,29 +113,20 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.payloads[first.ID()] = &flow.Payload{}
 	bs.last = &flow.Seal{
 		BlockID:      first.ID(),
-		ResultID:     flow.ZeroID, // we don't care
+		ResultID:     flow.ZeroID,
 		InitialState: unittest.StateCommitmentFixture(),
 		FinalState:   unittest.StateCommitmentFixture(),
 	}
 
 	// insert the finalized blocks between first and final
 	previous := &first
-	last := bs.last
 	for n := 0; n < numFinalized; n++ {
 		finalized := unittest.BlockHeaderWithParentFixture(previous)
 		bs.finalizedIDs = append(bs.finalizedIDs, finalized.ID())
 		bs.headers[finalized.ID()] = &finalized
 		bs.payloads[finalized.ID()] = &flow.Payload{}
+		bs.chainSeal(finalized.ID())
 		previous = &finalized
-		seal := &flow.Seal{
-			BlockID:      finalized.ID(),
-			ResultID:     flow.ZeroID, // we don't care
-			InitialState: last.FinalState,
-			FinalState:   unittest.StateCommitmentFixture(),
-		}
-		fmt.Printf("%x -> %x\n", seal.InitialState, seal.FinalState)
-		bs.chain = append(bs.chain, seal)
-		last = seal
 	}
 
 	// insert the finalized block with an empty payload
@@ -124,15 +134,7 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.finalID = final.ID()
 	bs.headers[final.ID()] = &final
 	bs.payloads[final.ID()] = &flow.Payload{}
-	seal := &flow.Seal{
-		BlockID:      final.ID(),
-		ResultID:     flow.ZeroID, // we don't care
-		InitialState: last.FinalState,
-		FinalState:   unittest.StateCommitmentFixture(),
-	}
-	fmt.Printf("%x -> %x\n", seal.InitialState, seal.FinalState)
-	bs.chain = append(bs.chain, seal)
-	last = seal
+	bs.chainSeal(final.ID())
 
 	// insert the finalized ancestors with empty payload
 	previous = &final
@@ -141,16 +143,8 @@ func (bs *BuilderSuite) SetupTest() {
 		bs.pendingIDs = append(bs.pendingIDs, pending.ID())
 		bs.headers[pending.ID()] = &pending
 		bs.payloads[pending.ID()] = &flow.Payload{}
+		bs.chainSeal(pending.ID())
 		previous = &pending
-		seal := &flow.Seal{
-			BlockID:      final.ID(),
-			ResultID:     flow.ZeroID, // we don't care
-			InitialState: last.FinalState,
-			FinalState:   unittest.StateCommitmentFixture(),
-		}
-		fmt.Printf("%x -> %x\n", seal.InitialState, seal.FinalState)
-		bs.chain = append(bs.chain, seal)
-		last = seal
 	}
 
 	// insert the parent block with an empty payload
@@ -158,14 +152,7 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.parentID = parent.ID()
 	bs.headers[parent.ID()] = &parent
 	bs.payloads[parent.ID()] = &flow.Payload{}
-	seal = &flow.Seal{
-		BlockID:      final.ID(),
-		ResultID:     flow.ZeroID, // we don't care
-		InitialState: last.FinalState,
-		FinalState:   unittest.StateCommitmentFixture(),
-	}
-	fmt.Printf("%x -> %x\n", seal.InitialState, seal.FinalState)
-	bs.chain = append(bs.chain, seal)
+	bs.chainSeal(parent.ID())
 
 	// set up temporary database for tests
 	bs.db, bs.dir = unittest.TempBadgerDB(bs.T())
@@ -251,6 +238,12 @@ func (bs *BuilderSuite) SetupTest() {
 		bs.sealPool,
 	)
 	bs.build.cfg.expiry = 11
+
+	fmt.Printf("first: %x\n", bs.firstID)
+	fmt.Printf("finalized: %s\n", bs.finalizedIDs)
+	fmt.Printf("final: %x\n", bs.finalID)
+	fmt.Printf("pending: %s\n", bs.pendingIDs)
+	fmt.Printf("parent: %x\n", bs.parentID)
 }
 
 func (bs *BuilderSuite) TearDownTest() {
@@ -359,10 +352,7 @@ func (bs *BuilderSuite) TestPayloadGuaranteeReferenceExpired() {
 	bs.Assert().ElementsMatch(flow.GetIDs(expired), bs.remCollIDs, "should remove guarantees with expired reference from mempool")
 }
 
-func (bs *BuilderSuite) TestPayloadSealValid() {
-
-	// TODO: enable with new sealing logic
-	bs.T().Skip()
+func (bs *BuilderSuite) TestPayloadSealAllValid() {
 
 	// use valid chain of seals in mempool
 	bs.seals = bs.chain
@@ -370,5 +360,46 @@ func (bs *BuilderSuite) TestPayloadSealValid() {
 	bs.Require().NoError(err)
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
 	bs.Assert().ElementsMatch(bs.seals, bs.assembled.Seals, "should have included valid chain of seals")
+	bs.Assert().Empty(bs.remSealIDs, "should not have removed empty seals")
+}
+
+func (bs *BuilderSuite) TestPayloadSealSomeValid() {
+
+	// generate invalid seals
+	invalid := unittest.BlockSealsFixture(8)
+
+	// use both valid and non-valid seals for chain
+	bs.seals = append(bs.chain, invalid...)
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
+	bs.Assert().ElementsMatch(bs.chain, bs.assembled.Seals, "should have included only valid chain of seals")
+	bs.Assert().Empty(bs.remSealIDs, "should not have removed empty seals")
+}
+
+func (bs *BuilderSuite) TestPayloadSealCutoffChain() {
+
+	// remove the seal at the start
+	bs.seals = bs.chain[1:]
+
+	// use both valid and non-valid seals for chain
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
+	bs.Assert().Empty(bs.assembled.Seals, "should have not included any chains from cutoff chain")
+	bs.Assert().Empty(bs.remSealIDs, "should not have removed empty seals")
+}
+
+func (bs *BuilderSuite) TestPayloadSealBrokenChain() {
+
+	// remove the seal at the start
+	bs.seals = bs.chain[:3]
+	bs.seals = append(bs.seals, bs.chain[4:]...)
+
+	// use both valid and non-valid seals for chain
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
+	bs.Assert().ElementsMatch(bs.chain[:3], bs.assembled.Seals, "should have included only beginning of broken chain")
 	bs.Assert().Empty(bs.remSealIDs, "should not have removed empty seals")
 }

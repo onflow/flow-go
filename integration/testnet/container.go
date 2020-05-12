@@ -110,11 +110,6 @@ func (c *Container) DB() (*badger.DB, error) {
 // re-started with Start.
 func (c *Container) Pause() error {
 
-	//TODO
-	// update testingdock to remove autoremove option
-	// ref https://github.com/dapperlabs/testingdock/blob/master/container.go#L132
-	panic("not supported")
-
 	ctx, cancel := context.WithTimeout(context.Background(), checkContainerTimeout)
 	defer cancel()
 
@@ -135,22 +130,17 @@ func (c *Container) Pause() error {
 // preserving existing state.
 func (c *Container) Start() error {
 
-	//TODO
-	// update testingdock to remove autoremove option
-	// ref https://github.com/dapperlabs/testingdock/blob/master/container.go#L132
-	panic("not supported")
-
 	ctx, cancel := context.WithTimeout(context.Background(), checkContainerTimeout)
 	defer cancel()
 
 	err := c.net.cli.ContainerStart(ctx, c.ID, types.ContainerStartOptions{})
 	if err != nil {
-		return fmt.Errorf("could not stop container: %w", err)
+		return fmt.Errorf("could not start container: %w", err)
 	}
 
 	err = c.waitForCondition(ctx, containerRunning)
 	if err != nil {
-		return fmt.Errorf("error waiting for container to stop: %w", err)
+		return fmt.Errorf("error waiting for container to start: %w", err)
 	}
 
 	return nil
@@ -158,14 +148,40 @@ func (c *Container) Start() error {
 
 // Disconnect disconnects this container from the network.
 func (c *Container) Disconnect() error {
-	// TODO
-	panic("not implemented")
+
+	ctx, cancel := context.WithTimeout(context.Background(), checkContainerTimeout)
+	defer cancel()
+
+	err := c.net.cli.NetworkDisconnect(ctx, c.net.network.ID(), c.ID, false)
+	if err != nil {
+		return fmt.Errorf("could not disconnect container (%s) from network: %w", c.Name(), err)
+	}
+
+	err = c.waitForCondition(ctx, containerDisconnected)
+	if err != nil {
+		return fmt.Errorf("error waiting for container to disconnect: %w", err)
+	}
+
+	return nil
 }
 
 // Connect connects this container to the network.
-func (net *FlowNetwork) Connect() error {
-	// TODO
-	panic("not implemented")
+func (c *Container) Connect() error {
+
+	ctx, cancel := context.WithTimeout(context.Background(), checkContainerTimeout)
+	defer cancel()
+
+	err := c.net.cli.NetworkConnect(ctx, c.net.network.ID(), c.ID, nil)
+	if err != nil {
+		return fmt.Errorf("could not connect container (%s) to network: %w", c.Name(), err)
+	}
+
+	err = c.waitForCondition(ctx, containerConnected)
+	if err != nil {
+		return fmt.Errorf("error waiting for container to connect: %w", err)
+	}
+
+	return nil
 }
 
 // containerStopped returns true if the container is not running.
@@ -176,6 +192,17 @@ func containerStopped(state *types.ContainerJSON) bool {
 // containerRunning returns true if the container is running.
 func containerRunning(state *types.ContainerJSON) bool {
 	return state.State.Running
+}
+
+// containerDisconnected returns true if the container is not connected to a
+// network.
+func containerDisconnected(state *types.ContainerJSON) bool {
+	return len(state.NetworkSettings.Networks) == 0
+}
+
+// containerConnected returns true if the container is connected to a network.
+func containerConnected(state *types.ContainerJSON) bool {
+	return len(state.NetworkSettings.Networks) == 1
 }
 
 // waitForCondition waits for the given condition to be true, checking the

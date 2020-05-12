@@ -119,8 +119,6 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // given origin ID.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch entity := event.(type) {
-	case *messages.BlockProposal:
-		return e.onBlockProposal(originID, entity)
 	case *messages.CollectionResponse:
 		return e.handleCollectionResponse(originID, entity)
 	default:
@@ -132,16 +130,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 	e.unit.Launch(func() {
 		id := hb.BlockID
-		block, err := e.blocks.ByID(id)
-		if err != nil {
-			e.log.Error().Err(err).Hex("block_id", id[:]).Msg("failed to lookup block")
-			return
-		}
-		proposal := &messages.BlockProposal{
-			Header:  block.Header,
-			Payload: block.Payload,
-		}
-		err = e.ProcessLocal(proposal)
+		err := e.processFinalizedBlock(id)
 		if err != nil {
 			e.log.Error().Err(err).Hex("block_id", id[:]).Msg("failed to process block")
 			return
@@ -149,9 +138,13 @@ func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 	})
 }
 
-// onBlock handles an incoming block.
-// TODO this will be an event triggered by the follower node when a new finalized or sealed block is received
-func (e *Engine) onBlockProposal(_ flow.Identifier, proposal *messages.BlockProposal) error {
+// processBlock handles an incoming finalized block.
+func (e *Engine) processFinalizedBlock(id flow.Identifier) error {
+
+	block, err := e.blocks.ByID(id)
+	if err != nil {
+		return fmt.Errorf("failed to lookup block: %w", err)
+	}
 
 	// FIX: we can't index guarantees here, as we might have more than one block
 	// with the same collection as long as it is not finalized
@@ -159,13 +152,13 @@ func (e *Engine) onBlockProposal(_ flow.Identifier, proposal *messages.BlockProp
 	// TODO: substitute an indexer module as layer between engine and storage
 
 	// index the block storage with each of the collection guarantee
-	err := e.blocks.IndexBlockForCollections(proposal.Header.ID(), flow.GetIDs(proposal.Payload.Guarantees))
+	err = e.blocks.IndexBlockForCollections(block.Header.ID(), flow.GetIDs(block.Payload.Guarantees))
 	if err != nil {
 		return fmt.Errorf("could not index block for collections: %w", err)
 	}
 
 	// request each of the collections from the collection node
-	return e.requestCollections(proposal.Payload.Guarantees...)
+	return e.requestCollections(block.Payload.Guarantees...)
 }
 
 // handleCollectionResponse handles the response of the a collection request made earlier when a block was received
