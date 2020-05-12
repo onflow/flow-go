@@ -144,7 +144,6 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 		Logger()
 
 	log.Debug().Msg("transaction message received")
-	e.colMetrics.TransactionReceived(tx.ID())
 
 	// short-circuit if we have already stored the transaction
 	if e.pool.Has(tx.ID()) {
@@ -181,6 +180,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// if our cluster is responsible for the transaction, store it
 	if localCluster.Fingerprint() == txCluster.Fingerprint() {
 		_ = e.pool.Add(tx)
+		e.colMetrics.TransactionReceived(tx.ID())
 		log.Debug().Msg("added transaction to pool")
 	}
 
