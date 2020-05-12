@@ -91,9 +91,9 @@ func (t *tree) init() error {
 
 	height := make([]byte, 8)
 	binary.BigEndian.PutUint64(height, t.height)
+
 	batcher.Put(metadataKeyPrevious, t.root)
 	batcher.Put(metadataHeight, height)
-
 
 	return t.database.UpdateTrieDB(batcher)
 }

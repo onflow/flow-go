@@ -205,7 +205,6 @@ func TestTrieStorage_CrashResistance(t *testing.T) {
 
 			assert.Equal(t, values, loadedValues)
 		}
-
 	})
 }
 
