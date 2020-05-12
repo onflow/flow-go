@@ -24,6 +24,8 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
+// TODO this is copied
+
 // Engine is the synchronization engine, responsible for synchronizing chain state.
 type Engine struct {
 	unit     *engine.Unit
@@ -33,7 +35,7 @@ type Engine struct {
 	state    protocol.State
 	con      network.Conduit
 	blocks   storage.Blocks
-	comp     network.Engine // compliance engine
+	prop     network.Engine // proposal engine
 	heights  map[uint64]*Status
 	blockIDs map[flow.Identifier]*Status
 
@@ -47,7 +49,7 @@ type Engine struct {
 	maxRequests   uint // maxRequests is the maximum number of requests we send during each scanning period
 }
 
-// New creates a new consensus propagation engine.
+// New creates a new collector propagation engine.
 func New(
 	log zerolog.Logger,
 	metrics module.EngineMetrics,
@@ -66,7 +68,7 @@ func New(
 		me:       me,
 		state:    state,
 		blocks:   blocks,
-		comp:     comp,
+		prop:     comp,
 		heights:  make(map[uint64]*Status),
 		blockIDs: make(map[flow.Identifier]*Status),
 
@@ -80,7 +82,7 @@ func New(
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.ProtocolSynchronization, e)
+	con, err := net.Register(engine.ProtocolClusterSynchronization, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -151,19 +153,19 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 	switch ev := event.(type) {
 	case *messages.SyncRequest:
-		e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageSyncRequest)
+		e.metrics.MessageReceived(metrics.EngineClusterSynchronization, metrics.MessageSyncRequest)
 		return e.onSyncRequest(originID, ev)
 	case *messages.SyncResponse:
-		e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageSyncResponse)
+		e.metrics.MessageReceived(metrics.EngineClusterSynchronization, metrics.MessageSyncResponse)
 		return e.onSyncResponse(originID, ev)
 	case *messages.RangeRequest:
-		e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageRangeRequest)
+		e.metrics.MessageReceived(metrics.EngineClusterSynchronization, metrics.MessageRangeRequest)
 		return e.onRangeRequest(originID, ev)
 	case *messages.BatchRequest:
-		e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageBatchRequest)
+		e.metrics.MessageReceived(metrics.EngineClusterSynchronization, metrics.MessageBatchRequest)
 		return e.onBatchRequest(originID, ev)
 	case *messages.BlockResponse:
-		e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageBlockResponse)
+		e.metrics.MessageReceived(metrics.EngineClusterSynchronization, metrics.MessageBlockResponse)
 		return e.onBlockResponse(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
@@ -407,7 +409,7 @@ func (e *Engine) processIncomingBlock(originID flow.Identifier, block *flow.Bloc
 		Block:    block,
 	}
 
-	e.comp.SubmitLocal(synced)
+	e.prop.SubmitLocal(synced)
 }
 
 // checkLoop will regularly scan for items that need requesting.

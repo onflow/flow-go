@@ -13,12 +13,13 @@ const (
 )
 
 const (
-	EnginePropagation     = "propagation"
-	EngineCompliance      = "compliance"
-	EngineProvider        = "provider"
-	EngineIngestion       = "ingestion"
-	EngineMatching        = "matching"
-	EngineSynchronization = "sync"
+	EnginePropagation            = "propagation"
+	EngineCompliance             = "compliance"
+	EngineProvider               = "provider"
+	EngineIngestion              = "ingestion"
+	EngineMatching               = "matching"
+	EngineSynchronization        = "sync"
+	EngineClusterSynchronization = "cluster-sync"
 )
 
 const (
