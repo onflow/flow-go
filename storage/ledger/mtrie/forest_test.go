@@ -674,7 +674,7 @@ func TestPurgeAndLoad(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir) // clean up
 
-	fStore, err := mtrie.NewMForest(trieHeight, dir, 2)
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 2, nil)
 	require.NoError(t, err)
 	rootHash1 := fStore.GetEmptyRootHash()
 

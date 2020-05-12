@@ -14,11 +14,11 @@ import (
 
 // MForest is an in memory forest (collection of tries)
 type MForest struct {
-	tries       *lru.Cache
-	dir         string
-	cacheSize   int
-	maxHeight   int // Height of the tree
-	keyByteSize int // acceptable number of bytes for key
+	tries         *lru.Cache
+	dir           string
+	cacheSize     int
+	maxHeight     int // Height of the tree
+	keyByteSize   int // acceptable number of bytes for key
 	onTreeEvicted func(tree *MTrie) error
 }
 
@@ -41,10 +41,10 @@ func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int, onTreeE
 	}
 
 	forest := &MForest{tries: cache,
-		maxHeight:   maxHeight,
-		dir:         trieStorageDir,
-		cacheSize:   trieCacheSize,
-		keyByteSize: (maxHeight - 1) / 8,
+		maxHeight:     maxHeight,
+		dir:           trieStorageDir,
+		cacheSize:     trieCacheSize,
+		keyByteSize:   (maxHeight - 1) / 8,
 		onTreeEvicted: onTreeEvicted,
 	}
 
@@ -599,5 +599,5 @@ func (f *MForest) LoadTrie(path string) (*MTrie, error) {
 }
 
 func (f *MForest) Size() int {
-	return len(f.tries)
+	return f.tries.Len()
 }
