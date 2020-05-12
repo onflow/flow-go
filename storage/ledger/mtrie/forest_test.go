@@ -495,7 +495,7 @@ func TestUpdatePrevStates(t *testing.T) {
 func TestRandomUpdateReadProof(t *testing.T) {
 	keyByteSize := 2
 	trieHeight := keyByteSize*8 + 1
-	rep := 50
+	rep := 10
 	maxNumKeysPerStep := 10
 	maxValueSize := 6 // bytes
 	rand.Seed(time.Now().UnixNano())
