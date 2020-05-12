@@ -25,16 +25,6 @@ type MForest struct {
 // NewMForest returns a new instance of memory forest
 func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int, onTreeEvicted func(tree *MTrie) error) (*MForest, error) {
 
-	// evict := func(key interface{}, value interface{}) {
-	// 	trie, ok := value.(*MTrie)
-	// 	if !ok {
-	// 		panic(fmt.Sprintf("cache contains item of type %T", value))
-	// 	}
-	// 	go func() {
-	// 		_ = trie.Store(filepath.Join(trieStorageDir, hex.EncodeToString(trie.rootHash)))
-	// 	}()
-	// }
-
 	var cache *lru.Cache
 	var err error
 
@@ -100,6 +90,13 @@ func (f *MForest) AddTrie(trie *MTrie) error {
 	encoded := trie.StringRootHash()
 	f.tries.Add(encoded, trie)
 	return nil
+}
+
+// RemoveTrie removes a trie to the forest
+func (f *MForest) RemoveTrie(rootHash []byte) {
+	// TODO remove from the file as well
+	encRootHash := hex.EncodeToString(rootHash)
+	f.tries.Remove(encRootHash)
 }
 
 // GetEmptyRootHash returns the rootHash of empty forest

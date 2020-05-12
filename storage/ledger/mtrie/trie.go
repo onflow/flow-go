@@ -34,6 +34,10 @@ func (mt *MTrie) RootHash() []byte {
 	return mt.rootHash
 }
 
+func (mt *MTrie) SetRootHash(rh []byte) {
+	mt.rootHash = rh
+}
+
 func (mt *MTrie) String() string {
 	trieStr := fmt.Sprintf("Trie number:%v hash:%v parent: %v\n", mt.number, mt.StringRootHash(), hex.EncodeToString(mt.parentRootHash))
 	return trieStr + mt.root.FmtStr("", "")
