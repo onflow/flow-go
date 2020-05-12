@@ -23,7 +23,7 @@ func NewMTrieStorage(dbDir string) (*MTrieStorage, error) {
 	}
 
 	mForest, err := mtrie.NewMForest(257, dbDir, 1000, func(evictedTrie *mtrie.MTrie) error {
-		return w.RecordDelete(evictedTrie.StateCommitment())
+		return w.RecordDelete(evictedTrie.RootHash())
 	})
 	if err != nil {
 		return nil, fmt.Errorf("cannot create MForest: %w", err)

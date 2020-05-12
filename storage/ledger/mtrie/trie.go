@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-
-	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // MTrie is a fully in memory trie with option to persist to disk
@@ -32,7 +30,7 @@ func (mt *MTrie) StringRootHash() string {
 	return hex.EncodeToString(mt.rootHash)
 }
 
-func (mt *MTrie) StateCommitment() flow.StateCommitment {
+func (mt *MTrie) RootHash() []byte {
 	return mt.rootHash
 }
 

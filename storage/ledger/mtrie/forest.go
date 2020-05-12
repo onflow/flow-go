@@ -34,8 +34,23 @@ func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int, onTreeE
 	// 		_ = trie.Store(filepath.Join(trieStorageDir, hex.EncodeToString(trie.rootHash)))
 	// 	}()
 	// }
-	// cache, err := lru.NewWithEvict(trieCacheSize, evict)
-	cache, err := lru.New(trieCacheSize)
+
+	var cache *lru.Cache
+	var err error
+
+	if onTreeEvicted != nil {
+		cache, err = lru.NewWithEvict(trieCacheSize, func(key interface{}, value interface{}) {
+			trie, ok := value.(*MTrie)
+			if !ok {
+				panic(fmt.Sprintf("cache contains item of type %T", value))
+			}
+			//TODO Log error
+			_ = onTreeEvicted(trie)
+		})
+	} else {
+		cache, err = lru.New(trieCacheSize)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("cannot create forest cache: %w", err)
 	}
