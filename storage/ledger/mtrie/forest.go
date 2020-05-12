@@ -29,7 +29,9 @@ func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int) (*MFore
 		if !ok {
 			panic(fmt.Sprintf("cache contains item of type %T", value))
 		}
-		go trie.Store(filepath.Join(trieStorageDir, hex.EncodeToString(trie.rootHash)))
+		go func() {
+			_ = trie.Store(filepath.Join(trieStorageDir, hex.EncodeToString(trie.rootHash)))
+		}()
 	}
 	cache, err := lru.NewWithEvict(trieCacheSize, evict)
 	if err != nil {
