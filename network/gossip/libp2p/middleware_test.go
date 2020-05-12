@@ -16,7 +16,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
-	mockmodule "github.com/dapperlabs/flow-go/module/mock"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/mock"
@@ -28,7 +28,7 @@ type MiddlewareTestSuit struct {
 	mws     []*Middleware // used to keep track of middlewares under test
 	ov      []*mock.Overlay
 	ids     []flow.Identifier
-	metrics *mockmodule.Metrics // mocks performance monitoring metrics
+	metrics *metrics.NoopCollector // no-op performance monitoring simulation
 }
 
 // TestMiddlewareTestSuit runs all the test methods in this test suit
@@ -40,9 +40,7 @@ func TestMiddlewareTestSuit(t *testing.T) {
 func (m *MiddlewareTestSuit) SetupTest() {
 	m.size = 2 // operates on two middlewares
 
-	m.metrics = &mockmodule.Metrics{}
-	m.metrics.On("NetworkMessageSent", mockery.Anything, mockery.Anything).Return()
-	m.metrics.On("NetworkMessageReceived", mockery.Anything, mockery.Anything).Return()
+	m.metrics = metrics.NewNoopCollector()
 
 	// create the middlewares
 	m.ids, m.mws = m.createMiddleWares(m.size)

@@ -23,8 +23,11 @@ import (
 	bootstrapcmd "github.com/dapperlabs/flow-go/cmd/bootstrap/cmd"
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	bootstraprun "github.com/dapperlabs/flow-go/cmd/bootstrap/run"
+	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
+	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -562,6 +565,33 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		}
 	}
 
+	// generate genesis blocks for each collector cluster
+	clusterBlocks, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, confs, genesis)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// write collector-specific genesis bootstrap files for each cluster
+	for i := 0; i < len(clusterBlocks); i++ {
+		clusterGenesis := clusterBlocks[i]
+		clusterQC := clusterQCs[i]
+
+		// cluster ID is equivalent to chain ID
+		clusterID := clusterGenesis.Header.ChainID
+
+		clusterGenesisPath := fmt.Sprintf(bootstrap.FilenameGenesisClusterBlock, clusterID)
+		err = writeJSON(filepath.Join(bootstrapDir, clusterGenesisPath), clusterGenesis)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		clusterQCPath := fmt.Sprintf(bootstrap.FilenameGenesisClusterQC, clusterID)
+		err = writeJSON(filepath.Join(bootstrapDir, clusterQCPath), clusterQC)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
 	return genesis, confs, nil
 }
 
@@ -620,6 +650,10 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 	return confs, nil
 }
 
+// runDKG runs the distributed key generation process for all consensus nodes
+// and returns all DKG data. This includes the group private key, node indices,
+// and per-node public and private key-shares.
+// Only consensus nodes are participate in the DKG.
 func runDKG(confs []ContainerConfig) (bootstrap.DKGData, error) {
 
 	// filter by consensus nodes
@@ -653,4 +687,49 @@ func runDKG(confs []ContainerConfig) (bootstrap.DKGData, error) {
 	}
 
 	return dkg, nil
+}
+
+// setupClusterGenesisBlockQCs generates bootstrapping resources necessary for each collector cluster:
+//   * a cluster-specific genesis block
+//   * a cluster-specific genesis QC
+func setupClusterGenesisBlockQCs(nClusters uint, confs []ContainerConfig, genesis *flow.Block) ([]*cluster.Block, []*hotstuff.QuorumCertificate, error) {
+
+	identities := toIdentityList(confs)
+	clusters := protocol.Clusters(nClusters, identities)
+
+	blocks := make([]*cluster.Block, 0, nClusters)
+	qcs := make([]*hotstuff.QuorumCertificate, 0, nClusters)
+
+	for _, cluster := range clusters.All() {
+		// generate genesis cluster block
+		block := bootstraprun.GenerateGenesisClusterBlock(cluster)
+
+		// gather cluster participants
+		// ToDo: optimize. This has quadratic scaling with the number of collectors:
+		//       Let N be the number of collectors. The number of clusters Xi = N / c where c is nearly a constant.
+		//       Furthermore, cluster.ByNodeID iterate over all c cluster members to check whether their ID matches.
+		//       Hence, we get a runtime cost: Xi * N * c = N^2. This could probably be reduced to linear cost of O(N).
+		participants := make([]bootstrap.NodeInfo, 0, len(cluster))
+		for _, conf := range confs {
+			_, exists := cluster.ByNodeID(conf.NodeID)
+			if exists {
+				participants = append(participants, conf.NodeInfo)
+			}
+		}
+		if len(cluster) != len(participants) { // sanity check
+			return nil, nil, fmt.Errorf("requiring a node info for each cluster participant")
+		}
+
+		// generate qc for genesis cluster block
+		qc, err := bootstraprun.GenerateClusterGenesisQC(participants, genesis, block)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// add block and qc to list
+		blocks = append(blocks, block)
+		qcs = append(qcs, qc)
+	}
+
+	return blocks, qcs, nil
 }

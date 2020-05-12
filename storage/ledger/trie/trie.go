@@ -258,7 +258,7 @@ func (f *forest) Get(root Root) (*tree, error) {
 	return tree, nil
 }
 
-func (f *forest) newDB(root Root) (*leveldb.LevelDB, error) {
+func (f *forest) newDB(root Root) (databases.DAL, error) {
 	treePath := filepath.Join(f.dbDir, root.String())
 
 	db, err := leveldb.NewLevelDB(treePath)
@@ -1136,6 +1136,7 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	err = db.UpdateTrieDB(batcher)
 	if err != nil {
 		return nil, err
@@ -1145,8 +1146,8 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.forest.Add(newTree)
 
+	s.forest.Add(newTree)
 	return newRootNode.value, nil
 }
 
@@ -1248,21 +1249,9 @@ func (s *SMT) UpdateAtomically(rootNode *node, keys [][]byte, values [][]byte, h
 	return rootNode, nil
 }
 
-// GetandSetChildren checks if any of the children are nill and creates them as a default node if they are, otherwise
-// we just return the children
-func (n *node) GetandSetChildren(hashes [257]Root) (*node, *node) {
-	if n.lChild == nil {
-		n.lChild = newNode(nil, n.height-1)
-	}
-	if n.rChild == nil {
-		n.rChild = newNode(nil, n.height-1)
-	}
-
-	return n.lChild, n.rChild
-}
-
 // updateParallel updates both the left and right subtrees and computes a new rootNode
 func (s *SMT) updateParallel(lnode *node, rnode *node, rootNode *node, keys [][]byte, values [][]byte, lkeys [][]byte, rkeys [][]byte, lvalues [][]byte, rvalues [][]byte, height int, batcher databases.Batcher, database databases.DAL) (*node, error) {
+
 	lupdate, err1 := s.UpdateAtomically(lnode, lkeys, lvalues, height-1, batcher, database)
 	rupdate, err2 := s.UpdateAtomically(rnode, rkeys, rvalues, height-1, batcher, database)
 
@@ -1292,6 +1281,19 @@ func (s *SMT) updateRight(lnode *node, rnode *node, rootNode *node, rkeys [][]by
 		return nil, err
 	}
 	return s.ComputeRootNode(lnode, update, rootNode, rkeys, rvalues, height, batcher), nil
+}
+
+// GetandSetChildren checks if any of the children are nill and creates them as a default node if they are, otherwise
+// we just return the children
+func (n *node) GetandSetChildren(hashes [257]Root) (*node, *node) {
+	if n.lChild == nil {
+		n.lChild = newNode(nil, n.height-1)
+	}
+	if n.rChild == nil {
+		n.rChild = newNode(nil, n.height-1)
+	}
+
+	return n.lChild, n.rChild
 }
 
 // ComputeRoot either returns a new leafNode or computes a new rootNode by hashing its children

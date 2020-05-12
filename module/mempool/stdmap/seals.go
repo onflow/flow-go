@@ -4,7 +4,6 @@ package stdmap
 
 import (
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/mempool"
 )
 
 // Seals implements the block seals memory pool of the consensus nodes,
@@ -25,19 +24,19 @@ func NewSeals(limit uint) (*Seals, error) {
 }
 
 // Add adds an block seal to the mempool.
-func (s *Seals) Add(seal *flow.Seal) error {
-	err := s.Backend.Add(seal)
-	if err != nil {
-		return err
+func (s *Seals) Add(seal *flow.Seal) bool {
+	added := s.Backend.Add(seal)
+	if !added {
+		return false
 	}
 	s.byBlock[seal.BlockID] = seal.ID()
-	return nil
+	return true
 }
 
 // Rem will remove a seal by ID.
 func (s *Seals) Rem(sealID flow.Identifier) bool {
-	entity, err := s.Backend.ByID(sealID)
-	if err != nil {
+	entity, exists := s.Backend.ByID(sealID)
+	if !exists {
 		return false
 	}
 	_ = s.Backend.Rem(sealID)
@@ -47,20 +46,20 @@ func (s *Seals) Rem(sealID flow.Identifier) bool {
 }
 
 // ByID returns the block seal with the given ID from the mempool.
-func (s *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {
-	entity, err := s.Backend.ByID(sealID)
-	if err != nil {
-		return nil, err
+func (s *Seals) ByID(sealID flow.Identifier) (*flow.Seal, bool) {
+	entity, exists := s.Backend.ByID(sealID)
+	if !exists {
+		return nil, false
 	}
 	seal := entity.(*flow.Seal)
-	return seal, nil
+	return seal, true
 }
 
 // ByBlocID returns the block seal associated with the given sealed block.
-func (s *Seals) ByBlockID(blockID flow.Identifier) (*flow.Seal, error) {
-	sealID, ok := s.byBlock[blockID]
-	if !ok {
-		return nil, mempool.ErrNotFound
+func (s *Seals) ByBlockID(blockID flow.Identifier) (*flow.Seal, bool) {
+	sealID, exists := s.byBlock[blockID]
+	if !exists {
+		return nil, false
 	}
 	return s.ByID(sealID)
 }

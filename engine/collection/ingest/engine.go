@@ -26,7 +26,7 @@ import (
 type Engine struct {
 	unit    *engine.Unit
 	log     zerolog.Logger
-	metrics module.Metrics
+	metrics module.CollectionMetrics
 	con     network.Conduit
 	me      module.Local
 	state   protocol.State
@@ -42,7 +42,7 @@ func New(
 	log zerolog.Logger,
 	net module.Network,
 	state protocol.State,
-	metrics module.Metrics,
+	metrics module.CollectionMetrics,
 	me module.Local,
 	pool mempool.Transactions,
 	expiryBuffer uint,
@@ -77,13 +77,11 @@ func New(
 
 // Ready returns a ready channel that is closed once the engine has fully
 // started.
-// TODO describe condition for ingest engine being ready
 func (e *Engine) Ready() <-chan struct{} {
 	return e.unit.Ready()
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
-// TODO describe conditions under which engine is done
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
 }
@@ -145,13 +143,19 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// report Metrics Transaction from received to being included in a collection guarantee
 	e.metrics.TransactionReceived(tx.ID())
 
+	// short-circuit if we have already stored the transaction
+	if e.pool.Has(tx.ID()) {
+		e.log.Debug().Msg("received dupe transaction")
+		return nil
+	}
+
 	// first, we check if the transaction is valid
 	err := e.ValidateTransaction(tx)
 	if err != nil {
 		return fmt.Errorf("invalid transaction: %w", err)
 	}
 
-	// cluster the collection nodes into the configured amount of clusters
+	// retrieve the set of collector clusters
 	clusters, err := e.state.Final().Clusters()
 	if err != nil {
 		return fmt.Errorf("could not cluster collection nodes: %w", err)
@@ -173,21 +177,22 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 	// if our cluster is responsible for the transaction, store it
 	if localCluster.Fingerprint() == txCluster.Fingerprint() {
-		log.Debug().Msg("adding transaction to pool")
-		err := e.pool.Add(tx)
-		if err != nil {
-			return fmt.Errorf("could not add transaction to mempool: %w", err)
-		}
+		_ = e.pool.Add(tx)
+		log.Debug().Msg("added transaction to pool")
 	}
 
-	// if the transaction is submitted locally, propagate it
-	if originID == localID {
-		log.Debug().Msg("propagating transaction to cluster")
-		targetIDs := txCluster.Filter(filter.Not(filter.HasNodeID(localID)))
-		err = e.con.Submit(tx, targetIDs.NodeIDs()...)
-		if err != nil {
-			return fmt.Errorf("could not route transaction to cluster: %w", err)
-		}
+	// propagate the transaction to 2 responsible nodes
+	targetIDs := txCluster.
+		Filter(filter.Not(filter.HasNodeID(localID))).
+		Sample(2)
+
+	log.Debug().
+		Str("recipients", fmt.Sprintf("%v", targetIDs.NodeIDs())).
+		Msg("propagating transaction to cluster")
+
+	err = e.con.Submit(tx, targetIDs.NodeIDs()...)
+	if err != nil {
+		return fmt.Errorf("could not route transaction to cluster: %w", err)
 	}
 
 	log.Info().Msg("transaction processed")

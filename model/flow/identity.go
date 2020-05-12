@@ -3,6 +3,7 @@ package flow
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/rand"
 	"regexp"
 	"sort"
@@ -251,6 +252,26 @@ func (il IdentityList) Sample(size uint) IdentityList {
 		dup[i], dup[j+i] = dup[j+i], dup[i]
 	}
 	return dup[:size]
+}
+
+// SamplePct returns a random sample from the receiver identity list. The
+// sample contains `pct` percentage of the list. The sample is rounded up
+// if `pct>0`, so this will always select at least one identity.
+//
+// NOTE: The input must be between 0-1.
+func (il IdentityList) SamplePct(pct float64) IdentityList {
+	if pct <= 0 {
+		return IdentityList{}
+	}
+
+	count := float64(il.Count()) * pct
+	size := uint(math.Round(count))
+	// ensure we always select at least 1, for non-zero input
+	if size == 0 {
+		size = 1
+	}
+
+	return il.Sample(size)
 }
 
 // StakingKeys returns a list of the staking public keys for the identities.

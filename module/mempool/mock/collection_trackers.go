@@ -13,14 +13,14 @@ type CollectionTrackers struct {
 }
 
 // Add provides a mock function with given fields: collt
-func (_m *CollectionTrackers) Add(collt *tracker.CollectionTracker) error {
+func (_m *CollectionTrackers) Add(collt *tracker.CollectionTracker) bool {
 	ret := _m.Called(collt)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*tracker.CollectionTracker) error); ok {
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(*tracker.CollectionTracker) bool); ok {
 		r0 = rf(collt)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0
@@ -43,7 +43,44 @@ func (_m *CollectionTrackers) All() []*tracker.CollectionTracker {
 }
 
 // ByCollectionID provides a mock function with given fields: collID
-func (_m *CollectionTrackers) ByCollectionID(collID flow.Identifier) (*tracker.CollectionTracker, error) {
+func (_m *CollectionTrackers) ByCollectionID(collID flow.Identifier) (*tracker.CollectionTracker, bool) {
+	ret := _m.Called(collID)
+
+	var r0 *tracker.CollectionTracker
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *tracker.CollectionTracker); ok {
+		r0 = rf(collID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*tracker.CollectionTracker)
+		}
+	}
+
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
+		r1 = rf(collID)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	return r0, r1
+}
+
+// Has provides a mock function with given fields: collID
+func (_m *CollectionTrackers) Has(collID flow.Identifier) bool {
+	ret := _m.Called(collID)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
+		r0 = rf(collID)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// Inc provides a mock function with given fields: collID
+func (_m *CollectionTrackers) Inc(collID flow.Identifier) (*tracker.CollectionTracker, error) {
 	ret := _m.Called(collID)
 
 	var r0 *tracker.CollectionTracker
@@ -63,20 +100,6 @@ func (_m *CollectionTrackers) ByCollectionID(collID flow.Identifier) (*tracker.C
 	}
 
 	return r0, r1
-}
-
-// Has provides a mock function with given fields: collID
-func (_m *CollectionTrackers) Has(collID flow.Identifier) bool {
-	ret := _m.Called(collID)
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
-		r0 = rf(collID)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
 }
 
 // Rem provides a mock function with given fields: collID

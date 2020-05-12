@@ -1,8 +1,6 @@
 package stdmap
 
 import (
-	"fmt"
-
 	chunkmodels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -28,20 +26,17 @@ func (a *Assignments) Has(assignmentID flow.Identifier) bool {
 }
 
 // ByID retrieves the chunk assignment from mempool based on provided ID
-func (a *Assignments) ByID(assignmentID flow.Identifier) (*chunkmodels.Assignment, error) {
-	entity, err := a.Backend.ByID(assignmentID)
-	if err != nil {
-		return nil, err
+func (a *Assignments) ByID(assignmentID flow.Identifier) (*chunkmodels.Assignment, bool) {
+	entity, exists := a.Backend.ByID(assignmentID)
+	if !exists {
+		return nil, false
 	}
-	adp, ok := entity.(*chunkmodels.AssignmentDataPack)
-	if !ok {
-		return nil, fmt.Errorf("invalid entity in assignments pool (%T)", entity)
-	}
-	return adp.Assignment(), nil
+	adp := entity.(*chunkmodels.AssignmentDataPack)
+	return adp.Assignment(), true
 }
 
 // Add adds an Assignment to the mempool.
-func (a *Assignments) Add(fingerprint flow.Identifier, assignment *chunkmodels.Assignment) error {
+func (a *Assignments) Add(fingerprint flow.Identifier, assignment *chunkmodels.Assignment) bool {
 	return a.Backend.Add(chunkmodels.NewAssignmentDataPack(fingerprint, assignment))
 }
 

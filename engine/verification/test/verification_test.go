@@ -37,10 +37,7 @@ import (
 // NOTE: some test cases are meant to solely run locally when FLOWLOCAL environmental
 // variable is set to TRUE
 func TestHappyPath(t *testing.T) {
-	// TODO broken test
-	// will be addressed in
-	// https://github.com/dapperlabs/flow-go/issues/3613
-	t.SkipNow()
+	var mu sync.Mutex
 	testcases := []struct {
 		verNodeCount,
 		chunkCount int
@@ -84,6 +81,8 @@ func TestHappyPath(t *testing.T) {
 			continue
 		}
 		t.Run(fmt.Sprintf("%d-verification node %d-chunk number", tc.verNodeCount, tc.chunkCount), func(t *testing.T) {
+			mu.Lock()
+			defer mu.Unlock()
 			testHappyPath(t, tc.verNodeCount, tc.chunkCount)
 		})
 	}
@@ -235,7 +234,8 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 		verNets = append(verNets, verNet)
 	}
 
-	unittest.RequireReturnsBefore(t, conWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second)
+	conWG.Wait()
+	// unittest.RequireReturnsBefore(t, conWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second)
 	// assert that the RA was received
 	conEngine.AssertExpectations(t)
 
@@ -448,7 +448,7 @@ func ingestHappyPath(tb testing.TB, receiptCount int, chunkCount int) {
 	//
 	ers := make([]verification.CompleteExecutionResult, receiptCount)
 	for i := 0; i < receiptCount; i++ {
-		ers[i] = CompleteExecutionResultFixture(tb, chunkCount)
+		ers[i] = LightExecutionResultFixture(chunkCount)
 	}
 
 	fmt.Println("Chunks have been made")
@@ -486,12 +486,12 @@ func ingestHappyPath(tb testing.TB, receiptCount int, chunkCount int) {
 
 		for _, chunk := range er.Receipt.ExecutionResult.Chunks {
 			// collection
-			err = verNode.AuthCollections.Add(er.Collections[chunk.Index])
-			require.NoError(tb, err)
+			added := verNode.AuthCollections.Add(er.Collections[chunk.Index])
+			require.True(tb, added)
 
 			// chunk
-			err = verNode.ChunkDataPacks.Add(er.ChunkDataPacks[chunk.Index])
-			require.NoError(tb, err)
+			added = verNode.ChunkDataPacks.Add(er.ChunkDataPacks[chunk.Index])
+			require.True(tb, added)
 		}
 	}
 
@@ -523,6 +523,8 @@ func setupMockExeNode(t *testing.T,
 	exeNode := testutil.GenericNode(t, hub, exeIdentity, othersIdentity)
 	exeEngine := new(network.Engine)
 
+	var mu sync.Mutex // to secure the mutual exclusion of process method
+
 	// determines the expected number of result chunk data pack requests
 	chunkDataPackCount := 0
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
@@ -544,6 +546,9 @@ func setupMockExeNode(t *testing.T,
 
 	exeEngine.On("Process", testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
+			mu.Lock()
+			defer mu.Unlock()
+
 			if originID, ok := args[0].(flow.Identifier); ok {
 				if req, ok := args[1].(*messages.ChunkDataPackRequest); ok {
 					require.True(t, ok)

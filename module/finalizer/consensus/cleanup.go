@@ -4,7 +4,9 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage"
 )
 
@@ -18,18 +20,26 @@ func CleanupNothing() CleanupFunc {
 	}
 }
 
-func CleanupMempools(payloads storage.Payloads, guarantees mempool.Guarantees, seals mempool.Seals) CleanupFunc {
+func CleanupMempools(collector module.MempoolMetrics, spans module.ConsensusMetrics, payloads storage.Payloads, guarantees mempool.Guarantees, seals mempool.Seals) CleanupFunc {
 	return func(blockID flow.Identifier) error {
+
 		payload, err := payloads.ByBlockID(blockID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve  payload (%x): %w", blockID, err)
 		}
+
 		for _, guarantee := range payload.Guarantees {
 			_ = guarantees.Rem(guarantee.ID())
 		}
+
+		collector.MempoolEntries(metrics.ResourceGuarantee, guarantees.Size())
+
 		for _, seal := range payload.Seals {
 			_ = seals.Rem(seal.ID())
 		}
+
+		collector.MempoolEntries(metrics.ResourceSeal, seals.Size())
+
 		return nil
 	}
 }

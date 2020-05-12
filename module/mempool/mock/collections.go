@@ -12,14 +12,14 @@ type Collections struct {
 }
 
 // Add provides a mock function with given fields: coll
-func (_m *Collections) Add(coll *flow.Collection) error {
+func (_m *Collections) Add(coll *flow.Collection) bool {
 	ret := _m.Called(coll)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.Collection) error); ok {
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(*flow.Collection) bool); ok {
 		r0 = rf(coll)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0
@@ -42,7 +42,7 @@ func (_m *Collections) All() []*flow.Collection {
 }
 
 // ByID provides a mock function with given fields: collID
-func (_m *Collections) ByID(collID flow.Identifier) (*flow.Collection, error) {
+func (_m *Collections) ByID(collID flow.Identifier) (*flow.Collection, bool) {
 	ret := _m.Called(collID)
 
 	var r0 *flow.Collection
@@ -54,11 +54,11 @@ func (_m *Collections) ByID(collID flow.Identifier) (*flow.Collection, error) {
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
 		r1 = rf(collID)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(bool)
 	}
 
 	return r0, r1

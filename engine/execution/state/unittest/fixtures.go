@@ -16,7 +16,7 @@ func EmptyView() *delta.View {
 
 	bootstrap.BootstrapView(view) //create genesis state
 
-	return view.NewChild() //return new view
+	return view.NewChild() // return new view
 }
 
 func StateViewFixture() *delta.View {
