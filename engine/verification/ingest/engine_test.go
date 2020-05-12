@@ -566,7 +566,7 @@ func (suite *IngestTestSuite) TestHandleReceipt_UnstakedSender() {
 	preceipts := []*verificationmodel.PendingReceipt{verificationmodel.NewPendingReceipt(suite.receipt, unstakedIdentity)}
 
 	// receipt should go to the pending receipts mempool
-	suite.pendingReceipts.On("Add", p).Return(true).Once()
+	suite.pendingReceipts.On("Add", preceipts[0]).Return(true).Once()
 	suite.pendingReceipts.On("All").Return(preceipts).Once()
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}).Once()
 	suite.blockStorage.On("ByID", suite.block.ID()).Return(nil, errors.New("dummy error")).Once()
@@ -660,12 +660,10 @@ func (suite *IngestTestSuite) TestHandleCollection_Untracked() {
 
 	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(false).Once()
 	// mocks a pending collection
-	pcoll := &verificationmodel.PendingCollection{
-		Collection: suite.collection,
-		OriginID:   suite.collIdentity.NodeID,
-	}
 	// expects the the collection to be added to pending receipts
-	suite.pendingCollections.On("Add", pcoll).Return(true).Once()
+	suite.pendingCollections.On("Add",
+		verificationmodel.NewPendingCollection(suite.collection, suite.collIdentity.NodeID)).
+		Return(true).Once()
 
 	err := eng.Process(suite.collIdentity.NodeID, suite.collection)
 	suite.Assert().Nil(err)

@@ -3,7 +3,7 @@
 package stdmap
 
 import (
-	"fmt"
+	"sync"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/verification"
@@ -13,44 +13,33 @@ import (
 // used to store execution receipts and to generate block seals.
 type PendingReceipts struct {
 	*Backend
-	counter uint // keeps number of added items to the mempool
+	counterMU sync.Mutex // provides atomic updates for the counter
+	counter   uint       // keeps number of added items to the mempool
 }
 
 // NewReceipts creates a new memory pool for execution receipts.
 func NewPendingReceipts(limit uint) (*PendingReceipts, error) {
 	// create the receipts memory pool with the lookup maps
 	r := &PendingReceipts{
-		Backend: NewBackend(WithLimit(limit)),
+		counter: 0,
+		Backend: NewBackend(WithLimit(limit), WithEject(ejectOldestPendingReceipt)),
 	}
 	return r, nil
 }
 
 // Add adds a pending execution receipt to the mempool.
 func (p *PendingReceipts) Add(preceipt *verification.PendingReceipt) bool {
+	p.counterMU.Lock()
+	defer p.counterMU.Unlock()
+
+	p.counter += 1
+	preceipt.Counter = p.counter
 	return p.Backend.Add(preceipt)
 }
 
 // Rem will remove a pending receipt by ID.
 func (p *PendingReceipts) Rem(preceiptID flow.Identifier) bool {
 	return p.Backend.Rem(preceiptID)
-}
-
-// Inc atomically increases the counter of pending receipt by one and returns the updated receipt
-func (p *PendingReceipts) Inc(preceiptID flow.Identifier) (*verification.PendingReceipt, error) {
-	updated, ok := p.Backend.Adjust(preceiptID, func(entity flow.Entity) flow.Entity {
-		pc := entity.(*verification.PendingReceipt)
-		return &verification.PendingReceipt{
-			Receipt:  pc.Receipt,
-			OriginID: pc.OriginID,
-			Counter:  pc.Counter + 1,
-		}
-	})
-
-	if !ok {
-		return nil, fmt.Errorf("could not update pending receipt in backend")
-	}
-
-	return updated.(*verification.PendingReceipt), nil
 }
 
 // All will return all pending execution receipts in the memory pool.
@@ -61,4 +50,22 @@ func (p *PendingReceipts) All() []*verification.PendingReceipt {
 		receipts = append(receipts, entity.(*verification.PendingReceipt))
 	}
 	return receipts
+}
+
+// ejectOldestPendingReceipt is the ejection function for pending receipts, it finds and returns
+// the entry with the largest counter value
+func ejectOldestPendingReceipt(entities map[flow.Identifier]flow.Entity) (flow.Identifier, flow.Entity) {
+	var oldestEntityID flow.Identifier
+	var oldestEntity flow.Entity
+
+	var maxCounter uint = 0
+	for entityID, entity := range entities {
+		pc := entity.(*verification.PendingReceipt)
+		if pc.Counter > maxCounter {
+			maxCounter = pc.Counter
+			oldestEntity = entity
+			oldestEntityID = entityID
+		}
+	}
+	return oldestEntityID, oldestEntity
 }
