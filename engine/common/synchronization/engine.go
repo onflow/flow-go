@@ -623,11 +623,16 @@ func (e *Engine) sendRequests(heights []uint64, blockIDs []flow.Identifier) erro
 
 		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageRangeRequest)
 
-		// mark all of the heights as requested; these should always be there as
-		// we call this right after the scan and nothing else can delete keys
+		// mark all of the heights as requested
 		for height := ran.From; height <= ran.To; height++ {
-			e.heights[height].Requested = time.Now()
-			e.heights[height].Attempts++
+			// NOTE: during the short window between scan and send, we could
+			// have received a block and removed a key
+			status, needed := e.heights[height]
+			if !needed {
+				continue
+			}
+			status.Requested = time.Now()
+			status.Attempts++
 		}
 
 		// check if we reached the maximum number of requests for this period
@@ -659,11 +664,16 @@ func (e *Engine) sendRequests(heights []uint64, blockIDs []flow.Identifier) erro
 
 		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBatchRequest)
 
-		// mark all of the blocks as requested; these should always be there as
-		// we call this right after the scan and nothing else can delete keys
+		// mark all of the blocks as requested
 		for _, blockID := range requestIDs {
-			e.blockIDs[blockID].Requested = time.Now()
-			e.blockIDs[blockID].Attempts++
+			// NOTE: during the short window between scan and send, we could
+			// have received a block and removed a key
+			status, needed := e.blockIDs[blockID]
+			if !needed {
+				continue
+			}
+			status.Requested = time.Now()
+			status.Attempts++
 		}
 
 		// check if we reached maximum requests
@@ -672,9 +682,6 @@ func (e *Engine) sendRequests(heights []uint64, blockIDs []flow.Identifier) erro
 			return nil
 		}
 	}
-
-	// TODO: when not requesting batches/ranges, make sure we don't add an
-	// attempt and we don't restart the retry timeout
 
 	return nil
 }
