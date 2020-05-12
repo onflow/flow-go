@@ -21,13 +21,14 @@ type State struct {
 	headers    storage.Headers
 	identities storage.Identities
 	seals      storage.Seals
+	index      storage.Index
 	payloads   storage.Payloads
 	blocks     storage.Blocks
 }
 
 // NewState initializes a new state backed by a badger database, applying the
 // optional configuration parameters.
-func NewState(metrics module.ComplianceMetrics, db *badger.DB, headers storage.Headers, identities storage.Identities, seals storage.Seals, payloads storage.Payloads, blocks storage.Blocks, options ...func(*State)) (*State, error) {
+func NewState(metrics module.ComplianceMetrics, db *badger.DB, headers storage.Headers, identities storage.Identities, seals storage.Seals, index storage.Index, payloads storage.Payloads, blocks storage.Blocks, options ...func(*State)) (*State, error) {
 	s := &State{
 		metrics:    metrics,
 		db:         db,
@@ -35,6 +36,7 @@ func NewState(metrics module.ComplianceMetrics, db *badger.DB, headers storage.H
 		headers:    headers,
 		identities: identities,
 		seals:      seals,
+		index:      index,
 		payloads:   payloads,
 		blocks:     blocks,
 	}

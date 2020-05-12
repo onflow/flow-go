@@ -302,6 +302,7 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.Storage.Headers,
 		fnb.Storage.Identities,
 		fnb.Storage.Seals,
+		fnb.Storage.Index,
 		fnb.Storage.Payloads,
 		fnb.Storage.Blocks,
 		protocol.SetClusters(fnb.BaseConfig.nClusters),

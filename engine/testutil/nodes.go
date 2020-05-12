@@ -65,7 +65,7 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	payloads := storage.NewPayloads(index, identities, guarantees, seals)
 	blocks := storage.NewBlocks(db, headers, payloads)
 
-	state, err := protocol.NewState(metrics, db, headers, identities, seals, payloads, blocks)
+	state, err := protocol.NewState(metrics, db, headers, identities, seals, index, payloads, blocks)
 	require.NoError(t, err)
 
 	genesis := flow.Genesis(participants)

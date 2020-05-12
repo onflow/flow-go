@@ -210,7 +210,7 @@ func main() {
 				node.DB,
 				node.Storage.Headers,
 				node.Storage.Seals,
-				node.Storage.Payloads,
+				node.Storage.Index,
 				node.Storage.Blocks,
 				guarantees,
 				seals,
