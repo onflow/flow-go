@@ -82,43 +82,6 @@ func TestTrieStorage_UpdateRegisters(t *testing.T) {
 	})
 }
 
-func TestTrieStorage_ConcurrentAccess(t *testing.T) {
-	trials := 100
-
-	unittest.RunWithTempDir(t, func(dbDir string) {
-
-		f, err := ledger.NewTrieStorage(dbDir)
-		require.NoError(t, err)
-
-		currentRoot := f.EmptyStateCommitment()
-
-		wg := sync.WaitGroup{}
-
-		for i := 0; i < trials; i++ {
-			wg.Add(1)
-			go func() {
-				ids := GetRandomKeysRandN(100, 32)
-				values := GetRandomValues(len(ids), 256)
-
-				newRoot, err := f.UpdateRegisters(ids, values, currentRoot)
-				require.NoError(t, err)
-
-				time.Sleep(time.Nanosecond)
-
-				newValuesA, _, err := f.GetRegistersWithProof(ids, newRoot)
-				require.NoError(t, err)
-
-				assert.Equal(t, values, newValuesA)
-				assert.NotEqual(t, currentRoot, newRoot)
-
-				wg.Done()
-			}()
-		}
-
-		wg.Wait()
-	})
-}
-
 func TestTrieStorage_UpdateRegistersWithProof(t *testing.T) {
 	t.Run("mismatched IDs and values", func(t *testing.T) {
 		unittest.RunWithTempDir(t, func(dbDir string) {
@@ -177,6 +140,43 @@ func TestTrieStorage_UpdateRegistersWithProof(t *testing.T) {
 			assert.Equal(t, values, newValues)
 			assert.NotEqual(t, currentRoot, newRoot)
 		})
+	})
+}
+
+func TestTrieStorage_ConcurrentAccess(t *testing.T) {
+	trials := 100
+
+	unittest.RunWithTempDir(t, func(dbDir string) {
+
+		f, err := ledger.NewTrieStorage(dbDir)
+		require.NoError(t, err)
+
+		currentRoot := f.EmptyStateCommitment()
+
+		wg := sync.WaitGroup{}
+
+		for i := 0; i < trials; i++ {
+			wg.Add(1)
+			go func() {
+				ids := GetRandomKeysRandN(100, 32)
+				values := GetRandomValues(len(ids), 256)
+
+				newRoot, err := f.UpdateRegisters(ids, values, currentRoot)
+				require.NoError(t, err)
+
+				time.Sleep(time.Nanosecond)
+
+				newValuesA, _, err := f.GetRegistersWithProof(ids, newRoot)
+				require.NoError(t, err)
+
+				assert.Equal(t, values, newValuesA)
+				assert.NotEqual(t, currentRoot, newRoot)
+
+				wg.Done()
+			}()
+		}
+
+		wg.Wait()
 	})
 }
 
