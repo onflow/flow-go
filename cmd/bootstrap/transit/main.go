@@ -219,7 +219,7 @@ func unwrapFile(bootdir, nodeId string) error {
 
 func wrapFile(bootdir, nodeId string) error {
 	pubKeyPath := filepath.Join(bootdir, fmt.Sprintf(FilenameTransitKeyPub, nodeId))
-	plaintextPath := filepath.Join(bootdir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID))
+	plaintextPath := filepath.Join(bootdir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeId))
 	ciphertextPath := filepath.Join(bootdir, FilenameRandomBeaconCipher)
 
 	plaintext, err := ioutil.ReadFile(plaintextPath)
