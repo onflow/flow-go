@@ -47,7 +47,10 @@ func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int) (*MFore
 	emptyTrie.number = uint64(0)
 	emptyTrie.rootHash = GetDefaultHashForHeight(maxHeight - 1)
 
-	forest.AddTrie(emptyTrie)
+	err = forest.AddTrie(emptyTrie)
+	if err != nil {
+		return nil, err
+	}
 	return forest, nil
 }
 
@@ -141,7 +144,7 @@ func (f *MForest) read(trie *MTrie, head *node, keys [][]byte) ([][]byte, error)
 	// keys not found
 	if head == nil {
 		res := make([][]byte, 0, len(keys))
-		for _ = range keys {
+		for range keys {
 			res = append(res, []byte{})
 		}
 		return res, nil

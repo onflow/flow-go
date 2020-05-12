@@ -506,7 +506,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 	fStore, err := mtrie.NewMForest(trieHeight, dir, 5)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
-	latestValueByKey := make(map[string][]byte, 0) // map store
+	latestValueByKey := make(map[string][]byte) // map store
 
 	for e := 0; e < rep; e++ {
 		keys := mtrie.GetRandomKeysRandN(maxNumKeysPerStep, keyByteSize)
