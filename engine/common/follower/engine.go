@@ -51,6 +51,7 @@ func New(
 		unit:     engine.NewUnit(),
 		log:      log.With().Str("engine", "follower").Logger(),
 		me:       me,
+		metrics:  metrics,
 		cleaner:  cleaner,
 		headers:  headers,
 		payloads: payloads,

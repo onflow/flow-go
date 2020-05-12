@@ -59,4 +59,7 @@ const (
 	MessageClusterBlockRequest  = "cluster_block_request"
 	MessageClusterBlockResponse = "cluster_block_response"
 	MessageTransaction          = "transaction"
+	MessageSubmitGuarantee      = "submit_guarantee"
+	MessageCollectionRequest    = "collection_request"
+	MessageCollectionResponse   = "collection_response"
 )
