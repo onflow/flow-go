@@ -24,16 +24,17 @@ type MForest struct {
 // NewMForest returns a new instance of memory forest
 func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int) (*MForest, error) {
 
-	evict := func(key interface{}, value interface{}) {
-		trie, ok := value.(*MTrie)
-		if !ok {
-			panic(fmt.Sprintf("cache contains item of type %T", value))
-		}
-		go func() {
-			_ = trie.Store(filepath.Join(trieStorageDir, hex.EncodeToString(trie.rootHash)))
-		}()
-	}
-	cache, err := lru.NewWithEvict(trieCacheSize, evict)
+	// evict := func(key interface{}, value interface{}) {
+	// 	trie, ok := value.(*MTrie)
+	// 	if !ok {
+	// 		panic(fmt.Sprintf("cache contains item of type %T", value))
+	// 	}
+	// 	go func() {
+	// 		_ = trie.Store(filepath.Join(trieStorageDir, hex.EncodeToString(trie.rootHash)))
+	// 	}()
+	// }
+	// cache, err := lru.NewWithEvict(trieCacheSize, evict)
+	cache, err := lru.New(trieCacheSize)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create forest cache: %w", err)
 	}
@@ -246,6 +247,7 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 	if err != nil {
 		return nil, err
 	}
+	go newTrie.Store(filepath.Join(f.dir, hex.EncodeToString(newRootHash)))
 	return newRootHash, nil
 }
 

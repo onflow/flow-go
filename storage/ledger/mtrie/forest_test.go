@@ -646,6 +646,9 @@ func TestPurgeAndLoad(t *testing.T) {
 	rootHash5, err := fStore.Update(keys, values, rootHash4)
 	require.NoError(t, err)
 
+	// TODO fix this gap in between
+	time.Sleep(3 * time.Second)
+
 	keys = [][]byte{k1}
 	values = [][]byte{v1}
 	retValues, err := fStore.Read(keys, rootHash2)
