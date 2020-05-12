@@ -180,6 +180,35 @@ func TestTrieStorage_ConcurrentAccess(t *testing.T) {
 	})
 }
 
+func TestTrieStorage_CrashResistance(t *testing.T) {
+	trials := 100
+
+	unittest.RunWithTempDir(t, func(dbDir string) {
+		f, err := ledger.NewTrieStorage(dbDir)
+		require.NoError(t, err)
+
+		currentRoot := f.EmptyStateCommitment()
+
+		for i := 0; i < trials; i++ {
+			ids := GetRandomKeysRandN(100, 32)
+			values := GetRandomValues(len(ids), 256)
+
+			newRoot, _ := f.UpdateRegisters(ids, values, currentRoot)
+
+			f.CloseStorage()
+
+			f, err := ledger.NewTrieStorage(dbDir)
+			require.NoError(t, err)
+
+			loadedValues, err := f.GetRegisters(ids, newRoot)
+			require.NoError(t, err)
+
+			assert.Equal(t, values, loadedValues)
+		}
+
+	})
+}
+
 func makeTestValues() ([][]byte, [][]byte) {
 	id1 := make([]byte, 32)
 	value1 := []byte{'a'}

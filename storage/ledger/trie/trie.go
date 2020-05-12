@@ -89,11 +89,11 @@ type tree struct {
 func (t *tree) init() error {
 	batcher := t.database.NewBatcher()
 
-	heightBytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(heightBytes, t.height)
+	height := make([]byte, 8)
+	binary.BigEndian.PutUint64(height, t.height)
+	batcher.Put(metadataKeyPrevious, t.root)
+	batcher.Put(metadataHeight, height)
 
-	batcher.Put(metadataKeyPrevious, []byte{})
-	batcher.Put(metadataHeight, heightBytes)
 
 	return t.database.UpdateTrieDB(batcher)
 }
