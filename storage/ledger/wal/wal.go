@@ -47,7 +47,7 @@ func (w *WAL) RecordDelete(stateCommitment flow.StateCommitment) error {
 	return nil
 }
 
-func (w *WAL) Reply(
+func (w *WAL) Replay(
 	updateFn func(flow.StateCommitment, [][]byte, [][]byte) error,
 	deleteFn func(flow.StateCommitment) error,
 ) error {

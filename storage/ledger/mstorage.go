@@ -33,7 +33,7 @@ func NewMTrieStorage(dbDir string) (*MTrieStorage, error) {
 		wal:     w,
 	}
 
-	err = w.Reply(
+	err = w.Replay(
 		func(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
 			_, err := trie.UpdateRegisters(keys, values, stateCommitment)
 			return err
