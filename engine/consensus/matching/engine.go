@@ -198,11 +198,9 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	// store the receipt in the memory pool
 	added := e.receipts.Add(receipt)
 	if !added {
-		log.Debug().Msg("skipping receipt already in mempool")
+		log.Debug().Msg("discarding receipt already in mempool")
 		return nil
 	}
-
-	log.Info().Msg("execution receipt added to mempool")
 
 	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
 
