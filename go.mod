@@ -47,6 +47,7 @@ require (
 	github.com/whyrusleeping/go-logging v0.0.1
 	go.uber.org/atomic v1.5.1
 	golang.org/x/crypto v0.0.0-20200423211502-4bdfaf469ed5
+	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	google.golang.org/api v0.18.0
 	google.golang.org/grpc v1.28.0
 )

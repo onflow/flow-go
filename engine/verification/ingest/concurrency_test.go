@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/rand"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/engine"
@@ -153,7 +154,17 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	// and checkTrackers loop starts
 	<-verNode.IngestEngine.Ready()
 
-	colNode := testutil.CollectionNode(t, hub, colID, identities)
+	// mocks the collection node with a generic node and
+	// mocked engine to handle requests for collections
+	collections := make([]*flow.Collection, 0)
+	for _, completeER := range ers {
+		for _, coll := range completeER.Collections {
+			collections = append(collections, coll)
+		}
+	}
+
+	colNode := testutil.GenericNode(t, hub, colID, identities)
+	setupMockCollectionNode(t, colNode, verID.NodeID, collections)
 
 	// mock the execution node with a generic node and mocked engine
 	// to handle requests for chunk state
@@ -173,10 +184,6 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	var blockStorageLock sync.Mutex
 
 	for _, completeER := range ers {
-		for _, coll := range completeER.Collections {
-			err := colNode.Collections.Store(coll)
-			assert.Nil(t, err)
-		}
 
 		// spin up `senderCount` sender goroutines to mimic receiving
 		// the same resource multiple times
@@ -297,4 +304,42 @@ func setupMockExeNode(t *testing.T, node mock.GenericNode, verID flow.Identifier
 		}).
 		Return(nil)
 
+}
+
+// setupMockExeNode sets up a mocked execution node that responds to requests for
+// chunk states. Any requests that don't correspond to an execution receipt in
+// the input ers list result in the test failing.
+func setupMockCollectionNode(t *testing.T, node mock.GenericNode, verID flow.Identifier, colls []*flow.Collection) {
+	eng := new(network.Engine)
+	chunksConduit, err := node.Net.Register(engine.CollectionProvider, eng)
+	assert.Nil(t, err)
+
+	retriedColl := make(map[flow.Identifier]struct{})
+
+	eng.On("Process", verID, testifymock.Anything).
+		Run(func(args testifymock.Arguments) {
+			if req, ok := args[1].(*messages.CollectionRequest); ok {
+				if _, ok := retriedColl[req.ID]; !ok {
+					// this is the first request for this collection
+					// it is dropped
+
+				}
+
+				for _, coll := range colls {
+					if coll.ID() == req.ID {
+						res := &messages.CollectionResponse{
+							Collection: *coll,
+							Nonce:      rand.Uint64(),
+						}
+						err := chunksConduit.Submit(res, verID)
+						assert.Nil(t, err)
+						return
+					}
+
+				}
+			}
+			t.Logf("invalid collection request (%T): %v ", args[1], args[1])
+			t.Fail()
+		}).
+		Return(nil)
 }
