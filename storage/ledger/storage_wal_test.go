@@ -21,7 +21,8 @@ func Test_WAL(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		f, err := ledger.NewTrieStorage(dir)
+		// cache size intentionally is set to size to test deletion
+		f, err := ledger.NewMTrieStorage(dir, size)
 		require.NoError(t, err)
 
 		var stateCommitment = f.EmptyStateCommitment()
@@ -48,7 +49,7 @@ func Test_WAL(t *testing.T) {
 
 		<-f.Done()
 
-		f2, err := ledger.NewTrieStorage(dir)
+		f2, err := ledger.NewMTrieStorage(dir, size+10)
 		require.NoError(t, err)
 
 		// random map iteration order is a benefit here
@@ -71,6 +72,11 @@ func Test_WAL(t *testing.T) {
 				assert.Equal(t, data[string(key)], registerValue)
 			}
 		}
+
+		// test deletion
+		s, err := f2.Size()
+		require.NoError(t, err)
+		assert.Equal(t, int(s), size)
 
 		<-f2.Done()
 	})
