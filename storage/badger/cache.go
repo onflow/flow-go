@@ -2,7 +2,8 @@ package badger
 
 import (
 	"fmt"
-	"sync"
+
+	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
@@ -46,27 +47,26 @@ func withResource(resource string) func(*Cache) {
 }
 
 type Cache struct {
-	sync.RWMutex
-	metrics   module.CacheMetrics
-	limit     uint
-	resources map[flow.Identifier]interface{}
-	store     storeFunc
-	retrieve  retrieveFunc
-	resource  string
+	metrics  module.CacheMetrics
+	limit    uint
+	store    storeFunc
+	retrieve retrieveFunc
+	resource string
+	cache    *lru.Cache
 }
 
 func newCache(collector module.CacheMetrics, options ...func(*Cache)) *Cache {
 	c := Cache{
-		metrics:   collector,
-		limit:     1000,
-		resources: make(map[flow.Identifier]interface{}),
-		store:     noStore,
-		retrieve:  noRetrieve,
-		resource:  metrics.ResourceUndefined,
+		metrics:  collector,
+		limit:    1000,
+		store:    noStore,
+		retrieve: noRetrieve,
+		resource: metrics.ResourceUndefined,
 	}
 	for _, option := range options {
 		option(&c)
 	}
+	c.cache, _ = lru.New(int(c.limit))
 	return &c
 }
 
@@ -75,9 +75,7 @@ func newCache(collector module.CacheMetrics, options ...func(*Cache)) *Cache {
 func (c *Cache) Get(entityID flow.Identifier) (interface{}, error) {
 
 	// check if we have it in the cache
-	c.RLock()
-	resource, cached := c.resources[entityID]
-	c.RUnlock()
+	resource, cached := c.cache.Get(entityID)
 	if cached {
 		c.metrics.CacheHit(c.resource)
 		return resource, nil
@@ -90,11 +88,11 @@ func (c *Cache) Get(entityID flow.Identifier) (interface{}, error) {
 		return nil, fmt.Errorf("could not retrieve resource: %w", err)
 	}
 
-	// cache the resource and eject a random one if we reached limit
-	c.Lock()
-	c.resources[entityID] = resource
-	c.eject()
-	c.Unlock()
+	// cache the resource and eject least recently used one if we reached limit
+	evicted := c.cache.Add(entityID, resource)
+	if !evicted {
+		c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
+	}
 
 	return resource, nil
 }
@@ -108,22 +106,11 @@ func (c *Cache) Put(entityID flow.Identifier, resource interface{}) error {
 		return fmt.Errorf("could not store resource: %w", err)
 	}
 
-	// cache the resource and eject a random one if we reached limit
-	c.Lock()
-	c.resources[entityID] = resource
-	c.eject()
-	c.Unlock()
+	// cache the resource and eject least recently used one if we reached limit
+	evicted := c.cache.Add(entityID, resource)
+	if !evicted {
+		c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
+	}
 
 	return nil
-}
-
-// eject will check if we reached the limit and eject an resource if we did.
-func (c *Cache) eject() {
-	if uint(len(c.resources)) > c.limit {
-		for ejectedID := range c.resources {
-			delete(c.resources, ejectedID)
-			break
-		}
-	}
-	c.metrics.CacheEntries(c.resource, uint(len(c.resources)))
 }

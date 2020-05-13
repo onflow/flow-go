@@ -245,7 +245,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		Network:    metrics.NewNetworkCollector(),
 		Engine:     metrics.NewEngineCollector(),
 		Compliance: metrics.NewComplianceCollector(),
-		Cache:      metrics.NewCacheCollector(),
+		Cache:      metrics.NewCacheCollector(flow.DefaultChainID),
 		Mempool:    metrics.NewMempoolCollector(),
 	}
 }
@@ -302,6 +302,7 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.Storage.Headers,
 		fnb.Storage.Identities,
 		fnb.Storage.Seals,
+		fnb.Storage.Index,
 		fnb.Storage.Payloads,
 		fnb.Storage.Blocks,
 		protocol.SetClusters(fnb.BaseConfig.nClusters),

@@ -132,7 +132,7 @@ func (va *VoteAggregator) BuildQCOnReceivedBlock(block *model.Block) (*model.Quo
 	if !exists {
 		// proposer must has been stored before, otherwise it's a bug.
 		// cannot build qc if proposer vote does not exist
-		return nil, false, fmt.Errorf("could not get proposer vote for block: %x", block.BlockID)
+		return nil, false, fmt.Errorf("could not get proposer vote for block: %x, blockView: %v, highestPrunedView: %v", block.BlockID, block.View, va.highestPrunedView)
 	}
 
 	// accumulate proposer's vote first to ensure proposer's vote is always included in the QC.
@@ -148,7 +148,6 @@ func (va *VoteAggregator) BuildQCOnReceivedBlock(block *model.Block) (*model.Quo
 		// being valid is broken. In this case, throw an error
 		return nil, false, fmt.Errorf("validating block failed: %x", block.BlockID)
 	}
-	delete(va.proposerVotes, block.BlockID)
 
 	// accumulate pending votes by order
 	pendingStatus, exists := va.pendingVotes.votes[block.BlockID]
