@@ -69,7 +69,7 @@ func main() {
 		}).
 		// Trie storage is required to bootstrap, but also should be handled while shutting down
 		Module("ledger storage", func(node *cmd.FlowNodeBuilder) error {
-			ledgerStorage, err = ledger.NewTrieStorage(triedir)
+			ledgerStorage, err = ledger.NewMTrieStorage(triedir, 10000) //TODO config
 			return err
 		}).
 		Module("execution metrics", func(node *cmd.FlowNodeBuilder) error {
