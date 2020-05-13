@@ -18,7 +18,7 @@ type Mutator struct {
 }
 
 func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) error {
-	return m.state.db.Update(func(tx *badger.Txn) error {
+	return operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
 
 		// FIRST: execute all the validity checks on the genesis block
 
@@ -229,7 +229,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	// we only look as far back for duplicates as the transaction expiry limit;
 	// if a guarantee was included before that, we will disqualify it on the
 	// basis of the reference block anyway
-	limit := header.Height - flow.DefaultTransactionExpiry
+	limit := header.Height - uint64(m.state.expiry)
 	if limit > header.Height { // overflow check
 		limit = 0
 	}
@@ -242,12 +242,12 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		if err != nil {
 			return fmt.Errorf("could not retrieve ancestor header (%x): %w", ancestorID, err)
 		}
-		payload, err := m.state.payloads.ByBlockID(ancestorID)
+		index, err := m.state.index.ByBlockID(ancestorID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve ancestor payload (%x): %w", ancestorID, err)
 		}
-		for _, guarantee := range payload.Guarantees {
-			lookup[guarantee.ID()] = struct{}{}
+		for _, collID := range index.CollectionIDs {
+			lookup[collID] = struct{}{}
 		}
 		if ancestor.Height <= limit {
 			break

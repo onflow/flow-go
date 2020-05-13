@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -188,6 +190,60 @@ func TestNoBlockExecutedUntilAllCollectionsArePosted(t *testing.T) {
 		rightResponse := messages.CollectionResponse{
 			Collection: flow.Collection{Transactions: executableBlock.Collections()[1].Transactions},
 		}
+
+		err = ctx.engine.ProcessLocal(&rightResponse)
+
+		require.NoError(t, err)
+	})
+}
+
+func TestRequestsAreRepeated(t *testing.T) {
+
+	runWithEngine(t, func(ctx testingContext) {
+
+		expectedRetries := 5
+		actualRetries := 0
+
+		ctx.engine.collectionRequestTimeout = 10 * time.Millisecond
+		ctx.engine.maximumCollectionRequestRetryNumber = uint(expectedRetries)
+
+		executableBlock := unittest.ExecutableBlockFixture(
+			[][]flow.Identifier{
+				{collection1Identity.NodeID},
+			},
+		)
+		executableBlock.StartState = unittest.StateCommitmentFixture()
+
+		rightResponse := messages.CollectionResponse{
+			Collection: flow.Collection{Transactions: executableBlock.Collections()[0].Transactions},
+		}
+
+		for _, col := range executableBlock.Block.Payload.Guarantees {
+			ctx.collectionConduit.EXPECT().Submit(
+				&colReqMatcher{req: &messages.CollectionRequest{ID: col.ID(), Nonce: rand.Uint64()}},
+				gomock.Eq(collection1Identity.NodeID),
+			).Do(func(_, _ interface{}) {
+				actualRetries++
+			}).Times(expectedRetries)
+		}
+
+		ctx.state.On("AtBlockID", executableBlock.ID()).Return(ctx.snapshot)
+
+		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlock.Block))
+		ctx.executionState.
+			On("StateCommitmentByBlockID", mock.Anything, executableBlock.Block.Header.ParentID).
+			Return(executableBlock.StartState, nil)
+
+		proposal := unittest.ProposalFromBlock(executableBlock.Block)
+		err := ctx.engine.ProcessLocal(proposal)
+		require.NoError(t, err)
+
+		// Expected no calls so test should fail if any occurs
+		assert.Eventually(t, func() bool {
+			return actualRetries == expectedRetries
+		}, time.Second, 10*time.Millisecond)
+
+		ctx.assertSuccessfulBlockComputation(executableBlock, unittest.IdentifierFixture())
 
 		err = ctx.engine.ProcessLocal(&rightResponse)
 

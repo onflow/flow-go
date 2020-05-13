@@ -21,34 +21,26 @@ func NewChunkDataPacks(db *badger.DB) *ChunkDataPacks {
 }
 
 func (ch *ChunkDataPacks) Store(c *flow.ChunkDataPack) error {
-	return ch.db.Update(func(btx *badger.Txn) error {
-		err := operation.SkipDuplicates(operation.InsertChunkDataPack(c))(btx)
-		if err != nil {
-			return fmt.Errorf("could not insert chunk data pack: %w", err)
-		}
-		return nil
-	})
+	err := operation.RetryOnConflict(ch.db.Update, operation.SkipDuplicates(operation.InsertChunkDataPack(c)))
+	if err != nil {
+		return fmt.Errorf("could not store chunk datapack: %w", err)
+	}
+	return nil
 }
 
 func (ch *ChunkDataPacks) Remove(chunkID flow.Identifier) error {
-	return ch.db.Update(func(btx *badger.Txn) error {
-		err := operation.RemoveChunkDataPack(chunkID)(btx)
-		if err != nil {
-			return fmt.Errorf("could not remove chunk data pack: %w", err)
-		}
-		return nil
-	})
+	err := operation.RetryOnConflict(ch.db.Update, operation.RemoveChunkDataPack(chunkID))
+	if err != nil {
+		return fmt.Errorf("could not remove chunk datapack: %w", err)
+	}
+	return nil
 }
 
 func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
 	var c flow.ChunkDataPack
-	err := ch.db.View(func(btx *badger.Txn) error {
-		err := operation.RetrieveChunkDataPack(chunkID, &c)(btx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve chunk data pack: %w", err)
-		}
-		return nil
-	})
-
-	return &c, err
+	err := ch.db.View(operation.RetrieveChunkDataPack(chunkID, &c))
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve chunk datapack: %w", err)
+	}
+	return &c, nil
 }

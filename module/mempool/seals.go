@@ -25,10 +25,6 @@ type Seals interface {
 	// pool. It will return false if it was not found in the mempool.
 	ByID(sealID flow.Identifier) (*flow.Seal, bool)
 
-	// ByBlockID retrieves the seal associated with the given sealed block; it
-	// will error if no seal for the given block was found.
-	ByBlockID(blockID flow.Identifier) (*flow.Seal, bool)
-
 	// Size will return the current size of the memory pool.
 	Size() uint
 

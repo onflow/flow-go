@@ -80,6 +80,7 @@ func registerConduits(net module.Network, eng network.Engine) (map[uint8]network
 		engine.CollectionIngest,
 		engine.ExecutionReceiptProvider,
 		engine.ExecutionStateProvider,
+		engine.ExecutionSync,
 		engine.ProtocolClusterConsensus,
 		engine.ProtocolConsensus,
 		engine.ProtocolSynchronization,

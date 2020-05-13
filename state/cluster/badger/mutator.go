@@ -16,7 +16,7 @@ type Mutator struct {
 }
 
 func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
-	return m.state.db.Update(func(tx *badger.Txn) error {
+	return operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
 
 		// check chain ID
 		if genesis.Header.ChainID != m.state.chainID {

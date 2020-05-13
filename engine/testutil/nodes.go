@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
@@ -65,7 +66,7 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	payloads := storage.NewPayloads(index, identities, guarantees, seals)
 	blocks := storage.NewBlocks(db, headers, payloads)
 
-	state, err := protocol.NewState(metrics, db, headers, identities, seals, payloads, blocks)
+	state, err := protocol.NewState(metrics, db, headers, identities, seals, index, payloads, blocks)
 	require.NoError(t, err)
 
 	genesis := flow.Genesis(participants)
@@ -123,10 +124,10 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 	collections := storage.NewCollections(node.DB)
 	transactions := storage.NewTransactions(node.DB)
 
-	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Me, pool, 0)
+	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, pool, 0)
 	require.Nil(t, err)
 
-	providerEngine, err := provider.New(node.Log, node.Net, node.State, node.Metrics, node.Me, pool, collections, transactions)
+	providerEngine, err := provider.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, pool, collections, transactions)
 	require.Nil(t, err)
 
 	return mock.CollectionNode{
@@ -283,6 +284,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Metrics,
 		node.Tracer,
 		false,
+		time.Second,
+		10,
 	)
 	require.NoError(t, err)
 

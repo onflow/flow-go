@@ -8,6 +8,7 @@ import (
 type EngineCollector struct {
 	sent     *prometheus.CounterVec
 	received *prometheus.CounterVec
+	handled  *prometheus.CounterVec
 }
 
 func NewEngineCollector() *EngineCollector {
@@ -27,6 +28,13 @@ func NewEngineCollector() *EngineCollector {
 			Subsystem: subsystemEngine,
 			Help:      "the number of messages received by engines",
 		}, []string{EngineLabel, LabelMessage}),
+
+		handled: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name:      "messages_handled_total",
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemEngine,
+			Help:      "the number of messages handled by engines",
+		}, []string{EngineLabel, LabelMessage}),
 	}
 
 	return ec
@@ -38,4 +46,8 @@ func (ec *EngineCollector) MessageSent(engine string, message string) {
 
 func (ec *EngineCollector) MessageReceived(engine string, message string) {
 	ec.received.With(prometheus.Labels{EngineLabel: engine, LabelMessage: message}).Inc()
+}
+
+func (ec *EngineCollector) MessageHandled(engine string, message string) {
+	ec.handled.With(prometheus.Labels{EngineLabel: engine, LabelMessage: message}).Inc()
 }

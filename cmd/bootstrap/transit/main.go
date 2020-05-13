@@ -18,6 +18,7 @@ import (
 	"google.golang.org/api/option"
 
 	"github.com/dapperlabs/flow-go/model/bootstrap"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 var (
@@ -31,31 +32,54 @@ const fileMode = os.FileMode(0644)
 const flowBucket = "flow-genesis-bootstrap"
 
 var (
+
+	// default files to upload for all role type
 	filesToUpload = []string{
-		FilenameTransitKeyPub,
 		bootstrap.PathNodeInfoPub,
 	}
+
+	// consensus node additionally will need the transit key (to securely transport DKG in phase 2)
+	filesToUploadConsensus = FilenameTransitKeyPub
+
+	// default files to download for all role type
 	filesToDownload = []string{
 		bootstrap.PathDKGDataPub,
 		bootstrap.PathNodeInfosPub,
 		bootstrap.PathGenesisBlock,
+		bootstrap.FilenameGenesisQC,
+		bootstrap.FilenameGenesisCommit,
 	}
+
+	// consensus node additionally gets random beacon
+	filesToDownloadConsensus = FilenameRandomBeaconCipher
 )
 
 func main() {
 
-	var bootdir, keydir, wrapId string
+	var bootdir, keydir, wrapId, role string
 	var pull, push bool
 
 	flag.StringVar(&bootdir, "d", "~/bootstrap", "The bootstrap directory containing your node-info files")
 	flag.StringVar(&keydir, "t", "", "Token provided by the Flow team to access the transit server")
 	flag.BoolVar(&pull, "pull", false, "Fetch keys and metadata from the transit server")
 	flag.BoolVar(&push, "push", false, "Upload public keys to the transit server")
-	flag.StringVar(&wrapId, "x-server-wrap", "", "(Flow Team Use), wrap response keys")
+	flag.StringVar(&role, "role", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
+	flag.StringVar(&wrapId, "x-server-wrap", "", "(Flow Team Use), wrap response keys for consensus node")
 	flag.Parse()
 
-	// Wrap takes prescedence, so we just do that first
-	if wrapId != "" {
+	if role == "" {
+		flag.Usage()
+		log.Fatal("Node role must be specified")
+	}
+
+	flowRole, err := flow.ParseRole(role)
+	if err != nil {
+		flag.Usage()
+		log.Fatalf(`unsupported role, allowed values: "collection"", "consensus", "execution", "verification" or "access""`)
+	}
+
+	// Wrap takes precedence, so we just do that first
+	if wrapId != "" && flowRole == flow.RoleConsensus {
 		log.Printf("Wrapping response for node %s\n", wrapId)
 		err := wrapFile(bootdir, wrapId)
 		if err != nil {
@@ -64,7 +88,6 @@ func main() {
 		return
 	}
 
-	var err error
 	if pull && push {
 		flag.Usage()
 		log.Fatal("Only one of -pull or -push may be specified\n")
@@ -90,12 +113,12 @@ func main() {
 	defer cancel()
 
 	if push {
-		runPush(ctx, bootdir, keydir, nodeId)
+		runPush(ctx, bootdir, keydir, nodeId, flowRole)
 		return
 	}
 
 	if pull {
-		runPull(ctx, bootdir, keydir, nodeId)
+		runPull(ctx, bootdir, keydir, nodeId, flowRole)
 		return
 	}
 }
@@ -112,36 +135,47 @@ func fetchNodeId(bootdir string) (string, error) {
 }
 
 // Run the push process
-// - create transit keypair
+// - create transit keypair (if the role type is Consensus)
 // - upload files to GCS bucket
-func runPush(ctx context.Context, bootdir, token, nodeId string) {
+func runPush(ctx context.Context, bootdir, token, nodeId string, role flow.Role) {
 	log.Println("Running push")
-	err := generateKeys(bootdir, nodeId)
-	if err != nil {
-		log.Fatalf("Failed to push: %s", err)
+
+	if role == flow.RoleConsensus {
+		err := generateKeys(bootdir, nodeId)
+		if err != nil {
+			log.Fatalf("Failed to push: %s", err)
+		}
 	}
-	for _, file := range filesToUpload {
-		err = bucketUpload(ctx, bootdir, fmt.Sprintf(file, nodeId), token)
+
+	files := getFilesToUpload(role)
+
+	for _, file := range files {
+		err := bucketUpload(ctx, bootdir, fmt.Sprintf(file, nodeId), token)
 		if err != nil {
 			log.Fatalf("Failed to push: %s", err)
 		}
 	}
 }
 
-func runPull(ctx context.Context, bootdir, token, nodeId string) {
-	filesToDownload = append(filesToDownload, FilenameRandomBeaconCipher)
+func runPull(ctx context.Context, bootdir, token, nodeId string, role flow.Role) {
+
 	log.Println("Running pull")
+
+	files := getFilesToDownload(role, nodeId)
+
 	var err error
-	for _, file := range filesToDownload {
+	for _, file := range files {
 		err = bucketDownload(ctx, bootdir, file, token)
 		if err != nil {
 			log.Fatalf("Failed to pull: %s", err)
 		}
 	}
 
-	err = unwrapFile(bootdir, nodeId)
-	if err != nil {
-		log.Fatalf("Failed to pull: %s", err)
+	if role == flow.RoleConsensus {
+		err = unwrapFile(bootdir, nodeId)
+		if err != nil {
+			log.Fatalf("Failed to pull: %s", err)
+		}
 	}
 }
 
@@ -318,4 +352,22 @@ func bucketDownload(ctx context.Context, bootdir, filename, token string) error 
 	}
 
 	return nil
+}
+
+func getFilesToUpload(role flow.Role) []string {
+	switch role {
+	case flow.RoleConsensus:
+		return append(filesToUpload, filesToUploadConsensus)
+	default:
+		return filesToUpload
+	}
+}
+
+func getFilesToDownload(role flow.Role, nodeId string) []string {
+	switch role {
+	case flow.RoleConsensus:
+		return append(filesToDownload, fmt.Sprintf(filesToDownloadConsensus, nodeId))
+	default:
+		return filesToDownload
+	}
 }

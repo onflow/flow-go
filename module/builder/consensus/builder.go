@@ -25,7 +25,7 @@ type Builder struct {
 	db       *badger.DB
 	seals    storage.Seals
 	headers  storage.Headers
-	payloads storage.Payloads
+	index    storage.Index
 	blocks   storage.Blocks
 	guarPool mempool.Guarantees
 	sealPool mempool.Seals
@@ -33,7 +33,7 @@ type Builder struct {
 }
 
 // NewBuilder creates a new block builder.
-func NewBuilder(metrics module.MempoolMetrics, db *badger.DB, headers storage.Headers, seals storage.Seals, payloads storage.Payloads, blocks storage.Blocks, guarPool mempool.Guarantees, sealPool mempool.Seals, options ...func(*Config)) *Builder {
+func NewBuilder(metrics module.MempoolMetrics, db *badger.DB, headers storage.Headers, seals storage.Seals, index storage.Index, blocks storage.Blocks, guarPool mempool.Guarantees, sealPool mempool.Seals, options ...func(*Config)) *Builder {
 
 	// initialize default config
 	cfg := Config{
@@ -52,7 +52,7 @@ func NewBuilder(metrics module.MempoolMetrics, db *badger.DB, headers storage.He
 		db:       db,
 		headers:  headers,
 		seals:    seals,
-		payloads: payloads,
+		index:    index,
 		blocks:   blocks,
 		guarPool: guarPool,
 		sealPool: sealPool,
@@ -90,12 +90,12 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		if ancestor.Height <= finalized {
 			return nil, fmt.Errorf("should always build on last finalized block")
 		}
-		payload, err := b.payloads.ByBlockID(ancestorID)
+		index, err := b.index.ByBlockID(ancestorID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
 		}
-		for _, guarantee := range payload.Guarantees {
-			pendingLookup[guarantee.ID()] = struct{}{}
+		for _, collID := range index.CollectionIDs {
+			pendingLookup[collID] = struct{}{}
 		}
 		ancestorID = ancestor.ParentID
 	}
@@ -120,12 +120,12 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		if err != nil {
 			return nil, fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
 		}
-		payload, err := b.payloads.ByBlockID(ancestorID)
+		index, err := b.index.ByBlockID(ancestorID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
 		}
-		for _, guarantee := range payload.Guarantees {
-			finalLookup[guarantee.ID()] = struct{}{}
+		for _, collID := range index.CollectionIDs {
+			finalLookup[collID] = struct{}{}
 		}
 		if ancestor.Height <= limit {
 			break
@@ -280,7 +280,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 	err = b.blocks.Store(proposal)
 	if err != nil {
-		return nil, fmt.Errorf("could ot store proposal: %w", err)
+		return nil, fmt.Errorf("could not store proposal: %w", err)
 	}
 
 	// update protocol state index for the seal and initialize children index

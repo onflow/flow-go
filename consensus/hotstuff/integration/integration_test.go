@@ -46,7 +46,7 @@ func TestThreeInstances(t *testing.T) {
 	// TeamCity for 1000 blocks; in order to avoid test timeouts, we keep the
 	// number low here
 	num := 3
-	finalView := uint64(1000)
+	finalView := uint64(100)
 
 	// generate three hotstuff participants
 	participants := unittest.IdentityListFixture(num)
@@ -104,7 +104,7 @@ func TestSevenInstances(t *testing.T) {
 	// number low here
 	numPass := 5
 	numFail := 2
-	finalView := uint64(1000)
+	finalView := uint64(100)
 
 	// generate the seven hotstuff participants
 	participants := unittest.IdentityListFixture(numPass + numFail)

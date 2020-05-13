@@ -1,6 +1,7 @@
 package common
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 	"time"
@@ -11,7 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 )
 
-const msgStateTimeout = 10 * time.Second
+const msgStateTimeout = 20 * time.Second
 
 type MsgState struct {
 	// TODO add lock to prevent concurrent map access bugs
@@ -37,8 +38,8 @@ func (ms *MsgState) LenFrom(node flow.Identifier) int {
 	return len(ms.msgs[node])
 }
 
-// WaitForAtFrom waits for a msg satisfying the predicate from the given node and returns it
-func (ms *MsgState) WaitForAtFrom(t *testing.T, predicate func(msg interface{}) bool, node flow.Identifier) interface{} {
+// WaitForMsgFrom waits for a msg satisfying the predicate from the given node and returns it
+func (ms *MsgState) WaitForMsgFrom(t *testing.T, predicate func(msg interface{}) bool, node flow.Identifier) interface{} {
 	var m interface{}
 	i := 0
 	require.Eventually(t, func() bool {
@@ -59,4 +60,23 @@ func (ms *MsgState) WaitForAtFrom(t *testing.T, predicate func(msg interface{}) 
 func MsgIsChunkDataPackRequest(msg interface{}) bool {
 	_, ok := msg.(*messages.ChunkDataPackRequest)
 	return ok
+}
+
+func MsgIsChunkDataPackResponse(msg interface{}) bool {
+	_, ok := msg.(*messages.ChunkDataPackResponse)
+	return ok
+}
+
+func MsgIsExecutionStateDelta(msg interface{}) bool {
+	_, ok := msg.(*messages.ExecutionStateDelta)
+	return ok
+}
+
+func MsgIsExecutionStateDeltaWithChanges(msg interface{}) bool {
+	delta, ok := msg.(*messages.ExecutionStateDelta)
+	if !ok {
+		return false
+	}
+
+	return bytes.Compare(delta.StartState, delta.EndState) != 0
 }
