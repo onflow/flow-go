@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"fmt"
 	"math/rand"
 	"os"
 	"testing"
@@ -77,7 +76,6 @@ func (bs *BuilderSuite) chainSeal(blockID flow.Identifier) {
 		FinalState:   final,
 	}
 	bs.chain = append(bs.chain, seal)
-	fmt.Printf("%d: %x = %x -> %x\n", len(bs.chain), blockID, initial, final)
 }
 
 func (bs *BuilderSuite) SetupTest() {
@@ -238,12 +236,6 @@ func (bs *BuilderSuite) SetupTest() {
 		bs.sealPool,
 	)
 	bs.build.cfg.expiry = 11
-
-	fmt.Printf("first: %x\n", bs.firstID)
-	fmt.Printf("finalized: %s\n", bs.finalizedIDs)
-	fmt.Printf("final: %x\n", bs.finalID)
-	fmt.Printf("pending: %s\n", bs.pendingIDs)
-	fmt.Printf("parent: %x\n", bs.parentID)
 }
 
 func (bs *BuilderSuite) TearDownTest() {
