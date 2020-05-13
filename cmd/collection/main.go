@@ -63,6 +63,7 @@ func main() {
 		ingressConf  ingress.Config
 		pool         mempool.Transactions
 		transactions *storagekv.Transactions
+		colHeaders   *storagekv.Headers
 		colPayloads  *storagekv.ClusterPayloads
 
 		colCache *buffer.PendingClusterBlocks // pending block cache for cluster consensus
@@ -98,10 +99,11 @@ func main() {
 		}).
 		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
 			transactions = storagekv.NewTransactions(node.DB)
+			colHeaders = storagekv.NewHeaders(node.Metrics.Cache, node.DB)
 			colPayloads = storagekv.NewClusterPayloads(node.DB)
 			return nil
 		}).
-		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
+		Module("block mempool", func(node *cmd.FlowNodeBuilder) error {
 			colCache = buffer.NewPendingClusterBlocks()
 			conCache = buffer.NewPendingBlocks()
 			return nil
@@ -144,7 +146,7 @@ func main() {
 		Module("cluster state", func(node *cmd.FlowNodeBuilder) error {
 
 			// initialize cluster state
-			clusterState, err = clusterkv.NewState(node.DB, clusterID, node.Storage.Headers, colPayloads)
+			clusterState, err = clusterkv.NewState(node.DB, clusterID, colHeaders, colPayloads)
 			if err != nil {
 				return fmt.Errorf("could not create cluster state: %w", err)
 			}
@@ -241,13 +243,13 @@ func main() {
 			return prov, err
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			builder := builder.NewBuilder(node.DB, node.Storage.Headers, colPayloads, pool,
+			builder := builder.NewBuilder(node.DB, colHeaders, colPayloads, pool,
 				builder.WithMaxCollectionSize(maxCollectionSize),
 				builder.WithExpiryBuffer(builderExpiryBuffer),
 			)
 			finalizer := colfinalizer.NewFinalizer(node.DB, pool, prov, colMetrics, clusterID)
 
-			prop, err := proposal.New(node.Logger, node.Network, node.Me, colMetrics, node.Metrics.Engine, node.State, clusterState, ing, pool, transactions, node.Storage.Headers, colPayloads, colCache)
+			prop, err := proposal.New(node.Logger, node.Network, node.Me, colMetrics, node.Metrics.Engine, node.State, clusterState, ing, pool, transactions, colHeaders, colPayloads, colCache)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize engine: %w", err)
 			}
@@ -267,7 +269,7 @@ func main() {
 
 			persist := persister.New(node.DB)
 
-			finalized, pending, err := findLatest(clusterState, node.Storage.Headers)
+			finalized, pending, err := findLatest(clusterState, colHeaders)
 			if err != nil {
 				return nil, fmt.Errorf("could not retrieve finalized/pending headers: %w", err)
 			}
@@ -276,7 +278,7 @@ func main() {
 				node.Logger,
 				notifier,
 				clusterMetrics,
-				node.Storage.Headers,
+				colHeaders,
 				committee,
 				builder,
 				finalizer,
