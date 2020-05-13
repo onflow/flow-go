@@ -72,7 +72,7 @@ func (p *AutoProfiler) pprof(profile string) {
 
 	path := filepath.Join(p.dir, fmt.Sprintf("%s-%s", profile, time.Now().Format(time.RFC3339)))
 	log := p.log.With().Str("file", path).Logger()
-	log.Info().Msgf("capturing %s profile", profile)
+	log.Debug().Msgf("capturing %s profile", profile)
 
 	f, err := os.Create(path)
 	if err != nil {
@@ -95,7 +95,7 @@ func (p *AutoProfiler) pprof(profile string) {
 func (p *AutoProfiler) cpu() {
 	path := filepath.Join(p.dir, fmt.Sprintf("cpu-%s", time.Now().Format(time.RFC3339)))
 	log := p.log.With().Str("file", path).Logger()
-	log.Info().Msgf("capturing cpu profile")
+	log.Debug().Msgf("capturing cpu profile")
 
 	f, err := os.Create(path)
 	if err != nil {
