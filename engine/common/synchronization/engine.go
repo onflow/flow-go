@@ -145,29 +145,40 @@ func (e *Engine) RequestBlock(blockID flow.Identifier) {
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
-	// process one event at a time for now
-	e.unit.Lock()
-	defer e.unit.Unlock()
-
 	switch ev := event.(type) {
 	case *messages.SyncRequest:
-		e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageSyncRequest)
+		e.before(metrics.MessageSyncRequest)
+		defer e.after(metrics.MessageSyncRequest)
 		return e.onSyncRequest(originID, ev)
 	case *messages.SyncResponse:
-		e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageSyncResponse)
+		e.before(metrics.MessageSyncResponse)
+		defer e.after(metrics.MessageSyncResponse)
 		return e.onSyncResponse(originID, ev)
 	case *messages.RangeRequest:
-		e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageRangeRequest)
+		e.before(metrics.MessageRangeRequest)
+		defer e.after(metrics.MessageRangeRequest)
 		return e.onRangeRequest(originID, ev)
 	case *messages.BatchRequest:
-		e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageBatchRequest)
+		e.before(metrics.MessageBatchRequest)
+		defer e.after(metrics.MessageBatchRequest)
 		return e.onBatchRequest(originID, ev)
 	case *messages.BlockResponse:
-		e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageBlockResponse)
+		e.before(metrics.MessageBlockResponse)
+		defer e.after(metrics.MessageBlockResponse)
 		return e.onBlockResponse(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
+}
+
+func (e *Engine) before(msg string) {
+	e.metrics.MessageReceived(metrics.EngineSynchronization, msg)
+	e.unit.Lock()
+}
+
+func (e *Engine) after(msg string) {
+	e.unit.Unlock()
+	e.metrics.MessageHandled(metrics.EngineSynchronization, msg)
 }
 
 // onSyncRequest processes an outgoing handshake; if we have a higher height, we

@@ -18,6 +18,7 @@ func (nc *NoopCollector) NetworkMessageSent(sizeBytes int, topic string)        
 func (nc *NoopCollector) NetworkMessageReceived(sizeBytes int, topic string)        {}
 func (nc *NoopCollector) MessageSent(engine string, message string)                 {}
 func (nc *NoopCollector) MessageReceived(engine string, message string)             {}
+func (nc *NoopCollector) MessageHandled(engine string, message string)              {}
 func (nc *NoopCollector) BadgerLSMSize(sizeBytes int64)                             {}
 func (nc *NoopCollector) BadgerVLogSize(sizeBytes int64)                            {}
 func (nc *NoopCollector) BadgerNumReads(n int64)                                    {}
