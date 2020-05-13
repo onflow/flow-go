@@ -8,6 +8,9 @@ import (
 	"github.com/dapperlabs/flow-go/model/verification"
 )
 
+// TODO consolidate with PendingReceipts to preserve DRY
+// https://github.com/dapperlabs/flow-go/issues/3690
+
 // PendingCollections implements a mempool storing collections.
 type PendingCollections struct {
 	*Backend

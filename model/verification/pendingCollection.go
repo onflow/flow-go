@@ -4,6 +4,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+// TODO consolidate with PendingReceipt to preserve DRY
+// https://github.com/dapperlabs/flow-go/issues/3690
 // PendingCollection represents a collection that its origin ID is pending to be verified
 // It is utilized whenever the reference blockID for the pending collection is not available
 type PendingCollection struct {
