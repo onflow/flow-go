@@ -1,6 +1,7 @@
 package mtrie
 
 import (
+	"bufio"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
@@ -50,9 +51,11 @@ func (mt *MTrie) Store(path string) error {
 		return err
 	}
 	defer fi.Close()
+	writer := bufio.NewWriter(fi)
+	defer writer.Flush()
 
 	// first byte is the store format version
-	_, err = fi.Write([]byte{byte(1)})
+	_, err = writer.Write([]byte{byte(1)})
 	if err != nil {
 		return err
 	}
@@ -60,7 +63,7 @@ func (mt *MTrie) Store(path string) error {
 	// then 8 bytes captures trie number
 	b1 := make([]byte, 8)
 	binary.LittleEndian.PutUint64(b1, mt.number)
-	_, err = fi.Write(b1)
+	_, err = writer.Write(b1)
 	if err != nil {
 		return err
 	}
@@ -68,25 +71,25 @@ func (mt *MTrie) Store(path string) error {
 	// then 2 byte2 captures the maxHeight
 	b2 := make([]byte, 2)
 	binary.LittleEndian.PutUint16(b2, uint16(mt.maxHeight))
-	_, err = fi.Write(b2)
+	_, err = writer.Write(b2)
 	if err != nil {
 		return err
 	}
 
 	// next 32 bytes are parent rootHash
-	_, err = fi.Write(mt.parentRootHash)
+	_, err = writer.Write(mt.parentRootHash)
 	if err != nil {
 		return err
 	}
 
 	// next 32 bytes are trie rootHash
-	_, err = fi.Write(mt.rootHash)
+	_, err = writer.Write(mt.rootHash)
 	if err != nil {
 		return err
 	}
 
 	// repeated: x bytes key, 4bytes valueSize(number of bytes value took), valueSize bytes value)
-	err = mt.store(mt.root, fi)
+	err = mt.store(mt.root, writer)
 	if err != nil {
 		return err
 	}
@@ -94,35 +97,35 @@ func (mt *MTrie) Store(path string) error {
 	return nil
 }
 
-func (mt *MTrie) store(n *node, fi *os.File) error {
+func (mt *MTrie) store(n *node, writer *bufio.Writer) error {
 	if n.key != nil {
-		_, err := fi.Write(n.key)
+		_, err := writer.Write(n.key)
 		if err != nil {
 			return err
 		}
 
 		b := make([]byte, 8)
 		binary.LittleEndian.PutUint64(b, uint64(len(n.value)))
-		_, err = fi.Write(b)
+		_, err = writer.Write(b)
 		if err != nil {
 			return err
 		}
 
-		_, err = fi.Write(n.value)
+		_, err = writer.Write(n.value)
 		if err != nil {
 			return err
 		}
 	}
 
 	if n.lChild != nil {
-		err := mt.store(n.lChild, fi)
+		err := mt.store(n.lChild, writer)
 		if err != nil {
 			return err
 		}
 	}
 
 	if n.rChild != nil {
-		err := mt.store(n.rChild, fi)
+		err := mt.store(n.rChild, writer)
 		if err != nil {
 			return err
 		}
