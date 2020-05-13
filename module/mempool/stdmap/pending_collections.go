@@ -1,9 +1,6 @@
 package stdmap
 
 import (
-	"math"
-	"sync"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/verification"
 )
@@ -14,18 +11,15 @@ import (
 // PendingCollections implements a mempool storing collections.
 type PendingCollections struct {
 	*Backend
-
-	// TODO push counter to the backend
-	// https://github.com/dapperlabs/flow-go/issues/3707
-	counterMU sync.Mutex // provides atomic updates for the counter
-	counter   uint64     // keeps number of added items to the mempool
+	qe *QueueEjector
 }
 
 // NewCollections creates a new memory pool for pending collection.
 func NewPendingCollections(limit uint) (*PendingCollections, error) {
+	qe := NewQueueEjector(limit + 1)
 	p := &PendingCollections{
-		counter: 0,
-		Backend: NewBackend(WithLimit(limit), WithEject(pendingCollectionLRUEject)),
+		qe:      qe,
+		Backend: NewBackend(WithLimit(limit), WithEject(qe.Eject)),
 	}
 
 	return p, nil
@@ -33,12 +27,12 @@ func NewPendingCollections(limit uint) (*PendingCollections, error) {
 
 // Add adds a pending collection to the mempool.
 func (p *PendingCollections) Add(pcoll *verification.PendingCollection) bool {
-	p.counterMU.Lock()
-	defer p.counterMU.Unlock()
+	ok := p.Backend.Add(pcoll)
+	if ok {
+		p.qe.Push(pcoll.ID())
+	}
 
-	p.counter += 1
-	pcoll.Counter = p.counter
-	return p.Backend.Add(pcoll)
+	return ok
 }
 
 // Rem removes a pending collection by ID from memory
@@ -64,22 +58,4 @@ func (p *PendingCollections) All() []*verification.PendingCollection {
 		pcolls = append(pcolls, entity.(*verification.PendingCollection))
 	}
 	return pcolls
-}
-
-// pendingCollectionLRUEject is the ejection function for pending collections, it finds and returns
-// the entry with the smallest counter value.
-func pendingCollectionLRUEject(entities map[flow.Identifier]flow.Entity) (flow.Identifier, flow.Entity) {
-	var oldestEntityID flow.Identifier
-	var oldestEntity flow.Entity
-
-	var minCounter uint64 = math.MaxUint64
-	for entityID, entity := range entities {
-		pc := entity.(*verification.PendingCollection)
-		if pc.Counter < minCounter {
-			minCounter = pc.Counter
-			oldestEntity = entity
-			oldestEntityID = entityID
-		}
-	}
-	return oldestEntityID, oldestEntity
 }
