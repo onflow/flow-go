@@ -190,9 +190,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// if the message was submitted internally (ie. via the Access API)
 	// propagate it to all members of the responsible cluster
 	if originID == localID {
-		targetIDs := txCluster.
-			Filter(filter.Not(filter.HasNodeID(localID))).
-			Sample(2)
+		targetIDs := txCluster.Filter(filter.Not(filter.HasNodeID(localID)))
 
 		log.Debug().
 			Str("recipients", fmt.Sprintf("%v", targetIDs.NodeIDs())).
