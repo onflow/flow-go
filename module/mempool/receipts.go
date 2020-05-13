@@ -28,7 +28,4 @@ type Receipts interface {
 
 	// All will return a list of all receipts in the memory pool.
 	All() []*flow.ExecutionReceipt
-
-	// DropForBlock will drop all receipts for the given block ID.
-	DropForBlock(blockID flow.Identifier) []flow.Identifier
 }

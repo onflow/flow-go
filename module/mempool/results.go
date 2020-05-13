@@ -26,7 +26,4 @@ type Results interface {
 
 	// All will return a list of all approvals in the memory pool.
 	All() []*flow.ExecutionResult
-
-	// DropForBlock will remove all results for the given block.
-	DropForBlock(blockID flow.Identifier) []flow.Identifier
 }

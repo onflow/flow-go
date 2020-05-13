@@ -33,19 +33,21 @@ type Engine struct {
 }
 
 // New creates a new collection propagation engine.
-func New(log zerolog.Logger, metrics module.EngineMetrics, mempool module.MempoolMetrics, spans module.ConsensusMetrics, net module.Network, state protocol.State, me module.Local, guarantees mempool.Guarantees) (*Engine, error) {
+func New(log zerolog.Logger, collector module.EngineMetrics, mempool module.MempoolMetrics, spans module.ConsensusMetrics, net module.Network, state protocol.State, me module.Local, guarantees mempool.Guarantees) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		unit:       engine.NewUnit(),
 		log:        log.With().Str("engine", "propagation").Logger(),
-		metrics:    metrics,
+		metrics:    collector,
 		mempool:    mempool,
 		spans:      spans,
 		state:      state,
 		me:         me,
 		guarantees: guarantees,
 	}
+
+	e.mempool.MempoolEntries(metrics.ResourceGuarantee, e.guarantees.Size())
 
 	// register the engine with the network layer and store the conduit
 	con, err := net.Register(engine.BlockPropagation, e)
