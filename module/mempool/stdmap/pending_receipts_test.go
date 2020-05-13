@@ -6,38 +6,36 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/verification"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-// TestLRUEject evaluates the ejection mechanism of PendingReceipts mempool
+// TestPendingReceiptsLRUEject evaluates the ejection mechanism of PendingReceipts mempool
 // every time the mempool gets full, the oldest entry should be ejected
-func TestLRUEject(t *testing.T) {
-	// creates a mempool with capacity of 3
-	p, err := NewPendingReceipts(3)
+func TestPendingReceiptsLRUEject(t *testing.T) {
+	var total uint = 4
+	// creates a mempool with capacity one less than `total`
+	p, err := NewPendingReceipts(total - 1)
 	require.Nil(t, err)
 
-	// generates 4 execution receipts and adds them to the mempool
-	r1 := verification.NewPendingReceipt(unittest.ExecutionReceiptFixture(), unittest.IdentifierFixture())
-	require.True(t, p.Add(r1))
-	require.True(t, p.Has(r1.Receipt.ID()))
+	// generates `total` execution receipts and adds them to the mempool
+	receipts := make([]*flow.ExecutionReceipt, total)
+	for i := 0; i < int(total); i++ {
+		receipt := unittest.ExecutionReceiptFixture()
+		pr := verification.NewPendingReceipt(receipt, unittest.IdentifierFixture())
+		require.True(t, p.Add(pr))
+		require.True(t, p.Has(pr.ID()))
+		receipts[i] = receipt
+	}
 
-	r2 := verification.NewPendingReceipt(unittest.ExecutionReceiptFixture(), unittest.IdentifierFixture())
-	require.True(t, p.Add(r2))
-	require.True(t, p.Has(r2.Receipt.ID()))
-
-	r3 := verification.NewPendingReceipt(unittest.ExecutionReceiptFixture(), unittest.IdentifierFixture())
-	require.True(t, p.Add(r3))
-	require.True(t, p.Has(r3.Receipt.ID()))
-
-	r4 := verification.NewPendingReceipt(unittest.ExecutionReceiptFixture(), unittest.IdentifierFixture())
-	require.True(t, p.Add(r4))
-	require.True(t, p.Has(r4.Receipt.ID()))
-
-	// at the end of inserting 4 items into a mempool with capacity of 3, the first item
-	// should be ejected
-	assert.False(t, p.Has(r1.Receipt.ID()))
-	assert.True(t, p.Has(r2.Receipt.ID()))
-	assert.True(t, p.Has(r3.Receipt.ID()))
-	assert.True(t, p.Has(r4.Receipt.ID()))
+	for i := 0; i < int(total); i++ {
+		if i == 0 {
+			// first item should be ejected to make the room for surplus item
+			assert.False(t, p.Has(receipts[i].ID()))
+			continue
+		}
+		// other pending receipts should be available in mempool
+		assert.True(t, p.Has(receipts[i].ID()))
+	}
 }
