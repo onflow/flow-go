@@ -3,6 +3,8 @@ package ledger
 import (
 	"fmt"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
 	"github.com/dapperlabs/flow-go/storage/ledger/wal"
@@ -16,7 +18,7 @@ type MTrieStorage struct {
 // NewMTrieStorage creates a new in-memory trie-backed ledger storage with persistence.
 func NewMTrieStorage(dbDir string, cacheSize int) (*MTrieStorage, error) {
 
-	w, err := wal.NewWAL(nil, nil, dbDir)
+	w, err := wal.NewWAL(nil, prometheus.DefaultRegisterer, dbDir)
 
 	if err != nil {
 		return nil, fmt.Errorf("cannot create WAL: %w", err)

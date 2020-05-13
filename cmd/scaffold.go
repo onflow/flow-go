@@ -92,7 +92,7 @@ type namedDoneObject struct {
 // It runs a node process with following structure, in sequential order
 // Base inits (network, storage, state, logger)
 //   PostInit handlers, if any
-//   GenesisHandler, if any and if genesis was generate
+//   GenesisHandler, if any and if genesis was generated
 // Components handlers, if any, wait sequentially
 // Run() <- main loop
 // Components destructors, if any
