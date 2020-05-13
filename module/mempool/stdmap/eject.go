@@ -4,6 +4,7 @@ package stdmap
 
 import (
 	"math/rand"
+	"sync"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -52,6 +53,7 @@ func EjectPanic(entities map[flow.Identifier]flow.Entity) (flow.Identifier, flow
 
 // QueueEjector provides a swift FIFO ejection functionality
 type QueueEjector struct {
+	sync.Mutex
 	queue chan flow.Identifier
 }
 
@@ -64,6 +66,8 @@ func NewQueueEjector(limit uint) *QueueEjector {
 // Push should be called every time a new entity is added to the mempool.
 // It enqueues the entity for later ejection.
 func (q *QueueEjector) Push(entityID flow.Identifier) {
+	q.Lock()
+	defer q.Unlock()
 	if len(q.queue) < cap(q.queue) {
 		q.queue <- entityID
 	}
@@ -72,6 +76,9 @@ func (q *QueueEjector) Push(entityID flow.Identifier) {
 // Eject is the EjectFunc of QueueEjector. It dequeues an identifier and returns its corresponding entity.
 // In case the dequeued identifier of entity does not exist, it returns a random entity of the queue.
 func (q *QueueEjector) Eject(entities map[flow.Identifier]flow.Entity) (flow.Identifier, flow.Entity) {
+	q.Lock()
+	defer q.Unlock()
+
 	if len(q.queue) == 0 {
 		return EjectTrueRandom(entities)
 	}
