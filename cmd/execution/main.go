@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/spf13/pflag"
@@ -158,6 +159,8 @@ func main() {
 				collector,
 				node.Tracer,
 				true,
+				time.Second, //TODO - config param
+				10,          // TODO - config param
 			)
 			return ingestionEng, err
 		}).
