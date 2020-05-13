@@ -67,7 +67,7 @@ func (p *PendingCollections) All() []*verification.PendingCollection {
 }
 
 // pendingCollectionLRUEject is the ejection function for pending collections, it finds and returns
-// the entry with the largest counter value, i.e., the least recently added
+// the entry with the smallest counter value.
 func pendingCollectionLRUEject(entities map[flow.Identifier]flow.Entity) (flow.Identifier, flow.Entity) {
 	var oldestEntityID flow.Identifier
 	var oldestEntity flow.Entity

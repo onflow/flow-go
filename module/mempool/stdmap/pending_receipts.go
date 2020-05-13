@@ -59,7 +59,7 @@ func (p *PendingReceipts) All() []*verification.PendingReceipt {
 }
 
 // ejectOldestPendingReceipt is the ejection function for pending receipts, it finds and returns
-// the entry with the largest counter value
+// the entry with the smallest counter value.
 func ejectOldestPendingReceipt(entities map[flow.Identifier]flow.Entity) (flow.Identifier, flow.Entity) {
 	var oldestEntityID flow.Identifier
 	var oldestEntity flow.Entity
