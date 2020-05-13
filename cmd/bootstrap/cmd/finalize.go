@@ -20,6 +20,7 @@ var (
 	flagPartnerNodeInfoDir                           string
 	flagPartnerStakes                                string
 	flagCollectorGenerationMaxHashGrindingIterations uint
+	flagMTrieStorage                                 bool
 )
 
 type PartnerStakes map[flow.Identifier]uint64
@@ -103,6 +104,8 @@ func init() {
 	finalizeCmd.Flags().StringVar(&flagPartnerStakes, "partner-stakes", "", "path to a JSON file containing "+
 		"a map from partner node's NodeID to their stake")
 	_ = finalizeCmd.MarkFlagRequired("partner-stakes")
+
+	finalizeCmd.Flags().BoolVar(&flagMTrieStorage, "mtrie", false, "enables MTrie Execution Storage engine")
 }
 
 func assemblePartnerNodes() []model.NodeInfo {

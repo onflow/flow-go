@@ -114,6 +114,8 @@ func (f *MTrieStorage) UpdateRegisters(
 		return nil, fmt.Errorf("cannot update state, error while writing WAL: %w", err)
 	}
 
+	prometheus.NewGauge()
+
 	newStateCommitment, err = f.mForest.Update(ids, values, stateCommitment)
 	// newStateCommitment, err = f.tree.Update(ids, values, stateCommitment)
 	if err != nil {

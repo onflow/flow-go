@@ -26,9 +26,17 @@ func GenerateAccount0PrivateKey(seed []byte) (flow.AccountPrivateKey, error) {
 	}, nil
 }
 
-func GenerateExecutionState(dbDir string, priv flow.AccountPrivateKey) (flow.StateCommitment, error) {
-	ledgerStorage, err := ledger.NewTrieStorage(dbDir)
-	defer ledgerStorage.CloseStorage()
+func GenerateExecutionState(dbDir string, priv flow.AccountPrivateKey, mTrie bool) (flow.StateCommitment, error) {
+	var ledgerStorage storage.Ledger
+	var err error
+	if mTrie {
+		ledgerStorage, err = ledger.NewMTrieStorage(dbDir, 10, nil)
+	} else {
+		ledgerStorage, err = ledger.NewTrieStorage(dbDir)
+	}
+	defer func() {
+		<-ledgerStorage.Done()
+	}()
 	if err != nil {
 		return nil, err
 	}
