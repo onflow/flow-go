@@ -128,6 +128,9 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
 	case *flow.TransactionBody:
 		e.engMetrics.MessageReceived(metrics.EngineCollectionIngest, metrics.MessageTransaction)
+		e.unit.Lock()
+		defer e.unit.Unlock()
+		defer e.engMetrics.MessageHandled(metrics.EngineCollectionIngest, metrics.MessageTransaction)
 		return e.onTransaction(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)

@@ -131,19 +131,29 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 func (e *Engine) process(originID flow.Identifier, input interface{}) error {
 	// process one event at a time for now
-	e.unit.Lock()
-	defer e.unit.Unlock()
 
 	switch v := input.(type) {
 	case *events.SyncedBlock:
-		e.metrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlock)
+		e.before(metrics.MessageSyncedBlock)
+		defer e.after(metrics.MessageSyncedBlock)
 		return e.onSyncedBlock(originID, v)
 	case *messages.BlockProposal:
-		e.metrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlock)
+		e.before(metrics.MessageBlockProposal)
+		defer e.after(metrics.MessageBlockProposal)
 		return e.onBlockProposal(originID, v)
 	default:
 		return fmt.Errorf("invalid event type (%T)", input)
 	}
+}
+
+func (e *Engine) before(msg string) {
+	e.metrics.MessageReceived(metrics.EngineFollower, msg)
+	e.unit.Lock()
+}
+
+func (e *Engine) after(msg string) {
+	e.unit.Unlock()
+	e.metrics.MessageHandled(metrics.EngineFollower, msg)
 }
 
 func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBlock) error {

@@ -164,25 +164,37 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	}
 
 	// just process one event at a time for now
-	e.unit.Lock()
-	defer e.unit.Unlock()
 
 	switch ev := event.(type) {
 	case *messages.ClusterBlockProposal:
-		e.engMetrics.MessageReceived(metrics.EngineProposal, metrics.MessageClusterBlockProposal)
+		e.before(metrics.MessageClusterBlockProposal)
+		defer e.after(metrics.MessageClusterBlockProposal)
 		return e.onBlockProposal(originID, ev)
 	case *messages.ClusterBlockVote:
-		e.engMetrics.MessageReceived(metrics.EngineProposal, metrics.MessageClusterBlockVote)
+		e.before(metrics.MessageClusterBlockVote)
+		defer e.after(metrics.MessageClusterBlockVote)
 		return e.onBlockVote(originID, ev)
 	case *messages.ClusterBlockRequest:
-		e.engMetrics.MessageReceived(metrics.EngineProposal, metrics.MessageClusterBlockRequest)
+		e.before(metrics.MessageClusterBlockRequest)
+		defer e.after(metrics.MessageClusterBlockRequest)
 		return e.onBlockRequest(originID, ev)
 	case *messages.ClusterBlockResponse:
-		e.engMetrics.MessageReceived(metrics.EngineProposal, metrics.MessageClusterBlockResponse)
+		e.before(metrics.MessageClusterBlockResponse)
+		defer e.after(metrics.MessageClusterBlockResponse)
 		return e.onBlockResponse(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
+}
+
+func (e *Engine) before(msg string) {
+	e.engMetrics.MessageReceived(metrics.EngineProposal, msg)
+	e.unit.Lock()
+}
+
+func (e *Engine) after(msg string) {
+	e.unit.Unlock()
+	e.engMetrics.MessageHandled(metrics.EngineProposal, msg)
 }
 
 // SendVote will send a vote to the desired node.
