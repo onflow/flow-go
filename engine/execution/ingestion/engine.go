@@ -576,15 +576,15 @@ func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Que
 	return newQueue(blockify, queues)
 }
 
-func (e *Engine) submitCollectionRequest(timer **time.Timer, request *messages.CollectionRequest, recipients []flow.Identifier, number uint) {
+func (e *Engine) submitCollectionRequest(timer **time.Timer, request *messages.CollectionRequest, recipients []flow.Identifier, retry uint) {
 
-	if number >= e.maximumCollectionRequestRetryNumber {
+	if retry >= e.maximumCollectionRequestRetryNumber {
 		e.log.Error().Hex("collection_id", logging.ID(request.ID)).Msg("exceeded maximum number of retries of collection request")
 		return
 	}
 
-	if number > 0 {
-		e.log.Info().Hex("collection_id", logging.ID(request.ID)).Uint("retry", number).Msg("retrying request for collection")
+	if retry > 0 {
+		e.log.Info().Hex("collection_id", logging.ID(request.ID)).Uint("retry", retry).Msg("retrying request for collection")
 	}
 
 	err := e.collectionConduit.Submit(
@@ -596,7 +596,7 @@ func (e *Engine) submitCollectionRequest(timer **time.Timer, request *messages.C
 	}
 
 	*timer = time.AfterFunc(e.collectionRequestTimeout, func() {
-		e.submitCollectionRequest(timer, request, recipients, number+1)
+		e.submitCollectionRequest(timer, request, recipients, retry+1)
 	})
 }
 
