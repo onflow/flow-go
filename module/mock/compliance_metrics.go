@@ -15,12 +15,17 @@ func (_m *ComplianceMetrics) BlockFinalized(_a0 *flow.Block) {
 	_m.Called(_a0)
 }
 
-// BlockProposed provides a mock function with given fields: _a0
-func (_m *ComplianceMetrics) BlockProposed(_a0 *flow.Block) {
-	_m.Called(_a0)
-}
-
 // BlockSealed provides a mock function with given fields: _a0
 func (_m *ComplianceMetrics) BlockSealed(_a0 *flow.Block) {
 	_m.Called(_a0)
+}
+
+// FinalizedHeight provides a mock function with given fields: height
+func (_m *ComplianceMetrics) FinalizedHeight(height uint64) {
+	_m.Called(height)
+}
+
+// SealedHeight provides a mock function with given fields: height
+func (_m *ComplianceMetrics) SealedHeight(height uint64) {
+	_m.Called(height)
 }

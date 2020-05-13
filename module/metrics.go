@@ -19,26 +19,12 @@ type NetworkMetrics interface {
 type EngineMetrics interface {
 	MessageSent(engine string, message string)
 	MessageReceived(engine string, message string)
-}
-
-type BadgerMetrics interface {
-	// BadgerLSMSize total size on-disk of the badger database.
-	BadgerLSMSize(sizeBytes int64)
-	BadgerVLogSize(sizeBytes int64)
-
-	// Badger built-in metrics (from badger/y/metrics.go)
-	BadgerNumReads(n int64)
-	BadgerNumWrites(n int64)
-	BadgerNumBytesRead(n int64)
-	BadgerNumBytesWritten(n int64)
-	BadgerNumGets(n int64)
-	BadgerNumPuts(n int64)
-	BadgerNumBlockedPuts(n int64)
-	BadgerNumMemtableGets(n int64)
+	MessageHandled(engine string, messages string)
 }
 
 type ComplianceMetrics interface {
-	BlockProposed(*flow.Block)
+	FinalizedHeight(height uint64)
+	SealedHeight(height uint64)
 	BlockFinalized(*flow.Block)
 	BlockSealed(*flow.Block)
 }
@@ -152,4 +138,10 @@ type ExecutionMetrics interface {
 
 	// ExecutionStorageStateCommitment reports the storage size of a state commitment in bytes
 	ExecutionStorageStateCommitment(bytes int64)
+
+	// ExecutionLastExecutedBlockView reports last executed block view
+	ExecutionLastExecutedBlockView(view uint64)
+
+	// ExecutionTotalExecutedTransactions adds num to the total number of executed transactions
+	ExecutionTotalExecutedTransactions(numExecuted int)
 }

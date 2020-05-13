@@ -18,6 +18,7 @@ func (nc *NoopCollector) NetworkMessageSent(sizeBytes int, topic string)        
 func (nc *NoopCollector) NetworkMessageReceived(sizeBytes int, topic string)        {}
 func (nc *NoopCollector) MessageSent(engine string, message string)                 {}
 func (nc *NoopCollector) MessageReceived(engine string, message string)             {}
+func (nc *NoopCollector) MessageHandled(engine string, message string)              {}
 func (nc *NoopCollector) BadgerLSMSize(sizeBytes int64)                             {}
 func (nc *NoopCollector) BadgerVLogSize(sizeBytes int64)                            {}
 func (nc *NoopCollector) BadgerNumReads(n int64)                                    {}
@@ -28,6 +29,8 @@ func (nc *NoopCollector) BadgerNumGets(n int64)                                 
 func (nc *NoopCollector) BadgerNumPuts(n int64)                                     {}
 func (nc *NoopCollector) BadgerNumBlockedPuts(n int64)                              {}
 func (nc *NoopCollector) BadgerNumMemtableGets(n int64)                             {}
+func (nc *NoopCollector) FinalizedHeight(height uint64)                             {}
+func (nc *NoopCollector) SealedHeight(height uint64)                                {}
 func (nc *NoopCollector) BlockProposed(*flow.Block)                                 {}
 func (nc *NoopCollector) BlockFinalized(*flow.Block)                                {}
 func (nc *NoopCollector) BlockSealed(*flow.Block)                                   {}
@@ -62,3 +65,5 @@ func (nc *NoopCollector) ExecutionGasUsedPerBlock(gas uint64)                   
 func (nc *NoopCollector) ExecutionStateReadsPerBlock(reads uint64)                  {}
 func (nc *NoopCollector) ExecutionStateStorageDiskTotal(bytes int64)                {}
 func (nc *NoopCollector) ExecutionStorageStateCommitment(bytes int64)               {}
+func (nc *NoopCollector) ExecutionLastExecutedBlockView(view uint64)                {}
+func (ec *NoopCollector) ExecutionTotalExecutedTransactions(numberOfTx int)         {}

@@ -1,8 +1,6 @@
 package stdmap
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/verification"
 )
@@ -22,26 +20,23 @@ func NewPendingCollections(limit uint) (*PendingCollections, error) {
 }
 
 // Add adds a pending collection to the mempool.
-func (p *PendingCollections) Add(pcoll *verification.PendingCollection) error {
+func (p *PendingCollections) Add(pcoll *verification.PendingCollection) bool {
 	return p.Backend.Add(pcoll)
 }
 
 // Rem removes a pending collection by ID from memory
-func (p *PendingCollections) Rem(pcollID flow.Identifier) bool {
-	return p.Backend.Rem(pcollID)
+func (p *PendingCollections) Rem(collID flow.Identifier) bool {
+	return p.Backend.Rem(collID)
 }
 
 // ByID returns the pending collection with the given ID from the mempool.
-func (p *PendingCollections) ByID(pcollID flow.Identifier) (*verification.PendingCollection, error) {
-	entity, err := p.Backend.ByID(pcollID)
-	if err != nil {
-		return nil, err
+func (p *PendingCollections) ByID(collID flow.Identifier) (*verification.PendingCollection, bool) {
+	entity, exists := p.Backend.ByID(collID)
+	if exists {
+		return nil, false
 	}
-	pcoll, ok := entity.(*verification.PendingCollection)
-	if !ok {
-		panic(fmt.Sprintf("invalid entity in pending collection pool (%T)", entity))
-	}
-	return pcoll, nil
+	pcoll := entity.(*verification.PendingCollection)
+	return pcoll, true
 }
 
 // All returns all pending collections from the mempool.

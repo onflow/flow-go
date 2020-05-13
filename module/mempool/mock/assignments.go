@@ -13,14 +13,14 @@ type Assignments struct {
 }
 
 // Add provides a mock function with given fields: assignmentFingerprint, assignment
-func (_m *Assignments) Add(assignmentFingerprint flow.Identifier, assignment *chunks.Assignment) error {
+func (_m *Assignments) Add(assignmentFingerprint flow.Identifier, assignment *chunks.Assignment) bool {
 	ret := _m.Called(assignmentFingerprint, assignment)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, *chunks.Assignment) error); ok {
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(flow.Identifier, *chunks.Assignment) bool); ok {
 		r0 = rf(assignmentFingerprint, assignment)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0
@@ -43,7 +43,7 @@ func (_m *Assignments) All() []*chunks.Assignment {
 }
 
 // ByID provides a mock function with given fields: assignmentID
-func (_m *Assignments) ByID(assignmentID flow.Identifier) (*chunks.Assignment, error) {
+func (_m *Assignments) ByID(assignmentID flow.Identifier) (*chunks.Assignment, bool) {
 	ret := _m.Called(assignmentID)
 
 	var r0 *chunks.Assignment
@@ -55,11 +55,11 @@ func (_m *Assignments) ByID(assignmentID flow.Identifier) (*chunks.Assignment, e
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
 		r1 = rf(assignmentID)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(bool)
 	}
 
 	return r0, r1

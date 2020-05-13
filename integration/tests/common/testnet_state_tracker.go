@@ -81,6 +81,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 				t.Logf("execution receipts received from %s for block ID %x by executor ID %x with SC %x", sender,
 					m.ExecutionResult.BlockID, m.ExecutorID, m.ExecutionResult.FinalStateCommit)
 			default:
+				t.Logf("other msg received from %s: %#v", sender, msg)
 				continue
 			}
 		}

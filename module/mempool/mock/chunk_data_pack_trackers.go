@@ -13,14 +13,14 @@ type ChunkDataPackTrackers struct {
 }
 
 // Add provides a mock function with given fields: cdpt
-func (_m *ChunkDataPackTrackers) Add(cdpt *tracker.ChunkDataPackTracker) error {
+func (_m *ChunkDataPackTrackers) Add(cdpt *tracker.ChunkDataPackTracker) bool {
 	ret := _m.Called(cdpt)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*tracker.ChunkDataPackTracker) error); ok {
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(*tracker.ChunkDataPackTracker) bool); ok {
 		r0 = rf(cdpt)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0
@@ -43,7 +43,44 @@ func (_m *ChunkDataPackTrackers) All() []*tracker.ChunkDataPackTracker {
 }
 
 // ByChunkID provides a mock function with given fields: chunkID
-func (_m *ChunkDataPackTrackers) ByChunkID(chunkID flow.Identifier) (*tracker.ChunkDataPackTracker, error) {
+func (_m *ChunkDataPackTrackers) ByChunkID(chunkID flow.Identifier) (*tracker.ChunkDataPackTracker, bool) {
+	ret := _m.Called(chunkID)
+
+	var r0 *tracker.ChunkDataPackTracker
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *tracker.ChunkDataPackTracker); ok {
+		r0 = rf(chunkID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*tracker.ChunkDataPackTracker)
+		}
+	}
+
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
+		r1 = rf(chunkID)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	return r0, r1
+}
+
+// Has provides a mock function with given fields: chunkID
+func (_m *ChunkDataPackTrackers) Has(chunkID flow.Identifier) bool {
+	ret := _m.Called(chunkID)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
+		r0 = rf(chunkID)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// Inc provides a mock function with given fields: chunkID
+func (_m *ChunkDataPackTrackers) Inc(chunkID flow.Identifier) (*tracker.ChunkDataPackTracker, error) {
 	ret := _m.Called(chunkID)
 
 	var r0 *tracker.ChunkDataPackTracker
@@ -63,20 +100,6 @@ func (_m *ChunkDataPackTrackers) ByChunkID(chunkID flow.Identifier) (*tracker.Ch
 	}
 
 	return r0, r1
-}
-
-// Has provides a mock function with given fields: chunkID
-func (_m *ChunkDataPackTrackers) Has(chunkID flow.Identifier) bool {
-	ret := _m.Called(chunkID)
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
-		r0 = rf(chunkID)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
 }
 
 // Rem provides a mock function with given fields: chunkID

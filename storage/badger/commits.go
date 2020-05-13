@@ -5,6 +5,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
@@ -16,7 +17,7 @@ type Commits struct {
 func NewCommits(collector module.CacheMetrics, db *badger.DB) *Commits {
 
 	store := func(blockID flow.Identifier, commit interface{}) error {
-		return db.Update(operation.IndexStateCommitment(blockID, commit.(flow.StateCommitment)))
+		return operation.RetryOnConflict(db.Update, operation.IndexStateCommitment(blockID, commit.(flow.StateCommitment)))
 	}
 
 	retrieve := func(blockID flow.Identifier) (interface{}, error) {
@@ -26,8 +27,13 @@ func NewCommits(collector module.CacheMetrics, db *badger.DB) *Commits {
 	}
 
 	c := &Commits{
-		db:    db,
-		cache: newCache(collector, withStore(store), withRetrieve(retrieve)),
+		db: db,
+		cache: newCache(collector,
+			withLimit(100),
+			withStore(store),
+			withRetrieve(retrieve),
+			withResource(metrics.ResourceCommit),
+		),
 	}
 
 	return c

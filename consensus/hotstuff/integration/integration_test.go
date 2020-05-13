@@ -25,7 +25,7 @@ func TestSingleInstance(t *testing.T) {
 	// with a single instance, leading to a boundlessly growing call stack,
 	// which slows down the mocks significantly due to splitting the callstack
 	// to find the calling function name; we thus keep it low for now
-	finalView := uint64(20)
+	finalView := uint64(10)
 	in := NewInstance(t,
 		WithStopCondition(ViewFinalized(finalView)),
 	)
@@ -46,7 +46,7 @@ func TestThreeInstances(t *testing.T) {
 	// TeamCity for 1000 blocks; in order to avoid test timeouts, we keep the
 	// number low here
 	num := 3
-	finalView := uint64(1000)
+	finalView := uint64(100)
 
 	// generate three hotstuff participants
 	participants := unittest.IdentityListFixture(num)
@@ -104,7 +104,7 @@ func TestSevenInstances(t *testing.T) {
 	// number low here
 	numPass := 5
 	numFail := 2
-	finalView := uint64(1000)
+	finalView := uint64(100)
 
 	// generate the seven hotstuff participants
 	participants := unittest.IdentityListFixture(numPass + numFail)

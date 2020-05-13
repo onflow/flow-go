@@ -106,8 +106,8 @@ func (suite *BuilderSuite) Bootstrap() {
 			tx.ReferenceBlockID = genesis.ID()
 			tx.ProposalKey.SequenceNumber = uint64(i)
 		})
-		err = suite.pool.Add(&transaction)
-		suite.Assert().Nil(err)
+		added := suite.pool.Add(&transaction)
+		suite.Assert().True(added)
 	}
 }
 
@@ -338,8 +338,8 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 			tx.ReferenceBlockID = refID
 			tx.ProposalKey.SequenceNumber = uint64(i)
 		})
-		err = suite.pool.Add(&tx)
-		assert.Nil(t, err)
+		added := suite.pool.Add(&tx)
+		assert.True(t, added)
 
 		// 1/3 of the time create a conflicting fork that will be invalidated
 		// don't do this the first and last few times to ensure we don't
@@ -415,6 +415,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 	for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
 		block := unittest.BlockWithParentFixture(head)
 		block.Payload.Guarantees = nil
+		block.Payload.Seals = nil
 		block.Header.PayloadHash = block.Payload.Hash()
 		err = suite.protoState.Mutate().Extend(&block)
 		suite.Require().Nil(err)
@@ -433,16 +434,16 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 		tx.ReferenceBlockID = genesis.ID()
 		tx.ProposalKey.SequenceNumber = 0
 	})
-	err = suite.pool.Add(&tx1)
-	suite.Assert().Nil(err)
+	added := suite.pool.Add(&tx1)
+	suite.Assert().True(added)
 
 	// insert a transaction referencing the head (valid)
 	tx2 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) {
 		tx.ReferenceBlockID = head.ID()
 		tx.ProposalKey.SequenceNumber = 1
 	})
-	err = suite.pool.Add(&tx2)
-	suite.Assert().Nil(err)
+	added = suite.pool.Add(&tx2)
+	suite.Assert().True(added)
 
 	suite.T().Log("tx1: ", tx1.ID())
 	suite.T().Log("tx2: ", tx2.ID())
@@ -555,8 +556,8 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		// add some transactions to transaction pool
 		for i := 0; i < 3; i++ {
 			tx := unittest.TransactionBodyFixture()
-			err = suite.pool.Add(&tx)
-			assert.Nil(b, err)
+			added := suite.pool.Add(&tx)
+			assert.True(b, added)
 		}
 
 		// create the builder

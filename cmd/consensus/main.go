@@ -42,6 +42,7 @@ func main() {
 
 	var (
 		guaranteeLimit  uint
+		resultLimit     uint
 		receiptLimit    uint
 		approvalLimit   uint
 		sealLimit       uint
@@ -52,6 +53,7 @@ func main() {
 		err            error
 		privateDKGData *bootstrap.DKGParticipantPriv
 		guarantees     mempool.Guarantees
+		results        mempool.Results
 		receipts       mempool.Receipts
 		approvals      mempool.Approvals
 		seals          mempool.Seals
@@ -65,6 +67,7 @@ func main() {
 	cmd.FlowNode("consensus").
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&guaranteeLimit, "guarantee-limit", 10000, "maximum number of guarantees in the memory pool")
+			flags.UintVar(&resultLimit, "result-limit", 1000, "maximum number of execution results in the memory pool")
 			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
 			flags.UintVar(&approvalLimit, "approval-limit", 1000, "maximum number of result approvals in the memory pool")
 			flags.UintVar(&sealLimit, "seal-limit", 1000, "maximum number of block seals in the memory pool")
@@ -78,6 +81,10 @@ func main() {
 		}).
 		Module("collection guarantees mempool", func(node *cmd.FlowNodeBuilder) error {
 			guarantees, err = stdmap.NewGuarantees(guaranteeLimit)
+			return err
+		}).
+		Module("execution results mempool", func(node *cmd.FlowNodeBuilder) error {
+			results, err = stdmap.NewResults(resultLimit)
 			return err
 		}).
 		Module("execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
@@ -101,7 +108,7 @@ func main() {
 			return nil
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			results := bstorage.NewExecutionResults(node.DB)
+			resultsDB := bstorage.NewExecutionResults(node.DB)
 			match, err := matching.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -109,6 +116,8 @@ func main() {
 				node.Network,
 				node.State,
 				node.Me,
+				resultsDB,
+				node.Storage.Headers,
 				results,
 				receipts,
 				approvals,
@@ -201,7 +210,7 @@ func main() {
 				node.DB,
 				node.Storage.Headers,
 				node.Storage.Seals,
-				node.Storage.Payloads,
+				node.Storage.Index,
 				node.Storage.Blocks,
 				guarantees,
 				seals,
@@ -319,8 +328,8 @@ func findLatest(state protocol.State, headers storage.Headers, rootHeader *flow.
 
 	// find all pending header by ID
 	pending := make([]*flow.Header, 0, len(pendingIDs))
-	for _, u := range pendingIDs {
-		pendingHeader, err := headers.ByBlockID(u)
+	for _, pendingID := range pendingIDs {
+		pendingHeader, err := headers.ByBlockID(pendingID)
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not find pending block by ID: %w", err)
 		}

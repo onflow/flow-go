@@ -23,15 +23,15 @@ func NewIndex(collector module.CacheMetrics, db *badger.DB) *Index {
 
 	storeIndex := func(blockID flow.Identifier, index interface{}) error {
 		idx := index.(flow.Index)
-		err := db.Update(operation.IndexPayloadIdentities(blockID, idx.NodeIDs))
+		err := operation.RetryOnConflict(db.Update, operation.IndexPayloadIdentities(blockID, idx.NodeIDs))
 		if err != nil {
 			return fmt.Errorf("could not store identity index: %w", err)
 		}
-		err = db.Update(operation.IndexPayloadGuarantees(blockID, idx.CollectionIDs))
+		err = operation.RetryOnConflict(db.Update, operation.IndexPayloadGuarantees(blockID, idx.CollectionIDs))
 		if err != nil {
 			return fmt.Errorf("could not store guarantee index: %w", err)
 		}
-		err = db.Update(operation.IndexPayloadSeals(blockID, idx.SealIDs))
+		err = operation.RetryOnConflict(db.Update, operation.IndexPayloadSeals(blockID, idx.SealIDs))
 		if err != nil {
 			return fmt.Errorf("could not store seal index: %w", err)
 		}
@@ -65,7 +65,7 @@ func NewIndex(collector module.CacheMetrics, db *badger.DB) *Index {
 	p := &Index{
 		db: db,
 		index: newCache(collector,
-			withLimit(1000),
+			withLimit(flow.DefaultTransactionExpiry+100),
 			withStore(storeIndex),
 			withRetrieve(retrieveIndex),
 			withResource(metrics.ResourceIndex),

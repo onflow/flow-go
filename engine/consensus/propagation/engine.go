@@ -3,7 +3,6 @@
 package propagation
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -126,50 +125,18 @@ func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.Collectio
 
 	log.Info().Msg("collection guarantee received")
 
-	err := e.storeGuarantee(guarantee)
-	if errors.Is(err, mempool.ErrAlreadyExists) {
+	added := e.guarantees.Add(guarantee)
+	if !added {
+		log.Debug().Msg("discarding guarantee already in mempool")
 		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("could not store guarantee: %w", err)
-	}
-
-	log.Info().Msg("collection guarantee processed")
-
-	// propagate the collection guarantee to other relevant nodes
-	err = e.propagateGuarantee(guarantee)
-	if err != nil {
-		return fmt.Errorf("could not broadcast guarantee: %w", err)
-	}
-
-	log.Info().Msg("collection guarantee propagated to consensus nodes")
-
-	return nil
-}
-
-// storeGuarantee will store a collection guarantee within the
-// context of our local protocol state and memory pool.
-func (e *Engine) storeGuarantee(guarantee *flow.CollectionGuarantee) error {
-
-	// TODO: validate the collection guarantee signature
-
-	// add the collection guarantee to our memory pool (also checks existence)
-	err := e.guarantees.Add(guarantee)
-	if err != nil {
-		return fmt.Errorf("could not add guarantee to mempool: %w", err)
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceGuarantee, e.guarantees.Size())
 
-	return nil
-}
-
-// propagateGuarantee will submit the collection guarantee to the
-// network layer with all other consensus nodes as desired recipients.
-func (e *Engine) propagateGuarantee(guarantee *flow.CollectionGuarantee) error {
+	log.Info().Msg("collection guarantee processed")
 
 	// select all the collection nodes on the network as our targets
-	ids, err := e.state.Final().Identities(filter.And(
+	identities, err := e.state.Final().Identities(filter.And(
 		filter.HasRole(flow.RoleConsensus),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
 	))
@@ -178,13 +145,14 @@ func (e *Engine) propagateGuarantee(guarantee *flow.CollectionGuarantee) error {
 	}
 
 	// send the collection guarantee to all consensus identities
-	targetIDs := ids.NodeIDs()
-	err = e.con.Submit(guarantee, targetIDs...)
+	err = e.con.Submit(guarantee, identities.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not send collection guarantee: %w", err)
 	}
 
 	e.metrics.MessageSent(metrics.EnginePropagation, metrics.MessageCollectionGuarantee)
+
+	log.Info().Msg("collection guarantee propagated to consensus nodes")
 
 	return nil
 }

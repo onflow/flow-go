@@ -204,6 +204,7 @@ func main() {
 			followerEng, err := followereng.New(node.Logger,
 				node.Network,
 				node.Me,
+				node.Metrics.Engine,
 				cleaner,
 				node.Storage.Headers,
 				node.Storage.Payloads,
