@@ -16,7 +16,7 @@ func TestBatchProofEncoderDecoder(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	fStore, err := mtrie.NewMForest(trieHeight, dir, 5)
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 

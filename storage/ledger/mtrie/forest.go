@@ -14,36 +14,44 @@ import (
 
 // MForest is an in memory forest (collection of tries)
 type MForest struct {
-	tries       *lru.Cache
-	dir         string
-	cacheSize   int
-	maxHeight   int // Height of the tree
-	keyByteSize int // acceptable number of bytes for key
+	tries         *lru.Cache
+	dir           string
+	cacheSize     int
+	maxHeight     int // Height of the tree
+	keyByteSize   int // acceptable number of bytes for key
+	onTreeEvicted func(tree *MTrie) error
 }
 
 // NewMForest returns a new instance of memory forest
-func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int) (*MForest, error) {
+func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int, onTreeEvicted func(tree *MTrie) error) (*MForest, error) {
 
-	// evict := func(key interface{}, value interface{}) {
-	// 	trie, ok := value.(*MTrie)
-	// 	if !ok {
-	// 		panic(fmt.Sprintf("cache contains item of type %T", value))
-	// 	}
-	// 	go func() {
-	// 		_ = trie.Store(filepath.Join(trieStorageDir, hex.EncodeToString(trie.rootHash)))
-	// 	}()
-	// }
-	// cache, err := lru.NewWithEvict(trieCacheSize, evict)
-	cache, err := lru.New(trieCacheSize)
+	var cache *lru.Cache
+	var err error
+
+	if onTreeEvicted != nil {
+		cache, err = lru.NewWithEvict(trieCacheSize, func(key interface{}, value interface{}) {
+			trie, ok := value.(*MTrie)
+			if !ok {
+				panic(fmt.Sprintf("cache contains item of type %T", value))
+			}
+			//TODO Log error
+			_ = onTreeEvicted(trie)
+		})
+	} else {
+		cache, err = lru.New(trieCacheSize)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("cannot create forest cache: %w", err)
 	}
 
 	forest := &MForest{tries: cache,
-		maxHeight:   maxHeight,
-		dir:         trieStorageDir,
-		cacheSize:   trieCacheSize,
-		keyByteSize: (maxHeight - 1) / 8}
+		maxHeight:     maxHeight,
+		dir:           trieStorageDir,
+		cacheSize:     trieCacheSize,
+		keyByteSize:   (maxHeight - 1) / 8,
+		onTreeEvicted: onTreeEvicted,
+	}
 
 	// add empty roothash
 	emptyTrie := NewMTrie(maxHeight)
@@ -79,9 +87,16 @@ func (f *MForest) GetTrie(rootHash []byte) (*MTrie, error) {
 // AddTrie adds a trie to the forest
 func (f *MForest) AddTrie(trie *MTrie) error {
 	// TODO check if not exist
-	encoded := hex.EncodeToString(trie.rootHash)
+	encoded := trie.StringRootHash()
 	f.tries.Add(encoded, trie)
 	return nil
+}
+
+// RemoveTrie removes a trie to the forest
+func (f *MForest) RemoveTrie(rootHash []byte) {
+	// TODO remove from the file as well
+	encRootHash := hex.EncodeToString(rootHash)
+	f.tries.Remove(encRootHash)
 }
 
 // GetEmptyRootHash returns the rootHash of empty forest
@@ -593,4 +608,8 @@ func (f *MForest) LoadTrie(path string) (*MTrie, error) {
 	}
 
 	return trie, nil
+}
+
+func (f *MForest) Size() int {
+	return f.tries.Len()
 }
