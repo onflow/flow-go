@@ -14,7 +14,7 @@ type MTrieStorage struct {
 }
 
 // NewMTrieStorage creates a new in-memory trie-backed ledger storage with persistence.
-func NewMTrieStorage(dbDir string) (*MTrieStorage, error) {
+func NewMTrieStorage(dbDir string, cacheSize int) (*MTrieStorage, error) {
 
 	w, err := wal.NewWAL(nil, nil, dbDir)
 
@@ -22,7 +22,7 @@ func NewMTrieStorage(dbDir string) (*MTrieStorage, error) {
 		return nil, fmt.Errorf("cannot create WAL: %w", err)
 	}
 
-	mForest, err := mtrie.NewMForest(257, dbDir, 1000, func(evictedTrie *mtrie.MTrie) error {
+	mForest, err := mtrie.NewMForest(257, dbDir, cacheSize, func(evictedTrie *mtrie.MTrie) error {
 		return w.RecordDelete(evictedTrie.RootHash())
 	})
 	if err != nil {
@@ -35,11 +35,13 @@ func NewMTrieStorage(dbDir string) (*MTrieStorage, error) {
 
 	err = w.Replay(
 		func(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
-			_, err := trie.UpdateRegisters(keys, values, stateCommitment)
+			_, err = trie.mForest.Update(keys, values, stateCommitment)
+			// _, err := trie.UpdateRegisters(keys, values, stateCommitment)
 			return err
 		},
 		func(stateCommitment flow.StateCommitment) error {
-			return nil //no need to do anything, mForest should prune trees in deterministic order
+			trie.mForest.RemoveTrie(stateCommitment)
+			return nil
 		},
 	)
 

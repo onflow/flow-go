@@ -16,6 +16,33 @@ import (
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
+func TestTrieOperations(t *testing.T) {
+	trieHeight := 17
+
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
+	require.NoError(t, err)
+	nt := mtrie.NewMTrie(trieHeight)
+	rh := []byte([]uint8{uint8(1), uint8(2)})
+	nt.SetRootHash(rh)
+	// Add trie
+	err = fStore.AddTrie(nt)
+	require.NoError(t, err)
+
+	// Get trie
+	retnt, err := fStore.GetTrie(rh)
+	require.NoError(t, err)
+	require.True(t, bytes.Equal(retnt.RootHash(), nt.RootHash()))
+	require.Equal(t, fStore.Size(), 2)
+
+	// Remove trie
+	fStore.RemoveTrie(nt.RootHash())
+	require.Equal(t, fStore.Size(), 1)
+}
+
 func TestEmptyInsert(t *testing.T) {
 	trieHeight := 17
 
