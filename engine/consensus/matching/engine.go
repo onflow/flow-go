@@ -39,6 +39,7 @@ type Engine struct {
 	receipts  mempool.Receipts         // holds execution receipts in memory
 	approvals mempool.Approvals        // holds result approvals in memory
 	seals     mempool.Seals            // holds block seals in memory
+	missing   map[flow.Identifier]uint // track how often a block was missing
 }
 
 // New creates a new collection propagation engine.
@@ -58,6 +59,7 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, mempool module.Mempoo
 		receipts:  receipts,
 		approvals: approvals,
 		seals:     seals,
+		missing:   make(map[flow.Identifier]uint),
 	}
 
 	// register engine with the receipt provider
@@ -177,7 +179,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	result := &receipt.ExecutionResult
 	_, err = e.resultsDB.ByID(result.ID())
 	if err == nil {
-		log.Debug().Msg("discarding receipt for existing result")
+		log.Debug().Msg("discarding receipt for sealed result")
 		return nil
 	}
 	if !errors.Is(err, storage.ErrNotFound) {
@@ -187,22 +189,24 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	// store the receipt in the memory pool
 	added := e.receipts.Add(receipt)
 	if !added {
-		log.Debug().Msg("discarding receipt already in mempool")
+		log.Debug().Msg("skipping receipt already in mempool")
 		return nil
 	}
+
+	log.Info().Msg("execution receipt added to mempool")
 
 	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
 
 	// store the result belonging to the receipt in the memory pool
 	added = e.results.Add(result)
 	if !added {
-		log.Debug().Msg("skipping sealing check on duplicate result")
+		log.Debug().Msg("skipping result already in mempool")
 		return nil
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.results.Size())
 
-	log.Info().Msg("execution receipt processed")
+	log.Info().Msg("execution result added to mempool")
 
 	// kick off a check for potential seal formation
 	go e.checkSealing()
@@ -245,7 +249,7 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	// check if the result of this approval is already in the dB
 	_, err = e.resultsDB.ByID(approval.Body.ExecutionResultID)
 	if err == nil {
-		log.Debug().Msg("discarding approval for existing result")
+		log.Debug().Msg("discarding approval for sealed result")
 		return nil
 	}
 	if !errors.Is(err, storage.ErrNotFound) {
@@ -255,13 +259,13 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	// store in the memory pool
 	added := e.approvals.Add(approval)
 	if !added {
-		log.Debug().Msg("discarding approval already in mempool")
+		log.Debug().Msg("skipping approval already in mempool")
 		return nil
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
 
-	log.Info().Msg("result approval processed")
+	log.Info().Msg("result approval added to mempool")
 
 	// kick off a check for potential seal formation
 	go e.checkSealing()
@@ -289,6 +293,7 @@ func (e *Engine) checkSealing() {
 	e.log.Info().Int("num_results", len(results)).Msg("identified sealable execution results")
 
 	// process the results results
+	var sealedIDs []flow.Identifier
 	for _, result := range results {
 
 		log := e.log.With().
@@ -311,8 +316,14 @@ func (e *Engine) checkSealing() {
 			continue
 		}
 
+		// mark the result cleared for mempool cleanup
+		sealedIDs = append(sealedIDs, result.ID())
+
 		log.Info().Msg("sealed execution result")
 	}
+
+	// clear the memory pools
+	e.clearPools(sealedIDs)
 }
 
 func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
@@ -408,19 +419,101 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 		return fmt.Errorf("could not add seal to mempool")
 	}
 
-	e.mempool.MempoolEntries(metrics.ResourceSeal, e.seals.Size())
+	return nil
+}
 
-	// clear up the caches
-	// TODO: find nice way to prune results/approvals for outdated heights
-	resultIDs := e.results.DropForBlock(result.BlockID)
-	e.receipts.DropForBlock(result.BlockID)
-	for _, resultID := range resultIDs {
-		e.approvals.DropForResult(resultID)
+func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
+
+	// NOTE: Below, we clear our memory pool of all entities that reference
+	// blocks at or below the sealed head. If we don't know the block, we purge
+	// the entities once we have sealed a further 100 blocks without seeing the
+	// block (it's probably no longer a valid extension of the state anyway).
+
+	clear := make(map[flow.Identifier]bool)
+	for _, sealedID := range sealedIDs {
+		clear[sealedID] = true
+	}
+
+	sealed, err := e.state.Sealed().Head()
+	if err != nil {
+		e.log.Error().Err(err).Msg("could not get sealed head")
+		return
+	}
+
+	missingIDs := make(map[flow.Identifier]bool) // count each missing block only once
+	shouldClear := func(blockID flow.Identifier) bool {
+		if e.missing[blockID] >= 100 {
+			return true // clear if block is missing for 100 seals already
+		}
+		header, err := e.headersDB.ByBlockID(blockID)
+		if errors.Is(err, storage.ErrNotFound) {
+			missingIDs[blockID] = true
+			return false // keep if the block is missing, but count times missing
+		}
+		if err != nil {
+			e.log.Error().Err(err).Msg("could not check block expiry")
+			return false // keep if we can't check the DB for the referenced block
+		}
+		if header.Height <= sealed.Height {
+			return true // clear if sealed block is same or higher than referenced block
+		}
+		return false
+	}
+
+	for _, result := range e.results.All() {
+		if clear[result.ID()] {
+			_ = e.results.Rem(result.ID())
+		}
+		if shouldClear(result.BlockID) {
+			_ = e.results.Rem(result.ID())
+		}
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.results.Size())
+
+	for _, receipt := range e.receipts.All() {
+		if clear[receipt.ExecutionResult.ID()] {
+			_ = e.receipts.Rem(receipt.ID())
+		}
+		if shouldClear(receipt.ExecutionResult.BlockID) {
+			_ = e.receipts.Rem(receipt.ID())
+		}
+	}
+
 	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
+
+	for _, approval := range e.approvals.All() {
+		if clear[approval.Body.ExecutionResultID] {
+			_ = e.approvals.Rem(approval.ID())
+		}
+		if shouldClear(approval.Body.BlockID) {
+			_ = e.approvals.Rem(approval.ID())
+		}
+	}
+
 	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
 
-	return nil
+	for _, seal := range e.seals.All() {
+		if shouldClear(seal.BlockID) {
+			_ = e.seals.Rem(seal.ID())
+		}
+	}
+
+	e.mempool.MempoolEntries(metrics.ResourceSeal, e.seals.Size())
+
+	// clear block missing counts that were just used
+	for missingID, count := range e.missing {
+		if count >= 100 {
+			delete(e.missing, missingID)
+		}
+		_, err := e.headersDB.ByBlockID(missingID)
+		if err == nil {
+			delete(e.missing, missingID)
+		}
+	}
+
+	// count up the remaining missing blocks
+	for missingID := range missingIDs {
+		e.missing[missingID]++
+	}
 }
