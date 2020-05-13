@@ -229,7 +229,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	// we only look as far back for duplicates as the transaction expiry limit;
 	// if a guarantee was included before that, we will disqualify it on the
 	// basis of the reference block anyway
-	limit := header.Height - flow.DefaultTransactionExpiry
+	limit := header.Height - uint64(m.state.expiry)
 	if limit > header.Height { // overflow check
 		limit = 0
 	}

@@ -30,7 +30,7 @@ func NewGuarantees(collector module.CacheMetrics, db *badger.DB) *Guarantees {
 	g := &Guarantees{
 		db: db,
 		cache: newCache(collector,
-			withLimit(10*flow.DefaultTransactionExpiry),
+			withLimit(10*(flow.DefaultTransactionExpiry+100)),
 			withStore(store),
 			withRetrieve(retrieve),
 			withResource(metrics.ResourceGuarantee),

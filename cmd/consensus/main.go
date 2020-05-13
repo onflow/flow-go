@@ -328,8 +328,8 @@ func findLatest(state protocol.State, headers storage.Headers, rootHeader *flow.
 
 	// find all pending header by ID
 	pending := make([]*flow.Header, 0, len(pendingIDs))
-	for _, u := range pendingIDs {
-		pendingHeader, err := headers.ByBlockID(u)
+	for _, pendingID := range pendingIDs {
+		pendingHeader, err := headers.ByBlockID(pendingID)
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not find pending block by ID: %w", err)
 		}

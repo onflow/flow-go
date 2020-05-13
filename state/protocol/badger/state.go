@@ -23,6 +23,7 @@ type State struct {
 	seals      storage.Seals
 	payloads   storage.Payloads
 	blocks     storage.Blocks
+	expiry     uint
 }
 
 // NewState initializes a new state backed by a badger database, applying the
@@ -37,6 +38,7 @@ func NewState(metrics module.ComplianceMetrics, db *badger.DB, headers storage.H
 		seals:      seals,
 		payloads:   payloads,
 		blocks:     blocks,
+		expiry:     flow.DefaultTransactionExpiry,
 	}
 	for _, option := range options {
 		option(s)
