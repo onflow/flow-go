@@ -74,7 +74,7 @@ func main() {
 		// Trie storage is required to bootstrap, but also should be handled while shutting down
 		Module("ledger storage", func(node *cmd.FlowNodeBuilder) error {
 			if useMtrie {
-				ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize))
+				ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), node.MetricsRegisterer)
 			} else {
 				ledgerStorage, err = ledger.NewTrieStorage(triedir)
 			}
