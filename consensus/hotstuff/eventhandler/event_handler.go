@@ -96,8 +96,15 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 	block := proposal.Block
 	curView := e.paceMaker.CurView()
 
+	// make a fork choice to determine if we can vote on the proposal
+	qc, _, err := e.forks.MakeForkChoice(curView)
+	if err != nil {
+		return fmt.Errorf("could not make fork choice: %w", err)
+	}
+
 	log := e.log.With().
 		Uint64("cur_view", curView).
+		Uint64("cur_qc_view", qc.View).
 		Uint64("block_view", block.View).
 		Hex("block_id", block.BlockID[:]).
 		Uint64("qc_view", block.QC.View).
@@ -113,7 +120,7 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 	}
 
 	// validate the block. exit if the proposal is invalid
-	err := e.validator.ValidateProposal(proposal)
+	err = e.validator.ValidateProposal(proposal)
 	if errors.Is(err, model.ErrorInvalidBlock{}) {
 		log.Warn().AnErr("ErrorInvalidBlock", err).Msg("invalid block proposal")
 		return nil
@@ -139,8 +146,10 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 	stored := e.voteAggregator.StoreProposerVote(proposal.ProposerVote())
 
 	// if the block is for the current view, then process the current block
-	if block.View == curView {
-		err = e.processBlockForCurrentView(block)
+	// we also tolerate blocks with a QC view below our last chosen QC in order
+	// to allow the network to sync after a prolonged liveness failure
+	if block.View == curView || block.QC.View <= qc.View {
+		err = e.processBlockForValidView(block)
 		if err != nil {
 			return fmt.Errorf("failed processing current block: %w", err)
 		}
@@ -275,7 +284,7 @@ func (e *EventHandler) startNewView() error {
 			return fmt.Errorf("cannot store block for curProposal: %w", err)
 		}
 
-		return e.processBlockForCurrentView(proposal.Block)
+		return e.processBlockForValidView(proposal.Block)
 	}
 
 	// as a replica of the current view,
@@ -304,7 +313,7 @@ func (e *EventHandler) startNewView() error {
 		Hex("signer", block.ProposerID[:]).
 		Msg("processing cached proposal from leader")
 
-	return e.processBlockForCurrentView(block)
+	return e.processBlockForValidView(block)
 }
 
 // pruneSubcomponents prunes EventHandler's sub-components
@@ -319,34 +328,29 @@ func (e *EventHandler) pruneSubcomponents() {
 	e.voteAggregator.PruneByView(e.forks.FinalizedView())
 }
 
-// processBlockForCurrentView processes the block for the current view.
+// processBlockForValidView processes the block for a valid view, which is either the current
+// view, or a view that has a QC at or below our best QC.
 // It is called AFTER the block has been stored or found in Forks
 // It checks whether to vote for this block.
 // It might trigger a view change to go to a different view, which might re-enter this function.
-func (e *EventHandler) processBlockForCurrentView(block *model.Block) error {
-
-	// this is a sanity check to see if the block is really for the current view.
-	curView := e.paceMaker.CurView()
-	if block.View != curView {
-		return fmt.Errorf("sanity check fails: block proposal's view does not match with curView, (blockView: %v, curView: %v)",
-			block.View, curView)
-	}
+func (e *EventHandler) processBlockForValidView(block *model.Block) error {
 
 	// checking if I'm the next leader
+	curView := e.paceMaker.CurView()
 	nextView := curView + 1
 	nextLeader, err := e.committee.LeaderForView(nextView)
 	if err != nil {
 		return fmt.Errorf("failed to determine primary for next view %d: %w", nextView, err)
 	}
 	if e.committee.Self() == nextLeader {
-		return e.processBlockForCurrentViewIfIsNextLeader(block)
+		return e.processBlockForValidViewIfIsNextLeader(block)
 	}
 
 	// if I'm not the next leader
-	return e.processBlockForCurrentViewIfIsNotNextLeader(block, nextLeader)
+	return e.processBlockForValidViewIfIsNotNextLeader(block, nextLeader)
 }
 
-func (e *EventHandler) processBlockForCurrentViewIfIsNextLeader(block *model.Block) error {
+func (e *EventHandler) processBlockForValidViewIfIsNextLeader(block *model.Block) error {
 
 	log := e.log.With().
 		Uint64("block_view", block.View).
@@ -399,7 +403,7 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNextLeader(block *model.Blo
 	return e.processVote(ownVote)
 }
 
-func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *model.Block, nextLeader flow.Identifier) error {
+func (e *EventHandler) processBlockForValidViewIfIsNotNextLeader(block *model.Block, nextLeader flow.Identifier) error {
 
 	log := e.log.With().
 		Uint64("block_view", block.View).

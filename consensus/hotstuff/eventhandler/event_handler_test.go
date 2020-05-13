@@ -252,7 +252,7 @@ func (f *Forks) MakeForkChoice(curView uint64) (*model.QuorumCertificate, *model
 
 	block, ok := f.blocks[f.qc.BlockID]
 	if !ok {
-		return nil, nil, fmt.Errorf("cannot block %V for fork choice qc", f.qc.BlockID)
+		return nil, nil, fmt.Errorf("cannot get block %v for fork choice qc", f.qc.BlockID)
 	}
 	f.t.Logf("forks.MakeForkChoice for view: %v, qc view: %v\n", curView, f.qc.View)
 	return f.qc, block, nil
