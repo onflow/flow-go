@@ -67,6 +67,7 @@ func newCache(collector module.CacheMetrics, options ...func(*Cache)) *Cache {
 		option(&c)
 	}
 	c.cache, _ = lru.New(int(c.limit))
+	c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
 	return &c
 }
 

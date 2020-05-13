@@ -43,13 +43,13 @@ type Engine struct {
 }
 
 // New creates a new collection propagation engine.
-func New(log zerolog.Logger, metrics module.EngineMetrics, mempool module.MempoolMetrics, net module.Network, state protocol.State, me module.Local, resultsDB storage.ExecutionResults, headersDB storage.Headers, results mempool.Results, receipts mempool.Receipts, approvals mempool.Approvals, seals mempool.Seals) (*Engine, error) {
+func New(log zerolog.Logger, collector module.EngineMetrics, mempool module.MempoolMetrics, net module.Network, state protocol.State, me module.Local, resultsDB storage.ExecutionResults, headersDB storage.Headers, results mempool.Results, receipts mempool.Receipts, approvals mempool.Approvals, seals mempool.Seals) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		unit:      engine.NewUnit(),
 		log:       log.With().Str("engine", "matching").Logger(),
-		metrics:   metrics,
+		metrics:   collector,
 		mempool:   mempool,
 		state:     state,
 		me:        me,
@@ -61,6 +61,11 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, mempool module.Mempoo
 		seals:     seals,
 		missing:   make(map[flow.Identifier]uint),
 	}
+
+	e.mempool.MempoolEntries(metrics.ResourceResult, e.results.Size())
+	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
+	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
+	e.mempool.MempoolEntries(metrics.ResourceSeal, e.seals.Size())
 
 	// register engine with the receipt provider
 	_, err := net.Register(engine.ExecutionReceiptProvider, e)
@@ -433,13 +438,14 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 	for _, sealedID := range sealedIDs {
 		clear[sealedID] = true
 	}
-
 	sealed, err := e.state.Sealed().Head()
 	if err != nil {
 		e.log.Error().Err(err).Msg("could not get sealed head")
 		return
 	}
 
+	// build a helper function that determines if an entity should be cleared
+	// if it references the block with the given ID
 	missingIDs := make(map[flow.Identifier]bool) // count each missing block only once
 	shouldClear := func(blockID flow.Identifier) bool {
 		if e.missing[blockID] >= 100 {
@@ -460,60 +466,44 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 		return false
 	}
 
+	// for each memory pool, clear if the related block is no longer relevant or
+	// if the seal was already built for it (except for seals themselves)
 	for _, result := range e.results.All() {
-		if clear[result.ID()] {
-			_ = e.results.Rem(result.ID())
-		}
-		if shouldClear(result.BlockID) {
+		if clear[result.ID()] || shouldClear(result.BlockID) {
 			_ = e.results.Rem(result.ID())
 		}
 	}
-
-	e.mempool.MempoolEntries(metrics.ResourceResult, e.results.Size())
-
 	for _, receipt := range e.receipts.All() {
-		if clear[receipt.ExecutionResult.ID()] {
-			_ = e.receipts.Rem(receipt.ID())
-		}
-		if shouldClear(receipt.ExecutionResult.BlockID) {
+		if clear[receipt.ExecutionResult.ID()] || shouldClear(receipt.ExecutionResult.BlockID) {
 			_ = e.receipts.Rem(receipt.ID())
 		}
 	}
-
-	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
-
 	for _, approval := range e.approvals.All() {
-		if clear[approval.Body.ExecutionResultID] {
-			_ = e.approvals.Rem(approval.ID())
-		}
-		if shouldClear(approval.Body.BlockID) {
+		if clear[approval.Body.ExecutionResultID] || shouldClear(approval.Body.BlockID) {
 			_ = e.approvals.Rem(approval.ID())
 		}
 	}
-
-	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
-
 	for _, seal := range e.seals.All() {
 		if shouldClear(seal.BlockID) {
 			_ = e.seals.Rem(seal.ID())
 		}
 	}
 
-	e.mempool.MempoolEntries(metrics.ResourceSeal, e.seals.Size())
-
-	// clear block missing counts that were just used
+	// for each missing block that we are tracking, remove it from tracking if
+	// we now know that block or if we have just cleared related resources; then
+	// increase the count for the remaining missing blocks
 	for missingID, count := range e.missing {
-		if count >= 100 {
-			delete(e.missing, missingID)
-		}
 		_, err := e.headersDB.ByBlockID(missingID)
-		if err == nil {
+		if count >= 100 || err == nil {
 			delete(e.missing, missingID)
 		}
 	}
-
-	// count up the remaining missing blocks
 	for missingID := range missingIDs {
 		e.missing[missingID]++
 	}
+
+	e.mempool.MempoolEntries(metrics.ResourceResult, e.results.Size())
+	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
+	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
+	e.mempool.MempoolEntries(metrics.ResourceSeal, e.seals.Size())
 }
