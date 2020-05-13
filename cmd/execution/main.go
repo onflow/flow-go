@@ -150,8 +150,8 @@ func main() {
 				collector,
 				node.Tracer,
 				true,
-				time.Second,
-				10,
+				time.Second, //TODO - config param
+				10,          // TODO - config param
 			)
 			return ingestionEng, err
 		}).

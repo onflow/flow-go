@@ -171,7 +171,7 @@ func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
 
 		// stop all timers
-		e.mempool.BlockByCollection.Run(func(backdata *stdmap.BlockByCollectionBackdata) error {
+		_ = e.mempool.BlockByCollection.Run(func(backdata *stdmap.BlockByCollectionBackdata) error {
 			for _, ent := range backdata.All() {
 				blocksByCollection, ok := ent.(*entity.BlocksByCollection)
 				if !ok {
