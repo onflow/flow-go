@@ -43,6 +43,7 @@ import (
 	"github.com/dapperlabs/flow-go/state/protocol"
 	storage "github.com/dapperlabs/flow-go/storage"
 	storagekv "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/utils/debug"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -172,6 +173,10 @@ func main() {
 			// otherwise, we already have cluster state on-disk, no bootstrapping needed
 
 			return nil
+		}).
+		Component("auto profiler", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			profiler, err := debug.NewAutoProfiler(filepath.Join(node.BaseConfig.BootstrapDir, "debug-pprof"), node.Logger)
+			return profiler, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
