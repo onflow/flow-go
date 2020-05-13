@@ -64,12 +64,18 @@ func NewQueueEjector(limit uint) *QueueEjector {
 // Push should be called every time a new entity is added to the mempool.
 // It enqueues the entity for later ejection.
 func (q *QueueEjector) Push(entityID flow.Identifier) {
-	q.queue <- entityID
+	if len(q.queue) < cap(q.queue) {
+		q.queue <- entityID
+	}
 }
 
 // Eject is the EjectFunc of QueueEjector. It dequeues an identifier and returns its corresponding entity.
 // In case the dequeued identifier of entity does not exist, it returns a random entity of the queue.
 func (q *QueueEjector) Eject(entities map[flow.Identifier]flow.Entity) (flow.Identifier, flow.Entity) {
+	if len(q.queue) == 0 {
+		return EjectTrueRandom(entities)
+	}
+
 	id := <-q.queue
 
 	entity, ok := entities[id]
