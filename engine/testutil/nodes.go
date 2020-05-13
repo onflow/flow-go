@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
@@ -283,6 +284,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Metrics,
 		node.Tracer,
 		false,
+		time.Second,
+		10,
 	)
 	require.NoError(t, err)
 

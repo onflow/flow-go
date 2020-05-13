@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
@@ -39,32 +40,34 @@ import (
 
 // An Engine receives and saves incoming blocks.
 type Engine struct {
-	unit               *engine.Unit
-	log                zerolog.Logger
-	me                 module.Local
-	state              protocol.State
-	receiptHasher      hash.Hasher // used as hasher to sign the execution receipt
-	conduit            network.Conduit
-	collectionConduit  network.Conduit
-	syncConduit        network.Conduit
-	blocks             storage.Blocks
-	payloads           storage.Payloads
-	collections        storage.Collections
-	events             storage.Events
-	transactionResults storage.TransactionResults
-	computationManager computation.ComputationManager
-	providerEngine     provider.ProviderEngine
-	mempool            *Mempool
-	execState          state.ExecutionState
-	wg                 sync.WaitGroup
-	syncWg             sync.WaitGroup
-	syncModeThreshold  uint64 // how many consecutive orphaned blocks trigger sync
-	syncInProgress     *atomic.Bool
-	syncTargetBlockID  atomic.Value
-	stateSync          executionSync.StateSynchronizer
-	metrics            module.ExecutionMetrics
-	tracer             module.Tracer
-	extensiveLogging   bool
+	unit                                *engine.Unit
+	log                                 zerolog.Logger
+	me                                  module.Local
+	state                               protocol.State
+	receiptHasher                       hash.Hasher // used as hasher to sign the execution receipt
+	conduit                             network.Conduit
+	collectionConduit                   network.Conduit
+	syncConduit                         network.Conduit
+	blocks                              storage.Blocks
+	payloads                            storage.Payloads
+	collections                         storage.Collections
+	events                              storage.Events
+	transactionResults                  storage.TransactionResults
+	computationManager                  computation.ComputationManager
+	providerEngine                      provider.ProviderEngine
+	mempool                             *Mempool
+	execState                           state.ExecutionState
+	wg                                  sync.WaitGroup
+	syncWg                              sync.WaitGroup
+	syncModeThreshold                   uint64 // how many consecutive orphaned blocks trigger sync
+	syncInProgress                      *atomic.Bool
+	syncTargetBlockID                   atomic.Value
+	stateSync                           executionSync.StateSynchronizer
+	metrics                             module.ExecutionMetrics
+	tracer                              module.Tracer
+	extensiveLogging                    bool
+	collectionRequestTimeout            time.Duration
+	maximumCollectionRequestRetryNumber uint
 }
 
 func New(
@@ -84,32 +87,36 @@ func New(
 	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
 	extLog bool,
+	collectionRequestTimeout time.Duration,
+	maximumCollectionRequestRetryNumber uint,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "blocks").Logger()
 
 	mempool := newMempool()
 
 	eng := Engine{
-		unit:               engine.NewUnit(),
-		log:                log,
-		me:                 me,
-		state:              state,
-		receiptHasher:      utils.NewExecutionReceiptHasher(),
-		blocks:             blocks,
-		payloads:           payloads,
-		collections:        collections,
-		events:             events,
-		transactionResults: transactionResults,
-		computationManager: executionEngine,
-		providerEngine:     providerEngine,
-		mempool:            mempool,
-		execState:          execState,
-		syncModeThreshold:  syncThreshold,
-		syncInProgress:     atomic.NewBool(false),
-		stateSync:          executionSync.NewStateSynchronizer(execState),
-		metrics:            metrics,
-		tracer:             tracer,
-		extensiveLogging:   extLog,
+		unit:                                engine.NewUnit(),
+		log:                                 log,
+		me:                                  me,
+		state:                               state,
+		receiptHasher:                       utils.NewExecutionReceiptHasher(),
+		blocks:                              blocks,
+		payloads:                            payloads,
+		collections:                         collections,
+		events:                              events,
+		transactionResults:                  transactionResults,
+		computationManager:                  executionEngine,
+		providerEngine:                      providerEngine,
+		mempool:                             mempool,
+		execState:                           execState,
+		syncModeThreshold:                   syncThreshold,
+		syncInProgress:                      atomic.NewBool(false),
+		stateSync:                           executionSync.NewStateSynchronizer(execState),
+		metrics:                             metrics,
+		tracer:                              tracer,
+		extensiveLogging:                    extLog,
+		collectionRequestTimeout:            collectionRequestTimeout,
+		maximumCollectionRequestRetryNumber: maximumCollectionRequestRetryNumber,
 	}
 
 	con, err := net.Register(engine.BlockProvider, &eng)
@@ -162,6 +169,21 @@ func (e *Engine) Ready() <-chan struct{} {
 // successfully stopped.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
+
+		// stop all timers
+		e.mempool.BlockByCollection.Run(func(backdata *stdmap.BlockByCollectionBackdata) error {
+			for _, ent := range backdata.All() {
+				blocksByCollection, ok := ent.(*entity.BlocksByCollection)
+				if !ok {
+					panic(fmt.Sprintf("unknown type in BlockByCollection mempool: %T", ent))
+				}
+				if blocksByCollection.TimeoutTimer != nil {
+					blocksByCollection.TimeoutTimer.Stop()
+				}
+			}
+			return nil
+		})
+
 		e.Wait()
 	})
 }
@@ -424,6 +446,11 @@ func (e *Engine) handleCollectionResponse(ctx context.Context, response *message
 			if !exists {
 				return fmt.Errorf("could not find block for collection")
 			}
+
+			blockByCollectionId.TimeoutTimer.Stop()
+			//set to nil to prevent stopping twice while shutting down
+			blockByCollectionId.TimeoutTimer = nil
+
 			executableBlocks := blockByCollectionId.ExecutableBlocks
 
 			for _, executableBlock := range executableBlocks {
@@ -549,6 +576,30 @@ func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Que
 	return newQueue(blockify, queues)
 }
 
+func (e *Engine) submitCollectionRequest(timer **time.Timer, request *messages.CollectionRequest, recipients []flow.Identifier, number uint) {
+
+	if number >= e.maximumCollectionRequestRetryNumber {
+		e.log.Error().Hex("collection_id", logging.ID(request.ID)).Msg("exceeded maximum number of retries of collection request")
+		return
+	}
+
+	if number > 0 {
+		e.log.Info().Hex("collection_id", logging.ID(request.ID)).Uint("retry", number).Msg("retrying request for collection")
+	}
+
+	err := e.collectionConduit.Submit(
+		request,
+		recipients...,
+	)
+	if err != nil {
+		e.log.Warn().Err(err).Hex("collection_id", logging.ID(request.ID)).Msg("cannot submit collection requests")
+	}
+
+	*timer = time.AfterFunc(e.collectionRequestTimeout, func() {
+		e.submitCollectionRequest(timer, request, recipients, number+1)
+	})
+}
+
 func (e *Engine) sendCollectionsRequest(
 	executableBlock *entity.ExecutableBlock,
 	backdata *stdmap.BlockByCollectionBackdata,
@@ -556,7 +607,6 @@ func (e *Engine) sendCollectionsRequest(
 
 	for _, guarantee := range executableBlock.Block.Payload.Guarantees {
 
-		// TODO: once collection can map to multiple blocks
 		maybeBlockByCollection, exists := backdata.ByID(guarantee.ID())
 
 		if !exists {
@@ -584,18 +634,12 @@ func (e *Engine) sendCollectionsRequest(
 				Hex("collection_id", logging.ID(guarantee.ID())).
 				Msg("requesting collection")
 
-			err = e.collectionConduit.Submit(
-				&messages.CollectionRequest{
-					ID:    guarantee.ID(),
-					Nonce: rand.Uint64(),
-				},
-				collectionGuaranteesIdentifiers...,
-			)
-			if err != nil {
-				// TODO - this should be handled, maybe retried or put into some form of a queue
-				e.log.Err(err).Msg("cannot submit collection requests")
+			collectionRequest := &messages.CollectionRequest{
+				ID:    guarantee.ID(),
+				Nonce: rand.Uint64(),
 			}
 
+			e.submitCollectionRequest(&maybeBlockByCollection.TimeoutTimer, collectionRequest, collectionGuaranteesIdentifiers, 0)
 		}
 
 		if _, exists := maybeBlockByCollection.ExecutableBlocks[executableBlock.ID()]; exists {

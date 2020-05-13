@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/rs/zerolog"
@@ -148,6 +149,8 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		metrics,
 		tracer,
 		false,
+		1*time.Hour, //practically disable retrying
+		10,
 	)
 	require.NoError(t, err)
 
@@ -164,6 +167,8 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		executionState:     executionState,
 		snapshot:           snapshot,
 	})
+
+	<-engine.Done()
 }
 
 func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *entity.ExecutableBlock, previousExecutionResultID flow.Identifier) {
