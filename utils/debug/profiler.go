@@ -71,15 +71,20 @@ func (p *AutoProfiler) start() {
 func (p *AutoProfiler) pprof(profile string) {
 
 	path := filepath.Join(p.dir, fmt.Sprintf("%s-%s", profile, time.Now().Format(time.RFC3339)))
-	p.log.Info().
-		Str("file", path).
-		Msgf("capturing %s profile", profile)
+	log := p.log.With().Str("file", path).Logger()
+	log.Debug().Msgf("capturing %s profile", profile)
 
 	f, err := os.Create(path)
 	if err != nil {
 		p.log.Error().Err(err).Msgf("failed to open %s file", profile)
 		return
 	}
+	defer func() {
+		err := f.Close()
+		if err != nil {
+			log.Error().Err(err).Msgf("failed to close %s file", profile)
+		}
+	}()
 
 	err = pprof.Lookup(profile).WriteTo(f, 0)
 	if err != nil {
@@ -89,15 +94,20 @@ func (p *AutoProfiler) pprof(profile string) {
 
 func (p *AutoProfiler) cpu() {
 	path := filepath.Join(p.dir, fmt.Sprintf("cpu-%s", time.Now().Format(time.RFC3339)))
-	p.log.Info().
-		Str("file", path).
-		Msgf("capturing cpu profile")
+	log := p.log.With().Str("file", path).Logger()
+	log.Debug().Msgf("capturing cpu profile")
 
 	f, err := os.Create(path)
 	if err != nil {
 		p.log.Error().Err(err).Msg("failed to open cpu file")
 		return
 	}
+	defer func() {
+		err := f.Close()
+		if err != nil {
+			p.log.Error().Err(err).Msgf("failed to close CPU file")
+		}
+	}()
 
 	err = pprof.StartCPUProfile(f)
 	if err != nil {
