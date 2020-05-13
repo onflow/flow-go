@@ -14,6 +14,9 @@ import (
 // PendingCollections implements a mempool storing collections.
 type PendingCollections struct {
 	*Backend
+
+	// TODO push counter to the backend
+	// https://github.com/dapperlabs/flow-go/issues/3707
 	counterMU sync.Mutex // provides atomic updates for the counter
 	counter   uint64     // keeps number of added items to the mempool
 }
