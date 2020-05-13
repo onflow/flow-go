@@ -60,11 +60,12 @@ func main() {
 		builderExpiryBuffer uint
 		hotstuffTimeout     time.Duration
 
-		ingressConf  ingress.Config
-		pool         mempool.Transactions
-		transactions *storagekv.Transactions
-		colHeaders   *storagekv.Headers
-		colPayloads  *storagekv.ClusterPayloads
+		ingressConf     ingress.Config
+		pool            mempool.Transactions
+		transactions    *storagekv.Transactions
+		colHeaders      *storagekv.Headers
+		colPayloads     *storagekv.ClusterPayloads
+		colCacheMetrics module.CacheMetrics
 
 		colCache *buffer.PendingClusterBlocks // pending block cache for cluster consensus
 		conCache *buffer.PendingBlocks        // pending block cache for follower
@@ -98,8 +99,9 @@ func main() {
 			return err
 		}).
 		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
+			colCacheMetrics = metrics.NewCacheCollector("cluster")
 			transactions = storagekv.NewTransactions(node.DB)
-			colHeaders = storagekv.NewHeaders(node.Metrics.Cache, node.DB)
+			colHeaders = storagekv.NewHeaders(colCacheMetrics, node.DB)
 			colPayloads = storagekv.NewClusterPayloads(node.DB)
 			return nil
 		}).
