@@ -175,8 +175,8 @@ func main() {
 			return nil
 		}).
 		Component("auto profiler", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			profiler := debug.NewAutoProfiler(filepath.Join(node.BaseConfig.BootstrapDir, "debug-pprof"), node.Logger)
-			return profiler, nil
+			profiler, err := debug.NewAutoProfiler(filepath.Join(node.BaseConfig.BootstrapDir, "debug-pprof"), node.Logger)
+			return profiler, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 

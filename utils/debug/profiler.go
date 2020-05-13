@@ -19,14 +19,20 @@ type AutoProfiler struct {
 	interval time.Duration
 }
 
-func NewAutoProfiler(dir string, log zerolog.Logger) *AutoProfiler {
+func NewAutoProfiler(dir string, log zerolog.Logger) (*AutoProfiler, error) {
+
+	err := os.MkdirAll(dir, os.ModePerm)
+	if err != nil {
+		return nil, fmt.Errorf("could not create profile dir: %w", err)
+	}
+
 	p := &AutoProfiler{
 		unit:     engine.NewUnit(),
 		log:      log.With().Str("debug", "auto-profiler").Logger(),
 		dir:      dir,
 		interval: time.Minute * 3,
 	}
-	return p
+	return p, nil
 }
 
 func (p *AutoProfiler) Ready() <-chan struct{} {
@@ -44,25 +50,31 @@ func (p *AutoProfiler) start() {
 	defer tick.Stop()
 
 	for {
+		p.log.Info().Msg("starting profile trace")
+		// write pprof trace files
+		p.pprof("heap")
+		p.pprof("goroutine")
+		p.pprof("block")
+		p.pprof("mutex")
+		p.cpu()
+		p.log.Info().Msg("finished profile trace")
+
 		select {
 		case <-p.unit.Quit():
 			return
 		case <-tick.C:
-
-			p.log.Debug().Msg("starting profile trace")
-			// write pprof trace files
-			p.pprof("heap")
-			p.pprof("goroutine")
-			p.pprof("block")
-			p.pprof("mutex")
-			p.cpu()
-			p.log.Debug().Msg("finished profile trace")
+			continue
 		}
 	}
 }
 
 func (p *AutoProfiler) pprof(profile string) {
+
 	path := filepath.Join(p.dir, fmt.Sprintf("%s-%s", profile, time.Now().Format(time.RFC3339)))
+	p.log.Info().
+		Str("file", path).
+		Msgf("capturing %s profile", profile)
+
 	f, err := os.Create(path)
 	if err != nil {
 		p.log.Error().Err(err).Msgf("failed to open %s file", profile)
@@ -77,6 +89,10 @@ func (p *AutoProfiler) pprof(profile string) {
 
 func (p *AutoProfiler) cpu() {
 	path := filepath.Join(p.dir, fmt.Sprintf("cpu-%s", time.Now().Format(time.RFC3339)))
+	p.log.Info().
+		Str("file", path).
+		Msgf("capturing cpu profile")
+
 	f, err := os.Create(path)
 	if err != nil {
 		p.log.Error().Err(err).Msg("failed to open cpu file")
