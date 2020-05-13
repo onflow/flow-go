@@ -26,11 +26,10 @@ func (p *PendingReceipt) Checksum() flow.Identifier {
 }
 
 // NewPendingReceipt creates a new PendingReceipt structure out of the receipt and
-// its originID. It also sets the counter value of receipt to one.
+// its originID.
 func NewPendingReceipt(receipt *flow.ExecutionReceipt, originID flow.Identifier) *PendingReceipt {
 	return &PendingReceipt{
 		Receipt:  receipt,
 		OriginID: originID,
-		Counter:  1,
 	}
 }
