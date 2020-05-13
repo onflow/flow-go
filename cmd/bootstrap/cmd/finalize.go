@@ -50,7 +50,7 @@ running the DKG for generating the random beacon keys, generating genesis execut
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ generating private key for account 0 and generating genesis execution state")
-		genGenesisExecutionState()
+		genGenesisExecutionState(flagMTrieStorage)
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ constructing genesis seal and genesis block")
