@@ -9,7 +9,7 @@ const (
 )
 
 const (
-	ChannelNone = "none"
+	ChannelOneToOne = "OneToOne"
 )
 
 const (
