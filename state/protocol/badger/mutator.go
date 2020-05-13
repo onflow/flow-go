@@ -242,12 +242,12 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		if err != nil {
 			return fmt.Errorf("could not retrieve ancestor header (%x): %w", ancestorID, err)
 		}
-		payload, err := m.state.payloads.ByBlockID(ancestorID)
+		index, err := m.state.index.ByBlockID(ancestorID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve ancestor payload (%x): %w", ancestorID, err)
 		}
-		for _, guarantee := range payload.Guarantees {
-			lookup[guarantee.ID()] = struct{}{}
+		for _, collID := range index.CollectionIDs {
+			lookup[collID] = struct{}{}
 		}
 		if ancestor.Height <= limit {
 			break
