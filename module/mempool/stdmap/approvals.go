@@ -54,15 +54,3 @@ func (a *Approvals) All() []*flow.ResultApproval {
 	}
 	return approvals
 }
-
-// DropForResult drops all execution receipts for the given block.
-func (a *Approvals) DropForResult(resultID flow.Identifier) []flow.Identifier {
-	var approvalIDs []flow.Identifier
-	for _, approval := range a.All() {
-		if approval.Body.ExecutionResultID == resultID {
-			_ = a.Rem(approval.ID())
-			approvalIDs = append(approvalIDs, approval.ID())
-		}
-	}
-	return approvalIDs
-}

@@ -4,6 +4,7 @@ package stdmap
 
 import (
 	"math/rand"
+	"sync"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -48,4 +49,47 @@ func EjectTrueRandom(entities map[flow.Identifier]flow.Entity) (flow.Identifier,
 // to grow beyond certain limits, but ejecting is not applicable
 func EjectPanic(entities map[flow.Identifier]flow.Entity) (flow.Identifier, flow.Entity) {
 	panic("unexpected: mempool size over the limit")
+}
+
+// QueueEjector provides a swift FIFO ejection functionality
+type QueueEjector struct {
+	sync.Mutex
+	queue chan flow.Identifier
+}
+
+func NewQueueEjector(limit uint) *QueueEjector {
+	return &QueueEjector{
+		queue: make(chan flow.Identifier, limit),
+	}
+}
+
+// Push should be called every time a new entity is added to the mempool.
+// It enqueues the entity for later ejection.
+func (q *QueueEjector) Push(entityID flow.Identifier) {
+	q.Lock()
+	defer q.Unlock()
+	if len(q.queue) < cap(q.queue) {
+		q.queue <- entityID
+	}
+}
+
+// Eject is the EjectFunc of QueueEjector. It dequeues an identifier and returns its corresponding entity.
+// In case the dequeued identifier of entity does not exist, it returns a random entity of the queue.
+func (q *QueueEjector) Eject(entities map[flow.Identifier]flow.Entity) (flow.Identifier, flow.Entity) {
+	q.Lock()
+	defer q.Unlock()
+
+	if len(q.queue) == 0 {
+		return EjectTrueRandom(entities)
+	}
+
+	id := <-q.queue
+
+	entity, ok := entities[id]
+
+	if !ok {
+		return EjectTrueRandom(entities)
+	}
+
+	return id, entity
 }

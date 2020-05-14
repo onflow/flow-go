@@ -45,7 +45,7 @@ type Engine struct {
 // New creates a new consensus propagation engine.
 func New(
 	log zerolog.Logger,
-	metrics module.EngineMetrics,
+	collector module.EngineMetrics,
 	mempool module.MempoolMetrics,
 	spans module.ConsensusMetrics,
 	net module.Network,
@@ -62,7 +62,7 @@ func New(
 	e := &Engine{
 		unit:     engine.NewUnit(),
 		log:      log.With().Str("engine", "compliance").Logger(),
-		metrics:  metrics,
+		metrics:  collector,
 		mempool:  mempool,
 		spans:    spans,
 		me:       me,
@@ -75,6 +75,8 @@ func New(
 		sync:     nil, // use `WithSynchronization`
 		hotstuff: nil, // use `WithConsensus`
 	}
+
+	e.mempool.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
 
 	// register the engine with the network layer and store the conduit
 	con, err := net.Register(engine.ProtocolConsensus, e)

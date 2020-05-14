@@ -5,15 +5,21 @@ import (
 	"github.com/dapperlabs/flow-go/model/verification"
 )
 
+// TODO consolidate with PendingReceipts to preserve DRY
+// https://github.com/dapperlabs/flow-go/issues/3690
+
 // PendingCollections implements a mempool storing collections.
 type PendingCollections struct {
 	*Backend
+	qe *QueueEjector
 }
 
 // NewCollections creates a new memory pool for pending collection.
 func NewPendingCollections(limit uint) (*PendingCollections, error) {
+	qe := NewQueueEjector(limit + 1)
 	p := &PendingCollections{
-		Backend: NewBackend(WithLimit(limit)),
+		qe:      qe,
+		Backend: NewBackend(WithLimit(limit), WithEject(qe.Eject)),
 	}
 
 	return p, nil
@@ -21,7 +27,12 @@ func NewPendingCollections(limit uint) (*PendingCollections, error) {
 
 // Add adds a pending collection to the mempool.
 func (p *PendingCollections) Add(pcoll *verification.PendingCollection) bool {
-	return p.Backend.Add(pcoll)
+	ok := p.Backend.Add(pcoll)
+	if ok {
+		p.qe.Push(pcoll.ID())
+	}
+
+	return ok
 }
 
 // Rem removes a pending collection by ID from memory
