@@ -262,9 +262,9 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 	if err != nil {
 		return nil, err
 	}
-	go func() {
-		_ = newTrie.Store(filepath.Join(f.dir, hex.EncodeToString(newRootHash)))
-	}()
+	// go func() {
+	// 	_ = newTrie.Store(filepath.Join(f.dir, hex.EncodeToString(newRootHash)))
+	// }()
 	return newRootHash, nil
 }
 

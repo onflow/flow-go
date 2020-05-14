@@ -618,8 +618,8 @@ func (fnb *FlowNodeBuilder) closeDatabase() {
 	}
 }
 
-func loadDKGPublicData(path string) (*dkg.PublicData, error) {
-	data, err := ioutil.ReadFile(filepath.Join(path, bootstrap.FilenameDKGDataPub))
+func loadDKGPublicData(dir string) (*dkg.PublicData, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathDKGDataPub))
 	if err != nil {
 		return nil, err
 	}
@@ -628,8 +628,8 @@ func loadDKGPublicData(path string) (*dkg.PublicData, error) {
 	return dkgPubData.ForHotStuff(), err
 }
 
-func loadGenesisCommit(path string) (flow.StateCommitment, error) {
-	data, err := ioutil.ReadFile(filepath.Join(path, bootstrap.FilenameGenesisCommit))
+func loadGenesisCommit(dir string) (flow.StateCommitment, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisCommit))
 	if err != nil {
 		return nil, err
 	}
@@ -638,8 +638,8 @@ func loadGenesisCommit(path string) (flow.StateCommitment, error) {
 	return commit, err
 }
 
-func loadGenesisBlock(path string) (*flow.Block, error) {
-	data, err := ioutil.ReadFile(filepath.Join(path, bootstrap.FilenameGenesisBlock))
+func loadGenesisBlock(dir string) (*flow.Block, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisBlock))
 	if err != nil {
 		return nil, err
 	}
@@ -649,8 +649,8 @@ func loadGenesisBlock(path string) (*flow.Block, error) {
 
 }
 
-func loadRootBlockQC(path string) (*model.QuorumCertificate, error) {
-	data, err := ioutil.ReadFile(filepath.Join(path, bootstrap.FilenameGenesisQC))
+func loadRootBlockQC(dir string) (*model.QuorumCertificate, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisQC))
 	if err != nil {
 		return nil, err
 	}
@@ -660,8 +660,8 @@ func loadRootBlockQC(path string) (*model.QuorumCertificate, error) {
 }
 
 // Loads the private info for this node from disk (eg. private staking/network keys).
-func loadPrivateNodeInfo(path string, myID flow.Identifier) (*bootstrap.NodeInfoPriv, error) {
-	data, err := ioutil.ReadFile(filepath.Join(path, fmt.Sprintf(bootstrap.FilenameNodeInfoPriv, myID)))
+func loadPrivateNodeInfo(dir string, myID flow.Identifier) (*bootstrap.NodeInfoPriv, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, myID)))
 	if err != nil {
 		return nil, err
 	}

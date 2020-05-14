@@ -235,6 +235,16 @@ docker-build-ghost-debug:
 	docker build -f cmd/Dockerfile --build-arg TARGET=ghost --target debug \
 		-t gcr.io/dl-flow/ghost-debug:latest -t "gcr.io/dl-flow/ghost-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/ghost-debug:$(IMAGE_TAG)" .
 
+PHONY: docker-build-bootstrap
+docker-build-bootstrap:
+	docker build -f cmd/Dockerfile --build-arg TARGET=bootstrap --target production \
+		-t gcr.io/dl-flow/bootstrap:latest -t "gcr.io/dl-flow/bootstrap:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/bootstrap:$(IMAGE_TAG)" .
+
+.PHONY: docker-build-bootstrap-transit
+docker-build-bootstrap-transit:
+	docker build -f cmd/Dockerfile --build-arg TARGET=bootstrap/transit --target production \
+		-t gcr.io/dl-flow/bootstrap-transit:latest -t "gcr.io/dl-flow/bootstrap-transit:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/bootstrap-transit:$(IMAGE_TAG)" .
+
 .PHONY: docker-build-flow
 docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access docker-build-ghost
 

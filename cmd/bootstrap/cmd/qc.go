@@ -17,7 +17,7 @@ func constructGenesisQC(block *flow.Block, allNodes, internalNodes []model.NodeI
 		log.Fatal().Err(err).Msg("generating genesis QC failed")
 	}
 
-	writeJSON(model.FilenameGenesisQC, qc)
+	writeJSON(model.PathGenesisQC, qc)
 }
 
 func GenerateQCParticipantData(allNodes, internalNodes []model.NodeInfo, dkgData model.DKGData) run.ParticipantData {

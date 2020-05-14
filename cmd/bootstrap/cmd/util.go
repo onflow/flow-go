@@ -29,8 +29,8 @@ func generateRandomSeed() []byte {
 	return seed
 }
 
-func readJSON(filename string, target interface{}) {
-	dat, err := ioutil.ReadFile(filename)
+func readJSON(path string, target interface{}) {
+	dat, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot read json")
 	}
@@ -40,17 +40,17 @@ func readJSON(filename string, target interface{}) {
 	}
 }
 
-func writeJSON(filename string, data interface{}) {
+func writeJSON(path string, data interface{}) {
 	bz, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot marshal json")
 	}
 
-	writeText(filename, bz)
+	writeText(path, bz)
 }
 
-func writeText(filename string, data []byte) {
-	path := filepath.Join(flagOutdir, filename)
+func writeText(path string, data []byte) {
+	path = filepath.Join(flagOutdir, path)
 
 	err := os.MkdirAll(filepath.Dir(path), 0755)
 	if err != nil {
