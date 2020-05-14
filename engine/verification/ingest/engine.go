@@ -447,6 +447,7 @@ func (e *Engine) requestChunkDataPack(chunkID, blockID flow.Identifier) error {
 
 	req := &messages.ChunkDataPackRequest{
 		ChunkID: chunkID,
+		Nonce:   rand.Uint64(),
 	}
 
 	// TODO we should only submit to execution node that generated execution receipt
