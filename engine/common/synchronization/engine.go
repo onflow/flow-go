@@ -505,12 +505,15 @@ func (e *Engine) scanPending() ([]uint64, []flow.Identifier, error) {
 	// for now, we just ignore that problem, but once we do, we should always
 	// prioritize range requests over batch requests
 
+	now := time.Now()
+
 	// create a list of all height requests that should be sent
 	var heights []uint64
 	for height, status := range e.heights {
 
 		// if the last request is young enough, skip
-		if !status.ShouldRetry(e.retryInterval) {
+		retryAfter := status.Requested.Add(e.retryInterval << status.Attempts)
+		if now.After(retryAfter) {
 			continue
 		}
 
@@ -529,7 +532,8 @@ func (e *Engine) scanPending() ([]uint64, []flow.Identifier, error) {
 	for blockID, status := range e.blockIDs {
 
 		// if the last request is young enough, skip
-		if !status.ShouldRetry(e.retryInterval) {
+		retryAfter := status.Requested.Add(e.retryInterval << status.Attempts)
+		if now.After(retryAfter) {
 			continue
 		}
 
