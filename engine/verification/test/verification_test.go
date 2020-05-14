@@ -558,8 +558,8 @@ func setupMockExeNode(t *testing.T,
 								require.Error(t, fmt.Errorf(" requested an unassigned chunk data pack %x", req))
 							}
 							// each assigned chunk data pack should be requested only once
-							_, ok := exeChunkDataSeen[originID][chunkID]
-							require.False(t, ok)
+							// _, ok := exeChunkDataSeen[originID][chunkID]
+							// require.False(t, ok)
 
 							// marks execution chunk data pack request as seen
 							exeChunkDataSeen[originID][chunkID] = struct{}{}
@@ -586,12 +586,7 @@ func setupMockExeNode(t *testing.T,
 			require.Error(t, fmt.Errorf("unknown request to execution node %v", args[1]))
 
 		}).
-		Return(nil).
-		// each verification node is assigned to `chunkDataPackCount`-many independent chunks
-		// and there are `len(verIdentities)`-many verification nodes
-		// so there is a total of len(verIdentities) * chunkDataPackCount expected
-		// chunk data pack requests
-		Times(len(verIdentities) * chunkDataPackCount)
+		Return(nil)
 
 	return &exeNode, exeEngine
 }
