@@ -130,30 +130,18 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 func (e *Engine) process(originID flow.Identifier, input interface{}) error {
-	// process one event at a time for now
-
 	switch v := input.(type) {
 	case *events.SyncedBlock:
-		e.before(metrics.MessageSyncedBlock)
-		defer e.after(metrics.MessageSyncedBlock)
+		e.metrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlock)
+		defer e.metrics.MessageHandled(metrics.EngineFollower, metrics.MessageSyncedBlock)
 		return e.onSyncedBlock(originID, v)
 	case *messages.BlockProposal:
-		e.before(metrics.MessageBlockProposal)
-		defer e.after(metrics.MessageBlockProposal)
+		e.metrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockProposal)
+		defer e.metrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
 		return e.onBlockProposal(originID, v)
 	default:
 		return fmt.Errorf("invalid event type (%T)", input)
 	}
-}
-
-func (e *Engine) before(msg string) {
-	e.metrics.MessageReceived(metrics.EngineFollower, msg)
-	e.unit.Lock()
-}
-
-func (e *Engine) after(msg string) {
-	e.unit.Unlock()
-	e.metrics.MessageHandled(metrics.EngineFollower, msg)
 }
 
 func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBlock) error {
@@ -262,6 +250,9 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	if err != nil {
 		return fmt.Errorf("could not check parent: %w", err)
 	}
+
+	e.unit.Lock()
+	defer e.unit.Unlock()
 
 	// at this point, we should be able to connect the proposal to the finalized
 	// state and should process it to see whether to forward to hotstuff or not
