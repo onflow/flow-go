@@ -102,7 +102,7 @@ func main() {
 			colCacheMetrics = metrics.NewCacheCollector("cluster")
 			transactions = storagekv.NewTransactions(node.DB)
 			colHeaders = storagekv.NewHeaders(colCacheMetrics, node.DB)
-			colPayloads = storagekv.NewClusterPayloads(node.DB)
+			colPayloads = storagekv.NewClusterPayloads(colCacheMetrics, node.DB)
 			return nil
 		}).
 		Module("block mempool", func(node *cmd.FlowNodeBuilder) error {

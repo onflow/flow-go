@@ -34,13 +34,13 @@ func (_m *ClusterPayloads) ByBlockID(blockID flow.Identifier) (*cluster.Payload,
 	return r0, r1
 }
 
-// Store provides a mock function with given fields: header, payload
-func (_m *ClusterPayloads) Store(header *flow.Header, payload *cluster.Payload) error {
-	ret := _m.Called(header, payload)
+// Store provides a mock function with given fields: blockID, payload
+func (_m *ClusterPayloads) Store(blockID flow.Identifier, payload *cluster.Payload) error {
+	ret := _m.Called(blockID, payload)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.Header, *cluster.Payload) error); ok {
-		r0 = rf(header, payload)
+	if rf, ok := ret.Get(0).(func(flow.Identifier, *cluster.Payload) error); ok {
+		r0 = rf(blockID, payload)
 	} else {
 		r0 = ret.Error(0)
 	}
