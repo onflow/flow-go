@@ -44,7 +44,10 @@ func GenerateAccountPrivateKeys(numberOfPrivateKeys int) ([]flow.AccountPrivateK
 	var privateKeys []flow.AccountPrivateKey
 	for i := 0; i < numberOfPrivateKeys; i++ {
 		seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
-		rand.Read(seed)
+		_, err := rand.Read(seed)
+		if err != nil {
+			return nil, err
+		}
 		privateKey, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
 		if err != nil {
 			return nil, err
