@@ -5,9 +5,10 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/common"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/wal"
 )
@@ -149,7 +150,7 @@ func (f *MTrieStorage) GetRegistersWithProof(
 		return nil, nil, fmt.Errorf("Could not get proofs: %w", err)
 	}
 
-	proofToGo := common.EncodeBatchProof(batchProof)
+	proofToGo := proof.EncodeBatchProof(batchProof)
 	return values, proofToGo, err
 }
 
