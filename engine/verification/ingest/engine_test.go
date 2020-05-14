@@ -895,6 +895,9 @@ func (suite *IngestTestSuite) TestChunkDataPackTracker_UntrackedChunkDataPack() 
 	// engine has not yet ingested this chunk
 	suite.ingestedChunkIDs.On("Has", suite.chunkDataPack.ChunkID).Return(false)
 
+	// engine should not already have the chunk data pack
+	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ChunkID).Return(false)
+
 	err := eng.Process(suite.execIdentity.NodeID, chunkDataPackResponse)
 
 	// asserts that process of an untracked chunk data pack return no error
