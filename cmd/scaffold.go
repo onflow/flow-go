@@ -110,6 +110,7 @@ type FlowNodeBuilder struct {
 	Tracer            *trace.OpenTracer
 	MetricsRegisterer prometheus.Registerer
 	Metrics           Metrics
+	Profiler          *debug.AutoProfiler
 	DB                *badger.DB
 	Storage           Storage
 	State             *protocol.State
@@ -137,16 +138,16 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	// bind configuration parameters
 	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", notSet, "identity of our node")
 	fnb.flags.StringVar(&fnb.BaseConfig.bindAddr, "bind", notSet, "address to bind on")
-	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "BootstrapDir", "b", "bootstrap", "path to the bootstrap directory")
+	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", "bootstrap", "path to the bootstrap directory")
 	fnb.flags.DurationVarP(&fnb.BaseConfig.timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", datadir, "directory to store the protocol state")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", "info", "level for logging output")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", 8080, "port for /metrics endpoint")
 	fnb.flags.UintVar(&fnb.BaseConfig.nClusters, "nclusters", 2, "number of collection node clusters")
 	fnb.flags.BoolVar(&fnb.BaseConfig.profilerEnabled, "profiler-enabled", false, "whether to enable the auto-profiler")
-	fnb.flags.StringVar(&fnb.BaseConfig.profilerDir, "profiler-dir", "pprof", "directory to create auto-profiler profiles")
-	fnb.flags.DurationVar(&fnb.BaseConfig.profilerInterval, "profiler-interval", 2*time.Minute, "the interval between auto-profiler runs")
-	fnb.flags.DurationVar(&fnb.BaseConfig.profilerDuration, "profiler-duration", 5*time.Second, "the duration to run the auto-profile for")
+	fnb.flags.StringVar(&fnb.BaseConfig.profilerDir, "profiler-dir", "profiler", "directory to create auto-profiler profiles")
+	fnb.flags.DurationVar(&fnb.BaseConfig.profilerInterval, "profiler-interval", 15*time.Minute, "the interval between auto-profiler runs")
+	fnb.flags.DurationVar(&fnb.BaseConfig.profilerDuration, "profiler-duration", 10*time.Second, "the duration to run the auto-profile for")
 }
 
 func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
@@ -205,18 +206,8 @@ func (fnb *FlowNodeBuilder) enqueueTracer() {
 }
 
 func (fnb *FlowNodeBuilder) enqueueProfiler() {
-	if !fnb.BaseConfig.profilerEnabled {
-		return
-	}
-	fnb.Component("auto profiler", func(node *FlowNodeBuilder) (module.ReadyDoneAware, error) {
-		dir := filepath.Join(node.BaseConfig.profilerDir, node.BaseConfig.nodeRole, node.BaseConfig.nodeIDHex)
-		profiler, err := debug.NewAutoProfiler(
-			node.Logger,
-			dir,
-			node.BaseConfig.profilerInterval,
-			node.BaseConfig.profilerDuration,
-		)
-		return profiler, err
+	fnb.Component("profiler", func(node *FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		return fnb.Profiler, nil
 	})
 }
 
@@ -273,6 +264,18 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		Cache:      metrics.NewCacheCollector(flow.DefaultChainID),
 		Mempool:    metrics.NewMempoolCollector(),
 	}
+}
+
+func (fnb *FlowNodeBuilder) initProfiler() {
+	dir := filepath.Join(fnb.BaseConfig.profilerDir, fnb.BaseConfig.nodeRole, fnb.BaseConfig.nodeIDHex)
+	profiler, err := debug.NewAutoProfiler(
+		fnb.Logger,
+		dir,
+		fnb.BaseConfig.profilerInterval,
+		fnb.BaseConfig.profilerDuration,
+	)
+	fnb.MustNot(err).Msg("could not initialize profiler")
+	fnb.Profiler = profiler
 }
 
 func (fnb *FlowNodeBuilder) initStorage() {
@@ -533,6 +536,8 @@ func FlowNode(role string) *FlowNodeBuilder {
 
 	builder.enqueueTracer()
 
+	builder.enqueueProfiler()
+
 	return builder
 }
 
@@ -556,6 +561,8 @@ func (fnb *FlowNodeBuilder) Run() {
 	fnb.initLogger()
 
 	fnb.initMetrics()
+
+	fnb.initProfiler()
 
 	fnb.initStorage()
 

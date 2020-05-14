@@ -128,7 +128,8 @@ func New(
 func (e *Engine) Ready() <-chan struct{} {
 	// checks pending chunks every `requestInterval` milliseconds
 	e.unit.LaunchPeriodically(e.checkPendingChunks,
-		time.Duration(e.requestInterval)*time.Millisecond)
+		time.Duration(e.requestInterval)*time.Millisecond,
+		0)
 	return e.unit.Ready()
 }
 

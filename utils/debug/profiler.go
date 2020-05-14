@@ -2,6 +2,7 @@ package debug
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"runtime/pprof"
@@ -37,7 +38,8 @@ func NewAutoProfiler(log zerolog.Logger, dir string, interval time.Duration, dur
 }
 
 func (p *AutoProfiler) Ready() <-chan struct{} {
-	p.unit.LaunchPeriodically(p.start, p.interval)
+	delay := time.Duration(float64(p.interval) * rand.Float64())
+	p.unit.LaunchPeriodically(p.start, p.interval, delay)
 	return p.unit.Ready()
 }
 
