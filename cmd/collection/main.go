@@ -18,6 +18,8 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
+	"github.com/dapperlabs/flow-go/consensus/recovery/cluster"
+	protocolRecovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/proposal"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
@@ -38,7 +40,6 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
-	"github.com/dapperlabs/flow-go/state/cluster"
 	clusterkv "github.com/dapperlabs/flow-go/state/cluster/badger"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	storage "github.com/dapperlabs/flow-go/storage"
@@ -207,12 +208,16 @@ func main() {
 			// initialize the verifier for the protocol consensus
 			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, node.DKGState, staking, beacon, merger)
 
-			// TODO: use proper engine for notifier to follower
+			// use proper engine for notifier to follower
 			notifier := notifications.NewNoopConsumer()
 
-			// creates a consensus follower with ingestEngine as the notifier
-			// so that it gets notified upon each new finalized block
-			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, finalizer, verifier, notifier, node.GenesisBlock.Header, node.GenesisQC)
+			finalized, pending, err := protocolRecovery.FindLatest(node.State, node.Storage.Headers, node.GenesisBlock.Header)
+			if err != nil {
+				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
+			}
+
+			// creates a consensus follower with noop consumer as the notifier
+			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, node.Storage.Headers, finalizer, verifier, notifier, node.GenesisBlock.Header, node.GenesisQC, finalized, pending)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
@@ -271,7 +276,7 @@ func main() {
 
 			persist := persister.New(node.DB)
 
-			finalized, pending, err := findLatest(clusterState, colHeaders)
+			finalized, pending, err := cluster.FindLatest(clusterState, colHeaders)
 			if err != nil {
 				return nil, fmt.Errorf("could not retrieve finalized/pending headers: %w", err)
 			}
@@ -346,32 +351,4 @@ func loadClusterQC(path string, clusterID string) (*hotstuffmodel.QuorumCertific
 		return nil, err
 	}
 	return &qc, nil
-}
-
-// findLatest retrieves the latest finalized header and all of its pending
-// children. These are child blocks that have been verified by both the
-// compliance layer and HotStuff and thus are safe to inject directly into
-// HotStuff with no further validation.
-func findLatest(state cluster.State, headers storage.Headers) (*flow.Header, []*flow.Header, error) {
-
-	finalized, err := state.Final().Head()
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not get finalized header: %w", err)
-	}
-
-	pendingIDs, err := state.Final().Pending()
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not get pending children: %w", err)
-	}
-
-	pending := make([]*flow.Header, 0, len(pendingIDs))
-	for _, pendingID := range pendingIDs {
-		header, err := headers.ByBlockID(pendingID)
-		if err != nil {
-			return nil, nil, fmt.Errorf("could not find pending child: %w", err)
-		}
-		pending = append(pending, header)
-	}
-
-	return finalized, pending, nil
 }

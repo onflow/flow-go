@@ -16,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
+	protocolRecovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
 	"github.com/dapperlabs/flow-go/engine/consensus/ingestion"
@@ -33,8 +34,6 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
@@ -264,7 +263,7 @@ func main() {
 			persist := persister.New(node.DB)
 
 			// query the last finalized block and pending blocks for recovery
-			finalized, pending, err := findLatest(node.State, node.Storage.Headers, node.GenesisBlock.Header)
+			finalized, pending, err := protocolRecovery.FindLatest(node.State, node.Storage.Headers, node.GenesisBlock.Header)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks: %w", err)
 			}
@@ -310,31 +309,4 @@ func loadDKGPrivateData(path string, myID flow.Identifier) (*bootstrap.DKGPartic
 		return nil, err
 	}
 	return &priv, nil
-}
-
-func findLatest(state protocol.State, headers storage.Headers, rootHeader *flow.Header) (*flow.Header, []*flow.Header, error) {
-	// find finalized block
-	finalized, err := state.Final().Head()
-
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not find finalized block")
-	}
-
-	// find all pending blockIDs
-	pendingIDs, err := state.Final().Pending()
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not find pending block")
-	}
-
-	// find all pending header by ID
-	pending := make([]*flow.Header, 0, len(pendingIDs))
-	for _, pendingID := range pendingIDs {
-		pendingHeader, err := headers.ByBlockID(pendingID)
-		if err != nil {
-			return nil, nil, fmt.Errorf("could not find pending block by ID: %w", err)
-		}
-		pending = append(pending, pendingHeader)
-	}
-
-	return finalized, pending, nil
 }
