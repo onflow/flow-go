@@ -672,6 +672,13 @@ func (suite *IngestTestSuite) TestHandleCollection_Untracked() {
 		verificationmodel.NewPendingCollection(suite.collection, suite.collIdentity.NodeID)).
 		Return(true).Once()
 
+	// mocks collection has not been ingested
+	suite.ingestedCollectionIDs.On("Has", suite.collection.ID()).Return(false)
+
+	// mocks collection does not exist in authenticated and pending collections
+	suite.authCollections.On("Has", suite.collection.ID()).Return(false)
+	suite.pendingCollections.On("Has", suite.collection.ID()).Return(false)
+
 	err := eng.Process(suite.collIdentity.NodeID, suite.collection)
 	suite.Assert().Nil(err)
 
