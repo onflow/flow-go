@@ -787,6 +787,7 @@ func (suite *IngestTestSuite) TestVerifyReady() {
 			// engine has not yet ingested this receipt and its chunk
 			suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).
 				Return(false).Once()
+
 			for _, chunk := range suite.receipt.ExecutionResult.Chunks {
 				suite.ingestedChunkIDs.On("Has", chunk.ID()).Return(false)
 				suite.ingestedChunkIDs.On("Add", chunk.ID()).Return(true)
@@ -800,6 +801,8 @@ func (suite *IngestTestSuite) TestVerifyReady() {
 			suite.authCollections.On("Has", suite.collection.ID()).Return(true)
 			suite.pendingCollections.On("Has", suite.collection.ID()).Return(false)
 			suite.authCollections.On("ByID", suite.collection.ID()).Return(suite.collection, true)
+			suite.ingestedCollectionIDs.On("Add", suite.collection.ID()).Return(true)
+			suite.ingestedCollectionIDs.On("Has", suite.collection.ID()).Return(false)
 			// tracker for the collection
 			suite.collectionTrackers.On("Has", suite.collection.ID()).Return(true)
 			suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, true)
