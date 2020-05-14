@@ -11,10 +11,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/common"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
-	"github.com/dapperlabs/flow-go/storage/ledger/trie"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/common"
+	cstrie "github.com/dapperlabs/flow-go/storage/ledger/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
@@ -27,7 +28,7 @@ func TestTrieOperations(t *testing.T) {
 
 	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
 	require.NoError(t, err)
-	nt := mtrie.NewMTrie(trieHeight)
+	nt := trie.NewMTrie(trieHeight)
 	rh := []byte([]uint8{uint8(1), uint8(2)})
 	nt.SetRootHash(rh)
 	// Add trie
@@ -82,9 +83,9 @@ func TestLeftEmptyInsert(t *testing.T) {
 	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
 	require.NoError(t, err)
 	rootHash1 := fStore.GetEmptyRootHash()
-	// key: 1000...
+	// Key: 1000...
 	k1 := []byte([]uint8{uint8(129), uint8(1)})
-	// key: 1100....
+	// Key: 1100....
 	k2 := []byte([]uint8{uint8(193), uint8(1)})
 
 	v1 := []byte{'A'}
@@ -137,9 +138,9 @@ func TestRightEmptyInsert(t *testing.T) {
 	require.NoError(t, err)
 	rootHash1 := fStore.GetEmptyRootHash()
 
-	// key: 1000...
+	// Key: 1000...
 	k1 := []byte([]uint8{uint8(129), uint8(1)})
-	// key: 1100....
+	// Key: 1100....
 	k2 := []byte([]uint8{uint8(193), uint8(1)})
 
 	v1 := []byte{'A'}
@@ -193,7 +194,7 @@ func TestExpansionInsert(t *testing.T) {
 	require.NoError(t, err)
 	rootHash1 := fStore.GetEmptyRootHash()
 
-	// key: 1000...
+	// Key: 1000...
 	k1 := []byte([]uint8{uint8(129), uint8(1)})
 	v1 := []byte{'A'}
 	keys := [][]byte{k1}
@@ -203,7 +204,7 @@ func TestExpansionInsert(t *testing.T) {
 	// expected trie:
 	// 16: ([129 1],41)[]
 
-	// key: 1111....
+	// Key: 1111....
 	k2 := []byte([]uint8{uint8(130), uint8(1)})
 	v2 := []byte{'B'}
 	keys = [][]byte{k2}
@@ -247,9 +248,9 @@ func TestFullHouseInsert(t *testing.T) {
 	require.NoError(t, err)
 	rootHash1 := fStore.GetEmptyRootHash()
 
-	// key: 1000...
+	// Key: 1000...
 	k1 := []byte([]uint8{uint8(129), uint8(1)})
-	// key: 1100....
+	// Key: 1100....
 	k2 := []byte([]uint8{uint8(193), uint8(1)})
 
 	v1 := []byte{'A'}
@@ -331,7 +332,7 @@ func TestLeafInsert(t *testing.T) {
 }
 
 func TestSameKeyInsert(t *testing.T) {
-	trieHeight := 17 // should be key size (in bits) + 1
+	trieHeight := 17 // should be Key size (in bits) + 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -361,7 +362,7 @@ func TestSameKeyInsert(t *testing.T) {
 }
 
 func TestUpdateWithWrongKeySize(t *testing.T) {
-	trieHeight := 17 // should be key size (in bits) + 1
+	trieHeight := 17 // should be Key size (in bits) + 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -370,7 +371,7 @@ func TestUpdateWithWrongKeySize(t *testing.T) {
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
-	// short key
+	// short Key
 	key1 := make([]byte, 1)
 	utils.SetBit(key1, 5)
 	value1 := []byte{'a'}
@@ -380,7 +381,7 @@ func TestUpdateWithWrongKeySize(t *testing.T) {
 	rootHash, err = fStore.Update(keys, values, rootHash)
 	require.Error(t, err)
 
-	// long key
+	// long Key
 	key2 := make([]byte, 33)
 	utils.SetBit(key2, 5)
 	value2 := []byte{'a'}
@@ -394,7 +395,7 @@ func TestUpdateWithWrongKeySize(t *testing.T) {
 // TODO insert with duplicated keys
 
 func TestReadOrder(t *testing.T) {
-	trieHeight := 17 // should be key size (in bits) + 1
+	trieHeight := 17 // should be Key size (in bits) + 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -419,7 +420,7 @@ func TestReadOrder(t *testing.T) {
 }
 
 func TestMixRead(t *testing.T) {
-	trieHeight := 17 // should be key size (in bits) + 1
+	trieHeight := 17 // should be Key size (in bits) + 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -453,7 +454,7 @@ func TestMixRead(t *testing.T) {
 }
 
 func TestReadWithDuplicatedKeys(t *testing.T) {
-	trieHeight := 17 // should be key size (in bits) + 1
+	trieHeight := 17 // should be Key size (in bits) + 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -484,7 +485,7 @@ func TestReadWithDuplicatedKeys(t *testing.T) {
 }
 
 func TestReadNonExistKey(t *testing.T) {
-	trieHeight := 17 // should be key size (in bits) + 1
+	trieHeight := 17 // should be Key size (in bits) + 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -509,7 +510,7 @@ func TestReadNonExistKey(t *testing.T) {
 }
 
 func TestReadWithWrongKeySize(t *testing.T) {
-	trieHeight := 17 // should be key size (in bits) + 1
+	trieHeight := 17 // should be Key size (in bits) + 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -527,7 +528,7 @@ func TestReadWithWrongKeySize(t *testing.T) {
 	rootHash, err = fStore.Update(keys, values, rootHash)
 	require.NoError(t, err)
 
-	// wrong key size
+	// wrong Key size
 	key2 := make([]byte, 33)
 	utils.SetBit(key2, 5)
 	keys = [][]byte{key2}
@@ -538,7 +539,7 @@ func TestReadWithWrongKeySize(t *testing.T) {
 // TODO test read (multiple non exist in a branch)
 
 func TestUpdatePrevStates(t *testing.T) {
-	trieHeight := 17 // should be key size (in bits) + 1
+	trieHeight := 17 // should be Key size (in bits) + 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -598,7 +599,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		keys := common.GetRandomKeysRandN(maxNumKeysPerStep, keyByteSize)
 		values := common.GetRandomValues(len(keys), maxValueSize)
 
-		// update map store with key values
+		// update map store with Key Values
 		// we use this at the end of each step to check all existing keys
 		for i, k := range keys {
 			latestValueByKey[string(k)] = values[i]
@@ -645,11 +646,11 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		require.NoError(t, err, "error generating proofs")
 		require.True(t, batchProof.Verify(proofKeys, proofValues, rootHash, trieHeight))
 
-		psmt, err := trie.NewPSMT(rootHash, trieHeight, proofKeys, proofValues, common.EncodeBatchProof(batchProof))
+		psmt, err := cstrie.NewPSMT(rootHash, trieHeight, proofKeys, proofValues, common.EncodeBatchProof(batchProof))
 		require.NoError(t, err, "error building partial trie")
 		require.True(t, bytes.Equal(psmt.GetRootHash(), rootHash))
 
-		// check values for all existing keys
+		// check Values for all existing keys
 		allKeys := make([][]byte, 0, len(latestValueByKey))
 		allValues := make([][]byte, 0, len(latestValueByKey))
 		for k, v := range latestValueByKey {
@@ -808,11 +809,11 @@ func TestTrieStoreAndLoad(t *testing.T) {
 
 // TODO comment out this for now
 // func TestMForestAccuracy(t *testing.T) {
-// 	trieHeight := 17 // should be key size (in bits) + 1
+// 	trieHeight := 17 // should be Key size (in bits) + 1
 // 	experimentRep := 10
 
 // 	dbDir := unittest.TempDir(t)
-// 	smt, err := trie.NewSMT(dbDir, trieHeight, 10, 100, experimentRep)
+// 	smt, err := cstrie.NewSMT(dbDir, trieHeight, 10, 100, experimentRep)
 // 	require.NoError(t, err)
 // 	defer func() {
 // 		smt.SafeClose()
@@ -823,13 +824,13 @@ func TestTrieStoreAndLoad(t *testing.T) {
 // 	require.NoError(t, err)
 // 	rootHash := fStore.GetEmptyRootHash()
 
-// 	emptyTree := trie.GetDefaultHashForHeight(trieHeight - 1)
+// 	emptyTree := cstrie.GetDefaultHashForHeight(trieHeight - 1)
 // 	require.NoError(t, err)
 // 	rootHashForSMT := emptyTree
 // 	for e := 0; e < experimentRep; e++ {
-// 		// insert some values to an empty trie
+// 		// insert some Values to an empty trie
 // 		keys := make([][]byte, 0)
-// 		values := make([][]byte, 0)
+// 		Values := make([][]byte, 0)
 // 		rand.Seed(time.Now().UnixNano())
 
 // 		// rejection sampling
@@ -837,24 +838,24 @@ func TestTrieStoreAndLoad(t *testing.T) {
 // 		keyValueMap := make(map[string][]byte)
 // 		i := 0
 // 		for i < numberOfKeys {
-// 			key := make([]byte, 2)
-// 			rand.Read(key)
+// 			Key := make([]byte, 2)
+// 			rand.Read(Key)
 // 			// deduplicate
-// 			if _, found := keyValueMap[string(key)]; !found {
-// 				keys = append(keys, key)
-// 				value := make([]byte, 4)
-// 				rand.Read(value)
-// 				keyValueMap[string(key)] = value
-// 				values = append(values, value)
+// 			if _, found := keyValueMap[string(Key)]; !found {
+// 				keys = append(keys, Key)
+// 				Value := make([]byte, 4)
+// 				rand.Read(Value)
+// 				keyValueMap[string(Key)] = Value
+// 				Values = append(Values, Value)
 // 				i++
 // 			}
 // 		}
 
-// 		newRootHash, err := fStore.Update(keys, values, rootHash)
+// 		newRootHash, err := fStore.Update(keys, Values, rootHash)
 // 		require.NoError(t, err, "error commiting changes")
 // 		rootHash = newRootHash
 
-// 		// check values
+// 		// check Values
 // 		retValues, err := fStore.Read(keys, rootHash)
 // 		require.NoError(t, err)
 // 		for i, k := range keys {
@@ -862,7 +863,7 @@ func TestTrieStoreAndLoad(t *testing.T) {
 // 		}
 
 // 		// Test eqaulity to SMT
-// 		newRootHashForSMT, err := smt.Update(keys, values, rootHashForSMT)
+// 		newRootHashForSMT, err := smt.Update(keys, Values, rootHashForSMT)
 // 		require.NoError(t, err)
 // 		rootHashForSMT = newRootHashForSMT
 // 		require.True(t, bytes.Equal(newRootHashForSMT, newRootHash))
@@ -875,13 +876,13 @@ func TestTrieStoreAndLoad(t *testing.T) {
 // 		require.NoError(t, err, "error generating proofs (SMT)")
 
 // 		encodedProof := mtrie.EncodeBatchProof(batchProof)
-// 		encodedProofSMT := trie.EncodeProof(batchProofSMT)
+// 		encodedProofSMT := cstrie.EncodeProof(batchProofSMT)
 
 // 		for i := range encodedProof {
 // 			require.True(t, bytes.Equal(encodedProof[i], encodedProofSMT[i]))
 // 		}
 
-// 		psmt, err := trie.NewPSMT(rootHash, trieHeight, keys, values, encodedProof)
+// 		psmt, err := cstrie.NewPSMT(rootHash, trieHeight, keys, Values, encodedProof)
 // 		require.True(t, bytes.Equal(psmt.GetRootHash(), rootHash))
 // 		require.NoError(t, err, "error building partial trie")
 

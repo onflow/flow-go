@@ -5,6 +5,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/common"
@@ -25,7 +27,7 @@ func NewMTrieStorage(dbDir string, cacheSize int, reg prometheus.Registerer) (*M
 		return nil, fmt.Errorf("cannot create WAL: %w", err)
 	}
 
-	mForest, err := mtrie.NewMForest(257, dbDir, cacheSize, func(evictedTrie *mtrie.MTrie) error {
+	mForest, err := mtrie.NewMForest(257, dbDir, cacheSize, func(evictedTrie *trie.MTrie) error {
 		return w.RecordDelete(evictedTrie.RootHash())
 	})
 	if err != nil {
