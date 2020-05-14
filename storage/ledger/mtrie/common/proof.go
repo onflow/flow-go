@@ -12,7 +12,7 @@ import (
 // up to the root of the trie.
 type Proof struct {
 	Values    [][]byte // the non-default intermediate nodes in the proof
-	Inclusion bool     // flag indicating if this is an Inclusion or exclusion
+	Inclusion bool     // flag indicating if this is an inclusion or exclusion
 	Flags     []byte   // The Flags of the proofs (is set if an intermediate node has a non-default)
 	Steps     uint8    // number of Steps for the proof (path len)
 }
@@ -64,9 +64,9 @@ func (p *Proof) String() string {
 	for _, f := range p.Flags {
 		flagStr += fmt.Sprintf("%08b", f)
 	}
-	proofStr := fmt.Sprintf("size: %d Flags: %v\n", p.Steps, flagStr)
+	proofStr := fmt.Sprintf("size: %d flags: %v\n", p.Steps, flagStr)
 	if p.Inclusion {
-		proofStr += fmt.Sprint("\t Inclusion proof:\n")
+		proofStr += fmt.Sprint("\t inclusion proof:\n")
 	} else {
 		proofStr += fmt.Sprint("\t noninclusion proof:\n")
 	}
@@ -80,14 +80,14 @@ func (p *Proof) String() string {
 	return proofStr
 }
 
-// Export return the flag, proofs, Inclusion, an size of the proof
+// Export return the flag, proofs, inclusion, an size of the proof
 func (p *Proof) Export() ([]byte, [][]byte, bool, uint8) {
 	return p.Flags, p.Values, p.Inclusion, p.Steps
 }
 
 // BatchProof is a struct that holds the proofs for several keys
 //
-// TODO (add key Values to batch proof and make it self-included),
+// TODO (add key values to batch proof and make it self-included),
 // so there is no need for two calls (read, proofs)
 type BatchProof struct {
 	Proofs []*Proof
@@ -153,21 +153,21 @@ func EncodeBatchProof(bp *BatchProof) [][]byte {
 	for _, p := range bp.Proofs {
 		flag, values, inclusion, steps := p.Export()
 
-		// 1. set the first bit to 1 if it is an Inclusion proof
+		// 1. set the first bit to 1 if it is an inclusion proof
 		byteInclusion := make([]byte, 1)
 		if inclusion {
 			utils.SetBit(byteInclusion, 0)
 		}
-		// 2. Steps is encoded as a single byte
+		// 2. steps is encoded as a single byte
 		byteSteps := []byte{steps}
 		proof := append(byteInclusion, byteSteps...)
 
-		// 3. include flag size first and then all the Flags
+		// 3. include flag size first and then all the flags
 		flagSize := []byte{uint8(len(flag))}
 		proof = append(proof, flagSize...)
 		proof = append(proof, flag...)
 
-		// 4. and finally include all the hash Values
+		// 4. and finally include all the hash values
 		for _, v := range values {
 			proof = append(proof, v...)
 		}
@@ -180,7 +180,7 @@ func EncodeBatchProof(bp *BatchProof) [][]byte {
 func DecodeBatchProof(proofs [][]byte) (*BatchProof, error) {
 	bp := NewBatchProof()
 	// The decode logic is as follows:
-	// The first byte in the array is the Inclusion flag, with the first bit set as the Inclusion (1 = Inclusion, 0 = non-Inclusion)
+	// The first byte in the array is the inclusion flag, with the first bit set as the inclusion (1 = inclusion, 0 = non-inclusion)
 	// The second byte is size, needs to be converted to uint8
 	// The next 32 bytes are the flag
 	// Each subsequent 32 bytes are the proofs needed for the verifier
