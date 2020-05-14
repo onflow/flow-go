@@ -191,7 +191,7 @@ func BenchmarkTransactionWithProgramASTCache(t *testing.B) {
 
 	// Create many transactions that imports the FlowToken contract.
 	var txs []flow.TransactionBody
-	for i := 0; i < 10000; i++ {
+	for i := 0; i < 1000; i++ {
 		tx := flow.TransactionBody{
 			Authorizers: []flow.Address{accounts[2]},
 			Script: []byte(fmt.Sprintf(`
@@ -199,13 +199,17 @@ func BenchmarkTransactionWithProgramASTCache(t *testing.B) {
 				transaction {
 					prepare(signer: AuthAccount) {}
 					execute {
+						log("Transaction %d")
 						let v <- FlowToken.createEmptyVault()
 						destroy v
 					}
 				}
-			`, accounts[1])),
+			`, accounts[1], i)),
 		}
-		_ = execTestutil.SignTransaction(&tx, accounts[2], privateKeys[1], 0)
+		err := execTestutil.SignTransaction(&tx, accounts[2], privateKeys[1], uint64(i))
+		if err != nil {
+			panic(err)
+		}
 		txs = append(txs, tx)
 	}
 
@@ -216,7 +220,7 @@ func BenchmarkTransactionWithProgramASTCache(t *testing.B) {
 			// Run the Use import (FT Vault resource) transaction.
 			_, err := bc.ExecuteTransaction(ledger, &tx)
 			if err != nil {
-				fmt.Println(err)
+				panic(err)
 			}
 		}
 	}
@@ -262,7 +266,7 @@ func BenchmarkTransactionWithoutProgramASTCache(t *testing.B) {
 
 	// Create many transactions that imports the FlowToken contract.
 	var txs []flow.TransactionBody
-	for i := 0; i < 10000; i++ {
+	for i := 0; i < 1000; i++ {
 		tx := flow.TransactionBody{
 			Authorizers: []flow.Address{accounts[2]},
 			Script: []byte(fmt.Sprintf(`
@@ -270,13 +274,14 @@ func BenchmarkTransactionWithoutProgramASTCache(t *testing.B) {
 				transaction {
 					prepare(signer: AuthAccount) {}
 					execute {
+						log("Transaction %d")
 						let v <- FlowToken.createEmptyVault()
 						destroy v
 					}
 				}
-			`, accounts[1])),
+			`, accounts[1], i)),
 		}
-		_ = execTestutil.SignTransaction(&tx, accounts[2], privateKeys[1], 0)
+		_ = execTestutil.SignTransaction(&tx, accounts[2], privateKeys[1], uint64(i))
 		txs = append(txs, tx)
 	}
 
@@ -287,7 +292,7 @@ func BenchmarkTransactionWithoutProgramASTCache(t *testing.B) {
 			// Run the Use import (FT Vault resource) transaction.
 			_, err := bc.ExecuteTransaction(ledger, &tx)
 			if err != nil {
-				fmt.Println(err)
+				panic(err)
 			}
 		}
 	}
