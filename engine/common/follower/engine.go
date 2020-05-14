@@ -134,26 +134,16 @@ func (e *Engine) process(originID flow.Identifier, input interface{}) error {
 
 	switch v := input.(type) {
 	case *events.SyncedBlock:
-		e.before(metrics.MessageSyncedBlock)
-		defer e.after(metrics.MessageSyncedBlock)
+		e.metrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlock)
+		defer e.metrics.MessageHandled(metrics.EngineFollower, metrics.MessageSyncedBlock)
 		return e.onSyncedBlock(originID, v)
 	case *messages.BlockProposal:
-		e.before(metrics.MessageBlockProposal)
-		defer e.after(metrics.MessageBlockProposal)
+		e.metrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockProposal)
+		defer e.metrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
 		return e.onBlockProposal(originID, v)
 	default:
 		return fmt.Errorf("invalid event type (%T)", input)
 	}
-}
-
-func (e *Engine) before(msg string) {
-	e.metrics.MessageReceived(metrics.EngineFollower, msg)
-	e.unit.Lock()
-}
-
-func (e *Engine) after(msg string) {
-	e.unit.Unlock()
-	e.metrics.MessageHandled(metrics.EngineFollower, msg)
 }
 
 func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBlock) error {
@@ -284,6 +274,9 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 // the children are also still on a valid chain and all missing links are there;
 // no need to do all the processing again.
 func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
+
+	e.unit.Lock()
+	defer e.unit.Unlock()
 
 	header := proposal.Header
 
