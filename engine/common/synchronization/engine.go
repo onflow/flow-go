@@ -513,7 +513,7 @@ func (e *Engine) scanPending() ([]uint64, []flow.Identifier, error) {
 
 		// if the last request is young enough, skip
 		retryAfter := status.Requested.Add(e.retryInterval << status.Attempts)
-		if now.After(retryAfter) {
+		if now.Before(retryAfter) {
 			continue
 		}
 
@@ -533,7 +533,7 @@ func (e *Engine) scanPending() ([]uint64, []flow.Identifier, error) {
 
 		// if the last request is young enough, skip
 		retryAfter := status.Requested.Add(e.retryInterval << status.Attempts)
-		if now.After(retryAfter) {
+		if now.Before(retryAfter) {
 			continue
 		}
 
