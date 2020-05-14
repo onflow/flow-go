@@ -5,11 +5,10 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/common"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/wal"
 )
 
