@@ -349,8 +349,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 			if _, ok := args[1].(*messages.ChunkDataPackRequest); ok {
 				// publishes the chunk data pack response to the network
 				res := &messages.ChunkDataPackResponse{
-					Data:  *completeER.ChunkDataPacks[0],
-					Nonce: rand.Uint64(),
+					Data: *completeER.ChunkDataPacks[0],
 				}
 				err := exeChunkDataConduit.Submit(res, verIdentity.NodeID)
 				assert.Nil(t, err)
@@ -532,12 +531,6 @@ func setupMockExeNode(t *testing.T,
 		}
 	}
 
-	// map form verIds --> chunks they asked
-	retriedChunks := make(map[flow.Identifier]map[flow.Identifier]struct{})
-	for _, verIdentity := range verIdentities {
-		retriedChunks[verIdentity.NodeID] = make(map[flow.Identifier]struct{})
-	}
-
 	exeChunkDataConduit, err := exeNode.Net.Register(engine.ChunkDataPackProvider, exeEngine)
 	assert.Nil(t, err)
 
@@ -558,15 +551,6 @@ func setupMockExeNode(t *testing.T,
 						if chunkID == req.ChunkID {
 							if !IsAssigned(chunk.Index) {
 								require.Error(t, fmt.Errorf(" requested an unassigned chunk data pack %x", req))
-							}
-							// each assigned chunk data pack should be requested only once
-							if _, ok := retriedChunks[originID][chunkID]; !ok {
-								// marks execution chunk data pack request as requested
-								retriedChunks[originID][chunkID] = struct{}{}
-
-								// drops the first request on chunk data pack
-								// to evaluate retrials
-								return
 							}
 
 							// publishes the chunk data pack response to the network
