@@ -46,8 +46,8 @@ var (
 		bootstrap.PathDKGDataPub,
 		bootstrap.PathNodeInfosPub,
 		bootstrap.PathGenesisBlock,
-		bootstrap.FilenameGenesisQC,
-		bootstrap.FilenameGenesisCommit,
+		bootstrap.PathGenesisQC,
+		bootstrap.PathGenesisCommit,
 	}
 
 	// consensus node additionally gets random beacon
