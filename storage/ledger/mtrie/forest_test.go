@@ -828,9 +828,9 @@ func TestTrieStoreAndLoad(t *testing.T) {
 // 	require.NoError(t, err)
 // 	rootHashForSMT := emptyTree
 // 	for e := 0; e < experimentRep; e++ {
-// 		// insert some Values to an empty trie
+// 		// insert some values to an empty trie
 // 		keys := make([][]byte, 0)
-// 		Values := make([][]byte, 0)
+// 		values := make([][]byte, 0)
 // 		rand.Seed(time.Now().UnixNano())
 
 // 		// rejection sampling
@@ -838,20 +838,20 @@ func TestTrieStoreAndLoad(t *testing.T) {
 // 		keyValueMap := make(map[string][]byte)
 // 		i := 0
 // 		for i < numberOfKeys {
-// 			Key := make([]byte, 2)
-// 			rand.Read(Key)
+// 			key := make([]byte, 2)
+// 			rand.Read(key)
 // 			// deduplicate
-// 			if _, found := keyValueMap[string(Key)]; !found {
+// 			if _, found := keyValueMap[string(key)]; !found {
 // 				keys = append(keys, Key)
-// 				Value := make([]byte, 4)
-// 				rand.Read(Value)
+// 				value := make([]byte, 4)
+// 				rand.Read(value)
 // 				keyValueMap[string(Key)] = Value
-// 				Values = append(Values, Value)
+// 				values = append(values, value)
 // 				i++
 // 			}
 // 		}
 
-// 		newRootHash, err := fStore.Update(keys, Values, rootHash)
+// 		newRootHash, err := fStore.Update(keys, values, rootHash)
 // 		require.NoError(t, err, "error commiting changes")
 // 		rootHash = newRootHash
 
@@ -863,7 +863,7 @@ func TestTrieStoreAndLoad(t *testing.T) {
 // 		}
 
 // 		// Test eqaulity to SMT
-// 		newRootHashForSMT, err := smt.Update(keys, Values, rootHashForSMT)
+// 		newRootHashForSMT, err := smt.Update(keys, values, rootHashForSMT)
 // 		require.NoError(t, err)
 // 		rootHashForSMT = newRootHashForSMT
 // 		require.True(t, bytes.Equal(newRootHashForSMT, newRootHash))
@@ -882,7 +882,7 @@ func TestTrieStoreAndLoad(t *testing.T) {
 // 			require.True(t, bytes.Equal(encodedProof[i], encodedProofSMT[i]))
 // 		}
 
-// 		psmt, err := cstrie.NewPSMT(rootHash, trieHeight, keys, Values, encodedProof)
+// 		psmt, err := cstrie.NewPSMT(rootHash, trieHeight, keys, values, encodedProof)
 // 		require.True(t, bytes.Equal(psmt.GetRootHash(), rootHash))
 // 		require.NoError(t, err, "error building partial trie")
 
