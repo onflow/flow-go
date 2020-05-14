@@ -32,8 +32,10 @@ func TestFinalizer(t *testing.T) {
 		genesis := model.Genesis()
 		chainID := genesis.Header.ChainID
 
-		headers := storage.NewHeaders(metrics.NewNoopCollector(), db)
-		payloads := storage.NewClusterPayloads(db)
+		metrics := metrics.NewNoopCollector()
+
+		headers := storage.NewHeaders(metrics, db)
+		payloads := storage.NewClusterPayloads(metrics, db)
 
 		state, err := cluster.NewState(db, chainID, headers, payloads)
 		require.NoError(t, err)
@@ -41,8 +43,6 @@ func TestFinalizer(t *testing.T) {
 
 		pool, err := stdmap.NewTransactions(1000)
 		require.NoError(t, err)
-
-		metrics := metrics.NewNoopCollector()
 
 		// a helper function to clean up shared state between tests
 		cleanup := func() {
