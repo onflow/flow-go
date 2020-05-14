@@ -130,8 +130,6 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 func (e *Engine) process(originID flow.Identifier, input interface{}) error {
-	// process one event at a time for now
-
 	switch v := input.(type) {
 	case *events.SyncedBlock:
 		e.metrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlock)
@@ -253,6 +251,9 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		return fmt.Errorf("could not check parent: %w", err)
 	}
 
+	e.unit.Lock()
+	defer e.unit.Unlock()
+
 	// at this point, we should be able to connect the proposal to the finalized
 	// state and should process it to see whether to forward to hotstuff or not
 	err = e.processBlockProposal(proposal)
@@ -274,9 +275,6 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 // the children are also still on a valid chain and all missing links are there;
 // no need to do all the processing again.
 func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
-
-	e.unit.Lock()
-	defer e.unit.Unlock()
 
 	header := proposal.Header
 
