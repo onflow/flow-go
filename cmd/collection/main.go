@@ -43,7 +43,6 @@ import (
 	"github.com/dapperlabs/flow-go/state/protocol"
 	storage "github.com/dapperlabs/flow-go/storage"
 	storagekv "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/utils/debug"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -85,7 +84,7 @@ func main() {
 		err            error
 	)
 
-	cmd.FlowNode("collection").
+	cmd.FlowNode(flow.RoleCollection.String()).
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&txLimit, "tx-limit", 50000, "maximum number of transactions in the memory pool")
 			flags.UintVar(&ingressExpiryBuffer, "ingress-expiry-buffer", 30, "expiry buffer for inbound transactions")
@@ -177,10 +176,6 @@ func main() {
 			// otherwise, we already have cluster state on-disk, no bootstrapping needed
 
 			return nil
-		}).
-		Component("auto profiler", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			profiler, err := debug.NewAutoProfiler(filepath.Join(node.BaseConfig.BootstrapDir, "debug-pprof"), node.Logger)
-			return profiler, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
@@ -300,7 +295,7 @@ func main() {
 			prop = prop.WithConsensus(hot)
 			return prop, nil
 		}).
-		Run(flow.RoleCollection.String())
+		Run()
 }
 
 // initClusterCommittee initializes the collector cluster's HotStuff committee state

@@ -5,8 +5,6 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/cmd"
@@ -19,6 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/model/encoding"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	"github.com/dapperlabs/flow-go/module/chunks"
@@ -74,7 +73,7 @@ func main() {
 		collector            module.VerificationMetrics
 	)
 
-	cmd.FlowNode("verification").
+	cmd.FlowNode(flow.RoleVerification.String()).
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
 			flags.UintVar(&collectionLimit, "collection-limit", 1000, "maximum number of authCollections in the memory pool")
@@ -230,5 +229,5 @@ func main() {
 
 			return followerEng.WithSynchronization(sync), nil
 		}).
-		Run(flow.RoleVerification.String())
+		Run()
 }

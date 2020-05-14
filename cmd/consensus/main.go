@@ -64,7 +64,7 @@ func main() {
 		mainMetrics    module.HotstuffMetrics
 	)
 
-	cmd.FlowNode("consensus").
+	cmd.FlowNode(flow.RoleConsensus.String()).
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&guaranteeLimit, "guarantee-limit", 10000, "maximum number of guarantees in the memory pool")
 			flags.UintVar(&resultLimit, "result-limit", 1000, "maximum number of execution results in the memory pool")
@@ -294,7 +294,7 @@ func main() {
 			comp = comp.WithSynchronization(sync).WithConsensus(hot)
 			return comp, nil
 		}).
-		Run(flow.RoleConsensus.String())
+		Run()
 }
 
 func loadDKGPrivateData(path string, myID flow.Identifier) (*bootstrap.DKGParticipantPriv, error) {
