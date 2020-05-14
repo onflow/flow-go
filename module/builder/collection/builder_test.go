@@ -15,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	builder "github.com/dapperlabs/flow-go/module/builder/collection"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/state/cluster"
 	clusterkv "github.com/dapperlabs/flow-go/state/cluster/badger"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
@@ -65,10 +66,11 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.dbdir = unittest.TempDir(suite.T())
 	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
 
+	metrics := metrics.NewNoopCollector()
 	headers, _, _, _, _, _, blocks := sutil.StorageLayer(suite.T(), suite.db)
 	suite.headers = headers
 	suite.blocks = blocks
-	suite.payloads = storage.NewClusterPayloads(suite.db)
+	suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
 
 	suite.state, err = clusterkv.NewState(suite.db, suite.chainID, suite.headers, suite.payloads)
 	suite.Require().Nil(err)
@@ -541,10 +543,11 @@ func benchmarkBuildOn(b *testing.B, size int) {
 			assert.Nil(b, err)
 		}()
 
+		metrics := metrics.NewNoopCollector()
 		headers, _, _, _, _, _, blocks := sutil.StorageLayer(suite.T(), suite.db)
 		suite.headers = headers
 		suite.blocks = blocks
-		suite.payloads = storage.NewClusterPayloads(suite.db)
+		suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
 
 		suite.state, err = clusterkv.NewState(suite.db, suite.chainID, suite.headers, suite.payloads)
 		assert.Nil(b, err)

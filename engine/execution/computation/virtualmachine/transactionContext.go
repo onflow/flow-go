@@ -73,7 +73,7 @@ func (r *TransactionContext) ValueExists(owner, controller, key []byte) (exists 
 		return false, err
 	}
 
-	return v != nil, nil
+	return len(v) > 0, nil
 }
 
 // CreateAccount creates a new account and inserts it into the world state.

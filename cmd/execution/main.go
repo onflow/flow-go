@@ -45,7 +45,7 @@ func main() {
 		mTrieCacheSize     uint32
 	)
 
-	cmd.FlowNode("execution").
+	cmd.FlowNode(flow.RoleExecution.String()).
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			homedir, _ := os.UserHomeDir()
 			datadir := filepath.Join(homedir, ".flow", "execution")
@@ -167,6 +167,6 @@ func main() {
 		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, events, txResults)
 			return rpcEng, nil
-		}).Run(flow.RoleExecution.String())
+		}).Run()
 
 }

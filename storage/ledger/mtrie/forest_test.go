@@ -699,6 +699,7 @@ func TestProofGenerationInclusion(t *testing.T) {
 }
 
 func TestPurgeAndLoad(t *testing.T) {
+	t.Skip("we don't have this functionality right now")
 	keyByteSize := 2
 	trieHeight := keyByteSize*8 + 1
 
@@ -738,9 +739,6 @@ func TestPurgeAndLoad(t *testing.T) {
 	values = [][]byte{v4}
 	rootHash5, err := fStore.Update(keys, values, rootHash4)
 	require.NoError(t, err)
-
-	// TODO fix this gap in between
-	time.Sleep(3 * time.Second)
 
 	keys = [][]byte{k1}
 	values = [][]byte{v1}
