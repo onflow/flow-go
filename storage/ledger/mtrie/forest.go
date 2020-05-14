@@ -44,6 +44,7 @@ func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int, onTreeE
 			if !ok {
 				panic(fmt.Sprintf("cache contains item of type %T", value))
 			}
+			forest.size -= trie.Size()
 			//TODO Log error
 			_ = onTreeEvicted(trie)
 		})
