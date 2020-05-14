@@ -31,6 +31,9 @@ func StorageBenchmark() {
 	trieHeight := keyByteSize*8 + 1 // 257
 
 	absPath, err := filepath.Abs("./logs.txt")
+	if err != nil {
+		panic("can't creat log file")
+	}
 	fmt.Printf("Writing log file to '%s'\n", absPath)
 	f, err := os.Create(absPath)
 	if err != nil {
