@@ -52,15 +52,3 @@ func (r *Results) All() []*flow.ExecutionResult {
 	}
 	return results
 }
-
-// DropForBlock will drop all results for the given block.
-func (r *Results) DropForBlock(blockID flow.Identifier) []flow.Identifier {
-	var resultIDs []flow.Identifier
-	for _, result := range r.All() {
-		if result.BlockID == blockID {
-			_ = r.Rem(result.ID())
-			resultIDs = append(resultIDs, result.ID())
-		}
-	}
-	return resultIDs
-}

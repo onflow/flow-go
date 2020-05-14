@@ -43,6 +43,7 @@ import (
 	"github.com/dapperlabs/flow-go/state/protocol"
 	storage "github.com/dapperlabs/flow-go/storage"
 	storagekv "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/utils/debug"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -59,10 +60,12 @@ func main() {
 		builderExpiryBuffer uint
 		hotstuffTimeout     time.Duration
 
-		ingressConf  ingress.Config
-		pool         mempool.Transactions
-		transactions *storagekv.Transactions
-		colPayloads  *storagekv.ClusterPayloads
+		ingressConf     ingress.Config
+		pool            mempool.Transactions
+		transactions    *storagekv.Transactions
+		colHeaders      *storagekv.Headers
+		colPayloads     *storagekv.ClusterPayloads
+		colCacheMetrics module.CacheMetrics
 
 		colCache *buffer.PendingClusterBlocks // pending block cache for cluster consensus
 		conCache *buffer.PendingBlocks        // pending block cache for follower
@@ -77,7 +80,7 @@ func main() {
 
 		prov           *provider.Engine
 		ing            *ingest.Engine
-		collMetrics    module.CollectionMetrics
+		colMetrics     module.CollectionMetrics
 		clusterMetrics module.HotstuffMetrics
 		err            error
 	)
@@ -96,11 +99,13 @@ func main() {
 			return err
 		}).
 		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
+			colCacheMetrics = metrics.NewCacheCollector("cluster")
 			transactions = storagekv.NewTransactions(node.DB)
+			colHeaders = storagekv.NewHeaders(colCacheMetrics, node.DB)
 			colPayloads = storagekv.NewClusterPayloads(node.DB)
 			return nil
 		}).
-		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
+		Module("block mempool", func(node *cmd.FlowNodeBuilder) error {
 			colCache = buffer.NewPendingClusterBlocks()
 			conCache = buffer.NewPendingBlocks()
 			return nil
@@ -114,7 +119,7 @@ func main() {
 			return nil
 		}).
 		Module("collection node metrics", func(node *cmd.FlowNodeBuilder) error {
-			collMetrics = metrics.NewCollectionCollector(node.Tracer)
+			colMetrics = metrics.NewCollectionCollector(node.Tracer)
 			return nil
 		}).
 		Module("hotstuff cluster metrics", func(node *cmd.FlowNodeBuilder) error {
@@ -143,7 +148,7 @@ func main() {
 		Module("cluster state", func(node *cmd.FlowNodeBuilder) error {
 
 			// initialize cluster state
-			clusterState, err = clusterkv.NewState(node.DB, clusterID, node.Storage.Headers, colPayloads)
+			clusterState, err = clusterkv.NewState(node.DB, clusterID, colHeaders, colPayloads)
 			if err != nil {
 				return fmt.Errorf("could not create cluster state: %w", err)
 			}
@@ -172,6 +177,10 @@ func main() {
 			// otherwise, we already have cluster state on-disk, no bootstrapping needed
 
 			return nil
+		}).
+		Component("auto profiler", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			profiler, err := debug.NewAutoProfiler(filepath.Join(node.BaseConfig.BootstrapDir, "debug-pprof"), node.Logger)
+			return profiler, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
@@ -208,7 +217,7 @@ func main() {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
 
-			follower, err := followereng.New(node.Logger, node.Network, node.Me, cleaner, node.Storage.Headers, node.Storage.Payloads, node.State, conCache, core)
+			follower, err := followereng.New(node.Logger, node.Network, node.Me, node.Metrics.Engine, cleaner, node.Storage.Headers, node.Storage.Payloads, node.State, conCache, core)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
@@ -223,7 +232,7 @@ func main() {
 			return follower.WithSynchronization(sync), nil
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ing, err = ingest.New(node.Logger, node.Network, node.State, collMetrics, node.Me, pool, ingressExpiryBuffer)
+			ing, err = ingest.New(node.Logger, node.Network, node.State, node.Metrics.Engine, colMetrics, node.Me, pool, ingressExpiryBuffer)
 			return ing, err
 		}).
 		Component("ingress server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -232,17 +241,17 @@ func main() {
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			collections := storagekv.NewCollections(node.DB)
-			prov, err = provider.New(node.Logger, node.Network, node.State, collMetrics, node.Me, pool, collections, transactions)
+			prov, err = provider.New(node.Logger, node.Network, node.State, node.Metrics.Engine, colMetrics, node.Me, pool, collections, transactions)
 			return prov, err
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			builder := builder.NewBuilder(node.DB, node.Storage.Headers, colPayloads, pool,
+			builder := builder.NewBuilder(node.DB, colHeaders, colPayloads, pool,
 				builder.WithMaxCollectionSize(maxCollectionSize),
 				builder.WithExpiryBuffer(builderExpiryBuffer),
 			)
-			finalizer := colfinalizer.NewFinalizer(node.DB, pool, prov, collMetrics, clusterID)
+			finalizer := colfinalizer.NewFinalizer(node.DB, pool, prov, colMetrics, clusterID)
 
-			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, clusterState, collMetrics, ing, pool, transactions, node.Storage.Headers, colPayloads, colCache)
+			prop, err := proposal.New(node.Logger, node.Network, node.Me, colMetrics, node.Metrics.Engine, node.State, clusterState, ing, pool, transactions, colHeaders, colPayloads, colCache)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize engine: %w", err)
 			}
@@ -262,7 +271,7 @@ func main() {
 
 			persist := persister.New(node.DB)
 
-			finalized, pending, err := findLatest(clusterState, node.Storage.Headers)
+			finalized, pending, err := findLatest(clusterState, colHeaders)
 			if err != nil {
 				return nil, fmt.Errorf("could not retrieve finalized/pending headers: %w", err)
 			}
@@ -271,7 +280,7 @@ func main() {
 				node.Logger,
 				notifier,
 				clusterMetrics,
-				node.Storage.Headers,
+				colHeaders,
 				committee,
 				builder,
 				finalizer,

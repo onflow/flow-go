@@ -11,6 +11,7 @@ require (
 	github.com/dgraph-io/badger/v2 v2.0.2
 	github.com/ethereum/go-ethereum v1.9.9
 	github.com/gammazero/deque v0.0.0-20200310222745-50fa758af896
+	github.com/go-kit/kit v0.9.0
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/mock v1.4.3
 	github.com/golang/protobuf v1.4.0
@@ -33,6 +34,7 @@ require (
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.3.0
+	github.com/prometheus/tsdb v0.7.1
 	github.com/rs/zerolog v1.15.0
 	github.com/segmentio/fasthash v1.0.2 // indirect
 	github.com/spf13/cobra v0.0.6

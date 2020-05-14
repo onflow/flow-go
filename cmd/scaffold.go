@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
@@ -92,33 +93,34 @@ type namedDoneObject struct {
 // It runs a node process with following structure, in sequential order
 // Base inits (network, storage, state, logger)
 //   PostInit handlers, if any
-//   GenesisHandler, if any and if genesis was generate
+//   GenesisHandler, if any and if genesis was generated
 // Components handlers, if any, wait sequentially
 // Run() <- main loop
 // Components destructors, if any
 type FlowNodeBuilder struct {
-	BaseConfig     BaseConfig
-	NodeID         flow.Identifier
-	flags          *pflag.FlagSet
-	name           string
-	Logger         zerolog.Logger
-	Me             *local.Local
-	Tracer         *trace.OpenTracer
-	Metrics        Metrics
-	DB             *badger.DB
-	Storage        Storage
-	State          *protocol.State
-	DKGState       *wrapper.State
-	Network        *libp2p.Network
-	modules        []namedModuleFunc
-	components     []namedComponentFunc
-	doneObject     []namedDoneObject
-	sig            chan os.Signal
-	genesisHandler func(node *FlowNodeBuilder, block *flow.Block)
-	postInitFns    []func(*FlowNodeBuilder)
-	stakingKey     crypto.PrivateKey
-	networkKey     crypto.PrivateKey
-	MsgValidators  []validators.MessageValidator
+	BaseConfig        BaseConfig
+	NodeID            flow.Identifier
+	flags             *pflag.FlagSet
+	name              string
+	Logger            zerolog.Logger
+	Me                *local.Local
+	Tracer            *trace.OpenTracer
+	MetricsRegisterer prometheus.Registerer
+	Metrics           Metrics
+	DB                *badger.DB
+	Storage           Storage
+	State             *protocol.State
+	DKGState          *wrapper.State
+	Network           *libp2p.Network
+	modules           []namedModuleFunc
+	components        []namedComponentFunc
+	doneObject        []namedDoneObject
+	sig               chan os.Signal
+	genesisHandler    func(node *FlowNodeBuilder, block *flow.Block)
+	postInitFns       []func(*FlowNodeBuilder)
+	stakingKey        crypto.PrivateKey
+	networkKey        crypto.PrivateKey
+	MsgValidators     []validators.MessageValidator
 
 	// genesis information
 	GenesisCommit flow.StateCommitment
@@ -240,12 +242,13 @@ func (fnb *FlowNodeBuilder) initLogger() {
 func (fnb *FlowNodeBuilder) initMetrics() {
 	tracer, err := trace.NewTracer(fnb.Logger, fnb.name)
 	fnb.MustNot(err).Msg("could not initialize tracer")
+	fnb.MetricsRegisterer = prometheus.DefaultRegisterer
 	fnb.Tracer = tracer
 	fnb.Metrics = Metrics{
 		Network:    metrics.NewNetworkCollector(),
 		Engine:     metrics.NewEngineCollector(),
 		Compliance: metrics.NewComplianceCollector(),
-		Cache:      metrics.NewCacheCollector(),
+		Cache:      metrics.NewCacheCollector(flow.DefaultChainID),
 		Mempool:    metrics.NewMempoolCollector(),
 	}
 }
@@ -302,6 +305,7 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.Storage.Headers,
 		fnb.Storage.Identities,
 		fnb.Storage.Seals,
+		fnb.Storage.Index,
 		fnb.Storage.Payloads,
 		fnb.Storage.Blocks,
 		protocol.SetClusters(fnb.BaseConfig.nClusters),

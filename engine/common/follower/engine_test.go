@@ -11,6 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/common/follower"
 	"github.com/dapperlabs/flow-go/model/flow"
+	metrics "github.com/dapperlabs/flow-go/module/metrics"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
@@ -60,7 +61,7 @@ func (suite *Suite) SetupTest() {
 	suite.state.On("Mutate").Return(suite.mutator)
 	suite.state.On("Final").Return(suite.snapshot)
 
-	eng, err := follower.New(zerolog.Logger{}, suite.net, suite.me, suite.cleaner, suite.headers, suite.payloads, suite.state, suite.cache, suite.follower)
+	eng, err := follower.New(zerolog.Logger{}, suite.net, suite.me, metrics.NewNoopCollector(), suite.cleaner, suite.headers, suite.payloads, suite.state, suite.cache, suite.follower)
 	require.Nil(suite.T(), err)
 	eng.WithSynchronization(suite.sync)
 

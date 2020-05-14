@@ -52,14 +52,14 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
 
 	metrics := metrics.NewNoopCollector()
-	headers, identities, _, seals, _, conPayloads, blocks := util.StorageLayer(suite.T(), suite.db)
+	headers, identities, _, seals, index, conPayloads, blocks := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(suite.db)
 
 	suite.state, err = NewState(suite.db, suite.chainID, headers, colPayloads)
 	suite.Assert().Nil(err)
 	suite.mutator = suite.state.Mutate()
 
-	suite.protoState, err = protocol.NewState(metrics, suite.db, headers, identities, seals, conPayloads, blocks)
+	suite.protoState, err = protocol.NewState(metrics, suite.db, headers, identities, seals, index, conPayloads, blocks)
 	require.NoError(suite.T(), err)
 }
 

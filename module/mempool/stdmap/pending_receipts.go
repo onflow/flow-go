@@ -3,9 +3,6 @@
 package stdmap
 
 import (
-	"math"
-	"sync"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/verification"
 )
@@ -16,31 +13,28 @@ import (
 // used to store execution receipts and to generate block seals.
 type PendingReceipts struct {
 	*Backend
-
-	// TODO push counter to the backend
-	// https://github.com/dapperlabs/flow-go/issues/3707
-	counterMU sync.Mutex // provides atomic updates for the counter
-	counter   uint64     // keeps number of added items to the mempool
+	qe *QueueEjector
 }
 
 // NewReceipts creates a new memory pool for execution receipts.
 func NewPendingReceipts(limit uint) (*PendingReceipts, error) {
 	// create the receipts memory pool with the lookup maps
+	qe := NewQueueEjector(limit + 1)
 	r := &PendingReceipts{
-		counter: 0,
-		Backend: NewBackend(WithLimit(limit), WithEject(ejectOldestPendingReceipt)),
+		qe:      qe,
+		Backend: NewBackend(WithLimit(limit), WithEject(qe.Eject)),
 	}
 	return r, nil
 }
 
 // Add adds a pending execution receipt to the mempool.
 func (p *PendingReceipts) Add(preceipt *verification.PendingReceipt) bool {
-	p.counterMU.Lock()
-	defer p.counterMU.Unlock()
+	ok := p.Backend.Add(preceipt)
+	if ok {
+		p.qe.Push(preceipt.ID())
+	}
 
-	p.counter += 1
-	preceipt.Counter = p.counter
-	return p.Backend.Add(preceipt)
+	return ok
 }
 
 // Rem will remove a pending receipt by ID.
@@ -56,22 +50,4 @@ func (p *PendingReceipts) All() []*verification.PendingReceipt {
 		receipts = append(receipts, entity.(*verification.PendingReceipt))
 	}
 	return receipts
-}
-
-// ejectOldestPendingReceipt is the ejection function for pending receipts, it finds and returns
-// the entry with the smallest counter value.
-func ejectOldestPendingReceipt(entities map[flow.Identifier]flow.Entity) (flow.Identifier, flow.Entity) {
-	var oldestEntityID flow.Identifier
-	var oldestEntity flow.Entity
-
-	var minCounter uint64 = math.MaxUint64
-	for entityID, entity := range entities {
-		pc := entity.(*verification.PendingReceipt)
-		if pc.Counter < minCounter {
-			minCounter = pc.Counter
-			oldestEntity = entity
-			oldestEntityID = entityID
-		}
-	}
-	return oldestEntityID, oldestEntity
 }
