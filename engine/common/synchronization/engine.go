@@ -40,11 +40,11 @@ type Engine struct {
 	// config parameters
 	pollInterval  time.Duration
 	scanInterval  time.Duration
-	retryInterval time.Duration
-	tolerance     uint // tolerance determines how big of a difference in block heights we tolerated before actively syncing with range requests
-	maxAttempts   uint // maxAttempts is the maximum number of attempts to sync we make for each requested block/height before discarding
-	maxSize       uint // maxSize is the maximum number of blocks we request in the same block request message
-	maxRequests   uint // maxRequests is the maximum number of requests we send during each scanning period
+	retryInterval time.Duration // the initial interval before we retry a request, uses exponential backoff
+	tolerance     uint          // determines how big of a difference in block heights we tolerated before actively syncing with range requests
+	maxAttempts   uint          // the maximum number of attempts we make for each requested block/height before discarding
+	maxSize       uint          // the maximum number of blocks we request in the same block request message
+	maxRequests   uint          // the maximum number of requests we send during each scanning period
 }
 
 // New creates a new consensus propagation engine.
@@ -505,16 +505,12 @@ func (e *Engine) scanPending() ([]uint64, []flow.Identifier, error) {
 	// for now, we just ignore that problem, but once we do, we should always
 	// prioritize range requests over batch requests
 
-	// we simply use the same timestamp for each scan, that should be fine
-	now := time.Now()
-
 	// create a list of all height requests that should be sent
 	var heights []uint64
 	for height, status := range e.heights {
 
 		// if the last request is young enough, skip
-		cutoff := status.Requested.Add(e.retryInterval)
-		if now.Before(cutoff) {
+		if !status.ShouldRetry(e.retryInterval) {
 			continue
 		}
 
@@ -533,8 +529,7 @@ func (e *Engine) scanPending() ([]uint64, []flow.Identifier, error) {
 	for blockID, status := range e.blockIDs {
 
 		// if the last request is young enough, skip
-		cutoff := status.Requested.Add(e.retryInterval)
-		if now.Before(cutoff) {
+		if !status.ShouldRetry(e.retryInterval) {
 			continue
 		}
 
