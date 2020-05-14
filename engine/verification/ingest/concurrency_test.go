@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -24,6 +25,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
+	"github.com/dapperlabs/flow-go/utils/logging"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -32,6 +34,7 @@ import (
 // - not all chunks of the receipts are assigned to the ingest engine
 // - for each assigned chunk ingest engine emits a single result approval to verify engine only once
 // (even in presence of duplication)
+// - also the test stages to drop the first request on each collection to evaluate the retrial
 func TestConcurrency(t *testing.T) {
 	var mu sync.Mutex
 	testcases := []struct {
@@ -306,9 +309,9 @@ func setupMockExeNode(t *testing.T, node mock.GenericNode, verID flow.Identifier
 
 }
 
-// setupMockExeNode sets up a mocked execution node that responds to requests for
-// chunk states. Any requests that don't correspond to an execution receipt in
-// the input ers list result in the test failing.
+// setupMockExeNode sets up a mocked collection node that responds to requests for collections.
+// Any requests that don't correspond to a collection ID in the input colls list result in the test failing.
+// It also drops the first request for each collection to evaluate retrials.
 func setupMockCollectionNode(t *testing.T, node mock.GenericNode, verID flow.Identifier, colls []*flow.Collection) {
 	eng := new(network.Engine)
 	chunksConduit, err := node.Net.Register(engine.CollectionProvider, eng)
@@ -321,8 +324,12 @@ func setupMockCollectionNode(t *testing.T, node mock.GenericNode, verID flow.Ide
 			if req, ok := args[1].(*messages.CollectionRequest); ok {
 				if _, ok := retriedColl[req.ID]; !ok {
 					// this is the first request for this collection
-					// it is dropped
-
+					// the request is dropped to evaluate retry functionality
+					retriedColl[req.ID] = struct{}{}
+					log.Debug().
+						Hex("collection_id", logging.ID(req.ID)).
+						Msg("mock collection node drops first collection request for this collection")
+					return
 				}
 
 				for _, coll := range colls {

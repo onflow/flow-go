@@ -9,12 +9,14 @@ import (
 // which is specified by a chunk ID.
 type ChunkDataPackRequest struct {
 	ChunkID flow.Identifier
+	Nonce   uint64 // so that we aren't deduplicated by the network layer
 }
 
 // ChunkDataPackResponse is the response to a chunk data pack request.
 // It contains the chunk data pack of the interest.
 type ChunkDataPackResponse struct {
-	Data flow.ChunkDataPack
+	Data  flow.ChunkDataPack
+	Nonce uint64 // so that we aren't deduplicated by the network layer
 }
 
 type ExecutionStateSyncRequest struct {
