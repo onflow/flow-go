@@ -12,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -22,6 +23,7 @@ type Engine struct {
 	unit     *engine.Unit
 	log      zerolog.Logger
 	me       module.Local
+	metrics  module.EngineMetrics
 	cleaner  storage.Cleaner
 	headers  storage.Headers
 	payloads storage.Payloads
@@ -36,6 +38,7 @@ func New(
 	log zerolog.Logger,
 	net module.Network,
 	me module.Local,
+	metrics module.EngineMetrics,
 	cleaner storage.Cleaner,
 	headers storage.Headers,
 	payloads storage.Payloads,
@@ -48,6 +51,7 @@ func New(
 		unit:     engine.NewUnit(),
 		log:      log.With().Str("engine", "follower").Logger(),
 		me:       me,
+		metrics:  metrics,
 		cleaner:  cleaner,
 		headers:  headers,
 		payloads: payloads,
@@ -126,14 +130,30 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 func (e *Engine) process(originID flow.Identifier, input interface{}) error {
+	// process one event at a time for now
+
 	switch v := input.(type) {
 	case *events.SyncedBlock:
+		e.before(metrics.MessageSyncedBlock)
+		defer e.after(metrics.MessageSyncedBlock)
 		return e.onSyncedBlock(originID, v)
 	case *messages.BlockProposal:
+		e.before(metrics.MessageBlockProposal)
+		defer e.after(metrics.MessageBlockProposal)
 		return e.onBlockProposal(originID, v)
 	default:
 		return fmt.Errorf("invalid event type (%T)", input)
 	}
+}
+
+func (e *Engine) before(msg string) {
+	e.metrics.MessageReceived(metrics.EngineFollower, msg)
+	e.unit.Lock()
+}
+
+func (e *Engine) after(msg string) {
+	e.unit.Unlock()
+	e.metrics.MessageHandled(metrics.EngineFollower, msg)
 }
 
 func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBlock) error {

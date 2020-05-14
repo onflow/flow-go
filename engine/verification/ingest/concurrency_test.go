@@ -1,7 +1,6 @@
 package ingest_test
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"sync"
@@ -14,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/crypto/random"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
@@ -34,6 +32,7 @@ import (
 // - for each assigned chunk ingest engine emits a single result approval to verify engine only once
 // (even in presence of duplication)
 func TestConcurrency(t *testing.T) {
+	var mu sync.Mutex
 	testcases := []struct {
 		erCount, // number of execution receipts
 		senderCount, // number of (concurrent) senders for each execution receipt
@@ -72,8 +71,12 @@ func TestConcurrency(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
+
 		t.Run(fmt.Sprintf("%d-ers/%d-senders/%d-chunks", tc.erCount, tc.senderCount, tc.chunksNum), func(t *testing.T) {
+			mu.Lock()
+			defer mu.Unlock()
 			testConcurrency(t, tc.erCount, tc.senderCount, tc.chunksNum)
+
 		})
 	}
 }
@@ -113,7 +116,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	// ingest only sends the assigned chunks to verifier
 
 	for i := 0; i < erCount; i++ {
-		er := test.CompleteExecutionResultFixture(t, chunksNum)
+		er := test.LightExecutionResultFixture(chunksNum)
 		ers = append(ers, er)
 		// assigns all chunks to the verifier node
 		for j, chunk := range er.Receipt.ExecutionResult.Chunks {
@@ -141,8 +144,8 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 
 	// set up mock verifier engine that asserts each receipt is submitted
 	// to the verifier exactly once.
-	verifierEng, verifierEngWG := setupMockVerifierEng(t, vChunks)
-	assigner := NewMockAssigner(verID.NodeID)
+	verifierEng, verifierEngWG := test.SetupMockVerifierEng(t, vChunks)
+	assigner := test.NewMockAssigner(verID.NodeID)
 	verNode := testutil.VerificationNode(t, hub, verID, identities, assigner, requestInterval, failureThreshold,
 		testutil.WithVerifierEngine(verifierEng))
 
@@ -228,8 +231,8 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	}
 
 	// wait for all ERs to be sent to VER
-	unittest.RequireReturnsBefore(t, senderWG.Wait, time.Duration(senderCount*chunksNum*erCount)*time.Second)
-	unittest.RequireReturnsBefore(t, verifierEngWG.Wait, time.Duration(senderCount*chunksNum*erCount)*time.Second)
+	unittest.RequireReturnsBefore(t, senderWG.Wait, time.Duration(senderCount*chunksNum*erCount*5)*time.Second)
+	unittest.RequireReturnsBefore(t, verifierEngWG.Wait, time.Duration(senderCount*chunksNum*erCount*5)*time.Second)
 
 	// stops ingest engine of verification node
 	// Note: this should be done prior to any evaluation to make sure that
@@ -240,7 +243,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	verNet.StopConDev()
 
 	for _, c := range vChunks {
-		if isAssigned(c.ChunkIndex) {
+		if test.IsAssigned(c.ChunkIndex) {
 			// assigned chunks should have their result to be added to ingested results mempool
 			assert.True(t, verNode.IngestedResultIDs.Has(c.Receipt.ExecutionResult.ID()))
 		}
@@ -294,104 +297,4 @@ func setupMockExeNode(t *testing.T, node mock.GenericNode, verID flow.Identifier
 		}).
 		Return(nil)
 
-}
-
-// setupMockVerifierEng sets up a mock verifier engine that asserts the followings:
-// - that a set of chunks are delivered to it.
-// - that each chunk is delivered exactly once
-// setupMockVerifierEng returns the mock engine and a wait group that unblocks when all ERs are received.
-func setupMockVerifierEng(t *testing.T, vChunks []*verification.VerifiableChunk) (*network.Engine, *sync.WaitGroup) {
-	eng := new(network.Engine)
-
-	// keep track of which verifiable chunks we have received
-	receivedChunks := make(map[flow.Identifier]struct{})
-	var (
-		// decrement the wait group when each verifiable chunk received
-		wg sync.WaitGroup
-		// check one verifiable chunk at a time to ensure dupe checking works
-		mu sync.Mutex
-	)
-
-	// computes expected number of assigned chunks
-	expected := 0
-	for _, c := range vChunks {
-		if isAssigned(c.ChunkIndex) {
-			expected++
-		}
-	}
-	wg.Add(expected)
-
-	eng.On("ProcessLocal", testifymock.Anything).
-		Run(func(args testifymock.Arguments) {
-			mu.Lock()
-			defer mu.Unlock()
-
-			// the received entity should be a verifiable chunk
-			vchunk, ok := args[0].(*verification.VerifiableChunk)
-			assert.True(t, ok)
-
-			// retrieves the content of received chunk
-			chunk, ok := vchunk.Receipt.ExecutionResult.Chunks.ByIndex(vchunk.ChunkIndex)
-			require.True(t, ok, "chunk out of range requested")
-			vID := chunk.ID()
-
-			// verifies that it has not seen this chunk before
-			_, alreadySeen := receivedChunks[vID]
-			if alreadySeen {
-				t.Logf("received duplicated chunk (id=%s)", vID)
-				t.Fail()
-				return
-			}
-
-			// ensure the received chunk matches one we expect
-			for _, vc := range vChunks {
-				if chunk.ID() == vID {
-					// mark it as seen and decrement the waitgroup
-					receivedChunks[vID] = struct{}{}
-					// checks end states match as expected
-					if !bytes.Equal(vchunk.EndState, vc.EndState) {
-						t.Logf("end states are not equal: expected %x got %x", vchunk.EndState, chunk.EndState)
-						t.Fail()
-					}
-					wg.Done()
-					return
-				}
-			}
-
-			// the received chunk doesn't match any expected ERs
-			t.Logf("received unexpected ER (id=%s)", vID)
-			t.Fail()
-		}).
-		Return(nil)
-
-	return eng, &wg
-}
-
-type MockAssigner struct {
-	me flow.Identifier
-}
-
-func NewMockAssigner(id flow.Identifier) *MockAssigner {
-	return &MockAssigner{me: id}
-}
-
-// Assign assigns all input chunks to the verifier node
-func (m *MockAssigner) Assign(ids flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chmodel.Assignment, error) {
-	if len(chunks) == 0 {
-		return nil, fmt.Errorf("assigner called with empty chunk list")
-	}
-	a := chmodel.NewAssignment()
-	for _, c := range chunks {
-		if isAssigned(c.Index) {
-			a.Add(c, flow.IdentifierList{m.me})
-		}
-	}
-
-	return a, nil
-}
-
-// isAssigned is a helper function that returns true for the even chunk indices
-func isAssigned(chunkIndex uint64) bool {
-	answer := chunkIndex%2 == 0
-	return answer
 }

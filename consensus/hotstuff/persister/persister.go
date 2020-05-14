@@ -36,10 +36,10 @@ func (p *Persister) GetVoted() (uint64, error) {
 
 // PutStarted persists the view when we start it in hotstuff.
 func (p *Persister) PutStarted(view uint64) error {
-	return p.db.Update(operation.UpdateStartedView(view))
+	return operation.RetryOnConflict(p.db.Update, operation.UpdateStartedView(view))
 }
 
 // PutVoted persist the view when we voted in hotstuff.
 func (p *Persister) PutVoted(view uint64) error {
-	return p.db.Update(operation.UpdateVotedView(view))
+	return operation.RetryOnConflict(p.db.Update, operation.UpdateVotedView(view))
 }

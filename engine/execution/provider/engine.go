@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -13,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -20,7 +22,7 @@ import (
 
 type ProviderEngine interface {
 	network.Engine
-	BroadcastExecutionReceipt(*flow.ExecutionReceipt) error
+	BroadcastExecutionReceipt(context.Context, *flow.ExecutionReceipt) error
 }
 
 // An Engine provides means of accessing data about execution state and broadcasts execution receipts to nodes in the network.
@@ -28,6 +30,7 @@ type ProviderEngine interface {
 type Engine struct {
 	unit          *engine.Unit
 	log           zerolog.Logger
+	tracer        module.Tracer
 	receiptCon    network.Conduit
 	state         protocol.ReadOnlyState
 	execState     state.ReadOnlyExecutionState
@@ -37,6 +40,7 @@ type Engine struct {
 
 func New(
 	logger zerolog.Logger,
+	tracer module.Tracer,
 	net module.Network,
 	state protocol.ReadOnlyState,
 	me module.Local,
@@ -49,6 +53,7 @@ func New(
 	eng := Engine{
 		unit:      engine.NewUnit(),
 		log:       log,
+		tracer:    tracer,
 		state:     state,
 		me:        me,
 		execState: execState,
@@ -101,10 +106,11 @@ func (e *Engine) Done() <-chan struct{} {
 
 func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
+		ctx := context.Background()
 		var err error
 		switch v := event.(type) {
 		case *messages.ChunkDataPackRequest:
-			err = e.onChunkDataPackRequest(originID, v)
+			err = e.onChunkDataPackRequest(ctx, originID, v)
 		default:
 			err = errors.Errorf("invalid event type (%T)", event)
 		}
@@ -118,7 +124,12 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // onChunkDataPackRequest receives a request for the chunk data pack associated with chunkID from the
 // requester `originID`. If such a chunk data pack is available in the execution state, it is sent to the
 // requester.
-func (e *Engine) onChunkDataPackRequest(originID flow.Identifier, req *messages.ChunkDataPackRequest) error {
+func (e *Engine) onChunkDataPackRequest(
+	ctx context.Context,
+	originID flow.Identifier,
+	req *messages.ChunkDataPackRequest,
+) error {
+
 	// extracts list of verifier nodes id
 	chunkID := req.ChunkID
 
@@ -139,7 +150,7 @@ func (e *Engine) onChunkDataPackRequest(originID flow.Identifier, req *messages.
 		return fmt.Errorf("invalid role for receiving collection: %s", origin.Role)
 	}
 
-	cdp, err := e.execState.ChunkDataPackByChunkID(chunkID)
+	cdp, err := e.execState.ChunkDataPackByChunkID(ctx, chunkID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve chunk ID (%s): %w", origin, err)
 	}
@@ -159,7 +170,10 @@ func (e *Engine) onChunkDataPackRequest(originID flow.Identifier, req *messages.
 	return nil
 }
 
-func (e *Engine) BroadcastExecutionReceipt(receipt *flow.ExecutionReceipt) error {
+func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.ExecutionReceipt) error {
+
+	span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEBroadcastExecutionReceipt)
+	defer span.Finish()
 
 	e.log.Debug().
 		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).

@@ -21,7 +21,7 @@ func NewChunkDataPackTrackers(limit uint) (*ChunkDataPackTrackers, error) {
 }
 
 // Add adds a ChunkDataPackTracker to the mempool.
-func (c *ChunkDataPackTrackers) Add(cdpt *tracker.ChunkDataPackTracker) error {
+func (c *ChunkDataPackTrackers) Add(cdpt *tracker.ChunkDataPackTracker) bool {
 	return c.Backend.Add(cdpt)
 }
 
@@ -36,21 +36,39 @@ func (c *ChunkDataPackTrackers) Rem(chunkID flow.Identifier) bool {
 	return c.Backend.Rem(chunkID)
 }
 
-// ByChunkID returns the chunk data pack tracker for the given chunk ID.
-func (c *ChunkDataPackTrackers) ByChunkID(chunkID flow.Identifier) (*tracker.ChunkDataPackTracker, error) {
-	entity, err := c.Backend.ByID(chunkID)
-	if err != nil {
-		return nil, err
-	}
-	chunkDataPackTracker, ok := entity.(*tracker.ChunkDataPackTracker)
+// Inc atomically increases the counter of tracker by one and returns the updated tracker
+func (c *ChunkDataPackTrackers) Inc(chunkID flow.Identifier) (*tracker.ChunkDataPackTracker, error) {
+	updated, ok := c.Backend.Adjust(chunkID, func(entity flow.Entity) flow.Entity {
+		cdpt := entity.(*tracker.ChunkDataPackTracker)
+		return &tracker.ChunkDataPackTracker{
+			ChunkID: cdpt.ChunkID,
+			BlockID: cdpt.BlockID,
+			Counter: cdpt.Counter + 1,
+		}
+	})
+
 	if !ok {
-		return nil, fmt.Errorf("invalid entity in chunk data pack tracker pool (%T)", entity)
+		return nil, fmt.Errorf("could not update tracker in backend")
 	}
-	return chunkDataPackTracker, nil
+
+	return updated.(*tracker.ChunkDataPackTracker), nil
+}
+
+// ByChunkID returns the chunk data pack tracker for the given chunk ID.
+func (c *ChunkDataPackTrackers) ByChunkID(chunkID flow.Identifier) (*tracker.ChunkDataPackTracker, bool) {
+	entity, ok := c.Backend.ByID(chunkID)
+	if !ok {
+		return nil, false
+	}
+	chunkDataPackTracker := entity.(*tracker.ChunkDataPackTracker)
+	return chunkDataPackTracker, true
 }
 
 // All returns all chunk data pack trackers from the pool.
 func (c *ChunkDataPackTrackers) All() []*tracker.ChunkDataPackTracker {
+	c.Lock()
+	defer c.Unlock()
+
 	entities := c.Backend.All()
 	chunkDataPackTrackers := make([]*tracker.ChunkDataPackTracker, 0, len(entities))
 	for _, entity := range entities {

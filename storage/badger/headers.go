@@ -8,6 +8,8 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
@@ -18,10 +20,10 @@ type Headers struct {
 	cache *Cache
 }
 
-func NewHeaders(db *badger.DB) *Headers {
+func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 
 	store := func(headerID flow.Identifier, header interface{}) error {
-		return db.Update(operation.InsertHeader(headerID, header.(*flow.Header)))
+		return operation.RetryOnConflict(db.Update, operation.InsertHeader(headerID, header.(*flow.Header)))
 	}
 
 	retrieve := func(blockID flow.Identifier) (interface{}, error) {
@@ -31,8 +33,13 @@ func NewHeaders(db *badger.DB) *Headers {
 	}
 
 	h := &Headers{
-		db:    db,
-		cache: newCache(withStore(store), withRetrieve(retrieve)),
+		db: db,
+		cache: newCache(collector,
+			withLimit(flow.DefaultTransactionExpiry+100),
+			withStore(store),
+			withRetrieve(retrieve),
+			withResource(metrics.ResourceHeader),
+		),
 	}
 
 	return h

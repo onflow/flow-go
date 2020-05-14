@@ -1,51 +1,42 @@
 package main
 
 import (
-	"encoding/binary"
 	"math/rand"
 	"time"
 
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/metrics/example"
+	"github.com/dapperlabs/flow-go/module/trace"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func main() {
 	example.WithMetricsServer(func(logger zerolog.Logger) {
-		collector, err := metrics.NewCollector(logger)
+		tracer, err := trace.NewTracer(logger, "collection")
 		if err != nil {
 			panic(err)
 		}
+		collector := struct {
+			*metrics.HotstuffCollector
+			*metrics.CollectionCollector
+			*metrics.NetworkCollector
+		}{
+			HotstuffCollector:   metrics.NewHotstuffCollector("some_chain_id"),
+			CollectionCollector: metrics.NewCollectionCollector(tracer),
+			NetworkCollector:    metrics.NewNetworkCollector(),
+		}
 
 		for i := 0; i < 100; i++ {
-			collector.CollectionsPerBlock(1)
-			collector.CollectionsInFinalizedBlock(3)
-			collector.SealsInFinalizedBlock(3)
+			collector.TransactionReceived(unittest.IdentifierFixture())
+			collector.PendingClusterBlocks(uint(rand.Intn(20) + 10))
 			collector.HotStuffBusyDuration(10, metrics.HotstuffEventTypeTimeout)
 			collector.HotStuffWaitDuration(10, metrics.HotstuffEventTypeTimeout)
 			collector.HotStuffIdleDuration(10)
-			collector.StartNewView(uint64(i))
-			collector.NewestKnownQC(uint64(i))
-
-			entityID := make([]byte, 32)
-			binary.LittleEndian.PutUint32(entityID, uint32(i/6))
-
-			entity2ID := make([]byte, 32)
-			binary.LittleEndian.PutUint32(entity2ID, uint32(i/6+100000))
-			if i%6 == 0 {
-				collector.StartCollectionToFinalized(flow.HashToID(entityID))
-			} else if i%6 == 3 {
-				collector.FinishCollectionToFinalized(flow.HashToID(entityID))
-			}
-
-			if i%5 == 0 {
-				collector.StartBlockToSeal(flow.HashToID(entityID))
-			} else if i%6 == 3 {
-				collector.FinishBlockToSeal(flow.HashToID(entityID))
-			}
+			collector.SetCurView(uint64(i))
+			collector.SetQCView(uint64(i))
 
 			collector.NetworkMessageSent(rand.Intn(1000), engine.ChannelName(engine.CollectionProvider))
 			collector.NetworkMessageSent(rand.Intn(1000), engine.ChannelName(engine.CollectionIngest))

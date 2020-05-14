@@ -18,7 +18,6 @@ import (
 // binary data in the badger DB under the provided key. It will error if the
 // key already exists.
 func insert(key []byte, entity interface{}) func(*badger.Txn) error {
-
 	return func(tx *badger.Txn) error {
 
 		// update the maximum key size if the inserted key is bigger

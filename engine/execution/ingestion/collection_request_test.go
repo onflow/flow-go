@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -32,7 +35,7 @@ func TestCollectionRequests(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
 
 		block := unittest.BlockFixture()
-		//To make sure we always have collection if the block fixture changes
+		// To make sure we always have collection if the block fixture changes
 		guarantees := unittest.CollectionGuaranteesFixture(3)
 
 		guarantees[0].SignerIDs = []flow.Identifier{collection1Identity.NodeID, collection3Identity.NodeID}
@@ -60,7 +63,9 @@ func TestCollectionRequests(t *testing.T) {
 			gomock.Eq([]flow.Identifier{collection2Identity.NodeID, collection3Identity.NodeID}),
 		)
 
-		ctx.executionState.On("StateCommitmentByBlockID", block.Header.ParentID).Return(unittest.StateCommitmentFixture(), nil)
+		ctx.executionState.
+			On("StateCommitmentByBlockID", mock.Anything, block.Header.ParentID).
+			Return(unittest.StateCommitmentFixture(), nil)
 
 		proposal := unittest.ProposalFromBlock(&block)
 		err := ctx.engine.ProcessLocal(proposal)
@@ -74,7 +79,7 @@ func TestNoCollectionRequestsIfParentMissing(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
 
 		block := unittest.BlockFixture()
-		//To make sure we always have collection if the block fixture changes
+		// To make sure we always have collection if the block fixture changes
 		guarantees := unittest.CollectionGuaranteesFixture(3)
 
 		guarantees[0].SignerIDs = []flow.Identifier{collection1Identity.NodeID, collection3Identity.NodeID}
@@ -89,7 +94,9 @@ func TestNoCollectionRequestsIfParentMissing(t *testing.T) {
 
 		ctx.collectionConduit.EXPECT().Submit(gomock.Any(), gomock.Any()).Times(0)
 
-		ctx.executionState.On("StateCommitmentByBlockID", block.Header.ParentID).Return(nil, realStorage.ErrNotFound)
+		ctx.executionState.
+			On("StateCommitmentByBlockID", mock.Anything, block.Header.ParentID).
+			Return(nil, realStorage.ErrNotFound)
 
 		proposal := unittest.ProposalFromBlock(&block)
 		err := ctx.engine.ProcessLocal(proposal)
@@ -115,7 +122,10 @@ func TestValidatingCollectionResponse(t *testing.T) {
 			&colReqMatcher{req: &messages.CollectionRequest{ID: id, Nonce: rand.Uint64()}},
 			gomock.Eq(collection1Identity.NodeID),
 		).Return(nil)
-		ctx.executionState.On("StateCommitmentByBlockID", executableBlock.Block.Header.ParentID).Return(executableBlock.StartState, nil)
+
+		ctx.executionState.
+			On("StateCommitmentByBlockID", mock.Anything, executableBlock.Block.Header.ParentID).
+			Return(executableBlock.StartState, nil)
 
 		proposal := unittest.ProposalFromBlock(executableBlock.Block)
 		err := ctx.engine.ProcessLocal(proposal)
@@ -168,7 +178,9 @@ func TestNoBlockExecutedUntilAllCollectionsArePosted(t *testing.T) {
 		ctx.state.On("AtBlockID", executableBlock.ID()).Return(ctx.snapshot)
 
 		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlock.Block))
-		ctx.executionState.On("StateCommitmentByBlockID", executableBlock.Block.Header.ParentID).Return(unittest.StateCommitmentFixture(), nil)
+		ctx.executionState.
+			On("StateCommitmentByBlockID", mock.Anything, executableBlock.Block.Header.ParentID).
+			Return(unittest.StateCommitmentFixture(), nil)
 
 		proposal := unittest.ProposalFromBlock(executableBlock.Block)
 		err := ctx.engine.ProcessLocal(proposal)
@@ -178,6 +190,60 @@ func TestNoBlockExecutedUntilAllCollectionsArePosted(t *testing.T) {
 		rightResponse := messages.CollectionResponse{
 			Collection: flow.Collection{Transactions: executableBlock.Collections()[1].Transactions},
 		}
+
+		err = ctx.engine.ProcessLocal(&rightResponse)
+
+		require.NoError(t, err)
+	})
+}
+
+func TestRequestsAreRepeated(t *testing.T) {
+
+	runWithEngine(t, func(ctx testingContext) {
+
+		expectedRetries := 5
+		actualRetries := 0
+
+		ctx.engine.collectionRequestTimeout = 10 * time.Millisecond
+		ctx.engine.maximumCollectionRequestRetryNumber = uint(expectedRetries)
+
+		executableBlock := unittest.ExecutableBlockFixture(
+			[][]flow.Identifier{
+				{collection1Identity.NodeID},
+			},
+		)
+		executableBlock.StartState = unittest.StateCommitmentFixture()
+
+		rightResponse := messages.CollectionResponse{
+			Collection: flow.Collection{Transactions: executableBlock.Collections()[0].Transactions},
+		}
+
+		for _, col := range executableBlock.Block.Payload.Guarantees {
+			ctx.collectionConduit.EXPECT().Submit(
+				&colReqMatcher{req: &messages.CollectionRequest{ID: col.ID(), Nonce: rand.Uint64()}},
+				gomock.Eq(collection1Identity.NodeID),
+			).Do(func(_, _ interface{}) {
+				actualRetries++
+			}).Times(expectedRetries)
+		}
+
+		ctx.state.On("AtBlockID", executableBlock.ID()).Return(ctx.snapshot)
+
+		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlock.Block))
+		ctx.executionState.
+			On("StateCommitmentByBlockID", mock.Anything, executableBlock.Block.Header.ParentID).
+			Return(executableBlock.StartState, nil)
+
+		proposal := unittest.ProposalFromBlock(executableBlock.Block)
+		err := ctx.engine.ProcessLocal(proposal)
+		require.NoError(t, err)
+
+		// Expected no calls so test should fail if any occurs
+		assert.Eventually(t, func() bool {
+			return actualRetries == expectedRetries
+		}, time.Second, 10*time.Millisecond)
+
+		ctx.assertSuccessfulBlockComputation(executableBlock, unittest.IdentifierFixture())
 
 		err = ctx.engine.ProcessLocal(&rightResponse)
 
@@ -221,8 +287,13 @@ func TestCollectionSharedByMultipleBlocks(t *testing.T) {
 			gomock.Any(),
 		).Times(1)
 
-		ctx.executionState.On("StateCommitmentByBlockID", blockA.Header.ParentID).Return(executableBlockA.StartState, nil)
-		ctx.executionState.On("StateCommitmentByBlockID", blockB.Header.ParentID).Return(executableBlockB.StartState, nil)
+		ctx.executionState.
+			On("StateCommitmentByBlockID", mock.Anything, blockA.Header.ParentID).
+			Return(executableBlockA.StartState, nil)
+
+		ctx.executionState.
+			On("StateCommitmentByBlockID", mock.Anything, blockB.Header.ParentID).
+			Return(executableBlockB.StartState, nil)
 
 		proposalA := unittest.ProposalFromBlock(executableBlockA.Block)
 		err := ctx.engine.ProcessLocal(proposalA)

@@ -11,7 +11,9 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
@@ -19,10 +21,11 @@ import (
 // Builder is the builder for consensus block payloads. Upon providing a payload
 // hash, it also memorizes which entities were included into the payload.
 type Builder struct {
+	metrics  module.MempoolMetrics
 	db       *badger.DB
 	seals    storage.Seals
 	headers  storage.Headers
-	payloads storage.Payloads
+	index    storage.Index
 	blocks   storage.Blocks
 	guarPool mempool.Guarantees
 	sealPool mempool.Seals
@@ -30,13 +33,13 @@ type Builder struct {
 }
 
 // NewBuilder creates a new block builder.
-func NewBuilder(db *badger.DB, headers storage.Headers, seals storage.Seals, payloads storage.Payloads, blocks storage.Blocks, guarPool mempool.Guarantees, sealPool mempool.Seals, options ...func(*Config)) *Builder {
+func NewBuilder(metrics module.MempoolMetrics, db *badger.DB, headers storage.Headers, seals storage.Seals, index storage.Index, blocks storage.Blocks, guarPool mempool.Guarantees, sealPool mempool.Seals, options ...func(*Config)) *Builder {
 
 	// initialize default config
 	cfg := Config{
-		minInterval:  500 * time.Millisecond,
-		maxInterval:  10 * time.Second,
-		expiryBlocks: 64,
+		minInterval: 500 * time.Millisecond,
+		maxInterval: 10 * time.Second,
+		expiry:      flow.DefaultTransactionExpiry,
 	}
 
 	// apply option parameters
@@ -45,10 +48,11 @@ func NewBuilder(db *badger.DB, headers storage.Headers, seals storage.Seals, pay
 	}
 
 	b := &Builder{
+		metrics:  metrics,
 		db:       db,
 		headers:  headers,
 		seals:    seals,
-		payloads: payloads,
+		index:    index,
 		blocks:   blocks,
 		guarPool: guarPool,
 		sealPool: sealPool,
@@ -61,7 +65,9 @@ func NewBuilder(db *badger.DB, headers storage.Headers, seals storage.Seals, pay
 // custom setter function to allow the caller to make changes to the header before storing it.
 func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
 
-	// STEP ONE: Load some things we need to do our work.
+	// STEP ONE: Create a lookup of all previously used guarantees on the part
+	// of the chain that we are building on. We do this separately for pending
+	// and finalized ancestors, so we can differentiate what to do about it.
 
 	var finalized uint64
 	err := b.db.View(operation.RetrieveFinalizedHeight(&finalized))
@@ -74,11 +80,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not lookup finalized block: %w", err)
 	}
 
-	// STEP TWO: Create a lookup of all previously used guarantees on the part
-	// of the chain we care about. We do this separately for unfinalized and
-	// finalized sections of the chain to decide whether removing guarantees
-	// from the memory pool is necessary.
-
 	ancestorID := parentID
 	pendingLookup := make(map[flow.Identifier]struct{})
 	for ancestorID != finalID {
@@ -89,37 +90,42 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		if ancestor.Height <= finalized {
 			return nil, fmt.Errorf("should always build on last finalized block")
 		}
-		payload, err := b.payloads.ByBlockID(ancestorID)
+		index, err := b.index.ByBlockID(ancestorID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
 		}
-		for _, guarantee := range payload.Guarantees {
-			pendingLookup[guarantee.ID()] = struct{}{}
+		for _, collID := range index.CollectionIDs {
+			pendingLookup[collID] = struct{}{}
 		}
 		ancestorID = ancestor.ParentID
 	}
 
-	// for now, we check at most 1000 blocks of history
-	// TODO: look back based on referenc block ID and expiry
-
-	limit := finalized - 1000
-	if limit > finalized { // overflow check
+	// we look back only as far as the expiry limit for the current height we
+	// are building for; any guarantee with a reference block before that can
+	// not be included anymore anyway
+	parent, err := b.headers.ByBlockID(parentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve parent: %w", err)
+	}
+	height := parent.Height + 1
+	limit := height - uint64(b.cfg.expiry)
+	if limit > height { // overflow check
 		limit = 0
 	}
 
-	finalLookup := make(map[flow.Identifier]struct{})
 	ancestorID = finalID
+	finalLookup := make(map[flow.Identifier]struct{})
 	for {
 		ancestor, err := b.headers.ByBlockID(ancestorID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
 		}
-		payload, err := b.payloads.ByBlockID(ancestorID)
+		index, err := b.index.ByBlockID(ancestorID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
 		}
-		for _, guarantee := range payload.Guarantees {
-			finalLookup[guarantee.ID()] = struct{}{}
+		for _, collID := range index.CollectionIDs {
+			finalLookup[collID] = struct{}{}
 		}
 		if ancestor.Height <= limit {
 			break
@@ -127,84 +133,99 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		ancestorID = ancestor.ParentID
 	}
 
-	// STEP THREE: Build a valid guarantee payload.
+	// STEP TWO: Go through the guarantees in our memory pool.
+	// 1) If it was already included on the finalized part of the chain, remove
+	// it from the memory pool and skip.
+	// 2) If the reference block has an expired height, also remove it from the
+	// memory pool and skip.
+	// 3) If it was already included on the pending part of the chain, skip, but
+	// keep in memory pool for now.
+	// 4) Otherwise, this guarantee can be included in the payload.
 
 	var guarantees []*flow.CollectionGuarantee
 	for _, guarantee := range b.guarPool.All() {
-
-		// get the reference block for expiration
-		refHeader, err := b.headers.ByBlockID(guarantee.ReferenceBlockID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get reference block: %w", err)
-		}
-
-		// for now, we simply ignore unfinalized reference blocks
-		// TODO: decide on whether we should remove those guarantees and when
-		if finalized < refHeader.Height {
-			continue
-		}
-
-		// check if the reference block is already too old
 		collID := guarantee.ID()
-		if uint(finalized-refHeader.Height) > flow.DefaultTransactionExpiry {
-			_ = b.guarPool.Rem(collID)
-			continue
-		}
-
-		// check if the guarantee was already finalized in a block
 		_, duplicated := finalLookup[collID]
 		if duplicated {
 			_ = b.guarPool.Rem(collID)
 			continue
 		}
-
-		// check if the guarantee is pending on this branch; don't remove from
-		// memory pool yet, but skip for payload
+		ref, err := b.headers.ByBlockID(guarantee.ReferenceBlockID)
+		if errors.Is(err, storage.ErrNotFound) {
+			_ = b.guarPool.Rem(collID)
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("could not get reference block: %w", err)
+		}
+		if ref.Height < limit {
+			_ = b.guarPool.Rem(collID)
+			continue
+		}
 		_, duplicated = pendingLookup[collID]
 		if duplicated {
 			continue
 		}
-
 		guarantees = append(guarantees, guarantee)
 	}
 
-	// STEP FOUR: Get the block seal from the parent and see how far we can
-	// extend the chain of sealed blocks with the seals in the memory pool.
+	b.metrics.MempoolEntries(metrics.ResourceGuarantee, b.guarPool.Size())
 
-	// we map each seal to the parent of its sealed block; that way, we can
-	// retrieve a valid seal that will *follow* each block's own seal
-	byParent := make(map[flow.Identifier]*flow.Seal)
+	// STEP FOUR: We try to get all ancestors from last sealed block all the way
+	// to the parent. Then we try to get seals for each of them until we don't
+	// find one. This creates a valid chain of seals from the last sealed block
+	// to at most the parent.
+
+	// create a mapping of block to seal for all seals in our pool
+	byBlock := make(map[flow.Identifier]*flow.Seal)
 	for _, seal := range b.sealPool.All() {
-		sealed, err := b.headers.ByBlockID(seal.BlockID)
-		if errors.Is(err, storage.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("could not retrieve sealed header (%x): %w", seal.BlockID, err)
-		}
-		byParent[sealed.ParentID] = seal
+		byBlock[seal.BlockID] = seal
+	}
+	if int(b.sealPool.Size()) > len(byBlock) {
+		return nil, fmt.Errorf("multiple seals for the same block")
 	}
 
-	// starting at the paren't seal, we try to find a seal to extend the current
-	// last sealed block; if we do, we keep going until we don't
-	// we also execute a sanity check on whether the execution state of the next
-	// seal propely connects to the previous seal
-	lastSeal, err := b.seals.ByBlockID(parentID)
+	// create a list of ancestors from parent to just before last sealed
+	last, err := b.seals.ByBlockID(parentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve parent seal: %w", err)
+	}
+	ancestorID = parentID
+	var sealableIDs []flow.Identifier
+	for ancestorID != last.BlockID {
+		sealableIDs = append(sealableIDs, ancestorID)
+		ancestor, err := b.headers.ByBlockID(ancestorID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get sealable ancestor (%x): %w", ancestorID, err)
+		}
+		ancestorID = ancestor.ParentID
+	}
+
+	// iterate backwards from just after last sealed to parent and build a chain
+	// of seals for those blocks that is as big as possible
 	var seals []*flow.Seal
-	for len(byParent) > 0 {
-		seal, found := byParent[lastSeal.BlockID]
+	for i := len(sealableIDs) - 1; i >= 0; i-- {
+		sealableID := sealableIDs[i]
+
+		// if we don't find the next seal, we are done building the chain
+		next, found := byBlock[sealableID]
 		if !found {
 			break
 		}
-		if !bytes.Equal(seal.InitialState, lastSeal.FinalState) {
+
+		// if the states mismatch between two subsequent seals, it's an error
+		if !bytes.Equal(next.InitialState, last.FinalState) {
 			return nil, fmt.Errorf("seal execution states do not connect")
 		}
-		delete(byParent, lastSeal.BlockID)
-		seals = append(seals, seal)
-		lastSeal = seal
+
+		// add seal to the payload
+		seals = append(seals, next)
+
+		// keep track of last seal to check state connection
+		last = next
 	}
 
-	// STEP FIVE: We now have guarantees and seals we can validly include
+	// STEP FOUR: We now have guarantees and seals we can validly include
 	// in the payload built on top of the given parent. Now we need to build
 	// and store the block header, as well as index the payload contents.
 
@@ -213,12 +234,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		Identities: nil,
 		Guarantees: guarantees,
 		Seals:      seals,
-	}
-
-	// retrieve the parent to set the height
-	parent, err := b.headers.ByBlockID(parentID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve parent: %w", err)
 	}
 
 	// calculate the timestamp and cutoffs
@@ -238,7 +253,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	header := &flow.Header{
 		ChainID:     parent.ChainID,
 		ParentID:    parentID,
-		Height:      parent.Height + 1,
+		Height:      height,
 		Timestamp:   timestamp,
 		PayloadHash: payload.Hash(),
 
@@ -265,13 +280,13 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 	err = b.blocks.Store(proposal)
 	if err != nil {
-		return nil, fmt.Errorf("could ot store proposal: %w", err)
+		return nil, fmt.Errorf("could not store proposal: %w", err)
 	}
 
 	// update protocol state index for the seal and initialize children index
 	blockID := proposal.ID()
 	err = operation.RetryOnConflict(b.db.Update, func(tx *badger.Txn) error {
-		err = operation.IndexBlockSeal(blockID, lastSeal.ID())(tx)
+		err = operation.IndexBlockSeal(blockID, last.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index proposal seal: %w", err)
 		}

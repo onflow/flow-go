@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -25,7 +26,8 @@ import (
 type Engine struct {
 	unit         *engine.Unit
 	log          zerolog.Logger
-	metrics      module.Metrics
+	engMetrics   module.EngineMetrics
+	colMetrics   module.CollectionMetrics
 	con          network.Conduit
 	me           module.Local
 	state        protocol.State
@@ -34,11 +36,12 @@ type Engine struct {
 	transactions storage.Transactions
 }
 
-func New(log zerolog.Logger, net module.Network, state protocol.State, metrics module.Metrics, me module.Local, pool mempool.Transactions, collections storage.Collections, transactions storage.Transactions) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, state protocol.State, engMetrics module.EngineMetrics, colMetrics module.CollectionMetrics, me module.Local, pool mempool.Transactions, collections storage.Collections, transactions storage.Transactions) (*Engine, error) {
 	e := &Engine{
 		unit:         engine.NewUnit(),
 		log:          log.With().Str("engine", "provider").Logger(),
-		metrics:      metrics,
+		engMetrics:   engMetrics,
+		colMetrics:   colMetrics,
 		me:           me,
 		state:        state,
 		pool:         pool,
@@ -77,7 +80,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // a potential processing error internally when done.
 func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
-		err := e.Process(originID, event)
+		err := e.process(originID, event)
 		if err != nil {
 			e.log.Error().Err(err).Msg("could not process submitted event")
 		}
@@ -101,27 +104,16 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
 	case *messages.SubmitCollectionGuarantee:
+		e.engMetrics.MessageReceived(metrics.EngineCollectionProvider, metrics.MessageSubmitGuarantee)
+		defer e.engMetrics.MessageHandled(metrics.EngineCollectionProvider, metrics.MessageSubmitGuarantee)
 		return e.onSubmitCollectionGuarantee(originID, ev)
-	case *messages.SubmitTransactionRequest:
-		return e.onSubmitTransactionRequest(originID, ev)
 	case *messages.CollectionRequest:
+		e.engMetrics.MessageReceived(metrics.EngineCollectionProvider, metrics.MessageCollectionRequest)
+		defer e.engMetrics.MessageHandled(metrics.EngineCollectionProvider, metrics.MessageCollectionRequest)
 		return e.onCollectionRequest(originID, ev)
-	case *messages.TransactionRequest:
-		return e.onTransactionRequest(originID, ev)
-	case *messages.TransactionResponse:
-		return e.onTransactionResponse(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
-}
-
-// onSubmitTransactionRequest handles submitting the given transaction request
-// to other collection nodes in our cluster.
-func (e *Engine) onSubmitTransactionRequest(originID flow.Identifier, req *messages.SubmitTransactionRequest) error {
-	if originID != e.me.NodeID() {
-		return fmt.Errorf("invalid remote request to submit transaction request (from=%x)", originID)
-	}
-	return e.SubmitTransactionRequest(&req.Request)
 }
 
 // onSubmitCollectionGuarantee handles submitting the given collection guarantee
@@ -135,6 +127,14 @@ func (e *Engine) onSubmitCollectionGuarantee(originID flow.Identifier, req *mess
 }
 
 func (e *Engine) onCollectionRequest(originID flow.Identifier, req *messages.CollectionRequest) error {
+
+	log := e.log.With().
+		Hex("origin_id", logging.ID(originID)).
+		Hex("collection_id", logging.ID(req.ID)).
+		Logger()
+
+	log.Debug().Msg("received collection request")
+
 	coll, err := e.collections.ByID(req.ID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve requested collection: %w", err)
@@ -149,56 +149,7 @@ func (e *Engine) onCollectionRequest(originID flow.Identifier, req *messages.Col
 		return fmt.Errorf("could not respond to collection requester: %w", err)
 	}
 
-	return nil
-}
-
-// onTransactionRequest handles requests for individual transactions.
-func (e *Engine) onTransactionRequest(originID flow.Identifier, req *messages.TransactionRequest) error {
-
-	// check the mempool first
-	if e.pool.Has(req.ID) {
-		tx, err := e.pool.ByID(req.ID)
-		if err != nil {
-			return fmt.Errorf("could not get transaction from pool: %w", err)
-		}
-
-		res := &messages.TransactionResponse{Transaction: *tx}
-
-		err = e.con.Submit(res, originID)
-		if err != nil {
-			return fmt.Errorf("could not submit transaction response: %w", err)
-		}
-
-		return nil
-	}
-
-	// if it isn't in the mempool, check persistent storage
-	tx, err := e.transactions.ByID(req.ID)
-	if err != nil {
-		return fmt.Errorf("could not get transaction from db: %w", err)
-	}
-
-	res := &messages.TransactionResponse{Transaction: *tx}
-
-	err = e.con.Submit(res, originID)
-	if err != nil {
-		return fmt.Errorf("could not submit transaction response: %w", err)
-	}
-
-	return nil
-}
-
-// onTransactionResponse handles responses for requests we have made for a
-// transaction by adding the transaction
-func (e *Engine) onTransactionResponse(originID flow.Identifier, res *messages.TransactionResponse) error {
-
-	err := e.pool.Add(&res.Transaction)
-	if err != nil {
-		e.log.Debug().
-			Err(err).
-			Hex("tx_id", logging.ID(res.Transaction.ID())).
-			Msg("could not add transaction to mempool")
-	}
+	e.engMetrics.MessageSent(metrics.EngineCollectionProvider, metrics.MessageCollectionResponse)
 
 	return nil
 }
@@ -217,31 +168,11 @@ func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) 
 		return fmt.Errorf("could not submit collection guarantee: %w", err)
 	}
 
-	return nil
-}
-
-// SubmitTransactionRequest submits the given request for an individual
-// transaction to all other nodes in our cluster.
-func (e *Engine) SubmitTransactionRequest(req *messages.TransactionRequest) error {
-
-	// get the clusters from protocol state
-	clusters, err := e.state.Final().Clusters()
-	if err != nil {
-		return fmt.Errorf("could not get clusters: %w", err)
-	}
-
-	// get the nodes in my cluster
-	clusterNodes, ok := clusters.ByNodeID(e.me.NodeID())
-	if !ok {
-		return fmt.Errorf("could not get my cluster")
-	}
-
-	// remove myself from the list
-	clusterNodes = clusterNodes.Filter(filter.Not(filter.HasNodeID(e.me.NodeID())))
-	err = e.con.Submit(req, clusterNodes.NodeIDs()...)
-	if err != nil {
-		return fmt.Errorf("could not submit transaction request: %w", err)
-	}
+	e.engMetrics.MessageSent(metrics.EngineCollectionProvider, metrics.MessageCollectionGuarantee)
+	e.log.Debug().
+		Hex("guarantee_id", logging.ID(guarantee.ID())).
+		Hex("ref_block_id", logging.ID(guarantee.ReferenceBlockID)).
+		Msg("submitting collection guarantee")
 
 	return nil
 }

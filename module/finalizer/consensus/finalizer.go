@@ -59,10 +59,12 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized height: %w", err)
 	}
+
 	pending, err := f.headers.ByBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve pending header: %w", err)
 	}
+
 	if pending.Height <= finalized {
 		dup, err := f.headers.ByHeight(pending.Height)
 		if err != nil {
@@ -128,7 +130,7 @@ func (f *Finalizer) MakePending(blockID flow.Identifier) error {
 	}
 
 	// insert the child index into the DB
-	err = f.db.Update(procedure.IndexBlockChild(header.ParentID, blockID))
+	err = operation.RetryOnConflict(f.db.Update, procedure.IndexBlockChild(header.ParentID, blockID))
 	if errors.Is(err, storage.ErrAlreadyExists) {
 		return nil
 	}

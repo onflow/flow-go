@@ -16,7 +16,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	mocknetwork "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
@@ -74,8 +73,11 @@ func (suite *Suite) TestSubmitCollectionGuarantee() {
 	guarantee := unittest.CollectionGuaranteeFixture()
 	guarantee.SignerIDs = []flow.Identifier{suite.colNode.Me.NodeID()}
 	guarantee.Signature = unittest.SignatureFixture()
+	genesis, err := suite.conNode.State.Final().Head()
+	assert.NoError(t, err)
+	guarantee.ReferenceBlockID = genesis.ID()
 
-	err := suite.colNode.ProviderEngine.SubmitCollectionGuarantee(guarantee)
+	err = suite.colNode.ProviderEngine.SubmitCollectionGuarantee(guarantee)
 	assert.NoError(t, err)
 
 	// flush messages from the collection node
@@ -135,84 +137,5 @@ func (suite *Suite) TestCollectionRequest() {
 		// provider should return error
 		err := suite.colNode.ProviderEngine.ProcessLocal(req)
 		assert.True(t, errors.Is(err, storage.ErrNotFound))
-	})
-}
-
-func (suite *Suite) TestTransactionRequest() {
-	suite.Run("should return transaction from pool", func() {
-		t := suite.T()
-
-		// create a transaction to request
-		tx := unittest.TransactionBodyFixture()
-		err := suite.colNode.Pool.Add(&tx)
-		assert.NoError(t, err)
-
-		// expect that the requester will receive the collection
-		expectedRes := &messages.TransactionResponse{
-			Transaction: tx,
-		}
-		suite.reqEngine.On("Process", suite.colNode.Me.NodeID(), expectedRes).Return(nil).Once()
-
-		// send a request for the collection
-		req := messages.TransactionRequest{ID: tx.ID()}
-		err = suite.conduit.Submit(&req, suite.colNode.Me.NodeID())
-		assert.NoError(t, err)
-
-		// flush the request
-		net, ok := suite.hub.GetNetwork(suite.reqNode.Me.NodeID())
-		require.True(t, ok)
-		net.DeliverAll(true)
-
-		// flush the response
-		net, ok = suite.hub.GetNetwork(suite.colNode.Me.NodeID())
-		require.True(t, ok)
-		net.DeliverAll(true)
-
-		//assert we received the right transaction
-		suite.reqEngine.AssertExpectations(t)
-	})
-
-	suite.Run("should return transaction from DB", func() {
-		t := suite.T()
-
-		// create a transaction to request
-		tx := unittest.TransactionBodyFixture()
-		err := suite.colNode.Transactions.Store(&tx)
-		assert.NoError(t, err)
-
-		// expect that the requester will receive the collection
-		expectedRes := &messages.TransactionResponse{
-			Transaction: tx,
-		}
-		suite.reqEngine.On("Process", suite.colNode.Me.NodeID(), expectedRes).Return(nil).Once()
-
-		// send a request for the collection
-		req := messages.TransactionRequest{ID: tx.ID()}
-		err = suite.conduit.Submit(&req, suite.colNode.Me.NodeID())
-		assert.NoError(t, err)
-
-		// flush the request
-		net, ok := suite.hub.GetNetwork(suite.reqNode.Me.NodeID())
-		require.True(t, ok)
-		net.DeliverAll(true)
-
-		// flush the response
-		net, ok = suite.hub.GetNetwork(suite.colNode.Me.NodeID())
-		require.True(t, ok)
-		net.DeliverAll(true)
-
-		//assert we received the right transaction
-		suite.reqEngine.AssertExpectations(t)
-	})
-
-	suite.Run("should return error for non-existent transaction", func() {
-		t := suite.T()
-
-		// create request with invalid/nonexistent fingerprint
-		req := &messages.TransactionRequest{ID: unittest.IdentifierFixture()}
-
-		// provider should return error
-		err := suite.colNode.ProviderEngine.ProcessLocal(req)
-		assert.True(t, errors.Is(err, storage.ErrNotFound) || errors.Is(err, mempool.ErrNotFound))
 	})
 }

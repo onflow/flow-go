@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -24,13 +25,14 @@ import (
 // transactions are delegated to the correct collection cluster, and prepared
 // to be included in a collection.
 type Engine struct {
-	unit    *engine.Unit
-	log     zerolog.Logger
-	metrics module.Metrics
-	con     network.Conduit
-	me      module.Local
-	state   protocol.State
-	pool    mempool.Transactions
+	unit       *engine.Unit
+	log        zerolog.Logger
+	engMetrics module.EngineMetrics
+	colMetrics module.CollectionMetrics
+	con        network.Conduit
+	me         module.Local
+	state      protocol.State
+	pool       mempool.Transactions
 
 	// the number of blocks that can be between the reference block and the
 	// finalized head before we consider the transaction expired
@@ -42,7 +44,8 @@ func New(
 	log zerolog.Logger,
 	net module.Network,
 	state protocol.State,
-	metrics module.Metrics,
+	engMetrics module.EngineMetrics,
+	colMetrics module.CollectionMetrics,
 	me module.Local,
 	pool mempool.Transactions,
 	expiryBuffer uint,
@@ -53,12 +56,13 @@ func New(
 		Logger()
 
 	e := &Engine{
-		unit:    engine.NewUnit(),
-		log:     logger,
-		metrics: metrics,
-		me:      me,
-		state:   state,
-		pool:    pool,
+		unit:       engine.NewUnit(),
+		log:        logger,
+		engMetrics: engMetrics,
+		colMetrics: colMetrics,
+		me:         me,
+		state:      state,
+		pool:       pool,
 		// add some expiry buffer -- this is how much time a transaction has
 		// to be included in a collection, then for that collection to be
 		// included in a block
@@ -77,13 +81,11 @@ func New(
 
 // Ready returns a ready channel that is closed once the engine has fully
 // started.
-// TODO describe condition for ingest engine being ready
 func (e *Engine) Ready() <-chan struct{} {
 	return e.unit.Ready()
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
-// TODO describe conditions under which engine is done
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
 }
@@ -98,7 +100,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // a potential processing error internally when done.
 func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
-		err := e.Process(originID, event)
+		err := e.process(originID, event)
 		if err != nil {
 			e.log.Error().Err(err).Msg("could not process submitted event")
 		}
@@ -125,6 +127,10 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
 	case *flow.TransactionBody:
+		e.engMetrics.MessageReceived(metrics.EngineCollectionIngest, metrics.MessageTransaction)
+		e.unit.Lock()
+		defer e.unit.Unlock()
+		defer e.engMetrics.MessageHandled(metrics.EngineCollectionIngest, metrics.MessageTransaction)
 		return e.onTransaction(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
@@ -142,8 +148,11 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 	log.Debug().Msg("transaction message received")
 
-	// report Metrics Transaction from received to being included in a collection guarantee
-	e.metrics.TransactionReceived(tx.ID())
+	// short-circuit if we have already stored the transaction
+	if e.pool.Has(tx.ID()) {
+		e.log.Debug().Msg("received dupe transaction")
+		return nil
+	}
 
 	// first, we check if the transaction is valid
 	err := e.ValidateTransaction(tx)
@@ -151,7 +160,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 		return fmt.Errorf("invalid transaction: %w", err)
 	}
 
-	// cluster the collection nodes into the configured amount of clusters
+	// retrieve the set of collector clusters
 	clusters, err := e.state.Final().Clusters()
 	if err != nil {
 		return fmt.Errorf("could not cluster collection nodes: %w", err)
@@ -173,21 +182,26 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 	// if our cluster is responsible for the transaction, store it
 	if localCluster.Fingerprint() == txCluster.Fingerprint() {
-		log.Debug().Msg("adding transaction to pool")
-		err := e.pool.Add(tx)
-		if err != nil {
-			return fmt.Errorf("could not add transaction to mempool: %w", err)
-		}
+		_ = e.pool.Add(tx)
+		e.colMetrics.TransactionReceived(tx.ID())
+		log.Debug().Msg("added transaction to pool")
 	}
 
-	// if the transaction is submitted locally, propagate it
+	// if the message was submitted internally (ie. via the Access API)
+	// propagate it to all members of the responsible cluster
 	if originID == localID {
-		log.Debug().Msg("propagating transaction to cluster")
 		targetIDs := txCluster.Filter(filter.Not(filter.HasNodeID(localID)))
+
+		log.Debug().
+			Str("recipients", fmt.Sprintf("%v", targetIDs.NodeIDs())).
+			Msg("propagating transaction to cluster")
+
 		err = e.con.Submit(tx, targetIDs.NodeIDs()...)
 		if err != nil {
 			return fmt.Errorf("could not route transaction to cluster: %w", err)
 		}
+
+		e.engMetrics.MessageSent(metrics.EngineCollectionIngest, metrics.MessageTransaction)
 	}
 
 	log.Info().Msg("transaction processed")

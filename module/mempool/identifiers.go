@@ -9,9 +9,9 @@ type Identifiers interface {
 	// Has checks whether the mempool has the identifier
 	Has(id flow.Identifier) bool
 
-	// Add will add the given identifier to the memory pool or it will error if
-	// the identifier is already in the memory pool.
-	Add(id flow.Identifier) error
+	// Add will add the given identifier to the memory pool. It will return
+	// false if it was already in the mempool.
+	Add(id flow.Identifier) bool
 
 	// Rem removes the given identifier
 	Rem(id flow.Identifier) bool

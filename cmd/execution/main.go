@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/onflow/cadence/runtime"
-
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/cmd"
@@ -21,6 +21,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/ledger"
@@ -39,6 +40,9 @@ func main() {
 		err                error
 		executionState     state.ExecutionState
 		triedir            string
+		collector          module.ExecutionMetrics
+		useMtrie           bool
+		mTrieCacheSize     uint32
 	)
 
 	cmd.FlowNode("execution").
@@ -48,6 +52,8 @@ func main() {
 
 			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
 			flags.StringVar(&triedir, "triedir", datadir, "directory to store the execution State")
+			flags.BoolVar(&useMtrie, "mtrie", false, "use experimental MTrie for Execution State")
+			flags.Uint32Var(&mTrieCacheSize, "mtrie-cache-size", 1000, "cache size for MTrie")
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
@@ -55,8 +61,10 @@ func main() {
 			if err != nil {
 				return err
 			}
+
 			computationManager = computation.New(
 				node.Logger,
+				node.Tracer,
 				node.Me,
 				node.State,
 				vm,
@@ -64,10 +72,19 @@ func main() {
 
 			return nil
 		}).
-		//Trie storage is required to bootstrap, but also shout be handled while shutting down
+		// Trie storage is required to bootstrap, but also should be handled while shutting down
 		Module("ledger storage", func(node *cmd.FlowNodeBuilder) error {
-			ledgerStorage, err = ledger.NewTrieStorage(triedir)
+			if useMtrie {
+				ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), node.MetricsRegisterer)
+			} else {
+				ledgerStorage, err = ledger.NewTrieStorage(triedir)
+			}
+
 			return err
+		}).
+		Module("execution metrics", func(node *cmd.FlowNodeBuilder) error {
+			collector = metrics.NewExecutionCollector(node.Tracer)
+			return nil
 		}).
 		GenesisHandler(func(node *cmd.FlowNodeBuilder, block *flow.Block) {
 			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage)
@@ -75,7 +92,7 @@ func main() {
 				panic(fmt.Sprintf("error while bootstrapping execution state: %s", err))
 			}
 			if !bytes.Equal(bootstrappedStateCommitment, flow.GenesisStateCommitment) {
-				panic("error while boostrapping execution state - resulting state is different than precalculated!")
+				panic("error while bootstrapping execution state - resulting state is different than precalculated!")
 			}
 			if !bytes.Equal(flow.GenesisStateCommitment, node.GenesisCommit) {
 				panic(fmt.Sprintf("genesis seal state commitment (%x) different from precalculated (%x)", node.GenesisCommit, flow.GenesisStateCommitment))
@@ -92,12 +109,23 @@ func main() {
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			chunkDataPacks := badger.NewChunkDataPacks(node.DB)
 			executionResults := badger.NewExecutionResults(node.DB)
-			stateCommitments := badger.NewCommits(node.DB)
-			executionState = state.NewExecutionState(ledgerStorage, stateCommitments, node.Blocks, chunkDataPacks, executionResults, node.DB)
-			//registerDeltas := badger.NewRegisterDeltas(node.DB)
+			stateCommitments := badger.NewCommits(node.Metrics.Cache, node.DB)
+
+			executionState = state.NewExecutionState(
+				ledgerStorage,
+				stateCommitments,
+				node.Storage.Blocks,
+				chunkDataPacks,
+				executionResults,
+				node.DB,
+				node.Tracer,
+			)
+
 			stateSync := sync.NewStateSynchronizer(executionState)
+
 			providerEngine, err = provider.New(
 				node.Logger,
+				node.Tracer,
 				node.Network,
 				node.State,
 				node.Me,
@@ -111,7 +139,7 @@ func main() {
 			// Only needed for ingestion engine
 			collections := badger.NewCollections(node.DB)
 
-			// Needed for grpc server, make sure to assign to main scoped vars
+			// Needed for gRPC server, make sure to assign to main scoped vars
 			events = badger.NewEvents(node.DB)
 			txResults = badger.NewTransactionResults(node.DB)
 			ingestionEng, err = ingestion.New(
@@ -119,23 +147,26 @@ func main() {
 				node.Network,
 				node.Me,
 				node.State,
-				node.Blocks,
-				node.Payloads,
+				node.Storage.Blocks,
+				node.Storage.Payloads,
 				collections,
 				events,
 				txResults,
 				computationManager,
 				providerEngine,
 				executionState,
-				6, //TODO - config param maybe?
-				node.Metrics,
+				6, // TODO - config param maybe?
+				collector,
+				node.Tracer,
 				true,
+				time.Second, //TODO - config param
+				10,          // TODO - config param
 			)
 			return ingestionEng, err
 		}).
 		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Blocks, events, txResults)
+			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, events, txResults)
 			return rpcEng, nil
-		}).Run("execution")
+		}).Run(flow.RoleExecution.String())
 
 }

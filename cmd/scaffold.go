@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
@@ -26,14 +27,15 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/metrics"
-	dbmetrics "github.com/dapperlabs/flow-go/module/metrics/badger"
+	"github.com/dapperlabs/flow-go/module/trace"
 	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/validators"
 	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
+	"github.com/dapperlabs/flow-go/storage"
 	storerr "github.com/dapperlabs/flow-go/storage"
-	storage "github.com/dapperlabs/flow-go/storage/badger"
+	bstorage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
@@ -52,6 +54,24 @@ type BaseConfig struct {
 	metricsPort  uint
 	nClusters    uint
 	BootstrapDir string
+}
+
+type Metrics struct {
+	Network    module.NetworkMetrics
+	Engine     module.EngineMetrics
+	Compliance module.ComplianceMetrics
+	Cache      module.CacheMetrics
+	Mempool    module.MempoolMetrics
+}
+
+type Storage struct {
+	Headers    storage.Headers
+	Index      storage.Index
+	Identities storage.Identities
+	Guarantees storage.Guarantees
+	Seals      storage.Seals
+	Payloads   storage.Payloads
+	Blocks     storage.Blocks
 }
 
 type namedModuleFunc struct {
@@ -73,37 +93,34 @@ type namedDoneObject struct {
 // It runs a node process with following structure, in sequential order
 // Base inits (network, storage, state, logger)
 //   PostInit handlers, if any
-//   GenesisHandler, if any and if genesis was generate
+//   GenesisHandler, if any and if genesis was generated
 // Components handlers, if any, wait sequentially
 // Run() <- main loop
 // Components destructors, if any
 type FlowNodeBuilder struct {
-	BaseConfig     BaseConfig
-	NodeID         flow.Identifier
-	flags          *pflag.FlagSet
-	name           string
-	Logger         zerolog.Logger
-	Metrics        *metrics.Collector
-	Me             *local.Local
-	DB             *badger.DB
-	Blocks         *storage.Blocks
-	Headers        *storage.Headers
-	Payloads       *storage.Payloads
-	Identities     *storage.Identities
-	Guarantees     *storage.Guarantees
-	Seals          *storage.Seals
-	State          *protocol.State
-	DKGState       *wrapper.State
-	modules        []namedModuleFunc
-	components     []namedComponentFunc
-	doneObject     []namedDoneObject
-	sig            chan os.Signal
-	Network        *libp2p.Network
-	genesisHandler func(node *FlowNodeBuilder, block *flow.Block)
-	postInitFns    []func(*FlowNodeBuilder)
-	stakingKey     crypto.PrivateKey
-	networkKey     crypto.PrivateKey
-	MsgValidators  []validators.MessageValidator
+	BaseConfig        BaseConfig
+	NodeID            flow.Identifier
+	flags             *pflag.FlagSet
+	name              string
+	Logger            zerolog.Logger
+	Me                *local.Local
+	Tracer            *trace.OpenTracer
+	MetricsRegisterer prometheus.Registerer
+	Metrics           Metrics
+	DB                *badger.DB
+	Storage           Storage
+	State             *protocol.State
+	DKGState          *wrapper.State
+	Network           *libp2p.Network
+	modules           []namedModuleFunc
+	components        []namedComponentFunc
+	doneObject        []namedDoneObject
+	sig               chan os.Signal
+	genesisHandler    func(node *FlowNodeBuilder, block *flow.Block)
+	postInitFns       []func(*FlowNodeBuilder)
+	stakingKey        crypto.PrivateKey
+	networkKey        crypto.PrivateKey
+	MsgValidators     []validators.MessageValidator
 
 	// genesis information
 	GenesisCommit flow.StateCommitment
@@ -137,7 +154,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		}
 
 		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, myAddr, fnb.Me.NodeID(),
-			fnb.networkKey, fnb.Metrics, libp2p.DefaultMaxPubSubMsgSize, fnb.MsgValidators...)
+			fnb.networkKey, fnb.Metrics.Network, libp2p.DefaultMaxPubSubMsgSize, fnb.MsgValidators...)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize middleware: %w", err)
 		}
@@ -171,10 +188,13 @@ func (fnb *FlowNodeBuilder) enqueueMetricsServerInit() {
 	})
 }
 
-func (fnb *FlowNodeBuilder) enqueueDBMetrics() {
-	fnb.Component("badger db metrics", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
-		monitor := dbmetrics.NewMonitor(fnb.Metrics, fnb.DB)
-		return monitor, nil
+func (fnb *FlowNodeBuilder) registerBadgerMetrics() {
+	metrics.RegisterBadgerMetrics()
+}
+
+func (fnb *FlowNodeBuilder) enqueueTracer() {
+	fnb.Component("tracer", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		return fnb.Tracer, nil
 	})
 }
 
@@ -219,8 +239,22 @@ func (fnb *FlowNodeBuilder) initLogger() {
 	fnb.Logger = log
 }
 
-func (fnb *FlowNodeBuilder) initDatabase() {
-	//Pre-create DB path (Badger creates only one-level dirs)
+func (fnb *FlowNodeBuilder) initMetrics() {
+	tracer, err := trace.NewTracer(fnb.Logger, fnb.name)
+	fnb.MustNot(err).Msg("could not initialize tracer")
+	fnb.MetricsRegisterer = prometheus.DefaultRegisterer
+	fnb.Tracer = tracer
+	fnb.Metrics = Metrics{
+		Network:    metrics.NewNetworkCollector(),
+		Engine:     metrics.NewEngineCollector(),
+		Compliance: metrics.NewComplianceCollector(),
+		Cache:      metrics.NewCacheCollector(flow.DefaultChainID),
+		Mempool:    metrics.NewMempoolCollector(),
+	}
+}
+
+func (fnb *FlowNodeBuilder) initStorage() {
+	// Pre-create DB path (Badger creates only one-level dirs)
 	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
 	fnb.MustNot(err).Str("dir", fnb.BaseConfig.datadir).Msg("could not create datadir")
 
@@ -238,35 +272,42 @@ func (fnb *FlowNodeBuilder) initDatabase() {
 	// in order to void long iterations with big keys when initializing with an
 	// already populated database, we bootstrap the initial maximum key size
 	// upon starting
-	err = db.Update(func(tx *badger.Txn) error {
+	err = operation.RetryOnConflict(db.Update, func(tx *badger.Txn) error {
 		return operation.InitMax(tx)
 	})
 	fnb.MustNot(err).Msg("could not initialize max tracker")
 
-	fnb.DB = db
-	fnb.Headers = storage.NewHeaders(db)
-	fnb.Identities = storage.NewIdentities(db)
-	fnb.Guarantees = storage.NewGuarantees(db)
-	fnb.Seals = storage.NewSeals(db)
-	fnb.Payloads = storage.NewPayloads(db, fnb.Identities, fnb.Guarantees, fnb.Seals)
-	fnb.Blocks = storage.NewBlocks(db, fnb.Headers, fnb.Payloads)
-}
+	headers := bstorage.NewHeaders(fnb.Metrics.Cache, db)
+	identities := bstorage.NewIdentities(fnb.Metrics.Cache, db)
+	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, db)
+	seals := bstorage.NewSeals(fnb.Metrics.Cache, db)
+	index := bstorage.NewIndex(fnb.Metrics.Cache, db)
+	payloads := bstorage.NewPayloads(index, identities, guarantees, seals)
+	blocks := bstorage.NewBlocks(db, headers, payloads)
 
-func (fnb *FlowNodeBuilder) initMetrics() {
-	metrics, err := metrics.NewCollector(fnb.Logger)
-	fnb.MustNot(err).Msg("could not initialize metrics")
-	fnb.Metrics = metrics
+	fnb.DB = db
+	fnb.Storage = Storage{
+		Headers:    headers,
+		Identities: identities,
+		Guarantees: guarantees,
+		Seals:      seals,
+		Index:      index,
+		Payloads:   payloads,
+		Blocks:     blocks,
+	}
 }
 
 func (fnb *FlowNodeBuilder) initState() {
 
 	state, err := protocol.NewState(
+		fnb.Metrics.Compliance,
 		fnb.DB,
-		fnb.Headers,
-		fnb.Identities,
-		fnb.Seals,
-		fnb.Payloads,
-		fnb.Blocks,
+		fnb.Storage.Headers,
+		fnb.Storage.Identities,
+		fnb.Storage.Seals,
+		fnb.Storage.Index,
+		fnb.Storage.Payloads,
+		fnb.Storage.Blocks,
 		protocol.SetClusters(fnb.BaseConfig.nClusters),
 	)
 	fnb.MustNot(err).Msg("could not initialize flow state")
@@ -465,7 +506,9 @@ func FlowNode(name string) *FlowNodeBuilder {
 
 	builder.enqueueMetricsServerInit()
 
-	builder.enqueueDBMetrics()
+	builder.registerBadgerMetrics()
+
+	builder.enqueueTracer()
 
 	return builder
 }
@@ -493,7 +536,7 @@ func (fnb *FlowNodeBuilder) Run(role string) {
 
 	fnb.initMetrics()
 
-	fnb.initDatabase()
+	fnb.initStorage()
 
 	fnb.initState()
 
@@ -532,7 +575,6 @@ func (fnb *FlowNodeBuilder) Run(role string) {
 	fnb.Logger.Info().Msgf("%s node shutdown complete", fnb.name)
 
 	os.Exit(0)
-
 }
 
 func (fnb *FlowNodeBuilder) handlePostInit(f func(node *FlowNodeBuilder)) {

@@ -14,7 +14,8 @@ import (
 
 // This file implements storage functions for blocks in cluster consensus.
 
-// InsertClusterBlock inserts a cluster consensus block.
+// InsertClusterBlock inserts a cluster consensus block, updating all
+// associated indexes.
 func InsertClusterBlock(block *cluster.Block) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
@@ -40,6 +41,12 @@ func InsertClusterBlock(block *cluster.Block) func(*badger.Txn) error {
 		err = IndexClusterPayload(block.Header, block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index payload: %w", err)
+		}
+
+		// start the new block with an empty child index
+		err = operation.InsertBlockChildren(blockID, nil)(tx)
+		if err != nil {
+			return fmt.Errorf("could not create empty child index: %w", err)
 		}
 
 		return nil

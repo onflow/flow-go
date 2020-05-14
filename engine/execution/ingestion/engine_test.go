@@ -2,8 +2,10 @@ package ingestion
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/rs/zerolog"
@@ -24,6 +26,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	module "github.com/dapperlabs/flow-go/module/mocks"
+	"github.com/dapperlabs/flow-go/module/trace"
 	network "github.com/dapperlabs/flow-go/network/mocks"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	realStorage "github.com/dapperlabs/flow-go/storage"
@@ -110,6 +113,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	snapshot.On("Identities", mock.Anything).Return(func(selector flow.IdentityFilter) flow.IdentityList {
 		return identityList.Filter(selector)
 	}, nil)
+
 	snapshot.On("Identity", mock.Anything).Return(func(nodeID flow.Identifier) *flow.Identity {
 		identity, ok := identityList.ByNodeID(nodeID)
 		require.Truef(t, ok, "Could not find nodeID %v in identityList", nodeID)
@@ -119,14 +123,35 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	payloads.EXPECT().Store(gomock.Any(), gomock.Any()).AnyTimes()
 
 	log := zerolog.Logger{}
-	metrics, err := metrics.NewCollector(log)
+	metrics := metrics.NewNoopCollector()
+
+	tracer, err := trace.NewTracer(log, "test")
 	require.NoError(t, err)
 
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.BlockProvider)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.ExecutionSync)), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 
-	engine, err = New(log, net, me, protocolState, blocks, payloads, collections, events, txResults, computationManager, providerEngine, executionState, 21, metrics, false)
+	engine, err = New(
+		log,
+		net,
+		me,
+		protocolState,
+		blocks,
+		payloads,
+		collections,
+		events,
+		txResults,
+		computationManager,
+		providerEngine,
+		executionState,
+		21,
+		metrics,
+		tracer,
+		false,
+		1*time.Hour, //practically disable retrying
+		10,
+	)
 	require.NoError(t, err)
 
 	f(testingContext{
@@ -142,56 +167,90 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		executionState:     executionState,
 		snapshot:           snapshot,
 	})
+
+	<-engine.Done()
 }
 
 func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *entity.ExecutableBlock, previousExecutionResultID flow.Identifier) {
 	computationResult := executionUnittest.ComputationResultForBlockFixture(executableBlock)
 	newStateCommitment := unittest.StateCommitmentFixture()
-	if len(computationResult.StateSnapshots) == 0 { //if block was empty, no new state commitment is produced
+	if len(computationResult.StateSnapshots) == 0 { // if block was empty, no new state commitment is produced
 		newStateCommitment = executableBlock.StartState
 	}
 	ctx.executionState.On("NewView", executableBlock.StartState).Return(new(delta.View))
 
-	ctx.computationManager.On("ComputeBlock", executableBlock, mock.Anything).Return(computationResult, nil).Once()
+	ctx.computationManager.
+		On("ComputeBlock", mock.Anything, executableBlock, mock.Anything).
+		Return(computationResult, nil).Once()
 
-	ctx.executionState.On("PersistStateInteractions", executableBlock.Block.ID(), mock.Anything).Return(nil)
+	ctx.executionState.
+		On("PersistStateInteractions", mock.Anything, executableBlock.Block.ID(), mock.Anything).
+		Return(nil)
 
 	for _, view := range computationResult.StateSnapshots {
-		ctx.executionState.On("CommitDelta", view.Delta, executableBlock.StartState).Return(newStateCommitment, nil)
-		ctx.executionState.On("GetRegistersWithProofs", mock.Anything, mock.Anything).Return(nil, nil, nil)
+		ctx.executionState.
+			On("CommitDelta", mock.Anything, view.Delta, executableBlock.StartState).
+			Return(newStateCommitment, nil)
 
-		ctx.executionState.On("PersistChunkDataPack", mock.MatchedBy(func(f *flow.ChunkDataPack) bool {
-			return bytes.Equal(f.StartState, executableBlock.StartState)
-		})).Return(nil)
+		ctx.executionState.
+			On("GetRegistersWithProofs", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil, nil, nil)
+
+		ctx.executionState.
+			On("PersistChunkDataPack", mock.Anything, mock.MatchedBy(func(f *flow.ChunkDataPack) bool {
+				return bytes.Equal(f.StartState, executableBlock.StartState)
+			})).
+			Return(nil)
 	}
 
-	ctx.executionState.On("GetExecutionResultID", executableBlock.Block.Header.ParentID).Return(func(blockID flow.Identifier) flow.Identifier {
-		return previousExecutionResultID
-	}, nil)
+	ctx.executionState.
+		On("GetExecutionResultID", mock.Anything, executableBlock.Block.Header.ParentID).
+		Return(previousExecutionResultID, nil)
 
-	ctx.executionState.On("UpdateHighestExecutedBlockIfHigher", executableBlock.Block.Header).Return(nil)
+	ctx.executionState.
+		On("UpdateHighestExecutedBlockIfHigher", mock.Anything, executableBlock.Block.Header).
+		Return(nil)
 
-	ctx.executionState.On("PersistExecutionResult", executableBlock.Block.ID(), mock.MatchedBy(func(er flow.ExecutionResult) bool {
-		return er.BlockID == executableBlock.Block.ID() && er.PreviousResultID == previousExecutionResultID
-	})).Return(nil)
-	ctx.executionState.On("PersistStateCommitment", executableBlock.Block.ID(), newStateCommitment).Return(nil)
-	ctx.providerEngine.On("BroadcastExecutionReceipt", mock.MatchedBy(func(er *flow.ExecutionReceipt) bool {
-		return er.ExecutionResult.BlockID == executableBlock.Block.ID() && er.ExecutionResult.PreviousResultID == previousExecutionResultID
-	})).Run(func(args mock.Arguments) {
-		receipt := args[0].(*flow.ExecutionReceipt)
+	ctx.executionState.
+		On(
+			"PersistExecutionResult",
+			mock.Anything,
+			executableBlock.Block.ID(),
+			mock.MatchedBy(func(er flow.ExecutionResult) bool {
+				return er.BlockID == executableBlock.Block.ID() && er.PreviousResultID == previousExecutionResultID
+			}),
+		).
+		Return(nil)
 
-		executor, err := ctx.snapshot.Identity(receipt.ExecutorID)
-		assert.NoError(ctx.t, err, "could not find executor in protocol state")
+	ctx.executionState.
+		On("PersistStateCommitment", mock.Anything, executableBlock.Block.ID(), newStateCommitment).
+		Return(nil)
 
-		// verify the signature
-		b, err := encoding.DefaultEncoder.Encode(receipt.Body())
-		assert.NoError(ctx.t, err)
+	ctx.providerEngine.
+		On(
+			"BroadcastExecutionReceipt",
+			mock.Anything,
+			mock.MatchedBy(func(er *flow.ExecutionReceipt) bool {
+				return er.ExecutionResult.BlockID == executableBlock.Block.ID() &&
+					er.ExecutionResult.PreviousResultID == previousExecutionResultID
+			}),
+		).
+		Run(func(args mock.Arguments) {
+			receipt := args[1].(*flow.ExecutionReceipt)
 
-		validSig, err := executor.StakingPubKey.Verify(receipt.ExecutorSignature, b, ctx.engine.receiptHasher)
-		assert.NoError(ctx.t, err)
+			executor, err := ctx.snapshot.Identity(receipt.ExecutorID)
+			assert.NoError(ctx.t, err, "could not find executor in protocol state")
 
-		assert.True(ctx.t, validSig, "execution receipt signature invalid")
-	}).Return(nil)
+			// verify the signature
+			b, err := encoding.DefaultEncoder.Encode(receipt.Body())
+			assert.NoError(ctx.t, err)
+
+			validSig, err := executor.StakingPubKey.Verify(receipt.ExecutorSignature, b, ctx.engine.receiptHasher)
+			assert.NoError(ctx.t, err)
+
+			assert.True(ctx.t, validSig, "execution receipt signature invalid")
+		}).
+		Return(nil)
 }
 
 func TestExecutionGenerationResultsAreChained(t *testing.T) {
@@ -206,10 +265,15 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 	endState := unittest.StateCommitmentFixture()
 	previousExecutionResultID := unittest.IdentifierFixture()
 
-	execState.On("GetExecutionResultID", executableBlock.Block.Header.ParentID).Return(previousExecutionResultID, nil)
-	execState.On("PersistExecutionResult", executableBlock.Block.ID(), mock.Anything).Return(nil)
+	execState.
+		On("GetExecutionResultID", mock.Anything, executableBlock.Block.Header.ParentID).
+		Return(previousExecutionResultID, nil)
 
-	er, err := e.generateExecutionResultForBlock(executableBlock.Block, nil, endState)
+	execState.
+		On("PersistExecutionResult", mock.Anything, executableBlock.Block.ID(), mock.Anything).
+		Return(nil)
+
+	er, err := e.generateExecutionResultForBlock(context.Background(), executableBlock.Block, nil, endState)
 	assert.NoError(t, err)
 
 	assert.Equal(t, previousExecutionResultID, er.PreviousResultID)
@@ -254,20 +318,26 @@ func TestBlockOutOfOrder(t *testing.T) {
 		proposalD := unittest.ProposalFromBlock(executableBlockD.Block)
 
 		// no execution state, so puts to waiting queue
-		ctx.executionState.On("StateCommitmentByBlockID", executableBlockB.Block.Header.ParentID).Return(nil, realStorage.ErrNotFound)
-		err := ctx.engine.handleBlockProposal(proposalB)
+		ctx.executionState.
+			On("StateCommitmentByBlockID", mock.Anything, executableBlockB.Block.Header.ParentID).
+			Return(nil, realStorage.ErrNotFound)
+
+		err := ctx.engine.handleBlockProposal(context.Background(), proposalB)
 		require.NoError(t, err)
 
 		// no execution state, no connection to other nodes
-		ctx.executionState.On("StateCommitmentByBlockID", executableBlockC.Block.Header.ParentID).Return(nil, realStorage.ErrNotFound)
-		err = ctx.engine.handleBlockProposal(proposalC)
+		ctx.executionState.
+			On("StateCommitmentByBlockID", mock.Anything, executableBlockC.Block.Header.ParentID).
+			Return(nil, realStorage.ErrNotFound)
+
+		err = ctx.engine.handleBlockProposal(context.Background(), proposalC)
 		require.NoError(t, err)
 
 		// child of c so no need to query execution state
 
 		// we account for every call, so if this call would have happen, test will fail
 		// ctx.executionState.On("StateCommitmentByBlockID", executableBlockD.Block.Header.ParentID).Return(nil, realStorage.ErrNotFound)
-		err = ctx.engine.handleBlockProposal(proposalD)
+		err = ctx.engine.handleBlockProposal(context.Background(), proposalD)
 		require.NoError(t, err)
 
 		// make sure there were no extra calls at this point in test
@@ -281,8 +351,11 @@ func TestBlockOutOfOrder(t *testing.T) {
 		ctx.assertSuccessfulBlockComputation(executableBlockC, blockAExecutionResultID)
 		ctx.assertSuccessfulBlockComputation(executableBlockD, unittest.IdentifierFixture())
 
-		ctx.executionState.On("StateCommitmentByBlockID", executableBlockA.Block.Header.ParentID).Return(executableBlockA.StartState, nil)
-		err = ctx.engine.handleBlockProposal(proposalA)
+		ctx.executionState.
+			On("StateCommitmentByBlockID", mock.Anything, executableBlockA.Block.Header.ParentID).
+			Return(executableBlockA.StartState, nil)
+
+		err = ctx.engine.handleBlockProposal(context.Background(), proposalA)
 		require.NoError(t, err)
 
 		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
@@ -305,16 +378,21 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 		snapshot.On("Head").Return(executableBlock.Block.Header, nil)
 
 		// Add all data needed for execution of script
-		ctx.executionState.On("StateCommitmentByBlockID", executableBlock.Block.ID()).Return(executableBlock.StartState, nil)
+		ctx.executionState.
+			On("StateCommitmentByBlockID", mock.Anything, executableBlock.Block.ID()).
+			Return(executableBlock.StartState, nil)
+
 		ctx.state.On("AtBlockID", executableBlock.Block.ID()).Return(snapshot)
 		view := new(delta.View)
 		ctx.executionState.On("NewView", executableBlock.StartState).Return(view)
 
 		// Successful call to computation manager
-		ctx.computationManager.On("ExecuteScript", script, executableBlock.Block.Header, view).Return(scriptResult, nil)
+		ctx.computationManager.
+			On("ExecuteScript", script, executableBlock.Block.Header, view).
+			Return(scriptResult, nil)
 
 		// Execute our script and expect no error
-		res, err := ctx.engine.ExecuteScriptAtBlockID(script, executableBlock.Block.ID())
+		res, err := ctx.engine.ExecuteScriptAtBlockID(context.Background(), script, executableBlock.Block.ID())
 		assert.NoError(t, err)
 		assert.Equal(t, scriptResult, res)
 

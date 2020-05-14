@@ -48,7 +48,6 @@ func CreateCounterTransaction() flow.TransactionBody {
 func CreateCounterPanicTransaction() flow.TransactionBody {
 	return flow.TransactionBody{
 		Script: []byte(`
-
 			import 0x01
 
 			transaction {

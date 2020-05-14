@@ -10,48 +10,9 @@ import (
 
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
+	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
-
-// GetRandomKeysRandN generate m random keys (size: byteSize),
-// assuming m is also randomly selected from zero to maxN
-func GetRandomKeysRandN(maxN int, byteSize int) [][]byte {
-	numberOfKeys := rand.Intn(maxN) + 1
-	// at least return 1 keys
-	if numberOfKeys == 0 {
-		numberOfKeys = 1
-	}
-	return GetRandomKeysFixedN(numberOfKeys, byteSize)
-}
-
-// GetRandomKeysFixedN generates n random fixed sized (byteSize) keys
-func GetRandomKeysFixedN(n int, byteSize int) [][]byte {
-	keys := make([][]byte, 0)
-	alreadySelectKeys := make(map[string]bool)
-	i := 0
-	for i < n {
-		key := make([]byte, byteSize)
-		rand.Read(key)
-		// deduplicate
-		if _, found := alreadySelectKeys[string(key)]; !found {
-			keys = append(keys, key)
-			alreadySelectKeys[string(key)] = true
-			i++
-		}
-	}
-	return keys
-}
-
-func GetRandomValues(n int, maxByteSize int) [][]byte {
-	values := make([][]byte, 0)
-	for i := 0; i < n; i++ {
-		byteSize := rand.Intn(maxByteSize)
-		value := make([]byte, byteSize)
-		rand.Read(value)
-		values = append(values, value)
-	}
-	return values
-}
 
 func valuesMatches(expected [][]byte, got [][]byte) bool {
 	if len(expected) != len(got) {
@@ -70,11 +31,9 @@ func valuesMatches(expected [][]byte, got [][]byte) bool {
 }
 
 func TestLedgerFunctionality(t *testing.T) {
-	// Skip this for now,
-	t.Skip()
 	rand.Seed(time.Now().UnixNano())
 	// You can manually increase this for more coverage
-	experimentRep := 5
+	experimentRep := 2
 	for e := 0; e < experimentRep; e++ {
 		maxNumInsPerStep := 100
 		numHistLookupPerStep := 10
@@ -91,8 +50,8 @@ func TestLedgerFunctionality(t *testing.T) {
 			for i := 0; i < steps; i++ {
 				// add new keys
 				// TODO update some of the existing keys and shuffle them
-				keys := GetRandomKeysRandN(maxNumInsPerStep, keyByteSize)
-				values := GetRandomValues(len(keys), valueMaxByteSize)
+				keys := utils.GetRandomKeysRandN(maxNumInsPerStep, keyByteSize)
+				values := utils.GetRandomValues(len(keys), valueMaxByteSize)
 				newState, err := led.UpdateRegisters(keys, values, stateCommitment)
 				assert.NoError(t, err)
 

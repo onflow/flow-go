@@ -19,8 +19,8 @@ import (
 )
 
 var (
-	// a simple counter contract in Cadence
-	counterContract = dsl.Contract{
+	// CounterContract is a simple counter contract in Cadence
+	CounterContract = dsl.Contract{
 		Name: "Testing",
 		Members: []dsl.CadenceCode{
 			dsl.Resource{
@@ -43,29 +43,28 @@ var (
 		},
 	}
 
-	// a transaction script for creating an instance of the counter in the
-	// account storage of the authorizing account
-	// NOTE: the counter contract must be deployed first
-	createCounterTx = dsl.Transaction{
+	// CreateCounterTx is a transaction script for creating an instance of the counter in the account storage of the
+	// authorizing account NOTE: the counter contract must be deployed first
+	CreateCounterTx = dsl.Transaction{
 		Import: dsl.Import{Address: flow.RootAddress},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
 				var maybeCounter <- signer.load<@Testing.Counter>(from: /storage/counter)
-				
+
 				if maybeCounter == nil {
 					maybeCounter <-! Testing.createCounter()
 				}
-				
+
 				maybeCounter?.add(2)
 				signer.save(<-maybeCounter!, to: /storage/counter)
-				
+
 				signer.link<&Testing.Counter>(/public/counter, target: /storage/counter)
 				`),
 		},
 	}
 
-	// a read-only script for reading the current value of the counter contract
-	readCounterScript = dsl.Main{
+	// ReadCounterScript is a read-only script for reading the current value of the counter contract
+	ReadCounterScript = dsl.Main{
 		ReturnType: "Int",
 		Code: `
 			let account = getAccount(0x01)
@@ -74,13 +73,36 @@ var (
 			}
 			return -3`,
 	}
+
+	// CreateCounterPanicTx is a transaction script that creates a counter instance in the root account, but panics after
+	// manipulating state. It can be used to test whether execution state stays untouched/will revert. NOTE: the counter
+	// contract must be deployed first
+	CreateCounterPanicTx = dsl.Transaction{
+		Import: dsl.Import{Address: flow.RootAddress},
+		Content: dsl.Prepare{
+			Content: dsl.Code(`
+				var maybeCounter <- signer.load<@Testing.Counter>(from: /storage/counter)
+
+				if maybeCounter == nil {
+					maybeCounter <-! Testing.createCounter()
+				}
+
+				maybeCounter?.add(2)
+				signer.save(<-maybeCounter!, to: /storage/counter)
+
+				signer.link<&Testing.Counter>(/public/counter, target: /storage/counter)
+
+				panic("fail for testing purposes")
+				`),
+		},
+	}
 )
 
 // readCounter executes a script to read the value of a counter. The counter
 // must have been deployed and created.
 func readCounter(ctx context.Context, client *testnet.Client) (int, error) {
 
-	res, err := client.ExecuteScript(ctx, readCounterScript)
+	res, err := client.ExecuteScript(ctx, ReadCounterScript)
 	if err != nil {
 		return 0, err
 	}

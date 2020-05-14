@@ -8,32 +8,39 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
 type State struct {
+	metrics    module.ComplianceMetrics
 	db         *badger.DB
 	clusters   uint
 	headers    storage.Headers
 	identities storage.Identities
 	seals      storage.Seals
+	index      storage.Index
 	payloads   storage.Payloads
 	blocks     storage.Blocks
+	expiry     uint
 }
 
 // NewState initializes a new state backed by a badger database, applying the
 // optional configuration parameters.
-func NewState(db *badger.DB, headers storage.Headers, identities storage.Identities, seals storage.Seals, payloads storage.Payloads, blocks storage.Blocks, options ...func(*State)) (*State, error) {
+func NewState(metrics module.ComplianceMetrics, db *badger.DB, headers storage.Headers, identities storage.Identities, seals storage.Seals, index storage.Index, payloads storage.Payloads, blocks storage.Blocks, options ...func(*State)) (*State, error) {
 	s := &State{
+		metrics:    metrics,
 		db:         db,
 		clusters:   1,
 		headers:    headers,
 		identities: identities,
 		seals:      seals,
+		index:      index,
 		payloads:   payloads,
 		blocks:     blocks,
+		expiry:     flow.DefaultTransactionExpiry,
 	}
 	for _, option := range options {
 		option(s)

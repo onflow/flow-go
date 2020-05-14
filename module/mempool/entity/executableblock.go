@@ -1,6 +1,10 @@
 package entity
 
-import "github.com/dapperlabs/flow-go/model/flow"
+import (
+	"time"
+
+	"github.com/dapperlabs/flow-go/model/flow"
+)
 
 type CompleteCollection struct {
 	Guarantee    *flow.CollectionGuarantee
@@ -16,6 +20,7 @@ type ExecutableBlock struct {
 type BlocksByCollection struct {
 	CollectionID     flow.Identifier
 	ExecutableBlocks map[flow.Identifier]*ExecutableBlock
+	TimeoutTimer     *time.Timer
 }
 
 func (b *BlocksByCollection) ID() flow.Identifier {

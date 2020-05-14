@@ -25,12 +25,12 @@ type Finalizer struct {
 	db           *badger.DB
 	transactions mempool.Transactions
 	prov         network.Engine
-	metrics      module.Metrics
+	metrics      module.CollectionMetrics
 	chainID      string // aka cluster ID
 }
 
 // NewFinalizer creates a new finalizer for collection nodes.
-func NewFinalizer(db *badger.DB, transactions mempool.Transactions, prov network.Engine, metrics module.Metrics, chainID string) *Finalizer {
+func NewFinalizer(db *badger.DB, transactions mempool.Transactions, prov network.Engine, metrics module.CollectionMetrics, chainID string) *Finalizer {
 	f := &Finalizer{
 		db:           db,
 		transactions: transactions,
@@ -52,7 +52,7 @@ func NewFinalizer(db *badger.DB, transactions mempool.Transactions, prov network
 // and being finalized, entities should be present in both the volatile memory
 // pools and persistent storage.
 func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
-	return f.db.Update(func(tx *badger.Txn) error {
+	return operation.RetryOnConflict(f.db.Update, func(tx *badger.Txn) error {
 
 		// retrieve the header of the block we want to finalize
 		var header flow.Header
@@ -168,7 +168,7 @@ func (f *Finalizer) MakePending(blockID flow.Identifier) error {
 	}
 
 	// insert the child index into the DB
-	err = f.db.Update(procedure.IndexBlockChild(header.ParentID, blockID))
+	err = operation.RetryOnConflict(f.db.Update, operation.SkipDuplicates(procedure.IndexBlockChild(header.ParentID, blockID)))
 	if errors.Is(err, storage.ErrAlreadyExists) {
 		return nil
 	}

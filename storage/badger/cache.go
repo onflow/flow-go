@@ -2,9 +2,12 @@ package badger
 
 import (
 	"fmt"
-	"sync"
+
+	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 )
 
 func withLimit(limit uint) func(*Cache) {
@@ -37,78 +40,78 @@ func noRetrieve(flow.Identifier) (interface{}, error) {
 	return nil, fmt.Errorf("no retrieve function for cache get available")
 }
 
-type Cache struct {
-	sync.RWMutex
-	store    storeFunc
-	retrieve retrieveFunc
-	entities map[flow.Identifier]interface{}
-	limit    uint
+func withResource(resource string) func(*Cache) {
+	return func(c *Cache) {
+		c.resource = resource
+	}
 }
 
-func newCache(options ...func(*Cache)) *Cache {
+type Cache struct {
+	metrics  module.CacheMetrics
+	limit    uint
+	store    storeFunc
+	retrieve retrieveFunc
+	resource string
+	cache    *lru.Cache
+}
+
+func newCache(collector module.CacheMetrics, options ...func(*Cache)) *Cache {
 	c := Cache{
+		metrics:  collector,
+		limit:    1000,
 		store:    noStore,
 		retrieve: noRetrieve,
-		entities: make(map[flow.Identifier]interface{}),
-		limit:    1000,
+		resource: metrics.ResourceUndefined,
 	}
 	for _, option := range options {
 		option(&c)
 	}
+	c.cache, _ = lru.New(int(c.limit))
+	c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
 	return &c
 }
 
-// Get will try to retrieve the entity from cache first, and then from the
+// Get will try to retrieve the resource from cache first, and then from the
 // injected
 func (c *Cache) Get(entityID flow.Identifier) (interface{}, error) {
 
 	// check if we have it in the cache
-	c.RLock()
-	entity, cached := c.entities[entityID]
-	c.RUnlock()
+	resource, cached := c.cache.Get(entityID)
 	if cached {
-		return entity, nil
+		c.metrics.CacheHit(c.resource)
+		return resource, nil
 	}
 
 	// get it from the database
-	entity, err := c.retrieve(entityID)
+	c.metrics.CacheMiss(c.resource)
+	resource, err := c.retrieve(entityID)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve entity: %w", err)
+		return nil, fmt.Errorf("could not retrieve resource: %w", err)
 	}
 
-	// cache the entity and eject a random one if we reached limit
-	c.Lock()
-	c.entities[entityID] = entity
-	c.eject()
-	c.Unlock()
+	// cache the resource and eject least recently used one if we reached limit
+	evicted := c.cache.Add(entityID, resource)
+	if !evicted {
+		c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
+	}
 
-	return entity, nil
+	return resource, nil
 }
 
-// Put will add an entity to the cache with the given ID.
-func (c *Cache) Put(entityID flow.Identifier, entity interface{}) error {
+// Put will add an resource to the cache with the given ID.
+func (c *Cache) Put(entityID flow.Identifier, resource interface{}) error {
 
-	// try to store the entity
-	err := c.store(entityID, entity)
+	// try to store the resource
+	err := c.store(entityID, resource)
 	if err != nil {
-		return fmt.Errorf("could not store entity: %w", err)
+		return fmt.Errorf("could not store resource: %w", err)
 	}
 
-	// cache the entity and eject a random one if we reached limit
-	c.Lock()
-	c.entities[entityID] = entity
-	c.eject()
-	c.Unlock()
+	// cache the resource and eject least recently used one if we reached limit
+	evicted := c.cache.Add(entityID, resource)
+	if !evicted {
+		c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
+	}
 
 	return nil
-}
-
-// eject will check if we reached the limit and eject an entity if we did.
-func (c *Cache) eject() {
-	if uint(len(c.entities)) > c.limit {
-		for ejectedID := range c.entities {
-			delete(c.entities, ejectedID)
-			break
-		}
-	}
 }

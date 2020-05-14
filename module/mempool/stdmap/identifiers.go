@@ -20,7 +20,7 @@ func NewIdentifiers(limit uint) (*Identifiers, error) {
 
 // Add will add the given identifier to the memory pool or it will error if
 // the identifier is already in the memory pool.
-func (i *Identifiers) Add(id flow.Identifier) error {
+func (i *Identifiers) Add(id flow.Identifier) bool {
 	// wraps ID around an ID entity to be stored in the mempool
 	idEntity := &model.IdEntity{
 		Id: id,

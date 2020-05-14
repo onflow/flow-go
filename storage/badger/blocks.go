@@ -75,7 +75,7 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 
 func (b *Blocks) IndexBlockForCollections(blockID flow.Identifier, collIDs []flow.Identifier) error {
 	for _, collID := range collIDs {
-		err := b.db.Update(operation.SkipDuplicates(operation.IndexCollectionBlock(collID, blockID)))
+		err := operation.RetryOnConflict(b.db.Update, operation.SkipDuplicates(operation.IndexCollectionBlock(collID, blockID)))
 		if err != nil {
 			return fmt.Errorf("could not index collection block (%x): %w", collID, err)
 		}
