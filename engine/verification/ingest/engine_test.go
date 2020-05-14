@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -533,7 +534,10 @@ func (suite *IngestTestSuite) TestIngestedChunk() {
 
 	eng := suite.TestNewEngine()
 
-	chunkDataPackResponse := &messages.ChunkDataPackResponse{Data: *suite.chunkDataPack}
+	chunkDataPackResponse := &messages.ChunkDataPackResponse{
+		Data:  *suite.chunkDataPack,
+		Nonce: rand.Uint64(),
+	}
 	// mocks this chunk id
 	suite.ingestedChunkIDs.On("Has", suite.chunkDataPack.ChunkID).Return(true)
 
@@ -878,7 +882,10 @@ func (suite *IngestTestSuite) TestChunkDataPackTracker_UntrackedChunkDataPack() 
 	eng := suite.TestNewEngine()
 
 	// creates a chunk fixture, its data pack, and the data pack response
-	chunkDataPackResponse := &messages.ChunkDataPackResponse{Data: *suite.chunkDataPack}
+	chunkDataPackResponse := &messages.ChunkDataPackResponse{
+		Data:  *suite.chunkDataPack,
+		Nonce: rand.Uint64(),
+	}
 
 	// mocks absence of chunk data pack tracker
 	suite.chunkDataPackTrackers.On("Has", suite.chunkDataPack.ChunkID).Return(false)
@@ -901,7 +908,10 @@ func (suite *IngestTestSuite) TestChunkDataPackTracker_HappyPath() {
 
 	eng := suite.TestNewEngine()
 
-	chunkDataPackResponse := &messages.ChunkDataPackResponse{Data: *suite.chunkDataPack}
+	chunkDataPackResponse := &messages.ChunkDataPackResponse{
+		Data:  *suite.chunkDataPack,
+		Nonce: rand.Uint64(),
+	}
 
 	// creates a tracker for chunk data pack that binds it to the block
 	track := &tracker.ChunkDataPackTracker{

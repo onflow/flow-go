@@ -291,7 +291,8 @@ func setupMockExeNode(t *testing.T, node mock.GenericNode, verID flow.Identifier
 					for _, chunk := range er.Receipt.ExecutionResult.Chunks {
 						if chunk.ID() == req.ChunkID {
 							res := &messages.ChunkDataPackResponse{
-								Data: *er.ChunkDataPacks[chunk.Index],
+								Data:  *er.ChunkDataPacks[chunk.Index],
+								Nonce: rand.Uint64(),
 							}
 							err := chunksConduit.Submit(res, verID)
 							assert.Nil(t, err)
