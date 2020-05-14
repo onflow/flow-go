@@ -61,7 +61,7 @@ func HashInterNode(hash1 []byte, hash2 []byte) []byte {
 	return hasher.SumHash()
 }
 
-// ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default Values.
+// ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.
 func ComputeCompactValue(key []byte, value []byte, nodeHeight int) []byte {
 	// if value is nil return default hash
 	if len(value) == 0 {
