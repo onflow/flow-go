@@ -185,14 +185,59 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("multiple seals for the same block")
 	}
 
-	// create a list of ancestors from parent to just before last sealed
+	// get the parent's block seal, which constitutes the beginning of the
+	// sealing chain; this is where we need to start with our chain of seals
 	last, err := b.seals.ByBlockID(parentID)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve parent seal: %w", err)
+		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", parentID, err)
 	}
+
+	// get the last sealed block; we use its height to iterate forwards through
+	// the finalized blocks which still need sealing
+	sealed, err := b.headers.ByBlockID(last.BlockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve sealed block (%x): %w", last.BlockID, err)
+	}
+
+	// we now go from last sealed height plus one to finalized height and check
+	// if we have the seal for each of them step by step; often we will not even
+	// enter this loop, because last sealed height is higher than finalized
+	skip := false
+	var seals []*flow.Seal
+	for height := sealed.Height + 1; height <= finalized; height++ {
+		if len(byBlock) == 0 {
+			skip = true
+			break
+		}
+		header, err := b.headers.ByHeight(height)
+		if err != nil {
+			return nil, fmt.Errorf("could not get block for height (%d): %w", height, err)
+		}
+		blockID := header.ID()
+		next, found := byBlock[blockID]
+		if !found {
+			skip = true
+			break
+		}
+		if !bytes.Equal(next.InitialState, last.FinalState) {
+			return nil, fmt.Errorf("seal execution states do not connect in finalized")
+		}
+		seals = append(seals, next)
+		delete(byBlock, blockID)
+		last = next
+	}
+
+	// NOTE: we should only run the next part in case we did not use up all
+	// seals in the previous part; both break cases should make us skip the rest
+	// as it means we can't make a chain with the remaining seals
+
+	// once we have filled in seals for all finalized blocks we need to check
+	// the non-finalized blocks backwards; collect all of them, from direct
+	// parent to just before finalized, and see if we can use up the rest of the
+	// seals
 	ancestorID = parentID
 	var sealableIDs []flow.Identifier
-	for ancestorID != last.BlockID {
+	for ancestorID != finalID {
 		sealableIDs = append(sealableIDs, ancestorID)
 		ancestor, err := b.headers.ByBlockID(ancestorID)
 		if err != nil {
@@ -200,28 +245,20 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		}
 		ancestorID = ancestor.ParentID
 	}
-
-	// iterate backwards from just after last sealed to parent and build a chain
-	// of seals for those blocks that is as big as possible
-	var seals []*flow.Seal
 	for i := len(sealableIDs) - 1; i >= 0; i-- {
+		if len(byBlock) == 0 || skip {
+			break
+		}
 		sealableID := sealableIDs[i]
-
-		// if we don't find the next seal, we are done building the chain
 		next, found := byBlock[sealableID]
 		if !found {
 			break
 		}
-
-		// if the states mismatch between two subsequent seals, it's an error
 		if !bytes.Equal(next.InitialState, last.FinalState) {
-			return nil, fmt.Errorf("seal execution states do not connect")
+			return nil, fmt.Errorf("seal execution states do not connect in pending")
 		}
-
-		// add seal to the payload
 		seals = append(seals, next)
-
-		// keep track of last seal to check state connection
+		delete(byBlock, sealableID)
 		last = next
 	}
 
