@@ -125,7 +125,7 @@ func main() {
 
 // Read the NodeID file to build other paths from
 func fetchNodeId(bootdir string) (string, error) {
-	path := filepath.Join(bootdir, bootstrap.FilenameNodeId)
+	path := filepath.Join(bootdir, bootstrap.PathNodeId)
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("Error reading file %s: %w", path, err)
