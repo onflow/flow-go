@@ -43,6 +43,43 @@ func TestTrieOperations(t *testing.T) {
 	require.Equal(t, fStore.Size(), 1)
 }
 
+func TestTrieSize(t *testing.T) {
+	trieHeight := 17
+
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
+	require.NoError(t, err)
+	require.Equal(t, fStore.Size(), 8)
+	rootHash := fStore.GetEmptyRootHash()
+
+	k1 := []byte([]uint8{uint8(53), uint8(74)})
+	v1 := []byte{'A'}
+	keys := [][]byte{k1}
+	values := [][]byte{v1}
+	rootHash, err = fStore.Update(keys, values, rootHash)
+	require.NoError(t, err)
+	require.Equal(t, fStore.Size(), 51)
+
+	k1 = []byte([]uint8{uint8(53), uint8(74)})
+	v1 = []byte{'B'}
+	keys = [][]byte{k1}
+	values = [][]byte{v1}
+	rootHash, err = fStore.Update(keys, values, rootHash)
+	require.NoError(t, err)
+	require.Equal(t, fStore.Size(), 94)
+
+	k2 := []byte([]uint8{uint8(1), uint8(74)})
+	v2 := []byte{'C'}
+	keys = [][]byte{k2}
+	values = [][]byte{v2}
+	rootHash, err = fStore.Update(keys, values, rootHash)
+	require.NoError(t, err)
+	require.Equal(t, fStore.Size(), 300)
+}
+
 func TestEmptyInsert(t *testing.T) {
 	trieHeight := 17
 

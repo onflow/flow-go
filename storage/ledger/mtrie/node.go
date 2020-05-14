@@ -11,6 +11,7 @@ type node struct {
 	lChild    *node // Left Child
 	rChild    *node // Right Child
 	height    int   // Height where the node is at
+	size      int
 	key       []byte
 	value     []byte
 	hashValue []byte
@@ -22,6 +23,7 @@ func newNode(height int) *node {
 		lChild:    nil,
 		rChild:    nil,
 		height:    height,
+		size:      8, // 4 bytes pointer, 4 bytes height
 		key:       nil,
 		value:     nil,
 		hashValue: nil,

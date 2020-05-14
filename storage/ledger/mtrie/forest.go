@@ -20,10 +20,20 @@ type MForest struct {
 	maxHeight     int // Height of the tree
 	keyByteSize   int // acceptable number of bytes for key
 	onTreeEvicted func(tree *MTrie) error
+	size          int
 }
 
 // NewMForest returns a new instance of memory forest
 func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int, onTreeEvicted func(tree *MTrie) error) (*MForest, error) {
+
+	forest := &MForest{
+		maxHeight:     maxHeight,
+		dir:           trieStorageDir,
+		cacheSize:     trieCacheSize,
+		keyByteSize:   (maxHeight - 1) / 8,
+		onTreeEvicted: onTreeEvicted,
+		size:          0,
+	}
 
 	var cache *lru.Cache
 	var err error
@@ -40,18 +50,10 @@ func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int, onTreeE
 	} else {
 		cache, err = lru.New(trieCacheSize)
 	}
-
 	if err != nil {
 		return nil, fmt.Errorf("cannot create forest cache: %w", err)
 	}
-
-	forest := &MForest{tries: cache,
-		maxHeight:     maxHeight,
-		dir:           trieStorageDir,
-		cacheSize:     trieCacheSize,
-		keyByteSize:   (maxHeight - 1) / 8,
-		onTreeEvicted: onTreeEvicted,
-	}
+	forest.tries = cache
 
 	// add empty roothash
 	emptyTrie := NewMTrie(maxHeight)
@@ -88,6 +90,7 @@ func (f *MForest) GetTrie(rootHash []byte) (*MTrie, error) {
 func (f *MForest) AddTrie(trie *MTrie) error {
 	// TODO check if not exist
 	encoded := trie.StringRootHash()
+	f.size = f.size + trie.Size()
 	f.tries.Add(encoded, trie)
 	return nil
 }
@@ -288,8 +291,8 @@ func (f *MForest) update(trie *MTrie, parent *node, head *node, keys [][]byte, v
 	if len(keys) == 1 && parent.lChild == nil && parent.rChild == nil {
 		head.key = keys[0]
 		head.value = values[0]
-		// ????
 		head.hashValue = f.GetNodeHash(head)
+		head.size = head.size + len(head.key) + len(head.value) + 32
 		return nil
 	}
 
@@ -571,14 +574,16 @@ func (f *MForest) PopulateNodeHashValues(n *node) []byte {
 	// otherwise compute
 	h1 := GetDefaultHashForHeight(n.height - 1)
 	if n.lChild != nil {
+		n.size += n.lChild.size
 		h1 = f.PopulateNodeHashValues(n.lChild)
 	}
 	h2 := GetDefaultHashForHeight(n.height - 1)
 	if n.rChild != nil {
+		n.size += n.rChild.size
 		h2 = f.PopulateNodeHashValues(n.rChild)
 	}
 	n.hashValue = HashInterNode(h1, h2)
-
+	n.size += 32
 	return n.hashValue
 }
 
@@ -611,5 +616,5 @@ func (f *MForest) LoadTrie(path string) (*MTrie, error) {
 }
 
 func (f *MForest) Size() int {
-	return f.tries.Len()
+	return f.size
 }

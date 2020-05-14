@@ -24,7 +24,8 @@ type MTrie struct {
 func NewMTrie(maxHeight int) *MTrie {
 	return &MTrie{root: newNode(maxHeight - 1),
 		values:    make(map[string][]byte),
-		maxHeight: maxHeight}
+		maxHeight: maxHeight,
+	}
 }
 
 func (mt *MTrie) StringRootHash() string {
@@ -37,6 +38,10 @@ func (mt *MTrie) RootHash() []byte {
 
 func (mt *MTrie) SetRootHash(rh []byte) {
 	mt.rootHash = rh
+}
+
+func (mt *MTrie) Size() int {
+	return mt.root.size
 }
 
 func (mt *MTrie) String() string {
@@ -176,13 +181,13 @@ func (mt *MTrie) Load(path string) error {
 		return errors.New("maxHeight doesn't match")
 	}
 
-	// next 32 bytes are parent rootHash
-	parentRootHash := make([]byte, 32)
-	_, err = fi.Read(parentRootHash)
-	if err != nil {
-		return err
-	}
-	mt.parentRootHash = parentRootHash
+	// // next 32 bytes are parent rootHash
+	// parentRootHash := make([]byte, 32)
+	// _, err = fi.Read(parentRootHash)
+	// if err != nil {
+	// 	return err
+	// }
+	// mt.parentRootHash = parentRootHash
 
 	// next 32 bytes are rootHash
 	rootHash := make([]byte, 32)
