@@ -62,6 +62,7 @@ type IngestTestSuite struct {
 	chunkDataPackTrackers *mempool.ChunkDataPackTrackers
 	ingestedChunkIDs      *mempool.Identifiers
 	ingestedResultIDs     *mempool.Identifiers
+	ingestedCollectionIDs *mempool.Identifiers
 	headerStorage         *storage.Headers
 	blockStorage          *storage.Blocks
 	// resources fixtures
@@ -110,6 +111,7 @@ func (suite *IngestTestSuite) SetupTest() {
 	suite.chunkDataPackTrackers = &mempool.ChunkDataPackTrackers{}
 	suite.ingestedResultIDs = &mempool.Identifiers{}
 	suite.ingestedChunkIDs = &mempool.Identifiers{}
+	suite.ingestedCollectionIDs = &mempool.Identifiers{}
 	suite.assigner = &module.ChunkAssigner{}
 
 	completeER := test.CompleteExecutionResultFixture(suite.T(), 1)
@@ -183,6 +185,7 @@ func (suite *IngestTestSuite) TestNewEngine() *ingest.Engine {
 		suite.chunkDataPackTrackers,
 		suite.ingestedChunkIDs,
 		suite.ingestedResultIDs,
+		suite.ingestedCollectionIDs,
 		suite.headerStorage,
 		suite.blockStorage,
 		suite.assigner,
@@ -913,17 +916,13 @@ func (suite *IngestTestSuite) TestChunkDataPackTracker_HappyPath() {
 		Nonce: rand.Uint64(),
 	}
 
-	// creates a tracker for chunk data pack that binds it to the block
-	track := &tracker.ChunkDataPackTracker{
-		BlockID: suite.block.ID(),
-		ChunkID: suite.chunkDataPack.ChunkID,
-	}
-
 	// mocks tracker to return the tracker for the chunk data pack
 	suite.chunkDataPackTrackers.On("Has", suite.chunkDataPack.ChunkID).Return(true).Once()
-	suite.chunkDataPackTrackers.On("ByChunkID", suite.chunkDataPack.ChunkID).Return(track, true).Once()
+	suite.chunkDataPackTrackers.On("ByChunkID", suite.chunkDataPack.ChunkID).Return(suite.chunkTracker, true).Once()
 	suite.ss.On("Identity", suite.execIdentity.NodeID).Return(suite.execIdentity, nil)
 
+	// engine should not already have the chunk data pack
+	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ChunkID).Return(false)
 	// chunk data pack should be successfully added to mempool and the tracker should be removed
 	suite.chunkDataPacks.On("Add", suite.chunkDataPack).Return(true).Once()
 	suite.chunkDataPackTrackers.On("Rem", suite.chunkDataPack.ChunkID).Return(true).Once()
