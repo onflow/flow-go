@@ -332,37 +332,38 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		last = next
 	}
 
-	// NOTE: we could skip the remaining part in case no seals are left; it is,
+	// NOTE: We could skip the remaining part in case no seals are left; it is,
 	// however, cheap, and it's what we will always do during normal operation,
-	// where we only seal the last 1-3 blocks, which are not yet finalized
+	// where we only seal the last 1-3 blocks, which are not yet finalized.
 
-	// once we have filled in seals for all finalized blocks we need to check
+	// Once we have filled in seals for all finalized blocks we need to check
 	// the non-finalized blocks backwards; collect all of them, from direct
 	// parent to just before finalized, and see if we can use up the rest of the
-	// seals
+	// seals. We need to stop collecting ancestors either when reaching the
+	// finalized state, or when reaching the last sealed block.
 	ancestorID = header.ParentID
-	var sealableIDs []flow.Identifier
-	for ancestorID != finalID {
-		sealableIDs = append(sealableIDs, ancestorID)
+	var pendingIDs []flow.Identifier
+	for ancestorID != finalID && ancestorID != last.BlockID {
+		pendingIDs = append(pendingIDs, ancestorID)
 		ancestor, err := m.state.headers.ByBlockID(ancestorID)
 		if err != nil {
 			return fmt.Errorf("could not get sealable ancestor (%x): %w", ancestorID, err)
 		}
 		ancestorID = ancestor.ParentID
 	}
-	for i := len(sealableIDs) - 1; i >= 0; i-- {
+	for i := len(pendingIDs) - 1; i >= 0; i-- {
 		if len(byBlock) == 0 {
 			break
 		}
-		sealableID := sealableIDs[i]
-		next, found := byBlock[sealableID]
+		pendingID := pendingIDs[i]
+		next, found := byBlock[pendingID]
 		if !found {
-			return fmt.Errorf("chain of seals broken for pending (missing: %x)", sealableID)
+			return fmt.Errorf("chain of seals broken for pending (missing: %x)", pendingID)
 		}
 		if !bytes.Equal(next.InitialState, last.FinalState) {
 			return fmt.Errorf("seal execution states do not connect in pending")
 		}
-		delete(byBlock, sealableID)
+		delete(byBlock, pendingID)
 		last = next
 	}
 

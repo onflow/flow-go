@@ -202,11 +202,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// we now go from last sealed height plus one to finalized height and check
 	// if we have the seal for each of them step by step; often we will not even
 	// enter this loop, because last sealed height is higher than finalized
-	skip := false
+	unchained := false
 	var seals []*flow.Seal
 	for height := sealed.Height + 1; height <= finalized; height++ {
 		if len(byBlock) == 0 {
-			skip = true
 			break
 		}
 		header, err := b.headers.ByHeight(height)
@@ -216,7 +215,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		blockID := header.ID()
 		next, found := byBlock[blockID]
 		if !found {
-			skip = true
+			unchained = true
 			break
 		}
 		if !bytes.Equal(next.InitialState, last.FinalState) {
@@ -227,30 +226,35 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		last = next
 	}
 
-	// NOTE: we should only run the next part in case we did not use up all
+	// NOTE: We should only run the next part in case we did not use up all
 	// seals in the previous part; both break cases should make us skip the rest
-	// as it means we can't make a chain with the remaining seals
+	// as it means we either ran out of seals or we can't find the next link in
+	// the chain.
 
-	// once we have filled in seals for all finalized blocks we need to check
+	// Once we have filled in seals for all finalized blocks we need to check
 	// the non-finalized blocks backwards; collect all of them, from direct
 	// parent to just before finalized, and see if we can use up the rest of the
-	// seals
+	// seals. We need to be careful to break when reaching the last sealed block
+	// as it could be higher than the last finalized block.
 	ancestorID = parentID
-	var sealableIDs []flow.Identifier
-	for ancestorID != finalID {
-		sealableIDs = append(sealableIDs, ancestorID)
+	var pendingIDs []flow.Identifier
+	for ancestorID != finalID && ancestorID != last.BlockID {
+		pendingIDs = append(pendingIDs, ancestorID)
 		ancestor, err := b.headers.ByBlockID(ancestorID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get sealable ancestor (%x): %w", ancestorID, err)
 		}
 		ancestorID = ancestor.ParentID
 	}
-	for i := len(sealableIDs) - 1; i >= 0; i-- {
-		if len(byBlock) == 0 || skip {
+	for i := len(pendingIDs) - 1; i >= 0; i-- {
+		if len(byBlock) == 0 {
 			break
 		}
-		sealableID := sealableIDs[i]
-		next, found := byBlock[sealableID]
+		if unchained {
+			break
+		}
+		pendingID := pendingIDs[i]
+		next, found := byBlock[pendingID]
 		if !found {
 			break
 		}
@@ -258,7 +262,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			return nil, fmt.Errorf("seal execution states do not connect in pending")
 		}
 		seals = append(seals, next)
-		delete(byBlock, sealableID)
+		delete(byBlock, pendingID)
 		last = next
 	}
 
