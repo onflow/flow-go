@@ -646,6 +646,13 @@ func (suite *IngestTestSuite) TestHandleCollection_Tracked() {
 	// expect that the collection tracker is removed
 	suite.collectionTrackers.On("Rem", suite.collection.ID()).Return(true)
 
+	// mocks collection has not been ingested
+	suite.ingestedCollectionIDs.On("Has", suite.collection.ID()).Return(false)
+
+	// mocks collection does not exist in authenticated and pending collections
+	suite.authCollections.On("Has", suite.collection.ID()).Return(false).Once()
+	suite.pendingCollections.On("Has", suite.collection.ID()).Return(false)
+
 	err := eng.Process(suite.collIdentity.NodeID, suite.collection)
 	suite.Assert().Nil(err)
 
