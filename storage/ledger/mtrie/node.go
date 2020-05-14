@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/common"
 )
 
 // node is a struct for constructing our Tree
@@ -38,15 +40,15 @@ func (n *node) PopulateNodeHashValues() []byte {
 	}
 
 	// otherwise compute
-	h1 := GetDefaultHashForHeight(n.height - 1)
+	h1 := common.GetDefaultHashForHeight(n.height - 1)
 	if n.lChild != nil {
 		h1 = n.lChild.PopulateNodeHashValues()
 	}
-	h2 := GetDefaultHashForHeight(n.height - 1)
+	h2 := common.GetDefaultHashForHeight(n.height - 1)
 	if n.rChild != nil {
 		h2 = n.rChild.PopulateNodeHashValues()
 	}
-	n.hashValue = HashInterNode(h1, h2)
+	n.hashValue = common.HashInterNode(h1, h2)
 
 	return n.hashValue
 }
@@ -68,10 +70,10 @@ func (n *node) ComputeNodeHash(forced bool) []byte {
 		if len(n.value) > 0 {
 			return n.GetCompactValue()
 		}
-		return GetDefaultHashForHeight(n.height)
+		return common.GetDefaultHashForHeight(n.height)
 	}
 	// otherwise compute
-	h1 := GetDefaultHashForHeight(n.height - 1)
+	h1 := common.GetDefaultHashForHeight(n.height - 1)
 	if n.lChild != nil {
 		if forced {
 			h1 = n.lChild.ComputeNodeHash(forced)
@@ -79,7 +81,7 @@ func (n *node) ComputeNodeHash(forced bool) []byte {
 			h1 = n.lChild.GetNodeHash()
 		}
 	}
-	h2 := GetDefaultHashForHeight(n.height - 1)
+	h2 := common.GetDefaultHashForHeight(n.height - 1)
 	if n.rChild != nil {
 		if forced {
 			h2 = n.rChild.ComputeNodeHash(forced)
@@ -87,12 +89,12 @@ func (n *node) ComputeNodeHash(forced bool) []byte {
 			h2 = n.rChild.GetNodeHash()
 		}
 	}
-	return HashInterNode(h1, h2)
+	return common.HashInterNode(h1, h2)
 }
 
 // GetCompactValue computes the value for the node considering the sub tree to only include this value and default values.
 func (n *node) GetCompactValue() []byte {
-	return ComputeCompactValue(n.key, n.value, n.height)
+	return common.ComputeCompactValue(n.key, n.value, n.height)
 }
 
 // FmtStr provides formatted string representation of the node and sub tree

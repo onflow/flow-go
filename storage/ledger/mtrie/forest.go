@@ -9,6 +9,8 @@ import (
 	"sort"
 
 	lru "github.com/hashicorp/golang-lru"
+
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/common"
 )
 
 // MForest is an in memory forest (collection of tries)
@@ -55,7 +57,7 @@ func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int, onTreeE
 	// add empty roothash
 	emptyTrie := NewMTrie(maxHeight)
 	emptyTrie.number = uint64(0)
-	emptyTrie.rootHash = GetDefaultHashForHeight(maxHeight - 1)
+	emptyTrie.rootHash = common.GetDefaultHashForHeight(maxHeight - 1)
 
 	err = forest.AddTrie(emptyTrie)
 	if err != nil {
@@ -221,11 +223,11 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 }
 
 // Proofs returns a batch proof for the given keys
-func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*BatchProof, error) {
+func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*common.BatchProof, error) {
 
 	// no key, empty batchproof
 	if len(keys) == 0 {
-		return NewBatchProof(), nil
+		return common.NewBatchProof(), nil
 	}
 
 	// look up for non exisitng keys
@@ -290,11 +292,11 @@ func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*BatchProof, error) {
 		return bytes.Compare(sortedKeys[i], sortedKeys[j]) < 0
 	})
 
-	bp := NewBatchProofWithEmptyProofs(len(sortedKeys))
+	bp := common.NewBatchProofWithEmptyProofs(len(sortedKeys))
 
 	for _, p := range bp.Proofs {
-		p.flags = make([]byte, f.keyByteSize)
-		p.inclusion = false
+		p.Flags = make([]byte, f.keyByteSize)
+		p.Inclusion = false
 	}
 
 	err = trie.UnsafeProofs(sortedKeys, bp.Proofs)
@@ -303,7 +305,7 @@ func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*BatchProof, error) {
 	}
 
 	// reconstruct the proofs in the same key order that called the method
-	retbp := NewBatchProofWithEmptyProofs(len(keys))
+	retbp := common.NewBatchProofWithEmptyProofs(len(keys))
 	for i, k := range sortedKeys {
 		for _, j := range keyOrgIndex[hex.EncodeToString(k)] {
 			retbp.Proofs[j] = bp.Proofs[i]

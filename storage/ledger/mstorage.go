@@ -7,6 +7,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/common"
 	"github.com/dapperlabs/flow-go/storage/ledger/wal"
 )
 
@@ -147,7 +148,7 @@ func (f *MTrieStorage) GetRegistersWithProof(
 		return nil, nil, fmt.Errorf("Could not get proofs: %w", err)
 	}
 
-	proofToGo := mtrie.EncodeBatchProof(batchProof)
+	proofToGo := common.EncodeBatchProof(batchProof)
 	return values, proofToGo, err
 }
 

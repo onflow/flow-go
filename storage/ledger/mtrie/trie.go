@@ -10,6 +10,8 @@ import (
 	"io"
 	"os"
 	"sync"
+
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/common"
 )
 
 // MTrie is a fully in memory trie with option to persist to disk
@@ -72,7 +74,7 @@ func (mt *MTrie) read(head *node, keys [][]byte) ([][]byte, error) {
 		return res, nil
 	}
 
-	lkeys, rkeys, err := SplitSortedKeys(keys, mt.maxHeight-head.height-1)
+	lkeys, rkeys, err := common.SplitSortedKeys(keys, mt.maxHeight-head.height-1)
 	if err != nil {
 		return nil, fmt.Errorf("can't read due to split key error: %w", err)
 	}
@@ -127,7 +129,7 @@ func (mt *MTrie) update(parent *node, head *node, keys [][]byte, values [][]byte
 	}
 
 	// Split the keys and values array so we can update the trie in parallel
-	lkeys, lvalues, rkeys, rvalues, err := SplitKeyValues(keys, values, mt.maxHeight-head.height-1)
+	lkeys, lvalues, rkeys, rvalues, err := common.SplitKeyValues(keys, values, mt.maxHeight-head.height-1)
 	if err != nil {
 		return fmt.Errorf("error spliting key values: %w", err)
 	}
@@ -185,11 +187,11 @@ func (mt *MTrie) update(parent *node, head *node, keys [][]byte, values [][]byte
 	return nil
 }
 
-func (mt *MTrie) UnsafeProofs(keys [][]byte, proofs []*Proof) error {
+func (mt *MTrie) UnsafeProofs(keys [][]byte, proofs []*common.Proof) error {
 	return mt.proofs(mt.root, keys, proofs)
 }
 
-func (mt *MTrie) proofs(head *node, keys [][]byte, proofs []*Proof) error {
+func (mt *MTrie) proofs(head *node, keys [][]byte, proofs []*common.Proof) error {
 	// we've reached the end of a trie
 	// and key is not found (noninclusion proof)
 	if head == nil {
@@ -200,17 +202,17 @@ func (mt *MTrie) proofs(head *node, keys [][]byte, proofs []*Proof) error {
 	if head.key != nil {
 		// value matches (inclusion proof)
 		if bytes.Equal(head.key, keys[0]) {
-			proofs[0].inclusion = true
+			proofs[0].Inclusion = true
 		}
 		return nil
 	}
 
 	// increment steps for all the proofs
 	for _, p := range proofs {
-		p.steps++
+		p.Steps++
 	}
 	// split keys based on the value of i-th bit (i = trie height - node height)
-	lkeys, lproofs, rkeys, rproofs, err := SplitKeyProofs(keys, proofs, mt.maxHeight-head.height-1)
+	lkeys, lproofs, rkeys, rproofs, err := common.SplitKeyProofs(keys, proofs, mt.maxHeight-head.height-1)
 	if err != nil {
 		return fmt.Errorf("proof generation failed, split key error: %w", err)
 	}
@@ -218,15 +220,15 @@ func (mt *MTrie) proofs(head *node, keys [][]byte, proofs []*Proof) error {
 	if len(lkeys) > 0 {
 		if head.rChild != nil {
 			nodeHash := head.rChild.GetNodeHash()
-			isDef := bytes.Equal(nodeHash, GetDefaultHashForHeight(head.rChild.height))
+			isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(head.rChild.height))
 			for _, p := range lproofs {
 				// we skip default values
 				if !isDef {
-					err := SetBit(p.flags, mt.maxHeight-head.height-1)
+					err := common.SetBit(p.Flags, mt.maxHeight-head.height-1)
 					if err != nil {
 						return err
 					}
-					p.values = append(p.values, nodeHash)
+					p.Values = append(p.Values, nodeHash)
 				}
 			}
 		}
@@ -239,15 +241,15 @@ func (mt *MTrie) proofs(head *node, keys [][]byte, proofs []*Proof) error {
 	if len(rkeys) > 0 {
 		if head.lChild != nil {
 			nodeHash := head.lChild.GetNodeHash()
-			isDef := bytes.Equal(nodeHash, GetDefaultHashForHeight(head.lChild.height))
+			isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(head.lChild.height))
 			for _, p := range rproofs {
 				// we skip default values
 				if !isDef {
-					err := SetBit(p.flags, mt.maxHeight-head.height-1)
+					err := common.SetBit(p.Flags, mt.maxHeight-head.height-1)
 					if err != nil {
 						return err
 					}
-					p.values = append(p.values, nodeHash)
+					p.Values = append(p.Values, nodeHash)
 				}
 			}
 		}
@@ -444,11 +446,11 @@ func (mt *MTrie) load(n *node, level int, keys [][]byte, values [][]byte) error 
 	if len(keys) == 1 {
 		n.key = keys[0]
 		n.value = values[0]
-		n.hashValue = ComputeCompactValue(n.key, n.value, n.height)
+		n.hashValue = common.ComputeCompactValue(n.key, n.value, n.height)
 		return nil
 	}
 	// TODO optimize as keys are already sorted
-	lkeys, lvalues, rkeys, rvalues, err := SplitKeyValues(keys, values, level)
+	lkeys, lvalues, rkeys, rvalues, err := common.SplitKeyValues(keys, values, level)
 	if err != nil {
 		return err
 	}

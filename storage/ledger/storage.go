@@ -19,7 +19,7 @@ func NewTrieStorage(dbDir string) (*TrieStorage, error) {
 		dbDir,
 		257,
 		1000,
-		1000000,
+		1000,
 		1000,
 	)
 	if err != nil {
