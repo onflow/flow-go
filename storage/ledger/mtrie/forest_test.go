@@ -842,10 +842,10 @@ func TestTrieStoreAndLoad(t *testing.T) {
 // 			rand.Read(key)
 // 			// deduplicate
 // 			if _, found := keyValueMap[string(key)]; !found {
-// 				keys = append(keys, Key)
+// 				keys = append(keys, key)
 // 				value := make([]byte, 4)
 // 				rand.Read(value)
-// 				keyValueMap[string(Key)] = Value
+// 				keyValueMap[string(key)] = value
 // 				values = append(values, value)
 // 				i++
 // 			}
