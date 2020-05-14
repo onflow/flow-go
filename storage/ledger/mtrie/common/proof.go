@@ -13,8 +13,8 @@ import (
 type Proof struct {
 	Values    [][]byte // the non-default intermediate nodes in the proof
 	Inclusion bool     // flag indicating if this is an inclusion or exclusion
-	Flags     []byte   // The Flags of the proofs (is set if an intermediate node has a non-default)
-	Steps     uint8    // number of Steps for the proof (path len)
+	Flags     []byte   // The flags of the proofs (is set if an intermediate node has a non-default)
+	Steps     uint8    // number of steps for the proof (path len)
 }
 
 // NewProof creates a new instance of Proof

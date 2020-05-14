@@ -33,7 +33,7 @@ func SplitKeyValues(keys [][]byte, values [][]byte, bitIndex int) ([][]byte, [][
 	for i, key := range keys {
 		bitIsSet, err := IsBitSet(key, bitIndex)
 		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("can't split key Values, error: %v", err)
+			return nil, nil, nil, nil, fmt.Errorf("can't split key values, error: %v", err)
 		}
 		if bitIsSet {
 			rkeys = append(rkeys, key)
@@ -112,7 +112,7 @@ func GetRandomKeysFixedN(n int, byteSize int) [][]byte {
 }
 
 // GetRandomValues generate an slice (len n) of
-// random Values (byte slice) of random size from the range [1, maxByteSize]
+// random values (byte slice) of random size from the range [1, maxByteSize]
 func GetRandomValues(n int, maxByteSize int) [][]byte {
 	values := make([][]byte, 0, n)
 	for i := 0; i < n; i++ {
