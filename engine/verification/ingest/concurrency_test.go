@@ -161,9 +161,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	// mocked engine to handle requests for collections
 	collections := make([]*flow.Collection, 0)
 	for _, completeER := range ers {
-		for _, coll := range completeER.Collections {
-			collections = append(collections, coll)
-		}
+		collections = append(collections, completeER.Collections...)
 	}
 
 	colNode := testutil.GenericNode(t, hub, colID, identities)
