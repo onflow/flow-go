@@ -83,9 +83,9 @@ func TestLeftEmptyInsert(t *testing.T) {
 	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
 	require.NoError(t, err)
 	rootHash1 := fStore.GetEmptyRootHash()
-	// Key: 1000...
+	// key: 1000...
 	k1 := []byte([]uint8{uint8(129), uint8(1)})
-	// Key: 1100....
+	// key: 1100....
 	k2 := []byte([]uint8{uint8(193), uint8(1)})
 
 	v1 := []byte{'A'}
@@ -138,9 +138,9 @@ func TestRightEmptyInsert(t *testing.T) {
 	require.NoError(t, err)
 	rootHash1 := fStore.GetEmptyRootHash()
 
-	// Key: 1000...
+	// key: 1000...
 	k1 := []byte([]uint8{uint8(129), uint8(1)})
-	// Key: 1100....
+	// key: 1100....
 	k2 := []byte([]uint8{uint8(193), uint8(1)})
 
 	v1 := []byte{'A'}
@@ -194,7 +194,7 @@ func TestExpansionInsert(t *testing.T) {
 	require.NoError(t, err)
 	rootHash1 := fStore.GetEmptyRootHash()
 
-	// Key: 1000...
+	// key: 1000...
 	k1 := []byte([]uint8{uint8(129), uint8(1)})
 	v1 := []byte{'A'}
 	keys := [][]byte{k1}
@@ -204,7 +204,7 @@ func TestExpansionInsert(t *testing.T) {
 	// expected trie:
 	// 16: ([129 1],41)[]
 
-	// Key: 1111....
+	// key: 1111....
 	k2 := []byte([]uint8{uint8(130), uint8(1)})
 	v2 := []byte{'B'}
 	keys = [][]byte{k2}
@@ -248,9 +248,9 @@ func TestFullHouseInsert(t *testing.T) {
 	require.NoError(t, err)
 	rootHash1 := fStore.GetEmptyRootHash()
 
-	// Key: 1000...
+	// key: 1000...
 	k1 := []byte([]uint8{uint8(129), uint8(1)})
-	// Key: 1100....
+	// key: 1100....
 	k2 := []byte([]uint8{uint8(193), uint8(1)})
 
 	v1 := []byte{'A'}
@@ -332,7 +332,7 @@ func TestLeafInsert(t *testing.T) {
 }
 
 func TestSameKeyInsert(t *testing.T) {
-	trieHeight := 17 // should be Key size (in bits) + 1
+	trieHeight := 17 // should be key size (in bits) + 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -362,7 +362,7 @@ func TestSameKeyInsert(t *testing.T) {
 }
 
 func TestUpdateWithWrongKeySize(t *testing.T) {
-	trieHeight := 17 // should be Key size (in bits) + 1
+	trieHeight := 17 // should be key size (in bits) + 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -371,7 +371,7 @@ func TestUpdateWithWrongKeySize(t *testing.T) {
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
-	// short Key
+	// short key
 	key1 := make([]byte, 1)
 	utils.SetBit(key1, 5)
 	value1 := []byte{'a'}
@@ -381,7 +381,7 @@ func TestUpdateWithWrongKeySize(t *testing.T) {
 	rootHash, err = fStore.Update(keys, values, rootHash)
 	require.Error(t, err)
 
-	// long Key
+	// long key
 	key2 := make([]byte, 33)
 	utils.SetBit(key2, 5)
 	value2 := []byte{'a'}
@@ -395,7 +395,7 @@ func TestUpdateWithWrongKeySize(t *testing.T) {
 // TODO insert with duplicated keys
 
 func TestReadOrder(t *testing.T) {
-	trieHeight := 17 // should be Key size (in bits) + 1
+	trieHeight := 17 // should be key size (in bits) + 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -420,7 +420,7 @@ func TestReadOrder(t *testing.T) {
 }
 
 func TestMixRead(t *testing.T) {
-	trieHeight := 17 // should be Key size (in bits) + 1
+	trieHeight := 17 // should be key size (in bits) + 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -454,7 +454,7 @@ func TestMixRead(t *testing.T) {
 }
 
 func TestReadWithDuplicatedKeys(t *testing.T) {
-	trieHeight := 17 // should be Key size (in bits) + 1
+	trieHeight := 17 // should be key size (in bits) + 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -485,7 +485,7 @@ func TestReadWithDuplicatedKeys(t *testing.T) {
 }
 
 func TestReadNonExistKey(t *testing.T) {
-	trieHeight := 17 // should be Key size (in bits) + 1
+	trieHeight := 17 // should be key size (in bits) + 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -510,7 +510,7 @@ func TestReadNonExistKey(t *testing.T) {
 }
 
 func TestReadWithWrongKeySize(t *testing.T) {
-	trieHeight := 17 // should be Key size (in bits) + 1
+	trieHeight := 17 // should be key size (in bits) + 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -528,7 +528,7 @@ func TestReadWithWrongKeySize(t *testing.T) {
 	rootHash, err = fStore.Update(keys, values, rootHash)
 	require.NoError(t, err)
 
-	// wrong Key size
+	// wrong key size
 	key2 := make([]byte, 33)
 	utils.SetBit(key2, 5)
 	keys = [][]byte{key2}
@@ -539,7 +539,7 @@ func TestReadWithWrongKeySize(t *testing.T) {
 // TODO test read (multiple non exist in a branch)
 
 func TestUpdatePrevStates(t *testing.T) {
-	trieHeight := 17 // should be Key size (in bits) + 1
+	trieHeight := 17 // should be key size (in bits) + 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -599,7 +599,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		keys := common.GetRandomKeysRandN(maxNumKeysPerStep, keyByteSize)
 		values := common.GetRandomValues(len(keys), maxValueSize)
 
-		// update map store with Key Values
+		// update map store with key values
 		// we use this at the end of each step to check all existing keys
 		for i, k := range keys {
 			latestValueByKey[string(k)] = values[i]
@@ -650,7 +650,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		require.NoError(t, err, "error building partial trie")
 		require.True(t, bytes.Equal(psmt.GetRootHash(), rootHash))
 
-		// check Values for all existing keys
+		// check values for all existing keys
 		allKeys := make([][]byte, 0, len(latestValueByKey))
 		allValues := make([][]byte, 0, len(latestValueByKey))
 		for k, v := range latestValueByKey {
@@ -809,7 +809,7 @@ func TestTrieStoreAndLoad(t *testing.T) {
 
 // TODO comment out this for now
 // func TestMForestAccuracy(t *testing.T) {
-// 	trieHeight := 17 // should be Key size (in bits) + 1
+// 	trieHeight := 17 // should be key size (in bits) + 1
 // 	experimentRep := 10
 
 // 	dbDir := unittest.TempDir(t)
@@ -855,7 +855,7 @@ func TestTrieStoreAndLoad(t *testing.T) {
 // 		require.NoError(t, err, "error commiting changes")
 // 		rootHash = newRootHash
 
-// 		// check Values
+// 		// check values
 // 		retValues, err := fStore.Read(keys, rootHash)
 // 		require.NoError(t, err)
 // 		for i, k := range keys {
