@@ -563,14 +563,10 @@ func (suite *IngestTestSuite) TestHandleReceipt_UnstakedSender() {
 	suite.pendingReceipts.On("Add", suite.receipt).Return(true).Once()
 
 	// creates and mocks a pending receipt for the unstaked node
-	p := &verificationmodel.PendingReceipt{
-		Receipt:  suite.receipt,
-		OriginID: unstakedIdentity,
-	}
-	preceipts := []*verificationmodel.PendingReceipt{p}
+	preceipts := []*verificationmodel.PendingReceipt{verificationmodel.NewPendingReceipt(suite.receipt, unstakedIdentity)}
 
 	// receipt should go to the pending receipts mempool
-	suite.pendingReceipts.On("Add", p).Return(true).Once()
+	suite.pendingReceipts.On("Add", preceipts[0]).Return(true).Once()
 	suite.pendingReceipts.On("All").Return(preceipts).Once()
 	suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{}).Once()
 	suite.blockStorage.On("ByID", suite.block.ID()).Return(nil, errors.New("dummy error")).Once()
@@ -664,12 +660,10 @@ func (suite *IngestTestSuite) TestHandleCollection_Untracked() {
 
 	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(false).Once()
 	// mocks a pending collection
-	pcoll := &verificationmodel.PendingCollection{
-		Collection: suite.collection,
-		OriginID:   suite.collIdentity.NodeID,
-	}
 	// expects the the collection to be added to pending receipts
-	suite.pendingCollections.On("Add", pcoll).Return(true).Once()
+	suite.pendingCollections.On("Add",
+		verificationmodel.NewPendingCollection(suite.collection, suite.collIdentity.NodeID)).
+		Return(true).Once()
 
 	err := eng.Process(suite.collIdentity.NodeID, suite.collection)
 	suite.Assert().Nil(err)
@@ -808,12 +802,9 @@ func (suite *IngestTestSuite) TestVerifyReady() {
 			// execution receipt in authenticated pool
 			suite.authReceipts.On("Add", suite.receipt).Return(true)
 			suite.authReceipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
+
 			// pending receipt for the test case in mempool
-			p := &verificationmodel.PendingReceipt{
-				Receipt:  suite.receipt,
-				OriginID: testcase.from.NodeID,
-			}
-			preceipts := []*verificationmodel.PendingReceipt{p}
+			preceipts := []*verificationmodel.PendingReceipt{verificationmodel.NewPendingReceipt(suite.receipt, testcase.from.NodeID)}
 			suite.pendingReceipts.On("All").Return(preceipts)
 
 			// mocks cleanup functionalities
