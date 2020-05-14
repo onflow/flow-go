@@ -11,6 +11,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
+
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
@@ -646,7 +648,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		require.NoError(t, err, "error generating proofs")
 		require.True(t, batchProof.Verify(proofKeys, proofValues, rootHash, trieHeight))
 
-		psmt, err := cstrie.NewPSMT(rootHash, trieHeight, proofKeys, proofValues, common.EncodeBatchProof(batchProof))
+		psmt, err := cstrie.NewPSMT(rootHash, trieHeight, proofKeys, proofValues, proof.EncodeBatchProof(batchProof))
 		require.NoError(t, err, "error building partial trie")
 		require.True(t, bytes.Equal(psmt.GetRootHash(), rootHash))
 

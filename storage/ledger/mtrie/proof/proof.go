@@ -1,9 +1,10 @@
-package common
+package proof
 
 import (
 	"bytes"
 	"fmt"
 
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/common"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
@@ -37,21 +38,21 @@ func (p *Proof) Verify(key []byte, value []byte, rootHash []byte, trieMaxHeight 
 		proofIndex = len(p.Values) - 1
 	}
 	// base case at the bottom of the trie
-	computed := ComputeCompactValue(key, value, trieMaxHeight-int(p.Steps)-1)
+	computed := common.ComputeCompactValue(key, value, trieMaxHeight-int(p.Steps)-1)
 	for i := int(p.Steps) - 1; i > -1; i-- {
 		// hashing is order dependant
 		if utils.IsBitSet(key, i) {
 			if !utils.IsBitSet(p.Flags, i) {
-				computed = HashInterNode(GetDefaultHashForHeight((trieMaxHeight-i)-2), computed)
+				computed = common.HashInterNode(common.GetDefaultHashForHeight((trieMaxHeight-i)-2), computed)
 			} else {
-				computed = HashInterNode(p.Values[proofIndex], computed)
+				computed = common.HashInterNode(p.Values[proofIndex], computed)
 				proofIndex--
 			}
 		} else {
 			if !utils.IsBitSet(p.Flags, i) {
-				computed = HashInterNode(computed, GetDefaultHashForHeight((trieMaxHeight-i)-2))
+				computed = common.HashInterNode(computed, common.GetDefaultHashForHeight((trieMaxHeight-i)-2))
 			} else {
-				computed = HashInterNode(computed, p.Values[proofIndex])
+				computed = common.HashInterNode(computed, p.Values[proofIndex])
 				proofIndex--
 			}
 		}
@@ -212,4 +213,28 @@ func DecodeBatchProof(proofs [][]byte) (*BatchProof, error) {
 		bp.AppendProof(pInst)
 	}
 	return bp, nil
+}
+
+// SplitKeyProofs splits a set of unordered key and proof pairs based on the value of bit (bitIndex)
+func SplitKeyProofs(keys [][]byte, proofs []*Proof, bitIndex int) ([][]byte, []*Proof, [][]byte, []*Proof, error) {
+
+	rkeys := make([][]byte, 0, len(keys))
+	rproofs := make([]*Proof, 0, len(proofs))
+	lkeys := make([][]byte, 0, len(keys))
+	lproofs := make([]*Proof, 0, len(proofs))
+
+	for i, key := range keys {
+		bitIsSet, err := common.IsBitSet(key, bitIndex)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("can't split key proof pairs , error: %v", err)
+		}
+		if bitIsSet {
+			rkeys = append(rkeys, key)
+			rproofs = append(rproofs, proofs[i])
+		} else {
+			lkeys = append(lkeys, key)
+			lproofs = append(lproofs, proofs[i])
+		}
+	}
+	return lkeys, lproofs, rkeys, rproofs, nil
 }

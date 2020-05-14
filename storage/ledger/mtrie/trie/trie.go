@@ -13,6 +13,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/common"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/node"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
 )
 
 // MTrie is a fully in memory trie with option to persist to disk
@@ -188,11 +189,11 @@ func (mt *MTrie) update(parent *node.Node, head *node.Node, keys [][]byte, value
 	return nil
 }
 
-func (mt *MTrie) UnsafeProofs(keys [][]byte, proofs []*common.Proof) error {
+func (mt *MTrie) UnsafeProofs(keys [][]byte, proofs []*proof.Proof) error {
 	return mt.proofs(mt.Root, keys, proofs)
 }
 
-func (mt *MTrie) proofs(head *node.Node, keys [][]byte, proofs []*common.Proof) error {
+func (mt *MTrie) proofs(head *node.Node, keys [][]byte, proofs []*proof.Proof) error {
 	// we've reached the end of a trie
 	// and Key is not found (noninclusion proof)
 	if head == nil {
@@ -213,7 +214,7 @@ func (mt *MTrie) proofs(head *node.Node, keys [][]byte, proofs []*common.Proof) 
 		p.Steps++
 	}
 	// split keys based on the Value of i-th bit (i = trie Height - node Height)
-	lkeys, lproofs, rkeys, rproofs, err := common.SplitKeyProofs(keys, proofs, mt.MaxHeight-head.Height-1)
+	lkeys, lproofs, rkeys, rproofs, err := proof.SplitKeyProofs(keys, proofs, mt.MaxHeight-head.Height-1)
 	if err != nil {
 		return fmt.Errorf("proof generation failed, split Key error: %w", err)
 	}
