@@ -705,6 +705,13 @@ func (suite *IngestTestSuite) TestHandleCollection_UnstakedSender() {
 	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(true)
 	suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, true)
 
+	// mocks collection has not been ingested
+	suite.ingestedCollectionIDs.On("Has", suite.collection.ID()).Return(false)
+
+	// mocks collection does not exist in authenticated and pending collections
+	suite.authCollections.On("Has", suite.collection.ID()).Return(false)
+	suite.pendingCollections.On("Has", suite.collection.ID()).Return(false)
+
 	err := eng.Process(unstakedIdentity, suite.collection)
 	suite.Assert().Error(err)
 
