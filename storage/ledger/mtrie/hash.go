@@ -62,13 +62,16 @@ func HashInterNode(hash1 []byte, hash2 []byte) []byte {
 }
 
 // ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.
-func ComputeCompactValue(key []byte, value []byte, nodeHeight int, maxHeight int) []byte {
+func ComputeCompactValue(key []byte, value []byte, nodeHeight int) []byte {
 	// if value is nil return default hash
 	if len(value) == 0 {
 		return GetDefaultHashForHeight(nodeHeight)
 	}
 	computedHash := HashLeaf(key, value)
 
+	// we have: len(key) = keyByteSize = (maxHeight - 1) / 8
+	// hence: maxHeight = 8 * len(key) + 1
+	maxHeight := 8*len(key) + 1
 	for j := maxHeight - 2; j > maxHeight-nodeHeight-2; j-- {
 		bitIsSet, err := IsBitSet(key, j)
 		// this won't happen ever

@@ -37,7 +37,7 @@ func (p *Proof) Verify(key []byte, value []byte, rootHash []byte, trieMaxHeight 
 		proofIndex = len(p.values) - 1
 	}
 	// base case at the bottom of the trie
-	computed := ComputeCompactValue(key, value, trieMaxHeight-int(p.steps)-1, trieMaxHeight)
+	computed := ComputeCompactValue(key, value, trieMaxHeight-int(p.steps)-1)
 	for i := int(p.steps) - 1; i > -1; i-- {
 		// hashing is order dependant
 		if utils.IsBitSet(key, i) {

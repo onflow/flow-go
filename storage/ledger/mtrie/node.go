@@ -28,6 +28,73 @@ func newNode(height int) *node {
 	}
 }
 
+// PopulateNodeHashValues recursively update nodes with
+// the hash values for intermediate nodes (leafs already has values after update)
+// we only use this function to speed up proof generation,
+// for less memory usage we can skip this function
+func (n *node) PopulateNodeHashValues() []byte {
+	if n.hashValue != nil {
+		return n.hashValue
+	}
+
+	// otherwise compute
+	h1 := GetDefaultHashForHeight(n.height - 1)
+	if n.lChild != nil {
+		h1 = n.lChild.PopulateNodeHashValues()
+	}
+	h2 := GetDefaultHashForHeight(n.height - 1)
+	if n.rChild != nil {
+		h2 = n.rChild.PopulateNodeHashValues()
+	}
+	n.hashValue = HashInterNode(h1, h2)
+
+	return n.hashValue
+}
+
+// GetNodeHash computes the hashValue for the given node
+func (n *node) GetNodeHash() []byte {
+	if n.hashValue != nil {
+		return n.hashValue
+	}
+	return n.ComputeNodeHash(false)
+}
+
+// ComputeNodeHash computes the hashValue for the given node
+// if forced it set it won't trust hash values of children and
+// recomputes it.
+func (n *node) ComputeNodeHash(forced bool) []byte {
+	// leaf node (this shouldn't happen)
+	if n.lChild == nil && n.rChild == nil {
+		if len(n.value) > 0 {
+			return n.GetCompactValue()
+		}
+		return GetDefaultHashForHeight(n.height)
+	}
+	// otherwise compute
+	h1 := GetDefaultHashForHeight(n.height - 1)
+	if n.lChild != nil {
+		if forced {
+			h1 = n.lChild.ComputeNodeHash(forced)
+		} else {
+			h1 = n.lChild.GetNodeHash()
+		}
+	}
+	h2 := GetDefaultHashForHeight(n.height - 1)
+	if n.rChild != nil {
+		if forced {
+			h2 = n.rChild.ComputeNodeHash(forced)
+		} else {
+			h2 = n.rChild.GetNodeHash()
+		}
+	}
+	return HashInterNode(h1, h2)
+}
+
+// GetCompactValue computes the value for the node considering the sub tree to only include this value and default values.
+func (n *node) GetCompactValue() []byte {
+	return ComputeCompactValue(n.key, n.value, n.height)
+}
+
 // FmtStr provides formatted string representation of the node and sub tree
 func (n node) FmtStr(prefix string, path string) string {
 	right := ""

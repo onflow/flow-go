@@ -97,3 +97,10 @@ func BenchmarkHash3(t *testing.B) {
 	}
 	fmt.Printf(hex.EncodeToString(res) + "\n")
 }
+
+func BenchmarkSinleCycle(t *testing.B) {
+	var k uint64 = 0
+	for i := 0; i < t.N; i++ {
+		k += 1
+	}
+}
