@@ -56,6 +56,7 @@ func main() {
 	var (
 		txLimit             uint
 		maxCollectionSize   uint
+		parseTxScripts      bool
 		ingressExpiryBuffer uint
 		builderExpiryBuffer uint
 		hotstuffTimeout     time.Duration
@@ -88,6 +89,7 @@ func main() {
 	cmd.FlowNode(flow.RoleCollection.String()).
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&txLimit, "tx-limit", 50000, "maximum number of transactions in the memory pool")
+			flags.BoolVar(&parseTxScripts, "ingress-parse-scripts", true, "whether we check that inbound transactions are parse-able")
 			flags.UintVar(&ingressExpiryBuffer, "ingress-expiry-buffer", 30, "expiry buffer for inbound transactions")
 			flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", 15, "expiry buffer for transactions in proposed collections")
 			flags.UintVar(&maxCollectionSize, "max-collection-size", 100, "maximum number of transactions in proposed collections")
@@ -232,7 +234,7 @@ func main() {
 			return follower.WithSynchronization(sync), nil
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ing, err = ingest.New(node.Logger, node.Network, node.State, node.Metrics.Engine, colMetrics, node.Me, pool, ingressExpiryBuffer)
+			ing, err = ingest.New(node.Logger, node.Network, node.State, node.Metrics.Engine, colMetrics, node.Me, pool, ingressExpiryBuffer, parseTxScripts)
 			return ing, err
 		}).
 		Component("ingress server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
