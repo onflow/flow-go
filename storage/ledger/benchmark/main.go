@@ -37,7 +37,7 @@ func StorageBenchmark() {
 
 	rand.Seed(time.Now().UnixNano())
 
-	led, err := ledger.NewTrieStorage(dir)
+	led, err := ledger.NewMTrieStorage(dir, 100, nil)
 	defer func() {
 		led.Done()
 		os.RemoveAll(dir)

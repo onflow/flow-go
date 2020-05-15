@@ -79,7 +79,7 @@ func TestSingleQC(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
 	voterIDs := identities.NodeIDs()
-	minShares := len(voterIDs) / 2
+	minShares := (len(voterIDs)-1) / 2 + 1
 	committeeState, dkg, stakingKeys, _ := MakeHotstuffCommitteeState(t, identities, false)
 	signers := MakeSigners(t, committeeState, dkg, identities.NodeIDs(), stakingKeys, nil)
 
