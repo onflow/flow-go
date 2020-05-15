@@ -110,7 +110,6 @@ type FlowNodeBuilder struct {
 	Tracer            *trace.OpenTracer
 	MetricsRegisterer prometheus.Registerer
 	Metrics           Metrics
-	Profiler          *debug.AutoProfiler
 	DB                *badger.DB
 	Storage           Storage
 	State             *protocol.State
@@ -205,12 +204,6 @@ func (fnb *FlowNodeBuilder) enqueueTracer() {
 	})
 }
 
-func (fnb *FlowNodeBuilder) enqueueProfiler() {
-	fnb.Component("profiler", func(node *FlowNodeBuilder) (module.ReadyDoneAware, error) {
-		return fnb.Profiler, nil
-	})
-}
-
 func (fnb *FlowNodeBuilder) initNodeInfo() {
 	if fnb.BaseConfig.nodeIDHex == notSet {
 		fnb.Logger.Fatal().Msg("cannot start without node ID")
@@ -267,6 +260,9 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 }
 
 func (fnb *FlowNodeBuilder) initProfiler() {
+	if !fnb.BaseConfig.profilerEnabled {
+		return
+	}
 	dir := filepath.Join(fnb.BaseConfig.profilerDir, fnb.BaseConfig.nodeRole, fnb.BaseConfig.nodeIDHex)
 	profiler, err := debug.NewAutoProfiler(
 		fnb.Logger,
@@ -275,7 +271,9 @@ func (fnb *FlowNodeBuilder) initProfiler() {
 		fnb.BaseConfig.profilerDuration,
 	)
 	fnb.MustNot(err).Msg("could not initialize profiler")
-	fnb.Profiler = profiler
+	fnb.Component("profiler", func(node *FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		return profiler, nil
+	})
 }
 
 func (fnb *FlowNodeBuilder) initStorage() {
@@ -535,8 +533,6 @@ func FlowNode(role string) *FlowNodeBuilder {
 	builder.registerBadgerMetrics()
 
 	builder.enqueueTracer()
-
-	builder.enqueueProfiler()
 
 	return builder
 }
