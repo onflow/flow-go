@@ -13,21 +13,8 @@ import (
 const NUM_THRES_TEST = 3
 const NUM_THRES_BENCH = 254
 
-// createThresholdsB creates a set of Threshold keys for benchmarking; as we might generate
-// many of them, we don't run a real Threshold here, but instead use randomly generated
-// keys. The performance of the algorithm remains the same, even if the resulting
-// signature will not be valid for any group key we know.
-func createThresholdsB(b *testing.B, n uint) []*ThresholdProvider {
-	signers := make([]*ThresholdProvider, 0, int(n))
-	for i := 0; i < int(n); i++ {
-		_, priv := createAggregationB(b)
-		thres := NewThresholdProvider("test_beacon", priv)
-		signers = append(signers, thres)
-	}
-	return signers
-}
 
-// createKDGsT creates a set of Thresholds with real key shares and a real group key.
+// createThresholdsT creates a set of valid Threshold signature keys.
 func createThresholdsT(t *testing.T, n uint) ([]*ThresholdProvider, crypto.PublicKey) {
 	seed := make([]byte, crypto.SeedMinLenDKG)
 	_, err := rand.Read(seed)
@@ -142,13 +129,27 @@ func TestThresholdCombineVerifyThreshold(t *testing.T) {
 	assert.False(t, valid, "threshold signature should not be valid with swapped indices")
 }
 
+// createThresholdsB creates a set of fake Threshold signature keys for benchmarking.
+// The performance of the threshold signature reconstruction is the same with valid or 
+// randomly generated keys. Generating fake keys avoids running an expensive key generation
+// especially when the total number of participants is high.
+func createThresholdsB(b *testing.B, n uint) []*ThresholdProvider {
+	signers := make([]*ThresholdProvider, 0, int(n))
+	for i := 0; i < int(n); i++ {
+		_, priv := createAggregationB(b)
+		thres := NewThresholdProvider("test_beacon", priv)
+		signers = append(signers, thres)
+	}
+	return signers
+}
+
 func BenchmarkThresholdCombination(b *testing.B) {
 
 	// stop timer and reset to zero
 	b.StopTimer()
 	b.ResetTimer()
 
-	// generate the desired fake DKG participants and create signatures
+	// generate the desired fake threshold signature participants and create signatures
 	msg := createMSGB(b)
 	signers := createThresholdsB(b, NUM_THRES_BENCH)
 	sigs := make([]crypto.Signature, 0, len(signers))

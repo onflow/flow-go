@@ -316,7 +316,7 @@ func ThresholdSignKeyGen(size int, seed []byte) ([]PrivateKey,
 	if err := seedRelic(seed) ; err != nil {
 		return nil, nil, nil, err
 	}
-	// Generate a polyomial P in Zr[X] of degree t
+	// Generate a polynomial P in Zr[X] of degree t
 	a := make([]scalar, threshold+1)
 	for i := 0; i < threshold+1; i++ {
  		err := randZr(&a[i])
