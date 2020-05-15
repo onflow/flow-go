@@ -26,7 +26,6 @@ type CollectionCollector struct {
 	proposals                prometheus.Counter
 	proposalSize             prometheus.Histogram
 	guaranteedCollectionSize prometheus.Histogram
-	pendingClusterBlocks     prometheus.Gauge
 }
 
 func NewCollectionCollector(tracer *trace.OpenTracer) *CollectionCollector {
@@ -59,12 +58,6 @@ func NewCollectionCollector(tracer *trace.OpenTracer) *CollectionCollector {
 			Name:      "guarantee_size_transactions",
 			Help:      "number of transactions in guaranteed collections",
 		}),
-
-		pendingClusterBlocks: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespaceCollection,
-			Name:      "pending_blocks_total",
-			Help:      "number of cluster blocks in pending cache of collection proposal engine",
-		}),
 	}
 
 	return cc
@@ -90,11 +83,6 @@ func (cc *CollectionCollector) CollectionGuaranteed(collection flow.LightCollect
 	for _, txID := range collection.Transactions {
 		cc.tracer.FinishSpan(txID, spanTransactionToCollection)
 	}
-}
-
-// PendingClusterBlocks sets the number of cluster blocks in the pending cache.
-func (cc *CollectionCollector) PendingClusterBlocks(n uint) {
-	cc.pendingClusterBlocks.Set(float64(n))
 }
 
 // StartCollectionToGuarantee starts a span to trace the duration of a collection
