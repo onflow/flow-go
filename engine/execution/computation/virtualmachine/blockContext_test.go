@@ -294,6 +294,92 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 	})
 }
 
+func TestBlockContext_GetBlockInfo(t *testing.T) {
+	// seed the RNG
+	rand.Seed(time.Now().UnixNano())
+	rt := runtime.NewInterpreterRuntime()
+
+	h := unittest.BlockHeaderFixture()
+
+	vm, err := virtualmachine.New(rt)
+	require.NoError(t, err)
+	bc := vm.NewBlockContext(&h, new(storage.Blocks))
+
+	t.Run("works as transaction", func(t *testing.T) {
+		tx := flow.NewTransactionBody().
+			SetScript([]byte(`
+				transaction {
+				execute {
+					let block = getCurrentBlock()
+					log(block)
+					log(block.height)
+					log(block.id)
+					log(block.timestamp)
+
+					let nextBlock = getBlock(at: block.height + UInt64(1))
+					log(nextBlock)
+					log(nextBlock?.height)
+					log(nextBlock?.id)
+					log(nextBlock?.timestamp)
+				}
+				}
+			`))
+
+		err := execTestutil.SignTransactionByRoot(tx, 0)
+		require.NoError(t, err)
+
+		ledger, err := execTestutil.RootBootstrappedLedger()
+		require.NoError(t, err)
+
+		result, err := bc.ExecuteTransaction(ledger, tx)
+		assert.NoError(t, err)
+
+		require.Len(t, result.Logs, 8)
+		assert.Equal(t, "Block(height: 1x, id: 0x0000000000000000000000000000000000000000000000000000000000000001, timestamp: 1.00000000)", result.Logs[0])
+		assert.Equal(t, "1", result.Logs[1])
+		assert.Equal(t, "[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]", result.Logs[2])
+		assert.Equal(t, "1.00000000", result.Logs[3])
+		assert.Equal(t, "Block(height: 2, id: 0x0000000000000000000000000000000000000000000000000000000000000002, timestamp: 2.00000000)", result.Logs[0])
+		assert.Equal(t, "2", result.Logs[1])
+		assert.Equal(t, "[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2]", result.Logs[2])
+		assert.Equal(t, "2.00000000", result.Logs[3])
+	})
+
+	t.Run("works as script", func(t *testing.T) {
+		script := []byte(`
+			pub fun main() {
+				let block = getCurrentBlock()
+				log(block)
+				log(block.height)
+				log(block.id)
+				log(block.timestamp)
+
+				let nextBlock = getBlock(at: block.height + UInt64(1))
+				log(nextBlock)
+				log(nextBlock?.height)
+				log(nextBlock?.id)
+				log(nextBlock?.timestamp)
+			}
+		`)
+
+		ledger, err := execTestutil.RootBootstrappedLedger()
+		require.NoError(t, err)
+
+		result, err := bc.ExecuteScript(ledger, script)
+		assert.NoError(t, err)
+
+		require.Len(t, result.Logs, 8)
+		assert.Equal(t, "Block(height: 1x, id: 0x0000000000000000000000000000000000000000000000000000000000000001, timestamp: 1.00000000)", result.Logs[0])
+		assert.Equal(t, "1", result.Logs[1])
+		assert.Equal(t, "[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]", result.Logs[2])
+		assert.Equal(t, "1.00000000", result.Logs[3])
+		assert.Equal(t, "Block(height: 2, id: 0x0000000000000000000000000000000000000000000000000000000000000002, timestamp: 2.00000000)", result.Logs[0])
+		assert.Equal(t, "2", result.Logs[1])
+		assert.Equal(t, "[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2]", result.Logs[2])
+		assert.Equal(t, "2.00000000", result.Logs[3])
+	})
+}
+
 func TestBlockContext_GetAccount(t *testing.T) {
 	// seed the RNG
 	rand.Seed(time.Now().UnixNano())

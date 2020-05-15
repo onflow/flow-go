@@ -65,6 +65,7 @@ func (bc *blockContext) newScriptContext(ledger Ledger) *TransactionContext {
 		astCache:  bc.vm.cache,
 		LedgerDAL: LedgerDAL{ledger},
 		header:    bc.header,
+		blocks:    bc.blocks,
 	}
 }
 
