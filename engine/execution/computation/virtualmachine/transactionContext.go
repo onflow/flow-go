@@ -17,18 +17,23 @@ const scriptGasLimit = 100000
 type CheckerFunc func([]byte, runtime.Location) error
 
 type TransactionContext struct {
-	ledger          LedgerDAL
-	astCache        ASTCache
-	signingAccounts []runtime.Address
-	checker         CheckerFunc
-	logs            []string
-	events          []cadence.Event
-	tx              *flow.TransactionBody
-	gasLimit        uint64
-	uuid            uint64 // TODO: implement proper UUID
+	ledger           LedgerDAL
+	astCache         ASTCache
+	signingAccounts  []runtime.Address
+	checker          CheckerFunc
+	logs             []string
+	events           []cadence.Event
+	tx               *flow.TransactionBody
+	gasLimit         uint64
+	uuid             uint64 // TODO: implement proper UUID
+	skipVerification bool
 }
 
 type TransactionContextOption func(*TransactionContext)
+
+var SkipVerification = func(ctx *TransactionContext) {
+	ctx.skipVerification = true
+}
 
 // GetSigningAccounts gets the signing accounts for this context.
 //
@@ -91,7 +96,7 @@ func (r *TransactionContext) CreateAccount(publicKeysBytes [][]byte) (runtime.Ad
 		}
 	}
 
-	accountAddress, err := r.ledger.CreateAccount(publicKeys, nil)
+	accountAddress, err := r.ledger.CreateAccount(publicKeys)
 	r.Log(fmt.Sprintf("Created new account with address: %x", accountAddress))
 
 	return runtime.Address(accountAddress), err
@@ -281,6 +286,9 @@ func (r *TransactionContext) checkProgram(code []byte, address runtime.Address) 
 //
 // An error is returned if any of the expected signatures are invalid or missing.
 func (r *TransactionContext) verifySignatures() FlowError {
+	if r.skipVerification {
+		return nil
+	}
 
 	if r.tx.Payer == flow.ZeroAddress {
 		return &MissingPayerError{}
@@ -341,6 +349,9 @@ func (r *TransactionContext) verifySignatures() FlowError {
 //
 // This function returns an error if any problem occurred during checking or the check failed
 func (r *TransactionContext) checkAndIncrementSequenceNumber() (FlowError, error) {
+	if r.skipVerification {
+		return nil, nil
+	}
 
 	proposalKey := r.tx.ProposalKey
 
@@ -458,3 +469,13 @@ func sigIsForProposalKey(txSig flow.TransactionSignature, proposalKey flow.Propo
 func hasSufficientKeyWeight(weights map[flow.Address]int, address flow.Address) bool {
 	return weights[address] >= AccountKeyWeightThreshold
 }
+
+var InitDefaultTokenScript = []byte(`
+	import ServiceAccount from 0x0
+
+	transaction {
+		prepare(acct: AuthAccount) {
+			ServiceAccount.initDefaultToken(acct)
+		}
+	}
+`)

@@ -4,24 +4,24 @@ import FeeContract from 0x%s
 
 pub contract ServiceAccount {
 
-    let transactionFee: UFix64
-    let accountCreationFee: UFix64
+    pub let transactionFee: UFix64
+    pub let accountCreationFee: UFix64
 
-    pub fun deductTransactionFee(acct: AuthAccount) {
+    pub fun deductTransactionFee(_ acct: AuthAccount) {
         let tokenVault = self.defaultTokenVault(acct)
         let feeVault <- tokenVault.withdraw(amount: self.transactionFee)
 
-        FeeContract.deposit(feeVault)
+        FeeContract.deposit(from: <- feeVault)
     }
 
-    pub fun deductAccountCreationFee(acct: AuthAccount) {
-        let tokenVault = self.getDefaultTokenVault(acct)
+    pub fun deductAccountCreationFee(_ acct: AuthAccount) {
+        let tokenVault = self.defaultTokenVault(acct)
         let feeVault <- tokenVault.withdraw(amount: self.accountCreationFee)
 
-        FeeContract.deposit(feeVault)
+        FeeContract.deposit(from: <- feeVault)
     }
 
-    pub fun initDefaultToken(acct: AuthAccount) {
+    pub fun initDefaultToken(_ acct: AuthAccount) {
         // Create a new FlowToken Vault and put it in storage
         acct.save(<-FlowToken.createEmptyVault(), to: /storage/flowTokenVault)
 
@@ -40,7 +40,7 @@ pub contract ServiceAccount {
         )
     }
 
-    pub fun defaultTokenBalance(acct: PublicAccount): UFix64 {
+    pub fun defaultTokenBalance(_ acct: PublicAccount): UFix64 {
         let balanceRef = acct
             .getCapability(/public/flowTokenBalance)!
             .borrow<&{FungibleToken.Balance}>()!
@@ -48,8 +48,8 @@ pub contract ServiceAccount {
         return balanceRef.balance
     }
 
-    fun defaultTokenVault(acct: AuthAccount): &FlowToken.Vault {
-        return signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault) ?? panic("Unable to borrow reference to the default token vault")
+    pub fun defaultTokenVault(_ acct: AuthAccount): &FlowToken.Vault {
+        return acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault) ?? panic("Unable to borrow reference to the default token vault")
     }
 
     init() {

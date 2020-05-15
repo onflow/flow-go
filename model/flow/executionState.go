@@ -29,7 +29,7 @@ type StateCommitment = []byte
 const RootAccountPrivateKeyHex = "e3a08ae3d0461cfed6d6f49bfc25fa899351c39d1bd21fdba8c87595b6c49bb4cc430201"
 
 // Pre-calculated state commitment with root account with the above private key
-const GenesistStateCommitmentHex = "c95f9c6a9e5cc270af0502a740fee65ccad451356038a5219b6440d13ee10161"
+const GenesistStateCommitmentHex = "c04fb1cb4d6cd198ec60954792480c05b42e8c5d8612e9af3b91fb07d3f44cc5"
 
 var GenesisStateCommitment StateCommitment
 var RootAccountPrivateKey AccountPrivateKey
