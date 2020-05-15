@@ -13,7 +13,6 @@ import (
 const NUM_THRES_TEST = 3
 const NUM_THRES_BENCH = 254
 
-
 // createThresholdsT creates a set of valid Threshold signature keys.
 func createThresholdsT(t *testing.T, n uint) ([]*ThresholdProvider, crypto.PublicKey) {
 	seed := make([]byte, crypto.SeedMinLenDKG)
@@ -130,7 +129,7 @@ func TestThresholdCombineVerifyThreshold(t *testing.T) {
 }
 
 // createThresholdsB creates a set of fake Threshold signature keys for benchmarking.
-// The performance of the threshold signature reconstruction is the same with valid or 
+// The performance of the threshold signature reconstruction is the same with valid or
 // randomly generated keys. Generating fake keys avoids running an expensive key generation
 // especially when the total number of participants is high.
 func createThresholdsB(b *testing.B, n uint) []*ThresholdProvider {
