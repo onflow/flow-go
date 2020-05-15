@@ -151,6 +151,30 @@ func (ss *SyncSuite) SetupTest() {
 	ss.e = e
 }
 
+func (ss *SyncSuite) QueuedStatus() *Status {
+	return &Status{
+		Queued: time.Now(),
+	}
+}
+
+func (ss *SyncSuite) RequestedStatus() *Status {
+	return &Status{
+		Queued:    time.Now().Add(-time.Second),
+		Requested: time.Now(),
+		Attempts:  1,
+	}
+}
+
+func (ss *SyncSuite) ReceivedStatus(header *flow.Header) *Status {
+	return &Status{
+		Queued:    time.Now().Add(-time.Second * 2),
+		Requested: time.Now().Add(-time.Second),
+		Attempts:  1,
+		Header:    header,
+		Received:  time.Now(),
+	}
+}
+
 func (ss *SyncSuite) TestOnSyncRequest() {
 
 	// generate origin and request message
@@ -342,20 +366,22 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 
 	// check if we want the block by height
 	block1 := unittest.BlockFixture()
-	ss.e.heights[block1.Header.Height] = nil
+	ss.e.heights[block1.Header.Height] = ss.RequestedStatus()
 	res.Blocks = []*flow.Block{&block1}
 	err := ss.e.onBlockResponse(originID, res)
 	require.NoError(ss.T(), err, "should pass block response (by height)")
-	assert.Empty(ss.T(), ss.e.heights, "heights map should now be empty")
+	status := ss.e.heights[block1.Header.Height]
+	ss.Assert().True(status.WasRequested())
 	ss.comp.AssertCalled(ss.T(), "SubmitLocal", &events.SyncedBlock{OriginID: originID, Block: &block1})
 
 	// check if we want the block by block ID
 	block2 := unittest.BlockFixture()
-	ss.e.blockIDs[block2.ID()] = nil
+	ss.e.blockIDs[block2.ID()] = ss.RequestedStatus()
 	res.Blocks = []*flow.Block{&block2}
 	err = ss.e.onBlockResponse(originID, res)
 	require.NoError(ss.T(), err, "should pass block response (by block ID)")
-	assert.Empty(ss.T(), ss.e.blockIDs, "block IDs map should be empty")
+	status = ss.e.blockIDs[block2.ID()]
+	ss.Assert().True(status.WasReceived())
 	ss.comp.AssertCalled(ss.T(), "SubmitLocal", &events.SyncedBlock{OriginID: originID, Block: &block2})
 
 	// check if we want the block by neither height or block ID
@@ -364,6 +390,17 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	err = ss.e.onBlockResponse(originID, res)
 	require.NoError(ss.T(), err, "should pass on unwanted block")
 	ss.comp.AssertNotCalled(ss.T(), "SubmitLocal", &events.SyncedBlock{OriginID: originID, Block: &block3})
+
+	// check if we've already received the block
+	block4 := unittest.BlockFixture()
+	status = ss.ReceivedStatus(block4.Header)
+	ss.e.blockIDs[block4.ID()] = status
+	ss.e.heights[block4.Header.Height] = status
+	res.Blocks = []*flow.Block{&block4}
+	err = ss.e.onBlockResponse(originID, res)
+	require.NoError(ss.T(), err, "should pass on already received block")
+	ss.comp.AssertNotCalled(ss.T(), "SubmitLocal", &events.SyncedBlock{OriginID: originID, Block: &block4})
+
 }
 
 func (ss *SyncSuite) TestQueueByHeight() {
@@ -432,14 +469,14 @@ func (ss *SyncSuite) TestProcessIncomingBlock() {
 	for n := 0; n < 3; n++ {
 		block := unittest.BlockFixture()
 		blocks = append(blocks, &block)
-		ss.e.heights[block.Header.Height] = nil
+		ss.e.heights[block.Header.Height] = ss.QueuedStatus()
 	}
 
 	// generate 3 by block ID blocks
 	for n := 0; n < 3; n++ {
 		block := unittest.BlockFixture()
 		blocks = append(blocks, &block)
-		ss.e.blockIDs[block.ID()] = nil
+		ss.e.blockIDs[block.ID()] = ss.QueuedStatus()
 	}
 
 	// generate 3 unwanted blocks
@@ -449,10 +486,10 @@ func (ss *SyncSuite) TestProcessIncomingBlock() {
 	}
 
 	// add 2 random heights and block IDs to the height maps
-	ss.e.heights[rand.Uint64()] = nil
-	ss.e.heights[rand.Uint64()] = nil
-	ss.e.blockIDs[unittest.IdentifierFixture()] = nil
-	ss.e.blockIDs[unittest.IdentifierFixture()] = nil
+	ss.e.heights[rand.Uint64()] = ss.QueuedStatus()
+	ss.e.heights[rand.Uint64()] = ss.QueuedStatus()
+	ss.e.blockIDs[unittest.IdentifierFixture()] = ss.QueuedStatus()
+	ss.e.blockIDs[unittest.IdentifierFixture()] = ss.QueuedStatus()
 
 	// process all of the blocks
 	for _, block := range blocks {
@@ -460,13 +497,15 @@ func (ss *SyncSuite) TestProcessIncomingBlock() {
 	}
 
 	// assert the maps have right size and elements
-	assert.Len(ss.T(), ss.e.heights, 2)
+	assert.Len(ss.T(), ss.e.heights, 3+3+2)
 	for _, block := range blocks[0:3] {
-		assert.NotContains(ss.T(), ss.e.heights, block.Header.Height, "should not contain blocks by height anymore")
+		status := ss.e.heights[block.Header.Height]
+		assert.True(ss.T(), status.WasReceived())
 	}
-	assert.Len(ss.T(), ss.e.blockIDs, 2)
+	assert.Len(ss.T(), ss.e.blockIDs, 3+3+2)
 	for _, block := range blocks[3:6] {
-		assert.NotContains(ss.T(), ss.e.blockIDs, block.ID(), "should not contain blocks by ID anymore")
+		status := ss.e.blockIDs[block.ID()]
+		assert.True(ss.T(), status.WasReceived())
 	}
 
 	// assert that submit local was called with the right blocks
@@ -474,6 +513,83 @@ func (ss *SyncSuite) TestProcessIncomingBlock() {
 		for _, block := range blocks[0:6] {
 			ss.comp.AssertCalled(ss.T(), "SubmitLocal", &events.SyncedBlock{OriginID: originID, Block: block})
 		}
+	}
+}
+
+func (ss *SyncSuite) TestPrune() {
+
+	// our latest finalized height is 100
+	finalHeight := uint64(100)
+	ss.head.Height = finalHeight
+
+	var (
+		prunableHeights  []flow.Block
+		prunableBlockIDs []flow.Block
+		unprunable       []flow.Block
+	)
+
+	// add some finalized blocks by height
+	for i := 0; i < 3; i++ {
+		block := unittest.BlockFixture()
+		block.Header.Height = uint64(i + 1)
+		ss.e.heights[block.Header.Height] = ss.QueuedStatus()
+		prunableHeights = append(prunableHeights, block)
+	}
+	// add some un-finalized blocks by height
+	for i := 0; i < 3; i++ {
+		block := unittest.BlockFixture()
+		block.Header.Height = finalHeight + uint64(i+1)
+		ss.e.heights[block.Header.Height] = ss.QueuedStatus()
+		unprunable = append(unprunable, block)
+	}
+
+	// add some finalized blocks by block ID
+	for i := 0; i < 3; i++ {
+		block := unittest.BlockFixture()
+		block.Header.Height = uint64(i + 1)
+		ss.e.blockIDs[block.ID()] = ss.ReceivedStatus(block.Header)
+		prunableBlockIDs = append(prunableBlockIDs, block)
+	}
+	// add some un-finalized, received blocks by block ID
+	for i := 0; i < 3; i++ {
+		block := unittest.BlockFixture()
+		block.Header.Height = 100 + uint64(i+1)
+		ss.e.blockIDs[block.ID()] = ss.ReceivedStatus(block.Header)
+		unprunable = append(unprunable, block)
+	}
+
+	// add some un-finalized, received blocks that are old enough to be evicted
+	for i := 0; i < 3; i++ {
+		block := unittest.BlockFixture()
+		block.Header.Height = finalHeight + uint64(i+1)
+		status := ss.ReceivedStatus(block.Header)
+		status.Received = time.Now().Add(-time.Hour * 48)
+		ss.e.blockIDs[block.ID()] = status
+		prunableBlockIDs = append(prunableBlockIDs, block)
+	}
+
+	heightsBefore := len(ss.e.heights)
+	blockIDsBefore := len(ss.e.blockIDs)
+
+	// prune the pending requests
+	ss.e.prune()
+
+	assert.Equal(ss.T(), heightsBefore-len(prunableHeights), len(ss.e.heights))
+	assert.Equal(ss.T(), blockIDsBefore-len(prunableBlockIDs), len(ss.e.blockIDs))
+
+	// ensure the right things were pruned
+	for _, block := range prunableBlockIDs {
+		_, exists := ss.e.blockIDs[block.ID()]
+		assert.False(ss.T(), exists)
+	}
+	for _, block := range prunableHeights {
+		_, exists := ss.e.heights[block.Header.Height]
+		assert.False(ss.T(), exists)
+	}
+	for _, block := range unprunable {
+		_, heightExists := ss.e.heights[block.Header.Height]
+		_, blockIDExists := ss.e.blockIDs[block.ID()]
+		assert.True(ss.T(), heightExists || blockIDExists)
 	}
 }
 

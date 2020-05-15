@@ -38,9 +38,10 @@ type Engine struct {
 	blockIDs map[flow.Identifier]*Status
 
 	// config parameters
-	pollInterval  time.Duration
-	scanInterval  time.Duration
+	pollInterval  time.Duration // how often we poll other nodes for their finalized height
+	scanInterval  time.Duration // how often we scan our pending statuses and request blocks
 	retryInterval time.Duration // the initial interval before we retry a request, uses exponential backoff
+	resetInterval time.Duration // how long we wait after receiving a block to re-request it if it remains below the finalized height
 	tolerance     uint          // determines how big of a difference in block heights we tolerated before actively syncing with range requests
 	maxAttempts   uint          // the maximum number of attempts we make for each requested block/height before discarding
 	maxSize       uint          // the maximum number of blocks we request in the same block request message
@@ -71,8 +72,9 @@ func New(
 		blockIDs: make(map[flow.Identifier]*Status),
 
 		pollInterval:  8 * time.Second,
-		scanInterval:  1 * time.Second,
+		scanInterval:  2 * time.Second,
 		retryInterval: 4 * time.Second,
+		resetInterval: 10 * time.Minute,
 		tolerance:     10,
 		maxAttempts:   5,
 		maxSize:       64,
@@ -397,21 +399,42 @@ func (e *Engine) queueByBlockID(blockID flow.Identifier) {
 	e.blockIDs[blockID] = &status
 }
 
+// getRequestStatus retrieves a request status for a block, regardless of
+// whether it was queued by height or by block ID.
+func (e *Engine) getRequestStatus(block *flow.Block) *Status {
+	heightStatus := e.heights[block.Header.Height]
+	idStatus := e.blockIDs[block.ID()]
+
+	if heightStatus.WasQueued() {
+		return heightStatus
+	}
+	if idStatus.WasQueued() {
+		return idStatus
+	}
+	return nil
+}
+
 // processIncoming processes an incoming block, so we can take into account the
 // overlap between block IDs and heights.
 func (e *Engine) processIncomingBlock(originID flow.Identifier, block *flow.Block) {
 
-	// check if we still need to process this block or it is stale already
-	blockID := block.ID()
-	_, wantHeight := e.heights[block.Header.Height]
-	_, wantBlockID := e.blockIDs[blockID]
-	if !wantHeight && !wantBlockID {
+	status := e.getRequestStatus(block)
+	// if we never asked for this block, discard it
+	if !status.WasQueued() {
+		return
+	}
+	// if we have already received this block, exit
+	if status.WasReceived() {
 		return
 	}
 
-	// delete from the queue and forward
-	delete(e.heights, block.Header.Height)
-	delete(e.blockIDs, blockID)
+	// this is a new block, remember that we've seen it
+	status.Header = block.Header
+	status.Received = time.Now()
+
+	// track it by ID and by height so we don't accidentally request it again
+	e.blockIDs[block.ID()] = status
+	e.heights[block.Header.Height] = status
 
 	synced := &events.SyncedBlock{
 		OriginID: originID,
@@ -495,6 +518,49 @@ func (e *Engine) pollHeight() error {
 	return errs
 }
 
+// prune removes any pending requests which we have received and which is below
+// the finalized height, or which we received sufficiently long ago.
+//
+// NOTE: the caller must acquire the engine lock!
+func (e *Engine) prune() {
+
+	final, err := e.state.Final().Head()
+	if err != nil {
+		e.log.Error().Err(err).Msg("failed to prune")
+		return
+	}
+
+	now := time.Now()
+
+	for height, status := range e.heights {
+		if height <= final.Height {
+			delete(e.heights, height)
+			continue
+		}
+
+		evictAfter := status.Received.Add(e.resetInterval)
+		if status.WasReceived() && now.After(evictAfter) {
+			delete(e.heights, height)
+		}
+	}
+
+	for blockID, status := range e.blockIDs {
+		if status.WasReceived() {
+			header := status.Header
+
+			if header.Height <= final.Height {
+				delete(e.blockIDs, blockID)
+				continue
+			}
+
+			evictAfter := status.Received.Add(e.resetInterval)
+			if now.After(evictAfter) {
+				delete(e.blockIDs, blockID)
+			}
+		}
+	}
+}
+
 // scanPending will check which items shall be requested.
 func (e *Engine) scanPending() ([]uint64, []flow.Identifier, error) {
 	e.unit.Lock()
@@ -517,6 +583,11 @@ func (e *Engine) scanPending() ([]uint64, []flow.Identifier, error) {
 			continue
 		}
 
+		// if we've already received this block, skip
+		if status.WasReceived() {
+			continue
+		}
+
 		// if we reached maximum number of attempts, delete
 		if status.Attempts >= e.maxAttempts {
 			delete(e.heights, height)
@@ -534,6 +605,11 @@ func (e *Engine) scanPending() ([]uint64, []flow.Identifier, error) {
 		// if the last request is young enough, skip
 		retryAfter := status.Requested.Add(e.retryInterval << status.Attempts)
 		if now.Before(retryAfter) {
+			continue
+		}
+
+		// if we've already received this block, skip
+		if status.WasReceived() {
 			continue
 		}
 
@@ -636,9 +712,9 @@ func (e *Engine) sendRequests(heights []uint64, blockIDs []flow.Identifier) erro
 		// mark all of the heights as requested
 		for height := ran.From; height <= ran.To; height++ {
 			// NOTE: during the short window between scan and send, we could
-			// have received a block and removed a key
-			status, needed := e.heights[height]
-			if !needed {
+			// have evicted a status
+			status, exists := e.heights[height]
+			if !exists {
 				continue
 			}
 			status.Requested = time.Now()
