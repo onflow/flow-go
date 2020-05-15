@@ -242,7 +242,7 @@ docker-build-bootstrap:
 
 .PHONY: docker-build-bootstrap-transit
 docker-build-bootstrap-transit:
-	docker build -f cmd/Dockerfile --build-arg TARGET=bootstrap/transit --target production \
+	docker build -f cmd/Dockerfile --build-arg TARGET=bootstrap/transit --target production-nocgo \
 		-t gcr.io/dl-flow/bootstrap-transit:latest -t "gcr.io/dl-flow/bootstrap-transit:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/bootstrap-transit:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-flow
