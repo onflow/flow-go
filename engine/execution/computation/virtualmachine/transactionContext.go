@@ -86,7 +86,6 @@ func (r *TransactionContext) ValueExists(owner, controller, key []byte) (exists 
 // After creating the account, this function calls the onAccountCreated callback registered
 // with this context.
 func (r *TransactionContext) CreateAccount(publicKeysBytes [][]byte) (runtime.Address, error) {
-
 	publicKeys := make([]flow.AccountPublicKey, len(publicKeysBytes))
 	var err error
 	for i, keyBytes := range publicKeysBytes {
