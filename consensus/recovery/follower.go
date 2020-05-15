@@ -27,7 +27,10 @@ func Follower(
 		if err != nil {
 			return fmt.Errorf("could not add block to finalizer: %w", err)
 		}
-		log.Debug().Hex("block_id", proposal.Block.BlockID[:]).Msg("block recovered")
+		log.Debug().
+			Uint64("block_view", proposal.Block.View).
+			Hex("block_id", proposal.Block.BlockID[:]).
+			Msg("block recovered")
 		return nil
 	})
 }
