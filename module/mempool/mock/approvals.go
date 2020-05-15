@@ -64,22 +64,6 @@ func (_m *Approvals) ByID(approvalID flow.Identifier) (*flow.ResultApproval, boo
 	return r0, r1
 }
 
-// DropForResult provides a mock function with given fields: resultID
-func (_m *Approvals) DropForResult(resultID flow.Identifier) []flow.Identifier {
-	ret := _m.Called(resultID)
-
-	var r0 []flow.Identifier
-	if rf, ok := ret.Get(0).(func(flow.Identifier) []flow.Identifier); ok {
-		r0 = rf(resultID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.Identifier)
-		}
-	}
-
-	return r0
-}
-
 // Has provides a mock function with given fields: approvalID
 func (_m *Approvals) Has(approvalID flow.Identifier) bool {
 	ret := _m.Called(approvalID)

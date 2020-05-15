@@ -177,6 +177,6 @@ func (f *TrieStorage) CloseStorage() {
 	f.tree.SafeClose()
 }
 
-func (f *TrieStorage) Size() (int64, error) {
-	return f.tree.Size()
+func (f *TrieStorage) DiskSize() (int64, error) {
+	return f.tree.DickSize()
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
@@ -23,7 +24,8 @@ func TestTrieOperations(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
+	metricsCollector := &metrics.NoopCollector{}
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	nt := mtrie.NewMTrie(trieHeight)
 	rh := []byte([]uint8{uint8(1), uint8(2)})
@@ -50,7 +52,8 @@ func TestEmptyInsert(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
+	metricsCollector := &metrics.NoopCollector{}
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
@@ -77,7 +80,8 @@ func TestLeftEmptyInsert(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
+	metricsCollector := &metrics.NoopCollector{}
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash1 := fStore.GetEmptyRootHash()
 	// key: 1000...
@@ -131,7 +135,8 @@ func TestRightEmptyInsert(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
+	metricsCollector := &metrics.NoopCollector{}
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash1 := fStore.GetEmptyRootHash()
 
@@ -187,7 +192,8 @@ func TestExpansionInsert(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
+	metricsCollector := &metrics.NoopCollector{}
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash1 := fStore.GetEmptyRootHash()
 
@@ -241,7 +247,8 @@ func TestFullHouseInsert(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
+	metricsCollector := &metrics.NoopCollector{}
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash1 := fStore.GetEmptyRootHash()
 
@@ -299,7 +306,8 @@ func TestLeafInsert(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
+	metricsCollector := &metrics.NoopCollector{}
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash1 := fStore.GetEmptyRootHash()
 
@@ -334,7 +342,8 @@ func TestSameKeyInsert(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
+	metricsCollector := &metrics.NoopCollector{}
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
@@ -364,7 +373,8 @@ func TestUpdateWithWrongKeySize(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
+	metricsCollector := &metrics.NoopCollector{}
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
@@ -397,7 +407,8 @@ func TestReadOrder(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
+	metricsCollector := &metrics.NoopCollector{}
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
@@ -422,7 +433,8 @@ func TestMixRead(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
+	metricsCollector := &metrics.NoopCollector{}
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
@@ -456,7 +468,8 @@ func TestReadWithDuplicatedKeys(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
+	metricsCollector := &metrics.NoopCollector{}
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
@@ -487,7 +500,8 @@ func TestReadNonExistKey(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
+	metricsCollector := &metrics.NoopCollector{}
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
@@ -512,7 +526,8 @@ func TestReadWithWrongKeySize(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
+	metricsCollector := &metrics.NoopCollector{}
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
@@ -541,7 +556,8 @@ func TestUpdatePrevStates(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
+	metricsCollector := &metrics.NoopCollector{}
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
@@ -587,7 +603,8 @@ func TestRandomUpdateReadProof(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir) // clean up
 
-	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
+	metricsCollector := &metrics.NoopCollector{}
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 	latestValueByKey := make(map[string][]byte) // map store
@@ -643,7 +660,8 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		require.NoError(t, err, "error generating proofs")
 		require.True(t, batchProof.Verify(proofKeys, proofValues, rootHash, trieHeight))
 
-		psmt, err := trie.NewPSMT(rootHash, trieHeight, proofKeys, proofValues, mtrie.EncodeBatchProof(batchProof))
+		encodeBatchProof, _ := mtrie.EncodeBatchProof(batchProof)
+		psmt, err := trie.NewPSMT(rootHash, trieHeight, proofKeys, proofValues, encodeBatchProof)
 		require.NoError(t, err, "error building partial trie")
 		require.True(t, bytes.Equal(psmt.GetRootHash(), rootHash))
 
@@ -668,7 +686,8 @@ func TestProofGenerationInclusion(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
+	metricsCollector := &metrics.NoopCollector{}
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
@@ -701,7 +720,8 @@ func TestPurgeAndLoad(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir) // clean up
 
-	fStore, err := mtrie.NewMForest(trieHeight, dir, 2, nil)
+	metricsCollector := &metrics.NoopCollector{}
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 2, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash1 := fStore.GetEmptyRootHash()
 
@@ -762,7 +782,8 @@ func TestTrieStoreAndLoad(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
+	metricsCollector := &metrics.NoopCollector{}
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
@@ -792,7 +813,8 @@ func TestTrieStoreAndLoad(t *testing.T) {
 	require.NoError(t, err)
 
 	// create new store
-	fStore, err = mtrie.NewMForest(trieHeight, "", 5, nil)
+
+	fStore, err = mtrie.NewMForest(trieHeight, "", 5, metricsCollector, nil)
 	require.NoError(t, err)
 	_, err = fStore.LoadTrie(file.Name())
 	require.NoError(t, err)

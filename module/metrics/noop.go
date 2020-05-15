@@ -67,3 +67,15 @@ func (nc *NoopCollector) ExecutionStateStorageDiskTotal(bytes int64)            
 func (nc *NoopCollector) ExecutionStorageStateCommitment(bytes int64)               {}
 func (nc *NoopCollector) ExecutionLastExecutedBlockView(view uint64)                {}
 func (ec *NoopCollector) ExecutionTotalExecutedTransactions(numberOfTx int)         {}
+func (nc *NoopCollector) ForestApproxMemorySize(bytes uint64)                       {}
+func (nc *NoopCollector) ForestNumberOfTrees(number uint64)                         {}
+func (nc *NoopCollector) UpdateCount()                                              {}
+func (nc *NoopCollector) ProofSize(bytes uint32)                                    {}
+func (nc *NoopCollector) UpdateValuesNumber(number uint64)                          {}
+func (nc *NoopCollector) UpdateValuesSize(byte uint64)                              {}
+func (nc *NoopCollector) UpdateDuration(duration time.Duration)                     {}
+func (nc *NoopCollector) UpdateDurationPerValue(duration time.Duration)             {}
+func (nc *NoopCollector) ReadValuesNumber(number uint64)                            {}
+func (nc *NoopCollector) ReadValuesSize(byte uint64)                                {}
+func (nc *NoopCollector) ReadDuration(duration time.Duration)                       {}
+func (nc *NoopCollector) ReadDurationPerValue(duration time.Duration)               {}

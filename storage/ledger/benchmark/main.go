@@ -60,7 +60,7 @@ func StorageBenchmark() {
 		}
 		elapsed := time.Since(start)
 
-		storageSize, _ := led.Size()
+		storageSize, _ := led.DiskSize()
 		logger.Info().
 			Int64("update_time_per_reg_ms", int64(elapsed/time.Millisecond)/int64(len(keys))).
 			Int64("storage_size_mb", storageSize/int64(1000000)).

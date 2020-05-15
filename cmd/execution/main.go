@@ -72,19 +72,19 @@ func main() {
 
 			return nil
 		}).
+		Module("execution metrics", func(node *cmd.FlowNodeBuilder) error {
+			collector = metrics.NewExecutionCollector(node.Tracer, node.MetricsRegisterer)
+			return nil
+		}).
 		// Trie storage is required to bootstrap, but also should be handled while shutting down
 		Module("ledger storage", func(node *cmd.FlowNodeBuilder) error {
 			if useMtrie {
-				ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), node.MetricsRegisterer)
+				ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), collector, node.MetricsRegisterer)
 			} else {
 				ledgerStorage, err = ledger.NewTrieStorage(triedir)
 			}
 
 			return err
-		}).
-		Module("execution metrics", func(node *cmd.FlowNodeBuilder) error {
-			collector = metrics.NewExecutionCollector(node.Tracer)
-			return nil
 		}).
 		GenesisHandler(func(node *cmd.FlowNodeBuilder, block *flow.Block) {
 			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage)

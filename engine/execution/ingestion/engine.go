@@ -376,7 +376,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		return
 	}
 
-	diskTotal, err := e.execState.Size()
+	diskTotal, err := e.execState.DiskSize()
 	if err != nil {
 		e.log.Err(err).Msg("could not get execution state disk size")
 	}
