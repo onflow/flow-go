@@ -207,8 +207,6 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	}
 
 	// fill in the fields that can't be populated by HotStuff
-	//TODO clean this up - currently we set these fields in builder, then lose
-	// them in HotStuff, then need to set them again here
 	header.ChainID = parent.ChainID
 	header.Height = parent.Height + 1
 
@@ -254,6 +252,9 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	if err != nil {
 		return fmt.Errorf("could not send proposal message: %w", err)
 	}
+
+	// submit the proposal back to our own hotstuff engine for processing
+	go e.hotstuff.SubmitProposal(header, parent.View)
 
 	e.metrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockProposal)
 
