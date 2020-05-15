@@ -233,6 +233,7 @@ func main() {
 				node.Network,
 				node.Me,
 				node.Metrics.Engine,
+				node.Metrics.Mempool,
 				cleaner,
 				node.Storage.Headers,
 				node.Storage.Payloads,
