@@ -104,6 +104,7 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 		Identities: identities,
 		Guarantees: guarantees,
 		Seals:      seals,
+		Index:      index,
 		Payloads:   payloads,
 		Blocks:     blocks,
 		State:      state,
@@ -184,7 +185,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	ingestionEngine, err := consensusingest.New(node.Log, node.Metrics, node.Metrics, node.Net, propagationEngine, node.State, node.Headers, node.Me)
 	require.Nil(t, err)
 
-	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Metrics, node.Net, node.State, node.Me, resultsDB, node.Headers, results, receipts, approvals, seals)
+	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Metrics, node.Net, node.State, node.Me, resultsDB, node.Headers, node.Index, results, receipts, approvals, seals)
 	require.Nil(t, err)
 
 	return mock.ConsensusNode{

@@ -101,7 +101,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	payloadsDB := storage.NewPayloads(indexDB, identitiesDB, guaranteesDB, sealsDB)
 	blocksDB := storage.NewBlocks(db, headersDB, payloadsDB)
 
-	state, err := protocol.NewState(metrics, db, headersDB, identitiesDB, sealsDB, payloadsDB, blocksDB)
+	state, err := protocol.NewState(metrics, db, headersDB, identitiesDB, sealsDB, indexDB, payloadsDB, blocksDB)
 	require.NoError(t, err)
 
 	err = state.Mutate().Bootstrap(flow.GenesisStateCommitment, genesis)
@@ -156,7 +156,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	require.NoError(t, err)
 
 	// initialize the block builder
-	build := builder.NewBuilder(metrics, db, headersDB, sealsDB, payloadsDB, blocksDB, guarantees, seals)
+	build := builder.NewBuilder(metrics, db, headersDB, sealsDB, indexDB, blocksDB, guarantees, seals)
 
 	signer := &Signer{identity.ID()}
 
