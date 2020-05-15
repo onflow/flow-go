@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math/rand"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -39,10 +40,8 @@ func main() {
 			collector.OnResultApproval()
 
 			// storage tests
-			collector.OnChunkDataAdded(chunkID, 10)
-			// adds a synthetic 10 ms delay between adding an removing storage
-			time.Sleep(10 * time.Millisecond)
-			collector.OnChunkDataRemoved(chunkID, 10)
+			// making randomized verifiable chunks that capture all storage per chunk
+			collector.OnVerifiableChunkSubmitted(rand.Float64() * 10000.0)
 		}
 	})
 }
