@@ -15,7 +15,7 @@ type VerificationCollector struct {
 	tracer                  *trace.OpenTracer
 	chunksCheckedPerBlock   prometheus.Counter
 	resultApprovalsPerBlock prometheus.Counter
-	storagePerChunk         *prometheus.GaugeVec
+	storagePerChunk         prometheus.Histogram
 }
 
 func NewVerificationCollector(tracer *trace.OpenTracer) *VerificationCollector {
@@ -35,12 +35,12 @@ func NewVerificationCollector(tracer *trace.OpenTracer) *VerificationCollector {
 			Help:      "The total number of emitted result approvals",
 		}),
 
-		// TODO(andrew) This metric is problematic. Label explosion and gauge sampling loss. Refactor needed
-		storagePerChunk: promauto.NewGaugeVec(prometheus.GaugeOpts{
-			Name:      "verifications_storage_per_chunk",
+		storagePerChunk: promauto.NewHistogram(prometheus.HistogramOpts{
+			Name:      "storage_per_chunk",
+			Buckets:   []float64{5, 10, 50, 100, 500, 1000, 10000},
 			Namespace: namespaceVerification,
 			Help:      "storage per chunk data",
-		}, []string{"chunkID"}),
+		}),
 	}
 
 	return vc
@@ -56,28 +56,14 @@ func (vc *VerificationCollector) OnResultApproval() {
 
 }
 
-// OnChunkDataAdded is called whenever something is added to related to chunkID to the in-memory mempools
-// of verification node. It records the size of stored object.
-func (vc *VerificationCollector) OnChunkDataAdded(chunkID flow.Identifier, size float64) {
-	// UpdateStoragePerChunk updates the size of on memory overhead of the
-	// verification per chunk ID.
-	// Todo wire this up to do monitoring
-	// https://github.com/dapperlabs/flow-go/issues/3183
-	vc.storagePerChunk.WithLabelValues(chunkID.String()).Add(size)
-
-}
-
-// OnChunkDataRemoved is called whenever something is removed that is related to chunkID from the in-memory mempools
-// of verification node. It records the size of stored object.
-func (vc *VerificationCollector) OnChunkDataRemoved(chunkID flow.Identifier, size float64) {
-	if size > 0 {
-		size *= -1
-	}
-	// UpdateStoragePerChunk updates the size of on memory overhead of the
-	// verification per chunk ID.
-	// Todo wire this up to do monitoring
-	// https://github.com/dapperlabs/flow-go/issues/3183
-	vc.storagePerChunk.WithLabelValues(chunkID.String()).Add(size)
+// OnVerifiableChunkSubmitted is called whenever a verifiable chunk is shaped for a specific
+// chunk. It adds the size of the verifiable chunk to the histogram. A verifiable chunk is assumed
+// to capture all the resources needed to verify a chunk.
+// The purpose of this function is to track the overall chunk resources size on disk.
+// Todo wire this up to do monitoring
+// https://github.com/dapperlabs/flow-go/issues/3183
+func (vc *VerificationCollector) OnVerifiableChunkSubmitted(size float64) {
+	vc.storagePerChunk.Observe(size)
 }
 
 // OnChunkVerificationStarted is called whenever the verification of a chunk is started

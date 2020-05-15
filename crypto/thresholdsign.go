@@ -301,10 +301,9 @@ func EnoughShares(size int, sharesNumber int) bool {
 	return sharesNumber >= (optimalThreshold(size) + 1)
 }
 
-
-func ThresholdSignKeyGen(size int, seed []byte) ([]PrivateKey, 
-	[]PublicKey, PublicKey,	error) {
-	// set threshold 
+func ThresholdSignKeyGen(size int, seed []byte) ([]PrivateKey,
+	[]PublicKey, PublicKey, error) {
+	// set threshold
 	threshold := optimalThreshold(size)
 	// initialize BLS settings
 	_ = newBLSBLS12381()
@@ -313,13 +312,13 @@ func ThresholdSignKeyGen(size int, seed []byte) ([]PrivateKey,
 	y := make([]pointG2, size)
 	var X0 pointG2
 	// seed relic
-	if err := seedRelic(seed) ; err != nil {
+	if err := seedRelic(seed); err != nil {
 		return nil, nil, nil, err
 	}
 	// Generate a polynomial P in Zr[X] of degree t
 	a := make([]scalar, threshold+1)
 	for i := 0; i < threshold+1; i++ {
- 		err := randZr(&a[i])
+		err := randZr(&a[i])
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -327,10 +326,10 @@ func ThresholdSignKeyGen(size int, seed []byte) ([]PrivateKey,
 	// compute the shares
 	for i := index(1); int(i) <= size; i++ {
 		C.Zr_polynomialImage(
-		(*C.bn_st)(&x[i-1]),
-		(*C.ep2_st)(&y[i-1]),
-		(*C.bn_st)(&a[0]), (C.int)(len(a)),
-		(C.uint8_t)(i),
+			(*C.bn_st)(&x[i-1]),
+			(*C.ep2_st)(&y[i-1]),
+			(*C.bn_st)(&a[0]), (C.int)(len(a)),
+			(C.uint8_t)(i),
 		)
 	}
 	// group public key
@@ -341,15 +340,14 @@ func ThresholdSignKeyGen(size int, seed []byte) ([]PrivateKey,
 	var pkGroup PublicKey
 	for i := 0; i < size; i++ {
 		skShares[i] = &PrKeyBLSBLS12381{
-			scalar: x[i], 
+			scalar: x[i],
 		}
 		pkShares[i] = &PubKeyBLSBLS12381{
-			point: y[i], 
+			point: y[i],
 		}
 	}
 	pkGroup = &PubKeyBLSBLS12381{
-		point: X0, 
+		point: X0,
 	}
 	return skShares, pkShares, pkGroup, nil
 }
-
