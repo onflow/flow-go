@@ -38,7 +38,7 @@ func NewVerificationCollector(tracer *trace.OpenTracer) *VerificationCollector {
 		storagePerChunk: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "storage_per_chunk_bytes",
 			Namespace: namespaceVerification,
-			Help:      "total number of chunks checked",
+			Help:      "storage per ingested chunk resources (bytes)",
 		}),
 	}
 
