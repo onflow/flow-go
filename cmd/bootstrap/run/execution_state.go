@@ -55,8 +55,8 @@ func bootstrapLedger(ledger storage.Ledger, priv flow.AccountPrivateKey) (flow.S
 }
 
 func createRootAccount(view *delta.View, privateKey flow.AccountPrivateKey) error {
-	ledgerAccess := virtualmachine.LedgerDAL{Ledger: view}
-	_, err := ledgerAccess.CreateAccountInLedger([]flow.AccountPublicKey{privateKey.PublicKey(1000)})
+	ledgerAccess := virtualmachine.NewLedgerDAL(view)
+	_, err := ledgerAccess.CreateAccount([]flow.AccountPublicKey{privateKey.PublicKey(1000)})
 	if err != nil {
 		return fmt.Errorf("error while creating account in ledger: %w", err)
 	}

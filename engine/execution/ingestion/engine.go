@@ -693,7 +693,7 @@ func (e *Engine) GetAccount(ctx context.Context, address flow.Address, blockID f
 
 	blockView := e.execState.NewView(stateCommit)
 
-	ledgerAccess := virtualmachine.LedgerDAL{Ledger: blockView}
+	ledgerAccess := virtualmachine.NewLedgerDAL(blockView)
 	return ledgerAccess.GetAccount(address), nil
 }
 
