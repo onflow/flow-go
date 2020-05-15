@@ -67,8 +67,8 @@ func (_m *ExecutionMetrics) ReadDuration(duration time.Duration) {
 	_m.Called(duration)
 }
 
-// ReadDurationPerValue provides a mock function with given fields: duration
-func (_m *ExecutionMetrics) ReadDurationPerValue(duration time.Duration) {
+// ReadDurationPerItem provides a mock function with given fields: duration
+func (_m *ExecutionMetrics) ReadDurationPerItem(duration time.Duration) {
 	_m.Called(duration)
 }
 
@@ -97,8 +97,8 @@ func (_m *ExecutionMetrics) UpdateDuration(duration time.Duration) {
 	_m.Called(duration)
 }
 
-// UpdateDurationPerValue provides a mock function with given fields: duration
-func (_m *ExecutionMetrics) UpdateDurationPerValue(duration time.Duration) {
+// UpdateDurationPerItem provides a mock function with given fields: duration
+func (_m *ExecutionMetrics) UpdateDurationPerItem(duration time.Duration) {
 	_m.Called(duration)
 }
 

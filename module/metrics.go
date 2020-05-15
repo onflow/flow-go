@@ -143,8 +143,8 @@ type LedgerMetrics interface {
 	// UpdateDuration records absolute time for the update of a trie
 	UpdateDuration(duration time.Duration)
 
-	// UpdateDurationPerValue records update time for single value (total duration / number of updated values)
-	UpdateDurationPerValue(duration time.Duration)
+	// UpdateDurationPerItem records update time for single value (total duration / number of updated values)
+	UpdateDurationPerItem(duration time.Duration)
 
 	// ReadValuesNumber accumulates number of read values
 	ReadValuesNumber(number uint64)
@@ -155,8 +155,8 @@ type LedgerMetrics interface {
 	// ReadDuration records absolute time for the read from a trie
 	ReadDuration(duration time.Duration)
 
-	// ReadDurationPerValue records read time for single value (total duration / number of read values)
-	ReadDurationPerValue(duration time.Duration)
+	// ReadDurationPerItem records read time for single value (total duration / number of read values)
+	ReadDurationPerItem(duration time.Duration)
 }
 
 type ExecutionMetrics interface {

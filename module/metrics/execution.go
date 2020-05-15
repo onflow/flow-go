@@ -276,8 +276,8 @@ func (ec *ExecutionCollector) UpdateDuration(duration time.Duration) {
 	ec.updatedDuration.Observe(duration.Seconds())
 }
 
-// UpdateDurationPerValue records update time for single value (total duration / number of updated values)
-func (ec *ExecutionCollector) UpdateDurationPerValue(duration time.Duration) {
+// UpdateDurationPerItem records update time for single value (total duration / number of updated values)
+func (ec *ExecutionCollector) UpdateDurationPerItem(duration time.Duration) {
 	ec.updatedDurationPerValue.Observe(duration.Seconds())
 }
 
@@ -296,7 +296,7 @@ func (ec *ExecutionCollector) ReadDuration(duration time.Duration) {
 	ec.readDuration.Observe(duration.Seconds())
 }
 
-// ReadDurationPerValue records read time for single value (total duration / number of read values)
-func (ec *ExecutionCollector) ReadDurationPerValue(duration time.Duration) {
+// ReadDurationPerItem records read time for single value (total duration / number of read values)
+func (ec *ExecutionCollector) ReadDurationPerItem(duration time.Duration) {
 	ec.readDurationPerValue.Observe(duration.Seconds())
 }

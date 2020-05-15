@@ -74,8 +74,8 @@ func (nc *NoopCollector) ProofSize(bytes uint32)                                
 func (nc *NoopCollector) UpdateValuesNumber(number uint64)                          {}
 func (nc *NoopCollector) UpdateValuesSize(byte uint64)                              {}
 func (nc *NoopCollector) UpdateDuration(duration time.Duration)                     {}
-func (nc *NoopCollector) UpdateDurationPerValue(duration time.Duration)             {}
+func (nc *NoopCollector) UpdateDurationPerItem(duration time.Duration)              {}
 func (nc *NoopCollector) ReadValuesNumber(number uint64)                            {}
 func (nc *NoopCollector) ReadValuesSize(byte uint64)                                {}
 func (nc *NoopCollector) ReadDuration(duration time.Duration)                       {}
-func (nc *NoopCollector) ReadDurationPerValue(duration time.Duration)               {}
+func (nc *NoopCollector) ReadDurationPerItem(duration time.Duration)                {}

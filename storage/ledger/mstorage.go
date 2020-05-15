@@ -101,7 +101,7 @@ func (f *MTrieStorage) GetRegisters(
 
 	durationPerValue := time.Duration(readDuration.Nanoseconds()/int64(len(registerIDs))) * time.Nanosecond
 
-	f.metrics.ReadDurationPerValue(durationPerValue)
+	f.metrics.ReadDurationPerItem(durationPerValue)
 
 	return values, err
 }
@@ -153,7 +153,7 @@ func (f *MTrieStorage) UpdateRegisters(
 
 	durationPerValue := time.Duration(elapsed.Nanoseconds()/int64(len(ids))) * time.Nanosecond
 
-	f.metrics.UpdateDurationPerValue(durationPerValue)
+	f.metrics.UpdateDurationPerItem(durationPerValue)
 
 	return newStateCommitment, nil
 }

@@ -31,8 +31,8 @@ func (_m *LedgerMetrics) ReadDuration(duration time.Duration) {
 	_m.Called(duration)
 }
 
-// ReadDurationPerValue provides a mock function with given fields: duration
-func (_m *LedgerMetrics) ReadDurationPerValue(duration time.Duration) {
+// ReadDurationPerItem provides a mock function with given fields: duration
+func (_m *LedgerMetrics) ReadDurationPerItem(duration time.Duration) {
 	_m.Called(duration)
 }
 
@@ -56,8 +56,8 @@ func (_m *LedgerMetrics) UpdateDuration(duration time.Duration) {
 	_m.Called(duration)
 }
 
-// UpdateDurationPerValue provides a mock function with given fields: duration
-func (_m *LedgerMetrics) UpdateDurationPerValue(duration time.Duration) {
+// UpdateDurationPerItem provides a mock function with given fields: duration
+func (_m *LedgerMetrics) UpdateDurationPerItem(duration time.Duration) {
 	_m.Called(duration)
 }
 
