@@ -99,9 +99,10 @@ func (f *MTrieStorage) GetRegisters(
 
 	f.metrics.ReadDuration(readDuration)
 
-	durationPerValue := time.Duration(readDuration.Nanoseconds()/int64(len(registerIDs))) * time.Nanosecond
-
-	f.metrics.ReadDurationPerItem(durationPerValue)
+	if len(registerIDs) > 0 {
+		durationPerValue := time.Duration(readDuration.Nanoseconds()/int64(len(registerIDs))) * time.Nanosecond
+		f.metrics.ReadDurationPerItem(durationPerValue)
+	}
 
 	return values, err
 }
@@ -151,9 +152,10 @@ func (f *MTrieStorage) UpdateRegisters(
 	elapsed := time.Since(start)
 	f.metrics.UpdateDuration(elapsed)
 
-	durationPerValue := time.Duration(elapsed.Nanoseconds()/int64(len(ids))) * time.Nanosecond
-
-	f.metrics.UpdateDurationPerItem(durationPerValue)
+	if len(ids) > 0 {
+		durationPerValue := time.Duration(elapsed.Nanoseconds()/int64(len(ids))) * time.Nanosecond
+		f.metrics.UpdateDurationPerItem(durationPerValue)
+	}
 
 	return newStateCommitment, nil
 }
@@ -184,7 +186,9 @@ func (f *MTrieStorage) GetRegistersWithProof(
 
 	proofToGo, totalProofLength := mtrie.EncodeBatchProof(batchProof)
 
-	f.metrics.ProofSize(uint32(totalProofLength / len(proofToGo)))
+	if len(proofToGo) > 0 {
+		f.metrics.ProofSize(uint32(totalProofLength / len(proofToGo)))
+	}
 
 	return values, proofToGo, err
 }

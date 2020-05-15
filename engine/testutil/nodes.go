@@ -230,7 +230,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	dbDir := unittest.TempDir(t)
 
-	ls, err := ledger.NewMTrieStorage(dbDir, 100, nil)
+	metricsCollector := &metrics.NoopCollector{}
+	ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 	require.NoError(t, err)
 
 	genesisHead, err := node.State.Final().Head()
@@ -284,7 +285,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Metrics,
 		node.Tracer,
 		false,
-		time.Second,
+		2137*time.Hour, // just don't retry
 		10,
 	)
 	require.NoError(t, err)
