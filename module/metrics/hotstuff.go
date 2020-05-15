@@ -10,6 +10,7 @@ import (
 // HotStuff Metrics
 const (
 	HotstuffEventTypeTimeout    = "timeout"
+	HotstuffEventTypeViewChange = "viewchange"
 	HotstuffEventTypeOnProposal = "onproposal"
 	HotstuffEventTypeOnVote     = "onvote"
 )

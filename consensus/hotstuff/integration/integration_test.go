@@ -13,11 +13,6 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-// a pacemaker timeout to wait for proposals. Usually 10 ms is enough,
-// but for slow environment like CI, a longer one is needed.
-const safeTimeout = 2 * time.Second
-const safeDecrease = 200 * time.Millisecond
-
 func TestSingleInstance(t *testing.T) {
 
 	// set up a single instance to run
@@ -25,7 +20,7 @@ func TestSingleInstance(t *testing.T) {
 	// with a single instance, leading to a boundlessly growing call stack,
 	// which slows down the mocks significantly due to splitting the callstack
 	// to find the calling function name; we thus keep it low for now
-	finalView := uint64(10)
+	finalView := uint64(100)
 	in := NewInstance(t,
 		WithStopCondition(ViewFinalized(finalView)),
 	)
@@ -51,7 +46,10 @@ func TestThreeInstances(t *testing.T) {
 	// generate three hotstuff participants
 	participants := unittest.IdentityListFixture(num)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, 0.5, 1.5, safeDecrease, 0)
+
+	// all of the nodes are up and should start around the same time, so we
+	// can use a normal timeout with no need to go up or down
+	timeouts, err := timeout.NewConfig(time.Second, time.Second, 0.5, 1.001, 1)
 	require.NoError(t, err)
 
 	// set up three instances that are exactly the same
@@ -97,6 +95,8 @@ func TestThreeInstances(t *testing.T) {
 
 func TestSevenInstances(t *testing.T) {
 
+	t.Skip("this test is too heavy for CI")
+
 	// test parameters
 	// NOTE: block finalization seems to be rather slow on CI at the moment,
 	// needing around 1 minute on Travis for 1000 blocks and 10 minutes on
@@ -110,7 +110,10 @@ func TestSevenInstances(t *testing.T) {
 	participants := unittest.IdentityListFixture(numPass + numFail)
 	instances := make([]*Instance, 0, numPass+numFail)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, 0.5, 1.5, safeDecrease, 0)
+
+	// we have two nodes that are offline; we should thus allow aggressive
+	// reduction of timeout to avoid having them slow it down too much
+	timeouts, err := timeout.NewConfig(time.Second, time.Second/2, 0.5, 1.5, 5*time.Second)
 	require.NoError(t, err)
 
 	// set up five instances that work fully

@@ -17,6 +17,7 @@ type EventLoop struct {
 	log          zerolog.Logger
 	eventHandler EventHandler
 	metrics      module.HotstuffMetrics
+	viewchanges  chan struct{}
 	proposals    chan *model.Proposal
 	votes        chan *model.Vote
 
@@ -24,14 +25,15 @@ type EventLoop struct {
 }
 
 // NewEventLoop creates an instance of EventLoop.
-func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler EventHandler) (*EventLoop, error) {
-	proposals := make(chan *model.Proposal)
-	votes := make(chan *model.Vote)
+func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler EventHandler, viewchanges chan struct{}) (*EventLoop, error) {
+	proposals := make(chan *model.Proposal, 1)
+	votes := make(chan *model.Vote, 1)
 
 	el := &EventLoop{
 		log:          log,
 		eventHandler: eventHandler,
 		metrics:      metrics,
+		viewchanges:  viewchanges,
 		proposals:    proposals,
 		votes:        votes,
 		unit:         engine.NewUnit(),
@@ -83,6 +85,20 @@ func (el *EventLoop) loop() {
 				el.log.Fatal().Err(err).Msg("could not process timeout")
 			}
 
+			// if we have a view change, process it
+		case <-el.viewchanges:
+
+			processStart := time.Now()
+
+			err := el.eventHandler.StartNewView()
+
+			// measure how long it takes for a new view to be started
+			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeViewChange)
+
+			if err != nil {
+				el.log.Fatal().Err(err).Msg("could not process view chaneg")
+			}
+
 		default:
 			// fall through to non-priority events
 		}
@@ -111,6 +127,23 @@ func (el *EventLoop) loop() {
 
 			if err != nil {
 				el.log.Fatal().Err(err).Msg("could not process timeout")
+			}
+
+		// if we have a view change, process it
+		case <-el.viewchanges:
+			// measure how long the event loop was idle waiting for an
+			// incoming event
+			el.metrics.HotStuffIdleDuration(time.Since(idleStart))
+
+			processStart := time.Now()
+
+			err := el.eventHandler.StartNewView()
+
+			// measure how long it takes for a new view to be started
+			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeViewChange)
+
+			if err != nil {
+				el.log.Fatal().Err(err).Msg("could not process view chaneg")
 			}
 
 		// if we have a new proposal, process it

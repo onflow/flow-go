@@ -15,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/trigger"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voter"
@@ -106,14 +107,18 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	// initialize the voter
 	voter := voter.New(signer, forks, persist, voted)
 
+	// initialize the trigger for view changes
+	viewchanges := make(chan struct{}, 1)
+	trigger := trigger.New(viewchanges)
+
 	// initialize the event handler
-	handler, err := eventhandler.New(log, pacemaker, producer, forks, persist, communicator, committee, aggregator, voter, validator, notifier)
+	handler, err := eventhandler.New(log, pacemaker, producer, forks, persist, communicator, committee, aggregator, voter, validator, notifier, trigger)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize event handler: %w", err)
 	}
 
 	// initialize and return the event loop
-	loop, err := hotstuff.NewEventLoop(log, metrics, handler)
+	loop, err := hotstuff.NewEventLoop(log, metrics, handler, viewchanges)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize event loop: %w", err)
 	}

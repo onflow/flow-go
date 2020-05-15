@@ -20,6 +20,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/trigger"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voter"
@@ -40,8 +41,9 @@ type Instance struct {
 	stop         Condition
 
 	// instance data
-	queue   chan interface{}
-	headers sync.Map //	headers map[flow.Identifier]*flow.Header
+	viewchanges chan struct{}
+	queue       chan interface{}
+	headers     sync.Map //	headers map[flow.Identifier]*flow.Header
 
 	// mocked dependencies
 	committee    *mocks.Committee
@@ -112,7 +114,8 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		stop:         cfg.StopCondition,
 
 		// instance data
-		queue: make(chan interface{}, 1024),
+		viewchanges: make(chan struct{}, 1),
+		queue:       make(chan interface{}, 1024),
 
 		// instance mocks
 		committee:    &mocks.Committee{},
@@ -311,8 +314,12 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	// initialize the voter
 	in.voter = voter.New(in.signer, in.forks, in.persist, DefaultVoted())
 
+	// initialize the trigger
+	in.viewchanges = make(chan struct{}, 1)
+	trigger := trigger.New(in.viewchanges)
+
 	// initialize the event handler
-	in.handler, err = eventhandler.New(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.committee, in.aggregator, in.voter, in.validator, notifier)
+	in.handler, err = eventhandler.New(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.committee, in.aggregator, in.voter, in.validator, notifier, trigger)
 	require.NoError(t, err)
 
 	return &in
@@ -341,6 +348,11 @@ func (in *Instance) Run() error {
 			if err != nil {
 				return fmt.Errorf("could not process timeout: %w", err)
 			}
+		case <-in.viewchanges:
+			err := in.handler.StartNewView()
+			if err != nil {
+				return fmt.Errorf("could not start view: %w", err)
+			}
 		default:
 		}
 
@@ -355,6 +367,11 @@ func (in *Instance) Run() error {
 			err := in.handler.OnLocalTimeout()
 			if err != nil {
 				return fmt.Errorf("could not process timeout: %w", err)
+			}
+		case <-in.viewchanges:
+			err := in.handler.StartNewView()
+			if err != nil {
+				return fmt.Errorf("could not start view: %w", err)
 			}
 		case msg := <-in.queue:
 			switch m := msg.(type) {

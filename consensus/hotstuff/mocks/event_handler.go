@@ -67,6 +67,20 @@ func (_m *EventHandler) Start() error {
 	return r0
 }
 
+// StartNewView provides a mock function with given fields:
+func (_m *EventHandler) StartNewView() error {
+	ret := _m.Called()
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // TimeoutChannel provides a mock function with given fields:
 func (_m *EventHandler) TimeoutChannel() <-chan time.Time {
 	ret := _m.Called()

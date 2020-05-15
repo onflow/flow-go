@@ -28,3 +28,9 @@ func WithBlockRateDelay(delay time.Duration) Option {
 		cfg.BlockRateDelay = delay
 	}
 }
+
+func WithIncrease(increase float64) Option {
+	return func(cfg *ParticipantConfig) {
+		cfg.TimeoutIncreaseFactor = increase
+	}
+}

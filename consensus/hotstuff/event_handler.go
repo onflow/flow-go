@@ -8,6 +8,12 @@ import (
 
 type EventHandler interface {
 
+	// Start will start the event handler.
+	Start() error
+
+	// StartNewView makes the event handler transition to the next view.
+	StartNewView() error
+
 	// OnReceiveVote processes a vote received from another HotStuff consensus
 	// participant.
 	OnReceiveVote(vote *model.Vote) error
@@ -21,7 +27,4 @@ type EventHandler interface {
 
 	// TimeoutChannel returs a channel that sends a signal on timeout.
 	TimeoutChannel() <-chan time.Time
-
-	// Start will start the event handler.
-	Start() error
 }

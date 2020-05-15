@@ -324,6 +324,7 @@ type EventHandlerSuite struct {
 	voter          *Voter
 	validator      *BlacklistValidator
 	notifier       hotstuff.Consumer
+	trigger        *mocks.Trigger
 
 	initView    uint64
 	endView     uint64
@@ -349,6 +350,12 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.voter = NewVoter(es.T(), finalized)
 	es.validator = NewBlacklistValidator(es.T())
 	es.notifier = &notifications.NoopConsumer{}
+	es.trigger = &mocks.Trigger{}
+	es.trigger.On("ViewChange").Return(
+		func() error {
+			return es.eventhandler.StartNewView()
+		},
+	)
 
 	eventhandler, err := eventhandler.New(
 		zerolog.New(os.Stderr),
@@ -361,7 +368,9 @@ func (es *EventHandlerSuite) SetupTest() {
 		es.voteAggregator,
 		es.voter,
 		es.validator,
-		es.notifier)
+		es.notifier,
+		es.trigger,
+	)
 	require.NoError(es.T(), err)
 
 	es.eventhandler = eventhandler

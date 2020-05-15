@@ -28,6 +28,7 @@ type EventHandler struct {
 	voter          hotstuff.Voter
 	validator      hotstuff.Validator
 	notifier       hotstuff.Consumer
+	trigger        hotstuff.Trigger
 }
 
 // New creates an EventHandler instance with initial components.
@@ -43,6 +44,7 @@ func New(
 	voter hotstuff.Voter,
 	validator hotstuff.Validator,
 	notifier hotstuff.Consumer,
+	trigger hotstuff.Trigger,
 ) (*EventHandler, error) {
 	e := &EventHandler{
 		log:            log.With().Str("hotstuff", "participant").Logger(),
@@ -56,6 +58,7 @@ func New(
 		validator:      validator,
 		committee:      committee,
 		notifier:       notifier,
+		trigger:        trigger,
 	}
 	return e, nil
 }
@@ -189,9 +192,9 @@ func (e *EventHandler) OnLocalTimeout() error {
 	}
 
 	// current view has changed, go to new view
-	err := e.startNewView()
+	err := e.trigger.ViewChange()
 	if err != nil {
-		return fmt.Errorf("could not start new view: %w", err)
+		return fmt.Errorf("could not trigger view change: %w", err)
 	}
 
 	log.Info().Msg("local timeout processed")
@@ -199,15 +202,15 @@ func (e *EventHandler) OnLocalTimeout() error {
 	return nil
 }
 
-// Start will start the pacemaker's timer and start the new view
+// Start will start the pacemaker and then start the first view.
 func (e *EventHandler) Start() error {
 	e.paceMaker.Start()
-	return e.startNewView()
+	return e.StartNewView()
 }
 
-// startNewView will only be called when there is a view change from pacemaker.
+// StartNewView will only be called when there is a view change from pacemaker.
 // It reads the current view, and check if it needs to propose or vote in this view.
-func (e *EventHandler) startNewView() error {
+func (e *EventHandler) StartNewView() error {
 
 	curView := e.paceMaker.CurView()
 
@@ -448,7 +451,12 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *model.
 	}
 
 	// current view has changed, go to new view
-	return e.startNewView()
+	err = e.trigger.ViewChange()
+	if err != nil {
+		return fmt.Errorf("could not trigger view change: %w", err)
+	}
+
+	return nil
 }
 
 // tryBuildQCForBlock checks whether there are enough votes to build a QC for the given block,
@@ -538,5 +546,10 @@ func (e *EventHandler) processQC(qc *model.QuorumCertificate) error {
 	log.Debug().Msg("QC triggered view change, starting new view now")
 
 	// current view has changed, go to new view
-	return e.startNewView()
+	err = e.trigger.ViewChange()
+	if err != nil {
+		return fmt.Errorf("could not trigger view change: %w", err)
+	}
+
+	return nil
 }

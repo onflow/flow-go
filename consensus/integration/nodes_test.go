@@ -37,7 +37,10 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-const hotstuffTimeout = 2 * time.Second
+const (
+	hotstuffTimeout  = 2 * time.Second
+	hotstuffIncrease = 1.0001
+)
 
 type Node struct {
 	db            *badger.DB
@@ -201,7 +204,10 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	// initialize the block finalizer
 	hot, err := consensus.NewParticipant(log, dis, metrics, headersDB,
 		com, build, final, persist, signer, comp, rootHeader,
-		rootQC, rootHeader, pending, consensus.WithTimeout(hotstuffTimeout))
+		rootQC, rootHeader, pending,
+		consensus.WithTimeout(hotstuffTimeout),
+		consensus.WithIncrease(hotstuffIncrease),
+	)
 
 	require.NoError(t, err)
 
