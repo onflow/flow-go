@@ -299,29 +299,27 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
 	rt := runtime.NewInterpreterRuntime()
 
-	h := unittest.BlockHeaderFixture()
+	block1 := unittest.BlockFixture()
+	block2 := unittest.BlockWithParentFixture(block1.Header)
 
 	vm, err := virtualmachine.New(rt)
 	require.NoError(t, err)
-	bc := vm.NewBlockContext(&h, new(storage.Blocks))
+	blocks := new(storage.Blocks)
+	bc := vm.NewBlockContext(block1.Header, blocks)
+	blocks.On("ByHeight", block1.Header.Height).Return(&block1, nil)
+	blocks.On("ByHeight", block2.Header.Height).Return(&block2, nil)
 
 	t.Run("works as transaction", func(t *testing.T) {
 		tx := flow.NewTransactionBody().
 			SetScript([]byte(`
 				transaction {
-				execute {
-					let block = getCurrentBlock()
-					log(block)
-					log(block.height)
-					log(block.id)
-					log(block.timestamp)
+					execute {
+						let block = getCurrentBlock()
+						log(block)
 
-					let nextBlock = getBlock(at: block.height + UInt64(1))
-					log(nextBlock)
-					log(nextBlock?.height)
-					log(nextBlock?.id)
-					log(nextBlock?.timestamp)
-				}
+						let nextBlock = getBlock(at: block.height + UInt64(1))
+						log(nextBlock)
+					}
 				}
 			`))
 
@@ -334,15 +332,13 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		result, err := bc.ExecuteTransaction(ledger, tx)
 		assert.NoError(t, err)
 
-		require.Len(t, result.Logs, 8)
-		assert.Equal(t, "Block(height: 1x, id: 0x0000000000000000000000000000000000000000000000000000000000000001, timestamp: 1.00000000)", result.Logs[0])
-		assert.Equal(t, "1", result.Logs[1])
-		assert.Equal(t, "[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]", result.Logs[2])
-		assert.Equal(t, "1.00000000", result.Logs[3])
-		assert.Equal(t, "Block(height: 2, id: 0x0000000000000000000000000000000000000000000000000000000000000002, timestamp: 2.00000000)", result.Logs[0])
-		assert.Equal(t, "2", result.Logs[1])
-		assert.Equal(t, "[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2]", result.Logs[2])
-		assert.Equal(t, "2.00000000", result.Logs[3])
+		assert.True(t, result.Succeeded())
+
+		require.Len(t, result.Logs, 2)
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, id: 0x%x, timestamp: %.8f)", block1.Header.Height, block1.ID(),
+			float64(block1.Header.Timestamp.Unix())), result.Logs[0])
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height, block2.ID(),
+			float64(block2.Header.Timestamp.Unix())), result.Logs[1])
 	})
 
 	t.Run("works as script", func(t *testing.T) {
@@ -350,15 +346,9 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 			pub fun main() {
 				let block = getCurrentBlock()
 				log(block)
-				log(block.height)
-				log(block.id)
-				log(block.timestamp)
 
 				let nextBlock = getBlock(at: block.height + UInt64(1))
 				log(nextBlock)
-				log(nextBlock?.height)
-				log(nextBlock?.id)
-				log(nextBlock?.timestamp)
 			}
 		`)
 
@@ -368,15 +358,13 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		result, err := bc.ExecuteScript(ledger, script)
 		assert.NoError(t, err)
 
-		require.Len(t, result.Logs, 8)
-		assert.Equal(t, "Block(height: 1x, id: 0x0000000000000000000000000000000000000000000000000000000000000001, timestamp: 1.00000000)", result.Logs[0])
-		assert.Equal(t, "1", result.Logs[1])
-		assert.Equal(t, "[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]", result.Logs[2])
-		assert.Equal(t, "1.00000000", result.Logs[3])
-		assert.Equal(t, "Block(height: 2, id: 0x0000000000000000000000000000000000000000000000000000000000000002, timestamp: 2.00000000)", result.Logs[0])
-		assert.Equal(t, "2", result.Logs[1])
-		assert.Equal(t, "[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2]", result.Logs[2])
-		assert.Equal(t, "2.00000000", result.Logs[3])
+		assert.True(t, result.Succeeded())
+
+		require.Len(t, result.Logs, 2)
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, id: 0x%x, timestamp: %.8f)", block1.Header.Height, block1.ID(),
+			float64(block1.Header.Timestamp.Unix())), result.Logs[0])
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height, block2.ID(),
+			float64(block2.Header.Timestamp.Unix())), result.Logs[1])
 	})
 }
 
