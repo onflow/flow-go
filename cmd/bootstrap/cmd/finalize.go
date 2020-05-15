@@ -20,6 +20,7 @@ var (
 	flagPartnerNodeInfoDir                           string
 	flagPartnerStakes                                string
 	flagCollectorGenerationMaxHashGrindingIterations uint
+	flagFastKG                                       bool
 )
 
 type PartnerStakes map[flow.Identifier]uint64
@@ -103,6 +104,8 @@ func init() {
 	finalizeCmd.Flags().StringVar(&flagPartnerStakes, "partner-stakes", "", "path to a JSON file containing "+
 		"a map from partner node's NodeID to their stake")
 	_ = finalizeCmd.MarkFlagRequired("partner-stakes")
+	finalizeCmd.Flags().BoolVar(&flagFastKG, "fast-kg", false, "use fast (centralized) random beacon key generation "+
+		"instead of DKG")
 }
 
 func assemblePartnerNodes() []model.NodeInfo {
