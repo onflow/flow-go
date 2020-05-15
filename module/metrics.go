@@ -77,9 +77,6 @@ type CollectionMetrics interface {
 
 	// CollectionGuaranteed is called when a collection is finalized.
 	CollectionGuaranteed(collection flow.LightCollection)
-
-	// PendingClusterBlocks the number of cluster blocks in the pending cache.
-	PendingClusterBlocks(n uint)
 }
 
 type ConsensusMetrics interface {

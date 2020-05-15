@@ -106,7 +106,7 @@ func (suite *Suite) SetupTest() {
 	suite.pending.On("PruneByHeight", mock.Anything).Return()
 	suite.coldstuff = new(module.ColdStuff)
 
-	eng, err := proposal.New(log, suite.net, suite.me, metrics, metrics, suite.proto.state, suite.cluster.state, suite.validator, suite.pool, suite.transactions, suite.headers, suite.payloads, suite.pending)
+	eng, err := proposal.New(log, suite.net, suite.me, metrics, metrics, metrics, suite.proto.state, suite.cluster.state, suite.validator, suite.pool, suite.transactions, suite.headers, suite.payloads, suite.pending)
 	require.NoError(suite.T(), err)
 	suite.eng = eng.WithConsensus(suite.coldstuff)
 }
