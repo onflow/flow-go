@@ -24,7 +24,7 @@ import (
 var (
 	FilenameTransitKeyPub      = "transit-key.pub.%v"
 	FilenameTransitKeyPriv     = "transit-key.priv.%v"
-	FilenameRandomBeaconCipher = bootstrap.FilenameRandomBeaconPriv + ".enc"
+	FilenameRandomBeaconCipher = bootstrap.FilenameRandomBeaconPriv + "%v.enc"
 )
 
 const fileMode = os.FileMode(0644)
