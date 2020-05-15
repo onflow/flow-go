@@ -24,7 +24,7 @@ import (
 var (
 	FilenameTransitKeyPub      = "transit-key.pub.%v"
 	FilenameTransitKeyPriv     = "transit-key.priv.%v"
-	FilenameRandomBeaconCipher = bootstrap.FilenameRandomBeaconPriv + "%v.enc"
+	FilenameRandomBeaconCipher = bootstrap.FilenameRandomBeaconPriv + ".%v.enc"
 )
 
 const fileMode = os.FileMode(0644)
@@ -254,7 +254,7 @@ func unwrapFile(bootdir, nodeId string) error {
 func wrapFile(bootdir, nodeId string) error {
 	pubKeyPath := filepath.Join(bootdir, fmt.Sprintf(FilenameTransitKeyPub, nodeId))
 	plaintextPath := filepath.Join(bootdir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeId))
-	ciphertextPath := filepath.Join(bootdir, FilenameRandomBeaconCipher)
+	ciphertextPath := filepath.Join(bootdir, fmt.Sprintf(FilenameRandomBeaconCipher, nodeId))
 
 	plaintext, err := ioutil.ReadFile(plaintextPath)
 	if err != nil {
