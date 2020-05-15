@@ -15,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -34,6 +35,7 @@ type Manager struct {
 	protoState    protocol.State
 	vm            virtualmachine.VirtualMachine
 	blockComputer computer.BlockComputer
+	blocks        storage.Blocks
 }
 
 func New(
@@ -42,6 +44,7 @@ func New(
 	me module.Local,
 	protoState protocol.State,
 	vm virtualmachine.VirtualMachine,
+	blocks storage.Blocks,
 ) *Manager {
 	log := logger.With().Str("engine", "computation").Logger()
 
@@ -50,7 +53,8 @@ func New(
 		me:            me,
 		protoState:    protoState,
 		vm:            vm,
-		blockComputer: computer.NewBlockComputer(vm, tracer),
+		blockComputer: computer.NewBlockComputer(vm, tracer, blocks),
+		blocks:        blocks,
 	}
 
 	return &e
@@ -58,7 +62,7 @@ func New(
 
 func (e *Manager) ExecuteScript(script []byte, blockHeader *flow.Header, view *delta.View) ([]byte, error) {
 
-	result, err := e.vm.NewBlockContext(blockHeader).ExecuteScript(view, script)
+	result, err := e.vm.NewBlockContext(blockHeader, e.blocks).ExecuteScript(view, script)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
 	}

@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/model/flow"
+	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -30,7 +31,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 	vm, err := virtualmachine.New(rt)
 	require.NoError(t, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(storage.Blocks))
 
 	t.Run("transaction success", func(t *testing.T) {
 		tx := flow.NewTransactionBody().
@@ -146,7 +147,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 
 	vm, err := virtualmachine.New(rt)
 	assert.NoError(t, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(storage.Blocks))
 
 	arg1, _ := jsoncdc.Encode(cadence.NewInt(42))
 	arg2, _ := jsoncdc.Encode(cadence.NewString("foo"))
@@ -237,7 +238,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 	vm, err := virtualmachine.New(rt)
 	require.NoError(t, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(storage.Blocks))
 
 	t.Run("script success", func(t *testing.T) {
 		script := []byte(`
@@ -303,7 +304,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	vm, err := virtualmachine.New(rt)
 	require.NoError(t, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(storage.Blocks))
 
 	sequenceNumber := 0
 

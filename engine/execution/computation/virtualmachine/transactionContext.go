@@ -1,6 +1,7 @@
 package virtualmachine
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/cadence"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
 type CheckerFunc func([]byte, runtime.Location) error
@@ -25,6 +27,8 @@ type TransactionContext struct {
 	gasUsed           uint64 // TODO fill with actual gas
 	tx                *flow.TransactionBody
 	uuid              uint64
+	header            *flow.Header
+	blocks            storage.Blocks
 }
 
 type TransactionContextOption func(*TransactionContext)
@@ -249,7 +253,19 @@ func (r *TransactionContext) DecodeArgument(b []byte, t cadence.Type) (cadence.V
 	return jsoncdc.Decode(b)
 }
 
-// GetAccount gets an account by address.
+// GetCurrentBlockHeight returns the current block height.
+func (r *TransactionContext) GetCurrentBlockHeight() uint64 {
+	return r.header.Height
+}
+
+// GetBlockAtHeight returns the block at the given height.
+func (r *TransactionContext) GetBlockAtHeight(height uint64) (hash [32]byte, timestamp int64, exists bool) {
+	block, err := r.blocks.ByHeight(height)
+	if errors.Is(err, storage.ErrNotFound) {
+		return
+	}
+	return block.ID(), block.Header.Timestamp.UnixNano(), true
+}
 
 func (r *TransactionContext) isValidSigningAccount(address runtime.Address) bool {
 	for _, accountAddress := range r.GetSigningAccounts() {

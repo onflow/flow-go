@@ -68,6 +68,7 @@ func main() {
 				node.Me,
 				node.State,
 				vm,
+				node.Storage.Blocks,
 			)
 
 			return nil

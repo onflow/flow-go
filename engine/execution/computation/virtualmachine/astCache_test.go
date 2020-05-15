@@ -11,6 +11,7 @@ import (
 	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/hash"
+	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -19,7 +20,7 @@ func TestTransactionASTCache(t *testing.T) {
 	h := unittest.BlockHeaderFixture()
 	vm, err := virtualmachine.New(rt)
 	require.NoError(t, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(storage.Blocks))
 
 	t.Run("transaction execution results in cached program", func(t *testing.T) {
 		tx := &flow.TransactionBody{
@@ -61,7 +62,7 @@ func TestScriptASTCache(t *testing.T) {
 	vm, err := virtualmachine.New(rt)
 
 	require.NoError(t, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(storage.Blocks))
 
 	t.Run("script execution results in cached program", func(t *testing.T) {
 		script := []byte(`

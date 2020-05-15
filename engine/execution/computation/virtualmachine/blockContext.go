@@ -10,6 +10,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/hash"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
 // A BlockContext is used to execute transactions in the context of a block.
@@ -29,6 +30,7 @@ type blockContext struct {
 	LedgerDAL
 	vm     *virtualMachine
 	header *flow.Header
+	blocks storage.Blocks
 }
 
 func (bc *blockContext) newTransactionContext(
@@ -47,6 +49,8 @@ func (bc *blockContext) newTransactionContext(
 		LedgerDAL:       LedgerDAL{ledger},
 		signingAccounts: signingAccounts,
 		tx:              tx,
+		header:          bc.header,
+		blocks:          bc.blocks,
 	}
 
 	for _, option := range options {
@@ -60,6 +64,7 @@ func (bc *blockContext) newScriptContext(ledger Ledger) *TransactionContext {
 	return &TransactionContext{
 		astCache:  bc.vm.cache,
 		LedgerDAL: LedgerDAL{ledger},
+		header:    bc.header,
 	}
 }
 

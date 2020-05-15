@@ -15,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	module "github.com/dapperlabs/flow-go/module/mock"
+	storage "github.com/dapperlabs/flow-go/storage/mock"
 )
 
 func TestComputeBlockWithStorage(t *testing.T) {
@@ -63,7 +64,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	vm, err := virtualmachine.New(rt)
 	require.NoError(t, err)
 
-	blockComputer := computer.NewBlockComputer(vm, nil)
+	blockComputer := computer.NewBlockComputer(vm, nil, new(storage.Blocks))
 
 	engine := &Manager{
 		blockComputer: blockComputer,
