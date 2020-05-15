@@ -369,7 +369,7 @@ func tsStatelessRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing
 // simple single-threaded test of threshold signature using the simple key generation.
 // The test generates keys for a threshold signatures scheme, uses the keys to sign shares,
 // and reconstruct the threshold signatures using (t+1) random shares.
-func testStatelessThresholdSignatureSimpleKeyGen (t *testing.T) {
+func testStatelessThresholdSignatureSimpleKeyGen(t *testing.T) {
 	n := 80
 	threshold := optimalThreshold(n)
 	// generate threshold keys
@@ -378,29 +378,29 @@ func testStatelessThresholdSignatureSimpleKeyGen (t *testing.T) {
 	_, err := mrand.Read(seed)
 	require.NoError(t, err)
 	skShares, pkShares, pkGroup, err := ThresholdSignKeyGen(n, seed)
-	require.NoError(t,err)
+	require.NoError(t, err)
 	// signature hasher
 	kmac := NewBLSKMAC(thresholdSignatureTag)
 	// generate signature shares
 	signShares := make([]Signature, 0, n)
 	signers := make([]int, 0, n)
 	// fill the signers list and shuffle it
-	for i:=0; i < n; i++ {
+	for i := 0; i < n; i++ {
 		signers = append(signers, i)
 	}
 	mrand.Shuffle(n, func(i, j int) {
 		signers[i], signers[j] = signers[j], signers[i]
 	})
 	// create (t+1) signatures of the first randomly chosen signers
-	for j:=0; j < threshold+1; j++ {
+	for j := 0; j < threshold+1; j++ {
 		i := signers[j]
 		share, err := skShares[i].Sign(messageToSign, kmac)
-		require.NoError(t,err)
+		require.NoError(t, err)
 		verif, err := pkShares[i].Verify(share, messageToSign, kmac)
 		require.NoError(t, err)
 		assert.True(t, verif, "signature share is not valid")
 		if verif {
-		signShares = append(signShares, share)
+			signShares = append(signShares, share)
 		}
 	}
 	// reconstruct and test the threshold signature
@@ -411,7 +411,7 @@ func testStatelessThresholdSignatureSimpleKeyGen (t *testing.T) {
 	assert.True(t, verif, "signature share is not valid")
 }
 
-func BenchmarkSimpleKeyGen (b *testing.B) {
+func BenchmarkSimpleKeyGen(b *testing.B) {
 	n := 60
 	seed := make([]byte, SeedMinLenDKG)
 	rand.Read(seed)
