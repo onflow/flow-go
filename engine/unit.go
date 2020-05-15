@@ -64,7 +64,7 @@ func (u *Unit) LaunchPeriodically(f func(), interval time.Duration, delay time.D
 			case <-u.quit:
 				return
 			case <-ticker.C:
-				u.Launch(f)
+				f()
 			}
 		}
 	})
