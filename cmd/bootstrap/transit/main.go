@@ -21,9 +21,9 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-const (
-	FilenameTransitKeyPub      = "%v.transit-key.pub"
-	FilenameTransitKeyPriv     = "%v.transit-key.priv"
+var (
+	FilenameTransitKeyPub      = "transit-key.pub.%v"
+	FilenameTransitKeyPriv     = "transit-key.priv.%v"
 	FilenameRandomBeaconCipher = bootstrap.FilenameRandomBeaconPriv + ".enc"
 )
 
@@ -35,7 +35,7 @@ var (
 
 	// default files to upload for all role type
 	filesToUpload = []string{
-		bootstrap.FilenameNodeInfoPub,
+		bootstrap.PathNodeInfoPub,
 	}
 
 	// consensus node additionally will need the transit key (to securely transport DKG in phase 2)
@@ -43,11 +43,11 @@ var (
 
 	// default files to download for all role type
 	filesToDownload = []string{
-		bootstrap.FilenameNodeInfosPub,
-		bootstrap.FilenameGenesisBlock,
-		bootstrap.FilenameGenesisQC,
-		bootstrap.FilenameGenesisCommit,
-		bootstrap.FilenameDKGDataPub,
+		bootstrap.PathDKGDataPub,
+		bootstrap.PathNodeInfosPub,
+		bootstrap.PathGenesisBlock,
+		bootstrap.PathGenesisQC,
+		bootstrap.PathGenesisCommit,
 	}
 
 	// consensus node additionally gets random beacon
@@ -123,9 +123,9 @@ func main() {
 	}
 }
 
-// Read the NodeID file to build other filenames from
+// Read the NodeID file to build other paths from
 func fetchNodeId(bootdir string) (string, error) {
-	path := filepath.Join(bootdir, bootstrap.FilenameNodeId)
+	path := filepath.Join(bootdir, bootstrap.PathNodeId)
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("Error reading file %s: %w", path, err)
@@ -214,7 +214,7 @@ func unwrapFile(bootdir, nodeId string) error {
 
 	pubKeyPath := filepath.Join(bootdir, fmt.Sprintf(FilenameTransitKeyPub, nodeId))
 	privKeyPath := filepath.Join(bootdir, fmt.Sprintf(FilenameTransitKeyPriv, nodeId))
-	ciphertextPath := filepath.Join(bootdir, fmt.Sprintf(FilenameRandomBeaconCipher, nodeId))
+	ciphertextPath := filepath.Join(bootdir, FilenameRandomBeaconCipher)
 	plaintextPath := filepath.Join(bootdir, fmt.Sprintf(bootstrap.FilenameRandomBeaconPriv, nodeId))
 
 	ciphertext, err := ioutil.ReadFile(ciphertextPath)
@@ -253,8 +253,8 @@ func unwrapFile(bootdir, nodeId string) error {
 
 func wrapFile(bootdir, nodeId string) error {
 	pubKeyPath := filepath.Join(bootdir, fmt.Sprintf(FilenameTransitKeyPub, nodeId))
-	plaintextPath := filepath.Join(bootdir, fmt.Sprintf(bootstrap.FilenameRandomBeaconPriv, nodeId))
-	ciphertextPath := filepath.Join(bootdir, fmt.Sprintf(FilenameRandomBeaconCipher, nodeId))
+	plaintextPath := filepath.Join(bootdir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeId))
+	ciphertextPath := filepath.Join(bootdir, FilenameRandomBeaconCipher)
 
 	plaintext, err := ioutil.ReadFile(plaintextPath)
 	if err != nil {

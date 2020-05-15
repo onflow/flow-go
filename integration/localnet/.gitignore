@@ -1,3 +1,4 @@
-bootstrap
+/bootstrap/
+/profiler/
 docker-compose.nodes.yml
 targets.nodes.json

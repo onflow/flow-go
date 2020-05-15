@@ -45,8 +45,10 @@ func (suite *SnapshotSuite) SetupTest() {
 	suite.dbdir = unittest.TempDir(suite.T())
 	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
 
-	headers := storage.NewHeaders(metrics.NewNoopCollector(), suite.db)
-	payloads := storage.NewClusterPayloads(suite.db)
+	metrics := metrics.NewNoopCollector()
+
+	headers := storage.NewHeaders(metrics, suite.db)
+	payloads := storage.NewClusterPayloads(metrics, suite.db)
 
 	suite.state, err = NewState(suite.db, suite.chainID, headers, payloads)
 	suite.Assert().Nil(err)

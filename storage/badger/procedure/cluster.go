@@ -1,14 +1,12 @@
 package procedure
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
@@ -32,15 +30,9 @@ func InsertClusterBlock(block *cluster.Block) func(*badger.Txn) error {
 		}
 
 		// insert the block payload
-		err = InsertClusterPayload(block.Header, block.Payload)(tx)
+		err = InsertClusterPayload(blockID, block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert payload: %w", err)
-		}
-
-		// index the block payload
-		err = IndexClusterPayload(block.Header, block.Payload)(tx)
-		if err != nil {
-			return fmt.Errorf("could not index payload: %w", err)
 		}
 
 		// start the new block with an empty child index
@@ -162,7 +154,7 @@ func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
 
 // InsertClusterPayload inserts the payload for a cluster block. It inserts
 // both the collection and all constituent transactions, allowing duplicates.
-func InsertClusterPayload(header *flow.Header, payload *cluster.Payload) func(*badger.Txn) error {
+func InsertClusterPayload(blockID flow.Identifier, payload *cluster.Payload) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// cluster payloads only contain a single collection, allow duplicates,
@@ -181,35 +173,17 @@ func InsertClusterPayload(header *flow.Header, payload *cluster.Payload) func(*b
 			}
 		}
 
-		// insert the reference block ID
-		err = operation.IndexCollectionReference(header.ID(), payload.ReferenceBlockID)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert reference block ID: %w", err)
-		}
-
-		return nil
-	}
-}
-
-// IndexClusterPayload indexes a cluster consensus block payload.
-func IndexClusterPayload(header *flow.Header, payload *cluster.Payload) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-
-		// only index a collection if it exists
-		var collection flow.LightCollection
-		err := operation.RetrieveCollection(payload.Collection.ID(), &collection)(tx)
-		if errors.Is(err, storage.ErrNotFound) {
-			return fmt.Errorf("cannot index non-existent collection")
-		}
-		if err != nil {
-			return fmt.Errorf("could not check collection: %w", err)
-		}
-
 		// index the transaction IDs within the collection
 		txIDs := payload.Collection.Light().Transactions
-		err = operation.SkipDuplicates(operation.IndexCollectionPayload(header.ID(), txIDs))(tx)
+		err = operation.SkipDuplicates(operation.IndexCollectionPayload(blockID, txIDs))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index collection: %w", err)
+		}
+
+		// insert the reference block ID
+		err = operation.IndexCollectionReference(blockID, payload.ReferenceBlockID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert reference block ID: %w", err)
 		}
 
 		return nil

@@ -482,7 +482,7 @@ func TestExtendSealNotConnected(t *testing.T) {
 		sealing.Header.PayloadHash = sealing.Payload.Hash()
 
 		err = state.Mutate().Extend(&sealing)
-		require.EqualError(t, err, "seal execution states do not connect")
+		require.Error(t, err)
 
 		// verify seal not indexed
 		var sealID flow.Identifier

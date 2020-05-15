@@ -128,7 +128,8 @@ func New(
 func (e *Engine) Ready() <-chan struct{} {
 	// checks pending chunks every `requestInterval` milliseconds
 	e.unit.LaunchPeriodically(e.checkPendingChunks,
-		time.Duration(e.requestInterval)*time.Millisecond)
+		time.Duration(e.requestInterval)*time.Millisecond,
+		0)
 	return e.unit.Ready()
 }
 
@@ -190,15 +191,17 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // handleExecutionReceipt receives an execution receipt, verifies its origin Id and
 // accordingly adds it to either the pending receipts or the authenticated receipts mempools
 func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
+	receiptID := receipt.ID()
+
 	e.log.Info().
 		Hex("origin_id", logging.ID(originID)).
-		Hex("receipt_id", logging.Entity(receipt)).
+		Hex("receipt_id", logging.ID(receiptID)).
 		Msg("execution receipt received at ingest engine")
 
 	if e.ingestedResultIDs.Has(receipt.ExecutionResult.ID()) {
 		e.log.Debug().
 			Hex("origin_id", logging.ID(originID)).
-			Hex("receipt_id", logging.Entity(receipt)).
+			Hex("receipt_id", logging.ID(receiptID)).
 			Msg("execution receipt with already ingested result discarded")
 		// discards the receipt if its result has already been ingested
 		return nil
@@ -210,16 +213,10 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	if err != nil {
 		// TODO: potential attack on authenticity
 		// stores ER in pending receipts till a block arrives authenticating this
-		preceipt := &verificationmodel.PendingReceipt{
-			Receipt:  receipt,
-			OriginID: originID,
-		}
-
-		ok := e.pendingReceipts.Add(preceipt)
-
+		ok := e.pendingReceipts.Add(verificationmodel.NewPendingReceipt(receipt, originID))
 		e.log.Debug().
 			Hex("origin_id", logging.ID(originID)).
-			Hex("receipt_id", logging.Entity(receipt)).
+			Hex("receipt_id", logging.ID(receiptID)).
 			Bool("mempool_insertion", ok).
 			Msg("execution receipt added to pending mempool")
 
@@ -235,9 +232,9 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		ok := e.authReceipts.Add(receipt)
 		e.log.Debug().
 			Hex("origin_id", logging.ID(originID)).
-			Hex("receipt_id", logging.Entity(receipt)).
+			Hex("receipt_id", logging.ID(receiptID)).
 			Bool("mempool_insertion", ok).
-			Msg("execution receipt successfully added to authenticated mempool")
+			Msg("execution receipt added to authenticated mempool")
 
 	}
 	return nil
@@ -332,7 +329,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 
 	e.log.Info().
 		Hex("origin_id", logging.ID(originID)).
-		Hex("collection_id", logging.Entity(coll)).
+		Hex("collection_id", logging.ID(collID)).
 		Msg("collection received")
 
 	if e.collectionTrackers.Has(collID) {
@@ -364,20 +361,16 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 
 		e.log.Debug().
 			Hex("origin_id", logging.ID(originID)).
-			Hex("collection_id", logging.Entity(coll)).
+			Hex("collection_id", logging.ID(collID)).
 			Msg("collection added to authenticated mempool, and tracker removed")
 	} else {
 		// this collection came passively
 		// collections with no tracker add to the pending collections mempool
-		pcoll := &verificationmodel.PendingCollection{
-			Collection: coll,
-			OriginID:   originID,
-		}
-		_ = e.pendingCollections.Add(pcoll)
-
+		ok := e.pendingCollections.Add(verificationmodel.NewPendingCollection(coll, originID))
 		e.log.Debug().
 			Hex("origin_id", logging.ID(originID)).
-			Hex("collection_id", logging.Entity(coll)).
+			Hex("collection_id", logging.ID(collID)).
+			Bool("mempool_insertion", ok).
 			Msg("collection added to pending mempool")
 	}
 
