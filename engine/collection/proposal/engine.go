@@ -258,6 +258,8 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			return
 		}
 
+		go e.hotstuff.SubmitProposal(header, parent.View)
+
 		log.Debug().
 			Str("recipients", fmt.Sprintf("%v", recipients.NodeIDs())).
 			Msg("broadcast proposal from hotstuff")

@@ -209,8 +209,6 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 	}
 
 	// fill in the fields that can't be populated by HotStuff
-	//TODO clean this up - currently we set these fields in builder, then lose
-	// them in HotStuff, then need to set them again here
 	header.ChainID = parent.ChainID
 	header.Height = parent.Height + 1
 
@@ -260,6 +258,8 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		}
 
 		e.metrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockProposal)
+
+		go e.hotstuff.SubmitProposal(header, parent.View)
 
 		log.Info().Msg("block proposal broadcasted")
 
