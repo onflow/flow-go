@@ -158,8 +158,6 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	// and checkTrackers loop starts
 	<-verNode.IngestEngine.Ready()
 
-	// mocks the collection node with a generic node and
-	// mocked engine to handle requests for collections
 	collections := make([]*flow.Collection, 0)
 	for _, completeER := range ers {
 		collections = append(collections, completeER.Collections...)
@@ -315,7 +313,7 @@ func setupMockExeNode(t *testing.T, node mock.GenericNode, verID flow.Identifier
 
 }
 
-// setupMockExeNode sets up a mocked collection node that responds to requests for collections.
+// setupMockCollectionNode sets up a mocked collection node that responds to requests for collections.
 // Any requests that don't correspond to a collection ID in the input colls list result in the test failing.
 // It also drops the first request for each collection to evaluate retrials.
 func setupMockCollectionNode(t *testing.T, node mock.GenericNode, verID flow.Identifier, colls []*flow.Collection) {

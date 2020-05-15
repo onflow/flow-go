@@ -547,6 +547,9 @@ func (suite *IngestTestSuite) TestIngestedChunk() {
 	// nothing else is mocked, hence the process should simply return nil
 	err := eng.Process(unittest.IdentifierFixture(), chunkDataPackResponse)
 	require.NoError(suite.T(), err)
+
+	// chunk data pack should not be tried to be stored in the mempool
+	suite.chunkDataPacks.AssertNotCalled(suite.T(), "Add", testifymock.Anything)
 }
 
 // TestHandleReceipt_UnstakedSender evaluates sending an execution receipt from an unstaked node
@@ -772,6 +775,72 @@ func (suite *IngestTestSuite) TestHandleCollection_SenderWithWrongRole() {
 
 		suite.Unlock()
 	}
+}
+
+// TestHandleCollection_IngestedCollection evaluates the happy path of submitting a collection an already ingested chunk
+func (suite *IngestTestSuite) TestHandleCollection_IngestedCollection() {
+	// locks to run the test sequentially
+	suite.Lock()
+	defer suite.Unlock()
+
+	eng := suite.TestNewEngine()
+
+	// mocks this collection as ingested
+	suite.ingestedCollectionIDs.On("Has", suite.collection.ID()).Return(true)
+
+	// nothing else is mocked, hence the process should simply return nil
+	err := eng.Process(unittest.IdentifierFixture(), suite.collection)
+	require.NoError(suite.T(), err)
+
+	// collection should not be tried to be stored in the mempool
+	suite.authCollections.AssertNotCalled(suite.T(), "Add", testifymock.Anything)
+	suite.pendingCollections.AssertNotCalled(suite.T(), "Add", testifymock.Anything)
+}
+
+// TestHandleCollection_ExistingAuthenticated evaluates the happy path of submitting a collection
+// that is existing in the authenticated mempool
+func (suite *IngestTestSuite) TestHandleCollection_ExistingAuthenticated() {
+	// locks to run the test sequentially
+	suite.Lock()
+	defer suite.Unlock()
+
+	eng := suite.TestNewEngine()
+
+	// mocks this collection as ingested
+	suite.ingestedCollectionIDs.On("Has", suite.collection.ID()).Return(false)
+	suite.authCollections.On("Has", suite.collection.ID()).Return(true)
+	suite.pendingCollections.On("Has", suite.collection.ID()).Return(false)
+
+	// nothing else is mocked, hence the process should simply return nil
+	err := eng.Process(unittest.IdentifierFixture(), suite.collection)
+	require.NoError(suite.T(), err)
+
+	// collection should not be tried to be stored in the mempool
+	suite.authCollections.AssertNotCalled(suite.T(), "Add", testifymock.Anything)
+	suite.pendingCollections.AssertNotCalled(suite.T(), "Add", testifymock.Anything)
+}
+
+// TestHandleCollection_ExistingPending evaluates the happy path of submitting a collection
+// that is existing in the pending mempool
+func (suite *IngestTestSuite) TestHandleCollection_ExistingPending() {
+	// locks to run the test sequentially
+	suite.Lock()
+	defer suite.Unlock()
+
+	eng := suite.TestNewEngine()
+
+	// mocks this collection as ingested
+	suite.ingestedCollectionIDs.On("Has", suite.collection.ID()).Return(false)
+	suite.authCollections.On("Has", suite.collection.ID()).Return(false)
+	suite.pendingCollections.On("Has", suite.collection.ID()).Return(true)
+
+	// nothing else is mocked, hence the process should simply return nil
+	err := eng.Process(unittest.IdentifierFixture(), suite.collection)
+	require.NoError(suite.T(), err)
+
+	// collection should not be tried to be stored in the mempool
+	suite.authCollections.AssertNotCalled(suite.T(), "Add", testifymock.Anything)
+	suite.pendingCollections.AssertNotCalled(suite.T(), "Add", testifymock.Anything)
 }
 
 // TestVerifyReady evaluates that a verifiable chunk is locally passed to the verifier engine
