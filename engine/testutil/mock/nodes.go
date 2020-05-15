@@ -40,6 +40,7 @@ type GenericNode struct {
 	Identities storage.Identities
 	Guarantees storage.Guarantees
 	Seals      storage.Seals
+	Index      storage.Index
 	Payloads   storage.Payloads
 	Blocks     storage.Blocks
 	State      protocol.State

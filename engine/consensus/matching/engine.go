@@ -35,6 +35,7 @@ type Engine struct {
 	me        module.Local             // used to access local node information
 	resultsDB storage.ExecutionResults // used to permanently store results
 	headersDB storage.Headers          // used to check sealed headers
+	indexDB   storage.Index            // used to check payloads for resulcts
 	results   mempool.Results          // holds execution results in memory
 	receipts  mempool.Receipts         // holds execution receipts in memory
 	approvals mempool.Approvals        // holds result approvals in memory
@@ -43,7 +44,7 @@ type Engine struct {
 }
 
 // New creates a new collection propagation engine.
-func New(log zerolog.Logger, collector module.EngineMetrics, mempool module.MempoolMetrics, net module.Network, state protocol.State, me module.Local, resultsDB storage.ExecutionResults, headersDB storage.Headers, results mempool.Results, receipts mempool.Receipts, approvals mempool.Approvals, seals mempool.Seals) (*Engine, error) {
+func New(log zerolog.Logger, collector module.EngineMetrics, mempool module.MempoolMetrics, net module.Network, state protocol.State, me module.Local, resultsDB storage.ExecutionResults, headersDB storage.Headers, indexDB storage.Index, results mempool.Results, receipts mempool.Receipts, approvals mempool.Approvals, seals mempool.Seals) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
@@ -55,6 +56,7 @@ func New(log zerolog.Logger, collector module.EngineMetrics, mempool module.Memp
 		me:        me,
 		resultsDB: resultsDB,
 		headersDB: headersDB,
+		indexDB:   indexDB,
 		results:   results,
 		receipts:  receipts,
 		approvals: approvals,
@@ -349,29 +351,51 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 	approvals := e.approvals.All()
 
 	// go through all results and check which ones we have enough approvals for
+ResultLoop:
 	for _, result := range e.results.All() {
 
-		// get the node IDs for all approvers of this result
-		// TODO: check for duplicate approver
-		var approverIDs []flow.Identifier
-		resultID := result.ID()
-		for _, approval := range approvals {
-			if approval.Body.ExecutionResultID == resultID {
-				approverIDs = append(approverIDs, approval.Body.ApproverID)
-			}
+		// we create one chunk per collection (at least for now), so we can
+		// check if the chunk number matches with the number of guarantees; this
+		// will ensure the execution receipt can not lie about having less
+		// chunks and having the remaining ones approved
+		index, err := e.indexDB.ByBlockID(result.BlockID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get block payload index (block: %x, result: %x): %w", result.BlockID, result.ID(), err)
+		}
+		if len(result.Chunks) != len(index.CollectionIDs) {
+			// NOTE: we can't check this upon reception, in case we receive an
+			// execuetion receipt before the actual block; we could clean up the
+			// memory pools here, but that will be done anyway in due time, so
+			// let's not complicate it and just log the error repeatedly until
+			// the execution result is purged
+			return nil, fmt.Errorf("execution result has insufficient chunks (%d < %d)", len(result.Chunks), len(index.CollectionIDs))
 		}
 
-		// get all of the approver identities and check threshold
-		approvers := verifiers.Filter(filter.And(
-			filter.HasRole(flow.RoleVerification),
-			filter.HasStake(true),
-			filter.HasNodeID(approverIDs...),
-		))
-		voted := approvers.TotalStake()
-		if voted <= threshold { // nolint: emptybranch
-			// NOTE: we are currently generating a seal for every result, regardless of approvals
-			// e.log.Debug().Msg("ignoring result with insufficient verification")
-			// continue
+		// go through all the chunks of this result and check that each of them
+		// have a qualified majority of verifier stake approving
+		for _, chunk := range result.Chunks {
+
+			// get the node IDs for all approvers of this chunk
+			// TODO: check for duplicate approvers
+			var approverIDs []flow.Identifier
+			resultID := result.ID()
+			for _, approval := range approvals {
+				if approval.Body.ExecutionResultID == resultID && approval.Body.ChunkIndex == chunk.Index {
+					approverIDs = append(approverIDs, approval.Body.ApproverID)
+				}
+			}
+
+			// get all of the approver identities and check threshold
+			approvers := verifiers.Filter(filter.HasNodeID(approverIDs...))
+			voted := approvers.TotalStake()
+			if voted <= threshold {
+				e.log.Debug().
+					Hex("block", result.BlockID[:]).
+					Hex("result", logging.Entity(result)).
+					Uint64("chunk", chunk.Index).
+					Msg("ignoring result with insufficient verification")
+				continue ResultLoop
+			}
 		}
 
 		// add the result to the results that should be sealed
