@@ -2,6 +2,7 @@ package flow
 
 import (
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/encoding/rlp"
 )
 
 // Attestation confirms correctness of a chunk of an exec result
@@ -16,12 +17,24 @@ func (a Attestation) ID() Identifier {
 	return MakeID(a)
 }
 
+// Encode serializes the Attestation.
+func (a Attestation) Encode() []byte {
+	encoder := rlp.NewEncoder()
+	return encoder.MustEncode(a)
+}
+
 // ResultApprovalBody holds body part of a result approval
 type ResultApprovalBody struct {
 	Attestation
 	ApproverID           Identifier       // node id generating this result approval
 	AttestationSignature crypto.Signature // signature over attestation, this has been separated for BLS aggregation
 	Spock                Spock            // proof of re-computation, one per each chunk
+}
+
+// Encode serializes the ResultApprovalBody.
+func (rab ResultApprovalBody) Encode() []byte {
+	encoder := rlp.NewEncoder()
+	return encoder.MustEncode(rab)
 }
 
 // ID generates a unique identifier using ResultApprovalBody
