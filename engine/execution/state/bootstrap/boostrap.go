@@ -73,3 +73,22 @@ func BootstrapView(view *delta.View) {
 		panic(fmt.Sprintf("error while creating account in ledger: %s ", err))
 	}
 }
+
+func deployFungibleToken(vm virtualmachine.VirtualMachine, view *delta.View) (flow.Address, error) {
+	vm.NewContext(view).Invoke("")
+	return flow.Address{}, nil
+}
+
+func deployFlowToken(vm virtualmachine.VirtualMachine, view *delta.View) (flow.Address, error) {
+	return flow.Address{}, nil
+}
+
+func deployFeeContract(vm virtualmachine.VirtualMachine, view *delta.View) (flow.Address, error) {
+	return flow.Address{}, nil
+}
+
+func createServiceAccount(vm virtualmachine.VirtualMachine, view *delta.View, fungibleToken, flowToken, feeContract flow.Address) (flow.Address, error) {
+	return flow.Address{}, nil
+}
+
+func deployContract(vm virtualmachine.VirtualMachine, view *delta.View) error { return nil }
