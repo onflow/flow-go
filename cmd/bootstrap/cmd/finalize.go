@@ -173,7 +173,7 @@ func readPartnerNodes() []model.PartnerNodeInfoPub {
 	}
 	for _, f := range files {
 		// skip files that do not include node-infos
-		if !strings.HasPrefix(f, model.PathPartnerNodeInfoPrefix) {
+		if !strings.Contains(f, model.PathPartnerNodeInfoPrefix) {
 			continue
 		}
 
