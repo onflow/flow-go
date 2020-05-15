@@ -38,7 +38,6 @@ func NewMTrieStorage(dbDir string, cacheSize int, reg prometheus.Registerer) (*M
 	err = w.Replay(
 		func(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
 			_, err = trie.mForest.Update(keys, values, stateCommitment)
-			// _, err := trie.UpdateRegisters(keys, values, stateCommitment)
 			return err
 		},
 		func(stateCommitment flow.StateCommitment) error {
@@ -69,7 +68,6 @@ func (f *MTrieStorage) Done() <-chan struct{} {
 
 func (f *MTrieStorage) EmptyStateCommitment() flow.StateCommitment {
 	return f.mForest.GetEmptyRootHash()
-	// return trie.GetDefaultHashForHeight(f.tree.GetHeight() - 1)
 }
 
 // GetRegisters read the values at the given registers at the given flow.StateCommitment
@@ -82,7 +80,6 @@ func (f *MTrieStorage) GetRegisters(
 	err error,
 ) {
 	values, err = f.mForest.Read(registerIDs, stateCommitment)
-	// values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
 	return values, err
 }
 
@@ -114,10 +111,7 @@ func (f *MTrieStorage) UpdateRegisters(
 		return nil, fmt.Errorf("cannot update state, error while writing WAL: %w", err)
 	}
 
-	prometheus.NewGauge()
-
 	newStateCommitment, err = f.mForest.Update(ids, values, stateCommitment)
-	// newStateCommitment, err = f.tree.Update(ids, values, stateCommitment)
 	if err != nil {
 		return nil, fmt.Errorf("cannot update state: %w", err)
 	}
@@ -138,13 +132,11 @@ func (f *MTrieStorage) GetRegistersWithProof(
 
 	values, err = f.mForest.Read(registerIDs, stateCommitment)
 
-	// values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Could not get register values: %w", err)
 	}
 
 	batchProof, err := f.mForest.Proofs(registerIDs, stateCommitment)
-	// batchProof, err := f.tree.GetBatchProof(registerIDs, stateCommitment)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Could not get proofs: %w", err)
 	}
