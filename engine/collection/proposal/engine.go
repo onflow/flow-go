@@ -304,7 +304,6 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	log.Debug().Msg("received proposal")
 
 	e.prunePendingCache()
-	e.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, e.pending.Size())
 
 	// retrieve the parent block
 	// if the parent is not in storage, it has not yet been processed
@@ -502,11 +501,17 @@ func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *mess
 
 // prunePendingCache prunes the pending block cache.
 func (e *Engine) prunePendingCache() {
+
 	// retrieve the finalized height
 	final, err := e.clusterState.Final().Head()
 	if err != nil {
 		e.log.Warn().Err(err).Msg("could not get finalized head to prune pending blocks")
 		return
 	}
+
+	// remove all pending blocks at or below the finalized height
 	e.pending.PruneByHeight(final.Height)
+
+	// always record the metric
+	e.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, e.pending.Size())
 }
