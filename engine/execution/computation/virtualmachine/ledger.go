@@ -168,18 +168,18 @@ func (r *LedgerDAL) SetAddressState(state flow.AddressState) {
 	r.Set(fullKeyHash("", "", keyAddressState), stateBytes)
 }
 
-func (r *LedgerDAL) CreateAccount(publicKeys []flow.AccountPublicKey, code []byte) (flow.Address, error) {
-	currentAdressState, err := r.GetAddressState()
+func (r *LedgerDAL) CreateAccount(publicKeys []flow.AccountPublicKey) (flow.Address, error) {
+	currentAddressState, err := r.GetAddressState()
 	if err != nil {
 		return flow.Address{}, err
 	}
 	// generate the new account address
-	newAddress, newAddressState, err := flow.AccountAddress(currentAdressState)
+	newAddress, newAddressState, err := flow.AccountAddress(currentAddressState)
 	if err != nil {
 		return flow.Address{}, err
 	}
 
-	err = r.CreateAccountWithAddress(newAddress, publicKeys, code)
+	err = r.CreateAccountWithAddress(newAddress, publicKeys)
 	if err != nil {
 		return flow.Address{}, err
 	}
@@ -193,7 +193,6 @@ func (r *LedgerDAL) CreateAccount(publicKeys []flow.AccountPublicKey, code []byt
 func (r *LedgerDAL) CreateAccountWithAddress(
 	addr flow.Address,
 	publicKeys []flow.AccountPublicKey,
-	code []byte,
 ) error {
 	accountID := addr.Bytes()
 
@@ -203,12 +202,7 @@ func (r *LedgerDAL) CreateAccountWithAddress(
 	// set account balance to 0
 	r.Set(fullKeyHash(string(accountID), "", keyBalance), big.NewInt(0).Bytes())
 
-	// normalize empty code input to nil
-	if len(code) == 0 {
-		code = nil
-	}
-
-	r.Set(fullKeyHash(string(accountID), string(accountID), keyCode), code)
+	r.Set(fullKeyHash(string(accountID), string(accountID), keyCode), nil)
 
 	err := r.SetAccountPublicKeys(accountID, publicKeys)
 	if err != nil {
