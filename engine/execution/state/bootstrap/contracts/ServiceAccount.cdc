@@ -1,6 +1,6 @@
-import FungibleToken from 0x02
-import FlowToken from 0x03
-import FeeContract from 0x04
+import FungibleToken from 0x%s
+import FlowToken from 0x%s
+import FeeContract from 0x%s
 
 pub contract ServiceAccount {
 

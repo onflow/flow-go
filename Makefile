@@ -72,7 +72,7 @@ ifeq ($(COVER), true)
 endif
 
 .PHONY: generate
-generate: generate-proto generate-mocks
+generate: generate-proto generate-mocks generate-bootstrap-contracts
 
 .PHONY: generate-proto
 generate-proto:
@@ -105,6 +105,14 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir="./engine/access/wrapper" -case=underscore -output="./engine/access/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'IngestRPC' -dir="./engine/execution/ingestion" -case=underscore -output="./engine/execution/ingestion/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=model/fingerprint -case=underscore -output="./model/fingerprint/mock" -outpkg="mock"
+
+.PHONY: generate-bootstrap-contracts
+generate-bootstrap-contracts:
+	GO111MODULE=on go-bindata \
+		-pkg bootstrap \
+		-prefix ./engine/execution/state/bootstrap \
+		-o ./engine/execution/state/bootstrap/contracts.go \
+		./engine/execution/state/bootstrap/contracts
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
