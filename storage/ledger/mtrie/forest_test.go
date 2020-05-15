@@ -11,8 +11,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
+
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
+
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
-	"github.com/dapperlabs/flow-go/storage/ledger/trie"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/common"
+	cstrie "github.com/dapperlabs/flow-go/storage/ledger/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
@@ -25,7 +30,7 @@ func TestTrieOperations(t *testing.T) {
 
 	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
 	require.NoError(t, err)
-	nt := mtrie.NewMTrie(trieHeight)
+	nt := trie.NewMTrie(trieHeight)
 	rh := []byte([]uint8{uint8(1), uint8(2)})
 	nt.SetRootHash(rh)
 	// Add trie
@@ -593,8 +598,8 @@ func TestRandomUpdateReadProof(t *testing.T) {
 	latestValueByKey := make(map[string][]byte) // map store
 
 	for e := 0; e < rep; e++ {
-		keys := mtrie.GetRandomKeysRandN(maxNumKeysPerStep, keyByteSize)
-		values := mtrie.GetRandomValues(len(keys), maxValueSize)
+		keys := common.GetRandomKeysRandN(maxNumKeysPerStep, keyByteSize)
+		values := common.GetRandomValues(len(keys), maxValueSize)
 
 		// update map store with key values
 		// we use this at the end of each step to check all existing keys
@@ -643,7 +648,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		require.NoError(t, err, "error generating proofs")
 		require.True(t, batchProof.Verify(proofKeys, proofValues, rootHash, trieHeight))
 
-		psmt, err := trie.NewPSMT(rootHash, trieHeight, proofKeys, proofValues, mtrie.EncodeBatchProof(batchProof))
+		psmt, err := cstrie.NewPSMT(rootHash, trieHeight, proofKeys, proofValues, proof.EncodeBatchProof(batchProof))
 		require.NoError(t, err, "error building partial trie")
 		require.True(t, bytes.Equal(psmt.GetRootHash(), rootHash))
 
@@ -808,7 +813,7 @@ func TestTrieStoreAndLoad(t *testing.T) {
 // 	experimentRep := 10
 
 // 	dbDir := unittest.TempDir(t)
-// 	smt, err := trie.NewSMT(dbDir, trieHeight, 10, 100, experimentRep)
+// 	smt, err := cstrie.NewSMT(dbDir, trieHeight, 10, 100, experimentRep)
 // 	require.NoError(t, err)
 // 	defer func() {
 // 		smt.SafeClose()
@@ -819,7 +824,7 @@ func TestTrieStoreAndLoad(t *testing.T) {
 // 	require.NoError(t, err)
 // 	rootHash := fStore.GetEmptyRootHash()
 
-// 	emptyTree := trie.GetDefaultHashForHeight(trieHeight - 1)
+// 	emptyTree := cstrie.GetDefaultHashForHeight(trieHeight - 1)
 // 	require.NoError(t, err)
 // 	rootHashForSMT := emptyTree
 // 	for e := 0; e < experimentRep; e++ {
@@ -871,13 +876,13 @@ func TestTrieStoreAndLoad(t *testing.T) {
 // 		require.NoError(t, err, "error generating proofs (SMT)")
 
 // 		encodedProof := mtrie.EncodeBatchProof(batchProof)
-// 		encodedProofSMT := trie.EncodeProof(batchProofSMT)
+// 		encodedProofSMT := cstrie.EncodeProof(batchProofSMT)
 
 // 		for i := range encodedProof {
 // 			require.True(t, bytes.Equal(encodedProof[i], encodedProofSMT[i]))
 // 		}
 
-// 		psmt, err := trie.NewPSMT(rootHash, trieHeight, keys, values, encodedProof)
+// 		psmt, err := cstrie.NewPSMT(rootHash, trieHeight, keys, values, encodedProof)
 // 		require.True(t, bytes.Equal(psmt.GetRootHash(), rootHash))
 // 		require.NoError(t, err, "error building partial trie")
 

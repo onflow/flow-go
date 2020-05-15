@@ -1,9 +1,10 @@
-package mtrie
+package proof
 
 import (
 	"bytes"
 	"fmt"
 
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/common"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
@@ -11,19 +12,19 @@ import (
 // through a trie branch from an specific leaf node (key)
 // up to the root of the trie.
 type Proof struct {
-	values    [][]byte // the non-default intermediate nodes in the proof
-	inclusion bool     // flag indicating if this is an inclusion or exclusion
-	flags     []byte   // The flags of the proofs (is set if an intermediate node has a non-default)
-	steps     uint8    // number of steps for the proof (path len)
+	Values    [][]byte // the non-default intermediate nodes in the proof
+	Inclusion bool     // flag indicating if this is an inclusion or exclusion
+	Flags     []byte   // The flags of the proofs (is set if an intermediate node has a non-default)
+	Steps     uint8    // number of steps for the proof (path len)
 }
 
 // NewProof creates a new instance of Proof
 func NewProof() *Proof {
 	p := new(Proof)
-	p.values = make([][]byte, 0)
-	p.inclusion = false
-	p.flags = make([]byte, 0)
-	p.steps = 0
+	p.Values = make([][]byte, 0)
+	p.Inclusion = false
+	p.Flags = make([]byte, 0)
+	p.Steps = 0
 	return p
 }
 
@@ -33,47 +34,47 @@ func (p *Proof) Verify(key []byte, value []byte, rootHash []byte, trieMaxHeight 
 	// get index of proof we start our calculations from
 	proofIndex := 0
 
-	if len(p.values) != 0 {
-		proofIndex = len(p.values) - 1
+	if len(p.Values) != 0 {
+		proofIndex = len(p.Values) - 1
 	}
 	// base case at the bottom of the trie
-	computed := ComputeCompactValue(key, value, trieMaxHeight-int(p.steps)-1, trieMaxHeight)
-	for i := int(p.steps) - 1; i > -1; i-- {
+	computed := common.ComputeCompactValue(key, value, trieMaxHeight-int(p.Steps)-1)
+	for i := int(p.Steps) - 1; i > -1; i-- {
 		// hashing is order dependant
 		if utils.IsBitSet(key, i) {
-			if !utils.IsBitSet(p.flags, i) {
-				computed = HashInterNode(GetDefaultHashForHeight((trieMaxHeight-i)-2), computed)
+			if !utils.IsBitSet(p.Flags, i) {
+				computed = common.HashInterNode(common.GetDefaultHashForHeight((trieMaxHeight-i)-2), computed)
 			} else {
-				computed = HashInterNode(p.values[proofIndex], computed)
+				computed = common.HashInterNode(p.Values[proofIndex], computed)
 				proofIndex--
 			}
 		} else {
-			if !utils.IsBitSet(p.flags, i) {
-				computed = HashInterNode(computed, GetDefaultHashForHeight((trieMaxHeight-i)-2))
+			if !utils.IsBitSet(p.Flags, i) {
+				computed = common.HashInterNode(computed, common.GetDefaultHashForHeight((trieMaxHeight-i)-2))
 			} else {
-				computed = HashInterNode(computed, p.values[proofIndex])
+				computed = common.HashInterNode(computed, p.Values[proofIndex])
 				proofIndex--
 			}
 		}
 	}
-	return bytes.Equal(computed, rootHash) == p.inclusion
+	return bytes.Equal(computed, rootHash) == p.Inclusion
 }
 
 func (p *Proof) String() string {
 	flagStr := ""
-	for _, f := range p.flags {
+	for _, f := range p.Flags {
 		flagStr += fmt.Sprintf("%08b", f)
 	}
-	proofStr := fmt.Sprintf("size: %d flags: %v\n", p.steps, flagStr)
-	if p.inclusion {
+	proofStr := fmt.Sprintf("size: %d flags: %v\n", p.Steps, flagStr)
+	if p.Inclusion {
 		proofStr += fmt.Sprint("\t inclusion proof:\n")
 	} else {
 		proofStr += fmt.Sprint("\t noninclusion proof:\n")
 	}
 	valueIndex := 0
-	for j := 0; j < int(p.steps); j++ {
-		if utils.IsBitSet(p.flags, j) {
-			proofStr += fmt.Sprintf("\t\t %d: [%x]\n", j, p.values[valueIndex])
+	for j := 0; j < int(p.Steps); j++ {
+		if utils.IsBitSet(p.Flags, j) {
+			proofStr += fmt.Sprintf("\t\t %d: [%x]\n", j, p.Values[valueIndex])
 			valueIndex++
 		}
 	}
@@ -82,7 +83,7 @@ func (p *Proof) String() string {
 
 // Export return the flag, proofs, inclusion, an size of the proof
 func (p *Proof) Export() ([]byte, [][]byte, bool, uint8) {
-	return p.flags, p.values, p.inclusion, p.steps
+	return p.Flags, p.Values, p.Inclusion, p.Steps
 }
 
 // BatchProof is a struct that holds the proofs for several keys
@@ -191,14 +192,14 @@ func DecodeBatchProof(proofs [][]byte) (*BatchProof, error) {
 		}
 		pInst := NewProof()
 		byteInclusion := proof[0:1]
-		pInst.inclusion = utils.IsBitSet(byteInclusion, 0)
+		pInst.Inclusion = utils.IsBitSet(byteInclusion, 0)
 		step := proof[1:2]
-		pInst.steps = step[0]
+		pInst.Steps = step[0]
 		flagSize := int(proof[2])
 		if flagSize < 1 {
 			return nil, fmt.Errorf("error decoding the proof: flag size should be greater than 0")
 		}
-		pInst.flags = proof[3 : flagSize+3]
+		pInst.Flags = proof[3 : flagSize+3]
 		byteProofs := make([][]byte, 0)
 		for i := flagSize + 3; i < len(proof); i += 32 {
 			// TODO understand the logic here
@@ -208,8 +209,32 @@ func DecodeBatchProof(proofs [][]byte) (*BatchProof, error) {
 				byteProofs = append(byteProofs, proof[i:])
 			}
 		}
-		pInst.values = byteProofs
+		pInst.Values = byteProofs
 		bp.AppendProof(pInst)
 	}
 	return bp, nil
+}
+
+// SplitKeyProofs splits a set of unordered key and proof pairs based on the value of bit (bitIndex)
+func SplitKeyProofs(keys [][]byte, proofs []*Proof, bitIndex int) ([][]byte, []*Proof, [][]byte, []*Proof, error) {
+
+	rkeys := make([][]byte, 0, len(keys))
+	rproofs := make([]*Proof, 0, len(proofs))
+	lkeys := make([][]byte, 0, len(keys))
+	lproofs := make([]*Proof, 0, len(proofs))
+
+	for i, key := range keys {
+		bitIsSet, err := common.IsBitSet(key, bitIndex)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("can't split key proof pairs , error: %v", err)
+		}
+		if bitIsSet {
+			rkeys = append(rkeys, key)
+			rproofs = append(rproofs, proofs[i])
+		} else {
+			lkeys = append(lkeys, key)
+			lproofs = append(lproofs, proofs[i])
+		}
+	}
+	return lkeys, lproofs, rkeys, rproofs, nil
 }

@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"runtime"
 	"runtime/pprof"
 	"time"
@@ -29,7 +30,12 @@ func StorageBenchmark() {
 	valueMaxByteSize := 32
 	trieHeight := keyByteSize*8 + 1 // 257
 
-	f, err := os.Create("./logs.txt")
+	absPath, err := filepath.Abs("./logs.txt")
+	if err != nil {
+		panic("can't creat log file")
+	}
+	fmt.Printf("Writing log file to '%s'\n", absPath)
+	f, err := os.Create(absPath)
 	if err != nil {
 		panic("can't creat log file")
 	}
