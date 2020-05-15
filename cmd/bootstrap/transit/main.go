@@ -43,7 +43,7 @@ var (
 	filesToUploadConsensus = FilenameTransitKeyPub
 
 	// default folder to download for all role type
-	folderToDownload = bootstrap.PathPublicGenesis
+	folderToDownload = bootstrap.DirnamePublicGenesis
 
 	// consensus node additionally gets the random beacon file
 	filesToDownloadConsensus = FilenameRandomBeaconCipher
@@ -161,7 +161,7 @@ func runPull(ctx context.Context, bootdir, token, nodeId string, role flow.Role)
 	var err error
 
 	// download the public folder from the bucket and any additional files
-	err = bucketDownload(ctx, bootdir, folderToDownload, bootstrap.PathPublicGenesis, token, extraFiles...)
+	err = bucketDownload(ctx, bootdir, folderToDownload, bootstrap.DirnamePublicGenesis, token, extraFiles...)
 	if err != nil {
 		log.Fatalf("Failed to pull: %s", err)
 	}
