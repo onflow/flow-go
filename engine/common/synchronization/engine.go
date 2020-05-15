@@ -41,7 +41,6 @@ type Engine struct {
 	pollInterval  time.Duration // how often we poll other nodes for their finalized height
 	scanInterval  time.Duration // how often we scan our pending statuses and request blocks
 	retryInterval time.Duration // the initial interval before we retry a request, uses exponential backoff
-	resetInterval time.Duration // how long we wait after receiving a block to re-request it if it remains below the finalized height
 	tolerance     uint          // determines how big of a difference in block heights we tolerated before actively syncing with range requests
 	maxAttempts   uint          // the maximum number of attempts we make for each requested block/height before discarding
 	maxSize       uint          // the maximum number of blocks we request in the same block request message
@@ -74,7 +73,6 @@ func New(
 		pollInterval:  8 * time.Second,
 		scanInterval:  2 * time.Second,
 		retryInterval: 4 * time.Second,
-		resetInterval: 10 * time.Minute,
 		tolerance:     10,
 		maxAttempts:   5,
 		maxSize:       64,
@@ -530,17 +528,10 @@ func (e *Engine) prune() {
 		return
 	}
 
-	now := time.Now()
-
-	for height, status := range e.heights {
+	for height := range e.heights {
 		if height <= final.Height {
 			delete(e.heights, height)
 			continue
-		}
-
-		evictAfter := status.Received.Add(e.resetInterval)
-		if status.WasReceived() && now.After(evictAfter) {
-			delete(e.heights, height)
 		}
 	}
 
@@ -551,11 +542,6 @@ func (e *Engine) prune() {
 			if header.Height <= final.Height {
 				delete(e.blockIDs, blockID)
 				continue
-			}
-
-			evictAfter := status.Received.Add(e.resetInterval)
-			if now.After(evictAfter) {
-				delete(e.blockIDs, blockID)
 			}
 		}
 	}

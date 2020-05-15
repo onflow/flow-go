@@ -558,16 +558,6 @@ func (ss *SyncSuite) TestPrune() {
 		unprunable = append(unprunable, block)
 	}
 
-	// add some un-finalized, received blocks that are old enough to be evicted
-	for i := 0; i < 3; i++ {
-		block := unittest.BlockFixture()
-		block.Header.Height = finalHeight + uint64(i+1)
-		status := ss.ReceivedStatus(block.Header)
-		status.Received = time.Now().Add(-time.Hour * 48)
-		ss.e.blockIDs[block.ID()] = status
-		prunableBlockIDs = append(prunableBlockIDs, block)
-	}
-
 	heightsBefore := len(ss.e.heights)
 	blockIDsBefore := len(ss.e.blockIDs)
 
