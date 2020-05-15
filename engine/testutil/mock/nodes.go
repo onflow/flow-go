@@ -1,6 +1,7 @@
 package mock
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -22,6 +23,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/stub"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -30,18 +32,27 @@ import (
 
 // GenericNode implements a generic in-process node for tests.
 type GenericNode struct {
-	Log     zerolog.Logger
-	Metrics module.Metrics
-	DB      *badger.DB
-	State   protocol.State
-	Me      module.Local
-	Net     *stub.Network
-	DBDir   string
+	Log        zerolog.Logger
+	Metrics    *metrics.NoopCollector
+	Tracer     module.Tracer
+	DB         *badger.DB
+	Headers    storage.Headers
+	Identities storage.Identities
+	Guarantees storage.Guarantees
+	Seals      storage.Seals
+	Payloads   storage.Payloads
+	Blocks     storage.Blocks
+	State      protocol.State
+	Me         module.Local
+	Net        *stub.Network
+	DBDir      string
 }
 
 func (g *GenericNode) Done() {
 	_ = g.DB.Close()
 	_ = os.RemoveAll(g.DBDir)
+
+	<-g.Tracer.Done()
 }
 
 // Closes closes the badger database of the node
@@ -94,7 +105,7 @@ func (en ExecutionNode) Done() {
 
 func (en ExecutionNode) AssertHighestExecutedBlock(t *testing.T, header *flow.Header) {
 
-	height, blockID, err := en.ExecutionState.GetHighestExecutedBlockID()
+	height, blockID, err := en.ExecutionState.GetHighestExecutedBlockID(context.Background())
 	require.NoError(t, err)
 
 	require.Equal(t, header.ID(), blockID)
@@ -106,7 +117,6 @@ type VerificationNode struct {
 	GenericNode
 	AuthReceipts          mempool.Receipts
 	PendingReceipts       mempool.PendingReceipts
-	BlockStorage          storage.Blocks
 	AuthCollections       mempool.Collections
 	PendingCollections    mempool.PendingCollections
 	CollectionTrackers    mempool.CollectionTrackers

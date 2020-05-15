@@ -15,9 +15,10 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/finalizer/collection"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	modulemock "github.com/dapperlabs/flow-go/module/mock"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
 	cluster "github.com/dapperlabs/flow-go/state/cluster/badger"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -29,17 +30,19 @@ func TestFinalizer(t *testing.T) {
 		rand.Seed(time.Now().UnixNano())
 
 		genesis := model.Genesis()
-		chainID := genesis.ChainID
+		chainID := genesis.Header.ChainID
 
-		state, err := cluster.NewState(db, chainID)
+		metrics := metrics.NewNoopCollector()
+
+		headers := storage.NewHeaders(metrics, db)
+		payloads := storage.NewClusterPayloads(metrics, db)
+
+		state, err := cluster.NewState(db, chainID, headers, payloads)
 		require.NoError(t, err)
 		mutator := state.Mutate()
 
 		pool, err := stdmap.NewTransactions(1000)
 		require.NoError(t, err)
-
-		metrics := &modulemock.Metrics{}
-		metrics.On("CollectionGuaranteed", mock.Anything).Return()
 
 		// a helper function to clean up shared state between tests
 		cleanup := func() {
@@ -87,11 +90,11 @@ func TestFinalizer(t *testing.T) {
 
 			// tx1 is included in the finalized block
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
-			assert.Nil(t, pool.Add(&tx1))
+			assert.True(t, pool.Add(&tx1))
 
 			// create a new block on genesis
 			block := unittest.ClusterBlockWithParent(genesis)
-			block.SetPayload(model.PayloadFromTransactions(&tx1))
+			block.SetPayload(model.PayloadFromTransactions(flow.ZeroID, &tx1))
 			insert(block)
 
 			// finalize the block
@@ -113,7 +116,7 @@ func TestFinalizer(t *testing.T) {
 
 			// create a new block that isn't connected to a parent
 			block := unittest.ClusterBlockWithParent(genesis)
-			block.ParentID = unittest.IdentifierFixture()
+			block.Header.ParentID = unittest.IdentifierFixture()
 			insert(block)
 
 			// try to finalize - this should fail
@@ -130,7 +133,7 @@ func TestFinalizer(t *testing.T) {
 
 			// create a block with empty payload on genesis
 			block := unittest.ClusterBlockWithParent(genesis)
-			block.SetPayload(model.EmptyPayload())
+			block.SetPayload(model.EmptyPayload(flow.ZeroID))
 			insert(block)
 
 			// finalize the block
@@ -156,14 +159,14 @@ func TestFinalizer(t *testing.T) {
 
 			// tx1 is included in the finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
-			assert.Nil(t, pool.Add(&tx1))
+			assert.True(t, pool.Add(&tx1))
 			// tx2 is only in the mempool
 			tx2 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 2 })
-			assert.Nil(t, pool.Add(&tx2))
+			assert.True(t, pool.Add(&tx2))
 
 			// create a block containing tx1 on top of genesis
 			block := unittest.ClusterBlockWithParent(genesis)
-			block.SetPayload(model.PayloadFromTransactions(&tx1))
+			block.SetPayload(model.PayloadFromTransactions(flow.ZeroID, &tx1))
 			insert(block)
 
 			// finalize the block
@@ -185,8 +188,8 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block.Payload.Collection.ID(),
-					SignerIDs:    block.ParentVoterIDs,
-					Signature:    block.ParentVoterSig,
+					SignerIDs:    block.Header.ParentVoterIDs,
+					Signature:    block.Header.ParentVoterSig,
 				},
 			})
 		})
@@ -203,19 +206,19 @@ func TestFinalizer(t *testing.T) {
 
 			// tx1 is included in the first finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
-			assert.Nil(t, pool.Add(&tx1))
+			assert.True(t, pool.Add(&tx1))
 			// tx2 is included in the second finalized block and mempool
 			tx2 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 2 })
-			assert.Nil(t, pool.Add(&tx2))
+			assert.True(t, pool.Add(&tx2))
 
 			// create a block containing tx1 on top of genesis
 			block1 := unittest.ClusterBlockWithParent(genesis)
-			block1.SetPayload(model.PayloadFromTransactions(&tx1))
+			block1.SetPayload(model.PayloadFromTransactions(flow.ZeroID, &tx1))
 			insert(block1)
 
 			// create a block containing tx2 on top of block1
 			block2 := unittest.ClusterBlockWithParent(&block1)
-			block2.SetPayload(model.PayloadFromTransactions(&tx2))
+			block2.SetPayload(model.PayloadFromTransactions(flow.ZeroID, &tx2))
 			insert(block2)
 
 			// finalize block2 (should indirectly finalize block1 as well)
@@ -236,15 +239,15 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block1.Payload.Collection.ID(),
-					SignerIDs:    block1.ParentVoterIDs,
-					Signature:    block1.ParentVoterSig,
+					SignerIDs:    block1.Header.ParentVoterIDs,
+					Signature:    block1.Header.ParentVoterSig,
 				},
 			})
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block2.Payload.Collection.ID(),
-					SignerIDs:    block2.ParentVoterIDs,
-					Signature:    block2.ParentVoterSig,
+					SignerIDs:    block2.Header.ParentVoterIDs,
+					Signature:    block2.Header.ParentVoterSig,
 				},
 			})
 		})
@@ -259,19 +262,19 @@ func TestFinalizer(t *testing.T) {
 
 			// tx1 is included in the finalized parent block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
-			assert.Nil(t, pool.Add(&tx1))
+			assert.True(t, pool.Add(&tx1))
 			// tx2 is included in the un-finalized block and mempool
 			tx2 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 2 })
-			assert.Nil(t, pool.Add(&tx2))
+			assert.True(t, pool.Add(&tx2))
 
 			// create a block containing tx1 on top of genesis
 			block1 := unittest.ClusterBlockWithParent(genesis)
-			block1.SetPayload(model.PayloadFromTransactions(&tx1))
+			block1.SetPayload(model.PayloadFromTransactions(flow.ZeroID, &tx1))
 			insert(block1)
 
 			// create a block containing tx2 on top of block1
 			block2 := unittest.ClusterBlockWithParent(&block1)
-			block2.SetPayload(model.PayloadFromTransactions(&tx2))
+			block2.SetPayload(model.PayloadFromTransactions(flow.ZeroID, &tx2))
 			insert(block2)
 
 			// finalize block1 (should NOT finalize block2)
@@ -293,8 +296,8 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block1.Payload.Collection.ID(),
-					SignerIDs:    block1.ParentVoterIDs,
-					Signature:    block1.ParentVoterSig,
+					SignerIDs:    block1.Header.ParentVoterIDs,
+					Signature:    block1.Header.ParentVoterSig,
 				},
 			})
 		})
@@ -311,19 +314,19 @@ func TestFinalizer(t *testing.T) {
 
 			// tx1 is included in the finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
-			assert.Nil(t, pool.Add(&tx1))
+			assert.True(t, pool.Add(&tx1))
 			// tx2 is included in the conflicting block and mempool
 			tx2 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 2 })
-			assert.Nil(t, pool.Add(&tx2))
+			assert.True(t, pool.Add(&tx2))
 
 			// create a block containing tx1 on top of genesis
 			block1 := unittest.ClusterBlockWithParent(genesis)
-			block1.SetPayload(model.PayloadFromTransactions(&tx1))
+			block1.SetPayload(model.PayloadFromTransactions(flow.ZeroID, &tx1))
 			insert(block1)
 
 			// create a block containing tx2 on top of genesis (conflicting with block1)
 			block2 := unittest.ClusterBlockWithParent(genesis)
-			block2.SetPayload(model.PayloadFromTransactions(&tx2))
+			block2.SetPayload(model.PayloadFromTransactions(flow.ZeroID, &tx2))
 			insert(block2)
 
 			// finalize block2
@@ -345,8 +348,8 @@ func TestFinalizer(t *testing.T) {
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block1.Payload.Collection.ID(),
-					SignerIDs:    block1.ParentVoterIDs,
-					Signature:    block1.ParentVoterSig,
+					SignerIDs:    block1.Header.ParentVoterIDs,
+					Signature:    block1.Header.ParentVoterSig,
 				},
 			})
 		})

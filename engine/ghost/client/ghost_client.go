@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -49,7 +50,7 @@ func (c *GhostClient) Close() error {
 	return c.close()
 }
 
-func (c *GhostClient) Send(ctx context.Context, channelID uint8, targetIDs []flow.Identifier, event interface{}) error {
+func (c *GhostClient) Send(ctx context.Context, channelID uint8, event interface{}, targetIDs ...flow.Identifier) error {
 
 	message, err := c.codec.Encode(event)
 	if err != nil {
@@ -90,7 +91,7 @@ type FlowMessageStreamReader struct {
 
 func (fmsr *FlowMessageStreamReader) Next() (flow.Identifier, interface{}, error) {
 	msg, err := fmsr.stream.Recv()
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		// read done.
 		return flow.ZeroID, nil, fmt.Errorf("end of stream reached: %w", err)
 	}

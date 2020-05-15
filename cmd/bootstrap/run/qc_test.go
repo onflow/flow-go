@@ -1,10 +1,12 @@
 package run
 
 import (
+	"crypto/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/dkg"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -16,20 +18,20 @@ func TestGenerateGenesisQC(t *testing.T) {
 	participantData := createSignerData(t, 3)
 
 	block := unittest.BlockFixture()
-	block.Height = 0
-	block.Identities = flow.IdentityList{
+	block.Payload.Identities = flow.IdentityList{
 		unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection)),
 		unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)),
 		unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
 	}
+	block.Payload.Guarantees = nil
+	block.Payload.Seals = nil
 	for _, participant := range participantData.Participants {
-		block.Identities = append(block.Identities, participant.Identity())
+		block.Payload.Identities = append(block.Payload.Identities, participant.Identity())
 	}
-	block.ParentID = flow.ZeroID
-	block.View = 3
-	block.Seals = nil
-	block.Guarantees = nil
-	block.PayloadHash = block.Payload.Hash()
+	block.Header.Height = 0
+	block.Header.ParentID = flow.ZeroID
+	block.Header.View = 3
+	block.Header.PayloadHash = block.Payload.Hash()
 
 	_, err := GenerateGenesisQC(participantData, &block)
 	require.NoError(t, err)
@@ -44,7 +46,11 @@ func createSignerData(t *testing.T, n int) ParticipantData {
 	stakingKeys, err := unittest.StakingKeys(n)
 	require.NoError(t, err)
 
-	randomBKeys, groupKey, _ := unittest.RunDKG(t, n)
+	seed := make([]byte, crypto.SeedMinLenDKG)
+	_, err = rand.Read(seed)
+	require.NoError(t, err)
+	randomBSKs, randomBPKs, groupKey, err := crypto.ThresholdSignKeyGen(n, seed)
+	require.NoError(t, err)
 
 	pubData := dkg.PublicData{
 		GroupPubKey:     groupKey,
@@ -53,7 +59,7 @@ func createSignerData(t *testing.T, n int) ParticipantData {
 	for i, identity := range identities {
 		participant := dkg.Participant{
 			Index:          uint(i),
-			PublicKeyShare: randomBKeys[i].PublicKey(),
+			PublicKeyShare: randomBPKs[i],
 		}
 		pubData.IDToParticipant[identity.NodeID] = &participant
 	}
@@ -74,7 +80,7 @@ func createSignerData(t *testing.T, n int) ParticipantData {
 		)
 
 		// add random beacon private key
-		participantData.Participants[i].RandomBeaconPrivKey = randomBKeys[i]
+		participantData.Participants[i].RandomBeaconPrivKey = randomBSKs[i]
 	}
 
 	return participantData

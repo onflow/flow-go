@@ -68,8 +68,8 @@ func ProposalFixture() *messages.BlockProposal {
 
 func ProposalFromBlock(block *flow.Block) *messages.BlockProposal {
 	proposal := &messages.BlockProposal{
-		Header:  &block.Header,
-		Payload: &block.Payload,
+		Header:  block.Header,
+		Payload: block.Payload,
 	}
 	return proposal
 }
@@ -77,8 +77,8 @@ func ProposalFromBlock(block *flow.Block) *messages.BlockProposal {
 func PendingFromBlock(block *flow.Block) *flow.PendingBlock {
 	pending := flow.PendingBlock{
 		OriginID: block.Header.ProposerID,
-		Header:   &block.Header,
-		Payload:  &block.Payload,
+		Header:   block.Header,
+		Payload:  block.Payload,
 	}
 	return &pending
 }
@@ -91,29 +91,42 @@ func StateDeltaFixture() *messages.ExecutionStateDelta {
 	}
 }
 
-func BlockWithParentFixture(parent *flow.Header) flow.Block {
+func PayloadFixture(options ...func(*flow.Payload)) *flow.Payload {
 	payload := flow.Payload{
-		Identities: nil,
+		Identities: IdentityListFixture(8),
 		Guarantees: CollectionGuaranteesFixture(16),
 		Seals:      BlockSealsFixture(16),
 	}
+	for _, option := range options {
+		option(&payload)
+	}
+	return &payload
+}
+
+func WithoutIdentities(payload *flow.Payload) {
+	payload.Identities = nil
+}
+
+func WithoutSeals(payload *flow.Payload) {
+	payload.Seals = nil
+}
+
+func BlockWithParentFixture(parent *flow.Header) flow.Block {
+	payload := PayloadFixture(WithoutIdentities, WithoutSeals)
 	header := BlockHeaderWithParentFixture(parent)
 	header.PayloadHash = payload.Hash()
 	return flow.Block{
-		Header:  header,
+		Header:  &header,
 		Payload: payload,
 	}
 }
 
 func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDelta {
-	payload := flow.Payload{
-		Identities: nil,
-		Guarantees: CollectionGuaranteesFixture(16),
-	}
+	payload := PayloadFixture(WithoutIdentities)
 	header := BlockHeaderWithParentFixture(parent)
 	header.PayloadHash = payload.Hash()
 	block := flow.Block{
-		Header:  header,
+		Header:  &header,
 		Payload: payload,
 	}
 	return &messages.ExecutionStateDelta{
@@ -121,19 +134,33 @@ func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDe
 	}
 }
 
+func GenesisFixture(identities flow.IdentityList) *flow.Block {
+	genesis := flow.Genesis(identities)
+	genesis.Header.ChainID = flow.TestingChainID
+	return genesis
+}
+
 func BlockHeaderFixture() flow.Header {
+	height := uint64(rand.Uint32())
+	view := height + uint64(rand.Intn(1000))
 	return BlockHeaderWithParentFixture(&flow.Header{
+		ChainID:  flow.TestingChainID,
 		ParentID: IdentifierFixture(),
-		Height:   rand.Uint64(),
+		Height:   height,
+		View:     view,
 	})
 }
 
 func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
+	height := parent.Height + 1
+	view := parent.View + uint64(rand.Intn(10))
 	return flow.Header{
 		ChainID:        parent.ChainID,
 		ParentID:       parent.ID(),
-		View:           rand.Uint64(),
-		Height:         parent.Height + 1,
+		Height:         height,
+		PayloadHash:    IdentifierFixture(),
+		Timestamp:      time.Now().UTC(),
+		View:           view,
 		ParentVoterIDs: IdentifierListFixture(4),
 		ParentVoterSig: SignatureFixture(),
 		ProposerID:     IdentifierFixture(),
@@ -141,13 +168,14 @@ func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 	}
 }
 
-func ClusterPayloadFixture(n int) cluster.Payload {
+func ClusterPayloadFixture(n int) *cluster.Payload {
 	transactions := make([]*flow.TransactionBody, n)
 	for i := 0; i < n; i++ {
 		tx := TransactionBodyFixture()
 		transactions[i] = &tx
 	}
-	return cluster.PayloadFromTransactions(transactions...)
+	payload := cluster.PayloadFromTransactions(flow.ZeroID, transactions...)
+	return &payload
 }
 
 func ClusterBlockFixture() cluster.Block {
@@ -157,7 +185,7 @@ func ClusterBlockFixture() cluster.Block {
 	header.PayloadHash = payload.Hash()
 
 	return cluster.Block{
-		Header:  header,
+		Header:  &header,
 		Payload: payload,
 	}
 }
@@ -169,39 +197,46 @@ func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
 	payload := ClusterPayloadFixture(3)
 
 	header := BlockHeaderFixture()
-	header.Height = parent.Height + 1
-	header.View = parent.View + 1
-	header.ChainID = parent.ChainID
+	header.Height = parent.Header.Height + 1
+	header.View = parent.Header.View + 1
+	header.ChainID = parent.Header.ChainID
 	header.Timestamp = time.Now()
 	header.ParentID = parent.ID()
 	header.PayloadHash = payload.Hash()
 
 	block := cluster.Block{
-		Header:  header,
+		Header:  &header,
 		Payload: payload,
 	}
 
 	return block
 }
 
-func CollectionGuaranteeFixture() *flow.CollectionGuarantee {
-	return &flow.CollectionGuarantee{
+func WithCollRef(refID flow.Identifier) func(*flow.CollectionGuarantee) {
+	return func(guarantee *flow.CollectionGuarantee) {
+		guarantee.ReferenceBlockID = refID
+	}
+}
+
+func CollectionGuaranteeFixture(options ...func(*flow.CollectionGuarantee)) *flow.CollectionGuarantee {
+	guarantee := &flow.CollectionGuarantee{
 		CollectionID: IdentifierFixture(),
 		SignerIDs:    IdentifierListFixture(16),
 		Signature:    SignatureFixture(),
 	}
+	for _, option := range options {
+		option(guarantee)
+	}
+	return guarantee
 }
 
-func CollectionGuaranteesFixture(n int) []*flow.CollectionGuarantee {
-	ret := make([]*flow.CollectionGuarantee, 0, n)
+func CollectionGuaranteesFixture(n int, options ...func(*flow.CollectionGuarantee)) []*flow.CollectionGuarantee {
+	guarantees := make([]*flow.CollectionGuarantee, 0, n)
 	for i := 1; i <= n; i++ {
-		cg := flow.CollectionGuarantee{
-			CollectionID: IdentifierFixture(),
-			Signature:    SignatureFixture(),
-		}
-		ret = append(ret, &cg)
+		guarantee := CollectionGuaranteeFixture(options...)
+		guarantees = append(guarantees, guarantee)
 	}
-	return ret
+	return guarantees
 }
 
 func BlockSealFixture() *flow.Seal {
@@ -266,16 +301,16 @@ func ExecutableBlockFixtureWithParent(collectionsSignerIDs [][]flow.Identifier, 
 
 	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection, len(collectionsSignerIDs))
 	block := BlockWithParentFixture(parent)
-	block.Guarantees = nil
+	block.Payload.Guarantees = nil
 
 	for _, signerIDs := range collectionsSignerIDs {
 		completeCollection := CompleteCollectionFixture()
 		completeCollection.Guarantee.SignerIDs = signerIDs
-		block.Guarantees = append(block.Guarantees, completeCollection.Guarantee)
+		block.Payload.Guarantees = append(block.Payload.Guarantees, completeCollection.Guarantee)
 		completeCollections[completeCollection.Guarantee.CollectionID] = completeCollection
 	}
 
-	block.PayloadHash = block.Payload.Hash()
+	block.Header.PayloadHash = block.Payload.Hash()
 
 	return &entity.ExecutableBlock{
 		Block:               &block,
@@ -415,6 +450,50 @@ func WithRandomPublicKeys() func(*flow.Identity) {
 	}
 }
 
+// WithAllRoles can be used used to ensure an IdentityList fixtures contains
+// all the roles required for a valid genesis block.
+func WithAllRoles() func(*flow.Identity) {
+	return WithAllRolesExcept()
+}
+
+// Same as above, but omitting a certain role for cases where we are manually
+// setting up nodes or a particular role.
+func WithAllRolesExcept(except ...flow.Role) func(*flow.Identity) {
+	i := 0
+	roles := flow.Roles()
+
+	// remove omitted roles
+	for _, omitRole := range except {
+		for i, role := range roles {
+			if role == omitRole {
+				roles = append(roles[:i], roles[i+1:]...)
+			}
+		}
+	}
+
+	return func(id *flow.Identity) {
+		id.Role = roles[i%len(roles)]
+		i++
+	}
+}
+
+// CompleteIdentitySet takes a number of identities and completes the missing roles.
+func CompleteIdentitySet(identities ...*flow.Identity) flow.IdentityList {
+	required := map[flow.Role]struct{}{
+		flow.RoleCollection:   struct{}{},
+		flow.RoleConsensus:    struct{}{},
+		flow.RoleExecution:    struct{}{},
+		flow.RoleVerification: struct{}{},
+	}
+	for _, identity := range identities {
+		delete(required, identity.Role)
+	}
+	for role := range required {
+		identities = append(identities, IdentityFixture(WithRole(role)))
+	}
+	return identities
+}
+
 // IdentityListFixture returns a list of node identity objects. The identities
 // can be customized (ie. set their role) by passing in a function that modifies
 // the input identities as required.
@@ -423,7 +502,7 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 
 	for i := 0; i < n; i++ {
 		identity := IdentityFixture()
-		identity.Address = fmt.Sprintf("address-%d", i+1)
+		identity.Address = fmt.Sprintf("%x@flow.com", identity.NodeID)
 		for _, opt := range opts {
 			opt(identity)
 		}
@@ -494,6 +573,12 @@ func WithTransactionDSL(txDSL dsl.Transaction) func(tx *flow.TransactionBody) {
 	}
 }
 
+func WithReferenceBlock(id flow.Identifier) func(tx *flow.TransactionBody) {
+	return func(tx *flow.TransactionBody) {
+		tx.ReferenceBlockID = id
+	}
+}
+
 func TransactionDSLFixture() dsl.Transaction {
 	return dsl.Transaction{
 		Import: dsl.Import{Address: flow.RootAddress},
@@ -522,13 +607,14 @@ func VerifiableChunkFixture(chunkIndex uint64) *verification.VerifiableChunk {
 	payload := flow.Payload{
 		Identities: nil,
 		Guarantees: guarantees,
+		Seals:      nil,
 	}
 	header := BlockHeaderFixture()
 	header.PayloadHash = payload.Hash()
 
 	block := flow.Block{
-		Header:  header,
-		Payload: payload,
+		Header:  &header,
+		Payload: &payload,
 	}
 
 	chunks := make([]*flow.Chunk, 0)

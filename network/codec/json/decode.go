@@ -58,10 +58,6 @@ func decode(env Envelope) (interface{}, error) {
 		v = &flow.TransactionBody{}
 	case CodeTransaction:
 		v = &flow.Transaction{}
-	case CodeTransactionRequest:
-		v = &messages.TransactionRequest{}
-	case CodeTransactionResponse:
-		v = &messages.TransactionResponse{}
 
 	case CodeCollectionRequest:
 		v = &messages.CollectionRequest{}

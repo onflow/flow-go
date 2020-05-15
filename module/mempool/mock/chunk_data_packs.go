@@ -12,14 +12,14 @@ type ChunkDataPacks struct {
 }
 
 // Add provides a mock function with given fields: cdp
-func (_m *ChunkDataPacks) Add(cdp *flow.ChunkDataPack) error {
+func (_m *ChunkDataPacks) Add(cdp *flow.ChunkDataPack) bool {
 	ret := _m.Called(cdp)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.ChunkDataPack) error); ok {
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(*flow.ChunkDataPack) bool); ok {
 		r0 = rf(cdp)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0
@@ -42,7 +42,7 @@ func (_m *ChunkDataPacks) All() []*flow.ChunkDataPack {
 }
 
 // ByChunkID provides a mock function with given fields: chunkID
-func (_m *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
+func (_m *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, bool) {
 	ret := _m.Called(chunkID)
 
 	var r0 *flow.ChunkDataPack
@@ -54,11 +54,11 @@ func (_m *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
 		r1 = rf(chunkID)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(bool)
 	}
 
 	return r0, r1

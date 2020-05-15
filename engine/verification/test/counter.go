@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"testing"
@@ -26,7 +27,7 @@ func GetTxBodyDeployCounterContract() *flow.TransactionBody {
 			access(all) contract Container {
 				access(all) resource Counter {
 					pub var count: Int
-		
+
 					init(_ v: Int) {
 						self.count = v
 					}
@@ -103,16 +104,16 @@ func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExe
 	header.PayloadHash = payload.Hash()
 
 	block := flow.Block{
-		Header:  header,
-		Payload: payload,
+		Header:  &header,
+		Payload: &payload,
 	}
 
 	// Setup chunk and chunk data package
 	chunks := make([]*flow.Chunk, 0)
 	chunkDataPacks := make([]*flow.ChunkDataPack, 0)
 
-	unittest.RunWithTempDBDir(t, func(dir string) {
-		led, err := ledger.NewTrieStorage(dir)
+	unittest.RunWithTempDir(t, func(dir string) {
+		led, err := ledger.NewMTrieStorage(dir, 100, nil)
 		require.NoError(t, err)
 		defer led.Done()
 
@@ -120,13 +121,14 @@ func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExe
 		require.NoError(t, err)
 
 		rt := runtime.NewInterpreterRuntime()
-		vm := virtualmachine.New(rt)
+		vm, err := virtualmachine.New(rt)
+		require.NoError(t, err)
 
 		// create state.View
 		view := delta.NewView(state.LedgerGetRegister(led, startStateCommitment))
 
 		// create BlockComputer
-		bc := computer.NewBlockComputer(vm)
+		bc := computer.NewBlockComputer(vm, nil)
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
 		completeColls[guarantee.ID()] = &entity.CompleteCollection{
@@ -141,7 +143,7 @@ func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExe
 		}
 
 		// *execution.ComputationResult, error
-		_, err = bc.ExecuteBlock(executableBlock, view)
+		_, err = bc.ExecuteBlock(context.Background(), executableBlock, view)
 		require.NoError(t, err, "error executing block")
 
 		ids, values := view.Delta().RegisterUpdates()

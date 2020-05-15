@@ -1,14 +1,12 @@
 package badger
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
@@ -18,48 +16,43 @@ type Mutator struct {
 }
 
 func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
-	return m.state.db.Update(func(tx *badger.Txn) error {
+	return operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
 
 		// check chain ID
-		if genesis.ChainID != m.state.chainID {
-			return fmt.Errorf("genesis chain ID (%s) does not match configured (%s)", genesis.ChainID, m.state.chainID)
+		if genesis.Header.ChainID != m.state.chainID {
+			return fmt.Errorf("genesis chain ID (%s) does not match configured (%s)", genesis.Header.ChainID, m.state.chainID)
 		}
 
 		// check header number
-		if genesis.Height != 0 {
-			return fmt.Errorf("genesis number should be 0 (got %d)", genesis.Height)
+		if genesis.Header.Height != 0 {
+			return fmt.Errorf("genesis number should be 0 (got %d)", genesis.Header.Height)
 		}
 
 		// check header parent ID
-		if genesis.ParentID != flow.ZeroID {
-			return fmt.Errorf("genesis parent ID must be zero hash (got %x)", genesis.ParentID)
+		if genesis.Header.ParentID != flow.ZeroID {
+			return fmt.Errorf("genesis parent ID must be zero hash (got %x)", genesis.Header.ParentID)
 		}
 
 		// check payload
-		collSize := len(genesis.Collection.Transactions)
+		collSize := len(genesis.Payload.Collection.Transactions)
 		if collSize != 0 {
 			return fmt.Errorf("genesis collection should contain no transactions (got %d)", collSize)
 		}
 
-		err := procedure.InsertClusterPayload(&genesis.Payload)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert genesis cluster payload: %w", err)
-		}
-
-		// insert block
-		err = procedure.InsertClusterBlock(genesis)(tx)
+		// insert the block
+		err := procedure.InsertClusterBlock(genesis)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis block: %w", err)
 		}
 
 		// insert block number -> ID mapping
-		err = operation.InsertNumberForCluster(genesis.ChainID, genesis.Height, genesis.ID())(tx)
+		err = operation.IndexClusterBlockHeight(genesis.Header.ChainID, genesis.Header.Height, genesis.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis number: %w", err)
 		}
 
 		// insert boundary
-		err = operation.InsertBoundaryForCluster(genesis.ChainID, genesis.Height)(tx)
+		err = operation.InsertClusterFinalizedHeight(genesis.Header.ChainID, genesis.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis boundary: %w", err)
 		}
@@ -68,79 +61,115 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 	})
 }
 
-func (m *Mutator) Extend(blockID flow.Identifier) error {
-	return m.state.db.View(func(tx *badger.Txn) error {
-
-		// retrieve the block
-		var block cluster.Block
-		err := procedure.RetrieveClusterBlock(blockID, &block)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve block: %w", err)
-		}
+func (m *Mutator) Extend(block *cluster.Block) error {
+	err := m.state.db.View(func(tx *badger.Txn) error {
 
 		// check chain ID
-		if block.ChainID != m.state.chainID {
-			return fmt.Errorf("new block chain ID (%s) does not match configured (%s)", block.ChainID, m.state.chainID)
-		}
-
-		// check for duplicate transactions in block's ancestry
-		parentHeight := block.Height - 1
-		parentID := block.ParentID
-		txIDs := block.Payload.Collection.Light().Transactions
-		err = operation.VerifyCollectionPayload(parentHeight, parentID, txIDs)(tx)
-		if errors.Is(err, storage.ErrAlreadyIndexed) {
-			return fmt.Errorf("found duplicate transaction in payload: %w", err)
-		}
-		if err != nil {
-			return fmt.Errorf("could not verify collection payload: %w", err)
+		if block.Header.ChainID != m.state.chainID {
+			return fmt.Errorf("new block chain ID (%s) does not match configured (%s)", block.Header.ChainID, m.state.chainID)
 		}
 
 		// get the chain ID, which determines which cluster state to query
-		chainID := block.ChainID
+		chainID := block.Header.ChainID
 
-		// get finalized state boundary
-		var boundary uint64
-		err = operation.RetrieveBoundaryForCluster(chainID, &boundary)(tx)
+		// get the latest finalized block
+		var final flow.Header
+		err := procedure.RetrieveLatestFinalizedClusterHeader(chainID, &final)(tx)
 		if err != nil {
-			return fmt.Errorf("could not retrieve boundary: %w", err)
-		}
-
-		// get the hash of the latest finalized block
-		var lastFinalizedBlockID flow.Identifier
-		err = operation.RetrieveNumberForCluster(chainID, boundary, &lastFinalizedBlockID)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve latest finalized ID: %w", err)
+			return fmt.Errorf("could not retrieve finalized head: %w", err)
 		}
 
 		// get the header of the parent of the new block
-		var parent flow.Header
-		err = operation.RetrieveHeader(block.ParentID, &parent)(tx)
+		parent, err := m.state.headers.ByBlockID(block.Header.ParentID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve latest finalized header: %w", err)
 		}
 
-		// if the new block has a lower number than its parent, we can't add it
-		if block.Height != parent.Height+1 {
-			return fmt.Errorf("extending block height (%d) must be parent height + 1 (%d)", block.Height, parent.Height)
+		// the extending block must increase height by 1 from parent
+		if block.Header.Height != parent.Height+1 {
+			return fmt.Errorf("extending block height (%d) must be parent height + 1 (%d)", block.Header.Height, parent.Height)
 		}
 
-		// trace back from new block until we find a block that has the latest
-		// finalized block as its parent
-		for block.ParentID != lastFinalizedBlockID {
+		// ensure that the extending block connects to the finalized state, we
+		// do this by tracing back until we see a parent block that is the
+		// latest finalized block, or reach height below the finalized boundary
+
+		// start with the extending block's parent
+		parentID := block.Header.ParentID
+		for parentID != final.ID() {
 
 			// get the parent of current block
-			err = operation.RetrieveHeader(block.ParentID, &block.Header)(tx)
+			ancestor, err := m.state.headers.ByBlockID(parentID)
 			if err != nil {
-				return fmt.Errorf("could not get parent (%x): %w", block.ParentID, err)
+				return fmt.Errorf("could not get parent (%x): %w", block.Header.ParentID, err)
 			}
 
 			// if its number is below current boundary, the block does not connect
 			// to the finalized protocol state and would break database consistency
-			if block.Height < boundary {
+			if ancestor.Height < final.Height {
 				return fmt.Errorf("block doesn't connect to finalized state")
 			}
+
+			parentID = ancestor.ParentID
+		}
+
+		// we go back a fixed number of  blocks to check payload for now
+		//TODO look back based on reference block ID and expiry
+		// ref: https://github.com/dapperlabs/flow-go/issues/3556
+		limit := block.Header.Height - flow.DefaultTransactionExpiry
+		if limit > block.Header.Height { // overflow check
+			limit = 0
+		}
+
+		// check for duplicate transactions in block's ancestry
+		txLookup := make(map[flow.Identifier]struct{})
+		for _, tx := range block.Payload.Collection.Transactions {
+			txLookup[tx.ID()] = struct{}{}
+		}
+
+		var duplicateTxIDs flow.IdentifierList
+		ancestorID := block.Header.ParentID
+		for {
+			ancestor, err := m.state.headers.ByBlockID(ancestorID)
+			if err != nil {
+				return fmt.Errorf("could not retrieve ancestor header: %w", err)
+			}
+
+			if ancestor.Height <= limit {
+				break
+			}
+
+			payload, err := m.state.payloads.ByBlockID(ancestorID)
+			if err != nil {
+				return fmt.Errorf("could not retrieve ancestor payload: %w", err)
+			}
+
+			for _, tx := range payload.Collection.Transactions {
+				txID := tx.ID()
+				_, duplicated := txLookup[txID]
+				if duplicated {
+					duplicateTxIDs = append(duplicateTxIDs, txID)
+				}
+			}
+			ancestorID = ancestor.ParentID
+		}
+
+		// if we have duplicate transactions, fail
+		if len(duplicateTxIDs) > 0 {
+			return fmt.Errorf("payload includes duplicate transactions (duplicates: %s)", duplicateTxIDs)
 		}
 
 		return nil
 	})
+	if err != nil {
+		return fmt.Errorf("could not validate extending block: %w", err)
+	}
+
+	// insert the block
+	err = operation.RetryOnConflict(m.state.db.Update, procedure.InsertClusterBlock(block))
+	if err != nil {
+		return fmt.Errorf("could not insert extending block: %w", err)
+	}
+
+	return nil
 }

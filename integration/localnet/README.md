@@ -8,10 +8,10 @@ Bootstrap a new network:
 make init
 ```
 
-You can optionally specify the number of consensus nodes:
+You can optionally specify the number of nodes for each role:
 
 ```sh
-make -e CONSENSUS=5 init
+make -e COLLECTION=2 CONSENSUS=5 EXECUTION=3 VERIFICATION=2 ACCESS=2 init
 ```
 
 ## Start the network
@@ -43,6 +43,13 @@ make logs
 You can view realtime metrics while the network is running:
 
 - Prometheus: http://localhost:9090/
+- Traces (Jaeger): http://localhost:16686/
 - Grafana: http://localhost:3000/
   - Username: `admin`
   - Password: `admin`
+
+Here's an example of a Prometheus query that filters by the `consensus` role:
+
+```
+avg(rate(consensus_finalized_blocks{role="consensus"}[2m]))
+```

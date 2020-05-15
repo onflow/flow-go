@@ -6,7 +6,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/encoding/rlp"
 )
 
@@ -20,8 +19,11 @@ type TransactionBody struct {
 	// user can adjust this reference to older blocks if he/she wants to make tx expire faster
 	ReferenceBlockID Identifier
 
-	// the script part of the transaction in Cadence Language
+	// the transaction script as UTF-8 encoded Cadence source code
 	Script []byte
+
+	// arguments passed to the Cadence transaction
+	Arguments [][]byte
 
 	// Max amount of computation which is allowed to be done during this transaction
 	GasLimit uint64
@@ -64,6 +66,18 @@ func (tb *TransactionBody) SetScript(script []byte) *TransactionBody {
 	return tb
 }
 
+// SetArguments sets the Cadence arguments list for this transaction.
+func (tb *TransactionBody) SetArguments(args [][]byte) *TransactionBody {
+	tb.Arguments = args
+	return tb
+}
+
+// AddArgument adds an argument to the Cadence arguments list for this transaction.
+func (tb *TransactionBody) AddArgument(arg []byte) *TransactionBody {
+	tb.Arguments = append(tb.Arguments, arg)
+	return tb
+}
+
 // SetReferenceBlockID sets the reference block ID for this transaction.
 func (tb *TransactionBody) SetReferenceBlockID(blockID Identifier) *TransactionBody {
 	tb.ReferenceBlockID = blockID
@@ -80,7 +94,7 @@ func (tb *TransactionBody) SetGasLimit(limit uint64) *TransactionBody {
 //
 // The first two arguments specify the account key to be used, and the last argument is the sequence
 // number being declared.
-func (tb *TransactionBody) SetProposalKey(address Address, keyID int, sequenceNum uint64) *TransactionBody {
+func (tb *TransactionBody) SetProposalKey(address Address, keyID uint64, sequenceNum uint64) *TransactionBody {
 	proposalKey := ProposalKey{
 		Address:        address,
 		KeyID:          keyID,
@@ -187,7 +201,7 @@ func (tb *TransactionBody) signerMap() map[Address]int {
 //being added to the transaction.
 //
 //This function returns an error if the signature cannot be generated.
-func (tb *TransactionBody) SignPayload(address Address, keyID int, privateKey crypto.PrivateKey, hasher hash.Hasher) error {
+func (tb *TransactionBody) SignPayload(address Address, keyID uint64, privateKey crypto.PrivateKey, hasher hash.Hasher) error {
 
 	sig, err := privateKey.Sign(tb.PayloadMessage(), hasher)
 	if err != nil {
@@ -205,7 +219,7 @@ func (tb *TransactionBody) SignPayload(address Address, keyID int, privateKey cr
 //being added to the transaction.
 //
 //This function returns an error if the signature cannot be generated.
-func (tb *TransactionBody) SignEnvelope(address Address, keyID int, privateKey crypto.PrivateKey, hasher hash.Hasher) error {
+func (tb *TransactionBody) SignEnvelope(address Address, keyID uint64, privateKey crypto.PrivateKey, hasher hash.Hasher) error {
 
 	sig, err := privateKey.Sign(tb.EnvelopeMessage(), hasher)
 	if err != nil {
@@ -218,7 +232,7 @@ func (tb *TransactionBody) SignEnvelope(address Address, keyID int, privateKey c
 }
 
 // AddPayloadSignature adds a payload signature to the transaction for the given address and key ID.
-func (tb *TransactionBody) AddPayloadSignature(address Address, keyID int, sig []byte) *TransactionBody {
+func (tb *TransactionBody) AddPayloadSignature(address Address, keyID uint64, sig []byte) *TransactionBody {
 	s := tb.createSignature(address, keyID, sig)
 
 	tb.PayloadSignatures = append(tb.PayloadSignatures, s)
@@ -228,7 +242,7 @@ func (tb *TransactionBody) AddPayloadSignature(address Address, keyID int, sig [
 }
 
 // AddEnvelopeSignature adds an envelope signature to the transaction for the given address and key ID.
-func (tb *TransactionBody) AddEnvelopeSignature(address Address, keyID int, sig []byte) *TransactionBody {
+func (tb *TransactionBody) AddEnvelopeSignature(address Address, keyID uint64, sig []byte) *TransactionBody {
 	s := tb.createSignature(address, keyID, sig)
 
 	tb.EnvelopeSignatures = append(tb.EnvelopeSignatures, s)
@@ -237,7 +251,7 @@ func (tb *TransactionBody) AddEnvelopeSignature(address Address, keyID int, sig 
 	return tb
 }
 
-func (tb *TransactionBody) createSignature(address Address, keyID int, sig []byte) TransactionSignature {
+func (tb *TransactionBody) createSignature(address Address, keyID uint64, sig []byte) TransactionSignature {
 	signerIndex, signerExists := tb.signerMap()[address]
 	if !signerExists {
 		signerIndex = -1
@@ -289,7 +303,7 @@ func (tb *TransactionBody) payloadCanonicalForm() interface{} {
 // This message is only signed by the payer account.
 func (tb *TransactionBody) EnvelopeMessage() []byte {
 	temp := tb.envelopeCanonicalForm()
-	return encoding.DefaultEncoder.MustEncode(temp)
+	return rlp.NewEncoder().MustEncode(temp)
 }
 
 func (tb *TransactionBody) envelopeCanonicalForm() interface{} {
@@ -374,7 +388,7 @@ func (f TransactionField) String() string {
 // A ProposalKey is the key that specifies the proposal key and sequence number for a transaction.
 type ProposalKey struct {
 	Address        Address
-	KeyID          int
+	KeyID          uint64
 	SequenceNumber uint64
 }
 
@@ -382,7 +396,7 @@ type ProposalKey struct {
 type TransactionSignature struct {
 	Address     Address
 	SignerIndex int
-	KeyID       int
+	KeyID       uint64
 	Signature   []byte
 }
 

@@ -1,7 +1,6 @@
 package bootstrap
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,13 +11,13 @@ import (
 )
 
 func TestGenerateGenesisStateCommitment(t *testing.T) {
-	unittest.RunWithTempDBDir(t, func(dbDir string) {
+	unittest.RunWithTempDir(t, func(dbDir string) {
 
-		ls, err := ledger.NewTrieStorage(dbDir)
+		ls, err := ledger.NewMTrieStorage(dbDir, 100, nil)
 		require.NoError(t, err)
 
 		newStateCommitment, err := BootstrapLedger(ls)
 		require.NoError(t, err)
-		require.True(t, bytes.Equal(flow.GenesisStateCommitment, newStateCommitment))
+		require.Equal(t, flow.GenesisStateCommitment, newStateCommitment)
 	})
 }

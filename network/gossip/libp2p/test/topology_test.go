@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 )
@@ -48,10 +49,10 @@ func (n *TopologyTestSuite) SetupTest() {
 	key, err := GenerateNetworkingKey(me.NodeID)
 	require.NoError(n.Suite.T(), err)
 
-	metrics := SetupMetrics()
+	metrics := metrics.NewNoopCollector()
 
 	// creates a middleware instance
-	mw, err := libp2p.NewMiddleware(logger, json.NewCodec(), "0.0.0.0:0", me.NodeID, key, metrics)
+	mw, err := libp2p.NewMiddleware(logger, json.NewCodec(), "0.0.0.0:0", me.NodeID, key, metrics, libp2p.DefaultMaxPubSubMsgSize)
 	require.NoError(n.Suite.T(), err)
 
 	// creates and mocks a network instance

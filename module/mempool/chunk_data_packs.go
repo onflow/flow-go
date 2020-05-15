@@ -13,17 +13,17 @@ type ChunkDataPacks interface {
 	// the memory pool.
 	Has(chunkID flow.Identifier) bool
 
-	// Add will add the given ChunkDataPack to the memory pool; it will error if
-	// the ChunkDataPack is already in the memory pool.
-	Add(cdp *flow.ChunkDataPack) error
+	// Add will add the given chunk datapack to the memory pool. It will return
+	// false if it was already in the mempool.
+	Add(cdp *flow.ChunkDataPack) bool
 
 	// Rem will remove the given ChunkDataPack from the memory pool; it will
 	// return true if the ChunkDataPack was known and removed.
 	Rem(chunkID flow.Identifier) bool
 
-	// ByChunkID retrieves the ChunkDataPack with the given ChunkID from the memory pool; it will
-	// error if the ChunkDataPack is not in the memory pool.
-	ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error)
+	// ByID retrieve the chunk datapacke with the given chunk ID from the memory
+	// pool. It will return false if it was not found in the mempool.
+	ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, bool)
 
 	// Size will return the current size of the memory pool.
 	Size() uint

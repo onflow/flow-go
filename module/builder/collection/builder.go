@@ -2,6 +2,7 @@ package collection
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -9,6 +10,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
@@ -20,164 +22,229 @@ import (
 // HotStuff event loop is the only consumer of this interface and is single
 // threaded, this is OK.
 type Builder struct {
-	db           *badger.DB
-	transactions mempool.Transactions
+	db                *badger.DB
+	mainHeaders       storage.Headers
+	clusterHeaders    storage.Headers
+	payloads          storage.ClusterPayloads
+	transactions      mempool.Transactions
+	maxCollectionSize uint
+	expiryBuffer      uint
 }
 
-func NewBuilder(db *badger.DB, transactions mempool.Transactions, chainID string) *Builder {
-	b := &Builder{
-		db:           db,
-		transactions: transactions,
+type Opt func(*Builder)
+
+func WithMaxCollectionSize(size uint) Opt {
+	return func(b *Builder) {
+		b.maxCollectionSize = size
 	}
-	return b
+}
+
+func WithExpiryBuffer(buf uint) Opt {
+	return func(b *Builder) {
+		b.expiryBuffer = buf
+	}
+}
+
+func NewBuilder(db *badger.DB, headers storage.Headers, payloads storage.ClusterPayloads, transactions mempool.Transactions, opts ...Opt) *Builder {
+
+	b := Builder{
+		db:                db,
+		mainHeaders:       headers,
+		clusterHeaders:    headers,
+		payloads:          payloads,
+		transactions:      transactions,
+		maxCollectionSize: 100,
+		expiryBuffer:      15,
+	}
+
+	for _, apply := range opts {
+		apply(&b)
+	}
+	return &b
 }
 
 // BuildOn creates a new block built on the given parent. It produces a payload
 // that is valid with respect to the un-finalized chain it extends.
-func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (*flow.Header, error) {
-	var header *flow.Header
-	err := b.db.Update(func(tx *badger.Txn) error {
+func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
+	var proposal cluster.Block
 
-		// retrieve the parent to set the height and have chain ID
+	// first we construct a proposal in-memory, ensuring it is a valid extension
+	// of chain state -- this can be done in a read-only transaction
+	err := b.db.View(func(tx *badger.Txn) error {
+
+		// STEP ONE: Load some things we need to do our work.
+
 		var parent flow.Header
 		err := operation.RetrieveHeader(parentID, &parent)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve parent: %w", err)
 		}
 
-		// STEP ONE: get the payload contents that are included in ancestor
-		// blocks which are not finalized yet; this allows us to avoid
-		// including them in a block on the same fork twice.
-		var boundary uint64
-		err = operation.RetrieveBoundaryForCluster(parent.ChainID, &boundary)(tx)
+		// retrieve the height and ID of the latest finalized block ON THE MAIN CHAIN
+		// this is used as the reference point for transaction expiry
+		var refChainFinalizedHeight uint64
+		err = operation.RetrieveFinalizedHeight(&refChainFinalizedHeight)(tx)
 		if err != nil {
-			return fmt.Errorf("could not retrieve boundary: %w", err)
+			return fmt.Errorf("could not retrieve main finalized height: %w", err)
+		}
+		var refChainFinalizedID flow.Identifier
+		err = operation.LookupBlockHeight(refChainFinalizedHeight, &refChainFinalizedID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve main finalized ID: %w", err)
 		}
 
-		var finalizedID flow.Identifier
-		err = operation.RetrieveNumberForCluster(parent.ChainID, boundary, &finalizedID)(tx)
+		// retrieve the finalized boundary ON THE CLUSTER CHAIN
+		var clusterFinal flow.Header
+		err = procedure.RetrieveLatestFinalizedClusterHeader(parent.ChainID, &clusterFinal)(tx)
 		if err != nil {
-			return fmt.Errorf("could not retrieve finalized ID: %w", err)
+			return fmt.Errorf("could not retrieve cluster final: %w", err)
 		}
 
-		// for each un-finalized ancestor of our new block, retrieve the list
-		// of pending transactions; we use this to exclude transactions that
-		// already exist in this fork.
+		// STEP TWO: create a lookup of all previously used transactions on the
+		// part of the chain we care about. We do this separately for
+		// un-finalized and finalized sections of the chain to decide whether to
+		// remove conflicting transactions from the mempool.
+
+		// look up previously included transactions in UN-FINALIZED ancestors
 		ancestorID := parentID
-		txLookup := make(map[flow.Identifier]struct{})
-		for {
-
-			// retrieve the header for the ancestor
-			var ancestor flow.Header
-			err = operation.RetrieveHeader(ancestorID, &ancestor)(tx)
+		unfinalizedLookup := make(map[flow.Identifier]struct{})
+		for ancestorID != clusterFinal.ID() {
+			ancestor, err := b.clusterHeaders.ByBlockID(ancestorID)
 			if err != nil {
-				return fmt.Errorf("could not retrieve ancestor (id=%x): %w", ancestorID, err)
+				return fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
 			}
 
-			// if we have reached the finalized boundary, stop indexing
-			if ancestor.Height <= boundary {
-				break
+			if ancestor.Height <= clusterFinal.Height {
+				return fmt.Errorf("should always build on last finalized block")
 			}
 
-			// look up the cluster payload (ie. the collection)
-			var payload cluster.Payload
-			err = procedure.RetrieveClusterPayload(ancestor.ID(), &payload)(tx)
+			payload, err := b.payloads.ByBlockID(ancestorID)
 			if err != nil {
-				return fmt.Errorf("could not retrieve ancestor payload: %w", err)
+				return fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
 			}
 
-			// insert the transactions into the lookup
-			for _, colTx := range payload.Collection.Transactions {
-				txLookup[colTx.ID()] = struct{}{}
+			collection := payload.Collection
+			for _, tx := range collection.Transactions {
+				unfinalizedLookup[tx.ID()] = struct{}{}
 			}
-
-			// continue with the next ancestor in the chain
 			ancestorID = ancestor.ParentID
 		}
 
-		// STEP TWO: build a payload that includes as many transactions from the
-		// memory pool as possible without including any that already exist on
-		// our fork.
-		// TODO make empty collections / limit size based on collection min/max size constraints
-		var candidateTxIDs []flow.Identifier
-		for _, flowTx := range b.transactions.All() {
-			_, exists := txLookup[flowTx.ID()]
-			if exists {
+		//TODO for now we check a fixed # of finalized ancestors - we should
+		// instead look back based on reference block ID and expiry
+		// ref: https://github.com/dapperlabs/flow-go/issues/3556
+		limit := clusterFinal.Height - flow.DefaultTransactionExpiry
+		if limit > clusterFinal.Height { // overflow check
+			limit = 0
+		}
+
+		// look up previously included transactions in FINALIZED ancestors
+		finalizedLookup := make(map[flow.Identifier]struct{})
+		ancestorID = clusterFinal.ID()
+		ancestorHeight := clusterFinal.Height
+		for ancestorHeight > limit {
+			ancestor, err := b.clusterHeaders.ByBlockID(ancestorID)
+			if err != nil {
+				return fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
+			}
+			payload, err := b.payloads.ByBlockID(ancestorID)
+			if err != nil {
+				return fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
+			}
+
+			collection := payload.Collection
+			for _, tx := range collection.Transactions {
+				finalizedLookup[tx.ID()] = struct{}{}
+			}
+
+			ancestorID = ancestor.ParentID
+			ancestorHeight = ancestor.Height
+		}
+
+		// STEP THREE: build a payload of valid transactions, while at the same
+		// time figuring out the correct reference block ID for the collection.
+
+		minRefHeight := uint64(math.MaxUint64)
+		// start with the finalized reference ID (longest expiry time)
+		minRefID := refChainFinalizedID
+
+		var transactions []*flow.TransactionBody
+		for _, tx := range b.transactions.All() {
+
+			// if we have reached maximum number of transactions, stop
+			if uint(len(transactions)) >= b.maxCollectionSize {
+				break
+			}
+
+			// retrieve the main chain header that was used as reference
+			refHeader, err := b.mainHeaders.ByBlockID(tx.ReferenceBlockID)
+			if err != nil {
+				return fmt.Errorf("could not retrieve reference header: %w", err)
+			}
+
+			// for now, disallow un-finalized reference blocks
+			if refChainFinalizedHeight < refHeader.Height {
 				continue
 			}
-			candidateTxIDs = append(candidateTxIDs, flowTx.ID())
-		}
 
-		// find any guarantees that conflict with FINALIZED blocks
-		var invalidIDs map[flow.Identifier]struct{}
-		err = operation.CheckCollectionPayload(boundary, finalizedID, candidateTxIDs, &invalidIDs)(tx)
-		if err != nil {
-			return fmt.Errorf("could not check collection payload: %w", err)
-		}
-
-		// populate the final list of transaction IDs for the block - these
-		// are guaranteed to be valid
-		var finalTransactions []*flow.TransactionBody
-		for _, txID := range candidateTxIDs {
-
-			_, isInvalid := invalidIDs[txID]
-			if isInvalid {
-				// remove from mempool, it will never be valid
+			// ensure the reference block is not too old
+			txID := tx.ID()
+			if refChainFinalizedHeight-refHeader.Height > uint64(flow.DefaultTransactionExpiry-b.expiryBuffer) {
+				// the transaction is expired, it will never be valid
 				b.transactions.Rem(txID)
 				continue
 			}
 
-			// add ONLY non-conflicting transaction to the final payload
-			nextTx, err := b.transactions.ByID(txID)
-			if err != nil {
-				return fmt.Errorf("could not get transaction: %w", err)
+			// check that the transaction was not already used in un-finalized history
+			_, duplicated := unfinalizedLookup[txID]
+			if duplicated {
+				continue
 			}
-			finalTransactions = append(finalTransactions, nextTx)
+
+			// check that the transaction was not already included in finalized history.
+			_, duplicated = finalizedLookup[txID]
+			if duplicated {
+				// remove from mempool, conflicts with finalized block will never be valid
+				b.transactions.Rem(txID)
+				continue
+			}
+
+			// ensure we find the lowest reference block height
+			if refHeader.Height < minRefHeight {
+				minRefHeight = refHeader.Height
+				minRefID = tx.ReferenceBlockID
+			}
+
+			transactions = append(transactions, tx)
 		}
 
-		// STEP THREE: we have a set of transactions that are valid to include
+		// STEP FOUR: we have a set of transactions that are valid to include
 		// on this fork. Now we need to create the collection that will be
-		// used in the payload, store and index it in storage, and insert the
-		// header.
+		// used in the payload and construct the final proposal model
 
 		// build the payload from the transactions
-		payload := cluster.PayloadFromTransactions(finalTransactions...)
+		payload := cluster.PayloadFromTransactions(minRefID, transactions...)
 
-		header = &flow.Header{
+		header := flow.Header{
 			ChainID:     parent.ChainID,
 			ParentID:    parentID,
 			Height:      parent.Height + 1,
 			PayloadHash: payload.Hash(),
 			Timestamp:   time.Now().UTC(),
 
-			// the following fields should be set by the provided setter function
-			View:           0,
-			ParentVoterIDs: nil,
-			ParentVoterSig: nil,
-			ProposerID:     flow.ZeroID,
-			ProposerSig:    nil,
+			// NOTE: we rely on the HotStuff-provided setter to set the other
+			// fields, which are related to signatures and HotStuff internals
 		}
 
 		// set fields specific to the consensus algorithm
-		setter(header)
-
-		// insert the header for the newly built block
-		err = operation.InsertHeader(header)(tx)
+		err = setter(&header)
 		if err != nil {
-			return fmt.Errorf("could not insert cluster header: %w", err)
+			return fmt.Errorf("could not set fields to header: %w", err)
 		}
 
-		// insert the payload
-		// this inserts the collection AND all constituent transactions
-		err = procedure.InsertClusterPayload(&payload)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert cluster payload: %w", err)
-		}
-
-		// index the payload by block ID
-		err = procedure.IndexClusterPayload(header, &payload)(tx)
-		if err != nil {
-			return fmt.Errorf("could not index cluster payload: %w", err)
+		proposal = cluster.Block{
+			Header:  &header,
+			Payload: &payload,
 		}
 
 		return nil
@@ -186,5 +253,11 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		return nil, fmt.Errorf("could not build block: %w", err)
 	}
 
-	return header, nil
+	// finally we insert the block in a write transaction
+	err = operation.RetryOnConflict(b.db.Update, procedure.InsertClusterBlock(&proposal))
+	if err != nil {
+		return nil, fmt.Errorf("could not insert built block: %w", err)
+	}
+
+	return proposal.Header, err
 }

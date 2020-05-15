@@ -389,7 +389,7 @@ func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) {
 			data := make([]byte, complainAnswerSize+1)
 			data[0] = byte(feldmanVSSComplaintAnswer)
 			data[1] = byte(origin)
-			ZrPolynomialImage(data[2:], s.a, origin+1, nil)
+			zrPolynomialImage(data[2:], s.a, origin+1, nil)
 			s.complaints[origin].answerReceived = true
 			s.processor.Broadcast(data)
 		}

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/onflow/cadence/runtime"
-
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/cmd"
@@ -21,6 +21,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/ledger"
@@ -29,9 +30,7 @@ import (
 func main() {
 
 	var (
-		stateCommitments   storage.Commits
 		ledgerStorage      storage.Ledger
-		blocks             storage.Blocks
 		events             storage.Events
 		txResults          storage.TransactionResults
 		providerEngine     *provider.Engine
@@ -41,21 +40,29 @@ func main() {
 		err                error
 		executionState     state.ExecutionState
 		triedir            string
+		collector          module.ExecutionMetrics
+		mTrieCacheSize     uint32
 	)
 
-	cmd.FlowNode("execution").
+	cmd.FlowNode(flow.RoleExecution.String()).
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			homedir, _ := os.UserHomeDir()
 			datadir := filepath.Join(homedir, ".flow", "execution")
 
 			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
 			flags.StringVar(&triedir, "triedir", datadir, "directory to store the execution State")
+			flags.Uint32Var(&mTrieCacheSize, "mtrie-cache-size", 1000, "cache size for MTrie")
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
-			vm := virtualmachine.New(rt)
+			vm, err := virtualmachine.New(rt)
+			if err != nil {
+				return err
+			}
+
 			computationManager = computation.New(
 				node.Logger,
+				node.Tracer,
 				node.Me,
 				node.State,
 				vm,
@@ -63,10 +70,15 @@ func main() {
 
 			return nil
 		}).
-		//Trie storage is required to bootstrap, but also shout be handled while shutting down
+		// Trie storage is required to bootstrap, but also should be handled while shutting down
 		Module("ledger storage", func(node *cmd.FlowNodeBuilder) error {
-			ledgerStorage, err = ledger.NewTrieStorage(triedir)
+			ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), node.MetricsRegisterer)
+
 			return err
+		}).
+		Module("execution metrics", func(node *cmd.FlowNodeBuilder) error {
+			collector = metrics.NewExecutionCollector(node.Tracer)
+			return nil
 		}).
 		GenesisHandler(func(node *cmd.FlowNodeBuilder, block *flow.Block) {
 			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage)
@@ -74,13 +86,13 @@ func main() {
 				panic(fmt.Sprintf("error while bootstrapping execution state: %s", err))
 			}
 			if !bytes.Equal(bootstrappedStateCommitment, flow.GenesisStateCommitment) {
-				panic("error while boostrapping execution state - resulting state is different than precalculated!")
+				panic("error while bootstrapping execution state - resulting state is different than precalculated!")
 			}
 			if !bytes.Equal(flow.GenesisStateCommitment, node.GenesisCommit) {
-				panic("genesis seal state commitment different from precalculated")
+				panic(fmt.Sprintf("genesis seal state commitment (%x) different from precalculated (%x)", node.GenesisCommit, flow.GenesisStateCommitment))
 			}
 
-			err = bootstrap.BootstrapExecutionDatabase(node.DB, &block.Header)
+			err = bootstrap.BootstrapExecutionDatabase(node.DB, bootstrappedStateCommitment, block.Header)
 			if err != nil {
 				panic(fmt.Sprintf("error while boostrapping execution state - cannot bootstrap database: %s", err))
 			}
@@ -91,12 +103,23 @@ func main() {
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			chunkDataPacks := badger.NewChunkDataPacks(node.DB)
 			executionResults := badger.NewExecutionResults(node.DB)
-			stateCommitments = badger.NewCommits(node.DB)
-			executionState = state.NewExecutionState(ledgerStorage, stateCommitments, chunkDataPacks, executionResults, node.DB)
-			//registerDeltas := badger.NewRegisterDeltas(node.DB)
+			stateCommitments := badger.NewCommits(node.Metrics.Cache, node.DB)
+
+			executionState = state.NewExecutionState(
+				ledgerStorage,
+				stateCommitments,
+				node.Storage.Blocks,
+				chunkDataPacks,
+				executionResults,
+				node.DB,
+				node.Tracer,
+			)
+
 			stateSync := sync.NewStateSynchronizer(executionState)
+
 			providerEngine, err = provider.New(
 				node.Logger,
+				node.Tracer,
 				node.Network,
 				node.State,
 				node.Me,
@@ -107,33 +130,37 @@ func main() {
 			return providerEngine, err
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			blocks = badger.NewBlocks(node.DB)
+			// Only needed for ingestion engine
 			collections := badger.NewCollections(node.DB)
-			payloads := badger.NewPayloads(node.DB)
-			events := badger.NewEvents(node.DB)
-			txResults := badger.NewTransactionResults(node.DB)
+
+			// Needed for gRPC server, make sure to assign to main scoped vars
+			events = badger.NewEvents(node.DB)
+			txResults = badger.NewTransactionResults(node.DB)
 			ingestionEng, err = ingestion.New(
 				node.Logger,
 				node.Network,
 				node.Me,
 				node.State,
-				blocks,
-				payloads,
+				node.Storage.Blocks,
+				node.Storage.Payloads,
 				collections,
 				events,
 				txResults,
 				computationManager,
 				providerEngine,
 				executionState,
-				6, //TODO - config param maybe?
-				node.Metrics,
+				6, // TODO - config param maybe?
+				collector,
+				node.Tracer,
 				true,
+				time.Second, //TODO - config param
+				10,          // TODO - config param
 			)
 			return ingestionEng, err
 		}).
 		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, blocks, events, txResults)
+			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, events, txResults)
 			return rpcEng, nil
-		}).Run("execution")
+		}).Run()
 
 }

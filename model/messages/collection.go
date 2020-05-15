@@ -11,13 +11,6 @@ type SubmitCollectionGuarantee struct {
 	Guarantee flow.CollectionGuarantee
 }
 
-// SubmitTransactionRequest is a request to submit the given transaction
-// request to other collection nodes in our cluster. Only valid as a node-local
-// message.
-type SubmitTransactionRequest struct {
-	Request TransactionRequest
-}
-
 // CollectionRequest request all transactions from a collection with the given
 // fingerprint.
 type CollectionRequest struct {
@@ -28,16 +21,7 @@ type CollectionRequest struct {
 // CollectionResponse is a response to a request for a collection.
 type CollectionResponse struct {
 	Collection flow.Collection
-}
-
-// TransactionRequest is a request message for a single transaction.
-type TransactionRequest struct {
-	ID flow.Identifier
-}
-
-// TransactionResponse is a response to a transaction request.
-type TransactionResponse struct {
-	Transaction flow.TransactionBody
+	Nonce      uint64 // so that we aren't deduplicated by the network layer
 }
 
 // ClusterBlockProposal is a proposal for a block in collection node cluster
