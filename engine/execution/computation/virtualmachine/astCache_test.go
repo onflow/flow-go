@@ -6,7 +6,6 @@ import (
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
@@ -41,9 +40,9 @@ func TestTransactionASTCache(t *testing.T) {
 
 		result, err := bc.ExecuteTransaction(ledger, tx)
 
-		assert.NoError(t, err)
-		assert.True(t, result.Succeeded())
-		assert.Nil(t, result.Error)
+		require.NoError(t, err)
+		require.True(t, result.Succeeded())
+		require.Nil(t, result.Error)
 
 		// Determine location of transaction
 		txID := tx.ID()
@@ -51,8 +50,8 @@ func TestTransactionASTCache(t *testing.T) {
 
 		// Get cached program
 		program, err := vm.ASTCache().GetProgram(location)
-		assert.NotNil(t, program)
-		assert.NoError(t, err)
+		require.NotNil(t, program)
+		require.NoError(t, err)
 	})
 
 }
@@ -76,8 +75,8 @@ func TestScriptASTCache(t *testing.T) {
 		require.NoError(t, err)
 
 		result, err := bc.ExecuteScript(ledger, script)
-		assert.NoError(t, err)
-		assert.True(t, result.Succeeded())
+		require.NoError(t, err)
+		require.True(t, result.Succeeded())
 
 		// Determine location
 		scriptHash := hash.DefaultHasher.ComputeHash(script)
@@ -85,8 +84,8 @@ func TestScriptASTCache(t *testing.T) {
 
 		// Get cached program
 		program, err := vm.ASTCache().GetProgram(location)
-		assert.NotNil(t, program)
-		assert.NoError(t, err)
+		require.NotNil(t, program)
+		require.NoError(t, err)
 
 	})
 }
@@ -136,21 +135,21 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 
 	// Deploy the FungibleToken contract interface
 	result, err := bc.ExecuteTransaction(ledger, &deployFungibleTokenContractTx)
-	assert.NoError(t, err)
-	assert.True(t, result.Succeeded())
-	assert.Nil(t, result.Error)
+	require.NoError(t, err)
+	require.True(t, result.Succeeded())
+	require.Nil(t, result.Error)
 
 	// Deploy the FlowToken contract
 	result, err = bc.ExecuteTransaction(ledger, &deployFlowTokenContractTx)
-	assert.NoError(t, err)
-	assert.True(t, result.Succeeded())
-	assert.Nil(t, result.Error)
+	require.NoError(t, err)
+	require.True(t, result.Succeeded())
+	require.Nil(t, result.Error)
 
 	// Run the Use import (FT Vault resource) transaction
 	result, err = bc.ExecuteTransaction(ledger, &useImportTx)
-	assert.NoError(t, err)
-	assert.True(t, result.Succeeded())
-	assert.Nil(t, result.Error)
+	require.NoError(t, err)
+	require.True(t, result.Succeeded())
+	require.Nil(t, result.Error)
 
 	// Determine location of transaction
 	txID := useImportTx.ID()
@@ -158,36 +157,45 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 
 	// Get cached program
 	program, err := vm.ASTCache().GetProgram(location)
-	assert.NotNil(t, program)
-	assert.NoError(t, err)
+	require.NotNil(t, program)
+	require.NoError(t, err)
 }
 
-func BenchmarkTransactionWithProgramASTCache(t *testing.B) {
+func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
 
-	vm, _ := virtualmachine.New(rt)
+	vm, err := virtualmachine.New(rt)
+	require.NoError(b, err)
 	bc := vm.NewBlockContext(&h)
 
 	// Create a number of account private keys.
-	privateKeys, _ := execTestutil.GenerateAccountPrivateKeys(3)
+	privateKeys, err := execTestutil.GenerateAccountPrivateKeys(3)
+	require.NoError(b, err)
 
 	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-	ledger, accounts, _ := execTestutil.BootstrappedLedger(make(virtualmachine.MapLedger), privateKeys)
+	ledger, accounts, err := execTestutil.BootstrappedLedger(make(virtualmachine.MapLedger), privateKeys)
+	require.NoError(b, err)
 
 	// Create FungibleToken deployment transaction.
 	deployFungibleTokenContractTx := execTestutil.CreateDeployFungibleTokenContractInterfaceTransaction(accounts[0])
-	_ = execTestutil.SignTransaction(&deployFungibleTokenContractTx, accounts[0], flow.RootAccountPrivateKey, 0)
+	err = execTestutil.SignTransaction(&deployFungibleTokenContractTx, accounts[0], flow.RootAccountPrivateKey, 0)
+	require.NoError(b, err)
 
 	// Create FlowToken deployment transaction.
 	deployFlowTokenContractTx := execTestutil.CreateDeployFlowTokenContractTransaction(accounts[1], accounts[0])
-	_ = execTestutil.SignTransaction(&deployFlowTokenContractTx, accounts[1], privateKeys[0], 0)
+	err = execTestutil.SignTransaction(&deployFlowTokenContractTx, accounts[1], privateKeys[0], 0)
+	require.NoError(b, err)
 
 	// Deploy the FungibleToken contract interface.
-	_, _ = bc.ExecuteTransaction(ledger, &deployFungibleTokenContractTx)
+	result, err := bc.ExecuteTransaction(ledger, &deployFungibleTokenContractTx)
+	require.True(b, result.Succeeded())
+	require.NoError(b, err)
 
 	// Deploy the FlowToken contract.
-	_, _ = bc.ExecuteTransaction(ledger, &deployFlowTokenContractTx)
+	result, err = bc.ExecuteTransaction(ledger, &deployFlowTokenContractTx)
+	require.True(b, result.Succeeded())
+	require.NoError(b, err)
 
 	// Create many transactions that imports the FlowToken contract.
 	var txs []flow.TransactionBody
@@ -213,15 +221,14 @@ func BenchmarkTransactionWithProgramASTCache(t *testing.B) {
 		txs = append(txs, tx)
 	}
 
-	t.ResetTimer()
+	b.ResetTimer()
 
-	for i := 0; i < t.N; i++ {
+	for i := 0; i < b.N; i++ {
 		for _, tx := range txs {
 			// Run the Use import (FT Vault resource) transaction.
-			_, err := bc.ExecuteTransaction(ledger, &tx)
-			if err != nil {
-				panic(err)
-			}
+			result, err := bc.ExecuteTransaction(ledger, &tx)
+			require.True(b, result.Succeeded())
+			require.NoError(b, err)
 		}
 	}
 
@@ -237,32 +244,41 @@ func (cache *nonFunctioningCache) SetProgram(location ast.Location, program *ast
 	return nil
 }
 
-func BenchmarkTransactionWithoutProgramASTCache(t *testing.B) {
+func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
 
-	vm, _ := virtualmachine.NewWithCache(rt, &nonFunctioningCache{})
+	vm, err := virtualmachine.NewWithCache(rt, &nonFunctioningCache{})
+	require.NoError(b, err)
 	bc := vm.NewBlockContext(&h)
 
 	// Create a number of account private keys.
-	privateKeys, _ := execTestutil.GenerateAccountPrivateKeys(3)
+	privateKeys, err := execTestutil.GenerateAccountPrivateKeys(3)
+	require.NoError(b, err)
 
 	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-	ledger, accounts, _ := execTestutil.BootstrappedLedger(make(virtualmachine.MapLedger), privateKeys)
+	ledger, accounts, err := execTestutil.BootstrappedLedger(make(virtualmachine.MapLedger), privateKeys)
+	require.NoError(b, err)
 
 	// Create FungibleToken deployment transaction.
 	deployFungibleTokenContractTx := execTestutil.CreateDeployFungibleTokenContractInterfaceTransaction(accounts[0])
-	_ = execTestutil.SignTransaction(&deployFungibleTokenContractTx, accounts[0], flow.RootAccountPrivateKey, 0)
+	err = execTestutil.SignTransaction(&deployFungibleTokenContractTx, accounts[0], flow.RootAccountPrivateKey, 0)
+	require.NoError(b, err)
 
 	// Create FlowToken deployment transaction.
 	deployFlowTokenContractTx := execTestutil.CreateDeployFlowTokenContractTransaction(accounts[1], accounts[0])
-	_ = execTestutil.SignTransaction(&deployFlowTokenContractTx, accounts[1], privateKeys[0], 0)
+	err = execTestutil.SignTransaction(&deployFlowTokenContractTx, accounts[1], privateKeys[0], 0)
+	require.NoError(b, err)
 
 	// Deploy the FungibleToken contract interface.
-	_, _ = bc.ExecuteTransaction(ledger, &deployFungibleTokenContractTx)
+	result, err := bc.ExecuteTransaction(ledger, &deployFungibleTokenContractTx)
+	require.True(b, result.Succeeded())
+	require.NoError(b, err)
 
 	// Deploy the FlowToken contract.
-	_, _ = bc.ExecuteTransaction(ledger, &deployFlowTokenContractTx)
+	result, err = bc.ExecuteTransaction(ledger, &deployFlowTokenContractTx)
+	require.True(b, result.Succeeded())
+	require.NoError(b, err)
 
 	// Create many transactions that imports the FlowToken contract.
 	var txs []flow.TransactionBody
@@ -285,15 +301,14 @@ func BenchmarkTransactionWithoutProgramASTCache(t *testing.B) {
 		txs = append(txs, tx)
 	}
 
-	t.ResetTimer()
+	b.ResetTimer()
 
-	for i := 0; i < t.N; i++ {
+	for i := 0; i < b.N; i++ {
 		for _, tx := range txs {
 			// Run the Use import (FT Vault resource) transaction.
-			_, err := bc.ExecuteTransaction(ledger, &tx)
-			if err != nil {
-				panic(err)
-			}
+			result, err := bc.ExecuteTransaction(ledger, &tx)
+			require.True(b, result.Succeeded())
+			require.NoError(b, err)
 		}
 	}
 
