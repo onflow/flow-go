@@ -71,9 +71,6 @@ func (r LedgerDAL) CheckAccountExists(accountID []byte) error {
 	}
 
 	bal, err := r.Get(fullKeyHash(string(accountID), "", keyBalance))
-	if err != nil {
-		return err
-	}
 
 	if len(exists) != 0 || bal != nil {
 		return nil

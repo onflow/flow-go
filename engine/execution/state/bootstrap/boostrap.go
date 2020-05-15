@@ -89,6 +89,7 @@ func createRootAccount(l virtualmachine.LedgerDAL, privateKey flow.AccountPrivat
 		flow.RootAddress,
 		[]flow.AccountPublicKey{accountKey},
 	)
+
 	if err != nil {
 		panic(fmt.Sprintf("failed to create root account: %s", err))
 	}
