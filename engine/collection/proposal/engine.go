@@ -28,21 +28,22 @@ import (
 // Engine is the collection proposal engine, which packages pending
 // transactions into collections and sends them to consensus nodes.
 type Engine struct {
-	unit         *engine.Unit
-	log          zerolog.Logger
-	colMetrics   module.CollectionMetrics
-	engMetrics   module.EngineMetrics
-	con          network.Conduit
-	me           module.Local
-	protoState   protocol.State  // flow-wide protocol chain state
-	clusterState clusterkv.State // cluster-specific chain state
-	validator    module.TransactionValidator
-	pool         mempool.Transactions
-	transactions storage.Transactions
-	headers      storage.Headers
-	payloads     storage.ClusterPayloads
-	pending      module.PendingClusterBlockBuffer // pending block cache
-	participants flow.IdentityList                // consensus participants in our cluster
+	unit           *engine.Unit
+	log            zerolog.Logger
+	colMetrics     module.CollectionMetrics
+	engMetrics     module.EngineMetrics
+	mempoolMetrics module.MempoolMetrics
+	con            network.Conduit
+	me             module.Local
+	protoState     protocol.State  // flow-wide protocol chain state
+	clusterState   clusterkv.State // cluster-specific chain state
+	validator      module.TransactionValidator
+	pool           mempool.Transactions
+	transactions   storage.Transactions
+	headers        storage.Headers
+	payloads       storage.ClusterPayloads
+	pending        module.PendingClusterBlockBuffer // pending block cache
+	participants   flow.IdentityList                // consensus participants in our cluster
 
 	hotstuff module.HotStuff
 }
@@ -53,6 +54,7 @@ func New(
 	me module.Local,
 	colMetrics module.CollectionMetrics,
 	engMetrics module.EngineMetrics,
+	mempoolMetrics module.MempoolMetrics,
 	protoState protocol.State,
 	clusterState clusterkv.State,
 	validator module.TransactionValidator,
@@ -69,20 +71,21 @@ func New(
 	}
 
 	e := &Engine{
-		unit:         engine.NewUnit(),
-		log:          log.With().Str("engine", "proposal").Logger(),
-		colMetrics:   colMetrics,
-		engMetrics:   engMetrics,
-		me:           me,
-		protoState:   protoState,
-		clusterState: clusterState,
-		validator:    validator,
-		pool:         pool,
-		transactions: transactions,
-		headers:      headers,
-		payloads:     payloads,
-		pending:      cache,
-		participants: participants,
+		unit:           engine.NewUnit(),
+		log:            log.With().Str("engine", "proposal").Logger(),
+		colMetrics:     colMetrics,
+		engMetrics:     engMetrics,
+		mempoolMetrics: mempoolMetrics,
+		me:             me,
+		protoState:     protoState,
+		clusterState:   clusterState,
+		validator:      validator,
+		pool:           pool,
+		transactions:   transactions,
+		headers:        headers,
+		payloads:       payloads,
+		pending:        cache,
+		participants:   participants,
 	}
 
 	con, err := net.Register(engine.ProtocolClusterConsensus, e)
@@ -301,7 +304,6 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	log.Debug().Msg("received proposal")
 
 	e.prunePendingCache()
-	e.colMetrics.PendingClusterBlocks(e.pending.Size())
 
 	// retrieve the parent block
 	// if the parent is not in storage, it has not yet been processed
@@ -499,11 +501,17 @@ func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *mess
 
 // prunePendingCache prunes the pending block cache.
 func (e *Engine) prunePendingCache() {
+
 	// retrieve the finalized height
 	final, err := e.clusterState.Final().Head()
 	if err != nil {
 		e.log.Warn().Err(err).Msg("could not get finalized head to prune pending blocks")
 		return
 	}
+
+	// remove all pending blocks at or below the finalized height
 	e.pending.PruneByHeight(final.Height)
+
+	// always record the metric
+	e.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, e.pending.Size())
 }
