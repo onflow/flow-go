@@ -129,7 +129,7 @@ func main() {
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rt := runtime.NewInterpreterRuntime()
-			vm, err := virtualmachine.New(rt)
+			vm, err := virtualmachine.New(node.Logger, rt)
 			if err != nil {
 				return nil, err
 			}

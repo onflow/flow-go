@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/runtime"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
@@ -122,7 +123,7 @@ func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExe
 		require.NoError(t, err)
 
 		rt := runtime.NewInterpreterRuntime()
-		vm, err := virtualmachine.New(rt)
+		vm, err := virtualmachine.New(zerolog.Logger{}, rt)
 		require.NoError(t, err)
 
 		// create state.View

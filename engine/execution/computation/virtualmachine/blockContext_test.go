@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -29,7 +30,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.New(rt)
+	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
 	require.NoError(t, err)
 	bc := vm.NewBlockContext(&h, new(storage.Blocks))
 
@@ -145,7 +146,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.New(rt)
+	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
 	assert.NoError(t, err)
 	bc := vm.NewBlockContext(&h, new(storage.Blocks))
 
@@ -236,7 +237,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.New(rt)
+	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
 	require.NoError(t, err)
 	bc := vm.NewBlockContext(&h, new(storage.Blocks))
 
@@ -302,7 +303,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 	block1 := unittest.BlockFixture()
 	block2 := unittest.BlockWithParentFixture(block1.Header)
 
-	vm, err := virtualmachine.New(rt)
+	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
 	require.NoError(t, err)
 	blocks := new(storage.Blocks)
 	bc := vm.NewBlockContext(block1.Header, blocks)
@@ -376,7 +377,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.New(rt)
+	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
 	require.NoError(t, err)
 	bc := vm.NewBlockContext(&h, new(storage.Blocks))
 

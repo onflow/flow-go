@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/runtime"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -61,7 +62,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	rt := runtime.NewInterpreterRuntime()
 
-	vm, err := virtualmachine.New(rt)
+	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
 	require.NoError(t, err)
 
 	blockComputer := computer.NewBlockComputer(vm, nil, new(storage.Blocks))

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/runtime"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,7 +19,7 @@ import (
 func TestTransactionASTCache(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
-	vm, err := virtualmachine.New(rt)
+	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
 	require.NoError(t, err)
 	bc := vm.NewBlockContext(&h, new(storage.Blocks))
 
@@ -59,7 +60,7 @@ func TestTransactionASTCache(t *testing.T) {
 func TestScriptASTCache(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
-	vm, err := virtualmachine.New(rt)
+	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
 
 	require.NoError(t, err)
 	bc := vm.NewBlockContext(&h, new(storage.Blocks))
