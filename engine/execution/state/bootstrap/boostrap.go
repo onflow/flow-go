@@ -62,27 +62,97 @@ func BootstrapExecutionDatabase(db *badger.DB, commit flow.StateCommitment, gene
 }
 
 func BootstrapView(view *delta.View) {
-	ledgerAccess := virtualmachine.NewLedgerDAL(view)
-	_, err := ledgerAccess.CreateAccount([]flow.AccountPublicKey{flow.RootAccountPrivateKey.PublicKey(1000)})
+	l := virtualmachine.NewLedgerDAL(view)
+
+	fungibleToken := deployFungibleToken(l)
+	flowToken := deployFlowToken(l, fungibleToken)
+	feeContract := deployFeeContract(l, fungibleToken, flowToken)
+
+	createRootAccount(l, fungibleToken, flowToken, feeContract)
+}
+
+func deployFungibleToken(l virtualmachine.LedgerDAL) flow.Address {
+	addr, err := l.CreateAccount(nil, fungibleTokenContract())
 	if err != nil {
-		panic(fmt.Sprintf("error while creating account in ledger: %s ", err))
+		panic(fmt.Sprintf("failed to deploy fungible token contract: %s", err))
+	}
+
+	return addr
+}
+
+func deployFlowToken(l virtualmachine.LedgerDAL, fungibleToken flow.Address) flow.Address {
+	addr, err := l.CreateAccount(nil, flowTokenContract(fungibleToken))
+	if err != nil {
+		panic(fmt.Sprintf("failed to deploy flow token contract: %s", err))
+	}
+
+	return addr
+}
+
+func deployFeeContract(l virtualmachine.LedgerDAL, fungibleToken, flowToken flow.Address) flow.Address {
+	addr, err := l.CreateAccount(nil, feeContract(fungibleToken, flowToken))
+	if err != nil {
+		panic(fmt.Sprintf("failed to deploy fee contract: %s", err))
+	}
+
+	return addr
+}
+
+func createRootAccount(
+	l virtualmachine.LedgerDAL,
+	fungibleToken, flowToken, feeContract flow.Address,
+) {
+	// TODO: remove magic constant
+	accountKey := flow.RootAccountPrivateKey.PublicKey(1000)
+
+	err := l.CreateAccountWithAddress(
+		flow.ZeroAddress,
+		[]flow.AccountPublicKey{accountKey},
+		serviceAccountContract(fungibleToken, flowToken, feeContract),
+	)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create root account: %s", err))
 	}
 }
 
-func deployFungibleToken(vm virtualmachine.VirtualMachine, view *delta.View) (flow.Address, error) {
-	return flow.Address{}, nil
+func fungibleTokenContract() []byte {
+	code, err := Asset("contracts/FungibleToken.cdc")
+	if err != nil {
+		panic(err)
+	}
+
+	return code
 }
 
-func deployFlowToken(vm virtualmachine.VirtualMachine, view *delta.View) (flow.Address, error) {
-	return flow.Address{}, nil
+func flowTokenContract(fungibleToken flow.Address) []byte {
+	tpl, err := AssetString("contracts/FlowToken.cdc")
+	if err != nil {
+		panic(err)
+	}
+
+	code := fmt.Sprintf(tpl, fungibleToken.Hex())
+
+	return []byte(code)
 }
 
-func deployFeeContract(vm virtualmachine.VirtualMachine, view *delta.View) (flow.Address, error) {
-	return flow.Address{}, nil
+func feeContract(fungibleToken, flowToken flow.Address) []byte {
+	tpl, err := AssetString("contracts/FeeContract.cdc")
+	if err != nil {
+		panic(err)
+	}
+
+	code := fmt.Sprintf(tpl, fungibleToken.Hex(), flowToken.Hex())
+
+	return []byte(code)
 }
 
-func createServiceAccount(vm virtualmachine.VirtualMachine, view *delta.View, fungibleToken, flowToken, feeContract flow.Address) (flow.Address, error) {
-	return flow.Address{}, nil
-}
+func serviceAccountContract(fungibleToken, flowToken, feeContract flow.Address) []byte {
+	tpl, err := AssetString("contracts/ServiceAccount.cdc")
+	if err != nil {
+		panic(err)
+	}
 
-func deployContract(vm virtualmachine.VirtualMachine, view *delta.View) error { return nil }
+	code := fmt.Sprintf(tpl, fungibleToken.Hex(), flowToken.Hex(), feeContract.Hex())
+
+	return []byte(code)
+}
