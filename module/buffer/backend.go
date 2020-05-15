@@ -21,13 +21,16 @@ type backend struct {
 	byParent map[flow.Identifier][]flow.Identifier
 	// set of pending blocks, keyed by ID to avoid duplication
 	byID map[flow.Identifier]*item
+	// the minimum height in the cache to avoid unnecessary pruning
+	minHeight uint64
 }
 
 // newBackend returns a new pending block cache.
 func newBackend() *backend {
 	cache := &backend{
-		byParent: make(map[flow.Identifier][]flow.Identifier),
-		byID:     make(map[flow.Identifier]*item),
+		byParent:  make(map[flow.Identifier][]flow.Identifier),
+		byID:      make(map[flow.Identifier]*item),
+		minHeight: 0,
 	}
 	return cache
 }
@@ -54,6 +57,13 @@ func (b *backend) add(originID flow.Identifier, header *flow.Header, payload int
 
 	b.byID[blockID] = item
 	b.byParent[header.ParentID] = append(b.byParent[header.ParentID], blockID)
+
+	// engines using this module shouldn't be doing this, since it is equivalent
+	// to adding an already finalized or invalidated block, but we handle it
+	// anyway at this layer to ensure correctness of pruning
+	if header.Height < b.minHeight {
+		b.minHeight = header.Height
+	}
 
 	return true
 }
@@ -110,10 +120,12 @@ func (b *backend) dropForParent(parentID flow.Identifier) {
 
 // pruneByHeight prunes any items in the cache that have height below the
 // given height. The pruning height should be the finalized height.
-//
-// NOTE: this is a naive, linear-time pruning strategy, thus it should be called
-// infrequently.
 func (b *backend) pruneByHeight(height uint64) {
+
+	// nothing to prune
+	if b.minHeight >= height {
+		return
+	}
 
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -124,4 +136,7 @@ func (b *backend) pruneByHeight(height uint64) {
 			delete(b.byParent, item.header.ParentID)
 		}
 	}
+
+	// update the new minimum height
+	b.minHeight = height
 }
