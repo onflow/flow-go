@@ -13,7 +13,7 @@ import (
 func TestGenerateGenesisStateCommitment(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dbDir string) {
 
-		ls, err := ledger.NewTrieStorage(dbDir)
+		ls, err := ledger.NewMTrieStorage(dbDir, 100, nil)
 		require.NoError(t, err)
 
 		newStateCommitment, err := BootstrapLedger(ls)

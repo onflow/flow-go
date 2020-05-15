@@ -230,7 +230,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	dbDir := unittest.TempDir(t)
 
-	ls, err := ledger.NewTrieStorage(dbDir)
+	ls, err := ledger.NewMTrieStorage(dbDir, 100, nil)
 	require.NoError(t, err)
 
 	genesisHead, err := node.State.Final().Head()
