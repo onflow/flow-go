@@ -15,7 +15,7 @@ type VerificationCollector struct {
 	tracer                  *trace.OpenTracer
 	chunksCheckedPerBlock   prometheus.Counter
 	resultApprovalsPerBlock prometheus.Counter
-	storagePerChunk         prometheus.Histogram
+	storagePerChunk         prometheus.Gauge
 }
 
 func NewVerificationCollector(tracer *trace.OpenTracer) *VerificationCollector {
@@ -26,28 +26,27 @@ func NewVerificationCollector(tracer *trace.OpenTracer) *VerificationCollector {
 		chunksCheckedPerBlock: promauto.NewCounter(prometheus.CounterOpts{
 			Name:      "checked_chunks_total",
 			Namespace: namespaceVerification,
-			Help:      "The total number of chunks checked",
+			Help:      "total number of chunks checked",
 		}),
 
 		resultApprovalsPerBlock: promauto.NewCounter(prometheus.CounterOpts{
 			Name:      "result_approvals_total",
 			Namespace: namespaceVerification,
-			Help:      "The total number of emitted result approvals",
+			Help:      "total number of emitted result approvals",
 		}),
 
-		storagePerChunk: promauto.NewHistogram(prometheus.HistogramOpts{
-			Name:      "storage_per_chunk",
-			Buckets:   []float64{5, 10, 50, 100, 500, 1000, 10000},
+		storagePerChunk: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "storage_per_chunk_bytes",
 			Namespace: namespaceVerification,
-			Help:      "storage per chunk data",
+			Help:      "total number of chunks checked",
 		}),
 	}
 
 	return vc
 }
 
-// OnResultApproval is called whenever a result approval is emitted
-// it increases the result approval counter for this chunk
+// OnResultApproval is called whenever a result approval is emitted.
+// It increases the result approval counter for this chunk.
 func (vc *VerificationCollector) OnResultApproval() {
 	// increases the counter of disseminated result approvals
 	// fo by one. Each result approval corresponds to a single chunk of the block
@@ -63,18 +62,18 @@ func (vc *VerificationCollector) OnResultApproval() {
 // Todo wire this up to do monitoring
 // https://github.com/dapperlabs/flow-go/issues/3183
 func (vc *VerificationCollector) OnVerifiableChunkSubmitted(size float64) {
-	vc.storagePerChunk.Observe(size)
+	vc.storagePerChunk.Set(size)
 }
 
-// OnChunkVerificationStarted is called whenever the verification of a chunk is started
-// it starts the timer to record the execution time
+// OnChunkVerificationStarted is called whenever the verification of a chunk is started.
+// It starts the timer to record the execution time.
 func (vc *VerificationCollector) OnChunkVerificationStarted(chunkID flow.Identifier) {
 	// starts spanner tracer for this chunk ID
 	vc.tracer.StartSpan(chunkID, chunkExecutionSpanner)
 }
 
-// OnChunkVerificationFinished is called whenever chunkID verification gets finished
-// it finishes recording the duration of execution and increases number of checked chunks
+// OnChunkVerificationFinished is called whenever chunkID verification gets finished.
+// It finishes recording the duration of execution and increases number of checked chunks.
 func (vc *VerificationCollector) OnChunkVerificationFinished(chunkID flow.Identifier) {
 	vc.tracer.FinishSpan(chunkID, chunkExecutionSpanner)
 	// increases the checked chunks counter
