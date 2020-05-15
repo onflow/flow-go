@@ -17,7 +17,7 @@ const scriptGasLimit = 100000
 type CheckerFunc func([]byte, runtime.Location) error
 
 type TransactionContext struct {
-	LedgerDAL
+	ledger          LedgerDAL
 	astCache        ASTCache
 	signingAccounts []runtime.Address
 	checker         CheckerFunc
@@ -55,13 +55,13 @@ func (r *TransactionContext) Logs() []string {
 
 // GetValue gets a register value from the world state.
 func (r *TransactionContext) GetValue(owner, controller, key []byte) ([]byte, error) {
-	v, _ := r.Ledger.Get(fullKeyHash(string(owner), string(controller), string(key)))
+	v, _ := r.ledger.Get(fullKeyHash(string(owner), string(controller), string(key)))
 	return v, nil
 }
 
 // SetValue sets a register value in the world state.
 func (r *TransactionContext) SetValue(owner, controller, key, value []byte) error {
-	r.Ledger.Set(fullKeyHash(string(owner), string(controller), string(key)), value)
+	r.ledger.Set(fullKeyHash(string(owner), string(controller), string(key)), value)
 	return nil
 }
 
@@ -91,7 +91,7 @@ func (r *TransactionContext) CreateAccount(publicKeysBytes [][]byte) (runtime.Ad
 		}
 	}
 
-	accountAddress, err := r.CreateAccount(publicKeys)
+	accountAddress, err := r.ledger.CreateAccount(publicKeys, nil)
 	r.Log(fmt.Sprintf("Created new account with address: %x", accountAddress))
 
 	return runtime.Address(accountAddress), err
@@ -104,7 +104,7 @@ func (r *TransactionContext) CreateAccount(publicKeysBytes [][]byte) (runtime.Ad
 func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []byte) error {
 	accountID := address[:]
 
-	err := r.CheckAccountExists(accountID)
+	err := r.ledger.CheckAccountExists(accountID)
 	if err != nil {
 		return err
 	}
@@ -114,14 +114,14 @@ func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []
 		return fmt.Errorf("cannot decode runtime public account key: %w", err)
 	}
 
-	publicKeys, err := r.GetAccountPublicKeys(accountID)
+	publicKeys, err := r.ledger.GetAccountPublicKeys(accountID)
 	if err != nil {
 		return err
 	}
 
 	publicKeys = append(publicKeys, runtimePublicKey)
 
-	return r.SetAccountPublicKeys(accountID, publicKeys)
+	return r.ledger.SetAccountPublicKeys(accountID, publicKeys)
 }
 
 // RemoveAccountKey removes a public key by index from an existing account.
@@ -131,12 +131,12 @@ func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []
 func (r *TransactionContext) RemoveAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
 	accountID := address[:]
 
-	err = r.CheckAccountExists(accountID)
+	err = r.ledger.CheckAccountExists(accountID)
 	if err != nil {
 		return nil, err
 	}
 
-	publicKeys, err := r.GetAccountPublicKeys(accountID)
+	publicKeys, err := r.ledger.GetAccountPublicKeys(accountID)
 	if err != nil {
 		return publicKey, err
 	}
@@ -149,7 +149,7 @@ func (r *TransactionContext) RemoveAccountKey(address runtime.Address, index int
 
 	publicKeys = append(publicKeys[:index], publicKeys[index+1:]...)
 
-	err = r.SetAccountPublicKeys(accountID, publicKeys)
+	err = r.ledger.SetAccountPublicKeys(accountID, publicKeys)
 	if err != nil {
 		return publicKey, err
 	}
@@ -177,12 +177,12 @@ func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []b
 		return fmt.Errorf("not permitted to update account with ID %s", address)
 	}
 
-	err = r.CheckAccountExists(accountID)
+	err = r.ledger.CheckAccountExists(accountID)
 	if err != nil {
 		return err
 	}
 
-	r.Ledger.Set(fullKeyHash(string(accountID), string(accountID), keyCode), code)
+	r.ledger.Set(fullKeyHash(string(accountID), string(accountID), keyCode), code)
 
 	return nil
 }
@@ -201,7 +201,7 @@ func (r *TransactionContext) ResolveImport(location runtime.Location) ([]byte, e
 
 	accountID := address.Bytes()
 
-	code, err := r.Ledger.Get(fullKeyHash(string(accountID), string(accountID), keyCode))
+	code, err := r.ledger.Get(fullKeyHash(string(accountID), string(accountID), keyCode))
 	if err != nil {
 		return nil, err
 	}
@@ -344,7 +344,7 @@ func (r *TransactionContext) checkAndIncrementSequenceNumber() (FlowError, error
 
 	proposalKey := r.tx.ProposalKey
 
-	account := r.GetAccount(proposalKey.Address)
+	account := r.ledger.GetAccount(proposalKey.Address)
 
 	if int(proposalKey.KeyID) >= len(account.Keys) {
 		return &InvalidProposalKeyError{
@@ -372,7 +372,7 @@ func (r *TransactionContext) checkAndIncrementSequenceNumber() (FlowError, error
 	if err != nil {
 		return nil, err
 	}
-	r.setAccountPublicKey(account.Address.Bytes(), proposalKey.KeyID, updatedAccountBytes)
+	r.ledger.setAccountPublicKey(account.Address.Bytes(), proposalKey.KeyID, updatedAccountBytes)
 
 	return nil, nil
 }
@@ -415,7 +415,7 @@ func (r *TransactionContext) verifyAccountSignature(
 	txSig flow.TransactionSignature,
 	message []byte,
 ) (*flow.AccountPublicKey, FlowError) {
-	account := r.GetAccount(txSig.Address)
+	account := r.ledger.GetAccount(txSig.Address)
 	if account == nil {
 		return nil, &InvalidSignatureAccountError{Address: txSig.Address}
 	}
