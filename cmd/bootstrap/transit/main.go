@@ -332,14 +332,12 @@ func bucketDownload(ctx context.Context, bootdir, srcFolder, destFolder, token s
 	})
 	for {
 		attrs, err := it.Next()
-
 		if err == iterator.Done {
 			break
 		}
 		if err != nil {
 			return fmt.Errorf("Bucket(%q).Objects(): %v", flowBucket, err)
 		}
-		log.Printf("Downloading %s\n", attrs.Name)
 
 		err = bucketFileDownload(gcsClient, ctx, filepath.Join(bootdir, destFolder), attrs.Name)
 		if err != nil {
