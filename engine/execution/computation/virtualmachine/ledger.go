@@ -57,20 +57,20 @@ func keyPublicKey(index uint64) string {
 
 // A LedgerDAL is an abstraction layer used to read and manipulate ledger state in a consistent way.
 type LedgerDAL struct {
-	ledger Ledger
+	Ledger
 }
 
 func NewLedgerDAL(ledger Ledger) LedgerDAL {
-	return LedgerDAL{ledger}
+	return LedgerDAL{Ledger: ledger}
 }
 
 func (r LedgerDAL) CheckAccountExists(accountID []byte) error {
-	exists, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyExists))
+	exists, err := r.Get(fullKeyHash(string(accountID), "", keyExists))
 	if err != nil {
 		return err
 	}
 
-	bal, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyBalance))
+	bal, err := r.Get(fullKeyHash(string(accountID), "", keyBalance))
 	if err != nil {
 		return err
 	}
@@ -83,7 +83,7 @@ func (r LedgerDAL) CheckAccountExists(accountID []byte) error {
 }
 
 func (r LedgerDAL) GetAccountPublicKeys(accountID []byte) (publicKeys []flow.AccountPublicKey, err error) {
-	countBytes, err := r.ledger.Get(
+	countBytes, err := r.Get(
 		fullKeyHash(string(accountID), string(accountID), keyPublicKeyCount),
 	)
 	if err != nil {
@@ -103,7 +103,7 @@ func (r LedgerDAL) GetAccountPublicKeys(accountID []byte) (publicKeys []flow.Acc
 	publicKeys = make([]flow.AccountPublicKey, count)
 
 	for i := uint64(0); i < count; i++ {
-		publicKey, err := r.ledger.Get(
+		publicKey, err := r.Get(
 			fullKeyHash(string(accountID), string(accountID), keyPublicKey(i)),
 		)
 		if err != nil {
@@ -133,10 +133,10 @@ func (r LedgerDAL) GetAccount(address flow.Address) *flow.Account {
 		return nil
 	}
 
-	balanceBytes, _ := r.ledger.Get(fullKeyHash(string(accountID), "", keyBalance))
+	balanceBytes, _ := r.Get(fullKeyHash(string(accountID), "", keyBalance))
 	balanceInt := new(big.Int).SetBytes(balanceBytes)
 
-	code, _ := r.ledger.Get(fullKeyHash(string(accountID), string(accountID), keyCode))
+	code, _ := r.Get(fullKeyHash(string(accountID), string(accountID), keyCode))
 
 	publicKeys, err := r.GetAccountPublicKeys(accountID)
 	if err != nil {
@@ -152,45 +152,64 @@ func (r LedgerDAL) GetAccount(address flow.Address) *flow.Account {
 }
 
 func (r LedgerDAL) GetLatestAccount() flow.Address {
-	latestAccountID, _ := r.ledger.Get(fullKeyHash("", "", keyLatestAccount))
+	latestAccountID, _ := r.Get(fullKeyHash("", "", keyLatestAccount))
 
 	return flow.BytesToAddress(latestAccountID)
 }
 
-func (r LedgerDAL) CreateAccount(publicKeys []flow.AccountPublicKey) (flow.Address, error) {
-	accountAddress := r.GetLatestAccount()
+func (r LedgerDAL) CreateAccount(publicKeys []flow.AccountPublicKey, code []byte) (flow.Address, error) {
+	lastAddr := r.GetLatestAccount()
 
-	accountID := accountAddress[:]
+	lastID := lastAddr[:]
 
-	accountIDInt := new(big.Int).SetBytes(accountID)
-	newAccountBytes := accountIDInt.Add(accountIDInt, big.NewInt(1)).Bytes()
+	lastIDInt := new(big.Int).SetBytes(lastID)
+	newID := lastIDInt.Add(lastIDInt, big.NewInt(1)).Bytes()
 
-	newAccountAddress := flow.BytesToAddress(newAccountBytes)
-	newAccountID := newAccountAddress[:]
+	newAddr := flow.BytesToAddress(newID)
 
-	// mark that account with this ID exists
-	r.ledger.Set(fullKeyHash(string(newAccountID), "", keyExists), []byte{1})
-
-	// set account balance to 0
-	r.ledger.Set(fullKeyHash(string(newAccountID), "", keyBalance), big.NewInt(0).Bytes())
-
-	r.ledger.Set(fullKeyHash(string(newAccountID), string(newAccountID), keyCode), nil)
-
-	err := r.SetAccountPublicKeys(newAccountID, publicKeys)
+	err := r.CreateAccountWithAddress(newAddr, publicKeys, code)
 	if err != nil {
 		return flow.Address{}, err
 	}
 
-	r.ledger.Set(fullKeyHash("", "", keyLatestAccount), newAccountID)
+	return newAddr, nil
+}
 
-	return flow.BytesToAddress(newAccountID), nil
+func (r LedgerDAL) CreateAccountWithAddress(
+	addr flow.Address,
+	publicKeys []flow.AccountPublicKey,
+	code []byte,
+) error {
+	accountID := addr.Bytes()
+
+	// mark that account with this ID exists
+	r.Set(fullKeyHash(string(accountID), "", keyExists), []byte{1})
+
+	// set account balance to 0
+	r.Set(fullKeyHash(string(accountID), "", keyBalance), big.NewInt(0).Bytes())
+
+	// normalize empty code input to nil
+	if len(code) == 0 {
+		code = nil
+	}
+
+	r.Set(fullKeyHash(string(accountID), string(accountID), keyCode), code)
+
+	err := r.SetAccountPublicKeys(accountID, publicKeys)
+	if err != nil {
+		return err
+	}
+
+	r.Set(fullKeyHash("", "", keyLatestAccount), accountID)
+
+	return nil
 }
 
 func (r LedgerDAL) SetAccountPublicKeys(accountID []byte, publicKeys []flow.AccountPublicKey) error {
 
 	var existingCount uint64
 
-	countBytes, err := r.ledger.Get(
+	countBytes, err := r.Get(
 		fullKeyHash(string(accountID), string(accountID), keyPublicKeyCount),
 	)
 	if err != nil {
@@ -200,7 +219,10 @@ func (r LedgerDAL) SetAccountPublicKeys(accountID []byte, publicKeys []flow.Acco
 	if countBytes != nil {
 		countInt := new(big.Int).SetBytes(countBytes)
 		if !countInt.IsUint64() {
-			return fmt.Errorf("retrieved public key account bytes (hex): %x do not represent valid uint64", countBytes)
+			return fmt.Errorf(
+				"retrieved public key account bytes (hex): %x do not represent valid uint64",
+				countBytes,
+			)
 		}
 		existingCount = countInt.Uint64()
 	} else {
@@ -210,7 +232,7 @@ func (r LedgerDAL) SetAccountPublicKeys(accountID []byte, publicKeys []flow.Acco
 	newCount := uint64(len(publicKeys)) //len returns int and this won't exceed uint64
 	newKeyCount := new(big.Int).SetUint64(newCount)
 
-	r.ledger.Set(
+	r.Set(
 		fullKeyHash(string(accountID), string(accountID), keyPublicKeyCount),
 		newKeyCount.Bytes(),
 	)
@@ -233,14 +255,14 @@ func (r LedgerDAL) SetAccountPublicKeys(accountID []byte, publicKeys []flow.Acco
 
 	// delete leftover keys
 	for i := newCount; i < existingCount; i++ {
-		r.ledger.Delete(fullKeyHash(string(accountID), string(accountID), keyPublicKey(i)))
+		r.Delete(fullKeyHash(string(accountID), string(accountID), keyPublicKey(i)))
 	}
 
 	return nil
 }
 
 func (r LedgerDAL) setAccountPublicKey(accountID []byte, keyndex uint64, publicKey []byte) {
-	r.ledger.Set(
+	r.Set(
 		fullKeyHash(string(accountID), string(accountID), keyPublicKey(keyndex)),
 		publicKey,
 	)
