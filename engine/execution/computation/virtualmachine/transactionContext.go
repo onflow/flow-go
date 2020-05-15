@@ -91,7 +91,7 @@ func (r *TransactionContext) CreateAccount(publicKeysBytes [][]byte) (runtime.Ad
 		}
 	}
 
-	accountAddress, err := r.CreateAccountInLedger(publicKeys)
+	accountAddress, err := r.CreateAccount(publicKeys)
 	r.Log(fmt.Sprintf("Created new account with address: %x", accountAddress))
 
 	return runtime.Address(accountAddress), err

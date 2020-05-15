@@ -62,15 +62,14 @@ func BootstrapExecutionDatabase(db *badger.DB, commit flow.StateCommitment, gene
 }
 
 func BootstrapView(view *delta.View) {
-	ledgerAccess := virtualmachine.LedgerDAL{Ledger: view}
-	_, err := ledgerAccess.CreateAccountInLedger([]flow.AccountPublicKey{flow.RootAccountPrivateKey.PublicKey(1000)})
+	ledgerAccess := virtualmachine.NewLedgerDAL(view)
+	_, err := ledgerAccess.CreateAccount([]flow.AccountPublicKey{flow.RootAccountPrivateKey.PublicKey(1000)})
 	if err != nil {
 		panic(fmt.Sprintf("error while creating account in ledger: %s ", err))
 	}
 }
 
 func deployFungibleToken(vm virtualmachine.VirtualMachine, view *delta.View) (flow.Address, error) {
-	vm.NewContext(view).Invoke("")
 	return flow.Address{}, nil
 }
 
