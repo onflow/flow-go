@@ -628,7 +628,7 @@ func (e *Engine) checkPendingChunks() {
 
 		if receipt.ExecutionResult.Chunks.Len() == 0 {
 			// TODO potential attack on availability
-			e.log.Error().
+			e.log.Debug().
 				Hex("receipt_id", logging.Entity(receipt)).
 				Hex("result_id", logging.Entity(receipt.ExecutionResult)).
 				Msg("could not ingest execution result with zero chunks")
