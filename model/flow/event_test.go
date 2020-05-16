@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/model/encoding/rlp"
+	"github.com/dapperlabs/flow-go/model/fingerprint"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -22,9 +23,9 @@ func wrapEvent(e flow.Event) eventWrapper {
 	}
 }
 
-func TestEventEncodingRLP(t *testing.T) {
+func TestEventFingerprint(t *testing.T) {
 	evt := unittest.EventFixture(flow.EventAccountCreated, 13, 12, unittest.IdentifierFixture())
-	data := evt.Encode()
+	data := fingerprint.Fingerprint(evt)
 	var decoded eventWrapper
 	rlp.NewEncoder().MustDecode(data, &decoded)
 	assert.Equal(t, wrapEvent(evt), decoded)

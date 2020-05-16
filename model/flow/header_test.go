@@ -28,10 +28,10 @@ func TestHeaderEncodingJSON(t *testing.T) {
 	assert.Equal(t, header, decoded)
 }
 
-func TestHeaderEncodingRLP(t *testing.T) {
+func TestHeaderFingerprint(t *testing.T) {
 	header := unittest.BlockHeaderFixture()
 	headerID := header.ID()
-	data := header.Encode()
+	data := header.Fingerprint()
 	var decoded struct {
 		ChainID        string
 		ParentID       flow.Identifier

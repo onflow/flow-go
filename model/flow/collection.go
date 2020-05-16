@@ -1,6 +1,6 @@
 package flow
 
-import "github.com/dapperlabs/flow-go/model/encoding/rlp"
+import "github.com/dapperlabs/flow-go/model/fingerprint"
 
 // Collection is set of transactions.
 type Collection struct {
@@ -45,6 +45,19 @@ func (c Collection) Checksum() Identifier {
 	return c.Light().Checksum()
 }
 
+func (c Collection) Fingerprint() []byte {
+	var txs []byte
+	for _, tx := range c.Transactions {
+		txs = append(txs, tx.Fingerprint()...)
+	}
+
+	return fingerprint.Fingerprint(struct {
+		Transactions []byte
+	}{
+		Transactions: txs,
+	})
+}
+
 // LightCollection is a collection containing references to the constituent
 // transactions rather than full transaction bodies. It is used for indexing
 // transactions by collection and for computing the collection fingerprint.
@@ -58,11 +71,6 @@ func (lc LightCollection) ID() Identifier {
 
 func (lc LightCollection) Checksum() Identifier {
 	return MakeID(lc)
-}
-
-// Encode returns the canonical RLP byte representation of this light collection
-func (lc LightCollection) Encode() []byte {
-	return rlp.NewEncoder().MustEncode(lc)
 }
 
 func (lc LightCollection) Len() int {

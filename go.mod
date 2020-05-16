@@ -47,6 +47,7 @@ require (
 	golang.org/x/crypto v0.0.0-20200423211502-4bdfaf469ed5
 	google.golang.org/api v0.18.0
 	google.golang.org/grpc v1.28.0
+	gotest.tools v2.2.0+incompatible
 )
 
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1

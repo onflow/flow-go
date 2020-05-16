@@ -7,7 +7,7 @@ import (
 	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/encoding/rlp"
+	"github.com/dapperlabs/flow-go/model/fingerprint"
 )
 
 // Header contains all meta-data for a block, as well as a hash representing
@@ -51,9 +51,8 @@ func (h Header) Body() interface{} {
 	}
 }
 
-// Encode returns the canonical RLP byte representation of this header
-func (h Header) Encode() []byte {
-	return rlp.NewEncoder().MustEncode(h.Body())
+func (h Header) Fingerprint() []byte {
+	return fingerprint.Fingerprint(h.Body())
 }
 
 // ID returns a unique ID to singularly identify the header and its block
