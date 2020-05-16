@@ -316,7 +316,14 @@ func (ms *MatchingSuite) TestOnReceiptPendingReceipt() {
 	originID := ms.exeID
 	receipt := unittest.ExecutionReceiptFixture()
 	receipt.ExecutorID = originID
-	ms.receiptsPL.On("Add", mock.Anything).Return(false)
+
+	// check parameters are correct for calls
+	ms.receiptsPL.On("Add", mock.Anything).Run(
+		func(args mock.Arguments) {
+			added := args.Get(0).(*flow.ExecutionReceipt)
+			ms.Assert().Equal(receipt, added)
+		},
+	).Return(false)
 
 	err := ms.matching.onReceipt(originID, receipt)
 	ms.Require().NoError(err, "should ignore already pending receipt")
@@ -332,8 +339,20 @@ func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 	originID := ms.exeID
 	receipt := unittest.ExecutionReceiptFixture()
 	receipt.ExecutorID = originID
-	ms.receiptsPL.On("Add", mock.Anything).Return(true)
-	ms.resultsPL.On("Add", mock.Anything).Return(false)
+
+	// check parameters are correct for calls
+	ms.receiptsPL.On("Add", mock.Anything).Run(
+		func(args mock.Arguments) {
+			added := args.Get(0).(*flow.ExecutionReceipt)
+			ms.Assert().Equal(receipt, added)
+		},
+	).Return(true)
+	ms.resultsPL.On("Add", mock.Anything).Run(
+		func(args mock.Arguments) {
+			result := args.Get(0).(*flow.ExecutionResult)
+			ms.Assert().Equal(result, &receipt.ExecutionResult)
+		},
+	).Return(false)
 
 	err := ms.matching.onReceipt(originID, receipt)
 	ms.Require().NoError(err, "should ignore receipt for already pending result")
@@ -349,8 +368,20 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 	originID := ms.exeID
 	receipt := unittest.ExecutionReceiptFixture()
 	receipt.ExecutorID = originID
-	ms.receiptsPL.On("Add", mock.Anything).Return(true)
-	ms.resultsPL.On("Add", mock.Anything).Return(true)
+
+	// check parameters are correct for calls
+	ms.receiptsPL.On("Add", mock.Anything).Run(
+		func(args mock.Arguments) {
+			added := args.Get(0).(*flow.ExecutionReceipt)
+			ms.Assert().Equal(receipt, added)
+		},
+	).Return(true)
+	ms.resultsPL.On("Add", mock.Anything).Run(
+		func(args mock.Arguments) {
+			result := args.Get(0).(*flow.ExecutionResult)
+			ms.Assert().Equal(result, &receipt.ExecutionResult)
+		},
+	).Return(true)
 
 	err := ms.matching.onReceipt(originID, receipt)
 	ms.Require().NoError(err, "should ignore receipt for already pending result")
@@ -423,7 +454,14 @@ func (ms *MatchingSuite) TestOnApprovalPendingApproval() {
 	originID := ms.verID
 	approval := unittest.ResultApprovalFixture()
 	approval.Body.ApproverID = originID
-	ms.approvalsPL.On("Add", mock.Anything).Return(false)
+
+	// check calls have the correct parameters
+	ms.approvalsPL.On("Add", mock.Anything).Run(
+		func(args mock.Arguments) {
+			added := args.Get(0).(*flow.ResultApproval)
+			ms.Assert().Equal(approval, added)
+		},
+	).Return(false)
 
 	err := ms.matching.onApproval(originID, approval)
 	ms.Require().NoError(err, "should ignore approval for sealed result")
@@ -438,7 +476,14 @@ func (ms *MatchingSuite) TestOnApprovalValid() {
 	originID := ms.verID
 	approval := unittest.ResultApprovalFixture()
 	approval.Body.ApproverID = originID
-	ms.approvalsPL.On("Add", mock.Anything).Return(true)
+
+	// check calls have the correct parameters
+	ms.approvalsPL.On("Add", mock.Anything).Run(
+		func(args mock.Arguments) {
+			added := args.Get(0).(*flow.ResultApproval)
+			ms.Assert().Equal(approval, added)
+		},
+	).Return(true)
 
 	err := ms.matching.onApproval(originID, approval)
 	ms.Require().NoError(err, "should ignore approval for sealed result")
@@ -469,7 +514,10 @@ func (ms *MatchingSuite) TestSealableResultsNoPayload() {
 
 	results, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
-	ms.Assert().Len(results, 1, "should select result for empty block")
+	if ms.Assert().Len(results, 1, "should select result for empty block") {
+		sealable := results[0]
+		ms.Assert().Equal(result, sealable)
+	}
 }
 
 func (ms *MatchingSuite) TestSealableResultsNoApprovals() {
@@ -542,5 +590,115 @@ func (ms *MatchingSuite) TestSealableResultsSufficientApprovals() {
 
 	results, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
-	ms.Assert().Len(results, 1, "should select result with sufficient approvals")
+	if ms.Assert().Len(results, 1, "should select result with sufficient approvals") {
+		sealable := results[0]
+		ms.Assert().Equal(result, sealable)
+	}
+}
+
+func (ms *MatchingSuite) TestSealResultMissingBlock() {
+
+	// try to seal a result for which we don't have the index payload
+	result := unittest.ExecutionResultFixture()
+
+	err := ms.matching.sealResult(result)
+	ms.Require().Equal(errUnknownBlock, err, "should get unknown block error on missing block")
+
+	ms.resultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
+	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
+}
+
+func (ms *MatchingSuite) TestSealResultInvalidChunks() {
+
+	// try to seal a result with a mismatching chunk count
+	block := unittest.BlockFixture()
+	ms.blocks[block.Header.ID()] = &block
+	result := unittest.ResultForBlockFixture(&block)
+	chunk := unittest.ChunkFixture()
+	chunk.Index = uint64(len(block.Payload.Guarantees))
+	result.Chunks = append(result.Chunks, chunk)
+
+	err := ms.matching.sealResult(result)
+	ms.Require().Equal(errInvalidChunks, err, "should get invalid chunks error on wrong chunk count")
+
+	ms.resultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
+	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
+}
+
+func (ms *MatchingSuite) TestSealResultMissingPrevious() {
+
+	// try to seal a result with a missing previous result
+	block := unittest.BlockFixture()
+	ms.blocks[block.Header.ID()] = &block
+	result := unittest.ResultForBlockFixture(&block)
+
+	err := ms.matching.sealResult(result)
+	ms.Require().Equal(errUnknownPrevious, err, "should get unknown previous error on missing previous result")
+
+	ms.resultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
+	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
+}
+
+func (ms *MatchingSuite) TestSealResultPendingPrevious() {
+
+	// try to seal a result with a missing previous result
+	block := unittest.BlockFixture()
+	ms.blocks[block.Header.ID()] = &block
+	result := unittest.ResultForBlockFixture(&block)
+	previous := unittest.ExecutionResultFixture()
+	result.PreviousResultID = previous.ID()
+	ms.pendingResults[previous.ID()] = previous
+
+	// check match when we are storing entities
+	ms.resultsDB.On("Store", mock.Anything).Run(
+		func(args mock.Arguments) {
+			stored := args.Get(0).(*flow.ExecutionResult)
+			ms.Assert().Equal(result, stored)
+		},
+	).Return(nil)
+	ms.sealsPL.On("Add", mock.Anything).Run(
+		func(args mock.Arguments) {
+			seal := args.Get(0).(*flow.Seal)
+			ms.Assert().Equal(result.ID(), seal.ResultID)
+			ms.Assert().Equal(result.BlockID, seal.BlockID)
+		},
+	).Return(true)
+
+	err := ms.matching.sealResult(result)
+	ms.Require().NoError(err, "should generate seal on pending previous result")
+
+	ms.resultsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
+	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
+}
+
+func (ms *MatchingSuite) TestSealResultValid() {
+
+	// try to seal a result with a persisted previous result
+	block := unittest.BlockFixture()
+	ms.blocks[block.Header.ID()] = &block
+	result := unittest.ResultForBlockFixture(&block)
+	previous := unittest.ExecutionResultFixture()
+	result.PreviousResultID = previous.ID()
+	ms.results[previous.ID()] = previous
+
+	// check match when we are storing entities
+	ms.resultsDB.On("Store", mock.Anything).Run(
+		func(args mock.Arguments) {
+			stored := args.Get(0).(*flow.ExecutionResult)
+			ms.Assert().Equal(result, stored)
+		},
+	).Return(nil)
+	ms.sealsPL.On("Add", mock.Anything).Run(
+		func(args mock.Arguments) {
+			seal := args.Get(0).(*flow.Seal)
+			ms.Assert().Equal(result.ID(), seal.ResultID)
+			ms.Assert().Equal(result.BlockID, seal.BlockID)
+		},
+	).Return(true)
+
+	err := ms.matching.sealResult(result)
+	ms.Require().NoError(err, "should generate seal on persisted previous result")
+
+	ms.resultsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
+	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
 }
