@@ -352,40 +352,11 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 	}
 	threshold := verifiers.TotalStake() / 3 * 2
 
-	// Get all available approvals once, and map them to their result and
-	// approver; we also check for two approvals of the same result by the same
-	// approver here. For now, we just raise a warning and discard the duplicate;
-	// in the future, we should raise a slashing challenge.
-	byResult := make(map[flow.Identifier](map[flow.Identifier]*flow.ResultApproval))
+	// get all available approvals once, and map them to their result
+	byResult := make(map[flow.Identifier]([]*flow.ResultApproval))
 	for _, approval := range e.approvals.All() {
-		approvalID := approval.ID()
 		resultID := approval.Body.ExecutionResultID
-		approverID := approval.Body.ApproverID
-
-		log := e.log.With().
-			Hex("approval", approvalID[:]).
-			Hex("approver", approverID[:]).
-			Hex("result", resultID[:]).
-			Logger()
-
-		// get the map of approvals for the result
-		byApprover, exists := byResult[resultID]
-		if !exists {
-			byApprover = make(map[flow.Identifier]*flow.ResultApproval)
-			byResult[resultID] = byApprover
-		}
-
-		// check if the approver already approved the result
-		duplicate, approved := byApprover[approverID]
-		if approved {
-			_ = e.approvals.Rem(approvalID)
-			log.Warn().
-				Hex("duplicate", logging.Entity(duplicate)).
-				Msg("discarding duplicate approval")
-			continue
-		}
-
-		byApprover[approverID] = approval
+		byResult[resultID] = append(byResult[resultID], approval)
 	}
 
 	// go through all results and check which ones we have enough approvals for
@@ -400,10 +371,28 @@ ResultLoop:
 		// have a qualified majority of verifier stake approving
 		for _, chunk := range result.Chunks {
 
+			log := e.log.With().
+				Hex("block", result.BlockID[:]).
+				Hex("result", logging.Entity(result)).
+				Uint64("chunk", chunk.Index).
+				Logger()
+
+			// we use this to check for duplicate approvals by one approver
+			dupCheck := make(map[flow.Identifier]bool)
+
 			// get the node IDs for all approvers of this chunk
 			var approverIDs []flow.Identifier
-			for approverID, approval := range approvals {
+			for _, approval := range approvals {
 				if approval.Body.ChunkIndex == chunk.Index {
+					approverID := approval.Body.ApproverID
+					if dupCheck[approverID] {
+						_ = e.approvals.Rem(approval.ID())
+						log.Warn().
+							Hex("approver", approverID[:]).
+							Msg("dropping duplicate approval")
+						continue
+					}
+					dupCheck[approverID] = true
 					approverIDs = append(approverIDs, approverID)
 				}
 			}
@@ -412,10 +401,7 @@ ResultLoop:
 			approvers := verifiers.Filter(filter.HasNodeID(approverIDs...))
 			voted := approvers.TotalStake()
 
-			log := e.log.With().
-				Hex("block", result.BlockID[:]).
-				Hex("result", logging.Entity(result)).
-				Uint64("chunk", chunk.Index).
+			log = log.With().
 				Uint64("voted", voted).
 				Uint64("threshold", threshold).
 				Logger()

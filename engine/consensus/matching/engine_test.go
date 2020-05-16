@@ -4,13 +4,14 @@ package matching
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -33,6 +34,8 @@ type MatchingSuite struct {
 	verID flow.Identifier
 
 	identities map[flow.Identifier]*flow.Identity
+
+	approvers flow.IdentityList
 
 	state    *protocol.State
 	snapshot *protocol.Snapshot
@@ -59,7 +62,8 @@ type MatchingSuite struct {
 
 func (ms *MatchingSuite) SetupTest() {
 
-	log := zerolog.New(ioutil.Discard)
+	unit := engine.NewUnit()
+	log := zerolog.New(os.Stderr)
 	metrics := metrics.NewNoopCollector()
 
 	con := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
@@ -74,6 +78,8 @@ func (ms *MatchingSuite) SetupTest() {
 	ms.identities[ms.conID] = con
 	ms.identities[ms.exeID] = exe
 	ms.identities[ms.verID] = ver
+
+	ms.approvers = unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleVerification))
 
 	ms.state = &protocol.State{}
 	ms.state.On("Final").Return(
@@ -95,6 +101,12 @@ func (ms *MatchingSuite) SetupTest() {
 			}
 			return nil
 		},
+	)
+	ms.snapshot.On("Identities", mock.Anything).Return(
+		func(selector flow.IdentityFilter) flow.IdentityList {
+			return ms.approvers
+		},
+		nil,
 	)
 
 	ms.results = make(map[flow.Identifier]*flow.ExecutionResult)
@@ -166,6 +178,15 @@ func (ms *MatchingSuite) SetupTest() {
 			return found
 		},
 	)
+	ms.resultsPL.On("All").Return(
+		func() []*flow.ExecutionResult {
+			results := make([]*flow.ExecutionResult, 0, len(ms.pendingResults))
+			for _, result := range ms.pendingResults {
+				results = append(results, result)
+			}
+			return results
+		},
+	)
 
 	ms.receiptsPL = &mempool.Receipts{}
 	ms.receiptsPL.On("Size").Return(uint(0)) // only for metrics
@@ -190,6 +211,15 @@ func (ms *MatchingSuite) SetupTest() {
 			return found
 		},
 	)
+	ms.approvalsPL.On("All").Return(
+		func() []*flow.ResultApproval {
+			approvals := make([]*flow.ResultApproval, 0, len(ms.pendingApprovals))
+			for _, approval := range ms.pendingApprovals {
+				approvals = append(approvals, approval)
+			}
+			return approvals
+		},
+	)
 
 	ms.sealsPL = &mempool.Seals{}
 	ms.sealsPL.On("Size").Return(uint(0)) // only for metrics
@@ -204,6 +234,7 @@ func (ms *MatchingSuite) SetupTest() {
 	)
 
 	ms.matching = &Engine{
+		unit:      unit,
 		log:       log,
 		metrics:   metrics,
 		mempool:   metrics,
@@ -216,23 +247,6 @@ func (ms *MatchingSuite) SetupTest() {
 		approvals: ms.approvalsPL,
 		seals:     ms.sealsPL,
 	}
-}
-
-func (ms *MatchingSuite) TestOnReceiptValid() {
-
-	// try to submit a receipt that should be valid
-	originID := ms.exeID
-	receipt := unittest.ExecutionReceiptFixture()
-	receipt.ExecutorID = originID
-	ms.receiptsPL.On("Add", mock.Anything).Return(true)
-	ms.resultsPL.On("Add", mock.Anything).Return(true)
-
-	err := ms.matching.onReceipt(originID, receipt)
-	ms.Require().NoError(err, "should ignore receipt for already pending result")
-
-	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
-	ms.receiptsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
-	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
 func (ms *MatchingSuite) TestOnReceiptInvalidOrigin() {
@@ -329,18 +343,20 @@ func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
-func (ms *MatchingSuite) TestOnApprovalValid() {
+func (ms *MatchingSuite) TestOnReceiptValid() {
 
-	// try to submit an approval for a sealed result
-	originID := ms.verID
-	approval := unittest.ResultApprovalFixture()
-	approval.Body.ApproverID = originID
-	ms.approvalsPL.On("Add", mock.Anything).Return(true)
+	// try to submit a receipt that should be valid
+	originID := ms.exeID
+	receipt := unittest.ExecutionReceiptFixture()
+	receipt.ExecutorID = originID
+	ms.receiptsPL.On("Add", mock.Anything).Return(true)
+	ms.resultsPL.On("Add", mock.Anything).Return(true)
 
-	err := ms.matching.onApproval(originID, approval)
-	ms.Require().NoError(err, "should ignore approval for sealed result")
+	err := ms.matching.onReceipt(originID, receipt)
+	ms.Require().NoError(err, "should ignore receipt for already pending result")
 
-	ms.approvalsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
+	ms.resultsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
+	ms.receiptsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
@@ -416,21 +432,115 @@ func (ms *MatchingSuite) TestOnApprovalPendingApproval() {
 	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
-func (ms *MatchingSuite) TestSealableResultsNoResults() {
+func (ms *MatchingSuite) TestOnApprovalValid() {
 
+	// try to submit an approval for a sealed result
+	originID := ms.verID
+	approval := unittest.ResultApprovalFixture()
+	approval.Body.ApproverID = originID
+	ms.approvalsPL.On("Add", mock.Anything).Return(true)
+
+	err := ms.matching.onApproval(originID, approval)
+	ms.Require().NoError(err, "should ignore approval for sealed result")
+
+	ms.approvalsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
+	ms.sealsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
+}
+
+func (ms *MatchingSuite) TestSealableResultsEmptyMempools() {
+
+	// try to get sealable results with nothing in memory pools
+
+	results, err := ms.matching.sealableResults()
+	ms.Require().NoError(err, "should not error with empty mempools")
+	ms.Assert().Empty(results, "should not have sealable results with empty mempools")
+}
+
+func (ms *MatchingSuite) TestSealableResultsNoPayload() {
+
+	// add a block with a specific guarantee to the DB
+	block := unittest.BlockFixture()
+	block.Payload.Guarantees = nil
+	ms.blocks[block.Header.ID()] = &block
+
+	// add a result for this block to the DB
+	result := unittest.ResultForBlockFixture(&block)
+	ms.pendingResults[result.ID()] = result
+
+	results, err := ms.matching.sealableResults()
+	ms.Require().NoError(err)
+	ms.Assert().Len(results, 1, "should select result for empty block")
 }
 
 func (ms *MatchingSuite) TestSealableResultsNoApprovals() {
+
+	// add a block with a specific guarantee to the DB
+	block := unittest.BlockFixture()
+	ms.blocks[block.Header.ID()] = &block
+
+	// add a result for this block to the DB
+	result := unittest.ResultForBlockFixture(&block)
+	ms.pendingResults[result.ID()] = result
+
+	results, err := ms.matching.sealableResults()
+	ms.Require().NoError(err)
+	ms.Assert().Empty(results, "should not select result with no approvals")
 }
 
-func (ms *MatchingSuite) TestSealableResultsInsufficientStake() {
+func (ms *MatchingSuite) TestSealableResultsInsufficientApprovals() {
+
+	// add a block with a specific guarantee to the DB
+	block := unittest.BlockFixture()
+	ms.blocks[block.Header.ID()] = &block
+
+	// add a result for this block to the DB
+	result := unittest.ResultForBlockFixture(&block)
+	ms.pendingResults[result.ID()] = result
+
+	// add approvals for each chunk that have insufficient stake
+	for n := 0; n < 3; n++ {
+		for index := uint64(0); index < uint64(len(result.Chunks)); index++ {
+			// skip last chunk for last approval
+			if n == 2 && index == uint64(len(result.Chunks)-1) {
+				break
+			}
+			approval := unittest.ResultApprovalFixture()
+			approval.Body.BlockID = block.Header.ID()
+			approval.Body.ExecutionResultID = result.ID()
+			approval.Body.ApproverID = ms.approvers[n].NodeID
+			approval.Body.ChunkIndex = index
+			ms.pendingApprovals[approval.ID()] = approval
+		}
+	}
+
+	results, err := ms.matching.sealableResults()
+	ms.Require().NoError(err)
+	ms.Assert().Empty(results, "should not select result with insufficient approvals")
 }
 
-func (ms *MatchingSuite) TestSealResultValid() {
-}
+func (ms *MatchingSuite) TestSealableResultsSufficientApprovals() {
 
-func (ms *MatchingSuite) TestSealResultUnknownBlock() {
-}
+	// add a block with a specific guarantee to the DB
+	block := unittest.BlockFixture()
+	ms.blocks[block.Header.ID()] = &block
 
-func (ms *MatchingSuite) TestSealResultUnknownPrevious() {
+	// add a result for this block to the DB
+	result := unittest.ResultForBlockFixture(&block)
+	ms.pendingResults[result.ID()] = result
+
+	// add approvals for each chunk that have insufficient stake
+	for n := 0; n < 3; n++ {
+		for index := uint64(0); index < uint64(len(result.Chunks)); index++ {
+			approval := unittest.ResultApprovalFixture()
+			approval.Body.BlockID = block.Header.ID()
+			approval.Body.ExecutionResultID = result.ID()
+			approval.Body.ApproverID = ms.approvers[n].NodeID
+			approval.Body.ChunkIndex = index
+			ms.pendingApprovals[approval.ID()] = approval
+		}
+	}
+
+	results, err := ms.matching.sealableResults()
+	ms.Require().NoError(err)
+	ms.Assert().Len(results, 1, "should select result with sufficient approvals")
 }
