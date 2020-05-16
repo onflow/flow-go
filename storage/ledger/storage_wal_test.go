@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -18,11 +19,12 @@ func Test_WAL(t *testing.T) {
 	keyByteSize := 32
 	valueMaxByteSize := 2 << 16
 	size := 10
+	metricsCollector := &metrics.NoopCollector{}
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
 		// cache size intentionally is set to size to test deletion
-		f, err := ledger.NewMTrieStorage(dir, size, nil)
+		f, err := ledger.NewMTrieStorage(dir, size, metricsCollector, nil)
 		require.NoError(t, err)
 
 		var stateCommitment = f.EmptyStateCommitment()
@@ -49,7 +51,7 @@ func Test_WAL(t *testing.T) {
 
 		<-f.Done()
 
-		f2, err := ledger.NewMTrieStorage(dir, size+10, nil)
+		f2, err := ledger.NewMTrieStorage(dir, size+10, metricsCollector, nil)
 		require.NoError(t, err)
 
 		// random map iteration order is a benefit here
@@ -74,9 +76,8 @@ func Test_WAL(t *testing.T) {
 		}
 
 		// test deletion
-		s, err := f2.Size()
-		require.NoError(t, err)
-		assert.Equal(t, int(s), size)
+		s := f2.ForestSize()
+		assert.Equal(t, s, size)
 
 		<-f2.Done()
 	})

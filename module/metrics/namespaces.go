@@ -33,6 +33,7 @@ const (
 // Execution Subsystems
 const (
 	subsystemStateStorage = "state_storage"
+	subsystemMTrie        = "mtrie"
 	subsystemRuntime      = "runtime"
 )
 
