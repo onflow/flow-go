@@ -22,6 +22,7 @@ import (
 var (
 	errUnknownBlock    = errors.New("result block unknown")
 	errUnknownPrevious = errors.New("previous result unknown")
+	errInvalidChunks   = errors.New("invalid chunk number")
 )
 
 // Engine is the propagation engine, which makes sure that new collections are
@@ -310,6 +311,11 @@ func (e *Engine) checkSealing() {
 			Logger()
 
 		err := e.sealResult(result)
+		if err == errInvalidChunks {
+			_ = e.results.Rem(result.ID())
+			log.Warn().Msg("removing sealable result with invalid number of chunks")
+			continue
+		}
 		if err == errUnknownBlock {
 			log.Debug().Msg("skipping sealable result with unknown sealed block")
 			continue
@@ -354,23 +360,6 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 ResultLoop:
 	for _, result := range e.results.All() {
 
-		// we create one chunk per collection (at least for now), so we can
-		// check if the chunk number matches with the number of guarantees; this
-		// will ensure the execution receipt can not lie about having less
-		// chunks and having the remaining ones approved
-		index, err := e.indexDB.ByBlockID(result.BlockID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get block payload index (block: %x, result: %x): %w", result.BlockID, result.ID(), err)
-		}
-		if len(result.Chunks) != len(index.CollectionIDs) {
-			// NOTE: we can't check this upon reception, in case we receive an
-			// execuetion receipt before the actual block; we could clean up the
-			// memory pools here, but that will be done anyway in due time, so
-			// let's not complicate it and just log the error repeatedly until
-			// the execution result is purged
-			return nil, fmt.Errorf("execution result has insufficient chunks (%d < %d)", len(result.Chunks), len(index.CollectionIDs))
-		}
-
 		// go through all the chunks of this result and check that each of them
 		// have a qualified majority of verifier stake approving
 		for _, chunk := range result.Chunks {
@@ -407,13 +396,22 @@ ResultLoop:
 
 func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 
-	// check if we know the block the result pertains to
-	_, err := e.headersDB.ByBlockID(result.BlockID)
+	// we create one chunk per collection (at least for now), so we can
+	// check if the chunk number matches with the number of guarantees; this
+	// will ensure the execution receipt can not lie about having less
+	// chunks and having the remaining ones approved
+	index, err := e.indexDB.ByBlockID(result.BlockID)
 	if errors.Is(err, storage.ErrNotFound) {
+		// if we have not received the block yet, we will just keep
+		// rechecking until the block has been received or the result has
+		// been purged
 		return errUnknownBlock
 	}
 	if err != nil {
-		return fmt.Errorf("could not check sealed header: %w", err)
+		return fmt.Errorf("could not retrieve payload index: %w", err)
+	}
+	if len(result.Chunks) != len(index.CollectionIDs) {
+		return errInvalidChunks
 	}
 
 	// get the previous result from our mempool or storage
