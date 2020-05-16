@@ -38,6 +38,7 @@ type BuilderSuite struct {
 	guarantees []*flow.CollectionGuarantee
 	seals      []*flow.Seal
 	headers    map[flow.Identifier]*flow.Header
+	heights    map[uint64]*flow.Header
 	index      map[flow.Identifier]flow.Index
 
 	// real dependencies
@@ -97,6 +98,7 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.guarantees = nil
 	bs.seals = nil
 	bs.headers = make(map[flow.Identifier]*flow.Header)
+	bs.heights = make(map[uint64]*flow.Header)
 	bs.index = make(map[flow.Identifier]flow.Index)
 
 	// initialize behaviour tracking
@@ -108,6 +110,7 @@ func (bs *BuilderSuite) SetupTest() {
 	first := unittest.BlockHeaderFixture()
 	bs.firstID = first.ID()
 	bs.headers[first.ID()] = &first
+	bs.heights[first.Height] = &first
 	bs.index[first.ID()] = flow.Index{}
 	bs.last = &flow.Seal{
 		BlockID:      first.ID(),
@@ -122,6 +125,7 @@ func (bs *BuilderSuite) SetupTest() {
 		finalized := unittest.BlockHeaderWithParentFixture(previous)
 		bs.finalizedIDs = append(bs.finalizedIDs, finalized.ID())
 		bs.headers[finalized.ID()] = &finalized
+		bs.heights[finalized.Height] = &finalized
 		bs.index[finalized.ID()] = flow.Index{}
 		bs.chainSeal(finalized.ID())
 		previous = &finalized
@@ -131,6 +135,7 @@ func (bs *BuilderSuite) SetupTest() {
 	final := unittest.BlockHeaderWithParentFixture(previous)
 	bs.finalID = final.ID()
 	bs.headers[final.ID()] = &final
+	bs.heights[final.Height] = &final
 	bs.index[final.ID()] = flow.Index{}
 	bs.chainSeal(final.ID())
 
@@ -174,6 +179,18 @@ func (bs *BuilderSuite) SetupTest() {
 		},
 		func(blockID flow.Identifier) error {
 			_, exists := bs.headers[blockID]
+			if !exists {
+				return storerr.ErrNotFound
+			}
+			return nil
+		},
+	)
+	bs.headerDB.On("ByHeight", mock.Anything).Return(
+		func(height uint64) *flow.Header {
+			return bs.heights[height]
+		},
+		func(height uint64) error {
+			_, exists := bs.heights[height]
 			if !exists {
 				return storerr.ErrNotFound
 			}

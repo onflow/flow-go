@@ -10,40 +10,53 @@ import (
 	"sync"
 
 	lru "github.com/hashicorp/golang-lru"
+
+	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/utils/io"
 )
 
 // MForest is an in memory forest (collection of tries)
 type MForest struct {
-	tries       *lru.Cache
-	dir         string
-	cacheSize   int
-	maxHeight   int // Height of the tree
-	keyByteSize int // acceptable number of bytes for key
+	tries         *lru.Cache
+	dir           string
+	cacheSize     int
+	maxHeight     int // Height of the tree
+	keyByteSize   int // acceptable number of bytes for key
+	onTreeEvicted func(tree *MTrie) error
+	metrics       module.LedgerMetrics
 }
 
 // NewMForest returns a new instance of memory forest
-func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int) (*MForest, error) {
+func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int, metrics module.LedgerMetrics, onTreeEvicted func(tree *MTrie) error) (*MForest, error) {
 
-	// evict := func(key interface{}, value interface{}) {
-	// 	trie, ok := value.(*MTrie)
-	// 	if !ok {
-	// 		panic(fmt.Sprintf("cache contains item of type %T", value))
-	// 	}
-	// 	go func() {
-	// 		_ = trie.Store(filepath.Join(trieStorageDir, hex.EncodeToString(trie.rootHash)))
-	// 	}()
-	// }
-	// cache, err := lru.NewWithEvict(trieCacheSize, evict)
-	cache, err := lru.New(trieCacheSize)
+	var cache *lru.Cache
+	var err error
+
+	if onTreeEvicted != nil {
+		cache, err = lru.NewWithEvict(trieCacheSize, func(key interface{}, value interface{}) {
+			trie, ok := value.(*MTrie)
+			if !ok {
+				panic(fmt.Sprintf("cache contains item of type %T", value))
+			}
+			//TODO Log error
+			_ = onTreeEvicted(trie)
+		})
+	} else {
+		cache, err = lru.New(trieCacheSize)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("cannot create forest cache: %w", err)
 	}
 
 	forest := &MForest{tries: cache,
-		maxHeight:   maxHeight,
-		dir:         trieStorageDir,
-		cacheSize:   trieCacheSize,
-		keyByteSize: (maxHeight - 1) / 8}
+		maxHeight:     maxHeight,
+		dir:           trieStorageDir,
+		cacheSize:     trieCacheSize,
+		keyByteSize:   (maxHeight - 1) / 8,
+		onTreeEvicted: onTreeEvicted,
+		metrics:       metrics,
+	}
 
 	// add empty roothash
 	emptyTrie := NewMTrie(maxHeight)
@@ -79,9 +92,21 @@ func (f *MForest) GetTrie(rootHash []byte) (*MTrie, error) {
 // AddTrie adds a trie to the forest
 func (f *MForest) AddTrie(trie *MTrie) error {
 	// TODO check if not exist
-	encoded := hex.EncodeToString(trie.rootHash)
+	encoded := trie.StringRootHash()
 	f.tries.Add(encoded, trie)
+
+	f.metrics.ForestNumberOfTrees(uint64(f.tries.Len()))
+
 	return nil
+}
+
+// RemoveTrie removes a trie to the forest
+func (f *MForest) RemoveTrie(rootHash []byte) {
+	// TODO remove from the file as well
+	encRootHash := hex.EncodeToString(rootHash)
+	f.tries.Remove(encRootHash)
+
+	f.metrics.ForestNumberOfTrees(uint64(f.tries.Len()))
 }
 
 // GetEmptyRootHash returns the rootHash of empty forest
@@ -133,13 +158,19 @@ func (f *MForest) Read(keys [][]byte, rootHash []byte) ([][]byte, error) {
 		return nil, err
 	}
 
+	totalValuesSize := 0
+
 	// reconstruct the values in the same key order that called the method
 	orderedValues := make([][]byte, len(keys))
 	for i, k := range sortedKeys {
 		for _, j := range keyOrgIndex[hex.EncodeToString(k)] {
 			orderedValues[j] = values[i]
+			totalValuesSize += len(values[i])
 		}
 	}
+
+	f.metrics.ReadValuesSize(uint64(totalValuesSize))
+
 	return orderedValues, nil
 }
 
@@ -201,6 +232,7 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 	// sort keys and deduplicate keys (we only consider the last occurrence, and ignore the rest)
 	sortedKeys := make([][]byte, 0)
 	valueMap := make(map[string][]byte)
+	totalValuesSize := 0
 	for i, key := range keys {
 		// check key sizes
 		if len(key) != f.keyByteSize {
@@ -214,7 +246,10 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 		} else {
 			valueMap[hex.EncodeToString(key)] = values[i]
 		}
+		totalValuesSize += len(values[i])
 	}
+
+	f.metrics.UpdateValuesSize(uint64(totalValuesSize))
 
 	// TODO we might be able to remove this
 	sort.Slice(sortedKeys, func(i, j int) bool {
@@ -247,9 +282,9 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 	if err != nil {
 		return nil, err
 	}
-	go func() {
-		_ = newTrie.Store(filepath.Join(f.dir, hex.EncodeToString(newRootHash)))
-	}()
+	// go func() {
+	// 	_ = newTrie.Store(filepath.Join(f.dir, hex.EncodeToString(newRootHash)))
+	// }()
 	return newRootHash, nil
 }
 
@@ -593,4 +628,12 @@ func (f *MForest) LoadTrie(path string) (*MTrie, error) {
 	}
 
 	return trie, nil
+}
+
+func (f *MForest) Size() int {
+	return f.tries.Len()
+}
+
+func (f *MForest) DiskSize() (int64, error) {
+	return io.DirSize(f.dir)
 }

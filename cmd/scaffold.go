@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
@@ -36,6 +37,7 @@ import (
 	storerr "github.com/dapperlabs/flow-go/storage"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/dapperlabs/flow-go/utils/debug"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -43,16 +45,19 @@ const notSet = "not set"
 
 // BaseConfig is the general config for the FlowNodeBuilder
 type BaseConfig struct {
-	nodeIDHex    string
-	bindAddr     string
-	NodeRole     string
-	NodeName     string
-	Timeout      time.Duration
-	datadir      string
-	level        string
-	metricsPort  uint
-	nClusters    uint
-	BootstrapDir string
+	nodeIDHex        string
+	bindAddr         string
+	nodeRole         string
+	timeout          time.Duration
+	datadir          string
+	level            string
+	metricsPort      uint
+	nClusters        uint
+	BootstrapDir     string
+	profilerEnabled  bool
+	profilerDir      string
+	profilerInterval time.Duration
+	profilerDuration time.Duration
 }
 
 type Metrics struct {
@@ -92,33 +97,33 @@ type namedDoneObject struct {
 // It runs a node process with following structure, in sequential order
 // Base inits (network, storage, state, logger)
 //   PostInit handlers, if any
-//   GenesisHandler, if any and if genesis was generate
+//   GenesisHandler, if any and if genesis was generated
 // Components handlers, if any, wait sequentially
 // Run() <- main loop
 // Components destructors, if any
 type FlowNodeBuilder struct {
-	BaseConfig     BaseConfig
-	NodeID         flow.Identifier
-	flags          *pflag.FlagSet
-	name           string
-	Logger         zerolog.Logger
-	Me             *local.Local
-	Tracer         *trace.OpenTracer
-	Metrics        Metrics
-	DB             *badger.DB
-	Storage        Storage
-	State          *protocol.State
-	DKGState       *wrapper.State
-	Network        *libp2p.Network
-	modules        []namedModuleFunc
-	components     []namedComponentFunc
-	doneObject     []namedDoneObject
-	sig            chan os.Signal
-	genesisHandler func(node *FlowNodeBuilder, block *flow.Block)
-	postInitFns    []func(*FlowNodeBuilder)
-	stakingKey     crypto.PrivateKey
-	networkKey     crypto.PrivateKey
-	MsgValidators  []validators.MessageValidator
+	BaseConfig        BaseConfig
+	NodeID            flow.Identifier
+	flags             *pflag.FlagSet
+	Logger            zerolog.Logger
+	Me                *local.Local
+	Tracer            *trace.OpenTracer
+	MetricsRegisterer prometheus.Registerer
+	Metrics           Metrics
+	DB                *badger.DB
+	Storage           Storage
+	State             *protocol.State
+	DKGState          *wrapper.State
+	Network           *libp2p.Network
+	modules           []namedModuleFunc
+	components        []namedComponentFunc
+	doneObject        []namedDoneObject
+	sig               chan os.Signal
+	genesisHandler    func(node *FlowNodeBuilder, block *flow.Block)
+	postInitFns       []func(*FlowNodeBuilder)
+	stakingKey        crypto.PrivateKey
+	networkKey        crypto.PrivateKey
+	MsgValidators     []validators.MessageValidator
 
 	// genesis information
 	GenesisCommit flow.StateCommitment
@@ -132,13 +137,16 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	// bind configuration parameters
 	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", notSet, "identity of our node")
 	fnb.flags.StringVar(&fnb.BaseConfig.bindAddr, "bind", notSet, "address to bind on")
-	fnb.flags.StringVarP(&fnb.BaseConfig.NodeName, "nodename", "n", "node1", "identity of our node")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", "bootstrap", "path to the bootstrap directory")
-	fnb.flags.DurationVarP(&fnb.BaseConfig.Timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
+	fnb.flags.DurationVarP(&fnb.BaseConfig.timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", datadir, "directory to store the protocol state")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", "info", "level for logging output")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", 8080, "port for /metrics endpoint")
 	fnb.flags.UintVar(&fnb.BaseConfig.nClusters, "nclusters", 2, "number of collection node clusters")
+	fnb.flags.BoolVar(&fnb.BaseConfig.profilerEnabled, "profiler-enabled", false, "whether to enable the auto-profiler")
+	fnb.flags.StringVar(&fnb.BaseConfig.profilerDir, "profiler-dir", "profiler", "directory to create auto-profiler profiles")
+	fnb.flags.DurationVar(&fnb.BaseConfig.profilerInterval, "profiler-interval", 15*time.Minute, "the interval between auto-profiler runs")
+	fnb.flags.DurationVar(&fnb.BaseConfig.profilerDuration, "profiler-duration", 10*time.Second, "the duration to run the auto-profile for")
 }
 
 func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
@@ -221,11 +229,11 @@ func (fnb *FlowNodeBuilder) initLogger() {
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
 	log := fnb.Logger.With().
 		Timestamp().
-		Str("node_role", fnb.BaseConfig.NodeRole).
+		Str("node_role", fnb.BaseConfig.nodeRole).
 		Str("node_id", fnb.BaseConfig.nodeIDHex).
 		Logger()
 
-	log.Info().Msgf("flow %s node starting up", fnb.name)
+	log.Info().Msgf("flow %s node starting up", fnb.BaseConfig.nodeRole)
 
 	// parse config log level and apply to logger
 	lvl, err := zerolog.ParseLevel(strings.ToLower(fnb.BaseConfig.level))
@@ -238,8 +246,9 @@ func (fnb *FlowNodeBuilder) initLogger() {
 }
 
 func (fnb *FlowNodeBuilder) initMetrics() {
-	tracer, err := trace.NewTracer(fnb.Logger, fnb.name)
+	tracer, err := trace.NewTracer(fnb.Logger, fnb.BaseConfig.nodeRole)
 	fnb.MustNot(err).Msg("could not initialize tracer")
+	fnb.MetricsRegisterer = prometheus.DefaultRegisterer
 	fnb.Tracer = tracer
 	fnb.Metrics = Metrics{
 		Network:    metrics.NewNetworkCollector(),
@@ -248,6 +257,23 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		Cache:      metrics.NewCacheCollector(flow.DefaultChainID),
 		Mempool:    metrics.NewMempoolCollector(),
 	}
+}
+
+func (fnb *FlowNodeBuilder) initProfiler() {
+	if !fnb.BaseConfig.profilerEnabled {
+		return
+	}
+	dir := filepath.Join(fnb.BaseConfig.profilerDir, fnb.BaseConfig.nodeRole, fnb.BaseConfig.nodeIDHex)
+	profiler, err := debug.NewAutoProfiler(
+		fnb.Logger,
+		dir,
+		fnb.BaseConfig.profilerInterval,
+		fnb.BaseConfig.profilerDuration,
+	)
+	fnb.MustNot(err).Msg("could not initialize profiler")
+	fnb.Component("profiler", func(node *FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		return profiler, nil
+	})
 }
 
 func (fnb *FlowNodeBuilder) initStorage() {
@@ -408,7 +434,7 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc) {
 	select {
 	case <-readyAware.Ready():
 		log.Info().Msg("component startup complete")
-	case <-time.After(fnb.BaseConfig.Timeout):
+	case <-time.After(fnb.BaseConfig.timeout):
 		log.Fatal().Msg("component startup timed out")
 	case <-fnb.sig:
 		log.Warn().Msg("component startup aborted")
@@ -427,7 +453,7 @@ func (fnb *FlowNodeBuilder) handleDoneObject(v namedDoneObject) {
 	select {
 	case <-v.ob.Done():
 		log.Info().Msg("component shutdown complete")
-	case <-time.After(fnb.BaseConfig.Timeout):
+	case <-time.After(fnb.BaseConfig.timeout):
 		log.Fatal().Msg("component shutdown timed out")
 	case <-fnb.sig:
 		log.Warn().Msg("component shutdown aborted")
@@ -488,13 +514,14 @@ func (fnb *FlowNodeBuilder) PostInit(f func(node *FlowNodeBuilder)) *FlowNodeBui
 }
 
 // FlowNode creates a new Flow node builder with the given name.
-func FlowNode(name string) *FlowNodeBuilder {
+func FlowNode(role string) *FlowNodeBuilder {
 
 	builder := &FlowNodeBuilder{
-		BaseConfig: BaseConfig{},
-		Logger:     zerolog.New(os.Stderr),
-		flags:      pflag.CommandLine,
-		name:       name,
+		BaseConfig: BaseConfig{
+			nodeRole: role,
+		},
+		Logger: zerolog.New(os.Stderr),
+		flags:  pflag.CommandLine,
 	}
 
 	builder.baseFlags()
@@ -513,9 +540,7 @@ func FlowNode(name string) *FlowNodeBuilder {
 // Run initiates all common components (logger, database, protocol state etc.)
 // then starts each component. It also sets up a channel to gracefully shut
 // down each component if a SIGINT is received.
-func (fnb *FlowNodeBuilder) Run(role string) {
-
-	fnb.BaseConfig.NodeRole = role
+func (fnb *FlowNodeBuilder) Run() {
 
 	// initialize signal catcher
 	fnb.sig = make(chan os.Signal, 1)
@@ -532,6 +557,8 @@ func (fnb *FlowNodeBuilder) Run(role string) {
 	fnb.initLogger()
 
 	fnb.initMetrics()
+
+	fnb.initProfiler()
 
 	fnb.initStorage()
 
@@ -555,11 +582,11 @@ func (fnb *FlowNodeBuilder) Run(role string) {
 		fnb.handleComponent(f)
 	}
 
-	fnb.Logger.Info().Msgf("%s node startup complete", fnb.name)
+	fnb.Logger.Info().Msgf("%s node startup complete", fnb.BaseConfig.nodeRole)
 
 	<-fnb.sig
 
-	fnb.Logger.Info().Msgf("%s node shutting down", fnb.name)
+	fnb.Logger.Info().Msgf("%s node shutting down", fnb.BaseConfig.nodeRole)
 
 	for i := len(fnb.doneObject) - 1; i >= 0; i-- {
 		doneObject := fnb.doneObject[i]
@@ -569,7 +596,7 @@ func (fnb *FlowNodeBuilder) Run(role string) {
 
 	fnb.closeDatabase()
 
-	fnb.Logger.Info().Msgf("%s node shutdown complete", fnb.name)
+	fnb.Logger.Info().Msgf("%s node shutdown complete", fnb.BaseConfig.nodeRole)
 
 	os.Exit(0)
 }
@@ -587,8 +614,8 @@ func (fnb *FlowNodeBuilder) closeDatabase() {
 	}
 }
 
-func loadDKGPublicData(path string) (*dkg.PublicData, error) {
-	data, err := ioutil.ReadFile(filepath.Join(path, bootstrap.FilenameDKGDataPub))
+func loadDKGPublicData(dir string) (*dkg.PublicData, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathDKGDataPub))
 	if err != nil {
 		return nil, err
 	}
@@ -597,8 +624,8 @@ func loadDKGPublicData(path string) (*dkg.PublicData, error) {
 	return dkgPubData.ForHotStuff(), err
 }
 
-func loadGenesisCommit(path string) (flow.StateCommitment, error) {
-	data, err := ioutil.ReadFile(filepath.Join(path, bootstrap.FilenameGenesisCommit))
+func loadGenesisCommit(dir string) (flow.StateCommitment, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisCommit))
 	if err != nil {
 		return nil, err
 	}
@@ -607,8 +634,8 @@ func loadGenesisCommit(path string) (flow.StateCommitment, error) {
 	return commit, err
 }
 
-func loadGenesisBlock(path string) (*flow.Block, error) {
-	data, err := ioutil.ReadFile(filepath.Join(path, bootstrap.FilenameGenesisBlock))
+func loadGenesisBlock(dir string) (*flow.Block, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisBlock))
 	if err != nil {
 		return nil, err
 	}
@@ -618,8 +645,8 @@ func loadGenesisBlock(path string) (*flow.Block, error) {
 
 }
 
-func loadRootBlockQC(path string) (*model.QuorumCertificate, error) {
-	data, err := ioutil.ReadFile(filepath.Join(path, bootstrap.FilenameGenesisQC))
+func loadRootBlockQC(dir string) (*model.QuorumCertificate, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisQC))
 	if err != nil {
 		return nil, err
 	}
@@ -629,8 +656,8 @@ func loadRootBlockQC(path string) (*model.QuorumCertificate, error) {
 }
 
 // Loads the private info for this node from disk (eg. private staking/network keys).
-func loadPrivateNodeInfo(path string, myID flow.Identifier) (*bootstrap.NodeInfoPriv, error) {
-	data, err := ioutil.ReadFile(filepath.Join(path, fmt.Sprintf(bootstrap.FilenameNodeInfoPriv, myID)))
+func loadPrivateNodeInfo(dir string, myID flow.Identifier) (*bootstrap.NodeInfoPriv, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, myID)))
 	if err != nil {
 		return nil, err
 	}

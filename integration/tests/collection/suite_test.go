@@ -302,7 +302,7 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstate.S
 	metrics := metrics.NewNoopCollector()
 
 	headers := storage.NewHeaders(metrics, db)
-	payloads := storage.NewClusterPayloads(db)
+	payloads := storage.NewClusterPayloads(metrics, db)
 
 	state, err := clusterstate.NewState(db, chainID, headers, payloads)
 	require.Nil(suite.T(), err, "could not get cluster state")

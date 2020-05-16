@@ -278,7 +278,7 @@ func (m *Middleware) sendDirect(targetID flow.Identifier, msg *message.Message) 
 	go helpers.FullClose(stream)
 
 	// OneToOne communication metrics are reported with topic OneToOne
-	go m.reportOutboundMsgSize(byteCount, metrics.ChannelNone)
+	go m.reportOutboundMsgSize(byteCount, metrics.ChannelOneToOne)
 
 	return nil
 }
@@ -350,7 +350,7 @@ ProcessLoop:
 			}
 
 			msgSize := msg.Size()
-			m.reportInboundMsgSize(msgSize, metrics.ChannelNone)
+			m.reportInboundMsgSize(msgSize, metrics.ChannelOneToOne)
 
 			m.processMessage(msg)
 			continue ProcessLoop

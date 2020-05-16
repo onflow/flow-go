@@ -8,9 +8,11 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/rand"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/engine"
@@ -23,6 +25,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
+	"github.com/dapperlabs/flow-go/utils/logging"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -31,6 +34,8 @@ import (
 // - not all chunks of the receipts are assigned to the ingest engine
 // - for each assigned chunk ingest engine emits a single result approval to verify engine only once
 // (even in presence of duplication)
+// - also the test stages to drop the first request on each collection to evaluate the retrial
+// - also the test stages to drop the first request on each chunk data pack to evaluate the retrial
 func TestConcurrency(t *testing.T) {
 	var mu sync.Mutex
 	testcases := []struct {
@@ -153,7 +158,13 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	// and checkTrackers loop starts
 	<-verNode.IngestEngine.Ready()
 
-	colNode := testutil.CollectionNode(t, hub, colID, identities)
+	collections := make([]*flow.Collection, 0)
+	for _, completeER := range ers {
+		collections = append(collections, completeER.Collections...)
+	}
+
+	colNode := testutil.GenericNode(t, hub, colID, identities)
+	setupMockCollectionNode(t, colNode, verID.NodeID, collections)
 
 	// mock the execution node with a generic node and mocked engine
 	// to handle requests for chunk state
@@ -173,10 +184,6 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	var blockStorageLock sync.Mutex
 
 	for _, completeER := range ers {
-		for _, coll := range completeER.Collections {
-			err := colNode.Collections.Store(coll)
-			assert.Nil(t, err)
-		}
 
 		// spin up `senderCount` sender goroutines to mimic receiving
 		// the same resource multiple times
@@ -264,26 +271,33 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 // setupMockExeNode sets up a mocked execution node that responds to requests for
 // chunk states. Any requests that don't correspond to an execution receipt in
 // the input ers list result in the test failing.
+// It also drops the first request for each chunk to evaluate retrials.
 func setupMockExeNode(t *testing.T, node mock.GenericNode, verID flow.Identifier, ers []verification.CompleteExecutionResult) {
 	eng := new(network.Engine)
 	chunksConduit, err := node.Net.Register(engine.ChunkDataPackProvider, eng)
 	assert.Nil(t, err)
 
-	reqChunksExe := make(map[flow.Identifier]struct{})
+	retriedChunks := make(map[flow.Identifier]struct{})
 
 	eng.On("Process", verID, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
 			if req, ok := args[1].(*messages.ChunkDataPackRequest); ok {
-				if _, ok := reqChunksExe[req.ChunkID]; ok {
-					// duplicate request detected
-					t.Fail()
+				if _, ok := retriedChunks[req.ChunkID]; !ok {
+					// this is the first request for this chunk
+					// the request is dropped to evaluate retry functionality
+					retriedChunks[req.ChunkID] = struct{}{}
+					log.Debug().
+						Hex("collection_id", logging.ID(req.ChunkID)).
+						Msg("mock execution node drops first collection request for this collection")
+					return
 				}
-				reqChunksExe[req.ChunkID] = struct{}{}
+
 				for _, er := range ers {
 					for _, chunk := range er.Receipt.ExecutionResult.Chunks {
 						if chunk.ID() == req.ChunkID {
 							res := &messages.ChunkDataPackResponse{
-								Data: *er.ChunkDataPacks[chunk.Index],
+								Data:  *er.ChunkDataPacks[chunk.Index],
+								Nonce: rand.Uint64(),
 							}
 							err := chunksConduit.Submit(res, verID)
 							assert.Nil(t, err)
@@ -297,4 +311,46 @@ func setupMockExeNode(t *testing.T, node mock.GenericNode, verID flow.Identifier
 		}).
 		Return(nil)
 
+}
+
+// setupMockCollectionNode sets up a mocked collection node that responds to requests for collections.
+// Any requests that don't correspond to a collection ID in the input colls list result in the test failing.
+// It also drops the first request for each collection to evaluate retrials.
+func setupMockCollectionNode(t *testing.T, node mock.GenericNode, verID flow.Identifier, colls []*flow.Collection) {
+	eng := new(network.Engine)
+	chunksConduit, err := node.Net.Register(engine.CollectionProvider, eng)
+	assert.Nil(t, err)
+
+	retriedColl := make(map[flow.Identifier]struct{})
+
+	eng.On("Process", verID, testifymock.Anything).
+		Run(func(args testifymock.Arguments) {
+			if req, ok := args[1].(*messages.CollectionRequest); ok {
+				if _, ok := retriedColl[req.ID]; !ok {
+					// this is the first request for this collection
+					// the request is dropped to evaluate retry functionality
+					retriedColl[req.ID] = struct{}{}
+					log.Debug().
+						Hex("collection_id", logging.ID(req.ID)).
+						Msg("mock collection node drops first collection request for this collection")
+					return
+				}
+
+				for _, coll := range colls {
+					if coll.ID() == req.ID {
+						res := &messages.CollectionResponse{
+							Collection: *coll,
+							Nonce:      rand.Uint64(),
+						}
+						err := chunksConduit.Submit(res, verID)
+						assert.Nil(t, err)
+						return
+					}
+
+				}
+			}
+			t.Logf("invalid collection request (%T): %v ", args[1], args[1])
+			t.Fail()
+		}).
+		Return(nil)
 }

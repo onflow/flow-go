@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
@@ -229,7 +230,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	dbDir := unittest.TempDir(t)
 
-	ls, err := ledger.NewTrieStorage(dbDir)
+	metricsCollector := &metrics.NoopCollector{}
+	ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 	require.NoError(t, err)
 
 	genesisHead, err := node.State.Final().Head()
@@ -283,6 +285,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Metrics,
 		node.Tracer,
 		false,
+		2137*time.Hour, // just don't retry
+		10,
 	)
 	require.NoError(t, err)
 
@@ -381,6 +385,11 @@ func VerificationNode(t testing.TB,
 		require.Nil(t, err)
 	}
 
+	if node.IngestedCollectionIDs == nil {
+		node.IngestedCollectionIDs, err = stdmap.NewIdentifiers(1000)
+		require.Nil(t, err)
+	}
+
 	if node.IngestEngine == nil {
 		node.IngestEngine, err = ingest.New(node.Log,
 			node.Net,
@@ -396,6 +405,7 @@ func VerificationNode(t testing.TB,
 			node.ChunkDataPackTrackers,
 			node.IngestedChunkIDs,
 			node.IngestedResultIDs,
+			node.IngestedCollectionIDs,
 			node.Headers,
 			node.Blocks,
 			assigner,

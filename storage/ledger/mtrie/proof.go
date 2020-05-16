@@ -147,8 +147,9 @@ func (bp *BatchProof) MergeInto(dest *BatchProof) {
 }
 
 // EncodeBatchProof encodes all the content of a batch proof into an array of byte arrays
-func EncodeBatchProof(bp *BatchProof) [][]byte {
+func EncodeBatchProof(bp *BatchProof) ([][]byte, int) {
 	proofs := make([][]byte, 0)
+	totalLength := 0
 	// for each proof we create a byte array
 	for _, p := range bp.Proofs {
 		flag, values, inclusion, steps := p.Export()
@@ -171,9 +172,10 @@ func EncodeBatchProof(bp *BatchProof) [][]byte {
 		for _, v := range values {
 			proof = append(proof, v...)
 		}
+		totalLength += len(proof)
 		proofs = append(proofs, proof)
 	}
-	return proofs
+	return proofs, totalLength
 }
 
 // DecodeBatchProof takes in an encodes array of byte arrays an converts them into a BatchProof

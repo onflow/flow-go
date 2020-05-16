@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"os/user"
+	"path/filepath"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/integration/client"
@@ -83,6 +85,11 @@ func getSeeds(n int) ([][]byte, error) {
 }
 
 func writeJSON(path string, data interface{}) error {
+	err := os.MkdirAll(filepath.Dir(path), 0755)
+	if err != nil {
+		return err
+	}
+
 	marshaled, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return err

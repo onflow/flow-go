@@ -57,10 +57,7 @@ func (b *Backdata) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Ent
 	}
 	newentity := f(entity)
 	newentityID := newentity.ID()
-	if newentityID == entityID {
-		// item is not adjusted
-		return nil, false
-	}
+
 	delete(b.entities, entityID)
 	b.entities[newentityID] = newentity
 	return newentity, true

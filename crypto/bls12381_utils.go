@@ -42,7 +42,8 @@ func (ct *ctx) initContext() error {
 	return nil
 }
 
-// seeds the internal relic random function
+// seeds the internal relic random function.
+// relic context must be initialized before seeding.
 func seedRelic(seed []byte) error {
 	if len(seed) < (securityBits / 8) {
 		return fmt.Errorf("seed length needs to be larger than %d",

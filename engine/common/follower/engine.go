@@ -20,25 +20,27 @@ import (
 )
 
 type Engine struct {
-	unit     *engine.Unit
-	log      zerolog.Logger
-	me       module.Local
-	metrics  module.EngineMetrics
-	cleaner  storage.Cleaner
-	headers  storage.Headers
-	payloads storage.Payloads
-	state    protocol.State
-	pending  module.PendingBlockBuffer
-	follower module.HotStuffFollower
-	con      network.Conduit
-	sync     module.Synchronization
+	unit           *engine.Unit
+	log            zerolog.Logger
+	me             module.Local
+	engMetrics     module.EngineMetrics
+	mempoolMetrics module.MempoolMetrics
+	cleaner        storage.Cleaner
+	headers        storage.Headers
+	payloads       storage.Payloads
+	state          protocol.State
+	pending        module.PendingBlockBuffer
+	follower       module.HotStuffFollower
+	con            network.Conduit
+	sync           module.Synchronization
 }
 
 func New(
 	log zerolog.Logger,
 	net module.Network,
 	me module.Local,
-	metrics module.EngineMetrics,
+	engMetrics module.EngineMetrics,
+	mempoolMetrics module.MempoolMetrics,
 	cleaner storage.Cleaner,
 	headers storage.Headers,
 	payloads storage.Payloads,
@@ -48,16 +50,17 @@ func New(
 ) (*Engine, error) {
 
 	e := &Engine{
-		unit:     engine.NewUnit(),
-		log:      log.With().Str("engine", "follower").Logger(),
-		me:       me,
-		metrics:  metrics,
-		cleaner:  cleaner,
-		headers:  headers,
-		payloads: payloads,
-		state:    state,
-		pending:  pending,
-		follower: follower,
+		unit:           engine.NewUnit(),
+		log:            log.With().Str("engine", "follower").Logger(),
+		me:             me,
+		engMetrics:     engMetrics,
+		mempoolMetrics: mempoolMetrics,
+		cleaner:        cleaner,
+		headers:        headers,
+		payloads:       payloads,
+		state:          state,
+		pending:        pending,
+		follower:       follower,
 	}
 
 	con, err := net.Register(engine.BlockProvider, e)
@@ -130,30 +133,18 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 func (e *Engine) process(originID flow.Identifier, input interface{}) error {
-	// process one event at a time for now
-
 	switch v := input.(type) {
 	case *events.SyncedBlock:
-		e.before(metrics.MessageSyncedBlock)
-		defer e.after(metrics.MessageSyncedBlock)
+		e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlock)
+		defer e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageSyncedBlock)
 		return e.onSyncedBlock(originID, v)
 	case *messages.BlockProposal:
-		e.before(metrics.MessageBlockProposal)
-		defer e.after(metrics.MessageBlockProposal)
+		e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockProposal)
+		defer e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
 		return e.onBlockProposal(originID, v)
 	default:
 		return fmt.Errorf("invalid event type (%T)", input)
 	}
-}
-
-func (e *Engine) before(msg string) {
-	e.metrics.MessageReceived(metrics.EngineFollower, msg)
-	e.unit.Lock()
-}
-
-func (e *Engine) after(msg string) {
-	e.unit.Unlock()
-	e.metrics.MessageHandled(metrics.EngineFollower, msg)
 }
 
 func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBlock) error {
@@ -190,6 +181,8 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		Logger()
 
 	log.Info().Msg("block proposal received")
+
+	e.prunePendingCache()
 
 	// first, we reject all blocks that we don't need to process:
 	// 1) blocks already in the cache; they will already be processed later
@@ -262,6 +255,9 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	if err != nil {
 		return fmt.Errorf("could not check parent: %w", err)
 	}
+
+	e.unit.Lock()
+	defer e.unit.Unlock()
 
 	// at this point, we should be able to connect the proposal to the finalized
 	// state and should process it to see whether to forward to hotstuff or not
@@ -359,4 +355,21 @@ func (e *Engine) processPendingChildren(header *flow.Header) error {
 	e.pending.DropForParent(header)
 
 	return result.ErrorOrNil()
+}
+
+// prunePendingCache prunes the pending block cache.
+func (e *Engine) prunePendingCache() {
+
+	// retrieve the finalized height
+	final, err := e.state.Final().Head()
+	if err != nil {
+		e.log.Warn().Err(err).Msg("could not get finalized head to prune pending blocks")
+		return
+	}
+
+	// remove all pending blocks at or below the finalized height
+	e.pending.PruneByHeight(final.Height)
+
+	// always record the metric
+	e.mempoolMetrics.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
 }
