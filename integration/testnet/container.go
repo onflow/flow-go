@@ -99,7 +99,7 @@ func (c *Container) DB() (*badger.DB, error) {
 	dbPath := filepath.Join(c.datadir, DefaultFlowDBDir)
 	opts := badger.
 		DefaultOptions(dbPath).
-		WithKeepL0InMemory(true).
+		WithReadOnly(true).
 		WithLogger(nil)
 
 	db, err := badger.Open(opts)
