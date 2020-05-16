@@ -104,9 +104,9 @@ func (r *TransactionContext) CreateAccount(publicKeysBytes [][]byte) (runtime.Ad
 // This function returns an error if the specified account does not exist or
 // if the key insertion fails.
 func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []byte) error {
-	accountID := address[:]
+	accountAddress := address[:]
 
-	err := r.CheckAccountExists(accountID)
+	err := r.CheckAccountExists(accountAddress)
 	if err != nil {
 		return err
 	}
@@ -116,14 +116,14 @@ func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []
 		return fmt.Errorf("cannot decode runtime public account key: %w", err)
 	}
 
-	publicKeys, err := r.GetAccountPublicKeys(accountID)
+	publicKeys, err := r.GetAccountPublicKeys(accountAddress)
 	if err != nil {
 		return err
 	}
 
 	publicKeys = append(publicKeys, runtimePublicKey)
 
-	return r.SetAccountPublicKeys(accountID, publicKeys)
+	return r.SetAccountPublicKeys(accountAddress, publicKeys)
 }
 
 // RemoveAccountKey removes a public key by index from an existing account.
@@ -131,14 +131,14 @@ func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []
 // This function returns an error if the specified account does not exist, the
 // provided key is invalid, or if key deletion fails.
 func (r *TransactionContext) RemoveAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
-	accountID := address[:]
+	accountAddress := address[:]
 
-	err = r.CheckAccountExists(accountID)
+	err = r.CheckAccountExists(accountAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	publicKeys, err := r.GetAccountPublicKeys(accountID)
+	publicKeys, err := r.GetAccountPublicKeys(accountAddress)
 	if err != nil {
 		return publicKey, err
 	}
@@ -151,7 +151,7 @@ func (r *TransactionContext) RemoveAccountKey(address runtime.Address, index int
 
 	publicKeys = append(publicKeys[:index], publicKeys[index+1:]...)
 
-	err = r.SetAccountPublicKeys(accountID, publicKeys)
+	err = r.SetAccountPublicKeys(accountAddress, publicKeys)
 	if err != nil {
 		return publicKey, err
 	}
@@ -173,18 +173,18 @@ func (r *TransactionContext) CheckCode(address runtime.Address, code []byte) (er
 // This function returns an error if the specified account does not exist or is
 // not a valid signing account.
 func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []byte, checkPermission bool) (err error) {
-	accountID := address[:]
+	accountAddress := address[:]
 
 	if checkPermission && !r.isValidSigningAccount(address) {
 		return fmt.Errorf("not permitted to update account with ID %s", address)
 	}
 
-	err = r.CheckAccountExists(accountID)
+	err = r.CheckAccountExists(accountAddress)
 	if err != nil {
 		return err
 	}
 
-	r.Ledger.Set(fullKeyHash(string(accountID), string(accountID), keyCode), code)
+	r.Ledger.Set(fullKeyHash(string(accountAddress), string(accountAddress), keyCode), code)
 
 	return nil
 }
@@ -201,15 +201,15 @@ func (r *TransactionContext) ResolveImport(location runtime.Location) ([]byte, e
 
 	address := flow.BytesToAddress(addressLocation)
 
-	accountID := address.Bytes()
+	accountAddress := address.Bytes()
 
-	code, err := r.Ledger.Get(fullKeyHash(string(accountID), string(accountID), keyCode))
+	code, err := r.Ledger.Get(fullKeyHash(string(accountAddress), string(accountAddress), keyCode))
 	if err != nil {
 		return nil, err
 	}
 
 	if code == nil {
-		return nil, fmt.Errorf("no code deployed at address %x", accountID)
+		return nil, fmt.Errorf("no code deployed at address %x", accountAddress)
 	}
 
 	return code, nil
