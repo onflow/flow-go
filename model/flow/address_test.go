@@ -57,3 +57,12 @@ func TestShort(t *testing.T) {
 		assert.Equal(t, c.addr.Short(), c.expected)
 	}
 }
+
+func TestConstants(t *testing.T) {
+	var expected [flow.AddressLength]byte
+	assert.Equal(t, flow.ZeroAddress, flow.Address(expected))
+	expected[flow.AddressLength-1] = 1
+	assert.Equal(t, flow.RootAddress, flow.Address(expected))
+}
+
+

@@ -34,7 +34,8 @@ func (m MapLedger) Delete(key flow.RegisterID) {
 }
 
 const (
-	keyAddressState   = "latest_account_index"
+	// TODO: change to "account_address_state" 
+	keyAddressState   = "latest_account"
 	keyExists         		= "exists"
 	keyBalance        		= "balance"
 	keyCode           		= "code"
@@ -147,19 +148,18 @@ func (r *LedgerDAL) GetAccount(address flow.Address) *flow.Account {
 	}
 }
 
-func (r *LedgerDAL) GetAddressState() (Flow.AddressState, error) {
+func (r *LedgerDAL) GetAddressState() (flow.AddressState, error) {
 	stateBytes, err := r.Ledger.Get(fullKeyHash("", "", keyAddressState))
 	if err != nil {
 		return 0, err
 	}
-	state := Flow.BytesToAddressState(stateBytes)
+	state := flow.BytesToAddressState(stateBytes)
 	return state, nil
 }
 
-func (r *LedgerDAL) SetAddressState(Flow.AddressState state) {
+func (r *LedgerDAL) SetAddressState(state flow.AddressState) {
 	stateBytes := state.Bytes()
 	r.Ledger.Set(fullKeyHash("", "", keyAddressState), stateBytes)
-	return state
 }
 
 func (r *LedgerDAL) CreateAccountInLedger(publicKeys []flow.AccountPublicKey) (flow.Address, error) {
@@ -180,14 +180,14 @@ func (r *LedgerDAL) CreateAccountInLedger(publicKeys []flow.AccountPublicKey) (f
 
 	r.Ledger.Set(fullKeyHash(string(newAddressBytes), string(newAddressBytes), keyCode), nil)
 
-	err := r.SetAccountPublicKeys(newAddressBytes, publicKeys)
+	err = r.SetAccountPublicKeys(newAddressBytes, publicKeys)
 	if err != nil {
 		// TODO : should rewind the DB updates!
 		return flow.Address{}, err
 	}
 
 	// update the address state
-	r.Ledger.SetAddressState(newAddressState)
+	r.SetAddressState(newAddressState)
 
 	return newAddress, nil
 }

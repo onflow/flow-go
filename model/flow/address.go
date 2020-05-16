@@ -98,6 +98,7 @@ func BytesToAddressState(b []byte) AddressState {
 	return AddressState(state)
 }
 
+
 // BytesToAddressState converts an array of bytes into an adress state
 func (state *AddressState) Bytes() []byte {
 	stateBytes := make([]byte, AddressLength)
@@ -110,7 +111,9 @@ func (state *AddressState) Bytes() []byte {
 //
 // The second returned value is the new addressing state after the generation.
 func AccountAddress(state AddressState) (Address, AddressState) { 
-	return nextAddress(state), nextState(state)
+	newState := nextState(state)
+	address := nextAddress(newState)
+	return address, newState
 }
 
 // returns the new state from an adressing state
