@@ -10,7 +10,7 @@ import (
 )
 
 func TestFingerprint(t *testing.T) {
-	tests := []{
+	tests := []struct {
 		input  interface{}
 		output string
 	}{
