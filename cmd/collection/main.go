@@ -214,19 +214,50 @@ func main() {
 			}
 
 			// creates a consensus follower with noop consumer as the notifier
-			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, node.Storage.Headers, finalizer, verifier, notifier, node.GenesisBlock.Header, node.GenesisQC, finalized, pending)
+			core, err := consensus.NewFollower(
+				node.Logger,
+				mainConsensusCommittee,
+				node.Storage.Headers,
+				finalizer,
+				verifier,
+				notifier,
+				node.GenesisBlock.Header,
+				node.GenesisQC,
+				finalized,
+				pending,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
 
-			follower, err := followereng.New(node.Logger, node.Network, node.Me, node.Metrics.Engine, cleaner, node.Storage.Headers, node.Storage.Payloads, node.State, conCache, core)
+			follower, err := followereng.New(
+				node.Logger,
+				node.Network,
+				node.Me,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
+				cleaner,
+				node.Storage.Headers,
+				node.Storage.Payloads,
+				node.State,
+				conCache,
+				core,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
 
 			// create a block synchronization engine to handle follower getting
 			// out of sync
-			sync, err := synchronization.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State, node.Storage.Blocks, follower)
+			sync, err := synchronization.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				node.Storage.Blocks,
+				follower,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
@@ -234,7 +265,17 @@ func main() {
 			return follower.WithSynchronization(sync), nil
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ing, err = ingest.New(node.Logger, node.Network, node.State, node.Metrics.Engine, colMetrics, node.Me, pool, ingressExpiryBuffer, parseTxScripts)
+			ing, err = ingest.New(
+				node.Logger,
+				node.Network,
+				node.State,
+				node.Metrics.Engine,
+				colMetrics,
+				node.Me,
+				pool,
+				ingressExpiryBuffer,
+				parseTxScripts,
+			)
 			return ing, err
 		}).
 		Component("ingress server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -243,7 +284,17 @@ func main() {
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			collections := storagekv.NewCollections(node.DB)
-			prov, err = provider.New(node.Logger, node.Network, node.State, node.Metrics.Engine, colMetrics, node.Me, pool, collections, transactions)
+			prov, err = provider.New(
+				node.Logger,
+				node.Network,
+				node.State,
+				node.Metrics.Engine,
+				colMetrics,
+				node.Me,
+				pool,
+				collections,
+				transactions,
+			)
 			return prov, err
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -253,7 +304,22 @@ func main() {
 			)
 			finalizer := colfinalizer.NewFinalizer(node.DB, pool, prov, colMetrics, clusterID)
 
-			prop, err := proposal.New(node.Logger, node.Network, node.Me, colMetrics, node.Metrics.Engine, node.State, clusterState, ing, pool, transactions, colHeaders, colPayloads, colCache)
+			prop, err := proposal.New(
+				node.Logger,
+				node.Network,
+				node.Me,
+				colMetrics,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
+				node.State,
+				clusterState,
+				ing,
+				pool,
+				transactions,
+				colHeaders,
+				colPayloads,
+				colCache,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize engine: %w", err)
 			}

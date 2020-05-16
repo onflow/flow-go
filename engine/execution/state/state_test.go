@@ -21,7 +21,7 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 	return func(t *testing.T) {
 		unittest.RunWithBadgerDB(t, func(badgerDB *badger.DB) {
 			unittest.RunWithTempDir(t, func(dbDir string) {
-				ls, err := ledger.NewTrieStorage(dbDir)
+				ls, err := ledger.NewMTrieStorage(dbDir, 100, nil)
 				require.NoError(t, err)
 
 				ctrl := gomock.NewController(t)

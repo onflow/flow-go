@@ -63,7 +63,7 @@ func CompleteExecutionResultFixture(t testing.TB, chunkCount int) verification.C
 		values = append(values, rootRegisterValues...)
 
 		unittest.RunWithTempDir(t, func(dir string) {
-			f, err := ledger.NewTrieStorage(dir)
+			f, err := ledger.NewMTrieStorage(dir, 100, nil)
 			defer f.Done()
 			require.NoError(t, err)
 

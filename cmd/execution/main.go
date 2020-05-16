@@ -41,7 +41,6 @@ func main() {
 		executionState     state.ExecutionState
 		triedir            string
 		collector          module.ExecutionMetrics
-		useMtrie           bool
 		mTrieCacheSize     uint32
 	)
 
@@ -52,7 +51,6 @@ func main() {
 
 			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
 			flags.StringVar(&triedir, "triedir", datadir, "directory to store the execution State")
-			flags.BoolVar(&useMtrie, "mtrie", false, "use experimental MTrie for Execution State")
 			flags.Uint32Var(&mTrieCacheSize, "mtrie-cache-size", 1000, "cache size for MTrie")
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
@@ -74,11 +72,7 @@ func main() {
 		}).
 		// Trie storage is required to bootstrap, but also should be handled while shutting down
 		Module("ledger storage", func(node *cmd.FlowNodeBuilder) error {
-			if useMtrie {
-				ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), node.MetricsRegisterer)
-			} else {
-				ledgerStorage, err = ledger.NewTrieStorage(triedir)
-			}
+			ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), node.MetricsRegisterer)
 
 			return err
 		}).

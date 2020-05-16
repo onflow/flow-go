@@ -254,7 +254,6 @@ func prepareExecutionService(container testnet.ContainerConfig, i int) Service {
 	service.Command = append(
 		service.Command,
 		fmt.Sprintf("--rpc-addr=%s:%d", container.ContainerName, RPCPort),
-		"--mtrie=true",
 	)
 
 	return service
