@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"errors"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -33,7 +34,10 @@ func TestProviderEngine_onChunkDataPackRequest(t *testing.T) {
 		ss.On("Identity", originID).
 			Return(unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)), nil)
 
-		req := &messages.ChunkDataPackRequest{ChunkID: chunkID}
+		req := &messages.ChunkDataPackRequest{
+			ChunkID: chunkID,
+			Nonce:   rand.Uint64(),
+		}
 		// submit using origin ID with invalid role
 		err := e.onChunkDataPackRequest(context.Background(), originID, req)
 		assert.Error(t, err)
@@ -61,7 +65,10 @@ func TestProviderEngine_onChunkDataPackRequest(t *testing.T) {
 		ps.On("Final").Return(ss)
 		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil)
 
-		req := &messages.ChunkDataPackRequest{ChunkID: chunkID}
+		req := &messages.ChunkDataPackRequest{
+			ChunkID: chunkID,
+			Nonce:   rand.Uint64(),
+		}
 		err := e.onChunkDataPackRequest(context.Background(), originIdentity.NodeID, req)
 		assert.Error(t, err)
 
@@ -100,7 +107,10 @@ func TestProviderEngine_onChunkDataPackRequest(t *testing.T) {
 			On("ChunkDataPackByChunkID", mock.Anything, chunkID).
 			Return(&chunkDataPack, nil)
 
-		req := &messages.ChunkDataPackRequest{ChunkID: chunkID}
+		req := &messages.ChunkDataPackRequest{
+			ChunkID: chunkID,
+			Nonce:   rand.Uint64(),
+		}
 
 		err := e.onChunkDataPackRequest(context.Background(), originIdentity.NodeID, req)
 		assert.NoError(t, err)

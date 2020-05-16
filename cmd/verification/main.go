@@ -53,25 +53,26 @@ const (
 func main() {
 
 	var (
-		alpha                uint
-		receiptLimit         uint
-		collectionLimit      uint
-		blockLimit           uint
-		chunkLimit           uint
-		err                  error
-		authReceipts         *stdmap.Receipts
-		pendingReceipts      *stdmap.PendingReceipts
-		conCache             *buffer.PendingBlocks
-		authCollections      *stdmap.Collections
-		pendingCollections   *stdmap.PendingCollections
-		collectionTrackers   *stdmap.CollectionTrackers
-		chunkDataPacks       *stdmap.ChunkDataPacks
-		chunkDataPackTracker *stdmap.ChunkDataPackTrackers
-		ingestedChunkIDs     *stdmap.Identifiers
-		ingestedResultIDs    *stdmap.Identifiers
-		verifierEng          *verifier.Engine
-		ingestEng            *ingest.Engine
-		collector            module.VerificationMetrics
+		alpha                 uint
+		receiptLimit          uint
+		collectionLimit       uint
+		blockLimit            uint
+		chunkLimit            uint
+		err                   error
+		authReceipts          *stdmap.Receipts
+		pendingReceipts       *stdmap.PendingReceipts
+		conCache              *buffer.PendingBlocks
+		authCollections       *stdmap.Collections
+		pendingCollections    *stdmap.PendingCollections
+		collectionTrackers    *stdmap.CollectionTrackers
+		chunkDataPacks        *stdmap.ChunkDataPacks
+		chunkDataPackTracker  *stdmap.ChunkDataPackTrackers
+		ingestedChunkIDs      *stdmap.Identifiers
+		ingestedCollectionIDs *stdmap.Identifiers
+		ingestedResultIDs     *stdmap.Identifiers
+		verifierEng           *verifier.Engine
+		ingestEng             *ingest.Engine
+		collector             module.VerificationMetrics
 	)
 
 	cmd.FlowNode(flow.RoleVerification.String()).
@@ -118,6 +119,10 @@ func main() {
 			ingestedResultIDs, err = stdmap.NewIdentifiers(receiptLimit)
 			return err
 		}).
+		Module("ingested collection ids mempool", func(node *cmd.FlowNodeBuilder) error {
+			ingestedCollectionIDs, err = stdmap.NewIdentifiers(receiptLimit)
+			return err
+		}).
 		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
 			// consensus cache for follower engine
 			conCache = buffer.NewPendingBlocks()
@@ -156,6 +161,7 @@ func main() {
 				chunkDataPacks,
 				chunkDataPackTracker,
 				ingestedChunkIDs,
+				ingestedCollectionIDs,
 				ingestedResultIDs,
 				node.Storage.Headers,
 				node.Storage.Blocks,

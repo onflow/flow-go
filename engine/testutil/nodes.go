@@ -384,6 +384,11 @@ func VerificationNode(t testing.TB,
 		require.Nil(t, err)
 	}
 
+	if node.IngestedCollectionIDs == nil {
+		node.IngestedCollectionIDs, err = stdmap.NewIdentifiers(1000)
+		require.Nil(t, err)
+	}
+
 	if node.IngestEngine == nil {
 		node.IngestEngine, err = ingest.New(node.Log,
 			node.Net,
@@ -399,6 +404,7 @@ func VerificationNode(t testing.TB,
 			node.ChunkDataPackTrackers,
 			node.IngestedChunkIDs,
 			node.IngestedResultIDs,
+			node.IngestedCollectionIDs,
 			node.Headers,
 			node.Blocks,
 			assigner,
