@@ -24,7 +24,7 @@ type MForest struct {
 	tries         *lru.Cache
 	dir           string
 	cacheSize     int
-	maxHeight     int // Height of the tree
+	maxHeight     int // height of the tree
 	keyByteSize   int // acceptable number of bytes for key
 	onTreeEvicted func(tree *trie.MTrie) error
 }
@@ -133,7 +133,7 @@ func (f *MForest) Read(keys [][]byte, rootHash []byte) ([][]byte, error) {
 	for i, key := range keys {
 		// check key sizes
 		if len(key) != f.keyByteSize {
-			return nil, fmt.Errorf("key size doesn't match the trie Height: %x", key)
+			return nil, fmt.Errorf("key size doesn't match the trie height: %x", key)
 		}
 		// only collect dupplicated keys once
 		if _, ok := keyOrgIndex[hex.EncodeToString(key)]; !ok {
@@ -179,7 +179,7 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 	for i, key := range keys {
 		// check key sizes
 		if len(key) != f.keyByteSize {
-			return nil, fmt.Errorf("key size doesn't match the trie Height: %x", key)
+			return nil, fmt.Errorf("key size doesn't match the trie height: %x", key)
 		}
 		// check if doesn't exist
 		if _, ok := valueMap[hex.EncodeToString(key)]; !ok {
@@ -231,7 +231,7 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 // Proofs returns a batch proof for the given keys
 func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*proof.BatchProof, error) {
 
-	// no Key, empty batchproof
+	// no key, empty batchproof
 	if len(keys) == 0 {
 		return proof.NewBatchProof(), nil
 	}
@@ -249,7 +249,7 @@ func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*proof.BatchProof, err
 	for i, key := range keys {
 		// check key sizes
 		if len(key) != f.keyByteSize {
-			return nil, fmt.Errorf("key size doesn't match the trie Height: %x", key)
+			return nil, fmt.Errorf("key size doesn't match the trie height: %x", key)
 		}
 		// only collect duplicated keys once
 		if _, ok := keyOrgIndex[hex.EncodeToString(key)]; !ok {

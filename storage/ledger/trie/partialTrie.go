@@ -13,12 +13,12 @@ import (
 // a database.
 type PSMT struct {
 	root        *node // Root
-	height      int   // Height of the tree
+	height      int   // height of the tree
 	keyByteSize int   // acceptable size of key (in bytes)
 	keyLookUp   map[string]*node
 }
 
-// GetHeight returns the Height of the SMT
+// GetHeight returns the height of the SMT
 func (p *PSMT) GetHeight() int {
 	return p.height
 }

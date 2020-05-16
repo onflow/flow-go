@@ -240,6 +240,8 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	if err != nil {
 		return fmt.Errorf("could not get consensus recipients: %w", err)
 	}
+	// Submit our own proposal back to our HotStuff engine
+	e.hotstuff.SubmitProposal(header, parent.View)
 
 	// NOTE: some fields are not needed for the message
 	// - proposer ID is conveyed over the network message

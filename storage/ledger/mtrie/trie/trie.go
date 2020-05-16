@@ -64,11 +64,11 @@ func (mt *MTrie) read(head *node.Node, keys [][]byte) ([][]byte, error) {
 		return res, nil
 	}
 	// reached a leaf node
-	if head.Key != nil {
+	if head.key != nil {
 		res := make([][]byte, 0)
 		for _, k := range keys {
-			if bytes.Equal(head.Key, k) {
-				res = append(res, head.Value)
+			if bytes.Equal(head.key, k) {
+				res = append(res, head.value)
 			} else {
 				res = append(res, []byte{})
 			}
@@ -76,15 +76,15 @@ func (mt *MTrie) read(head *node.Node, keys [][]byte) ([][]byte, error) {
 		return res, nil
 	}
 
-	lkeys, rkeys, err := common.SplitSortedKeys(keys, mt.MaxHeight-head.Height-1)
+	lkeys, rkeys, err := common.SplitSortedKeys(keys, mt.MaxHeight-head.height-1)
 	if err != nil {
-		return nil, fmt.Errorf("can't read due to split Key error: %w", err)
+		return nil, fmt.Errorf("can't read due to split key error: %w", err)
 	}
 
 	// TODO make this parallel
 	values := make([][]byte, 0)
 	if len(lkeys) > 0 {
-		v, err := mt.read(head.LChild, lkeys)
+		v, err := mt.read(head.lChild, lkeys)
 		if err != nil {
 			return nil, err
 		}
@@ -92,7 +92,7 @@ func (mt *MTrie) read(head *node.Node, keys [][]byte) ([][]byte, error) {
 	}
 
 	if len(rkeys) > 0 {
-		v, err := mt.read(head.RChild, rkeys)
+		v, err := mt.read(head.rChild, rkeys)
 		if err != nil {
 			return nil, err
 		}
@@ -106,34 +106,34 @@ func (mt *MTrie) UnsafeUpdate(parentTrie *MTrie, keys [][]byte, values [][]byte)
 }
 
 func (mt *MTrie) update(parent *node.Node, head *node.Node, keys [][]byte, values [][]byte) error {
-	// parent has a Key for this node (add Key and insert)
-	if parent.Key != nil {
+	// parent has a key for this node (add key and insert)
+	if parent.key != nil {
 		alreadyExist := false
 		// deduplicate
 		for _, k := range keys {
-			if bytes.Equal(k, parent.Key) {
+			if bytes.Equal(k, parent.key) {
 				alreadyExist = true
 			}
 		}
 		if !alreadyExist {
-			keys = append(keys, parent.Key)
-			values = append(values, parent.Value)
+			keys = append(keys, parent.key)
+			values = append(values, parent.value)
 		}
 
 	}
 	// If we are at a leaf node, we create the node
-	if len(keys) == 1 && parent.LChild == nil && parent.RChild == nil {
-		head.Key = keys[0]
-		head.Value = values[0]
+	if len(keys) == 1 && parent.lChild == nil && parent.rChild == nil {
+		head.key = keys[0]
+		head.value = values[0]
 		// ????
-		head.HashValue = head.GetNodeHash()
+		head.hashValue = head.GetNodeHash()
 		return nil
 	}
 
 	// Split the keys and Values array so we can update the trie in parallel
-	lkeys, lvalues, rkeys, rvalues, err := common.SplitKeyValues(keys, values, mt.MaxHeight-head.Height-1)
+	lkeys, lvalues, rkeys, rvalues, err := common.SplitKeyValues(keys, values, mt.MaxHeight-head.height-1)
 	if err != nil {
-		return fmt.Errorf("error spliting Key Values: %w", err)
+		return fmt.Errorf("error spliting key Values: %w", err)
 	}
 
 	wg := sync.WaitGroup{}
@@ -145,13 +145,13 @@ func (mt *MTrie) update(parent *node.Node, head *node.Node, keys [][]byte, value
 		// no change needed on the left side,
 		if len(lkeys) == 0 {
 			// reuse the node from previous trie
-			lupdate = parent.LChild
+			lupdate = parent.lChild
 		} else {
-			newN := node.NewNode(parent.Height - 1)
-			if parent.LChild != nil {
-				err1 = mt.update(parent.LChild, newN, lkeys, lvalues)
+			newN := node.NewNode(parent.height - 1)
+			if parent.lChild != nil {
+				err1 = mt.update(parent.lChild, newN, lkeys, lvalues)
 			} else {
-				err1 = mt.update(node.NewNode(parent.Height-1), newN, lkeys, lvalues)
+				err1 = mt.update(node.NewNode(parent.height-1), newN, lkeys, lvalues)
 			}
 			newN.PopulateNodeHashValues()
 			lupdate = newN
@@ -162,13 +162,13 @@ func (mt *MTrie) update(parent *node.Node, head *node.Node, keys [][]byte, value
 		// no change needed on right side
 		if len(rkeys) == 0 {
 			// reuse the node from previous trie
-			rupdate = parent.RChild
+			rupdate = parent.rChild
 		} else {
-			newN := node.NewNode(head.Height - 1)
-			if parent.RChild != nil {
-				err2 = mt.update(parent.RChild, newN, rkeys, rvalues)
+			newN := node.NewNode(head.height - 1)
+			if parent.rChild != nil {
+				err2 = mt.update(parent.rChild, newN, rkeys, rvalues)
 			} else {
-				err2 = mt.update(node.NewNode(head.Height-1), newN, rkeys, rvalues)
+				err2 = mt.update(node.NewNode(head.height-1), newN, rkeys, rvalues)
 			}
 			newN.PopulateNodeHashValues()
 			rupdate = newN
@@ -179,12 +179,12 @@ func (mt *MTrie) update(parent *node.Node, head *node.Node, keys [][]byte, value
 	if err1 != nil {
 		return err1
 	}
-	head.LChild = lupdate
+	head.lChild = lupdate
 
 	if err2 != nil {
 		return err2
 	}
-	head.RChild = rupdate
+	head.rChild = rupdate
 
 	return nil
 }
@@ -195,15 +195,15 @@ func (mt *MTrie) UnsafeProofs(keys [][]byte, proofs []*proof.Proof) error {
 
 func (mt *MTrie) proofs(head *node.Node, keys [][]byte, proofs []*proof.Proof) error {
 	// we've reached the end of a trie
-	// and Key is not found (noninclusion proof)
+	// and key is not found (noninclusion proof)
 	if head == nil {
 		return nil
 	}
 
-	// we've reached a leaf that has a Key
-	if head.Key != nil {
-		// Value matches (inclusion proof)
-		if bytes.Equal(head.Key, keys[0]) {
+	// we've reached a leaf that has a key
+	if head.key != nil {
+		// value matches (inclusion proof)
+		if bytes.Equal(head.key, keys[0]) {
 			proofs[0].Inclusion = true
 		}
 		return nil
@@ -213,20 +213,20 @@ func (mt *MTrie) proofs(head *node.Node, keys [][]byte, proofs []*proof.Proof) e
 	for _, p := range proofs {
 		p.Steps++
 	}
-	// split keys based on the Value of i-th bit (i = trie Height - node Height)
-	lkeys, lproofs, rkeys, rproofs, err := proof.SplitKeyProofs(keys, proofs, mt.MaxHeight-head.Height-1)
+	// split keys based on the value of i-th bit (i = trie height - node height)
+	lkeys, lproofs, rkeys, rproofs, err := proof.SplitKeyProofs(keys, proofs, mt.MaxHeight-head.height-1)
 	if err != nil {
-		return fmt.Errorf("proof generation failed, split Key error: %w", err)
+		return fmt.Errorf("proof generation failed, split key error: %w", err)
 	}
 
 	if len(lkeys) > 0 {
-		if head.RChild != nil {
-			nodeHash := head.RChild.GetNodeHash()
-			isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(head.RChild.Height))
+		if head.rChild != nil {
+			nodeHash := head.rChild.GetNodeHash()
+			isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(head.rChild.height))
 			for _, p := range lproofs {
 				// we skip default Values
 				if !isDef {
-					err := common.SetBit(p.Flags, mt.MaxHeight-head.Height-1)
+					err := common.SetBit(p.Flags, mt.MaxHeight-head.height-1)
 					if err != nil {
 						return err
 					}
@@ -234,20 +234,20 @@ func (mt *MTrie) proofs(head *node.Node, keys [][]byte, proofs []*proof.Proof) e
 				}
 			}
 		}
-		err := mt.proofs(head.LChild, lkeys, lproofs)
+		err := mt.proofs(head.lChild, lkeys, lproofs)
 		if err != nil {
 			return err
 		}
 	}
 
 	if len(rkeys) > 0 {
-		if head.LChild != nil {
-			nodeHash := head.LChild.GetNodeHash()
-			isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(head.LChild.Height))
+		if head.lChild != nil {
+			nodeHash := head.lChild.GetNodeHash()
+			isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(head.lChild.height))
 			for _, p := range rproofs {
 				// we skip default Values
 				if !isDef {
-					err := common.SetBit(p.Flags, mt.MaxHeight-head.Height-1)
+					err := common.SetBit(p.Flags, mt.MaxHeight-head.height-1)
 					if err != nil {
 						return err
 					}
@@ -255,7 +255,7 @@ func (mt *MTrie) proofs(head *node.Node, keys [][]byte, proofs []*proof.Proof) e
 				}
 			}
 		}
-		err := mt.proofs(head.RChild, rkeys, rproofs)
+		err := mt.proofs(head.rChild, rkeys, rproofs)
 		if err != nil {
 			return err
 		}
@@ -263,7 +263,7 @@ func (mt *MTrie) proofs(head *node.Node, keys [][]byte, proofs []*proof.Proof) e
 	return nil
 }
 
-// Store stores the trie Key Values to a file
+// Store stores the trie key Values to a file
 func (mt *MTrie) Store(path string) error {
 	fi, err := os.Create(path)
 	if err != nil {
@@ -307,7 +307,7 @@ func (mt *MTrie) Store(path string) error {
 		return err
 	}
 
-	// repeated: x bytes Key, 4bytes valueSize(Number of bytes Value took), valueSize bytes Value)
+	// repeated: x bytes key, 4bytes valueSize(Number of bytes value took), valueSize bytes value)
 	err = mt.store(mt.Root, writer)
 	if err != nil {
 		return err
@@ -317,34 +317,34 @@ func (mt *MTrie) Store(path string) error {
 }
 
 func (mt *MTrie) store(n *node.Node, writer *bufio.Writer) error {
-	if n.Key != nil {
-		_, err := writer.Write(n.Key)
+	if n.key != nil {
+		_, err := writer.Write(n.key)
 		if err != nil {
 			return err
 		}
 
 		b := make([]byte, 8)
-		binary.LittleEndian.PutUint64(b, uint64(len(n.Value)))
+		binary.LittleEndian.PutUint64(b, uint64(len(n.value)))
 		_, err = writer.Write(b)
 		if err != nil {
 			return err
 		}
 
-		_, err = writer.Write(n.Value)
+		_, err = writer.Write(n.value)
 		if err != nil {
 			return err
 		}
 	}
 
-	if n.LChild != nil {
-		err := mt.store(n.LChild, writer)
+	if n.lChild != nil {
+		err := mt.store(n.lChild, writer)
 		if err != nil {
 			return err
 		}
 	}
 
-	if n.RChild != nil {
-		err := mt.store(n.RChild, writer)
+	if n.rChild != nil {
+		err := mt.store(n.rChild, writer)
 		if err != nil {
 			return err
 		}
@@ -374,7 +374,7 @@ func (mt *MTrie) Load(path string) error {
 		return errors.New("trie store/load version doesn't match")
 	}
 
-	// next 8 bytes captures the Key size
+	// next 8 bytes captures the key size
 	numberB := make([]byte, 8)
 	_, err = fi.Read(numberB)
 	if err != nil {
@@ -390,7 +390,7 @@ func (mt *MTrie) Load(path string) error {
 	}
 	maxHeight := binary.LittleEndian.Uint16(maxHeightB)
 
-	// assert max Height
+	// assert max height
 	if maxHeight != uint16(mt.MaxHeight) {
 		return errors.New("MaxHeight doesn't match")
 	}
@@ -446,9 +446,9 @@ func (mt *MTrie) Load(path string) error {
 
 func (mt *MTrie) load(n *node.Node, level int, keys [][]byte, values [][]byte) error {
 	if len(keys) == 1 {
-		n.Key = keys[0]
-		n.Value = values[0]
-		n.HashValue = common.ComputeCompactValue(n.Key, n.Value, n.Height)
+		n.key = keys[0]
+		n.value = values[0]
+		n.hashValue = common.ComputeCompactValue(n.key, n.value, n.height)
 		return nil
 	}
 	// TODO optimize as keys are already sorted
@@ -457,16 +457,16 @@ func (mt *MTrie) load(n *node.Node, level int, keys [][]byte, values [][]byte) e
 		return err
 	}
 	if len(lkeys) > 0 {
-		n.LChild = node.NewNode(n.Height - 1)
-		err := mt.load(n.LChild, level+1, lkeys, lvalues)
+		n.lChild = node.NewNode(n.height - 1)
+		err := mt.load(n.lChild, level+1, lkeys, lvalues)
 		if err != nil {
 			return err
 		}
 	}
 
 	if len(rkeys) > 0 {
-		n.RChild = node.NewNode(n.Height - 1)
-		err := mt.load(n.RChild, level+1, rkeys, rvalues)
+		n.rChild = node.NewNode(n.height - 1)
+		err := mt.load(n.rChild, level+1, rkeys, rvalues)
 		if err != nil {
 			return err
 		}

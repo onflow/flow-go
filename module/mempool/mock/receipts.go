@@ -64,22 +64,6 @@ func (_m *Receipts) ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, boo
 	return r0, r1
 }
 
-// DropForBlock provides a mock function with given fields: blockID
-func (_m *Receipts) DropForBlock(blockID flow.Identifier) []flow.Identifier {
-	ret := _m.Called(blockID)
-
-	var r0 []flow.Identifier
-	if rf, ok := ret.Get(0).(func(flow.Identifier) []flow.Identifier); ok {
-		r0 = rf(blockID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.Identifier)
-		}
-	}
-
-	return r0
-}
-
 // Has provides a mock function with given fields: receiptID
 func (_m *Receipts) Has(receiptID flow.Identifier) bool {
 	ret := _m.Called(receiptID)
