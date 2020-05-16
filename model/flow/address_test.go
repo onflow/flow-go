@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/magiconair/properties/assert"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -59,10 +59,23 @@ func TestShort(t *testing.T) {
 }
 
 func TestConstants(t *testing.T) {
+	//check the Zero and Root constants
 	var expected [flow.AddressLength]byte
 	assert.Equal(t, flow.ZeroAddress, flow.Address(expected))
 	expected[flow.AddressLength-1] = 1
 	assert.Equal(t, flow.RootAddress, flow.Address(expected))
+
+	// check the transition from account zero to root
+	state := flow.AddressState(0)
+	address, _, err := flow.AccountAddress(state)
+	require.NoError(t, err)
+	assert.Equal(t, address, flow.RootAddress)
+	// check high states
+	state = flow.AddressState(1<<45 - 1)
+	_, state, err = flow.AccountAddress(state)
+	assert.NoError(t, err)
+	_, _, err = flow.AccountAddress(state)
+	assert.Error(t, err)
 }
 
 

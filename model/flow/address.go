@@ -106,20 +106,53 @@ func (state *AddressState) Bytes() []byte {
 	return stateBytes
 }
 
+const (
+	// [n,k,d]-Linear code parameters 
+	// The linear code used in the account addressing is a [64,45,7]
+	// It generates a [64,45]-code, which is the space of Flow account addresses
+	//
+	// size of the code words in bits,
+	// which is also the size of the account addresses in bits
+	n = AddressLength << 3
+	// size of the words in bits.
+	// 2^k is the total number of possible account addresses.
+	k = 45
+	// number of code parity bits
+	p = n-k
+	// distance of the linear code.
+	// d is the minimum hamming distance between any two Flow account addresses.
+	// d is also the minimum hamming weight of all non-zero account addresses.
+	d = 7
 
-// AccountAddress generates a new account address and given an addressing state. 
+	// the maximum value of the internal state, 2^k.
+	maxState = (1 << k) - 1
+)
+
+// AccountAddress generates a new account address given an addressing state. 
 //
-// The second returned value is the new addressing state after the generation.
-func AccountAddress(state AddressState) (Address, AddressState) { 
-	newState := nextState(state)
+// The second returned value is the new updated addressing state.
+// Each state is mapped to exactly one address. There are as many addresses 
+// as states.
+// ZeroAddress corresponds to the state "0" while RootAddress corresponds to the 
+// state "1".
+func AccountAddress(state AddressState) (Address, AddressState, error) { 
+	newState, err := nextState(state)
+	if err != nil {
+		return Address{}, AddressState(0), err
+	}
 	address := nextAddress(newState)
-	return address, newState
+	return address, newState, nil
 }
 
-// returns the new state from an adressing state
-func nextState(state AddressState) AddressState{
+// returns the next state given an adressing state.
+// The state values are incremented from 0 to 2^k-1
+func nextState(state AddressState) (AddressState, error) {
+	if uint64(state) > maxState {
+		return AddressState(0), 
+			fmt.Errorf("the state value is not valid, it must be less or equal to %x", maxState)
+	}
 	newState := state + 1
-	return newState
+	return newState, nil
 }
 
 // uint64ToAddress returns an address with value v
@@ -130,9 +163,13 @@ func uint64ToAddress(v uint64) Address {
 	return Address(b)
 }
 
-// returns the next address from an adressing state
+// returns the next address given an adressing state
+// The function assumes the state is valid (<2^k) so the test
+// must be done before calling this function
 func nextAddress(state AddressState) Address{
 	index := uint64(state)
 	address := uint64ToAddress(index)
 	return address
 }
+
+

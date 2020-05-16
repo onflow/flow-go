@@ -168,7 +168,10 @@ func (r *LedgerDAL) CreateAccountInLedger(publicKeys []flow.AccountPublicKey) (f
 		return flow.Address{}, err 
 	}
 	// generate the new account address
-	newAddress, newAddressState := flow.AccountAddress(currentAdressState)
+	newAddress, newAddressState, err := flow.AccountAddress(currentAdressState)
+	if err := nil {
+		return flow.Address{}, err 
+	}
 	// the bytes version needed for the DB update
 	newAddressBytes := newAddress.Bytes()
 
