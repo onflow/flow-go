@@ -111,8 +111,7 @@ func (ss *SealingSuite) TestBlockSealCreation() {
 	// fix the deadline of the entire test
 	deadline := time.Now().Add(20 * time.Second)
 
-	// first, we listen to see which block proposal is the first one to be
-	// confirmed three times (finalized)
+	// listen for the first block proposal
 	var targetID flow.Identifier
 	parents := make(map[flow.Identifier]flow.Identifier)
 	confirmations := make(map[flow.Identifier]uint)
