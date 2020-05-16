@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -353,39 +354,81 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 	}
 	threshold := verifiers.TotalStake() / 3 * 2
 
-	// get all available approvals once
-	approvals := e.approvals.All()
+	// Get all available approvals once, and map them to their result and
+	// approver; we also check for two approvals of the same result by the same
+	// approver here. For now, we just raise a warning and discard the duplicate;
+	// in the future, we should raise a slashing challenge.
+	byResult := make(map[flow.Identifier](map[flow.Identifier]*flow.ResultApproval))
+	for _, approval := range e.approvals.All() {
+		approvalID := approval.ID()
+		resultID := approval.Body.ExecutionResultID
+		approverID := approval.Body.ApproverID
+
+		log := e.log.With().
+			Hex("approval", approvalID[:]).
+			Hex("approver", approverID[:]).
+			Hex("result", resultID[:]).
+			Logger()
+
+		// get the map of approvals for the result
+		byApprover, exists := byResult[resultID]
+		if !exists {
+			byApprover = make(map[flow.Identifier]*flow.ResultApproval)
+			byResult[resultID] = byApprover
+		}
+
+		// check if the approver already approved the result
+		duplicate, approved := byApprover[approverID]
+		if approved {
+			_ = e.approvals.Rem(approvalID)
+			log.Warn().
+				Hex("duplicate", logging.Entity(duplicate)).
+				Msg("discarding duplicate approval")
+			continue
+		}
+
+		byApprover[approverID] = approval
+	}
 
 	// go through all results and check which ones we have enough approvals for
 ResultLoop:
 	for _, result := range e.results.All() {
+		resultID := result.ID()
+
+		// get the approvals for this result
+		approvals := byResult[resultID]
 
 		// go through all the chunks of this result and check that each of them
 		// have a qualified majority of verifier stake approving
 		for _, chunk := range result.Chunks {
 
 			// get the node IDs for all approvers of this chunk
-			// TODO: check for duplicate approvers
 			var approverIDs []flow.Identifier
-			resultID := result.ID()
-			for _, approval := range approvals {
-				if approval.Body.ExecutionResultID == resultID && approval.Body.ChunkIndex == chunk.Index {
-					approverIDs = append(approverIDs, approval.Body.ApproverID)
+			for approverID, approval := range approvals {
+				if approval.Body.ChunkIndex == chunk.Index {
+					approverIDs = append(approverIDs, approverID)
 				}
 			}
 
 			// get all of the approver identities and check threshold
 			approvers := verifiers.Filter(filter.HasNodeID(approverIDs...))
 			voted := approvers.TotalStake()
+
+			log := e.log.With().
+				Hex("block", result.BlockID[:]).
+				Hex("result", logging.Entity(result)).
+				Uint64("chunk", chunk.Index).
+				Uint64("voted", voted).
+				Uint64("threshold", threshold).
+				Logger()
+
 			if voted <= threshold {
-				e.log.Debug().
-					Hex("block", result.BlockID[:]).
-					Hex("result", logging.Entity(result)).
-					Uint64("chunk", chunk.Index).
-					Msg("ignoring result with insufficient verification")
+				log.Debug().Msg("ignoring result with insufficient verification")
 				continue ResultLoop
 			}
 		}
+
+		log.Info().Msg("adding result with sufficient verification")
 
 		// add the result to the results that should be sealed
 		results = append(results, result)
