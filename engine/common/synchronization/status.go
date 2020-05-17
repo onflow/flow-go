@@ -34,3 +34,9 @@ func (s *Status) WasReceived() bool {
 	}
 	return !s.Received.IsZero()
 }
+
+func NewQueuedStatus() *Status {
+	return &Status{
+		Queued: time.Now(),
+	}
+}

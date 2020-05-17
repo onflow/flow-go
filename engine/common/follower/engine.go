@@ -137,10 +137,14 @@ func (e *Engine) process(originID flow.Identifier, input interface{}) error {
 	case *events.SyncedBlock:
 		e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageSyncedBlock)
 		defer e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageSyncedBlock)
+		e.unit.Lock()
+		defer e.unit.Unlock()
 		return e.onSyncedBlock(originID, v)
 	case *messages.BlockProposal:
 		e.engMetrics.MessageReceived(metrics.EngineFollower, metrics.MessageBlockProposal)
 		defer e.engMetrics.MessageHandled(metrics.EngineFollower, metrics.MessageBlockProposal)
+		e.unit.Lock()
+		defer e.unit.Unlock()
 		return e.onBlockProposal(originID, v)
 	default:
 		return fmt.Errorf("invalid event type (%T)", input)
@@ -224,14 +228,17 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		// go to the first missing ancestor
 		ancestorID := ancestor.Header.ParentID
 		for {
-			ancestor, found := e.pending.ByID(ancestorID)
+			ancestor, found = e.pending.ByID(ancestorID)
 			if !found {
 				break
 			}
 			ancestorID = ancestor.Header.ParentID
 		}
 
-		log.Debug().Msg("requesting missing ancestor for proposal")
+		log.Debug().
+			Uint64("ancestor_height", ancestor.Header.Height).
+			Hex("ancestor_id", ancestorID[:]).
+			Msg("requesting missing ancestor for proposal")
 
 		e.sync.RequestBlock(ancestorID)
 
@@ -255,9 +262,6 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	if err != nil {
 		return fmt.Errorf("could not check parent: %w", err)
 	}
-
-	e.unit.Lock()
-	defer e.unit.Unlock()
 
 	// at this point, we should be able to connect the proposal to the finalized
 	// state and should process it to see whether to forward to hotstuff or not
