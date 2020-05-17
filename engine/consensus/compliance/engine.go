@@ -5,6 +5,7 @@ package compliance
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
@@ -56,6 +57,7 @@ func New(
 	state protocol.State,
 	prov network.Engine,
 	pending module.PendingBlockBuffer,
+	blockRateDelay time.Duration,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
@@ -191,9 +193,9 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 	return nil
 }
 
-// BroadcastProposal will propagate a block proposal to all non-local consensus nodes.
+// BroadcastProposalWithDelay will propagate a block proposal to all non-local consensus nodes.
 // Note the header has incomplete fields, because it was converted from a hotstuff.
-func (e *Engine) BroadcastProposal(header *flow.Header) error {
+func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Duration) error {
 
 	// first, check that we are the proposer of the block
 	if header.ProposerID != e.me.NodeID() {
@@ -222,6 +224,7 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
 		Int("num_signers", len(header.ParentVoterIDs)).
+		Dur("delay", delay).
 		Logger()
 
 	log.Info().Msg("processing proposal broadcast request from hotstuff")
@@ -241,29 +244,37 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		return fmt.Errorf("could not get consensus recipients: %w", err)
 	}
 
-	// NOTE: some fields are not needed for the message
-	// - proposer ID is conveyed over the network message
-	// - the payload hash is deduced from the payload
-	proposal := &messages.BlockProposal{
-		Header:  header,
-		Payload: payload,
-	}
+	e.unit.LaunchAfter(delay, func() {
+		// NOTE: some fields are not needed for the message
+		// - proposer ID is conveyed over the network message
+		// - the payload hash is deduced from the payload
+		proposal := &messages.BlockProposal{
+			Header:  header,
+			Payload: payload,
+		}
 
-	// broadcast the proposal to consensus nodes
-	err = e.con.Submit(proposal, recipients.NodeIDs()...)
-	if err != nil {
-		return fmt.Errorf("could not send proposal message: %w", err)
-	}
+		// broadcast the proposal to consensus nodes
+		err = e.con.Submit(proposal, recipients.NodeIDs()...)
+		if err != nil {
+			log.Error().Err(err).Msg("could not send proposal message")
+		}
 
-	e.metrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockProposal)
+		e.metrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockProposal)
 
-	log.Info().Msg("block proposal broadcasted")
+		log.Info().Msg("block proposal broadcasted")
 
-	// submit the proposal to the provider engine to forward it to other
-	// node roles
-	e.prov.SubmitLocal(proposal)
+		// submit the proposal to the provider engine to forward it to other
+		// node roles
+		e.prov.SubmitLocal(proposal)
+	})
 
 	return nil
+}
+
+// BroadcastProposal will propagate a block proposal to all non-local consensus nodes.
+// Note the header has incomplete fields, because it was converted from a hotstuff.
+func (e *Engine) BroadcastProposal(header *flow.Header) error {
+	return e.BroadcastProposalWithDelay(header, 0)
 }
 
 // process processes events for the propagation engine on the consensus node.
@@ -534,8 +545,9 @@ func (e *Engine) prunePendingCache() {
 		return
 	}
 
-	// remove everything at or below final height
+	// remove all pending blocks at or below the finalized height
 	e.pending.PruneByHeight(final.Height)
 
+	// always record the metric
 	e.mempool.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
 }

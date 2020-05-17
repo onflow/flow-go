@@ -79,22 +79,6 @@ func TestAdjust(t *testing.T) {
 		assert.False(t, found)
 	})
 
-	t.Run("should not adjust if item didn't change", func(t *testing.T) {
-		pool := NewBackend()
-		_ = pool.Add(item1)
-
-		_, updated := pool.Adjust(item1.ID(), func(old flow.Entity) flow.Entity {
-			// item 1 exist, but got replaced with item1 again, nothing was changed
-			return item1
-		})
-
-		assert.False(t, updated)
-
-		value1, found := pool.ByID(item1.ID())
-		assert.True(t, found)
-		assert.Equal(t, value1, item1)
-	})
-
 	t.Run("should adjust if exists", func(t *testing.T) {
 		pool := NewBackend()
 		_ = pool.Add(item1)

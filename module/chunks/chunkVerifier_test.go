@@ -14,6 +14,7 @@ import (
 	chModels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/chunks"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -147,8 +148,10 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 
 	var verifiableChunk verification.VerifiableChunk
 
+	metricsCollector := &metrics.NoopCollector{}
+
 	unittest.RunWithTempDir(t, func(dbDir string) {
-		f, _ := ledger.NewTrieStorage(dbDir)
+		f, _ := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 		startState, _ := f.UpdateRegisters(ids, values, f.EmptyStateCommitment())
 		regTs, _ := f.GetRegisterTouches(ids, startState)
 

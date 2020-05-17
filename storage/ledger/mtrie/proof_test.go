@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
 )
 
@@ -16,7 +17,8 @@ func TestBatchProofEncoderDecoder(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
+	metricsCollector := &metrics.NoopCollector{}
+	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
@@ -29,7 +31,8 @@ func TestBatchProofEncoderDecoder(t *testing.T) {
 	batchProof, err := fStore.Proofs(keys, rootHash)
 	require.NoError(t, err)
 
-	p, err := mtrie.DecodeBatchProof(mtrie.EncodeBatchProof(batchProof))
+	encodeBatchProof, _ := mtrie.EncodeBatchProof(batchProof)
+	p, err := mtrie.DecodeBatchProof(encodeBatchProof)
 	require.NoError(t, err)
 	require.Equal(t, p, batchProof, "Proof encoder and/or decoder has an issue")
 

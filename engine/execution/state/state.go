@@ -45,7 +45,7 @@ type ReadOnlyExecutionState interface {
 
 	GetHighestExecutedBlockID(context.Context) (uint64, flow.Identifier, error)
 
-	Size() (int64, error)
+	DiskSize() (int64, error)
 }
 
 // TODO Many operations here are should be transactional, so we need to refactor this
@@ -340,6 +340,6 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 	return highest.Height, blockID, nil
 }
 
-func (s *state) Size() (int64, error) {
-	return s.ls.Size()
+func (s *state) DiskSize() (int64, error) {
+	return s.ls.DiskSize()
 }

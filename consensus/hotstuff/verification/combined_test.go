@@ -81,7 +81,7 @@ func TestCombinedQC(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(8, unittest.WithRole(flow.RoleConsensus))
 	voterIDs := identities.NodeIDs()
-	minShares := (len(voterIDs)-1) / 2 + 1
+	minShares := (len(voterIDs)-1)/2 + 1
 	committeeState, dkg, stakingKeys, beaconKeys := MakeHotstuffCommitteeState(t, identities, true)
 	signers := MakeSigners(t, committeeState, dkg, identities.NodeIDs(), stakingKeys, beaconKeys)
 

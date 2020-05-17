@@ -84,6 +84,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 		cfg.TimeoutAggregationFraction,
 		cfg.TimeoutIncreaseFactor,
 		cfg.TimeoutDecreaseStep,
+		cfg.BlockRateDelay,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize timeout config: %w", err)

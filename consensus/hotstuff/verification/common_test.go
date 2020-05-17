@@ -1,8 +1,8 @@
 package verification
 
 import (
-	"testing"
 	"crypto/rand"
+	"testing"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"

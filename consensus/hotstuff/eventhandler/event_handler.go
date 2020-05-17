@@ -259,7 +259,8 @@ func (e *EventHandler) startNewView() error {
 
 		// broadcast the proposal
 		header := model.ProposalToFlow(proposal)
-		err = e.communicator.BroadcastProposal(header)
+		err = e.communicator.BroadcastProposalWithDelay(header, e.paceMaker.BlockRateDelay())
+
 		if err != nil {
 			log.Warn().Err(err).Msg("could not forward proposal")
 		}

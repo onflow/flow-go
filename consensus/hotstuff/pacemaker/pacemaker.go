@@ -127,3 +127,7 @@ func (p *FlowPaceMaker) Start() {
 	timerInfo := p.timeoutControl.StartTimeout(model.ReplicaTimeout, p.currentView)
 	p.notifier.OnStartingTimeout(timerInfo)
 }
+
+func (p *FlowPaceMaker) BlockRateDelay() time.Duration {
+	return p.timeoutControl.BlockRateDelay()
+}

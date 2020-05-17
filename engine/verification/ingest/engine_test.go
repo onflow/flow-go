@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -61,6 +62,7 @@ type IngestTestSuite struct {
 	chunkDataPackTrackers *mempool.ChunkDataPackTrackers
 	ingestedChunkIDs      *mempool.Identifiers
 	ingestedResultIDs     *mempool.Identifiers
+	ingestedCollectionIDs *mempool.Identifiers
 	headerStorage         *storage.Headers
 	blockStorage          *storage.Blocks
 	// resources fixtures
@@ -109,6 +111,7 @@ func (suite *IngestTestSuite) SetupTest() {
 	suite.chunkDataPackTrackers = &mempool.ChunkDataPackTrackers{}
 	suite.ingestedResultIDs = &mempool.Identifiers{}
 	suite.ingestedChunkIDs = &mempool.Identifiers{}
+	suite.ingestedCollectionIDs = &mempool.Identifiers{}
 	suite.assigner = &module.ChunkAssigner{}
 
 	completeER := test.CompleteExecutionResultFixture(suite.T(), 1)
@@ -182,6 +185,7 @@ func (suite *IngestTestSuite) TestNewEngine() *ingest.Engine {
 		suite.chunkDataPackTrackers,
 		suite.ingestedChunkIDs,
 		suite.ingestedResultIDs,
+		suite.ingestedCollectionIDs,
 		suite.headerStorage,
 		suite.blockStorage,
 		suite.assigner,
@@ -533,13 +537,19 @@ func (suite *IngestTestSuite) TestIngestedChunk() {
 
 	eng := suite.TestNewEngine()
 
-	chunkDataPackResponse := &messages.ChunkDataPackResponse{Data: *suite.chunkDataPack}
+	chunkDataPackResponse := &messages.ChunkDataPackResponse{
+		Data:  *suite.chunkDataPack,
+		Nonce: rand.Uint64(),
+	}
 	// mocks this chunk id
 	suite.ingestedChunkIDs.On("Has", suite.chunkDataPack.ChunkID).Return(true)
 
 	// nothing else is mocked, hence the process should simply return nil
 	err := eng.Process(unittest.IdentifierFixture(), chunkDataPackResponse)
 	require.NoError(suite.T(), err)
+
+	// chunk data pack should not be tried to be stored in the mempool
+	suite.chunkDataPacks.AssertNotCalled(suite.T(), "Add", testifymock.Anything)
 }
 
 // TestHandleReceipt_UnstakedSender evaluates sending an execution receipt from an unstaked node
@@ -639,6 +649,13 @@ func (suite *IngestTestSuite) TestHandleCollection_Tracked() {
 	// expect that the collection tracker is removed
 	suite.collectionTrackers.On("Rem", suite.collection.ID()).Return(true)
 
+	// mocks collection has not been ingested
+	suite.ingestedCollectionIDs.On("Has", suite.collection.ID()).Return(false)
+
+	// mocks collection does not exist in authenticated and pending collections
+	suite.authCollections.On("Has", suite.collection.ID()).Return(false).Once()
+	suite.pendingCollections.On("Has", suite.collection.ID()).Return(false)
+
 	err := eng.Process(suite.collIdentity.NodeID, suite.collection)
 	suite.Assert().Nil(err)
 
@@ -664,6 +681,13 @@ func (suite *IngestTestSuite) TestHandleCollection_Untracked() {
 	suite.pendingCollections.On("Add",
 		verificationmodel.NewPendingCollection(suite.collection, suite.collIdentity.NodeID)).
 		Return(true).Once()
+
+	// mocks collection has not been ingested
+	suite.ingestedCollectionIDs.On("Has", suite.collection.ID()).Return(false)
+
+	// mocks collection does not exist in authenticated and pending collections
+	suite.authCollections.On("Has", suite.collection.ID()).Return(false)
+	suite.pendingCollections.On("Has", suite.collection.ID()).Return(false)
 
 	err := eng.Process(suite.collIdentity.NodeID, suite.collection)
 	suite.Assert().Nil(err)
@@ -698,6 +722,13 @@ func (suite *IngestTestSuite) TestHandleCollection_UnstakedSender() {
 	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(true)
 	suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, true)
 
+	// mocks collection has not been ingested
+	suite.ingestedCollectionIDs.On("Has", suite.collection.ID()).Return(false)
+
+	// mocks collection does not exist in authenticated and pending collections
+	suite.authCollections.On("Has", suite.collection.ID()).Return(false)
+	suite.pendingCollections.On("Has", suite.collection.ID()).Return(false)
+
 	err := eng.Process(unstakedIdentity, suite.collection)
 	suite.Assert().Error(err)
 
@@ -729,6 +760,13 @@ func (suite *IngestTestSuite) TestHandleCollection_SenderWithWrongRole() {
 		suite.collectionTrackers.On("Has", suite.collection.ID()).Return(true)
 		suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, true)
 
+		// mocks collection has not been ingested
+		suite.ingestedCollectionIDs.On("Has", suite.collection.ID()).Return(false)
+
+		// mocks collection does not exist in authenticated and pending collections
+		suite.authCollections.On("Has", suite.collection.ID()).Return(false)
+		suite.pendingCollections.On("Has", suite.collection.ID()).Return(false)
+
 		err := eng.Process(invalidIdentity.NodeID, suite.collection)
 		suite.Assert().Error(err)
 
@@ -737,6 +775,72 @@ func (suite *IngestTestSuite) TestHandleCollection_SenderWithWrongRole() {
 
 		suite.Unlock()
 	}
+}
+
+// TestHandleCollection_IngestedCollection evaluates the happy path of submitting a collection an already ingested chunk
+func (suite *IngestTestSuite) TestHandleCollection_IngestedCollection() {
+	// locks to run the test sequentially
+	suite.Lock()
+	defer suite.Unlock()
+
+	eng := suite.TestNewEngine()
+
+	// mocks this collection as ingested
+	suite.ingestedCollectionIDs.On("Has", suite.collection.ID()).Return(true)
+
+	// nothing else is mocked, hence the process should simply return nil
+	err := eng.Process(unittest.IdentifierFixture(), suite.collection)
+	require.NoError(suite.T(), err)
+
+	// collection should not be tried to be stored in the mempool
+	suite.authCollections.AssertNotCalled(suite.T(), "Add", testifymock.Anything)
+	suite.pendingCollections.AssertNotCalled(suite.T(), "Add", testifymock.Anything)
+}
+
+// TestHandleCollection_ExistingAuthenticated evaluates the happy path of submitting a collection
+// that is existing in the authenticated mempool
+func (suite *IngestTestSuite) TestHandleCollection_ExistingAuthenticated() {
+	// locks to run the test sequentially
+	suite.Lock()
+	defer suite.Unlock()
+
+	eng := suite.TestNewEngine()
+
+	// mocks this collection as ingested
+	suite.ingestedCollectionIDs.On("Has", suite.collection.ID()).Return(false)
+	suite.authCollections.On("Has", suite.collection.ID()).Return(true)
+	suite.pendingCollections.On("Has", suite.collection.ID()).Return(false)
+
+	// nothing else is mocked, hence the process should simply return nil
+	err := eng.Process(unittest.IdentifierFixture(), suite.collection)
+	require.NoError(suite.T(), err)
+
+	// collection should not be tried to be stored in the mempool
+	suite.authCollections.AssertNotCalled(suite.T(), "Add", testifymock.Anything)
+	suite.pendingCollections.AssertNotCalled(suite.T(), "Add", testifymock.Anything)
+}
+
+// TestHandleCollection_ExistingPending evaluates the happy path of submitting a collection
+// that is existing in the pending mempool
+func (suite *IngestTestSuite) TestHandleCollection_ExistingPending() {
+	// locks to run the test sequentially
+	suite.Lock()
+	defer suite.Unlock()
+
+	eng := suite.TestNewEngine()
+
+	// mocks this collection as ingested
+	suite.ingestedCollectionIDs.On("Has", suite.collection.ID()).Return(false)
+	suite.authCollections.On("Has", suite.collection.ID()).Return(false)
+	suite.pendingCollections.On("Has", suite.collection.ID()).Return(true)
+
+	// nothing else is mocked, hence the process should simply return nil
+	err := eng.Process(unittest.IdentifierFixture(), suite.collection)
+	require.NoError(suite.T(), err)
+
+	// collection should not be tried to be stored in the mempool
+	suite.authCollections.AssertNotCalled(suite.T(), "Add", testifymock.Anything)
+	suite.pendingCollections.AssertNotCalled(suite.T(), "Add", testifymock.Anything)
 }
 
 // TestVerifyReady evaluates that a verifiable chunk is locally passed to the verifier engine
@@ -780,6 +884,7 @@ func (suite *IngestTestSuite) TestVerifyReady() {
 			// engine has not yet ingested this receipt and its chunk
 			suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).
 				Return(false).Once()
+
 			for _, chunk := range suite.receipt.ExecutionResult.Chunks {
 				suite.ingestedChunkIDs.On("Has", chunk.ID()).Return(false)
 				suite.ingestedChunkIDs.On("Add", chunk.ID()).Return(true)
@@ -793,6 +898,8 @@ func (suite *IngestTestSuite) TestVerifyReady() {
 			suite.authCollections.On("Has", suite.collection.ID()).Return(true)
 			suite.pendingCollections.On("Has", suite.collection.ID()).Return(false)
 			suite.authCollections.On("ByID", suite.collection.ID()).Return(suite.collection, true)
+			suite.ingestedCollectionIDs.On("Add", suite.collection.ID()).Return(true)
+			suite.ingestedCollectionIDs.On("Has", suite.collection.ID()).Return(false)
 			// tracker for the collection
 			suite.collectionTrackers.On("Has", suite.collection.ID()).Return(true)
 			suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, true)
@@ -878,12 +985,18 @@ func (suite *IngestTestSuite) TestChunkDataPackTracker_UntrackedChunkDataPack() 
 	eng := suite.TestNewEngine()
 
 	// creates a chunk fixture, its data pack, and the data pack response
-	chunkDataPackResponse := &messages.ChunkDataPackResponse{Data: *suite.chunkDataPack}
+	chunkDataPackResponse := &messages.ChunkDataPackResponse{
+		Data:  *suite.chunkDataPack,
+		Nonce: rand.Uint64(),
+	}
 
 	// mocks absence of chunk data pack tracker
 	suite.chunkDataPackTrackers.On("Has", suite.chunkDataPack.ChunkID).Return(false)
 	// engine has not yet ingested this chunk
 	suite.ingestedChunkIDs.On("Has", suite.chunkDataPack.ChunkID).Return(false)
+
+	// engine should not already have the chunk data pack
+	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ChunkID).Return(false)
 
 	err := eng.Process(suite.execIdentity.NodeID, chunkDataPackResponse)
 
@@ -901,19 +1014,18 @@ func (suite *IngestTestSuite) TestChunkDataPackTracker_HappyPath() {
 
 	eng := suite.TestNewEngine()
 
-	chunkDataPackResponse := &messages.ChunkDataPackResponse{Data: *suite.chunkDataPack}
-
-	// creates a tracker for chunk data pack that binds it to the block
-	track := &tracker.ChunkDataPackTracker{
-		BlockID: suite.block.ID(),
-		ChunkID: suite.chunkDataPack.ChunkID,
+	chunkDataPackResponse := &messages.ChunkDataPackResponse{
+		Data:  *suite.chunkDataPack,
+		Nonce: rand.Uint64(),
 	}
 
 	// mocks tracker to return the tracker for the chunk data pack
 	suite.chunkDataPackTrackers.On("Has", suite.chunkDataPack.ChunkID).Return(true).Once()
-	suite.chunkDataPackTrackers.On("ByChunkID", suite.chunkDataPack.ChunkID).Return(track, true).Once()
+	suite.chunkDataPackTrackers.On("ByChunkID", suite.chunkDataPack.ChunkID).Return(suite.chunkTracker, true).Once()
 	suite.ss.On("Identity", suite.execIdentity.NodeID).Return(suite.execIdentity, nil)
 
+	// engine should not already have the chunk data pack
+	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ChunkID).Return(false)
 	// chunk data pack should be successfully added to mempool and the tracker should be removed
 	suite.chunkDataPacks.On("Add", suite.chunkDataPack).Return(true).Once()
 	suite.chunkDataPackTrackers.On("Rem", suite.chunkDataPack.ChunkID).Return(true).Once()

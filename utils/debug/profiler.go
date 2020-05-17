@@ -32,7 +32,8 @@ func NewAutoProfiler(log zerolog.Logger, dir string, interval time.Duration, dur
 		unit:     engine.NewUnit(),
 		log:      log.With().Str("component", "profiler").Logger(),
 		dir:      dir,
-		interval: time.Minute * 3,
+		interval: interval,
+		duration: duration,
 	}
 	return p, nil
 }
