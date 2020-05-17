@@ -31,6 +31,11 @@ var (
 	ZeroAddress = generateAddress(AddressState(0))
 	// RootAddress represents the root (first) generated account address.
 	RootAddress = generateAddress(AddressState(1))
+
+	// ZeroTestAddress represents the "zero address" in Flow testnet or emulator instances (account that no one owns).
+	ZeroTestAddress = generateTestAddress(AddressState(0))
+	// RootTestAddress represents the root (first) generated test account address.
+	RootTestAddress = generateTestAddress(AddressState(1))
 )
 
 // HexToAddress converts a hex string to an Address.
@@ -175,7 +180,7 @@ func (a *Address) Uint64() uint64 {
 // returns an account address given an adressing state
 // The function assumes the state is valid (<2^k) so the test
 // must be done before calling this function
-func generateAddress(state AddressState) Address{
+func generateAddress(state AddressState) Address {
 	index := uint64(state)
 
 	// Multiply the index GF(2) vector by the code generator matrix
@@ -194,9 +199,14 @@ func generateAddress(state AddressState) Address{
 //
 // This is an off-chain check that only tells whether the address format is 
 // valid. If the function returns true, this does not mean
-// a Flow account with this address has been generated. This would
+// a Flow account with this address has been generated. Such a test would
 // require on on-chain check.
-func (a* Address) CheckAddress() bool{
+// ZeroAddress fails the check. Although it has a valid format, no account
+// in Flow is assigned to ZeroAddress.
+func (a* Address) CheckAddress() bool {
+	if *a == ZeroAddress {
+		return false
+	}
 	codeWord := a.Uint64()
 
 	// Multiply the code word GF(2)-vector by the parity-check matrix
@@ -208,6 +218,46 @@ func (a* Address) CheckAddress() bool{
 		codeWord >>= 1
 	}
 	return parity == 0
+}
+
+// TestAccountAddress generates a test account address for Flow testnets
+// and emulator instances.
+//
+// TestAccountAddress uses the same arguments and parameters as AccountAddress,
+// but generates a test address space that has no intersection with Flow
+// address space.
+func TestAccountAddress(state AddressState) (Address, AddressState, error) { 
+	newState, err := nextState(state)
+	if err != nil {
+		return Address{}, AddressState(0), err
+	}
+	address := generateTestAddress(newState)
+	return address, newState, nil
+}
+
+// invalid code-word in the [64,45] code
+// this constant is used to generate Flow test addresses
+const constInvalidAddress = uint64(0x39e00070ed880200)
+
+// generateTestAddress is similar to generateAddress
+// but only return test addresses 
+func generateTestAddress(state AddressState) Address{
+	validAddress := generateAddress(state)
+	invalidAddress := validAddress.Uint64() ^ constInvalidAddress 
+	return Uint64ToAddress(invalidAddress)
+}
+
+// CheckTestAddress returns true if a given address is a valid test account address,
+// and false otherwise. 
+//
+// Since there is no intersection in Flow address space and Flow test address space, 
+// any value that passes this check should fail CheckAddress() and vice versa. 
+// ZeroTestAddress fails the check. Although it has a valid format, no test account
+// in Flow is assigned to ZeroTestAddress.
+func (a* Address) CheckTestAddress() bool {
+	addressUint64 := a.Uint64() ^ constInvalidAddress
+	address := Uint64ToAddress(addressUint64)
+	return address.CheckAddress()
 }
 
 // Rows of the generator matrix G of the [64,45]-code used for Flow addresses
