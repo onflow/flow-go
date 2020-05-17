@@ -34,12 +34,11 @@ func (m MapLedger) Delete(key flow.RegisterID) {
 }
 
 const (
-	// TODO: change to "account_address_state" 
-	keyAddressState   = "latest_account"
-	keyExists         		= "exists"
-	keyBalance        		= "balance"
-	keyCode           		= "code"
-	keyPublicKeyCount 		= "public_key_count"
+	keyAddressState   	= "account_address_state"
+	keyExists         	= "exists"
+	keyBalance        	= "balance"
+	keyCode           	= "code"
+	keyPublicKeyCount 	= "public_key_count"
 )
 
 func fullKey(owner, controller, key string) string {
@@ -169,7 +168,7 @@ func (r *LedgerDAL) CreateAccountInLedger(publicKeys []flow.AccountPublicKey) (f
 	}
 	// generate the new account address
 	newAddress, newAddressState, err := flow.AccountAddress(currentAdressState)
-	if err := nil {
+	if err != nil {
 		return flow.Address{}, err 
 	}
 	// the bytes version needed for the DB update

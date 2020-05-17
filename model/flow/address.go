@@ -30,12 +30,16 @@ var (
 	// ZeroAddress represents the "zero address" (account that no one owns).
 	ZeroAddress = generateAddress(AddressState(0))
 	// RootAddress represents the root (first) generated account address.
-	RootAddress = generateAddress(AddressState(1))
+	RootAddress = generateAddress(RootAddressState)
+	// RootAddressState is the initial addressing state
+	RootAddressState = AddressState(1)
 
 	// ZeroTestAddress represents the "zero address" in Flow testnet or emulator instances (account that no one owns).
 	ZeroTestAddress = generateTestAddress(AddressState(0))
 	// RootTestAddress represents the root (first) generated test account address.
-	RootTestAddress = generateTestAddress(AddressState(1))
+	RootTestAddress = generateTestAddress(RootTestAddressState)
+	// RootAddressState is the initial addressing state
+	RootTestAddressState = AddressState(1)
 )
 
 // HexToAddress converts a hex string to an Address.
@@ -104,7 +108,7 @@ func BytesToAddressState(b []byte) AddressState {
 }
 
 
-// BytesToAddressState converts an array of bytes into an adress state
+// Bytes converts an array of bytes into an adress state
 func (state *AddressState) Bytes() []byte {
 	stateBytes := make([]byte, AddressLength)
 	binary.BigEndian.PutUint64(stateBytes, uint64(*state))
