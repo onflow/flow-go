@@ -264,10 +264,10 @@ func TestFlowTestAddressGeneration(t *testing.T) {
 func TestUint48(t *testing.T) {
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
-	
+
 	const loop = 50
 	// test consistensy of putUint48 and uint48
-	for i:=0; i<loop; i++ {
+	for i := 0; i < loop; i++ {
 		r := uint64(0) //uint64(rand.Intn(1<<k))
 		b := make([]byte, AddressStateLength)
 		putUint48(b, r)

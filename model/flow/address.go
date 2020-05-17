@@ -30,7 +30,6 @@ const (
 	RootTestAddressState = AddressState(1)
 )
 
-
 var (
 	// ZeroAddress represents the "zero address" (account that no one owns).
 	ZeroAddress = generateAddress(AddressState(0))
