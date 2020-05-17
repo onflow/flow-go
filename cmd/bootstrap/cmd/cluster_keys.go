@@ -49,6 +49,12 @@ func (c collector) NodeID() flow.Identifier {
 // approach needs to find a valid collector allocation it might be worthwhile to rething that decision. by shifting
 // partner nodes through deterministic
 func generateAdditionalInternalCollectors(nClusters, minPerCluster int, internalNodes, partnerNodes []model.NodeInfo) []model.NodeInfo {
+	// Check if we need to add any internal nodes at all
+	currentTotal := len(internalNodes) + len(partnerNodes)
+	maxPerCluster := currentTotal / nClusters
+	if len(partnerNodes) < maxPerCluster/3 {
+		return []model.NodeInfo{}
+	}
 
 	maxPartnerPerCluster := len(partnerNodes) / nClusters
 	if len(partnerNodes)%nClusters > 0 {
@@ -56,7 +62,7 @@ func generateAdditionalInternalCollectors(nClusters, minPerCluster int, internal
 	}
 	nTotal := calcTotalCollectors(nClusters, minPerCluster, len(partnerNodes))
 
-	// require 2at least 1/3 of colletors to be randomly generated
+	// require 2at least 1/3 of collectors to be randomly generated
 	if len(internalNodes)+len(partnerNodes) >= nTotal*2/3 {
 		log.Fatal().Msgf("at least 1/3 of %v total requried collectors should be available for hash grinding, got %v "+
 			"internal nodes and %v partner nodes – please reduce the number of internal nodes", nTotal,
