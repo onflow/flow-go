@@ -198,7 +198,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 			authorizers: []flow.Address{flow.RootAddress},
 			check: func(t *testing.T, result *virtualmachine.TransactionResult) {
 				require.Nil(t, result.Error)
-				assert.ElementsMatch(t, []string{"0x"+flow.RootAddress.Hex(), "42", `"foo"`}, result.Logs)
+				assert.ElementsMatch(t, []string{"0x" + flow.RootAddress.Hex(), "42", `"foo"`}, result.Logs)
 			},
 		},
 	}
@@ -383,7 +383,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	state := flow.RootAddressState
 	for i := 0; i < count; i++ {
 		// increment the adddressing state
-		_ , state , err = flow.AccountAddress(state)
+		_, state, err = flow.AccountAddress(state)
 		require.NoError(t, err)
 		address, key := createAccount()
 		accounts[address] = key
@@ -403,7 +403,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	// non-happy path - get an account that was never created
 	t.Run("get a non-existing account", func(t *testing.T) {
-		address , _ , err := flow.AccountAddress(state)
+		address, _, err := flow.AccountAddress(state)
 		require.NoError(t, err)
 		account := ledgerAccess.GetAccount(address)
 		assert.Nil(t, account)

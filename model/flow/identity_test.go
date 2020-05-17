@@ -44,6 +44,7 @@ func TestHexStringToIdentifier(t *testing.T) {
 		assert.Equal(t, tcase.hex, id.String())
 	}
 }
+
 /*
 func TestIdentityEncodingJSON(t *testing.T) {
 	identity := unittest.IdentityFixture(unittest.WithRandomPublicKeys())
