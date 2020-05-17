@@ -17,31 +17,35 @@ type Address [AddressLength]byte
 type AddressState uint64
 
 const (
-	// AddressLength is the size of an account address.
-	AddressLength = 8
-	// AddressStateLength is the size of an account address state.
-	AddressStateLength = 8
+	// AddressLength is the size of an account address in bytes.
+	// (n) is the size of an account address in bits.
+	AddressLength = (n + 7) >> 3
+	// AddressStateLength is the size of an account address state in bytes.
+	// (k) is the size of an account address in bits.
+	AddressStateLength = (k + 7) >> 3
+
+	// RootAddressState is the initial addressing state
+	RootAddressState = AddressState(1)
+	// RootAddressState is the initial addressing state
+	RootTestAddressState = AddressState(1)
 )
 
-func init() {
-	gob.Register(Address{})
-}
 
 var (
 	// ZeroAddress represents the "zero address" (account that no one owns).
 	ZeroAddress = generateAddress(AddressState(0))
 	// RootAddress represents the root (first) generated account address.
 	RootAddress = generateAddress(RootAddressState)
-	// RootAddressState is the initial addressing state
-	RootAddressState = AddressState(1)
 
 	// ZeroTestAddress represents the "zero address" in Flow testnet or emulator instances (account that no one owns).
 	ZeroTestAddress = generateTestAddress(AddressState(0))
 	// RootTestAddress represents the root (first) generated test account address.
 	RootTestAddress = generateTestAddress(RootTestAddressState)
-	// RootAddressState is the initial addressing state
-	RootTestAddressState = AddressState(1)
 )
+
+func init() {
+	gob.Register(Address{})
+}
 
 // HexToAddress converts a hex string to an Address.
 func HexToAddress(h string) Address {
@@ -95,21 +99,39 @@ func (a *Address) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// modified from binary.bigEndian.Uint64
+func uint48(b []byte) uint64 {
+	_ = b[5] // bounds check hint to compiler;
+	return uint64(b[5]) | uint64(b[4])<<8 |
+		uint64(b[3])<<16 | uint64(b[2])<<24 | uint64(b[1])<<32 | uint64(b[0])<<40
+}
+
+// modified from binary.bigEndian.PutUint64
+func putUint48(b []byte, v uint64) {
+	_ = b[5] // early bounds check to guarantee safety of writes below
+	b[0] = byte(v >> 40)
+	b[1] = byte(v >> 32)
+	b[2] = byte(v >> 24)
+	b[3] = byte(v >> 16)
+	b[4] = byte(v >> 8)
+	b[5] = byte(v)
+}
+
 // BytesToAddressState converts an array of bytes into an adress state
 func BytesToAddressState(b []byte) AddressState {
 	if len(b) > AddressStateLength {
 		b = b[len(b)-AddressStateLength:]
 	}
 	var stateBytes [AddressStateLength]byte
-	copy(stateBytes[AddressLength-len(b):], b)
-	state := binary.BigEndian.Uint64(stateBytes[:])
+	copy(stateBytes[AddressStateLength-len(b):], b)
+	state := uint48(stateBytes[:])
 	return AddressState(state)
 }
 
 // Bytes converts an addresse state into a slice of bytes
 func (state *AddressState) Bytes() []byte {
-	stateBytes := make([]byte, AddressLength)
-	binary.BigEndian.PutUint64(stateBytes, uint64(*state))
+	stateBytes := make([]byte, AddressStateLength)
+	putUint48(stateBytes, uint64(*state))
 	return stateBytes
 }
 
@@ -120,7 +142,7 @@ const (
 	//
 	// n is the size of the code words in bits,
 	// which is also the size of the account addresses in bits
-	n = AddressLength << 3
+	n = 64
 	// k is size of the words in bits.
 	// 2^k is the total number of possible account addresses.
 	k = 45
@@ -241,7 +263,7 @@ func TestAccountAddress(state AddressState) (Address, AddressState, error) {
 
 // invalid code-word in the [64,45] code
 // this constant is used to generate Flow test addresses
-const constInvalidAddress = uint64(0x39e00070ed880200)
+const constInvalidAddress = uint64(0x6834ba37b3980209)
 
 // generateTestAddress is similar to generateAddress
 // but only return test addresses

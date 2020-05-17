@@ -62,6 +62,9 @@ func TestShort(t *testing.T) {
 const invalidCodeWord = uint64(0xab2ae42382900010)
 
 func TestFlowAdressConstants(t *testing.T) {
+	// check n and k fit in 8 and 6 bytes
+	assert.LessOrEqual(t, n, 64)
+	assert.LessOrEqual(t, k, 48)
 
 	//check the Zero and Root constants
 	// Flow
@@ -255,5 +258,20 @@ func TestFlowTestAddressGeneration(t *testing.T) {
 		// should fail Flow test check
 		check = invalidAddress.CheckTestAddress()
 		assert.False(t, check, "account address format should be invalid")
+	}
+}
+
+func TestUint48(t *testing.T) {
+	// seed random generator
+	rand.Seed(time.Now().UnixNano())
+	
+	const loop = 50
+	// test consistensy of putUint48 and uint48
+	for i:=0; i<loop; i++ {
+		r := uint64(0) //uint64(rand.Intn(1<<k))
+		b := make([]byte, AddressStateLength)
+		putUint48(b, r)
+		res := uint48(b)
+		assert.Equal(t, r, res)
 	}
 }
