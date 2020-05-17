@@ -45,7 +45,8 @@ func initPaceMaker(t *testing.T, view uint64) (hotstuff.PaceMaker, *mocks.Consum
 		time.Duration(minRepTimeout*1e6),
 		voteTimeoutFraction,
 		multiplicativeIncrease,
-		time.Duration(additiveDecrease*1e6))
+		time.Duration(additiveDecrease*1e6),
+		0)
 	if err != nil {
 		t.Fail()
 	}

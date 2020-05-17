@@ -75,7 +75,8 @@ func initPaceMaker(t *testing.T, view uint64) hotstuff.PaceMaker {
 		time.Duration(minRepTimeout*1e6),
 		voteTimeoutFraction,
 		multiplicativeIncrease,
-		time.Duration(additiveDecrease*1e6))
+		time.Duration(additiveDecrease*1e6),
+		0)
 	if err != nil {
 		t.Fail()
 	}
@@ -341,7 +342,7 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.persist.On("PutStarted", mock.Anything).Return(nil)
 	es.blockProducer = &BlockProducer{}
 	es.communicator = &mocks.Communicator{}
-	es.communicator.On("BroadcastProposal", mock.Anything).Return(nil)
+	es.communicator.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Return(nil)
 	es.communicator.On("SendVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	es.committee = NewCommittee()
 	es.voteAggregator = NewVoteAggregator(es.T())

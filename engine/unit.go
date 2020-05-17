@@ -51,6 +51,19 @@ func (u *Unit) Launch(f func()) {
 	}()
 }
 
+// LaunchAfter asynchronously executes the input function after a certain delay
+// unless the unit has shut down.
+func (u *Unit) LaunchAfter(delay time.Duration, f func()) {
+	u.Launch(func() {
+		select {
+		case <-u.quit:
+			return
+		case <-time.After(delay):
+			f()
+		}
+	})
+}
+
 // LaunchPeriodically asynchronously executes the input function on `interval` periods
 // unless the unit has shut down.
 // If f is executed, the unit will not shut down until after f returns.
