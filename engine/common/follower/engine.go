@@ -224,14 +224,17 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		// go to the first missing ancestor
 		ancestorID := ancestor.Header.ParentID
 		for {
-			ancestor, found := e.pending.ByID(ancestorID)
+			ancestor, found = e.pending.ByID(ancestorID)
 			if !found {
 				break
 			}
 			ancestorID = ancestor.Header.ParentID
 		}
 
-		log.Debug().Msg("requesting missing ancestor for proposal")
+		log.Debug().
+			Uint64("ancestor_height", ancestor.Header.Height).
+			Hex("ancestor_id", ancestorID[:]).
+			Msg("requesting missing ancestor for proposal")
 
 		e.sync.RequestBlock(ancestorID)
 
