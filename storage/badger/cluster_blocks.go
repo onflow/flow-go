@@ -33,7 +33,7 @@ func (b *ClusterBlocks) Store(block *cluster.Block) error {
 	if err != nil {
 		return fmt.Errorf("could not store header: %w", err)
 	}
-	err = b.payloads.Store(block.Header, block.Payload)
+	err = b.payloads.Store(block.ID(), block.Payload)
 	if err != nil {
 		return fmt.Errorf("could not store payload: %w", err)
 	}
