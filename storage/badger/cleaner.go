@@ -3,7 +3,6 @@
 package badger
 
 import (
-	"errors"
 	"math/rand"
 
 	"github.com/dgraph-io/badger/v2"
@@ -50,12 +49,12 @@ func (c *Cleaner) RunGC() {
 	// run the garbage collection in own goroutine and handle sentinel errors
 	go func() {
 		err := c.db.RunValueLogGC(c.ratio)
-		if errors.Is(err, badger.ErrRejected) {
+		if err == badger.ErrRejected {
 			// NOTE: this happens when a GC call is already running
 			c.log.Warn().Msg("garbage collection on value log already running")
 			return
 		}
-		if errors.Is(err, badger.ErrNoRewrite) {
+		if err == badger.ErrNoRewrite {
 			// NOTE: this happens when no files have any garbage to drop
 			c.log.Debug().Msg("garbage collection on value log unnecessary")
 			return

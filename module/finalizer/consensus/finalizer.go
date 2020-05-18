@@ -130,7 +130,7 @@ func (f *Finalizer) MakePending(blockID flow.Identifier) error {
 	}
 
 	// insert the child index into the DB
-	err = f.db.Update(procedure.IndexBlockChild(header.ParentID, blockID))
+	err = operation.RetryOnConflict(f.db.Update, procedure.IndexBlockChild(header.ParentID, blockID))
 	if errors.Is(err, storage.ErrAlreadyExists) {
 		return nil
 	}

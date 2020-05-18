@@ -130,11 +130,11 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 			ancestorID = ancestor.ParentID
 		}
 
-		//TODO for now we check at most 1000 finalized ancestors - we should
+		//TODO for now we check a fixed # of finalized ancestors - we should
 		// instead look back based on reference block ID and expiry
 		// ref: https://github.com/dapperlabs/flow-go/issues/3556
-		limit := clusterFinal.Height - 1000
-		if clusterFinal.Height < 1000 { // check underflow
+		limit := clusterFinal.Height - flow.DefaultTransactionExpiry
+		if limit > clusterFinal.Height { // overflow check
 			limit = 0
 		}
 

@@ -17,6 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -112,8 +113,10 @@ func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExe
 	chunks := make([]*flow.Chunk, 0)
 	chunkDataPacks := make([]*flow.ChunkDataPack, 0)
 
+	metricsCollector := &metrics.NoopCollector{}
+
 	unittest.RunWithTempDir(t, func(dir string) {
-		led, err := ledger.NewTrieStorage(dir)
+		led, err := ledger.NewMTrieStorage(dir, 100, metricsCollector, nil)
 		require.NoError(t, err)
 		defer led.Done()
 

@@ -110,9 +110,6 @@ func (b *backend) dropForParent(parentID flow.Identifier) {
 
 // pruneByHeight prunes any items in the cache that have height below the
 // given height. The pruning height should be the finalized height.
-//
-// NOTE: this is a naive, linear-time pruning strategy, thus it should be called
-// infrequently.
 func (b *backend) pruneByHeight(height uint64) {
 
 	b.mu.Lock()

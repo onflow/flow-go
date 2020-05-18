@@ -91,7 +91,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	}, 30*time.Second, time.Second)
 
 	tx := unittest.TransactionBodyFixture(
-		unittest.WithTransactionDSL(createCounterTx),
+		unittest.WithTransactionDSL(CreateCounterTx),
 		unittest.WithReferenceBlock(genesis.ID()),
 	)
 	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)

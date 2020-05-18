@@ -45,7 +45,7 @@ type ReadOnlyExecutionState interface {
 
 	GetHighestExecutedBlockID(context.Context) (uint64, flow.Identifier, error)
 
-	Size() (int64, error)
+	DiskSize() (int64, error)
 }
 
 // TODO Many operations here are should be transactional, so we need to refactor this
@@ -231,9 +231,7 @@ func (s *state) PersistStateInteractions(ctx context.Context, blockID flow.Ident
 		defer span.Finish()
 	}
 
-	return s.db.Update(func(txn *badger.Txn) error {
-		return operation.InsertExecutionStateInteractions(blockID, views)(txn)
-	})
+	return operation.RetryOnConflict(s.db.Update, operation.InsertExecutionStateInteractions(blockID, views))
 }
 
 func (s *state) RetrieveStateDelta(ctx context.Context, blockID flow.Identifier) (*messages.ExecutionStateDelta, error) {
@@ -296,7 +294,7 @@ func (s *state) UpdateHighestExecutedBlockIfHigher(ctx context.Context, header *
 		defer span.Finish()
 	}
 
-	return s.db.Update(func(txn *badger.Txn) error {
+	return operation.RetryOnConflict(s.db.Update, func(txn *badger.Txn) error {
 		var blockID flow.Identifier
 		err := operation.RetrieveExecutedBlock(&blockID)(txn)
 		if err != nil {
@@ -342,6 +340,6 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 	return highest.Height, blockID, nil
 }
 
-func (s *state) Size() (int64, error) {
-	return s.ls.Size()
+func (s *state) DiskSize() (int64, error) {
+	return s.ls.DiskSize()
 }

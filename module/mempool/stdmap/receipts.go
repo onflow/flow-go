@@ -54,15 +54,3 @@ func (r *Receipts) All() []*flow.ExecutionReceipt {
 	}
 	return receipts
 }
-
-// DropForBlock drops all execution receipts for the given block.
-func (r *Receipts) DropForBlock(blockID flow.Identifier) []flow.Identifier {
-	var receiptIDs []flow.Identifier
-	for _, receipt := range r.All() {
-		if receipt.ExecutionResult.BlockID == blockID {
-			_ = r.Rem(receipt.ID())
-			receiptIDs = append(receiptIDs, receipt.ID())
-		}
-	}
-	return receiptIDs
-}

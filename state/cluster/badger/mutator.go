@@ -16,7 +16,7 @@ type Mutator struct {
 }
 
 func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
-	return m.state.db.Update(func(tx *badger.Txn) error {
+	return operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
 
 		// check chain ID
 		if genesis.Header.ChainID != m.state.chainID {
@@ -113,10 +113,10 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 			parentID = ancestor.ParentID
 		}
 
-		// we go back at most 1k blocks to check payload for now
+		// we go back a fixed number of  blocks to check payload for now
 		//TODO look back based on reference block ID and expiry
 		// ref: https://github.com/dapperlabs/flow-go/issues/3556
-		limit := block.Header.Height - 1000
+		limit := block.Header.Height - flow.DefaultTransactionExpiry
 		if limit > block.Header.Height { // overflow check
 			limit = 0
 		}

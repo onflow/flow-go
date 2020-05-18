@@ -18,6 +18,7 @@ func (nc *NoopCollector) NetworkMessageSent(sizeBytes int, topic string)        
 func (nc *NoopCollector) NetworkMessageReceived(sizeBytes int, topic string)        {}
 func (nc *NoopCollector) MessageSent(engine string, message string)                 {}
 func (nc *NoopCollector) MessageReceived(engine string, message string)             {}
+func (nc *NoopCollector) MessageHandled(engine string, message string)              {}
 func (nc *NoopCollector) BadgerLSMSize(sizeBytes int64)                             {}
 func (nc *NoopCollector) BadgerVLogSize(sizeBytes int64)                            {}
 func (nc *NoopCollector) BadgerNumReads(n int64)                                    {}
@@ -66,3 +67,15 @@ func (nc *NoopCollector) ExecutionStateStorageDiskTotal(bytes int64)            
 func (nc *NoopCollector) ExecutionStorageStateCommitment(bytes int64)               {}
 func (nc *NoopCollector) ExecutionLastExecutedBlockView(view uint64)                {}
 func (ec *NoopCollector) ExecutionTotalExecutedTransactions(numberOfTx int)         {}
+func (nc *NoopCollector) ForestApproxMemorySize(bytes uint64)                       {}
+func (nc *NoopCollector) ForestNumberOfTrees(number uint64)                         {}
+func (nc *NoopCollector) UpdateCount()                                              {}
+func (nc *NoopCollector) ProofSize(bytes uint32)                                    {}
+func (nc *NoopCollector) UpdateValuesNumber(number uint64)                          {}
+func (nc *NoopCollector) UpdateValuesSize(byte uint64)                              {}
+func (nc *NoopCollector) UpdateDuration(duration time.Duration)                     {}
+func (nc *NoopCollector) UpdateDurationPerItem(duration time.Duration)              {}
+func (nc *NoopCollector) ReadValuesNumber(number uint64)                            {}
+func (nc *NoopCollector) ReadValuesSize(byte uint64)                                {}
+func (nc *NoopCollector) ReadDuration(duration time.Duration)                       {}
+func (nc *NoopCollector) ReadDurationPerItem(duration time.Duration)                {}

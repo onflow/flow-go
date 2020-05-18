@@ -8,8 +8,8 @@ The server token is needed with the `-t` flag for both commands. It authenticate
 
 ## Usage
 ```bash
-$ ./transit -push -t ${server-token} -d ${bootstrap-dir}
-$ ./transit -pull -t ${server-token} -d ${bootstrap-dir}
+$ ./transit -push -t ${server-token} -d ${bootstrap-dir} -r ${flow-role}
+$ ./transit -pull -t ${server-token} -d ${bootstrap-dir} -r ${flow-role}
 ```
 
 ## Push

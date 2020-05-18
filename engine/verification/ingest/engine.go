@@ -30,28 +30,29 @@ import (
 // all dependent resources for each execution receipt and relays a complete
 // execution result to the verifier engine when all dependencies are ready.
 type Engine struct {
-	unit                 *engine.Unit
-	log                  zerolog.Logger
-	collectionsConduit   network.Conduit
-	stateConduit         network.Conduit
-	chunksConduit        network.Conduit
-	me                   module.Local
-	state                protocol.State
-	verifierEng          network.Engine                // for submitting ERs that are ready to be verified
-	authReceipts         mempool.Receipts              // keeps receipts with authenticated origin IDs
-	pendingReceipts      mempool.PendingReceipts       // keeps receipts pending for their originID to be authenticated
-	authCollections      mempool.Collections           // keeps collections with authenticated origin IDs
-	pendingCollections   mempool.PendingCollections    // keeps collections pending for their origin IDs to be authenticated
-	collectionTrackers   mempool.CollectionTrackers    // keeps track of collection requests that this engine made
-	chunkDataPacks       mempool.ChunkDataPacks        // keeps chunk data packs with authenticated origin IDs
-	chunkDataPackTackers mempool.ChunkDataPackTrackers // keeps track of chunk data pack requests that this engine made
-	ingestedResultIDs    mempool.Identifiers           // keeps ids of ingested execution results
-	ingestedChunkIDs     mempool.Identifiers           // keeps ids of ingested chunks
-	headerStorage        storage.Headers               // used to check block existence to improve performance
-	blockStorage         storage.Blocks                // used to retrieve blocks
-	assigner             module.ChunkAssigner          // used to determine chunks this node needs to verify
-	requestInterval      uint                          // determines time in milliseconds for retrying tracked requests
-	failureThreshold     uint                          // determines number of retries for tracked requests before raising a challenge
+	unit                  *engine.Unit
+	log                   zerolog.Logger
+	collectionsConduit    network.Conduit
+	stateConduit          network.Conduit
+	chunksConduit         network.Conduit
+	me                    module.Local
+	state                 protocol.State
+	verifierEng           network.Engine                // for submitting ERs that are ready to be verified
+	authReceipts          mempool.Receipts              // keeps receipts with authenticated origin IDs
+	pendingReceipts       mempool.PendingReceipts       // keeps receipts pending for their originID to be authenticated
+	authCollections       mempool.Collections           // keeps collections with authenticated origin IDs
+	pendingCollections    mempool.PendingCollections    // keeps collections pending for their origin IDs to be authenticated
+	collectionTrackers    mempool.CollectionTrackers    // keeps track of collection requests that this engine made
+	chunkDataPacks        mempool.ChunkDataPacks        // keeps chunk data packs with authenticated origin IDs
+	chunkDataPackTackers  mempool.ChunkDataPackTrackers // keeps track of chunk data pack requests that this engine made
+	ingestedResultIDs     mempool.Identifiers           // keeps ids of ingested execution results
+	ingestedChunkIDs      mempool.Identifiers           // keeps ids of ingested chunks
+	ingestedCollectionIDs mempool.Identifiers           // keeps ids collections of ingested chunks
+	headerStorage         storage.Headers               // used to check block existence to improve performance
+	blockStorage          storage.Blocks                // used to retrieve blocks
+	assigner              module.ChunkAssigner          // used to determine chunks this node needs to verify
+	requestInterval       uint                          // determines time in milliseconds for retrying tracked requests
+	failureThreshold      uint                          // determines number of retries for tracked requests before raising a challenge
 }
 
 // New creates and returns a new instance of the ingest engine.
@@ -70,6 +71,7 @@ func New(
 	chunkDataPackTrackers mempool.ChunkDataPackTrackers,
 	ingestedChunkIDs mempool.Identifiers,
 	ingestedResultIDs mempool.Identifiers,
+	ingestedCollectionIDs mempool.Identifiers,
 	headerStorage storage.Headers,
 	blockStorage storage.Blocks,
 	assigner module.ChunkAssigner,
@@ -78,25 +80,26 @@ func New(
 ) (*Engine, error) {
 
 	e := &Engine{
-		unit:                 engine.NewUnit(),
-		log:                  log,
-		state:                state,
-		me:                   me,
-		authReceipts:         authReceipts,
-		pendingReceipts:      pendingReceipts,
-		verifierEng:          verifierEng,
-		authCollections:      authCollections,
-		pendingCollections:   pendingCollections,
-		collectionTrackers:   collectionTrackers,
-		chunkDataPacks:       chunkDataPacks,
-		chunkDataPackTackers: chunkDataPackTrackers,
-		ingestedChunkIDs:     ingestedChunkIDs,
-		ingestedResultIDs:    ingestedResultIDs,
-		headerStorage:        headerStorage,
-		blockStorage:         blockStorage,
-		assigner:             assigner,
-		failureThreshold:     failureThreshold,
-		requestInterval:      requestIntervalMs,
+		unit:                  engine.NewUnit(),
+		log:                   log,
+		state:                 state,
+		me:                    me,
+		authReceipts:          authReceipts,
+		pendingReceipts:       pendingReceipts,
+		verifierEng:           verifierEng,
+		authCollections:       authCollections,
+		pendingCollections:    pendingCollections,
+		collectionTrackers:    collectionTrackers,
+		chunkDataPacks:        chunkDataPacks,
+		chunkDataPackTackers:  chunkDataPackTrackers,
+		ingestedChunkIDs:      ingestedChunkIDs,
+		ingestedResultIDs:     ingestedResultIDs,
+		ingestedCollectionIDs: ingestedCollectionIDs,
+		headerStorage:         headerStorage,
+		blockStorage:          blockStorage,
+		assigner:              assigner,
+		failureThreshold:      failureThreshold,
+		requestInterval:       requestIntervalMs,
 	}
 
 	var err error
@@ -128,7 +131,8 @@ func New(
 func (e *Engine) Ready() <-chan struct{} {
 	// checks pending chunks every `requestInterval` milliseconds
 	e.unit.LaunchPeriodically(e.checkPendingChunks,
-		time.Duration(e.requestInterval)*time.Millisecond)
+		time.Duration(e.requestInterval)*time.Millisecond,
+		0)
 	return e.unit.Ready()
 }
 
@@ -190,15 +194,17 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // handleExecutionReceipt receives an execution receipt, verifies its origin Id and
 // accordingly adds it to either the pending receipts or the authenticated receipts mempools
 func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
+	receiptID := receipt.ID()
+
 	e.log.Info().
 		Hex("origin_id", logging.ID(originID)).
-		Hex("receipt_id", logging.Entity(receipt)).
+		Hex("receipt_id", logging.ID(receiptID)).
 		Msg("execution receipt received at ingest engine")
 
 	if e.ingestedResultIDs.Has(receipt.ExecutionResult.ID()) {
 		e.log.Debug().
 			Hex("origin_id", logging.ID(originID)).
-			Hex("receipt_id", logging.Entity(receipt)).
+			Hex("receipt_id", logging.ID(receiptID)).
 			Msg("execution receipt with already ingested result discarded")
 		// discards the receipt if its result has already been ingested
 		return nil
@@ -210,16 +216,10 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	if err != nil {
 		// TODO: potential attack on authenticity
 		// stores ER in pending receipts till a block arrives authenticating this
-		preceipt := &verificationmodel.PendingReceipt{
-			Receipt:  receipt,
-			OriginID: originID,
-		}
-
-		ok := e.pendingReceipts.Add(preceipt)
-
+		ok := e.pendingReceipts.Add(verificationmodel.NewPendingReceipt(receipt, originID))
 		e.log.Debug().
 			Hex("origin_id", logging.ID(originID)).
-			Hex("receipt_id", logging.Entity(receipt)).
+			Hex("receipt_id", logging.ID(receiptID)).
 			Bool("mempool_insertion", ok).
 			Msg("execution receipt added to pending mempool")
 
@@ -235,9 +235,9 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		ok := e.authReceipts.Add(receipt)
 		e.log.Debug().
 			Hex("origin_id", logging.ID(originID)).
-			Hex("receipt_id", logging.Entity(receipt)).
+			Hex("receipt_id", logging.ID(receiptID)).
 			Bool("mempool_insertion", ok).
-			Msg("execution receipt successfully added to authenticated mempool")
+			Msg("execution receipt added to authenticated mempool")
 
 	}
 	return nil
@@ -257,6 +257,15 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 			Hex("origin_id", logging.ID(originID)).
 			Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
 			Msg("discards the chunk data pack of an already ingested chunk")
+		return nil
+	}
+
+	if e.chunkDataPacks.Has(chunkDataPack.ChunkID) {
+		// discards an already existing chunk data pack
+		e.log.Debug().
+			Hex("origin_id", logging.ID(originID)).
+			Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
+			Msg("discards the already exisiting chunk data pack")
 		return nil
 	}
 
@@ -332,8 +341,26 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 
 	e.log.Info().
 		Hex("origin_id", logging.ID(originID)).
-		Hex("collection_id", logging.Entity(coll)).
+		Hex("collection_id", logging.ID(collID)).
 		Msg("collection received")
+
+	// drops already ingested collection
+	if e.ingestedCollectionIDs.Has(collID) {
+		e.log.Info().
+			Hex("origin_id", logging.ID(originID)).
+			Hex("collection_id", logging.ID(collID)).
+			Msg("drops ingested collection")
+		return nil
+	}
+
+	// drops collection if it is residing on the mempools
+	if e.authCollections.Has(collID) || e.pendingCollections.Has(collID) {
+		e.log.Info().
+			Hex("origin_id", logging.ID(originID)).
+			Hex("collection_id", logging.ID(collID)).
+			Msg("drops existing collection")
+		return nil
+	}
 
 	if e.collectionTrackers.Has(collID) {
 		// this event is a reply to a prior request
@@ -364,20 +391,16 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 
 		e.log.Debug().
 			Hex("origin_id", logging.ID(originID)).
-			Hex("collection_id", logging.Entity(coll)).
+			Hex("collection_id", logging.ID(collID)).
 			Msg("collection added to authenticated mempool, and tracker removed")
 	} else {
 		// this collection came passively
 		// collections with no tracker add to the pending collections mempool
-		pcoll := &verificationmodel.PendingCollection{
-			Collection: coll,
-			OriginID:   originID,
-		}
-		_ = e.pendingCollections.Add(pcoll)
-
+		ok := e.pendingCollections.Add(verificationmodel.NewPendingCollection(coll, originID))
 		e.log.Debug().
 			Hex("origin_id", logging.ID(originID)).
-			Hex("collection_id", logging.Entity(coll)).
+			Hex("collection_id", logging.ID(collID)).
+			Bool("mempool_insertion", ok).
 			Msg("collection added to pending mempool")
 	}
 
@@ -455,6 +478,7 @@ func (e *Engine) requestChunkDataPack(chunkID, blockID flow.Identifier) error {
 
 	req := &messages.ChunkDataPackRequest{
 		ChunkID: chunkID,
+		Nonce:   rand.Uint64(),
 	}
 
 	// TODO we should only submit to execution node that generated execution receipt
@@ -604,7 +628,7 @@ func (e *Engine) checkPendingChunks() {
 
 		if receipt.ExecutionResult.Chunks.Len() == 0 {
 			// TODO potential attack on availability
-			e.log.Error().
+			e.log.Debug().
 				Hex("receipt_id", logging.Entity(receipt)).
 				Hex("result_id", logging.Entity(receipt.ExecutionResult)).
 				Msg("could not ingest execution result with zero chunks")
@@ -692,11 +716,20 @@ func (e *Engine) checkPendingChunks() {
 // It cleans up all resources associated with this chunk
 func (e *Engine) onChunkIngested(vc *verification.VerifiableChunk) {
 	// marks this chunk as ingested
-	added := e.ingestedChunkIDs.Add(vc.ChunkDataPack.ChunkID)
-	if !added {
+	ok := e.ingestedChunkIDs.Add(vc.ChunkDataPack.ChunkID)
+	if !ok {
 		e.log.Error().
 			Hex("chunk_id", logging.ID(vc.ChunkDataPack.ChunkID)).
 			Msg("could not add chunk to ingested chunks mempool")
+	}
+
+	// marks collection corresponding to this chunk as ingested
+	ok = e.ingestedCollectionIDs.Add(vc.Collection.ID())
+	if !ok {
+		e.log.Error().
+			Hex("chunk_id", logging.ID(vc.ChunkDataPack.ChunkID)).
+			Hex("chunk_id", logging.ID(vc.Collection.ID())).
+			Msg("could not add collection to ingested collections mempool")
 	}
 
 	// cleans up resources of the ingested chunk from mempools

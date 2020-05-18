@@ -18,8 +18,10 @@ import (
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	clusterstate "github.com/dapperlabs/flow-go/state/cluster/badger"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -297,7 +299,12 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstate.S
 	db, err := node.DB()
 	require.Nil(suite.T(), err, "could not get node db")
 
-	state, err := clusterstate.NewState(db, chainID)
+	metrics := metrics.NewNoopCollector()
+
+	headers := storage.NewHeaders(metrics, db)
+	payloads := storage.NewClusterPayloads(metrics, db)
+
+	state, err := clusterstate.NewState(db, chainID, headers, payloads)
 	require.Nil(suite.T(), err, "could not get cluster state")
 
 	return state

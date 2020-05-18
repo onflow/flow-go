@@ -23,18 +23,16 @@ func NewCollections(db *badger.DB) *Collections {
 }
 
 func (c *Collections) StoreLight(collection *flow.LightCollection) error {
-	return c.db.Update(func(tx *badger.Txn) error {
-		err := operation.InsertCollection(collection)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert collection: %w", err)
-		}
+	err := operation.RetryOnConflict(c.db.Update, operation.InsertCollection(collection))
+	if err != nil {
+		return fmt.Errorf("could not insert collection: %w", err)
+	}
 
-		return nil
-	})
+	return nil
 }
 
 func (c *Collections) Store(collection *flow.Collection) error {
-	return c.db.Update(func(btx *badger.Txn) error {
+	return operation.RetryOnConflict(c.db.Update, func(btx *badger.Txn) error {
 		light := collection.Light()
 		err := operation.InsertCollection(&light)(btx)
 		if err != nil {
@@ -111,7 +109,7 @@ func (c *Collections) LightByID(colID flow.Identifier) (*flow.LightCollection, e
 }
 
 func (c *Collections) Remove(colID flow.Identifier) error {
-	return c.db.Update(func(btx *badger.Txn) error {
+	return operation.RetryOnConflict(c.db.Update, func(btx *badger.Txn) error {
 		err := operation.RemoveCollection(colID)(btx)
 		if err != nil {
 			return fmt.Errorf("could not remove collection: %w", err)
@@ -121,7 +119,7 @@ func (c *Collections) Remove(colID flow.Identifier) error {
 }
 
 func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightCollection) error {
-	return c.db.Update(func(tx *badger.Txn) error {
+	return operation.RetryOnConflict(c.db.Update, func(tx *badger.Txn) error {
 		err := operation.InsertCollection(collection)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert collection: %w", err)

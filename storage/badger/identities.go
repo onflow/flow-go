@@ -17,7 +17,7 @@ type Identities struct {
 func NewIdentities(collector module.CacheMetrics, db *badger.DB) *Identities {
 
 	store := func(nodeID flow.Identifier, identity interface{}) error {
-		return db.Update(operation.SkipDuplicates(operation.InsertIdentity(nodeID, identity.(*flow.Identity))))
+		return operation.RetryOnConflict(db.Update, operation.SkipDuplicates(operation.InsertIdentity(nodeID, identity.(*flow.Identity))))
 	}
 
 	retrieve := func(nodeID flow.Identifier) (interface{}, error) {

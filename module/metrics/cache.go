@@ -11,29 +11,32 @@ type CacheCollector struct {
 	misses  *prometheus.CounterVec
 }
 
-func NewCacheCollector() *CacheCollector {
+func NewCacheCollector(chain string) *CacheCollector {
 
 	cm := &CacheCollector{
 
 		entries: promauto.NewGaugeVec(prometheus.GaugeOpts{
-			Name:      "entries_total",
-			Namespace: namespaceStorage,
-			Subsystem: subsystemCache,
-			Help:      "the number of entries in the cache",
+			Name:        "entries_total",
+			Namespace:   namespaceStorage,
+			Subsystem:   subsystemCache,
+			Help:        "the number of entries in the cache",
+			ConstLabels: prometheus.Labels{LabelChain: chain},
 		}, []string{LabelResource}),
 
 		hits: promauto.NewCounterVec(prometheus.CounterOpts{
-			Name:      "hits_total",
-			Namespace: namespaceStorage,
-			Subsystem: subsystemCache,
-			Help:      "the number of hits for the cache",
+			Name:        "hits_total",
+			Namespace:   namespaceStorage,
+			Subsystem:   subsystemCache,
+			Help:        "the number of hits for the cache",
+			ConstLabels: prometheus.Labels{LabelChain: chain},
 		}, []string{LabelResource}),
 
 		misses: promauto.NewCounterVec(prometheus.CounterOpts{
-			Name:      "misses_total",
-			Namespace: namespaceStorage,
-			Subsystem: subsystemCache,
-			Help:      "the number of misses for the cache",
+			Name:        "misses_total",
+			Namespace:   namespaceStorage,
+			Subsystem:   subsystemCache,
+			Help:        "the number of misses for the cache",
+			ConstLabels: prometheus.Labels{LabelChain: chain},
 		}, []string{LabelResource}),
 	}
 

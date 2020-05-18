@@ -106,7 +106,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
 	case *flow.CollectionGuarantee:
-		e.metrics.MessageReceived(metrics.EngineIngestion, metrics.MessageCollectionGuarantee)
+		e.metrics.MessageReceived(metrics.EngineConsensusIngestion, metrics.MessageCollectionGuarantee)
 		return e.onCollectionGuarantee(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)

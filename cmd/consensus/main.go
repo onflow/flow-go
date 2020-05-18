@@ -16,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
+	protocolRecovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
 	"github.com/dapperlabs/flow-go/engine/consensus/ingestion"
@@ -33,8 +34,6 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
@@ -49,6 +48,7 @@ func main() {
 		minInterval     time.Duration
 		maxInterval     time.Duration
 		hotstuffTimeout time.Duration
+		blockRateDelay  time.Duration
 
 		err            error
 		privateDKGData *bootstrap.DKGParticipantPriv
@@ -64,16 +64,20 @@ func main() {
 		mainMetrics    module.HotstuffMetrics
 	)
 
-	cmd.FlowNode("consensus").
+	cmd.FlowNode(flow.RoleConsensus.String()).
 		ExtraFlags(func(flags *pflag.FlagSet) {
-			flags.UintVar(&guaranteeLimit, "guarantee-limit", 10*flow.DefaultTransactionExpiry, "maximum number of guarantees in the memory pool")
-			flags.UintVar(&resultLimit, "result-limit", flow.DefaultTransactionExpiry, "maximum number of execution results in the memory pool")
-			flags.UintVar(&receiptLimit, "receipt-limit", flow.DefaultTransactionExpiry, "maximum number of execution receipts in the memory pool")
-			flags.UintVar(&approvalLimit, "approval-limit", flow.DefaultTransactionExpiry, "maximum number of result approvals in the memory pool")
-			flags.UintVar(&sealLimit, "seal-limit", flow.DefaultTransactionExpiry, "maximum number of block seals in the memory pool")
+			flags.UintVar(&guaranteeLimit, "guarantee-limit", 10000, "maximum number of guarantees in the memory pool")
+			flags.UintVar(&resultLimit, "result-limit", 1000, "maximum number of execution results in the memory pool")
+			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
+			flags.UintVar(&approvalLimit, "approval-limit", 1000, "maximum number of result approvals in the memory pool")
+			flags.UintVar(&sealLimit, "seal-limit", 1000, "maximum number of block seals in the memory pool")
 			flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
 			flags.DurationVar(&maxInterval, "max-interval", 60*time.Second, "the maximum amount of time between two blocks")
 			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 2*time.Second, "the initial timeout for the hotstuff pacemaker")
+			// From the experiment,
+			// if block rate delay is 1 second, then 0.8 block will be finalized per second in average.
+			// if block rate delay is 1.5 second, then 0.5 block will be finalized per second in averge
+			flags.DurationVar(&blockRateDelay, "block-rate-delay", time.Second, "the delay to broadcast block proposal in order to control block production rate")
 		}).
 		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
 			privateDKGData, err = loadDKGPrivateData(node.BaseConfig.BootstrapDir, node.NodeID)
@@ -185,6 +189,7 @@ func main() {
 				node.State,
 				prov,
 				proposals,
+				blockRateDelay,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
@@ -210,7 +215,7 @@ func main() {
 				node.DB,
 				node.Storage.Headers,
 				node.Storage.Seals,
-				node.Storage.Payloads,
+				node.Storage.Index,
 				node.Storage.Blocks,
 				guarantees,
 				seals,
@@ -264,7 +269,7 @@ func main() {
 			persist := persister.New(node.DB)
 
 			// query the last finalized block and pending blocks for recovery
-			finalized, pending, err := findLatest(node.State, node.Storage.Headers, node.GenesisBlock.Header)
+			finalized, pending, err := protocolRecovery.FindLatest(node.State, node.Storage.Headers, node.GenesisBlock.Header)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks: %w", err)
 			}
@@ -286,6 +291,7 @@ func main() {
 				finalized,
 				pending,
 				consensus.WithTimeout(hotstuffTimeout),
+				consensus.WithBlockRateDelay(blockRateDelay),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize hotstuff engine: %w", err)
@@ -294,12 +300,12 @@ func main() {
 			comp = comp.WithSynchronization(sync).WithConsensus(hot)
 			return comp, nil
 		}).
-		Run(flow.RoleConsensus.String())
+		Run()
 }
 
-func loadDKGPrivateData(path string, myID flow.Identifier) (*bootstrap.DKGParticipantPriv, error) {
-	filename := fmt.Sprintf(bootstrap.FilenameRandomBeaconPriv, myID)
-	data, err := ioutil.ReadFile(filepath.Join(path, filename))
+func loadDKGPrivateData(dir string, myID flow.Identifier) (*bootstrap.DKGParticipantPriv, error) {
+	path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, myID)
+	data, err := ioutil.ReadFile(filepath.Join(dir, path))
 	if err != nil {
 		return nil, err
 	}
@@ -310,31 +316,4 @@ func loadDKGPrivateData(path string, myID flow.Identifier) (*bootstrap.DKGPartic
 		return nil, err
 	}
 	return &priv, nil
-}
-
-func findLatest(state protocol.State, headers storage.Headers, rootHeader *flow.Header) (*flow.Header, []*flow.Header, error) {
-	// find finalized block
-	finalized, err := state.Final().Head()
-
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not find finalized block")
-	}
-
-	// find all pending blockIDs
-	pendingIDs, err := state.Final().Pending()
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not find pending block")
-	}
-
-	// find all pending header by ID
-	pending := make([]*flow.Header, 0, len(pendingIDs))
-	for _, u := range pendingIDs {
-		pendingHeader, err := headers.ByBlockID(u)
-		if err != nil {
-			return nil, nil, fmt.Errorf("could not find pending block by ID: %w", err)
-		}
-		pending = append(pending, pendingHeader)
-	}
-
-	return finalized, pending, nil
 }

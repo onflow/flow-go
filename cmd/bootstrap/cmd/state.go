@@ -17,7 +17,7 @@ func genGenesisExecutionState() flow.StateCommitment {
 	}
 
 	enc := account0Priv.PrivateKey.Encode()
-	writeJSON(bootstrap.FilenameAccount0Priv, enc)
+	writeJSON(bootstrap.PathAccount0Priv, enc)
 
 	dbpath := filepath.Join(flagOutdir, bootstrap.DirnameExecutionState)
 	stateCommitment, err := run.GenerateExecutionState(dbpath, account0Priv)
@@ -26,7 +26,7 @@ func genGenesisExecutionState() flow.StateCommitment {
 	}
 	log.Info().Msgf("wrote execution state db to directory %v", dbpath)
 
-	writeJSON(bootstrap.FilenameGenesisCommit, stateCommitment)
+	writeJSON(bootstrap.PathGenesisCommit, stateCommitment)
 
 	return stateCommitment
 }

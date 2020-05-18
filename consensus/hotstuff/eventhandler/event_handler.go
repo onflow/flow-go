@@ -136,7 +136,7 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 	}
 
 	// store the proposer's vote in voteAggregator
-	_ = e.voteAggregator.StoreProposerVote(proposal.ProposerVote())
+	stored := e.voteAggregator.StoreProposerVote(proposal.ProposerVote())
 
 	// if the block is for the current view, then process the current block
 	if block.View == curView {
@@ -159,7 +159,7 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 
 	newView := e.paceMaker.CurView() // in case we skipped ahead
 
-	log.Info().Uint64("new_view", newView).Msg("block proposal for non-current view processed")
+	log.Info().Uint64("new_view", newView).Bool("proposer_vote_stored", stored).Msg("block proposal for non-current view processed")
 
 	return nil
 }
@@ -218,6 +218,7 @@ func (e *EventHandler) startNewView() error {
 
 	log := e.log.With().
 		Uint64("cur_view", curView).
+		Uint64("finalized_view", e.forks.FinalizedView()).
 		Logger()
 
 	log.Debug().Msg("entering new view")
@@ -258,7 +259,8 @@ func (e *EventHandler) startNewView() error {
 
 		// broadcast the proposal
 		header := model.ProposalToFlow(proposal)
-		err = e.communicator.BroadcastProposal(header)
+		err = e.communicator.BroadcastProposalWithDelay(header, e.paceMaker.BlockRateDelay())
+
 		if err != nil {
 			log.Warn().Err(err).Msg("could not forward proposal")
 		}

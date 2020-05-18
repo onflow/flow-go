@@ -18,6 +18,8 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
+	"github.com/dapperlabs/flow-go/consensus/recovery/cluster"
+	protocolRecovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/proposal"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
@@ -38,7 +40,6 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
-	"github.com/dapperlabs/flow-go/state/cluster"
 	clusterkv "github.com/dapperlabs/flow-go/state/cluster/badger"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	storage "github.com/dapperlabs/flow-go/storage"
@@ -59,10 +60,12 @@ func main() {
 		builderExpiryBuffer uint
 		hotstuffTimeout     time.Duration
 
-		ingressConf  ingress.Config
-		pool         mempool.Transactions
-		transactions *storagekv.Transactions
-		colPayloads  *storagekv.ClusterPayloads
+		ingressConf     ingress.Config
+		pool            mempool.Transactions
+		transactions    *storagekv.Transactions
+		colHeaders      *storagekv.Headers
+		colPayloads     *storagekv.ClusterPayloads
+		colCacheMetrics module.CacheMetrics
 
 		colCache *buffer.PendingClusterBlocks // pending block cache for cluster consensus
 		conCache *buffer.PendingBlocks        // pending block cache for follower
@@ -77,12 +80,12 @@ func main() {
 
 		prov           *provider.Engine
 		ing            *ingest.Engine
-		collMetrics    module.CollectionMetrics
+		colMetrics     module.CollectionMetrics
 		clusterMetrics module.HotstuffMetrics
 		err            error
 	)
 
-	cmd.FlowNode("collection").
+	cmd.FlowNode(flow.RoleCollection.String()).
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&txLimit, "tx-limit", 50000, "maximum number of transactions in the memory pool")
 			flags.UintVar(&ingressExpiryBuffer, "ingress-expiry-buffer", 30, "expiry buffer for inbound transactions")
@@ -96,11 +99,13 @@ func main() {
 			return err
 		}).
 		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
+			colCacheMetrics = metrics.NewCacheCollector("cluster")
 			transactions = storagekv.NewTransactions(node.DB)
-			colPayloads = storagekv.NewClusterPayloads(node.DB)
+			colHeaders = storagekv.NewHeaders(colCacheMetrics, node.DB)
+			colPayloads = storagekv.NewClusterPayloads(colCacheMetrics, node.DB)
 			return nil
 		}).
-		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
+		Module("block mempool", func(node *cmd.FlowNodeBuilder) error {
 			colCache = buffer.NewPendingClusterBlocks()
 			conCache = buffer.NewPendingBlocks()
 			return nil
@@ -114,7 +119,7 @@ func main() {
 			return nil
 		}).
 		Module("collection node metrics", func(node *cmd.FlowNodeBuilder) error {
-			collMetrics = metrics.NewCollectionCollector(node.Tracer)
+			colMetrics = metrics.NewCollectionCollector(node.Tracer)
 			return nil
 		}).
 		Module("hotstuff cluster metrics", func(node *cmd.FlowNodeBuilder) error {
@@ -143,7 +148,7 @@ func main() {
 		Module("cluster state", func(node *cmd.FlowNodeBuilder) error {
 
 			// initialize cluster state
-			clusterState, err = clusterkv.NewState(node.DB, clusterID, node.Storage.Headers, colPayloads)
+			clusterState, err = clusterkv.NewState(node.DB, clusterID, colHeaders, colPayloads)
 			if err != nil {
 				return fmt.Errorf("could not create cluster state: %w", err)
 			}
@@ -198,24 +203,59 @@ func main() {
 			// initialize the verifier for the protocol consensus
 			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, node.DKGState, staking, beacon, merger)
 
-			// TODO: use proper engine for notifier to follower
+			// use proper engine for notifier to follower
 			notifier := notifications.NewNoopConsumer()
 
-			// creates a consensus follower with ingestEngine as the notifier
-			// so that it gets notified upon each new finalized block
-			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, finalizer, verifier, notifier, node.GenesisBlock.Header, node.GenesisQC)
+			finalized, pending, err := protocolRecovery.FindLatest(node.State, node.Storage.Headers, node.GenesisBlock.Header)
+			if err != nil {
+				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
+			}
+
+			// creates a consensus follower with noop consumer as the notifier
+			core, err := consensus.NewFollower(
+				node.Logger,
+				mainConsensusCommittee,
+				node.Storage.Headers,
+				finalizer,
+				verifier,
+				notifier,
+				node.GenesisBlock.Header,
+				node.GenesisQC,
+				finalized,
+				pending,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
 
-			follower, err := followereng.New(node.Logger, node.Network, node.Me, cleaner, node.Storage.Headers, node.Storage.Payloads, node.State, conCache, core)
+			follower, err := followereng.New(
+				node.Logger,
+				node.Network,
+				node.Me,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
+				cleaner,
+				node.Storage.Headers,
+				node.Storage.Payloads,
+				node.State,
+				conCache,
+				core,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
 
 			// create a block synchronization engine to handle follower getting
 			// out of sync
-			sync, err := synchronization.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State, node.Storage.Blocks, follower)
+			sync, err := synchronization.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				node.Storage.Blocks,
+				follower,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
@@ -223,7 +263,16 @@ func main() {
 			return follower.WithSynchronization(sync), nil
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ing, err = ingest.New(node.Logger, node.Network, node.State, collMetrics, node.Me, pool, ingressExpiryBuffer)
+			ing, err = ingest.New(
+				node.Logger,
+				node.Network,
+				node.State,
+				node.Metrics.Engine,
+				colMetrics,
+				node.Me,
+				pool,
+				ingressExpiryBuffer,
+			)
 			return ing, err
 		}).
 		Component("ingress server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -232,17 +281,42 @@ func main() {
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			collections := storagekv.NewCollections(node.DB)
-			prov, err = provider.New(node.Logger, node.Network, node.State, collMetrics, node.Me, pool, collections, transactions)
+			prov, err = provider.New(
+				node.Logger,
+				node.Network,
+				node.State,
+				node.Metrics.Engine,
+				colMetrics,
+				node.Me,
+				pool,
+				collections,
+				transactions,
+			)
 			return prov, err
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			builder := builder.NewBuilder(node.DB, node.Storage.Headers, colPayloads, pool,
+			builder := builder.NewBuilder(node.DB, colHeaders, colPayloads, pool,
 				builder.WithMaxCollectionSize(maxCollectionSize),
 				builder.WithExpiryBuffer(builderExpiryBuffer),
 			)
-			finalizer := colfinalizer.NewFinalizer(node.DB, pool, prov, collMetrics, clusterID)
+			finalizer := colfinalizer.NewFinalizer(node.DB, pool, prov, colMetrics, clusterID)
 
-			prop, err := proposal.New(node.Logger, node.Network, node.Me, node.State, clusterState, collMetrics, ing, pool, transactions, node.Storage.Headers, colPayloads, colCache)
+			prop, err := proposal.New(
+				node.Logger,
+				node.Network,
+				node.Me,
+				colMetrics,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
+				node.State,
+				clusterState,
+				ing,
+				pool,
+				transactions,
+				colHeaders,
+				colPayloads,
+				colCache,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize engine: %w", err)
 			}
@@ -262,7 +336,7 @@ func main() {
 
 			persist := persister.New(node.DB)
 
-			finalized, pending, err := findLatest(clusterState, node.Storage.Headers)
+			finalized, pending, err := cluster.FindLatest(clusterState, colHeaders)
 			if err != nil {
 				return nil, fmt.Errorf("could not retrieve finalized/pending headers: %w", err)
 			}
@@ -271,7 +345,7 @@ func main() {
 				node.Logger,
 				notifier,
 				clusterMetrics,
-				node.Storage.Headers,
+				colHeaders,
 				committee,
 				builder,
 				finalizer,
@@ -291,7 +365,7 @@ func main() {
 			prop = prop.WithConsensus(hot)
 			return prop, nil
 		}).
-		Run(flow.RoleCollection.String())
+		Run()
 }
 
 // initClusterCommittee initializes the collector cluster's HotStuff committee state
@@ -310,7 +384,7 @@ func initClusterCommittee(node *cmd.FlowNodeBuilder, colPayloads *storagekv.Clus
 }
 
 func loadClusterBlock(path string, clusterID string) (*clustermodel.Block, error) {
-	filename := fmt.Sprintf(bootstrap.FilenameGenesisClusterBlock, clusterID)
+	filename := fmt.Sprintf(bootstrap.PathGenesisClusterBlock, clusterID)
 	data, err := ioutil.ReadFile(filepath.Join(path, filename))
 	if err != nil {
 		return nil, err
@@ -325,7 +399,7 @@ func loadClusterBlock(path string, clusterID string) (*clustermodel.Block, error
 }
 
 func loadClusterQC(path string, clusterID string) (*hotstuffmodel.QuorumCertificate, error) {
-	filename := fmt.Sprintf(bootstrap.FilenameGenesisClusterQC, clusterID)
+	filename := fmt.Sprintf(bootstrap.PathGenesisClusterQC, clusterID)
 	data, err := ioutil.ReadFile(filepath.Join(path, filename))
 	if err != nil {
 		return nil, err
@@ -337,32 +411,4 @@ func loadClusterQC(path string, clusterID string) (*hotstuffmodel.QuorumCertific
 		return nil, err
 	}
 	return &qc, nil
-}
-
-// findLatest retrieves the latest finalized header and all of its pending
-// children. These are child blocks that have been verified by both the
-// compliance layer and HotStuff and thus are safe to inject directly into
-// HotStuff with no further validation.
-func findLatest(state cluster.State, headers storage.Headers) (*flow.Header, []*flow.Header, error) {
-
-	finalized, err := state.Final().Head()
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not get finalized header: %w", err)
-	}
-
-	pendingIDs, err := state.Final().Pending()
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not get pending children: %w", err)
-	}
-
-	pending := make([]*flow.Header, 0, len(pendingIDs))
-	for _, pendingID := range pendingIDs {
-		header, err := headers.ByBlockID(pendingID)
-		if err != nil {
-			return nil, nil, fmt.Errorf("could not find pending child: %w", err)
-		}
-		pending = append(pending, header)
-	}
-
-	return finalized, pending, nil
 }

@@ -153,7 +153,7 @@ func NewProtocolState(block *flow.Block) (*protoBadger.State, *badger.DB, error)
 	payloads := storeBadger.NewPayloads(index, identities, guarantees, seals)
 	blocks := storeBadger.NewBlocks(db, headers, payloads)
 
-	state, err := protoBadger.NewState(metrics, db, headers, identities, seals, payloads, blocks)
+	state, err := protoBadger.NewState(metrics, db, headers, identities, seals, index, payloads, blocks)
 	if err != nil {
 		return nil, nil, err
 	}

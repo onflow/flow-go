@@ -25,7 +25,7 @@ type Builder struct {
 	db       *badger.DB
 	seals    storage.Seals
 	headers  storage.Headers
-	payloads storage.Payloads
+	index    storage.Index
 	blocks   storage.Blocks
 	guarPool mempool.Guarantees
 	sealPool mempool.Seals
@@ -33,7 +33,7 @@ type Builder struct {
 }
 
 // NewBuilder creates a new block builder.
-func NewBuilder(metrics module.MempoolMetrics, db *badger.DB, headers storage.Headers, seals storage.Seals, payloads storage.Payloads, blocks storage.Blocks, guarPool mempool.Guarantees, sealPool mempool.Seals, options ...func(*Config)) *Builder {
+func NewBuilder(metrics module.MempoolMetrics, db *badger.DB, headers storage.Headers, seals storage.Seals, index storage.Index, blocks storage.Blocks, guarPool mempool.Guarantees, sealPool mempool.Seals, options ...func(*Config)) *Builder {
 
 	// initialize default config
 	cfg := Config{
@@ -52,7 +52,7 @@ func NewBuilder(metrics module.MempoolMetrics, db *badger.DB, headers storage.He
 		db:       db,
 		headers:  headers,
 		seals:    seals,
-		payloads: payloads,
+		index:    index,
 		blocks:   blocks,
 		guarPool: guarPool,
 		sealPool: sealPool,
@@ -90,12 +90,12 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		if ancestor.Height <= finalized {
 			return nil, fmt.Errorf("should always build on last finalized block")
 		}
-		payload, err := b.payloads.ByBlockID(ancestorID)
+		index, err := b.index.ByBlockID(ancestorID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
 		}
-		for _, guarantee := range payload.Guarantees {
-			pendingLookup[guarantee.ID()] = struct{}{}
+		for _, collID := range index.CollectionIDs {
+			pendingLookup[collID] = struct{}{}
 		}
 		ancestorID = ancestor.ParentID
 	}
@@ -120,12 +120,12 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		if err != nil {
 			return nil, fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
 		}
-		payload, err := b.payloads.ByBlockID(ancestorID)
+		index, err := b.index.ByBlockID(ancestorID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
 		}
-		for _, guarantee := range payload.Guarantees {
-			finalLookup[guarantee.ID()] = struct{}{}
+		for _, collID := range index.CollectionIDs {
+			finalLookup[collID] = struct{}{}
 		}
 		if ancestor.Height <= limit {
 			break
@@ -185,43 +185,84 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("multiple seals for the same block")
 	}
 
-	// create a list of ancestors from parent to just before last sealed
+	// get the parent's block seal, which constitutes the beginning of the
+	// sealing chain; this is where we need to start with our chain of seals
 	last, err := b.seals.ByBlockID(parentID)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve parent seal: %w", err)
+		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", parentID, err)
 	}
+
+	// get the last sealed block; we use its height to iterate forwards through
+	// the finalized blocks which still need sealing
+	sealed, err := b.headers.ByBlockID(last.BlockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve sealed block (%x): %w", last.BlockID, err)
+	}
+
+	// we now go from last sealed height plus one to finalized height and check
+	// if we have the seal for each of them step by step; often we will not even
+	// enter this loop, because last sealed height is higher than finalized
+	unchained := false
+	var seals []*flow.Seal
+	for height := sealed.Height + 1; height <= finalized; height++ {
+		if len(byBlock) == 0 {
+			break
+		}
+		header, err := b.headers.ByHeight(height)
+		if err != nil {
+			return nil, fmt.Errorf("could not get block for height (%d): %w", height, err)
+		}
+		blockID := header.ID()
+		next, found := byBlock[blockID]
+		if !found {
+			unchained = true
+			break
+		}
+		if !bytes.Equal(next.InitialState, last.FinalState) {
+			return nil, fmt.Errorf("seal execution states do not connect in finalized")
+		}
+		seals = append(seals, next)
+		delete(byBlock, blockID)
+		last = next
+	}
+
+	// NOTE: We should only run the next part in case we did not use up all
+	// seals in the previous part; both break cases should make us skip the rest
+	// as it means we either ran out of seals or we can't find the next link in
+	// the chain.
+
+	// Once we have filled in seals for all finalized blocks we need to check
+	// the non-finalized blocks backwards; collect all of them, from direct
+	// parent to just before finalized, and see if we can use up the rest of the
+	// seals. We need to be careful to break when reaching the last sealed block
+	// as it could be higher than the last finalized block.
 	ancestorID = parentID
-	var sealableIDs []flow.Identifier
-	for ancestorID != last.BlockID {
-		sealableIDs = append(sealableIDs, ancestorID)
+	var pendingIDs []flow.Identifier
+	for ancestorID != finalID && ancestorID != last.BlockID {
+		pendingIDs = append(pendingIDs, ancestorID)
 		ancestor, err := b.headers.ByBlockID(ancestorID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get sealable ancestor (%x): %w", ancestorID, err)
 		}
 		ancestorID = ancestor.ParentID
 	}
-
-	// iterate backwards from just after last sealed to parent and build a chain
-	// of seals for those blocks that is as big as possible
-	var seals []*flow.Seal
-	for i := len(sealableIDs) - 1; i >= 0; i-- {
-		sealableID := sealableIDs[i]
-
-		// if we don't find the next seal, we are done building the chain
-		next, found := byBlock[sealableID]
+	for i := len(pendingIDs) - 1; i >= 0; i-- {
+		if len(byBlock) == 0 {
+			break
+		}
+		if unchained {
+			break
+		}
+		pendingID := pendingIDs[i]
+		next, found := byBlock[pendingID]
 		if !found {
 			break
 		}
-
-		// if the states mismatch between two subsequent seals, it's an error
 		if !bytes.Equal(next.InitialState, last.FinalState) {
-			return nil, fmt.Errorf("seal execution states do not connect")
+			return nil, fmt.Errorf("seal execution states do not connect in pending")
 		}
-
-		// add seal to the payload
 		seals = append(seals, next)
-
-		// keep track of last seal to check state connection
+		delete(byBlock, pendingID)
 		last = next
 	}
 
@@ -280,7 +321,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 	err = b.blocks.Store(proposal)
 	if err != nil {
-		return nil, fmt.Errorf("could ot store proposal: %w", err)
+		return nil, fmt.Errorf("could not store proposal: %w", err)
 	}
 
 	// update protocol state index for the seal and initialize children index

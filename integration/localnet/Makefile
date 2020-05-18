@@ -4,6 +4,7 @@ EXECUTION = 1
 VERIFICATION = 1
 ACCESS = 1
 NCLUSTERS=1
+PROFILER=false
 
 .PHONY: init
 init:
@@ -13,7 +14,8 @@ init:
 		-execution=$(EXECUTION) \
 		-verification=$(VERIFICATION) \
 		-access=$(ACCESS) \
-		-nclusters=$(NCLUSTERS)
+		-nclusters=$(NCLUSTERS) \
+		-profiler=$(PROFILER)
 
 .PHONY: start
 start:

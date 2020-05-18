@@ -17,7 +17,7 @@ type Commits struct {
 func NewCommits(collector module.CacheMetrics, db *badger.DB) *Commits {
 
 	store := func(blockID flow.Identifier, commit interface{}) error {
-		return db.Update(operation.IndexStateCommitment(blockID, commit.(flow.StateCommitment)))
+		return operation.RetryOnConflict(db.Update, operation.IndexStateCommitment(blockID, commit.(flow.StateCommitment)))
 	}
 
 	retrieve := func(blockID flow.Identifier) (interface{}, error) {
