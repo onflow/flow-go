@@ -524,9 +524,13 @@ func (e *Engine) prune() {
 		return
 	}
 
+	prunedHeights := 0
+	prunedIDs := 0
+
 	for height := range e.heights {
 		if height <= final.Height {
 			delete(e.heights, height)
+			prunedHeights++
 			continue
 		}
 	}
@@ -537,16 +541,24 @@ func (e *Engine) prune() {
 
 			if header.Height <= final.Height {
 				delete(e.blockIDs, blockID)
+				prunedIDs++
 				continue
 			}
 		}
 	}
+
+	e.log.Debug().
+		Uint64("final_height", final.Height).
+		Msgf("pruned %d heights, %d block IDs", prunedHeights, prunedIDs)
 }
 
 // scanPending will check which items shall be requested.
 func (e *Engine) scanPending() ([]uint64, []flow.Identifier, error) {
 	e.unit.Lock()
 	defer e.unit.Unlock()
+
+	// first, prune any finalized heights
+	e.prune()
 
 	// TODO: we will probably want to limit the maximum amount of in-flight
 	// requests and maximum amount of blocks requested at the same time here;
