@@ -20,11 +20,6 @@ func (_m *CollectionMetrics) CollectionProposed(collection flow.LightCollection)
 	_m.Called(collection)
 }
 
-// PendingClusterBlocks provides a mock function with given fields: n
-func (_m *CollectionMetrics) PendingClusterBlocks(n uint) {
-	_m.Called(n)
-}
-
 // TransactionReceived provides a mock function with given fields: txID
 func (_m *CollectionMetrics) TransactionReceived(txID flow.Identifier) {
 	_m.Called(txID)
