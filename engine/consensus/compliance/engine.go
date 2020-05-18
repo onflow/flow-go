@@ -389,7 +389,10 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 			ancestorID = ancestor.Header.ParentID
 		}
 
-		log.Debug().Msg("requesting missing ancestor for proposal")
+		log.Debug().
+			Uint64("ancestor_height", ancestor.Header.Height).
+			Hex("ancestor_id", ancestorID[:]).
+			Msg("requesting missing ancestor for proposal")
 
 		e.sync.RequestBlock(ancestorID)
 
@@ -507,12 +510,17 @@ func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.BlockVote)
 // parent block that was just processed; if this is the case, they should now
 // all be validly connected to the finalized state and we should process them.
 func (e *Engine) processPendingChildren(header *flow.Header) error {
+	blockID := header.ID()
 
 	// check if there are any children for this parent in the cache
-	children, has := e.pending.ByParentID(header.ID())
+	children, has := e.pending.ByParentID(blockID)
 	if !has {
 		return nil
 	}
+
+	e.log.Debug().
+		Int("children", len(children)).
+		Msg("processing pending children")
 
 	// then try to process children only this once
 	var result *multierror.Error
@@ -528,7 +536,7 @@ func (e *Engine) processPendingChildren(header *flow.Header) error {
 	}
 
 	// drop all of the children that should have been processed now
-	e.pending.DropForParent(header)
+	e.pending.DropForParent(blockID)
 
 	e.mempool.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
 
