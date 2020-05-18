@@ -9,6 +9,11 @@ import (
 )
 
 // Node of a RamSafe MTrie.
+//
+// DEFINITIONS:
+//     * HEIGHT of a node v in a tree is the number of edges on the longest
+//       downward path between v and a tree leaf.
+//
 // Conceptually, an MTrie is a sparse Merkle Trie, which has three different types of nodes:
 //    * LEAF node: fully defined by key-value pair and a height
 //      hash is pre-computed, lChild and rChild are nil)
@@ -17,6 +22,9 @@ import (
 //    * ROOT of empty trie node: this is a special case, where the node
 //      has no children, and no key-value
 // Currently, we represent both data structures by Node instances
+//
+// Nodes are supposed to be used in READ-ONLY fashion. However,
+// for performance reasons, we not not copy read.
 // TODO: optimized data structures might be able to reduce memory consumption
 type Node struct {
 	lChild    *Node // Left Child
@@ -28,7 +36,7 @@ type Node struct {
 }
 
 // NewLeaf creates a compact leaf Node
-func NewRoot(height int) *Node {
+func NewEmptyTreeRoot(height int) *Node {
 	n := &Node{
 		lChild: nil,
 		rChild: nil,
@@ -92,22 +100,33 @@ func (n *Node) computeNodeHash() []byte {
 	return common.HashInterNode(h1, h2)
 }
 
-// Height returns the Node's hash value. Do not modify returned slice!
+// Height returns the Node's hash value.
+// Do NOT MODIFY returned slice!
 func (n *Node) Hash() []byte { return n.hashValue }
 
 // Height returns the Node's height.
+// Per definition, the height of a node v in a tree is the number
+// of edges on the longest downward path between v and a tree leaf.
 func (n *Node) Height() int { return n.height }
 
-// Key returns the the Node. For all node types other than LEAF nodes,
-// the return values are nil. For LEAF node, both return values are non-nil
-func (n *Node) KeyValue() ([]byte, []byte) { return n.key, n.value }
+// Key returns the the Node's register key.
+// The present node is a LEAF node, if and only if the returned key is NOT NULL.
+// Do NOT MODIFY returned slices!
+func (n *Node) Key() []byte { return n.key }
+
+// Value returns the the Node's register values.
+// The present node is a LEAF node, if and only if the returned value is NOT NULL.
+// Do NOT MODIFY returned slices!
+func (n *Node) Value() []byte { return n.value }
 
 // LeftChild returns the the Node's left child.
 // Only INTERIOR nodes have children.
+// Do NOT MODIFY returned Node!
 func (n *Node) LeftChild() *Node { return n.lChild }
 
 // RigthChild returns the the Node's right child.
 // Only INTERIOR nodes have children.
+// Do NOT MODIFY returned Node!
 func (n *Node) RigthChild() *Node { return n.rChild }
 
 // FmtStr provides formatted string representation of the Node and sub tree

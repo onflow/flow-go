@@ -12,7 +12,7 @@ import (
 // unpopulated branches and parts that are compact. It is fully stored in memory and doesn't use
 // a database.
 type PSMT struct {
-	root        *node // Root
+	root        *node // root
 	height      int   // height of the tree
 	keyByteSize int   // acceptable size of key (in bytes)
 	keyLookUp   map[string]*node

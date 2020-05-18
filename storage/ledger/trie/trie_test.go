@@ -36,7 +36,7 @@ func TestSMTInitialization(t *testing.T) {
 		}
 
 		if len(emptyTree.rootNode.value) != testHashLength {
-			t.Errorf("Root should be a hash")
+			t.Errorf("root should be a hash")
 		}
 	})
 }

@@ -17,41 +17,43 @@ import (
 )
 
 // MTrie is a fully in memory trie with option to persist to disk
+// TODO: UPDATE to this DEFINITION:
+//   * HEIGHT of a node v in a tree is the number of edges on the longest downward path
+//    between v and a tree leaf. The height of a tree is the heights of its root.
 type MTrie struct {
-	Root           *node.Node
+	root           *node.Node
 	Number         uint64
 	MaxHeight      int
 	Values         map[string][]byte
-	rootHash       []byte
 	ParentRootHash []byte
 }
 
-// NewMTrie returns the same Root
-func NewMTrie(maxHeight int) *MTrie {
-	return &MTrie{Root: node.NewNode(maxHeight - 1),
-		Values:    make(map[string][]byte),
-		MaxHeight: maxHeight}
+// NewMTrie
+func NewMTrie(maxHeight int, number uint64, parentRootHash []byte) *MTrie {
+	return &MTrie{
+		root:           node.NewEmptyTreeRoot(maxHeight - 1),
+		Number:         number,
+		MaxHeight:      maxHeight,
+		Values:         make(map[string][]byte),
+		ParentRootHash: parentRootHash,
+	}
 }
 
 func (mt *MTrie) StringRootHash() string {
-	return hex.EncodeToString(mt.rootHash)
+	return hex.EncodeToString(mt.root.Hash())
 }
 
 func (mt *MTrie) RootHash() []byte {
-	return mt.rootHash
-}
-
-func (mt *MTrie) SetRootHash(rh []byte) {
-	mt.rootHash = rh
+	return mt.root.Hash()
 }
 
 func (mt *MTrie) String() string {
 	trieStr := fmt.Sprintf("Trie Number:%v hash:%v parent: %v\n", mt.Number, mt.StringRootHash(), hex.EncodeToString(mt.ParentRootHash))
-	return trieStr + mt.Root.FmtStr("", "")
+	return trieStr + mt.root.FmtStr("", "")
 }
 
 func (mt *MTrie) UnsafeRead(keys [][]byte) ([][]byte, error) {
-	return mt.read(mt.Root, keys)
+	return mt.read(mt.root, keys)
 }
 
 func (mt *MTrie) read(head *node.Node, keys [][]byte) ([][]byte, error) {
@@ -64,11 +66,11 @@ func (mt *MTrie) read(head *node.Node, keys [][]byte) ([][]byte, error) {
 		return res, nil
 	}
 	// reached a leaf node
-	if head.key != nil {
+	if head.Key() != nil {
 		res := make([][]byte, 0)
 		for _, k := range keys {
-			if bytes.Equal(head.key, k) {
-				res = append(res, head.value)
+			if bytes.Equal(head.Key(), k) {
+				res = append(res, head.Value())
 			} else {
 				res = append(res, []byte{})
 			}
@@ -76,7 +78,7 @@ func (mt *MTrie) read(head *node.Node, keys [][]byte) ([][]byte, error) {
 		return res, nil
 	}
 
-	lkeys, rkeys, err := common.SplitSortedKeys(keys, mt.MaxHeight-head.height-1)
+	lkeys, rkeys, err := common.SplitSortedKeys(keys, mt.MaxHeight-head.Height()-1)
 	if err != nil {
 		return nil, fmt.Errorf("can't read due to split key error: %w", err)
 	}
@@ -84,7 +86,7 @@ func (mt *MTrie) read(head *node.Node, keys [][]byte) ([][]byte, error) {
 	// TODO make this parallel
 	values := make([][]byte, 0)
 	if len(lkeys) > 0 {
-		v, err := mt.read(head.lChild, lkeys)
+		v, err := mt.read(head.LeftChild(), lkeys)
 		if err != nil {
 			return nil, err
 		}
@@ -92,7 +94,7 @@ func (mt *MTrie) read(head *node.Node, keys [][]byte) ([][]byte, error) {
 	}
 
 	if len(rkeys) > 0 {
-		v, err := mt.read(head.rChild, rkeys)
+		v, err := mt.read(head.RigthChild(), rkeys)
 		if err != nil {
 			return nil, err
 		}
@@ -102,25 +104,26 @@ func (mt *MTrie) read(head *node.Node, keys [][]byte) ([][]byte, error) {
 }
 
 func (mt *MTrie) UnsafeUpdate(parentTrie *MTrie, keys [][]byte, values [][]byte) error {
-	return mt.update(parentTrie.Root, mt.Root, keys, values)
+	return mt.update(parentTrie.root, mt.root, keys, values)
 }
 
 func (mt *MTrie) update(parent *node.Node, head *node.Node, keys [][]byte, values [][]byte) error {
 	// parent has a key for this node (add key and insert)
-	if parent.key != nil {
+	if parentKey := parent.Key(); parentKey != nil {
 		alreadyExist := false
 		// deduplicate
 		for _, k := range keys {
-			if bytes.Equal(k, parent.key) {
+			if bytes.Equal(k, parentKey) {
 				alreadyExist = true
+				break
 			}
 		}
 		if !alreadyExist {
-			keys = append(keys, parent.key)
-			values = append(values, parent.value)
+			keys = append(keys, parentKey)
+			values = append(values, parent.Value())
 		}
-
 	}
+
 	// If we are at a leaf node, we create the node
 	if len(keys) == 1 && parent.lChild == nil && parent.rChild == nil {
 		head.key = keys[0]
@@ -190,7 +193,7 @@ func (mt *MTrie) update(parent *node.Node, head *node.Node, keys [][]byte, value
 }
 
 func (mt *MTrie) UnsafeProofs(keys [][]byte, proofs []*proof.Proof) error {
-	return mt.proofs(mt.Root, keys, proofs)
+	return mt.proofs(mt.root, keys, proofs)
 }
 
 func (mt *MTrie) proofs(head *node.Node, keys [][]byte, proofs []*proof.Proof) error {
@@ -308,7 +311,7 @@ func (mt *MTrie) Store(path string) error {
 	}
 
 	// repeated: x bytes key, 4bytes valueSize(Number of bytes value took), valueSize bytes value)
-	err = mt.store(mt.Root, writer)
+	err = mt.store(mt.root, writer)
 	if err != nil {
 		return err
 	}
@@ -441,7 +444,7 @@ func (mt *MTrie) Load(path string) error {
 		values = append(values, value)
 	}
 
-	return mt.load(mt.Root, 0, keys, values)
+	return mt.load(mt.root, 0, keys, values)
 }
 
 func (mt *MTrie) load(n *node.Node, level int, keys [][]byte, values [][]byte) error {

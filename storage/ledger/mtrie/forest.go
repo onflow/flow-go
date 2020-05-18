@@ -207,7 +207,7 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 	}
 
 	newTrie := trie.NewMTrie(f.maxHeight)
-	newTrie.ParentRootHash = parentTrie.Root.GetNodeHash()
+	newTrie.ParentRootHash = parentTrie.root.GetNodeHash()
 	newTrie.Number = parentTrie.Number + 1
 
 	err = newTrie.UnsafeUpdate(parentTrie, sortedKeys, sortedValues)
@@ -215,8 +215,8 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 		return nil, err
 	}
 
-	newTrie.Root.PopulateNodeHashValues()
-	newRootHash := newTrie.Root.GetNodeHash()
+	newTrie.root.PopulateNodeHashValues()
+	newRootHash := newTrie.root.GetNodeHash()
 	newTrie.SetRootHash(newRootHash)
 	err = f.AddTrie(newTrie)
 	if err != nil {
@@ -276,7 +276,7 @@ func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*proof.BatchProof, err
 	// if we have to insert empty values
 	if len(notFoundKeys) > 0 {
 		newTrie := trie.NewMTrie(f.maxHeight)
-		newRoot := newTrie.Root
+		newRoot := newTrie.root
 
 		sort.Slice(notFoundKeys, func(i, j int) bool {
 			return bytes.Compare(notFoundKeys[i], notFoundKeys[j]) < 0
@@ -289,7 +289,7 @@ func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*proof.BatchProof, err
 
 		// rootHash shouldn't change
 		if !bytes.Equal(newRoot.GetNodeHash(), rootHash) {
-			return nil, errors.New("Root hash has changed during the operation")
+			return nil, errors.New("root hash has changed during the operation")
 		}
 		stateTrie = newTrie
 	}
@@ -337,8 +337,8 @@ func (f *MForest) LoadTrie(path string) (*trie.MTrie, error) {
 	if err != nil {
 		return nil, err
 	}
-	stateTrie.Root.PopulateNodeHashValues()
-	if !bytes.Equal(stateTrie.RootHash(), stateTrie.Root.GetNodeHash()) {
+	stateTrie.root.PopulateNodeHashValues()
+	if !bytes.Equal(stateTrie.RootHash(), stateTrie.root.GetNodeHash()) {
 		return nil, errors.New("error loading a trie, rootHash doesn't match")
 	}
 	err = f.AddTrie(stateTrie)

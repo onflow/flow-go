@@ -274,7 +274,7 @@ func (f *forest) Size() (int64, error) {
 type SMT struct {
 	forest *forest
 
-	//rootNode                 *node                    // Root
+	//rootNode                 *node                    // root
 	height      int // height of the tree
 	keyByteSize int // acceptable number of bytes for key
 	//database             databases.DAL            // The Database Interface for the trie
@@ -725,7 +725,7 @@ func (s *SMT) GetBatchProof(keys [][]byte, root Root) (*proofHolder, error) {
 		if err != nil {
 			return nil, err
 		}
-		// TODO assert new Root is the same
+		// TODO assert new root is the same
 		// if bytes.Equal(new)
 	}
 
