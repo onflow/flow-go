@@ -24,6 +24,9 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
+//TODO this is duplicated in collection/synchronization
+// We should refactor both engines using module/synchronization/core
+
 // Engine is the synchronization engine, responsible for synchronizing chain state.
 type Engine struct {
 	unit     *engine.Unit
