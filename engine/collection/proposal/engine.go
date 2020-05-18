@@ -287,6 +287,10 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	// just process one event at a time for now
 
 	switch ev := event.(type) {
+	case *events.SyncedClusterBlock:
+		e.before(metrics.MessageSyncedClusterBlock)
+		defer e.after(metrics.MessageSyncedClusterBlock)
+		return e.onSyncedBlock(originID, ev)
 	case *messages.ClusterBlockProposal:
 		e.before(metrics.MessageClusterBlockProposal)
 		defer e.after(metrics.MessageClusterBlockProposal)
