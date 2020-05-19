@@ -536,9 +536,9 @@ func (suite *LightIngestTestSuite) TestIngestedChunk() {
 	suite.chunkDataPacks.AssertNotCalled(suite.T(), "Add", testifymock.Anything)
 }
 
-// TestHandleCollection_Tracked evaluates receiving a tracked collection without any other receipt-dependent resources
-// the collection should be added to the authenticate collection pool, and tracker should be removed
-func (suite *LightIngestTestSuite) TestHandleCollection_Tracked() {
+// TestHandleCollection evaluates receiving a collection without any other receipt-dependent resources
+// the collection should be added to the collection pool.
+func (suite *LightIngestTestSuite) TestHandleCollection() {
 	// locks to run the tests sequentially
 	suite.Lock()
 	defer suite.Unlock()
@@ -546,15 +546,10 @@ func (suite *LightIngestTestSuite) TestHandleCollection_Tracked() {
 	eng := suite.TestNewLightEngine()
 
 	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
-	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(true).Once()
-	suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, true).Once()
 	suite.ss.On("Identity", suite.collIdentity.NodeID).Return(suite.collIdentity, nil)
 
 	// expect that the collection be added to the mempool
 	suite.collections.On("Add", suite.collection).Return(true).Once()
-
-	// expect that the collection tracker is removed
-	suite.collectionTrackers.On("Rem", suite.collection.ID()).Return(true)
 
 	// mocks collection has not been ingested
 	suite.ingestedCollectionIDs.On("Has", suite.collection.ID()).Return(false)
@@ -572,8 +567,6 @@ func (suite *LightIngestTestSuite) TestHandleCollection_Tracked() {
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
 }
 
-// TestHandleCollection_Untracked evaluates receiving an  un-tracked collection
-// It expects that the collection to be added to the pending receipts
 func (suite *LightIngestTestSuite) TestHandleCollection_Untracked() {
 	// Locks to run the tests sequentially
 	suite.Lock()
