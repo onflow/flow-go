@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -121,6 +122,10 @@ func NewLightEngine(
 
 // Ready returns a channel that is closed when the verifier engine is ready.
 func (l *LightEngine) Ready() <-chan struct{} {
+	// checks pending chunks every `requestInterval` milliseconds
+	l.unit.LaunchPeriodically(l.checkPendingChunks,
+		time.Duration(l.requestInterval)*time.Millisecond,
+		0)
 	return l.unit.Ready()
 }
 
