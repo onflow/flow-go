@@ -24,9 +24,9 @@ import (
 //    between v and a tree leaf. The height of a tree is the heights of its root.
 type MTrie struct {
 	root           *node.Node
-	Number         uint64
-	MaxHeight      int
-	ParentRootHash []byte
+	number         uint64
+	maxHeight      int
+	parentRootHash []byte
 }
 
 func NewEmptyMTrie(maxHeight int, number uint64, parentRootHash []byte) (*MTrie, error) {
@@ -35,22 +35,19 @@ func NewEmptyMTrie(maxHeight int, number uint64, parentRootHash []byte) (*MTrie,
 	}
 	return &MTrie{
 		root:           node.NewEmptyTreeRoot(maxHeight - 1),
-		Number:         number,
-		MaxHeight:      maxHeight,
-		ParentRootHash: parentRootHash,
+		number:         number,
+		maxHeight:      maxHeight,
+		parentRootHash: parentRootHash,
 	}, nil
 }
 
-func (mt *MTrie) StringRootHash() string {
-	return hex.EncodeToString(mt.root.Hash())
-}
-
-func (mt *MTrie) RootHash() []byte {
-	return mt.root.Hash()
-}
+func (mt *MTrie) StringRootHash() string { return hex.EncodeToString(mt.root.Hash()) }
+func (mt *MTrie) RootHash() []byte       { return mt.root.Hash() }
+func (mt *MTrie) Number() uint64         { return mt.number }
+func (mt *MTrie) ParentRootHash() []byte { return mt.parentRootHash }
 
 func (mt *MTrie) String() string {
-	trieStr := fmt.Sprintf("Trie Number:%v hash:%v parent: %v\n", mt.Number, mt.StringRootHash(), hex.EncodeToString(mt.ParentRootHash))
+	trieStr := fmt.Sprintf("Trie number:%v hash:%v parent: %v\n", mt.number, mt.StringRootHash(), hex.EncodeToString(mt.parentRootHash))
 	return trieStr + mt.root.FmtStr("", "")
 }
 
@@ -80,7 +77,7 @@ func (mt *MTrie) read(head *node.Node, keys [][]byte) ([][]byte, error) {
 		return res, nil
 	}
 
-	lkeys, rkeys, err := common.SplitSortedKeys(keys, mt.MaxHeight-head.Height()-1)
+	lkeys, rkeys, err := common.SplitSortedKeys(keys, mt.maxHeight-head.Height()-1)
 	if err != nil {
 		return nil, fmt.Errorf("can't read due to split key error: %w", err)
 	}
@@ -120,9 +117,9 @@ func (mt *MTrie) UnsafeUpdate(keys [][]byte, values [][]byte) (*MTrie, error) {
 	}
 	updatedTrie := &MTrie{
 		root:           updatedRoot,
-		Number:         mt.Number + 1,
-		MaxHeight:      mt.MaxHeight,
-		ParentRootHash: mt.RootHash(),
+		number:         mt.number + 1,
+		maxHeight:      mt.maxHeight,
+		parentRootHash: mt.RootHash(),
 	}
 	return updatedTrie, nil
 }
@@ -130,13 +127,13 @@ func (mt *MTrie) UnsafeUpdate(keys [][]byte, values [][]byte) (*MTrie, error) {
 // update returns the head of updated sub-trie for the specified key-value pairs.
 // UNSAFE: update requires the following conditions to be satisfied,
 // but does not explicitly check them for performance reasons
-//   * all keys AND the parent node share the same common prefix [0 : mt.MaxHeight-1 - headHeight)
+//   * all keys AND the parent node share the same common prefix [0 : mt.maxHeight-1 - headHeight)
 //     (excluding the bit at index headHeight)
 //   * keys are NOT duplicated
 // TODO: remove error return
 func (mt *MTrie) update(keys [][]byte, values [][]byte, height int, parentNode *node.Node) (*node.Node, error) {
 	if parentNode == nil { // parent Trie has no sub-trie for the set of key-value pairs => construct entire subtree
-		return constructSubtrie(height, keys, mt.MaxHeight-1, values)
+		return constructSubtrie(height, keys, mt.maxHeight-1, values)
 	}
 	if len(keys) == 0 { // We are not changing any values in this sub-trie => return parent trie
 		return parentNode, nil
@@ -157,11 +154,11 @@ func (mt *MTrie) update(keys [][]byte, values [][]byte, height int, parentNode *
 			keys = append(keys, parentKey)
 			values = append(values, parentNode.Value())
 		}
-		return constructSubtrie(height, keys, mt.MaxHeight-1, values)
+		return constructSubtrie(height, keys, mt.maxHeight-1, values)
 	}
 
 	// Split the keys and Values array so we can update the trie in parallel
-	lkeys, lvalues, rkeys, rvalues, err := common.SplitKeyValues(keys, values, mt.MaxHeight-1-height)
+	lkeys, lvalues, rkeys, rvalues, err := common.SplitKeyValues(keys, values, mt.maxHeight-1-height)
 	if err != nil {
 		return nil, fmt.Errorf("error spliting key Values: %w", err)
 	}
@@ -196,7 +193,7 @@ func (mt *MTrie) update(keys [][]byte, values [][]byte, height int, parentNode *
 // constructSubtrie returns the head of a newly-constructed sub-trie for the specified key-value pairs.
 // UNSAFE: constructSubtrie requires the following conditions to be satisfied,
 // but does not explicitly check them for performance reasons
-//   * keys all share the same common prefix [0 : mt.MaxHeight-1 - headHeight)
+//   * keys all share the same common prefix [0 : mt.maxHeight-1 - headHeight)
 //     (excluding the bit at index headHeight)
 //   * keys contains at least one element
 //   * keys are NOT duplicated
@@ -274,7 +271,7 @@ func (mt *MTrie) proofs(head *node.Node, keys [][]byte, proofs []*proof.Proof) e
 		p.Steps++
 	}
 	// split keys based on the value of i-th bit (i = trie height - node height)
-	lkeys, lproofs, rkeys, rproofs, err := proof.SplitKeyProofs(keys, proofs, mt.MaxHeight-head.Height()-1)
+	lkeys, lproofs, rkeys, rproofs, err := proof.SplitKeyProofs(keys, proofs, mt.maxHeight-head.Height()-1)
 	if err != nil {
 		return fmt.Errorf("proof generation failed, split key error: %w", err)
 	}
@@ -285,7 +282,7 @@ func (mt *MTrie) proofs(head *node.Node, keys [][]byte, proofs []*proof.Proof) e
 			isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(rChild.Height()))
 			if !isDef { // in proofs, we only provide non-default value hashes
 				for _, p := range lproofs {
-					err := common.SetBit(p.Flags, mt.MaxHeight-1-head.Height())
+					err := common.SetBit(p.Flags, mt.maxHeight-1-head.Height())
 					if err != nil {
 						return err
 					}
@@ -305,7 +302,7 @@ func (mt *MTrie) proofs(head *node.Node, keys [][]byte, proofs []*proof.Proof) e
 			isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(lChild.Height()))
 			if !isDef { // in proofs, we only provide non-default value hashes
 				for _, p := range rproofs {
-					err := common.SetBit(p.Flags, mt.MaxHeight-1-head.Height())
+					err := common.SetBit(p.Flags, mt.maxHeight-1-head.Height())
 					if err != nil {
 						return err
 					}
@@ -337,24 +334,24 @@ func (mt *MTrie) Store(path string) error {
 		return err
 	}
 
-	// then 8 bytes captures trie Number
+	// then 8 bytes captures trie number
 	b1 := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b1, mt.Number)
+	binary.LittleEndian.PutUint64(b1, mt.number)
 	_, err = writer.Write(b1)
 	if err != nil {
 		return err
 	}
 
-	// then 2 bytes capture the MaxHeight
+	// then 2 bytes capture the maxHeight
 	b2 := make([]byte, 2)
-	binary.LittleEndian.PutUint16(b2, uint16(mt.MaxHeight))
+	binary.LittleEndian.PutUint16(b2, uint16(mt.maxHeight))
 	_, err = writer.Write(b2)
 	if err != nil {
 		return err
 	}
 
 	// next 32 bytes are parent rootHash
-	_, err = writer.Write(mt.ParentRootHash)
+	_, err = writer.Write(mt.parentRootHash)
 	if err != nil {
 		return err
 	}
@@ -428,7 +425,7 @@ func Load(path string) (*MTrie, error) {
 		return nil, errors.New("trie store/load version doesn't match")
 	}
 
-	// next 8 bytes captures trie Number
+	// next 8 bytes captures trie number
 	trieNumberB := make([]byte, 8)
 	_, err = fi.Read(trieNumberB)
 	if err != nil {
@@ -436,7 +433,7 @@ func Load(path string) (*MTrie, error) {
 	}
 	trieNumber := binary.LittleEndian.Uint64(trieNumberB)
 
-	// next 2 bytes capture the MaxHeight
+	// next 2 bytes capture the maxHeight
 	maxHeightB := make([]byte, 2)
 	_, err = fi.Read(maxHeightB)
 	if err != nil {
@@ -515,8 +512,8 @@ func constructTrieFromKeyValuePairs(keys [][]byte, keyLength int, values [][]byt
 
 	return &MTrie{
 		root:           root,
-		Number:         number,
-		MaxHeight:      keyLength,
-		ParentRootHash: parentRootHash,
+		number:         number,
+		maxHeight:      keyLength,
+		parentRootHash: parentRootHash,
 	}, nil
 }
