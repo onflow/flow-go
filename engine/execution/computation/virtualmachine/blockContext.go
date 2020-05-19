@@ -82,7 +82,7 @@ func (bc *blockContext) ExecuteTransaction(
 	txID := tx.ID()
 	location := runtime.TransactionLocation(txID[:])
 
-	ctx := bc.newTransactionContext(bc.vm, ledger, tx, options...)
+	ctx := bc.newTransactionContext(ledger, tx, options...)
 
 	flowErr := ctx.verifySignatures()
 	if flowErr != nil {
