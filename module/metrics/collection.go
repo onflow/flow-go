@@ -22,7 +22,7 @@ const (
 
 type CollectionCollector struct {
 	tracer               *trace.OpenTracer
-	transactionsIngested *prometheus.CounterVec   // tracks the number of ingested transactions
+	transactionsIngested prometheus.Counter       // tracks the number of ingested transactions
 	finalizedHeight      *prometheus.GaugeVec     // tracks the finalized height
 	proposals            *prometheus.HistogramVec // tracks the number/size of PROPOSED collections
 	guarantees           *prometheus.HistogramVec // counts the number/size of FINALIZED collections
@@ -33,11 +33,11 @@ func NewCollectionCollector(tracer *trace.OpenTracer) *CollectionCollector {
 	cc := &CollectionCollector{
 		tracer: tracer,
 
-		transactionsIngested: promauto.NewCounterVec(prometheus.CounterOpts{
+		transactionsIngested: promauto.NewCounter(prometheus.CounterOpts{
 			Namespace: namespaceCollection,
 			Name:      "ingested_transactions_total",
 			Help:      "count of transactions ingested by this node",
-		}, []string{LabelStatus}),
+		}),
 
 		finalizedHeight: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: namespaceCollection,
@@ -69,8 +69,7 @@ func NewCollectionCollector(tracer *trace.OpenTracer) *CollectionCollector {
 // TransactionIngested starts a span to trace the duration of a transaction
 // from being created to being included as part of a collection.
 func (cc *CollectionCollector) TransactionIngested(txID flow.Identifier) {
-	// TODO always mark as valid for now
-	cc.transactionsIngested.With(prometheus.Labels{LabelStatus: StatusValid}).Inc()
+	cc.transactionsIngested.Inc()
 	cc.tracer.StartSpan(txID, spanTransactionToCollection)
 }
 
