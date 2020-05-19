@@ -17,6 +17,7 @@ const scriptGasLimit = 100000
 type CheckerFunc func([]byte, runtime.Location) error
 
 type TransactionContext struct {
+	bc               BlockContext
 	ledger           LedgerDAL
 	astCache         ASTCache
 	signingAccounts  []runtime.Address
@@ -95,11 +96,42 @@ func (r *TransactionContext) CreateAccount(publicKeysBytes [][]byte) (runtime.Ad
 		}
 	}
 
-	accountAddress, err := r.ledger.CreateAccount(publicKeys)
+	addr, err := r.ledger.CreateAccount(publicKeys)
+	if err != nil {
+		return runtime.Address{}, err
+	}
 
-	r.Log(fmt.Sprintf("Created new account with address: %x", accountAddress))
+	r.Log(fmt.Sprintf("Created new account with address: %s", addr))
 
-	return runtime.Address(accountAddress), err
+	err = r.initDefaultToken(addr)
+	if err != nil {
+		return runtime.Address{}, err
+	}
+
+	return runtime.Address(addr), nil
+}
+
+func (r *TransactionContext) initDefaultToken(addr flow.Address) error {
+	tx := flow.NewTransactionBody().
+		SetScript(InitDefaultTokenScript).
+		AddAuthorizer(addr)
+
+	result, err := r.bc.ExecuteTransaction(r.ledger, tx, SkipVerification)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to initialize default token: %w",
+			err,
+		)
+	}
+
+	if result.Error != nil {
+		return fmt.Errorf(
+			"failed to initialize default token: %s",
+			result.Error.ErrorMessage(),
+		)
+	}
+
+	return nil
 }
 
 // AddAccountKey adds a public key to an existing account.
@@ -258,8 +290,6 @@ func (r *TransactionContext) GetCurrentBlockHeight() uint64 {
 func (r *TransactionContext) GetBlockAtHeight(height uint64) (hash runtime.BlockHash, timestamp int64, exists bool) {
 	panic("implement me")
 }
-
-// GetAccount gets an account by address.
 
 func (r *TransactionContext) isValidSigningAccount(address runtime.Address) bool {
 	for _, accountAddress := range r.GetSigningAccounts() {
