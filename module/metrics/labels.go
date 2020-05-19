@@ -40,6 +40,7 @@ const (
 	ResourceApproval        = "approval"
 	ResourceSeal            = "seal"
 	ResourceCommit          = "commit"
+	ResourceTransaction     = "transaction"
 	ResourceClusterPayload  = "cluster_payload"
 	ResourceClusterProposal = "cluster_proposal"
 )

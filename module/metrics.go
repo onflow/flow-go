@@ -3,6 +3,7 @@ package module
 import (
 	"time"
 
+	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -69,17 +70,17 @@ type HotstuffMetrics interface {
 }
 
 type CollectionMetrics interface {
-	// TransactionReceived is called when a new transaction is ingested by the
+	// TransactionIngested is called when a new transaction is ingested by the
 	// node. It increments the total count of ingested transactions and starts
 	// a tx->col span for the transaction.
-	TransactionReceived(txID flow.Identifier)
+	TransactionIngested(txID flow.Identifier)
 
-	// CollectionProposed is called when a new collection is proposed by us or
+	// ClusterBlockProposed is called when a new collection is proposed by us or
 	// any other node in the cluster.
-	CollectionProposed(collection flow.LightCollection)
+	ClusterBlockProposed(block *cluster.Block)
 
-	// CollectionGuaranteed is called when a collection is finalized.
-	CollectionGuaranteed(collection flow.LightCollection)
+	// ClusterBlockFinalized is called when a collection is finalized.
+	ClusterBlockFinalized(block *cluster.Block)
 }
 
 type ConsensusMetrics interface {

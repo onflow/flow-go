@@ -290,7 +290,11 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			Msg("broadcast proposal from hotstuff")
 
 		e.engMetrics.MessageSent(metrics.EngineProposal, metrics.MessageClusterBlockProposal)
-		e.colMetrics.CollectionProposed(payload.Collection.Light())
+		block := &cluster.Block{
+			Header:  header,
+			Payload: payload,
+		}
+		e.colMetrics.ClusterBlockProposed(block)
 	})
 
 	return nil
@@ -314,6 +318,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	log.Debug().Msg("received proposal")
 
 	e.prunePendingCache()
+	e.mempoolMetrics.MempoolEntries(metrics.ResourceTransaction, e.pool.Size())
 
 	// retrieve the parent block
 	// if the parent is not in storage, it has not yet been processed
@@ -341,14 +346,14 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	}
 
 	// create a cluster block representing the proposal
-	block := cluster.Block{
+	block := &cluster.Block{
 		Header:  header,
 		Payload: payload,
 	}
 
 	// extend the state with the proposal -- if it is an invalid extension,
 	// we will throw an error here
-	err = e.clusterState.Mutate().Extend(&block)
+	err = e.clusterState.Mutate().Extend(block)
 	if err != nil {
 		return fmt.Errorf("could not extend cluster state: %w", err)
 	}
@@ -357,7 +362,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	e.hotstuff.SubmitProposal(header, parent.View)
 
 	// report proposed (case that we are follower)
-	e.colMetrics.CollectionProposed(proposal.Payload.Collection.Light())
+	e.colMetrics.ClusterBlockProposed(block)
 
 	blockID := header.ID()
 
