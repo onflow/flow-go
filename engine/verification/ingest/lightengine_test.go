@@ -203,8 +203,8 @@ func (suite *LightIngestTestSuite) TestHandleBlock() {
 	assert.Equal(suite.T(), err, ingest.ErrInvType)
 }
 
-// TestHandleReceipt_MissingCollection evaluates that when ingest engine has both a receipt and its block
-// but not the collections, it asks for the collections through the network
+// TestHandleReceipt_MissingCollection evaluates that when the LightIngestEngine has both a receipt and its block
+// but not the collections, it asks for the collections through the network.
 func (suite *LightIngestTestSuite) TestHandleReceipt_MissingCollection() {
 	// locks to run the test sequentially
 	suite.Lock()
@@ -212,8 +212,6 @@ func (suite *LightIngestTestSuite) TestHandleReceipt_MissingCollection() {
 
 	eng := suite.TestNewLightEngine()
 
-	// mocks state
-	suite.ss.On("Identity", suite.execIdentity.NodeID).Return(suite.execIdentity, nil)
 	// mocks state snapshot to return collIdentities as identity list of staked collection nodes
 	suite.ss.On("Identities", testifymock.AnythingOfType("flow.IdentityFilter")).Return(flow.IdentityList{suite.collIdentity}, nil)
 
@@ -228,17 +226,16 @@ func (suite *LightIngestTestSuite) TestHandleReceipt_MissingCollection() {
 	// mocks missing collection
 	//
 	// mocks the absence of `suite.collection` which is the associated collection to this block
-	// the collection does not exist in authenticated and pending collections mempools
+	// the collection does not exist in mempool
 	suite.collections.On("Has", suite.collection.ID()).Return(false).Once()
 
 	// engine has not yet ingested the result of this receipt yet
-	suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
+	suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).
+		Return(false)
+	suite.ingestedChunkIDs.On("Has", suite.chunk.ID()).
+		Return(false)
 
-	for _, chunk := range suite.receipt.ExecutionResult.Chunks {
-		suite.ingestedChunkIDs.On("Has", chunk.ID()).Return(false)
-	}
-
-	// expect that we already have the receipt in the authenticated receipts mempool
+	// expect that we already have the receipt in mempool
 	suite.receipts.On("Add", suite.receipt).Return(true).Once()
 	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
 
@@ -279,7 +276,7 @@ func (suite *LightIngestTestSuite) TestHandleReceipt_MissingCollection() {
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
 }
 
-// TestHandleReceipt_MissingChunkDataPack evaluates that when ingest engine has both a receipt and its block
+// TestHandleReceipt_MissingChunkDataPack evaluates that when the LightIngestEngine has both a receipt and its block
 // but not the chunk data pack of it, it asks for the chunk data pack through the network
 func (suite *LightIngestTestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	// locks to run the test sequentially
@@ -288,8 +285,6 @@ func (suite *LightIngestTestSuite) TestHandleReceipt_MissingChunkDataPack() {
 
 	eng := suite.TestNewLightEngine()
 
-	// mocks state snapshot
-	suite.ss.On("Identity", suite.execIdentity.NodeID).Return(suite.execIdentity, nil)
 	// mocks state snapshot to return exeIdentities as identity list of staked collection nodes
 	suite.ss.On("Identities", testifymock.AnythingOfType("flow.IdentityFilter")).Return(flow.IdentityList{suite.execIdentity}, nil)
 
@@ -299,13 +294,14 @@ func (suite *LightIngestTestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil)
 	// collection
 	suite.collections.On("Has", suite.collection.ID()).Return(true)
-	// receipt in the authenticated mempool
+	// receipt in the mempool
 	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
 
 	// mocks missing resources
 	//
 	// absence of chunk data pack itself
 	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(false)
+
 	// engine has not yet ingested the result of this receipt as well as its chunks yet
 	suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
 	suite.ingestedChunkIDs.On("Has", suite.chunk.ID()).Return(false)
@@ -324,7 +320,8 @@ func (suite *LightIngestTestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	var submitWG sync.WaitGroup
 	submitWG.Add(1)
 	suite.chunksConduit.
-		On("Submit", testifymock.AnythingOfType("*messages.ChunkDataPackRequest"), suite.execIdentity.NodeID).Run(func(args testifymock.Arguments) {
+		On("Submit", testifymock.AnythingOfType("*messages.ChunkDataPackRequest"),
+			suite.execIdentity.NodeID).Run(func(args testifymock.Arguments) {
 		submitWG.Done()
 	}).Return(nil).Once()
 
