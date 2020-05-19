@@ -39,7 +39,6 @@ type LightEngine struct {
 	verifierEng           network.Engine                // for submitting ERs that are ready to be verified
 	receipts              mempool.Receipts              // keeps execution receipts
 	collections           mempool.Collections           // keeps collections
-	collectionTrackers    mempool.CollectionTrackers    // keeps track of collection requests that this engine made
 	chunkDataPacks        mempool.ChunkDataPacks        // keeps chunk data packs with authenticated origin IDs
 	chunkDataPackTackers  mempool.ChunkDataPackTrackers // keeps track of chunk data pack requests that this engine made
 	ingestedResultIDs     mempool.Identifiers           // keeps ids of ingested execution results
@@ -82,7 +81,6 @@ func NewLightEngine(
 		verifierEng:           verifierEng,
 		collections:           collections,
 		receipts:              receipts,
-		collectionTrackers:    collectionTrackers,
 		chunkDataPacks:        chunkDataPacks,
 		chunkDataPackTackers:  chunkDataPackTrackers,
 		ingestedChunkIDs:      ingestedChunkIDs,
@@ -298,23 +296,11 @@ func (l *LightEngine) handleCollection(originID flow.Identifier, coll *flow.Coll
 		return nil
 	}
 
-	// drops the collection if it does not have a registered tracker
-	if !l.collectionTrackers.Has(collID) {
-		l.log.Info().
-			Hex("origin_id", logging.ID(originID)).
-			Hex("collection_id", logging.ID(collID)).
-			Msg("drops untracked collection")
-		return nil
-	}
-
 	// adds collection to mempool
 	added := l.collections.Add(coll)
 	if !added {
 		return fmt.Errorf("could not add collection to mempool")
 	}
-
-	// removes tracker
-	l.collectionTrackers.Rem(collID)
 
 	l.log.Debug().
 		Hex("origin_id", logging.ID(originID)).
@@ -327,21 +313,6 @@ func (l *LightEngine) handleCollection(originID flow.Identifier, coll *flow.Coll
 // or drops and logs the request if the tracker associated with the request goes beyond the
 // failure threshold
 func (l *LightEngine) requestCollection(collID, blockID flow.Identifier) error {
-	// updates tracker for this request
-	ct, err := l.updateCollectionTracker(collID, blockID)
-	if err != nil {
-		return fmt.Errorf("could not update the collection tracker: %w", err)
-	}
-
-	// checks against maximum retries
-	if ct.Counter > l.failureThreshold {
-		// tracker met maximum retry chances
-		// no longer retried
-		// TODO raise a missing collection challenge
-		// TODO drop tracker from memory once the challenge gets accepted, or trackers has nonce
-		return fmt.Errorf("collection tracker met maximum retries, no longer retried, chunk ID: %x", collID)
-	}
-
 	// extracts list of collection nodes id
 	//
 	collNodes, err := l.state.Final().Identities(filter.HasRole(flow.RoleCollection))
@@ -751,32 +722,6 @@ func (l *LightEngine) updateChunkDataPackTracker(chunkID flow.Identifier, blockI
 	}
 
 	return cdpt, nil
-}
-
-// updateCollectionTracker performs the following
-// If there is a tracker for this collection ID, it pulls it out of mempool, increases its counter by one, and returns it
-// Else it creates a new empty tracker for this collection with counter value of one and returns it.
-func (l *LightEngine) updateCollectionTracker(collectionID flow.Identifier, blockID flow.Identifier) (*trackers.CollectionTracker, error) {
-	var ct *trackers.CollectionTracker
-
-	if l.collectionTrackers.Has(collectionID) {
-		// there is a tracker for this collection
-		// increases its counter
-		t, err := l.collectionTrackers.Inc(collectionID)
-		if err != nil {
-			return nil, fmt.Errorf("could not update collection tracker: %w", err)
-		}
-		ct = t
-	} else {
-		// creates a new collection tracker and stores in in memory
-		ct = trackers.NewCollectionTracker(collectionID, blockID)
-		ok := l.collectionTrackers.Add(ct)
-		if !ok {
-			return nil, fmt.Errorf("could not store tracker of collection request in mempool")
-		}
-	}
-
-	return ct, nil
 }
 
 // To implement FinalizationConsumer
