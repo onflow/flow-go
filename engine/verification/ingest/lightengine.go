@@ -14,7 +14,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
-	verificationmodel "github.com/dapperlabs/flow-go/model/verification"
 	trackers "github.com/dapperlabs/flow-go/model/verification/tracker"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -37,10 +36,8 @@ type LightEngine struct {
 	me                    module.Local
 	state                 protocol.State
 	verifierEng           network.Engine                // for submitting ERs that are ready to be verified
-	authReceipts          mempool.Receipts              // keeps receipts with authenticated origin IDs
-	pendingReceipts       mempool.PendingReceipts       // keeps receipts pending for their originID to be authenticated
-	authCollections       mempool.Collections           // keeps collections with authenticated origin IDs
-	pendingCollections    mempool.PendingCollections    // keeps collections pending for their origin IDs to be authenticated
+	receipts              mempool.Receipts              // keeps execution receipts
+	collections           mempool.Collections           // keeps collections
 	collectionTrackers    mempool.CollectionTrackers    // keeps track of collection requests that this engine made
 	chunkDataPacks        mempool.ChunkDataPacks        // keeps chunk data packs with authenticated origin IDs
 	chunkDataPackTackers  mempool.ChunkDataPackTrackers // keeps track of chunk data pack requests that this engine made
@@ -186,8 +183,7 @@ func (l *LightEngine) process(originID flow.Identifier, event interface{}) error
 	}
 }
 
-// handleExecutionReceipt receives an execution receipt, verifies its origin Id and
-// accordingly adds it to either the pending receipts or the authenticated receipts mempools
+// handleExecutionReceipt receives an execution receipt, and adds it to receipts mempool
 func (l *LightEngine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
 	receiptID := receipt.ID()
 
@@ -205,36 +201,14 @@ func (l *LightEngine) handleExecutionReceipt(originID flow.Identifier, receipt *
 		return nil
 	}
 
-	// TODO: correctness check for execution receipts
-	// extracts list of verifier nodes id
-	origin, err := l.state.AtBlockID(receipt.ExecutionResult.BlockID).Identity(originID)
-	if err != nil {
-		// TODO: potential attack on authenticity
-		// stores ER in pending receipts till a block arrives authenticating this
-		ok := l.pendingReceipts.Add(verificationmodel.NewPendingReceipt(receipt, originID))
-		l.log.Debug().
-			Hex("origin_id", logging.ID(originID)).
-			Hex("receipt_id", logging.ID(receiptID)).
-			Bool("mempool_insertion", ok).
-			Msg("execution receipt added to pending mempool")
+	// stores the execution receipt in the mempool
+	ok := l.receipts.Add(receipt)
+	l.log.Debug().
+		Hex("origin_id", logging.ID(originID)).
+		Hex("receipt_id", logging.ID(receiptID)).
+		Bool("mempool_insertion", ok).
+		Msg("execution receipt added to mempool")
 
-	} else {
-		// execution results are only valid from execution nodes
-		if origin.Role != flow.RoleExecution {
-			// TODO: potential attack on integrity
-			return fmt.Errorf("invalid role for generating an execution receipt, id: %s, role: %s", origin.NodeID, origin.Role)
-		}
-
-		// store the execution receipt in the store of the engine
-		// this will fail if the receipt already exists in the store
-		ok := l.authReceipts.Add(receipt)
-		l.log.Debug().
-			Hex("origin_id", logging.ID(originID)).
-			Hex("receipt_id", logging.ID(receiptID)).
-			Bool("mempool_insertion", ok).
-			Msg("execution receipt added to authenticated mempool")
-
-	}
 	return nil
 }
 
@@ -274,48 +248,15 @@ func (l *LightEngine) handleChunkDataPack(originID flow.Identifier, chunkDataPac
 		return nil
 	}
 
-	tracker, ok := l.chunkDataPackTackers.ByChunkID(chunkDataPack.ChunkID)
-	if !ok {
-		l.log.Debug().
-			Hex("origin_id", logging.ID(originID)).
-			Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
-			Msg("cannot retrieve tracker for received chunk data pack")
-		return fmt.Errorf("no tracker available for chunk ID: %x", chunkDataPack.ChunkID)
-	}
-
-	// checks the authenticity of origin ID
-	origin, err := l.state.AtBlockID(tracker.BlockID).Identity(originID)
-	if err != nil {
-		// TODO: potential attack on authenticity
-		l.log.Debug().
-			Err(err).
-			Hex("origin_id", logging.ID(originID)).
-			Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
-			Msg("invalid origin ID for chunk data pack")
-		return fmt.Errorf("invalid origin id (%s): %w", originID[:], err)
-	}
-
-	// chunk data pack should only be sent by an execution node
-	if origin.Role != flow.RoleExecution {
-		// TODO: potential attack on integrity
-		l.log.Debug().
-			Hex("origin_id", logging.ID(originID)).
-			Str("origin_role", origin.Role.String()).
-			Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
-			Msg("invalid origin role for chunk data pack")
-		return fmt.Errorf("invalid role for generating an execution receipt, id: %s, role: %s", origin.NodeID, origin.Role)
-	}
-
 	// store the chunk data pack in the store of the engine
 	// this will fail if the receipt already exists in the store
 	added := l.chunkDataPacks.Add(chunkDataPack)
 	if !added {
 		l.log.Debug().
-			Err(err).
 			Hex("origin_id", logging.ID(originID)).
 			Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
 			Msg("could not store chunk data pack")
-		return fmt.Errorf("could not store chunk data pack: %w", err)
+		return nil
 	}
 
 	// removes chunk data pack tracker from  mempool
@@ -329,8 +270,7 @@ func (l *LightEngine) handleChunkDataPack(originID flow.Identifier, chunkDataPac
 }
 
 // handleCollection handles receipt of a new collection, either via push or
-// after a request. It adds the collection to the mempool and checks for
-// pending receipts that are ready for verification.
+// after a request. It adds the collection to the mempool.
 func (l *LightEngine) handleCollection(originID flow.Identifier, coll *flow.Collection) error {
 	collID := coll.ID()
 
@@ -348,8 +288,8 @@ func (l *LightEngine) handleCollection(originID flow.Identifier, coll *flow.Coll
 		return nil
 	}
 
-	// drops collection if it is residing on the mempools
-	if l.authCollections.Has(collID) || l.pendingCollections.Has(collID) {
+	// drops collection if it is residing on the mempool
+	if l.collections.Has(collID) {
 		l.log.Info().
 			Hex("origin_id", logging.ID(originID)).
 			Hex("collection_id", logging.ID(collID)).
@@ -357,48 +297,28 @@ func (l *LightEngine) handleCollection(originID flow.Identifier, coll *flow.Coll
 		return nil
 	}
 
-	if l.collectionTrackers.Has(collID) {
-		// this event is a reply to a prior request
-		tracker, ok := l.collectionTrackers.ByCollectionID(collID)
-		if !ok {
-			return fmt.Errorf("could not retrieve collection tracker from mempool")
-		}
-
-		// a tracker exists for the requesting collection
-		// verifies identity of origin
-		origin, err := l.state.AtBlockID(tracker.BlockID).Identity(originID)
-		if err != nil {
-			return fmt.Errorf("invalid origin id (%s): %w", origin, err)
-		}
-
-		if origin.Role != flow.RoleCollection {
-			return fmt.Errorf("invalid role for receiving collection: %s", origin.Role)
-		}
-
-		// adds collection to authenticated mempool
-		added := l.authCollections.Add(coll)
-		if !added {
-			return fmt.Errorf("could not add collection to mempool")
-		}
-
-		// removes tracker
-		l.collectionTrackers.Rem(collID)
-
-		l.log.Debug().
+	// drops the collection if it does not have a registered tracker
+	if !l.collectionTrackers.Has(collID) {
+		l.log.Info().
 			Hex("origin_id", logging.ID(originID)).
 			Hex("collection_id", logging.ID(collID)).
-			Msg("collection added to authenticated mempool, and tracker removed")
-	} else {
-		// this collection came passively
-		// collections with no tracker add to the pending collections mempool
-		ok := l.pendingCollections.Add(verificationmodel.NewPendingCollection(coll, originID))
-		l.log.Debug().
-			Hex("origin_id", logging.ID(originID)).
-			Hex("collection_id", logging.ID(collID)).
-			Bool("mempool_insertion", ok).
-			Msg("collection added to pending mempool")
+			Msg("drops untracked collection")
+		return nil
 	}
 
+	// adds collection to mempool
+	added := l.collections.Add(coll)
+	if !added {
+		return fmt.Errorf("could not add collection to mempool")
+	}
+
+	// removes tracker
+	l.collectionTrackers.Rem(collID)
+
+	l.log.Debug().
+		Hex("origin_id", logging.ID(originID)).
+		Hex("collection_id", logging.ID(collID)).
+		Msg("collection added to mempool, and tracker removed")
 	return nil
 }
 
@@ -562,14 +482,11 @@ func (l *LightEngine) getCollectionForChunk(block *flow.Block, receipt *flow.Exe
 
 	collID := block.Payload.Guarantees[collIndex].ID()
 
-	// updates pending collection
-	l.checkPendingCollections(collID, block.ID())
-
 	// checks authenticated collections mempool
 	//
 	//
-	if l.authCollections.Has(collID) {
-		coll, exists := l.authCollections.ByID(collID)
+	if l.collections.Has(collID) {
+		coll, exists := l.collections.ByID(collID)
 		if !exists {
 			// couldn't get the collection from mempool
 			log.Error().
@@ -613,7 +530,7 @@ func (l *LightEngine) checkPendingChunks() {
 
 	// checks the current authenticated receipts for their resources
 	// ready for verification
-	receipts := l.authReceipts.All()
+	receipts := l.receipts.All()
 	for _, receipt := range receipts {
 		block, blockReady := l.getBlockForReceipt(receipt)
 		// we can't get collections without the block
@@ -728,7 +645,7 @@ func (l *LightEngine) onChunkIngested(vc *verification.VerifiableChunk) {
 	}
 
 	// cleans up resources of the ingested chunk from mempools
-	l.authCollections.Rem(vc.Collection.ID())
+	l.collections.Rem(vc.Collection.ID())
 	l.chunkDataPacks.Rem(vc.ChunkDataPack.ID())
 
 	mychunks, err := l.myUningestedChunks(&vc.Receipt.ExecutionResult)
@@ -752,22 +669,13 @@ func (l *LightEngine) onChunkIngested(vc *verification.VerifiableChunk) {
 				Msg("could add ingested result to mempool")
 		}
 		// removes receipt from mempool to avoid further iteration
-		l.authReceipts.Rem(vc.Receipt.ID())
+		l.receipts.Rem(vc.Receipt.ID())
 
-		// removes all pending and authenticated receipts with the same result
-		// pending receipts
-		for _, p := range l.pendingReceipts.All() {
-			// TODO check for nil dereferencing
-			if l.ingestedResultIDs.Has(p.Receipt.ExecutionResult.ID()) {
-				l.pendingReceipts.Rem(p.Receipt.ID())
-			}
-		}
-
-		// authenticated receipts
-		for _, areceipt := range l.authReceipts.All() {
+		// removes all authenticated receipts with the same result
+		for _, areceipt := range l.receipts.All() {
 			// TODO check for nil dereferencing
 			if l.ingestedResultIDs.Has(areceipt.ExecutionResult.ID()) {
-				l.authReceipts.Rem(areceipt.ID())
+				l.receipts.Rem(areceipt.ID())
 			}
 		}
 	}
@@ -816,115 +724,6 @@ func (l *LightEngine) myUningestedChunks(res *flow.ExecutionResult) (flow.ChunkL
 	}
 
 	return mine, nil
-}
-
-// checkPendingReceipts iterates over all pending receipts
-// if any receipt has the `blockID`, it evaluates the receipt's origin ID
-// if originID is evaluated successfully, the receipt is added to authenticated receipts mempool
-// Otherwise it is dropped completely
-func (l *LightEngine) checkPendingReceipts(blockID flow.Identifier) {
-	l.log.Info().
-		Hex("block_id", logging.ID(blockID)).
-		Msg("pending receipts are checking against finalized block")
-
-	for _, p := range l.pendingReceipts.All() {
-		if blockID == p.Receipt.ExecutionResult.BlockID {
-			// removes receipt from pending receipts pool
-			l.pendingReceipts.Rem(p.Receipt.ID())
-
-			// evaluates receipt origin ID at the block it refers to
-			origin, err := l.state.AtBlockID(blockID).Identity(p.OriginID)
-			if err != nil {
-				// could not verify origin Id of pending receipt based on its referenced block
-				// drops it
-				// TODO: potential attack on authenticity
-				l.log.Error().
-					Err(err).
-					Hex("receipt_id", logging.ID(p.Receipt.ID())).
-					Hex("origin_id", logging.ID(p.OriginID)).
-					Msg("could not verify origin ID of pending receipt")
-				continue
-			}
-
-			// execution results are only valid from execution nodes
-			if origin.Role != flow.RoleExecution {
-				// TODO: potential attack on integrity
-				l.log.Error().
-					Err(err).
-					Hex("receipt_id", logging.ID(p.Receipt.ID())).
-					Hex("origin_id", logging.ID(origin.NodeID)).
-					Uint8("origin_role", uint8(origin.Role)).
-					Msg("invalid role for pending execution receipt")
-				continue
-			}
-
-			// store the execution receipt in the authenticated mempool of the engine
-			// this will fail if the receipt already exists in the store
-			_ = l.authReceipts.Add(p.Receipt)
-
-			l.log.Debug().
-				Hex("receipt_id", logging.ID(p.Receipt.ID())).
-				Hex("block_id", logging.ID(blockID)).
-				Msg("pending receipt moved to authenticated mempool")
-		}
-	}
-}
-
-// checkPendingCollections checks if a certain collection is available for the requested block.
-// if the collection is available, it evaluates the collections's origin ID based on the block ID.
-// if originID is evaluated successfully, the collection is added to authenticated collections mempool.
-// Otherwise it is dropped completely.
-func (l *LightEngine) checkPendingCollections(collID, blockID flow.Identifier) {
-	if !l.pendingCollections.Has(collID) {
-		l.log.Debug().
-			Hex("collection_id", logging.ID(collID)).
-			Hex("block_id", logging.ID(blockID)).
-			Msg("no pending collection is available with this parameters")
-		return
-	}
-
-	// retrieves collection from mempool
-	pcoll, exists := l.pendingCollections.ByID(collID)
-	if !exists {
-		l.log.Error().
-			Hex("collection_id", logging.ID(collID)).
-			Msg("could not retrieve collection from pending mempool")
-	}
-	// removes collection from pending pool
-	l.pendingCollections.Rem(collID)
-
-	// evaluates origin ID of pending collection at the block it is referenced
-	origin, err := l.state.AtBlockID(blockID).Identity(pcoll.OriginID)
-	if err != nil {
-		// could not verify origin ID of pending collection based on its referenced block
-		// drops it
-		// TODO: potential attack on authenticity
-		l.log.Error().
-			Err(err).
-			Hex("collection_id", logging.ID(pcoll.ID())).
-			Hex("origin_id", logging.ID(pcoll.OriginID)).
-			Msg("could not verify origin ID of pending collection")
-		return
-	}
-	// collections should come from collection nodes
-	if origin.Role != flow.RoleCollection {
-		// TODO: potential attack on integrity
-		l.log.Error().
-			Err(err).
-			Hex("collection_id", logging.ID(pcoll.ID())).
-			Hex("origin_id", logging.ID(pcoll.OriginID)).
-			Str("origin_role", origin.Role.String()).
-			Msg("invalid role for pending collection")
-		return
-	}
-	// store the collection in the authenticated collections mempool
-	// this will fail if the collection already exists in the store
-	_ = l.authCollections.Add(pcoll.Collection)
-
-	l.log.Debug().
-		Hex("collection_id", logging.ID(collID)).
-		Hex("block_id", logging.ID(blockID)).
-		Msg("pending collection successfully moved to authenticated mempool")
 }
 
 // updateChunkDataPackTracker performs the following
@@ -1007,12 +806,6 @@ func (l *LightEngine) OnFinalizedBlock(block *model.Block) {
 			Msg("could not check block availability in storage")
 		return
 	}
-
-	// checks pending receipts in parallel and non-blocking based on new block ID
-	_ = l.unit.Do(func() error {
-		l.checkPendingReceipts(block.BlockID)
-		return nil
-	})
 }
 
 // To implement FinalizationConsumer
