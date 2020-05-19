@@ -15,8 +15,6 @@ import (
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/node"
 
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
-
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/common"
 )
 
 // MForest is an in memory forest (collection of tries)
@@ -61,13 +59,14 @@ func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int, onTreeE
 	}
 
 	// add empty roothash
-	emptyTrie := trie.NewMTrie(maxHeight)
-	emptyTrie.Number = uint64(0)
-	emptyTrie.SetRootHash(common.GetDefaultHashForHeight(maxHeight - 1))
+	emptyTrie, err := trie.NewEmptyMTrie(maxHeight, 0, nil)
+	if err != nil {
+		return nil, fmt.Errorf("constructing empty trie for forest failed: %w", err)
+	}
 
 	err = forest.AddTrie(emptyTrie)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("adding empty trie to forest failed: %w", err)
 	}
 	return forest, nil
 }
@@ -108,9 +107,8 @@ func (f *MForest) RemoveTrie(rootHash []byte) {
 
 // GetEmptyRootHash returns the rootHash of empty forest
 func (f *MForest) GetEmptyRootHash() []byte {
-	newRoot := node.NewNode(f.maxHeight - 1)
-	rootHash := newRoot.ComputeNodeHash(false)
-	return rootHash
+	dummyRoot := node.NewEmptyTreeRoot(f.maxHeight - 1)
+	return dummyRoot.Hash()
 }
 
 // Read reads values for an slice of keys and returns values and error (if any)
@@ -166,11 +164,14 @@ func (f *MForest) Read(keys [][]byte, rootHash []byte) ([][]byte, error) {
 }
 
 // Update updates the Values for the registers and returns rootHash and error (if any)
-func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byte, error) {
+func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) (*trie.MTrie, error) {
+	parentTrie, err := f.GetTrie(rootHash)
+	if err != nil {
+		return nil, err
+	}
 
-	// no key no change
-	if len(keys) == 0 {
-		return rootHash, nil
+	if len(keys) == 0 { // no key no change
+		return parentTrie, nil
 	}
 
 	// sort keys and deduplicate keys (we only consider the last occurrence, and ignore the rest)
@@ -201,31 +202,19 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) ([]byt
 		sortedValues = append(sortedValues, valueMap[hex.EncodeToString(key)])
 	}
 
-	parentTrie, err := f.GetTrie(rootHash)
+	newTrie, err := parentTrie.UnsafeUpdate(sortedKeys, sortedValues)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
 
-	newTrie := trie.NewMTrie(f.maxHeight)
-	newTrie.ParentRootHash = parentTrie.root.GetNodeHash()
-	newTrie.Number = parentTrie.Number + 1
-
-	err = newTrie.UnsafeUpdate(parentTrie, sortedKeys, sortedValues)
-	if err != nil {
-		return nil, err
-	}
-
-	newTrie.root.PopulateNodeHashValues()
-	newRootHash := newTrie.root.GetNodeHash()
-	newTrie.SetRootHash(newRootHash)
 	err = f.AddTrie(newTrie)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("adding updated trie to forrest failed: %w", err)
 	}
 	// go func() {
 	// 	_ = newTrie.Store(filepath.Join(f.dir, hex.EncodeToString(newRootHash)))
 	// }()
-	return newRootHash, nil
+	return newTrie, nil
 }
 
 // Proofs returns a batch proof for the given keys
@@ -275,20 +264,17 @@ func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*proof.BatchProof, err
 
 	// if we have to insert empty values
 	if len(notFoundKeys) > 0 {
-		newTrie := trie.NewMTrie(f.maxHeight)
-		newRoot := newTrie.root
-
 		sort.Slice(notFoundKeys, func(i, j int) bool {
 			return bytes.Compare(notFoundKeys[i], notFoundKeys[j]) < 0
 		})
 
-		err = newTrie.UnsafeUpdate(stateTrie, notFoundKeys, notFoundValues)
+		newTrie, err := stateTrie.UnsafeUpdate(notFoundKeys, notFoundValues)
 		if err != nil {
 			return nil, err
 		}
 
 		// rootHash shouldn't change
-		if !bytes.Equal(newRoot.GetNodeHash(), rootHash) {
+		if !bytes.Equal(newTrie.RootHash(), rootHash) {
 			return nil, errors.New("root hash has changed during the operation")
 		}
 		stateTrie = newTrie
@@ -332,21 +318,16 @@ func (f *MForest) StoreTrie(rootHash []byte, path string) error {
 
 // LoadTrie loads a trie from the disk
 func (f *MForest) LoadTrie(path string) (*trie.MTrie, error) {
-	stateTrie := trie.NewMTrie(f.maxHeight)
-	err := stateTrie.Load(path)
+	newTrie, err := trie.Load(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("loading trie from '%s' failed: %w", path, err)
 	}
-	stateTrie.root.PopulateNodeHashValues()
-	if !bytes.Equal(stateTrie.RootHash(), stateTrie.root.GetNodeHash()) {
-		return nil, errors.New("error loading a trie, rootHash doesn't match")
-	}
-	err = f.AddTrie(stateTrie)
+	err = f.AddTrie(newTrie)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("adding loaded trie from '%s' to forest failed: %w", path, err)
 	}
 
-	return stateTrie, nil
+	return newTrie, nil
 }
 
 func (f *MForest) Size() int {

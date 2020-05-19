@@ -117,13 +117,12 @@ func (f *MTrieStorage) UpdateRegisters(
 		return nil, fmt.Errorf("cannot update state, error while writing WAL: %w", err)
 	}
 
-	newStateCommitment, err = f.mForest.Update(ids, values, stateCommitment)
-	// newStateCommitment, err = f.tree.Update(ids, values, stateCommitment)
+	newTrie, err := f.mForest.Update(ids, values, stateCommitment)
 	if err != nil {
 		return nil, fmt.Errorf("cannot update state: %w", err)
 	}
 
-	return newStateCommitment, nil
+	return newTrie.RootHash(), nil
 }
 
 // GetRegistersWithProof read the values at the given registers at the given flow.StateCommitment

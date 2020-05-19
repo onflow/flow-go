@@ -129,6 +129,12 @@ func (n *Node) LeftChild() *Node { return n.lChild }
 // Do NOT MODIFY returned Node!
 func (n *Node) RigthChild() *Node { return n.rChild }
 
+// IsLeaf returns true if and only if Node is a LEAF.
+func (n *Node) IsLeaf() bool {
+	// Per definition, a node is a leaf if and only if it has defined by key-value pair
+	return n.key != nil
+}
+
 // FmtStr provides formatted string representation of the Node and sub tree
 func (n Node) FmtStr(prefix string, path string) string {
 	right := ""
