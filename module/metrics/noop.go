@@ -3,6 +3,7 @@ package metrics
 import (
 	"time"
 
+	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -46,9 +47,9 @@ func (nc *NoopCollector) SetQCView(view uint64)                                 
 func (nc *NoopCollector) CountSkipped()                                             {}
 func (nc *NoopCollector) CountTimeout()                                             {}
 func (nc *NoopCollector) SetTimeout(duration time.Duration)                         {}
-func (nc *NoopCollector) TransactionReceived(txID flow.Identifier)                  {}
-func (nc *NoopCollector) ClusterBlockProposed(collection flow.LightCollection)      {}
-func (nc *NoopCollector) CollectionGuaranteed(collection flow.LightCollection)      {}
+func (nc *NoopCollector) TransactionIngested(txID flow.Identifier)                  {}
+func (nc *NoopCollector) ClusterBlockProposed(*cluster.Block)                       {}
+func (nc *NoopCollector) ClusterBlockFinalized(*cluster.Block)                      {}
 func (nc *NoopCollector) PendingClusterBlocks(n uint)                               {}
 func (nc *NoopCollector) StartCollectionToFinalized(collectionID flow.Identifier)   {}
 func (nc *NoopCollector) FinishCollectionToFinalized(collectionID flow.Identifier)  {}
