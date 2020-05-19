@@ -161,7 +161,7 @@ func (suite *LightIngestTestSuite) SetupTest() {
 // TestNewLightEngine verifies the establishment of the network registration upon
 // creation of an instance of LightIngestEngine using the New method
 // It also returns an instance of new engine to be used in the later tests
-func (suite *LightIngestTestSuite) TestNewLightEngine() *ingest.Engine {
+func (suite *LightIngestTestSuite) TestNewLightEngine() *ingest.LightEngine {
 	e, err := ingest.NewLightEngine(zerolog.Logger{},
 		suite.net,
 		suite.state,
