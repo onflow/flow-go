@@ -524,13 +524,13 @@ func (e *Engine) prune() {
 		return
 	}
 
-	prunedHeights := 0
-	prunedIDs := 0
+	// track how many statuses we are pruning
+	initialHeights := len(e.heights)
+	initialBlockIDs := len(e.blockIDs)
 
 	for height := range e.heights {
 		if height <= final.Height {
 			delete(e.heights, height)
-			prunedHeights++
 			continue
 		}
 	}
@@ -541,15 +541,16 @@ func (e *Engine) prune() {
 
 			if header.Height <= final.Height {
 				delete(e.blockIDs, blockID)
-				prunedIDs++
 				continue
 			}
 		}
 	}
 
+	prunedHeights := len(e.heights) - initialHeights
+	prunedBlockIDs := len(e.blockIDs) - initialBlockIDs
 	e.log.Debug().
 		Uint64("final_height", final.Height).
-		Msgf("pruned %d heights, %d block IDs", prunedHeights, prunedIDs)
+		Msgf("pruned %d heights, %d block IDs", prunedHeights, prunedBlockIDs)
 }
 
 // scanPending will check which items shall be requested.
