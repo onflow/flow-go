@@ -36,7 +36,6 @@ func (m MapLedger) Delete(key flow.RegisterID) {
 const (
 	keyAddressState   = "account_address_state"
 	keyExists         = "exists"
-	keyBalance        = "balance"
 	keyCode           = "code"
 	keyPublicKeyCount = "public_key_count"
 )
@@ -70,12 +69,7 @@ func (r *LedgerDAL) CheckAccountExists(accountAddress []byte) error {
 		return err
 	}
 
-	bal, err := r.Get(fullKeyHash(string(accountAddress), "", keyBalance))
-	if err != nil {
-		return err
-	}
-
-	if len(exists) != 0 || bal != nil {
+	if len(exists) != 0 {
 		return nil
 	}
 
@@ -136,9 +130,6 @@ func (r *LedgerDAL) GetAccount(address flow.Address) *flow.Account {
 		return nil
 	}
 
-	balanceBytes, _ := r.Get(fullKeyHash(string(accountAddress), "", keyBalance))
-	balanceInt := new(big.Int).SetBytes(balanceBytes)
-
 	code, _ := r.Get(fullKeyHash(string(accountAddress), string(accountAddress), keyCode))
 
 	publicKeys, err := r.GetAccountPublicKeys(accountAddress)
@@ -148,7 +139,6 @@ func (r *LedgerDAL) GetAccount(address flow.Address) *flow.Account {
 
 	return &flow.Account{
 		Address: address,
-		Balance: balanceInt.Uint64(),
 		Code:    code,
 		Keys:    publicKeys,
 	}
@@ -198,9 +188,6 @@ func (r *LedgerDAL) CreateAccountWithAddress(
 
 	// mark that account with this ID exists
 	r.Set(fullKeyHash(string(accountID), "", keyExists), []byte{1})
-
-	// set account balance to 0
-	r.Set(fullKeyHash(string(accountID), "", keyBalance), big.NewInt(0).Bytes())
 
 	r.Set(fullKeyHash(string(accountID), string(accountID), keyCode), nil)
 
