@@ -586,8 +586,8 @@ func (suite *LightIngestTestSuite) TestHandleCollection_IngestedCollection() {
 }
 
 // TestHandleCollection_ExistingAuthenticated evaluates the happy path of submitting a collection
-// that is existing in the authenticated mempool
-func (suite *LightIngestTestSuite) TestHandleCollection_ExistingAuthenticated() {
+// that currently exists in the mempool.
+func (suite *LightIngestTestSuite) TestHandleCollection_Existing() {
 	// locks to run the test sequentially
 	suite.Lock()
 	defer suite.Unlock()
