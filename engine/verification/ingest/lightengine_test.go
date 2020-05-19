@@ -606,27 +606,6 @@ func (suite *LightIngestTestSuite) TestHandleCollection_Existing() {
 	suite.collections.AssertNotCalled(suite.T(), "Add", testifymock.Anything)
 }
 
-// TestHandleCollection_ExistingPending evaluates the happy path of submitting a collection
-// that is existing in the pending mempool
-func (suite *LightIngestTestSuite) TestHandleCollection_ExistingPending() {
-	// locks to run the test sequentially
-	suite.Lock()
-	defer suite.Unlock()
-
-	eng := suite.TestNewLightEngine()
-
-	// mocks this collection as ingested
-	suite.ingestedCollectionIDs.On("Has", suite.collection.ID()).Return(false)
-	suite.collections.On("Has", suite.collection.ID()).Return(false)
-
-	// nothing else is mocked, hence the process should simply return nil
-	err := eng.Process(unittest.IdentifierFixture(), suite.collection)
-	require.NoError(suite.T(), err)
-
-	// collection should not be tried to be stored in the mempool
-	suite.collections.AssertNotCalled(suite.T(), "Add", testifymock.Anything)
-}
-
 // TestVerifyReady evaluates that a verifiable chunk is locally passed to the verifier engine
 // whenever all of its relevant resources are ready regardless of the order in which dependent resources are received.
 func (suite *LightIngestTestSuite) TestVerifyReady() {
