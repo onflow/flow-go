@@ -318,6 +318,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	log.Debug().Msg("received proposal")
 
 	e.prunePendingCache()
+	e.mempoolMetrics.MempoolEntries(metrics.ResourceTransaction, e.pool.Size())
 
 	// retrieve the parent block
 	// if the parent is not in storage, it has not yet been processed
