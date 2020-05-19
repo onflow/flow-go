@@ -37,6 +37,8 @@ type Engine struct {
 	// the number of blocks that can be between the reference block and the
 	// finalized head before we consider the transaction expired
 	expiry uint
+	// whether or not we validate that transaction scripts are parseable
+	parseScripts bool
 }
 
 // New creates a new collection ingest engine.
@@ -49,6 +51,7 @@ func New(
 	me module.Local,
 	pool mempool.Transactions,
 	expiryBuffer uint,
+	parseScripts bool,
 ) (*Engine, error) {
 
 	logger := log.With().
@@ -66,7 +69,8 @@ func New(
 		// add some expiry buffer -- this is how much time a transaction has
 		// to be included in a collection, then for that collection to be
 		// included in a block
-		expiry: flow.DefaultTransactionExpiry - expiryBuffer,
+		expiry:       flow.DefaultTransactionExpiry - expiryBuffer,
+		parseScripts: parseScripts,
 	}
 
 	con, err := net.Register(engine.CollectionIngest, e)
@@ -128,8 +132,6 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
 	case *flow.TransactionBody:
 		e.engMetrics.MessageReceived(metrics.EngineCollectionIngest, metrics.MessageTransaction)
-		e.unit.Lock()
-		defer e.unit.Unlock()
 		defer e.engMetrics.MessageHandled(metrics.EngineCollectionIngest, metrics.MessageTransaction)
 		return e.onTransaction(originID, ev)
 	default:
@@ -245,10 +247,12 @@ func (e *Engine) ValidateTransaction(tx *flow.TransactionBody) error {
 		}
 	}
 
-	// ensure the script is at least parse-able
-	_, _, err = parser.ParseProgram(string(tx.Script))
-	if err != nil {
-		return InvalidScriptError{ParserErr: err}
+	if e.parseScripts {
+		// ensure the script is at least parse-able
+		_, _, err = parser.ParseProgram(string(tx.Script))
+		if err != nil {
+			return InvalidScriptError{ParserErr: err}
+		}
 	}
 
 	// TODO check account/payer signatures
