@@ -2,14 +2,12 @@ package cache
 
 import (
 	"fmt"
-	"sync"
 
 	lru "github.com/hashicorp/golang-lru"
 )
 
 // RcvCache implements an LRU cache of the received eventIDs that delivered to their engines
 type RcvCache struct {
-	sync.Mutex
 	c *lru.Cache // used to incorporate an LRU cache
 }
 
@@ -27,31 +25,19 @@ func NewRcvCache(size int) (*RcvCache, error) {
 	}
 
 	rcv := &RcvCache{
-		Mutex: sync.Mutex{},
-		c:     c,
+		c: c,
 	}
 
 	return rcv, nil
 }
 
-// Add adds an event ID and its targeted channelID to the cache
-func (r *RcvCache) Add(eventID []byte, channelID uint32) {
-	r.Lock()
-	defer r.Unlock()
+// Adds a new message to the cache if not already present. Returns true if the message was already in the cache and false
+// otherwise
+func (r *RcvCache) ContainsOrAdd(eventID []byte, channelID uint32) bool {
 	entry := RcvCacheEntry{
 		eventID:   string(eventID),
 		channelID: channelID,
 	}
-	r.c.Add(entry, true)
-}
-
-// Seen returns true if the eventID exists in the cache for the channelID
-func (r *RcvCache) Seen(eventID []byte, channelID uint32) bool {
-	r.Lock()
-	defer r.Unlock()
-	entry := RcvCacheEntry{
-		eventID:   string(eventID),
-		channelID: channelID,
-	}
-	return r.c.Contains(entry)
+	ok, _ := r.c.ContainsOrAdd(entry, true) // ignore eviction status
+	return ok
 }

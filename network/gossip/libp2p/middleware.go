@@ -167,9 +167,6 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 func (m *Middleware) Stop() {
 	close(m.stop)
 
-	// cancel the context (this also signals libp2p go routines to exit)
-	m.cancel()
-
 	// stop libp2p
 	done, err := m.libP2PNode.Stop()
 	if err != nil {
@@ -178,6 +175,9 @@ func (m *Middleware) Stop() {
 		<-done
 		m.log.Debug().Msg("node stopped successfully")
 	}
+
+	// cancel the context (this also signals any lingering libp2p go routines to exit)
+	m.cancel()
 
 	// wait for the go routines spawned by middleware to stop
 	m.wg.Wait()
