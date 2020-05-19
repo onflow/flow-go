@@ -509,3 +509,13 @@ var InitDefaultTokenScript = []byte(fmt.Sprintf(`
 		}
 	}
 `, flow.RootAddress))
+
+var DefaultTokenBalanceScript = []byte(fmt.Sprintf(`
+	import ServiceAccount from 0x%s
+
+	transaction {
+		prepare(acct: AuthAccount) {
+			ServiceAccount.defaultTokenBalance(acct)
+		}
+	}
+`, flow.RootAddress))

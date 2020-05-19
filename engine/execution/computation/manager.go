@@ -25,6 +25,7 @@ type ComputationManager interface {
 		block *entity.ExecutableBlock,
 		view *delta.View,
 	) (*execution.ComputationResult, error)
+	GetAccount(addr flow.Address, header *flow.Header, view *delta.View) (*flow.Account, error)
 }
 
 // Manager manages computation and execution
@@ -99,4 +100,13 @@ func (e *Manager) ComputeBlock(
 		Msg("computed block result")
 
 	return result, nil
+}
+
+func (e *Manager) GetAccount(addr flow.Address, blockHeader *flow.Header, view *delta.View) (*flow.Account, error) {
+	account, err := e.vm.NewBlockContext(blockHeader).GetAccount(view, addr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get accounot at block (%s): %s", blockHeader.ID(), err)
+	}
+
+	return account, nil
 }
