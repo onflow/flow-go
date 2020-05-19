@@ -24,22 +24,22 @@ const (
 	// (k) is the size of an account address in bits.
 	AddressStateLength = (k + 7) >> 3
 
+	// ZeroAddressState is the addressing state when Flow is bootstrapped
+	ZeroAddressState = AddressState(0)
 	// RootAddressState is the initial addressing state
 	RootAddressState = AddressState(1)
-	// RootAddressState is the initial addressing state
-	RootTestAddressState = AddressState(1)
 )
 
 var (
 	// ZeroAddress represents the "zero address" (account that no one owns).
-	ZeroAddress = generateAddress(AddressState(0))
+	ZeroAddress = generateAddress(ZeroAddressState)
 	// RootAddress represents the root (first) generated account address.
 	RootAddress = generateAddress(RootAddressState)
 
 	// ZeroTestAddress represents the "zero address" in Flow testnet or emulator instances (account that no one owns).
-	ZeroTestAddress = generateTestAddress(AddressState(0))
+	ZeroTestAddress = generateTestAddress(ZeroAddressState)
 	// RootTestAddress represents the root (first) generated test account address.
-	RootTestAddress = generateTestAddress(RootTestAddressState)
+	RootTestAddress = generateTestAddress(RootAddressState)
 )
 
 func init() {
@@ -171,7 +171,7 @@ const (
 func AccountAddress(state AddressState) (Address, AddressState, error) {
 	newState, err := nextState(state)
 	if err != nil {
-		return Address{}, AddressState(0), err
+		return Address{}, ZeroAddressState, err
 	}
 	address := generateAddress(newState)
 	return address, newState, nil
@@ -181,7 +181,7 @@ func AccountAddress(state AddressState) (Address, AddressState, error) {
 // The state values are incremented from 0 to 2^k-1
 func nextState(state AddressState) (AddressState, error) {
 	if uint64(state) > maxState {
-		return AddressState(0),
+		return ZeroAddressState,
 			fmt.Errorf("the state value is not valid, it must be less or equal to %x", maxState)
 	}
 	newState := state + 1
@@ -254,7 +254,7 @@ func (a *Address) CheckAddress() bool {
 func TestAccountAddress(state AddressState) (Address, AddressState, error) {
 	newState, err := nextState(state)
 	if err != nil {
-		return Address{}, AddressState(0), err
+		return Address{}, ZeroAddressState, err
 	}
 	address := generateTestAddress(newState)
 	return address, newState, nil

@@ -80,12 +80,12 @@ func TestFlowAdressConstants(t *testing.T) {
 
 	// check the transition from account zero to root
 	// Flow
-	state := AddressState(0)
+	state := ZeroAddressState
 	address, _, err := AccountAddress(state)
 	require.NoError(t, err)
 	assert.Equal(t, address, RootAddress)
 	// Flow test
-	state = AddressState(0)
+	state = ZeroAddressState
 	address, _, err = TestAccountAddress(state)
 	require.NoError(t, err)
 	assert.Equal(t, address, RootTestAddress)
@@ -119,8 +119,8 @@ func TestFlowAddressGeneration(t *testing.T) {
 	const loop = 50
 
 	// sanity check of AccountAddress function consistency
-	state := AddressState(0)
-	expectedState := AddressState(0)
+	state := ZeroAddressState
+	expectedState := ZeroAddressState
 	for i := 0; i < loop; i++ {
 		address, stateResult, err := AccountAddress(state)
 		state = stateResult
@@ -192,8 +192,8 @@ func TestFlowTestAddressGeneration(t *testing.T) {
 	const loop = 50
 
 	// sanity check of TestAccountAddress function consistency
-	state := AddressState(0)
-	expectedState := AddressState(0)
+	state := ZeroAddressState
+	expectedState := ZeroAddressState
 	for i := 0; i < loop; i++ {
 		testAddress, stateResult, err := TestAccountAddress(state)
 		state = stateResult
