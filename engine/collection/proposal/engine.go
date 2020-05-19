@@ -263,7 +263,11 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			Msg("broadcast proposal from hotstuff")
 
 		e.engMetrics.MessageSent(metrics.EngineProposal, metrics.MessageClusterBlockProposal)
-		e.colMetrics.CollectionProposed(payload.Collection.Light())
+		block := &cluster.Block{
+			Header:  header,
+			Payload: payload,
+		}
+		e.colMetrics.ClusterBlockProposed(block)
 	})
 
 	return nil
@@ -349,6 +353,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	log.Debug().Msg("received proposal")
 
 	e.prunePendingCache()
+	e.mempoolMetrics.MempoolEntries(metrics.ResourceTransaction, e.pool.Size())
 
 	// first, we reject all blocks that we don't need to process:
 	// 1) blocks already in the cache; they will already be processed later
@@ -405,7 +410,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 
 		// go to the first missing ancestor
 		ancestorID := ancestor.Header.ParentID
-		ancestorHeight := ancestor.Header.Height
+		ancestorHeight := ancestor.Header.Height - 1
 		for {
 			ancestor, found := e.pending.ByID(ancestorID)
 			if !found {
@@ -474,11 +479,11 @@ func (e *Engine) processBlockProposal(proposal *messages.ClusterBlockProposal) e
 
 	// extend the state with the proposal -- if it is an invalid extension,
 	// we will throw an error here
-	block := cluster.Block{
+	block := &cluster.Block{
 		Header:  proposal.Header,
 		Payload: proposal.Payload,
 	}
-	err := e.clusterState.Mutate().Extend(&block)
+	err := e.clusterState.Mutate().Extend(block)
 	if err != nil {
 		return fmt.Errorf("could not extend cluster state: %w", err)
 	}
@@ -495,7 +500,7 @@ func (e *Engine) processBlockProposal(proposal *messages.ClusterBlockProposal) e
 	e.hotstuff.SubmitProposal(header, parent.View)
 
 	// report proposed (case that we are not leader)
-	e.colMetrics.CollectionProposed(proposal.Payload.Collection.Light())
+	e.colMetrics.ClusterBlockProposed(block)
 
 	err = e.processPendingChildren(header)
 	if err != nil {

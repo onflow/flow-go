@@ -227,7 +227,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 		// go to the first missing ancestor
 		ancestorID := ancestor.Header.ParentID
-		ancestorHeight := ancestor.Header.Height
+		ancestorHeight := ancestor.Header.Height - 1
 		for {
 			ancestor, found = e.pending.ByID(ancestorID)
 			if !found {
