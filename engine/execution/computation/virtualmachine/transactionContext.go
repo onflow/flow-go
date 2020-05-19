@@ -31,7 +31,7 @@ type TransactionContext struct {
 
 type TransactionContextOption func(*TransactionContext)
 
-var SkipVerification = func(ctx *TransactionContext) {
+func SkipVerification(ctx *TransactionContext) {
 	ctx.skipVerification = true
 }
 
