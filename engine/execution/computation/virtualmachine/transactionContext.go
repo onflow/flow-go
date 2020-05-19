@@ -86,9 +86,32 @@ func (r *TransactionContext) ValueExists(owner, controller, key []byte) (exists 
 //
 // After creating the account, this function calls the onAccountCreated callback registered
 // with this context.
-func (r *TransactionContext) CreateAccount(publicKeysBytes [][]byte) (runtime.Address, error) {
-	publicKeys := make([]flow.AccountPublicKey, len(publicKeysBytes))
+func (r *TransactionContext) CreateAccount(publicKeysBytes [][]byte, payer runtime.Address) (runtime.Address, error) {
+
+	flowErr, fatalErr := r.deductAccountCreationFee(flow.Address(payer))
+	if fatalErr != nil {
+		return runtime.Address{}, fatalErr
+	}
+
+	if flowErr != nil {
+		// TODO: properly propagate this error
+
+		switch err := flowErr.(type) {
+		case *CodeExecutionError:
+			return runtime.Address{}, err.RuntimeError.Unwrap()
+		default:
+			// Account creation should fail due to insufficient balance, which is reported in `flowErr`.
+			// Should we tree other FlowErrors as fatal?
+			return runtime.Address{}, fmt.Errorf(
+				"failed to deduct account creation fee: %s",
+				err.ErrorMessage(),
+			)
+		}
+	}
+
 	var err error
+
+	publicKeys := make([]flow.AccountPublicKey, len(publicKeysBytes))
 	for i, keyBytes := range publicKeysBytes {
 		publicKeys[i], err = flow.DecodeRuntimeAccountPublicKey(keyBytes, 0)
 		if err != nil {
@@ -103,35 +126,62 @@ func (r *TransactionContext) CreateAccount(publicKeysBytes [][]byte) (runtime.Ad
 
 	r.Log(fmt.Sprintf("Created new account with address: %s", addr))
 
-	err = r.initDefaultToken(addr)
-	if err != nil {
-		return runtime.Address{}, err
+	flowErr, fatalErr = r.initDefaultToken(addr)
+	if fatalErr != nil {
+		return runtime.Address{}, fatalErr
+	}
+
+	if flowErr != nil {
+		// TODO: properly propagate this error
+
+		switch err := flowErr.(type) {
+		case *CodeExecutionError:
+			return runtime.Address{}, err.RuntimeError.Unwrap()
+		default:
+			return runtime.Address{}, fmt.Errorf(
+				"failed to initialize default token: %s",
+				err.ErrorMessage(),
+			)
+		}
 	}
 
 	return runtime.Address(addr), nil
 }
 
-func (r *TransactionContext) initDefaultToken(addr flow.Address) error {
+func (r *TransactionContext) initDefaultToken(addr flow.Address) (FlowError, error) {
 	tx := flow.NewTransactionBody().
 		SetScript(InitDefaultTokenScript).
 		AddAuthorizer(addr)
 
+	// TODO: propagate computation limit
 	result, err := r.bc.ExecuteTransaction(r.ledger, tx, SkipVerification)
 	if err != nil {
-		return fmt.Errorf(
-			"failed to initialize default token: %w",
-			err,
-		)
+		return nil, err
 	}
 
 	if result.Error != nil {
-		return fmt.Errorf(
-			"failed to initialize default token: %s",
-			result.Error.ErrorMessage(),
-		)
+		return result.Error, nil
 	}
 
-	return nil
+	return nil, nil
+}
+
+func (r *TransactionContext) deductAccountCreationFee(addr flow.Address) (FlowError, error) {
+	tx := flow.NewTransactionBody().
+		SetScript(DeductAccountCreationFeeScript).
+		AddAuthorizer(addr)
+
+	// TODO: propagate computation limit
+	result, err := r.bc.ExecuteTransaction(r.ledger, tx, SkipVerification)
+	if err != nil {
+		return nil, err
+	}
+
+	if result.Error != nil {
+		return result.Error, nil
+	}
+
+	return nil, nil
 }
 
 // AddAccountKey adds a public key to an existing account.
@@ -519,3 +569,13 @@ var DefaultTokenBalanceScript = []byte(fmt.Sprintf(`
 		}
 	}
 `, flow.RootAddress))
+
+var DeductAccountCreationFeeScript = []byte(`
+	import ServiceAccount from 0x0
+
+	transaction {
+		prepare(acct: AuthAccount) {
+			ServiceAccount.deductAccountCreationFee(acct)
+		}
+	}
+`)
