@@ -96,6 +96,7 @@ func (suite *Suite) SetupTest() {
 
 	suite.validator = new(module.TransactionValidator)
 	suite.pool = new(mempool.Transactions)
+	suite.pool.On("Size").Return(uint(0))
 	suite.transactions = new(storage.Transactions)
 	suite.headers = new(storage.Headers)
 	suite.payloads = new(storage.ClusterPayloads)
