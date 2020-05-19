@@ -52,7 +52,6 @@ type LightIngestTestSuite struct {
 	// to these when they are received from an appropriate node role.
 	receipts              *mempool.Receipts
 	collections           *mempool.Collections
-	collectionTrackers    *mempool.CollectionTrackers
 	chunkDataPacks        *mempool.ChunkDataPacks
 	chunkDataPackTrackers *mempool.ChunkDataPackTrackers
 	ingestedChunkIDs      *mempool.Identifiers
@@ -99,7 +98,6 @@ func (suite *LightIngestTestSuite) SetupTest() {
 	suite.blockStorage = &storage.Blocks{}
 	suite.receipts = &mempool.Receipts{}
 	suite.collections = &mempool.Collections{}
-	suite.collectionTrackers = &mempool.CollectionTrackers{}
 	suite.chunkDataPacks = &mempool.ChunkDataPacks{}
 	suite.chunkDataPackTrackers = &mempool.ChunkDataPackTrackers{}
 	suite.ingestedResultIDs = &mempool.Identifiers{}
@@ -171,7 +169,6 @@ func (suite *LightIngestTestSuite) TestNewLightEngine() *ingest.LightEngine {
 		suite.verifierEng,
 		suite.receipts,
 		suite.collections,
-		suite.collectionTrackers,
 		suite.chunkDataPacks,
 		suite.chunkDataPackTrackers,
 		suite.ingestedChunkIDs,
@@ -236,14 +233,6 @@ func (suite *LightIngestTestSuite) TestHandleReceipt_MissingCollection() {
 	// expect that we already have the receipt in mempool
 	suite.receipts.On("Add", suite.receipt).Return(true).Once()
 	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
-
-	// mocks functionalities
-	//
-	// adding functionality of chunk tracker to trackers mempool
-	// mocks initial insertion of tracker into mempool
-	suite.collectionTrackers.On("Add", suite.collTracker).Return(true).Once()
-	// there is no tracker registered for the collection, i.e., the collection has not been requested yet
-	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(false)
 
 	var submitWG sync.WaitGroup
 	submitWG.Add(1)
@@ -344,158 +333,6 @@ func (suite *LightIngestTestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
 }
 
-// TestHandleReceipt_RetryMissingCollection evaluates that when LightIngestEngine has a missing collections with
-// a tracker registered, it retries its request (`failureThreshold`)-many times and then drops it.
-func (suite *LightIngestTestSuite) TestHandleReceipt_RetryMissingCollection() {
-	// locks to run the test sequentially
-	suite.Lock()
-	defer suite.Unlock()
-
-	eng := suite.TestNewLightEngine()
-
-	// mocking state
-	suite.ss.On("Identities", testifymock.AnythingOfType("flow.IdentityFilter")).Return(flow.IdentityList{suite.collIdentity}, nil)
-
-	// mocks functionalities
-	//
-	// mocks tracker check
-	// presence of tracker in the trackers mempool
-	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(true)
-	suite.collectionTrackers.On("All").Return([]*tracker.CollectionTracker{suite.collTracker})
-	suite.collectionTrackers.On("Add", suite.collTracker).Return(nil)
-	// update functionality for the present tracker
-	suite.collectionTrackers.On("Inc", suite.collection.ID()).Run(func(args testifymock.Arguments) {
-		// +1 accounts for updating the trackers counter
-		suite.collTracker.Counter += 1
-	}).Return(suite.collTracker, nil)
-
-	// no chunk data pack tacker
-	suite.chunkDataPackTrackers.On("All").Return(nil)
-
-	// mocks the existence of receipt
-	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
-
-	// mocks the existence of block
-	suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil)
-
-	// mock existence of chunk data pack
-	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
-	suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, true)
-
-	// engine has not yet ingested the result of this receipt as well as its chunks yet
-	suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
-	suite.ingestedChunkIDs.On("Has", suite.chunk.ID()).Return(false)
-
-	// engine does not have the collection pending or authenticated
-	suite.collections.On("Has", suite.collection.ID()).Return(false)
-
-	// mocks expectation
-	//
-	// expect that the collection is requested from collection nodes `failureThreshold` - 1 many times
-	// the -1 is to exclude the initial request submission made before adding tracker to mempool
-	submitWG := sync.WaitGroup{}
-	submitWG.Add(int(suite.failureThreshold) - 1)
-	suite.collectionsConduit.
-		On("Submit", testifymock.AnythingOfType("*messages.CollectionRequest"), suite.collIdentity.NodeID).
-		Run(func(args testifymock.Arguments) {
-			submitWG.Done()
-		}).
-		Return(nil)
-
-	// starts engine
-	<-eng.Ready()
-
-	// starts timer for submitting retries
-	// expects `failureThreshold`-many requests each sent at `requestInterval` milliseconds time interval
-	unittest.RequireReturnsBefore(suite.T(), submitWG.Wait,
-		time.Duration(int64(suite.failureThreshold*suite.requestInterval))*time.Millisecond)
-
-	// waits for the engine to get shutdown
-	<-eng.Done()
-
-	// verifier should not be called
-	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
-}
-
-// TestHandleReceipt_RetryMissingChunkDataPack evaluates that when LightIngestEngine has a missing chunk data pack with
-// a tracker registered, it retries its request (`failureThreshold` - 1)-many times and then drops it.
-// The -1 is to account for the initial request of the chunk data pack directly without registering the tracker.
-func (suite *LightIngestTestSuite) TestHandleReceipt_RetryMissingChunkDataPack() {
-	// locks to run the test sequentially
-	suite.Lock()
-	defer suite.Unlock()
-
-	eng := suite.TestNewLightEngine()
-
-	// mocks identities
-	//
-	// required roles
-	exeIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleExecution))
-
-	// mocking state
-	suite.ss.On("Identities", testifymock.AnythingOfType("flow.IdentityFilter")).Return(exeIdentities, nil)
-
-	// mocks functionalities
-	//
-	// mocks tracker check
-	// presence of tracker in the trackers mempool
-	suite.chunkDataPackTrackers.On("Has", suite.chunkDataPack.ID()).Return(true)
-	suite.chunkDataPackTrackers.On("All").Return([]*tracker.ChunkDataPackTracker{suite.chunkTracker})
-	suite.chunkDataPackTrackers.On("Add", suite.chunkTracker).Return(nil)
-	// update functionality for the present tracker
-	suite.chunkDataPackTrackers.On("Inc", suite.chunkDataPack.ID()).Run(func(args testifymock.Arguments) {
-		// +1 accounts for updating the trackers counter
-		suite.chunkTracker.Counter += 1
-	}).Return(suite.chunkTracker, nil)
-
-	// no collection tracker
-	suite.collectionTrackers.On("All").Return(nil)
-
-	// mocks the existence of receipt
-	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
-
-	// mocks the existence of block
-	suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil)
-
-	// mock existence of collection
-	suite.collections.On("Has", suite.collection.ID()).Return(true)
-	suite.collections.On("ByCollectionID", suite.collection.ID()).Return(suite.collection, nil)
-
-	// engine has not yet ingested the result of this receipt as well as its chunks yet
-	suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
-	suite.ingestedChunkIDs.On("Has", suite.chunk.ID()).Return(false)
-
-	// engine does not have the chunk data pack
-	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(false)
-
-	// mocks expectation
-	//
-	// expect that the collection is requested from collection nodes `failureThreshold` - 1 many times
-	// the -1 is to exclude the initial request submission made before adding tracker to mempool
-	submitWG := sync.WaitGroup{}
-	submitWG.Add(int(suite.failureThreshold) - 1)
-	suite.chunksConduit.
-		On("Submit", testifymock.AnythingOfType("*messages.ChunkDataPackRequest"), exeIdentities[0].NodeID).
-		Run(func(args testifymock.Arguments) {
-			submitWG.Done()
-		}).
-		Return(nil)
-
-	// starts engine
-	<-eng.Ready()
-
-	// starts timer for submitting retries
-	// expects `failureThreshold`-many requests each sent at `requestInterval` milliseconds time interval
-	unittest.RequireReturnsBefore(suite.T(), submitWG.Wait,
-		time.Duration(int64(suite.failureThreshold*suite.requestInterval))*time.Millisecond)
-
-	// waits for the engine to get shutdown
-	<-eng.Done()
-
-	// verifier should not be called
-	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
-}
-
 // TestIngestedResult evaluates the happy path of submitting an execution receipt with an already ingested result
 func (suite *LightIngestTestSuite) TestIngestedResult() {
 	// locks to run the test sequentially
@@ -560,7 +397,6 @@ func (suite *LightIngestTestSuite) TestHandleCollection() {
 	suite.Assert().Nil(err)
 
 	suite.collections.AssertExpectations(suite.T())
-	suite.collectionTrackers.AssertExpectations(suite.T())
 
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
@@ -636,9 +472,6 @@ func (suite *LightIngestTestSuite) TestVerifyReady() {
 			// mocks state
 			suite.ss.On("Identities", testifymock.AnythingOfType("flow.IdentityFilter")).Return(flow.IdentityList{suite.verIdentity}, nil)
 
-			// mocks identity of the origin id of test case
-			suite.ss.On("Identity", testcase.from.NodeID).Return(testcase.from, nil)
-
 			// mocks the functionality of adding collection to the mempool
 			suite.collections.On("Add", suite.collection).Return(true)
 
@@ -662,9 +495,7 @@ func (suite *LightIngestTestSuite) TestVerifyReady() {
 			suite.collections.On("ByID", suite.collection.ID()).Return(suite.collection, true)
 			suite.ingestedCollectionIDs.On("Add", suite.collection.ID()).Return(true)
 			suite.ingestedCollectionIDs.On("Has", suite.collection.ID()).Return(false)
-			// tracker for the collection
-			suite.collectionTrackers.On("Has", suite.collection.ID()).Return(true)
-			suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, true)
+
 			// chunk data pack in mempool
 			suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
 			suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, true)
@@ -678,9 +509,6 @@ func (suite *LightIngestTestSuite) TestVerifyReady() {
 			suite.collections.On("Rem", suite.collection.ID()).Return(true)
 			// mocks removing chunk data pack from the mempool
 			suite.chunkDataPacks.On("Rem", suite.chunkDataPack.ID()).Return(true)
-			// mocks removing collection tracker from mempool
-			suite.collectionTrackers.On("Rem", suite.collection.ID()).Return(true)
-			// mocks removing receipt from pending mempool
 
 			// mocks test expectation
 			//

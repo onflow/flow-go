@@ -60,7 +60,6 @@ func NewLightEngine(
 	verifierEng network.Engine,
 	receipts mempool.Receipts,
 	collections mempool.Collections,
-	collectionTrackers mempool.CollectionTrackers,
 	chunkDataPacks mempool.ChunkDataPacks,
 	chunkDataPackTrackers mempool.ChunkDataPackTrackers,
 	ingestedChunkIDs mempool.Identifiers,
