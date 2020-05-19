@@ -2,8 +2,11 @@ package trie
 
 import (
 	"bytes"
+	"encoding/hex"
+	"math/rand"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -39,7 +42,7 @@ func TestSMTInitialization(t *testing.T) {
 }
 
 func TestSMTHeightTooSmall(t *testing.T) {
-	dbDir := unittest.TempDBDir(t)
+	dbDir := unittest.TempDir(t)
 
 	defer func() {
 		os.RemoveAll(dbDir)
@@ -1084,7 +1087,6 @@ func TestGetHistoricalProofs(t *testing.T) {
 }
 
 func TestGetHistoricalProofs_NonInclusion(t *testing.T) {
-
 	withSMT(t, 9, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
 		key1 := make([]byte, 1)
 		value1 := []byte{'a'}
@@ -2632,6 +2634,132 @@ func TestProofEncoderDecoder(t *testing.T) {
 		require.Equal(t, p, proofHldr, "Proof encoder and/or decoder has an issue")
 	})
 }
+func TestTrieConstructionCase1(t *testing.T) {
+
+	trieHeight := 257
+	withSMT(t, trieHeight, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+		// 0001111001101001...
+		// [30 105 156 202 161 209 27 123 89 40 174 255 91 148 246 122 86 30 72 252 203 180 164 95 96 111 164 127 31 232 165 99]
+		key1, _ := hex.DecodeString("1e699ccaa1d11b7b5928aeff5b94f67a561e48fccbb4a45f606fa47f1fe8a563")
+		value1 := []byte{'a'}
+
+		// 0100101101110011...
+		// [75 115 94 30 83 178 28 62 236 122 205 55 42 80 98 41 130 82 198 150 140 223 93 195 51 172 216 40 87 194 41 47]
+		key2, _ := hex.DecodeString("4b735e1e53b21c3eec7acd372a5062298252c6968cdf5dc333acd82857c2292f")
+		value2 := []byte{'b'}
+
+		// 0110011011011011...
+		// [102 219 49 15 46 242 56 112 222 196 199 126 23 84 69 16 146 84 195 238 143 1 9 252 237 26 40 91 189 183 128 52]
+		key3, _ := hex.DecodeString("66db310f2ef23870dec4c77e175445109254c3ee8f0109fced1a285bbdb78034")
+		value3, _ := hex.DecodeString("01")
+
+		// 1000010101111000...
+		// [133 120 84 0 236 182 113 244 61 164 14 85 11 78 71 210 104 193 112 144 118 71 113 8 181 248 42 101 206 60 172 35]
+		key4, _ := hex.DecodeString("85785400ecb671f43da40e550b4e47d268c1709076477108b5f82a65ce3cac23")
+		value4, _ := hex.DecodeString("01")
+
+		// 1100011010110010...
+		// [198 178 3 70 165 140 220 177 201 138 211 113 139 136 177 159 168 94 39 63 17 54 241 70 65 113 35 219 118 94 7 217]
+		key5, _ := hex.DecodeString("c6b20346a58cdcb1c98ad3718b88b19fa85e273f1136f146417123db765e07d9")
+		value5 := []byte{'e'}
+
+		// 1000100101101011...
+		// [137 107 114 103 127 66 78 29 245 251 184 114 188 52 189 152 213 188 241 208 116 119 85 191 22 78 180 63 44 160 38 59]
+		key6, _ := hex.DecodeString("896b72677f424e1df5fbb872bc34bd98d5bcf1d0747755bf164eb43f2ca0263b")
+		value6 := []byte{'f'}
+
+		// 1001011010010110...
+		// [150 150 209 192 186 239 247 115 79 117 170 17 239 248 191 67 250 10 39 181 48 241 154 52 125 139 99 28 178 151 3 126]
+		key7, _ := hex.DecodeString("9696d1c0baeff7734f75aa11eff8bf43fa0a27b530f19a347d8b631cb297037e")
+		value7 := []byte{'g'}
+
+		// 1110111110110011...
+		// [239 179 85 63 28 189 73 141 88 84 129 83 43 239 117 134 122 226 174 84 247 120 179 210 243 99 134 91 230 40 123 105]
+		key8, _ := hex.DecodeString("efb3553f1cbd498d585481532bef75867ae2ae54f778b3d2f363865be6287b69")
+		value8 := []byte{'h'}
+
+		// 1000100101101011...
+		// [137 107 114 103 127 66 78 29 245 251 184 114 188 52 189 152 213 188 241 208 116 119 85 191 22 78 180 63 44 160 38 59] [10001001 1101011 1110010 1100111 1111111 1000010 1001110 11101 11110101 11111011 10111000 1110010 10111100 110100 10111101 10011000 11010101 10111100 11110001 11010000 1110100 1110111 1010101 10111111 10110 1001110 10110100 111111 101100 10100000 100110 111011]
+		key9, _ := hex.DecodeString("896b72677f424e1df5fbb872bc34bd98d5bcf1d0747755bf164eb43f2ca0263b")
+		// value9 := []byte{'i'}
+
+		keys := [][]byte{key1, key2, key3, key4, key5}
+		values := [][]byte{value1, value2, value3, value4, value5}
+
+		newRoot, err := smt.Update(keys, values, emptyTree.root)
+		require.NoError(t, err)
+
+		keys = [][]byte{key1, key2, key3, key4, key5}
+		_, _, err = smt.Read(keys, true, newRoot)
+		require.NoError(t, err)
+
+		_, _, err = smt.Read([][]byte{key4}, true, newRoot)
+		require.NoError(t, err)
+
+		_, _, err = smt.Read([][]byte{key6}, true, newRoot)
+		require.NoError(t, err)
+
+		_, _, err = smt.Read([][]byte{key8}, true, newRoot)
+		require.NoError(t, err)
+
+		keys = [][]byte{key6, key7, key8}
+		values = [][]byte{value6, value7, value8}
+
+		newRoot2, err := smt.Update(keys, values, newRoot)
+		require.NoError(t, err)
+
+		keys = [][]byte{key4, key5, key8, key9}
+		_, _, err = smt.Read(keys, false, newRoot2)
+		pholder, _ := smt.GetBatchProof(keys, newRoot2)
+		require.NoError(t, err)
+		// TODO furthure checks
+		require.NotNil(t, pholder)
+
+	})
+}
+
+func TestRandomUpdateRead(t *testing.T) {
+	trieHeight := 17 // should be key size (in bits) + 1
+
+	withSMT(t, trieHeight, 10, 100, 5, func(t *testing.T, smt *SMT, emptyTree *tree) {
+
+		// insert some values to an empty trie
+		keys := make([][]byte, 0)
+		values := make([][]byte, 0)
+
+		rand.Seed(time.Now().UnixNano())
+
+		// numberOfKeys := rand.Intn(256) + 1
+		numberOfKeys := rand.Intn(30) + 1
+		for i := 0; i < numberOfKeys; i++ {
+			key := make([]byte, 2)
+			rand.Read(key)
+			keys = append(keys, key)
+
+			value := make([]byte, 4)
+			rand.Read(value)
+			values = append(values, value)
+		}
+
+		// keep a subset as initial insert and keep the rest as default value read
+		split := rand.Intn(numberOfKeys)
+		insertKeys := keys[:split]
+		insertValues := values[:split]
+
+		root, err := smt.Update(insertKeys, insertValues, emptyTree.root)
+		require.NoError(t, err, "error updating trie")
+
+		retvalues, _, err := smt.Read(insertKeys, true, root)
+		require.NoError(t, err, "error reading values")
+
+		for i := range retvalues {
+			if !bytes.Equal(retvalues[i], insertValues[i]) {
+				t.Fatalf("returned values doesn't match for key [%v], expected [%v] got [%v]", insertKeys[i], insertValues[i], retvalues[i])
+			}
+		}
+	})
+
+}
 
 func withSMT(
 	t *testing.T,
@@ -2640,7 +2768,7 @@ func withSMT(
 	numHistoricalStates int,
 	numFullStates int, f func(t *testing.T, smt *SMT, emptyTree *tree)) {
 
-	dbDir := unittest.TempDBDir(t)
+	dbDir := unittest.TempDir(t)
 
 	trie, err := NewSMT(dbDir, height, interval, numHistoricalStates, numFullStates)
 	require.NoError(t, err)

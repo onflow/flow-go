@@ -7,23 +7,26 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestNewTrieStorage(t *testing.T) {
-	unittest.RunWithTempDBDir(t, func(dbDir string) {
-		_, err := ledger.NewTrieStorage(dbDir)
+	unittest.RunWithTempDir(t, func(dbDir string) {
+		metricsCollector := &metrics.NoopCollector{}
+		_, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 		assert.NoError(t, err)
 	})
 }
 
 func TestTrieStorage_UpdateRegisters(t *testing.T) {
 	t.Run("mismatched IDs and values", func(t *testing.T) {
-		unittest.RunWithTempDBDir(t, func(dbDir string) {
+		unittest.RunWithTempDir(t, func(dbDir string) {
 
-			f, err := ledger.NewTrieStorage(dbDir)
+			metricsCollector := &metrics.NoopCollector{}
+			f, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 			require.NoError(t, err)
 
 			ids, values := makeTestValues()
@@ -39,9 +42,10 @@ func TestTrieStorage_UpdateRegisters(t *testing.T) {
 	})
 
 	t.Run("empty update", func(t *testing.T) {
-		unittest.RunWithTempDBDir(t, func(dbDir string) {
+		unittest.RunWithTempDir(t, func(dbDir string) {
 
-			f, err := ledger.NewTrieStorage(dbDir)
+			metricsCollector := &metrics.NoopCollector{}
+			f, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 			require.NoError(t, err)
 
 			// create empty values
@@ -59,9 +63,10 @@ func TestTrieStorage_UpdateRegisters(t *testing.T) {
 	})
 
 	t.Run("non-empty update", func(t *testing.T) {
-		unittest.RunWithTempDBDir(t, func(dbDir string) {
+		unittest.RunWithTempDir(t, func(dbDir string) {
 
-			f, err := ledger.NewTrieStorage(dbDir)
+			metricsCollector := &metrics.NoopCollector{}
+			f, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 			require.NoError(t, err)
 
 			ids, values := makeTestValues()
@@ -82,9 +87,10 @@ func TestTrieStorage_UpdateRegisters(t *testing.T) {
 
 func TestTrieStorage_UpdateRegistersWithProof(t *testing.T) {
 	t.Run("mismatched IDs and values", func(t *testing.T) {
-		unittest.RunWithTempDBDir(t, func(dbDir string) {
+		unittest.RunWithTempDir(t, func(dbDir string) {
 
-			f, err := ledger.NewTrieStorage(dbDir)
+			metricsCollector := &metrics.NoopCollector{}
+			f, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 			require.NoError(t, err)
 
 			ids, values := makeTestValues()
@@ -100,9 +106,10 @@ func TestTrieStorage_UpdateRegistersWithProof(t *testing.T) {
 	})
 
 	t.Run("empty update", func(t *testing.T) {
-		unittest.RunWithTempDBDir(t, func(dbDir string) {
+		unittest.RunWithTempDir(t, func(dbDir string) {
 
-			f, err := ledger.NewTrieStorage(dbDir)
+			metricsCollector := &metrics.NoopCollector{}
+			f, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 			require.NoError(t, err)
 
 			currentRoot := f.EmptyStateCommitment()
@@ -120,9 +127,10 @@ func TestTrieStorage_UpdateRegistersWithProof(t *testing.T) {
 	})
 
 	t.Run("non-empty update", func(t *testing.T) {
-		unittest.RunWithTempDBDir(t, func(dbDir string) {
+		unittest.RunWithTempDir(t, func(dbDir string) {
 
-			f, err := ledger.NewTrieStorage(dbDir)
+			metricsCollector := &metrics.NoopCollector{}
+			f, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 			require.NoError(t, err)
 
 			ids, values := makeTestValues()

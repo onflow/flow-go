@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/mempool"
 )
 
 // Backdata implements a generic memory pool backed by a Go map.
@@ -24,39 +23,53 @@ func NewBackdata() Backdata {
 
 // Has checks if we already contain the item with the given hash.
 func (b *Backdata) Has(entityID flow.Identifier) bool {
-	_, ok := b.entities[entityID]
-	return ok
+	_, exists := b.entities[entityID]
+	return exists
 }
 
 // Add adds the given item to the pool.
-func (b *Backdata) Add(entity flow.Entity) error {
+func (b *Backdata) Add(entity flow.Entity) bool {
 	entityID := entity.ID()
-	_, ok := b.entities[entityID]
-	if ok {
-		return mempool.ErrAlreadyExists
+	_, exists := b.entities[entityID]
+	if exists {
+		return false
 	}
 	b.entities[entityID] = entity
-	return nil
+	return true
 }
 
 // Rem will remove the item with the given hash.
 func (b *Backdata) Rem(entityID flow.Identifier) bool {
-	_, ok := b.entities[entityID]
-	if !ok {
+	_, exists := b.entities[entityID]
+	if !exists {
 		return false
 	}
 	delete(b.entities, entityID)
 	return true
 }
 
-// ByID returns the given item from the pool.
-func (b *Backdata) ByID(entityID flow.Identifier) (flow.Entity, error) {
-	_, ok := b.entities[entityID]
+// Adjust will adjust the value item using the given function if the given key can be found.
+// Returns a bool which indicates whether the value was updated as well as the updated value
+func (b *Backdata) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity) (flow.Entity, bool) {
+	entity, ok := b.entities[entityID]
 	if !ok {
-		return nil, mempool.ErrNotFound
+		return nil, false
 	}
-	entity := b.entities[entityID]
-	return entity, nil
+	newentity := f(entity)
+	newentityID := newentity.ID()
+
+	delete(b.entities, entityID)
+	b.entities[newentityID] = newentity
+	return newentity, true
+}
+
+// ByID returns the given item from the pool.
+func (b *Backdata) ByID(entityID flow.Identifier) (flow.Entity, bool) {
+	entity, exists := b.entities[entityID]
+	if !exists {
+		return nil, false
+	}
+	return entity, true
 }
 
 // Size will return the size of the backend.
@@ -103,30 +116,41 @@ func NewBackend(options ...OptionFunc) *Backend {
 func (b *Backend) Has(entityID flow.Identifier) bool {
 	b.RLock()
 	defer b.RUnlock()
-	return b.Backdata.Has(entityID)
+	has := b.Backdata.Has(entityID)
+	return has
 }
 
 // Add adds the given item to the pool.
-func (b *Backend) Add(entity flow.Entity) error {
+func (b *Backend) Add(entity flow.Entity) bool {
 	b.Lock()
 	defer b.Unlock()
-	err := b.Backdata.Add(entity)
+	added := b.Backdata.Add(entity)
 	b.reduce()
-	return err
+	return added
 }
 
 // Rem will remove the item with the given hash.
 func (b *Backend) Rem(entityID flow.Identifier) bool {
 	b.Lock()
 	defer b.Unlock()
-	return b.Backdata.Rem(entityID)
+	removed := b.Backdata.Rem(entityID)
+	return removed
+}
+
+// Adjust will adjust the value item using the given function if the given key can be found.
+// Returns a bool which indicates whether the value was updated.
+func (b *Backend) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity) (flow.Entity, bool) {
+	b.Lock()
+	defer b.Unlock()
+	return b.Backdata.Adjust(entityID, f)
 }
 
 // ByID returns the given item from the pool.
-func (b *Backend) ByID(entityID flow.Identifier) (flow.Entity, error) {
+func (b *Backend) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 	b.RLock()
 	defer b.RUnlock()
-	return b.Backdata.ByID(entityID)
+	entity, exists := b.Backdata.ByID(entityID)
+	return entity, exists
 }
 
 // Run executes a function giving it exclusive access to the backdata

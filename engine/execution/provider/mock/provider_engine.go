@@ -2,6 +2,7 @@
 
 package mock
 
+import context "context"
 import flow "github.com/dapperlabs/flow-go/model/flow"
 import mock "github.com/stretchr/testify/mock"
 
@@ -10,13 +11,13 @@ type ProviderEngine struct {
 	mock.Mock
 }
 
-// BroadcastExecutionReceipt provides a mock function with given fields: _a0
-func (_m *ProviderEngine) BroadcastExecutionReceipt(_a0 *flow.ExecutionReceipt) error {
-	ret := _m.Called(_a0)
+// BroadcastExecutionReceipt provides a mock function with given fields: _a0, _a1
+func (_m *ProviderEngine) BroadcastExecutionReceipt(_a0 context.Context, _a1 *flow.ExecutionReceipt) error {
+	ret := _m.Called(_a0, _a1)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.ExecutionReceipt) error); ok {
-		r0 = rf(_a0)
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.ExecutionReceipt) error); ok {
+		r0 = rf(_a0, _a1)
 	} else {
 		r0 = ret.Error(0)
 	}

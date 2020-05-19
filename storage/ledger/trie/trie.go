@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"sort"
 
 	"github.com/gammazero/deque"
 	lru "github.com/hashicorp/golang-lru"
@@ -47,6 +48,28 @@ type node struct {
 	rChild *node  // Right Child
 	height int    // Height where the node is at
 	key    []byte // key this node is pointing at
+}
+
+func (n *node) deepCopy() *node {
+	newNode := &node{height: n.height}
+
+	if n.value != nil {
+		value := make([]byte, len(n.value))
+		copy(value, n.value)
+		newNode.value = value
+	}
+	if n.key != nil {
+		key := make([]byte, len(n.key))
+		copy(key, n.key)
+		newNode.key = key
+	}
+	if n.lChild != nil {
+		newNode.lChild = n.lChild.deepCopy()
+	}
+	if n.rChild != nil {
+		newNode.rChild = n.rChild.deepCopy()
+	}
+	return newNode
 }
 
 type tree struct {
@@ -132,6 +155,14 @@ func LoadNode(value Root, height int, db databases.DAL) (*node, error) {
 	}, nil
 }
 
+func (f forest) PrintCache() {
+	for _, key := range f.cache.Keys() {
+		k, _ := hex.DecodeString(key.(string))
+		t, _ := f.Get(Root(k))
+		fmt.Println(key, t.rootNode.FmtStr("", ""))
+	}
+}
+
 func (f *forest) newTree(root Root, db databases.DAL) (*tree, error) {
 
 	deltaNumber, err := db.GetTrieDB(metadataHeight)
@@ -185,12 +216,21 @@ func NewForest(dbDir string, maxSize int, maxFullSize int, height int) (*forest,
 	}, nil
 }
 
-func (f *forest) Add(tree *tree) {
+func (f *forest) Add(t *tree) {
 	//if tree.numDeltas == 0 {
 	//	f.fullCache.Add(tree.root.String(), tree)
 	//	return
 	//}
-	f.cache.Add(tree.root.String(), tree)
+	// if db is already here safe close it before overriding
+	if foundTree, ok := f.cache.Get(t.root.String()); ok {
+		foundTree.(*tree).database.SafeClose()
+	}
+	f.cache.Add(t.root.String(), t)
+}
+
+func (f *forest) Has(root Root) bool {
+	_, ok := f.cache.Get(root.String())
+	return ok
 }
 
 func (f *forest) Get(root Root) (*tree, error) {
@@ -218,15 +258,15 @@ func (f *forest) Get(root Root) (*tree, error) {
 	return tree, nil
 }
 
-func (f *forest) newDB(root Root) (*leveldb.LevelDB, error) {
+func (f *forest) newDB(root Root) (databases.DAL, error) {
 	treePath := filepath.Join(f.dbDir, root.String())
 
 	db, err := leveldb.NewLevelDB(treePath)
 	return db, err
 }
 
-// Size returns the size of the forest on disk in bytes
-func (f *forest) Size() (int64, error) {
+// DiskSize returns the size of the forest on disk in bytes
+func (f *forest) DiskSize() (int64, error) {
 	return io.DirSize(f.dbDir)
 }
 
@@ -302,7 +342,10 @@ func (n *node) GetHeight() int {
 func (n *node) ComputeValue() []byte {
 	// leaf node
 	if n.lChild == nil && n.rChild == nil {
-		return n.value
+		if n.value != nil {
+			return n.value
+		}
+		return GetDefaultHashForHeight(n.height)
 	}
 	// otherwise compute
 	h1 := GetDefaultHashForHeight(n.height - 1)
@@ -316,18 +359,6 @@ func (n *node) ComputeValue() []byte {
 	// For debugging purpose uncomment this
 	// n.value = HashInterNode(h1, h2)
 	return HashInterNode(h1, h2)
-}
-
-func (n node) String() string {
-	right := ""
-	if n.rChild != nil {
-		right = n.rChild.String()
-	}
-	left := ""
-	if n.lChild != nil {
-		left = n.lChild.String()
-	}
-	return fmt.Sprintf("%v: (%v,%v) left> %v right> %v ", n.height, n.key, hex.EncodeToString(n.value), left, right)
 }
 
 // FmtStr provides formated string represntation of the node and sub tree
@@ -455,6 +486,33 @@ func (p *proofHolder) ExportWholeProof() ([][]byte, [][][]byte, []bool, []uint8)
 	return p.flags, p.proofs, p.inclusions, p.sizes
 }
 
+func (p proofHolder) String() string {
+	res := fmt.Sprintf("> proof holder includes %d proofs\n", len(p.sizes))
+	for i, size := range p.sizes {
+		flags := p.flags[i]
+		proof := p.proofs[i]
+		flagStr := ""
+		for _, f := range flags {
+			flagStr += fmt.Sprintf("%08b", f)
+		}
+		proofStr := fmt.Sprintf("size: %d flags: %v\n", size, flagStr)
+		if p.inclusions[i] {
+			proofStr += fmt.Sprintf("\t proof %d (inclusion)\n", i)
+		} else {
+			proofStr += fmt.Sprintf("\t proof %d (noninclusion)\n", i)
+		}
+		proofIndex := 0
+		for j := 0; j < int(size); j++ {
+			if utils.IsBitSet(flags, j) {
+				proofStr += fmt.Sprintf("\t\t %d: [%x]\n", j, proof[proofIndex])
+				proofIndex++
+			}
+		}
+		res = res + "\n" + proofStr
+	}
+	return res
+}
+
 // updateCache takes a key and all relevant parts of the proof and insterts in into the cache, removing values if needed
 func (t *tree) updateCache(key Key, flag []byte, proof [][]byte, inclusion bool, size uint8) {
 	holder := newProofHolder([][]byte{flag}, [][][]byte{proof}, []bool{inclusion}, []uint8{size})
@@ -572,6 +630,17 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root Root) ([][]byte, *proofHold
 	return values, holder, nil
 }
 
+// Print writes the structure of the tree to the stdout.
+// Warning this should only be used for debugging
+func (s *SMT) Print(root Root) error {
+	t, err := s.forest.Get(root)
+	if err != nil {
+		return err
+	}
+	fmt.Println(t.rootNode.FmtStr("", ""))
+	return nil
+}
+
 // verifyInclusionFlag is used to verify a flag against the trie given the key
 func (s *SMT) verifyInclusionFlag(key []byte, flag []byte, root Root) (bool, error) {
 
@@ -612,6 +681,98 @@ func (s *SMT) verifyInclusionFlag(key []byte, flag []byte, root Root) (bool, err
 	return true, nil
 }
 
+// GetBatchProof returns proof for a batch of keys
+// no dupplicated keys are allowed for this method
+// split key with trie has some issues.
+func (s *SMT) GetBatchProof(keys [][]byte, root Root) (*proofHolder, error) {
+
+	tree, err := s.forest.Get(root)
+	if err != nil {
+		return nil, fmt.Errorf("invalid historical state: %w", err)
+	}
+
+	flags := make([][]byte, len(keys))
+	proofs := make([][][]byte, len(keys))
+	inclusions := make([]bool, len(keys))
+	sizes := make([]uint8, len(keys))
+
+	notFoundKeys := make([][]byte, 0)
+	values := make([][]byte, 0)
+
+	for _, key := range keys {
+		_, err := tree.database.GetKVDB(key)
+		// TODO check the error
+		if err != nil {
+			notFoundKeys = append(notFoundKeys, key)
+			values = append(values, []byte{})
+		}
+	}
+
+	orgRoot, err := tree.Root()
+	if err != nil {
+		return nil, fmt.Errorf("cannot load tree root: %w", err)
+	}
+	treeRoot := orgRoot.deepCopy()
+
+	if len(notFoundKeys) > 0 {
+		batcher := tree.database.NewBatcher()
+		// sort keys before update
+		sort.Slice(notFoundKeys, func(i, j int) bool {
+			return bytes.Compare(notFoundKeys[i], notFoundKeys[j]) < 0
+		})
+
+		treeRoot, err = s.UpdateAtomically(treeRoot, notFoundKeys, values, s.height-1, batcher, tree.database)
+		if err != nil {
+			return nil, err
+		}
+		// TODO assert new Root is the same
+		// if bytes.Equal(new)
+	}
+
+	incl := true
+	for i, key := range keys {
+		flag := make([]byte, s.GetHeight()/8)
+		proof := make([][]byte, 0)
+		proofLen := uint8(0)
+
+		curr := treeRoot
+
+		for i := 0; i < s.GetHeight()-1; i++ {
+			if bytes.Equal(curr.key, key) {
+				break
+			}
+			if utils.IsBitSet(key, i) {
+				if curr.lChild != nil {
+					utils.SetBit(flag, i)
+					proof = append(proof, curr.lChild.value)
+				}
+				curr = curr.rChild
+				proofLen++
+			} else {
+				if curr.rChild != nil {
+					utils.SetBit(flag, i)
+					proof = append(proof, curr.rChild.value)
+				}
+				curr = curr.lChild
+				proofLen++
+			}
+			if curr == nil {
+				// TODO error ??
+				incl = false
+				break
+			}
+
+		}
+
+		flags[i] = flag
+		proofs[i] = proof
+		inclusions[i] = incl
+		sizes[i] = proofLen
+	}
+	holder := newProofHolder(flags, proofs, inclusions, sizes)
+	return holder, nil
+}
+
 // GetProof searching the tree for a value if it exists, and returns the flag and then proof
 func (s *SMT) GetProof(key []byte, rootNode *node) ([]byte, [][]byte, uint8, bool, error) {
 	flag := make([]byte, s.GetHeight()/8) // Flag is used to save space by removing default hashesh (zeros) from the proofs
@@ -645,12 +806,12 @@ func (s *SMT) GetProof(key []byte, rootNode *node) ([]byte, [][]byte, uint8, boo
 
 			nextKey = curr.lChild
 		}
-
-		if nextKey == nil {
+		if nextKey == nil { // nonInclusion proof
 			return flag, proof, proofLen, false, nil
 		} else {
 			curr = nextKey
 			proofLen++
+			// inclusion proof
 			if bytes.Equal(key, curr.key) {
 				return flag, proof, proofLen, true, nil
 			}
@@ -824,7 +985,6 @@ func VerifyNonInclusionProof(key []byte, value []byte, flag []byte, proof [][]by
 	if len(proof) != 0 {
 		proofIndex = len(proof) - 1
 	}
-
 	// base case at the bottom of the trie
 	computed := ComputeCompactValue(key, value, height-int(size)-1, height)
 	for i := int(size) - 1; i > -1; i-- {
@@ -854,16 +1014,15 @@ func (s *SMT) updateHistoricalStates(oldTree *tree, newTree *tree, batcher datab
 	if err != nil {
 		return fmt.Errorf("error while copying DB: %s", err)
 	}
-
 	numStates := newTree.historicalStateRoots.Len()
 	switch {
 	case numStates > s.numHistoricalStates:
-		return errors.New("We have more Historical States stored than the Maximum Allowed Amount!")
+		return errors.New("we have more Historical States stored than the Maximum Allowed Amount!")
 
 	case numStates >= int(s.snapshotInterval):
 		if newTree.height%s.snapshotInterval != 0 {
-			stateToPrune := newTree.historicalStateRoots.At(int(s.snapshotInterval)).(Root)
-			referenceState := newTree.historicalStateRoots.At(int(s.snapshotInterval - 1)).(Root)
+			stateToPrune := newTree.historicalStateRoots.At(int(s.snapshotInterval) - 1).(Root)
+			referenceState := newTree.historicalStateRoots.At(int(s.snapshotInterval - 2)).(Root)
 			dbToPrune, err := s.forest.Get(stateToPrune)
 			if err != nil {
 				return fmt.Errorf("cannot get tree referenced in history: %w", err)
@@ -894,28 +1053,61 @@ func (s *SMT) updateHistoricalStates(oldTree *tree, newTree *tree, batcher datab
 // Update takes a sorted list of keys and associated values and inserts
 // them into the trie, and if that is successful updates the databases.
 func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
+	// if no update
+	if len(keys) < 1 {
+		return root, nil
+	}
 
 	t, err := s.forest.Get(root)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get tree: %w", err)
 	}
 
-	// check key sizes
-	for _, k := range keys {
-		if len(k) != s.keyByteSize {
-			return nil, fmt.Errorf("key size doesn't match the trie height: %x", k)
+	// sort keys and deduplicate keys (we only consider the first occurance, and ignore the rest)
+	sortedKeys := make([][]byte, 0)
+	valueMap := make(map[string][]byte)
+	for i, key := range keys {
+		// check key sizes
+		if len(key) != s.keyByteSize {
+			return nil, fmt.Errorf("key size doesn't match the trie height: %x", key)
+		}
+		// check if doesn't exist
+		if _, ok := valueMap[string(key)]; !ok {
+			//do something here
+			sortedKeys = append(sortedKeys, key)
+			valueMap[string(key)] = values[i]
 		}
 	}
 
-	batcher := t.database.NewBatcher()
+	sort.Slice(sortedKeys, func(i, j int) bool {
+		return bytes.Compare(sortedKeys[i], sortedKeys[j]) < 0
+	})
+
+	sortedValues := make([][]byte, 0)
+	for _, key := range sortedKeys {
+		sortedValues = append(sortedValues, valueMap[string(key)])
+	}
+
+	// use sorted keys
+	keys = sortedKeys
+	values = sortedValues
 
 	treeRoot, err := t.Root()
 	if err != nil {
 		return nil, fmt.Errorf("cannot load tree root: %w", err)
 	}
-	newRootNode, err := s.UpdateAtomically(treeRoot, keys, values, s.height-1, batcher, t.database)
+
+	newTreeRoot := treeRoot.deepCopy()
+	batcher := t.database.NewBatcher()
+	newRootNode, err := s.UpdateAtomically(newTreeRoot, keys, values, s.height-1, batcher, t.database)
+
 	if err != nil {
 		return nil, err
+	}
+
+	// TODO improve this in case of getting an state which has been there before
+	if s.forest.Has(newRootNode.value) {
+		return newRootNode.value, nil
 	}
 
 	db, err := leveldb.NewLevelDB(filepath.Join(s.forest.dbDir, newRootNode.value.String()))
@@ -924,11 +1116,10 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 	}
 
 	var newHistoricalStatRoots deque.Deque
-
 	for i := 0; i < t.historicalStateRoots.Len(); i++ {
 		newHistoricalStatRoots.PushBack(t.historicalStateRoots.At(i))
 	}
-	newHistoricalStatRoots.PushBack(root)
+	newHistoricalStatRoots.PushBack(newRootNode.value)
 
 	newTree := &tree{
 		root:                 newRootNode.value,
@@ -957,7 +1148,6 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 	}
 
 	s.forest.Add(newTree)
-
 	return newRootNode.value, nil
 }
 
@@ -1059,21 +1249,9 @@ func (s *SMT) UpdateAtomically(rootNode *node, keys [][]byte, values [][]byte, h
 	return rootNode, nil
 }
 
-// GetandSetChildren checks if any of the children are nill and creates them as a default node if they are, otherwise
-// we just return the children
-func (n *node) GetandSetChildren(hashes [257]Root) (*node, *node) {
-	if n.lChild == nil {
-		n.lChild = newNode(nil, n.height-1)
-	}
-	if n.rChild == nil {
-		n.rChild = newNode(nil, n.height-1)
-	}
-
-	return n.lChild, n.rChild
-}
-
 // updateParallel updates both the left and right subtrees and computes a new rootNode
 func (s *SMT) updateParallel(lnode *node, rnode *node, rootNode *node, keys [][]byte, values [][]byte, lkeys [][]byte, rkeys [][]byte, lvalues [][]byte, rvalues [][]byte, height int, batcher databases.Batcher, database databases.DAL) (*node, error) {
+
 	lupdate, err1 := s.UpdateAtomically(lnode, lkeys, lvalues, height-1, batcher, database)
 	rupdate, err2 := s.UpdateAtomically(rnode, rkeys, rvalues, height-1, batcher, database)
 
@@ -1103,6 +1281,19 @@ func (s *SMT) updateRight(lnode *node, rnode *node, rootNode *node, rkeys [][]by
 		return nil, err
 	}
 	return s.ComputeRootNode(lnode, update, rootNode, rkeys, rvalues, height, batcher), nil
+}
+
+// GetandSetChildren checks if any of the children are nill and creates them as a default node if they are, otherwise
+// we just return the children
+func (n *node) GetandSetChildren(hashes [257]Root) (*node, *node) {
+	if n.lChild == nil {
+		n.lChild = newNode(nil, n.height-1)
+	}
+	if n.rChild == nil {
+		n.rChild = newNode(nil, n.height-1)
+	}
+
+	return n.lChild, n.rChild
 }
 
 // ComputeRoot either returns a new leafNode or computes a new rootNode by hashing its children
@@ -1171,14 +1362,17 @@ func (s *SMT) IsSnapshot(t *tree) bool {
 	return t.height%s.snapshotInterval == 0
 }
 
-// Size returns the size of the forest on disk in bytes
-func (s *SMT) Size() (int64, error) {
-	return s.forest.Size()
+// DiskSize returns the size of the forest on disk in bytes
+func (s *SMT) DickSize() (int64, error) {
+	return s.forest.DiskSize()
 }
 
 // ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.
 func ComputeCompactValue(key []byte, value []byte, height int, maxHeight int) []byte {
-
+	// if value is nil return default hash
+	if len(value) == 0 {
+		return GetDefaultHashForHeight(height)
+	}
 	computedHash := HashLeaf(key, value)
 
 	for j := maxHeight - 2; j > maxHeight-height-2; j-- {

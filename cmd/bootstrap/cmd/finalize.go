@@ -9,6 +9,7 @@ import (
 
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
 var (
@@ -19,6 +20,7 @@ var (
 	flagPartnerNodeInfoDir                           string
 	flagPartnerStakes                                string
 	flagCollectorGenerationMaxHashGrindingIterations uint
+	flagFastKG                                       bool
 )
 
 type PartnerStakes map[flow.Identifier]uint64
@@ -40,7 +42,7 @@ running the DKG for generating the random beacon keys, generating genesis execut
 
 		log.Info().Msg("✨ assembling network and staking keys")
 		stakingNodes := mergeNodeInfos(internalNodes, partnerNodes)
-		writeJSON(model.FilenameNodeInfosPub, model.ToPublicNodeInfoList(stakingNodes))
+		writeJSON(model.PathNodeInfosPub, model.ToPublicNodeInfoList(stakingNodes))
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ running DKG for consensus nodes")
@@ -48,16 +50,16 @@ running the DKG for generating the random beacon keys, generating genesis execut
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ generating private key for account 0 and generating genesis execution state")
-		stateCommitment := genGenesisExecutionState()
+		genGenesisExecutionState()
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ constructing genesis seal and genesis block")
-		block := constructGenesisBlock(stateCommitment, stakingNodes, dkgData)
+		block := constructGenesisBlock(stakingNodes, dkgData)
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ constructing genesis QC")
 		constructGenesisQC(
-			&block,
+			block,
 			model.FilterByRole(stakingNodes, flow.RoleConsensus),
 			model.FilterByRole(internalNodes, flow.RoleConsensus),
 			dkgData,
@@ -65,7 +67,7 @@ running the DKG for generating the random beacon keys, generating genesis execut
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ computing collector clusters")
-		clusters := computeCollectorClusters(stakingNodes)
+		clusters := protocol.Clusters(uint(flagCollectionClusters), model.ToIdentityList(stakingNodes))
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ constructing genesis blocks for collector clusters")
@@ -96,12 +98,14 @@ func init() {
 	finalizeCmd.Flags().UintVar(&flagCollectorGenerationMaxHashGrindingIterations, "collector-gen-max-iter", 1000,
 		"max hash grinding iterations for collector generation")
 	finalizeCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", fmt.Sprintf("path to directory "+
-		"containing one JSON file ending with %v for every partner node (fields Role, Address, NodeID, "+
-		"NetworkPubKey, StakingPubKey)", model.FilenamePartnerNodeInfoSuffix))
+		"containing one JSON file starting with %v for every partner node (fields Role, Address, NodeID, "+
+		"NetworkPubKey, StakingPubKey)", model.PathPartnerNodeInfoPrefix))
 	_ = finalizeCmd.MarkFlagRequired("partner-dir")
 	finalizeCmd.Flags().StringVar(&flagPartnerStakes, "partner-stakes", "", "path to a JSON file containing "+
 		"a map from partner node's NodeID to their stake")
 	_ = finalizeCmd.MarkFlagRequired("partner-stakes")
+	finalizeCmd.Flags().BoolVar(&flagFastKG, "fast-kg", false, "use fast (centralized) random beacon key generation "+
+		"instead of DKG")
 }
 
 func assemblePartnerNodes() []model.NodeInfo {
@@ -172,7 +176,7 @@ func readPartnerNodes() []model.PartnerNodeInfoPub {
 	}
 	for _, f := range files {
 		// skip files that do not include node-infos
-		if !strings.HasSuffix(f, model.FilenamePartnerNodeInfoSuffix) {
+		if !strings.Contains(f, model.PathPartnerNodeInfoPrefix) {
 			continue
 		}
 

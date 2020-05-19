@@ -17,10 +17,12 @@ import (
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/local"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/state/dkg"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	protoBadger "github.com/dapperlabs/flow-go/state/protocol/badger"
+	storeBadger "github.com/dapperlabs/flow-go/storage/badger"
 )
 
 type Participant struct {
@@ -47,11 +49,11 @@ func GenerateGenesisQC(participantData ParticipantData, block *flow.Block) (*mod
 
 	hotBlock := model.Block{
 		BlockID:     block.ID(),
-		View:        block.View,
-		ProposerID:  block.ProposerID,
+		View:        block.Header.View,
+		ProposerID:  block.Header.ProposerID,
 		QC:          nil,
-		PayloadHash: block.PayloadHash,
-		Timestamp:   block.Timestamp,
+		PayloadHash: block.Header.PayloadHash,
+		Timestamp:   block.Header.Timestamp,
 	}
 
 	votes := make([]*model.Vote, 0, len(signers))
@@ -131,17 +133,32 @@ func NewProtocolState(block *flow.Block) (*protoBadger.State, *badger.DB, error)
 		return nil, nil, err
 	}
 
-	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
+	opts := badger.
+		DefaultOptions(dir).
+		WithKeepL0InMemory(true).
+		WithLogger(nil)
+
+	db, err := badger.Open(opts)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	state, err := protoBadger.NewState(db)
+	metrics := metrics.NewNoopCollector()
+
+	headers := storeBadger.NewHeaders(metrics, db)
+	identities := storeBadger.NewIdentities(metrics, db)
+	guarantees := storeBadger.NewGuarantees(metrics, db)
+	seals := storeBadger.NewSeals(metrics, db)
+	index := storeBadger.NewIndex(metrics, db)
+	payloads := storeBadger.NewPayloads(index, identities, guarantees, seals)
+	blocks := storeBadger.NewBlocks(db, headers, payloads)
+
+	state, err := protoBadger.NewState(metrics, db, headers, identities, seals, index, payloads, blocks)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	err = state.Mutate().Bootstrap(block)
+	err = state.Mutate().Bootstrap(nil, block)
 	if err != nil {
 		return nil, nil, err
 	}

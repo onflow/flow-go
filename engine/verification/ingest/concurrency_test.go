@@ -1,18 +1,20 @@
 package ingest_test
 
 import (
-	"bytes"
 	"fmt"
+	"os"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/rand"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/crypto/random"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
@@ -23,6 +25,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
+	"github.com/dapperlabs/flow-go/utils/logging"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -31,7 +34,10 @@ import (
 // - not all chunks of the receipts are assigned to the ingest engine
 // - for each assigned chunk ingest engine emits a single result approval to verify engine only once
 // (even in presence of duplication)
+// - also the test stages to drop the first request on each collection to evaluate the retrial
+// - also the test stages to drop the first request on each chunk data pack to evaluate the retrial
 func TestConcurrency(t *testing.T) {
+	var mu sync.Mutex
 	testcases := []struct {
 		erCount, // number of execution receipts
 		senderCount, // number of (concurrent) senders for each execution receipt
@@ -64,19 +70,30 @@ func TestConcurrency(t *testing.T) {
 		},
 		{
 			erCount:     2,
-			senderCount: 10,
-			chunksNum:   10,
+			senderCount: 5,
+			chunksNum:   4,
 		},
 	}
 
 	for _, tc := range testcases {
+
 		t.Run(fmt.Sprintf("%d-ers/%d-senders/%d-chunks", tc.erCount, tc.senderCount, tc.chunksNum), func(t *testing.T) {
+			mu.Lock()
+			defer mu.Unlock()
 			testConcurrency(t, tc.erCount, tc.senderCount, tc.chunksNum)
+
 		})
 	}
 }
 
 func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
+	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
+	// to demarcate the logs
+	log.Debug().
+		Int("execution_receipt_count", erCount).
+		Int("sender_count", senderCount).
+		Int("chunks_num", chunksNum).
+		Msg("TestConcurrency started")
 	hub := stub.NewNetworkHub()
 
 	// ingest engine parameters
@@ -104,7 +121,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	// ingest only sends the assigned chunks to verifier
 
 	for i := 0; i < erCount; i++ {
-		er := test.CompleteExecutionResultFixture(t, chunksNum)
+		er := test.LightExecutionResultFixture(chunksNum)
 		ers = append(ers, er)
 		// assigns all chunks to the verifier node
 		for j, chunk := range er.Receipt.ExecutionResult.Chunks {
@@ -132,8 +149,8 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 
 	// set up mock verifier engine that asserts each receipt is submitted
 	// to the verifier exactly once.
-	verifierEng, verifierEngWG := setupMockVerifierEng(t, vChunks)
-	assigner := NewMockAssigner(verID.NodeID)
+	verifierEng, verifierEngWG := test.SetupMockVerifierEng(t, vChunks)
+	assigner := test.NewMockAssigner(verID.NodeID)
 	verNode := testutil.VerificationNode(t, hub, verID, identities, assigner, requestInterval, failureThreshold,
 		testutil.WithVerifierEngine(verifierEng))
 
@@ -141,7 +158,13 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	// and checkTrackers loop starts
 	<-verNode.IngestEngine.Ready()
 
-	colNode := testutil.CollectionNode(t, hub, colID, identities)
+	collections := make([]*flow.Collection, 0)
+	for _, completeER := range ers {
+		collections = append(collections, completeER.Collections...)
+	}
+
+	colNode := testutil.GenericNode(t, hub, colID, identities)
+	setupMockCollectionNode(t, colNode, verID.NodeID, collections)
 
 	// mock the execution node with a generic node and mocked engine
 	// to handle requests for chunk state
@@ -161,10 +184,6 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	var blockStorageLock sync.Mutex
 
 	for _, completeER := range ers {
-		for _, coll := range completeER.Collections {
-			err := colNode.Collections.Store(coll)
-			assert.Nil(t, err)
-		}
 
 		// spin up `senderCount` sender goroutines to mimic receiving
 		// the same resource multiple times
@@ -178,17 +197,17 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 					blockStorageLock.Lock()
 					// we don't check for error as it definitely returns error when we
 					// have duplicate blocks, however, this is not the concern for this test
-					_ = verNode.BlockStorage.Store(block)
+					_ = verNode.Blocks.Store(block)
 					blockStorageLock.Unlock()
 
 					// casts block into a Hotstuff block for notifier
 					hotstuffBlock := &model.Block{
 						BlockID:     block.ID(),
-						View:        block.View,
-						ProposerID:  block.ProposerID,
+						View:        block.Header.View,
+						ProposerID:  block.Header.ProposerID,
 						QC:          nil,
-						PayloadHash: block.Hash(),
-						Timestamp:   block.Timestamp,
+						PayloadHash: block.Header.PayloadHash,
+						Timestamp:   block.Header.Timestamp,
 					}
 					verNode.IngestEngine.OnFinalizedBlock(hotstuffBlock)
 				}
@@ -219,8 +238,8 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	}
 
 	// wait for all ERs to be sent to VER
-	unittest.RequireReturnsBefore(t, senderWG.Wait, 10*time.Second)
-	unittest.RequireReturnsBefore(t, verifierEngWG.Wait, 10*time.Second)
+	unittest.RequireReturnsBefore(t, senderWG.Wait, time.Duration(senderCount*chunksNum*erCount*5)*time.Second)
+	unittest.RequireReturnsBefore(t, verifierEngWG.Wait, time.Duration(senderCount*chunksNum*erCount*5)*time.Second)
 
 	// stops ingest engine of verification node
 	// Note: this should be done prior to any evaluation to make sure that
@@ -231,7 +250,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	verNet.StopConDev()
 
 	for _, c := range vChunks {
-		if isAssigned(c.ChunkIndex) {
+		if test.IsAssigned(c.ChunkIndex) {
 			// assigned chunks should have their result to be added to ingested results mempool
 			assert.True(t, verNode.IngestedResultIDs.Has(c.Receipt.ExecutionResult.ID()))
 		}
@@ -240,31 +259,45 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	exeNode.Done()
 	colNode.Done()
 	verNode.Done()
+
+	// to demarcate the logs
+	log.Debug().
+		Int("execution_receipt_count", erCount).
+		Int("sender_count", senderCount).
+		Int("chunks_num", chunksNum).
+		Msg("TestConcurrency finished")
 }
 
 // setupMockExeNode sets up a mocked execution node that responds to requests for
 // chunk states. Any requests that don't correspond to an execution receipt in
 // the input ers list result in the test failing.
+// It also drops the first request for each chunk to evaluate retrials.
 func setupMockExeNode(t *testing.T, node mock.GenericNode, verID flow.Identifier, ers []verification.CompleteExecutionResult) {
 	eng := new(network.Engine)
 	chunksConduit, err := node.Net.Register(engine.ChunkDataPackProvider, eng)
 	assert.Nil(t, err)
 
-	reqChunksExe := make(map[flow.Identifier]struct{})
+	retriedChunks := make(map[flow.Identifier]struct{})
 
 	eng.On("Process", verID, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
 			if req, ok := args[1].(*messages.ChunkDataPackRequest); ok {
-				if _, ok := reqChunksExe[req.ChunkID]; ok {
-					// duplicate request detected
-					t.Fail()
+				if _, ok := retriedChunks[req.ChunkID]; !ok {
+					// this is the first request for this chunk
+					// the request is dropped to evaluate retry functionality
+					retriedChunks[req.ChunkID] = struct{}{}
+					log.Debug().
+						Hex("collection_id", logging.ID(req.ChunkID)).
+						Msg("mock execution node drops first collection request for this collection")
+					return
 				}
-				reqChunksExe[req.ChunkID] = struct{}{}
+
 				for _, er := range ers {
 					for _, chunk := range er.Receipt.ExecutionResult.Chunks {
 						if chunk.ID() == req.ChunkID {
 							res := &messages.ChunkDataPackResponse{
-								Data: *er.ChunkDataPacks[chunk.Index],
+								Data:  *er.ChunkDataPacks[chunk.Index],
+								Nonce: rand.Uint64(),
 							}
 							err := chunksConduit.Submit(res, verID)
 							assert.Nil(t, err)
@@ -280,102 +313,44 @@ func setupMockExeNode(t *testing.T, node mock.GenericNode, verID flow.Identifier
 
 }
 
-// setupMockVerifierEng sets up a mock verifier engine that asserts the followings:
-// - that a set of chunks are delivered to it.
-// - that each chunk is delivered exactly once
-// setupMockVerifierEng returns the mock engine and a wait group that unblocks when all ERs are received.
-func setupMockVerifierEng(t *testing.T, vChunks []*verification.VerifiableChunk) (*network.Engine, *sync.WaitGroup) {
+// setupMockCollectionNode sets up a mocked collection node that responds to requests for collections.
+// Any requests that don't correspond to a collection ID in the input colls list result in the test failing.
+// It also drops the first request for each collection to evaluate retrials.
+func setupMockCollectionNode(t *testing.T, node mock.GenericNode, verID flow.Identifier, colls []*flow.Collection) {
 	eng := new(network.Engine)
+	chunksConduit, err := node.Net.Register(engine.CollectionProvider, eng)
+	assert.Nil(t, err)
 
-	// keep track of which verifiable chunks we have received
-	receivedChunks := make(map[flow.Identifier]struct{})
-	var (
-		// decrement the wait group when each verifiable chunk received
-		wg sync.WaitGroup
-		// check one verifiable chunk at a time to ensure dupe checking works
-		mu sync.Mutex
-	)
+	retriedColl := make(map[flow.Identifier]struct{})
 
-	// computes expected number of assigned chunks
-	expected := 0
-	for _, c := range vChunks {
-		if isAssigned(c.ChunkIndex) {
-			expected++
-		}
-	}
-	wg.Add(expected)
-
-	eng.On("ProcessLocal", testifymock.Anything).
+	eng.On("Process", verID, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
-			mu.Lock()
-			defer mu.Unlock()
-
-			// the received entity should be a verifiable chunk
-			vchunk, ok := args[0].(*verification.VerifiableChunk)
-			assert.True(t, ok)
-
-			// retrieves the content of received chunk
-			chunk, ok := vchunk.Receipt.ExecutionResult.Chunks.ByIndex(vchunk.ChunkIndex)
-			require.True(t, ok, "chunk out of range requested")
-			vID := chunk.ID()
-
-			// verifies that it has not seen this chunk before
-			_, alreadySeen := receivedChunks[vID]
-			if alreadySeen {
-				t.Logf("received duplicated chunk (id=%s)", vID)
-				t.Fail()
-				return
-			}
-
-			// ensure the received chunk matches one we expect
-			for _, vc := range vChunks {
-				if chunk.ID() == vID {
-					// mark it as seen and decrement the waitgroup
-					receivedChunks[vID] = struct{}{}
-					// checks end states match as expected
-					if !bytes.Equal(vchunk.EndState, vc.EndState) {
-						t.Logf("end states are not equal: expected %x got %x", vchunk.EndState, chunk.EndState)
-						t.Fail()
-					}
-					wg.Done()
+			if req, ok := args[1].(*messages.CollectionRequest); ok {
+				if _, ok := retriedColl[req.ID]; !ok {
+					// this is the first request for this collection
+					// the request is dropped to evaluate retry functionality
+					retriedColl[req.ID] = struct{}{}
+					log.Debug().
+						Hex("collection_id", logging.ID(req.ID)).
+						Msg("mock collection node drops first collection request for this collection")
 					return
 				}
-			}
 
-			// the received chunk doesn't match any expected ERs
-			t.Logf("received unexpected ER (id=%s)", vID)
+				for _, coll := range colls {
+					if coll.ID() == req.ID {
+						res := &messages.CollectionResponse{
+							Collection: *coll,
+							Nonce:      rand.Uint64(),
+						}
+						err := chunksConduit.Submit(res, verID)
+						assert.Nil(t, err)
+						return
+					}
+
+				}
+			}
+			t.Logf("invalid collection request (%T): %v ", args[1], args[1])
 			t.Fail()
 		}).
 		Return(nil)
-
-	return eng, &wg
-}
-
-type MockAssigner struct {
-	me flow.Identifier
-}
-
-func NewMockAssigner(id flow.Identifier) *MockAssigner {
-	return &MockAssigner{me: id}
-}
-
-// Assign assigns all input chunks to the verifier node
-func (m *MockAssigner) Assign(ids flow.IdentityList, chunks flow.ChunkList, rng random.Rand) (*chmodel.Assignment, error) {
-	if len(chunks) == 0 {
-		return nil, fmt.Errorf("assigner called with empty chunk list")
-	}
-	a := chmodel.NewAssignment()
-	for _, c := range chunks {
-		if isAssigned(c.Index) {
-			a.Add(c, flow.IdentifierList{m.me})
-		}
-	}
-
-	return a, nil
-}
-
-// isAssigned is a helper function that returns true for the even chunk indices
-func isAssigned(chunkIndex uint64) bool {
-	answer := chunkIndex%2 == 0
-	return answer
 }

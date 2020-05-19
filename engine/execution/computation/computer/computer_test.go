@@ -1,12 +1,12 @@
 package computer_test
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"testing"
 
-	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -24,12 +24,12 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := new(vmmock.VirtualMachine)
 		bc := new(vmmock.BlockContext)
 
-		exe := computer.NewBlockComputer(vm)
+		exe := computer.NewBlockComputer(vm, nil)
 
 		// create a block with 1 collection with 2 transactions
 		block := generateBlock(1, 2)
 
-		vm.On("NewBlockContext", &block.Block.Header).Return(bc)
+		vm.On("NewBlockContext", block.Block.Header).Return(bc)
 
 		bc.On("ExecuteTransaction", mock.Anything, mock.Anything).
 			Return(&virtualmachine.TransactionResult{}, nil).
@@ -39,7 +39,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(block, view)
+		result, err := exe.ExecuteBlock(context.Background(), block, view)
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
 
@@ -51,7 +51,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := new(vmmock.VirtualMachine)
 		bc := new(vmmock.BlockContext)
 
-		exe := computer.NewBlockComputer(vm)
+		exe := computer.NewBlockComputer(vm, nil)
 
 		collectionCount := 2
 		transactionsPerCollection := 2
@@ -65,26 +65,26 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		// create dummy events
 		events := generateEvents(eventsPerTransaction)
 
-		vm.On("NewBlockContext", &block.Block.Header).Return(bc)
+		vm.On("NewBlockContext", block.Block.Header).Return(bc)
 
 		bc.On("ExecuteTransaction", mock.Anything, mock.Anything).
-			Return(&virtualmachine.TransactionResult{Events: events, Error: fmt.Errorf("runtime error")}, nil).
+			Return(&virtualmachine.TransactionResult{Events: events, Error: &virtualmachine.MissingPayerError{}}, nil).
 			Times(totalTransactionCount)
 
 		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(block, view)
+		result, err := exe.ExecuteBlock(context.Background(), block, view)
 		assert.NoError(t, err)
 
-		//chunk count should match collection count
+		// chunk count should match collection count
 		assert.Len(t, result.StateSnapshots, collectionCount)
 
 		// all events should have been collected
 		assert.Len(t, result.Events, totalEventCount)
 
-		//events should have been indexed by transaction and event
+		// events should have been indexed by transaction and event
 		k := 0
 		for expectedTxIndex := 0; expectedTxIndex < totalTransactionCount; expectedTxIndex++ {
 			for expectedEventIndex := 0; expectedEventIndex < eventsPerTransaction; expectedEventIndex++ {
@@ -100,7 +100,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			for _, t := range c.Transactions {
 				txResult := flow.TransactionResult{
 					TransactionID: t.ID(),
-					ErrorMessage:  "runtime error",
+					ErrorMessage:  "no payer address provided",
 				}
 				expectedResults = append(expectedResults, txResult)
 			}
@@ -125,10 +125,10 @@ func generateBlock(collectionCount, transactionCount int) *entity.ExecutableBloc
 	}
 
 	block := flow.Block{
-		Header: flow.Header{
+		Header: &flow.Header{
 			View: 42,
 		},
-		Payload: flow.Payload{
+		Payload: &flow.Payload{
 			Guarantees: guarantees,
 		},
 	}
@@ -159,11 +159,13 @@ func generateCollection(transactionCount int) *entity.CompleteCollection {
 	}
 }
 
-func generateEvents(eventCount int) []runtime.Event {
-	events := make([]runtime.Event, eventCount)
+func generateEvents(eventCount int) []cadence.Event {
+	events := make([]cadence.Event, eventCount)
 	for i := 0; i < eventCount; i++ {
 		// creating some dummy event
-		event := runtime.Event{Type: &sema.StringType{}}
+		event := cadence.Event{EventType: cadence.EventType{
+			Identifier: "whatever",
+		}}
 		events[i] = event
 	}
 	return events

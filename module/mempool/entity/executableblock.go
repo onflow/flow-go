@@ -1,6 +1,10 @@
 package entity
 
-import "github.com/dapperlabs/flow-go/model/flow"
+import (
+	"time"
+
+	"github.com/dapperlabs/flow-go/model/flow"
+)
 
 type CompleteCollection struct {
 	Guarantee    *flow.CollectionGuarantee
@@ -13,16 +17,17 @@ type ExecutableBlock struct {
 	StartState          flow.StateCommitment
 }
 
-type BlockByCollection struct {
-	CollectionID    flow.Identifier
-	ExecutableBlock *ExecutableBlock
+type BlocksByCollection struct {
+	CollectionID     flow.Identifier
+	ExecutableBlocks map[flow.Identifier]*ExecutableBlock
+	TimeoutTimer     *time.Timer
 }
 
-func (b *BlockByCollection) ID() flow.Identifier {
+func (b *BlocksByCollection) ID() flow.Identifier {
 	return b.CollectionID
 }
 
-func (b *BlockByCollection) Checksum() flow.Identifier {
+func (b *BlocksByCollection) Checksum() flow.Identifier {
 	return b.CollectionID
 }
 
@@ -35,17 +40,17 @@ func (b *ExecutableBlock) Checksum() flow.Identifier {
 }
 
 func (b *ExecutableBlock) Height() uint64 {
-	return b.Block.Height
+	return b.Block.Header.Height
 }
 
 func (b *ExecutableBlock) ParentID() flow.Identifier {
-	return b.Block.ParentID
+	return b.Block.Header.ParentID
 }
 
 func (b *ExecutableBlock) Collections() []*CompleteCollection {
-	collections := make([]*CompleteCollection, len(b.Block.Guarantees))
+	collections := make([]*CompleteCollection, len(b.Block.Payload.Guarantees))
 
-	for i, cg := range b.Block.Guarantees {
+	for i, cg := range b.Block.Payload.Guarantees {
 		collections[i] = b.CompleteCollections[cg.ID()]
 	}
 
@@ -53,7 +58,7 @@ func (b *ExecutableBlock) Collections() []*CompleteCollection {
 }
 
 func (b *ExecutableBlock) HasAllTransactions() bool {
-	for _, collection := range b.Block.Guarantees {
+	for _, collection := range b.Block.Payload.Guarantees {
 
 		completeCollection, ok := b.CompleteCollections[collection.ID()]
 		if ok && completeCollection.Transactions != nil {

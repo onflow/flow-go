@@ -9,12 +9,14 @@ import (
 // which is specified by a chunk ID.
 type ChunkDataPackRequest struct {
 	ChunkID flow.Identifier
+	Nonce   uint64 // so that we aren't deduplicated by the network layer
 }
 
 // ChunkDataPackResponse is the response to a chunk data pack request.
 // It contains the chunk data pack of the interest.
 type ChunkDataPackResponse struct {
-	Data flow.ChunkDataPack
+	Data  flow.ChunkDataPack
+	Nonce uint64 // so that we aren't deduplicated by the network layer
 }
 
 type ExecutionStateSyncRequest struct {
@@ -40,9 +42,9 @@ func (b *ExecutionStateDelta) Checksum() flow.Identifier {
 }
 
 func (b *ExecutionStateDelta) Height() uint64 {
-	return b.Block.Height
+	return b.Block.Header.Height
 }
 
 func (b *ExecutionStateDelta) ParentID() flow.Identifier {
-	return b.Block.ParentID
+	return b.Block.Header.ParentID
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -27,6 +28,7 @@ import (
 type Engine struct {
 	unit     *engine.Unit
 	log      zerolog.Logger
+	metrics  module.EngineMetrics
 	me       module.Local
 	state    protocol.State
 	con      network.Conduit
@@ -36,17 +38,19 @@ type Engine struct {
 	blockIDs map[flow.Identifier]*Status
 
 	// config parameters
-	pollInterval  time.Duration
-	scanInterval  time.Duration
-	retryInterval time.Duration
-	maxAttempts   uint
-	maxSize       uint
-	maxRequests   uint
+	pollInterval  time.Duration // how often we poll other nodes for their finalized height
+	scanInterval  time.Duration // how often we scan our pending statuses and request blocks
+	retryInterval time.Duration // the initial interval before we retry a request, uses exponential backoff
+	tolerance     uint          // determines how big of a difference in block heights we tolerated before actively syncing with range requests
+	maxAttempts   uint          // the maximum number of attempts we make for each requested block/height before discarding
+	maxSize       uint          // the maximum number of blocks we request in the same block request message
+	maxRequests   uint          // the maximum number of requests we send during each scanning period
 }
 
 // New creates a new consensus propagation engine.
 func New(
 	log zerolog.Logger,
+	metrics module.EngineMetrics,
 	net module.Network,
 	me module.Local,
 	state protocol.State,
@@ -57,7 +61,8 @@ func New(
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		unit:     engine.NewUnit(),
-		log:      log.With().Str("engine", "consensus").Logger(),
+		log:      log.With().Str("engine", "synchronization").Logger(),
+		metrics:  metrics,
 		me:       me,
 		state:    state,
 		blocks:   blocks,
@@ -66,8 +71,9 @@ func New(
 		blockIDs: make(map[flow.Identifier]*Status),
 
 		pollInterval:  8 * time.Second,
-		scanInterval:  1 * time.Second,
+		scanInterval:  2 * time.Second,
 		retryInterval: 4 * time.Second,
+		tolerance:     10,
 		maxAttempts:   5,
 		maxSize:       64,
 		maxRequests:   3,
@@ -109,7 +115,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+			e.log.Error().Err(err).Msg("synchronization could not process submitted event")
 		}
 	})
 }
@@ -133,30 +139,53 @@ func (e *Engine) RequestBlock(blockID flow.Identifier) {
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
+	// if we already received this block, reset its status so we can re-queue
+	status := e.blockIDs[blockID]
+	if status.WasReceived() {
+		delete(e.blockIDs, status.Header.ID())
+		delete(e.heights, status.Header.Height)
+	}
+
 	e.queueByBlockID(blockID)
 }
 
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
-	// process one event at a time for now
-	e.unit.Lock()
-	defer e.unit.Unlock()
-
 	switch ev := event.(type) {
 	case *messages.SyncRequest:
+		e.before(metrics.MessageSyncRequest)
+		defer e.after(metrics.MessageSyncRequest)
 		return e.onSyncRequest(originID, ev)
 	case *messages.SyncResponse:
+		e.before(metrics.MessageSyncResponse)
+		defer e.after(metrics.MessageSyncResponse)
 		return e.onSyncResponse(originID, ev)
 	case *messages.RangeRequest:
+		e.before(metrics.MessageRangeRequest)
+		defer e.after(metrics.MessageRangeRequest)
 		return e.onRangeRequest(originID, ev)
 	case *messages.BatchRequest:
+		e.before(metrics.MessageBatchRequest)
+		defer e.after(metrics.MessageBatchRequest)
 		return e.onBatchRequest(originID, ev)
 	case *messages.BlockResponse:
+		e.before(metrics.MessageBlockResponse)
+		defer e.after(metrics.MessageBlockResponse)
 		return e.onBlockResponse(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
+}
+
+func (e *Engine) before(msg string) {
+	e.metrics.MessageReceived(metrics.EngineSynchronization, msg)
+	e.unit.Lock()
+}
+
+func (e *Engine) after(msg string) {
+	e.unit.Unlock()
+	e.metrics.MessageHandled(metrics.EngineSynchronization, msg)
 }
 
 // onSyncRequest processes an outgoing handshake; if we have a higher height, we
@@ -170,9 +199,13 @@ func (e *Engine) onSyncRequest(originID flow.Identifier, req *messages.SyncReque
 		return fmt.Errorf("could not get finalized head: %w", err)
 	}
 
-	// compare the height and see if we can bail early
-	// TODO: we probably want to add some tolerance here
-	if req.Height == final.Height {
+	// if we are within the tolerance threshold we do nothing
+	lower := final.Height - uint64(e.tolerance)
+	if lower > final.Height { // overflow check
+		lower = 0
+	}
+	upper := final.Height + uint64(e.tolerance)
+	if req.Height >= lower && req.Height <= upper {
 		return nil
 	}
 
@@ -194,6 +227,8 @@ func (e *Engine) onSyncRequest(originID flow.Identifier, req *messages.SyncReque
 		return fmt.Errorf("could not send sync response: %w", err)
 	}
 
+	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageSyncResponse)
+
 	return nil
 }
 
@@ -201,18 +236,19 @@ func (e *Engine) onSyncRequest(originID flow.Identifier, req *messages.SyncReque
 func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResponse) error {
 
 	// get the header at the latest finalized state
-	head, err := e.state.Final().Head()
+	final, err := e.state.Final().Head()
 	if err != nil {
 		return fmt.Errorf("could not get finalized head: %w", err)
 	}
 
-	// if the height is the same or smaller, there is nothing to do
-	if res.Height <= head.Height {
+	// if we are within the tolerance threshold we do nothing
+	upper := final.Height + uint64(e.tolerance)
+	if res.Height <= upper {
 		return nil
 	}
 
 	// mark the missing height
-	for height := head.Height + 1; height <= res.Height; height++ {
+	for height := final.Height + 1; height <= res.Height; height++ {
 		e.queueByHeight(height)
 	}
 
@@ -263,6 +299,8 @@ func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeReq
 		return fmt.Errorf("could not send range response: %w", err)
 	}
 
+	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBlockResponse)
+
 	return nil
 }
 
@@ -310,6 +348,8 @@ func (e *Engine) onBatchRequest(originID flow.Identifier, req *messages.BatchReq
 		return fmt.Errorf("could not send batch response: %w", err)
 	}
 
+	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBlockResponse)
+
 	return nil
 }
 
@@ -324,61 +364,68 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 	return nil
 }
 
-// queueByHeight queues a request for the finalized block at the given height.
+// queueByHeight queues a request for the finalized block at the given height,
+// only if no equivalent request has been queued before.
 func (e *Engine) queueByHeight(height uint64) {
 
-	// if we already have the height, skip
-	_, ok := e.heights[height]
-	if ok {
+	// only queue the request if have never queued it before
+	if e.heights[height].WasQueued() {
 		return
 	}
 
-	// TODO: we might want to double check if we don't have the height finalized yet
-
-	// create the status and add to map
-	status := Status{
-		Queued:    time.Now(),  // this can be used for timing out
-		Requested: time.Time{}, // this can be used for both retries & timeouts
-		Attempts:  0,           // this can be used to abort after certain amount of retries
-	}
-	e.heights[height] = &status
+	// queue the request
+	e.heights[height] = NewQueuedStatus()
 }
 
-// queueByBlockID queues a request for a block by block ID.
+// queueByBlockID queues a request for a block by block ID, only if no
+// equivalent request has been queued before.
 func (e *Engine) queueByBlockID(blockID flow.Identifier) {
 
-	// if we already have the blockID, skip
-	_, ok := e.blockIDs[blockID]
-	if ok {
+	// only queue the request if have never queued it before
+	if e.blockIDs[blockID].WasQueued() {
 		return
 	}
 
-	// TODO: we might want to double check that we don't have the block yet
+	// queue the request
+	e.blockIDs[blockID] = NewQueuedStatus()
+}
 
-	// create the status and add to map
-	status := Status{
-		Queued:    time.Now(),
-		Requested: time.Time{},
-		Attempts:  0,
+// getRequestStatus retrieves a request status for a block, regardless of
+// whether it was queued by height or by block ID.
+func (e *Engine) getRequestStatus(block *flow.Block) *Status {
+	heightStatus := e.heights[block.Header.Height]
+	idStatus := e.blockIDs[block.ID()]
+
+	if heightStatus.WasQueued() {
+		return heightStatus
 	}
-	e.blockIDs[blockID] = &status
+	if idStatus.WasQueued() {
+		return idStatus
+	}
+	return nil
 }
 
 // processIncoming processes an incoming block, so we can take into account the
 // overlap between block IDs and heights.
 func (e *Engine) processIncomingBlock(originID flow.Identifier, block *flow.Block) {
 
-	// check if we still need to process this block or it is stale already
-	blockID := block.ID()
-	_, wantHeight := e.heights[block.Height]
-	_, wantBlockID := e.blockIDs[blockID]
-	if !wantHeight && !wantBlockID {
+	status := e.getRequestStatus(block)
+	// if we never asked for this block, discard it
+	if !status.WasQueued() {
+		return
+	}
+	// if we have already received this block, exit
+	if status.WasReceived() {
 		return
 	}
 
-	// delete from the queue and forward
-	delete(e.heights, block.Height)
-	delete(e.blockIDs, blockID)
+	// this is a new block, remember that we've seen it
+	status.Header = block.Header
+	status.Received = time.Now()
+
+	// track it by ID and by height so we don't accidentally request it again
+	e.blockIDs[block.ID()] = status
+	e.heights[block.Header.Height] = status
 
 	synced := &events.SyncedBlock{
 		OriginID: originID,
@@ -446,6 +493,7 @@ func (e *Engine) pollHeight() error {
 	var errs error
 	// send the request for synchronization
 	for _, targetID := range identities.Sample(3).NodeIDs() {
+
 		req := &messages.SyncRequest{
 			Nonce:  rand.Uint64(),
 			Height: final.Height,
@@ -454,9 +502,42 @@ func (e *Engine) pollHeight() error {
 		if err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("could not send sync request: %w", err))
 		}
+
+		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageSyncRequest)
 	}
 
 	return errs
+}
+
+// prune removes any pending requests which we have received and which is below
+// the finalized height, or which we received sufficiently long ago.
+//
+// NOTE: the caller must acquire the engine lock!
+func (e *Engine) prune() {
+
+	final, err := e.state.Final().Head()
+	if err != nil {
+		e.log.Error().Err(err).Msg("failed to prune")
+		return
+	}
+
+	for height := range e.heights {
+		if height <= final.Height {
+			delete(e.heights, height)
+			continue
+		}
+	}
+
+	for blockID, status := range e.blockIDs {
+		if status.WasReceived() {
+			header := status.Header
+
+			if header.Height <= final.Height {
+				delete(e.blockIDs, blockID)
+				continue
+			}
+		}
+	}
 }
 
 // scanPending will check which items shall be requested.
@@ -469,7 +550,6 @@ func (e *Engine) scanPending() ([]uint64, []flow.Identifier, error) {
 	// for now, we just ignore that problem, but once we do, we should always
 	// prioritize range requests over batch requests
 
-	// we simply use the same timestamp for each scan, that should be fine
 	now := time.Now()
 
 	// create a list of all height requests that should be sent
@@ -477,8 +557,13 @@ func (e *Engine) scanPending() ([]uint64, []flow.Identifier, error) {
 	for height, status := range e.heights {
 
 		// if the last request is young enough, skip
-		cutoff := status.Requested.Add(e.retryInterval)
-		if now.Before(cutoff) {
+		retryAfter := status.Requested.Add(e.retryInterval << status.Attempts)
+		if now.Before(retryAfter) {
+			continue
+		}
+
+		// if we've already received this block, skip
+		if status.WasReceived() {
 			continue
 		}
 
@@ -497,8 +582,13 @@ func (e *Engine) scanPending() ([]uint64, []flow.Identifier, error) {
 	for blockID, status := range e.blockIDs {
 
 		// if the last request is young enough, skip
-		cutoff := status.Requested.Add(e.retryInterval)
-		if now.Before(cutoff) {
+		retryAfter := status.Requested.Add(e.retryInterval << status.Attempts)
+		if now.Before(retryAfter) {
+			continue
+		}
+
+		// if we've already received this block, skip
+		if status.WasReceived() {
 			continue
 		}
 
@@ -596,11 +686,18 @@ func (e *Engine) sendRequests(heights []uint64, blockIDs []flow.Identifier) erro
 			return fmt.Errorf("could not send range request: %w", err)
 		}
 
-		// mark all of the heights as requested; these should always be there as
-		// we call this right after the scan and nothing else can delete keys
+		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageRangeRequest)
+
+		// mark all of the heights as requested
 		for height := ran.From; height <= ran.To; height++ {
-			e.heights[height].Requested = time.Now()
-			e.heights[height].Attempts++
+			// NOTE: during the short window between scan and send, we could
+			// have evicted a status
+			status, exists := e.heights[height]
+			if !exists {
+				continue
+			}
+			status.Requested = time.Now()
+			status.Attempts++
 		}
 
 		// check if we reached the maximum number of requests for this period
@@ -630,11 +727,18 @@ func (e *Engine) sendRequests(heights []uint64, blockIDs []flow.Identifier) erro
 			return fmt.Errorf("could not send batch request: %w", err)
 		}
 
-		// mark all of the blocks as requested; these should always be there as
-		// we call this right after the scan and nothing else can delete keys
+		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBatchRequest)
+
+		// mark all of the blocks as requested
 		for _, blockID := range requestIDs {
-			e.blockIDs[blockID].Requested = time.Now()
-			e.blockIDs[blockID].Attempts++
+			// NOTE: during the short window between scan and send, we could
+			// have received a block and removed a key
+			status, needed := e.blockIDs[blockID]
+			if !needed {
+				continue
+			}
+			status.Requested = time.Now()
+			status.Attempts++
 		}
 
 		// check if we reached maximum requests
@@ -643,9 +747,6 @@ func (e *Engine) sendRequests(heights []uint64, blockIDs []flow.Identifier) erro
 			return nil
 		}
 	}
-
-	// TODO: when not requesting batches/ranges, make sure we don't add an
-	// attempt and we don't restart the retry timeout
 
 	return nil
 }

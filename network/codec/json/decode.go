@@ -58,10 +58,6 @@ func decode(env Envelope) (interface{}, error) {
 		v = &flow.TransactionBody{}
 	case CodeTransaction:
 		v = &flow.Transaction{}
-	case CodeTransactionRequest:
-		v = &messages.TransactionRequest{}
-	case CodeTransactionResponse:
-		v = &messages.TransactionResponse{}
 
 	case CodeCollectionRequest:
 		v = &messages.CollectionRequest{}
@@ -84,9 +80,11 @@ func decode(env Envelope) (interface{}, error) {
 
 	case CodeChunkDataPackRequest:
 		v = &messages.ChunkDataPackRequest{}
-
 	case CodeChunkDataPackResponse:
 		v = &messages.ChunkDataPackResponse{}
+
+	case CodeResultApproval:
+		v = &flow.ResultApproval{}
 
 	default:
 		return nil, errors.Errorf("invalid message code (%d)", env.Code)

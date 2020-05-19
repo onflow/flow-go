@@ -66,11 +66,6 @@ func encode(v interface{}) (*Envelope, error) {
 	case *message.Echo:
 		code = CodeEcho
 
-	case *messages.TransactionRequest:
-		code = CodeTransactionRequest
-	case *messages.TransactionResponse:
-		code = CodeTransactionResponse
-
 	case *flow.ExecutionReceipt:
 		code = CodeExecutionReceipt
 	case *messages.ChunkDataPackRequest:
@@ -81,6 +76,8 @@ func encode(v interface{}) (*Envelope, error) {
 		code = CodeExecutionStateSyncRequest
 	case *messages.ExecutionStateDelta:
 		code = CodeExecutionStateDelta
+	case *flow.ResultApproval:
+		code = CodeResultApproval
 
 	default:
 		return nil, errors.Errorf("invalid encode type (%T)", v)

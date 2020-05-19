@@ -56,9 +56,9 @@ var keyCmd = &cobra.Command{
 			log.Fatal().Err(err).Msg("could not access private keys")
 		}
 
-		writeText(model.FilenameNodeId, []byte(nodeInfo.NodeID.String()))
-		writeJSON(fmt.Sprintf(model.FilenameNodeInfoPriv, nodeInfo.NodeID), private)
-		writeJSON(fmt.Sprintf(model.FilenameNodeInfoPub, nodeInfo.NodeID), nodeInfo.Public())
+		writeText(model.PathNodeId, []byte(nodeInfo.NodeID.String()))
+		writeJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID), private)
+		writeJSON(fmt.Sprintf(model.PathNodeInfoPub, nodeInfo.NodeID), nodeInfo.Public())
 	},
 }
 

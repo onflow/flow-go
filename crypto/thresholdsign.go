@@ -13,8 +13,27 @@ import (
 	"github.com/dapperlabs/flow-go/crypto/hash"
 )
 
-// ThresholdSigner holds the data needed for threshold signaures
-type ThresholdSigner struct {
+// BLS-based threshold signature on BLS 12-381 curve
+// The BLS settings are the same as in the signature
+// scheme defined in the package.
+
+// the threshold value (t) if fixed for now to t = floor((n-1)/2)
+// where (t+1) signatures are required to reconstruct the
+// threshold signature.
+// FeldmanVSS, FeldmanVSSQual and JointFeldman are
+// key generators for this threshold signature scheme
+
+// The package offers two api:
+// - stateful api where a structure holds all information
+//  of the threshold signature protocols and is recommended
+//  to be used for safety and to reduce protocol inconsistencies.
+// - stateless api where only a to reconstruct the signature
+// is provided. Verifying and storing the signature shares
+// has to be done outside of the library.
+
+// thresholdSigner is part of the stateful api
+// It holds the data needed for threshold signaures
+type thresholdSigner struct {
 	// size of the group
 	size int
 	// the thresold t of the scheme where (t+1) shares are
@@ -43,12 +62,10 @@ type ThresholdSigner struct {
 	thresholdSignature Signature
 }
 
-const ThresholdSignatureTag = "Threshold Signatures"
-
 // NewThresholdSigner creates a new instance of Threshold signer using BLS
 // hash is the hashing algorithm to be used
 // size is the number of participants
-func NewThresholdSigner(size int, currentIndex int, hashAlgo hash.Hasher) (*ThresholdSigner, error) {
+func NewThresholdSigner(size int, currentIndex int, hashAlgo hash.Hasher) (*thresholdSigner, error) {
 	if size < ThresholdMinSize || size > ThresholdMaxSize {
 		return nil, fmt.Errorf("size should be between %d and %d", ThresholdMinSize, ThresholdMaxSize)
 	}
@@ -56,13 +73,16 @@ func NewThresholdSigner(size int, currentIndex int, hashAlgo hash.Hasher) (*Thre
 		return nil, fmt.Errorf("The current index must be between 0 and %d", size-1)
 	}
 
+	// initialize BLS settings
+	_ = newBLSBLS12381()
+
 	// optimal threshold (t) to allow the largest number of malicious nodes (m)
 	threshold := optimalThreshold(size)
 	// internal list of valid signature shares
 	shares := make([]byte, 0, (threshold+1)*SignatureLenBLSBLS12381)
 	signers := make([]index, 0, threshold+1)
 
-	return &ThresholdSigner{
+	return &thresholdSigner{
 		size:               size,
 		threshold:          threshold,
 		currentIndex:       currentIndex,
@@ -74,8 +94,13 @@ func NewThresholdSigner(size int, currentIndex int, hashAlgo hash.Hasher) (*Thre
 }
 
 // SetKeys sets the private and public keys needed by the threshold signature
-// the input keys can be the output keys of a Distributed Key Generator
-func (s *ThresholdSigner) SetKeys(currentPrivateKey PrivateKey,
+// - groupPublicKey is the group public key corresponding to the group secret key
+// - sharePublicKeys are the public key shares corresponding to the nodes private
+// key shares.
+// - currentPrivateKey is the current node's own private key share
+// Output keys of FeldmanVSS, FeldmanVSSQual and JointFeldman protocols could
+// be used as the input keys to this function.
+func (s *thresholdSigner) SetKeys(currentPrivateKey PrivateKey,
 	groupPublicKey PublicKey,
 	sharePublicKeys []PublicKey) {
 
@@ -85,14 +110,14 @@ func (s *ThresholdSigner) SetKeys(currentPrivateKey PrivateKey,
 }
 
 // SetMessageToSign sets the next message to be signed
-// all received signatures of a different message are ignored
-func (s *ThresholdSigner) SetMessageToSign(message []byte) {
+// All signatures shares of a different message are ignored
+func (s *thresholdSigner) SetMessageToSign(message []byte) {
 	s.ClearShares()
 	s.messageToSign = message
 }
 
 // SignShare generates a signature share using the current private key share
-func (s *ThresholdSigner) SignShare() (Signature, error) {
+func (s *thresholdSigner) SignShare() (Signature, error) {
 	if s.currentPrivateKey == nil {
 		return nil, errors.New("The private key of the current node is not set")
 	}
@@ -113,7 +138,7 @@ func (s *ThresholdSigner) SignShare() (Signature, error) {
 }
 
 // VerifyShare verifies a signature share using the signer's public key
-func (s *ThresholdSigner) verifyShare(share Signature, signerIndex index) (bool, error) {
+func (s *thresholdSigner) verifyShare(share Signature, signerIndex index) (bool, error) {
 	if len(s.publicKeyShares)-1 < int(signerIndex) {
 		return false, errors.New("The node public keys are not set")
 	}
@@ -122,7 +147,7 @@ func (s *ThresholdSigner) verifyShare(share Signature, signerIndex index) (bool,
 }
 
 // VerifyThresholdSignature verifies a threshold signature using the group public key
-func (s *ThresholdSigner) VerifyThresholdSignature(thresholdSignature Signature) (bool, error) {
+func (s *thresholdSigner) VerifyThresholdSignature(thresholdSignature Signature) (bool, error) {
 	if s.groupPublicKey == nil {
 		return false, errors.New("The group public key is not set")
 	}
@@ -130,23 +155,23 @@ func (s *ThresholdSigner) VerifyThresholdSignature(thresholdSignature Signature)
 }
 
 // ClearShares clears the shares and signers lists
-func (s *ThresholdSigner) ClearShares() {
+func (s *thresholdSigner) ClearShares() {
 	s.thresholdSignature = nil
 	s.signers = s.signers[:0]
 	s.shares = s.shares[:0]
 }
 
 // EnoughShares checks whether there are enough shares to reconstruct a signature
-func (s *ThresholdSigner) EnoughShares() bool {
+func (s *thresholdSigner) EnoughShares() bool {
 	// note: len(s.signers) is always <= s.threshold + 1
 	return len(s.signers) == (s.threshold + 1)
 }
 
-// AddSignatureShare processes a new TS share
+// AddSignatureShare processes a signature share
 // If the share is valid, not perviously added and the threshold is not reached yet,
 // it is appended to a local list of valid shares
 // The function returns true if the share is valid, false otherwise
-func (s *ThresholdSigner) AddSignatureShare(orig int, share Signature) (bool, error) {
+func (s *thresholdSigner) AddSignatureShare(orig int, share Signature) (bool, error) {
 	if orig >= s.size || orig < 0 {
 		return false, errors.New("orig input is invalid")
 	}
@@ -175,7 +200,7 @@ func (s *ThresholdSigner) AddSignatureShare(orig int, share Signature) (bool, er
 }
 
 // ThresholdSignature returns the threshold signature if the threshold was reached, nil otherwise
-func (s *ThresholdSigner) ThresholdSignature() (Signature, error) {
+func (s *thresholdSigner) ThresholdSignature() (Signature, error) {
 	// thresholdSignature is only computed once
 	if s.thresholdSignature != nil {
 		return s.thresholdSignature, nil
@@ -193,7 +218,7 @@ func (s *ThresholdSigner) ThresholdSignature() (Signature, error) {
 }
 
 // ReconstructThresholdSignature reconstructs the threshold signature from at least (t+1) shares.
-func (s *ThresholdSigner) reconstructThresholdSignature() (Signature, error) {
+func (s *thresholdSigner) reconstructThresholdSignature() (Signature, error) {
 	// sanity check
 	if len(s.shares) != len(s.signers)*signatureLengthBLSBLS12381 {
 		s.ClearShares()
@@ -220,8 +245,8 @@ func (s *ThresholdSigner) reconstructThresholdSignature() (Signature, error) {
 	return thresholdSignature, nil
 }
 
-// ReconstructThresholdSignature is a stateless function that takes a list of
-// signatures and their signers's indices and returns the threshold signature
+// ReconstructThresholdSignature is a stateless api that takes a list of
+// signatures and their signers's indices and returns the threshold signature.
 // size is the size of the threshold signature group
 // The function does not check the validity of the shares, and does not check
 // the validity of the resulting signature. It also does not check the signatures signers
@@ -231,6 +256,8 @@ func (s *ThresholdSigner) reconstructThresholdSignature() (Signature, error) {
 // - error if the inputs are not in the correct range or if the threshold is not reached
 // - Signature: the threshold signature if there is no returned error, nil otherwise
 func ReconstructThresholdSignature(size int, shares []Signature, signers []int) (Signature, error) {
+	// initialize BLS settings
+	_ = newBLSBLS12381()
 	if size < ThresholdMinSize || size > ThresholdMaxSize {
 		return nil, fmt.Errorf("size should be between %d and %d",
 			ThresholdMinSize, ThresholdMaxSize)
@@ -272,4 +299,55 @@ func ReconstructThresholdSignature(size int, shares []Signature, signers []int) 
 // The function assumes the threshold value is equal to floor((n-1)/2)
 func EnoughShares(size int, sharesNumber int) bool {
 	return sharesNumber >= (optimalThreshold(size) + 1)
+}
+
+func ThresholdSignKeyGen(size int, seed []byte) ([]PrivateKey,
+	[]PublicKey, PublicKey, error) {
+	// set threshold
+	threshold := optimalThreshold(size)
+	// initialize BLS settings
+	_ = newBLSBLS12381()
+	// the scalars x and G2 points y
+	x := make([]scalar, size)
+	y := make([]pointG2, size)
+	var X0 pointG2
+	// seed relic
+	if err := seedRelic(seed); err != nil {
+		return nil, nil, nil, err
+	}
+	// Generate a polynomial P in Zr[X] of degree t
+	a := make([]scalar, threshold+1)
+	for i := 0; i < threshold+1; i++ {
+		err := randZr(&a[i])
+		if err != nil {
+			return nil, nil, nil, err
+		}
+	}
+	// compute the shares
+	for i := index(1); int(i) <= size; i++ {
+		C.Zr_polynomialImage(
+			(*C.bn_st)(&x[i-1]),
+			(*C.ep2_st)(&y[i-1]),
+			(*C.bn_st)(&a[0]), (C.int)(len(a)),
+			(C.uint8_t)(i),
+		)
+	}
+	// group public key
+	genScalarMultG2(&X0, &a[0])
+	// export the keys
+	skShares := make([]PrivateKey, size)
+	pkShares := make([]PublicKey, size)
+	var pkGroup PublicKey
+	for i := 0; i < size; i++ {
+		skShares[i] = &PrKeyBLSBLS12381{
+			scalar: x[i],
+		}
+		pkShares[i] = &PubKeyBLSBLS12381{
+			point: y[i],
+		}
+	}
+	pkGroup = &PubKeyBLSBLS12381{
+		point: X0,
+	}
+	return skShares, pkShares, pkGroup, nil
 }

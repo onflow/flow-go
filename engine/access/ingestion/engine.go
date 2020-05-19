@@ -23,16 +23,16 @@ import (
 // Engine represents the ingestion engine, used to funnel data from other nodes
 // to a centralized location that can be queried by a user
 type Engine struct {
-	unit    *engine.Unit   // used to manage concurrency & shutdown
-	log     zerolog.Logger // used to log relevant actions with context
-	metrics module.Metrics // used to collect metrics
-	state   protocol.State // used to access the  protocol state
-	me      module.Local   // used to access local node information
+	unit  *engine.Unit   // used to manage concurrency & shutdown
+	log   zerolog.Logger // used to log relevant actions with context
+	state protocol.State // used to access the  protocol state
+	me    module.Local   // used to access local node information
 
 	// Conduits
 	collectionConduit network.Conduit
 
 	// storage
+	// FIX: remove direct DB access by substituting indexer module
 	blocks       storage.Blocks
 	headers      storage.Headers
 	collections  storage.Collections
@@ -43,7 +43,6 @@ type Engine struct {
 func New(log zerolog.Logger,
 	net module.Network,
 	state protocol.State,
-	metrics module.Metrics,
 	me module.Local,
 	blocks storage.Blocks,
 	headers storage.Headers,
@@ -54,7 +53,6 @@ func New(log zerolog.Logger,
 	eng := &Engine{
 		unit:         engine.NewUnit(),
 		log:          log.With().Str("engine", "ingestion").Logger(),
-		metrics:      metrics,
 		state:        state,
 		me:           me,
 		blocks:       blocks,
@@ -121,8 +119,6 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // given origin ID.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch entity := event.(type) {
-	case *messages.BlockProposal:
-		return e.onBlockProposal(originID, entity)
 	case *messages.CollectionResponse:
 		return e.handleCollectionResponse(originID, entity)
 	default:
@@ -134,40 +130,44 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 	e.unit.Launch(func() {
 		id := hb.BlockID
-		block, err := e.blocks.ByID(id)
-		if err != nil {
-			e.log.Error().Err(err).Hex("block_id", id[:]).Msg("failed to lookup block")
-		}
-		proposal := &messages.BlockProposal{
-			Header:  &block.Header,
-			Payload: &block.Payload,
-		}
-		err = e.ProcessLocal(proposal)
+		err := e.processFinalizedBlock(id)
 		if err != nil {
 			e.log.Error().Err(err).Hex("block_id", id[:]).Msg("failed to process block")
+			return
 		}
-		e.metrics.FinalizedBlocks(1)
 	})
 }
 
-// onBlock handles an incoming block.
-// TODO this will be an event triggered by the follower node when a new finalized or sealed block is received
-func (e *Engine) onBlockProposal(_ flow.Identifier, proposal *messages.BlockProposal) error {
+// processBlock handles an incoming finalized block.
+func (e *Engine) processFinalizedBlock(id flow.Identifier) error {
+
+	block, err := e.blocks.ByID(id)
+	if err != nil {
+		return fmt.Errorf("failed to lookup block: %w", err)
+	}
+
+	// FIX: we can't index guarantees here, as we might have more than one block
+	// with the same collection as long as it is not finalized
+
+	// TODO: substitute an indexer module as layer between engine and storage
 
 	// index the block storage with each of the collection guarantee
-	err := e.blocks.IndexByGuarantees(proposal.Header.ID())
+	err = e.blocks.IndexBlockForCollections(block.Header.ID(), flow.GetIDs(block.Payload.Guarantees))
 	if err != nil {
-		return err
+		return fmt.Errorf("could not index block for collections: %w", err)
 	}
 
 	// request each of the collections from the collection node
-	return e.requestCollections(proposal.Payload.Guarantees...)
+	return e.requestCollections(block.Payload.Guarantees...)
 }
 
 // handleCollectionResponse handles the response of the a collection request made earlier when a block was received
 func (e *Engine) handleCollectionResponse(originID flow.Identifier, response *messages.CollectionResponse) error {
 	collection := response.Collection
 	light := collection.Light()
+
+	// FIX: we can't index guarantees here, as we might have more than one block
+	// with the same collection as long as it is not finalized
 
 	// store the light collection (collection minus the transaction body - those are stored separately)
 	// and add transaction ids as index
@@ -215,7 +215,7 @@ func (e *Engine) findCollectionNodes() ([]flow.Identifier, error) {
 		return nil, fmt.Errorf("could not retrieve identities: %w", err)
 	}
 	if len(identities) < 1 {
-		return nil, fmt.Errorf("no Collection identity found")
+		return nil, fmt.Errorf("no collection identity found")
 	}
 	identifiers := flow.GetIDs(identities)
 	return identifiers, nil

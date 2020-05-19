@@ -12,14 +12,14 @@ type Transactions struct {
 }
 
 // Add provides a mock function with given fields: tx
-func (_m *Transactions) Add(tx *flow.TransactionBody) error {
+func (_m *Transactions) Add(tx *flow.TransactionBody) bool {
 	ret := _m.Called(tx)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.TransactionBody) error); ok {
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(*flow.TransactionBody) bool); ok {
 		r0 = rf(tx)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0
@@ -42,7 +42,7 @@ func (_m *Transactions) All() []*flow.TransactionBody {
 }
 
 // ByID provides a mock function with given fields: txID
-func (_m *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error) {
+func (_m *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, bool) {
 	ret := _m.Called(txID)
 
 	var r0 *flow.TransactionBody
@@ -54,11 +54,11 @@ func (_m *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
 		r1 = rf(txID)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(bool)
 	}
 
 	return r0, r1

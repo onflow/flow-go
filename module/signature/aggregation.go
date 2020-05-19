@@ -21,7 +21,7 @@ type AggregationVerifier struct {
 // signatures in the context of the provided KMAC tag.
 func NewAggregationVerifier(tag string) *AggregationVerifier {
 	av := &AggregationVerifier{
-		hasher: crypto.NewBLS_KMAC(tag),
+		hasher: crypto.NewBLSKMAC(tag),
 	}
 	return av
 }

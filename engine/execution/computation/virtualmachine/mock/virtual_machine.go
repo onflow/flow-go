@@ -11,6 +11,22 @@ type VirtualMachine struct {
 	mock.Mock
 }
 
+// ASTCache provides a mock function with given fields:
+func (_m *VirtualMachine) ASTCache() virtualmachine.ASTCache {
+	ret := _m.Called()
+
+	var r0 virtualmachine.ASTCache
+	if rf, ok := ret.Get(0).(func() virtualmachine.ASTCache); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(virtualmachine.ASTCache)
+		}
+	}
+
+	return r0
+}
+
 // NewBlockContext provides a mock function with given fields: b
 func (_m *VirtualMachine) NewBlockContext(b *flow.Header) virtualmachine.BlockContext {
 	ret := _m.Called(b)

@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/engine/execution/state"
@@ -11,6 +12,7 @@ import (
 type StateSynchronizer interface {
 	//PersistDelta(blockID flow.Identifier, set flow.RegisterDelta) error
 	DeltaRange(
+		ctx context.Context,
 		startID, endID flow.Identifier,
 		onDelta func(delta *messages.ExecutionStateDelta) error,
 	) error
@@ -29,21 +31,24 @@ type stateSync struct {
 }
 
 // walk the chain to find a path between blocks
-func (ss *stateSync) findDeltasToSend(startID, endID flow.Identifier) ([]*messages.ExecutionStateDelta, error) {
+func (ss *stateSync) findDeltasToSend(
+	ctx context.Context,
+	startID, endID flow.Identifier,
+) ([]*messages.ExecutionStateDelta, error) {
 
 	if startID == endID {
 		return nil, nil
 	}
 
-	//find lowest common block
-	startDelta, err := ss.execState.RetrieveStateDelta(startID)
+	// find lowest common block
+	startDelta, err := ss.execState.RetrieveStateDelta(ctx, startID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve state delta for blockID %s: %w", startID, err)
+		return nil, fmt.Errorf("failed to retrieve state delta for start (%s): %w", startID, err)
 	}
 
-	endDelta, err := ss.execState.RetrieveStateDelta(endID)
+	endDelta, err := ss.execState.RetrieveStateDelta(ctx, endID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve state delta for blockID %s: %w", endID, err)
+		return nil, fmt.Errorf("failed to retrieve state delta for end (%s): %w", endID, err)
 	}
 
 	// start from higher block
@@ -60,7 +65,7 @@ func (ss *stateSync) findDeltasToSend(startID, endID flow.Identifier) ([]*messag
 	// but other option are also supported, so handy variable to distinguish later
 	reversedHeights := false
 
-	if startDelta.Block.Height > endDelta.Block.Height {
+	if startDelta.Block.Header.Height > endDelta.Block.Header.Height {
 		highDelta, lowDelta = lowDelta, highDelta
 		higherChainDelta, lowerChainDelta = lowerChainDelta, higherChainDelta
 		reversedHeights = true
@@ -68,13 +73,13 @@ func (ss *stateSync) findDeltasToSend(startID, endID flow.Identifier) ([]*messag
 
 	// worst case we should reach genesis, block common for all
 	for {
-		highParentDelta, err := ss.execState.RetrieveStateDelta(highDelta.Block.ParentID)
+		highParentDelta, err := ss.execState.RetrieveStateDelta(ctx, highDelta.Block.Header.ParentID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to retrieve state delta for blockID %s: %w", highDelta.Block.ParentID, err)
+			return nil, fmt.Errorf("failed to retrieve state delta for blockID %s: %w", highDelta.Block.Header.ParentID, err)
 		}
 
 		if highParentDelta.Block.ID() == lowDelta.Block.ID() {
-			//we found a simple path
+			// we found a simple path
 
 			if reversedHeights {
 				return nil, fmt.Errorf("invalid request. Start block higher then lower on the same chain")
@@ -83,12 +88,12 @@ func (ss *stateSync) findDeltasToSend(startID, endID flow.Identifier) ([]*messag
 			break
 		}
 
-		if highDelta.Block.Height <= lowDelta.Block.Height {
+		if highDelta.Block.Header.Height <= lowDelta.Block.Header.Height {
 			// reached end block height without match
 			// now descent both paths until we find common parent
-			lowParentDelta, err := ss.execState.RetrieveStateDelta(lowDelta.Block.ParentID)
+			lowParentDelta, err := ss.execState.RetrieveStateDelta(ctx, lowDelta.Block.Header.ParentID)
 			if err != nil {
-				return nil, fmt.Errorf("failed to retrieve state delta for blockID %s: %w", lowDelta.Block.ParentID, err)
+				return nil, fmt.Errorf("failed to retrieve state delta for blockID %s: %w", lowDelta.Block.Header.ParentID, err)
 			}
 
 			if lowParentDelta.Block.ID() == highParentDelta.Block.ID() {
@@ -117,12 +122,13 @@ func (ss *stateSync) findDeltasToSend(startID, endID flow.Identifier) ([]*messag
 }
 
 func (ss *stateSync) DeltaRange(
+	ctx context.Context,
 	startID, endID flow.Identifier,
 	onDelta func(delta *messages.ExecutionStateDelta) error,
 ) error {
 
 	// if range is zero, we're done
-	deltas, err := ss.findDeltasToSend(startID, endID)
+	deltas, err := ss.findDeltasToSend(ctx, startID, endID)
 	if err != nil {
 		return fmt.Errorf("cannot find deltas to send: %w", err)
 	}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
@@ -44,7 +45,8 @@ func initPaceMaker(t *testing.T, view uint64) (hotstuff.PaceMaker, *mocks.Consum
 		time.Duration(minRepTimeout*1e6),
 		voteTimeoutFraction,
 		multiplicativeIncrease,
-		time.Duration(additiveDecrease*1e6))
+		time.Duration(additiveDecrease*1e6),
+		0)
 	if err != nil {
 		t.Fail()
 	}
@@ -272,12 +274,12 @@ func Test_ReplicaTimeout(t *testing.T) {
 	select {
 	case <-pm.TimeoutChannel():
 		break // testing path: corresponds to EventLoop picking up timeout from channel
-	case <-time.NewTimer(time.Duration(2) * time.Duration(startRepTimeout) * time.Millisecond).C:
+	case <-time.After(time.Duration(2) * time.Duration(startRepTimeout) * time.Millisecond):
 		t.Fail() // to prevent test from hanging
 	}
-	duration := float64(time.Since(start).Milliseconds()) // in millisecond
-	fmt.Println(duration)
-	assert.True(t, math.Abs(duration-startRepTimeout) < 0.1*startRepTimeout)
+	actualTimeout := float64(time.Since(start).Milliseconds()) // in millisecond
+	fmt.Println(actualTimeout)
+	assert.GreaterOrEqual(t, actualTimeout, startRepTimeout, "the actual timeout should be greater or equal to the init timeout")
 	// While the timeout event has been put in the channel,
 	// PaceMaker should NOT react on it without the timeout event being processed by the EventHandler
 	assert.Equal(t, uint64(3), pm.CurView())
@@ -294,6 +296,84 @@ func Test_ReplicaTimeout(t *testing.T) {
 	assert.Equal(t, uint64(4), pm.CurView())
 }
 
+func Test_ReplicaTimeoutAgain(t *testing.T) {
+	start := time.Now()
+	pm, notifier := initPaceMaker(t, 3) // initPaceMaker also calls Start() on PaceMaker
+	notifier.On("OnReachedTimeout", mock.Anything)
+	notifier.On("OnStartingTimeout", mock.Anything)
+
+	// wait until the timeout is hit for the first time
+	select {
+	case <-pm.TimeoutChannel():
+	case <-time.After(time.Duration(2*startRepTimeout) * time.Millisecond):
+	}
+
+	// calculate the actual timeout duration that has been waited.
+	actualTimeout := float64(time.Since(start).Milliseconds()) // in millisecond
+	assert.GreaterOrEqual(t, actualTimeout, startRepTimeout, "the actual timeout should be greater or equal to the init timeout")
+	assert.Less(t, actualTimeout, 2*startRepTimeout, "the actual timeout was too long")
+
+	// reset timer
+	start = time.Now()
+
+	// trigger view change and restart the pacemaker timer. The next timeout should take 1.5 longer
+	_ = pm.OnTimeout()
+
+	// wait until the timeout is hit again
+	select {
+	case <-pm.TimeoutChannel():
+	case <-time.After(time.Duration(3) * time.Duration(startRepTimeout) * time.Millisecond):
+	}
+
+	nv := pm.OnTimeout()
+
+	// calculate the actual timeout duration that has been waited again
+	actualTimeout = float64(time.Since(start).Milliseconds()) // in millisecond
+	assert.GreaterOrEqual(t, actualTimeout, 1.5*startRepTimeout, "the actual timeout should be greater or equal to the timeout")
+	assert.Less(t, actualTimeout, 2*startRepTimeout, "the actual timeout was too long")
+
+	var changed bool
+	// timeout reduce linearly
+	select {
+	case <-pm.TimeoutChannel():
+		break
+	case <-time.After(time.Duration(0.1 * startRepTimeout)):
+		nv, changed = pm.UpdateCurViewWithBlock(makeBlock(nv.View-1, nv.View), false)
+		break
+	}
+
+	require.True(t, changed)
+
+	// timeout reduce linearly
+	select {
+	case <-pm.TimeoutChannel():
+		break
+	case <-time.After(time.Duration(0.1 * startRepTimeout)):
+		// start the timer before the UpdateCurViewWithBlock is called, which starts the internal timer.
+		// This is required to make the tests more accurate, because when it's running on CI,
+		// there might be some delay for time.Now() gets called, which impact the accuracy of the actual timeout
+		// measurement
+
+		start = time.Now()
+		nv, changed = pm.UpdateCurViewWithBlock(makeBlock(nv.View-1, nv.View), false)
+		break
+	}
+
+	require.True(t, changed)
+
+	// wait until the timeout is hit again
+	select {
+	case <-pm.TimeoutChannel():
+	case <-time.After(time.Duration(3) * time.Duration(startRepTimeout) * time.Millisecond):
+	}
+
+	actualTimeout = float64(time.Since(start).Milliseconds()) // in millisecond
+	// the actual timeout should be startRepTimeout * 1.5 *1.5- 2*additiveDecrease
+	// because it hits timeout twice and then received blocks for current view twice
+	assert.GreaterOrEqual(t, actualTimeout, 1.5*1.5*startRepTimeout-2*additiveDecrease, "the actual timeout should be greater or equal to the timeout")
+	assert.Less(t, actualTimeout, 1.5*1.5*startRepTimeout-additiveDecrease, "the actual timeout is too long")
+}
+
 // Test_VoteTimeout tests that vote timeout fires as expected
 func Test_VoteTimeout(t *testing.T) {
 	pm, notifier := initPaceMaker(t, 3) // initPaceMaker also calls Start() on PaceMaker
@@ -303,15 +383,17 @@ func Test_VoteTimeout(t *testing.T) {
 	pm.UpdateCurViewWithBlock(makeBlock(2, 3), true)
 	notifier.AssertExpectations(t)
 
-	expectedTimeout := startRepTimeout * voteTimeoutFraction
+	// the previous pacemaker update decreased the vote timeout by (additiveDecrease * voteTimeoutFraction)
+	expectedTimeout := (startRepTimeout - additiveDecrease) * voteTimeoutFraction
 	select {
 	case <-pm.TimeoutChannel():
 		break // testing path: corresponds to EventLoop picking up timeout from channel
-	case <-time.NewTimer(time.Duration(2) * time.Duration(expectedTimeout) * time.Millisecond).C:
+	case <-time.After(time.Duration(2) * time.Duration(expectedTimeout) * time.Millisecond):
 		t.Fail() // to prevent test from hanging
 	}
 	duration := float64(time.Since(start).Milliseconds()) // in millisecond
 	fmt.Println(duration)
+	fmt.Println(expectedTimeout)
 	assert.True(t, math.Abs(duration-expectedTimeout) < 0.1*expectedTimeout)
 	// While the timeout event has been put in the channel,
 	// PaceMaker should NOT react on it without the timeout event being processed by the EventHandler

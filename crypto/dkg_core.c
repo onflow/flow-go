@@ -1,7 +1,7 @@
 // +build relic
 
 #include "dkg_include.h"
-#include "bls_include.h"
+
 
 #define N_max 250
 #define N_bits_max 8  // log(250)  
@@ -11,7 +11,21 @@
 // r being the order of G1
 // writes P(x) in out and P(x).g2 in y if y is non NULL
 // x being a small integer
-void Zr_polynomialImage(byte* out, ep2_st* y, const bn_st* a, const int a_size, const byte x){
+void Zr_polynomialImage_export(byte* out, ep2_st* y, const bn_st* a, const int a_size, const byte x){
+    bn_st image;
+    bn_new(&image);
+    Zr_polynomialImage(&image, y, a, a_size, x);
+    // exports the result
+    const int out_size = Fr_BYTES;
+    bn_write_bin(out, out_size, &image);
+    bn_free(&image);
+}
+
+// computes P(x) = a_0 + a_1*x + .. + a_n x^n (mod r)
+// r being the order of G1
+// writes P(x) in out and P(x).g2 in y if y is non NULL
+// x being a small integer
+void Zr_polynomialImage(bn_st* image, ep2_st* y, const bn_st* a, const int a_size, const byte x){
     bn_st r;
     bn_new(&r); 
     g2_get_ord(&r);
@@ -39,9 +53,8 @@ void Zr_polynomialImage(byte* out, ep2_st* y, const bn_st* a, const int a_size, 
         bn_mul_dig(&bn_x, &bn_x, x);
         bn_mod_basic(&bn_x, &bn_x, &r);
     }
-    // exports the result
-    const int out_size = Fr_BYTES;
-    bn_write_bin(out, out_size, &acc); 
+    // copy the result
+    bn_copy(image, &acc); 
 
     // compute y = P(x).g2
     if (y) g2_mul_gen(y, &acc);
@@ -107,7 +120,7 @@ void ep2_vector_write_bin(byte* out, const ep2_st* A, const int len) {
     const int size = (G2_BYTES/(SERIALIZATION+1));
     byte* p = out;
     for (int i=0; i<len; i++){
-        _ep2_write_bin_compact(p, &A[i], size);
+        ep2_write_bin_compact(p, &A[i], size);
         p += size;
     }
 }
@@ -136,7 +149,7 @@ int verifyshare(const bn_st* x, const ep2_st* y) {
 
 // computes the sum of the array elements x and writes the sum in jointx
 // the sum is computed in Zr
-void sumScalarVector(bn_st* jointx, bn_st* x, int len) {
+void bn_sum_vector(bn_st* jointx, bn_st* x, int len) {
     bn_st r;
     bn_new(&r); 
     g2_get_ord(&r);
@@ -152,7 +165,7 @@ void sumScalarVector(bn_st* jointx, bn_st* x, int len) {
 
 // computes the sum of the array elements y and writes the sum in jointy
 // the sum is computed in G2
-void sumPointG2Vector(ep2_st* jointy, ep2_st* y, int len){
+void ep2_sum_vector(ep2_st* jointy, ep2_st* y, int len){
     ep2_set_infty(jointy);
     for (int i=0; i<len; i++){
         ep2_add_projc(jointy, jointy, &y[i]);

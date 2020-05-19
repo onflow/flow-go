@@ -12,14 +12,14 @@ type Identifiers struct {
 }
 
 // Add provides a mock function with given fields: id
-func (_m *Identifiers) Add(id flow.Identifier) error {
+func (_m *Identifiers) Add(id flow.Identifier) bool {
 	ret := _m.Called(id)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) error); ok {
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
 		r0 = rf(id)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0

@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 )
@@ -27,7 +28,8 @@ func GenerateAccount0PrivateKey(seed []byte) (flow.AccountPrivateKey, error) {
 }
 
 func GenerateExecutionState(dbDir string, priv flow.AccountPrivateKey) (flow.StateCommitment, error) {
-	ledgerStorage, err := ledger.NewTrieStorage(dbDir)
+	metricsCollector := &metrics.NoopCollector{}
+	ledgerStorage, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 	defer ledgerStorage.CloseStorage()
 	if err != nil {
 		return nil, err
@@ -53,11 +55,8 @@ func bootstrapLedger(ledger storage.Ledger, priv flow.AccountPrivateKey) (flow.S
 }
 
 func createRootAccount(view *delta.View, privateKey flow.AccountPrivateKey) error {
-	publicKeyBytes, err := flow.EncodeAccountPublicKey(privateKey.PublicKey(1000))
-	if err != nil {
-		return fmt.Errorf("cannot encode public key of hardcoded private key: %w", err)
-	}
-	_, err = virtualmachine.CreateAccountInLedger(view, [][]byte{publicKeyBytes})
+	ledgerAccess := virtualmachine.LedgerDAL{Ledger: view}
+	_, err := ledgerAccess.CreateAccountInLedger([]flow.AccountPublicKey{privateKey.PublicKey(1000)})
 	if err != nil {
 		return fmt.Errorf("error while creating account in ledger: %w", err)
 	}

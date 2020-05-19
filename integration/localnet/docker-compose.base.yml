@@ -1,0 +1,76 @@
+version: '3.7'
+services:
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "6831:6831/udp"
+      - "16686:16686"
+
+  prom:
+    image: prom/prometheus:latest
+    volumes:
+      - ./conf/prometheus.yaml:/etc/prometheus/prometheus.yaml
+      - ./targets.nodes.json:/etc/prometheus/targets.nodes.json
+    command: "--config.file=/etc/prometheus/prometheus.yaml --storage.tsdb.path=/prometheus"
+    ports:
+      - 9090:9090
+    depends_on:
+      - exporter
+    environment:
+      - LOGSPOUT=ignore
+
+  exporter:
+    image: prom/node-exporter:latest
+    ports:
+      - "9100:9100"
+    environment:
+      - LOGSPOUT=ignore
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - LOGSPOUT=ignore
+    depends_on:
+      - prom
+
+  kibana:
+    image: kibana:7.0.1
+    environment:
+      - LOGSPOUT=ignore
+    depends_on:
+      - elasticsearch
+    ports:
+      - '5601:5601'
+
+  elasticsearch:
+    image: elasticsearch:7.0.1
+    environment:
+      - LOGSPOUT=ignore
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - ./conf/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+
+  logstash:
+    image: logstash:7.0.1
+    environment:
+      - LOGSPOUT=ignore
+    depends_on:
+      - elasticsearch
+    ports:
+      - "9600:9600"
+      - "6000:6000"
+    volumes:
+      - ./conf/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+      - ./conf/logstash/pipeline/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+
+  logspout:
+    image: gliderlabs/logspout
+    command: "syslog+udp://logstash:6000"
+    depends_on:
+      - logstash
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"

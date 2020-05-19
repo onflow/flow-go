@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/dchest/siphash"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
@@ -27,6 +28,7 @@ type Network struct {
 	me      module.Local
 	mw      middleware.Middleware
 	top     middleware.Topology
+	metrics module.NetworkMetrics
 	engines map[uint8]network.Engine
 	rcache  *cache.RcvCache // used to deduplicate incoming messages
 	fanout  int             // used to determine number of nodes' neighbors on overlay
@@ -43,7 +45,9 @@ func NewNetwork(
 	me module.Local,
 	mw middleware.Middleware,
 	csize int,
-	top middleware.Topology) (*Network, error) {
+	top middleware.Topology,
+	metrics module.NetworkMetrics,
+) (*Network, error) {
 
 	rcache, err := cache.NewRcvCache(csize)
 	if err != nil {
@@ -62,6 +66,7 @@ func NewNetwork(
 		rcache:  rcache,
 		fanout:  fanout,
 		top:     top,
+		metrics: metrics,
 	}
 
 	o.SetIDs(ids)
@@ -75,7 +80,7 @@ func (n *Network) Ready() <-chan struct{} {
 	go func() {
 		err := n.mw.Start(n)
 		if err != nil {
-			n.logger.Err(err).Msg("failed to start middleware")
+			n.logger.Fatal().Err(err).Msg("failed to start middleware")
 		}
 		close(ready)
 	}()
@@ -156,8 +161,13 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 	// checks the cache for deduplication
 	if n.rcache.Seen(message.EventID, message.ChannelID) {
 		// drops duplicate message
-		n.logger.Debug().Bytes("event ID", message.EventID).
-			Msg(" dropping message due to duplication")
+		channelName := engine.ChannelName(uint8(message.ChannelID))
+		n.logger.Debug().
+			Str("channel", channelName).
+			Hex("sender_id", senderID[:]).
+			Hex("event_id", message.EventID).
+			Msg("dropping message due to duplication")
+		n.metrics.NetworkDuplicateMessagesDropped(channelName)
 		return nil
 	}
 	n.rcache.Add(message.EventID, message.ChannelID)
@@ -175,12 +185,9 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 		return fmt.Errorf("could not decode event: %w", err)
 	}
 
-	// call the engine with the message payload
-	err = en.Process(senderID, decodedMessage)
-	if err != nil {
-		n.logger.Error().Str("sender", senderID.String()).Uint8("channel", channelID).Err(err)
-		return fmt.Errorf("failed to process message from %s: %w", senderID.String(), err)
-	}
+	// call the engine asynchronously with the message payload
+	en.Submit(senderID, decodedMessage)
+
 	return nil
 }
 
@@ -193,7 +200,18 @@ func (n *Network) genNetworkMessage(channelID uint8, event interface{}, targetID
 	}
 
 	// use a hash with an engine-specific salt to get the payload hash
-	sip := siphash.New([]byte("libp2ppacking" + fmt.Sprintf("%03d", channelID)))
+	h := hash.NewSHA3_384()
+	_, err = h.Write([]byte("libp2ppacking" + fmt.Sprintf("%03d", channelID)))
+	if err != nil {
+		return nil, errors.Wrap(err, "could not hash channel ID as salt")
+	}
+
+	_, err = h.Write(payload)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not hash event")
+	}
+
+	payloadHash := h.SumHash()
 
 	var emTargets [][]byte
 	for _, targetID := range targetIDs {
@@ -208,7 +226,7 @@ func (n *Network) genNetworkMessage(channelID uint8, event interface{}, targetID
 	// cast event to a libp2p.Message
 	msg := &message.Message{
 		ChannelID: uint32(channelID),
-		EventID:   sip.Sum(payload),
+		EventID:   payloadHash,
 		OriginID:  originID,
 		TargetIDs: emTargets,
 		Payload:   payload,

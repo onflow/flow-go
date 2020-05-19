@@ -15,7 +15,7 @@ import (
 func WithMetricsServer(f func(logger zerolog.Logger)) {
 	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
 	port := 3030
-	server := metrics.NewServer(logger, uint(port))
+	server := metrics.NewServer(logger, uint(port), true)
 	exitSig := make(chan os.Signal, 1)
 	signal.Notify(exitSig, os.Interrupt, syscall.SIGTERM)
 

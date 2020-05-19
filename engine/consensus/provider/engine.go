@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -22,22 +23,22 @@ import (
 // to create a different underlying protocol for consensus nodes, which have a
 // higher priority to receive block proposals, and other nodes
 type Engine struct {
-	unit    *engine.Unit    // used for concurrency & shutdown
-	log     zerolog.Logger  // used to log relevant actions with context
-	metrics module.Metrics  // used to trace the duration of certain operations for metrics
-	con     network.Conduit // used to talk to other nodes on the network
-	state   protocol.State  // used to access the  protocol state
-	me      module.Local    // used to access local node information
+	unit    *engine.Unit         // used for concurrency & shutdown
+	log     zerolog.Logger       // used to log relevant actions with context
+	message module.EngineMetrics // used to track sent & received messages
+	con     network.Conduit      // used to talk to other nodes on the network
+	state   protocol.State       // used to access the  protocol state
+	me      module.Local         // used to access local node information
 }
 
 // New creates a new block provider engine.
-func New(log zerolog.Logger, metrics module.Metrics, net module.Network, state protocol.State, me module.Local) (*Engine, error) {
+func New(log zerolog.Logger, message module.EngineMetrics, net module.Network, state protocol.State, me module.Local) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		unit:    engine.NewUnit(),
 		log:     log.With().Str("engine", "provider").Logger(),
-		metrics: metrics,
+		message: message,
 		state:   state,
 		me:      me,
 	}
@@ -101,9 +102,9 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // given origin ID.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	var err error
-	switch entity := event.(type) {
+	switch ev := event.(type) {
 	case *messages.BlockProposal:
-		err = e.onBlockProposal(originID, entity)
+		err = e.onBlockProposal(originID, ev)
 	default:
 		err = errors.Errorf("invalid event type (%T)", event)
 	}
@@ -127,11 +128,6 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 	log.Info().Msg("block proposal submitted for propagation")
 
-	// reports Metrics C4: Block Received by CCL → Block Seal in finalized block
-	// TODO: move this to the correct location; this is not where the CCL receives
-	// blocks, this is where the CCL forwards blocks to other node roles
-	e.metrics.StartBlockToSeal(proposal.Header.ID())
-
 	// currently, only accept blocks that come from our local consensus
 	localID := e.me.NodeID()
 	if originID != localID {
@@ -149,6 +145,8 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	if err != nil {
 		return errors.Wrap(err, "could not broadcast block")
 	}
+
+	e.message.MessageSent(metrics.EngineConsensusProvider, metrics.MessageBlockProposal)
 
 	log.Info().Msg("block proposal propagated to non-consensus nodes")
 

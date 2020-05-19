@@ -15,7 +15,13 @@ func runDKG(nodes []model.NodeInfo) model.DKGData {
 	log.Info().Msgf("read %v node infos for DKG", n)
 
 	log.Debug().Msgf("will run DKG")
-	dkgData, err := run.RunDKG(n, generateRandomSeeds(n))
+	var dkgData model.DKGData
+	var err error
+	if flagFastKG {
+		dkgData, err = run.RunDKG(n, generateRandomSeeds(n))
+	} else {
+		dkgData, err = run.RunFastKG(n, generateRandomSeed())
+	}
 	if err != nil {
 		log.Fatal().Err(err).Msg("error running DKG")
 	}
@@ -27,10 +33,10 @@ func runDKG(nodes []model.NodeInfo) model.DKGData {
 
 		log.Debug().Int("i", i).Str("nodeId", nodeID.String()).Msg("assembling dkg data")
 
-		writeJSON(fmt.Sprintf(model.FilenameRandomBeaconPriv, nodeID), participant.Private())
+		writeJSON(fmt.Sprintf(model.PathRandomBeaconPriv, nodeID), participant.Private())
 	}
 
-	writeJSON(model.FilenameDKGDataPub, dkgData.Public())
+	writeJSON(model.PathDKGDataPub, dkgData.Public())
 
 	return dkgData
 }
