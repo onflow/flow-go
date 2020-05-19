@@ -2,7 +2,6 @@ package ingest_test
 
 import (
 	"bytes"
-	"errors"
 	"math/rand"
 	"sync"
 	"testing"
@@ -565,107 +564,6 @@ func (suite *LightIngestTestSuite) TestHandleCollection() {
 
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
-}
-
-func (suite *LightIngestTestSuite) TestHandleCollection_Untracked() {
-	// Locks to run the tests sequentially
-	suite.Lock()
-	defer suite.Unlock()
-
-	eng := suite.TestNewLightEngine()
-
-	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(false).Once()
-
-	// mocks collection has not been ingested
-	suite.ingestedCollectionIDs.On("Has", suite.collection.ID()).Return(false)
-
-	// mocks collection does not exist in authenticated and pending collections
-	suite.collections.On("Has", suite.collection.ID()).Return(false)
-
-	err := eng.Process(suite.collIdentity.NodeID, suite.collection)
-	suite.Assert().Nil(err)
-
-	suite.collections.AssertExpectations(suite.T())
-	suite.collectionTrackers.AssertExpectations(suite.T())
-
-	// verifier should not be called
-	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
-	// does not expect that the collection be added to the mempool
-	suite.collections.AssertNotCalled(suite.T(), "Add", suite.collection)
-	// does not expect tracker to be removed from trackers mempool
-	suite.collectionTrackers.AssertNotCalled(suite.T(), "Rem", suite.collection.ID())
-}
-
-// TestHandleCollection_UnstakedSender evaluates receiving a tracked collection from an unstaked node
-// process method should return an error
-// TODO pending collections cleanup
-// https://github.com/dapperlabs/flow-go/issues/2966
-func (suite *LightIngestTestSuite) TestHandleCollection_UnstakedSender() {
-	// locks to run the tests sequentially
-	suite.Lock()
-	defer suite.Unlock()
-
-	eng := suite.TestNewLightEngine()
-
-	// mock the receipt coming from an unstaked node
-	unstakedIdentity := unittest.IdentifierFixture()
-	suite.ss.On("Identity", unstakedIdentity).Return(nil, errors.New("")).Once()
-
-	// mocks a tracker for the collection
-	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(true)
-	suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, true)
-
-	// mocks collection has not been ingested
-	suite.ingestedCollectionIDs.On("Has", suite.collection.ID()).Return(false)
-
-	// mocks collection does not exist in authenticated and pending collections
-	suite.collections.On("Has", suite.collection.ID()).Return(false)
-
-	err := eng.Process(unstakedIdentity, suite.collection)
-	suite.Assert().Error(err)
-
-	// should not add collection to mempool
-	suite.collections.AssertNotCalled(suite.T(), "Add", suite.collection)
-
-	// should not call verifier
-	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
-
-}
-
-// TestHandleCollection_UnstakedSender evaluates receiving a tracked collection from an unstaked node
-// process method should return an error
-func (suite *LightIngestTestSuite) TestHandleCollection_SenderWithWrongRole() {
-	invalidRoles := []flow.Role{flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification, flow.RoleAccess}
-
-	for _, role := range invalidRoles {
-		// locks to run the test sequentially
-		suite.Lock()
-
-		// refresh test state in between each loop
-		suite.SetupTest()
-		eng := suite.TestNewLightEngine()
-
-		// mock the collection coming from the invalid role
-		invalidIdentity := unittest.IdentityFixture(unittest.WithRole(role))
-		suite.ss.On("Identity", invalidIdentity.NodeID).Return(invalidIdentity, nil).Once()
-		// mocks a tracker for the collection
-		suite.collectionTrackers.On("Has", suite.collection.ID()).Return(true)
-		suite.collectionTrackers.On("ByCollectionID", suite.collection.ID()).Return(suite.collTracker, true)
-
-		// mocks collection has not been ingested
-		suite.ingestedCollectionIDs.On("Has", suite.collection.ID()).Return(false)
-
-		// mocks collection does not exist in authenticated and pending collections
-		suite.collections.On("Has", suite.collection.ID()).Return(false)
-
-		err := eng.Process(invalidIdentity.NodeID, suite.collection)
-		suite.Assert().Error(err)
-
-		// should not add collection to mempool
-		suite.collections.AssertNotCalled(suite.T(), "Add", suite.collection)
-
-		suite.Unlock()
-	}
 }
 
 // TestHandleCollection_IngestedCollection evaluates the happy path of submitting a collection an already ingested chunk
