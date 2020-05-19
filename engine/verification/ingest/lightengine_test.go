@@ -161,7 +161,7 @@ func (suite *LightIngestTestSuite) SetupTest() {
 // TestNewLightEngine verifies the establishment of the network registration upon
 // creation of an instance of LightIngestEngine using the New method
 // It also returns an instance of new engine to be used in the later tests
-func (suite *LightIngestTestSuite) TestNewLightEngine() *ingest.LightEngine {
+func (suite *LightIngestTestSuite) TestNewLightEngine() *ingest.Engine {
 	e, err := ingest.NewLightEngine(zerolog.Logger{},
 		suite.net,
 		suite.state,
@@ -560,7 +560,7 @@ func (suite *LightIngestTestSuite) TestVerifyReady() {
 	}
 }
 
-// TestChunkDataPackTracker_UntrackedChunkDataPack tests that ingest engine process method returns an error
+// TestChunkDataPackTracker_UntrackedChunkDataPack tests that LightIngestEngine process method returns an error
 // if it receives a ChunkDataPackResponse that does not have any tracker in the engine's mempool
 func (suite *LightIngestTestSuite) TestChunkDataPackTracker_UntrackedChunkDataPack() {
 	// locks to run the tests sequentially
@@ -606,8 +606,6 @@ func (suite *LightIngestTestSuite) TestChunkDataPackTracker_HappyPath() {
 
 	// mocks tracker to return the tracker for the chunk data pack
 	suite.chunkDataPackTrackers.On("Has", suite.chunkDataPack.ChunkID).Return(true).Once()
-	suite.chunkDataPackTrackers.On("ByChunkID", suite.chunkDataPack.ChunkID).Return(suite.chunkTracker, true).Once()
-	suite.ss.On("Identity", suite.execIdentity.NodeID).Return(suite.execIdentity, nil)
 
 	// engine should not already have the chunk data pack
 	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ChunkID).Return(false)
