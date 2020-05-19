@@ -53,9 +53,10 @@ RUN chmod a+x /app/app
 ## (3) Add the statically linked binary to a distroless image
 FROM gcr.io/distroless/base as production
 
-COPY --from=build-production /app/app /bin/app
+ARG TARGET
+COPY --from=build-production /app/app /bin/${TARGET}
 
-ENTRYPOINT ["/bin/app"]
+ENTRYPOINT ["/bin/${TARGET}"]
 
 
 FROM build-env as build-debug
@@ -63,7 +64,7 @@ WORKDIR /app
 RUN --mount=type=ssh \
     --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags "-extldflags -static"  -gcflags="all=-N -l" -o ./app ./cmd/${TARGET}
+    GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build --tags relic -ldflags "-extldflags -static"  -gcflags="all=-N -l" -o ./app ./cmd/${TARGET}
 
 RUN chmod a+x /app/app
 
@@ -71,9 +72,10 @@ FROM golang:1.13 as debug
 
 RUN go get -u github.com/go-delve/delve/cmd/dlv
 
-COPY --from=build-debug /app/app /bin/app
+ARG TARGET
+COPY --from=build-debug /app/app /bin/${TARGET}
 
-ENTRYPOINT ["dlv", "--listen=:2345", "--headless=true", "--api-version=2", "--accept-multiclient", "exec", "/bin/app"]
+ENTRYPOINT ["dlv", "--listen=:2345", "--headless=true", "--api-version=2", "--accept-multiclient", "exec", "/bin/${TARGET}"]
 
 FROM build-env as build-production-nocgo
 WORKDIR /app
@@ -87,6 +89,7 @@ RUN chmod a+x /app/app
 ## (3) Add the statically linked binary to a distroless image
 FROM gcr.io/distroless/base as production-nocgo
 
-COPY --from=build-production-nocgo /app/app /bin/app
+ARG TARGET
+COPY --from=build-production-nocgo /app/app /bin/${TARGET}
 
-ENTRYPOINT ["/bin/app"]
+ENTRYPOINT ["/bin/${TARGET}"]
