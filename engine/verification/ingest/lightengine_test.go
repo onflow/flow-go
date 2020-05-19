@@ -3,7 +3,6 @@ package ingest_test
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"math/rand"
 	"sync"
 	"testing"
@@ -346,7 +345,7 @@ func (suite *LightIngestTestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
 }
 
-// TestHandleReceipt_RetryMissingCollection evaluates that when ingest engine has a missing collections with
+// TestHandleReceipt_RetryMissingCollection evaluates that when LightIngestEngine has a missing collections with
 // a tracker registered, it retries its request (`failureThreshold`)-many times and then drops it.
 func (suite *LightIngestTestSuite) TestHandleReceipt_RetryMissingCollection() {
 	// locks to run the test sequentially
@@ -419,7 +418,7 @@ func (suite *LightIngestTestSuite) TestHandleReceipt_RetryMissingCollection() {
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
 }
 
-// TestHandleReceipt_RetryMissingChunkDataPack evaluates that when ingest engine has a missing chunk data pack with
+// TestHandleReceipt_RetryMissingChunkDataPack evaluates that when LightIngestEngine has a missing chunk data pack with
 // a tracker registered, it retries its request (`failureThreshold` - 1)-many times and then drops it.
 // The -1 is to account for the initial request of the chunk data pack directly without registering the tracker.
 func (suite *LightIngestTestSuite) TestHandleReceipt_RetryMissingChunkDataPack() {
@@ -535,74 +534,6 @@ func (suite *LightIngestTestSuite) TestIngestedChunk() {
 
 	// chunk data pack should not be tried to be stored in the mempool
 	suite.chunkDataPacks.AssertNotCalled(suite.T(), "Add", testifymock.Anything)
-}
-
-// TestHandleReceipt_UnstakedSender evaluates sending an execution receipt from an unstaked node
-// it should go to the pending receipts and (later on) dropped from the cache
-// Todo dropping unauthenticated receipts from cache
-// https://github.com/dapperlabs/flow-go/issues/2966
-func (suite *LightIngestTestSuite) TestHandleReceipt_UnstakedSender() {
-	// locks to run the test sequentially
-	suite.Lock()
-	defer suite.Unlock()
-
-	eng := suite.TestNewLightEngine()
-
-	// mock the receipt coming from an unstaked node
-	unstakedIdentity := unittest.IdentifierFixture()
-	suite.ss.On("Identity", unstakedIdentity).Return(nil, fmt.Errorf("unstaked node")).Once()
-	// engine has not yet ingested the result of this receipt
-	suite.ingestedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
-
-	// receipt should go to the pending receipts mempool
-	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{}).Once()
-	suite.blockStorage.On("ByID", suite.block.ID()).Return(nil, errors.New("dummy error")).Once()
-
-	err := eng.Process(unstakedIdentity, suite.receipt)
-	require.NoError(suite.T(), err)
-
-	// receipt should not be added
-	suite.receipts.AssertNotCalled(suite.T(), "Add", suite.receipt)
-
-	// Todo (depends on handling edge cases): adding network call for requesting block of receipt from consensus nodes
-
-	// verifier should not be called
-	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
-}
-
-// TestHandleReceipt_SenderWithWrongRole evaluates sending an execution receipt from a staked
-// node with a role rather than execution node discards that immediately
-func (suite *LightIngestTestSuite) TestHandleReceipt_SenderWithWrongRole() {
-	invalidRoles := []flow.Role{flow.RoleConsensus, flow.RoleCollection, flow.RoleVerification, flow.RoleAccess}
-
-	for _, role := range invalidRoles {
-		suite.Run(fmt.Sprintf("role: %s", role), func() {
-			// locks to run the test cases sequentially
-			suite.Lock()
-			defer suite.Unlock()
-
-			// refresh test state in between each loop
-			suite.SetupTest()
-			eng := suite.TestNewLightEngine()
-
-			// mock the receipt coming from the invalid role
-			invalidIdentity := unittest.IdentityFixture(unittest.WithRole(role))
-			suite.ss.On("Identity", invalidIdentity.NodeID).Return(invalidIdentity, nil)
-
-			receipt := unittest.ExecutionReceiptFixture()
-
-			// process should fail
-			err := eng.Process(invalidIdentity.NodeID, &receipt)
-			suite.Assert().Error(err)
-
-			// receipt should not be added
-			suite.receipts.AssertNotCalled(suite.T(), "Add", &receipt)
-
-			// verifier should not be called
-			suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
-		})
-	}
-
 }
 
 // TestHandleCollection_Tracked evaluates receiving a tracked collection without any other receipt-dependent resources
