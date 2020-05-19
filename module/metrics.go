@@ -14,6 +14,9 @@ type NetworkMetrics interface {
 	// Network Metrics
 	// NetworkMessageReceived size in bytes and count of the network message received
 	NetworkMessageReceived(sizeBytes int, topic string)
+
+	// NetworkDuplicateMessagesDropped counts number of messages dropped due to duplicate detection
+	NetworkDuplicateMessagesDropped(topic string)
 }
 
 type EngineMetrics interface {
