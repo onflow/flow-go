@@ -290,7 +290,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			Msg("broadcast proposal from hotstuff")
 
 		e.engMetrics.MessageSent(metrics.EngineProposal, metrics.MessageClusterBlockProposal)
-		e.colMetrics.CollectionProposed(payload.Collection.Light())
+		e.colMetrics.ClusterBlockProposed(cluster.FromProposal(msg))
 	})
 
 	return nil
@@ -357,7 +357,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	e.hotstuff.SubmitProposal(header, parent.View)
 
 	// report proposed (case that we are follower)
-	e.colMetrics.CollectionProposed(proposal.Payload.Collection.Light())
+	e.colMetrics.ClusterBlockProposed(cluster.FromProposal(proposal))
 
 	blockID := header.ID()
 

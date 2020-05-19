@@ -3,6 +3,7 @@ package metrics
 const (
 	LabelChannel  = "topic"
 	LabelChain    = "chain"
+	LabelStatus   = "status"
 	EngineLabel   = "engine"
 	LabelResource = "resource"
 	LabelMessage  = "message"
@@ -10,6 +11,11 @@ const (
 
 const (
 	ChannelOneToOne = "OneToOne"
+)
+
+const (
+	StatusValid   = "valid"
+	StatusInvalid = "invalid"
 )
 
 const (

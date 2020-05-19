@@ -183,7 +183,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// if our cluster is responsible for the transaction, store it
 	if localCluster.Fingerprint() == txCluster.Fingerprint() {
 		_ = e.pool.Add(tx)
-		e.colMetrics.TransactionReceived(tx.ID())
+		e.colMetrics.TransactionIngested(tx.ID())
 		log.Debug().Msg("added transaction to pool")
 	}
 

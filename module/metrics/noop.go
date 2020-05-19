@@ -47,7 +47,7 @@ func (nc *NoopCollector) CountSkipped()                                         
 func (nc *NoopCollector) CountTimeout()                                             {}
 func (nc *NoopCollector) SetTimeout(duration time.Duration)                         {}
 func (nc *NoopCollector) TransactionReceived(txID flow.Identifier)                  {}
-func (nc *NoopCollector) CollectionProposed(collection flow.LightCollection)        {}
+func (nc *NoopCollector) ClusterBlockProposed(collection flow.LightCollection)      {}
 func (nc *NoopCollector) CollectionGuaranteed(collection flow.LightCollection)      {}
 func (nc *NoopCollector) PendingClusterBlocks(n uint)                               {}
 func (nc *NoopCollector) StartCollectionToFinalized(collectionID flow.Identifier)   {}
