@@ -26,7 +26,7 @@ func NewServer(log zerolog.Logger, port uint, enableProfilerEndpoint bool) *Serv
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 	if enableProfilerEndpoint {
-		mux.Handle("/debug", http.DefaultServeMux)
+		mux.Handle("/debug/pprof/", http.DefaultServeMux)
 	}
 
 	m := &Server{
