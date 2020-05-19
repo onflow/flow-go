@@ -4,7 +4,6 @@ package cluster
 
 import (
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
 )
 
 func Genesis() *Block {
@@ -50,11 +49,4 @@ type PendingBlock struct {
 	OriginID flow.Identifier
 	Header   *flow.Header
 	Payload  *Payload
-}
-
-func FromProposal(proposal *messages.ClusterBlockProposal) *Block {
-	return &Block{
-		Header:  proposal.Header,
-		Payload: proposal.Payload,
-	}
 }
