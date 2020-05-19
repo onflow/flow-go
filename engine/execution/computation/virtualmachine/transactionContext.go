@@ -261,7 +261,7 @@ func (r *TransactionContext) GetCurrentBlockHeight() uint64 {
 }
 
 // GetBlockAtHeight returns the block at the given height.
-func (r *TransactionContext) GetBlockAtHeight(height uint64) (hash [32]byte, timestamp int64, exists bool) {
+func (r *TransactionContext) GetBlockAtHeight(height uint64) (hash runtime.BlockHash, timestamp int64, exists bool) {
 	block, err := r.blocks.ByHeight(height)
 	if errors.Is(err, storage.ErrNotFound) {
 		return
@@ -270,7 +270,7 @@ func (r *TransactionContext) GetBlockAtHeight(height uint64) (hash [32]byte, tim
 			Msg("unexpected failure of GetBlockAtHeight")
 		panic(err)
 	}
-	return block.ID(), block.Header.Timestamp.UnixNano(), true
+	return runtime.BlockHash(block.ID()), block.Header.Timestamp.UnixNano(), true
 }
 
 func (r *TransactionContext) isValidSigningAccount(address runtime.Address) bool {

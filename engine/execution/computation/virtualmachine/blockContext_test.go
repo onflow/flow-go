@@ -10,8 +10,10 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto"
@@ -302,6 +304,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 	block1 := unittest.BlockFixture()
 	block2 := unittest.BlockWithParentFixture(block1.Header)
+	block3 := unittest.BlockWithParentFixture(block2.Header)
 
 	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
 	require.NoError(t, err)
@@ -309,6 +312,8 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 	bc := vm.NewBlockContext(block1.Header, blocks)
 	blocks.On("ByHeight", block1.Header.Height).Return(&block1, nil)
 	blocks.On("ByHeight", block2.Header.Height).Return(&block2, nil)
+	type logPanic struct{}
+	blocks.On("ByHeight", block3.Header.Height).Run(func(args mock.Arguments) { panic(logPanic{}) })
 
 	t.Run("works as transaction", func(t *testing.T) {
 		tx := flow.NewTransactionBody().
@@ -366,6 +371,48 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 			float64(block1.Header.Timestamp.Unix())), result.Logs[0])
 		assert.Equal(t, fmt.Sprintf("Block(height: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height, block2.ID(),
 			float64(block2.Header.Timestamp.Unix())), result.Logs[1])
+	})
+
+	t.Run("panics if external function panics in transaction", func(t *testing.T) {
+		tx := flow.NewTransactionBody().
+			SetScript([]byte(`
+				transaction {
+					execute {
+						let block = getCurrentBlock()
+						let nextBlock = getBlock(at: block.height + UInt64(2))
+					}
+				}
+			`))
+
+		err := execTestutil.SignTransactionByRoot(tx, 0)
+		require.NoError(t, err)
+
+		ledger, err := execTestutil.RootBootstrappedLedger()
+		require.NoError(t, err)
+
+		assert.PanicsWithValue(t, interpreter.ExternalError{
+			Recovered: logPanic{},
+		}, func() {
+			_, _ = bc.ExecuteTransaction(ledger, tx)
+		})
+	})
+
+	t.Run("panics if external function panics in script", func(t *testing.T) {
+		script := []byte(`
+			pub fun main() {
+				let block = getCurrentBlock()
+				let nextBlock = getBlock(at: block.height + UInt64(2))
+			}
+		`)
+
+		ledger, err := execTestutil.RootBootstrappedLedger()
+		require.NoError(t, err)
+
+		assert.PanicsWithValue(t, interpreter.ExternalError{
+			Recovered: logPanic{},
+		}, func() {
+			_, _ = bc.ExecuteScript(ledger, script)
+		})
 	})
 }
 
