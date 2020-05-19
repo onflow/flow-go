@@ -339,6 +339,18 @@ func ExecutionResultFixture() *flow.ExecutionResult {
 	}
 }
 
+func ResultForBlockFixture(block *flow.Block) *flow.ExecutionResult {
+	return &flow.ExecutionResult{
+		ExecutionResultBody: flow.ExecutionResultBody{
+			PreviousResultID: IdentifierFixture(),
+			BlockID:          block.Header.ID(),
+			FinalStateCommit: StateCommitmentFixture(),
+			Chunks:           ChunksFixture(uint(len(block.Payload.Guarantees))),
+		},
+		Signatures: SignaturesFixture(6),
+	}
+}
+
 func WithExecutionResultID(id flow.Identifier) func(*flow.ResultApproval) {
 	return func(ra *flow.ResultApproval) {
 		ra.Body.ExecutionResultID = id
@@ -530,6 +542,16 @@ func ChunkFixture() *flow.Chunk {
 		Index:    0,
 		EndState: StateCommitmentFixture(),
 	}
+}
+
+func ChunksFixture(n uint) []*flow.Chunk {
+	chunks := make([]*flow.Chunk, 0, n)
+	for i := uint64(0); i < uint64(n); i++ {
+		chunk := ChunkFixture()
+		chunk.Index = i
+		chunks = append(chunks, chunk)
+	}
+	return chunks
 }
 
 func SignatureFixture() crypto.Signature {
