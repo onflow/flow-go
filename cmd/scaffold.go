@@ -189,7 +189,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 
 func (fnb *FlowNodeBuilder) enqueueMetricsServerInit() {
 	fnb.Component("metrics server", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
-		server := metrics.NewServer(fnb.Logger, fnb.BaseConfig.metricsPort)
+		server := metrics.NewServer(fnb.Logger, fnb.BaseConfig.metricsPort, fnb.BaseConfig.profilerEnabled)
 		return server, nil
 	})
 }
