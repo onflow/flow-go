@@ -58,10 +58,8 @@ func NewLightEngine(
 	state protocol.State,
 	me module.Local,
 	verifierEng network.Engine,
-	authReceipts mempool.Receipts,
-	pendingReceipts mempool.PendingReceipts,
-	authCollections mempool.Collections,
-	pendingCollections mempool.PendingCollections,
+	receipts mempool.Receipts,
+	collections mempool.Collections,
 	collectionTrackers mempool.CollectionTrackers,
 	chunkDataPacks mempool.ChunkDataPacks,
 	chunkDataPackTrackers mempool.ChunkDataPackTrackers,
@@ -73,18 +71,16 @@ func NewLightEngine(
 	assigner module.ChunkAssigner,
 	requestIntervalMs uint,
 	failureThreshold uint,
-) (*Engine, error) {
+) (*LightEngine, error) {
 
-	e := &Engine{
+	e := &LightEngine{
 		unit:                  engine.NewUnit(),
 		log:                   log,
 		state:                 state,
 		me:                    me,
-		authReceipts:          authReceipts,
-		pendingReceipts:       pendingReceipts,
 		verifierEng:           verifierEng,
-		authCollections:       authCollections,
-		pendingCollections:    pendingCollections,
+		collections:           collections,
+		receipts:              receipts,
 		collectionTrackers:    collectionTrackers,
 		chunkDataPacks:        chunkDataPacks,
 		chunkDataPackTackers:  chunkDataPackTrackers,
