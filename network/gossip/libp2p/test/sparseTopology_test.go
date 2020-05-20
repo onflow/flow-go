@@ -7,13 +7,11 @@ import (
 	"testing"
 	"time"
 
-	golog "github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	gologging "github.com/whyrusleeping/go-logging"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
@@ -32,7 +30,6 @@ type SparseTopologyTestSuite struct {
 
 // TestSparseTopologyTestSuite runs all tests in this test suit
 func TestSparseTopologyTestSuite(t *testing.T) {
-	golog.SetAllLoggers(gologging.DEBUG)
 	suite.Run(t, new(SparseTopologyTestSuite))
 }
 
@@ -41,6 +38,7 @@ func TestSparseTopologyTestSuite(t *testing.T) {
 // 0,1,2,3 <-> 3,4,5,6 <-> 6,7,8,9
 // Message sent by a node from one subset should be able to make it to nodes all subsets
 func (stt *SparseTopologyTestSuite) TestSparselyConnectedNetwork() {
+	stt.T().Skip()
 
 	// total number of nodes in the network
 	const count = 9
@@ -88,7 +86,7 @@ func (stt *SparseTopologyTestSuite) TestSparselyConnectedNetwork() {
 // each node does have the ip addresses of all other nodes and could just disregard topology all together and connect
 // to every other node directly making the TestSparselyConnectedNetwork test meaningless
 func (stt *SparseTopologyTestSuite) TestDisjointedNetwork() {
-
+	stt.T().Skip()
 	// total number of nodes in the network
 	const count = 9
 	// total number of subnets (should be less than count)
