@@ -20,15 +20,14 @@ func TestBatchProofEncoderDecoder(t *testing.T) {
 
 	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
 	require.NoError(t, err)
-	rootHash := fStore.GetEmptyRootHash()
 
 	k1 := []byte([]uint8{uint8(1)})
 	v1 := []byte{'A'}
 	keys := [][]byte{k1}
 	values := [][]byte{v1}
-	rootHash, err = fStore.Update(keys, values, rootHash)
+	testTrie, err := fStore.Update(fStore.GetEmptyRootHash(), keys, values)
 	require.NoError(t, err)
-	batchProof, err := fStore.Proofs(keys, rootHash)
+	batchProof, err := fStore.Proofs(testTrie.RootHash(), keys)
 	require.NoError(t, err)
 
 	p, err := proof.DecodeBatchProof(proof.EncodeBatchProof(batchProof))

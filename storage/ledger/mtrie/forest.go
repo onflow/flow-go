@@ -242,7 +242,7 @@ func (f *MForest) Proofs(rootHash []byte, keys [][]byte) (*proof.BatchProof, err
 	// look up for non exisitng keys
 	notFoundKeys := make([][]byte, 0)
 	notFoundValues := make([][]byte, 0)
-	retValues, err := f.Read(keys, rootHash)
+	retValues, err := f.Read(rootHash, keys)
 	if err != nil {
 		return nil, err
 	}
