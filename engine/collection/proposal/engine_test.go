@@ -51,8 +51,9 @@ type Suite struct {
 	builder      *module.Builder
 	finalizer    *module.Finalizer
 	pending      *module.PendingClusterBlockBuffer
+	sync         *module.Synchronization
+	hotstuff     *module.HotStuff
 	eng          *proposal.Engine
-	coldstuff    *module.ColdStuff
 }
 
 func TestProposalEngine(t *testing.T) {
@@ -105,11 +106,12 @@ func (suite *Suite) SetupTest() {
 	suite.pending = new(module.PendingClusterBlockBuffer)
 	suite.pending.On("Size").Return(uint(0))
 	suite.pending.On("PruneByHeight", mock.Anything).Return()
-	suite.coldstuff = new(module.ColdStuff)
+	suite.sync = new(module.Synchronization)
+	suite.hotstuff = new(module.HotStuff)
 
 	eng, err := proposal.New(log, suite.net, suite.me, metrics, metrics, metrics, suite.proto.state, suite.cluster.state, suite.validator, suite.pool, suite.transactions, suite.headers, suite.payloads, suite.pending)
 	require.NoError(suite.T(), err)
-	suite.eng = eng.WithConsensus(suite.coldstuff)
+	suite.eng = eng.WithConsensus(suite.hotstuff).WithSynchronization(suite.sync)
 }
 
 func (suite *Suite) TestHandleProposal() {
@@ -124,8 +126,14 @@ func (suite *Suite) TestHandleProposal() {
 
 	tx := unittest.TransactionBodyFixture()
 
+	// this is a new block
+	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound)
+	suite.pending.On("ByID", block.ID()).Return(nil, false)
+	suite.pending.On("ByID", block.Header.ParentID).Return(nil, false)
+
 	// we have already received and stored the parent
 	suite.headers.On("ByBlockID", parent.ID()).Return(parent.Header, nil)
+	suite.pending.On("ByID", block.Header.ParentID).Return(nil, false)
 	// we have all transactions
 	suite.pool.On("Has", mock.Anything).Return(true)
 	// should store transactions
@@ -137,7 +145,7 @@ func (suite *Suite) TestHandleProposal() {
 	// should extend state with new block
 	suite.cluster.mutator.On("Extend", &block).Return(nil).Once()
 	// should submit to consensus algo
-	suite.coldstuff.On("SubmitProposal", proposal.Header, parent.Header.View).Once()
+	suite.hotstuff.On("SubmitProposal", proposal.Header, parent.Header.View).Once()
 	// we don't have any cached children
 	suite.pending.On("ByParentID", block.ID()).Return(nil, false)
 
@@ -145,7 +153,7 @@ func (suite *Suite) TestHandleProposal() {
 	suite.Assert().Nil(err)
 
 	// assert that the proposal was submitted to consensus algo
-	suite.coldstuff.AssertExpectations(suite.T())
+	suite.hotstuff.AssertExpectations(suite.T())
 }
 
 func (suite *Suite) TestHandleProposalWithUnknownValidTransactions() {
@@ -158,8 +166,13 @@ func (suite *Suite) TestHandleProposalWithUnknownValidTransactions() {
 		Payload: block.Payload,
 	}
 
-	// we have already received and stored the parent
+	// this is a new block
+	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound)
+	suite.pending.On("ByID", block.ID()).Return(nil, false)
+
+	// we have already received and processed the parent
 	suite.headers.On("ByBlockID", parent.ID()).Return(parent.Header, nil)
+	suite.pending.On("ByID", parent.ID()).Return(nil, false)
 	// we are missing all the transactions
 	suite.pool.On("Has", mock.Anything).Return(false)
 	// the missing transactions should be verified
@@ -171,7 +184,7 @@ func (suite *Suite) TestHandleProposalWithUnknownValidTransactions() {
 	// should extend state with new block
 	suite.cluster.mutator.On("Extend", &block).Return(nil).Once()
 	// should submit to consensus algo
-	suite.coldstuff.On("SubmitProposal", proposal.Header, parent.Header.View).Once()
+	suite.hotstuff.On("SubmitProposal", proposal.Header, parent.Header.View).Once()
 	// we don't have any cached children
 	suite.pending.On("ByParentID", block.ID()).Return(nil, false)
 
@@ -183,7 +196,7 @@ func (suite *Suite) TestHandleProposalWithUnknownValidTransactions() {
 	suite.payloads.AssertExpectations(suite.T())
 	// transactions should have been validated
 	suite.validator.AssertExpectations(suite.T())
-	suite.coldstuff.AssertExpectations(suite.T())
+	suite.hotstuff.AssertExpectations(suite.T())
 }
 
 func (suite *Suite) TestHandlePendingProposal() {
@@ -195,20 +208,27 @@ func (suite *Suite) TestHandlePendingProposal() {
 		Payload: block.Payload,
 	}
 
+	// this is a new block
+	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound)
+	suite.pending.On("ByID", block.ID()).Return(nil, false)
+
+	// we have all transactions
+	suite.pool.On("Has", mock.Anything).Return(true)
 	// we do not have the parent yet
 	suite.headers.On("ByBlockID", block.Header.ParentID).Return(nil, realstorage.ErrNotFound)
-	// should request parent block
-	suite.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-	suite.pending.On("Add", mock.Anything).Return(true).Once()
 	suite.pending.On("ByID", block.Header.ParentID).Return(nil, false)
+	// should request parent block
+	suite.sync.On("RequestBlock", block.Header.ParentID)
+	// should add the proposal to pending buffer
+	suite.pending.On("Add", originID, proposal).Return(true).Once()
 
 	err := suite.eng.Process(originID, proposal)
 	suite.Assert().Nil(err)
 
 	// proposal should not have been submitted to consensus algo
-	suite.coldstuff.AssertNotCalled(suite.T(), "SubmitProposal")
+	suite.hotstuff.AssertNotCalled(suite.T(), "SubmitProposal")
 	// parent block should be requested
-	suite.con.AssertExpectations(suite.T())
+	suite.sync.AssertExpectations(suite.T())
 }
 
 func (suite *Suite) TestHandlePendingProposalWithPendingParent() {
@@ -225,6 +245,12 @@ func (suite *Suite) TestHandlePendingProposalWithPendingParent() {
 		Payload: block.Payload,
 	}
 
+	// this is a new block
+	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound)
+	suite.pending.On("ByID", block.ID()).Return(nil, false)
+	// we have all transactions
+	suite.pool.On("Has", mock.Anything).Return(true)
+
 	// we have the parent, it is in pending cache
 	pendingParent := &cluster.PendingBlock{
 		OriginID: originID,
@@ -234,24 +260,17 @@ func (suite *Suite) TestHandlePendingProposalWithPendingParent() {
 	suite.headers.On("ByBlockID", block.Header.ParentID).Return(nil, realstorage.ErrNotFound)
 
 	// should add block to the cache
-	suite.pending.On("Add", mock.Anything).Return(true).Once()
+	suite.pending.On("Add", originID, proposal).Return(true).Once()
 	suite.pending.On("ByID", parent.ID()).Return(pendingParent, true).Once()
 	suite.pending.On("ByID", grandparent.ID()).Return(nil, false).Once()
 	// should send a request for the grandparent
-	suite.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		// assert the right ID was requested manually as we don't know what nonce was used
-		Run(func(args mock.Arguments) {
-			req := args.Get(0).(*messages.ClusterBlockRequest)
-			suite.Assert().Equal(req.BlockID, grandparent.ID())
-		}).
-		Return(nil).
-		Once()
+	suite.sync.On("RequestBlock", grandparent.ID())
 
 	err := suite.eng.Process(originID, proposal)
 	suite.Assert().Nil(err)
 
 	// proposal should not have been submitted to consensus algo
-	suite.coldstuff.AssertNotCalled(suite.T(), "SubmitProposal")
+	suite.hotstuff.AssertNotCalled(suite.T(), "SubmitProposal")
 	// parent block should be requested
 	suite.con.AssertExpectations(suite.T())
 }
@@ -266,24 +285,40 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 		Header:  block.Header,
 		Payload: block.Payload,
 	}
-	tx := unittest.TransactionBodyFixture()
 
-	// we have already received and stored the parent
-	suite.headers.On("ByBlockID", parent.ID()).Return(parent.Header, nil)
-	suite.headers.On("ByBlockID", block.ID()).Return(block.Header, nil)
+	headersDB := make(map[flow.Identifier]*flow.Header)
+	suite.headers.On("ByBlockID", mock.Anything).Return(
+		func(id flow.Identifier) *flow.Header {
+			return headersDB[id]
+		},
+		func(id flow.Identifier) error {
+			_, exists := headersDB[id]
+			if !exists {
+				return realstorage.ErrNotFound
+			}
+			return nil
+		},
+	)
+
+	// this is a new block
+	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound)
+	suite.pending.On("ByID", block.ID()).Return(nil, false)
 	// we have all transactions
 	suite.pool.On("Has", mock.Anything).Return(true)
-	// should store transactions
-	suite.pool.On("ByID", mock.Anything).Return(&tx, true)
-	suite.transactions.On("Store", mock.Anything).Return(nil)
-	// should store payload and header
-	suite.payloads.On("Store", mock.Anything, mock.Anything).Return(nil).Twice()
-	suite.headers.On("Store", mock.Anything).Return(nil).Twice()
+
+	// we have already received and stored the parent
+	headersDB[parent.ID()] = parent.Header
+	suite.pending.On("ByID", parent.ID()).Return(nil, false)
 	// should extend state with new block
-	suite.cluster.mutator.On("Extend", &block).Return(nil).Once()
+	suite.cluster.mutator.On("Extend", &block).
+		Run(func(_ mock.Arguments) {
+			// once we add the block to the state, ensure it is retrievable from storage
+			headersDB[block.ID()] = block.Header
+		}).
+		Return(nil).Once()
 	suite.cluster.mutator.On("Extend", &child).Return(nil).Once()
 	// should submit to consensus algo
-	suite.coldstuff.On("SubmitProposal", mock.Anything, mock.Anything).Twice()
+	suite.hotstuff.On("SubmitProposal", mock.Anything, mock.Anything).Twice()
 	// should return the pending child
 	suite.pending.On("ByParentID", block.ID()).Return([]*cluster.PendingBlock{{
 		OriginID: unittest.IdentifierFixture(),
@@ -297,7 +332,7 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	suite.Assert().Nil(err)
 
 	// assert that the proposal was submitted to consensus algo
-	suite.coldstuff.AssertExpectations(suite.T())
+	suite.hotstuff.AssertExpectations(suite.T())
 }
 
 func (suite *Suite) TestReceiveVote() {
@@ -309,10 +344,10 @@ func (suite *Suite) TestReceiveVote() {
 		SigData: nil,
 	}
 
-	suite.coldstuff.On("SubmitVote", originID, vote.BlockID, vote.View, vote.SigData).Once()
+	suite.hotstuff.On("SubmitVote", originID, vote.BlockID, vote.View, vote.SigData).Once()
 
 	err := suite.eng.Process(originID, vote)
 	suite.Assert().Nil(err)
 
-	suite.coldstuff.AssertExpectations(suite.T())
+	suite.hotstuff.AssertExpectations(suite.T())
 }

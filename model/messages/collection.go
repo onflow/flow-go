@@ -39,18 +39,3 @@ type ClusterBlockVote struct {
 	View    uint64
 	SigData []byte
 }
-
-// ClusterBlockRequest is a request for a block in collection node cluster
-// consensus; effectively a request for a particular collection collection and
-// the associated consensus information.
-type ClusterBlockRequest struct {
-	BlockID flow.Identifier
-	Nonce   uint64
-}
-
-// ClusterBlockResponse  is the response to a collection request. It contains
-// the block proposing the collection.
-type ClusterBlockResponse struct {
-	Proposal *ClusterBlockProposal
-	Nonce    uint64
-}

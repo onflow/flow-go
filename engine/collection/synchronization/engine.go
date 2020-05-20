@@ -13,6 +13,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
+	clustermodel "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/events"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -20,25 +21,26 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/state/cluster"
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-//TODO this is duplicated in collection/synchronization
+//TODO this is duplicated from common/synchronization
 // We should refactor both engines using module/synchronization/core
 
 // Engine is the synchronization engine, responsible for synchronizing chain state.
 type Engine struct {
-	unit     *engine.Unit
-	log      zerolog.Logger
-	metrics  module.EngineMetrics
-	me       module.Local
-	state    protocol.State
-	con      network.Conduit
-	blocks   storage.Blocks
-	comp     network.Engine // compliance engine
-	heights  map[uint64]*Status
-	blockIDs map[flow.Identifier]*Status
+	unit         *engine.Unit
+	log          zerolog.Logger
+	metrics      module.EngineMetrics
+	me           module.Local
+	participants flow.IdentityList
+	state        cluster.State
+	con          network.Conduit
+	blocks       storage.ClusterBlocks
+	comp         network.Engine // compliance layer engine
+	heights      map[uint64]*Status
+	blockIDs     map[flow.Identifier]*Status
 
 	// config parameters
 	pollInterval  time.Duration // how often we poll other nodes for their finalized height
@@ -50,28 +52,30 @@ type Engine struct {
 	maxRequests   uint          // the maximum number of requests we send during each scanning period
 }
 
-// New creates a new consensus propagation engine.
+// New creates a new cluster synchronization engine.
 func New(
 	log zerolog.Logger,
 	metrics module.EngineMetrics,
 	net module.Network,
 	me module.Local,
-	state protocol.State,
-	blocks storage.Blocks,
+	participants flow.IdentityList,
+	state cluster.State,
+	blocks storage.ClusterBlocks,
 	comp network.Engine,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:     engine.NewUnit(),
-		log:      log.With().Str("engine", "synchronization").Logger(),
-		metrics:  metrics,
-		me:       me,
-		state:    state,
-		blocks:   blocks,
-		comp:     comp,
-		heights:  make(map[uint64]*Status),
-		blockIDs: make(map[flow.Identifier]*Status),
+		unit:         engine.NewUnit(),
+		log:          log.With().Str("engine", "cluster_synchronization").Logger(),
+		metrics:      metrics,
+		me:           me,
+		participants: participants.Filter(filter.Not(filter.HasNodeID(me.NodeID()))),
+		state:        state,
+		blocks:       blocks,
+		comp:         comp,
+		heights:      make(map[uint64]*Status),
+		blockIDs:     make(map[flow.Identifier]*Status),
 
 		pollInterval:  8 * time.Second,
 		scanInterval:  2 * time.Second,
@@ -83,7 +87,7 @@ func New(
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.ProtocolSynchronization, e)
+	con, err := net.Register(engine.ProtocolClusterSynchronization, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -172,9 +176,9 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		e.before(metrics.MessageBatchRequest)
 		defer e.after(metrics.MessageBatchRequest)
 		return e.onBatchRequest(originID, ev)
-	case *messages.BlockResponse:
-		e.before(metrics.MessageBlockResponse)
-		defer e.after(metrics.MessageBlockResponse)
+	case *messages.ClusterBlockResponse:
+		e.before(metrics.MessageClusterBlockResponse)
+		defer e.after(metrics.MessageClusterBlockResponse)
 		return e.onBlockResponse(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
@@ -182,13 +186,13 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 }
 
 func (e *Engine) before(msg string) {
-	e.metrics.MessageReceived(metrics.EngineSynchronization, msg)
+	e.metrics.MessageReceived(metrics.EngineClusterSynchronization, msg)
 	e.unit.Lock()
 }
 
 func (e *Engine) after(msg string) {
 	e.unit.Unlock()
-	e.metrics.MessageHandled(metrics.EngineSynchronization, msg)
+	e.metrics.MessageHandled(metrics.EngineClusterSynchronization, msg)
 }
 
 // onSyncRequest processes an outgoing handshake; if we have a higher height, we
@@ -230,7 +234,7 @@ func (e *Engine) onSyncRequest(originID flow.Identifier, req *messages.SyncReque
 		return fmt.Errorf("could not send sync response: %w", err)
 	}
 
-	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageSyncResponse)
+	e.metrics.MessageSent(metrics.EngineClusterSynchronization, metrics.MessageSyncResponse)
 
 	return nil
 }
@@ -273,7 +277,7 @@ func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeReq
 	}
 
 	// get all of the blocks, one by one
-	blocks := make([]*flow.Block, 0, req.ToHeight-req.FromHeight+1)
+	blocks := make([]*clustermodel.Block, 0, req.ToHeight-req.FromHeight+1)
 	for height := req.FromHeight; height <= req.ToHeight; height++ {
 		block, err := e.blocks.ByHeight(height)
 		if errors.Is(err, storage.ErrNotFound) {
@@ -293,7 +297,7 @@ func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeReq
 	}
 
 	// send the response
-	res := &messages.BlockResponse{
+	res := &messages.ClusterBlockResponse{
 		Nonce:  req.Nonce,
 		Blocks: blocks,
 	}
@@ -302,7 +306,7 @@ func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeReq
 		return fmt.Errorf("could not send range response: %w", err)
 	}
 
-	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBlockResponse)
+	e.metrics.MessageSent(metrics.EngineClusterSynchronization, metrics.MessageBlockResponse)
 
 	return nil
 }
@@ -322,7 +326,7 @@ func (e *Engine) onBatchRequest(originID flow.Identifier, req *messages.BatchReq
 	}
 
 	// try to get all the blocks by ID
-	blocks := make([]*flow.Block, 0, len(blockIDs))
+	blocks := make([]*clustermodel.Block, 0, len(blockIDs))
 	for blockID := range blockIDs {
 		block, err := e.blocks.ByID(blockID)
 		if errors.Is(err, storage.ErrNotFound) {
@@ -342,7 +346,7 @@ func (e *Engine) onBatchRequest(originID flow.Identifier, req *messages.BatchReq
 	}
 
 	// send the response
-	res := &messages.BlockResponse{
+	res := &messages.ClusterBlockResponse{
 		Nonce:  req.Nonce,
 		Blocks: blocks,
 	}
@@ -351,13 +355,13 @@ func (e *Engine) onBatchRequest(originID flow.Identifier, req *messages.BatchReq
 		return fmt.Errorf("could not send batch response: %w", err)
 	}
 
-	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBlockResponse)
+	e.metrics.MessageSent(metrics.EngineClusterSynchronization, metrics.MessageBlockResponse)
 
 	return nil
 }
 
 // onBlockResponse processes a response containing a specifically requested block.
-func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) error {
+func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.ClusterBlockResponse) error {
 
 	// process the blocks one by one
 	for _, block := range res.Blocks {
@@ -395,7 +399,7 @@ func (e *Engine) queueByBlockID(blockID flow.Identifier) {
 
 // getRequestStatus retrieves a request status for a block, regardless of
 // whether it was queued by height or by block ID.
-func (e *Engine) getRequestStatus(block *flow.Block) *Status {
+func (e *Engine) getRequestStatus(block *clustermodel.Block) *Status {
 	heightStatus := e.heights[block.Header.Height]
 	idStatus := e.blockIDs[block.ID()]
 
@@ -410,7 +414,7 @@ func (e *Engine) getRequestStatus(block *flow.Block) *Status {
 
 // processIncoming processes an incoming block, so we can take into account the
 // overlap between block IDs and heights.
-func (e *Engine) processIncomingBlock(originID flow.Identifier, block *flow.Block) {
+func (e *Engine) processIncomingBlock(originID flow.Identifier, block *clustermodel.Block) {
 
 	status := e.getRequestStatus(block)
 	// if we never asked for this block, discard it
@@ -430,7 +434,7 @@ func (e *Engine) processIncomingBlock(originID flow.Identifier, block *flow.Bloc
 	e.blockIDs[block.ID()] = status
 	e.heights[block.Header.Height] = status
 
-	synced := &events.SyncedBlock{
+	synced := &events.SyncedClusterBlock{
 		OriginID: originID,
 		Block:    block,
 	}
@@ -484,18 +488,9 @@ func (e *Engine) pollHeight() error {
 		return fmt.Errorf("could not get last finalized header: %w", err)
 	}
 
-	// get all of the consensus nodes from the state
-	identities, err := e.state.Final().Identities(filter.And(
-		filter.HasRole(flow.RoleConsensus),
-		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	))
-	if err != nil {
-		return fmt.Errorf("could not send get consensus identities: %w", err)
-	}
-
 	var errs error
 	// send the request for synchronization
-	for _, targetID := range identities.Sample(3).NodeIDs() {
+	for _, targetID := range e.participants.Sample(3).NodeIDs() {
 
 		req := &messages.SyncRequest{
 			Nonce:  rand.Uint64(),
@@ -506,7 +501,7 @@ func (e *Engine) pollHeight() error {
 			errs = multierror.Append(errs, fmt.Errorf("could not send sync request: %w", err))
 		}
 
-		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageSyncRequest)
+		e.metrics.MessageSent(metrics.EngineClusterSynchronization, metrics.MessageSyncRequest)
 	}
 
 	return errs
@@ -627,16 +622,6 @@ func (e *Engine) sendRequests(heights []uint64, blockIDs []flow.Identifier) erro
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
-	// get all of the consensus nodes from the state
-	// NOTE: we want to request from consensus nodes even on other node roles
-	identities, err := e.state.Final().Identities(filter.And(
-		filter.HasRole(flow.RoleConsensus),
-		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	))
-	if err != nil {
-		return fmt.Errorf("could not send get consensus identities: %w", err)
-	}
-
 	// sort the heights so we can build contiguous ranges more easily
 	sort.Slice(heights, func(i int, j int) bool {
 		return heights[i] < heights[j]
@@ -697,12 +682,12 @@ func (e *Engine) sendRequests(heights []uint64, blockIDs []flow.Identifier) erro
 			FromHeight: ran.From,
 			ToHeight:   ran.To,
 		}
-		err := e.con.Submit(req, identities.Sample(3).NodeIDs()...)
+		err := e.con.Submit(req, e.participants.Sample(3).NodeIDs()...)
 		if err != nil {
 			return fmt.Errorf("could not send range request: %w", err)
 		}
 
-		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageRangeRequest)
+		e.metrics.MessageSent(metrics.EngineClusterSynchronization, metrics.MessageRangeRequest)
 
 		// mark all of the heights as requested
 		for height := ran.From; height <= ran.To; height++ {
@@ -738,12 +723,12 @@ func (e *Engine) sendRequests(heights []uint64, blockIDs []flow.Identifier) erro
 			Nonce:    rand.Uint64(),
 			BlockIDs: requestIDs,
 		}
-		err := e.con.Submit(req, identities.Sample(3).NodeIDs()...)
+		err := e.con.Submit(req, e.participants.Sample(3).NodeIDs()...)
 		if err != nil {
 			return fmt.Errorf("could not send batch request: %w", err)
 		}
 
-		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBatchRequest)
+		e.metrics.MessageSent(metrics.EngineClusterSynchronization, metrics.MessageBatchRequest)
 
 		// mark all of the blocks as requested
 		for _, blockID := range requestIDs {

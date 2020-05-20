@@ -14,9 +14,10 @@ const (
 
 const (
 	// collection
-	EngineProposal           = "proposal"
-	EngineCollectionIngest   = "collection_ingest"
-	EngineCollectionProvider = "collection_provider"
+	EngineProposal               = "proposal"
+	EngineCollectionIngest       = "collection_ingest"
+	EngineCollectionProvider     = "collection_provider"
+	EngineClusterSynchronization = "cluster-sync"
 	// consensus
 	EnginePropagation        = "propagation"
 	EngineCompliance         = "compliance"
@@ -59,8 +60,8 @@ const (
 	MessageSyncedBlock          = "synced_block"
 	MessageClusterBlockProposal = "cluster_proposal"
 	MessageClusterBlockVote     = "cluster_vote"
-	MessageClusterBlockRequest  = "cluster_block_request"
 	MessageClusterBlockResponse = "cluster_block_response"
+	MessageSyncedClusterBlock   = "synced_cluster_block"
 	MessageTransaction          = "transaction"
 	MessageSubmitGuarantee      = "submit_guarantee"
 	MessageCollectionRequest    = "collection_request"

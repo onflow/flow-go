@@ -30,7 +30,6 @@ const (
 	// cluster consensus
 	CodeClusterBlockProposal
 	CodeClusterBlockVote
-	CodeClusterBlockRequest
 	CodeClusterBlockResponse
 
 	CodeCollectionGuarantee
