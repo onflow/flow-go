@@ -122,8 +122,7 @@ func (f *MForest) RemoveTrie(rootHash []byte) {
 
 // GetEmptyRootHash returns the rootHash of empty Trie
 func (f *MForest) GetEmptyRootHash() []byte {
-	dummyRoot := node.NewEmptyTreeRoot(f.maxHeight - 1)
-	return dummyRoot.Hash()
+	return node.NewEmptyTreeRoot(f.maxHeight - 1).Hash()
 }
 
 // Read reads values for an slice of keys and returns values and error (if any)
