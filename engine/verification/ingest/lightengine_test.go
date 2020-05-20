@@ -244,7 +244,7 @@ func (suite *LightIngestTestSuite) TestHandleReceipt_MissingCollection() {
 	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
 
 	// mocks trackers functionality for the chunk
-	suite.collectionTrackers.On("Add", suite.collTracker).Return(true).Once()
+	suite.collectionTrackers.On("Add", suite.collTracker).Return(true)
 	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(false)
 
 	var submitWG sync.WaitGroup
@@ -295,8 +295,9 @@ func (suite *LightIngestTestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	suite.blockStorage.On("ByID", suite.block.ID()).Return(suite.block, nil)
 	// collection
 	suite.collections.On("Has", suite.collection.ID()).Return(true)
+	suite.collections.On("ByID", suite.collection.ID()).Return(suite.collection, true)
 	// receipt in the mempool
-	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
+	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
 
 	// mocks missing resources
 	//
@@ -311,12 +312,15 @@ func (suite *LightIngestTestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	//
 	// adding functionality of chunk tracker to trackers mempool
 	// mocks initial insertion of tracker into mempool
-	suite.chunkDataPackTrackers.On("Add", suite.chunkTracker).Return(true).Once()
+	suite.chunkDataPackTrackers.On("Add", suite.chunkTracker).Return(true)
 	// mocks tracker check
 	// absence of a tracker for chunk data pack
 	suite.chunkDataPackTrackers.On("Has", suite.chunkDataPack.ID()).Return(false)
 	// mocks the functionality of adding receipt to the mempool
 	suite.receipts.On("Add", suite.receipt).Return(true).Once()
+	// mocks handling functionality
+	suite.assignedChunkIDs.On("Add", suite.chunk.ID()).Return(true)
+	suite.assignedChunkIDs.On("Has", suite.chunk.ID()).Return(true)
 
 	var submitWG sync.WaitGroup
 	submitWG.Add(1)
@@ -340,8 +344,8 @@ func (suite *LightIngestTestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	<-eng.Done()
 
 	// asserts necessary calls
+	suite.receipts.AssertExpectations(suite.T())
 	suite.chunksConduit.AssertExpectations(suite.T())
-	suite.chunkDataPackTrackers.AssertExpectations(suite.T())
 
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
