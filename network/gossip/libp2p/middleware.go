@@ -142,6 +142,9 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 		pubsub.WithStrictSignatureVerification(false),
 		// set max message size limit for 1-k PubSub messaging
 		pubsub.WithMaxMessageSize(m.maxPubSubMsgSize),
+		// since we don't use libp2p validators, we don't need validator go routines that libp2p spins off
+		// (minimum is required to be 1, else libp2p defaults to number of CPUs)
+		pubsub.WithValidateWorkers(1),
 	}
 
 	nodeAddress := NodeAddress{Name: m.me.String(), IP: m.host, Port: m.port}
