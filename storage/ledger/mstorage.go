@@ -40,7 +40,7 @@ func NewMTrieStorage(dbDir string, cacheSize int, reg prometheus.Registerer) (*M
 
 	err = w.Replay(
 		func(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
-			_, err = trie.mForest.Update(keys, values, stateCommitment)
+			_, err = trie.mForest.Update(stateCommitment, keys, values)
 			// _, err := trie.UpdateRegisters(keys, values, stateCommitment)
 			return err
 		},
@@ -84,7 +84,7 @@ func (f *MTrieStorage) GetRegisters(
 	values []flow.RegisterValue,
 	err error,
 ) {
-	values, err = f.mForest.Read(registerIDs, stateCommitment)
+	values, err = f.mForest.Read(stateCommitment, registerIDs)
 	// values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
 	return values, err
 }
@@ -117,7 +117,7 @@ func (f *MTrieStorage) UpdateRegisters(
 		return nil, fmt.Errorf("cannot update state, error while writing WAL: %w", err)
 	}
 
-	newTrie, err := f.mForest.Update(ids, values, stateCommitment)
+	newTrie, err := f.mForest.Update(stateCommitment, ids, values)
 	if err != nil {
 		return nil, fmt.Errorf("cannot update state: %w", err)
 	}
@@ -136,14 +136,14 @@ func (f *MTrieStorage) GetRegistersWithProof(
 	err error,
 ) {
 
-	values, err = f.mForest.Read(registerIDs, stateCommitment)
+	values, err = f.mForest.Read(stateCommitment, registerIDs)
 
 	// values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Could not get register values: %w", err)
 	}
 
-	batchProof, err := f.mForest.Proofs(registerIDs, stateCommitment)
+	batchProof, err := f.mForest.Proofs(stateCommitment, registerIDs)
 	// batchProof, err := f.tree.GetBatchProof(registerIDs, stateCommitment)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Could not get proofs: %w", err)

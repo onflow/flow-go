@@ -32,6 +32,7 @@ func TestTrieOperations(t *testing.T) {
 
 	// Make new Trie (independently of MForest):
 	nt, err := trie.NewEmptyMTrie(trieHeight, 23, []byte{})
+	require.NoError(t, err)
 	k1 := []byte([]uint8{uint8(53), uint8(74)})
 	v1 := []byte{'A'}
 	updatedTrie, err := nt.UnsafeUpdate([][]byte{k1}, [][]byte{v1})
