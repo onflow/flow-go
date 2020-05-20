@@ -24,7 +24,7 @@ func TestSMTInitialization(t *testing.T) {
 	withSMT(t, 257, 10, 100, 10, func(t *testing.T, smt *SMT, emptyTree *tree) {
 
 		if smt.GetHeight() != 257 {
-			t.Errorf("height is %d; want %d", smt.GetHeight(), 257)
+			t.Errorf("Height is %d; want %d", smt.GetHeight(), 257)
 		}
 
 		hashes := GetDefaultHashes()
@@ -36,7 +36,7 @@ func TestSMTInitialization(t *testing.T) {
 		}
 
 		if len(emptyTree.rootNode.value) != testHashLength {
-			t.Errorf("root should be a hash")
+			t.Errorf("Root should be a hash")
 		}
 	})
 }
@@ -50,7 +50,7 @@ func TestSMTHeightTooSmall(t *testing.T) {
 
 	_, err := NewSMT(dbDir, -1, 10, 100, 10)
 
-	require.Error(t, err, "height error should have been thrown")
+	require.Error(t, err, "Height error should have been thrown")
 }
 
 func TestInteriorNode(t *testing.T) {
@@ -367,7 +367,7 @@ func TestUpdateAtomicallyMultiValUpdateAndRead(t *testing.T) {
 
 		for i := 0; i < len(values); i++ {
 			if !bytes.Equal(test_vals[i], values[i]) {
-				t.Errorf("value is Incorrect")
+				t.Errorf("Value is Incorrect")
 			}
 		}
 
@@ -414,7 +414,7 @@ func TestTrustedRead(t *testing.T) {
 
 		for i := 0; i < len(values); i++ {
 			if !bytes.Equal(test_vals[i], values[i]) {
-				t.Errorf("value is Incorrect")
+				t.Errorf("Value is Incorrect")
 			}
 		}
 	})
@@ -824,7 +824,7 @@ func TestNonInclusionProof_MultipleValueTree(t *testing.T) {
 
 		flag, proof, size, inclusion, err := smt.GetProof(nonIncludedKey, newTree.rootNode)
 		require.NoError(t, err)
-		require.False(t, inclusion, "key should not be included in the trie!")
+		require.False(t, inclusion, "Key should not be included in the trie!")
 
 		verifyNonInclusion := VerifyNonInclusionProof(nonIncludedKey, nonIncludedValue, flag, proof, size, newRoot, smt.height)
 
@@ -843,7 +843,7 @@ func TestNonInclusionProof_EmptyTree(t *testing.T) {
 
 		flag, proof, size, inclusion, err := smt.GetProof(nonIncludedKey, emptyTree.rootNode)
 		require.NoError(t, err)
-		require.False(t, inclusion, "key should not be included in the trie!")
+		require.False(t, inclusion, "Key should not be included in the trie!")
 
 		verifyNonInclusion := VerifyNonInclusionProof(nonIncludedKey, nonIncludedValue, flag, proof, size, emptyTree.root, smt.height)
 
@@ -877,7 +877,7 @@ func TestNonInclusionProof_SingleValueTree(t *testing.T) {
 
 		flag, proof, size, inclusion, err := smt.GetProof(nonIncludedKey, newTree.rootNode)
 		require.NoError(t, err)
-		require.False(t, inclusion, "key should not be included in the trie!")
+		require.False(t, inclusion, "Key should not be included in the trie!")
 
 		verifyNonInclusion := VerifyNonInclusionProof(nonIncludedKey, nonIncludedValue, flag, proof, size, newRoot, smt.height)
 
@@ -916,19 +916,19 @@ func TestNonInclusionProof_IncludedKey(t *testing.T) {
 
 		flag, proof, size, inclusion, err := smt.GetProof(key1, newTree.rootNode)
 		require.NoError(t, err)
-		require.True(t, inclusion, "key should be included in the trie!")
+		require.True(t, inclusion, "Key should be included in the trie!")
 
 		verifyNonInclusion1 := VerifyNonInclusionProof(key1, value1, flag, proof, size, newRoot, smt.height)
 
 		flag, proof, size, inclusion, err = smt.GetProof(key2, newTree.rootNode)
 		require.NoError(t, err)
-		require.True(t, inclusion, "key should be included in the trie!")
+		require.True(t, inclusion, "Key should be included in the trie!")
 
 		verifyNonInclusion2 := VerifyNonInclusionProof(key2, value2, flag, proof, size, newRoot, smt.height)
 
 		flag, proof, size, inclusion, err = smt.GetProof(key3, newTree.rootNode)
 		require.NoError(t, err)
-		require.True(t, inclusion, "key should be included in the trie!")
+		require.True(t, inclusion, "Key should be included in the trie!")
 
 		verifyNonInclusion3 := VerifyNonInclusionProof(key3, value3, flag, proof, size, newRoot, smt.height)
 
@@ -1223,7 +1223,7 @@ func TestRead_HistoricalValues(t *testing.T) {
 
 		for i := 0; i < len(values); i++ {
 			if !bytes.Equal(test_vals[i], values[i]) {
-				t.Errorf("value is Incorrect")
+				t.Errorf("Value is Incorrect")
 			}
 		}
 
@@ -1293,7 +1293,7 @@ func TestRead_HistoricalValuesTrusted(t *testing.T) {
 
 		for i := 0; i < len(values); i++ {
 			if !bytes.Equal(test_vals[i], values[i]) {
-				t.Errorf("value is Incorrect")
+				t.Errorf("Value is Incorrect")
 			}
 		}
 	})
@@ -1976,7 +1976,7 @@ func TestTrustedRead_Pruned(t *testing.T) {
 
 		for i := 0; i < len(expectedValues); i++ {
 			if !bytes.Equal(test_vals[i], expectedValues[i]) {
-				t.Errorf("value is Incorrect")
+				t.Errorf("Value is Incorrect")
 			}
 		}
 	})
@@ -2555,7 +2555,7 @@ func TestRead_HistoricalValuesPruned(t *testing.T) {
 
 		for i := 0; i < len(expectedValues); i++ {
 			if !bytes.Equal(test_vals[i], expectedValues[i]) {
-				t.Errorf("value is Incorrect")
+				t.Errorf("Value is Incorrect")
 			}
 		}
 

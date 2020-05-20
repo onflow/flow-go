@@ -46,7 +46,7 @@ type node struct {
 	value  Root   // Hash
 	lChild *node  // Left Child
 	rChild *node  // Right Child
-	height int    // height where the node is at
+	height int    // Height where the node is at
 	key    []byte // key this node is pointing at
 }
 
@@ -274,8 +274,8 @@ func (f *forest) Size() (int64, error) {
 type SMT struct {
 	forest *forest
 
-	//rootNode                 *node                    // root
-	height      int // height of the tree
+	//rootNode                 *node                    // Root
+	height      int // Height of the tree
 	keyByteSize int // acceptable number of bytes for key
 	//database             databases.DAL            // The Database Interface for the trie
 	//historicalStates     map[string]databases.DAL // Map of string representations of Historical States to Historical Database references
@@ -725,7 +725,7 @@ func (s *SMT) GetBatchProof(keys [][]byte, root Root) (*proofHolder, error) {
 		if err != nil {
 			return nil, err
 		}
-		// TODO assert new root is the same
+		// TODO assert new Root is the same
 		// if bytes.Equal(new)
 	}
 
@@ -1151,7 +1151,7 @@ func (s *SMT) Update(keys [][]byte, values [][]byte, root Root) (Root, error) {
 	return newRootNode.value, nil
 }
 
-// GetHeight returns the height of the SMT
+// GetHeight returns the Height of the SMT
 func (s *SMT) GetHeight() int {
 	return s.height
 }
@@ -1213,7 +1213,7 @@ func (s *SMT) UpdateAtomically(rootNode *node, keys [][]byte, values [][]byte, h
 	}
 
 	if len(keys) != len(values) {
-		return nil, errors.New("total key/value Length mismatch")
+		return nil, errors.New("Total Key/Value Length mismatch")
 	}
 
 	// If we are at a leaf node, then we create said node
@@ -1229,10 +1229,10 @@ func (s *SMT) UpdateAtomically(rootNode *node, keys [][]byte, values [][]byte, h
 	lvalues, rvalues := values[:splitIndex], values[splitIndex:]
 
 	if len(lkeys) != len(lvalues) {
-		return nil, errors.New("left key/value Length mismatch")
+		return nil, errors.New("left Key/Value Length mismatch")
 	}
 	if len(rkeys) != len(rvalues) {
-		return nil, errors.New("right key/value Length mismatch")
+		return nil, errors.New("right Key/Value Length mismatch")
 	}
 
 	if len(rkeys) == 0 && len(lkeys) > 0 {
