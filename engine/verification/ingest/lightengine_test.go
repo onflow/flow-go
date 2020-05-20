@@ -235,13 +235,21 @@ func (suite *LightIngestTestSuite) TestHandleReceipt_MissingCollection() {
 		Return(false)
 	suite.ingestedChunkIDs.On("Has", suite.chunk.ID()).
 		Return(false)
+	// mocks handling functionality
+	suite.assignedChunkIDs.On("Add", suite.chunk.ID()).Return(true)
+	suite.assignedChunkIDs.On("Has", suite.chunk.ID()).Return(true)
 
-	// expect that we already have the receipt in mempool
+	// mocks functionalities of adding receipt and chunk to memory pools
 	suite.receipts.On("Add", suite.receipt).Return(true).Once()
-	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
+	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
+
+	// mocks trackers functionality for the chunk
+	suite.collectionTrackers.On("Add", suite.collTracker).Return(true).Once()
+	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(false)
 
 	var submitWG sync.WaitGroup
 	submitWG.Add(1)
+	// expects a collection request is submitted
 	suite.collectionsConduit.
 		On("Submit", testifymock.AnythingOfType("*messages.CollectionRequest"), suite.collIdentity.NodeID).
 		Run(func(args testifymock.Arguments) {
