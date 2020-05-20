@@ -463,20 +463,6 @@ func (l *LightEngine) requestChunkDataPack(chunkID, blockID flow.Identifier) err
 	return nil
 }
 
-// getBlockForReceipt checks the block referenced by the given receipt. If the
-// block is available locally, returns true and the block. Otherwise, returns
-// false and requests the block.
-func (l *LightEngine) getBlockForReceipt(receipt *flow.ExecutionReceipt) (*flow.Block, bool) {
-	// ensure we have the block corresponding to this pending execution receipt
-	block, err := l.blockStorage.ByID(receipt.ExecutionResult.BlockID)
-	if err != nil {
-		// block is not ready for retrieval. Should wait for the consensus follower.
-		return nil, false
-	}
-
-	return block, true
-}
-
 // getChunkDataPackForReceipt checks the chunk data pack associated with a chunk ID and
 // execution receipt. If the chunk data pack is available locally, returns true
 // as well as the chunk data pack itself.
@@ -582,51 +568,30 @@ func (l *LightEngine) checkPendingChunks() {
 	l.log.Debug().
 		Msg("check pending chunks background service started")
 
-	// checks the current authenticated receipts for their resources
-	// ready for verification
-	receipts := l.receipts.All()
-	for _, receipt := range receipts {
-		block, blockReady := l.getBlockForReceipt(receipt)
-		// we can't get collections without the block
-		if !blockReady {
-			continue
-		}
-
-		if receipt.ExecutionResult.Chunks.Len() == 0 {
-			// TODO potential attack on availability
-			l.log.Debug().
-				Hex("receipt_id", logging.Entity(receipt)).
-				Hex("result_id", logging.Entity(receipt.ExecutionResult)).
-				Msg("could not ingest execution result with zero chunks")
-
-			continue
-		}
-
-		mychunks, err := l.myAssignedChunks(&receipt.ExecutionResult)
-		// extracts list of chunks assigned to this Verification node
+	for _, receipt := range l.receipts.All() {
+		readyToClean := true
+		block, err := l.blockStorage.ByID(receipt.ExecutionResult.BlockID)
 		if err != nil {
-			l.log.Error().
-				Err(err).
-				Hex("result_id", logging.Entity(receipt.ExecutionResult)).
-				Msg("could not fetch assigned chunks")
+			// we can't get collections without the block
 			continue
 		}
 
-		l.log.Debug().
-			Hex("receipt_id", logging.Entity(receipt)).
-			Hex("result_id", logging.Entity(receipt.ExecutionResult)).
-			Int("total_chunks", receipt.ExecutionResult.Chunks.Len()).
-			Int("assigned_chunks", len(mychunks)).
-			Msg("chunk assignment is done")
+		for _, chunk := range receipt.ExecutionResult.Chunks {
+			chunkID := chunk.ID()
 
-		for _, chunk := range mychunks {
-
-			// TODO replace chunk state with chunk data pack
-			chunkDatapack, chunkDataPackReady := l.getChunkDataPackForReceipt(receipt, chunk.ID())
-			if !chunkDataPackReady {
-				// can not verify a chunk without its chunk data, moves to the next chunk
+			if !l.assignedChunkIDs.Has(chunkID) {
+				// discards ingesting un-assigned chunk
 				continue
 			}
+
+			if l.ingestedChunkIDs.Has(chunkID) {
+				// discards ingesting an already ingested chunk
+				continue
+			}
+
+			// receipt has at least one chunk for ingestion
+			// not ready to clean
+			readyToClean = false
 
 			// retrieves collection corresponding to the chunk
 			collection, collectionReady := l.getCollectionForChunk(block, receipt, chunk)
@@ -635,46 +600,71 @@ func (l *LightEngine) checkPendingChunks() {
 				continue
 			}
 
-			index := chunk.Index
-			var endState flow.StateCommitment
-			if int(index) == len(receipt.ExecutionResult.Chunks)-1 {
-				// last chunk in receipt takes final state commitment
-				endState = receipt.ExecutionResult.FinalStateCommit
-			} else {
-				// any chunk except last takes the subsequent chunk's start state
-				endState = receipt.ExecutionResult.Chunks[index+1].StartState
+			// retrieves chunk data pack for chunk
+			chunkDatapack, chunkDataPackReady := l.getChunkDataPackForReceipt(receipt, chunk.ID())
+			if !chunkDataPackReady {
+				// can not verify a chunk without its chunk data, moves to the next chunk
+				continue
 			}
 
-			// creates a verifiable chunk for assigned chunk
-			vchunk := &verification.VerifiableChunk{
-				ChunkIndex:    chunk.Index,
-				Receipt:       receipt,
-				EndState:      endState,
-				Block:         block,
-				Collection:    collection,
-				ChunkDataPack: chunkDatapack,
-			}
-
-			// verify the receipt
-			err := l.verifierEng.ProcessLocal(vchunk)
+			err := l.ingestChunk(chunk, receipt, block, collection, chunkDatapack)
 			if err != nil {
 				l.log.Error().
 					Err(err).
 					Hex("result_id", logging.Entity(receipt.ExecutionResult)).
 					Hex("chunk_id", logging.ID(chunk.ID())).
-					Msg("could not pass chunk to verifier engine")
-				continue
+					Msg("could not ingest chunk")
 			}
+		}
 
-			// does resource cleanup
-			l.onChunkIngested(vchunk)
-
-			l.log.Debug().
-				Hex("result_id", logging.Entity(receipt.ExecutionResult)).
-				Hex("chunk_id", logging.ID(chunk.ID())).
-				Msg("chunk successfully ingested")
+		if readyToClean {
+			// marks the receipt as ingested
+			l.onReceiptIngested(receipt.ID(), receipt.ExecutionResult.ID())
 		}
 	}
+}
+
+func (l *LightEngine) ingestChunk(chunk *flow.Chunk,
+	receipt *flow.ExecutionReceipt,
+	block *flow.Block,
+	collection *flow.Collection,
+	chunkDataPack *flow.ChunkDataPack) error {
+	// creates chunk end state
+	index := chunk.Index
+	var endState flow.StateCommitment
+	if int(index) == len(receipt.ExecutionResult.Chunks)-1 {
+		// last chunk in receipt takes final state commitment
+		endState = receipt.ExecutionResult.FinalStateCommit
+	} else {
+		// any chunk except last takes the subsequent chunk's start state
+		endState = receipt.ExecutionResult.Chunks[index+1].StartState
+	}
+
+	// creates a verifiable chunk for assigned chunk
+	vchunk := &verification.VerifiableChunk{
+		ChunkIndex:    chunk.Index,
+		Receipt:       receipt,
+		EndState:      endState,
+		Block:         block,
+		Collection:    collection,
+		ChunkDataPack: chunkDataPack,
+	}
+
+	// verify the receipt
+	err := l.verifierEng.ProcessLocal(vchunk)
+	if err != nil {
+		return fmt.Errorf("could not submit verifiable chunk to verify engine: %w", err)
+	}
+
+	// does resource cleanup
+	l.onChunkIngested(vchunk)
+
+	l.log.Debug().
+		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
+		Hex("chunk_id", logging.ID(chunk.ID())).
+		Msg("chunk successfully ingested")
+
+	return nil
 }
 
 // onChunkIngested is called whenever a verifiable chunk is formed for a
@@ -701,36 +691,29 @@ func (l *LightEngine) onChunkIngested(vc *verification.VerifiableChunk) {
 	// cleans up resources of the ingested chunk from mempools
 	l.collections.Rem(vc.Collection.ID())
 	l.chunkDataPacks.Rem(vc.ChunkDataPack.ID())
+}
 
-	mychunks, err := l.myAssignedChunks(&vc.Receipt.ExecutionResult)
-	// extracts list of chunks assigned to this Verification node
-	if err != nil {
-		l.log.Error().
-			Err(err).
-			Hex("result_id", logging.Entity(vc.Receipt.ExecutionResult)).
-			Msg("could not fetch assigned chunks")
-		return
+// onReceiptIngested is called whenever all chunks in the execution receipt are ingested.
+// It removes the receipt from the memory pool, marks its result as ingested, and removes all
+// receipts with the same result part from the mempool.
+func (l *LightEngine) onReceiptIngested(receiptID flow.Identifier, resultID flow.Identifier) {
+
+	// marks execution result as ingested
+	added := l.ingestedResultIDs.Add(resultID)
+	if !added {
+		l.log.Debug().
+			Hex("result_id", logging.ID(resultID)).
+			Msg("could add ingested id result to mempool")
 	}
+	// removes receipt from mempool to avoid further iteration
+	l.receipts.Rem(receiptID)
 
-	if len(mychunks) == 0 {
-		// no un-ingested chunk remains with this receipt
-		// marks execution result as ingested
-		added := l.ingestedResultIDs.Add(vc.Receipt.ExecutionResult.ID())
-
-		if !added {
-			l.log.Error().
-				Hex("result_id", logging.Entity(vc.Receipt.ExecutionResult)).
-				Msg("could add ingested result to mempool")
-		}
-		// removes receipt from mempool to avoid further iteration
-		l.receipts.Rem(vc.Receipt.ID())
-
-		// removes all authenticated receipts with the same result
-		for _, areceipt := range l.receipts.All() {
-			// TODO check for nil dereferencing
-			if l.ingestedResultIDs.Has(areceipt.ExecutionResult.ID()) {
-				l.receipts.Rem(areceipt.ID())
-			}
+	// removes all authenticated receipts with the same result
+	for _, receipt := range l.receipts.All() {
+		// TODO check for nil dereferencing
+		id := receipt.ExecutionResult.ID()
+		if id == resultID {
+			l.receipts.Rem(id)
 		}
 	}
 }
