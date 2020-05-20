@@ -31,9 +31,9 @@ func NewRcvCache(size int) (*RcvCache, error) {
 	return rcv, nil
 }
 
-// Adds a new message to the cache if not already present. Returns true if the message was already in the cache and false
+// Add adds a new message to the cache if not already present. Returns true if the message was already in the cache and false
 // otherwise
-func (r *RcvCache) ContainsOrAdd(eventID []byte, channelID uint32) bool {
+func (r *RcvCache) Add(eventID []byte, channelID uint32) bool {
 	entry := RcvCacheEntry{
 		eventID:   string(eventID),
 		channelID: channelID,
