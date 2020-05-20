@@ -16,15 +16,13 @@ type CheckerFunc func([]byte, runtime.Location) error
 
 type TransactionContext struct {
 	LedgerDAL
-	astCache          ASTCache
-	signingAccounts   []runtime.Address
-	checker           CheckerFunc
-	logs              []string
-	events            []cadence.Event
-	OnSetValueHandler func(owner, controller, key, value []byte)
-	gasUsed           uint64 // TODO fill with actual gas
-	tx                *flow.TransactionBody
-	uuid              uint64
+	astCache        ASTCache
+	signingAccounts []runtime.Address
+	checker         CheckerFunc
+	logs            []string
+	events          []cadence.Event
+	tx              *flow.TransactionBody
+	uuid            uint64
 }
 
 type TransactionContextOption func(*TransactionContext)
@@ -61,9 +59,6 @@ func (r *TransactionContext) GetValue(owner, controller, key []byte) ([]byte, er
 // SetValue sets a register value in the world state.
 func (r *TransactionContext) SetValue(owner, controller, key, value []byte) error {
 	r.Ledger.Set(fullKeyHash(string(owner), string(controller), string(key)), value)
-	if r.OnSetValueHandler != nil {
-		r.OnSetValueHandler(owner, controller, key, value)
-	}
 	return nil
 }
 
