@@ -48,19 +48,17 @@ func (r *ReadSubscription) stop() {
 // RceiveLoop must be run in a goroutine. It takes care of continuously receiving
 // messages from the peer connection until the connection fails
 func (r *ReadSubscription) ReceiveLoop() {
-	defer r.stop()
 	// close and drain the inbound channel
 	defer close(r.inbound)
 
 	c := context.Background()
 
-RecvLoop:
 	for {
 		// check if we should stop
 		select {
 		case <-r.done:
 			r.log.Debug().Msg("exiting receive routine")
-			break RecvLoop
+			return
 		default:
 		}
 		var msg message.Message
@@ -68,13 +66,13 @@ RecvLoop:
 		rawMsg, err := r.sub.Next(c)
 		if err != nil {
 			r.log.Err(err).Msg("failed to read subscription message")
-			break RecvLoop
+			return
 		}
 
 		err = msg.Unmarshal(rawMsg.Data)
 		if err != nil {
 			r.log.Err(err).Str("topic_message", msg.String()).Msg("failed to unmarshal message")
-			break RecvLoop
+			return
 		}
 
 		// stash the received message into the inbound queue for handling
