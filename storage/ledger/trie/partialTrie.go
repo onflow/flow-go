@@ -12,13 +12,13 @@ import (
 // unpopulated branches and parts that are compact. It is fully stored in memory and doesn't use
 // a database.
 type PSMT struct {
-	root        *node // root
-	height      int   // height of the tree
+	root        *node // Root
+	height      int   // Height of the tree
 	keyByteSize int   // acceptable size of key (in bytes)
 	keyLookUp   map[string]*node
 }
 
-// GetHeight returns the height of the SMT
+// GetHeight returns the Height of the SMT
 func (p *PSMT) GetHeight() int {
 	return p.height
 }

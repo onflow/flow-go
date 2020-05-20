@@ -19,7 +19,7 @@ import (
 
 // MForest is an in memory forest (collection of tries)
 type MForest struct {
-	tries         *lru.Cache
+	tries         *lru.Cache // TODO: add godoc about meaning of LRU chache
 	dir           string
 	cacheSize     int
 	maxHeight     int // height of the tree
