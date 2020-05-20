@@ -23,8 +23,9 @@ import (
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/proposal"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
+	colsync "github.com/dapperlabs/flow-go/engine/collection/synchronization"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
-	"github.com/dapperlabs/flow-go/engine/common/synchronization"
+	consync "github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	clustermodel "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/encoding"
@@ -66,6 +67,7 @@ func main() {
 		transactions    *storagekv.Transactions
 		colHeaders      *storagekv.Headers
 		colPayloads     *storagekv.ClusterPayloads
+		colBlocks       *storagekv.ClusterBlocks
 		colCacheMetrics module.CacheMetrics
 
 		colCache *buffer.PendingClusterBlocks // pending block cache for cluster consensus
@@ -100,24 +102,25 @@ func main() {
 			pool, err = stdmap.NewTransactions(txLimit)
 			return err
 		}).
-		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
-			colCacheMetrics = metrics.NewCacheCollector("cluster")
-			transactions = storagekv.NewTransactions(node.DB)
-			colHeaders = storagekv.NewHeaders(colCacheMetrics, node.DB)
-			colPayloads = storagekv.NewClusterPayloads(colCacheMetrics, node.DB)
-			return nil
-		}).
-		Module("block mempool", func(node *cmd.FlowNodeBuilder) error {
-			colCache = buffer.NewPendingClusterBlocks()
-			conCache = buffer.NewPendingBlocks()
-			return nil
-		}).
 		Module("collection cluster ID", func(node *cmd.FlowNodeBuilder) error {
 			myCluster, err = protocol.ClusterFor(node.State.Final(), node.Me.NodeID())
 			if err != nil {
 				return fmt.Errorf("could not get my cluster: %w", err)
 			}
 			clusterID = protocol.ChainIDForCluster(myCluster)
+			return nil
+		}).
+		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
+			colCacheMetrics = metrics.NewCacheCollector("cluster")
+			transactions = storagekv.NewTransactions(node.DB)
+			colHeaders = storagekv.NewHeaders(colCacheMetrics, node.DB)
+			colPayloads = storagekv.NewClusterPayloads(colCacheMetrics, node.DB)
+			colBlocks = storagekv.NewClusterBlocks(node.DB, clusterID, colHeaders, colPayloads)
+			return nil
+		}).
+		Module("block mempool", func(node *cmd.FlowNodeBuilder) error {
+			colCache = buffer.NewPendingClusterBlocks()
+			conCache = buffer.NewPendingBlocks()
 			return nil
 		}).
 		Module("collection node metrics", func(node *cmd.FlowNodeBuilder) error {
@@ -249,7 +252,7 @@ func main() {
 
 			// create a block synchronization engine to handle follower getting
 			// out of sync
-			sync, err := synchronization.New(
+			sync, err := consync.New(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Network,
@@ -362,10 +365,24 @@ func main() {
 				consensus.WithTimeout(hotstuffTimeout),
 			)
 			if err != nil {
-				return nil, fmt.Errorf("creating HotStuff participant failed: %w", err)
+				return nil, fmt.Errorf("could not initialize hotstuff participant: %w", err)
 			}
 
-			prop = prop.WithConsensus(hot)
+			sync, err := colsync.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				myCluster,
+				clusterState,
+				colBlocks,
+				prop,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create cluster sync engine: %w", err)
+			}
+
+			prop = prop.WithConsensus(hot).WithSynchronization(sync)
 			return prop, nil
 		}).
 		Run()

@@ -35,8 +35,6 @@ func decode(env Envelope) (interface{}, error) {
 		v = &messages.ClusterBlockProposal{}
 	case CodeClusterBlockVote:
 		v = &messages.ClusterBlockVote{}
-	case CodeClusterBlockRequest:
-		v = &messages.ClusterBlockRequest{}
 	case CodeClusterBlockResponse:
 		v = &messages.ClusterBlockResponse{}
 
