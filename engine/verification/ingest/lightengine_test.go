@@ -411,6 +411,9 @@ func (suite *LightIngestTestSuite) TestHandleCollection() {
 	// mocks collection does not exist in authenticated and pending collections
 	suite.collections.On("Has", suite.collection.ID()).Return(false).Once()
 
+	// mocks collection tracker is cleaned up
+	suite.collectionTrackers.On("Rem", suite.collection.ID()).Return(true).Once()
+
 	err := eng.Process(suite.collIdentity.NodeID, suite.collection)
 	suite.Assert().Nil(err)
 
