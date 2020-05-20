@@ -249,6 +249,14 @@ func (r *TransactionContext) DecodeArgument(b []byte, t cadence.Type) (cadence.V
 	return jsoncdc.Decode(b)
 }
 
+func (r *TransactionContext) GetCurrentBlockHeight() uint64 {
+	panic("implement me")
+}
+
+func (r *TransactionContext) GetBlockAtHeight(height uint64) (hash runtime.BlockHash, timestamp int64, exists bool) {
+	panic("implement me")
+}
+
 // GetAccount gets an account by address.
 
 func (r *TransactionContext) isValidSigningAccount(address runtime.Address) bool {
