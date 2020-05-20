@@ -624,11 +624,15 @@ func (l *LightEngine) checkPendingChunks() {
 	}
 }
 
+// ingestChunk is called whenever a chunk is ready for ingestion, i.e., its receipt, block, collection, and chunkDataPack
+// are all ready. It computes the end state of the chunk and ingests the chunk by submitting a verifiable chunk to the verify
+// engine.
 func (l *LightEngine) ingestChunk(chunk *flow.Chunk,
 	receipt *flow.ExecutionReceipt,
 	block *flow.Block,
 	collection *flow.Collection,
 	chunkDataPack *flow.ChunkDataPack) error {
+
 	// creates chunk end state
 	index := chunk.Index
 	var endState flow.StateCommitment
@@ -669,7 +673,7 @@ func (l *LightEngine) ingestChunk(chunk *flow.Chunk,
 
 // onChunkIngested is called whenever a verifiable chunk is formed for a
 // chunk and is sent to the verify engine successfully.
-// It cleans up all resources associated with this chunk
+// It cleans up all resources associated with this chunk.
 func (l *LightEngine) onChunkIngested(vc *verification.VerifiableChunk) {
 	// marks this chunk as ingested
 	ok := l.ingestedChunkIDs.Add(vc.ChunkDataPack.ChunkID)
