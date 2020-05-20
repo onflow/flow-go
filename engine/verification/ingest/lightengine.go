@@ -43,6 +43,7 @@ type LightEngine struct {
 	chunkDataPackTackers  mempool.ChunkDataPackTrackers // keeps track of chunk data pack requests that this engine made
 	ingestedResultIDs     mempool.Identifiers           // keeps ids of ingested execution results
 	ingestedChunkIDs      mempool.Identifiers           // keeps ids of ingested chunks
+	assignedChunkIDs      mempool.Identifiers           // keeps ids of assigned chunk IDs pending for ingestion
 	ingestedCollectionIDs mempool.Identifiers           // keeps ids collections of ingested chunks
 	headerStorage         storage.Headers               // used to check block existence to improve performance
 	blockStorage          storage.Blocks                // used to retrieve blocks
@@ -184,13 +185,14 @@ func (l *LightEngine) process(originID flow.Identifier, event interface{}) error
 // handleExecutionReceipt receives an execution receipt, and adds it to receipts mempool
 func (l *LightEngine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
 	receiptID := receipt.ID()
+	resultID := receipt.ExecutionResult.ID()
 
 	l.log.Info().
 		Hex("origin_id", logging.ID(originID)).
 		Hex("receipt_id", logging.ID(receiptID)).
 		Msg("execution receipt received at ingest engine")
 
-	if l.ingestedResultIDs.Has(receipt.ExecutionResult.ID()) {
+	if l.ingestedResultIDs.Has(resultID) {
 		l.log.Debug().
 			Hex("origin_id", logging.ID(originID)).
 			Hex("receipt_id", logging.ID(receiptID)).
@@ -206,6 +208,87 @@ func (l *LightEngine) handleExecutionReceipt(originID flow.Identifier, receipt *
 		Hex("receipt_id", logging.ID(receiptID)).
 		Bool("mempool_insertion", ok).
 		Msg("execution receipt added to mempool")
+
+	// checks if the execution result has empty chunk
+	if receipt.ExecutionResult.Chunks.Len() == 0 {
+		// TODO potential attack on availability
+		l.log.Debug().
+			Hex("receipt_id", logging.ID(receiptID)).
+			Hex("result_id", logging.ID(resultID)).
+			Msg("could not ingest execution result with zero chunks")
+		return nil
+	}
+
+	mychunks, err := l.myAssignedChunks(&receipt.ExecutionResult)
+	// extracts list of chunks assigned to this Verification node
+	if err != nil {
+		l.log.Error().
+			Err(err).
+			Hex("result_id", logging.Entity(receipt.ExecutionResult)).
+			Msg("could not fetch assigned chunks")
+		return fmt.Errorf("could not perfrom chunk assignment on receipt: %w", err)
+	}
+
+	l.log.Debug().
+		Hex("receipt_id", logging.ID(receiptID)).
+		Hex("result_id", logging.ID(resultID)).
+		Int("total_chunks", receipt.ExecutionResult.Chunks.Len()).
+		Int("assigned_chunks", len(mychunks)).
+		Msg("chunk assignment is done")
+
+	for _, chunk := range mychunks {
+		err := l.handleChunk(chunk, receipt)
+		if err != nil {
+			l.log.Err(err).
+				Hex("receipt_id", logging.ID(receiptID)).
+				Hex("result_id", logging.ID(resultID)).
+				Hex("chunk_id", logging.ID(chunk.ID())).
+				Msg("could not handle chunk")
+		}
+	}
+
+	return nil
+}
+
+// handleChunk receives an assigned chunk as part of an incoming receipt. It requests chunk data pack for it, and
+// stores the chunk ID in the assigned chunk IDs mempool.
+func (l *LightEngine) handleChunk(chunk *flow.Chunk, receipt *flow.ExecutionReceipt) error {
+	chunkID := chunk.ID()
+
+	// checks that the chunk has not been handled yet
+	if l.assignedChunkIDs.Has(chunkID) {
+		l.log.Debug().
+			Hex("chunk_id", logging.ID(chunkID)).
+			Msg("discards handling an already handled chunk")
+		return nil
+	}
+
+	// checks that the chunk has not been ingested yet
+	if l.ingestedChunkIDs.Has(chunkID) {
+		l.log.Debug().
+			Hex("chunk_id", logging.ID(chunkID)).
+			Msg("discards handling an already ingested chunk")
+		return nil
+	}
+
+	// requests the chunk data pack from network
+	err := l.requestChunkDataPack(chunkID, receipt.ExecutionResult.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not make a request of chunk data pack to the network")
+	}
+
+	// adds chunk to assigned mempool
+	ok := l.assignedChunkIDs.Add(chunkID)
+	if !ok {
+		l.log.Debug().
+			Hex("chunk_id", logging.ID(chunkID)).
+			Msg("could not add chunk to memory pool")
+		return nil
+	}
+
+	l.log.Debug().
+		Hex("chunk_id", logging.ID(chunkID)).
+		Msg("chunk handling is done")
 
 	return nil
 }
@@ -519,7 +602,7 @@ func (l *LightEngine) checkPendingChunks() {
 			continue
 		}
 
-		mychunks, err := l.myUningestedChunks(&receipt.ExecutionResult)
+		mychunks, err := l.myAssignedChunks(&receipt.ExecutionResult)
 		// extracts list of chunks assigned to this Verification node
 		if err != nil {
 			l.log.Error().
@@ -619,7 +702,7 @@ func (l *LightEngine) onChunkIngested(vc *verification.VerifiableChunk) {
 	l.collections.Rem(vc.Collection.ID())
 	l.chunkDataPacks.Rem(vc.ChunkDataPack.ID())
 
-	mychunks, err := l.myUningestedChunks(&vc.Receipt.ExecutionResult)
+	mychunks, err := l.myAssignedChunks(&vc.Receipt.ExecutionResult)
 	// extracts list of chunks assigned to this Verification node
 	if err != nil {
 		l.log.Error().
@@ -652,10 +735,9 @@ func (l *LightEngine) onChunkIngested(vc *verification.VerifiableChunk) {
 	}
 }
 
-// myUningestedChunks returns the list of chunks in the chunk list that this verifier node
-// is assigned to, and are not ingested yet. A chunk is ingested once a verifiable chunk is
-// formed out of it and is passed to verify engine
-func (l *LightEngine) myUningestedChunks(res *flow.ExecutionResult) (flow.ChunkList, error) {
+// myAssignedChunks returns the list of chunks in the chunk list that this verifier node
+// is assigned to.
+func (l *LightEngine) myAssignedChunks(res *flow.ExecutionResult) (flow.ChunkList, error) {
 
 	// extracts list of verifier nodes id
 	//
@@ -686,10 +768,6 @@ func (l *LightEngine) myUningestedChunks(res *flow.ExecutionResult) (flow.ChunkL
 		chunk, ok := res.Chunks.ByIndex(index)
 		if !ok {
 			return nil, fmt.Errorf("chunk out of range requested: %v", index)
-		}
-		// discard the chunk if it has been already ingested
-		if l.ingestedChunkIDs.Has(chunk.ID()) {
-			continue
 		}
 		mine = append(mine, chunk)
 	}
