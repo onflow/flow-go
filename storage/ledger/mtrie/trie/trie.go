@@ -41,19 +41,35 @@ func NewEmptyMTrie(maxHeight int, number uint64, parentRootHash []byte) (*MTrie,
 	}, nil
 }
 
+// StringRootHash returns the trie's Hex-encoded root hash.
+// Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) StringRootHash() string { return hex.EncodeToString(mt.root.Hash()) }
-func (mt *MTrie) RootHash() []byte       { return mt.root.Hash() }
-func (mt *MTrie) Number() uint64         { return mt.number }
+
+// RootHash returns the trie's root hash (i.e. the hash of the trie's root node).
+// Concurrency safe (as Tries are immutable structures by convention)
+func (mt *MTrie) RootHash() []byte { return mt.root.Hash() }
+
+// Number returns the trie's number. By convention, the number of a Trie is
+// the parent Trie's number incremented by one.
+// Concurrency safe (as Tries are immutable structures by convention)
+func (mt *MTrie) Number() uint64 { return mt.number }
+
+// ParentRootHash returns the root hash of the trie's parent.
+// Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) ParentRootHash() []byte { return mt.parentRootHash }
 
 // Height return the trie height. The height is identical to the key length [in bit].
+// Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) Height() int { return mt.maxHeight - 1 }
 
+// StringRootHash returns the trie's string representation.
+// Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) String() string {
 	trieStr := fmt.Sprintf("Trie number:%v hash:%v parent: %v\n", mt.number, mt.StringRootHash(), hex.EncodeToString(mt.parentRootHash))
 	return trieStr + mt.root.FmtStr("", "")
 }
 
+// TODO move consistency checks from Forrest into Trie to obtain a safe, self-contained API
 func (mt *MTrie) UnsafeRead(keys [][]byte) ([][]byte, error) {
 	return mt.read(mt.root, keys)
 }
@@ -105,27 +121,30 @@ func (mt *MTrie) read(head *node.Node, keys [][]byte) ([][]byte, error) {
 	return values, nil
 }
 
-// UnsafeUpdate returns constructs a new trie by updating the specified registers.
-// Updates are performed in a copy-on-write manner:
+// NewTrieCopyOnWrite constructs a new trie containing all registers from the parent trie.
+// The key-value pairs specify the registers whose values are supposed to hold updated values
+// compared to the parent trie. Constructing the new trie is done in a copy-on-write manner:
 //   * The original trie remains unchanged.
-//   * identical subtries from the original trie are referenced instead of copied.
+//   * subtries that remain unchanged are from the parent trie instead of copied.
 // UNSAFE: method requires the following conditions to be satisfied:
 //   * keys are NOT duplicated
-// TODO: move consistency checks from Forrest to here, so API is safe and self-contained
-func (mt *MTrie) UnsafeUpdate(keys [][]byte, values [][]byte) (*MTrie, error) {
-	parentRoot := mt.root
-	updatedRoot, err := mt.update(keys, values, parentRoot.Height(), parentRoot)
+// TODO: move consistency checks from MForest to here, to make API is safe and self-contained
+func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedRegisterKeys [][]byte, updatedRegisterValues [][]byte) (*MTrie, error) {
+	parentRoot := parentTrie.root
+	updatedRoot, err := update(parentRoot, parentRoot.Height(), updatedRegisterKeys, parentTrie.maxHeight-1, updatedRegisterValues)
 	if err != nil {
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
 	updatedTrie := &MTrie{
 		root:           updatedRoot,
-		number:         mt.number + 1,
-		maxHeight:      mt.maxHeight,
-		parentRootHash: mt.RootHash(),
+		number:         parentTrie.number + 1,
+		maxHeight:      parentTrie.maxHeight,
+		parentRootHash: parentTrie.RootHash(),
 	}
 	return updatedTrie, nil
 }
+
+//func constructSubtrie(height int, keys [][]byte, keyLength int, values [][]byte) (*node.Node, error) {
 
 // update returns the head of updated sub-trie for the specified key-value pairs.
 // UNSAFE: update requires the following conditions to be satisfied,
@@ -134,9 +153,9 @@ func (mt *MTrie) UnsafeUpdate(keys [][]byte, values [][]byte) (*MTrie, error) {
 //     (excluding the bit at index headHeight)
 //   * keys are NOT duplicated
 // TODO: remove error return
-func (mt *MTrie) update(keys [][]byte, values [][]byte, height int, parentNode *node.Node) (*node.Node, error) {
+func update(parentNode *node.Node, height int, keys [][]byte, keyLength int, values [][]byte) (*node.Node, error) {
 	if parentNode == nil { // parent Trie has no sub-trie for the set of key-value pairs => construct entire subtree
-		return constructSubtrie(height, keys, mt.maxHeight-1, values)
+		return constructSubtrie(height, keys, keyLength, values)
 	}
 	if len(keys) == 0 { // We are not changing any values in this sub-trie => return parent trie
 		return parentNode, nil
@@ -157,11 +176,11 @@ func (mt *MTrie) update(keys [][]byte, values [][]byte, height int, parentNode *
 			keys = append(keys, parentKey)
 			values = append(values, parentNode.Value())
 		}
-		return constructSubtrie(height, keys, mt.maxHeight-1, values)
+		return constructSubtrie(height, keys, keyLength, values)
 	}
 
 	// Split the keys and Values array so we can update the trie in parallel
-	lkeys, lvalues, rkeys, rvalues, err := common.SplitKeyValues(keys, values, mt.maxHeight-1-height)
+	lkeys, lvalues, rkeys, rvalues, err := common.SplitKeyValues(keys, values, keyLength-height)
 	if err != nil {
 		return nil, fmt.Errorf("error spliting key Values: %w", err)
 	}
@@ -173,9 +192,9 @@ func (mt *MTrie) update(keys [][]byte, values [][]byte, height int, parentNode *
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		lChild, lErr = mt.update(lkeys, lvalues, height-1, parentNode.LeftChild())
+		lChild, lErr = update(parentNode.LeftChild(), height-1, lkeys, keyLength, lvalues)
 	}()
-	rChild, rErr = mt.update(rkeys, rvalues, height-1, parentNode.RigthChild())
+	rChild, rErr = update(parentNode.RigthChild(), height-1, rkeys, keyLength, rvalues)
 	wg.Wait()
 	if lErr != nil || rErr != nil {
 		var merr *multierror.Error

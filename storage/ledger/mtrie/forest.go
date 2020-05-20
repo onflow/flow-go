@@ -216,7 +216,7 @@ func (f *MForest) Update(rootHash []byte, keys [][]byte, values [][]byte) (*trie
 		sortedValues = append(sortedValues, valueMap[hex.EncodeToString(key)])
 	}
 
-	newTrie, err := parentTrie.UnsafeUpdate(sortedKeys, sortedValues)
+	newTrie, err := trie.NewTrieWithUpdatedRegisters(parentTrie, sortedKeys, sortedValues)
 	if err != nil {
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
@@ -282,7 +282,7 @@ func (f *MForest) Proofs(rootHash []byte, keys [][]byte) (*proof.BatchProof, err
 			return bytes.Compare(notFoundKeys[i], notFoundKeys[j]) < 0
 		})
 
-		newTrie, err := stateTrie.UnsafeUpdate(notFoundKeys, notFoundValues)
+		newTrie, err := trie.NewTrieWithUpdatedRegisters(stateTrie, notFoundKeys, notFoundValues)
 		if err != nil {
 			return nil, err
 		}

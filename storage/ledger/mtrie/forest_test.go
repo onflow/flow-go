@@ -35,7 +35,8 @@ func TestTrieOperations(t *testing.T) {
 	require.NoError(t, err)
 	k1 := []byte([]uint8{uint8(53), uint8(74)})
 	v1 := []byte{'A'}
-	updatedTrie, err := nt.UnsafeUpdate([][]byte{k1}, [][]byte{v1})
+
+	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(nt, [][]byte{k1}, [][]byte{v1})
 	require.NoError(t, err)
 
 	// Add trie
