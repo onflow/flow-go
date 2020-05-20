@@ -33,19 +33,25 @@ func TestTrieOperations(t *testing.T) {
 	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
 	require.NoError(t, err)
 
+	// Make new Trie (independently of MForest):
+	nt, err := trie.NewEmptyMTrie(trieHeight, 23, []byte{})
+	k1 := []byte([]uint8{uint8(53), uint8(74)})
+	v1 := []byte{'A'}
+	updatedTrie, err := nt.UnsafeUpdate([][]byte{k1}, [][]byte{v1})
+	require.NoError(t, err)
+
 	// Add trie
-	nt, err := trie.NewEmptyMTrie(trieHeight, 1, []byte{})
-	err = fStore.AddTrie(nt)
+	err = fStore.AddTrie(updatedTrie)
 	require.NoError(t, err)
 
 	// Get trie
-	retnt, err := fStore.GetTrie(nt.RootHash())
+	retnt, err := fStore.GetTrie(updatedTrie.RootHash())
 	require.NoError(t, err)
-	require.True(t, bytes.Equal(retnt.RootHash(), nt.RootHash()))
+	require.True(t, bytes.Equal(retnt.RootHash(), updatedTrie.RootHash()))
 	require.Equal(t, fStore.Size(), 2)
 
 	// Remove trie
-	fStore.RemoveTrie(nt.RootHash())
+	fStore.RemoveTrie(updatedTrie.RootHash())
 	require.Equal(t, fStore.Size(), 1)
 }
 
@@ -458,7 +464,7 @@ func TestUpdateWithWrongKeySize(t *testing.T) {
 	keys := [][]byte{key1}
 	values := [][]byte{value1}
 
-	testTrie, err := fStore.Update(fStore.GetEmptyRootHash(), keys, values)
+	_, err = fStore.Update(fStore.GetEmptyRootHash(), keys, values)
 	require.Error(t, err)
 
 	// long key
@@ -468,7 +474,7 @@ func TestUpdateWithWrongKeySize(t *testing.T) {
 	keys = [][]byte{key2}
 	values = [][]byte{value2}
 
-	_, err = fStore.Update(testTrie.RootHash(), keys, values)
+	_, err = fStore.Update(fStore.GetEmptyRootHash(), keys, values)
 	require.Error(t, err)
 }
 
@@ -760,7 +766,8 @@ func TestRandomUpdateReadProof(t *testing.T) {
 
 	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
 	require.NoError(t, err)
-	emptyTrieHash := fStore.GetEmptyRootHash()
+	testTrie, err := fStore.GetTrie(fStore.GetEmptyRootHash())
+	require.NoError(t, err)
 	latestValueByKey := make(map[string][]byte) // map store
 
 	for e := 0; e < rep; e++ {
@@ -780,19 +787,18 @@ func TestRandomUpdateReadProof(t *testing.T) {
 				nonExistingKeys = append(nonExistingKeys, k)
 			}
 		}
-		retValues, err := fStore.Read(emptyTrieHash, nonExistingKeys)
+		retValues, err := fStore.Read(testTrie.RootHash(), nonExistingKeys)
 		require.NoError(t, err, "error reading - non existing keys")
 		for i := range retValues {
 			require.True(t, len(retValues[i]) == 0)
 		}
 
 		// test update
-		updatedTrie, err := fStore.Update(emptyTrieHash, keys, values)
-		updatedTrieHash := updatedTrie.RootHash()
+		testTrie, err = fStore.Update(testTrie.RootHash(), keys, values)
 		require.NoError(t, err, "error updating")
 
 		// test read
-		retValues, err = fStore.Read(updatedTrieHash, keys)
+		retValues, err = fStore.Read(testTrie.RootHash(), keys)
 		require.NoError(t, err, "error reading")
 		for i := range values {
 			require.True(t, bytes.Equal(values[i], retValues[i]))
@@ -811,13 +817,13 @@ func TestRandomUpdateReadProof(t *testing.T) {
 			proofValues = append(proofValues, []byte{})
 		}
 
-		batchProof, err := fStore.Proofs(updatedTrieHash, proofKeys)
+		batchProof, err := fStore.Proofs(testTrie.RootHash(), proofKeys)
 		require.NoError(t, err, "error generating proofs")
-		require.True(t, batchProof.Verify(proofKeys, proofValues, updatedTrieHash, trieHeight))
+		require.True(t, batchProof.Verify(proofKeys, proofValues, testTrie.RootHash(), trieHeight))
 
-		psmt, err := cstrie.NewPSMT(updatedTrieHash, trieHeight, proofKeys, proofValues, proof.EncodeBatchProof(batchProof))
+		psmt, err := cstrie.NewPSMT(testTrie.RootHash(), trieHeight, proofKeys, proofValues, proof.EncodeBatchProof(batchProof))
 		require.NoError(t, err, "error building partial trie")
-		require.True(t, bytes.Equal(psmt.GetRootHash(), updatedTrieHash))
+		require.True(t, bytes.Equal(psmt.GetRootHash(), testTrie.RootHash()))
 
 		// check values for all existing keys
 		allKeys := make([][]byte, 0, len(latestValueByKey))
@@ -826,7 +832,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 			allKeys = append(allKeys, []byte(k))
 			allValues = append(allValues, v)
 		}
-		retValues, err = fStore.Read(updatedTrieHash, allKeys)
+		retValues, err = fStore.Read(testTrie.RootHash(), allKeys)
 		require.NoError(t, err)
 		for i, v := range allValues {
 			require.True(t, bytes.Equal(v, retValues[i]))

@@ -526,7 +526,7 @@ func constructTrieFromKeyValuePairs(keys [][]byte, keyLength int, values [][]byt
 	return &MTrie{
 		root:           root,
 		number:         number,
-		maxHeight:      keyLength,
+		maxHeight:      keyLength + 1, // TODO: fix me when replacing maxHeight definition
 		parentRootHash: parentRootHash,
 	}, nil
 }
