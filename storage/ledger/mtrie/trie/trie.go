@@ -123,7 +123,7 @@ func (mt *MTrie) read(head *node.Node, keys [][]byte) ([][]byte, error) {
 
 // NewTrieCopyOnWrite constructs a new trie containing all registers from the parent trie.
 // The key-value pairs specify the registers whose values are supposed to hold updated values
-// compared to the parent trie. Constructing the new trie is done in a copy-on-write manner:
+// compared to the parent trie. Constructing the new trie is done in a COPY-ON-WRITE manner:
 //   * The original trie remains unchanged.
 //   * subtries that remain unchanged are from the parent trie instead of copied.
 // UNSAFE: method requires the following conditions to be satisfied:
