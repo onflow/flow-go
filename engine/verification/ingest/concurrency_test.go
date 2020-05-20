@@ -289,7 +289,8 @@ func setupMockExeNode(t *testing.T, node mock.GenericNode, verID flow.Identifier
 					log.Debug().
 						Hex("collection_id", logging.ID(req.ChunkID)).
 						Msg("mock execution node drops first collection request for this collection")
-					return
+					// TODO as it is switched to light node, retrial evaluation is disabled temporarily
+					// return
 				}
 
 				for _, er := range ers {
@@ -333,7 +334,8 @@ func setupMockCollectionNode(t *testing.T, node mock.GenericNode, verID flow.Ide
 					log.Debug().
 						Hex("collection_id", logging.ID(req.ID)).
 						Msg("mock collection node drops first collection request for this collection")
-					return
+					// TODO as it is switched to light node, retrial evaluation is disabled temporarily
+					// return
 				}
 
 				for _, coll := range colls {
