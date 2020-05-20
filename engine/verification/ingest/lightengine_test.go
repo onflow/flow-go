@@ -520,6 +520,8 @@ func (suite *LightIngestTestSuite) TestVerifyReady() {
 			// chunk data pack in mempool
 			suite.chunkDataPacks.On("Has", suite.chunkDataPack.ID()).Return(true)
 			suite.chunkDataPacks.On("ByChunkID", suite.chunkDataPack.ID()).Return(suite.chunkDataPack, true)
+			suite.assignedChunkIDs.On("Add", suite.chunk.ID()).Return(true)
+			suite.assignedChunkIDs.On("Has", suite.chunk.ID()).Return(true)
 			// execution receipt in authenticated pool
 			suite.receipts.On("Add", suite.receipt).Return(true)
 			suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
