@@ -1,5 +1,7 @@
 package mtrie_test
 
+// TODO: remove _test
+
 import (
 	"bytes"
 	"fmt"
@@ -41,11 +43,11 @@ func TestTrieOperations(t *testing.T) {
 	require.NoError(t, err)
 
 	// Add trie
-	err = fStore.AddTrie(updatedTrie)
+	err = fStore.addTrie(updatedTrie)
 	require.NoError(t, err)
 
 	// Get trie
-	retnt, err := fStore.GetTrie(updatedTrie.RootHash())
+	retnt, err := fStore.getTrie(updatedTrie.RootHash())
 	require.NoError(t, err)
 	require.True(t, bytes.Equal(retnt.RootHash(), updatedTrie.RootHash()))
 	require.Equal(t, fStore.Size(), 2)
@@ -766,7 +768,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 
 	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, nil)
 	require.NoError(t, err)
-	testTrie, err := fStore.GetTrie(fStore.GetEmptyRootHash())
+	testTrie, err := fStore.getTrie(fStore.GetEmptyRootHash())
 	require.NoError(t, err)
 	latestValueByKey := make(map[string][]byte) // map store
 

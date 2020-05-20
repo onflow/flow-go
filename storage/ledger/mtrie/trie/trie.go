@@ -266,6 +266,7 @@ func (mt *MTrie) proofs(head *node.Node, keys [][]byte, proofs []*proof.Proof) e
 		if bytes.Equal(head.Key(), keys[0]) {
 			proofs[0].Inclusion = true
 		}
+		// TODO: insert ERROR if len(keys) != 1
 		return nil
 	}
 

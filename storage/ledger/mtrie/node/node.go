@@ -149,6 +149,7 @@ func (n Node) FmtStr(prefix string, path string) string {
 }
 
 // DeepCopy returns a deep copy of the Node (including deep copy of children)
+// TODO: potentially can be removed
 func (n *Node) DeepCopy() *Node {
 	newNode := &Node{height: n.height}
 
@@ -182,6 +183,7 @@ func (n *Node) DeepCopy() *Node {
 // Equals compares two nodes and all subsequent children
 // this is an expensive call and should only be used
 // for limited cases (e.g. testing)
+// TODO: potentially can be removed
 func (n *Node) Equals(o *Node) bool {
 	if o == nil {
 		return false
