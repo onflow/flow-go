@@ -128,7 +128,7 @@ func NewDKG(dkg DKGProtocol, size int, currentIndex int,
 		jf.init()
 		return jf, nil
 	default:
-		return nil, fmt.Errorf("the Distributed key Generation %d is not supported", dkg)
+		return nil, fmt.Errorf("the Distributed Key Generation %d is not supported", dkg)
 	}
 }
 
