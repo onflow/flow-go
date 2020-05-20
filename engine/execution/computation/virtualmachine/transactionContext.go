@@ -12,6 +12,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+const scriptGasLimit = 100000
+
 type CheckerFunc func([]byte, runtime.Location) error
 
 type TransactionContext struct {
@@ -22,6 +24,7 @@ type TransactionContext struct {
 	logs            []string
 	events          []cadence.Event
 	tx              *flow.TransactionBody
+	gasLimit        uint64
 	uuid            uint64 // TODO: implement proper UUID
 }
 
@@ -236,7 +239,7 @@ func (r *TransactionContext) GenerateUUID() uint64 {
 }
 
 func (r *TransactionContext) GetComputationLimit() uint64 {
-	return r.tx.GasLimit
+	return r.gasLimit
 }
 
 func (r *TransactionContext) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {

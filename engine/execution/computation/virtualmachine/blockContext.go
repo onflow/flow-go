@@ -47,6 +47,7 @@ func (bc *blockContext) newTransactionContext(
 		LedgerDAL:       LedgerDAL{ledger},
 		signingAccounts: signingAccounts,
 		tx:              tx,
+		gasLimit:        tx.GasLimit,
 	}
 
 	for _, option := range options {
@@ -60,6 +61,7 @@ func (bc *blockContext) newScriptContext(ledger Ledger) *TransactionContext {
 	return &TransactionContext{
 		astCache:  bc.vm.cache,
 		LedgerDAL: LedgerDAL{ledger},
+		gasLimit:  scriptGasLimit,
 	}
 }
 
@@ -121,7 +123,7 @@ func (bc *blockContext) ExecuteTransaction(
 		Error:         nil,
 		Events:        ctx.Events(),
 		Logs:          ctx.Logs(),
-		GasUsed:       ctx.gasUsed,
+		GasUsed:       0, // TODO: record gas usage
 	}, nil
 }
 
