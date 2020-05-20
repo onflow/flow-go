@@ -22,7 +22,7 @@ type TransactionContext struct {
 	logs            []string
 	events          []cadence.Event
 	tx              *flow.TransactionBody
-	uuid            uint64
+	uuid            uint64 // TODO: implement proper UUID
 }
 
 type TransactionContextOption func(*TransactionContext)
