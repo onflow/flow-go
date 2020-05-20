@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"sync"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -19,18 +20,34 @@ type Ledger interface {
 // A MapLedger is a naive ledger storage implementation backed by a simple map.
 //
 // This implementation is designed for testing purposes.
-type MapLedger map[string]flow.RegisterValue
+type MapLedger struct {
+	ledgerMutex sync.Mutex
+	ledger      map[string]flow.RegisterValue
+}
+
+func NewMapLedger() *MapLedger {
+	return &MapLedger{
+		ledgerMutex: sync.Mutex{},
+		ledger:      make(map[string]flow.RegisterValue),
+	}
+}
 
 func (m MapLedger) Set(key flow.RegisterID, value flow.RegisterValue) {
-	m[string(key)] = value
+	m.ledgerMutex.Lock()
+	defer m.ledgerMutex.Unlock()
+	m.ledger[string(key)] = value
 }
 
 func (m MapLedger) Get(key flow.RegisterID) (flow.RegisterValue, error) {
-	return m[string(key)], nil
+	m.ledgerMutex.Lock()
+	defer m.ledgerMutex.Unlock()
+	return m.ledger[string(key)], nil
 }
 
 func (m MapLedger) Delete(key flow.RegisterID) {
-	delete(m, string(key))
+	m.ledgerMutex.Lock()
+	defer m.ledgerMutex.Unlock()
+	delete(m.ledger, string(key))
 }
 
 const (

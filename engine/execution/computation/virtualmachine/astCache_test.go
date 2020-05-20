@@ -104,7 +104,7 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 	require.NoError(t, err)
 
 	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-	ledger, accounts, err := execTestutil.BootstrappedLedger(make(virtualmachine.MapLedger), privateKeys)
+	ledger, accounts, err := execTestutil.BootstrappedLedger(virtualmachine.NewMapLedger(), privateKeys)
 	require.NoError(t, err)
 
 	// Create FungibleToken deployment transaction.
@@ -175,7 +175,7 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 	require.NoError(b, err)
 
 	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-	ledger, accounts, err := execTestutil.BootstrappedLedger(make(virtualmachine.MapLedger), privateKeys)
+	ledger, accounts, err := execTestutil.BootstrappedLedger(virtualmachine.NewMapLedger(), privateKeys)
 	require.NoError(b, err)
 
 	// Create FungibleToken deployment transaction.
@@ -258,7 +258,7 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 	require.NoError(b, err)
 
 	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-	ledger, accounts, err := execTestutil.BootstrappedLedger(make(virtualmachine.MapLedger), privateKeys)
+	ledger, accounts, err := execTestutil.BootstrappedLedger(virtualmachine.NewMapLedger(), privateKeys)
 	require.NoError(b, err)
 
 	// Create FungibleToken deployment transaction.
@@ -327,7 +327,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 	require.NoError(t, err)
 
 	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-	ledger, accounts, err := execTestutil.BootstrappedLedger(make(virtualmachine.MapLedger), privateKeys)
+	ledger, accounts, err := execTestutil.BootstrappedLedger(virtualmachine.NewMapLedger(), privateKeys)
 	require.NoError(t, err)
 
 	// Create FungibleToken deployment transaction.
