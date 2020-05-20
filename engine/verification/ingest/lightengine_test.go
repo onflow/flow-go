@@ -54,9 +54,11 @@ type LightIngestTestSuite struct {
 	collections           *mempool.Collections
 	chunkDataPacks        *mempool.ChunkDataPacks
 	chunkDataPackTrackers *mempool.ChunkDataPackTrackers
+	collectionTrackers    *mempool.CollectionTrackers
 	ingestedChunkIDs      *mempool.Identifiers
 	ingestedResultIDs     *mempool.Identifiers
 	ingestedCollectionIDs *mempool.Identifiers
+	assignedChunkIDs      *mempool.Identifiers
 	headerStorage         *storage.Headers
 	blockStorage          *storage.Blocks
 	// resources fixtures
@@ -100,8 +102,10 @@ func (suite *LightIngestTestSuite) SetupTest() {
 	suite.collections = &mempool.Collections{}
 	suite.chunkDataPacks = &mempool.ChunkDataPacks{}
 	suite.chunkDataPackTrackers = &mempool.ChunkDataPackTrackers{}
+	suite.collectionTrackers = &mempool.CollectionTrackers{}
 	suite.ingestedResultIDs = &mempool.Identifiers{}
 	suite.ingestedChunkIDs = &mempool.Identifiers{}
+	suite.assignedChunkIDs = &mempool.Identifiers{}
 	suite.ingestedCollectionIDs = &mempool.Identifiers{}
 	suite.assigner = &module.ChunkAssigner{}
 
@@ -170,10 +174,12 @@ func (suite *LightIngestTestSuite) TestNewLightEngine() *ingest.LightEngine {
 		suite.receipts,
 		suite.collections,
 		suite.chunkDataPacks,
+		suite.collectionTrackers,
 		suite.chunkDataPackTrackers,
 		suite.ingestedChunkIDs,
 		suite.ingestedResultIDs,
 		suite.ingestedCollectionIDs,
+		suite.assignedChunkIDs,
 		suite.headerStorage,
 		suite.blockStorage,
 		suite.assigner,

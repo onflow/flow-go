@@ -125,6 +125,7 @@ type VerificationNode struct {
 	IngestedChunkIDs      mempool.Identifiers
 	IngestedResultIDs     mempool.Identifiers
 	IngestedCollectionIDs mempool.Identifiers
+	AssignedChunkIDs      mempool.Identifiers
 	IngestEngine          *ingest.LightEngine
 	VerifierEngine        network.Engine
 }

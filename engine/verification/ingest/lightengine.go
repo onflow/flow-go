@@ -41,6 +41,7 @@ type LightEngine struct {
 	collections           mempool.Collections           // keeps collections
 	chunkDataPacks        mempool.ChunkDataPacks        // keeps chunk data packs with authenticated origin IDs
 	chunkDataPackTackers  mempool.ChunkDataPackTrackers // keeps track of chunk data pack requests that this engine made
+	collectionTrackers    mempool.CollectionTrackers    // keeps track of collection requests that this engine made
 	ingestedResultIDs     mempool.Identifiers           // keeps ids of ingested execution results
 	ingestedChunkIDs      mempool.Identifiers           // keeps ids of ingested chunks
 	assignedChunkIDs      mempool.Identifiers           // keeps ids of assigned chunk IDs pending for ingestion
@@ -62,10 +63,12 @@ func NewLightEngine(
 	receipts mempool.Receipts,
 	collections mempool.Collections,
 	chunkDataPacks mempool.ChunkDataPacks,
+	collectionTrackers mempool.CollectionTrackers,
 	chunkDataPackTrackers mempool.ChunkDataPackTrackers,
 	ingestedChunkIDs mempool.Identifiers,
 	ingestedResultIDs mempool.Identifiers,
 	ingestedCollectionIDs mempool.Identifiers,
+	assignedChunkIDs mempool.Identifiers,
 	headerStorage storage.Headers,
 	blockStorage storage.Blocks,
 	assigner module.ChunkAssigner,
@@ -83,9 +86,11 @@ func NewLightEngine(
 		receipts:              receipts,
 		chunkDataPacks:        chunkDataPacks,
 		chunkDataPackTackers:  chunkDataPackTrackers,
+		collectionTrackers:    collectionTrackers,
 		ingestedChunkIDs:      ingestedChunkIDs,
 		ingestedResultIDs:     ingestedResultIDs,
 		ingestedCollectionIDs: ingestedCollectionIDs,
+		assignedChunkIDs:      assignedChunkIDs,
 		headerStorage:         headerStorage,
 		blockStorage:          blockStorage,
 		assigner:              assigner,
@@ -378,6 +383,9 @@ func (l *LightEngine) handleCollection(originID flow.Identifier, coll *flow.Coll
 		return nil
 	}
 
+	// cleans tracker for the collection if any exists
+	l.collectionTrackers.Rem(collID)
+
 	// adds collection to mempool
 	added := l.collections.Add(coll)
 	if !added {
@@ -529,13 +537,13 @@ func (l *LightEngine) getCollectionForChunk(block *flow.Block, receipt *flow.Exe
 		coll, exists := l.collections.ByID(collID)
 		if !exists {
 			// couldn't get the collection from mempool
-			log.Error().
+			l.log.Error().
 				Hex("collection_id", logging.ID(collID)).
 				Msg("could not get collection from authenticated pool")
 			return nil, false
 		}
 
-		log.Debug().
+		l.log.Debug().
 			Hex("collection_id", logging.ID(collID)).
 			Hex("chunk_id", logging.ID(chunk.ID())).
 			Msg("collection is resolved from authenticated mempool")
@@ -543,10 +551,21 @@ func (l *LightEngine) getCollectionForChunk(block *flow.Block, receipt *flow.Exe
 		return coll, true
 	}
 
+	if l.collectionTrackers.Has(collID) {
+		// collection has already been requested
+		// drops its request
+		l.log.Debug().
+			Hex("collection_id", logging.ID(collID)).
+			Msg("drops the request of already requested collection")
+	}
+
+	// adds a tracker for this collection
+	l.collectionTrackers.Add(trackers.NewCollectionTracker(collID, block.ID()))
+
 	// requests the collection from network
 	err := l.requestCollection(collID, block.ID())
 	if err != nil {
-		log.Error().
+		l.log.Error().
 			Err(err).
 			Hex("collection_id", logging.ID(collID)).
 			Msg("could make a request of collection to the network")
