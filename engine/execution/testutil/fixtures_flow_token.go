@@ -22,13 +22,13 @@ func CreateDeployFlowTokenContractTransaction(authorizer flow.Address, fungibleT
 			init(balance: UFix64) {
 				self.balance = balance
 			}
-			pub fun withdraw(amount: UFix64): @FlowToken.Vault {
+			pub fun withdraw(amount: UFix64): @FungibleToken.Vault {
 				self.balance = self.balance - amount
 				emit Withdraw(amount: amount, from: self.owner?.address)
 				return <-create Vault(balance: amount)
 			}
-			pub fun deposit(from: @Vault) {
-				let vault <- from as! @FlowToken.Vault
+			pub fun deposit(from: @FungibleToken.Vault) {
+				let vault <- from as! @Vault
 				self.balance = self.balance + vault.balance
 				emit Deposit(amount: vault.balance, to: self.owner?.address)
 				vault.balance = 0.0
@@ -38,7 +38,7 @@ func CreateDeployFlowTokenContractTransaction(authorizer flow.Address, fungibleT
 				FlowToken.totalSupply = FlowToken.totalSupply - self.balance
 			}
 		}
-		pub fun createEmptyVault(): @FlowToken.Vault {
+		pub fun createEmptyVault(): @FungibleToken.Vault {
 			return <-create Vault(balance: 0.0)
 		}
 		pub resource MintAndBurn {
