@@ -46,6 +46,9 @@ func (mt *MTrie) RootHash() []byte       { return mt.root.Hash() }
 func (mt *MTrie) Number() uint64         { return mt.number }
 func (mt *MTrie) ParentRootHash() []byte { return mt.parentRootHash }
 
+// Height return the trie height. The height is identical to the key length [in bit].
+func (mt *MTrie) Height() int { return mt.maxHeight - 1 }
+
 func (mt *MTrie) String() string {
 	trieStr := fmt.Sprintf("Trie number:%v hash:%v parent: %v\n", mt.number, mt.StringRootHash(), hex.EncodeToString(mt.parentRootHash))
 	return trieStr + mt.root.FmtStr("", "")
@@ -316,6 +319,16 @@ func (mt *MTrie) proofs(head *node.Node, keys [][]byte, proofs []*proof.Proof) e
 		}
 	}
 	return nil
+}
+
+// Equals compares two tries for equality.
+// Tries are equal iff they store the same data (i.e. root hash matches)
+// and their number and height are identical
+func (mt *MTrie) Equals(o *MTrie) bool {
+	if o == nil {
+		return false
+	}
+	return o.Number() == mt.Number() && o.Height() == mt.Height() && bytes.Equal(o.RootHash(), mt.RootHash())
 }
 
 // Store stores the trie key Values to a file

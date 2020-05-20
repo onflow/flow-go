@@ -183,6 +183,9 @@ func (n *Node) DeepCopy() *Node {
 // this is an expensive call and should only be used
 // for limited cases (e.g. testing)
 func (n *Node) Equals(o *Node) bool {
+	if o == nil {
+		return false
+	}
 
 	// height don't match
 	if n.height != o.height {

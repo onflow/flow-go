@@ -91,10 +91,24 @@ func (f *MForest) GetTrie(rootHash []byte) (*trie.MTrie, error) {
 }
 
 // AddTrie adds a trie to the forest
-func (f *MForest) AddTrie(trie *trie.MTrie) error {
-	// TODO check if not exist
-	encoded := trie.StringRootHash()
-	f.tries.Add(encoded, trie)
+func (f *MForest) AddTrie(newTrie *trie.MTrie) error {
+	if newTrie == nil {
+		return nil
+	}
+	expectedHeight := f.maxHeight - 1
+	if newTrie.Height() != expectedHeight {
+		return fmt.Errorf("forest holds tries of uniform height %d, but new trie has height %d", expectedHeight, newTrie.Height())
+	}
+
+	hashString := newTrie.StringRootHash()
+	if storedTrie, found := f.tries.Get(hashString); found {
+		foo := storedTrie.(*trie.MTrie)
+		if foo.Equals(newTrie) {
+			return nil
+		}
+		return fmt.Errorf("forest already contains a tree with same root hash but other properties")
+	}
+	f.tries.Add(hashString, newTrie)
 	return nil
 }
 
@@ -105,14 +119,14 @@ func (f *MForest) RemoveTrie(rootHash []byte) {
 	f.tries.Remove(encRootHash)
 }
 
-// GetEmptyRootHash returns the rootHash of empty forest
+// GetEmptyRootHash returns the rootHash of empty Trie
 func (f *MForest) GetEmptyRootHash() []byte {
 	dummyRoot := node.NewEmptyTreeRoot(f.maxHeight - 1)
 	return dummyRoot.Hash()
 }
 
 // Read reads values for an slice of keys and returns values and error (if any)
-func (f *MForest) Read(keys [][]byte, rootHash []byte) ([][]byte, error) {
+func (f *MForest) Read(rootHash []byte, keys [][]byte) ([][]byte, error) {
 
 	// no key no change
 	if len(keys) == 0 {
@@ -164,7 +178,7 @@ func (f *MForest) Read(keys [][]byte, rootHash []byte) ([][]byte, error) {
 }
 
 // Update updates the Values for the registers and returns rootHash and error (if any)
-func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) (*trie.MTrie, error) {
+func (f *MForest) Update(rootHash []byte, keys [][]byte, values [][]byte) (*trie.MTrie, error) {
 	parentTrie, err := f.GetTrie(rootHash)
 	if err != nil {
 		return nil, err
@@ -218,7 +232,7 @@ func (f *MForest) Update(keys [][]byte, values [][]byte, rootHash []byte) (*trie
 }
 
 // Proofs returns a batch proof for the given keys
-func (f *MForest) Proofs(keys [][]byte, rootHash []byte) (*proof.BatchProof, error) {
+func (f *MForest) Proofs(rootHash []byte, keys [][]byte) (*proof.BatchProof, error) {
 
 	// no key, empty batchproof
 	if len(keys) == 0 {
