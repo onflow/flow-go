@@ -46,8 +46,8 @@ func (s *Suite) SetupTest() {
 	acsConfig := testnet.NewNodeConfig(flow.RoleAccess)
 	s.nodeConfigs = append(s.nodeConfigs, acsConfig)
 
-	// generate the three consensus identities
-	s.nodeIDs = unittest.IdentifierListFixture(3)
+	// generate the four consensus identities
+	s.nodeIDs = unittest.IdentifierListFixture(4)
 	for _, nodeID := range s.nodeIDs {
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithID(nodeID),
 			testnet.WithLogLevel(zerolog.FatalLevel),
