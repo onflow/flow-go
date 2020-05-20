@@ -351,7 +351,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 	require.NoError(t, err)
 
 	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 100; i++ {
 		wg.Add(1)
 		go func(id int, wg *sync.WaitGroup) {
 			defer wg.Done()
