@@ -319,10 +319,7 @@ func (e *Engine) handleBlockProposal(ctx context.Context, proposal *messages.Blo
 			e.tryRequeueOrphans(executableBlock, newQueue, orphanQueues)
 
 			// If the block was empty
-			if executableBlock.IsComplete() {
-				e.wg.Add(1)
-				go e.executeBlock(ctx, executableBlock)
-			}
+			e.executeBlockIfComplete(executableBlock)
 
 			return nil
 		},
@@ -411,10 +408,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 					return fmt.Errorf("fatal error - child block already in execution queue")
 				}
 
-				if newExecutableBlock.IsComplete() {
-					e.wg.Add(1)
-					go e.executeBlock(context.Background(), newExecutableBlock)
-				}
+				e.executeBlockIfComplete(newExecutableBlock)
 			}
 
 			executionQueues.Rem(executableBlock.Block.ID())
@@ -433,6 +427,21 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		Hex("final_state", finalState).
 		Msg("block executed")
 	e.metrics.ExecutionLastExecutedBlockView(executableBlock.Block.Header.View)
+}
+
+func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) {
+	if eb.IsComplete() {
+		e.log.Debug().
+			Hex("block_id", logging.Entity(eb.Block)).
+			Msg("executing block")
+
+		if e.extensiveLogging {
+			e.logExecutableBlock(eb)
+		}
+
+		e.wg.Add(1)
+		go e.executeBlock(context.Background(), eb)
+	}
 }
 
 func (e *Engine) handleCollectionResponse(ctx context.Context, response *messages.CollectionResponse) error {
@@ -467,18 +476,7 @@ func (e *Engine) handleCollectionResponse(ctx context.Context, response *message
 
 				completeCollection.Transactions = collection.Transactions
 
-				if executableBlock.IsComplete() {
-
-					e.log.Debug().
-						Hex("block_id", logging.Entity(executableBlock.Block)).
-						Msg("block complete - executing")
-
-					if e.extensiveLogging {
-						e.logExecutableBlock(executableBlock)
-					}
-					e.wg.Add(1)
-					go e.executeBlock(ctx, executableBlock)
-				}
+				e.executeBlockIfComplete(executableBlock)
 			}
 			backdata.Rem(collID)
 
