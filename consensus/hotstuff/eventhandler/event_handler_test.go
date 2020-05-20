@@ -527,7 +527,7 @@ func (es *EventHandlerSuite) TestInNewView_NotLeader_HasBlock_NoVote_IsNextLeade
 
 	lastCall := es.communicator.Calls[len(es.communicator.Calls)-1]
 	// the last call is BroadcastProposal
-	require.Equal(es.T(), "BroadcastProposal", lastCall.Method)
+	require.Equal(es.T(), "BroadcastProposalWithDelay", lastCall.Method)
 	header, ok := lastCall.Arguments[0].(*flow.Header)
 	require.True(es.T(), ok)
 	// it should broadcast a header as the same as endView
@@ -708,7 +708,7 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_ForCurView_NoVote_IsNextLeade
 
 	lastCall := es.communicator.Calls[len(es.communicator.Calls)-1]
 	// the last call is BroadcastProposal
-	require.Equal(es.T(), "BroadcastProposal", lastCall.Method)
+	require.Equal(es.T(), "BroadcastProposalWithDelay", lastCall.Method)
 	header, ok := lastCall.Arguments[0].(*flow.Header)
 	require.True(es.T(), ok)
 	// it should broadcast a header as the same as endView
@@ -767,7 +767,7 @@ func (es *EventHandlerSuite) TestLeaderBuild100Blocks() {
 		err := es.eventhandler.OnReceiveProposal(proposal)
 		require.NoError(es.T(), err)
 		lastCall := es.communicator.Calls[len(es.communicator.Calls)-1]
-		require.Equal(es.T(), "BroadcastProposal", lastCall.Method)
+		require.Equal(es.T(), "BroadcastProposalWithDelay", lastCall.Method)
 		header, ok := lastCall.Arguments[0].(*flow.Header)
 		require.True(es.T(), ok)
 		require.Equal(es.T(), proposal.Block.View+1, header.View)

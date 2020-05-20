@@ -243,6 +243,9 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 	}
 
 	e.unit.LaunchAfter(delay, func() {
+
+		go e.hotstuff.SubmitProposal(header, parent.View)
+
 		// NOTE: some fields are not needed for the message
 		// - proposer ID is conveyed over the network message
 		// - the payload hash is deduced from the payload
@@ -258,8 +261,6 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		}
 
 		e.metrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockProposal)
-
-		go e.hotstuff.SubmitProposal(header, parent.View)
 
 		log.Info().Msg("block proposal broadcasted")
 
