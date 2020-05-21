@@ -246,6 +246,9 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 	}
 
 	e.unit.LaunchAfter(delay, func() {
+
+		go e.hotstuff.SubmitProposal(header, parent.View)
+
 		// create the proposal message for the collection
 		msg := &messages.ClusterBlockProposal{
 			Header:  header,
