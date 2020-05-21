@@ -470,6 +470,9 @@ func (l *LightEngine) getChunkDataPackForReceipt(receipt *flow.ExecutionReceipt,
 			Msg("drops the request of already requested chunk")
 	}
 
+	// adds a tracker for this collection
+	l.chunkDataPackTackers.Add(trackers.NewChunkDataPackTracker(chunkID, receipt.ExecutionResult.BlockID))
+
 	// requests the chunk data pack from network
 	err := l.requestChunkDataPack(chunkID, receipt.ExecutionResult.BlockID)
 	if err != nil {
@@ -584,16 +587,15 @@ func (l *LightEngine) checkPendingChunks() {
 				continue
 			}
 
-			// receipt has at least one chunk for ingestion
-			// not ready to clean
-			readyToClean = false
-
 			// retrieves collection corresponding to the chunk
 			collection, collectionReady := l.getCollectionForChunk(block, receipt, chunk)
 			// retrieves chunk data pack for chunk
 			chunkDatapack, chunkDataPackReady := l.getChunkDataPackForReceipt(receipt, chunk.ID())
 
 			if !collectionReady || !chunkDataPackReady {
+				// receipt has at least one chunk pending for ingestion not ready to clean
+				readyToClean = false
+
 				// can not verify a chunk without its chunk data pack or collection moves to the next chunk
 				continue
 			}
@@ -605,6 +607,9 @@ func (l *LightEngine) checkPendingChunks() {
 					Hex("result_id", logging.Entity(receipt.ExecutionResult)).
 					Hex("chunk_id", logging.ID(chunk.ID())).
 					Msg("could not ingest chunk")
+
+				// receipt has at least one chunk pending for ingestion not ready to clean
+				readyToClean = false
 			}
 		}
 

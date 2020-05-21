@@ -98,7 +98,8 @@ func TestHappyPath(t *testing.T) {
 // - submitting a verifiable chunk locally to the verify engine by the ingest engine
 // - dropping the ingestion of the ERs that share the same result once the verifiable chunk is submitted to verify engine
 // - broadcast of a matching result approval to consensus nodes for each assigned chunk
-func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
+// lightIngest indicates whether to use the LightIngestEngine or the original ingest engine
+func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest bool) {
 	// to demarcate the debug logs
 	log.Debug().
 		Int("verification_nodes_count", verNodeCount).
@@ -268,11 +269,16 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 				assert.True(t, verNode.IngestedChunkIDs.Has(completeER.Receipt.ExecutionResult.Chunks[i].ID()))
 			}
 		}
-		// since all chunks have been ingested, neither of execution receipts should reside on any mempool
-		assert.False(t, verNode.PendingReceipts.Has(receipt1.ID()))
-		assert.False(t, verNode.AuthReceipts.Has(receipt1.ID()))
-		assert.False(t, verNode.PendingReceipts.Has(receipt2.ID()))
-		assert.False(t, verNode.AuthReceipts.Has(receipt2.ID()))
+
+		// LightIngestEngine does the cleaning of ingested receipts slower and passively
+		// hence it is discarded to check the receipts clean up in lightIngest mode.
+		if !lightIngest {
+			// since all chunks have been ingested, neither of execution receipts should reside on any mempool
+			assert.False(t, verNode.PendingReceipts.Has(receipt1.ID()))
+			assert.False(t, verNode.AuthReceipts.Has(receipt1.ID()))
+			assert.False(t, verNode.PendingReceipts.Has(receipt2.ID()))
+			assert.False(t, verNode.AuthReceipts.Has(receipt2.ID()))
+		}
 
 		// result ID should be added to the ingested results mempool
 		assert.True(t, verNode.IngestedResultIDs.Has(completeER.Receipt.ExecutionResult.ID()))
