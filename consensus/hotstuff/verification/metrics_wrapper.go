@@ -16,6 +16,13 @@ type SignerMetricsWrapper struct {
 	metrics module.HotstuffMetrics
 }
 
+func NewMetricsWrapper(signer hotstuff.Signer, metrics module.HotstuffMetrics) hotstuff.Signer {
+	return &SignerMetricsWrapper{
+		signer:  signer,
+		metrics: metrics,
+	}
+}
+
 func (w SignerMetricsWrapper) VerifyVote(voterID flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
 	processStart := time.Now()
 	valid, err := w.signer.VerifyVote(voterID, sigData, block)

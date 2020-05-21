@@ -11,9 +11,13 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff"
+
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/blockproducer"
+
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
+	committeeImpl "github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	protocolRecovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
@@ -210,7 +214,8 @@ func main() {
 			}
 
 			// initialize the block builder
-			build := builder.NewBuilder(
+			var build module.Builder
+			build = builder.NewBuilder(
 				node.Metrics.Mempool,
 				node.DB,
 				node.Storage.Headers,
@@ -222,6 +227,7 @@ func main() {
 				builder.WithMinInterval(minInterval),
 				builder.WithMaxInterval(maxInterval),
 			)
+			build = blockproducer.NewMetricsWrapper(build, mainMetrics) // wrapper for measuring time spent building block payload component
 
 			// initialize the block finalizer
 			finalize := finalizer.NewFinalizer(
@@ -248,13 +254,16 @@ func main() {
 			merger := signature.NewCombiner()
 
 			// initialize Main consensus committee's state
-			committee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID())
+			var committee hotstuff.Committee
+			committee, err = committeeImpl.NewMainConsensusCommitteeState(node.State, node.Me.NodeID())
 			if err != nil {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
+			committee = committeeImpl.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
 
 			// initialize the combined signer for hotstuff
-			signer := verification.NewCombinedSigner(
+			var signer hotstuff.Signer
+			signer = verification.NewCombinedSigner(
 				committee,
 				node.DKGState,
 				staking,
@@ -262,6 +271,7 @@ func main() {
 				merger,
 				node.NodeID,
 			)
+			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations
 
 			// initialize a logging notifier for hotstuff
 			notifier := createNotifier(node.Logger, mainMetrics)

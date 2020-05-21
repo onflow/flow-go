@@ -3,21 +3,27 @@ package blockproducer
 import (
 	"time"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 )
 
-// BlockProducerMetricsWrapper measures the time which the HotStuff's core logic
-// spends in the hotstuff.BlockProducer component, i.e. the with generating block payloads
-type BlockProducerMetricsWrapper struct {
-	blockProducer hotstuff.BlockProducer
-	metrics       module.HotstuffMetrics
+// BlockBuilderMetricsWrapper measures the time which the HotStuff's core logic
+// spends in the module.Builder component, i.e. the with generating block payloads
+type BlockBuilderMetricsWrapper struct {
+	builder module.Builder
+	metrics module.HotstuffMetrics
 }
 
-func (w BlockProducerMetricsWrapper) MakeBlockProposal(qc *model.QuorumCertificate, view uint64) (*model.Proposal, error) {
+func NewMetricsWrapper(builder module.Builder, metrics module.HotstuffMetrics) module.Builder {
+	return &BlockBuilderMetricsWrapper{
+		builder: builder,
+		metrics: metrics,
+	}
+}
+
+func (w BlockBuilderMetricsWrapper) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
 	processStart := time.Now()
-	proposal, err := w.blockProducer.MakeBlockProposal(qc, view)
+	header, err := w.builder.BuildOn(parentID, setter)
 	w.metrics.PayloadProductionDuration(time.Since(processStart))
-	return proposal, err
+	return header, err
 }

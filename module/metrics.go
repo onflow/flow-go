@@ -83,7 +83,7 @@ type HotstuffMetrics interface {
 	ValidatorProcessingDuration(duration time.Duration)
 
 	// PayloadProductionDuration measures the time which the HotStuff's core logic
-	// spends in the hotstuff.BlockProducer component, i.e. the with generating block payloads
+	// spends in the module.Builder component, i.e. the with generating block payloads
 	PayloadProductionDuration(duration time.Duration)
 }
 

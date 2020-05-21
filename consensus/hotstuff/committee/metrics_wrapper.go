@@ -4,6 +4,7 @@ package committee
 import (
 	"time"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 )
@@ -12,8 +13,15 @@ import (
 // spends in the hotstuff.Committee component, i.e. the time determining consensus
 // committee relations.
 type CommitteeMetricsWrapper struct {
-	committee Committee
+	committee hotstuff.Committee
 	metrics   module.HotstuffMetrics
+}
+
+func NewMetricsWrapper(committee hotstuff.Committee, metrics module.HotstuffMetrics) hotstuff.Committee {
+	return &CommitteeMetricsWrapper{
+		committee: committee,
+		metrics:   metrics,
+	}
 }
 
 func (w CommitteeMetricsWrapper) Identities(blockID flow.Identifier, selector flow.IdentityFilter) (flow.IdentityList, error) {

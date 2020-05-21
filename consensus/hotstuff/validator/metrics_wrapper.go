@@ -17,6 +17,13 @@ type ValidatorMetricsWrapper struct {
 	metrics   module.HotstuffMetrics
 }
 
+func NewMetricsWrapper(validator hotstuff.Validator, metrics module.HotstuffMetrics) hotstuff.Validator {
+	return &ValidatorMetricsWrapper{
+		validator: validator,
+		metrics:   metrics,
+	}
+}
+
 func (w ValidatorMetricsWrapper) ValidateQC(qc *model.QuorumCertificate, block *model.Block) error {
 	processStart := time.Now()
 	err := w.validator.ValidateQC(qc, block)

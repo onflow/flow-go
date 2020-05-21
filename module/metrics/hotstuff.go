@@ -239,7 +239,7 @@ func (hc *HotstuffCollector) ValidatorProcessingDuration(duration time.Duration)
 }
 
 // PayloadProductionDuration reports the time which the HotStuff's core logic
-// spends in the hotstuff.BlockProducer component, i.e. the with generating block payloads
+// spends in the module.Builder component, i.e. the with generating block payloads
 func (hc *HotstuffCollector) PayloadProductionDuration(duration time.Duration) {
 	// We report the time in centi-seconds, i.e. in units of 1/100 seconds
 	hc.payloadProductionCsCounter.Add(float64(duration.Milliseconds()) * 0.1)
