@@ -304,7 +304,7 @@ func (e *Engine) handleBlockProposal(ctx context.Context, proposal *messages.Blo
 			}
 
 			//if block has state commitment, it has all parents blocks
-			err = e.sendCollectionsRequest(executableBlock, blockByCollection)
+			err = e.matchOrRequestCollections(executableBlock, blockByCollection)
 			if err != nil {
 				return fmt.Errorf("cannot send collection requests: %w", err)
 			}
@@ -398,7 +398,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 				newExecutableBlock := queue.Head.Item.(*entity.ExecutableBlock)
 				newExecutableBlock.StartState = finalState
 
-				err := e.sendCollectionsRequest(newExecutableBlock, blockByCollection)
+				err := e.matchOrRequestCollections(newExecutableBlock, blockByCollection)
 				if err != nil {
 					return fmt.Errorf("cannot send collection requests: %w", err)
 				}
@@ -610,7 +610,7 @@ func (e *Engine) submitCollectionRequest(timer **time.Timer, collID flow.Identif
 	})
 }
 
-func (e *Engine) sendCollectionsRequest(
+func (e *Engine) matchOrRequestCollections(
 	executableBlock *entity.ExecutableBlock,
 	backdata *stdmap.BlockByCollectionBackdata,
 ) error {
@@ -1111,7 +1111,7 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 				executableBlock := syncedQueue.Head.Item.(*entity.ExecutableBlock)
 				executableBlock.StartState = executionStateDelta.EndState
 
-				err = e.sendCollectionsRequest(executableBlock, blockByCollection)
+				err = e.matchOrRequestCollections(executableBlock, blockByCollection)
 				if err != nil {
 					return fmt.Errorf("cannot send collection requests: %w", err)
 				}
@@ -1180,6 +1180,7 @@ func generateChunkDataPack(
 	registers []flow.RegisterID,
 	values []flow.RegisterValue,
 	proofs []flow.StorageProof,
+	collection flow.Collection,
 ) *flow.ChunkDataPack {
 	regTs := make([]flow.RegisterTouch, len(registers))
 	for i, reg := range registers {
@@ -1192,5 +1193,6 @@ func generateChunkDataPack(
 		ChunkID:         chunk.ID(),
 		StartState:      chunk.StartState,
 		RegisterTouches: regTs,
+		Collection:      collection,
 	}
 }
