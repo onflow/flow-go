@@ -15,17 +15,21 @@ type ParticipantConfig struct {
 
 type Option func(*ParticipantConfig)
 
-func WithTimeout(timeout time.Duration) Option {
+func WithInitialTimeout(timeout time.Duration) Option {
 	return func(cfg *ParticipantConfig) {
 		cfg.TimeoutInitial = timeout
-		cfg.TimeoutMinimum = timeout
-		cfg.TimeoutDecreaseStep = timeout / 2
 	}
 }
 
-func WithBlockRateDelay(delay time.Duration) Option {
+func WithMinTimeout(timeout time.Duration) Option {
 	return func(cfg *ParticipantConfig) {
-		cfg.BlockRateDelay = delay
+		cfg.TimeoutMinimum = timeout
+	}
+}
+
+func WithTimeoutIncreaseFactor(factor float64) Option {
+	return func(cfg *ParticipantConfig) {
+		cfg.TimeoutIncreaseFactor = factor
 	}
 }
 
@@ -41,8 +45,8 @@ func WithVoteAggregationTimeoutFraction(fraction float64) Option {
 	}
 }
 
-func WithTimeoutIncreaseFactor(factor float64) Option {
+func WithBlockRateDelay(delay time.Duration) Option {
 	return func(cfg *ParticipantConfig) {
-		cfg.TimeoutIncreaseFactor = factor
+		cfg.BlockRateDelay = delay
 	}
 }

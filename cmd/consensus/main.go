@@ -48,6 +48,7 @@ func main() {
 		minInterval                            time.Duration
 		maxInterval                            time.Duration
 		hotstuffTimeout                        time.Duration
+		hotstuffMinTimeout                     time.Duration
 		hotstuffTimeoutInfreaseFactor          float64
 		hotstuffTimeoutDecrease                time.Duration
 		hotstuffTimeoutVoteAggregationFraction float64
@@ -75,15 +76,16 @@ func main() {
 			flags.UintVar(&approvalLimit, "approval-limit", 1000, "maximum number of result approvals in the memory pool")
 			flags.UintVar(&sealLimit, "seal-limit", 1000, "maximum number of block seals in the memory pool")
 			flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
-			flags.DurationVar(&maxInterval, "max-interval", 60*time.Second, "the maximum amount of time between two blocks")
-			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 2*time.Second, "the initial timeout for the hotstuff pacemaker")
-			flags.DurationVar(&hotstuffTimeoutDecrease, "hotstuff-timeout-decrease", 2*time.Second, "decrease of timeout duration in case of progress")
-			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", 0.75, "additional fraction of replica timeout that the primary will wait for votes")
-			flags.Float64Var(&hotstuffTimeoutInfreaseFactor, "hotstuff-timeout-increase-factor", 1.3, "multiplicative increase of timeout duration in case of time out event")
+			flags.DurationVar(&maxInterval, "max-interval", 90*time.Second, "the maximum amount of time between two blocks")
+			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second, "the initial timeout for the hotstuff pacemaker")
+			flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 1200*time.Millisecond, "the lower timeout bound for the hotstuff pacemaker")
+			flags.DurationVar(&hotstuffTimeoutDecrease, "hotstuff-timeout-decrease", 1*time.Second, "decrease of timeout duration in case of progress")
+			flags.Float64Var(&hotstuffTimeoutInfreaseFactor, "hotstuff-timeout-increase-factor", 2.0, "multiplicative increase of timeout duration in case of time out event")
+			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", 0.5, "additional fraction of replica timeout that the primary will wait for votes")
 			// From the experiment,
 			// if block rate delay is 1 second, then 0.8 block will be finalized per second in average.
 			// if block rate delay is 1.5 second, then 0.5 block will be finalized per second in averge
-			flags.DurationVar(&blockRateDelay, "block-rate-delay", time.Second, "the delay to broadcast block proposal in order to control block production rate")
+			flags.DurationVar(&blockRateDelay, "block-rate-delay", 0*time.Second, "the delay to broadcast block proposal in order to control block production rate")
 		}).
 		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
 			privateDKGData, err = loadDKGPrivateData(node.BaseConfig.BootstrapDir, node.NodeID)
@@ -296,11 +298,12 @@ func main() {
 				node.GenesisQC,
 				finalized,
 				pending,
-				consensus.WithTimeout(hotstuffTimeout),
-				consensus.WithBlockRateDelay(blockRateDelay),
-				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
+				consensus.WithInitialTimeout(hotstuffTimeout),
+				consensus.WithMinTimeout(hotstuffMinTimeout),
 				consensus.WithTimeoutDecreaseStep(hotstuffTimeoutDecrease),
 				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutInfreaseFactor),
+				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
+				consensus.WithBlockRateDelay(blockRateDelay),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize hotstuff engine: %w", err)
