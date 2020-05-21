@@ -40,3 +40,9 @@ func WithVoteAggregationTimeoutFraction(fraction float64) Option {
 		cfg.TimeoutAggregationFraction = fraction
 	}
 }
+
+func WithTimeoutIncreaseFactor(factor float64) Option {
+	return func(cfg *ParticipantConfig) {
+		cfg.TimeoutIncreaseFactor = factor
+	}
+}

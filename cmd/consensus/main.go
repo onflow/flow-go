@@ -48,6 +48,7 @@ func main() {
 		minInterval                            time.Duration
 		maxInterval                            time.Duration
 		hotstuffTimeout                        time.Duration
+		hotstuffTimeoutInfreaseFactor          float64
 		hotstuffTimeoutDecrease                time.Duration
 		hotstuffTimeoutVoteAggregationFraction float64
 		blockRateDelay                         time.Duration
@@ -76,8 +77,9 @@ func main() {
 			flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
 			flags.DurationVar(&maxInterval, "max-interval", 60*time.Second, "the maximum amount of time between two blocks")
 			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 2*time.Second, "the initial timeout for the hotstuff pacemaker")
-			flags.DurationVar(&hotstuffTimeoutDecrease, "hotstuff-timeout-decrease", 2*time.Second, "the initial timeout for the hotstuff pacemaker")
-			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", 0.75, "the initial timeout for the hotstuff pacemaker")
+			flags.DurationVar(&hotstuffTimeoutDecrease, "hotstuff-timeout-decrease", 2*time.Second, "decrease of timeout duration in case of progress")
+			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", 0.75, "additional fraction of replica timeout that the primary will wait for votes")
+			flags.Float64Var(&hotstuffTimeoutInfreaseFactor, "hotstuff-timeout-increase-factor", 1.3, "multiplicative increase of timeout duration in case of time out event")
 			// From the experiment,
 			// if block rate delay is 1 second, then 0.8 block will be finalized per second in average.
 			// if block rate delay is 1.5 second, then 0.5 block will be finalized per second in averge
@@ -296,8 +298,9 @@ func main() {
 				pending,
 				consensus.WithTimeout(hotstuffTimeout),
 				consensus.WithBlockRateDelay(blockRateDelay),
-				consensus.WithTimeoutDecreaseStep(hotstuffTimeoutDecrease),
 				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
+				consensus.WithTimeoutDecreaseStep(hotstuffTimeoutDecrease),
+				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutInfreaseFactor),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize hotstuff engine: %w", err)
