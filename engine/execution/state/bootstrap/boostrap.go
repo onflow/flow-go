@@ -84,17 +84,17 @@ func BootstrapView(view *delta.View) {
 
 func createRootAccount(l virtualmachine.LedgerDAL) flow.Address {
 	// TODO: remove magic constant
-	accountKey := flow.RootAccountPrivateKey.PublicKey(1000)
+	accountKey := flow.RootAccountPrivateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold)
 
 	err := l.CreateAccountWithAddress(
-		flow.ZeroAddress,
+		flow.RootAddress,
 		[]flow.AccountPublicKey{accountKey},
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create root account: %s", err))
 	}
 
-	return flow.ZeroAddress
+	return flow.RootAddress
 }
 
 func deployFungibleToken(ctx virtualmachine.BlockContext, view *delta.View) flow.Address {
@@ -173,8 +173,7 @@ func deployContract(ctx virtualmachine.BlockContext, view *delta.View, contract 
 					AuthAccount(publicKeys: [], code: "%s".decodeHex())
               	}
             }
-		`,
-			contract),
+		`, contract),
 	)
 
 	tx := flow.NewTransactionBody().SetScript(script)
@@ -206,8 +205,7 @@ func deployContractToAccount(
 					 acct.setCode("%s".decodeHex())
               	}
             }
-		`,
-			contract),
+		`, contract),
 	)
 
 	tx := flow.NewTransactionBody().

@@ -195,7 +195,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 					execute { log(x); log(y) }
 				}`,
 			args:        [][]byte{arg1, arg2},
-			authorizers: []flow.Address{flow.HexToAddress("01")},
+			authorizers: []flow.Address{flow.RootAddress},
 			check: func(t *testing.T, result *virtualmachine.TransactionResult) {
 				require.Nil(t, result.Error)
 				assert.ElementsMatch(t, []string{"0x1", "42", `"foo"`}, result.Logs)
