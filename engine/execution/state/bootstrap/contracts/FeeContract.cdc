@@ -23,12 +23,12 @@ pub contract FeeContract {
 
     // Private vault, with public deposit function
     //
-    access(self) var vault: @FlowToken.Vault
+    access(self) var vault: @FungibleToken.Vault
 
     // deposit
     //
     //
-    pub fun deposit(from: @FlowToken.Vault) {
+    pub fun deposit(from: @FungibleToken.Vault) {
         let balance = from.balance
         self.vault.deposit(from: <- from)
         emit FeeDeposited(amount: balance)

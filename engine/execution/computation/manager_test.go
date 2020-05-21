@@ -19,10 +19,18 @@ import (
 
 func TestComputeBlockWithStorage(t *testing.T) {
 
-	tx1 := testutil.DeployCounterContractTransaction()
-	tx2 := testutil.CreateCounterTransaction()
+	view := unittest.EmptyView()
 
-	err := testutil.SignTransactionByRoot(&tx1, 0)
+	privateKeys, err := testutil.GenerateAccountPrivateKeys(2)
+	require.NoError(t, err)
+
+	accounts, err := testutil.BootstrappedLedger(view, privateKeys)
+	require.NoError(t, err)
+
+	tx1 := testutil.DeployCounterContractTransaction(accounts[0])
+	tx2 := testutil.CreateCounterTransaction(accounts[0], accounts[1])
+
+	err = testutil.SignTransactionByRoot(&tx1, 0)
 	require.NoError(t, err)
 	err = testutil.SignTransactionByRoot(&tx2, 1)
 	require.NoError(t, err)
@@ -70,14 +78,12 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		me:            me,
 	}
 
-	view := unittest.EmptyView()
+	blockView := view.NewChild()
 
-	require.Empty(t, view.Delta())
-
-	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, view)
+	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
 	require.NoError(t, err)
 
-	require.NotEmpty(t, view.Delta())
+	require.NotEmpty(t, blockView.Delta())
 	require.Len(t, returnedComputationResult.StateSnapshots, 1)
 	assert.NotEmpty(t, returnedComputationResult.StateSnapshots[0].Delta)
 }
