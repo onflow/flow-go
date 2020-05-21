@@ -63,23 +63,21 @@ func GenerateAccountPrivateKeys(numberOfPrivateKeys int) ([]flow.AccountPrivateK
 }
 
 // Create accounts on the ledger for the root account and for the private keys provided.
-func BootstrappedLedger(ledger virtualmachine.Ledger, privateKeys []flow.AccountPrivateKey) (virtualmachine.Ledger, []flow.Address, error) {
+func BootstrappedLedger(ledger virtualmachine.Ledger, privateKeys []flow.AccountPrivateKey) ([]flow.Address, error) {
+	ledgerAccess := virtualmachine.NewLedgerDAL(ledger)
+
 	var accounts []flow.Address
 
-	ledgerAccess := virtualmachine.NewLedgerDAL(ledger)
-	privateKeysIncludingRoot := []flow.AccountPrivateKey{flow.ServiceAccountPrivateKey}
-	if len(privateKeys) > 0 {
-		privateKeysIncludingRoot = append(privateKeysIncludingRoot, privateKeys...)
-	}
-	for _, account := range privateKeysIncludingRoot {
+	for _, account := range privateKeys {
 		accountPublicKey := account.PublicKey(virtualmachine.AccountKeyWeightThreshold)
 		account, err := ledgerAccess.CreateAccount([]flow.AccountPublicKey{accountPublicKey})
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		accounts = append(accounts, account)
 	}
-	return ledger, accounts, nil
+
+	return accounts, nil
 }
 
 func SignTransactionByRoot(tx *flow.TransactionBody, seqNum uint64) error {

@@ -88,10 +88,10 @@ func BootstrapView(view *delta.View) {
 }
 
 func createRootAccount(l virtualmachine.LedgerDAL) flow.Address {
-	// TODO: remove magic constant
-	accountKey := flow.ServiceAccountPrivateKey.PublicKey(1000)
+	accountKey := flow.ServiceAccountPrivateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold)
 
 	addr, err := l.CreateAccount([]flow.AccountPublicKey{accountKey})
+
 	if err != nil {
 		panic(fmt.Sprintf("failed to create root account: %s", err))
 	}
@@ -175,8 +175,7 @@ func deployContract(ctx virtualmachine.BlockContext, view *delta.View, contract 
 					AuthAccount(publicKeys: [], code: "%s".decodeHex())
               	}
             }
-		`,
-			contract),
+		`, contract),
 	)
 
 	tx := flow.NewTransactionBody().SetScript(script)
@@ -208,8 +207,7 @@ func deployContractToAccount(
 					 acct.setCode("%s".decodeHex())
               	}
             }
-		`,
-			contract),
+		`, contract),
 	)
 
 	tx := flow.NewTransactionBody().

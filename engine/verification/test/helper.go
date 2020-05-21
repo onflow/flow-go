@@ -49,11 +49,13 @@ func CompleteExecutionResultFixture(t testing.TB, chunkCount int) verification.C
 		ids := make([][]byte, 0)
 		values := make([][]byte, 0)
 
-		//bootstrap with root account as it is retrieved by VM to check for permissions
+		// bootstrap with root account as it is retrieved by VM to check for permissions
 		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
 		})
+
 		err := testutil.BootstrapLedgerWithServiceAccount(view)
+
 		require.NoError(t, err)
 
 		rootRegisterIDs, rootRegisterValues := view.Interactions().Delta.RegisterUpdates()

@@ -71,7 +71,7 @@ pub contract FlowToken: FungibleToken {
         // created Vault to the context that called so it can be deposited
         // elsewhere.
         //
-        pub fun withdraw(amount: UFix64): @FlowToken.Vault {
+        pub fun withdraw(amount: UFix64): @FungibleToken.Vault {
             self.balance = self.balance - amount
             emit Withdraw(amount: amount, from: self.owner?.address)
             return <-create Vault(balance: amount)
@@ -84,7 +84,7 @@ pub contract FlowToken: FungibleToken {
         // It is allowed to destroy the sent Vault because the Vault
         // was a temporary holder of the tokens. The Vault's balance has
         // been consumed and therefore can be destroyed.
-        pub fun deposit(from: @Vault) {
+        pub fun deposit(from: @FungibleToken.Vault) {
             let vault <- from as! @FlowToken.Vault
             self.balance = self.balance + vault.balance
             emit Deposit(amount: vault.balance, to: self.owner?.address)
@@ -104,7 +104,7 @@ pub contract FlowToken: FungibleToken {
     // and store the returned Vault in their storage in order to allow their
     // account to be able to receive deposits of this token type.
     //
-    pub fun createEmptyVault(): @FlowToken.Vault {
+    pub fun createEmptyVault(): @FungibleToken.Vault {
         return <-create Vault(balance: 0.0)
     }
 
@@ -142,7 +142,7 @@ pub contract FlowToken: FungibleToken {
         //
         // Returns the amount that was burnt.
         //
-        pub fun burnTokens(from: @Vault) {
+        pub fun burnTokens(from: @FungibleToken.Vault) {
             let vault <- from as! @FlowToken.Vault
             let amount = vault.balance
             destroy vault

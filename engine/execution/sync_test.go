@@ -48,17 +48,17 @@ func TestSyncFlow(t *testing.T) {
 
 	seq := uint64(0)
 
-	tx1 := execTestutil.DeployCounterContractTransaction()
+	tx1 := execTestutil.DeployCounterContractTransaction(flow.RootAddress)
 	err = execTestutil.SignTransactionByRoot(&tx1, seq)
 	require.NoError(t, err)
 	seq++
 
-	tx2 := execTestutil.CreateCounterTransaction()
+	tx2 := execTestutil.CreateCounterTransaction(flow.RootAddress, flow.RootAddress)
 	err = execTestutil.SignTransactionByRoot(&tx2, seq)
 	require.NoError(t, err)
 	seq++
 
-	tx4 := execTestutil.AddToCounterTransaction()
+	tx4 := execTestutil.AddToCounterTransaction(flow.RootAddress, flow.RootAddress)
 	err = execTestutil.SignTransactionByRoot(&tx4, seq)
 	require.NoError(t, err)
 	seq++

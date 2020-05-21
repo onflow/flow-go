@@ -470,12 +470,12 @@ func hasSufficientKeyWeight(weights map[flow.Address]int, address flow.Address) 
 	return weights[address] >= AccountKeyWeightThreshold
 }
 
-var InitDefaultTokenScript = []byte(`
-	import ServiceAccount from 0x0
+var InitDefaultTokenScript = []byte(fmt.Sprintf(`
+	import ServiceAccount from 0x%s
 
 	transaction {
 		prepare(acct: AuthAccount) {
 			ServiceAccount.initDefaultToken(acct)
 		}
 	}
-`)
+`, flow.RootAddress))
