@@ -67,6 +67,11 @@ type HotstuffMetrics interface {
 
 	// SetTimeout sets the current timeout duration
 	SetTimeout(duration time.Duration)
+
+	// CommitteeProcessingDuration measures the time which the HotStuff's core logic
+	// spends in the hotstuff.Committee component, i.e. the time determining consensus
+	// committee relations.
+	CommitteeProcessingDuration(duration time.Duration)
 }
 
 type CollectionMetrics interface {
