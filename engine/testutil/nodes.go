@@ -391,16 +391,13 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.IngestEngine == nil {
-		node.IngestEngine, err = ingest.New(node.Log,
+		node.IngestEngine, err = ingest.NewLightEngine(node.Log,
 			node.Net,
 			node.State,
 			node.Me,
 			node.VerifierEngine,
 			node.AuthReceipts,
-			node.PendingReceipts,
 			node.AuthCollections,
-			node.PendingCollections,
-			node.CollectionTrackers,
 			node.ChunkDataPacks,
 			node.ChunkDataPackTrackers,
 			node.IngestedChunkIDs,
