@@ -81,6 +81,10 @@ type HotstuffMetrics interface {
 	// spends in the hotstuff.Validator component, i.e. the with verifying higher-level
 	// consensus messages.
 	ValidatorProcessingDuration(duration time.Duration)
+
+	// PayloadProductionDuration measures the time which the HotStuff's core logic
+	// spends in the hotstuff.BlockProducer component, i.e. the with generating block payloads
+	PayloadProductionDuration(duration time.Duration)
 }
 
 type CollectionMetrics interface {

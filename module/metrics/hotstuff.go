@@ -37,6 +37,7 @@ type HotstuffCollector struct {
 	committeeComputationsCsCounter prometheus.Counter
 	signerComputationsCsCounter    prometheus.Counter
 	validatorComputationsCsCounter prometheus.Counter
+	payloadProductionCsCounter     prometheus.Counter
 }
 
 func NewHotstuffCollector(chain string) *HotstuffCollector {
@@ -154,6 +155,14 @@ func NewHotstuffCollector(chain string) *HotstuffCollector {
 			Help:        "total count of cs [units of 10ms = cs] of how long HotStuff sends with message-validation",
 			ConstLabels: prometheus.Labels{LabelChain: chain},
 		}),
+
+		payloadProductionCsCounter: promauto.NewCounter(prometheus.CounterOpts{
+			Name:        "payload_production_cseconds_total",
+			Namespace:   namespaceConsensus,
+			Subsystem:   subsystemHotstuff,
+			Help:        "total count of cs [units of 10ms = cs] of how long HotStuff sends with payload production",
+			ConstLabels: prometheus.Labels{LabelChain: chain},
+		}),
 	}
 
 	return hc
@@ -162,18 +171,24 @@ func NewHotstuffCollector(chain string) *HotstuffCollector {
 // HotStuffBusyDuration reports Metrics C6 HotStuff Busy Duration
 func (hc *HotstuffCollector) HotStuffBusyDuration(duration time.Duration, event string) {
 	hc.busyDuration.WithLabelValues(event).Observe(duration.Seconds())
+
+	// We report the time in centi-seconds, i.e. in units of 1/100 seconds
 	hc.busyDurationCsCounter.WithLabelValues(event).Add(float64(duration.Milliseconds()) * 0.1)
 }
 
 // HotStuffIdleDuration reports Metrics C6 HotStuff Idle Duration
 func (hc *HotstuffCollector) HotStuffIdleDuration(duration time.Duration) {
 	hc.idleDuration.Observe(duration.Seconds())
+
+	// We report the time in centi-seconds, i.e. in units of 1/100 seconds
 	hc.idleDurationCsCounter.Add(float64(duration.Milliseconds()) * 0.1)
 }
 
 // HotStuffWaitDuration reports Metrics C6 HotStuff Wait Duration
 func (hc *HotstuffCollector) HotStuffWaitDuration(duration time.Duration, event string) {
 	hc.waitDuration.WithLabelValues(event).Observe(duration.Seconds())
+
+	// We report the time in centi-seconds, i.e. in units of 1/100 seconds
 	hc.waitDurationCsCounter.WithLabelValues(event).Add(float64(duration.Milliseconds()) * 0.1)
 }
 
@@ -204,18 +219,28 @@ func (hc *HotstuffCollector) SetTimeout(duration time.Duration) {
 
 // CommitteeProcessingDuration reports time spend computing consensus committee relations
 func (hc *HotstuffCollector) CommitteeProcessingDuration(duration time.Duration) {
+	// We report the time in centi-seconds, i.e. in units of 1/100 seconds
 	hc.committeeComputationsCsCounter.Add(float64(duration.Milliseconds()) * 0.1)
 }
 
 // SignerProcessingDuration reports the time which the HotStuff's core logic
 // spends in the hotstuff.Signer component, i.e. the with crypto-related operations.
 func (hc *HotstuffCollector) SignerProcessingDuration(duration time.Duration) {
+	// We report the time in centi-seconds, i.e. in units of 1/100 seconds
 	hc.signerComputationsCsCounter.Add(float64(duration.Milliseconds()) * 0.1)
 }
 
-// ValidatorProcessingDuration measures the time which the HotStuff's core logic
+// ValidatorProcessingDuration reports the time which the HotStuff's core logic
 // spends in the hotstuff.Validator component, i.e. the with verifying higher-level
 // consensus messages.
 func (hc *HotstuffCollector) ValidatorProcessingDuration(duration time.Duration) {
+	// We report the time in centi-seconds, i.e. in units of 1/100 seconds
 	hc.validatorComputationsCsCounter.Add(float64(duration.Milliseconds()) * 0.1)
+}
+
+// PayloadProductionDuration reports the time which the HotStuff's core logic
+// spends in the hotstuff.BlockProducer component, i.e. the with generating block payloads
+func (hc *HotstuffCollector) PayloadProductionDuration(duration time.Duration) {
+	// We report the time in centi-seconds, i.e. in units of 1/100 seconds
+	hc.payloadProductionCsCounter.Add(float64(duration.Milliseconds()) * 0.1)
 }
