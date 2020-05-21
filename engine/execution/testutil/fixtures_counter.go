@@ -20,7 +20,7 @@ func DeployCounterContractTransaction() flow.TransactionBody {
 			pub fun createCounter(_ v: Int): @Counter {
 				return <-create Counter(v)
 			}
-		}`, flow.RootAddress)
+		}`, flow.ServiceAddress)
 }
 
 func CreateCounterTransaction() flow.TransactionBody {
@@ -39,7 +39,7 @@ func CreateCounterTransaction() flow.TransactionBody {
 					acc.save(<-maybeCounter!, to: /storage/counter)
 				}
 			}`),
-		Authorizers: []flow.Address{flow.RootAddress},
+		Authorizers: []flow.Address{flow.ServiceAddress},
 	}
 }
 
@@ -59,7 +59,7 @@ func CreateCounterPanicTransaction() flow.TransactionBody {
 					panic("fail for testing purposes")
               	}
             }`),
-		Authorizers: []flow.Address{flow.RootAddress},
+		Authorizers: []flow.Address{flow.ServiceAddress},
 	}
 }
 
@@ -74,6 +74,6 @@ func AddToCounterTransaction() flow.TransactionBody {
 					counter?.add(2)
 				}
 			}`),
-		Authorizers: []flow.Address{flow.RootAddress},
+		Authorizers: []flow.Address{flow.ServiceAddress},
 	}
 }

@@ -82,7 +82,7 @@ func BootstrappedLedger(ledger virtualmachine.Ledger, privateKeys []flow.Account
 }
 
 func SignTransactionByRoot(tx *flow.TransactionBody, seqNum uint64) error {
-	return SignTransaction(tx, flow.RootAddress, flow.ServiceAccountPrivateKey, seqNum)
+	return SignTransaction(tx, flow.ServiceAddress, flow.ServiceAccountPrivateKey, seqNum)
 }
 
 func RootBootstrappedLedger() (virtualmachine.Ledger, error) {

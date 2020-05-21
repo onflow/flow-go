@@ -59,7 +59,7 @@ func main() {
 				ReferenceBlockHash: []byte{1, 2, 3, 4},
 				Nonce:              nonce,
 				ComputeLimit:       10,
-				PayerAccount:       sdk.RootAddress,
+				PayerAccount:       sdk.ServiceAddress,
 			}
 
 			sig, err := keys.SignTransaction(tx, key)
@@ -67,7 +67,7 @@ func main() {
 				log.Fatal(err)
 			}
 
-			tx.AddSignature(sdk.RootAddress, sig)
+			tx.AddSignature(sdk.ServiceAddress, sig)
 
 			err = c.SendTransaction(context.Background(), tx)
 			if err != nil {
