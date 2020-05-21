@@ -22,7 +22,7 @@ func initTimeoutController(t *testing.T) *Controller {
 		time.Duration(minRepTimeout*1e6),
 		voteTimeoutFraction,
 		multiplicativeIncrease,
-		time.Duration(additiveDecrease*1e6))
+		time.Duration(additiveDecrease*1e6), 0)
 	if err != nil {
 		t.Fail()
 	}
@@ -105,7 +105,8 @@ func Test_MaxCutoff(t *testing.T) {
 		time.Duration(minRepTimeout*float64(time.Millisecond)),
 		voteTimeoutFraction,
 		10,
-		time.Duration(additiveDecrease*float64(time.Millisecond)))
+		time.Duration(additiveDecrease*float64(time.Millisecond)),
+		0)
 	if err != nil {
 		t.Fail()
 	}
@@ -116,4 +117,20 @@ func Test_MaxCutoff(t *testing.T) {
 		assert.True(t, float64(tc.ReplicaTimeout().Milliseconds()) <= timeoutCap)
 		assert.True(t, float64(tc.VoteCollectionTimeout().Milliseconds()) <= timeoutCap*voteTimeoutFraction)
 	}
+}
+
+func Test_BlockRateDelay(t *testing.T) {
+	// here we use a different timeout controller with a larger timeoutIncrease to avoid too many iterations
+	c, err := NewConfig(
+		time.Duration(200*float64(time.Millisecond)),
+		time.Duration(minRepTimeout*float64(time.Millisecond)),
+		voteTimeoutFraction,
+		10,
+		time.Duration(additiveDecrease*float64(time.Millisecond)),
+		time.Second)
+	if err != nil {
+		t.Fail()
+	}
+	tc := NewController(c)
+	assert.Equal(t, time.Second, tc.BlockRateDelay())
 }

@@ -220,8 +220,8 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	// program the hotstuff communicator behaviour
-	in.communicator.On("BroadcastProposal", mock.Anything).Return(
-		func(header *flow.Header) error {
+	in.communicator.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Return(
+		func(header *flow.Header, delay time.Duration) error {
 
 			// check that we have the parent
 			parent, found := in.headers.Load(header.ParentID)

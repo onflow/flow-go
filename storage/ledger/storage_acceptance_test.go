@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	ptriep "github.com/dapperlabs/flow-go/storage/ledger/ptrie"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
@@ -34,6 +35,9 @@ func TestLedgerFunctionality(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
 	// You can manually increase this for more coverage
 	experimentRep := 2
+
+	metricsCollector := &metrics.NoopCollector{}
+
 	for e := 0; e < experimentRep; e++ {
 		maxNumInsPerStep := 100
 		numHistLookupPerStep := 10
@@ -45,7 +49,7 @@ func TestLedgerFunctionality(t *testing.T) {
 		histStorage := make(map[string][]byte) // historic storage string(key, statecommitment) -> value
 		latestValue := make(map[string][]byte) // key to value
 		unittest.RunWithTempDir(t, func(dbDir string) {
-			led, err := ledger.NewMTrieStorage(dbDir, activeTries, nil)
+			led, err := ledger.NewMTrieStorage(dbDir, activeTries, metricsCollector, nil)
 			assert.NoError(t, err)
 			stateCommitment := led.EmptyStateCommitment()
 			for i := 0; i < steps; i++ {

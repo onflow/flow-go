@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -62,7 +63,7 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 
 	// send a ChunkDataPackRequest from Ghost node
 	err = gs.Ghost().Send(context.Background(), engine.ExecutionReceiptProvider, []flow.Identifier{gs.exe1ID},
-		&messages.ChunkDataPackRequest{ChunkID: chunkID})
+		&messages.ChunkDataPackRequest{ChunkID: chunkID, Nonce: rand.Uint64()})
 	require.NoError(gs.T(), err)
 
 	// wait for ChunkDataPackResponse

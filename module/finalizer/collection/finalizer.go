@@ -124,7 +124,11 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 				return fmt.Errorf("could not finalize block: %w", err)
 			}
 
-			f.metrics.CollectionGuaranteed(payload.Collection.Light())
+			block := &cluster.Block{
+				Header:  step,
+				Payload: &payload,
+			}
+			f.metrics.ClusterBlockFinalized(block)
 
 			// don't bother submitting empty collections
 			if len(payload.Collection.Transactions) == 0 {

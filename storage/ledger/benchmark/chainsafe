@@ -1,0 +1,1300 @@
+Step:  0
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 0
+step5- update atomically is done 500
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 0
+step9- UpdateTrieDB is done 2
+step10- UpdateKVDB is done 1
+end of update, total time: 0.505272797
+Step:  1
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 0
+step5- update atomically is done 541
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 1
+step9- UpdateTrieDB is done 1
+step10- UpdateKVDB is done 0
+end of update, total time: 0.545541766
+Step:  2
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 0
+step5- update atomically is done 470
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 1
+step9- UpdateTrieDB is done 3
+step10- UpdateKVDB is done 0
+end of update, total time: 0.477201275
+Step:  3
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 0
+step5- update atomically is done 647
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 4
+step9- UpdateTrieDB is done 3
+step10- UpdateKVDB is done 0
+end of update, total time: 0.658310419
+Step:  4
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 1
+step5- update atomically is done 355
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 4
+step9- UpdateTrieDB is done 0
+step10- UpdateKVDB is done 0
+end of update, total time: 0.363562121
+Step:  5
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 1
+step5- update atomically is done 319
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 5
+step9- UpdateTrieDB is done 1
+step10- UpdateKVDB is done 0
+end of update, total time: 0.329558787
+Step:  6
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 1
+step5- update atomically is done 361
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 7
+step9- UpdateTrieDB is done 5
+step10- UpdateKVDB is done 0
+end of update, total time: 0.377636505
+Step:  7
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 3
+step5- update atomically is done 498
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 24
+step9- UpdateTrieDB is done 2
+step10- UpdateKVDB is done 0
+end of update, total time: 0.530866328
+Step:  8
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 3
+step5- update atomically is done 456
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 27
+step9- UpdateTrieDB is done 2
+step10- UpdateKVDB is done 0
+end of update, total time: 0.491698309
+Step:  9
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 3
+step5- update atomically is done 404
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 31
+step9- UpdateTrieDB is done 1
+step10- UpdateKVDB is done 0
+end of update, total time: 0.442866054
+Step:  10
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 2
+step5- update atomically is done 335
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 15
+step9- UpdateTrieDB is done 7
+step10- UpdateKVDB is done 0
+end of update, total time: 0.363043589
+Step:  11
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 9
+step5- update atomically is done 304
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 22
+step9- UpdateTrieDB is done 3
+step10- UpdateKVDB is done 0
+end of update, total time: 0.342703237
+Step:  12
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 3
+step5- update atomically is done 329
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 28
+step9- UpdateTrieDB is done 2
+step10- UpdateKVDB is done 0
+end of update, total time: 0.363610773
+Step:  13
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 3
+step5- update atomically is done 308
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 25
+step9- UpdateTrieDB is done 1
+step10- UpdateKVDB is done 1
+end of update, total time: 0.340755887
+Step:  14
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 8
+step5- update atomically is done 287
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 39
+step9- UpdateTrieDB is done 4
+step10- UpdateKVDB is done 1
+end of update, total time: 0.343998775
+Step:  15
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 3
+step5- update atomically is done 302
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 35
+step9- UpdateTrieDB is done 3
+step10- UpdateKVDB is done 0
+end of update, total time: 0.346361966
+Step:  16
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 5
+step5- update atomically is done 395
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 46
+step9- UpdateTrieDB is done 4
+step10- UpdateKVDB is done 0
+end of update, total time: 0.453523568
+Step:  17
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 6
+step5- update atomically is done 609
+step6- historic state queue push is done 2
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 77
+step9- UpdateTrieDB is done 4
+step10- UpdateKVDB is done 0
+end of update, total time: 0.704191915
+Step:  18
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 5
+step5- update atomically is done 355
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 42
+step9- UpdateTrieDB is done 14
+step10- UpdateKVDB is done 0
+end of update, total time: 0.419895437
+Step:  19
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 7
+step5- update atomically is done 469
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 72
+step9- UpdateTrieDB is done 7
+step10- UpdateKVDB is done 0
+end of update, total time: 0.557671387
+Step:  20
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 5
+step5- update atomically is done 324
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 143
+step9- UpdateTrieDB is done 3
+step10- UpdateKVDB is done 0
+end of update, total time: 0.477946104
+Step:  21
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 7
+step5- update atomically is done 302
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 121
+step9- UpdateTrieDB is done 5
+step10- UpdateKVDB is done 0
+end of update, total time: 0.439393665
+Step:  22
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 7
+step5- update atomically is done 383
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 87
+step9- UpdateTrieDB is done 3
+step10- UpdateKVDB is done 0
+end of update, total time: 0.482884403
+Step:  23
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 6
+step5- update atomically is done 478
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 65
+step9- UpdateTrieDB is done 2
+step10- UpdateKVDB is done 0
+end of update, total time: 0.554601835
+Step:  24
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 3
+step4- deep copy of trie is done 13
+step5- update atomically is done 354
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 147
+step9- UpdateTrieDB is done 3
+step10- UpdateKVDB is done 0
+end of update, total time: 0.530526122
+Step:  25
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 1
+step4- deep copy of trie is done 17
+step5- update atomically is done 372
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 106
+step9- UpdateTrieDB is done 2
+step10- UpdateKVDB is done 0
+end of update, total time: 0.501983607
+Step:  26
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 8
+step5- update atomically is done 373
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 63
+step9- UpdateTrieDB is done 2
+step10- UpdateKVDB is done 2
+end of update, total time: 0.451447241
+Step:  27
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 6
+step5- update atomically is done 448
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 107
+step9- UpdateTrieDB is done 3
+step10- UpdateKVDB is done 1
+end of update, total time: 0.568269354
+Step:  28
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 17
+step5- update atomically is done 359
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 142
+step9- UpdateTrieDB is done 4
+step10- UpdateKVDB is done 2
+end of update, total time: 0.528292079
+Step:  29
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 6
+step5- update atomically is done 418
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 93
+step9- UpdateTrieDB is done 3
+step10- UpdateKVDB is done 0
+end of update, total time: 0.523063893
+Step:  30
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 11
+step5- update atomically is done 592
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 95
+step9- UpdateTrieDB is done 3
+step10- UpdateKVDB is done 0
+end of update, total time: 0.704772555
+Step:  31
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 10
+step5- update atomically is done 553
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 137
+step9- UpdateTrieDB is done 3
+step10- UpdateKVDB is done 0
+end of update, total time: 0.706098026
+Step:  32
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 10
+step5- update atomically is done 434
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 152
+step9- UpdateTrieDB is done 24
+step10- UpdateKVDB is done 0
+end of update, total time: 0.637954757
+Step:  33
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 7
+step5- update atomically is done 428
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 211
+step9- UpdateTrieDB is done 23
+step10- UpdateKVDB is done 0
+end of update, total time: 0.672660546
+Step:  34
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 8
+step5- update atomically is done 401
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 254
+step9- UpdateTrieDB is done 11
+step10- UpdateKVDB is done 0
+end of update, total time: 0.678003388
+Step:  35
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 8
+step5- update atomically is done 412
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 264
+step9- UpdateTrieDB is done 4
+step10- UpdateKVDB is done 0
+end of update, total time: 0.691243502
+Step:  36
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 8
+step5- update atomically is done 416
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 337
+step9- UpdateTrieDB is done 7
+step10- UpdateKVDB is done 0
+end of update, total time: 0.772291135
+Step:  37
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 13
+step5- update atomically is done 455
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 422
+step9- UpdateTrieDB is done 7
+step10- UpdateKVDB is done 0
+end of update, total time: 0.907746198
+Step:  38
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 9
+step5- update atomically is done 718
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 546
+step9- UpdateTrieDB is done 5
+step10- UpdateKVDB is done 0
+end of update, total time: 1.281721233
+Step:  39
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 9
+step5- update atomically is done 353
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 402
+step9- UpdateTrieDB is done 8
+step10- UpdateKVDB is done 0
+end of update, total time: 0.775744463
+Step:  40
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 12
+step5- update atomically is done 278
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 134
+step9- UpdateTrieDB is done 3
+step10- UpdateKVDB is done 0
+end of update, total time: 0.429516198
+Step:  41
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 27
+step5- update atomically is done 354
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 154
+step9- UpdateTrieDB is done 5
+step10- UpdateKVDB is done 0
+end of update, total time: 0.544947629
+Step:  42
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 15
+step5- update atomically is done 595
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 358
+step9- UpdateTrieDB is done 5
+step10- UpdateKVDB is done 0
+end of update, total time: 0.976996205
+Step:  43
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 9
+step5- update atomically is done 252
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 241
+step9- UpdateTrieDB is done 7
+step10- UpdateKVDB is done 0
+end of update, total time: 0.512680774
+Step:  44
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 23
+step5- update atomically is done 392
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 141
+step9- UpdateTrieDB is done 4
+step10- UpdateKVDB is done 0
+end of update, total time: 0.563385823
+Step:  45
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 15
+step5- update atomically is done 575
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 534
+step9- UpdateTrieDB is done 10
+step10- UpdateKVDB is done 0
+end of update, total time: 1.138963421
+Step:  46
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 11
+step5- update atomically is done 245
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 210
+step9- UpdateTrieDB is done 4
+step10- UpdateKVDB is done 0
+end of update, total time: 0.473049063
+Step:  47
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 48
+step5- update atomically is done 705
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 493
+step9- UpdateTrieDB is done 5
+step10- UpdateKVDB is done 0
+end of update, total time: 1.261632144
+Step:  48
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 15
+step5- update atomically is done 400
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 386
+step9- UpdateTrieDB is done 8
+step10- UpdateKVDB is done 0
+end of update, total time: 0.813348605
+Step:  49
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 29
+step5- update atomically is done 441
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 179
+step9- UpdateTrieDB is done 4
+step10- UpdateKVDB is done 0
+end of update, total time: 0.656570788
+Step:  50
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 14
+step5- update atomically is done 364
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 654
+step9- UpdateTrieDB is done 10
+step10- UpdateKVDB is done 0
+end of update, total time: 1.046464676
+Step:  51
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 1
+step3- key sorting is done 1
+step4- deep copy of trie is done 40
+step5- update atomically is done 1477
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 650
+step9- UpdateTrieDB is done 5
+step10- UpdateKVDB is done 0
+end of update, total time: 2.17729778
+Step:  52
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 22
+step5- update atomically is done 389
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 326
+step9- UpdateTrieDB is done 5
+step10- UpdateKVDB is done 0
+end of update, total time: 0.745351653
+Step:  53
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 64
+step5- update atomically is done 826
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 498
+step9- UpdateTrieDB is done 6
+step10- UpdateKVDB is done 6
+end of update, total time: 1.405670161
+Step:  54
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 28
+step5- update atomically is done 1146
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 648
+step9- UpdateTrieDB is done 6
+step10- UpdateKVDB is done 4
+end of update, total time: 1.857036364
+Step:  55
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 127
+step5- update atomically is done 1338
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 737
+step9- UpdateTrieDB is done 5
+step10- UpdateKVDB is done 2
+end of update, total time: 2.235686605
+Step:  56
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 25
+step5- update atomically is done 649
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 686
+step9- UpdateTrieDB is done 10
+step10- UpdateKVDB is done 2
+end of update, total time: 1.376095525
+Step:  57
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 49
+step5- update atomically is done 601
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 996
+step9- UpdateTrieDB is done 78
+step10- UpdateKVDB is done 3
+end of update, total time: 1.7325560599999998
+Step:  58
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 27
+step5- update atomically is done 520
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 819
+step9- UpdateTrieDB is done 69
+step10- UpdateKVDB is done 1
+end of update, total time: 1.440216996
+Step:  59
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 7
+step3- key sorting is done 0
+step4- deep copy of trie is done 35
+step5- update atomically is done 1245
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 1564
+step9- UpdateTrieDB is done 155
+step10- UpdateKVDB is done 0
+end of update, total time: 3.017634895
+Step:  60
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 114
+step5- update atomically is done 743
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 714
+step9- UpdateTrieDB is done 59
+step10- UpdateKVDB is done 0
+end of update, total time: 1.633718005
+Step:  61
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 34
+step5- update atomically is done 849
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 1913
+step9- UpdateTrieDB is done 68
+step10- UpdateKVDB is done 0
+end of update, total time: 2.8740018689999998
+Step:  62
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 110
+step5- update atomically is done 1404
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 1262
+step9- UpdateTrieDB is done 13
+step10- UpdateKVDB is done 1
+end of update, total time: 2.797799208
+Step:  63
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 47
+step5- update atomically is done 509
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 1029
+step9- UpdateTrieDB is done 6
+step10- UpdateKVDB is done 0
+end of update, total time: 1.594855442
+Step:  64
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 25
+step5- update atomically is done 967
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 1764
+step9- UpdateTrieDB is done 10
+step10- UpdateKVDB is done 0
+end of update, total time: 2.7698925340000002
+Step:  65
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 56
+step5- update atomically is done 2057
+step6- historic state queue push is done 44
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 1623
+step9- UpdateTrieDB is done 11
+step10- UpdateKVDB is done 0
+end of update, total time: 3.806676966
+Step:  66
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 22
+step5- update atomically is done 482
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 457
+step9- UpdateTrieDB is done 8
+step10- UpdateKVDB is done 0
+end of update, total time: 0.972601925
+Step:  67
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 42
+step5- update atomically is done 626
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 573
+step9- UpdateTrieDB is done 10
+step10- UpdateKVDB is done 0
+end of update, total time: 1.255348803
+Step:  68
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 39
+step5- update atomically is done 1592
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 1083
+step9- UpdateTrieDB is done 9
+step10- UpdateKVDB is done 0
+end of update, total time: 2.7301849049999998
+Step:  69
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 477
+step5- update atomically is done 892
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 607
+step9- UpdateTrieDB is done 9
+step10- UpdateKVDB is done 0
+end of update, total time: 2.000503971
+Step:  70
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 2
+step4- deep copy of trie is done 33
+step5- update atomically is done 376
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 516
+step9- UpdateTrieDB is done 7
+step10- UpdateKVDB is done 0
+end of update, total time: 0.937423728
+Step:  71
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 60
+step5- update atomically is done 1134
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 1461
+step9- UpdateTrieDB is done 9
+step10- UpdateKVDB is done 0
+end of update, total time: 2.679102683
+Step:  72
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 53
+step5- update atomically is done 1373
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 971
+step9- UpdateTrieDB is done 5
+step10- UpdateKVDB is done 0
+end of update, total time: 2.407634956
+Step:  73
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 22
+step5- update atomically is done 418
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 710
+step9- UpdateTrieDB is done 6
+step10- UpdateKVDB is done 0
+end of update, total time: 1.159884392
+Step:  74
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 2
+step4- deep copy of trie is done 65
+step5- update atomically is done 514
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 550
+step9- UpdateTrieDB is done 5
+step10- UpdateKVDB is done 0
+end of update, total time: 1.139922963
+Step:  75
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 4
+step3- key sorting is done 0
+step4- deep copy of trie is done 144
+step5- update atomically is done 1356
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 1209
+step9- UpdateTrieDB is done 12
+step10- UpdateKVDB is done 0
+end of update, total time: 2.731109865
+Step:  76
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 88
+step5- update atomically is done 1462
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 1962
+step9- UpdateTrieDB is done 17
+step10- UpdateKVDB is done 0
+end of update, total time: 3.548383965
+Step:  77
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 2
+step3- key sorting is done 0
+step4- deep copy of trie is done 159
+step5- update atomically is done 1420
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 1354
+step9- UpdateTrieDB is done 10
+step10- UpdateKVDB is done 0
+end of update, total time: 2.959422627
+Step:  78
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 44
+step5- update atomically is done 549
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 563
+step9- UpdateTrieDB is done 6
+step10- UpdateKVDB is done 0
+end of update, total time: 1.165786384
+Step:  79
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 1
+step3- key sorting is done 0
+step4- deep copy of trie is done 48
+step5- update atomically is done 2100
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 1879
+step9- UpdateTrieDB is done 46
+step10- UpdateKVDB is done 0
+end of update, total time: 4.095919043
+Step:  80
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 1
+step3- key sorting is done 1
+step4- deep copy of trie is done 222
+step5- update atomically is done 997
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 1017
+step9- UpdateTrieDB is done 5
+step10- UpdateKVDB is done 0
+end of update, total time: 2.246748445
+Step:  81
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 4
+step3- key sorting is done 0
+step4- deep copy of trie is done 352
+step5- update atomically is done 1321
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 1485
+step9- UpdateTrieDB is done 10
+step10- UpdateKVDB is done 0
+end of update, total time: 3.217845374
+Step:  82
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 2
+step3- key sorting is done 1
+step4- deep copy of trie is done 170
+step5- update atomically is done 1740
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 1752
+step9- UpdateTrieDB is done 14
+step10- UpdateKVDB is done 1
+end of update, total time: 3.720168491
+Step:  83
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 125
+step5- update atomically is done 3253
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 3628
+step9- UpdateTrieDB is done 27
+step10- UpdateKVDB is done 2
+end of update, total time: 7.081023096
+Step:  84
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 2
+step3- key sorting is done 1
+step4- deep copy of trie is done 119
+step5- update atomically is done 2351
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 839
+step9- UpdateTrieDB is done 14
+step10- UpdateKVDB is done 0
+end of update, total time: 3.329691955
+Step:  85
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 92
+step5- update atomically is done 1599
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 564
+step9- UpdateTrieDB is done 6
+step10- UpdateKVDB is done 0
+end of update, total time: 2.265462604
+Step:  86
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 94
+step5- update atomically is done 1598
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 1473
+step9- UpdateTrieDB is done 6
+step10- UpdateKVDB is done 0
+end of update, total time: 3.175139986
+Step:  87
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 2
+step3- key sorting is done 7
+step4- deep copy of trie is done 655
+step5- update atomically is done 4475
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 3454
+step9- UpdateTrieDB is done 16
+step10- UpdateKVDB is done 1
+end of update, total time: 8.621534705
+Step:  88
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 1
+step3- key sorting is done 0
+step4- deep copy of trie is done 321
+step5- update atomically is done 3686
+step6- historic state queue push is done 1
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 2529
+step9- UpdateTrieDB is done 9
+step10- UpdateKVDB is done 1
+end of update, total time: 6.576105624
+Step:  89
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 1
+step3- key sorting is done 0
+step4- deep copy of trie is done 517
+step5- update atomically is done 1909
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 1418
+step9- UpdateTrieDB is done 13
+step10- UpdateKVDB is done 0
+end of update, total time: 3.8714145
+Step:  90
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 1
+step3- key sorting is done 0
+step4- deep copy of trie is done 139
+step5- update atomically is done 1415
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 783
+step9- UpdateTrieDB is done 6
+step10- UpdateKVDB is done 0
+end of update, total time: 2.346352488
+Step:  91
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 128
+step5- update atomically is done 1570
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 1772
+step9- UpdateTrieDB is done 16
+step10- UpdateKVDB is done 2
+end of update, total time: 3.5328547390000002
+Step:  92
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 1
+step3- key sorting is done 1
+step4- deep copy of trie is done 240
+step5- update atomically is done 2686
+step6- historic state queue push is done 1
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 1545
+step9- UpdateTrieDB is done 12
+step10- UpdateKVDB is done 1
+end of update, total time: 4.494314185
+Step:  93
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 79
+step5- update atomically is done 961
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 1444
+step9- UpdateTrieDB is done 11
+step10- UpdateKVDB is done 0
+end of update, total time: 2.507982039
+Step:  94
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 5
+step3- key sorting is done 0
+step4- deep copy of trie is done 700
+step5- update atomically is done 1372
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 904
+step9- UpdateTrieDB is done 11
+step10- UpdateKVDB is done 0
+end of update, total time: 2.99629072
+Step:  95
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 0
+step4- deep copy of trie is done 99
+step5- update atomically is done 1046
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 936
+step9- UpdateTrieDB is done 6
+step10- UpdateKVDB is done 0
+end of update, total time: 2.090756924
+Step:  96
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 1
+step3- key sorting is done 0
+step4- deep copy of trie is done 135
+step5- update atomically is done 1301
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 739
+step9- UpdateTrieDB is done 6
+step10- UpdateKVDB is done 0
+end of update, total time: 2.18609354
+Step:  97
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 2
+step3- key sorting is done 0
+step4- deep copy of trie is done 234
+step5- update atomically is done 3258
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 6543
+step9- UpdateTrieDB is done 13
+step10- UpdateKVDB is done 0
+end of update, total time: 10.055653089
+Step:  98
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 2
+step3- key sorting is done 10
+step4- deep copy of trie is done 443
+step5- update atomically is done 3297
+step6- historic state queue push is done 0
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 4406
+step9- UpdateTrieDB is done 80
+step10- UpdateKVDB is done 50
+end of update, total time: 8.362127424
+Step:  99
+step0- update is called
+step1- trie lookup is done 0
+step2- deduplication is done 0
+step3- key sorting is done 1
+step4- deep copy of trie is done 181
+step5- update atomically is done 1504
+step6- historic state queue push is done 3
+step7- new tree creation is done 0
+step8- updateHistoricalStates is done 3492
+step9- UpdateTrieDB is done 13
+step10- UpdateKVDB is done 0
+end of update, total time: 5.209168862

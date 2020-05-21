@@ -16,7 +16,7 @@ func (_m *CollectionMetrics) CollectionGuaranteed(collection flow.LightCollectio
 }
 
 // CollectionProposed provides a mock function with given fields: collection
-func (_m *CollectionMetrics) CollectionProposed(collection flow.LightCollection) {
+func (_m *CollectionMetrics) ClusterBlockProposed(collection flow.LightCollection) {
 	_m.Called(collection)
 }
 

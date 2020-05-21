@@ -376,7 +376,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		return
 	}
 
-	diskTotal, err := e.execState.Size()
+	diskTotal, err := e.execState.DiskSize()
 	if err != nil {
 		e.log.Err(err).Msg("could not get execution state disk size")
 	}
@@ -576,15 +576,20 @@ func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Que
 	return newQueue(blockify, queues)
 }
 
-func (e *Engine) submitCollectionRequest(timer **time.Timer, request *messages.CollectionRequest, recipients []flow.Identifier, retry uint) {
+func (e *Engine) submitCollectionRequest(timer **time.Timer, collID flow.Identifier, recipients []flow.Identifier, retry uint) {
+
+	request := &messages.CollectionRequest{
+		ID:    collID,
+		Nonce: rand.Uint64(),
+	}
 
 	if retry >= e.maximumCollectionRequestRetryNumber {
-		e.log.Error().Hex("collection_id", logging.ID(request.ID)).Msg("exceeded maximum number of retries of collection request")
+		e.log.Error().Hex("collection_id", collID[:]).Msg("exceeded maximum number of retries of collection request")
 		return
 	}
 
 	if retry > 0 {
-		e.log.Info().Hex("collection_id", logging.ID(request.ID)).Uint("retry", retry).Msg("retrying request for collection")
+		e.log.Info().Hex("collection_id", collID[:]).Uint("retry", retry).Msg("retrying request for collection")
 	}
 
 	err := e.collectionConduit.Submit(
@@ -592,11 +597,11 @@ func (e *Engine) submitCollectionRequest(timer **time.Timer, request *messages.C
 		recipients...,
 	)
 	if err != nil {
-		e.log.Warn().Err(err).Hex("collection_id", logging.ID(request.ID)).Msg("cannot submit collection requests")
+		e.log.Warn().Err(err).Hex("collection_id", collID[:]).Msg("cannot submit collection requests")
 	}
 
 	*timer = time.AfterFunc(e.collectionRequestTimeout, func() {
-		e.submitCollectionRequest(timer, request, recipients, retry+1)
+		e.submitCollectionRequest(timer, collID, recipients, retry+1)
 	})
 }
 
@@ -634,12 +639,7 @@ func (e *Engine) sendCollectionsRequest(
 				Hex("collection_id", logging.ID(guarantee.ID())).
 				Msg("requesting collection")
 
-			collectionRequest := &messages.CollectionRequest{
-				ID:    guarantee.ID(),
-				Nonce: rand.Uint64(),
-			}
-
-			e.submitCollectionRequest(&maybeBlockByCollection.TimeoutTimer, collectionRequest, collectionGuaranteesIdentifiers, 0)
+			e.submitCollectionRequest(&maybeBlockByCollection.TimeoutTimer, guarantee.ID(), collectionGuaranteesIdentifiers, 0)
 		}
 
 		if _, exists := maybeBlockByCollection.ExecutableBlocks[executableBlock.ID()]; exists {

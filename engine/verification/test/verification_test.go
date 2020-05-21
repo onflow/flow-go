@@ -2,6 +2,7 @@ package test
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"sync"
 	"testing"
@@ -530,12 +531,6 @@ func setupMockExeNode(t *testing.T,
 		}
 	}
 
-	// map form verIds --> chunks they asked
-	exeChunkDataSeen := make(map[flow.Identifier]map[flow.Identifier]struct{})
-	for _, verIdentity := range verIdentities {
-		exeChunkDataSeen[verIdentity.NodeID] = make(map[flow.Identifier]struct{})
-	}
-
 	exeChunkDataConduit, err := exeNode.Net.Register(engine.ChunkDataPackProvider, exeEngine)
 	assert.Nil(t, err)
 
@@ -557,16 +552,11 @@ func setupMockExeNode(t *testing.T,
 							if !IsAssigned(chunk.Index) {
 								require.Error(t, fmt.Errorf(" requested an unassigned chunk data pack %x", req))
 							}
-							// each assigned chunk data pack should be requested only once
-							_, ok := exeChunkDataSeen[originID][chunkID]
-							require.False(t, ok)
-
-							// marks execution chunk data pack request as seen
-							exeChunkDataSeen[originID][chunkID] = struct{}{}
 
 							// publishes the chunk data pack response to the network
 							res := &messages.ChunkDataPackResponse{
-								Data: *completeER.ChunkDataPacks[i],
+								Data:  *completeER.ChunkDataPacks[i],
+								Nonce: rand.Uint64(),
 							}
 							err := exeChunkDataConduit.Submit(res, originID)
 							assert.Nil(t, err)
@@ -586,12 +576,7 @@ func setupMockExeNode(t *testing.T,
 			require.Error(t, fmt.Errorf("unknown request to execution node %v", args[1]))
 
 		}).
-		Return(nil).
-		// each verification node is assigned to `chunkDataPackCount`-many independent chunks
-		// and there are `len(verIdentities)`-many verification nodes
-		// so there is a total of len(verIdentities) * chunkDataPackCount expected
-		// chunk data pack requests
-		Times(len(verIdentities) * chunkDataPackCount)
+		Return(nil)
 
 	return &exeNode, exeEngine
 }

@@ -3,6 +3,7 @@ package ledger_test
 import (
 	"testing"
 
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -10,7 +11,8 @@ import (
 func TestTrieUntrustedAndVerify(t *testing.T) {
 	trieH := 257
 	unittest.RunWithTempDir(t, func(dbDir string) {
-		f, err := ledger.NewMTrieStorage(dbDir, 10, nil)
+		metricsCollector := &metrics.NoopCollector{}
+		f, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

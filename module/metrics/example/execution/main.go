@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -26,7 +27,7 @@ func main() {
 			*metrics.NetworkCollector
 		}{
 			HotstuffCollector:  metrics.NewHotstuffCollector("some_chain_id"),
-			ExecutionCollector: metrics.NewExecutionCollector(tracer),
+			ExecutionCollector: metrics.NewExecutionCollector(tracer, prometheus.DefaultRegisterer),
 			NetworkCollector:   metrics.NewNetworkCollector(),
 		}
 		diskTotal := rand.Int63n(1024 ^ 3)

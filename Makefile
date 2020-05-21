@@ -242,7 +242,7 @@ docker-build-bootstrap:
 
 .PHONY: docker-build-bootstrap-transit
 docker-build-bootstrap-transit:
-	docker build -f cmd/Dockerfile --build-arg TARGET=bootstrap/transit --target production \
+	docker build -f cmd/Dockerfile --build-arg TARGET=bootstrap/transit --target production-nocgo \
 		-t gcr.io/dl-flow/bootstrap-transit:latest -t "gcr.io/dl-flow/bootstrap-transit:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/bootstrap-transit:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-flow
@@ -307,7 +307,7 @@ docker-run-verification:
 docker-run-access:
 	docker run -p 9000:9000 -p 3569:3569 gcr.io/dl-flow/access:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries access-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
 
-.PHONY: docker-run-access
+.PHONY: docker-run-ghost
 docker-run-ghost:
 	docker run -p 9000:9000 -p 3569:3569 gcr.io/dl-flow/ghost:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries ghost-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
 

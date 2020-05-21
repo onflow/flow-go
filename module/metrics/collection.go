@@ -5,6 +5,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
+	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/trace"
 )
@@ -16,17 +17,15 @@ const (
 	spanTransactionToCollection = "transaction_to_collection"
 
 	// span from a collection being proposed to being finalized (eg. guaranteed)
-	// TODO not used -- this doesn't really make sense until we use hotstuff
 	spanCollectionToGuarantee = "collection_to_guarantee"
 )
 
 type CollectionCollector struct {
-	tracer                   *trace.OpenTracer
-	transactionsIngested     prometheus.Counter
-	proposals                prometheus.Counter
-	proposalSize             prometheus.Histogram
-	guaranteedCollectionSize prometheus.Histogram
-	pendingClusterBlocks     prometheus.Gauge
+	tracer               *trace.OpenTracer
+	transactionsIngested prometheus.Counter       // tracks the number of ingested transactions
+	finalizedHeight      *prometheus.GaugeVec     // tracks the finalized height
+	proposals            *prometheus.HistogramVec // tracks the number/size of PROPOSED collections
+	guarantees           *prometheus.HistogramVec // counts the number/size of FINALIZED collections
 }
 
 func NewCollectionCollector(tracer *trace.OpenTracer) *CollectionCollector {
@@ -40,67 +39,48 @@ func NewCollectionCollector(tracer *trace.OpenTracer) *CollectionCollector {
 			Help:      "count of transactions ingested by this node",
 		}),
 
-		proposals: promauto.NewCounter(prometheus.CounterOpts{
+		finalizedHeight: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: namespaceCollection,
-			Name:      "proposals_total",
-			Help:      "count of collection proposals",
-		}),
+			Subsystem: subsystemProposal,
+			Name:      "finalized_height",
+			Help:      "tracks the latest finalized height",
+		}, []string{LabelChain}),
 
-		proposalSize: promauto.NewHistogram(prometheus.HistogramOpts{
+		proposals: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespaceCollection,
+			Subsystem: subsystemProposal,
 			Buckets:   []float64{5, 10, 50, 100}, //TODO(andrew) update once collection limits are known
-			Name:      "proposal_size_transactions",
-			Help:      "number of transactions in proposed collections",
-		}),
+			Name:      "proposals_size_transactions",
+			Help:      "size/number of proposed collections",
+		}, []string{LabelChain}),
 
-		guaranteedCollectionSize: promauto.NewHistogram(prometheus.HistogramOpts{
+		guarantees: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespaceCollection,
+			Subsystem: subsystemProposal,
 			Buckets:   []float64{5, 10, 50, 100}, //TODO(andrew) update once collection limits are known
-			Name:      "guarantee_size_transactions",
-			Help:      "number of transactions in guaranteed collections",
-		}),
-
-		pendingClusterBlocks: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespaceCollection,
-			Name:      "pending_blocks_total",
-			Help:      "number of cluster blocks in pending cache of collection proposal engine",
-		}),
+			Name:      "guarantees_size_transactions",
+			Help:      "size/number of guaranteed/finalized collections",
+		}, []string{LabelChain}),
 	}
 
 	return cc
 }
 
-// TransactionReceived starts a span to trace the duration of a transaction
+// TransactionIngested starts a span to trace the duration of a transaction
 // from being created to being included as part of a collection.
-func (cc *CollectionCollector) TransactionReceived(txID flow.Identifier) {
+func (cc *CollectionCollector) TransactionIngested(txID flow.Identifier) {
 	cc.transactionsIngested.Inc()
 	cc.tracer.StartSpan(txID, spanTransactionToCollection)
 }
 
-// CollectionProposed tracks the size and number of proposals.
-func (cc *CollectionCollector) CollectionProposed(collection flow.LightCollection) {
-	cc.proposalSize.Observe(float64(collection.Len()))
-	cc.proposals.Inc()
-}
+// ClusterBlockProposed tracks the size and number of proposals, as well as
+// starting the collection->guarantee span.
+func (cc *CollectionCollector) ClusterBlockProposed(block *cluster.Block) {
+	collection := block.Payload.Collection.Light()
 
-// CollectionGuaranteed updates the guaranteed collection size gauge and
-// finishes the tx->collection span for each constituent transaction.
-func (cc *CollectionCollector) CollectionGuaranteed(collection flow.LightCollection) {
-	cc.guaranteedCollectionSize.Observe(float64(collection.Len()))
-	for _, txID := range collection.Transactions {
-		cc.tracer.FinishSpan(txID, spanTransactionToCollection)
-	}
-}
-
-// PendingClusterBlocks sets the number of cluster blocks in the pending cache.
-func (cc *CollectionCollector) PendingClusterBlocks(n uint) {
-	cc.pendingClusterBlocks.Set(float64(n))
-}
-
-// StartCollectionToGuarantee starts a span to trace the duration of a collection
-// from being created to being submitted as a collection guarantee
-// TODO not used, revisit once HotStuff is in use
-func (cc *CollectionCollector) StartCollectionToGuarantee(collection flow.LightCollection) {
+	cc.proposals.
+		With(prometheus.Labels{LabelChain: block.Header.ChainID}).
+		Observe(float64(collection.Len()))
 
 	followsFrom := make([]opentracing.StartSpanOption, 0, len(collection.Transactions))
 	for _, txID := range collection.Transactions {
@@ -115,9 +95,21 @@ func (cc *CollectionCollector) StartCollectionToGuarantee(collection flow.LightC
 		SetTag("collection_txs", collection.Transactions)
 }
 
-// FinishCollectionToGuarantee finishes a span to trace the duration of a collection
-// from being proposed to being finalized (eg. guaranteed).
-// TODO not used, revisit once HotStuff is in use
-func (cc *CollectionCollector) FinishCollectionToGuarantee(collectionID flow.Identifier) {
-	cc.tracer.FinishSpan(collectionID, spanCollectionToGuarantee)
+// ClusterBlockFinalized updates the guaranteed collection size gauge and
+// finishes the tx->collection span for each constituent transaction.
+func (cc *CollectionCollector) ClusterBlockFinalized(block *cluster.Block) {
+	collection := block.Payload.Collection.Light()
+	chainID := block.Header.ChainID
+
+	cc.finalizedHeight.
+		With(prometheus.Labels{LabelChain: chainID}).
+		Set(float64(block.Header.Height))
+	cc.guarantees.
+		With(prometheus.Labels{LabelChain: block.Header.ChainID}).
+		Observe(float64(collection.Len()))
+
+	for _, txID := range collection.Transactions {
+		cc.tracer.FinishSpan(txID, spanTransactionToCollection)
+	}
+	cc.tracer.FinishSpan(collection.ID(), spanCollectionToGuarantee)
 }
