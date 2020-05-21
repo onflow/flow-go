@@ -21,6 +21,8 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
+// MaxGasLimit is the maximum allowed gas limit for a transaction.
+// TODO: update the hardcoded number based on real world cases.
 const MaxGasLimit = 9999
 
 // Engine is the transaction ingestion engine, which ensures that new
