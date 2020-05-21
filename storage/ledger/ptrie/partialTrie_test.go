@@ -10,7 +10,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
@@ -23,7 +25,8 @@ func withMForest(
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	mForest, err := mtrie.NewMForest(trieHeight, dir, numberOfActiveTries, nil)
+	metricsCollector := &metrics.NoopCollector{}
+	mForest, err := mtrie.NewMForest(trieHeight, dir, numberOfActiveTries, metricsCollector, nil)
 	require.NoError(t, err)
 
 	f(t, mForest)
@@ -46,19 +49,21 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 
 		rootHash := mForest.GetEmptyRootHash()
 
-		retValues, err := mForest.Read(keys, rootHash)
+		retValues, err := mForest.Read(rootHash, keys)
 		require.NoError(t, err, "error reading values")
 
-		bp, err := mForest.Proofs(keys, rootHash)
+		bp, err := mForest.Proofs(rootHash, keys)
 		require.NoError(t, err, "error getting proofs values")
 
-		psmt, err := NewPSMT(rootHash, trieHeight, keys, retValues, bp.EncodeBatchProof())
+		encBP, _ := proof.EncodeBatchProof(bp)
+		psmt, err := NewPSMT(rootHash, trieHeight, keys, retValues, encBP)
 
 		require.NoError(t, err, "error building partial trie")
 		if !bytes.Equal(rootHash, psmt.root.ComputeValue()) {
 			t.Fatal("rootNode hash doesn't match [before set]")
 		}
-		rootHash, err = mForest.Update(keys, values, rootHash)
+		newTrie, err := mForest.Update(rootHash, keys, values)
+		rootHash = newTrie.RootHash()
 		require.NoError(t, err, "error updating trie")
 
 		_, _, err = psmt.Update(keys, values)
@@ -73,7 +78,8 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 		keys = append(keys, key1)
 		values = append(values, updatedValue1)
 
-		rootHash, err = mForest.Update(keys, values, rootHash)
+		newTrie, err = mForest.Update(rootHash, keys, values)
+		rootHash = newTrie.RootHash()
 		require.NoError(t, err, "error updating trie")
 
 		_, _, err = psmt.Update(keys, values)
@@ -106,16 +112,18 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 		keys = append(keys, key1, key2)
 		values = append(values, value1, value2)
 
-		newRoot, err := mForest.Update(keys, values, mForest.GetEmptyRootHash())
+		newTrie, err := mForest.Update(mForest.GetEmptyRootHash(), keys, values)
+		newRoot := newTrie.RootHash()
 		require.NoError(t, err, "error updating trie")
 
-		retvalues, err := mForest.Read(keys, newRoot)
+		retvalues, err := mForest.Read(newRoot, keys)
 		require.NoError(t, err, "error reading values")
 
-		bp, err := mForest.Proofs(keys, newRoot)
+		bp, err := mForest.Proofs(newRoot, keys)
 		require.NoError(t, err, "error getting batch proof")
 
-		psmt, err := NewPSMT(newRoot, trieHeight, keys, retvalues, bp.EncodeBatchProof())
+		encBP, _ := proof.EncodeBatchProof(bp)
+		psmt, err := NewPSMT(newRoot, trieHeight, keys, retvalues, encBP)
 		require.NoError(t, err, "error building partial trie")
 
 		if !bytes.Equal(newRoot, psmt.root.ComputeValue()) {
@@ -124,7 +132,8 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 
 		values = make([][]byte, 0)
 		values = append(values, updatedValue1, updatedValue2)
-		newRoot2, err := mForest.Update(keys, values, newRoot)
+		newTrie2, err := mForest.Update(newRoot, keys, values)
+		newRoot2 := newTrie2.RootHash()
 		require.NoError(t, err, "error updating trie")
 
 		_, _, err = psmt.Update(keys, values)
@@ -160,39 +169,40 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 		keys = append(keys, key1, key2, key3)
 		values = append(values, value1, value2, value3)
 
-		retvalues, err := mForest.Read(keys, mForest.GetEmptyRootHash())
+		retvalues, err := mForest.Read(mForest.GetEmptyRootHash(), keys)
 		require.NoError(t, err, "error reading values")
 
-		bp, err := mForest.Proofs(keys, mForest.GetEmptyRootHash())
+		bp, err := mForest.Proofs(mForest.GetEmptyRootHash(), keys)
 		require.NoError(t, err, "error getting batch proof")
 
-		psmt, err := NewPSMT(mForest.GetEmptyRootHash(), trieHeight, keys, retvalues, bp.EncodeBatchProof())
+		encBP, _ := proof.EncodeBatchProof(bp)
+		psmt, err := NewPSMT(mForest.GetEmptyRootHash(), trieHeight, keys, retvalues, encBP)
 		require.NoError(t, err, "error building partial trie")
 
 		if !bytes.Equal(mForest.GetEmptyRootHash(), psmt.root.ComputeValue()) {
 			t.Fatal("rootNode hash doesn't match [before update]")
 		}
 		// first update
-		newRoot, err := mForest.Update(keys, values, mForest.GetEmptyRootHash())
+		newTrie, err := mForest.Update(mForest.GetEmptyRootHash(), keys, values)
 		require.NoError(t, err, "error updating trie")
 
 		_, _, err = psmt.Update(keys, values)
 		require.NoError(t, err, "error updating psmt")
 
-		if !bytes.Equal(newRoot, psmt.root.ComputeValue()) {
+		if !bytes.Equal(newTrie.RootHash(), psmt.root.ComputeValue()) {
 			t.Fatal("rootNode hash doesn't match [before update]")
 		}
 
 		// second update
 		values = make([][]byte, 0)
 		values = append(values, updatedValue1, updatedValue2, updatedValue3)
-		newRoot2, err := mForest.Update(keys, values, newRoot)
+		newTrie2, err := mForest.Update(newTrie.RootHash(), keys, values)
 		require.NoError(t, err, "error updating trie")
 
 		_, _, err = psmt.Update(keys, values)
 		require.NoError(t, err, "error updating psmt")
 
-		if !bytes.Equal(newRoot2, psmt.root.ComputeValue()) {
+		if !bytes.Equal(newTrie2.RootHash(), psmt.root.ComputeValue()) {
 			t.Fatal("rootNode hash doesn't match [after update]")
 		}
 	})
@@ -217,13 +227,14 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 		keys = append(keys, key1, key2)
 		values = append(values, value1, value2)
 
-		retvalues, err := mForest.Read(keys, mForest.GetEmptyRootHash())
+		retvalues, err := mForest.Read(mForest.GetEmptyRootHash(), keys)
 		require.NoError(t, err, "error reading values")
 
-		bp, err := mForest.Proofs(keys, mForest.GetEmptyRootHash())
+		bp, err := mForest.Proofs(mForest.GetEmptyRootHash(), keys)
 		require.NoError(t, err, "error getting batch proof")
 
-		psmt, err := NewPSMT(mForest.GetEmptyRootHash(), trieHeight, keys, retvalues, bp.EncodeBatchProof())
+		encBP, _ := proof.EncodeBatchProof(bp)
+		psmt, err := NewPSMT(mForest.GetEmptyRootHash(), trieHeight, keys, retvalues, encBP)
 		require.NoError(t, err, "error building partial trie")
 
 		if !bytes.Equal(mForest.GetEmptyRootHash(), psmt.root.ComputeValue()) {
@@ -231,7 +242,8 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 		}
 
 		// first update
-		newRoot, err := mForest.Update(keys, values, mForest.GetEmptyRootHash())
+		newTrie, err := mForest.Update(mForest.GetEmptyRootHash(), keys, values)
+		newRoot := newTrie.RootHash()
 		require.NoError(t, err, "error updating trie")
 
 		_, _, err = psmt.Update(keys, values)
@@ -243,7 +255,8 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 		// second update
 		values = make([][]byte, 0)
 		values = append(values, updatedValue1, updatedValue2)
-		newRoot2, err := mForest.Update(keys, values, newRoot)
+		newTrie2, err := mForest.Update(newRoot, keys, values)
+		newRoot2 := newTrie2.RootHash()
 		require.NoError(t, err, "error updating trie")
 
 		_, _, err = psmt.Update(keys, values)
@@ -274,19 +287,21 @@ func TestMixProof(t *testing.T) {
 		keys = append(keys, key1, key3)
 		values = append(values, value1, value3)
 
-		newRoot, err := mForest.Update(keys, values, mForest.GetEmptyRootHash())
+		newTrie, err := mForest.Update(mForest.GetEmptyRootHash(), keys, values)
+		newRoot := newTrie.RootHash()
 		require.NoError(t, err, "error updating trie")
 
 		keys = make([][]byte, 0)
 		keys = append(keys, key1, key2, key3)
 
-		retvalues, err := mForest.Read(keys, newRoot)
+		retvalues, err := mForest.Read(newRoot, keys)
 		require.NoError(t, err, "error reading values")
 
-		bp, err := mForest.Proofs(keys, newRoot)
+		bp, err := mForest.Proofs(newRoot, keys)
 		require.NoError(t, err, "error getting batch proof")
 
-		psmt, err := NewPSMT(newRoot, trieHeight, keys, retvalues, bp.EncodeBatchProof())
+		encBP, _ := proof.EncodeBatchProof(bp)
+		psmt, err := NewPSMT(newRoot, trieHeight, keys, retvalues, encBP)
 		require.NoError(t, err, "error building partial trie")
 
 		if !bytes.Equal(newRoot, psmt.root.ComputeValue()) {
@@ -299,7 +314,8 @@ func TestMixProof(t *testing.T) {
 		values = make([][]byte, 0)
 		values = append(values, []byte{'X'}, []byte{'Y'})
 
-		root2, err := mForest.Update(keys, values, newRoot)
+		trie2, err := mForest.Update(newRoot, keys, values)
+		root2 := trie2.RootHash()
 		require.NoError(t, err, "error updating trie")
 
 		proot2, _, err := psmt.Update(keys, values)
@@ -350,7 +366,8 @@ func TestRandomProofs(t *testing.T) {
 			insertKeys := keys[:split]
 			insertValues := values[:split]
 
-			root, err := mForest.Update(insertKeys, insertValues, mForest.GetEmptyRootHash())
+			nTrie, err := mForest.Update(mForest.GetEmptyRootHash(), insertKeys, insertValues)
+			root := nTrie.RootHash()
 			require.NoError(t, err, "error updating trie")
 
 			// shuffle keys for read
@@ -359,13 +376,14 @@ func TestRandomProofs(t *testing.T) {
 				values[i], values[j] = values[j], values[i]
 			})
 
-			retvalues, err := mForest.Read(keys, root)
+			retvalues, err := mForest.Read(root, keys)
 			require.NoError(t, err, "error reading values")
 
-			bp, err := mForest.Proofs(keys, root)
+			bp, err := mForest.Proofs(root, keys)
 			require.NoError(t, err, "error getting batch proof")
 
-			psmt, err := NewPSMT(root, trieHeight, keys, retvalues, bp.EncodeBatchProof())
+			encBP, _ := proof.EncodeBatchProof(bp)
+			psmt, err := NewPSMT(root, trieHeight, keys, retvalues, encBP)
 			require.NoError(t, err, "error building partial trie")
 
 			if !bytes.Equal(root, psmt.root.ComputeValue()) {
@@ -381,7 +399,8 @@ func TestRandomProofs(t *testing.T) {
 				updateValues[i], updateValues[j] = updateValues[j], updateValues[i]
 			})
 
-			root2, err := mForest.Update(updateKeys, updateValues, root)
+			newTrie2, err := mForest.Update(root, updateKeys, updateValues)
+			root2 := newTrie2.RootHash()
 			require.NoError(t, err, "error updating trie")
 
 			proot2, _, err := psmt.Update(updateKeys, updateValues)
@@ -395,5 +414,5 @@ func TestRandomProofs(t *testing.T) {
 	}
 }
 
-// // TODO add test for incompatible proofs [Byzantine milestone]
-// // TODO add test key not exist [Byzantine milestone]
+// TODO add test for incompatible proofs [Byzantine milestone]
+// TODO add test key not exist [Byzantine milestone]

@@ -14,6 +14,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/common"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/ptrie"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"

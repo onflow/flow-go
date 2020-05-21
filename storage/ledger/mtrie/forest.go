@@ -361,10 +361,12 @@ func (f *MForest) LoadTrie(path string) (*trie.MTrie, error) {
 	return newTrie, nil
 }
 
+// Size returns the number of active tries in this store
 func (f *MForest) Size() int {
 	return f.tries.Len()
 }
 
+// DiskSize returns the disk size of the directory used by the forrest
 func (f *MForest) DiskSize() (int64, error) {
 	return io.DirSize(f.dir)
 }
