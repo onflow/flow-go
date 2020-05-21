@@ -12,13 +12,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
-
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/common"
-  "github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
-  "github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
-
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
+	"github.com/dapperlabs/flow-go/storage/ledger/ptrie"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
@@ -823,10 +819,9 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		require.NoError(t, err, "error generating proofs")
 		require.True(t, batchProof.Verify(proofKeys, proofValues, testTrie.RootHash(), trieHeight))
 
-
-		psmt, err := cstrie.NewPSMT(rootHash, trieHeight, proofKeys, proofValues, batchProof.EncodeBatchProof())
+		psmt, err := ptrie.NewPSMT(testTrie.RootHash(), trieHeight, proofKeys, proofValues, batchProof.EncodeBatchProof())
 		require.NoError(t, err, "error building partial trie")
-		require.True(t, bytes.Equal(psmt.GetRootHash(), rootHash))
+		require.True(t, bytes.Equal(psmt.GetRootHash(), testTrie.RootHash()))
 
 		// check values for all existing keys
 		allKeys := make([][]byte, 0, len(latestValueByKey))
