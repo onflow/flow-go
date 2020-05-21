@@ -24,7 +24,7 @@ var (
 
 	// private genesis information
 	DirPrivateGenesis        = "private-genesis-information"
-	PathAccount0Priv         = filepath.Join(DirPrivateGenesis, "account-0.priv.json")
+	PathServiceAccountPriv   = filepath.Join(DirPrivateGenesis, "service-account.priv.json")
 	PathNodeInfoPriv         = filepath.Join(DirPrivateGenesis, "private-node-info_%v", "node-info.priv.json") // %v will be replaced by NodeID
 	FilenameRandomBeaconPriv = "random-beacon.priv.json"
 	PathRandomBeaconPriv     = filepath.Join(DirPrivateGenesis, "private-node-info_%v", FilenameRandomBeaconPriv) // %v will be replaced by NodeID

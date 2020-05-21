@@ -3,6 +3,8 @@
 package flow
 
 import (
+	"encoding/json"
+
 	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/crypto"
@@ -61,6 +63,18 @@ func (a AccountPrivateKey) PublicKey(weight int) AccountPublicKey {
 		HashAlgo:  a.HashAlgo,
 		Weight:    weight,
 	}
+}
+
+func (a AccountPrivateKey) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		PrivateKey []byte
+		SignAlgo   crypto.SigningAlgorithm
+		HashAlgo   hash.HashingAlgorithm
+	}{
+		a.PrivateKey.Encode(),
+		a.SignAlgo,
+		a.HashAlgo,
+	})
 }
 
 // CompatibleAlgorithms returns true if the signature and hash algorithms are compatible.
