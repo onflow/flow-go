@@ -148,7 +148,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 	var verifiableChunk verification.VerifiableChunk
 
 	unittest.RunWithTempDir(t, func(dbDir string) {
-		f, _ := ledger.NewTrieStorage(dbDir)
+		f, _ := ledger.NewMTrieStorage(dbDir, 1000, nil)
 		startState, _ := f.UpdateRegisters(ids, values, f.EmptyStateCommitment())
 		regTs, _ := f.GetRegisterTouches(ids, startState)
 
