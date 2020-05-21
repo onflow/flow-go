@@ -783,8 +783,9 @@ func TestRandomUpdateReadProof(t *testing.T) {
 
 	metricsCollector := &metrics.NoopCollector{}
 	fStore, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
-	testTrie, err := fStore.getTrie(fStore.GetEmptyRootHash())
+	require.NoError(t, err)
 
+	testTrie, err := fStore.getTrie(fStore.GetEmptyRootHash())
 	require.NoError(t, err)
 	latestValueByKey := make(map[string][]byte) // map store
 
