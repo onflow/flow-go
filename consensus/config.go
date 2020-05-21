@@ -28,3 +28,15 @@ func WithBlockRateDelay(delay time.Duration) Option {
 		cfg.BlockRateDelay = delay
 	}
 }
+
+func WithTimeoutDecreaseStep(decrease time.Duration) Option {
+	return func(cfg *ParticipantConfig) {
+		cfg.TimeoutDecreaseStep = decrease
+	}
+}
+
+func WithVoteAggregationTimeoutFraction(fraction float64) Option {
+	return func(cfg *ParticipantConfig) {
+		cfg.TimeoutAggregationFraction = fraction
+	}
+}
