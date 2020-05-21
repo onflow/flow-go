@@ -62,10 +62,10 @@ func (s *Suite) SetupTest() {
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
 	// need one verification node
-	s.verID = unittest.IdentifierFixture()
-	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithID(s.verID),
-		testnet.WithLogLevel(zerolog.InfoLevel))
-	s.nodeConfigs = append(s.nodeConfigs, verConfig)
+	// s.verID = unittest.IdentifierFixture()
+	// verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithID(s.verID),
+	// 	testnet.WithLogLevel(zerolog.InfoLevel))
+	// s.nodeConfigs = append(s.nodeConfigs, verConfig)
 
 	// need one collection node
 	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel))
