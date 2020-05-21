@@ -2,13 +2,17 @@ package cmd
 
 import (
 	"fmt"
+	"net"
+	"strconv"
 
+	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 )
 
 var (
@@ -25,6 +29,7 @@ var keyCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		// validate inputs
 		role := validateRole(flagRole)
+		validateAddressFormat(flagAddress)
 		networkSeed := validateSeed(flagNetworkSeed)
 		stakingSeed := validateSeed(flagStakingSeed)
 
@@ -90,4 +95,31 @@ func validateSeed(seed []byte) []byte {
 		log.Fatal().Int("len(seed)", len(seed)).Msgf("seed too short, needs to be at least %v bytes long", minSeedBytes)
 	}
 	return seed
+}
+
+// validateAddressFormat validates the address provided by pretty much doing what the network layer would do before
+// starting the node
+func validateAddressFormat(address string) {
+	checkErr := func(err error) {
+		if err != nil {
+			log.Fatal().Err(err).Str("address", address).Msg("invalid address format.\n" +
+				`Address needs to be in the format hostname:port or ip:port e.g. "flow.com:3569"`)
+		}
+	}
+
+	// derive the IP and Port
+	ip, port, err := net.SplitHostPort(address)
+	checkErr(err)
+
+	_, err = strconv.Atoi(port)
+	checkErr(err)
+
+	nodeAddrs := libp2p.NodeAddress{
+		IP:   ip,
+		Port: port,
+	}
+	// create a libp2p address from the ip and port
+	lp2pAddr := libp2p.MultiaddressStr(nodeAddrs)
+	_, err = multiaddr.NewMultiaddr(lp2pAddr)
+	checkErr(err)
 }
