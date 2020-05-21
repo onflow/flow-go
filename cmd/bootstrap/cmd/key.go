@@ -107,10 +107,11 @@ func validateAddressFormat(address string) {
 		}
 	}
 
-	// derive the IP and Port
+	// split address into ip/hostname and port
 	ip, port, err := net.SplitHostPort(address)
 	checkErr(err)
 
+	// check that port number is indeed a number
 	_, err = strconv.Atoi(port)
 	checkErr(err)
 
@@ -118,6 +119,7 @@ func validateAddressFormat(address string) {
 		IP:   ip,
 		Port: port,
 	}
+
 	// create a libp2p address from the ip and port
 	lp2pAddr := libp2p.MultiaddressStr(nodeAddrs)
 	_, err = multiaddr.NewMultiaddr(lp2pAddr)
