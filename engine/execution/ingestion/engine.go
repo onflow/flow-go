@@ -429,7 +429,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	e.metrics.ExecutionLastExecutedBlockView(executableBlock.Block.Header.View)
 }
 
-func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) {
+func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 	if eb.IsComplete() {
 		e.log.Debug().
 			Hex("block_id", logging.Entity(eb.Block)).
@@ -441,13 +441,20 @@ func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) {
 
 		e.wg.Add(1)
 		go e.executeBlock(context.Background(), eb)
+		return true
 	}
+	return false
 }
 
 func (e *Engine) handleCollectionResponse(ctx context.Context, response *messages.CollectionResponse) error {
 
 	collection := response.Collection
 	collID := collection.ID()
+
+	err := e.collections.Store(&collection)
+	if err != nil {
+		return fmt.Errorf("cannot store collection: %w", err)
+	}
 
 	return e.mempool.BlockByCollection.Run(
 		func(backdata *stdmap.BlockByCollectionBackdata) error {
@@ -609,47 +616,52 @@ func (e *Engine) sendCollectionsRequest(
 ) error {
 
 	for _, guarantee := range executableBlock.Block.Payload.Guarantees {
-
+		var transactions []*flow.TransactionBody
 		maybeBlockByCollection, exists := backdata.ByID(guarantee.ID())
 
-		if !exists {
-
-			maybeBlockByCollection = &entity.BlocksByCollection{
-				CollectionID:     guarantee.ID(),
-				ExecutableBlocks: make(map[flow.Identifier]*entity.ExecutableBlock),
+		if exists {
+			if _, exists := maybeBlockByCollection.ExecutableBlocks[executableBlock.ID()]; exists {
+				e.log.Info().Hex("block_id", logging.Entity(executableBlock)).Msg("requesting collections for block with already pending requests. Ignoring requests.")
 			}
+			maybeBlockByCollection.ExecutableBlocks[executableBlock.ID()] = executableBlock
+		} else {
+			collection, err := e.collections.ByID(guarantee.CollectionID)
 
-			added := backdata.Add(maybeBlockByCollection)
-			if !added {
-				return fmt.Errorf("collection already mapped to block")
+			if err == nil {
+				transactions = collection.Transactions
+			} else if errors.Is(err, storage.ErrNotFound) {
+				maybeBlockByCollection = &entity.BlocksByCollection{
+					CollectionID:     guarantee.ID(),
+					ExecutableBlocks: map[flow.Identifier]*entity.ExecutableBlock{executableBlock.ID(): executableBlock},
+				}
+
+				added := backdata.Add(maybeBlockByCollection)
+				if !added {
+					return fmt.Errorf("collection already mapped to block")
+				}
+
+				collectionGuaranteesIdentifiers, err := e.findCollectionNodesForGuarantee(
+					executableBlock.Block.ID(),
+					guarantee,
+				)
+				if err != nil {
+					return err
+				}
+
+				e.log.Debug().
+					Hex("block_id", logging.Entity(executableBlock.Block)).
+					Hex("collection_id", logging.ID(guarantee.ID())).
+					Msg("requesting collection")
+
+				e.submitCollectionRequest(&maybeBlockByCollection.TimeoutTimer, guarantee.ID(), collectionGuaranteesIdentifiers, 0)
+			} else {
+				return fmt.Errorf("error while querying for collection: %w", err)
 			}
-
-			collectionGuaranteesIdentifiers, err := e.findCollectionNodesForGuarantee(
-				executableBlock.Block.ID(),
-				guarantee,
-			)
-			if err != nil {
-				return err
-			}
-
-			e.log.Debug().
-				Hex("block_id", logging.Entity(executableBlock.Block)).
-				Hex("collection_id", logging.ID(guarantee.ID())).
-				Msg("requesting collection")
-
-			e.submitCollectionRequest(&maybeBlockByCollection.TimeoutTimer, guarantee.ID(), collectionGuaranteesIdentifiers, 0)
 		}
-
-		if _, exists := maybeBlockByCollection.ExecutableBlocks[executableBlock.ID()]; exists {
-			e.log.Info().Hex("block_id", logging.Entity(executableBlock)).Msg("requesting collections for block with already pending requests. Ignoring requests.")
-			continue
-		}
-
-		maybeBlockByCollection.ExecutableBlocks[executableBlock.ID()] = executableBlock
 
 		executableBlock.CompleteCollections[guarantee.ID()] = &entity.CompleteCollection{
 			Guarantee:    guarantee,
-			Transactions: nil,
+			Transactions: transactions,
 		}
 	}
 
