@@ -31,7 +31,7 @@ func TestBatchProofEncoderDecoder(t *testing.T) {
 	batchProof, err := fStore.Proofs(keys, rootHash)
 	require.NoError(t, err)
 
-	p, err := proof.DecodeBatchProof(proof.EncodeBatchProof(batchProof))
+	p, err := proof.DecodeBatchProof(batchProof.EncodeBatchProof())
 	require.NoError(t, err)
 	require.Equal(t, p, batchProof, "Proof encoder and/or decoder has an issue")
 
