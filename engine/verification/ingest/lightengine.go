@@ -711,9 +711,8 @@ func (l *LightEngine) onReceiptIngested(receiptID flow.Identifier, resultID flow
 	// removes all authenticated receipts with the same result
 	for _, receipt := range l.receipts.All() {
 		// TODO check for nil dereferencing
-		id := receipt.ExecutionResult.ID()
-		if id == resultID {
-			l.receipts.Rem(id)
+		if receipt.ExecutionResult.ID() == resultID {
+			l.receipts.Rem(receipt.ID())
 		}
 	}
 }

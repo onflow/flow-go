@@ -21,7 +21,7 @@ func (_m *CollectionMetrics) ClusterBlockProposed(block *cluster.Block) {
 	_m.Called(block)
 }
 
-// TransactionReceived provides a mock function with given fields: txID
-func (_m *CollectionMetrics) TransactionReceived(txID flow.Identifier) {
+// TransactionIngested provides a mock function with given fields: txID
+func (_m *CollectionMetrics) TransactionIngested(txID flow.Identifier) {
 	_m.Called(txID)
 }

@@ -532,6 +532,10 @@ func (suite *LightIngestTestSuite) TestVerifyReady() {
 			suite.collections.On("Rem", suite.collection.ID()).Return(true)
 			// mocks removing chunk data pack from the mempool
 			suite.chunkDataPacks.On("Rem", suite.chunkDataPack.ID()).Return(true)
+			// mocks removing ingested receipt
+			suite.receipts.On("Rem", suite.receipt.ID()).Return(true)
+			// mocks execution receipt is ingested literally
+			suite.ingestedResultIDs.On("Add", suite.receipt.ExecutionResult.ID()).Return(true)
 
 			// mocks test expectation
 			//
