@@ -21,6 +21,8 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
+const MaxGasLimit = 9999
+
 // Engine is the transaction ingestion engine, which ensures that new
 // transactions are delegated to the correct collection cluster, and prepared
 // to be included in a collection.
@@ -219,6 +221,11 @@ func (e *Engine) ValidateTransaction(tx *flow.TransactionBody) error {
 	missingFields := tx.MissingFields()
 	if len(missingFields) > 0 {
 		return IncompleteTransactionError{Missing: missingFields}
+	}
+
+	// ensure the gas limit is not over the maximum
+	if tx.GasLimit > MaxGasLimit {
+		return GasLimitExceededError{Actual: tx.GasLimit, Maximum: MaxGasLimit}
 	}
 
 	// ensure the transaction is not expired
