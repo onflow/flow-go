@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"time"
+	"sync"
 
 	"github.com/rs/zerolog"
 
@@ -49,8 +49,9 @@ type LightEngine struct {
 	headerStorage         storage.Headers               // used to check block existence to improve performance
 	blockStorage          storage.Blocks                // used to retrieve blocks
 	assigner              module.ChunkAssigner          // used to determine chunks this node needs to verify
-	requestInterval       uint                          // determines time in milliseconds for retrying tracked requests
-	failureThreshold      uint                          // determines number of retries for tracked requests before raising a challenge
+	checkChunkLock        sync.Mutex
+	requestInterval       uint // determines time in milliseconds for retrying tracked requests
+	failureThreshold      uint // determines number of retries for tracked requests before raising a challenge
 }
 
 // New creates and returns a new instance of the ingest engine.
@@ -126,9 +127,6 @@ func NewLightEngine(
 // Ready returns a channel that is closed when the verifier engine is ready.
 func (l *LightEngine) Ready() <-chan struct{} {
 	// checks pending chunks every `requestInterval` milliseconds
-	l.unit.LaunchPeriodically(l.checkPendingChunks,
-		time.Duration(l.requestInterval)*time.Millisecond,
-		0)
 	return l.unit.Ready()
 }
 
@@ -252,6 +250,9 @@ func (l *LightEngine) handleExecutionReceipt(originID flow.Identifier, receipt *
 		}
 	}
 
+	// checks pending chunks for this receipt
+	l.checkPendingChunks()
+
 	return nil
 }
 
@@ -310,16 +311,6 @@ func (l *LightEngine) handleChunkDataPack(originID flow.Identifier, chunkDataPac
 		return nil
 	}
 
-	if !l.chunkDataPackTackers.Has(chunkDataPack.ChunkID) {
-		// does not have a valid tracker
-		// discards the chunk data pack
-		l.log.Debug().
-			Hex("origin_id", logging.ID(originID)).
-			Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
-			Msg("discards the chunk data pack with no tracker")
-		return nil
-	}
-
 	// store the chunk data pack in the store of the engine
 	// this will fail if the receipt already exists in the store
 	added := l.chunkDataPacks.Add(chunkDataPack)
@@ -337,6 +328,8 @@ func (l *LightEngine) handleChunkDataPack(originID flow.Identifier, chunkDataPac
 		Hex("origin_id", logging.ID(originID)).
 		Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
 		Msg("chunk data pack stored in mempool, tracker removed")
+
+	l.checkPendingChunks()
 
 	return nil
 }
@@ -369,19 +362,21 @@ func (l *LightEngine) handleCollection(originID flow.Identifier, coll *flow.Coll
 		return nil
 	}
 
-	// cleans tracker for the collection if any exists
-	l.collectionTrackers.Rem(collID)
-
 	// adds collection to mempool
 	added := l.collections.Add(coll)
 	if !added {
 		return fmt.Errorf("could not add collection to mempool")
 	}
 
+	// cleans tracker for the collection if any exists
+	l.collectionTrackers.Rem(collID)
 	l.log.Debug().
 		Hex("origin_id", logging.ID(originID)).
 		Hex("collection_id", logging.ID(collID)).
 		Msg("collection added to mempool, and tracker removed")
+
+	l.checkPendingChunks()
+
 	return nil
 }
 
@@ -563,6 +558,9 @@ func (l *LightEngine) getCollectionForChunk(block *flow.Block, receipt *flow.Exe
 //
 // NOTE: this method is protected by mutex to prevent double-verifying ERs.
 func (l *LightEngine) checkPendingChunks() {
+	l.checkChunkLock.Lock()
+	defer l.checkChunkLock.Unlock()
+
 	l.log.Debug().
 		Msg("check pending chunks background service started")
 

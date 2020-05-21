@@ -631,9 +631,6 @@ func (suite *LightIngestTestSuite) TestChunkDataPackTracker_HappyPath() {
 		Nonce: rand.Uint64(),
 	}
 
-	// mocks tracker to return the tracker for the chunk data pack
-	suite.chunkDataPackTrackers.On("Has", suite.chunkDataPack.ChunkID).Return(true).Once()
-
 	// engine should not already have the chunk data pack
 	suite.chunkDataPacks.On("Has", suite.chunkDataPack.ChunkID).Return(false)
 	// chunk data pack should be successfully added to mempool and the tracker should be removed
@@ -642,6 +639,9 @@ func (suite *LightIngestTestSuite) TestChunkDataPackTracker_HappyPath() {
 
 	// engine has not yet ingested this chunk
 	suite.ingestedChunkIDs.On("Has", suite.chunkDataPack.ChunkID).Return(false).Once()
+
+	// engine does not have any receipt
+	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{})
 
 	err := eng.Process(suite.execIdentity.NodeID, chunkDataPackResponse)
 
