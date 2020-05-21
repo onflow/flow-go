@@ -21,7 +21,7 @@ func NewTransactions(db *badger.DB) *Transactions {
 }
 
 func (t *Transactions) Store(tx *flow.TransactionBody) error {
-	err := operation.RetryOnConflict(t.db.Update, operation.InsertTransaction(tx))
+	err := operation.RetryOnConflict(t.db.Update, operation.SkipDuplicates(operation.InsertTransaction(tx)))
 	if err != nil {
 		return fmt.Errorf("could not insert transaction: %w", err)
 	}
