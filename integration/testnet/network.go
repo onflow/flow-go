@@ -54,6 +54,9 @@ const (
 	AccessNodeAPIPort = "access-api-port"
 	// GhostNodeAPIPort is the name used for the access node API port.
 	GhostNodeAPIPort = "ghost-api-port"
+
+	// ExeNodeMetricsPort
+	ExeNodeMetricsPort = "exe-metrics-port"
 )
 
 func init() {
@@ -404,12 +407,20 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			nodeContainer.bindPort(hostPort, containerPort)
 
+			hostMetricsPort := testingdock.RandomPort(t)
+			containerMetricsPort := "8080/tcp"
+
+			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
+
 			nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 			if !nodeContainer.Config.Ghost {
 			}
 			nodeContainer.Ports[ExeNodeAPIPort] = hostPort
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckExecutionGRPC(hostPort))
 			net.AccessPorts[ExeNodeAPIPort] = hostPort
+
+			nodeContainer.Ports[ExeNodeMetricsPort] = hostMetricsPort
+			net.AccessPorts[ExeNodeMetricsPort] = hostMetricsPort
 
 			// create directories for execution state trie and values in the tmp
 			// host directory.
