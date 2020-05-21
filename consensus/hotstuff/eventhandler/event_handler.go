@@ -238,9 +238,11 @@ func (e *EventHandler) startNewView() error {
 		return fmt.Errorf("failed to determine primary for new view %d: %w", curView, err)
 	}
 
-	log = log.With().Hex("leader_id", currentLeader[:]).Logger()
+	isLeader := e.committee.Self() == currentLeader
 
-	if e.committee.Self() == currentLeader {
+	log = log.With().Hex("leader_id", currentLeader[:]).Bool("is_leader", isLeader).Logger()
+
+	if isLeader {
 
 		log.Debug().Msg("generating block proposal as leader")
 
