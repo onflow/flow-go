@@ -198,8 +198,8 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 	verWG := sync.WaitGroup{}
 	for _, verNode := range verNodes {
 		verWG.Add(2)
-		for _, receipt := range []*flow.ExecutionReceipt{receipt1, receipt2} {
-			go func(vn mock2.VerificationNode) {
+		for _, er := range []*flow.ExecutionReceipt{receipt1, receipt2} {
+			go func(vn mock2.VerificationNode, receipt *flow.ExecutionReceipt) {
 				defer verWG.Done()
 				// routes the receipt to either light or original ingest engines based
 				// on the test type
@@ -210,7 +210,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 					err := vn.IngestEngine.Process(exeIdentity.NodeID, receipt)
 					assert.Nil(t, err)
 				}
-			}(verNode)
+			}(verNode, er)
 		}
 	}
 
