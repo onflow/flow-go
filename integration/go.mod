@@ -9,8 +9,8 @@ require (
 	github.com/dgraph-io/badger/v2 v2.0.2
 	github.com/docker/docker v1.4.2-0.20190513124817-8c8457b0f2f8
 	github.com/docker/go-connections v0.4.0
-	github.com/onflow/cadence v0.2.0
-	github.com/onflow/flow-go-sdk v0.1.2-0.20200507214414-a33d38d32156
+	github.com/onflow/cadence v0.3.0-beta1
+	github.com/onflow/flow-go-sdk v0.3.0-beta1
 	github.com/onflow/flow/protobuf/go/flow v0.1.4
 	github.com/rs/zerolog v1.15.0
 	github.com/stretchr/testify v1.5.1

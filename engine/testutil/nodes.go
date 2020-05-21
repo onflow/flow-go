@@ -124,7 +124,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 	collections := storage.NewCollections(node.DB)
 	transactions := storage.NewTransactions(node.DB)
 
-	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, pool, 0)
+	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, pool, 0, true)
 	require.Nil(t, err)
 
 	providerEngine, err := provider.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, pool, collections, transactions)
@@ -391,16 +391,13 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.IngestEngine == nil {
-		node.IngestEngine, err = ingest.New(node.Log,
+		node.IngestEngine, err = ingest.NewLightEngine(node.Log,
 			node.Net,
 			node.State,
 			node.Me,
 			node.VerifierEngine,
 			node.AuthReceipts,
-			node.PendingReceipts,
 			node.AuthCollections,
-			node.PendingCollections,
-			node.CollectionTrackers,
 			node.ChunkDataPacks,
 			node.ChunkDataPackTrackers,
 			node.IngestedChunkIDs,

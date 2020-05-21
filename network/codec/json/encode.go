@@ -46,8 +46,6 @@ func encode(v interface{}) (*Envelope, error) {
 		code = CodeClusterBlockProposal
 	case *messages.ClusterBlockVote:
 		code = CodeClusterBlockVote
-	case *messages.ClusterBlockRequest:
-		code = CodeClusterBlockRequest
 	case *messages.ClusterBlockResponse:
 		code = CodeClusterBlockResponse
 

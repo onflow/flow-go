@@ -167,9 +167,6 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 func (m *Middleware) Stop() {
 	close(m.stop)
 
-	// cancel the context (this also signals libp2p go routines to exit)
-	m.cancel()
-
 	// stop libp2p
 	done, err := m.libP2PNode.Stop()
 	if err != nil {
@@ -178,6 +175,9 @@ func (m *Middleware) Stop() {
 		<-done
 		m.log.Debug().Msg("node stopped successfully")
 	}
+
+	// cancel the context (this also signals any lingering libp2p go routines to exit)
+	m.cancel()
 
 	// wait for the go routines spawned by middleware to stop
 	m.wg.Wait()
@@ -340,18 +340,14 @@ ProcessLoop:
 		case <-m.stop:
 			m.log.Info().Msg("exiting process loop: middleware stops")
 			break ProcessLoop
-		case <-conn.done:
-			m.log.Info().Msg("exiting process loop: connection stops")
-			break ProcessLoop
 		case msg, ok := <-conn.inbound:
 			if !ok {
-				m.log.Info().Msg("exiting process loop: connection stops")
+				m.log.Info().Msg("exiting process loop: read connection closed")
 				break ProcessLoop
 			}
 
 			msgSize := msg.Size()
 			m.reportInboundMsgSize(msgSize, metrics.ChannelOneToOne)
-
 			m.processMessage(msg)
 			continue ProcessLoop
 		}
@@ -382,6 +378,7 @@ func (m *Middleware) Subscribe(channelID uint8) error {
 // handleInboundSubscription reads the messages from the channel written to by readsSubscription and processes them
 func (m *Middleware) handleInboundSubscription(rs *ReadSubscription) {
 	defer m.wg.Done()
+	defer rs.stop()
 	// process incoming messages for as long as the peer is running
 SubscriptionLoop:
 	for {
@@ -389,10 +386,6 @@ SubscriptionLoop:
 		case <-m.stop:
 			// middleware stops
 			m.log.Info().Msg("exiting subscription loop: middleware stops")
-			break SubscriptionLoop
-		case <-rs.done:
-			// subscription stops
-			m.log.Info().Msg("exiting subscription loop: connection stops")
 			break SubscriptionLoop
 		case msg, ok := <-rs.inbound:
 			if !ok {

@@ -169,7 +169,7 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 	id := unittest.IdentifierFixture()
 	rootAddress := flow.ServiceAddress
 
-	rootAccount := flow.Account{
+	serviceAccount := flow.Account{
 		Address: rootAddress,
 	}
 
@@ -190,7 +190,7 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 	suite.Run("happy path with valid request", func() {
 
 		// setup mock expectations
-		mockEngine.On("GetAccount", mock.Anything, rootAddress, id).Return(&rootAccount, nil).Once()
+		mockEngine.On("GetAccount", mock.Anything, rootAddress, id).Return(&serviceAccount, nil).Once()
 
 		req := createReq(id[:], rootAddress.Bytes())
 
@@ -198,7 +198,7 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 
 		suite.Require().NoError(err)
 		actualAccount := resp.GetAccount()
-		expectedAccount, err := convert.AccountToMessage(&rootAccount)
+		expectedAccount, err := convert.AccountToMessage(&serviceAccount)
 		suite.Require().NoError(err)
 		suite.Require().Equal(*expectedAccount, *actualAccount)
 		mockEngine.AssertExpectations(suite.T())

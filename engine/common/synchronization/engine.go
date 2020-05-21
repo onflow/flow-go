@@ -24,6 +24,9 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
+//TODO this is duplicated in collection/synchronization
+// We should refactor both engines using module/synchronization/core
+
 // Engine is the synchronization engine, responsible for synchronizing chain state.
 type Engine struct {
 	unit     *engine.Unit
@@ -138,6 +141,13 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) RequestBlock(blockID flow.Identifier) {
 	e.unit.Lock()
 	defer e.unit.Unlock()
+
+	// if we already received this block, reset its status so we can re-queue
+	status := e.blockIDs[blockID]
+	if status.WasReceived() {
+		delete(e.blockIDs, status.Header.ID())
+		delete(e.heights, status.Header.Height)
+	}
 
 	e.queueByBlockID(blockID)
 }
@@ -357,44 +367,30 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 	return nil
 }
 
-// queueByHeight queues a request for the finalized block at the given height.
+// queueByHeight queues a request for the finalized block at the given height,
+// only if no equivalent request has been queued before.
 func (e *Engine) queueByHeight(height uint64) {
 
-	// if we already have the height, skip
-	_, ok := e.heights[height]
-	if ok {
+	// only queue the request if have never queued it before
+	if e.heights[height].WasQueued() {
 		return
 	}
 
-	// TODO: we might want to double check if we don't have the height finalized yet
-
-	// create the status and add to map
-	status := Status{
-		Queued:    time.Now(),  // this can be used for timing out
-		Requested: time.Time{}, // this can be used for both retries & timeouts
-		Attempts:  0,           // this can be used to abort after certain amount of retries
-	}
-	e.heights[height] = &status
+	// queue the request
+	e.heights[height] = NewQueuedStatus()
 }
 
-// queueByBlockID queues a request for a block by block ID.
+// queueByBlockID queues a request for a block by block ID, only if no
+// equivalent request has been queued before.
 func (e *Engine) queueByBlockID(blockID flow.Identifier) {
 
-	// if we already have the blockID, skip
-	_, ok := e.blockIDs[blockID]
-	if ok {
+	// only queue the request if have never queued it before
+	if e.blockIDs[blockID].WasQueued() {
 		return
 	}
 
-	// TODO: we might want to double check that we don't have the block yet
-
-	// create the status and add to map
-	status := Status{
-		Queued:    time.Now(),
-		Requested: time.Time{},
-		Attempts:  0,
-	}
-	e.blockIDs[blockID] = &status
+	// queue the request
+	e.blockIDs[blockID] = NewQueuedStatus()
 }
 
 // getRequestStatus retrieves a request status for a block, regardless of
@@ -528,6 +524,10 @@ func (e *Engine) prune() {
 		return
 	}
 
+	// track how many statuses we are pruning
+	initialHeights := len(e.heights)
+	initialBlockIDs := len(e.blockIDs)
+
 	for height := range e.heights {
 		if height <= final.Height {
 			delete(e.heights, height)
@@ -545,12 +545,21 @@ func (e *Engine) prune() {
 			}
 		}
 	}
+
+	prunedHeights := len(e.heights) - initialHeights
+	prunedBlockIDs := len(e.blockIDs) - initialBlockIDs
+	e.log.Debug().
+		Uint64("final_height", final.Height).
+		Msgf("pruned %d heights, %d block IDs", prunedHeights, prunedBlockIDs)
 }
 
 // scanPending will check which items shall be requested.
 func (e *Engine) scanPending() ([]uint64, []flow.Identifier, error) {
 	e.unit.Lock()
 	defer e.unit.Unlock()
+
+	// first, prune any finalized heights
+	e.prune()
 
 	// TODO: we will probably want to limit the maximum amount of in-flight
 	// requests and maximum amount of blocks requested at the same time here;

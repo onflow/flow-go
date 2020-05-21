@@ -12,19 +12,20 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+const scriptGasLimit = 100000
+
 type CheckerFunc func([]byte, runtime.Location) error
 
 type TransactionContext struct {
 	LedgerDAL
-	astCache          ASTCache
-	signingAccounts   []runtime.Address
-	checker           CheckerFunc
-	logs              []string
-	events            []cadence.Event
-	OnSetValueHandler func(owner, controller, key, value []byte)
-	gasUsed           uint64 // TODO fill with actual gas
-	tx                *flow.TransactionBody
-	uuid              uint64
+	astCache        ASTCache
+	signingAccounts []runtime.Address
+	checker         CheckerFunc
+	logs            []string
+	events          []cadence.Event
+	tx              *flow.TransactionBody
+	gasLimit        uint64
+	uuid            uint64 // TODO: implement proper UUID
 }
 
 type TransactionContextOption func(*TransactionContext)
@@ -61,9 +62,6 @@ func (r *TransactionContext) GetValue(owner, controller, key []byte) ([]byte, er
 // SetValue sets a register value in the world state.
 func (r *TransactionContext) SetValue(owner, controller, key, value []byte) error {
 	r.Ledger.Set(fullKeyHash(string(owner), string(controller), string(key)), value)
-	if r.OnSetValueHandler != nil {
-		r.OnSetValueHandler(owner, controller, key, value)
-	}
 	return nil
 }
 
@@ -241,12 +239,19 @@ func (r *TransactionContext) GenerateUUID() uint64 {
 }
 
 func (r *TransactionContext) GetComputationLimit() uint64 {
-	// TODO: implement me
-	return 100
+	return r.gasLimit
 }
 
 func (r *TransactionContext) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {
 	return jsoncdc.Decode(b)
+}
+
+func (r *TransactionContext) GetCurrentBlockHeight() uint64 {
+	panic("implement me")
+}
+
+func (r *TransactionContext) GetBlockAtHeight(height uint64) (hash runtime.BlockHash, timestamp int64, exists bool) {
+	panic("implement me")
 }
 
 // GetAccount gets an account by address.

@@ -486,7 +486,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 
 	// generate the root account
-	hardcoded, err := hex.DecodeString(flow.RootAccountPrivateKeyHex)
+	hardcoded, err := hex.DecodeString(flow.ServiceAccountPrivateKeyHex)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -661,12 +661,12 @@ func runDKG(confs []ContainerConfig) (bootstrap.DKGData, error) {
 	nConsensusNodes := len(consensusNodes)
 
 	// run the core dkg algorithm
-	dkgSeeds, err := getSeeds(nConsensusNodes)
+	dkgSeed, err := getSeed()
 	if err != nil {
 		return bootstrap.DKGData{}, err
 	}
 
-	dkg, err := bootstraprun.RunDKG(nConsensusNodes, dkgSeeds)
+	dkg, err := bootstraprun.RunFastKG(nConsensusNodes, dkgSeed)
 	if err != nil {
 		return bootstrap.DKGData{}, err
 	}
