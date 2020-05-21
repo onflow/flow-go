@@ -87,7 +87,9 @@ func StateDeltaFixture() *messages.ExecutionStateDelta {
 	header := BlockHeaderFixture()
 	block := BlockWithParentFixture(&header)
 	return &messages.ExecutionStateDelta{
-		Block: &block,
+		ExecutableBlock: entity.ExecutableBlock{
+			Block: &block,
+		},
 	}
 }
 
@@ -130,7 +132,9 @@ func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDe
 		Payload: payload,
 	}
 	return &messages.ExecutionStateDelta{
-		Block: &block,
+		ExecutableBlock: entity.ExecutableBlock{
+			Block: &block,
+		},
 	}
 }
 
@@ -657,6 +661,7 @@ func ChunkDataPackFixture(identifier flow.Identifier) flow.ChunkDataPack {
 		ChunkID:         identifier,
 		StartState:      StateCommitmentFixture(),
 		RegisterTouches: []flow.RegisterTouch{flow.RegisterTouch{RegisterID: []byte{'1'}, Value: []byte{'a'}, Proof: []byte{'p'}}},
+		CollectionID:    IdentifierFixture(),
 	}
 }
 

@@ -711,7 +711,7 @@ func (e *Engine) handleComputationResult(
 
 	receipt, err := e.saveExecutionResults(
 		ctx,
-		result.ExecutableBlock.Block,
+		result.ExecutableBlock,
 		result.StateSnapshots,
 		result.Events,
 		result.TransactionResult,
@@ -731,7 +731,7 @@ func (e *Engine) handleComputationResult(
 
 func (e *Engine) saveExecutionResults(
 	ctx context.Context,
-	block *flow.Block,
+	executableBlock *entity.ExecutableBlock,
 	stateInteractions []*delta.Snapshot,
 	events []flow.Event,
 	txResults []flow.TransactionResult,
@@ -743,7 +743,7 @@ func (e *Engine) saveExecutionResults(
 
 	originalState := startState
 
-	err := e.execState.PersistStateInteractions(childCtx, block.ID(), stateInteractions)
+	err := e.execState.PersistStateInteractions(childCtx, executableBlock.Block.ID(), stateInteractions)
 	if err != nil {
 		return nil, err
 	}
@@ -769,11 +769,14 @@ func (e *Engine) saveExecutionResults(
 		values, proofs, err := e.execState.GetRegistersWithProofs(childCtx, chunk.StartState, allRegisters)
 		if err != nil {
 			return nil, fmt.Errorf(
-				"error reading registers with proofs for chunk number [%v] of block [%x] ", i, block.ID(),
+				"error reading registers with proofs for chunk number [%v] of block [%x] ", i, executableBlock.ID(),
 			)
 		}
 
-		chdp := generateChunkDataPack(chunk, allRegisters, values, proofs)
+		collectionGuarantee := executableBlock.Block.Payload.Guarantees[i]
+		completeCollection := executableBlock.CompleteCollections[collectionGuarantee.ID()]
+
+		chdp := generateChunkDataPack(chunk, completeCollection.Collection().ID(), allRegisters, values, proofs)
 
 		err = e.execState.PersistChunkDataPack(childCtx, chdp)
 		if err != nil {
@@ -785,17 +788,17 @@ func (e *Engine) saveExecutionResults(
 		startState = endState
 	}
 
-	err = e.execState.PersistStateCommitment(childCtx, block.ID(), endState)
+	err = e.execState.PersistStateCommitment(childCtx, executableBlock.ID(), endState)
 	if err != nil {
 		return nil, fmt.Errorf("failed to store state commitment: %w", err)
 	}
 
-	err = e.execState.UpdateHighestExecutedBlockIfHigher(childCtx, block.Header)
+	err = e.execState.UpdateHighestExecutedBlockIfHigher(childCtx, executableBlock.Block.Header)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update highest executed block: %w", err)
 	}
 
-	executionResult, err := e.generateExecutionResultForBlock(childCtx, block, chunks, endState)
+	executionResult, err := e.generateExecutionResultForBlock(childCtx, executableBlock.Block, chunks, endState)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate execution result: %w", err)
 	}
@@ -810,14 +813,14 @@ func (e *Engine) saveExecutionResults(
 		defer span.Finish()
 
 		if len(events) > 0 {
-			err = e.events.Store(block.ID(), events)
+			err = e.events.Store(executableBlock.ID(), events)
 			if err != nil {
 				return fmt.Errorf("failed to store events: %w", err)
 			}
 		}
 
 		for _, te := range txResults {
-			err = e.transactionResults.Store(block.ID(), &te)
+			err = e.transactionResults.Store(executableBlock.ID(), &te)
 			if err != nil {
 				return fmt.Errorf("failed to store transaction error: %w", err)
 			}
@@ -830,7 +833,7 @@ func (e *Engine) saveExecutionResults(
 	}
 
 	e.log.Debug().
-		Hex("block_id", logging.Entity(block)).
+		Hex("block_id", logging.Entity(executableBlock)).
 		Hex("start_state", originalState).
 		Hex("final_state", endState).
 		Msg("saved computation results")
@@ -1059,10 +1062,19 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 			Err(err).Msg("could  not store block from delta")
 	}
 
+	for _, collection := range executionStateDelta.CompleteCollections {
+		collection := collection.Collection()
+		err := e.collections.Store(&collection)
+		if err != nil {
+			e.log.Fatal().Hex("block_id", logging.Entity(executionStateDelta.Block)).
+				Err(err).Msg("could not store collection from delta")
+		}
+	}
+
 	// TODO - validate state sync, reject invalid messages, change provider
 	executionReceipt, err := e.saveExecutionResults(
 		ctx,
-		executionStateDelta.Block,
+		&executionStateDelta.ExecutableBlock,
 		executionStateDelta.StateInteractions,
 		executionStateDelta.Events,
 		executionStateDelta.TransactionResults,
@@ -1177,10 +1189,10 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 // generateChunkDataPack creates a chunk data pack
 func generateChunkDataPack(
 	chunk *flow.Chunk,
+	collectionID flow.Identifier,
 	registers []flow.RegisterID,
 	values []flow.RegisterValue,
 	proofs []flow.StorageProof,
-	collection flow.Collection,
 ) *flow.ChunkDataPack {
 	regTs := make([]flow.RegisterTouch, len(registers))
 	for i, reg := range registers {
@@ -1193,6 +1205,6 @@ func generateChunkDataPack(
 		ChunkID:         chunk.ID(),
 		StartState:      chunk.StartState,
 		RegisterTouches: regTs,
-		Collection:      collection,
+		CollectionID:    collectionID,
 	}
 }

@@ -349,7 +349,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 			if _, ok := args[1].(*messages.ChunkDataPackRequest); ok {
 				// publishes the chunk data pack response to the network
 				res := &messages.ChunkDataPackResponse{
-					Data: *completeER.ChunkDataPacks[0],
+					ChunkDataPack: *completeER.ChunkDataPacks[0],
 				}
 				err := exeChunkDataConduit.Submit(res, verIdentity.NodeID)
 				assert.Nil(t, err)
@@ -555,8 +555,8 @@ func setupMockExeNode(t *testing.T,
 
 							// publishes the chunk data pack response to the network
 							res := &messages.ChunkDataPackResponse{
-								Data:  *completeER.ChunkDataPacks[i],
-								Nonce: rand.Uint64(),
+								ChunkDataPack: *completeER.ChunkDataPacks[i],
+								Nonce:         rand.Uint64(),
 							}
 							err := exeChunkDataConduit.Submit(res, originID)
 							assert.Nil(t, err)

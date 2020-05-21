@@ -185,7 +185,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	case *messages.CollectionResponse:
 		return e.handleCollection(originID, &resource.Collection)
 	case *messages.ChunkDataPackResponse:
-		return e.handleChunkDataPack(originID, &resource.Data)
+		return e.handleChunkDataPack(originID, &resource.ChunkDataPack)
 	default:
 		return ErrInvType
 	}

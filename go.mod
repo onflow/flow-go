@@ -52,6 +52,7 @@ require (
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	google.golang.org/api v0.18.0
 	google.golang.org/grpc v1.28.0
+	gotest.tools v2.2.0+incompatible
 )
 
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1

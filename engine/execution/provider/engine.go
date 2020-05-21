@@ -156,9 +156,15 @@ func (e *Engine) onChunkDataPackRequest(
 		return fmt.Errorf("could not retrieve chunk ID (%s): %w", origin, err)
 	}
 
+	collection, err := e.execState.GetCollection(cdp.CollectionID)
+	if err != nil {
+		return fmt.Errorf("cannot retrieve collection %x for chunk %x: %w", cdp.CollectionID, cdp.ChunkID, err)
+	}
+
 	response := &messages.ChunkDataPackResponse{
-		Data:  *cdp,
-		Nonce: rand.Uint64(),
+		ChunkDataPack: *cdp,
+		Nonce:         rand.Uint64(),
+		Collection:    *collection,
 	}
 
 	log.Debug().Msg("sending chunk data pack response")

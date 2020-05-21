@@ -58,7 +58,7 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 	// wait for ChunkDataPack pushed from execution node
 	// msg := gs.MsgState.WaitForMsgFrom(gs.T(), common.MsgIsChunkDataPackResponse, gs.exe1ID)
 	// pack := msg.(*messages.ChunkDataPackResponse)
-	// require.Equal(gs.T(), erExe1BlockB.ExecutionResult.Chunks[0].ID(), pack.Data.ChunkID
+	// require.Equal(gs.T(), erExe1BlockB.ExecutionResult.Chunks[0].ID(), pack.ChunkDataPack.ChunkID
 	// TODO clear messages
 
 	// send a ChunkDataPackRequest from Ghost node
@@ -69,16 +69,16 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 	// wait for ChunkDataPackResponse
 	msg2 := gs.MsgState.WaitForMsgFrom(gs.T(), common.MsgIsChunkDataPackResponse, gs.exe1ID)
 	pack2 := msg2.(*messages.ChunkDataPackResponse)
-	require.Equal(gs.T(), chunkID, pack2.Data.ChunkID)
-	require.Equal(gs.T(), erExe1BlockB.ExecutionResult.Chunks[0].StartState, pack2.Data.StartState)
+	require.Equal(gs.T(), chunkID, pack2.ChunkDataPack.ChunkID)
+	require.Equal(gs.T(), erExe1BlockB.ExecutionResult.Chunks[0].StartState, pack2.ChunkDataPack.StartState)
 
 	// verify state proofs
 	v := ledger.NewTrieVerifier(257)
-	isValid, err := v.VerifyRegistersProof(pack2.Data.Registers(), pack2.Data.Values(), pack2.Data.Proofs(),
+	isValid, err := v.VerifyRegistersProof(pack2.ChunkDataPack.Registers(), pack2.ChunkDataPack.Values(), pack2.ChunkDataPack.Proofs(),
 		erExe1BlockB.ExecutionResult.Chunks[0].StartState)
 	require.NoError(gs.T(), err, "error verifying chunk trie proofs")
 	require.True(gs.T(), isValid, "chunk trie proofs are not valid, but must be")
 
-	_, err = trie.NewPSMT(pack2.Data.StartState, 257, pack2.Data.Registers(), pack2.Data.Values(), pack2.Data.Proofs())
+	_, err = trie.NewPSMT(pack2.ChunkDataPack.StartState, 257, pack2.ChunkDataPack.Registers(), pack2.ChunkDataPack.Values(), pack2.ChunkDataPack.Proofs())
 	require.NoError(gs.T(), err, "error building PSMT")
 }

@@ -90,6 +90,7 @@ func TestProviderEngine_onChunkDataPackRequest(t *testing.T) {
 
 		chunkID := unittest.IdentifierFixture()
 		chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
+		collection := unittest.CollectionFixture(1)
 
 		ps.On("Final").Return(ss)
 		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil)
@@ -98,7 +99,7 @@ func TestProviderEngine_onChunkDataPackRequest(t *testing.T) {
 				res, ok := args[0].(*messages.ChunkDataPackResponse)
 				require.True(t, ok)
 
-				actualChunkID := res.Data.ChunkID
+				actualChunkID := res.ChunkDataPack.ChunkID
 				assert.Equal(t, chunkID, actualChunkID)
 			}).
 			Return(nil)
@@ -106,6 +107,8 @@ func TestProviderEngine_onChunkDataPackRequest(t *testing.T) {
 		execState.
 			On("ChunkDataPackByChunkID", mock.Anything, chunkID).
 			Return(&chunkDataPack, nil)
+
+		execState.On("GetCollection", chunkDataPack.CollectionID).Return(&collection, nil)
 
 		req := &messages.ChunkDataPackRequest{
 			ChunkID: chunkID,

@@ -93,6 +93,7 @@ type ExecutionNode struct {
 	ExecutionState  state.ExecutionState
 	Ledger          storage.Ledger
 	LevelDbDir      string
+	Collections     storage.Collections
 }
 
 func (en ExecutionNode) Done() {
