@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/storage/ledger/trie"
+	ptriep "github.com/dapperlabs/flow-go/storage/ledger/ptrie"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -39,12 +39,13 @@ func TestLedgerFunctionality(t *testing.T) {
 		numHistLookupPerStep := 10
 		keyByteSize := 32
 		valueMaxByteSize := 64
+		activeTries := 1000
 		trieHeight := keyByteSize*8 + 1        // 257
 		steps := 40                            // number of steps
 		histStorage := make(map[string][]byte) // historic storage string(key, statecommitment) -> value
 		latestValue := make(map[string][]byte) // key to value
 		unittest.RunWithTempDir(t, func(dbDir string) {
-			led, err := ledger.NewTrieStorage(dbDir)
+			led, err := ledger.NewMTrieStorage(dbDir, activeTries, nil)
 			assert.NoError(t, err)
 			stateCommitment := led.EmptyStateCommitment()
 			for i := 0; i < steps; i++ {
@@ -80,7 +81,7 @@ func TestLedgerFunctionality(t *testing.T) {
 				assert.True(t, isValid)
 
 				// validate proofs as a batch
-				_, err = trie.NewPSMT(newState, trieHeight, keys, retValues, proofs)
+				_, err = ptriep.NewPSMT(newState, trieHeight, keys, retValues, proofs)
 				assert.NoError(t, err)
 
 				// query all exising keys (check no drop)

@@ -14,7 +14,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/storage/ledger/trie"
+	ptriep "github.com/dapperlabs/flow-go/storage/ledger/ptrie"
 	utils "github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
@@ -43,7 +43,7 @@ func StorageBenchmark() {
 
 	rand.Seed(time.Now().UnixNano())
 
-	led, err := ledger.NewTrieStorage(dir)
+	led, err := ledger.NewMTrieStorage(dir)
 	defer func() {
 		led.Done()
 		os.RemoveAll(dir)
@@ -96,7 +96,7 @@ func StorageBenchmark() {
 		elapsed = time.Since(start)
 		start = time.Now()
 		// validate proofs as a batch
-		_, err = trie.NewPSMT(newState, trieHeight, keys, retValues, proofs)
+		_, err = ptriep.NewPSMT(newState, trieHeight, keys, retValues, proofs)
 		if err != nil {
 			panic("failed to create PSMT")
 		}

@@ -9,7 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification"
 	chmodels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/ledger/trie"
+	ptriep "github.com/dapperlabs/flow-go/storage/ledger/ptrie"
 )
 
 // ChunkVerifier is a verifier based on the current definitions of the flow network
@@ -50,7 +50,7 @@ func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) (chmodels.Chu
 	if ch.ChunkDataPack == nil {
 		return nil, fmt.Errorf("missing chunk data pack")
 	}
-	ptrie, err := trie.NewPSMT(ch.ChunkDataPack.StartState,
+	ptrie, err := ptriep.NewPSMT(ch.ChunkDataPack.StartState,
 		fcv.trieDepth,
 		ch.ChunkDataPack.Registers(),
 		ch.ChunkDataPack.Values(),

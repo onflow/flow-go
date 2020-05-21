@@ -10,7 +10,7 @@ import (
 func TestTrieUntrustedAndVerify(t *testing.T) {
 	trieH := 257
 	unittest.RunWithTempDir(t, func(dbDir string) {
-		f, err := ledger.NewTrieStorage(dbDir)
+		f, err := ledger.NewMTrieStorage(dbDir, 10, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
