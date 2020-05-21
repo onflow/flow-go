@@ -515,7 +515,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 
 	// write common genesis bootstrap files
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathAccount0Priv), account)
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathServiceAccountPriv), account)
 	if err != nil {
 		return nil, nil, err
 	}
