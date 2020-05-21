@@ -35,6 +35,7 @@ type HotstuffCollector struct {
 	timeoutDuration       prometheus.Gauge
 
 	committeeComputationsCsCounter prometheus.Counter
+	signerComputationsCsCounter    prometheus.Counter
 }
 
 func NewHotstuffCollector(chain string) *HotstuffCollector {
@@ -136,6 +137,14 @@ func NewHotstuffCollector(chain string) *HotstuffCollector {
 			Help:        "total count of cs [units of 10ms = cs] of how long HotStuff sends computing consensus committee relations",
 			ConstLabels: prometheus.Labels{LabelChain: chain},
 		}),
+
+		signerComputationsCsCounter: promauto.NewCounter(prometheus.CounterOpts{
+			Name:        "crypto_computations_cseconds_total",
+			Namespace:   namespaceConsensus,
+			Subsystem:   subsystemHotstuff,
+			Help:        "total count of cs [units of 10ms = cs] of how long HotStuff sends with crypto-related operations",
+			ConstLabels: prometheus.Labels{LabelChain: chain},
+		}),
 	}
 
 	return hc
@@ -187,4 +196,10 @@ func (hc *HotstuffCollector) SetTimeout(duration time.Duration) {
 // CommitteeProcessingDuration reports time spend computing consensus committee relations
 func (hc *HotstuffCollector) CommitteeProcessingDuration(duration time.Duration) {
 	hc.committeeComputationsCsCounter.Add(float64(duration.Milliseconds()) * 0.1)
+}
+
+// SignerProcessingDuration reports the time which the HotStuff's core logic
+// spends in the hotstuff.Signer component, i.e. the with crypto-related operations.
+func (hc *HotstuffCollector) SignerProcessingDuration(duration time.Duration) {
+	hc.signerComputationsCsCounter.Add(float64(duration.Milliseconds()) * 0.1)
 }

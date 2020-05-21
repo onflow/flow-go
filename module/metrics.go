@@ -72,6 +72,10 @@ type HotstuffMetrics interface {
 	// spends in the hotstuff.Committee component, i.e. the time determining consensus
 	// committee relations.
 	CommitteeProcessingDuration(duration time.Duration)
+
+	// SignerProcessingDuration measures the time which the HotStuff's core logic
+	// spends in the hotstuff.Signer component, i.e. the with crypto-related operations.
+	SignerProcessingDuration(duration time.Duration)
 }
 
 type CollectionMetrics interface {
