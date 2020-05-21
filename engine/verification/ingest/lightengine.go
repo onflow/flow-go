@@ -753,32 +753,6 @@ func (l *LightEngine) myAssignedChunks(res *flow.ExecutionResult) (flow.ChunkLis
 	return mine, nil
 }
 
-// updateChunkDataPackTracker performs the following
-// If there is a tracker for this chunk ID, it increases its counter by one in place
-// Else it creates a new empty tracker with counter value of one and stores it in the trackers mempool
-func (l *LightEngine) updateChunkDataPackTracker(chunkID flow.Identifier, blockID flow.Identifier) (*trackers.ChunkDataPackTracker, error) {
-	var cdpt *trackers.ChunkDataPackTracker
-
-	if l.chunkDataPackTackers.Has(chunkID) {
-		// there is a tracker for this chunk
-		// increases its counter
-		t, err := l.chunkDataPackTackers.Inc(chunkID)
-		if err != nil {
-			return nil, fmt.Errorf("could not update chunk data pack tracker: %w", err)
-		}
-		cdpt = t
-	} else {
-		// creates a new chunk data pack tracker and stores in in memory
-		cdpt = trackers.NewChunkDataPackTracker(chunkID, blockID)
-		ok := l.chunkDataPackTackers.Add(cdpt)
-		if !ok {
-			return nil, fmt.Errorf("could not store tracker of chunk data pack request in mempool")
-		}
-	}
-
-	return cdpt, nil
-}
-
 // To implement FinalizationConsumer
 func (l *LightEngine) OnBlockIncorporated(*model.Block) {
 
