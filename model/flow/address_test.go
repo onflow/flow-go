@@ -16,7 +16,7 @@ type addressWrapper struct {
 }
 
 func TestAddressJSON(t *testing.T) {
-	addr := RootAddress
+	addr := ServiceAddress
 	data, err := json.Marshal(addressWrapper{Address: addr})
 	require.Nil(t, err)
 
@@ -36,8 +36,8 @@ func TestShort(t *testing.T) {
 
 	cases := []testcase{
 		{
-			addr:     RootAddress,
-			expected: RootAddress.Hex(),
+			addr:     ServiceAddress,
+			expected: ServiceAddress.Hex(),
 		},
 		{
 			addr:     HexToAddress("0000000002"),
@@ -71,24 +71,24 @@ func TestFlowAdressConstants(t *testing.T) {
 	var expected [AddressLength]byte
 	assert.Equal(t, ZeroAddress, Address(expected))
 	expected = Uint64ToAddress(generatorMatrixRows[0])
-	assert.Equal(t, RootAddress, Address(expected))
+	assert.Equal(t, ServiceAddress, Address(expected))
 	// Flow test
 	expected = Uint64ToAddress(constInvalidAddress)
 	assert.Equal(t, ZeroTestAddress, Address(expected))
 	expected = Uint64ToAddress(generatorMatrixRows[0] ^ constInvalidAddress)
-	assert.Equal(t, RootTestAddress, Address(expected))
+	assert.Equal(t, ServiceTestAddress, Address(expected))
 
 	// check the transition from account zero to root
 	// Flow
 	state := ZeroAddressState
 	address, _, err := AccountAddress(state)
 	require.NoError(t, err)
-	assert.Equal(t, address, RootAddress)
+	assert.Equal(t, address, ServiceAddress)
 	// Flow test
 	state = ZeroAddressState
 	address, _, err = TestAccountAddress(state)
 	require.NoError(t, err)
-	assert.Equal(t, address, RootTestAddress)
+	assert.Equal(t, address, ServiceTestAddress)
 
 	// check high state values: generation should fail for high value states
 	// Flow

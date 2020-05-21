@@ -26,20 +26,20 @@ const (
 
 	// ZeroAddressState is the addressing state when Flow is bootstrapped
 	ZeroAddressState = AddressState(0)
-	// RootAddressState is the initial addressing state
-	RootAddressState = AddressState(1)
+	// ServiceAddressState is the initial addressing state
+	ServiceAddressState = AddressState(1)
 )
 
 var (
 	// ZeroAddress represents the "zero address" (account that no one owns).
 	ZeroAddress = generateAddress(ZeroAddressState)
-	// RootAddress represents the root (first) generated account address.
-	RootAddress = generateAddress(RootAddressState)
+	// ServiceAddress represents the root (first) generated account address.
+	ServiceAddress = generateAddress(ServiceAddressState)
 
 	// ZeroTestAddress represents the "zero address" in Flow testnet or emulator instances (account that no one owns).
 	ZeroTestAddress = generateTestAddress(ZeroAddressState)
-	// RootTestAddress represents the root (first) generated test account address.
-	RootTestAddress = generateTestAddress(RootAddressState)
+	// ServiceTestAddress represents the root (first) generated test account address.
+	ServiceTestAddress = generateTestAddress(ServiceAddressState)
 )
 
 func init() {
@@ -166,7 +166,7 @@ const (
 // addresses in a sequential way.
 // Each state is mapped to exactly one address. There are as many addresses
 // as states.
-// ZeroAddress corresponds to the state "0" while RootAddress corresponds to the
+// ZeroAddress corresponds to the state "0" while ServiceAddress corresponds to the
 // state "1".
 func AccountAddress(state AddressState) (Address, AddressState, error) {
 	newState, err := nextState(state)

@@ -33,7 +33,7 @@ func DeployCounterContractTransaction() flow.TransactionBody {
                 signer.setCode("%s".decodeHex())
               }
             }`, encoded)),
-		Authorizers: []flow.Address{flow.RootAddress},
+		Authorizers: []flow.Address{flow.ServiceAddress},
 	}
 }
 
@@ -53,7 +53,7 @@ func CreateCounterTransaction() flow.TransactionBody {
 					acc.save(<-maybeCounter!, to: /storage/counter)
 				}
 			}`),
-		Authorizers: []flow.Address{flow.RootAddress},
+		Authorizers: []flow.Address{flow.ServiceAddress},
 	}
 }
 
@@ -73,7 +73,7 @@ func CreateCounterPanicTransaction() flow.TransactionBody {
 					panic("fail for testing purposes")
               	}
             }`),
-		Authorizers: []flow.Address{flow.RootAddress},
+		Authorizers: []flow.Address{flow.ServiceAddress},
 	}
 }
 
@@ -88,7 +88,7 @@ func AddToCounterTransaction() flow.TransactionBody {
 					counter?.add(2)
 				}
 			}`),
-		Authorizers: []flow.Address{flow.RootAddress},
+		Authorizers: []flow.Address{flow.ServiceAddress},
 	}
 }
 
@@ -99,9 +99,9 @@ func SignTransactionByRoot(tx *flow.TransactionBody, seqNum uint64) error {
 		return fmt.Errorf("cannot create hasher: %w", err)
 	}
 
-	err = tx.SetPayer(flow.RootAddress).
-		SetProposalKey(flow.RootAddress, 0, seqNum).
-		SignEnvelope(flow.RootAddress, 0, flow.RootAccountPrivateKey.PrivateKey, hasher)
+	err = tx.SetPayer(flow.ServiceAddress).
+		SetProposalKey(flow.ServiceAddress, 0, seqNum).
+		SignEnvelope(flow.ServiceAddress, 0, flow.RootAccountPrivateKey.PrivateKey, hasher)
 
 	if err != nil {
 		return fmt.Errorf("cannot sign tx: %w", err)
