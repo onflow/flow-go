@@ -8,22 +8,24 @@ var (
 	DirnameExecutionState = "execution-state"
 
 	// public genesis information
-	PathDKGDataPub            = filepath.Join("public-genesis-information", "dkg-data.pub.json")
-	PathGenesisBlock          = filepath.Join("public-genesis-information", "genesis-block.json")
-	PathGenesisClusterBlock   = filepath.Join("public-genesis-information", "genesis-cluster-block.%v.json") // %v will be replaced by cluster ID
-	PathGenesisClusterQC      = filepath.Join("public-genesis-information", "genesis-cluster-qc.%v.json")    // %v will be replaced by cluster ID
-	PathGenesisCommit         = filepath.Join("public-genesis-information", "genesis-commit.json")
-	PathGenesisQC             = filepath.Join("public-genesis-information", "genesis-qc.json")
-	PathNodeInfosPub          = filepath.Join("public-genesis-information", "node-infos.pub.json")
-	PathNodeInfoPub           = filepath.Join("public-genesis-information", "node-info.pub.%v.json") // %v will be replaced by NodeID
-	PathPartnerNodeInfoPrefix = filepath.Join("public-genesis-information", "node-info.pub.")
+	DirnamePublicGenesis      = "public-genesis-information"
+	PathDKGDataPub            = filepath.Join(DirnamePublicGenesis, "dkg-data.pub.json")
+	PathGenesisBlock          = filepath.Join(DirnamePublicGenesis, "genesis-block.json")
+	PathGenesisClusterBlock   = filepath.Join(DirnamePublicGenesis, "genesis-cluster-block.%v.json") // %v will be replaced by cluster ID
+	PathGenesisClusterQC      = filepath.Join(DirnamePublicGenesis, "genesis-cluster-qc.%v.json")    // %v will be replaced by cluster ID
+	PathGenesisCommit         = filepath.Join(DirnamePublicGenesis, "genesis-commit.json")
+	PathGenesisQC             = filepath.Join(DirnamePublicGenesis, "genesis-qc.json")
+	PathNodeInfosPub          = filepath.Join(DirnamePublicGenesis, "node-infos.pub.json")
+	PathNodeInfoPub           = filepath.Join(DirnamePublicGenesis, "node-info.pub.%v.json") // %v will be replaced by NodeID
+	PathPartnerNodeInfoPrefix = filepath.Join(DirnamePublicGenesis, "node-info.pub.")
 	// The Node ID file is used as a helper by the transit scripts
 	FilenameNodeId = "node-id"
-	PathNodeId     = filepath.Join("public-genesis-information", FilenameNodeId) // %v will be replaced by NodeID
+	PathNodeId     = filepath.Join(DirnamePublicGenesis, FilenameNodeId) // %v will be replaced by NodeID
 
 	// private genesis information
-	PathAccount0Priv         = filepath.Join("private-genesis-information", "account-0.priv.json")
-	PathNodeInfoPriv         = filepath.Join("private-genesis-information", "private-node-info_%v", "node-info.priv.json") // %v will be replaced by NodeID
+	DirPrivateGenesis        = "private-genesis-information"
+	PathAccount0Priv         = filepath.Join(DirPrivateGenesis, "account-0.priv.json")
+	PathNodeInfoPriv         = filepath.Join(DirPrivateGenesis, "private-node-info_%v", "node-info.priv.json") // %v will be replaced by NodeID
 	FilenameRandomBeaconPriv = "random-beacon.priv.json"
-	PathRandomBeaconPriv     = filepath.Join("private-genesis-information", "private-node-info_%v", FilenameRandomBeaconPriv) // %v will be replaced by NodeID
+	PathRandomBeaconPriv     = filepath.Join(DirPrivateGenesis, "private-node-info_%v", FilenameRandomBeaconPriv) // %v will be replaced by NodeID
 )

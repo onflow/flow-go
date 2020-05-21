@@ -110,7 +110,6 @@ type FlowNodeBuilder struct {
 	Tracer            *trace.OpenTracer
 	MetricsRegisterer prometheus.Registerer
 	Metrics           Metrics
-	Profiler          *debug.AutoProfiler
 	DB                *badger.DB
 	Storage           Storage
 	State             *protocol.State
@@ -178,7 +177,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		nodeRole := nodeID.Role
 		topology := libp2p.NewRandPermTopology(nodeRole)
 
-		net, err := libp2p.NewNetwork(fnb.Logger, codec, participants, fnb.Me, mw, 10e6, topology)
+		net, err := libp2p.NewNetwork(fnb.Logger, codec, participants, fnb.Me, mw, 10e6, topology, fnb.Metrics.Network)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize network: %w", err)
 		}
@@ -190,7 +189,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 
 func (fnb *FlowNodeBuilder) enqueueMetricsServerInit() {
 	fnb.Component("metrics server", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
-		server := metrics.NewServer(fnb.Logger, fnb.BaseConfig.metricsPort)
+		server := metrics.NewServer(fnb.Logger, fnb.BaseConfig.metricsPort, fnb.BaseConfig.profilerEnabled)
 		return server, nil
 	})
 }
@@ -202,12 +201,6 @@ func (fnb *FlowNodeBuilder) registerBadgerMetrics() {
 func (fnb *FlowNodeBuilder) enqueueTracer() {
 	fnb.Component("tracer", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
 		return fnb.Tracer, nil
-	})
-}
-
-func (fnb *FlowNodeBuilder) enqueueProfiler() {
-	fnb.Component("profiler", func(node *FlowNodeBuilder) (module.ReadyDoneAware, error) {
-		return fnb.Profiler, nil
 	})
 }
 
@@ -267,6 +260,9 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 }
 
 func (fnb *FlowNodeBuilder) initProfiler() {
+	if !fnb.BaseConfig.profilerEnabled {
+		return
+	}
 	dir := filepath.Join(fnb.BaseConfig.profilerDir, fnb.BaseConfig.nodeRole, fnb.BaseConfig.nodeIDHex)
 	profiler, err := debug.NewAutoProfiler(
 		fnb.Logger,
@@ -275,7 +271,9 @@ func (fnb *FlowNodeBuilder) initProfiler() {
 		fnb.BaseConfig.profilerDuration,
 	)
 	fnb.MustNot(err).Msg("could not initialize profiler")
-	fnb.Profiler = profiler
+	fnb.Component("profiler", func(node *FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		return profiler, nil
+	})
 }
 
 func (fnb *FlowNodeBuilder) initStorage() {
@@ -535,8 +533,6 @@ func FlowNode(role string) *FlowNodeBuilder {
 	builder.registerBadgerMetrics()
 
 	builder.enqueueTracer()
-
-	builder.enqueueProfiler()
 
 	return builder
 }

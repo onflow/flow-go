@@ -48,6 +48,7 @@ func main() {
 		minInterval     time.Duration
 		maxInterval     time.Duration
 		hotstuffTimeout time.Duration
+		blockRateDelay  time.Duration
 
 		err            error
 		privateDKGData *bootstrap.DKGParticipantPriv
@@ -73,6 +74,10 @@ func main() {
 			flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
 			flags.DurationVar(&maxInterval, "max-interval", 60*time.Second, "the maximum amount of time between two blocks")
 			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 2*time.Second, "the initial timeout for the hotstuff pacemaker")
+			// From the experiment,
+			// if block rate delay is 1 second, then 0.8 block will be finalized per second in average.
+			// if block rate delay is 1.5 second, then 0.5 block will be finalized per second in averge
+			flags.DurationVar(&blockRateDelay, "block-rate-delay", time.Second, "the delay to broadcast block proposal in order to control block production rate")
 		}).
 		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
 			privateDKGData, err = loadDKGPrivateData(node.BaseConfig.BootstrapDir, node.NodeID)
@@ -184,6 +189,7 @@ func main() {
 				node.State,
 				prov,
 				proposals,
+				blockRateDelay,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
@@ -285,6 +291,7 @@ func main() {
 				finalized,
 				pending,
 				consensus.WithTimeout(hotstuffTimeout),
+				consensus.WithBlockRateDelay(blockRateDelay),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize hotstuff engine: %w", err)

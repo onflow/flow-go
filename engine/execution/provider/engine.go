@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"math/rand"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -156,7 +157,8 @@ func (e *Engine) onChunkDataPackRequest(
 	}
 
 	response := &messages.ChunkDataPackResponse{
-		Data: *cdp,
+		Data:  *cdp,
+		Nonce: rand.Uint64(),
 	}
 
 	log.Debug().Msg("sending chunk data pack response")

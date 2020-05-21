@@ -29,18 +29,20 @@ const (
 )
 
 const (
-	ResourceUndefined      = "undefined"
-	ResourceProposal       = "proposal"
-	ResourceHeader         = "header"
-	ResourceIndex          = "index"
-	ResourceIdentity       = "identity"
-	ResourceGuarantee      = "guarantee"
-	ResourceResult         = "result"
-	ResourceReceipt        = "receipt"
-	ResourceApproval       = "approval"
-	ResourceSeal           = "seal"
-	ResourceCommit         = "commit"
-	ResourceClusterPayload = "cluster_payload"
+	ResourceUndefined       = "undefined"
+	ResourceProposal        = "proposal"
+	ResourceHeader          = "header"
+	ResourceIndex           = "index"
+	ResourceIdentity        = "identity"
+	ResourceGuarantee       = "guarantee"
+	ResourceResult          = "result"
+	ResourceReceipt         = "receipt"
+	ResourceApproval        = "approval"
+	ResourceSeal            = "seal"
+	ResourceCommit          = "commit"
+	ResourceTransaction     = "transaction"
+	ResourceClusterPayload  = "cluster_payload"
+	ResourceClusterProposal = "cluster_proposal"
 )
 
 const (

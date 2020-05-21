@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 )
@@ -27,7 +28,8 @@ func GenerateAccount0PrivateKey(seed []byte) (flow.AccountPrivateKey, error) {
 }
 
 func GenerateExecutionState(dbDir string, priv flow.AccountPrivateKey) (flow.StateCommitment, error) {
-	ledgerStorage, err := ledger.NewTrieStorage(dbDir)
+	metricsCollector := &metrics.NoopCollector{}
+	ledgerStorage, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 	defer ledgerStorage.CloseStorage()
 	if err != nil {
 		return nil, err

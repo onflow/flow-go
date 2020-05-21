@@ -30,8 +30,7 @@ func main() {
 		}
 
 		for i := 0; i < 100; i++ {
-			collector.TransactionReceived(unittest.IdentifierFixture())
-			collector.PendingClusterBlocks(uint(rand.Intn(20) + 10))
+			collector.TransactionIngested(unittest.IdentifierFixture())
 			collector.HotStuffBusyDuration(10, metrics.HotstuffEventTypeTimeout)
 			collector.HotStuffWaitDuration(10, metrics.HotstuffEventTypeTimeout)
 			collector.HotStuffIdleDuration(10)

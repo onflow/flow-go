@@ -13,6 +13,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 	utils "github.com/dapperlabs/flow-go/storage/ledger/utils"
@@ -43,7 +44,9 @@ func StorageBenchmark() {
 
 	rand.Seed(time.Now().UnixNano())
 
-	led, err := ledger.NewTrieStorage(dir)
+	metricsCollector := &metrics.NoopCollector{}
+
+	led, err := ledger.NewMTrieStorage(dir, 100, metricsCollector, nil)
 	defer func() {
 		led.Done()
 		os.RemoveAll(dir)
@@ -66,7 +69,7 @@ func StorageBenchmark() {
 		}
 		elapsed := time.Since(start)
 
-		storageSize, _ := led.Size()
+		storageSize, _ := led.DiskSize()
 		logger.Info().
 			Int64("update_time_per_reg_ms", int64(elapsed/time.Millisecond)/int64(len(keys))).
 			Int64("storage_size_mb", storageSize/int64(1000000)).

@@ -65,4 +65,7 @@ type PaceMaker interface {
 
 	// Start starts the PaceMaker (i.e. the timeout for the configured starting value for view).
 	Start()
+
+	// BlockRateDelay
+	BlockRateDelay() time.Duration
 }

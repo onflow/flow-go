@@ -265,8 +265,8 @@ func (f *forest) newDB(root Root) (databases.DAL, error) {
 	return db, err
 }
 
-// Size returns the size of the forest on disk in bytes
-func (f *forest) Size() (int64, error) {
+// DiskSize returns the size of the forest on disk in bytes
+func (f *forest) DiskSize() (int64, error) {
 	return io.DirSize(f.dbDir)
 }
 
@@ -1362,9 +1362,9 @@ func (s *SMT) IsSnapshot(t *tree) bool {
 	return t.height%s.snapshotInterval == 0
 }
 
-// Size returns the size of the forest on disk in bytes
-func (s *SMT) Size() (int64, error) {
-	return s.forest.Size()
+// DiskSize returns the size of the forest on disk in bytes
+func (s *SMT) DickSize() (int64, error) {
+	return s.forest.DiskSize()
 }
 
 // ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.

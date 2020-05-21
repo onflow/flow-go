@@ -1,10 +1,12 @@
 package run
 
 import (
+	"crypto/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/dkg"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -44,7 +46,11 @@ func createSignerData(t *testing.T, n int) ParticipantData {
 	stakingKeys, err := unittest.StakingKeys(n)
 	require.NoError(t, err)
 
-	randomBKeys, groupKey, _ := unittest.RunDKG(t, n)
+	seed := make([]byte, crypto.SeedMinLenDKG)
+	_, err = rand.Read(seed)
+	require.NoError(t, err)
+	randomBSKs, randomBPKs, groupKey, err := crypto.ThresholdSignKeyGen(n, seed)
+	require.NoError(t, err)
 
 	pubData := dkg.PublicData{
 		GroupPubKey:     groupKey,
@@ -53,7 +59,7 @@ func createSignerData(t *testing.T, n int) ParticipantData {
 	for i, identity := range identities {
 		participant := dkg.Participant{
 			Index:          uint(i),
-			PublicKeyShare: randomBKeys[i].PublicKey(),
+			PublicKeyShare: randomBPKs[i],
 		}
 		pubData.IDToParticipant[identity.NodeID] = &participant
 	}
@@ -74,7 +80,7 @@ func createSignerData(t *testing.T, n int) ParticipantData {
 		)
 
 		// add random beacon private key
-		participantData.Participants[i].RandomBeaconPrivKey = randomBKeys[i]
+		participantData.Participants[i].RandomBeaconPrivKey = randomBSKs[i]
 	}
 
 	return participantData
