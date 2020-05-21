@@ -36,6 +36,7 @@ type HotstuffCollector struct {
 
 	committeeComputationsCsCounter prometheus.Counter
 	signerComputationsCsCounter    prometheus.Counter
+	validatorComputationsCsCounter prometheus.Counter
 }
 
 func NewHotstuffCollector(chain string) *HotstuffCollector {
@@ -145,6 +146,14 @@ func NewHotstuffCollector(chain string) *HotstuffCollector {
 			Help:        "total count of cs [units of 10ms = cs] of how long HotStuff sends with crypto-related operations",
 			ConstLabels: prometheus.Labels{LabelChain: chain},
 		}),
+
+		validatorComputationsCsCounter: promauto.NewCounter(prometheus.CounterOpts{
+			Name:        "message_validation_cseconds_total",
+			Namespace:   namespaceConsensus,
+			Subsystem:   subsystemHotstuff,
+			Help:        "total count of cs [units of 10ms = cs] of how long HotStuff sends with message-validation",
+			ConstLabels: prometheus.Labels{LabelChain: chain},
+		}),
 	}
 
 	return hc
@@ -202,4 +211,11 @@ func (hc *HotstuffCollector) CommitteeProcessingDuration(duration time.Duration)
 // spends in the hotstuff.Signer component, i.e. the with crypto-related operations.
 func (hc *HotstuffCollector) SignerProcessingDuration(duration time.Duration) {
 	hc.signerComputationsCsCounter.Add(float64(duration.Milliseconds()) * 0.1)
+}
+
+// ValidatorProcessingDuration measures the time which the HotStuff's core logic
+// spends in the hotstuff.Validator component, i.e. the with verifying higher-level
+// consensus messages.
+func (hc *HotstuffCollector) ValidatorProcessingDuration(duration time.Duration) {
+	hc.validatorComputationsCsCounter.Add(float64(duration.Milliseconds()) * 0.1)
 }

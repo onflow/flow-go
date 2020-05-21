@@ -76,6 +76,11 @@ type HotstuffMetrics interface {
 	// SignerProcessingDuration measures the time which the HotStuff's core logic
 	// spends in the hotstuff.Signer component, i.e. the with crypto-related operations.
 	SignerProcessingDuration(duration time.Duration)
+
+	// ValidatorProcessingDuration measures the time which the HotStuff's core logic
+	// spends in the hotstuff.Validator component, i.e. the with verifying higher-level
+	// consensus messages.
+	ValidatorProcessingDuration(duration time.Duration)
 }
 
 type CollectionMetrics interface {
