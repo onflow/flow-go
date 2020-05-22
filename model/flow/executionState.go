@@ -33,6 +33,7 @@ const GenesistStateCommitmentHex = "71a3275f197df8bd959f3641c562e42df2247d2c2a25
 
 var GenesisStateCommitment StateCommitment
 var ServiceAccountPrivateKey AccountPrivateKey
+var ServiceAccountPublicKey AccountPublicKey
 
 func init() {
 	var err error
@@ -50,4 +51,8 @@ func init() {
 	if err != nil {
 		panic("error while decoding hardcoded root key bytes")
 	}
+
+	// Cannot import virtual machine, due to circular dependency. Just use the value of
+	// virtualmachine.AccountKeyWeightThreshold here
+	ServiceAccountPublicKey = ServiceAccountPrivateKey.PublicKey(1000)
 }

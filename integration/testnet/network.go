@@ -24,6 +24,7 @@ import (
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	bootstraprun "github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -515,7 +516,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 
 	// write common genesis bootstrap files
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathServiceAccountPriv), account)
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathServiceAccountPublicKey), account.PublicKey(virtualmachine.AccountKeyWeightThreshold))
 	if err != nil {
 		return nil, nil, err
 	}

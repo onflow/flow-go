@@ -81,14 +81,14 @@ func main() {
 			return err
 		}).
 		GenesisHandler(func(node *cmd.FlowNodeBuilder, block *flow.Block) {
-			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage)
+			if node.GenesisAccountPublicKey == nil {
+				panic(fmt.Sprintf("error while bootstrapping execution state: no root account public key"))
+			}
+			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage, *node.GenesisAccountPublicKey)
 			if err != nil {
 				panic(fmt.Sprintf("error while bootstrapping execution state: %s", err))
 			}
-			if !bytes.Equal(bootstrappedStateCommitment, flow.GenesisStateCommitment) {
-				panic("error while bootstrapping execution state - resulting state is different than precalculated!")
-			}
-			if !bytes.Equal(flow.GenesisStateCommitment, node.GenesisCommit) {
+			if !bytes.Equal(bootstrappedStateCommitment, node.GenesisCommit) {
 				panic(fmt.Sprintf("genesis seal state commitment (%x) different from precalculated (%x)", node.GenesisCommit, flow.GenesisStateCommitment))
 			}
 
