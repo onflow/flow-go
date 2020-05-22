@@ -19,10 +19,10 @@ type AddressState uint64
 const (
 	// AddressLength is the size of an account address in bytes.
 	// (n) is the size of an account address in bits.
-	AddressLength = (n + 7) >> 3
+	AddressLength = (linearCodeN + 7) >> 3
 	// AddressStateLength is the size of an account address state in bytes.
 	// (k) is the size of an account address in bits.
-	AddressStateLength = (k + 7) >> 3
+	AddressStateLength = (linearCodeK + 7) >> 3
 
 	// ZeroAddressState is the addressing state when Flow is bootstrapped
 	ZeroAddressState = AddressState(0)
@@ -137,26 +137,26 @@ func (state *AddressState) Bytes() []byte {
 const (
 	// [n,k,d]-Linear code parameters
 	// The linear code used in the account addressing is a [64,45,7]
-	// It generates a [64,45]-code, which is the space of Flow account addresses
+	// It generates a [64,45]-code, which is the space of Flow account addresses.
 	//
 	// n is the size of the code words in bits,
-	// which is also the size of the account addresses in bits
-	n = 64
+	// which is also the size of the account addresses in bits.
+	linearCodeN = 64
 	// k is size of the words in bits.
 	// 2^k is the total number of possible account addresses.
-	k = 45
-	// p is the number of code parity bits
+	linearCodeK = 45
+	// p is the number of code parity bits.
 	// p = n - k
 	//
 	// d is the distance of the linear code.
 	// It is the minimum hamming distance between any two Flow account addresses.
 	// This means any pair of Flow addresses have at least 7 different bits, which
 	// minimizes the mistakes of typing wrong addresses.
-	// d is also the minimum hamming weight of all account addresses (the zero address is not an account address)
-	d = 7
+	// d is also the minimum hamming weight of all account addresses (the zero address is not an account address).
+	linearCodeD = 7
 
 	// the maximum value of the internal state, 2^k.
-	maxState = (1 << k) - 1
+	maxState = (1 << linearCodeK) - 1
 )
 
 // AccountAddress generates an account address given an addressing state.
@@ -177,7 +177,7 @@ func AccountAddress(state AddressState) (Address, AddressState, error) {
 	return address, newState, nil
 }
 
-// returns the next state given an adressing state.
+// returns the next state given an addressing state.
 // The state values are incremented from 0 to 2^k-1
 func nextState(state AddressState) (AddressState, error) {
 	if uint64(state) > maxState {
@@ -202,7 +202,7 @@ func (a *Address) Uint64() uint64 {
 	return v
 }
 
-// generateAddress returns an account address given an adressing state.
+// generateAddress returns an account address given an addressing state.
 // The function assumes the state is valid (<2^k) which means
 // a check on the state should be done before calling this function.
 func generateAddress(state AddressState) Address {
@@ -210,7 +210,7 @@ func generateAddress(state AddressState) Address {
 
 	// Multiply the index GF(2) vector by the code generator matrix
 	address := uint64(0)
-	for i := 0; i < k; i++ {
+	for i := 0; i < linearCodeK; i++ {
 		if index&1 == 1 {
 			address ^= generatorMatrixRows[i]
 		}
@@ -219,7 +219,7 @@ func generateAddress(state AddressState) Address {
 	return Uint64ToAddress(address)
 }
 
-// CheckAddress returns true if a given address is a valid account address,
+// IsValid returns true if a given address is a valid account address,
 // and false otherwise.
 //
 // This is an off-chain check that only tells whether the address format is
@@ -228,7 +228,7 @@ func generateAddress(state AddressState) Address {
 // require on on-chain check.
 // ZeroAddress fails the check. Although it has a valid format, no account
 // in Flow is assigned to ZeroAddress.
-func (a *Address) CheckAddress() bool {
+func (a *Address) IsValid() bool {
 	if *a == ZeroAddress {
 		return false
 	}
@@ -236,7 +236,7 @@ func (a *Address) CheckAddress() bool {
 
 	// Multiply the code word GF(2)-vector by the parity-check matrix
 	parity := uint(0)
-	for i := 0; i < n; i++ {
+	for i := 0; i < linearCodeN; i++ {
 		if codeWord&1 == 1 {
 			parity ^= parityCheckMatrixColumns[i]
 		}
@@ -272,24 +272,24 @@ func generateTestAddress(state AddressState) Address {
 	return Uint64ToAddress(invalidAddress)
 }
 
-// CheckTestAddress returns true if a given address is a valid test account address,
+// IsValidForTest returns true if a given address is a valid test account address,
 // and false otherwise.
 //
 // Since there is no intersection in Flow address space and Flow test address space,
-// any value that passes this check should fail CheckAddress() and vice versa.
+// any value that passes this check should fail IsValid() and vice versa.
 // ZeroTestAddress fails the check. Although it has a valid format, no test account
 // in Flow is assigned to ZeroTestAddress.
-func (a *Address) CheckTestAddress() bool {
+func (a *Address) IsValidForTest() bool {
 	addressUint64 := a.Uint64() ^ constInvalidAddress
 	address := Uint64ToAddress(addressUint64)
-	return address.CheckAddress()
+	return address.IsValid()
 }
 
 // Rows of the generator matrix G of the [64,45]-code used for Flow addresses.
 // G is a (k x n) matrix with coefficients in GF(2), each row is converted into
 // a big endian integer representation of the GF(2) raw vector.
 // G is used to generate the account addresses
-var generatorMatrixRows = [k]uint64{
+var generatorMatrixRows = [linearCodeK]uint64{
 	0xe467b9dd11fa00df, 0xf233dcee88fe0abe, 0xf919ee77447b7497, 0xfc8cf73ba23a260d,
 	0xfe467b9dd11ee2a1, 0xff233dcee888d807, 0xff919ee774476ce6, 0x7fc8cf73ba231d10,
 	0x3fe467b9dd11b183, 0x1ff233dcee8f96d6, 0x8ff919ee774757ba, 0x47fc8cf73ba2b331,
@@ -307,7 +307,7 @@ var generatorMatrixRows = [k]uint64{
 // H is a (n x p) matrix with coefficients in GF(2), each column is converted into
 // a big endian integer representation of the GF(2) column vector.
 // H is used to verify a code word is a valid account address.
-var parityCheckMatrixColumns = [n]uint{
+var parityCheckMatrixColumns = [linearCodeN]uint{
 	0x00001, 0x00002, 0x00004, 0x00008,
 	0x00010, 0x00020, 0x00040, 0x00080,
 	0x00100, 0x00200, 0x00400, 0x00800,
