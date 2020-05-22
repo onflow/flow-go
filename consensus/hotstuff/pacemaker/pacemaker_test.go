@@ -22,7 +22,6 @@ const (
 	voteTimeoutFraction    float64 = 0.5   // multiplicative factor
 	multiplicativeIncrease float64 = 1.5   // multiplicative factor
 	multiplicativeDecrease float64 = 0.85  // multiplicative factor
-	additiveDecrease       float64 = 50    // Milliseconds
 )
 
 func expectedTimerInfo(view uint64, mode model.TimeoutMode) interface{} {
@@ -368,11 +367,11 @@ func Test_ReplicaTimeoutAgain(t *testing.T) {
 	case <-time.After(time.Duration(3) * time.Duration(startRepTimeout) * time.Millisecond):
 	}
 
-	actualTimeout = float64(time.Since(start).Milliseconds()) // in millisecond
+	actualTimeout = float64(time.Since(start).Microseconds()) * 0.001 // in millisecond
 	// the actual timeout should be startRepTimeout * 1.5 *1.5- 2*additiveDecrease
 	// because it hits timeout twice and then received blocks for current view twice
-	assert.GreaterOrEqual(t, actualTimeout, 1.5*1.5*startRepTimeout-2*additiveDecrease, "the actual timeout should be greater or equal to the timeout")
-	assert.Less(t, actualTimeout, 1.5*1.5*startRepTimeout-additiveDecrease, "the actual timeout is too long")
+	assert.GreaterOrEqual(t, actualTimeout, 1.5*1.5*startRepTimeout*multiplicativeDecrease*multiplicativeDecrease, "the actual timeout should be greater or equal to the timeout")
+	assert.Less(t, actualTimeout, 1.5*1.5*startRepTimeout*multiplicativeDecrease, "the actual timeout is too long")
 }
 
 // Test_VoteTimeout tests that vote timeout fires as expected
@@ -385,7 +384,7 @@ func Test_VoteTimeout(t *testing.T) {
 	notifier.AssertExpectations(t)
 
 	// the previous pacemaker update decreased the vote timeout by (additiveDecrease * voteTimeoutFraction)
-	expectedTimeout := (startRepTimeout - additiveDecrease) * voteTimeoutFraction
+	expectedTimeout := (startRepTimeout * multiplicativeDecrease) * voteTimeoutFraction
 	select {
 	case <-pm.TimeoutChannel():
 		break // testing path: corresponds to EventLoop picking up timeout from channel
