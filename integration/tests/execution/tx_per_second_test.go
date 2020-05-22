@@ -45,6 +45,10 @@ const (
 	TransferTokens = "transfer_tokens.cdc"
 )
 
+const (
+	ResultFile = "/tmp/tx_per_second_test_%s.txt"
+)
+
 var (
 	fungibleTokenAddress flowsdk.Address
 	flowTokenAddress     flowsdk.Address
@@ -158,6 +162,8 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 		tps := float64(endNum-startNum) / dur.Seconds()
 
 		fmt.Println("==========TPS", tps)
+		err = logTPSToFile(tps)
+		require.NoErrorf(gs.T(), err, "failed to write tps to file")
 	}()
 
 	transferWG.Wait()
@@ -489,4 +495,10 @@ func GenerateTransferScript(ftAddr, flowToken, toAddr flowsdk.Address) []byte {
 	withAmount := strings.Replace(string(withToAddr), "10.0", "0.01", 1)
 
 	return []byte(withAmount)
+}
+
+func logTPSToFile(tps float64) error {
+	resultFileName := fmt.Sprintf(ResultFile, time.Now().Format("2006_01_02_15_04_05"))
+	tpsStr := fmt.Sprintf("%f\n", tps)
+	return ioutil.WriteFile(resultFileName, []byte(tpsStr), 0644)
 }
