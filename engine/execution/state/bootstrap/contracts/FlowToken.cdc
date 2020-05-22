@@ -172,7 +172,7 @@ pub contract FlowToken: FungibleToken {
     //
     init() {
         // Initialize the totalSupply field to the initial balance
-        self.totalSupply = 1000.0
+        self.totalSupply = 100000000000.0
 
         // Create the Vault with the total supply of tokens and save it in storage
         //
