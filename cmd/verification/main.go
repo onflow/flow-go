@@ -48,10 +48,6 @@ const (
 	// this value is set following this issue:
 	// https://github.com/dapperlabs/flow-go/issues/3443
 	failureThreshold = 2
-
-	// lightIngest determines whether light or original ingest engine
-	// should be used
-	lightIngest = true
 )
 
 func main() {
@@ -152,44 +148,7 @@ func main() {
 			verifierEng, err = verifier.New(node.Logger, collector, node.Network, node.State, node.Me, chunkVerifier)
 			return verifierEng, err
 		}).
-		Component("ingest engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			if lightIngest {
-				// light ingest engine is supposed to be instantiated
-				return nil, nil
-			}
-
-			assigner, err := chunks.NewPublicAssignment(chunkAssignmentAlpha)
-			if err != nil {
-				return nil, err
-			}
-			ingestEng, err = ingest.New(node.Logger,
-				node.Network,
-				node.State,
-				node.Me,
-				verifierEng,
-				authReceipts,
-				pendingReceipts,
-				authCollections,
-				pendingCollections,
-				collectionTrackers,
-				chunkDataPacks,
-				chunkDataPackTracker,
-				ingestedChunkIDs,
-				ingestedCollectionIDs,
-				ingestedResultIDs,
-				node.Storage.Headers,
-				node.Storage.Blocks,
-				assigner,
-				requestIntervalMs,
-				failureThreshold)
-			return ingestEng, err
-		}).
 		Component("light ingest engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			if !lightIngest {
-				// ingest engine is supposed to be instantiated instead
-				return nil, nil
-			}
-
 			assigner, err := chunks.NewPublicAssignment(chunkAssignmentAlpha)
 			if err != nil {
 				return nil, err
