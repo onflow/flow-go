@@ -57,16 +57,20 @@ func keyPublicKey(index uint64) string {
 
 // A LedgerDAL is an abstraction layer used to read and manipulate ledger state in a consistent way.
 type LedgerDAL struct {
-	Ledger Ledger
+	Ledger
 }
 
-func (r *LedgerDAL) CheckAccountExists(accountID []byte) error {
-	exists, err := r.Ledger.Get(fullKeyHash(string(accountID), "", keyExists))
+func NewLedgerDAL(ledger Ledger) LedgerDAL {
+	return LedgerDAL{Ledger: ledger}
+}
+
+func (r LedgerDAL) CheckAccountExists(accountID []byte) error {
+	exists, err := r.Get(fullKeyHash(string(accountID), "", keyExists))
 	if err != nil {
 		return err
 	}
 
-	bal, err := r.Ledger.Get(fullKeyHash(string(accountID), "", keyBalance))
+	bal, err := r.Get(fullKeyHash(string(accountID), "", keyBalance))
 	if err != nil {
 		return err
 	}
@@ -78,8 +82,8 @@ func (r *LedgerDAL) CheckAccountExists(accountID []byte) error {
 	return fmt.Errorf("account with ID %x does not exist", accountID)
 }
 
-func (r *LedgerDAL) GetAccountPublicKeys(accountID []byte) (publicKeys []flow.AccountPublicKey, err error) {
-	countBytes, err := r.Ledger.Get(
+func (r LedgerDAL) GetAccountPublicKeys(accountID []byte) (publicKeys []flow.AccountPublicKey, err error) {
+	countBytes, err := r.Get(
 		fullKeyHash(string(accountID), string(accountID), keyPublicKeyCount),
 	)
 	if err != nil {
@@ -99,7 +103,7 @@ func (r *LedgerDAL) GetAccountPublicKeys(accountID []byte) (publicKeys []flow.Ac
 	publicKeys = make([]flow.AccountPublicKey, count)
 
 	for i := uint64(0); i < count; i++ {
-		publicKey, err := r.Ledger.Get(
+		publicKey, err := r.Get(
 			fullKeyHash(string(accountID), string(accountID), keyPublicKey(i)),
 		)
 		if err != nil {
@@ -121,7 +125,7 @@ func (r *LedgerDAL) GetAccountPublicKeys(accountID []byte) (publicKeys []flow.Ac
 	return publicKeys, nil
 }
 
-func (r *LedgerDAL) GetAccount(address flow.Address) *flow.Account {
+func (r LedgerDAL) GetAccount(address flow.Address) *flow.Account {
 	accountID := address.Bytes()
 
 	err := r.CheckAccountExists(accountID)
@@ -129,10 +133,10 @@ func (r *LedgerDAL) GetAccount(address flow.Address) *flow.Account {
 		return nil
 	}
 
-	balanceBytes, _ := r.Ledger.Get(fullKeyHash(string(accountID), "", keyBalance))
+	balanceBytes, _ := r.Get(fullKeyHash(string(accountID), "", keyBalance))
 	balanceInt := new(big.Int).SetBytes(balanceBytes)
 
-	code, _ := r.Ledger.Get(fullKeyHash(string(accountID), string(accountID), keyCode))
+	code, _ := r.Get(fullKeyHash(string(accountID), string(accountID), keyCode))
 
 	publicKeys, err := r.GetAccountPublicKeys(accountID)
 	if err != nil {
@@ -147,46 +151,59 @@ func (r *LedgerDAL) GetAccount(address flow.Address) *flow.Account {
 	}
 }
 
-func (r *LedgerDAL) GetLatestAccount() flow.Address {
-	latestAccountID, _ := r.Ledger.Get(fullKeyHash("", "", keyLatestAccount))
+func (r LedgerDAL) GetLatestAccount() flow.Address {
+	latestAccountID, _ := r.Get(fullKeyHash("", "", keyLatestAccount))
 
 	return flow.BytesToAddress(latestAccountID)
 }
 
-func (r *LedgerDAL) CreateAccountInLedger(publicKeys []flow.AccountPublicKey) (flow.Address, error) {
-	accountAddress := r.GetLatestAccount()
+func (r LedgerDAL) CreateAccount(publicKeys []flow.AccountPublicKey) (flow.Address, error) {
+	lastAddr := r.GetLatestAccount()
 
-	accountID := accountAddress[:]
+	lastID := lastAddr[:]
 
-	accountIDInt := new(big.Int).SetBytes(accountID)
-	newAccountBytes := accountIDInt.Add(accountIDInt, big.NewInt(1)).Bytes()
+	lastIDInt := new(big.Int).SetBytes(lastID)
+	newID := lastIDInt.Add(lastIDInt, big.NewInt(1)).Bytes()
 
-	newAccountAddress := flow.BytesToAddress(newAccountBytes)
-	newAccountID := newAccountAddress[:]
+	newAddr := flow.BytesToAddress(newID)
 
-	// mark that account with this ID exists
-	r.Ledger.Set(fullKeyHash(string(newAccountID), "", keyExists), []byte{1})
-
-	// set account balance to 0
-	r.Ledger.Set(fullKeyHash(string(newAccountID), "", keyBalance), big.NewInt(0).Bytes())
-
-	r.Ledger.Set(fullKeyHash(string(newAccountID), string(newAccountID), keyCode), nil)
-
-	err := r.SetAccountPublicKeys(newAccountID, publicKeys)
+	err := r.CreateAccountWithAddress(newAddr, publicKeys)
 	if err != nil {
 		return flow.Address{}, err
 	}
 
-	r.Ledger.Set(fullKeyHash("", "", keyLatestAccount), newAccountID)
-
-	return flow.BytesToAddress(newAccountID), nil
+	return newAddr, nil
 }
 
-func (r *LedgerDAL) SetAccountPublicKeys(accountID []byte, publicKeys []flow.AccountPublicKey) error {
+func (r LedgerDAL) CreateAccountWithAddress(
+	addr flow.Address,
+	publicKeys []flow.AccountPublicKey,
+) error {
+	accountID := addr.Bytes()
+
+	// mark that account with this ID exists
+	r.Set(fullKeyHash(string(accountID), "", keyExists), []byte{1})
+
+	// set account balance to 0
+	r.Set(fullKeyHash(string(accountID), "", keyBalance), big.NewInt(0).Bytes())
+
+	r.Set(fullKeyHash(string(accountID), string(accountID), keyCode), nil)
+
+	err := r.SetAccountPublicKeys(accountID, publicKeys)
+	if err != nil {
+		return err
+	}
+
+	r.Set(fullKeyHash("", "", keyLatestAccount), accountID)
+
+	return nil
+}
+
+func (r LedgerDAL) SetAccountPublicKeys(accountID []byte, publicKeys []flow.AccountPublicKey) error {
 
 	var existingCount uint64
 
-	countBytes, err := r.Ledger.Get(
+	countBytes, err := r.Get(
 		fullKeyHash(string(accountID), string(accountID), keyPublicKeyCount),
 	)
 	if err != nil {
@@ -196,7 +213,10 @@ func (r *LedgerDAL) SetAccountPublicKeys(accountID []byte, publicKeys []flow.Acc
 	if countBytes != nil {
 		countInt := new(big.Int).SetBytes(countBytes)
 		if !countInt.IsUint64() {
-			return fmt.Errorf("retrieved public key account bytes (hex): %x do not represent valid uint64", countBytes)
+			return fmt.Errorf(
+				"retrieved public key account bytes (hex): %x do not represent valid uint64",
+				countBytes,
+			)
 		}
 		existingCount = countInt.Uint64()
 	} else {
@@ -206,7 +226,7 @@ func (r *LedgerDAL) SetAccountPublicKeys(accountID []byte, publicKeys []flow.Acc
 	newCount := uint64(len(publicKeys)) //len returns int and this won't exceed uint64
 	newKeyCount := new(big.Int).SetUint64(newCount)
 
-	r.Ledger.Set(
+	r.Set(
 		fullKeyHash(string(accountID), string(accountID), keyPublicKeyCount),
 		newKeyCount.Bytes(),
 	)
@@ -229,14 +249,14 @@ func (r *LedgerDAL) SetAccountPublicKeys(accountID []byte, publicKeys []flow.Acc
 
 	// delete leftover keys
 	for i := newCount; i < existingCount; i++ {
-		r.Ledger.Delete(fullKeyHash(string(accountID), string(accountID), keyPublicKey(i)))
+		r.Delete(fullKeyHash(string(accountID), string(accountID), keyPublicKey(i)))
 	}
 
 	return nil
 }
 
-func (r *LedgerDAL) setAccountPublicKey(accountID []byte, keyndex uint64, publicKey []byte) {
-	r.Ledger.Set(
+func (r LedgerDAL) setAccountPublicKey(accountID []byte, keyndex uint64, publicKey []byte) {
+	r.Set(
 		fullKeyHash(string(accountID), string(accountID), keyPublicKey(keyndex)),
 		publicKey,
 	)

@@ -63,22 +63,26 @@ func GenerateAccountPrivateKeys(numberOfPrivateKeys int) ([]flow.AccountPrivateK
 }
 
 // Create accounts on the ledger for the root account and for the private keys provided.
-func BootstrappedLedger(ledger virtualmachine.Ledger, privateKeys []flow.AccountPrivateKey) (virtualmachine.Ledger, []flow.Address, error) {
-	var accounts []flow.Address
-	ledgerAccess := virtualmachine.LedgerDAL{Ledger: ledger}
+func BootstrappedLedger(ledger virtualmachine.Ledger, privateKeys []flow.AccountPrivateKey) ([]flow.Address, error) {
+	ledgerAccess := virtualmachine.NewLedgerDAL(ledger)
+
 	privateKeysIncludingRoot := []flow.AccountPrivateKey{flow.RootAccountPrivateKey}
 	if len(privateKeys) > 0 {
 		privateKeysIncludingRoot = append(privateKeysIncludingRoot, privateKeys...)
 	}
+
+	var accounts []flow.Address
+
 	for _, account := range privateKeysIncludingRoot {
 		accountPublicKey := account.PublicKey(virtualmachine.AccountKeyWeightThreshold)
-		account, err := ledgerAccess.CreateAccountInLedger([]flow.AccountPublicKey{accountPublicKey})
+		account, err := ledgerAccess.CreateAccount([]flow.AccountPublicKey{accountPublicKey})
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		accounts = append(accounts, account)
 	}
-	return ledger, accounts, nil
+
+	return accounts, nil
 }
 
 func SignTransactionByRoot(tx *flow.TransactionBody, seqNum uint64) error {
@@ -87,18 +91,16 @@ func SignTransactionByRoot(tx *flow.TransactionBody, seqNum uint64) error {
 
 func RootBootstrappedLedger() (virtualmachine.Ledger, error) {
 	ledger := make(virtualmachine.MapLedger)
-	return ledger, BootstrapLedgerWithRootAccount(ledger)
+	return ledger, CreateRootAccountInLedger(ledger)
 }
 
-func BootstrapLedgerWithRootAccount(ledger virtualmachine.Ledger) error {
-	ledgerAccess := virtualmachine.LedgerDAL{Ledger: ledger}
+func CreateRootAccountInLedger(ledger virtualmachine.Ledger) error {
+	l := virtualmachine.NewLedgerDAL(ledger)
 
-	rootAccountPublicKey := flow.RootAccountPrivateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold)
+	accountKey := flow.RootAccountPrivateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold)
 
-	_, err := ledgerAccess.CreateAccountInLedger([]flow.AccountPublicKey{rootAccountPublicKey})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return l.CreateAccountWithAddress(
+		flow.RootAddress,
+		[]flow.AccountPublicKey{accountKey},
+	)
 }

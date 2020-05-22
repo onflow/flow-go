@@ -11,16 +11,16 @@ import (
 )
 
 func genGenesisExecutionState() flow.StateCommitment {
-	account0Priv, err := run.GenerateAccount0PrivateKey(generateRandomSeed())
+	serviceAccountPriv, err := run.GenerateServiceAccountPrivateKey(generateRandomSeed())
 	if err != nil {
 		log.Fatal().Err(err).Msg("error generating account 0 private key")
 	}
 
-	enc := account0Priv.PrivateKey.Encode()
-	writeJSON(bootstrap.PathAccount0Priv, enc)
+	enc := serviceAccountPriv.PrivateKey.Encode()
+	writeJSON(bootstrap.PathServiceAccountPriv, enc)
 
 	dbpath := filepath.Join(flagOutdir, bootstrap.DirnameExecutionState)
-	stateCommitment, err := run.GenerateExecutionState(dbpath, account0Priv)
+	stateCommitment, err := run.GenerateExecutionState(dbpath, serviceAccountPriv)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error generating execution state")
 	}
