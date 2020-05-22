@@ -254,7 +254,7 @@ func (l *LightEngine) handleExecutionReceipt(originID flow.Identifier, receipt *
 	}
 
 	// checks pending chunks for this receipt
-	l.checkPendingChunks()
+	l.checkPendingChunks([]*flow.ExecutionReceipt{receipt})
 
 	return nil
 }
@@ -335,7 +335,7 @@ func (l *LightEngine) handleChunkDataPack(originID flow.Identifier, chunkDataPac
 		Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
 		Msg("chunk data pack stored in mempool, tracker removed")
 
-	l.checkPendingChunks()
+	l.checkPendingChunks(l.receipts.All())
 
 	return nil
 }
@@ -384,7 +384,7 @@ func (l *LightEngine) handleCollection(originID flow.Identifier, coll *flow.Coll
 		Hex("collection_id", logging.ID(collID)).
 		Msg("collection added to mempool, and tracker removed")
 
-	l.checkPendingChunks()
+	l.checkPendingChunks(l.receipts.All())
 
 	return nil
 }
@@ -547,12 +547,12 @@ func (l *LightEngine) getCollectionForChunk(block *flow.Block, receipt *flow.Exe
 	return nil, false
 }
 
-// checkPendingChunks checks all pending chunks of receipts in the mempool and verifies
+// checkPendingChunks checks assigned chunks in receipts in the mempool and verifies
 // any that are ready for verification.
 //
 // NOTE: this method is protected by mutex to prevent double-verifying ERs.
-func (l *LightEngine) checkPendingChunks() {
-	for _, receipt := range l.receipts.All() {
+func (l *LightEngine) checkPendingChunks(receipts []*flow.ExecutionReceipt) {
+	for _, receipt := range receipts {
 		readyToClean := true
 		block, err := l.blockStorage.ByID(receipt.ExecutionResult.BlockID)
 		if err != nil {

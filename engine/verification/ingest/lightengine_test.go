@@ -241,7 +241,6 @@ func (suite *LightIngestTestSuite) TestHandleReceipt_MissingCollection() {
 
 	// mocks functionalities of adding receipt and chunk to memory pools
 	suite.receipts.On("Add", suite.receipt).Return(true).Once()
-	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil)
 
 	// mocks trackers functionality for the chunk
 	suite.collectionTrackers.On("Add", suite.collTracker).Return(true)
@@ -296,8 +295,6 @@ func (suite *LightIngestTestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	// collection
 	suite.collections.On("Has", suite.collection.ID()).Return(true)
 	suite.collections.On("ByID", suite.collection.ID()).Return(suite.collection, true)
-	// receipt in the mempool
-	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
 
 	// mocks missing resources
 	//
