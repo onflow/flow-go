@@ -15,8 +15,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
-	ptriep "github.com/dapperlabs/flow-go/storage/ledger/ptrie"
-	utils "github.com/dapperlabs/flow-go/storage/ledger/utils"
+	"github.com/dapperlabs/flow-go/storage/ledger/ptrie"
+	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
 var dir = "./db/"
@@ -98,7 +98,7 @@ func StorageBenchmark() {
 		elapsed = time.Since(start)
 		start = time.Now()
 		// validate proofs as a batch
-		_, err = ptriep.NewPSMT(newState, trieHeight, keys, retValues, proofs)
+		_, err = ptrie.NewPSMT(newState, trieHeight, keys, retValues, proofs)
 		if err != nil {
 			panic("failed to create PSMT")
 		}

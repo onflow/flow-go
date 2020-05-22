@@ -9,7 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification"
 	chmodels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
-	ptriep "github.com/dapperlabs/flow-go/storage/ledger/ptrie"
+	"github.com/dapperlabs/flow-go/storage/ledger/ptrie"
 )
 
 // ChunkVerifier is a verifier based on the current definitions of the flow network
@@ -50,7 +50,7 @@ func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) (chmodels.Chu
 	if ch.ChunkDataPack == nil {
 		return nil, fmt.Errorf("missing chunk data pack")
 	}
-	ptrie, err := ptriep.NewPSMT(ch.ChunkDataPack.StartState,
+	psmt, err := ptrie.NewPSMT(ch.ChunkDataPack.StartState,
 		fcv.trieDepth,
 		ch.ChunkDataPack.Registers(),
 		ch.ChunkDataPack.Values(),
@@ -107,7 +107,7 @@ func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) (chmodels.Chu
 	// this returns the expected end state commitment after updates and the list of
 	// register keys that was not provided by the chunk data package (err).
 	regs, values := chunkView.Delta().RegisterUpdates()
-	expEndStateComm, failedKeys, err := ptrie.Update(regs, values)
+	expEndStateComm, failedKeys, err := psmt.Update(regs, values)
 	if err != nil {
 		return chmodels.NewCFMissingRegisterTouch(failedKeys, chIndex, execResID), nil
 	}

@@ -10,7 +10,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
-	ptriep "github.com/dapperlabs/flow-go/storage/ledger/ptrie"
+	"github.com/dapperlabs/flow-go/storage/ledger/ptrie"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -85,7 +85,7 @@ func TestLedgerFunctionality(t *testing.T) {
 				assert.True(t, isValid)
 
 				// validate proofs as a batch
-				_, err = ptriep.NewPSMT(newState, trieHeight, keys, retValues, proofs)
+				_, err = ptrie.NewPSMT(newState, trieHeight, keys, retValues, proofs)
 				assert.NoError(t, err)
 
 				// query all exising keys (check no drop)
