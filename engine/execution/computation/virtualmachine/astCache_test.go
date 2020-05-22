@@ -37,12 +37,11 @@ func TestTransactionASTCache(t *testing.T) {
 		err := execTestutil.SignTransactionByRoot(tx, 0)
 		require.NoError(t, err)
 
-		ledger, err := execTestutil.RootBootstrappedLedger()
-		require.NoError(t, err)
+		ledger := execTestutil.RootBootstrappedLedger()
 
 		result, err := bc.ExecuteTransaction(ledger, tx)
-
 		require.NoError(t, err)
+
 		require.True(t, result.Succeeded())
 		require.Nil(t, result.Error)
 
@@ -73,8 +72,7 @@ func TestScriptASTCache(t *testing.T) {
 			}
 		`)
 
-		ledger, err := execTestutil.RootBootstrappedLedger()
-		require.NoError(t, err)
+		ledger := execTestutil.RootBootstrappedLedger()
 
 		result, err := bc.ExecuteScript(ledger, script)
 		require.NoError(t, err)

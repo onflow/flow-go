@@ -105,7 +105,8 @@ pub contract FlowToken: FungibleToken {
     // account to be able to receive deposits of this token type.
     //
     pub fun createEmptyVault(): @FungibleToken.Vault {
-        return <-create Vault(balance: 0.0)
+        // TODO: initialize with zero
+        return <-create Vault(balance: 100.0)
     }
 
     // MintAndBurn

@@ -19,8 +19,8 @@ func TestGenerateGenesisStateCommitment(t *testing.T) {
 		require.NoError(t, err)
 
 		newStateCommitment, err := BootstrapLedger(ls, flow.RootAccountPrivateKey)
-
 		require.NoError(t, err)
+
 		require.Equal(t, flow.GenesisStateCommitment, newStateCommitment)
 	})
 }
