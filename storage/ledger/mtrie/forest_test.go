@@ -86,7 +86,7 @@ func TestTrieUpdate(t *testing.T) {
 //   1. we first construct a baseTrie holding a couple of values on the right branch [~]
 //   2. we update a previously non-existent register on the left branch (X)
 // We verify that values for _all_ keys in the updated Trie have correct values
-// TODO: move to Trie test (as it directly tests trie update as opposed to forrest functions)
+// TODO: move to Trie test (as it directly tests trie update as opposed to forest functions)
 func TestLeftEmptyInsert(t *testing.T) {
 	//////////////////////
 	//     insert X     //
@@ -149,7 +149,7 @@ func TestLeftEmptyInsert(t *testing.T) {
 //   1. we first construct a baseTrie holding a couple of values on the left branch [~]
 //   2. we update a previously non-existent register on the right branch (X)
 // We verify that values for _all_ keys in the updated Trie have correct values
-// TODO: move to Trie test (as it directly tests trie update as opposed to forrest functions)
+// TODO: move to Trie test (as it directly tests trie update as opposed to forest functions)
 func TestRightEmptyInsert(t *testing.T) {
 	///////////////////////
 	//     insert X      //
@@ -214,7 +214,7 @@ func TestRightEmptyInsert(t *testing.T) {
 //   1. we first construct a baseTrie holding a couple of values on the right branch [~]
 //   2. we update a previously non-existent register on the right branch turning [~] to [~']
 // We verify that values for _all_ keys in the updated Trie have correct values
-// TODO: move to Trie test (as it directly tests trie update as opposed to forrest functions)
+// TODO: move to Trie test (as it directly tests trie update as opposed to forest functions)
 func TestExpansionInsert(t *testing.T) {
 	////////////////////////
 	// modify [~] -> [~'] //
@@ -277,7 +277,7 @@ func TestExpansionInsert(t *testing.T) {
 //   1. we first construct a baseTrie holding a couple of values on the right branch [~]
 //   2. we update a previously non-existent register on the right branch turning [~] to [~']
 // We verify that values for _all_ keys in the updated Trie have correct values
-// TODO: move to Trie test (as it directly tests trie update as opposed to forrest functions)
+// TODO: move to Trie test (as it directly tests trie update as opposed to forest functions)
 func TestFullHouseInsert(t *testing.T) {
 	///////////////////////
 	//   insert ~1<X<~2  //
@@ -347,7 +347,7 @@ func TestFullHouseInsert(t *testing.T) {
 // TestLeafInsert inserts two keys, which only differ in their last bit.
 // I.e. the trie needs to be expanded to its hull depth
 // We verify that values for _all_ keys in the updated Trie have correct values
-// TODO: move to Trie test (as it directly tests trie update as opposed to forrest functions)
+// TODO: move to Trie test (as it directly tests trie update as opposed to forest functions)
 func TestLeafInsert(t *testing.T) {
 	///////////////////////
 	//   insert 1, 2     //
@@ -393,7 +393,7 @@ func TestLeafInsert(t *testing.T) {
 
 // TestOverrideValue overrides an existing value in the trie (without any expansion)
 // We verify that values for _all_ keys in the updated Trie have correct values
-// TODO: move to Trie test (as it directly tests trie update as opposed to forrest functions)
+// TODO: move to Trie test (as it directly tests trie update as opposed to forest functions)
 func TestOverrideValue(t *testing.T) {
 	trieHeight := 17 // should be key size (in bits) + 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
@@ -429,7 +429,7 @@ func TestOverrideValue(t *testing.T) {
 // TestDuplicateOverride tests behaviour when the updates contain two different values for the
 // same key. I.e. we update with (k0, v0) and (k0, v1)
 // We expect that the _last_ written value is persisted in the Trie
-// TODO: move to Trie test (as it directly tests trie update as opposed to forrest functions)
+// TODO: move to Trie test (as it directly tests trie update as opposed to forest functions)
 func TestDuplicateOverride(t *testing.T) {
 	trieHeight := 17 // should be key size (in bits) + 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
@@ -456,7 +456,7 @@ func TestDuplicateOverride(t *testing.T) {
 }
 
 // TestUpdateWithWrongKeySize verifies that attempting to update a trie with wrong key size errors
-// TODO: move to Trie test (as it directly tests trie update as opposed to forrest functions)
+// TODO: move to Trie test (as it directly tests trie update as opposed to forest functions)
 func TestUpdateWithWrongKeySize(t *testing.T) {
 	trieHeight := 17 // should be key size (in bits) + 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
@@ -489,7 +489,7 @@ func TestUpdateWithWrongKeySize(t *testing.T) {
 }
 
 // TestReadOrder tests that values from reading a trie are delivered in the order as specified by the keys
-// TODO: move to Trie test (as it directly tests trie update as opposed to forrest functions)
+// TODO: move to Trie test (as it directly tests trie update as opposed to forest functions)
 func TestReadOrder(t *testing.T) {
 	trieHeight := 17 // should be key size (in bits) + 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
@@ -522,7 +522,7 @@ func TestReadOrder(t *testing.T) {
 
 // TestMixRead tests reading a mixture of set and unset registers.
 // We expect the default value (empty slice) to be returned for unset registers.
-// TODO: move to Trie test (as it directly tests trie update as opposed to forrest functions)
+// TODO: move to Trie test (as it directly tests trie update as opposed to forest functions)
 func TestMixRead(t *testing.T) {
 	trieHeight := 17 // should be key size (in bits) + 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
@@ -561,7 +561,7 @@ func TestMixRead(t *testing.T) {
 
 // TestReadWithDuplicatedKeys reads a the values for two keys, where both keys have the same value.
 // We expect that we receive the respective value twice in the return.
-// TODO: move to Trie test (as it directly tests trie update as opposed to forrest functions)
+// TODO: move to Trie test (as it directly tests trie update as opposed to forest functions)
 func TestReadWithDuplicatedKeys(t *testing.T) {
 	trieHeight := 17 // should be key size (in bits) + 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
@@ -596,7 +596,7 @@ func TestReadWithDuplicatedKeys(t *testing.T) {
 }
 
 // TestReadNonExistKey tests reading an unset registers.
-// TODO: move to Trie test (as it directly tests trie update as opposed to forrest functions)
+// TODO: move to Trie test (as it directly tests trie update as opposed to forest functions)
 func TestReadNonExistKey(t *testing.T) {
 	trieHeight := 17 // should be key size (in bits) + 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
@@ -623,7 +623,7 @@ func TestReadNonExistKey(t *testing.T) {
 }
 
 // TestReadWithWrongKeySize verifies that attempting to read a trie with wrong key size errors
-// TODO: move to Trie test (as it directly tests trie update as opposed to forrest functions)
+// TODO: move to Trie test (as it directly tests trie update as opposed to forest functions)
 func TestReadWithWrongKeySize(t *testing.T) {
 	trieHeight := 17 // should be key size (in bits) + 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
@@ -662,7 +662,7 @@ func TestReadWithWrongKeySize(t *testing.T) {
 // [AlexH] doesn't TestMixRead do this test?
 
 // TestForkingUpdates updates a base trie in two different ways. We expect
-// that for each update, a new trie is added to the forrest preserving the
+// that for each update, a new trie is added to the forest preserving the
 // updated values independently of the other update.
 func TestForkingUpdates(t *testing.T) {
 	trieHeight := 17 // should be key size (in bits) + 1
@@ -769,7 +769,7 @@ func TestIdenticalUpdateAppliedTwice(t *testing.T) {
 }
 
 // TestRandomUpdateReadProof tests a read proof against the ChainSafe Trie implementation
-// TODO: move to Trie test (as it directly tests trie update as opposed to forrest functions)
+// TODO: move to Trie test (as it directly tests trie update as opposed to forest functions)
 func TestRandomUpdateReadProof(t *testing.T) {
 	keyByteSize := 2
 	trieHeight := keyByteSize*8 + 1
@@ -861,7 +861,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 }
 
 // TestProofGenerationInclusion tests that inclusion proofs generated by a Trie pass verification
-// TODO: move to Trie test (as it directly tests trie update as opposed to forrest functions)
+// TODO: move to Trie test (as it directly tests trie update as opposed to forest functions)
 func TestProofGenerationInclusion(t *testing.T) {
 	trieHeight := 17
 	dir, err := ioutil.TempDir("", "test-mtrie-")

@@ -240,7 +240,7 @@ func (f *MForest) Update(rootHash []byte, keys [][]byte, values [][]byte) (*trie
 
 	err = f.addTrie(newTrie)
 	if err != nil {
-		return nil, fmt.Errorf("adding updated trie to forrest failed: %w", err)
+		return nil, fmt.Errorf("adding updated trie to forest failed: %w", err)
 	}
 	// go func() {
 	// 	_ = newTrie.Store(filepath.Join(f.dir, hex.EncodeToString(newRootHash)))
@@ -366,7 +366,7 @@ func (f *MForest) Size() int {
 	return f.tries.Len()
 }
 
-// DiskSize returns the disk size of the directory used by the forrest
+// DiskSize returns the disk size of the directory used by the forest
 func (f *MForest) DiskSize() (int64, error) {
 	return io.DirSize(f.dir)
 }
