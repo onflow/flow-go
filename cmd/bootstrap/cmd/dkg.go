@@ -15,7 +15,13 @@ func runDKG(nodes []model.NodeInfo) model.DKGData {
 	log.Info().Msgf("read %v node infos for DKG", n)
 
 	log.Debug().Msgf("will run DKG")
-	dkgData, err := run.RunDKG(n, generateRandomSeeds(n))
+	var dkgData model.DKGData
+	var err error
+	if flagFastKG {
+		dkgData, err = run.RunDKG(n, generateRandomSeeds(n))
+	} else {
+		dkgData, err = run.RunFastKG(n, generateRandomSeed())
+	}
 	if err != nil {
 		log.Fatal().Err(err).Msg("error running DKG")
 	}

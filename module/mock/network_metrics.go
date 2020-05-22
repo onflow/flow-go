@@ -9,6 +9,11 @@ type NetworkMetrics struct {
 	mock.Mock
 }
 
+// NetworkDuplicateMessagesDropped provides a mock function with given fields: topic
+func (_m *NetworkMetrics) NetworkDuplicateMessagesDropped(topic string) {
+	_m.Called(topic)
+}
+
 // NetworkMessageReceived provides a mock function with given fields: sizeBytes, topic
 func (_m *NetworkMetrics) NetworkMessageReceived(sizeBytes int, topic string) {
 	_m.Called(sizeBytes, topic)

@@ -1,6 +1,7 @@
 package messages
 
 import (
+	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -44,4 +45,11 @@ type BatchRequest struct {
 type BlockResponse struct {
 	Nonce  uint64
 	Blocks []*flow.Block
+}
+
+// ClusterBlockResponse is the same thing as BlockResponse, but for cluster
+// consensus.
+type ClusterBlockResponse struct {
+	Nonce  uint64
+	Blocks []*cluster.Block
 }

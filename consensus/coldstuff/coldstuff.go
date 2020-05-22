@@ -260,7 +260,7 @@ func (e *ColdStuff) sendProposal() error {
 	e.round.Propose(candidate)
 
 	// send the block proposal
-	err = e.comms.BroadcastProposal(candidate)
+	err = e.comms.BroadcastProposalWithDelay(candidate, 0)
 	if err != nil {
 		return fmt.Errorf("could not submit proposal: %w", err)
 	}

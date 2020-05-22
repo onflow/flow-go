@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/module/trace"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -45,7 +46,9 @@ type ReadOnlyExecutionState interface {
 
 	GetHighestExecutedBlockID(context.Context) (uint64, flow.Identifier, error)
 
-	Size() (int64, error)
+	GetCollection(identifier flow.Identifier) (*flow.Collection, error)
+
+	DiskSize() (int64, error)
 }
 
 // TODO Many operations here are should be transactional, so we need to refactor this
@@ -77,6 +80,7 @@ type state struct {
 	ls               storage.Ledger
 	commits          storage.Commits
 	blocks           storage.Blocks
+	collections      storage.Collections
 	chunkDataPacks   storage.ChunkDataPacks
 	executionResults storage.ExecutionResults
 	db               *badger.DB
@@ -87,6 +91,7 @@ func NewExecutionState(
 	ls storage.Ledger,
 	commits storage.Commits,
 	blocks storage.Blocks,
+	collections storage.Collections,
 	chunkDataPacks storage.ChunkDataPacks,
 	executionResult storage.ExecutionResults,
 	db *badger.DB,
@@ -97,6 +102,7 @@ func NewExecutionState(
 		ls:               ls,
 		commits:          commits,
 		blocks:           blocks,
+		collections:      collections,
 		chunkDataPacks:   chunkDataPacks,
 		executionResults: executionResult,
 		db:               db,
@@ -239,6 +245,18 @@ func (s *state) RetrieveStateDelta(ctx context.Context, blockID flow.Identifier)
 	if err != nil {
 		return nil, fmt.Errorf("cannot retrieve block: %w", err)
 	}
+	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection)
+
+	for _, guarantee := range block.Payload.Guarantees {
+		collection, err := s.collections.ByID(guarantee.CollectionID)
+		if err != nil {
+			return nil, fmt.Errorf("cannot retrieve collection for delta: %w", err)
+		}
+		completeCollections[collection.ID()] = &entity.CompleteCollection{
+			Guarantee:    guarantee,
+			Transactions: collection.Transactions,
+		}
+	}
 
 	var startStateCommitment flow.StateCommitment
 	var endStateCommitment flow.StateCommitment
@@ -272,6 +290,7 @@ func (s *state) RetrieveStateDelta(ctx context.Context, blockID flow.Identifier)
 		if err != nil {
 			return fmt.Errorf("cannot lookup execution state views: %w", err)
 		}
+
 		return nil
 	})
 	if err != nil {
@@ -279,13 +298,20 @@ func (s *state) RetrieveStateDelta(ctx context.Context, blockID flow.Identifier)
 	}
 
 	return &messages.ExecutionStateDelta{
-		Block:              block,
+		ExecutableBlock: entity.ExecutableBlock{
+			Block:               block,
+			StartState:          startStateCommitment,
+			CompleteCollections: completeCollections,
+		},
 		StateInteractions:  stateInteractions,
-		StartState:         startStateCommitment,
 		EndState:           endStateCommitment,
 		Events:             events,
 		TransactionResults: txResults,
 	}, nil
+}
+
+func (s *state) GetCollection(identifier flow.Identifier) (*flow.Collection, error) {
+	return s.collections.ByID(identifier)
 }
 
 func (s *state) UpdateHighestExecutedBlockIfHigher(ctx context.Context, header *flow.Header) error {
@@ -340,6 +366,6 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 	return highest.Height, blockID, nil
 }
 
-func (s *state) Size() (int64, error) {
-	return s.ls.Size()
+func (s *state) DiskSize() (int64, error) {
+	return s.ls.DiskSize()
 }

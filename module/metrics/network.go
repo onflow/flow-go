@@ -13,8 +13,9 @@ const (
 )
 
 type NetworkCollector struct {
-	outboundMessageSize *prometheus.HistogramVec
-	inboundMessageSize  *prometheus.HistogramVec
+	outboundMessageSize      *prometheus.HistogramVec
+	inboundMessageSize       *prometheus.HistogramVec
+	duplicateMessagesDropped *prometheus.CounterVec
 }
 
 func NewNetworkCollector() *NetworkCollector {
@@ -36,6 +37,13 @@ func NewNetworkCollector() *NetworkCollector {
 			Help:      "size of the inbound network message",
 			Buckets:   []float64{KiB, 100 * KiB, 500 * KiB, 1 * MiB, 2 * MiB, 4 * MiB},
 		}, []string{LabelChannel}),
+
+		duplicateMessagesDropped: promauto.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      "duplicate_messages_dropped",
+			Help:      "number of duplicate messages dropped",
+		}, []string{LabelChannel}),
 	}
 
 	return nc
@@ -51,4 +59,9 @@ func (nc *NetworkCollector) NetworkMessageSent(sizeBytes int, topic string) {
 // in bytes for the given topic
 func (nc *NetworkCollector) NetworkMessageReceived(sizeBytes int, topic string) {
 	nc.inboundMessageSize.WithLabelValues(topic).Observe(float64(sizeBytes))
+}
+
+// NetworkDuplicateMessagesDropped tracks the number of messages dropped by the network layer due to duplication
+func (nc *NetworkCollector) NetworkDuplicateMessagesDropped(topic string) {
+	nc.duplicateMessagesDropped.WithLabelValues(topic).Add(1)
 }

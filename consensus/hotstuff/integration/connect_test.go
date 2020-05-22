@@ -2,6 +2,7 @@ package integration
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 
@@ -23,8 +24,8 @@ func Connect(instances []*Instance) {
 		sender := sender // avoid capturing loop variable in closure
 
 		*sender.communicator = mocks.Communicator{}
-		sender.communicator.On("BroadcastProposal", mock.Anything).Return(
-			func(header *flow.Header) error {
+		sender.communicator.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Return(
+			func(header *flow.Header, delay time.Duration) error {
 
 				// sender should always have the parent
 				parentBlob, exists := sender.headers.Load(header.ParentID)
@@ -39,6 +40,10 @@ func Connect(instances []*Instance) {
 
 				// convert into proposal immediately
 				proposal := model.ProposalFromFlow(header, parent.View)
+
+				// store locally and loop back to engine for processing
+				sender.headers.Store(header.ID(), header)
+				sender.queue <- proposal
 
 				// check if we should block the outgoing proposal
 				if sender.blockPropOut(proposal) {

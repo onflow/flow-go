@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 
 	"gopkg.in/yaml.v2"
 
@@ -174,7 +175,7 @@ func prepareServices(containers []testnet.ContainerConfig) Services {
 	for _, container := range containers {
 		switch container.Role {
 		case flow.RoleConsensus:
-			services[container.ContainerName] = prepareService(container, numConsensus)
+			services[container.ContainerName] = prepareConsensusService(container, numConsensus)
 			numConsensus++
 		case flow.RoleCollection:
 			services[container.ContainerName] = prepareCollectionService(container, numCollection)
@@ -233,6 +234,17 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 			fmt.Sprintf("%s_1", container.Role),
 		}
 	}
+
+	return service
+}
+
+func prepareConsensusService(container testnet.ContainerConfig, i int) Service {
+	service := prepareService(container, i)
+
+	service.Command = append(
+		service.Command,
+		fmt.Sprintf("--block-rate-delay=%s", time.Duration(0)),
+	)
 
 	return service
 }

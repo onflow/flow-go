@@ -16,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification"
 	chmodel "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -62,8 +63,10 @@ func CompleteExecutionResultFixture(t testing.TB, chunkCount int) verification.C
 		values = append(values, value1, value2)
 		values = append(values, rootRegisterValues...)
 
+		metricsCollector := &metrics.NoopCollector{}
+
 		unittest.RunWithTempDir(t, func(dir string) {
-			f, err := ledger.NewMTrieStorage(dir, 100, nil)
+			f, err := ledger.NewMTrieStorage(dir, 100, metricsCollector, nil)
 			defer f.Done()
 			require.NoError(t, err)
 

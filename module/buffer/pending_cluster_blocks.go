@@ -3,6 +3,7 @@ package buffer
 import (
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/messages"
 )
 
 type PendingClusterBlocks struct {
@@ -14,8 +15,8 @@ func NewPendingClusterBlocks() *PendingClusterBlocks {
 	return b
 }
 
-func (b *PendingClusterBlocks) Add(block *cluster.PendingBlock) bool {
-	return b.backend.add(block.OriginID, block.Header, block.Payload)
+func (b *PendingClusterBlocks) Add(originID flow.Identifier, proposal *messages.ClusterBlockProposal) bool {
+	return b.backend.add(originID, proposal.Header, proposal.Payload)
 }
 
 func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (*cluster.PendingBlock, bool) {

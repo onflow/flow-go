@@ -1,123 +1,96 @@
 package testutil
 
 import (
+	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func DeployCounterContractTransaction() flow.TransactionBody {
-	encoded := hex.EncodeToString([]byte(`
-			access(all) contract Container {
-				access(all) resource Counter {
-					pub var count: Int
-
-					init(_ v: Int) {
-						self.count = v
-					}
-					pub fun add(_ count: Int) {
-						self.count = self.count + count
-					}
-				}
-				pub fun createCounter(_ v: Int): @Counter {
-					return <-create Counter(v)
-				}
-			}`))
-
+func CreateContractDeploymentTransaction(contract string, authorizer flow.Address) flow.TransactionBody {
+	encoded := hex.EncodeToString([]byte(contract))
 	return flow.TransactionBody{
 		Script: []byte(fmt.Sprintf(`transaction {
               prepare(signer: AuthAccount) {
                 signer.setCode("%s".decodeHex())
               }
             }`, encoded)),
-		Authorizers: []flow.Address{flow.RootAddress},
+		Authorizers: []flow.Address{authorizer},
 	}
 }
 
-func CreateCounterTransaction() flow.TransactionBody {
-	return flow.TransactionBody{
-		Script: []byte(`
-			import 0x01
-
-			transaction {
-				prepare(acc: AuthAccount) {
-					var maybeCounter <- acc.load<@Container.Counter>(from: /storage/counter)
-
-					if maybeCounter == nil {
-						maybeCounter <-! Container.createCounter(3)
-					}
-
-					acc.save(<-maybeCounter!, to: /storage/counter)
-				}
-			}`),
-		Authorizers: []flow.Address{flow.RootAddress},
-	}
-}
-
-// CreateCounterPanicTransaction returns a transaction that will manipulate state by writing a new counter into storage
-// and then panic. It can be used to test whether execution state stays untouched/will revert
-func CreateCounterPanicTransaction() flow.TransactionBody {
-	return flow.TransactionBody{
-		Script: []byte(`
-			import 0x01
-
-			transaction {
-				prepare(acc: AuthAccount) {
-					if let existing <- acc.load<@Container.Counter>(from: /storage/counter) {
-						destroy existing
-            		}
-
-					panic("fail for testing purposes")
-              	}
-            }`),
-		Authorizers: []flow.Address{flow.RootAddress},
-	}
-}
-
-func AddToCounterTransaction() flow.TransactionBody {
-	return flow.TransactionBody{
-		Script: []byte(`
-			import 0x01
-
-			transaction {
-				prepare(acc: AuthAccount) {
-					let counter = acc.borrow<&Container.Counter>(from: /storage/counter)
-					counter?.add(2)
-				}
-			}`),
-		Authorizers: []flow.Address{flow.RootAddress},
-	}
-}
-
-func SignTransactionByRoot(tx *flow.TransactionBody, seqNum uint64) error {
-
-	hasher, err := hash.NewHasher(flow.RootAccountPrivateKey.HashAlgo)
+func SignTransaction(tx *flow.TransactionBody, account flow.Address, privateKey flow.AccountPrivateKey, seqNum uint64) error {
+	hasher, err := hash.NewHasher(privateKey.HashAlgo)
 	if err != nil {
 		return fmt.Errorf("cannot create hasher: %w", err)
 	}
 
-	err = tx.SetPayer(flow.RootAddress).
-		SetProposalKey(flow.RootAddress, 0, seqNum).
-		SignEnvelope(flow.RootAddress, 0, flow.RootAccountPrivateKey.PrivateKey, hasher)
+	err = tx.SetPayer(account).
+		SetProposalKey(account, 0, seqNum).
+		SignEnvelope(account, 0, privateKey.PrivateKey, hasher)
 
 	if err != nil {
 		return fmt.Errorf("cannot sign tx: %w", err)
 	}
-
 	return nil
+}
+
+// Generate a number of private keys
+func GenerateAccountPrivateKeys(numberOfPrivateKeys int) ([]flow.AccountPrivateKey, error) {
+	var privateKeys []flow.AccountPrivateKey
+	for i := 0; i < numberOfPrivateKeys; i++ {
+		seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
+		_, err := rand.Read(seed)
+		if err != nil {
+			return nil, err
+		}
+		privateKey, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
+		if err != nil {
+			return nil, err
+		}
+		flowPrivateKey := flow.AccountPrivateKey{
+			PrivateKey: privateKey,
+			SignAlgo:   crypto.ECDSAP256,
+			HashAlgo:   hash.SHA2_256,
+		}
+		privateKeys = append(privateKeys, flowPrivateKey)
+	}
+	return privateKeys, nil
+}
+
+// Create accounts on the ledger for the root account and for the private keys provided.
+func BootstrappedLedger(ledger virtualmachine.Ledger, privateKeys []flow.AccountPrivateKey) (virtualmachine.Ledger, []flow.Address, error) {
+	var accounts []flow.Address
+	ledgerAccess := virtualmachine.LedgerDAL{Ledger: ledger}
+	privateKeysIncludingRoot := []flow.AccountPrivateKey{flow.RootAccountPrivateKey}
+	if len(privateKeys) > 0 {
+		privateKeysIncludingRoot = append(privateKeysIncludingRoot, privateKeys...)
+	}
+	for _, account := range privateKeysIncludingRoot {
+		accountPublicKey := account.PublicKey(virtualmachine.AccountKeyWeightThreshold)
+		account, err := ledgerAccess.CreateAccountInLedger([]flow.AccountPublicKey{accountPublicKey})
+		if err != nil {
+			return nil, nil, err
+		}
+		accounts = append(accounts, account)
+	}
+	return ledger, accounts, nil
+}
+
+func SignTransactionByRoot(tx *flow.TransactionBody, seqNum uint64) error {
+	return SignTransaction(tx, flow.RootAddress, flow.RootAccountPrivateKey, seqNum)
 }
 
 func RootBootstrappedLedger() (virtualmachine.Ledger, error) {
 	ledger := make(virtualmachine.MapLedger)
-
 	return ledger, BootstrapLedgerWithRootAccount(ledger)
 }
 
 func BootstrapLedgerWithRootAccount(ledger virtualmachine.Ledger) error {
-
 	ledgerAccess := virtualmachine.LedgerDAL{Ledger: ledger}
 
 	rootAccountPublicKey := flow.RootAccountPrivateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold)

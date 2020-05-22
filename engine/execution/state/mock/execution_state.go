@@ -59,6 +59,50 @@ func (_m *ExecutionState) CommitDelta(_a0 context.Context, _a1 delta.Delta, _a2 
 	return r0, r1
 }
 
+// DiskSize provides a mock function with given fields:
+func (_m *ExecutionState) DiskSize() (int64, error) {
+	ret := _m.Called()
+
+	var r0 int64
+	if rf, ok := ret.Get(0).(func() int64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetCollection provides a mock function with given fields: identifier
+func (_m *ExecutionState) GetCollection(identifier flow.Identifier) (*flow.Collection, error) {
+	ret := _m.Called(identifier)
+
+	var r0 *flow.Collection
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Collection); ok {
+		r0 = rf(identifier)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Collection)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(identifier)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetExecutionResultID provides a mock function with given fields: _a0, _a1
 func (_m *ExecutionState) GetExecutionResultID(_a0 context.Context, _a1 flow.Identifier) (flow.Identifier, error) {
 	ret := _m.Called(_a0, _a1)
@@ -255,27 +299,6 @@ func (_m *ExecutionState) RetrieveStateDelta(_a0 context.Context, _a1 flow.Ident
 	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
 		r1 = rf(_a0, _a1)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// Size provides a mock function with given fields:
-func (_m *ExecutionState) Size() (int64, error) {
-	ret := _m.Called()
-
-	var r0 int64
-	if rf, ok := ret.Get(0).(func() int64); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(int64)
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
 	} else {
 		r1 = ret.Error(1)
 	}

@@ -460,6 +460,32 @@ func (ss *SyncSuite) TestQueueByBlockID() {
 	assert.Len(ss.T(), ss.e.blockIDs, count, "block ID map should be the same")
 }
 
+func (ss *SyncSuite) TestRequestBlock() {
+
+	queuedID := unittest.IdentifierFixture()
+	requestedID := unittest.IdentifierFixture()
+	received := unittest.BlockFixture()
+
+	ss.e.blockIDs[queuedID] = ss.QueuedStatus()
+	ss.e.blockIDs[requestedID] = ss.RequestedStatus()
+	ss.e.blockIDs[received.ID()] = ss.RequestedStatus()
+	ss.e.processIncomingBlock(unittest.IdentifierFixture(), &received)
+
+	// queued status should stay the same
+	ss.e.RequestBlock(queuedID)
+	assert.True(ss.T(), ss.e.blockIDs[queuedID].WasQueued())
+
+	// requested status should stay the same
+	ss.e.RequestBlock(requestedID)
+	assert.True(ss.T(), ss.e.blockIDs[requestedID].WasRequested())
+
+	// received status should be re-queued by ID
+	ss.e.RequestBlock(received.ID())
+	assert.True(ss.T(), ss.e.blockIDs[received.ID()].WasQueued())
+	assert.False(ss.T(), ss.e.blockIDs[received.ID()].WasReceived())
+	assert.False(ss.T(), ss.e.heights[received.Header.Height].WasQueued())
+}
+
 func (ss *SyncSuite) TestProcessIncomingBlock() {
 
 	var blocks []*flow.Block

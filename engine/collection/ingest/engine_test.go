@@ -44,6 +44,16 @@ func TestInvalidTransaction(t *testing.T) {
 		}
 	})
 
+	t.Run("gas limit exceeds the maximum allowed", func(t *testing.T) {
+		tx := unittest.TransactionBodyFixture()
+		tx.GasLimit = ingest.MaxGasLimit + 1
+
+		err := node.IngestionEngine.ProcessLocal(&tx)
+		if assert.Error(t, err) {
+			assert.True(t, errors.Is(err, ingest.GasLimitExceededError{}))
+		}
+	})
+
 	t.Run("invalid reference block ID", func(t *testing.T) {
 		tx := unittest.TransactionBodyFixture()
 		tx.ReferenceBlockID = unittest.IdentifierFixture()

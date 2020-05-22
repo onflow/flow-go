@@ -23,7 +23,7 @@ type Ledger interface {
 	// Batched atomic updates of a subset of registers at specific state with proofs
 	UpdateRegistersWithProof(registerIDs []flow.RegisterID, values []flow.RegisterValue, stateCommitment flow.StateCommitment) (newStateCommitment flow.StateCommitment, proofs []flow.StorageProof, err error)
 
-	Size() (int64, error)
+	DiskSize() (int64, error)
 }
 
 // LedgerVerifier should be designed as an standalone package to verify proofs of storage

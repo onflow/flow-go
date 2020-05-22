@@ -48,30 +48,37 @@ const (
 	// this value is set following this issue:
 	// https://github.com/dapperlabs/flow-go/issues/3443
 	failureThreshold = 2
+
+	// lightIngest determines whether light or original ingest engine
+	// should be used
+	lightIngest = true
 )
 
 func main() {
 
 	var (
-		alpha                uint
-		receiptLimit         uint
-		collectionLimit      uint
-		blockLimit           uint
-		chunkLimit           uint
-		err                  error
-		authReceipts         *stdmap.Receipts
-		pendingReceipts      *stdmap.PendingReceipts
-		conCache             *buffer.PendingBlocks
-		authCollections      *stdmap.Collections
-		pendingCollections   *stdmap.PendingCollections
-		collectionTrackers   *stdmap.CollectionTrackers
-		chunkDataPacks       *stdmap.ChunkDataPacks
-		chunkDataPackTracker *stdmap.ChunkDataPackTrackers
-		ingestedChunkIDs     *stdmap.Identifiers
-		ingestedResultIDs    *stdmap.Identifiers
-		verifierEng          *verifier.Engine
-		ingestEng            *ingest.Engine
-		collector            module.VerificationMetrics
+		alpha                 uint
+		receiptLimit          uint
+		collectionLimit       uint
+		blockLimit            uint
+		chunkLimit            uint
+		err                   error
+		authReceipts          *stdmap.Receipts
+		pendingReceipts       *stdmap.PendingReceipts
+		conCache              *buffer.PendingBlocks
+		authCollections       *stdmap.Collections
+		pendingCollections    *stdmap.PendingCollections
+		collectionTrackers    *stdmap.CollectionTrackers
+		chunkDataPacks        *stdmap.ChunkDataPacks
+		chunkDataPackTracker  *stdmap.ChunkDataPackTrackers
+		ingestedChunkIDs      *stdmap.Identifiers
+		ingestedCollectionIDs *stdmap.Identifiers
+		assignedChunkIDs      *stdmap.Identifiers
+		ingestedResultIDs     *stdmap.Identifiers
+		verifierEng           *verifier.Engine
+		ingestEng             *ingest.Engine
+		lightIngestEng        *ingest.LightEngine
+		collector             module.VerificationMetrics
 	)
 
 	cmd.FlowNode(flow.RoleVerification.String()).
@@ -114,8 +121,16 @@ func main() {
 			ingestedChunkIDs, err = stdmap.NewIdentifiers(chunkLimit)
 			return err
 		}).
+		Module("assigned chunk ids mempool", func(node *cmd.FlowNodeBuilder) error {
+			assignedChunkIDs, err = stdmap.NewIdentifiers(chunkLimit)
+			return err
+		}).
 		Module("ingested result ids mempool", func(node *cmd.FlowNodeBuilder) error {
 			ingestedResultIDs, err = stdmap.NewIdentifiers(receiptLimit)
+			return err
+		}).
+		Module("ingested collection ids mempool", func(node *cmd.FlowNodeBuilder) error {
+			ingestedCollectionIDs, err = stdmap.NewIdentifiers(receiptLimit)
 			return err
 		}).
 		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
@@ -138,6 +153,10 @@ func main() {
 			return verifierEng, err
 		}).
 		Component("ingest engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			if lightIngest {
+				// light ingest engine is supposed to be instantiated
+				return nil, nil
+			}
 
 			assigner, err := chunks.NewPublicAssignment(chunkAssignmentAlpha)
 			if err != nil {
@@ -156,6 +175,7 @@ func main() {
 				chunkDataPacks,
 				chunkDataPackTracker,
 				ingestedChunkIDs,
+				ingestedCollectionIDs,
 				ingestedResultIDs,
 				node.Storage.Headers,
 				node.Storage.Blocks,
@@ -163,6 +183,37 @@ func main() {
 				requestIntervalMs,
 				failureThreshold)
 			return ingestEng, err
+		}).
+		Component("light ingest engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			if !lightIngest {
+				// ingest engine is supposed to be instantiated instead
+				return nil, nil
+			}
+
+			assigner, err := chunks.NewPublicAssignment(chunkAssignmentAlpha)
+			if err != nil {
+				return nil, err
+			}
+			lightIngestEng, err = ingest.NewLightEngine(node.Logger,
+				node.Network,
+				node.State,
+				node.Me,
+				verifierEng,
+				authReceipts,
+				authCollections,
+				chunkDataPacks,
+				collectionTrackers,
+				chunkDataPackTracker,
+				ingestedChunkIDs,
+				ingestedCollectionIDs,
+				ingestedResultIDs,
+				assignedChunkIDs,
+				node.Storage.Headers,
+				node.Storage.Blocks,
+				assigner,
+				requestIntervalMs,
+				failureThreshold)
+			return lightIngestEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
