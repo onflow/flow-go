@@ -2,15 +2,16 @@ package unittest
 
 import (
 	"github.com/dapperlabs/flow-go/engine/execution"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func EmptyView() *delta.View {
+func LedgerView(ledger virtualmachine.Ledger) *delta.View {
 	return delta.NewView(func(key flow.RegisterID) (bytes []byte, e error) {
-		return nil, nil
+		return ledger.Get(key)
 	})
 }
 

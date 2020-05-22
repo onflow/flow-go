@@ -1,8 +1,10 @@
 package bootstrap
 
 import (
+	"encoding/hex"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -20,6 +22,8 @@ func TestGenerateGenesisStateCommitment(t *testing.T) {
 		newStateCommitment, err := BootstrapLedger(ls, unittest.ServiceAccountPublicKey)
 		require.NoError(t, err)
 
-		require.Equal(t, unittest.GenesisStateCommitment, newStateCommitment)
+		if !assert.Equal(t, unittest.GenesisStateCommitment, newStateCommitment) {
+			t.Logf("Actual state commitment: %s", hex.EncodeToString(newStateCommitment))
+		}
 	})
 }

@@ -3,7 +3,11 @@ package testutil
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
+
+	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
@@ -42,41 +46,85 @@ func SignTransaction(tx *flow.TransactionBody, account flow.Address, privateKey 
 }
 
 // Generate a number of private keys
-func GenerateAccountPrivateKeys(numberOfPrivateKeys int) ([]flow.AccountPrivateKey, error) {
+func GenerateAccountPrivateKeys(numKeys int) ([]flow.AccountPrivateKey, error) {
 	var privateKeys []flow.AccountPrivateKey
-	for i := 0; i < numberOfPrivateKeys; i++ {
+
+	for i := 0; i < numKeys; i++ {
 		seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
+
 		_, err := rand.Read(seed)
 		if err != nil {
 			return nil, err
 		}
+
 		privateKey, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
 		if err != nil {
 			return nil, err
 		}
+
 		flowPrivateKey := flow.AccountPrivateKey{
 			PrivateKey: privateKey,
 			SignAlgo:   crypto.ECDSAP256,
 			HashAlgo:   hash.SHA2_256,
 		}
+
 		privateKeys = append(privateKeys, flowPrivateKey)
 	}
+
 	return privateKeys, nil
 }
 
-// Create accounts on the ledger for the root account and for the private keys provided.
-func BootstrappedLedger(ledger virtualmachine.Ledger, privateKeys []flow.AccountPrivateKey) ([]flow.Address, error) {
-	ledgerAccess := virtualmachine.NewLedgerDAL(ledger)
+// CreateAccounts inserts accounts into the ledger using the provided private keys.
+func CreateAccounts(
+	vm virtualmachine.VirtualMachine,
+	ledger virtualmachine.Ledger,
+	privateKeys []flow.AccountPrivateKey,
+) ([]flow.Address, error) {
+	ctx := vm.NewBlockContext(nil)
 
 	var accounts []flow.Address
 
-	for _, account := range privateKeys {
-		accountPublicKey := account.PublicKey(virtualmachine.AccountKeyWeightThreshold)
-		account, err := ledgerAccess.CreateAccount([]flow.AccountPublicKey{accountPublicKey})
+	script := []byte(`
+	  transaction(publicKey: [Int]) {
+	    prepare(signer: AuthAccount) {
+	  	  let acct = AuthAccount(payer: signer)
+	  	  acct.addPublicKey(publicKey)
+	    }
+	  }
+	`)
+
+	for _, privateKey := range privateKeys {
+		accountKey := privateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold)
+		encAccountKey, _ := flow.EncodeRuntimeAccountPublicKey(accountKey)
+		cadAccountKey := bytesToCadenceArray(encAccountKey)
+		encCadAccountKey, _ := jsoncdc.Encode(cadAccountKey)
+
+		tx := flow.NewTransactionBody().
+			SetScript(script).
+			AddArgument(encCadAccountKey).
+			AddAuthorizer(flow.ServiceAddress())
+
+		result, err := ctx.ExecuteTransaction(ledger, tx, virtualmachine.SkipVerification)
 		if err != nil {
 			return nil, err
 		}
-		accounts = append(accounts, account)
+
+		if result.Error != nil {
+			return nil, fmt.Errorf("failed to create account: %s", result.Error.ErrorMessage())
+		}
+
+		var addr flow.Address
+
+		for _, event := range result.Events {
+			if event.EventType.ID() == string(flow.EventAccountCreated) {
+				addr = event.Fields[0].ToGoValue().([8]byte)
+				break
+			}
+
+			return nil, errors.New("no account creation event emitted")
+		}
+
+		accounts = append(accounts, addr)
 	}
 
 	return accounts, nil
@@ -103,4 +151,13 @@ func BootstrapLedgerWithServiceAccount(ledger virtualmachine.Ledger) error {
 	}
 
 	return nil
+}
+
+func bytesToCadenceArray(l []byte) cadence.Array {
+	values := make([]cadence.Value, len(l))
+	for i, b := range l {
+		values[i] = cadence.NewInt(int(b))
+	}
+
+	return cadence.NewArray(values)
 }
