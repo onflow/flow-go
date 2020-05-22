@@ -18,21 +18,25 @@ import (
 )
 
 func TestComputeBlockWithStorage(t *testing.T) {
+	rt := runtime.NewInterpreterRuntime()
 
-	view := unittest.EmptyView()
+	vm, err := virtualmachine.New(rt)
+	require.NoError(t, err)
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(2)
 	require.NoError(t, err)
 
-	accounts, err := testutil.BootstrappedLedger(view, privateKeys)
+	ledger := testutil.RootBootstrappedLedger()
+	accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys)
 	require.NoError(t, err)
 
 	tx1 := testutil.DeployCounterContractTransaction(accounts[0])
 	tx2 := testutil.CreateCounterTransaction(accounts[0], accounts[1])
 
-	err = testutil.SignTransactionByRoot(&tx1, 0)
+	err = testutil.SignTransaction(&tx1, accounts[0], privateKeys[0], 0)
 	require.NoError(t, err)
-	err = testutil.SignTransactionByRoot(&tx2, 1)
+
+	err = testutil.SignTransaction(&tx2, accounts[1], privateKeys[1], 0)
 	require.NoError(t, err)
 
 	transactions := []*flow.TransactionBody{&tx1, &tx2}
@@ -66,11 +70,6 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	rt := runtime.NewInterpreterRuntime()
-
-	vm, err := virtualmachine.New(rt)
-	require.NoError(t, err)
-
 	blockComputer := computer.NewBlockComputer(vm, nil)
 
 	engine := &Manager{
@@ -78,6 +77,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		me:            me,
 	}
 
+	view := unittest.LedgerView(ledger)
 	blockView := view.NewChild()
 
 	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
