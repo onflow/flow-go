@@ -418,38 +418,8 @@ func (l *LightEngine) handleCollection(originID flow.Identifier, expectedRole fl
 	return nil
 }
 
-// requestCollection submits a request for the given collection to collection nodes,
-// or drops and logs the request if the tracker associated with the request goes beyond the
-// failure threshold
-func (l *LightEngine) requestCollection(collID, blockID flow.Identifier) error {
-	// extracts list of collection nodes id
-	//
-	collNodes, err := l.state.Final().Identities(filter.HasRole(flow.RoleCollection))
-	if err != nil {
-		return fmt.Errorf("could not load collection node identities: %w", err)
-	}
-
-	req := &messages.CollectionRequest{
-		ID:    collID,
-		Nonce: rand.Uint64(),
-	}
-
-	// TODO we should only submit to cluster which owns the collection
-	err = l.collectionsConduit.Submit(req, collNodes.NodeIDs()...)
-	if err != nil {
-		return fmt.Errorf("could not submit request for collection (id=%s): %w", collID, err)
-	}
-
-	l.log.Debug().
-		Hex("collection_id", logging.ID(collID)).
-		Hex("block_id", logging.ID(blockID)).
-		Msg("collection request submitted")
-	return nil
-}
-
-// requestChunkDataPack submits a request for the given chunk ID to the execution nodes,
-// or drops and logs the request if the tracker associated with the request goes beyond the
-// failure threshold
+// requestChunkDataPack submits a request for the given chunk ID to the execution nodes to the network.
+// It also adds a tracker for the chunk data if it is successfully submitted.
 func (l *LightEngine) requestChunkDataPack(chunkID, blockID flow.Identifier) error {
 	// extracts list of execution nodes
 	//
@@ -469,9 +439,8 @@ func (l *LightEngine) requestChunkDataPack(chunkID, blockID flow.Identifier) err
 		return fmt.Errorf("could not submit request for collection (id=%s): %w", chunkID, err)
 	}
 
-	l.log.Debug().
-		Hex("chunk_id", logging.ID(chunkID)).
-		Msg("chunk data pack request submitted")
+	// adds a tracker for this collection
+	l.chunkDataPackTackers.Add(trackers.NewChunkDataPackTracker(chunkID, blockID))
 
 	return nil
 }
@@ -507,13 +476,6 @@ func (l *LightEngine) getChunkDataPackForReceipt(receipt *flow.ExecutionReceipt,
 			Msg("could not make a request of chunk data pack to the network")
 		return nil, false
 	}
-
-	// adds a tracker for this collection
-	l.chunkDataPackTackers.Add(trackers.NewChunkDataPackTracker(chunkID, receipt.ExecutionResult.BlockID))
-
-	l.log.Debug().
-		Hex("chunk_id", logging.ID(chunkID)).
-		Msg("tracker added for the chunk data pack")
 
 	return nil, false
 }
