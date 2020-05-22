@@ -49,9 +49,9 @@ type LightEngine struct {
 	headerStorage         storage.Headers               // used to check block existence to improve performance
 	blockStorage          storage.Blocks                // used to retrieve blocks
 	assigner              module.ChunkAssigner          // used to determine chunks this node needs to verify
-	checkChunkLock        sync.Mutex
-	requestInterval       uint // determines time in milliseconds for retrying tracked requests
-	failureThreshold      uint // determines number of retries for tracked requests before raising a challenge
+	resourceHandlerLock   sync.Mutex                    // used to avoid race condition in handling resources
+	requestInterval       uint                          // determines time in milliseconds for retrying tracked requests
+	failureThreshold      uint                          // determines number of retries for tracked requests before raising a challenge
 }
 
 // New creates and returns a new instance of the ingest engine.
@@ -187,6 +187,9 @@ func (l *LightEngine) process(originID flow.Identifier, event interface{}) error
 
 // handleExecutionReceipt receives an execution receipt, and adds it to receipts mempool
 func (l *LightEngine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
+	l.resourceHandlerLock.Lock()
+	defer l.resourceHandlerLock.Unlock()
+
 	receiptID := receipt.ID()
 	resultID := receipt.ExecutionResult.ID()
 
@@ -287,6 +290,9 @@ func (l *LightEngine) handleChunk(chunk *flow.Chunk, receipt *flow.ExecutionRece
 
 // handleChunkDataPack receives a chunk data pack, verifies its origin ID, and stores that in the mempool
 func (l *LightEngine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack) error {
+	l.resourceHandlerLock.Lock()
+	defer l.resourceHandlerLock.Unlock()
+
 	l.log.Info().
 		Hex("origin_id", logging.ID(originID)).
 		Hex("chunk_data_pack_id", logging.Entity(chunkDataPack)).
@@ -337,6 +343,9 @@ func (l *LightEngine) handleChunkDataPack(originID flow.Identifier, chunkDataPac
 // handleCollection handles receipt of a new collection, either via push or
 // after a request. It adds the collection to the mempool.
 func (l *LightEngine) handleCollection(originID flow.Identifier, coll *flow.Collection) error {
+	l.resourceHandlerLock.Lock()
+	defer l.resourceHandlerLock.Unlock()
+
 	collID := coll.ID()
 
 	l.log.Info().
@@ -475,7 +484,7 @@ func (l *LightEngine) getChunkDataPackForReceipt(receipt *flow.ExecutionReceipt,
 
 	l.log.Debug().
 		Hex("chunk_id", logging.ID(chunkID)).
-		Msg("collection data pack requested")
+		Msg("tracker added for the chunk data pack")
 
 	return nil, false
 }
@@ -533,7 +542,7 @@ func (l *LightEngine) getCollectionForChunk(block *flow.Block, receipt *flow.Exe
 	l.log.Debug().
 		Hex("collection_id", logging.ID(collID)).
 		Hex("chunk_id", logging.ID(chunk.ID())).
-		Msg("collection for chunk requested")
+		Msg("tracker added for collection")
 
 	return nil, false
 }
@@ -543,12 +552,6 @@ func (l *LightEngine) getCollectionForChunk(block *flow.Block, receipt *flow.Exe
 //
 // NOTE: this method is protected by mutex to prevent double-verifying ERs.
 func (l *LightEngine) checkPendingChunks() {
-	l.checkChunkLock.Lock()
-	defer l.checkChunkLock.Unlock()
-
-	l.log.Debug().
-		Msg("check pending chunks background service started")
-
 	for _, receipt := range l.receipts.All() {
 		readyToClean := true
 		block, err := l.blockStorage.ByID(receipt.ExecutionResult.BlockID)
@@ -562,11 +565,17 @@ func (l *LightEngine) checkPendingChunks() {
 
 			if !l.assignedChunkIDs.Has(chunkID) {
 				// discards ingesting un-assigned chunk
+				l.log.Debug().
+					Hex("chunk_id", logging.ID(chunkID)).
+					Msg("discards ingesting un-assigned chunk")
 				continue
 			}
 
 			if l.ingestedChunkIDs.Has(chunkID) {
 				// discards ingesting an already ingested chunk
+				l.log.Debug().
+					Hex("chunk_id", logging.ID(chunkID)).
+					Msg("discards ingesting an already ingested chunk")
 				continue
 			}
 
