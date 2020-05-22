@@ -1,6 +1,8 @@
 package mtrie
 
-import "github.com/dapperlabs/flow-go/crypto/hash"
+import (
+	"golang.org/x/crypto/blake2b"
+)
 
 var emptySlice []byte
 var defaultLeafHash = HashLeaf([]byte("default:"), emptySlice)
@@ -34,7 +36,7 @@ func GetDefaultHashForHeight(height int) []byte {
 
 // HashLeaf generates hash value for leaf nodes (SHA3-256).
 func HashLeaf(key []byte, value []byte) []byte {
-	hasher := hash.NewSHA3_256()
+	hasher, _ := blake2b.New256(nil)
 	_, err := hasher.Write(key)
 	if err != nil {
 		panic(err)
@@ -43,13 +45,12 @@ func HashLeaf(key []byte, value []byte) []byte {
 	if err != nil {
 		panic(err)
 	}
-
-	return hasher.SumHash()
+	return hasher.Sum(nil)
 }
 
 // HashInterNode generates hash value for intermediate nodes (SHA3-256).
 func HashInterNode(hash1 []byte, hash2 []byte) []byte {
-	hasher := hash.NewSHA3_256()
+	hasher, _ := blake2b.New256(nil)
 	_, err := hasher.Write(hash1)
 	if err != nil {
 		panic(err)
@@ -58,7 +59,7 @@ func HashInterNode(hash1 []byte, hash2 []byte) []byte {
 	if err != nil {
 		panic(err)
 	}
-	return hasher.SumHash()
+	return hasher.Sum(nil)
 }
 
 // ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.

@@ -11,8 +11,8 @@ import (
 
 	"github.com/gammazero/deque"
 	lru "github.com/hashicorp/golang-lru"
+	"golang.org/x/crypto/blake2b"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
@@ -289,7 +289,7 @@ type SMT struct {
 
 // HashLeaf generates hash value for leaf nodes (SHA3-256).
 func HashLeaf(key []byte, value []byte) []byte {
-	hasher := hash.NewSHA3_256()
+	hasher, _ := blake2b.New256(nil)
 	_, err := hasher.Write(key)
 	if err != nil {
 		panic(err)
@@ -298,13 +298,12 @@ func HashLeaf(key []byte, value []byte) []byte {
 	if err != nil {
 		panic(err)
 	}
-
-	return hasher.SumHash()
+	return hasher.Sum(nil)
 }
 
 // HashInterNode generates hash value for intermediate nodes (SHA3-256).
 func HashInterNode(hash1 []byte, hash2 []byte) []byte {
-	hasher := hash.NewSHA3_256()
+	hasher, _ := blake2b.New256(nil)
 	_, err := hasher.Write(hash1)
 	if err != nil {
 		panic(err)
@@ -313,7 +312,7 @@ func HashInterNode(hash1 []byte, hash2 []byte) []byte {
 	if err != nil {
 		panic(err)
 	}
-	return hasher.SumHash()
+	return hasher.Sum(nil)
 }
 
 // newNode creates a new node with the provided value and no children
