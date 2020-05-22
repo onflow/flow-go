@@ -53,17 +53,17 @@ const (
 func main() {
 
 	var (
-		alpha                 uint
-		receiptLimit          uint
-		collectionLimit       uint
-		blockLimit            uint
-		chunkLimit            uint
-		err                   error
-		authReceipts          *stdmap.Receipts
-		pendingReceipts       *stdmap.PendingReceipts
-		conCache              *buffer.PendingBlocks
-		authCollections       *stdmap.Collections
-		pendingCollections    *stdmap.PendingCollections
+		alpha           uint
+		receiptLimit    uint
+		collectionLimit uint
+		blockLimit      uint
+		chunkLimit      uint
+		err             error
+		authReceipts    *stdmap.Receipts
+		// pendingReceipts       *stdmap.PendingReceipts
+		conCache        *buffer.PendingBlocks
+		authCollections *stdmap.Collections
+		// pendingCollections    *stdmap.PendingCollections
 		collectionTrackers    *stdmap.CollectionTrackers
 		chunkDataPacks        *stdmap.ChunkDataPacks
 		chunkDataPackTracker  *stdmap.ChunkDataPackTrackers
@@ -89,18 +89,18 @@ func main() {
 			authReceipts, err = stdmap.NewReceipts(receiptLimit)
 			return err
 		}).
-		Module("execution pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-			pendingReceipts, err = stdmap.NewPendingReceipts(receiptLimit)
-			return err
-		}).
+		//Module("execution pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
+		//	pendingReceipts, err = stdmap.NewPendingReceipts(receiptLimit)
+		//	return err
+		//}).
 		Module("authenticated collections mempool", func(node *cmd.FlowNodeBuilder) error {
 			authCollections, err = stdmap.NewCollections(collectionLimit)
 			return err
 		}).
-		Module("pending collections mempool", func(node *cmd.FlowNodeBuilder) error {
-			pendingCollections, err = stdmap.NewPendingCollections(collectionLimit)
-			return err
-		}).
+		//Module("pending collections mempool", func(node *cmd.FlowNodeBuilder) error {
+		//	pendingCollections, err = stdmap.NewPendingCollections(collectionLimit)
+		//	return err
+		//}).
 		Module("collection trackers mempool", func(node *cmd.FlowNodeBuilder) error {
 			collectionTrackers, err = stdmap.NewCollectionTrackers(collectionLimit)
 			return err
@@ -148,6 +148,33 @@ func main() {
 			verifierEng, err = verifier.New(node.Logger, collector, node.Network, node.State, node.Me, chunkVerifier)
 			return verifierEng, err
 		}).
+		//Component("ingest engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		//	assigner, err := chunks.NewPublicAssignment(chunkAssignmentAlpha)
+		//	if err != nil {
+		//		return nil, err
+		//	}
+		//	ingestEng, err = ingest.New(node.Logger,
+		//		node.Network,
+		//		node.State,
+		//		node.Me,
+		//		verifierEng,
+		//		authReceipts,
+		//		pendingReceipts,
+		//		authCollections,
+		//		pendingCollections,
+		//		collectionTrackers,
+		//		chunkDataPacks,
+		//		chunkDataPackTracker,
+		//		ingestedChunkIDs,
+		//		ingestedCollectionIDs,
+		//		ingestedResultIDs,
+		//		node.Storage.Headers,
+		//		node.Storage.Blocks,
+		//		assigner,
+		//		requestIntervalMs,
+		//		failureThreshold)
+		//	return ingestEng, err
+		//}).
 		Component("light ingest engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			assigner, err := chunks.NewPublicAssignment(chunkAssignmentAlpha)
 			if err != nil {
