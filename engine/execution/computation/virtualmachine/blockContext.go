@@ -85,11 +85,7 @@ func (bc *blockContext) ExecuteTransaction(
 	ctx := bc.newTransactionContext(ledger, tx, options...)
 
 	if !ctx.skipVerification {
-		flowErr, err := ctx.deductTransactionFee(tx.Payer)
-		if err != nil {
-			return nil, err
-		}
-
+		flowErr := ctx.verifySignatures()
 		if flowErr != nil {
 			return &TransactionResult{
 				TransactionID: txID,
@@ -97,7 +93,10 @@ func (bc *blockContext) ExecuteTransaction(
 			}, nil
 		}
 
-		flowErr = ctx.verifySignatures()
+		flowErr, err := ctx.checkAndIncrementSequenceNumber()
+		if err != nil {
+			return nil, err
+		}
 		if flowErr != nil {
 			return &TransactionResult{
 				TransactionID: txID,
@@ -105,10 +104,11 @@ func (bc *blockContext) ExecuteTransaction(
 			}, nil
 		}
 
-		flowErr, err = ctx.checkAndIncrementSequenceNumber()
+		flowErr, err = ctx.deductTransactionFee(tx.Payer)
 		if err != nil {
 			return nil, err
 		}
+
 		if flowErr != nil {
 			return &TransactionResult{
 				TransactionID: txID,
