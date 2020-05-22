@@ -268,6 +268,12 @@ func (r *TransactionContext) CheckCode(address runtime.Address, code []byte) (er
 func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []byte, checkPermission bool) (err error) {
 	accountAddress := address.Bytes()
 
+	// currently, every transaction that sets account code (deploys/updates contracts)
+	// must be signed by the service account
+	if !r.isValidSigningAccount(runtime.Address(flow.ServiceAddress())) {
+		return fmt.Errorf("code deployment requires authorization from the service account")
+	}
+
 	err = r.ledger.CheckAccountExists(accountAddress)
 	if err != nil {
 		return err
