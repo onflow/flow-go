@@ -335,6 +335,29 @@ func (l *LightEngine) handleChunkDataPack(originID flow.Identifier, chunkDataPac
 		Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
 		Msg("chunk data pack stored in mempool, tracker removed")
 
+	return nil
+}
+
+// handleChunkDataResponse receives a chunk data response and handles its chunk data pack and collection separately
+func (l *LightEngine) handleChunkDataResponse(originID flow.Identifier, chunkDataResponse *messages.ChunkDataResponse) error {
+	err := l.handleChunkDataPack(originID, &chunkDataResponse.ChunkDataPack)
+	if err != nil {
+		l.log.Error().
+			Err(err).
+			Hex("origin_id", logging.ID(originID)).
+			Hex("chunk_id", logging.ID(chunkDataResponse.ChunkDataPack.ChunkID)).
+			Msg("could not handle chunk data pack")
+	}
+
+	err = l.handleCollection(originID, flow.RoleExecution, &chunkDataResponse.Collection)
+	if err != nil {
+		l.log.Error().
+			Err(err).
+			Hex("origin_id", logging.ID(originID)).
+			Hex("collection_id", logging.Entity(chunkDataResponse.Collection)).
+			Msg("could not handle collection in chunk data pack")
+	}
+
 	l.checkPendingChunks(l.receipts.All())
 
 	return nil
@@ -342,7 +365,7 @@ func (l *LightEngine) handleChunkDataPack(originID flow.Identifier, chunkDataPac
 
 // handleCollection handles receipt of a new collection, either via push or
 // after a request. It adds the collection to the mempool.
-func (l *LightEngine) handleCollection(originID flow.Identifier, coll *flow.Collection) error {
+func (l *LightEngine) handleCollection(originID flow.Identifier, expectedRole flow.Role, coll *flow.Collection) error {
 	l.resourceHandlerLock.Lock()
 	defer l.resourceHandlerLock.Unlock()
 
@@ -384,7 +407,13 @@ func (l *LightEngine) handleCollection(originID flow.Identifier, coll *flow.Coll
 		Hex("collection_id", logging.ID(collID)).
 		Msg("collection added to mempool, and tracker removed")
 
-	l.checkPendingChunks(l.receipts.All())
+	if expectedRole != flow.RoleExecution {
+		// collection coming from execution nodes means that it is part of
+		// chunk data response. Hence check pending chunk will be called
+		// by handleChunkDataResponse. Otherwise, the collection is handled
+		// separately and we should call checkPendingChunk
+		l.checkPendingChunks(l.receipts.All())
+	}
 
 	return nil
 }
