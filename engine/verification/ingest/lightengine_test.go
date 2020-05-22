@@ -322,7 +322,7 @@ func (suite *LightIngestTestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	var submitWG sync.WaitGroup
 	submitWG.Add(1)
 	suite.chunksConduit.
-		On("Submit", testifymock.AnythingOfType("*messages.ChunkDataPackRequest"),
+		On("Submit", testifymock.AnythingOfType("*messages.ChunkDataRequest"),
 			suite.execIdentity.NodeID).Run(func(args testifymock.Arguments) {
 		submitWG.Done()
 	}).Return(nil).Once()
