@@ -126,9 +126,10 @@ type FlowNodeBuilder struct {
 	MsgValidators     []validators.MessageValidator
 
 	// genesis information
-	GenesisCommit flow.StateCommitment
-	GenesisBlock  *flow.Block
-	GenesisQC     *model.QuorumCertificate
+	GenesisCommit           flow.StateCommitment
+	GenesisBlock            *flow.Block
+	GenesisQC               *model.QuorumCertificate
+	GenesisAccountPublicKey *flow.AccountPublicKey
 }
 
 func (fnb *FlowNodeBuilder) baseFlags() {
@@ -341,6 +342,12 @@ func (fnb *FlowNodeBuilder) initState() {
 		// Bootstrap!
 
 		fnb.Logger.Info().Msg("bootstrapping empty protocol state")
+
+		// Load the genesis account public key
+		fnb.GenesisAccountPublicKey, err = loadGenesisAccountPublicKey(fnb.BaseConfig.BootstrapDir)
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis account public key")
+		}
 
 		// Load the genesis state commitment
 		fnb.GenesisCommit, err = loadGenesisCommit(fnb.BaseConfig.BootstrapDir)
@@ -622,6 +629,16 @@ func loadDKGPublicData(dir string) (*dkg.PublicData, error) {
 	dkgPubData := &bootstrap.DKGDataPub{}
 	err = json.Unmarshal(data, dkgPubData)
 	return dkgPubData.ForHotStuff(), err
+}
+
+func loadGenesisAccountPublicKey(dir string) (*flow.AccountPublicKey, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisCommit))
+	if err != nil {
+		return nil, err
+	}
+	publicKey := new(flow.AccountPublicKey)
+	err = json.Unmarshal(data, publicKey)
+	return publicKey, err
 }
 
 func loadGenesisCommit(dir string) (flow.StateCommitment, error) {
