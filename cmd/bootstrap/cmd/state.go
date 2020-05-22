@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -19,8 +20,11 @@ func genGenesisExecutionState() flow.StateCommitment {
 	enc := serviceAccountPriv.PrivateKey.Encode()
 	writeJSON(bootstrap.PathServiceAccountPriv, enc)
 
+	accountKey := serviceAccountPriv.PublicKey(virtualmachine.AccountKeyWeightThreshold)
+	writeJSON(bootstrap.PathServiceAccountPublicKey, accountKey)
+
 	dbpath := filepath.Join(flagOutdir, bootstrap.DirnameExecutionState)
-	stateCommitment, err := run.GenerateExecutionState(dbpath, serviceAccountPriv)
+	stateCommitment, err := run.GenerateExecutionState(dbpath, accountKey)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error generating execution state")
 	}
