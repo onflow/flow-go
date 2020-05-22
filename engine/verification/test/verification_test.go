@@ -346,10 +346,10 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	assert.Nil(t, err)
 	exeEngine.On("Process", verIdentity.NodeID, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
-			if _, ok := args[1].(*messages.ChunkDataPackRequest); ok {
+			if _, ok := args[1].(*messages.ChunkDataRequest); ok {
 				// publishes the chunk data pack response to the network
-				res := &messages.ChunkDataPackResponse{
-					Data: *completeER.ChunkDataPacks[0],
+				res := &messages.ChunkDataResponse{
+					ChunkDataPack: *completeER.ChunkDataPacks[0],
 				}
 				err := exeChunkDataConduit.Submit(res, verIdentity.NodeID)
 				assert.Nil(t, err)
@@ -542,7 +542,7 @@ func setupMockExeNode(t *testing.T,
 			defer mu.Unlock()
 
 			if originID, ok := args[0].(flow.Identifier); ok {
-				if req, ok := args[1].(*messages.ChunkDataPackRequest); ok {
+				if req, ok := args[1].(*messages.ChunkDataRequest); ok {
 					require.True(t, ok)
 					for i := 0; i < chunkNum; i++ {
 						chunk, ok := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i))
@@ -554,9 +554,9 @@ func setupMockExeNode(t *testing.T,
 							}
 
 							// publishes the chunk data pack response to the network
-							res := &messages.ChunkDataPackResponse{
-								Data:  *completeER.ChunkDataPacks[i],
-								Nonce: rand.Uint64(),
+							res := &messages.ChunkDataResponse{
+								ChunkDataPack: *completeER.ChunkDataPacks[i],
+								Nonce:         rand.Uint64(),
 							}
 							err := exeChunkDataConduit.Submit(res, originID)
 							assert.Nil(t, err)

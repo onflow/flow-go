@@ -109,6 +109,7 @@ func main() {
 				ledgerStorage,
 				stateCommitments,
 				node.Storage.Blocks,
+				node.Storage.Collections,
 				chunkDataPacks,
 				executionResults,
 				node.DB,
