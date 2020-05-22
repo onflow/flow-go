@@ -281,7 +281,7 @@ func setupMockExeNode(t *testing.T, node mock.GenericNode, verID flow.Identifier
 
 	eng.On("Process", verID, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
-			if req, ok := args[1].(*messages.ChunkDataPackRequest); ok {
+			if req, ok := args[1].(*messages.ChunkDataRequest); ok {
 				if _, ok := retriedChunks[req.ChunkID]; !ok {
 					// this is the first request for this chunk
 					// the request is dropped to evaluate retry functionality
@@ -295,7 +295,7 @@ func setupMockExeNode(t *testing.T, node mock.GenericNode, verID flow.Identifier
 				for _, er := range ers {
 					for _, chunk := range er.Receipt.ExecutionResult.Chunks {
 						if chunk.ID() == req.ChunkID {
-							res := &messages.ChunkDataPackResponse{
+							res := &messages.ChunkDataResponse{
 								ChunkDataPack: *er.ChunkDataPacks[chunk.Index],
 								Nonce:         rand.Uint64(),
 							}

@@ -334,7 +334,7 @@ func (suite *IngestTestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	var submitWG sync.WaitGroup
 	submitWG.Add(1)
 	suite.chunksConduit.
-		On("Submit", testifymock.AnythingOfType("*messages.ChunkDataPackRequest"), suite.execIdentity.NodeID).Run(func(args testifymock.Arguments) {
+		On("Submit", testifymock.AnythingOfType("*messages.ChunkDataRequest"), suite.execIdentity.NodeID).Run(func(args testifymock.Arguments) {
 		submitWG.Done()
 	}).Return(nil).Once()
 
@@ -492,7 +492,7 @@ func (suite *IngestTestSuite) TestHandleReceipt_RetryMissingChunkDataPack() {
 	submitWG := sync.WaitGroup{}
 	submitWG.Add(int(suite.failureThreshold) - 1)
 	suite.chunksConduit.
-		On("Submit", testifymock.AnythingOfType("*messages.ChunkDataPackRequest"), exeIdentities[0].NodeID).
+		On("Submit", testifymock.AnythingOfType("*messages.ChunkDataRequest"), exeIdentities[0].NodeID).
 		Run(func(args testifymock.Arguments) {
 			submitWG.Done()
 		}).
@@ -537,7 +537,7 @@ func (suite *IngestTestSuite) TestIngestedChunk() {
 
 	eng := suite.TestNewEngine()
 
-	chunkDataPackResponse := &messages.ChunkDataPackResponse{
+	chunkDataPackResponse := &messages.ChunkDataResponse{
 		ChunkDataPack: *suite.chunkDataPack,
 		Nonce:         rand.Uint64(),
 	}
@@ -976,7 +976,7 @@ func (suite *IngestTestSuite) TestVerifyReady() {
 }
 
 // TestChunkDataPackTracker_UntrackedChunkDataPack tests that ingest engine process method returns an error
-// if it receives a ChunkDataPackResponse that does not have any tracker in the engine's mempool
+// if it receives a ChunkDataResponse that does not have any tracker in the engine's mempool
 func (suite *IngestTestSuite) TestChunkDataPackTracker_UntrackedChunkDataPack() {
 	// locks to run the tests sequentially
 	suite.Lock()
@@ -985,7 +985,7 @@ func (suite *IngestTestSuite) TestChunkDataPackTracker_UntrackedChunkDataPack() 
 	eng := suite.TestNewEngine()
 
 	// creates a chunk fixture, its data pack, and the data pack response
-	chunkDataPackResponse := &messages.ChunkDataPackResponse{
+	chunkDataPackResponse := &messages.ChunkDataResponse{
 		ChunkDataPack: *suite.chunkDataPack,
 		Nonce:         rand.Uint64(),
 	}
@@ -1014,7 +1014,7 @@ func (suite *IngestTestSuite) TestChunkDataPackTracker_HappyPath() {
 
 	eng := suite.TestNewEngine()
 
-	chunkDataPackResponse := &messages.ChunkDataPackResponse{
+	chunkDataPackResponse := &messages.ChunkDataResponse{
 		ChunkDataPack: *suite.chunkDataPack,
 		Nonce:         rand.Uint64(),
 	}
