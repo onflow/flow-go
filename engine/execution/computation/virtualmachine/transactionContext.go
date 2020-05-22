@@ -267,10 +267,6 @@ func (r *TransactionContext) CheckCode(address runtime.Address, code []byte) (er
 func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []byte, checkPermission bool) (err error) {
 	accountID := address[:]
 
-	if checkPermission && !r.isValidSigningAccount(address) {
-		return fmt.Errorf("not permitted to update account with ID %s", address)
-	}
-
 	err = r.ledger.CheckAccountExists(accountID)
 	if err != nil {
 		return err
