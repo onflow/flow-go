@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -24,6 +25,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
+	"github.com/dapperlabs/flow-go/utils/logging"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -348,10 +350,10 @@ func setupMockExeNode(t *testing.T, node mock.GenericNode, verID flow.Identifier
 				if _, ok := retriedChunks[req.ChunkID]; !ok {
 					// this is the first request for this chunk
 					// the request is dropped to evaluate retry functionality
-					//retriedChunks[req.ChunkID] = struct{}{}
-					//log.Debug().
-					//	Hex("collection_id", logging.ID(req.ChunkID)).
-					//	Msg("mock execution node drops first collection request for this collection")
+					retriedChunks[req.ChunkID] = struct{}{}
+					log.Debug().
+						Hex("collection_id", logging.ID(req.ChunkID)).
+						Msg("mock execution node drops first collection request for this collection")
 					// TODO as it is switched to light node, retrial evaluation is disabled temporarily
 					// return
 				}
