@@ -39,6 +39,7 @@ const (
 const (
 	subsystemStateStorage = "state_storage"
 	subsystemMTrie        = "mtrie"
+	subsystemIngestion    = "ingestion"
 	subsystemRuntime      = "runtime"
 )
 

@@ -188,4 +188,8 @@ type ExecutionMetrics interface {
 
 	// ExecutionTotalExecutedTransactions adds num to the total number of executed transactions
 	ExecutionTotalExecutedTransactions(numExecuted int)
+
+	ExecutionCollectionRequestSent()
+
+	ExecutionCollectionRequestRetried()
 }

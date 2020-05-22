@@ -37,6 +37,8 @@ type ExecutionCollector struct {
 	readValuesSize                   prometheus.Gauge
 	readDuration                     prometheus.Histogram
 	readDurationPerValue             prometheus.Histogram
+	collectionRequestSent            prometheus.Counter
+	collectionRequestRetried         prometheus.Counter
 }
 
 func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer) *ExecutionCollector {
@@ -122,6 +124,20 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
 	})
 
+	collectionRequestsSent := prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemIngestion,
+		Name:      "collection_requests_sent",
+		Help:      "number of collection requests sent",
+	})
+
+	collectionRequestsRetries := prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemIngestion,
+		Name:      "collection_requests_retries",
+		Help:      "number of collection requests retried",
+	})
+
 	registerer.MustRegister(forestApproxMemorySize)
 	registerer.MustRegister(forestNumberOfTrees)
 	registerer.MustRegister(updatedCount)
@@ -134,6 +150,8 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 	registerer.MustRegister(readValuesSize)
 	registerer.MustRegister(readDuration)
 	registerer.MustRegister(readDurationPerValue)
+	registerer.MustRegister(collectionRequestsSent)
+	registerer.MustRegister(collectionRequestsRetries)
 
 	ec := &ExecutionCollector{
 		tracer: tracer,
@@ -299,4 +317,12 @@ func (ec *ExecutionCollector) ReadDuration(duration time.Duration) {
 // ReadDurationPerItem records read time for single value (total duration / number of read values)
 func (ec *ExecutionCollector) ReadDurationPerItem(duration time.Duration) {
 	ec.readDurationPerValue.Observe(duration.Seconds())
+}
+
+func (ec *ExecutionCollector) ExecutionCollectionRequestSent() {
+	ec.collectionRequestSent.Inc()
+}
+
+func (ec *ExecutionCollector) ExecutionCollectionRequestRetried() {
+	ec.collectionRequestRetried.Inc()
 }
