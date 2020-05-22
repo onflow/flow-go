@@ -83,10 +83,7 @@ func (r *TransactionContext) ValueExists(owner, controller, key []byte) (exists 
 // CreateAccount creates a new account and inserts it into the world state.
 //
 // This function returns an error if the input is invalid.
-//
-// After creating the account, this function calls the onAccountCreated callback registered
-// with this context.
-func (r *TransactionContext) CreateAccount(publicKeysBytes [][]byte, payer runtime.Address) (runtime.Address, error) {
+func (r *TransactionContext) CreateAccount(payer runtime.Address) (runtime.Address, error) {
 
 	flowErr, fatalErr := r.deductAccountCreationFee(flow.Address(payer))
 	if fatalErr != nil {
@@ -111,15 +108,7 @@ func (r *TransactionContext) CreateAccount(publicKeysBytes [][]byte, payer runti
 
 	var err error
 
-	publicKeys := make([]flow.AccountPublicKey, len(publicKeysBytes))
-	for i, keyBytes := range publicKeysBytes {
-		publicKeys[i], err = flow.DecodeRuntimeAccountPublicKey(keyBytes, 0)
-		if err != nil {
-			return runtime.Address{}, fmt.Errorf("cannot decode public key %d: %w", i, err)
-		}
-	}
-
-	addr, err := r.ledger.CreateAccount(publicKeys)
+	addr, err := r.ledger.CreateAccount(nil)
 	if err != nil {
 		return runtime.Address{}, err
 	}
@@ -560,22 +549,23 @@ var InitDefaultTokenScript = []byte(fmt.Sprintf(`
 	}
 `, flow.RootAddress))
 
-var DefaultTokenBalanceScript = []byte(fmt.Sprintf(`
-	import ServiceAccount from 0x%s
-
-	transaction {
-		prepare(acct: AuthAccount) {
-			ServiceAccount.defaultTokenBalance(acct)
+func DefaultTokenBalanceScript(addr flow.Address) []byte {
+	return []byte(fmt.Sprintf(`
+		import ServiceAccount from 0x%s
+	
+		pub fun main(): UFix64 {
+			let acct = getAccount(0x%s)
+			return ServiceAccount.defaultTokenBalance(acct)
 		}
-	}
-`, flow.RootAddress))
+	`, flow.RootAddress, addr))
+}
 
-var DeductAccountCreationFeeScript = []byte(`
-	import ServiceAccount from 0x0
+var DeductAccountCreationFeeScript = []byte(fmt.Sprintf(`
+	import ServiceAccount from 0x%s
 
 	transaction {
 		prepare(acct: AuthAccount) {
 			ServiceAccount.deductAccountCreationFee(acct)
 		}
 	}
-`)
+`, flow.RootAddress))

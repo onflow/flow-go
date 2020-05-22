@@ -168,12 +168,11 @@ func (bc *blockContext) GetAccount(ledger Ledger, addr flow.Address) (*flow.Acco
 		return nil, nil
 	}
 
-	result, err := bc.ExecuteScript(ledger, DefaultTokenBalanceScript)
+	result, err := bc.ExecuteScript(ledger, DefaultTokenBalanceScript(addr))
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: handle error case
 	if result.Error == nil {
 		acct.Balance = result.Value.ToGoValue().(uint64)
 	}

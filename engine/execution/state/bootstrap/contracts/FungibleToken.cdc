@@ -192,9 +192,9 @@ pub contract interface FungibleToken {
     // Any user can call this function to create a new Vault object
     // that has balance == 0
     //
-    pub fun createEmptyVault(): @Vault {
-        post {
-            result.balance == UFix64(0): "The newly created Vault must have zero balance"
-        }
-    }
+    pub fun createEmptyVault(): @Vault
+        // TODO: re-enable this post condition
+        // post {
+        //     result.balance == UFix64(0): "The newly created Vault must have zero balance"
+        // }
 }

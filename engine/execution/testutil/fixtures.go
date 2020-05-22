@@ -8,6 +8,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
+	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -82,12 +83,13 @@ func BootstrappedLedger(ledger virtualmachine.Ledger, privateKeys []flow.Account
 }
 
 func SignTransactionByRoot(tx *flow.TransactionBody, seqNum uint64) error {
-	return SignTransaction(tx, flow.ServiceAddress(), flow.ServiceAccountPrivateKey, seqNum)
+	return SignTransaction(tx, flow.ServiceAddress(), unittest.ServiceAccountPrivateKey, seqNum)
 }
 
-func RootBootstrappedLedger() (virtualmachine.Ledger, error) {
+func RootBootstrappedLedger() virtualmachine.Ledger {
 	ledger := make(virtualmachine.MapLedger)
-	return ledger, BootstrapLedgerWithServiceAccount(ledger)
+	bootstrap.BootstrapView(ledger, unittest.ServiceAccountPrivateKey)
+	return ledger
 }
 
 func BootstrapLedgerWithServiceAccount(ledger virtualmachine.Ledger) error {
