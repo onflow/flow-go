@@ -2,6 +2,7 @@ package libp2p
 
 import (
 	"context"
+	"strings"
 	"sync"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -65,7 +66,11 @@ func (r *ReadSubscription) ReceiveLoop() {
 
 		rawMsg, err := r.sub.Next(c)
 		if err != nil {
-			r.log.Err(err).Msg("failed to read subscription message")
+			// subscription may have just been cancelled if node is being stopped, don't log error in that case
+			// (https://github.com/ipsn/go-ipfs/blob/master/gxlibs/github.com/libp2p/go-libp2p-pubsub/pubsub.go#L435)
+			if !strings.Contains(err.Error(), "subscription cancelled") {
+				r.log.Err(err).Msg("failed to read subscription message")
+			}
 			return
 		}
 

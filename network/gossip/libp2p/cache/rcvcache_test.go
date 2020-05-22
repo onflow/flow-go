@@ -34,16 +34,16 @@ func (r *RcvCacheTestSuite) SetupTest() {
 func (r *RcvCacheTestSuite) TestSingleElementAdd() {
 	eventID := []byte("event-1")
 	channelID := uint32(0)
-	r.c.Add(eventID, channelID)
+	assert.False(r.Suite.T(), r.c.Add(eventID, channelID))
 
-	assert.True(r.Suite.T(), r.c.Seen(eventID, channelID))
+	assert.True(r.Suite.T(), r.c.Add(eventID, channelID))
 }
 
 // TestNoneExistence evaluates the correctness of cache operation against non-existing element
 func (r *RcvCacheTestSuite) TestNoneExistence() {
 	eventID := []byte("non-existing event")
 	channelID := uint32(1)
-	assert.False(r.Suite.T(), r.c.Seen(eventID, channelID))
+	assert.False(r.Suite.T(), r.c.Add(eventID, channelID))
 }
 
 // TestMultipleElementAdd adds several eventIDs to th cache and evaluates their xistence
@@ -57,11 +57,11 @@ func (r *RcvCacheTestSuite) TestMultipleElementAdd() {
 
 	// adds all events to the cache
 	for i := range events {
-		r.c.Add(events[i], uint32(i))
+		assert.False(r.Suite.T(), r.c.Add(events[i], uint32(i)))
 	}
 
 	// checks for the existence of the added events
 	for i := range events {
-		assert.True(r.Suite.T(), r.c.Seen(events[i], uint32(i)))
+		assert.True(r.Suite.T(), r.c.Add(events[i], uint32(i)))
 	}
 }

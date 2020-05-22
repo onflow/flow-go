@@ -158,8 +158,8 @@ func (n *Network) SetIDs(ids flow.IdentityList) {
 }
 
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
-	// checks the cache for deduplication
-	if n.rcache.Seen(message.EventID, message.ChannelID) {
+	// checks the cache for deduplication and adds the message if not already present
+	if n.rcache.Add(message.EventID, message.ChannelID) {
 		// drops duplicate message
 		channelName := engine.ChannelName(uint8(message.ChannelID))
 		n.logger.Debug().
@@ -170,7 +170,6 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 		n.metrics.NetworkDuplicateMessagesDropped(channelName)
 		return nil
 	}
-	n.rcache.Add(message.EventID, message.ChannelID)
 
 	// Extract channel id and find the registered engine
 	channelID := uint8(message.ChannelID)
