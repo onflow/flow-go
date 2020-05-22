@@ -372,9 +372,9 @@ func (suite *LightIngestTestSuite) TestIngestedChunk() {
 
 	eng := suite.TestNewLightEngine()
 
-	chunkDataPackResponse := &messages.ChunkDataPackResponse{
-		Data:  *suite.chunkDataPack,
-		Nonce: rand.Uint64(),
+	chunkDataPackResponse := &messages.ChunkDataResponse{
+		ChunkDataPack: *suite.chunkDataPack,
+		Nonce:         rand.Uint64(),
 	}
 	// mocks this chunk id
 	suite.ingestedChunkIDs.On("Has", suite.chunkDataPack.ChunkID).Return(true)
@@ -601,9 +601,9 @@ func (suite *LightIngestTestSuite) TestChunkDataPackTracker_HappyPath() {
 
 	eng := suite.TestNewLightEngine()
 
-	chunkDataPackResponse := &messages.ChunkDataPackResponse{
-		Data:  *suite.chunkDataPack,
-		Nonce: rand.Uint64(),
+	chunkDataPackResponse := &messages.ChunkDataResponse{
+		ChunkDataPack: *suite.chunkDataPack,
+		Nonce:         rand.Uint64(),
 	}
 
 	// engine should not already have the chunk data pack
