@@ -50,7 +50,7 @@ func main() {
 		hotstuffTimeout                        time.Duration
 		hotstuffMinTimeout                     time.Duration
 		hotstuffTimeoutInfreaseFactor          float64
-		hotstuffTimeoutDecrease                time.Duration
+		hotstuffTimeoutDecreaseFactor          float64
 		hotstuffTimeoutVoteAggregationFraction float64
 		blockRateDelay                         time.Duration
 
@@ -79,7 +79,7 @@ func main() {
 			flags.DurationVar(&maxInterval, "max-interval", 90*time.Second, "the maximum amount of time between two blocks")
 			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second, "the initial timeout for the hotstuff pacemaker")
 			flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 1200*time.Millisecond, "the lower timeout bound for the hotstuff pacemaker")
-			flags.DurationVar(&hotstuffTimeoutDecrease, "hotstuff-timeout-decrease", 1*time.Second, "decrease of timeout duration in case of progress")
+			flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease", 0.85, "decrease of timeout duration in case of progress")
 			flags.Float64Var(&hotstuffTimeoutInfreaseFactor, "hotstuff-timeout-increase-factor", 2.0, "multiplicative increase of timeout duration in case of time out event")
 			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", 0.5, "additional fraction of replica timeout that the primary will wait for votes")
 			// From the experiment,
@@ -300,7 +300,7 @@ func main() {
 				pending,
 				consensus.WithInitialTimeout(hotstuffTimeout),
 				consensus.WithMinTimeout(hotstuffMinTimeout),
-				consensus.WithTimeoutDecreaseStep(hotstuffTimeoutDecrease),
+				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
 				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutInfreaseFactor),
 				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
 				consensus.WithBlockRateDelay(blockRateDelay),

@@ -11,7 +11,7 @@ import (
 // timeout.Controller
 // - on timeout: increase timeout by multiplicative factor `timeoutIncrease` (user-specified)
 //   this results in exponential growing timeout duration on multiple subsequent timeouts
-// - on progress: decrease timeout by subtrahend `timeoutDecrease`
+// - on progress: MULTIPLICATIVE timeout decrease
 type Config struct {
 	// ReplicaTimeout is the duration of a view before we time out [Milliseconds]
 	// ReplicaTimeout is the only variable quantity
@@ -23,7 +23,7 @@ type Config struct {
 	VoteAggregationTimeoutFraction float64
 	// TimeoutDecrease: multiplicative factor for increasing timeout
 	TimeoutIncrease float64
-	// TimeoutDecrease linear subtrahend for timeout decrease [Milliseconds]
+	// TimeoutDecrease: MULTIPLICATIVE timeout decrease
 	TimeoutDecrease float64
 	// BlockRateDelayMS is a delay to broadcast the proposal in order to control block production rate [Milliseconds]
 	BlockRateDelayMS float64
@@ -40,8 +40,8 @@ var DefaultConfig = Config{
 	// The estimated time for the leader to receive majority votes after sending out its proposal is about
 	// half of ReplicaTimeout
 	VoteAggregationTimeoutFraction: 0.5,
-	TimeoutIncrease:                1.5,
-	TimeoutDecrease:                800,
+	TimeoutIncrease:                2,
+	TimeoutDecrease:                0.85,
 	// no delay to broadcast a proposal
 	BlockRateDelayMS: 0,
 }
@@ -58,7 +58,7 @@ func NewConfig(
 	minReplicaTimeout time.Duration,
 	voteAggregationTimeoutFraction float64,
 	timeoutIncrease float64,
-	timeoutDecrease time.Duration,
+	timeoutDecrease float64,
 	blockRateDelay time.Duration,
 ) (Config, error) {
 	if startReplicaTimeout < minReplicaTimeout {
@@ -87,7 +87,7 @@ func NewConfig(
 		MinReplicaTimeout:              float64(minReplicaTimeout.Milliseconds() + blockRateDelay.Milliseconds()),
 		VoteAggregationTimeoutFraction: fraction,
 		TimeoutIncrease:                timeoutIncrease,
-		TimeoutDecrease:                float64(timeoutDecrease.Milliseconds()),
+		TimeoutDecrease:                timeoutDecrease,
 		BlockRateDelayMS:               float64(blockRateDelay.Milliseconds()),
 	}
 	return tc, nil

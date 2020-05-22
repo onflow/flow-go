@@ -9,7 +9,7 @@ type ParticipantConfig struct {
 	TimeoutMinimum             time.Duration // the minimum timeout for the pacemaker
 	TimeoutAggregationFraction float64       // the percentage part of the timeout period reserved for vote aggregation
 	TimeoutIncreaseFactor      float64       // the factor at which the timeout grows when timeouts occur
-	TimeoutDecreaseStep        time.Duration // the step with which the timeout decreases when no timeouts occur
+	TimeoutDecreaseFactor      float64       // the factor at which the timeout grows when timeouts occur
 	BlockRateDelay             time.Duration // a delay to broadcast block proposal in order to control the block production rate
 }
 
@@ -33,9 +33,9 @@ func WithTimeoutIncreaseFactor(factor float64) Option {
 	}
 }
 
-func WithTimeoutDecreaseStep(decrease time.Duration) Option {
+func WithTimeoutDecreaseFactor(factor float64) Option {
 	return func(cfg *ParticipantConfig) {
-		cfg.TimeoutDecreaseStep = decrease
+		cfg.TimeoutDecreaseFactor = factor
 	}
 }
 

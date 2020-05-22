@@ -8,7 +8,7 @@ import (
 )
 
 func TestBlockRateDelay(t *testing.T) {
-	c, err := NewConfig(1200*time.Millisecond, 1200*time.Millisecond, 0.5, 1.5, 800*time.Millisecond, time.Second)
+	c, err := NewConfig(1200*time.Millisecond, 1200*time.Millisecond, 0.5, 1.5, 0.85, time.Second)
 	require.NoError(t, err)
 
 	require.Equal(t, float64(1000), c.BlockRateDelayMS)

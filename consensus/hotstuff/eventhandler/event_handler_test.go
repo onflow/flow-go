@@ -26,6 +26,7 @@ const (
 	minRepTimeout          float64 = 100.0 // Milliseconds
 	voteTimeoutFraction    float64 = 0.5   // multiplicative factor
 	multiplicativeIncrease float64 = 1.5   // multiplicative factor
+	multiplicativeDecrease float64 = 0.85  // multiplicative factor
 	additiveDecrease       float64 = 50    // Milliseconds
 )
 
@@ -75,7 +76,7 @@ func initPaceMaker(t *testing.T, view uint64) hotstuff.PaceMaker {
 		time.Duration(minRepTimeout*1e6),
 		voteTimeoutFraction,
 		multiplicativeIncrease,
-		time.Duration(additiveDecrease*1e6),
+		multiplicativeDecrease,
 		0)
 	if err != nil {
 		t.Fail()

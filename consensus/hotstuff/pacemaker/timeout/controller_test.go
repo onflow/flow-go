@@ -9,11 +9,12 @@ import (
 )
 
 const (
-	startRepTimeout        float64 = 120 // Milliseconds
-	minRepTimeout          float64 = 100 // Milliseconds
-	voteTimeoutFraction    float64 = 0.5 // multiplicative factor
-	multiplicativeIncrease float64 = 1.5 // multiplicative factor
-	additiveDecrease       float64 = 50  // Milliseconds
+	startRepTimeout        float64 = 120  // Milliseconds
+	minRepTimeout          float64 = 100  // Milliseconds
+	voteTimeoutFraction    float64 = 0.5  // multiplicative factor
+	multiplicativeIncrease float64 = 1.5  // multiplicative factor
+	multiplicativeDecrease float64 = 0.85 // multiplicative factor
+	additiveDecrease       float64 = 50   // Milliseconds
 )
 
 func initTimeoutController(t *testing.T) *Controller {
@@ -22,7 +23,8 @@ func initTimeoutController(t *testing.T) *Controller {
 		time.Duration(minRepTimeout*1e6),
 		voteTimeoutFraction,
 		multiplicativeIncrease,
-		time.Duration(additiveDecrease*1e6), 0)
+		multiplicativeDecrease,
+		0)
 	if err != nil {
 		t.Fail()
 	}
@@ -105,7 +107,7 @@ func Test_MaxCutoff(t *testing.T) {
 		time.Duration(minRepTimeout*float64(time.Millisecond)),
 		voteTimeoutFraction,
 		10,
-		time.Duration(additiveDecrease*float64(time.Millisecond)),
+		multiplicativeDecrease,
 		0)
 	if err != nil {
 		t.Fail()
@@ -126,7 +128,7 @@ func Test_BlockRateDelay(t *testing.T) {
 		time.Duration(minRepTimeout*float64(time.Millisecond)),
 		voteTimeoutFraction,
 		10,
-		time.Duration(additiveDecrease*float64(time.Millisecond)),
+		multiplicativeDecrease,
 		time.Second)
 	if err != nil {
 		t.Fail()

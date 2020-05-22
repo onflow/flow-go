@@ -37,7 +37,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 		TimeoutMinimum:             time.Duration(defTimeout.MinReplicaTimeout) * time.Millisecond,
 		TimeoutAggregationFraction: defTimeout.VoteAggregationTimeoutFraction,
 		TimeoutIncreaseFactor:      defTimeout.TimeoutIncrease,
-		TimeoutDecreaseStep:        time.Duration(defTimeout.TimeoutDecrease) * time.Millisecond,
+		TimeoutDecreaseFactor:      defTimeout.TimeoutDecrease,
 	}
 
 	// apply the configuration options
@@ -83,7 +83,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 		cfg.TimeoutMinimum,
 		cfg.TimeoutAggregationFraction,
 		cfg.TimeoutIncreaseFactor,
-		cfg.TimeoutDecreaseStep,
+		cfg.TimeoutDecreaseFactor,
 		cfg.BlockRateDelay,
 	)
 	if err != nil {
