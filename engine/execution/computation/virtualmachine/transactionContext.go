@@ -155,6 +155,24 @@ func (r *TransactionContext) initDefaultToken(addr flow.Address) (FlowError, err
 	return nil, nil
 }
 
+func (r *TransactionContext) deductTransactionFee(addr flow.Address) (FlowError, error) {
+	tx := flow.NewTransactionBody().
+		SetScript(DeductTransactionFeeScript).
+		AddAuthorizer(addr)
+
+	// TODO: propagate computation limit
+	result, err := r.bc.ExecuteTransaction(r.ledger, tx, SkipVerification)
+	if err != nil {
+		return nil, err
+	}
+
+	if result.Error != nil {
+		return result.Error, nil
+	}
+
+	return nil, nil
+}
+
 func (r *TransactionContext) deductAccountCreationFee(addr flow.Address) (FlowError, error) {
 	tx := flow.NewTransactionBody().
 		SetScript(DeductAccountCreationFeeTransaction).
@@ -355,10 +373,6 @@ func (r *TransactionContext) checkProgram(code []byte, address runtime.Address) 
 //
 // An error is returned if any of the expected signatures are invalid or missing.
 func (r *TransactionContext) verifySignatures() FlowError {
-	if r.skipVerification {
-		return nil
-	}
-
 	if r.tx.Payer == flow.ZeroAddress {
 		return &MissingPayerError{}
 	}
@@ -410,7 +424,7 @@ func (r *TransactionContext) verifySignatures() FlowError {
 	return nil
 }
 
-// CheckAndIncrementSequenceNumber validates and increments a sequence number for an account key.
+// checkAndIncrementSequenceNumber validates and increments a sequence number for an account key.
 //
 // This function first checks that the provided sequence number matches the version stored on-chain.
 // If they are equal, the on-chain sequence number is incremented.
@@ -418,10 +432,6 @@ func (r *TransactionContext) verifySignatures() FlowError {
 //
 // This function returns an error if any problem occurred during checking or the check failed
 func (r *TransactionContext) checkAndIncrementSequenceNumber() (FlowError, error) {
-	if r.skipVerification {
-		return nil, nil
-	}
-
 	proposalKey := r.tx.ProposalKey
 
 	account := r.ledger.GetAccount(proposalKey.Address)
@@ -566,6 +576,16 @@ var DeductAccountCreationFeeTransaction = []byte(fmt.Sprintf(`
 	transaction {
 		prepare(acct: AuthAccount) {
 			ServiceAccount.deductAccountCreationFee(acct)
+		}
+	}
+`, flow.RootAddress))
+
+var DeductTransactionFeeScript = []byte(fmt.Sprintf(`
+	import ServiceAccount from 0x%s
+
+	transaction {
+		prepare(acct: AuthAccount) {
+			ServiceAccount.deductTransactionFee(acct)
 		}
 	}
 `, flow.RootAddress))
