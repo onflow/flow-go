@@ -72,9 +72,9 @@ func main() {
 		assignedChunkIDs      *stdmap.Identifiers
 		ingestedResultIDs     *stdmap.Identifiers
 		verifierEng           *verifier.Engine
-		ingestEng             *ingest.Engine
-		lightIngestEng        *ingest.LightEngine
-		collector             module.VerificationMetrics
+		// ingestEng             *ingest.Engine
+		lightIngestEng *ingest.LightEngine
+		collector      module.VerificationMetrics
 	)
 
 	cmd.FlowNode(flow.RoleVerification.String()).
@@ -233,7 +233,7 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, node.Storage.Headers, final, verifier, ingestEng, node.GenesisBlock.Header, node.GenesisQC, finalized, pending)
+			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, node.Storage.Headers, final, verifier, lightIngestEng, node.GenesisBlock.Header, node.GenesisQC, finalized, pending)
 			if err != nil {
 				// return nil, fmt.Errorf("could not create follower core logic: %w", err)
 				// TODO for now we ignore failures in follower
