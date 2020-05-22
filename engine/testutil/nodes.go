@@ -396,30 +396,6 @@ func VerificationNode(t testing.TB,
 		require.Nil(t, err)
 	}
 
-	if node.LightIngestEngine == nil && lightIngestEngine {
-		node.LightIngestEngine, err = ingest.NewLightEngine(node.Log,
-			node.Net,
-			node.State,
-			node.Me,
-			node.VerifierEngine,
-			node.AuthReceipts,
-			node.AuthCollections,
-			node.ChunkDataPacks,
-			node.CollectionTrackers,
-			node.ChunkDataPackTrackers,
-			node.IngestedChunkIDs,
-			node.IngestedResultIDs,
-			node.AssignedChunkIDs,
-			node.IngestedCollectionIDs,
-			node.Headers,
-			node.Blocks,
-			assigner,
-			requestIntervalMs,
-			failureThreshold,
-		)
-		require.Nil(t, err)
-	}
-
 	// creates a light ingest engine for the node if lightIngestEngine is set
 	if node.LightIngestEngine == nil && lightIngestEngine {
 		node.LightIngestEngine, err = ingest.NewLightEngine(node.Log,
