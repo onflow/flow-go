@@ -211,7 +211,7 @@ func TestSyncFlow(t *testing.T) {
 	assert.Equal(t, col2, *rCol2)
 
 	// node two didn't get block4
-	rCol4, err = exeNode2.Collections.ByID(col4.ID())
+	_, err = exeNode2.Collections.ByID(col4.ID())
 	require.Error(t, err)
 
 	collectionEngine.AssertExpectations(t)
