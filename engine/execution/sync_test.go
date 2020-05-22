@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -187,6 +188,31 @@ func TestSyncFlow(t *testing.T) {
 		}
 		return block3ok && block4ok
 	})
+
+	// make sure collections are saved and synced as well
+	rCol1, err := exeNode1.Collections.ByID(col1.ID())
+	require.NoError(t, err)
+	assert.Equal(t, col1, *rCol1)
+
+	rCol2, err := exeNode1.Collections.ByID(col2.ID())
+	require.NoError(t, err)
+	assert.Equal(t, col2, *rCol2)
+
+	rCol4, err := exeNode1.Collections.ByID(col4.ID())
+	require.NoError(t, err)
+	assert.Equal(t, col4, *rCol4)
+
+	rCol1, err = exeNode2.Collections.ByID(col1.ID())
+	require.NoError(t, err)
+	assert.Equal(t, col1, *rCol1)
+
+	rCol2, err = exeNode2.Collections.ByID(col2.ID())
+	require.NoError(t, err)
+	assert.Equal(t, col2, *rCol2)
+
+	// node two didn't get block4
+	_, err = exeNode2.Collections.ByID(col4.ID())
+	require.Error(t, err)
 
 	collectionEngine.AssertExpectations(t)
 	verificationEngine.AssertExpectations(t)
