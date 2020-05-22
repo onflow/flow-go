@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+
+	"github.com/onflow/flow-go-sdk"
 )
 
 // Address represents the 8 byte address of an account.
@@ -49,6 +51,8 @@ func getNetworkType() networkType {
 		panic("chain ID is invalid or not set")
 	}
 }
+
+var EmptyAddress = Address{}
 
 // ZeroAddress represents the "zero address" (account that no one owns).
 func ZeroAddress() Address {

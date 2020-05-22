@@ -26,9 +26,9 @@ require (
 	github.com/libp2p/go-libp2p-swarm v0.2.2
 	github.com/libp2p/go-libp2p-transport-upgrader v0.1.1
 	github.com/libp2p/go-tcp-transport v0.1.1
-	github.com/magiconair/properties v1.8.1 // indirect
 	github.com/multiformats/go-multiaddr v0.2.0
 	github.com/onflow/cadence v0.3.0-beta4.0.20200524043105-6b94cabe6a65
+	github.com/onflow/flow-go-sdk v0.1.1
 	github.com/onflow/flow/protobuf/go/flow v0.1.4
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opentracing/opentracing-go v1.1.0

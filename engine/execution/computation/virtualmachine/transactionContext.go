@@ -155,6 +155,24 @@ func (r *TransactionContext) initDefaultToken(addr flow.Address) (FlowError, err
 	return nil, nil
 }
 
+func (r *TransactionContext) deductTransactionFee(addr flow.Address) (FlowError, error) {
+	tx := flow.NewTransactionBody().
+		SetScript(DeductTransactionFeeScript).
+		AddAuthorizer(addr)
+
+	// TODO: propagate computation limit
+	result, err := r.bc.ExecuteTransaction(r.ledger, tx, SkipVerification)
+	if err != nil {
+		return nil, err
+	}
+
+	if result.Error != nil {
+		return result.Error, nil
+	}
+
+	return nil, nil
+}
+
 func (r *TransactionContext) deductAccountCreationFee(addr flow.Address) (FlowError, error) {
 	tx := flow.NewTransactionBody().
 		SetScript(DeductAccountCreationFeeTransaction).
@@ -359,7 +377,7 @@ func (r *TransactionContext) verifySignatures() FlowError {
 		return nil
 	}
 
-	if r.tx.Payer == flow.ZeroAddress() {
+	if r.tx.Payer == flow.EmptyAddress {
 		return &MissingPayerError{}
 	}
 
@@ -410,7 +428,7 @@ func (r *TransactionContext) verifySignatures() FlowError {
 	return nil
 }
 
-// CheckAndIncrementSequenceNumber validates and increments a sequence number for an account key.
+// checkAndIncrementSequenceNumber validates and increments a sequence number for an account key.
 //
 // This function first checks that the provided sequence number matches the version stored on-chain.
 // If they are equal, the on-chain sequence number is incremented.
@@ -418,10 +436,6 @@ func (r *TransactionContext) verifySignatures() FlowError {
 //
 // This function returns an error if any problem occurred during checking or the check failed
 func (r *TransactionContext) checkAndIncrementSequenceNumber() (FlowError, error) {
-	if r.skipVerification {
-		return nil, nil
-	}
-
 	proposalKey := r.tx.ProposalKey
 
 	account := r.ledger.GetAccount(proposalKey.Address)
@@ -547,7 +561,7 @@ var InitDefaultTokenTransaction = []byte(fmt.Sprintf(`
 			ServiceAccount.initDefaultToken(acct)
 		}
 	}
-`, flow.RootAddress))
+`, flow.ServiceAddress()))
 
 func DefaultTokenBalanceScript(addr flow.Address) []byte {
 	return []byte(fmt.Sprintf(`
@@ -557,7 +571,7 @@ func DefaultTokenBalanceScript(addr flow.Address) []byte {
 			let acct = getAccount(0x%s)
 			return ServiceAccount.defaultTokenBalance(acct)
 		}
-	`, flow.RootAddress, addr))
+	`, flow.ServiceAddress(), addr))
 }
 
 var DeductAccountCreationFeeTransaction = []byte(fmt.Sprintf(`
@@ -568,4 +582,14 @@ var DeductAccountCreationFeeTransaction = []byte(fmt.Sprintf(`
 			ServiceAccount.deductAccountCreationFee(acct)
 		}
 	}
-`, flow.RootAddress))
+`, flow.ServiceAddress()))
+
+var DeductTransactionFeeScript = []byte(fmt.Sprintf(`
+	import ServiceAccount from 0x%s
+
+	transaction {
+		prepare(acct: AuthAccount) {
+			ServiceAccount.deductTransactionFee(acct)
+		}
+	}
+`, flow.ServiceAddress()))

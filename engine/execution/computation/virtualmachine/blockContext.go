@@ -84,26 +84,40 @@ func (bc *blockContext) ExecuteTransaction(
 
 	ctx := bc.newTransactionContext(ledger, tx, options...)
 
-	flowErr := ctx.verifySignatures()
-	if flowErr != nil {
-		return &TransactionResult{
-			TransactionID: txID,
-			Error:         flowErr,
-		}, nil
+	if !ctx.skipVerification {
+		flowErr, err := ctx.deductTransactionFee(tx.Payer)
+		if err != nil {
+			return nil, err
+		}
+
+		if flowErr != nil {
+			return &TransactionResult{
+				TransactionID: txID,
+				Error:         flowErr,
+			}, nil
+		}
+
+		flowErr = ctx.verifySignatures()
+		if flowErr != nil {
+			return &TransactionResult{
+				TransactionID: txID,
+				Error:         flowErr,
+			}, nil
+		}
+
+		flowErr, err = ctx.checkAndIncrementSequenceNumber()
+		if err != nil {
+			return nil, err
+		}
+		if flowErr != nil {
+			return &TransactionResult{
+				TransactionID: txID,
+				Error:         flowErr,
+			}, nil
+		}
 	}
 
-	flowErr, err := ctx.checkAndIncrementSequenceNumber()
-	if err != nil {
-		return nil, err
-	}
-	if flowErr != nil {
-		return &TransactionResult{
-			TransactionID: txID,
-			Error:         flowErr,
-		}, nil
-	}
-
-	err = bc.vm.executeTransaction(tx.Script, tx.Arguments, ctx, location)
+	err := bc.vm.executeTransaction(tx.Script, tx.Arguments, ctx, location)
 	if err != nil {
 		possibleRuntimeError := runtime.Error{}
 		if errors.As(err, &possibleRuntimeError) {
