@@ -15,8 +15,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/storage/ledger/trie"
-	utils "github.com/dapperlabs/flow-go/storage/ledger/utils"
+	"github.com/dapperlabs/flow-go/storage/ledger/ptrie"
+	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
 var dir = "./db/"
@@ -45,8 +45,7 @@ func StorageBenchmark() {
 	rand.Seed(time.Now().UnixNano())
 
 	metricsCollector := &metrics.NoopCollector{}
-
-	led, err := ledger.NewMTrieStorage(dir, 100, metricsCollector, nil)
+	led, err := ledger.NewMTrieStorage(dir, steps+1, metricsCollector, nil)
 	defer func() {
 		led.Done()
 		os.RemoveAll(dir)
@@ -99,7 +98,7 @@ func StorageBenchmark() {
 		elapsed = time.Since(start)
 		start = time.Now()
 		// validate proofs as a batch
-		_, err = trie.NewPSMT(newState, trieHeight, keys, retValues, proofs)
+		_, err = ptrie.NewPSMT(newState, trieHeight, keys, retValues, proofs)
 		if err != nil {
 			panic("failed to create PSMT")
 		}

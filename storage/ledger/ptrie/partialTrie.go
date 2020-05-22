@@ -1,9 +1,11 @@
-package trie
+package ptrie
 
 import (
 	"bytes"
 	"fmt"
 
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/common"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
@@ -40,7 +42,7 @@ func (p *PSMT) Update(registerIDs [][]byte, values [][]byte) ([]byte, []string, 
 			failedKeys = append(failedKeys, string(key))
 			continue
 		}
-		node.value = ComputeCompactValue(key, value, node.height, p.height)
+		node.value = common.ComputeCompactValue(key, value, node.height)
 	}
 	if len(failedKeys) > 0 {
 		return nil, failedKeys, fmt.Errorf("key(s) doesn't exist")
@@ -67,7 +69,7 @@ func NewPSMT(
 	psmt := PSMT{newNode(nil, height-1), height, (height - 1) / 8, make(map[string]*node)}
 
 	// We need to decode proof encodings
-	proofholder, err := DecodeProof(proofs)
+	batchProof, err := proof.DecodeBatchProof(proofs)
 	if err != nil {
 		return nil, fmt.Errorf("decoding proof failed: %w", err)
 	}
@@ -77,36 +79,34 @@ func NewPSMT(
 		return nil, fmt.Errorf("keys' size (%d) and values' size (%d) doesn't match", len(keys), len(values))
 	}
 
-	if len(keys) != len(proofholder.sizes) {
-		return nil, fmt.Errorf("keys' size (%d) and values' size (%d) doesn't match", len(keys), len(proofholder.sizes))
+	if len(keys) != batchProof.Size() {
+		return nil, fmt.Errorf("keys' size (%d) and values' size (%d) doesn't match", len(keys), batchProof.Size())
 	}
 
 	// iterating over proofs for building the tree
-	for i, proofSize := range proofholder.sizes {
+	for i, pr := range batchProof.Proofs {
 		key := keys[i]
 		value := values[i]
-		flags := proofholder.flags[i]
-		proof := proofholder.proofs[i]
 		// check key size
 		if len(key) != psmt.keyByteSize {
 			return nil, fmt.Errorf("key [%x] size (%d) doesn't match the trie height (%d)", key, len(key), height)
 		}
 
 		// we keep track of our progress through proofs by proofIndex
-		proofIndex := 0
+		prValueIndex := 0
 
 		// start from the rootNode and walk down the tree
 		currentNode := psmt.root
 
 		// we process the key bit by bit until we reach the end of the proof (due to compactness)
-		for j := 0; j < int(proofSize); j++ {
+		for j := 0; j < int(pr.Steps); j++ {
 			// if a flag (bit j in flags) is false, the value is a default value
 			// otherwise the value is stored in the proofs
-			v := GetDefaultHashForHeight(currentNode.height - 1)
-			if utils.IsBitSet(flags, j) {
+			v := common.GetDefaultHashForHeight(currentNode.height - 1)
+			if utils.IsBitSet(pr.Flags, j) {
 				// use the proof at index proofIndex
-				v = proof[proofIndex]
-				proofIndex++
+				v = pr.Values[prValueIndex]
+				prValueIndex++
 			}
 			// look at the bit number j (left to right) for branching
 			if utils.IsBitSet(key, j) { // right branching
@@ -136,8 +136,8 @@ func NewPSMT(
 
 		currentNode.key = key
 		// update values only for inclusion proofs (for others we assume default value)
-		if proofholder.inclusions[i] {
-			currentNode.value = ComputeCompactValue(key, value, currentNode.height, height)
+		if pr.Inclusion {
+			currentNode.value = common.ComputeCompactValue(key, value, currentNode.height)
 		}
 		// keep a reference to this node by key (for update purpose)
 		psmt.keyLookUp[string(key)] = currentNode

@@ -13,7 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/storage/ledger/trie"
+	"github.com/dapperlabs/flow-go/storage/ledger/ptrie"
 )
 
 func TestExecutionChunkDataPacks(t *testing.T) {
@@ -79,6 +79,6 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 	require.NoError(gs.T(), err, "error verifying chunk trie proofs")
 	require.True(gs.T(), isValid, "chunk trie proofs are not valid, but must be")
 
-	_, err = trie.NewPSMT(pack2.Data.StartState, 257, pack2.Data.Registers(), pack2.Data.Values(), pack2.Data.Proofs())
+	_, err = ptrie.NewPSMT(pack2.Data.StartState, 257, pack2.Data.Registers(), pack2.Data.Values(), pack2.Data.Proofs())
 	require.NoError(gs.T(), err, "error building PSMT")
 }

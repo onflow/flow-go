@@ -9,6 +9,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/wal"
 )
 
@@ -27,7 +29,7 @@ func NewMTrieStorage(dbDir string, cacheSize int, metrics module.LedgerMetrics, 
 		return nil, fmt.Errorf("cannot create WAL: %w", err)
 	}
 
-	mForest, err := mtrie.NewMForest(257, dbDir, cacheSize, metrics, func(evictedTrie *mtrie.MTrie) error {
+	mForest, err := mtrie.NewMForest(257, dbDir, cacheSize, metrics, func(evictedTrie *trie.MTrie) error {
 		return w.RecordDelete(evictedTrie.RootHash())
 	})
 	if err != nil {
@@ -89,7 +91,7 @@ func (f *MTrieStorage) GetRegisters(
 	err error,
 ) {
 	start := time.Now()
-	values, err = f.mForest.Read(registerIDs, stateCommitment)
+	values, err = f.mForest.Read(stateCommitment, registerIDs)
 	// values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
 
 	f.metrics.ReadValuesNumber(uint64(len(registerIDs)))
@@ -140,6 +142,7 @@ func (f *MTrieStorage) UpdateRegisters(
 	}
 
 	newTrie, err := f.mForest.Update(stateCommitment, ids, values)
+	newStateCommitment = newTrie.RootHash()
 	if err != nil {
 		return nil, fmt.Errorf("cannot update state: %w", err)
 	}
