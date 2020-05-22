@@ -480,7 +480,11 @@ func ingestHappyPath(tb testing.TB, receiptCount int, chunkCount int, lightInges
 		testutil.WithVerifierEngine(verifierEng))
 
 	// starts the ingest engine
-	<-verNode.IngestEngine.Ready()
+	if lightIngest {
+		<-verNode.LightIngestEngine.Ready()
+	} else {
+		<-verNode.IngestEngine.Ready()
+	}
 
 	// assumes the verification node has received the block, collections, and chunk data pack associated
 	// with each receipt
@@ -502,8 +506,13 @@ func ingestHappyPath(tb testing.TB, receiptCount int, chunkCount int, lightInges
 
 	for _, er := range ers {
 		go func(receipt *flow.ExecutionReceipt) {
-			err := verNode.IngestEngine.Process(exeIdentity.NodeID, receipt)
-			require.NoError(tb, err)
+			if lightIngest {
+				err := verNode.LightIngestEngine.Process(exeIdentity.NodeID, receipt)
+				require.NoError(tb, err)
+			} else {
+				err := verNode.IngestEngine.Process(exeIdentity.NodeID, receipt)
+				require.NoError(tb, err)
+			}
 		}(er.Receipt)
 	}
 
