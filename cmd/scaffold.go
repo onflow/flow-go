@@ -121,6 +121,7 @@ type FlowNodeBuilder struct {
 	doneObject        []namedDoneObject
 	sig               chan os.Signal
 	genesisHandler    func(node *FlowNodeBuilder, block *flow.Block)
+	genesisBootstrap  bool
 	postInitFns       []func(*FlowNodeBuilder)
 	stakingKey        crypto.PrivateKey
 	networkKey        crypto.PrivateKey
@@ -342,6 +343,9 @@ func (fnb *FlowNodeBuilder) initState() {
 	head, err := state.Final().Head()
 	if errors.Is(err, storerr.ErrNotFound) {
 		// Bootstrap!
+
+		// Mark that we need to run the genesis handler
+		fnb.genesisBootstrap = true
 
 		fnb.Logger.Info().Msg("bootstrapping empty protocol state")
 
@@ -576,7 +580,7 @@ func (fnb *FlowNodeBuilder) Run() {
 		fnb.handleModule(f)
 	}
 
-	if fnb.GenesisBlock != nil && fnb.genesisHandler != nil {
+	if fnb.genesisBootstrap && fnb.GenesisBlock != nil && fnb.genesisHandler != nil {
 		fnb.genesisHandler(fnb, fnb.GenesisBlock)
 	}
 
