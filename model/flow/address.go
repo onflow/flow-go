@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -26,24 +27,52 @@ const (
 
 	// ZeroAddressState is the addressing state when Flow is bootstrapped
 	ZeroAddressState = AddressState(0)
-	// ServiceAddressState is the initial addressing state
+	// ServiceAddressState is the initial addressing state for account creations
 	ServiceAddressState = AddressState(1)
 )
 
-var (
-	// ZeroAddress represents the "zero address" (account that no one owns).
-	ZeroAddress = generateAddress(ZeroAddressState)
-	// ServiceAddress represents the root (first) generated account address.
-	ServiceAddress = generateAddress(ServiceAddressState)
+// network is the type of network for which account addresses
+// are generated and checked.
+// A valid address in one network is invalid in the other networks.
+type networkType uint64
 
-	// ZeroTestAddress represents the "zero address" in Flow testnet or emulator instances (account that no one owns).
-	ZeroTestAddress = generateTestAddress(ZeroAddressState)
-	// ServiceTestAddress represents the root (first) generated test account address.
-	ServiceTestAddress = generateTestAddress(ServiceAddressState)
+const (
+	Mainnet  = networkType(0)
+	Testnet  = networkType(invalidCodeTestnet)
+	Emulator = networkType(invalidCodeEmulator)
 )
 
+var (
+	// network is the network type used in the adressing logic in all this file
+	network = Mainnet
+)
+
+// SetAccountAddressing sets the network of the account addressing
+// logic (mainnet, testnet, emulator).
+//
+// The setting should be called at the node initialization.
+// Addresses generated for one network type are invalid for the other
+// networks.
+func SetAccountAddressing(net networkType) error {
+	if net != Mainnet && net != Testnet && net != Emulator {
+		return errors.New("network setting is invalid")
+	}
+	network = net
+	return nil
+}
+
+// ZeroAddress represents the "zero address" (account that no one owns).
+func ZeroAddress() Address {
+	return generateAddress(ZeroAddressState)
+}
+
+// ServiceAddress represents the root (first) generated account address.
+func ServiceAddress() Address {
+	return generateAddress(ServiceAddressState)
+}
+
 func init() {
-	gob.Register(Address{})
+	gob.Register(ZeroAddress())
 }
 
 // HexToAddress converts a hex string to an Address.
@@ -161,17 +190,18 @@ const (
 
 // AccountAddress generates an account address given an addressing state.
 //
+// The address is generated for a specific network (Flow mainnet, testnet..)
 // The second returned value is the new updated addressing state. The new
 // addressing state should replace the old state to keep generating account
 // addresses in a sequential way.
 // Each state is mapped to exactly one address. There are as many addresses
 // as states.
-// ZeroAddress corresponds to the state "0" while ServiceAddress corresponds to the
+// ZeroAddress() corresponds to the state "0" while ServiceAddress() corresponds to the
 // state "1".
 func AccountAddress(state AddressState) (Address, AddressState, error) {
 	newState, err := nextState(state)
 	if err != nil {
-		return Address{}, ZeroAddressState, err
+		return ZeroAddress(), ZeroAddressState, err
 	}
 	address := generateAddress(newState)
 	return address, newState, nil
@@ -203,6 +233,7 @@ func (a *Address) Uint64() uint64 {
 }
 
 // generateAddress returns an account address given an addressing state.
+// (network) specifies the network to generate the address for (Flow Mainnet, testent..)
 // The function assumes the state is valid (<2^k) which means
 // a check on the state should be done before calling this function.
 func generateAddress(state AddressState) Address {
@@ -216,6 +247,9 @@ func generateAddress(state AddressState) Address {
 		}
 		index >>= 1
 	}
+
+	// customize the code word for a specific network
+	address ^= uint64(network)
 	return Uint64ToAddress(address)
 }
 
@@ -226,13 +260,15 @@ func generateAddress(state AddressState) Address {
 // valid. If the function returns true, this does not mean
 // a Flow account with this address has been generated. Such a test would
 // require on on-chain check.
-// ZeroAddress fails the check. Although it has a valid format, no account
-// in Flow is assigned to ZeroAddress.
+// ZeroAddress() fails the check. Although it has a valid format, no account
+// in Flow is assigned to ZeroAddress().
 func (a *Address) IsValid() bool {
-	if *a == ZeroAddress {
+	codeWord := a.Uint64()
+	codeWord ^= uint64(network)
+
+	if codeWord == 0 {
 		return false
 	}
-	codeWord := a.Uint64()
 
 	// Multiply the code word GF(2)-vector by the parity-check matrix
 	parity := uint(0)
@@ -245,45 +281,10 @@ func (a *Address) IsValid() bool {
 	return parity == 0
 }
 
-// TestAccountAddress generates a test account address for Flow testnets
-// and emulator instances.
-//
-// TestAccountAddress uses the same arguments and parameters as AccountAddress,
-// but generates a test address space that has no intersection with Flow
-// address space.
-func TestAccountAddress(state AddressState) (Address, AddressState, error) {
-	newState, err := nextState(state)
-	if err != nil {
-		return Address{}, ZeroAddressState, err
-	}
-	address := generateTestAddress(newState)
-	return address, newState, nil
-}
-
-// invalid code-word in the [64,45] code
-// this constant is used to generate Flow test addresses
-const constInvalidAddress = uint64(0x6834ba37b3980209)
-
-// generateTestAddress is similar to generateAddress
-// but only return test addresses
-func generateTestAddress(state AddressState) Address {
-	validAddress := generateAddress(state)
-	invalidAddress := validAddress.Uint64() ^ constInvalidAddress
-	return Uint64ToAddress(invalidAddress)
-}
-
-// IsValidForTest returns true if a given address is a valid test account address,
-// and false otherwise.
-//
-// Since there is no intersection in Flow address space and Flow test address space,
-// any value that passes this check should fail IsValid() and vice versa.
-// ZeroTestAddress fails the check. Although it has a valid format, no test account
-// in Flow is assigned to ZeroTestAddress.
-func (a *Address) IsValidForTest() bool {
-	addressUint64 := a.Uint64() ^ constInvalidAddress
-	address := Uint64ToAddress(addressUint64)
-	return address.IsValid()
-}
+// invalid code-words in the [64,45] code
+// these constants are used to generate non-Flow-Mainnet addresses
+const invalidCodeTestnet = uint64(0x6834ba37b3980209)
+const invalidCodeEmulator = uint64(0x1cb159857af02018)
 
 // Rows of the generator matrix G of the [64,45]-code used for Flow addresses.
 // G is a (k x n) matrix with coefficients in GF(2), each row is converted into

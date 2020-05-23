@@ -282,7 +282,7 @@ func (r *TransactionContext) checkProgram(code []byte, address runtime.Address) 
 // An error is returned if any of the expected signatures are invalid or missing.
 func (r *TransactionContext) verifySignatures() FlowError {
 
-	if r.tx.Payer == flow.ZeroAddress {
+	if r.tx.Payer == flow.ZeroAddress() {
 		return &MissingPayerError{}
 	}
 

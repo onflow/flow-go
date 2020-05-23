@@ -195,10 +195,10 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 					execute { log(x); log(y) }
 				}`,
 			args:        [][]byte{arg1, arg2},
-			authorizers: []flow.Address{flow.ServiceAddress},
+			authorizers: []flow.Address{flow.ServiceAddress()},
 			check: func(t *testing.T, result *virtualmachine.TransactionResult) {
 				require.Nil(t, result.Error)
-				assert.ElementsMatch(t, []string{"0x" + flow.ServiceAddress.Hex(), "42", `"foo"`}, result.Logs)
+				assert.ElementsMatch(t, []string{"0x" + flow.ServiceAddress().Hex(), "42", `"foo"`}, result.Logs)
 			},
 		},
 	}
@@ -424,9 +424,9 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		// create the transaction to create the account
 		tx := &flow.TransactionBody{
 			Script: []byte(script),
-			Payer:  flow.ServiceAddress,
+			Payer:  flow.ServiceAddress(),
 			ProposalKey: flow.ProposalKey{
-				Address:        flow.ServiceAddress,
+				Address:        flow.ServiceAddress(),
 				KeyID:          0,
 				SequenceNumber: uint64(sequenceNumber),
 			},
@@ -437,7 +437,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		rootHasher, err := hash.NewHasher(flow.ServiceAccountPrivateKey.HashAlgo)
 		require.NoError(t, err)
 
-		err = tx.SignEnvelope(flow.ServiceAddress, 0, flow.ServiceAccountPrivateKey.PrivateKey, rootHasher)
+		err = tx.SignEnvelope(flow.ServiceAddress(), 0, flow.ServiceAccountPrivateKey.PrivateKey, rootHasher)
 		require.NoError(t, err)
 
 		// execute the transaction

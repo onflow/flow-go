@@ -16,7 +16,7 @@ type addressWrapper struct {
 }
 
 func TestAddressJSON(t *testing.T) {
-	addr := ServiceAddress
+	addr := ServiceAddress()
 	data, err := json.Marshal(addressWrapper{Address: addr})
 	require.Nil(t, err)
 
@@ -36,8 +36,8 @@ func TestShort(t *testing.T) {
 
 	cases := []testcase{
 		{
-			addr:     ServiceAddress,
-			expected: ServiceAddress.Hex(),
+			addr:     ServiceAddress(),
+			expected: ServiceAddress().Hex(),
 		},
 		{
 			addr:     HexToAddress("0000000002"),
@@ -58,211 +58,221 @@ func TestShort(t *testing.T) {
 	}
 }
 
-// an invalid code word used in this test file
-const invalidCodeWord = uint64(0xab2ae42382900010)
+func TestSetAccountAdressing(t *testing.T) {
+
+	err := SetAccountAddressing(networkType(1))
+	assert.Error(t, err)
+	err = SetAccountAddressing(Emulator)
+	assert.NoError(t, err)
+	err = SetAccountAddressing(Testnet)
+	assert.NoError(t, err)
+	err = SetAccountAddressing(Mainnet)
+	assert.NoError(t, err)
+}
 
 func TestFlowAdressConstants(t *testing.T) {
 	// check n and k fit in 8 and 6 bytes
 	assert.LessOrEqual(t, linearCodeN, 8*8)
 	assert.LessOrEqual(t, linearCodeK, 6*8)
 
-	//check the Zero and Root constants
-	// Flow
-	var expected [AddressLength]byte
-	assert.Equal(t, ZeroAddress, Address(expected))
-	expected = Uint64ToAddress(generatorMatrixRows[0])
-	assert.Equal(t, ServiceAddress, Address(expected))
-	// Flow test
-	expected = Uint64ToAddress(constInvalidAddress)
-	assert.Equal(t, ZeroTestAddress, Address(expected))
-	expected = Uint64ToAddress(generatorMatrixRows[0] ^ constInvalidAddress)
-	assert.Equal(t, ServiceTestAddress, Address(expected))
+	// Test addresses for all type of networks
+	networks := []networkType{
+		Mainnet,
+		Testnet,
+		Emulator,
+	}
 
-	// check the transition from account zero to root
-	// Flow
-	state := ZeroAddressState
-	address, _, err := AccountAddress(state)
-	require.NoError(t, err)
-	assert.Equal(t, address, ServiceAddress)
-	// Flow test
-	state = ZeroAddressState
-	address, _, err = TestAccountAddress(state)
-	require.NoError(t, err)
-	assert.Equal(t, address, ServiceTestAddress)
+	for _, net := range networks {
 
-	// check high state values: generation should fail for high value states
-	// Flow
-	state = AddressState(maxState)
-	_, state, err = AccountAddress(state)
-	assert.NoError(t, err)
-	_, _, err = AccountAddress(state)
-	assert.Error(t, err)
-	// Flow test
-	state = AddressState(maxState)
-	_, state, err = TestAccountAddress(state)
-	assert.NoError(t, err)
-	_, _, err = TestAccountAddress(state)
-	assert.Error(t, err)
+		// set the network
+		_ = SetAccountAddressing(net)
 
-	// check ZeroAddress and ZeroTestAddress are invalid addresses
-	check := ZeroAddress.IsValid()
-	assert.False(t, check, "should be invalid")
-	check = ZeroTestAddress.IsValidForTest()
-	assert.False(t, check, "should be invalid")
+		//check the Zero and Root constants
+		expected := Uint64ToAddress(uint64(net))
+		assert.Equal(t, ZeroAddress(), Address(expected))
+		expected = Uint64ToAddress(generatorMatrixRows[0] ^ uint64(net))
+		assert.Equal(t, ServiceAddress(), Address(expected))
+
+		// check the transition from account zero to root
+		state := ZeroAddressState
+		address, _, err := AccountAddress(state)
+		require.NoError(t, err)
+		assert.Equal(t, address, ServiceAddress())
+
+		// check high state values: generation should fail for high value states
+		state = AddressState(maxState)
+		_, state, err = AccountAddress(state)
+		assert.NoError(t, err)
+		_, _, err = AccountAddress(state)
+		assert.Error(t, err)
+
+		// check ZeroAddress() is an invalid addresse
+		z := ZeroAddress()
+		check := z.IsValid()
+		assert.False(t, check, "should be invalid")
+	}
 }
 
-func TestFlowAddressGeneration(t *testing.T) {
+const invalidCodeWord = uint64(0xab2ae42382900010)
+
+func TestAddressGeneration(t *testing.T) {
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
 
 	// loops in each test
 	const loop = 50
 
-	// sanity check of AccountAddress function consistency
-	state := ZeroAddressState
-	expectedState := ZeroAddressState
-	for i := 0; i < loop; i++ {
-		address, stateResult, err := AccountAddress(state)
-		state = stateResult
-		require.NoError(t, err)
-		expectedState++
-		expectedAddress := generateAddress(expectedState)
-		assert.Equal(t, address, expectedAddress)
+	// Test addresses for all type of networks
+	networks := []networkType{
+		Mainnet,
+		Testnet,
+		Emulator,
 	}
 
-	// sanity check of addresses weights in Flow.
-	// All addresses hamming weights must be less than d.
-	// this is only a sanity check of the implementation and not an exhaustive proof
-	r := rand.Intn(maxState - loop)
-	state = AddressState(r)
-	for i := 0; i < loop; i++ {
-		address, stateResult, err := AccountAddress(state)
-		state = stateResult
-		require.NoError(t, err)
-		weight := bits.OnesCount64(address.Uint64())
-		assert.LessOrEqual(t, linearCodeD, weight)
-	}
+	for _, net := range networks {
 
-	// sanity check of address distances
-	// All distances between any two addresses must be less than d.
-	// this is only a sanity check of the implementation and not an exhaustive proof
-	r = rand.Intn(maxState - loop - 1)
-	state = AddressState(r)
-	refAddress, stateResult, err := AccountAddress(state)
-	state = stateResult
-	require.NoError(t, err)
-	for i := 0; i < loop; i++ {
-		address, stateResult, err := AccountAddress(state)
-		state = stateResult
-		require.NoError(t, err)
-		distance := bits.OnesCount64(address.Uint64() ^ refAddress.Uint64())
-		assert.LessOrEqual(t, linearCodeD, distance)
-	}
+		// set the network
+		_ = SetAccountAddressing(net)
 
-	// sanity check of valid account addresses.
-	// All valid addresses must pass IsValid.
-	r = rand.Intn(maxState - loop)
-	state = AddressState(r)
-	for i := 0; i < loop; i++ {
-		address, stateResult, err := AccountAddress(state)
-		state = stateResult
-		require.NoError(t, err)
-		check := address.IsValid()
-		assert.True(t, check, "account address format should be valid")
-	}
+		// sanity check of AccountAddress function consistency
+		state := ZeroAddressState
+		expectedState := ZeroAddressState
+		for i := 0; i < loop; i++ {
+			address, stateResult, err := AccountAddress(state)
+			state = stateResult
+			require.NoError(t, err)
+			expectedState++
+			expectedAddress := generateAddress(expectedState)
+			assert.Equal(t, address, expectedAddress)
+		}
 
-	// sanity check of invalid account addresses.
-	// All invalid addresses must fail IsValid.
-	invalidAddress := Uint64ToAddress(invalidCodeWord)
-	check := invalidAddress.IsValid()
-	assert.False(t, check, "account address format should be invalid")
-	r = rand.Intn(maxState - loop)
-	state = AddressState(r)
-	for i := 0; i < loop; i++ {
-		address, stateResult, err := AccountAddress(state)
+		// sanity check of addresses weights in Flow.
+		// All addresses hamming weights must be less than d.
+		// this is only a sanity check of the implementation and not an exhaustive proof
+		if net == Mainnet {
+			r := rand.Intn(maxState - loop)
+			state = AddressState(r)
+			for i := 0; i < loop; i++ {
+				address, stateResult, err := AccountAddress(state)
+				state = stateResult
+				require.NoError(t, err)
+				weight := bits.OnesCount64(address.Uint64())
+				assert.LessOrEqual(t, linearCodeD, weight)
+			}
+		}
+
+		// sanity check of address distances.
+		// All distances between any two addresses must be less than d.
+		// this is only a sanity check of the implementation and not an exhaustive proof
+		r := rand.Intn(maxState - loop - 1)
+		state = AddressState(r)
+		refAddress, stateResult, err := AccountAddress(state)
 		state = stateResult
 		require.NoError(t, err)
-		invalidAddress = Uint64ToAddress(address.Uint64() ^ invalidCodeWord)
+		for i := 0; i < loop; i++ {
+			address, stateResult, err := AccountAddress(state)
+			state = stateResult
+			require.NoError(t, err)
+			distance := bits.OnesCount64(address.Uint64() ^ refAddress.Uint64())
+			assert.LessOrEqual(t, linearCodeD, distance)
+		}
+
+		// sanity check of valid account addresses.
+		// All valid addresses must pass IsValid.
+		r = rand.Intn(maxState - loop)
+		state = AddressState(r)
+		for i := 0; i < loop; i++ {
+			address, stateResult, err := AccountAddress(state)
+			state = stateResult
+			require.NoError(t, err)
+			check := address.IsValid()
+			assert.True(t, check, "account address format should be valid")
+		}
+
+		// sanity check of invalid account addresses.
+		// All invalid addresses must fail IsValid.
+		invalidAddress := Uint64ToAddress(invalidCodeWord)
 		check := invalidAddress.IsValid()
 		assert.False(t, check, "account address format should be invalid")
+		r = rand.Intn(maxState - loop)
+		state = AddressState(r)
+		for i := 0; i < loop; i++ {
+			address, stateResult, err := AccountAddress(state)
+			state = stateResult
+			require.NoError(t, err)
+			invalidAddress = Uint64ToAddress(address.Uint64() ^ invalidCodeWord)
+			check := invalidAddress.IsValid()
+			assert.False(t, check, "account address format should be invalid")
+		}
 	}
 }
 
-func TestFlowTestAddressGeneration(t *testing.T) {
+func TestAddressesIntersection(t *testing.T) {
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
 
 	// loops in each test
 	const loop = 50
 
-	// sanity check of TestAccountAddress function consistency
-	state := ZeroAddressState
-	expectedState := ZeroAddressState
-	for i := 0; i < loop; i++ {
-		testAddress, stateResult, err := TestAccountAddress(state)
-		state = stateResult
-		require.NoError(t, err)
-		expectedState++
-		expectedTestAddress := generateTestAddress(expectedState)
-		assert.Equal(t, testAddress, expectedTestAddress)
+	// Test addresses for all type of networks
+	networks := []networkType{
+		Testnet,
+		Emulator,
 	}
 
-	// sanity check of valid test account addresses
-	// All valid test addresses must pass (but fail Flow check)
-	r := rand.Intn(maxState - loop)
-	state = AddressState(r)
-	for i := 0; i < loop; i++ {
-		address, stateResult, err := TestAccountAddress(state)
-		state = stateResult
-		require.NoError(t, err)
-		check := address.IsValidForTest()
-		assert.True(t, check, "test account address format should be valid")
-		// check for Flow address must fail
-		check = address.IsValid()
-		assert.False(t, check, "test account address format should be invalid in Flow")
-	}
+	for _, net := range networks {
 
-	// sanity check: Flow addresses must fail the test check
-	r = rand.Intn(maxState - loop)
-	state = AddressState(r)
-	for i := 0; i < loop; i++ {
-		invalidAddress, stateResult, err := AccountAddress(state)
-		state = stateResult
-		require.NoError(t, err)
-		check := invalidAddress.IsValidForTest()
-		assert.False(t, check, "account address format should be invalid")
-	}
+		// set the network
+		_ = SetAccountAddressing(net)
 
-	// sanity check: Flow addresses must fail the check
-	r = rand.Intn(maxState - loop)
-	state = AddressState(r)
-	for i := 0; i < loop; i++ {
-		invalidAddress, stateResult, err := AccountAddress(state)
-		state = stateResult
-		require.NoError(t, err)
-		check := invalidAddress.IsValidForTest()
-		assert.False(t, check, "account address format should be invalid")
-	}
+		// All valid test addresses must fail Flow Mainnet check
+		r := rand.Intn(maxState - loop)
+		state := AddressState(r)
+		for i := 0; i < loop; i++ {
+			address, stateResult, err := AccountAddress(state)
+			state = stateResult
+			require.NoError(t, err)
+			_ = SetAccountAddressing(Mainnet)
+			check := address.IsValid()
+			_ = SetAccountAddressing(net)
+			assert.False(t, check, "test account address format should be invalid in Flow")
+		}
 
-	// sanity check of invalid account addresses in both Flow and Flow test
-	invalidUint64 := uint64(invalidCodeWord ^ constInvalidAddress)
-	require.NotEqual(t, invalidUint64, uint64(0))
-	invalidAddress := Uint64ToAddress(invalidUint64)
-	check := invalidAddress.IsValid()
-	assert.False(t, check, "account address format should be invalid")
-	r = rand.Intn(maxState - loop)
-	state = AddressState(r)
-	for i := 0; i < loop; i++ {
-		address, stateResult, err := AccountAddress(state)
-		state = stateResult
-		require.NoError(t, err)
-		invalidAddress = Uint64ToAddress(address.Uint64() ^ invalidUint64)
-		// must fail Flow check
+		// sanity check: mainnet addresses must fail the test check
+		r = rand.Intn(maxState - loop)
+		state = AddressState(r)
+		for i := 0; i < loop; i++ {
+			_ = SetAccountAddressing(Mainnet)
+			invalidAddress, stateResult, err := AccountAddress(state)
+			_ = SetAccountAddressing(net)
+			state = stateResult
+			require.NoError(t, err)
+			check := invalidAddress.IsValid()
+			assert.False(t, check, "account address format should be invalid")
+		}
+
+		// sanity check of invalid account addresses in all networks
+		require.NotEqual(t, invalidCodeWord, uint64(0))
+		invalidAddress := Uint64ToAddress(invalidCodeWord)
+		_ = SetAccountAddressing(net)
 		check := invalidAddress.IsValid()
 		assert.False(t, check, "account address format should be invalid")
-		// must fail Flow test check
-		check = invalidAddress.IsValidForTest()
-		assert.False(t, check, "account address format should be invalid")
+		r = rand.Intn(maxState - loop)
+		state = AddressState(r)
+		for i := 0; i < loop; i++ {
+			_ = SetAccountAddressing(net)
+			address, stateResult, err := AccountAddress(state)
+			state = stateResult
+			require.NoError(t, err)
+			invalidAddress = Uint64ToAddress(address.Uint64() ^ invalidCodeWord)
+			// must fail test network check
+			check = invalidAddress.IsValid()
+			assert.False(t, check, "account address format should be invalid")
+			// must fail mainnet check
+			_ = SetAccountAddressing(Mainnet)
+			check := invalidAddress.IsValid()
+			assert.False(t, check, "account address format should be invalid")
+		}
 	}
 }
 
@@ -273,7 +283,7 @@ func TestUint48(t *testing.T) {
 	const loop = 50
 	// test consistensy of putUint48 and uint48
 	for i := 0; i < loop; i++ {
-		r := uint64(rand.Intn(1<<linearCodeK))
+		r := uint64(rand.Intn(1 << linearCodeK))
 		b := make([]byte, AddressStateLength)
 		putUint48(b, r)
 		res := uint48(b)
