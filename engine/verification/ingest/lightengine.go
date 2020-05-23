@@ -416,6 +416,13 @@ func (l *LightEngine) handleCollection(originID flow.Identifier, expectedRole fl
 // requestChunkData submits a request for the given chunk ID to the execution nodes to the network.
 // It also adds a tracker for the chunk data if it is successfully submitted.
 func (l *LightEngine) requestChunkData(chunkID, blockID flow.Identifier) error {
+	if l.chunkDataPackTackers.Has(chunkID) {
+		l.log.Debug().
+			Hex("chunk_id", logging.ID(chunkID)).
+			Msg("drops requesting an already requested chunk data pack")
+		return nil
+	}
+
 	// extracts list of execution nodes
 	//
 	execNodes, err := l.state.Final().Identities(filter.HasRole(flow.RoleExecution))
