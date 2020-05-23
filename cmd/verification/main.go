@@ -53,26 +53,28 @@ const (
 func main() {
 
 	var (
-		alpha                 uint
-		receiptLimit          uint
-		collectionLimit       uint
-		blockLimit            uint
-		chunkLimit            uint
-		err                   error
-		authReceipts          *stdmap.Receipts
-		pendingReceipts       *stdmap.PendingReceipts
-		conCache              *buffer.PendingBlocks
-		authCollections       *stdmap.Collections
-		pendingCollections    *stdmap.PendingCollections
+		alpha           uint
+		receiptLimit    uint
+		collectionLimit uint
+		blockLimit      uint
+		chunkLimit      uint
+		err             error
+		authReceipts    *stdmap.Receipts
+		// pendingReceipts       *stdmap.PendingReceipts
+		conCache        *buffer.PendingBlocks
+		authCollections *stdmap.Collections
+		// pendingCollections    *stdmap.PendingCollections
 		collectionTrackers    *stdmap.CollectionTrackers
 		chunkDataPacks        *stdmap.ChunkDataPacks
 		chunkDataPackTracker  *stdmap.ChunkDataPackTrackers
 		ingestedChunkIDs      *stdmap.Identifiers
 		ingestedCollectionIDs *stdmap.Identifiers
+		assignedChunkIDs      *stdmap.Identifiers
 		ingestedResultIDs     *stdmap.Identifiers
 		verifierEng           *verifier.Engine
-		ingestEng             *ingest.Engine
-		collector             module.VerificationMetrics
+		// ingestEng             *ingest.Engine
+		lightIngestEng *ingest.LightEngine
+		collector      module.VerificationMetrics
 	)
 
 	cmd.FlowNode(flow.RoleVerification.String()).
@@ -87,18 +89,18 @@ func main() {
 			authReceipts, err = stdmap.NewReceipts(receiptLimit)
 			return err
 		}).
-		Module("execution pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-			pendingReceipts, err = stdmap.NewPendingReceipts(receiptLimit)
-			return err
-		}).
+		//Module("execution pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
+		//	pendingReceipts, err = stdmap.NewPendingReceipts(receiptLimit)
+		//	return err
+		//}).
 		Module("authenticated collections mempool", func(node *cmd.FlowNodeBuilder) error {
 			authCollections, err = stdmap.NewCollections(collectionLimit)
 			return err
 		}).
-		Module("pending collections mempool", func(node *cmd.FlowNodeBuilder) error {
-			pendingCollections, err = stdmap.NewPendingCollections(collectionLimit)
-			return err
-		}).
+		//Module("pending collections mempool", func(node *cmd.FlowNodeBuilder) error {
+		//	pendingCollections, err = stdmap.NewPendingCollections(collectionLimit)
+		//	return err
+		//}).
 		Module("collection trackers mempool", func(node *cmd.FlowNodeBuilder) error {
 			collectionTrackers, err = stdmap.NewCollectionTrackers(collectionLimit)
 			return err
@@ -113,6 +115,10 @@ func main() {
 		}).
 		Module("ingested chunk ids mempool", func(node *cmd.FlowNodeBuilder) error {
 			ingestedChunkIDs, err = stdmap.NewIdentifiers(chunkLimit)
+			return err
+		}).
+		Module("assigned chunk ids mempool", func(node *cmd.FlowNodeBuilder) error {
+			assignedChunkIDs, err = stdmap.NewIdentifiers(chunkLimit)
 			return err
 		}).
 		Module("ingested result ids mempool", func(node *cmd.FlowNodeBuilder) error {
@@ -142,33 +148,58 @@ func main() {
 			verifierEng, err = verifier.New(node.Logger, collector, node.Network, node.State, node.Me, chunkVerifier)
 			return verifierEng, err
 		}).
-		Component("ingest engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-
+		//Component("ingest engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		//	assigner, err := chunks.NewPublicAssignment(chunkAssignmentAlpha)
+		//	if err != nil {
+		//		return nil, err
+		//	}
+		//	ingestEng, err = ingest.New(node.Logger,
+		//		node.Network,
+		//		node.State,
+		//		node.Me,
+		//		verifierEng,
+		//		authReceipts,
+		//		pendingReceipts,
+		//		authCollections,
+		//		pendingCollections,
+		//		collectionTrackers,
+		//		chunkDataPacks,
+		//		chunkDataPackTracker,
+		//		ingestedChunkIDs,
+		//		ingestedCollectionIDs,
+		//		ingestedResultIDs,
+		//		node.Storage.Headers,
+		//		node.Storage.Blocks,
+		//		assigner,
+		//		requestIntervalMs,
+		//		failureThreshold)
+		//	return ingestEng, err
+		//}).
+		Component("light ingest engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			assigner, err := chunks.NewPublicAssignment(chunkAssignmentAlpha)
 			if err != nil {
 				return nil, err
 			}
-			ingestEng, err = ingest.New(node.Logger,
+			lightIngestEng, err = ingest.NewLightEngine(node.Logger,
 				node.Network,
 				node.State,
 				node.Me,
 				verifierEng,
 				authReceipts,
-				pendingReceipts,
 				authCollections,
-				pendingCollections,
-				collectionTrackers,
 				chunkDataPacks,
+				collectionTrackers,
 				chunkDataPackTracker,
 				ingestedChunkIDs,
 				ingestedCollectionIDs,
 				ingestedResultIDs,
+				assignedChunkIDs,
 				node.Storage.Headers,
 				node.Storage.Blocks,
 				assigner,
 				requestIntervalMs,
 				failureThreshold)
-			return ingestEng, err
+			return lightIngestEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
@@ -202,7 +233,7 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, node.Storage.Headers, final, verifier, ingestEng, node.GenesisBlock.Header, node.GenesisQC, finalized, pending)
+			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, node.Storage.Headers, final, verifier, lightIngestEng, node.GenesisBlock.Header, node.GenesisQC, finalized, pending)
 			if err != nil {
 				// return nil, fmt.Errorf("could not create follower core logic: %w", err)
 				// TODO for now we ignore failures in follower

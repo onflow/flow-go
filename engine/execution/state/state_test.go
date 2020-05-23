@@ -30,6 +30,7 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 
 				stateCommitments := mocks.NewMockCommits(ctrl)
 				blocks := mocks.NewMockBlocks(ctrl)
+				collections := mocks.NewMockCollections(ctrl)
 
 				stateCommitment := ls.EmptyStateCommitment()
 
@@ -40,7 +41,7 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 				executionResults := new(storage.ExecutionResults)
 
 				es := state.NewExecutionState(
-					ls, stateCommitments, blocks, chunkDataPacks, executionResults, badgerDB, nil,
+					ls, stateCommitments, blocks, collections, chunkDataPacks, executionResults, badgerDB, nil,
 				)
 
 				f(t, es)

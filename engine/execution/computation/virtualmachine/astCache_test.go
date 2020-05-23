@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
+	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/hash"
@@ -355,7 +356,8 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 		wg.Add(1)
 		go func(id int, wg *sync.WaitGroup) {
 			defer wg.Done()
-			result, err := bc.ExecuteScript(ledger, []byte(fmt.Sprintf(`
+			view := delta.NewView(ledger.Get)
+			result, err := bc.ExecuteScript(view, []byte(fmt.Sprintf(`
 			import FlowToken from 0x%s
 			pub fun main() {
 				log("Transaction %d")
@@ -363,8 +365,8 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 				destroy v
 			}
 		`, accounts[1], id)))
-			require.True(t, result.Succeeded())
 			require.NoError(t, err)
+			require.True(t, result.Succeeded())
 		}(i, &wg)
 	}
 	wg.Wait()

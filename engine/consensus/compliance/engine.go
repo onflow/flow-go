@@ -209,8 +209,6 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 	}
 
 	// fill in the fields that can't be populated by HotStuff
-	//TODO clean this up - currently we set these fields in builder, then lose
-	// them in HotStuff, then need to set them again here
 	header.ChainID = parent.ChainID
 	header.Height = parent.Height + 1
 
@@ -245,6 +243,9 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 	}
 
 	e.unit.LaunchAfter(delay, func() {
+
+		go e.hotstuff.SubmitProposal(header, parent.View)
+
 		// NOTE: some fields are not needed for the message
 		// - proposer ID is conveyed over the network message
 		// - the payload hash is deduced from the payload
