@@ -5,6 +5,9 @@ import (
 	"time"
 )
 
+// A ChainID is a unique identifier for a specific Flow network instance.
+//
+// Chain IDs are used used to prevent replay attacks and to support network-specific address generation.
 type ChainID string
 
 // Mainnet is the chain ID for the mainnet node chain.
