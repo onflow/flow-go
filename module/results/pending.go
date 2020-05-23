@@ -15,28 +15,26 @@ func (b *PendingResults) Add(result *flow.PendingResult) bool {
 	b.Lock()
 	defer b.Unlock()
 
-	id := result.ExecutionResult.ID()
-	_, exists := b.byID[id]
+	resultID := result.ExecutionResult.ID()
+	_, exists := b.byID[resultID]
 	if exists {
 		return false
 	}
 
-	b.byID[id] = result
+	b.byID[resultID] = result
 	return true
 }
 
-func (b *PendingResults) Rem(result *flow.PendingResult) bool {
+func (b *PendingResults) Rem(resultID flow.Identifier) bool {
 	b.Lock()
 	defer b.Unlock()
 
-	id := result.ExecutionResult.ID()
-
-	_, exists := b.byID[id]
+	_, exists := b.byID[resultID]
 	if exists {
 		return false
 	}
 
-	delete(b.byID, id)
+	delete(b.byID, resultID)
 	return true
 }
 
