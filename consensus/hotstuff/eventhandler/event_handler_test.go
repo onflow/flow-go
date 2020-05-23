@@ -27,12 +27,11 @@ const (
 	voteTimeoutFraction    float64 = 0.5   // multiplicative factor
 	multiplicativeIncrease float64 = 1.5   // multiplicative factor
 	multiplicativeDecrease float64 = 0.85  // multiplicative factor
-	additiveDecrease       float64 = 50    // Milliseconds
 )
 
 // TestPaceMaker is a real pacemaker module with logging for view changes
 type TestPaceMaker struct {
-	*pacemaker.FlowPaceMaker
+	hotstuff.PaceMaker
 	t *testing.T
 }
 
@@ -41,29 +40,26 @@ func NewTestPaceMaker(t *testing.T, startView uint64, timeoutController *timeout
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &TestPaceMaker{
-		FlowPaceMaker: p,
-		t:             t,
-	}
+	return &TestPaceMaker{p, t}
 }
 
 func (p *TestPaceMaker) UpdateCurViewWithQC(qc *model.QuorumCertificate) (*model.NewViewEvent, bool) {
 	oldView := p.CurView()
-	newView, changed := p.FlowPaceMaker.UpdateCurViewWithQC(qc)
+	newView, changed := p.PaceMaker.UpdateCurViewWithQC(qc)
 	p.t.Logf("pacemaker.UpdateCurViewWithQC old view: %v, new view: %v\n", oldView, p.CurView())
 	return newView, changed
 }
 
 func (p *TestPaceMaker) UpdateCurViewWithBlock(block *model.Block, isLeaderForNextView bool) (*model.NewViewEvent, bool) {
 	oldView := p.CurView()
-	newView, changed := p.FlowPaceMaker.UpdateCurViewWithBlock(block, isLeaderForNextView)
+	newView, changed := p.PaceMaker.UpdateCurViewWithBlock(block, isLeaderForNextView)
 	p.t.Logf("pacemaker.UpdateCurViewWithBlock old view: %v, new view: %v\n", oldView, p.CurView())
 	return newView, changed
 }
 
 func (p *TestPaceMaker) OnTimeout() *model.NewViewEvent {
 	oldView := p.CurView()
-	newView := p.FlowPaceMaker.OnTimeout()
+	newView := p.PaceMaker.OnTimeout()
 	p.t.Logf("pacemaker.OnTimeout old view: %v, new view: %v\n", oldView, p.CurView())
 	return newView
 }

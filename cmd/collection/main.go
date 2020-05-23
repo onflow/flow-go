@@ -10,6 +10,8 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
+
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
@@ -62,7 +64,7 @@ func main() {
 		builderExpiryBuffer                    uint
 		hotstuffTimeout                        time.Duration
 		hotstuffMinTimeout                     time.Duration
-		hotstuffTimeoutInfreaseFactor          float64
+		hotstuffTimeoutIncreaseFactor          float64
 		hotstuffTimeoutDecreaseFactor          float64
 		hotstuffTimeoutVoteAggregationFraction float64
 
@@ -102,9 +104,9 @@ func main() {
 			flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000", "the address the ingress server listens on")
 			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second, "the initial timeout for the hotstuff pacemaker")
 			flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", proposalTimeout, "the lower timeout bound for the hotstuff pacemaker")
-			flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease", 0.85, "decrease of timeout duration in case of progress")
-			flags.Float64Var(&hotstuffTimeoutInfreaseFactor, "hotstuff-timeout-increase-factor", 2.0, "multiplicative increase of timeout duration in case of time out event")
-			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", 0.5, "additional fraction of replica timeout that the primary will wait for votes")
+			flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor", timeout.DefaultConfig.TimeoutIncrease, "multiplicative increase of timeout value in case of time out event")
+			flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor", timeout.DefaultConfig.TimeoutDecrease, "multiplicative decrease of timeout value in case of progress")
+			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", timeout.DefaultConfig.VoteAggregationTimeoutFraction, "additional fraction of replica timeout that the primary will wait for votes")
 		}).
 		Module("transactions mempool", func(node *cmd.FlowNodeBuilder) error {
 			pool, err = stdmap.NewTransactions(txLimit)
@@ -372,9 +374,9 @@ func main() {
 				pending,
 				consensus.WithInitialTimeout(hotstuffTimeout),
 				consensus.WithMinTimeout(hotstuffMinTimeout),
-				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
-				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutInfreaseFactor),
 				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
+				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
+				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize hotstuff participant: %w", err)

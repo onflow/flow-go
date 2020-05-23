@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/blockproducer"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/eventhandler"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks"
@@ -53,7 +54,7 @@ type Instance struct {
 	communicator *mocks.Communicator
 
 	// real dependencies
-	pacemaker  *pacemaker.FlowPaceMaker
+	pacemaker  hotstuff.PaceMaker
 	producer   *blockproducer.BlockProducer
 	forks      *forks.Forks
 	aggregator *voteaggregator.VoteAggregator

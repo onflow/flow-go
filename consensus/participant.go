@@ -38,6 +38,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 		TimeoutAggregationFraction: defTimeout.VoteAggregationTimeoutFraction,
 		TimeoutIncreaseFactor:      defTimeout.TimeoutIncrease,
 		TimeoutDecreaseFactor:      defTimeout.TimeoutDecrease,
+		BlockRateDelay:             time.Duration(defTimeout.BlockRateDelayMS) * time.Millisecond,
 	}
 
 	// apply the configuration options
