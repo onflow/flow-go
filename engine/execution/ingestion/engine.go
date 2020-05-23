@@ -203,13 +203,17 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 		case *messages.BlockProposal:
 			log.Debug().Hex("block_id", logging.Entity(v.Header)).
 				Uint64("block_view", v.Header.View).
+				Uint64("block_height", v.Header.Height).
 				Hex("block_proposal", logging.Entity(v.Header)).Msg("received block proposal")
 			err = e.handleBlockProposal(ctx, v)
 		case *messages.CollectionResponse:
 			log.Debug().Hex("collection_id", logging.Entity(v.Collection)).Msg("received collection response")
 			err = e.handleCollectionResponse(ctx, v)
 		case *messages.ExecutionStateDelta:
-			log.Debug().Hex("block_id", logging.Entity(v.Block)).Msg("received block delta")
+			log.Debug().
+				Hex("block_id", logging.Entity(v.Block)).
+				Uint64("block_height", v.Block.Header.Height).
+				Msg("received block delta")
 			err = e.handleExecutionStateDelta(ctx, v, originID)
 		case *messages.ExecutionStateSyncRequest:
 			log.Debug().Hex("current_block_id", logging.ID(v.CurrentBlockID)).
@@ -848,7 +852,7 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 	e.log.Info().
 		Hex("block_id", logging.Entity(eb.Block)).
 		Hex("prev_block_id", logging.ID(eb.Block.Header.ParentID)).
-		Int("block_height", int(eb.Block.Header.Height)).
+		Uint64("block_height", eb.Block.Header.Height).
 		Int("number_of_collections", len(eb.Collections())).
 		RawJSON("block_header", logging.AsJSON(eb.Block.Header)).
 		Msg("extensive log: block header")
@@ -1013,6 +1017,7 @@ func (e *Engine) handleExecutionStateDelta(
 		if queue, added := tryEnqueue(executionStateDelta, backdata); added {
 			e.log.Debug().
 				Hex("block_id", logging.Entity(executionStateDelta.Block)).
+				Uint64("block_height", executionStateDelta.Block.Header.Height).
 				Msg("added block to existing orphan queue")
 
 			e.tryRequeueOrphans(executionStateDelta, queue, backdata)
@@ -1055,10 +1060,15 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 
 	defer e.syncWg.Done()
 
+	log := e.log.With().
+		Hex("block_id", logging.Entity(executionStateDelta.Block)).
+		Uint64("block_id", executionStateDelta.Block.Header.Height).
+		Logger()
+
 	// synchronize DB writing to avoid tx conflicts with multiple blocks arriving fast
 	err := e.blocks.Store(executionStateDelta.Block)
 	if err != nil {
-		e.log.Fatal().Hex("block_id", logging.Entity(executionStateDelta.Block)).
+		log.Fatal().
 			Err(err).Msg("could  not store block from delta")
 	}
 
@@ -1066,7 +1076,7 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 		collection := collection.Collection()
 		err := e.collections.Store(&collection)
 		if err != nil {
-			e.log.Fatal().Hex("block_id", logging.Entity(executionStateDelta.Block)).
+			log.Fatal().
 				Err(err).Msg("could not store collection from delta")
 		}
 	}
@@ -1081,11 +1091,11 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 		executionStateDelta.StartState,
 	)
 	if err != nil {
-		e.log.Fatal().Hex("block_id", logging.Entity(executionStateDelta.Block)).Err(err).Msg("fatal error while processing sync message")
+		log.Fatal().Err(err).Msg("fatal error while processing sync message")
 	}
 
 	if !bytes.Equal(executionReceipt.ExecutionResult.FinalStateCommit, executionStateDelta.EndState) {
-		e.log.Fatal().Hex("block_id", logging.Entity(executionStateDelta.Block)).
+		log.Fatal().
 			Hex("saved_state", executionReceipt.ExecutionResult.FinalStateCommit).
 			Hex("delta_end_state", executionStateDelta.EndState).
 			Hex("delta_start_state", executionStateDelta.StartState).
@@ -1134,7 +1144,7 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 						panic(fmt.Sprintf("cannot add queue to execution queues"))
 					}
 
-					e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("block complete - executing")
+					log.Debug().Msg("block complete - executing")
 
 					e.wg.Add(1)
 					go e.executeBlock(context.Background(), executableBlock)
@@ -1144,7 +1154,7 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 			})
 
 		if err != nil {
-			e.log.Err(err).Hex("block_id", logging.Entity(executionStateDelta.Block)).Msg("error while processing final target sync block")
+			log.Err(err).Msg("error while processing final target sync block")
 		}
 
 		return
@@ -1178,12 +1188,10 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 	})
 
 	if err != nil {
-		e.log.Err(err).
-			Hex("block_id", logging.Entity(executionStateDelta.Block)).
-			Msg("error while requeueing delta after saving")
+		log.Err(err).Msg("error while requeueing delta after saving")
 	}
 
-	e.log.Debug().Hex("block_id", logging.Entity(executionStateDelta.Block)).Msg("finished processing sync delta")
+	log.Debug().Msg("finished processing sync delta")
 }
 
 // generateChunkDataPack creates a chunk data pack
