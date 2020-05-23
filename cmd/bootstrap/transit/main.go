@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/md5"
 	"crypto/rand"
 	"flag"
 	"fmt"
@@ -172,6 +173,13 @@ func runPull(ctx context.Context, bootdir, token, nodeId string, role flow.Role)
 			log.Fatalf("Failed to pull: %s", err)
 		}
 	}
+
+	genesisFile := filepath.Join(bootdir, bootstrap.PathGenesisBlock)
+	genesisMd5, err := getFileMd5(genesisFile)
+	if err != nil {
+		log.Fatalf("Failed to calculate md5 of %s: %v", genesisFile, err)
+	}
+	log.Printf("MD5 of Genesis is: %s\n", genesisMd5)
 }
 
 // generateKeys creates the transit keypair and writes them to disk for later
@@ -395,4 +403,19 @@ func getAdditionalFilesToDownload(role flow.Role, nodeId string) []string {
 		return []string{fmt.Sprintf(filesToDownloadConsensus, nodeId)}
 	}
 	return make([]string, 0)
+}
+
+func getFileMd5(file string) (string, error) {
+	f, err := os.Open(file)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	h := md5.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
