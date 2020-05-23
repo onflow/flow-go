@@ -158,7 +158,6 @@ func (b *Backend) Run(f func(backdata *Backdata) error) error {
 	b.Lock()
 	defer b.Unlock()
 	err := f(&b.Backdata)
-	b.reduce()
 	return err
 }
 
