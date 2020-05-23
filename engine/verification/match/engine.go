@@ -20,26 +20,27 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
+// Engine takes processable execution results, finds the chunks the are assigned to me, fetches
+// the chunk data pack from execution nodes, and passes verifiable chunks to Verifier engine
 type Engine struct {
 	unit          *engine.Unit
 	log           zerolog.Logger
 	me            module.Local
-	results       Results
-	verifier      network.Engine
-	assigner      module.ChunkAssigner // used to determine chunks this node needs to verify
-	state         protocol.State
-	chunks        *Chunks
-	con           network.Conduit
-	headers       storage.Headers
-	retryInterval time.Duration // determines time in milliseconds for retrying chunk data requests
-
+	results       module.PendingResults // used to store all the execution results along with their senders
+	verifier      network.Engine        // the verifier engine
+	assigner      module.ChunkAssigner  // used to determine chunks this node needs to verify
+	state         protocol.State        // used to verify the request origin
+	chunks        *Chunks               // used to store all the chunks that assigned to me
+	con           network.Conduit       // used to send the chunk data request
+	headers       storage.Headers       // used to fetch the block header when chunk data is ready to be verified
+	retryInterval time.Duration         // determines time in milliseconds for retrying chunk data requests
 }
 
 func New(
 	log zerolog.Logger,
 	net module.Network,
 	me module.Local,
-	results Results,
+	results module.PendingResults,
 	verifier network.Engine,
 	assigner module.ChunkAssigner,
 	state protocol.State,
@@ -72,7 +73,11 @@ func New(
 // Ready initializes the engine and returns a channel that is closed when the initialization is done
 func (e *Engine) Ready() <-chan struct{} {
 	delay := time.Duration(0)
-	e.unit.LaunchPeriodically(e.OnTimer, e.retryInterval, delay)
+	// run a periodic check to retry requesting chunk data packs for chunks that assigned to me.
+	// if onTimer takes longer than retryInterval, the next call will be blocked until the previous
+	// call has finished.
+	// That being said, there won't be two onTimer running in parallel. See test cases for LaunchPeriodically
+	e.unit.LaunchPeriodically(e.onTimer, e.retryInterval, delay)
 	return e.unit.Ready()
 }
 
@@ -127,34 +132,35 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	}
 }
 
+// handleExecutionResult takes a exeuction result and find chunks that are assigned to me, and add them to
+// the pending chunk list to be processed.
+// It stores the result in memory, in order to check if a chunk still needs to be processed.
 func (e *Engine) handleExecutionResult(originID flow.Identifier, r *flow.ExecutionResult) error {
-	result := &Result{
+	result := &flow.PendingResult{
 		ExecutorID:      originID,
 		ExecutionResult: r,
 	}
 
 	added := e.results.Add(result)
 
-	// is new exeuction result
+	// if a execution result has been added before, then don't process
+	// this result.
 	if !added {
 		return nil
 	}
 
-	// chunking can be run in parallel
+	// different execution results can be chunked in parallel
 	chunks, err := e.myChunkAssignments(result.ExecutionResult)
 	if err != nil {
 		return fmt.Errorf("could not find my chunk assignments: %w", err)
 	}
 
+	// add each chunk to a pending list to be processed by onTimer
 	for _, chunk := range chunks {
 		status := NewChunkStatus(chunk, result.ExecutionResult.ID(), result.ExecutorID)
-		added := e.chunks.Add(status)
-		if !added {
-			//TODO: log
-			e.log.Debug().Msg("chunk has already been added")
-			continue
-		}
+		_ = e.chunks.Add(status)
 	}
+
 	return nil
 }
 
@@ -184,7 +190,6 @@ func myAssignements(assigner module.ChunkAssigner, myID flow.Identifier, verifie
 		return nil, fmt.Errorf("could not generate random generator: %w", err)
 	}
 
-	// TODO pull up caching of chunk assignments to here
 	assignment, err := assigner.Assign(verifiers, result.Chunks, rng)
 	if err != nil {
 		return nil, fmt.Errorf("could not create chunk assignment %w", err)
@@ -207,39 +212,56 @@ func myAssignements(assigner module.ChunkAssigner, myID flow.Identifier, verifie
 	return mine, nil
 }
 
-func (e *Engine) OnTimer() {
+// onTimer runs periodically, it goes through all pending chunks, and fetches
+// its chunk data pack.
+// it also retries the chunk data request if the data hasn't been received
+// for a while.
+func (e *Engine) onTimer() {
 	allChunks := e.chunks.All()
 
 	for _, chunk := range allChunks {
-		id := chunk.ID()
-		c, exists := e.chunks.ByID(id)
-		// double check
+		exists := e.results.Has(chunk.ExecutionResultID)
+
+		cid := chunk.ID()
+
+		log := e.log.With().
+			Hex("chunk_id", cid[:]).
+			Hex("result_id", chunk.ExecutionResultID[:]).
+			Logger()
+
+		// if exeuction result has been removed, no need to request
+		// the chunk data any more.
 		if !exists {
-			// deleted
+			e.chunks.Rem(cid)
+			log.Debug().Msg("remove chunk since exeuction result no longer exists")
 			continue
 		}
 
-		err := e.requestChunkDataPack(c)
+		err := e.requestChunkDataPack(chunk)
 		if err != nil {
-			e.log.Warn().Msg("could not request chunk data pack")
+			log.Warn().Msg("could not request chunk data pack")
 		}
 	}
 }
 
+// request the chunk data pack from the execution node.
+// the chunk data pack includes the collection and statecommitments that
+// needed to make a VerifiableChunk
 func (e *Engine) requestChunkDataPack(c *ChunkStatus) error {
-	chunkID := c.Chunk.ID()
+	chunkID := c.ID()
 
 	execNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
 	if err != nil {
 		return fmt.Errorf("could not load execution nodes identities: %w", err)
 	}
 
+	// request from the exeuctor plus another random execution node as a backup
 	nodes := execNodes.Filter(filter.Not(filter.HasNodeID(c.ExecutorID, e.me.NodeID()))).Sample(1).NodeIDs()
 	nodes = append(nodes, c.ExecutorID)
 
 	req := &messages.ChunkDataPackRequest{
 		ChunkID: chunkID,
-		Nonce:   rand.Uint64(),
+		Nonce:   rand.Uint64(), // prevent the request from being deduplicated by the receiver
 	}
 
 	err = e.con.Submit(req, nodes...)
@@ -250,11 +272,12 @@ func (e *Engine) requestChunkDataPack(c *ChunkStatus) error {
 	return nil
 }
 
-// handleChunkDataPack receives a chunk data pack, verifies its origin ID, and stores that in the mempool
+// handleChunkDataPack receives a chunk data pack, verifies its origin ID, pull other data to make a
+// VerifiableChunk, and pass it to the verifier engine to verify
 func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack) error {
 	// check origin is from a exeuction node
 	e.log.Info().
-		Hex("origin_id", logging.ID(originID)).
+		Hex("executor_id", logging.ID(originID)).
 		Hex("chunk_data_pack_id", logging.Entity(chunkDataPack)).
 		Msg("chunk data pack received")
 
@@ -263,11 +286,9 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		return nil
 	}
 
-	// delete first to ensure concurrency issue
-	deleted := e.chunks.Rem(chunkDataPack.ChunkID)
-	if !deleted {
-		// no longer exists
-		// TODO
+	// remove first to ensure concurrency issue
+	removed := e.chunks.Rem(chunkDataPack.ChunkID)
+	if !removed {
 		return nil
 	}
 

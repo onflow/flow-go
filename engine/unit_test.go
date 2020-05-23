@@ -15,6 +15,8 @@ func TestReadyDone(t *testing.T) {
 	<-u.Done()
 }
 
+// Test that if a function is run by LaunchPeriodically and
+// takes longer than the interval, the next call will be blocked
 func TestLaunchPeriod(t *testing.T) {
 	u := engine.NewUnit()
 	<-u.Ready()
@@ -25,7 +27,11 @@ func TestLaunchPeriod(t *testing.T) {
 		logs = append(logs, "finish")
 	}, 10*time.Millisecond, 0)
 
-	<-time.After(95 * time.Millisecond)
-	require.Equal(t, []string{"running", "finish", "running", "finish", "running"}, logs)
-	u.Done()
+	<-time.After((30*3 + 5) * time.Millisecond)
+	require.Equal(t, []string{
+		"running", "finish",
+		"running", "finish",
+		"running",
+	}, logs)
+	<-u.Done()
 }
