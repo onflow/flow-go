@@ -22,49 +22,52 @@ var (
 	flagStakingSeed []byte
 )
 
+// keyCmdRun generate the node staking key, networking key and node information
+func keyCmdRun(_ *cobra.Command, _ []string) {
+	// validate inputs
+	role := validateRole(flagRole)
+	validateAddressFormat(flagAddress)
+	networkSeed := validateSeed(flagNetworkSeed)
+	stakingSeed := validateSeed(flagStakingSeed)
+
+	log.Debug().Msg("will generate networking key")
+	networkKeys, err := run.GenerateNetworkingKeys(1, [][]byte{networkSeed})
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot generate networking key")
+	}
+	log.Info().Msg("generated networking key")
+
+	log.Debug().Msg("will generate staking key")
+	stakingKeys, err := run.GenerateStakingKeys(1, [][]byte{stakingSeed})
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot generate staking key")
+	}
+	log.Info().Msg("generated staking key")
+
+	log.Debug().Str("address", flagAddress).Msg("assembling node information")
+	conf := model.NodeConfig{
+		Role:    role,
+		Address: flagAddress,
+		Stake:   0,
+	}
+	nodeInfo := assembleNodeInfo(conf, networkKeys[0], stakingKeys[0])
+
+	// retrieve private representation of the node
+	private, err := nodeInfo.Private()
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not access private keys")
+	}
+
+	writeText(model.PathNodeId, []byte(nodeInfo.NodeID.String()))
+	writeJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID), private)
+	writeJSON(fmt.Sprintf(model.PathNodeInfoPub, nodeInfo.NodeID), nodeInfo.Public())
+}
+
 // keyCmd represents the key command
 var keyCmd = &cobra.Command{
 	Use:   "key",
 	Short: "Generate networking and staking keys for a partner node and write them to files",
-	Run: func(cmd *cobra.Command, args []string) {
-		// validate inputs
-		role := validateRole(flagRole)
-		validateAddressFormat(flagAddress)
-		networkSeed := validateSeed(flagNetworkSeed)
-		stakingSeed := validateSeed(flagStakingSeed)
-
-		log.Debug().Msg("will generate networking key")
-		networkKeys, err := run.GenerateNetworkingKeys(1, [][]byte{networkSeed})
-		if err != nil {
-			log.Fatal().Err(err).Msg("cannot generate networking key")
-		}
-		log.Info().Msg("generated networking key")
-
-		log.Debug().Msg("will generate staking key")
-		stakingKeys, err := run.GenerateStakingKeys(1, [][]byte{stakingSeed})
-		if err != nil {
-			log.Fatal().Err(err).Msg("cannot generate staking key")
-		}
-		log.Info().Msg("generated staking key")
-
-		log.Debug().Str("address", flagAddress).Msg("assembling node information")
-		conf := model.NodeConfig{
-			Role:    role,
-			Address: flagAddress,
-			Stake:   0,
-		}
-		nodeInfo := assembleNodeInfo(conf, networkKeys[0], stakingKeys[0])
-
-		// retrieve private representation of the node
-		private, err := nodeInfo.Private()
-		if err != nil {
-			log.Fatal().Err(err).Msg("could not access private keys")
-		}
-
-		writeText(model.PathNodeId, []byte(nodeInfo.NodeID.String()))
-		writeJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID), private)
-		writeJSON(fmt.Sprintf(model.PathNodeInfoPub, nodeInfo.NodeID), nodeInfo.Public())
-	},
+	Run:   keyCmdRun,
 }
 
 func init() {
