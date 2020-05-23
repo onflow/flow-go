@@ -12,10 +12,15 @@ import (
 const chunkExecutionSpanner = "chunk_execution_duration"
 
 type VerificationCollector struct {
-	tracer                  *trace.OpenTracer
-	chunksCheckedPerBlock   prometheus.Counter
-	resultApprovalsPerBlock prometheus.Counter
-	storagePerChunk         prometheus.Gauge
+	tracer                      *trace.OpenTracer
+	chunksCheckedPerBlock       prometheus.Counter
+	resultApprovalsPerBlock     prometheus.Counter
+	storagePerChunk             prometheus.Gauge
+	pendingCollectionsNum       prometheus.Gauge
+	authenticatedCollectionsNum prometheus.Gauge
+	pendingReceiptsNum          prometheus.Gauge
+	authenticatedReceiptsNum    prometheus.Gauge
+	chunkTrackersNum            prometheus.Gauge
 }
 
 func NewVerificationCollector(tracer *trace.OpenTracer) *VerificationCollector {
@@ -36,9 +41,39 @@ func NewVerificationCollector(tracer *trace.OpenTracer) *VerificationCollector {
 		}),
 
 		storagePerChunk: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "storage_per_chunk_bytes",
+			Name:      "storage_latest_chunk_size_bytes",
 			Namespace: namespaceVerification,
-			Help:      "storage per ingested chunk resources (bytes)",
+			Help:      "latest ingested chunk resources storage (bytes)",
+		}),
+
+		pendingCollectionsNum: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "pending_collections_latest_number_collections",
+			Namespace: namespaceVerification,
+			Help:      "latest number of pending collections in mempool",
+		}),
+
+		authenticatedCollectionsNum: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "authenticated_collections_latest_number_collections",
+			Namespace: namespaceVerification,
+			Help:      "latest number of authenticated collections in mempool",
+		}),
+
+		pendingReceiptsNum: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "pending_receipts_latest_number_receipts",
+			Namespace: namespaceVerification,
+			Help:      "latest number of pending receipts in mempool",
+		}),
+
+		authenticatedReceiptsNum: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "authenticated_receipts_latest_number_receipts",
+			Namespace: namespaceVerification,
+			Help:      "latest number of authenticated receipts in mempool",
+		}),
+
+		chunkTrackersNum: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "chunk_trackers_number_latest_number_trackers",
+			Namespace: namespaceVerification,
+			Help:      "latest number of chunk trackers",
 		}),
 	}
 
@@ -63,6 +98,36 @@ func (vc *VerificationCollector) OnResultApproval() {
 // https://github.com/dapperlabs/flow-go/issues/3183
 func (vc *VerificationCollector) OnVerifiableChunkSubmitted(size float64) {
 	vc.storagePerChunk.Set(size)
+}
+
+// OnAuthenticatedReceiptsUpdated is called whenever size of AuthenticatedReceipts mempool gets changed.
+// It records the latest value of its size.
+func (vc *VerificationCollector) OnAuthenticatedReceiptsUpdated(size uint) {
+	vc.authenticatedReceiptsNum.Set(float64(size))
+}
+
+// OnPendingReceiptsUpdated is called whenever size of PendingReceipts mempool gets changed.
+// It records the latest value of its size.
+func (vc *VerificationCollector) OnPendingReceiptsUpdated(size uint) {
+	vc.pendingReceiptsNum.Set(float64(size))
+}
+
+// OnAuthenticatedCollectionsUpdated is called whenever size of AuthenticatedCollections mempool gets changed.
+// It records the latest value of its size.
+func (vc *VerificationCollector) OnAuthenticatedCollectionsUpdated(size uint) {
+	vc.authenticatedCollectionsNum.Set(float64(size))
+}
+
+// OnPendingCollectionsUpdated is called whenever size of PendingCollections mempool gets changed.
+// It records the latest value of its size.
+func (vc *VerificationCollector) OnPendingCollectionsUpdated(size uint) {
+	vc.pendingCollectionsNum.Set(float64(size))
+}
+
+// OnChunkTrackersUpdated is called whenever size of ChunkTrackers mempool gets changed.
+// It records the latest value of its size.
+func (vc *VerificationCollector) OnChunkTrackersUpdated(size uint) {
+	vc.chunkTrackersNum.Set(float64(size))
 }
 
 // OnChunkVerificationStarted is called whenever the verification of a chunk is started.
