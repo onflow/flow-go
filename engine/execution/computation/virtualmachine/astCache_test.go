@@ -271,13 +271,14 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 		wg.Add(1)
 		go func(id int, wg *sync.WaitGroup) {
 			defer wg.Done()
-			result, err := bc.ExecuteScript(ledger, []byte(fmt.Sprintf(`
+			view := delta.NewView(ledger.Get)
+			result, err := bc.ExecuteScript(view, []byte(fmt.Sprintf(`
 				import FlowToken from 0x%s
 				pub fun main() {
 					log("Script %d")
 					let v <- FlowToken.createEmptyVault()
 					destroy v
-				}
+				}s
 			`, virtualmachine.FlowTokenAddress, id)))
 			if !assert.True(t, result.Succeeded()) {
 				t.Log(result.Error.ErrorMessage())
