@@ -11,6 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/storage/mocks"
@@ -21,13 +22,15 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 	return func(t *testing.T) {
 		unittest.RunWithBadgerDB(t, func(badgerDB *badger.DB) {
 			unittest.RunWithTempDir(t, func(dbDir string) {
-				ls, err := ledger.NewMTrieStorage(dbDir, 100, nil)
+				metricsCollector := &metrics.NoopCollector{}
+				ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 				require.NoError(t, err)
 
 				ctrl := gomock.NewController(t)
 
 				stateCommitments := mocks.NewMockCommits(ctrl)
 				blocks := mocks.NewMockBlocks(ctrl)
+				collections := mocks.NewMockCollections(ctrl)
 
 				stateCommitment := ls.EmptyStateCommitment()
 
@@ -38,7 +41,7 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 				executionResults := new(storage.ExecutionResults)
 
 				es := state.NewExecutionState(
-					ls, stateCommitments, blocks, chunkDataPacks, executionResults, badgerDB, nil,
+					ls, stateCommitments, blocks, collections, chunkDataPacks, executionResults, badgerDB, nil,
 				)
 
 				f(t, es)

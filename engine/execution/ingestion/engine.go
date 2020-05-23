@@ -304,7 +304,7 @@ func (e *Engine) handleBlockProposal(ctx context.Context, proposal *messages.Blo
 			}
 
 			//if block has state commitment, it has all parents blocks
-			err = e.sendCollectionsRequest(executableBlock, blockByCollection)
+			err = e.matchOrRequestCollections(executableBlock, blockByCollection)
 			if err != nil {
 				return fmt.Errorf("cannot send collection requests: %w", err)
 			}
@@ -319,10 +319,7 @@ func (e *Engine) handleBlockProposal(ctx context.Context, proposal *messages.Blo
 			e.tryRequeueOrphans(executableBlock, newQueue, orphanQueues)
 
 			// If the block was empty
-			if executableBlock.IsComplete() {
-				e.wg.Add(1)
-				go e.executeBlock(ctx, executableBlock)
-			}
+			e.executeBlockIfComplete(executableBlock)
 
 			return nil
 		},
@@ -376,7 +373,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		return
 	}
 
-	diskTotal, err := e.execState.Size()
+	diskTotal, err := e.execState.DiskSize()
 	if err != nil {
 		e.log.Err(err).Msg("could not get execution state disk size")
 	}
@@ -401,7 +398,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 				newExecutableBlock := queue.Head.Item.(*entity.ExecutableBlock)
 				newExecutableBlock.StartState = finalState
 
-				err := e.sendCollectionsRequest(newExecutableBlock, blockByCollection)
+				err := e.matchOrRequestCollections(newExecutableBlock, blockByCollection)
 				if err != nil {
 					return fmt.Errorf("cannot send collection requests: %w", err)
 				}
@@ -411,10 +408,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 					return fmt.Errorf("fatal error - child block already in execution queue")
 				}
 
-				if newExecutableBlock.IsComplete() {
-					e.wg.Add(1)
-					go e.executeBlock(context.Background(), newExecutableBlock)
-				}
+				e.executeBlockIfComplete(newExecutableBlock)
 			}
 
 			executionQueues.Rem(executableBlock.Block.ID())
@@ -435,10 +429,32 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	e.metrics.ExecutionLastExecutedBlockView(executableBlock.Block.Header.View)
 }
 
+func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
+	if eb.IsComplete() {
+		e.log.Debug().
+			Hex("block_id", logging.Entity(eb.Block)).
+			Msg("executing block")
+
+		if e.extensiveLogging {
+			e.logExecutableBlock(eb)
+		}
+
+		e.wg.Add(1)
+		go e.executeBlock(context.Background(), eb)
+		return true
+	}
+	return false
+}
+
 func (e *Engine) handleCollectionResponse(ctx context.Context, response *messages.CollectionResponse) error {
 
 	collection := response.Collection
 	collID := collection.ID()
+
+	err := e.collections.Store(&collection)
+	if err != nil {
+		return fmt.Errorf("cannot store collection: %w", err)
+	}
 
 	return e.mempool.BlockByCollection.Run(
 		func(backdata *stdmap.BlockByCollectionBackdata) error {
@@ -467,18 +483,7 @@ func (e *Engine) handleCollectionResponse(ctx context.Context, response *message
 
 				completeCollection.Transactions = collection.Transactions
 
-				if executableBlock.IsComplete() {
-
-					e.log.Debug().
-						Hex("block_id", logging.Entity(executableBlock.Block)).
-						Msg("block complete - executing")
-
-					if e.extensiveLogging {
-						e.logExecutableBlock(executableBlock)
-					}
-					e.wg.Add(1)
-					go e.executeBlock(ctx, executableBlock)
-				}
+				e.executeBlockIfComplete(executableBlock)
 			}
 			backdata.Rem(collID)
 
@@ -605,53 +610,58 @@ func (e *Engine) submitCollectionRequest(timer **time.Timer, collID flow.Identif
 	})
 }
 
-func (e *Engine) sendCollectionsRequest(
+func (e *Engine) matchOrRequestCollections(
 	executableBlock *entity.ExecutableBlock,
 	backdata *stdmap.BlockByCollectionBackdata,
 ) error {
 
 	for _, guarantee := range executableBlock.Block.Payload.Guarantees {
-
+		var transactions []*flow.TransactionBody
 		maybeBlockByCollection, exists := backdata.ByID(guarantee.ID())
 
-		if !exists {
-
-			maybeBlockByCollection = &entity.BlocksByCollection{
-				CollectionID:     guarantee.ID(),
-				ExecutableBlocks: make(map[flow.Identifier]*entity.ExecutableBlock),
+		if exists {
+			if _, exists := maybeBlockByCollection.ExecutableBlocks[executableBlock.ID()]; exists {
+				e.log.Info().Hex("block_id", logging.Entity(executableBlock)).Msg("requesting collections for block with already pending requests. Ignoring requests.")
 			}
+			maybeBlockByCollection.ExecutableBlocks[executableBlock.ID()] = executableBlock
+		} else {
+			collection, err := e.collections.ByID(guarantee.CollectionID)
 
-			added := backdata.Add(maybeBlockByCollection)
-			if !added {
-				return fmt.Errorf("collection already mapped to block")
+			if err == nil {
+				transactions = collection.Transactions
+			} else if errors.Is(err, storage.ErrNotFound) {
+				maybeBlockByCollection = &entity.BlocksByCollection{
+					CollectionID:     guarantee.ID(),
+					ExecutableBlocks: map[flow.Identifier]*entity.ExecutableBlock{executableBlock.ID(): executableBlock},
+				}
+
+				added := backdata.Add(maybeBlockByCollection)
+				if !added {
+					return fmt.Errorf("collection already mapped to block")
+				}
+
+				collectionGuaranteesIdentifiers, err := e.findCollectionNodesForGuarantee(
+					executableBlock.Block.ID(),
+					guarantee,
+				)
+				if err != nil {
+					return err
+				}
+
+				e.log.Debug().
+					Hex("block_id", logging.Entity(executableBlock.Block)).
+					Hex("collection_id", logging.ID(guarantee.ID())).
+					Msg("requesting collection")
+
+				e.submitCollectionRequest(&maybeBlockByCollection.TimeoutTimer, guarantee.ID(), collectionGuaranteesIdentifiers, 0)
+			} else {
+				return fmt.Errorf("error while querying for collection: %w", err)
 			}
-
-			collectionGuaranteesIdentifiers, err := e.findCollectionNodesForGuarantee(
-				executableBlock.Block.ID(),
-				guarantee,
-			)
-			if err != nil {
-				return err
-			}
-
-			e.log.Debug().
-				Hex("block_id", logging.Entity(executableBlock.Block)).
-				Hex("collection_id", logging.ID(guarantee.ID())).
-				Msg("requesting collection")
-
-			e.submitCollectionRequest(&maybeBlockByCollection.TimeoutTimer, guarantee.ID(), collectionGuaranteesIdentifiers, 0)
 		}
-
-		if _, exists := maybeBlockByCollection.ExecutableBlocks[executableBlock.ID()]; exists {
-			e.log.Info().Hex("block_id", logging.Entity(executableBlock)).Msg("requesting collections for block with already pending requests. Ignoring requests.")
-			continue
-		}
-
-		maybeBlockByCollection.ExecutableBlocks[executableBlock.ID()] = executableBlock
 
 		executableBlock.CompleteCollections[guarantee.ID()] = &entity.CompleteCollection{
 			Guarantee:    guarantee,
-			Transactions: nil,
+			Transactions: transactions,
 		}
 	}
 
@@ -701,7 +711,7 @@ func (e *Engine) handleComputationResult(
 
 	receipt, err := e.saveExecutionResults(
 		ctx,
-		result.ExecutableBlock.Block,
+		result.ExecutableBlock,
 		result.StateSnapshots,
 		result.Events,
 		result.TransactionResult,
@@ -721,7 +731,7 @@ func (e *Engine) handleComputationResult(
 
 func (e *Engine) saveExecutionResults(
 	ctx context.Context,
-	block *flow.Block,
+	executableBlock *entity.ExecutableBlock,
 	stateInteractions []*delta.Snapshot,
 	events []flow.Event,
 	txResults []flow.TransactionResult,
@@ -733,7 +743,7 @@ func (e *Engine) saveExecutionResults(
 
 	originalState := startState
 
-	err := e.execState.PersistStateInteractions(childCtx, block.ID(), stateInteractions)
+	err := e.execState.PersistStateInteractions(childCtx, executableBlock.Block.ID(), stateInteractions)
 	if err != nil {
 		return nil, err
 	}
@@ -759,11 +769,14 @@ func (e *Engine) saveExecutionResults(
 		values, proofs, err := e.execState.GetRegistersWithProofs(childCtx, chunk.StartState, allRegisters)
 		if err != nil {
 			return nil, fmt.Errorf(
-				"error reading registers with proofs for chunk number [%v] of block [%x] ", i, block.ID(),
+				"error reading registers with proofs for chunk number [%v] of block [%x] ", i, executableBlock.ID(),
 			)
 		}
 
-		chdp := generateChunkDataPack(chunk, allRegisters, values, proofs)
+		collectionGuarantee := executableBlock.Block.Payload.Guarantees[i]
+		completeCollection := executableBlock.CompleteCollections[collectionGuarantee.ID()]
+
+		chdp := generateChunkDataPack(chunk, completeCollection.Collection().ID(), allRegisters, values, proofs)
 
 		err = e.execState.PersistChunkDataPack(childCtx, chdp)
 		if err != nil {
@@ -775,17 +788,17 @@ func (e *Engine) saveExecutionResults(
 		startState = endState
 	}
 
-	err = e.execState.PersistStateCommitment(childCtx, block.ID(), endState)
+	err = e.execState.PersistStateCommitment(childCtx, executableBlock.ID(), endState)
 	if err != nil {
 		return nil, fmt.Errorf("failed to store state commitment: %w", err)
 	}
 
-	err = e.execState.UpdateHighestExecutedBlockIfHigher(childCtx, block.Header)
+	err = e.execState.UpdateHighestExecutedBlockIfHigher(childCtx, executableBlock.Block.Header)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update highest executed block: %w", err)
 	}
 
-	executionResult, err := e.generateExecutionResultForBlock(childCtx, block, chunks, endState)
+	executionResult, err := e.generateExecutionResultForBlock(childCtx, executableBlock.Block, chunks, endState)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate execution result: %w", err)
 	}
@@ -800,14 +813,14 @@ func (e *Engine) saveExecutionResults(
 		defer span.Finish()
 
 		if len(events) > 0 {
-			err = e.events.Store(block.ID(), events)
+			err = e.events.Store(executableBlock.ID(), events)
 			if err != nil {
 				return fmt.Errorf("failed to store events: %w", err)
 			}
 		}
 
 		for _, te := range txResults {
-			err = e.transactionResults.Store(block.ID(), &te)
+			err = e.transactionResults.Store(executableBlock.ID(), &te)
 			if err != nil {
 				return fmt.Errorf("failed to store transaction error: %w", err)
 			}
@@ -820,7 +833,7 @@ func (e *Engine) saveExecutionResults(
 	}
 
 	e.log.Debug().
-		Hex("block_id", logging.Entity(block)).
+		Hex("block_id", logging.Entity(executableBlock)).
 		Hex("start_state", originalState).
 		Hex("final_state", endState).
 		Msg("saved computation results")
@@ -1049,10 +1062,19 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 			Err(err).Msg("could  not store block from delta")
 	}
 
+	for _, collection := range executionStateDelta.CompleteCollections {
+		collection := collection.Collection()
+		err := e.collections.Store(&collection)
+		if err != nil {
+			e.log.Fatal().Hex("block_id", logging.Entity(executionStateDelta.Block)).
+				Err(err).Msg("could not store collection from delta")
+		}
+	}
+
 	// TODO - validate state sync, reject invalid messages, change provider
 	executionReceipt, err := e.saveExecutionResults(
 		ctx,
-		executionStateDelta.Block,
+		&executionStateDelta.ExecutableBlock,
 		executionStateDelta.StateInteractions,
 		executionStateDelta.Events,
 		executionStateDelta.TransactionResults,
@@ -1101,7 +1123,7 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 				executableBlock := syncedQueue.Head.Item.(*entity.ExecutableBlock)
 				executableBlock.StartState = executionStateDelta.EndState
 
-				err = e.sendCollectionsRequest(executableBlock, blockByCollection)
+				err = e.matchOrRequestCollections(executableBlock, blockByCollection)
 				if err != nil {
 					return fmt.Errorf("cannot send collection requests: %w", err)
 				}
@@ -1167,6 +1189,7 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 // generateChunkDataPack creates a chunk data pack
 func generateChunkDataPack(
 	chunk *flow.Chunk,
+	collectionID flow.Identifier,
 	registers []flow.RegisterID,
 	values []flow.RegisterValue,
 	proofs []flow.StorageProof,
@@ -1182,5 +1205,6 @@ func generateChunkDataPack(
 		ChunkID:         chunk.ID(),
 		StartState:      chunk.StartState,
 		RegisterTouches: regTs,
+		CollectionID:    collectionID,
 	}
 }

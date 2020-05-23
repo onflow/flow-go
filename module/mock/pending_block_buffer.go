@@ -71,9 +71,9 @@ func (_m *PendingBlockBuffer) ByParentID(parentID flow.Identifier) ([]*flow.Pend
 	return r0, r1
 }
 
-// DropForParent provides a mock function with given fields: header
-func (_m *PendingBlockBuffer) DropForParent(header *flow.Header) {
-	_m.Called(header)
+// DropForParent provides a mock function with given fields: parentID
+func (_m *PendingBlockBuffer) DropForParent(parentID flow.Identifier) {
+	_m.Called(parentID)
 }
 
 // PruneByHeight provides a mock function with given fields: height

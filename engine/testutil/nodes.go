@@ -124,7 +124,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 	collections := storage.NewCollections(node.DB)
 	transactions := storage.NewTransactions(node.DB)
 
-	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, pool, 0)
+	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, pool, 0, true)
 	require.Nil(t, err)
 
 	providerEngine, err := provider.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, pool, collections, transactions)
@@ -230,7 +230,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	dbDir := unittest.TempDir(t)
 
-	ls, err := ledger.NewMTrieStorage(dbDir, 100, nil)
+	metricsCollector := &metrics.NoopCollector{}
+	ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 	require.NoError(t, err)
 
 	genesisHead, err := node.State.Final().Head()
@@ -243,7 +244,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	execState := state.NewExecutionState(
-		ls, commitsStorage, node.Blocks, chunkDataPackStorage, executionResults, node.DB, node.Tracer,
+		ls, commitsStorage, node.Blocks, collectionsStorage, chunkDataPackStorage, executionResults, node.DB, node.Tracer,
 	)
 
 	stateSync := sync.NewStateSynchronizer(execState)
@@ -284,7 +285,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Metrics,
 		node.Tracer,
 		false,
-		time.Second,
+		2137*time.Hour, // just don't retry
 		10,
 	)
 	require.NoError(t, err)
@@ -299,6 +300,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		ExecutionState:  execState,
 		Ledger:          ls,
 		LevelDbDir:      dbDir,
+		Collections:     collectionsStorage,
 	}
 }
 
@@ -317,6 +319,7 @@ func VerificationNode(t testing.TB,
 	assigner module.ChunkAssigner,
 	requestIntervalMs uint,
 	failureThreshold uint,
+	lightIngestEngine bool,
 	opts ...VerificationOpt) mock.VerificationNode {
 
 	var err error
@@ -384,7 +387,43 @@ func VerificationNode(t testing.TB,
 		require.Nil(t, err)
 	}
 
-	if node.IngestEngine == nil {
+	if node.IngestedCollectionIDs == nil {
+		node.IngestedCollectionIDs, err = stdmap.NewIdentifiers(1000)
+		require.Nil(t, err)
+	}
+
+	if node.AssignedChunkIDs == nil {
+		node.AssignedChunkIDs, err = stdmap.NewIdentifiers(1000)
+		require.Nil(t, err)
+	}
+
+	// creates a light ingest engine for the node if lightIngestEngine is set
+	if node.LightIngestEngine == nil && lightIngestEngine {
+		node.LightIngestEngine, err = ingest.NewLightEngine(node.Log,
+			node.Net,
+			node.State,
+			node.Me,
+			node.VerifierEngine,
+			node.AuthReceipts,
+			node.AuthCollections,
+			node.ChunkDataPacks,
+			node.CollectionTrackers,
+			node.ChunkDataPackTrackers,
+			node.IngestedChunkIDs,
+			node.IngestedResultIDs,
+			node.AssignedChunkIDs,
+			node.IngestedCollectionIDs,
+			node.Headers,
+			node.Blocks,
+			assigner,
+			requestIntervalMs,
+			failureThreshold,
+		)
+		require.Nil(t, err)
+	}
+
+	// otherwise, creates an (original) ingest engine for the node
+	if node.IngestEngine == nil && !lightIngestEngine {
 		node.IngestEngine, err = ingest.New(node.Log,
 			node.Net,
 			node.State,
@@ -399,6 +438,7 @@ func VerificationNode(t testing.TB,
 			node.ChunkDataPackTrackers,
 			node.IngestedChunkIDs,
 			node.IngestedResultIDs,
+			node.IngestedCollectionIDs,
 			node.Headers,
 			node.Blocks,
 			assigner,

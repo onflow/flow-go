@@ -19,14 +19,14 @@ StandardOutput=journal
 EnvironmentFile=/etc/flow/runtime-conf.env
 EnvironmentFile=-/etc/flow/conf.d/*.env
 
-ExecStartPre=docker pull gcr.io/dl-flow/access:${FLOW_GO_NODE_VERSION}
+ExecStartPre=docker pull gcr.io/flow-container-registry/access:${FLOW_GO_NODE_VERSION}
 ExecStart=docker run --rm \
 	-v /var/flow/bootstrap:/bootstrap:ro \
 	-v /var/flow/data:/data:rw \
 	--rm \
 	--name flow-go \
 	--network host \
-	gcr.io/dl-flow/access:${FLOW_GO_NODE_VERSION} \
+	gcr.io/flow-container-registry/access:${FLOW_GO_NODE_VERSION} \
 	--nodeid=${FLOW_GO_NODE_ID} \
 	--bootstrapdir=/bootstrap \
 	--datadir=/data/protocol \

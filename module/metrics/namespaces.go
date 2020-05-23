@@ -24,6 +24,11 @@ const (
 	subsystemCache   = "cache"
 )
 
+// Collection subsystem
+const (
+	subsystemProposal = "proposal"
+)
+
 // Consensus subsystems represent the different components of the consensus algorithm.
 const (
 	subsystemCompliance = "compliance"
@@ -33,6 +38,7 @@ const (
 // Execution Subsystems
 const (
 	subsystemStateStorage = "state_storage"
+	subsystemMTrie        = "mtrie"
 	subsystemRuntime      = "runtime"
 )
 

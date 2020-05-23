@@ -10,6 +10,7 @@ type ParticipantConfig struct {
 	TimeoutAggregationFraction float64       // the percentage part of the timeout period reserved for vote aggregation
 	TimeoutIncreaseFactor      float64       // the factor at which the timeout grows when timeouts occur
 	TimeoutDecreaseStep        time.Duration // the step with which the timeout decreases when no timeouts occur
+	BlockRateDelay             time.Duration // a delay to broadcast block proposal in order to control the block production rate
 }
 
 type Option func(*ParticipantConfig)
@@ -19,5 +20,11 @@ func WithTimeout(timeout time.Duration) Option {
 		cfg.TimeoutInitial = timeout
 		cfg.TimeoutMinimum = timeout
 		cfg.TimeoutDecreaseStep = timeout / 2
+	}
+}
+
+func WithBlockRateDelay(delay time.Duration) Option {
+	return func(cfg *ParticipantConfig) {
+		cfg.BlockRateDelay = delay
 	}
 }

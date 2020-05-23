@@ -80,7 +80,6 @@ func (s *StubEngineTestSuite) TestSingleEcho() {
 // TestMultiMsgSync tests sending multiple messages from sender to receiver
 // sender and receiver are synced over reception
 func (s *StubEngineTestSuite) TestMultiMsgSync() {
-	s.T().Skip()
 	// set to false for no echo expectation
 	s.multiMessageSync(false, 10)
 }
@@ -89,7 +88,6 @@ func (s *StubEngineTestSuite) TestMultiMsgSync() {
 // it also evaluates the correct reception of an echo message back for each send
 // sender and receiver are synced over reception
 func (s *StubEngineTestSuite) TestEchoMultiMsgSync() {
-	s.T().Skip()
 	// set to true for an echo expectation
 	s.multiMessageSync(true, 10)
 }
@@ -97,7 +95,6 @@ func (s *StubEngineTestSuite) TestEchoMultiMsgSync() {
 // TestMultiMsgAsync tests sending multiple messages from sender to receiver
 // sender and receiver are not synchronized
 func (s *StubEngineTestSuite) TestMultiMsgAsync() {
-	s.T().Skip()
 	// set to false for no echo expectation
 	s.multiMessageAsync(false, 10)
 }
@@ -106,7 +103,6 @@ func (s *StubEngineTestSuite) TestMultiMsgAsync() {
 // it also evaluates the correct reception of an echo message back for each send
 // sender and receiver are not synchronized
 func (s *StubEngineTestSuite) TestEchoMultiMsgAsync() {
-	s.T().Skip()
 	// set to true for an echo expectation
 	s.multiMessageAsync(true, 10)
 }
@@ -182,7 +178,6 @@ func (s *StubEngineTestSuite) TestDuplicateMessageParallel() {
 // on deduplicating the received messages against different engine ids. In specific, the
 // desire behavior is that the deduplication should happen based on both eventID and channelID
 func (s *StubEngineTestSuite) TestDuplicateMessageDifferentChan() {
-	s.T().Skip()
 	const (
 		sndNode = iota
 		rcvNode

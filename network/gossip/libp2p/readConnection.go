@@ -59,7 +59,7 @@ RecvLoop:
 					rc.log.Error().Err(err)
 				}
 			}
-			rc.stop()
+
 			return
 		}
 

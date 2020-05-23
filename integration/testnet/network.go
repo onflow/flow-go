@@ -661,12 +661,12 @@ func runDKG(confs []ContainerConfig) (bootstrap.DKGData, error) {
 	nConsensusNodes := len(consensusNodes)
 
 	// run the core dkg algorithm
-	dkgSeeds, err := getSeeds(nConsensusNodes)
+	dkgSeed, err := getSeed()
 	if err != nil {
 		return bootstrap.DKGData{}, err
 	}
 
-	dkg, err := bootstraprun.RunDKG(nConsensusNodes, dkgSeeds)
+	dkg, err := bootstraprun.RunFastKG(nConsensusNodes, dkgSeed)
 	if err != nil {
 		return bootstrap.DKGData{}, err
 	}

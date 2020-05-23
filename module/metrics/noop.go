@@ -3,6 +3,7 @@ package metrics
 import (
 	"time"
 
+	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -16,6 +17,7 @@ func NewNoopCollector() *NoopCollector {
 
 func (nc *NoopCollector) NetworkMessageSent(sizeBytes int, topic string)            {}
 func (nc *NoopCollector) NetworkMessageReceived(sizeBytes int, topic string)        {}
+func (nc *NoopCollector) NetworkDuplicateMessagesDropped(topic string)              {}
 func (nc *NoopCollector) MessageSent(engine string, message string)                 {}
 func (nc *NoopCollector) MessageReceived(engine string, message string)             {}
 func (nc *NoopCollector) MessageHandled(engine string, message string)              {}
@@ -46,9 +48,9 @@ func (nc *NoopCollector) SetQCView(view uint64)                                 
 func (nc *NoopCollector) CountSkipped()                                             {}
 func (nc *NoopCollector) CountTimeout()                                             {}
 func (nc *NoopCollector) SetTimeout(duration time.Duration)                         {}
-func (nc *NoopCollector) TransactionReceived(txID flow.Identifier)                  {}
-func (nc *NoopCollector) CollectionProposed(collection flow.LightCollection)        {}
-func (nc *NoopCollector) CollectionGuaranteed(collection flow.LightCollection)      {}
+func (nc *NoopCollector) TransactionIngested(txID flow.Identifier)                  {}
+func (nc *NoopCollector) ClusterBlockProposed(*cluster.Block)                       {}
+func (nc *NoopCollector) ClusterBlockFinalized(*cluster.Block)                      {}
 func (nc *NoopCollector) PendingClusterBlocks(n uint)                               {}
 func (nc *NoopCollector) StartCollectionToFinalized(collectionID flow.Identifier)   {}
 func (nc *NoopCollector) FinishCollectionToFinalized(collectionID flow.Identifier)  {}
@@ -67,3 +69,15 @@ func (nc *NoopCollector) ExecutionStateStorageDiskTotal(bytes int64)            
 func (nc *NoopCollector) ExecutionStorageStateCommitment(bytes int64)               {}
 func (nc *NoopCollector) ExecutionLastExecutedBlockView(view uint64)                {}
 func (ec *NoopCollector) ExecutionTotalExecutedTransactions(numberOfTx int)         {}
+func (nc *NoopCollector) ForestApproxMemorySize(bytes uint64)                       {}
+func (nc *NoopCollector) ForestNumberOfTrees(number uint64)                         {}
+func (nc *NoopCollector) UpdateCount()                                              {}
+func (nc *NoopCollector) ProofSize(bytes uint32)                                    {}
+func (nc *NoopCollector) UpdateValuesNumber(number uint64)                          {}
+func (nc *NoopCollector) UpdateValuesSize(byte uint64)                              {}
+func (nc *NoopCollector) UpdateDuration(duration time.Duration)                     {}
+func (nc *NoopCollector) UpdateDurationPerItem(duration time.Duration)              {}
+func (nc *NoopCollector) ReadValuesNumber(number uint64)                            {}
+func (nc *NoopCollector) ReadValuesSize(byte uint64)                                {}
+func (nc *NoopCollector) ReadDuration(duration time.Duration)                       {}
+func (nc *NoopCollector) ReadDurationPerItem(duration time.Duration)                {}

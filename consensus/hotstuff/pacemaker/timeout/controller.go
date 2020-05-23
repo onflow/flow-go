@@ -106,3 +106,8 @@ func (t *Controller) OnTimeout() {
 func (t *Controller) OnProgressBeforeTimeout() {
 	t.cfg.ReplicaTimeout = math.Max(t.cfg.ReplicaTimeout-t.cfg.TimeoutDecrease, t.cfg.MinReplicaTimeout)
 }
+
+// BlockRateDelay is a delay to broadcast the proposal in order to control block production rate
+func (t *Controller) BlockRateDelay() time.Duration {
+	return time.Duration(t.cfg.BlockRateDelayMS * float64(time.Millisecond))
+}

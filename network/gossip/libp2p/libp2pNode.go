@@ -15,7 +15,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	swarm "github.com/libp2p/go-libp2p-swarm"
@@ -128,15 +127,21 @@ func (p *P2PNode) Stop() (chan struct{}, error) {
 		}
 	}
 
-	if result != nil {
-		// TODO: Till #2485 - graceful shutdown is implemented, swallow all unsusbscribe errors and only log it
-		p.logger.Debug().Err(result)
-	}
-
 	p.logger.Debug().Str("name", p.name).Msg("stopping libp2p node")
 	if err := p.libP2PHost.Close(); err != nil {
+		result = multierror.Append(result, err)
+	}
+
+	p.logger.Debug().Str("name", p.name).Msg("closing peer store")
+	// to prevent peerstore routine leak (https://github.com/libp2p/go-libp2p/issues/718)
+	if err := p.libP2PHost.Peerstore().Close(); err != nil {
+		p.logger.Debug().Str("name", p.name).Err(err).Msg("closing peer store")
+		result = multierror.Append(result, err)
+	}
+
+	if result != nil {
 		close(done)
-		return done, multierror.Append(result, err)
+		return done, result
 	}
 
 	go func(done chan struct{}) {
@@ -170,10 +175,6 @@ func (p *P2PNode) AddPeers(ctx context.Context, peers ...NodeAddress) error {
 		if err != nil {
 			return err
 		}
-
-		// Add the destination's peer multiaddress in the peerstore.
-		// This will be used during connection and stream creation by libp2p.
-		p.libP2PHost.Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.PermanentAddrTTL)
 
 		err = p.libP2PHost.Connect(ctx, pInfo)
 		if err != nil {

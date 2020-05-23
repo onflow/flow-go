@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
@@ -27,6 +28,7 @@ type Network struct {
 	me      module.Local
 	mw      middleware.Middleware
 	top     middleware.Topology
+	metrics module.NetworkMetrics
 	engines map[uint8]network.Engine
 	rcache  *cache.RcvCache // used to deduplicate incoming messages
 	fanout  int             // used to determine number of nodes' neighbors on overlay
@@ -43,7 +45,9 @@ func NewNetwork(
 	me module.Local,
 	mw middleware.Middleware,
 	csize int,
-	top middleware.Topology) (*Network, error) {
+	top middleware.Topology,
+	metrics module.NetworkMetrics,
+) (*Network, error) {
 
 	rcache, err := cache.NewRcvCache(csize)
 	if err != nil {
@@ -62,6 +66,7 @@ func NewNetwork(
 		rcache:  rcache,
 		fanout:  fanout,
 		top:     top,
+		metrics: metrics,
 	}
 
 	o.SetIDs(ids)
@@ -153,14 +158,18 @@ func (n *Network) SetIDs(ids flow.IdentityList) {
 }
 
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
-	// checks the cache for deduplication
-	if n.rcache.Seen(message.EventID, message.ChannelID) {
+	// checks the cache for deduplication and adds the message if not already present
+	if n.rcache.Add(message.EventID, message.ChannelID) {
 		// drops duplicate message
-		n.logger.Debug().Hex("event ID", message.EventID).
+		channelName := engine.ChannelName(uint8(message.ChannelID))
+		n.logger.Debug().
+			Str("channel", channelName).
+			Hex("sender_id", senderID[:]).
+			Hex("event_id", message.EventID).
 			Msg("dropping message due to duplication")
+		n.metrics.NetworkDuplicateMessagesDropped(channelName)
 		return nil
 	}
-	n.rcache.Add(message.EventID, message.ChannelID)
 
 	// Extract channel id and find the registered engine
 	channelID := uint8(message.ChannelID)
