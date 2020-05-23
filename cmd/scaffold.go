@@ -46,6 +46,7 @@ const notSet = "not set"
 // BaseConfig is the general config for the FlowNodeBuilder
 type BaseConfig struct {
 	nodeIDHex        string
+	chainID          string
 	bindAddr         string
 	nodeRole         string
 	timeout          time.Duration
@@ -138,6 +139,7 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	datadir := filepath.Join(homedir, ".flow", "database")
 	// bind configuration parameters
 	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", notSet, "identity of our node")
+	fnb.flags.StringVar(&fnb.BaseConfig.chainID, "chainid", flow.Mainnet.String(), "chain ID to use for block generation")
 	fnb.flags.StringVar(&fnb.BaseConfig.bindAddr, "bind", notSet, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", "bootstrap", "path to the bootstrap directory")
 	fnb.flags.DurationVarP(&fnb.BaseConfig.timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
@@ -149,6 +151,10 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.profilerDir, "profiler-dir", "profiler", "directory to create auto-profiler profiles")
 	fnb.flags.DurationVar(&fnb.BaseConfig.profilerInterval, "profiler-interval", 15*time.Minute, "the interval between auto-profiler runs")
 	fnb.flags.DurationVar(&fnb.BaseConfig.profilerDuration, "profiler-duration", 10*time.Second, "the duration to run the auto-profile for")
+}
+
+func (fnb *FlowNodeBuilder) configureChainParams() {
+	flow.SetChainID(flow.ChainID(fnb.BaseConfig.chainID))
 }
 
 func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
@@ -532,6 +538,8 @@ func FlowNode(role string) *FlowNodeBuilder {
 	}
 
 	builder.baseFlags()
+
+	builder.configureChainParams()
 
 	builder.enqueueNetworkInit()
 

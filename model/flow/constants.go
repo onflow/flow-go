@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
@@ -19,6 +20,10 @@ const Testnet ChainID = "flow-testnet"
 // Emulator is the chain ID for the emulated node chain.
 const Emulator ChainID = "flow-emulator"
 
+func (id ChainID) String() string {
+	return string(id)
+}
+
 var chainIDOnce sync.Once
 var chainID = Mainnet
 
@@ -32,7 +37,12 @@ func SetChainID(id ChainID) {
 
 // setChainID is an unsafe version of SetChainID that does not enforce singleton behaviour.
 func setChainID(id ChainID) {
-	chainID = id
+	switch id {
+	case Mainnet, Testnet, Emulator:
+		chainID = id
+	default:
+		panic(fmt.Sprintf("invalid chain ID %s", id))
+	}
 }
 
 // GetChainID returns the global chain ID.
