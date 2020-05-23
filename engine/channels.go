@@ -8,9 +8,10 @@ const (
 	// Reserved 000-009
 
 	// Collection 010-029
-	CollectionProvider       = 10 // providing collections/transactions to non-collection nodes
-	CollectionIngest         = 11 // ingesting transactions and routing to appropriate cluster
-	ProtocolClusterConsensus = 20 // cluster-specific consensus protocol
+	CollectionProvider             = 10 // providing collections/transactions to non-collection nodes
+	CollectionIngest               = 11 // ingesting transactions and routing to appropriate cluster
+	ProtocolClusterConsensus       = 20 // cluster-specific consensus protocol
+	ProtocolClusterSynchronization = 21 // cluster-specific consensus synchronization
 
 	// Observation 030-049
 

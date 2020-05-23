@@ -23,6 +23,10 @@ type BlocksByCollection struct {
 	TimeoutTimer     *time.Timer
 }
 
+func (c *CompleteCollection) Collection() flow.Collection {
+	return flow.Collection{Transactions: c.Transactions}
+}
+
 func (b *BlocksByCollection) ID() flow.Identifier {
 	return b.CollectionID
 }

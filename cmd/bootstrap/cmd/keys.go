@@ -77,10 +77,13 @@ func genNetworkAndStakingKeys(partnerNodes []model.NodeInfo) []model.NodeInfo {
 }
 
 func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto.PrivateKey) model.NodeInfo {
-
-	nodeID, err := flow.PublicKeyToID(stakingKey.PublicKey())
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot generate NodeID from PublicKey")
+	var err error
+	nodeID, found := getNameID()
+	if !found {
+		nodeID, err = flow.PublicKeyToID(stakingKey.PublicKey())
+		if err != nil {
+			log.Fatal().Err(err).Msg("cannot generate NodeID from PublicKey")
+		}
 	}
 
 	log.Debug().

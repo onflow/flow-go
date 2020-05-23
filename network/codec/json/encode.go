@@ -46,8 +46,6 @@ func encode(v interface{}) (*Envelope, error) {
 		code = CodeClusterBlockProposal
 	case *messages.ClusterBlockVote:
 		code = CodeClusterBlockVote
-	case *messages.ClusterBlockRequest:
-		code = CodeClusterBlockRequest
 	case *messages.ClusterBlockResponse:
 		code = CodeClusterBlockResponse
 
@@ -68,9 +66,9 @@ func encode(v interface{}) (*Envelope, error) {
 
 	case *flow.ExecutionReceipt:
 		code = CodeExecutionReceipt
-	case *messages.ChunkDataPackRequest:
+	case *messages.ChunkDataRequest:
 		code = CodeChunkDataPackRequest
-	case *messages.ChunkDataPackResponse:
+	case *messages.ChunkDataResponse:
 		code = CodeChunkDataPackResponse
 	case *messages.ExecutionStateSyncRequest:
 		code = CodeExecutionStateSyncRequest
