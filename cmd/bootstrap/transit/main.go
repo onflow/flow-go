@@ -179,7 +179,7 @@ func runPull(ctx context.Context, bootdir, token, nodeId string, role flow.Role)
 	if err != nil {
 		log.Fatalf("Failed to calculate md5 of %s: %v", genesisFile, err)
 	}
-	log.Printf("MD5 of Genesis is: %s\n", genesisMd5)
+	log.Printf("MD5 of the genesis block is: %s\n", genesisMd5)
 }
 
 // generateKeys creates the transit keypair and writes them to disk for later
