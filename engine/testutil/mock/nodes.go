@@ -93,6 +93,7 @@ type ExecutionNode struct {
 	ExecutionState  state.ExecutionState
 	Ledger          storage.Ledger
 	LevelDbDir      string
+	Collections     storage.Collections
 }
 
 func (en ExecutionNode) Done() {
@@ -125,6 +126,8 @@ type VerificationNode struct {
 	IngestedChunkIDs      mempool.Identifiers
 	IngestedResultIDs     mempool.Identifiers
 	IngestedCollectionIDs mempool.Identifiers
+	AssignedChunkIDs      mempool.Identifiers
 	IngestEngine          *ingest.Engine
+	LightIngestEngine     *ingest.LightEngine // a lighter version of ingest engine
 	VerifierEngine        network.Engine
 }

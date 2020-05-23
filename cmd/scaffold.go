@@ -69,13 +69,14 @@ type Metrics struct {
 }
 
 type Storage struct {
-	Headers    storage.Headers
-	Index      storage.Index
-	Identities storage.Identities
-	Guarantees storage.Guarantees
-	Seals      storage.Seals
-	Payloads   storage.Payloads
-	Blocks     storage.Blocks
+	Headers     storage.Headers
+	Index       storage.Index
+	Identities  storage.Identities
+	Guarantees  storage.Guarantees
+	Seals       storage.Seals
+	Payloads    storage.Payloads
+	Blocks      storage.Blocks
+	Collections storage.Collections
 }
 
 type namedModuleFunc struct {
@@ -177,7 +178,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		nodeRole := nodeID.Role
 		topology := libp2p.NewRandPermTopology(nodeRole)
 
-		net, err := libp2p.NewNetwork(fnb.Logger, codec, participants, fnb.Me, mw, 10e6, topology)
+		net, err := libp2p.NewNetwork(fnb.Logger, codec, participants, fnb.Me, mw, 10e6, topology, fnb.Metrics.Network)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize network: %w", err)
 		}
@@ -189,7 +190,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 
 func (fnb *FlowNodeBuilder) enqueueMetricsServerInit() {
 	fnb.Component("metrics server", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
-		server := metrics.NewServer(fnb.Logger, fnb.BaseConfig.metricsPort)
+		server := metrics.NewServer(fnb.Logger, fnb.BaseConfig.metricsPort, fnb.BaseConfig.profilerEnabled)
 		return server, nil
 	})
 }
@@ -307,16 +308,18 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	index := bstorage.NewIndex(fnb.Metrics.Cache, db)
 	payloads := bstorage.NewPayloads(index, identities, guarantees, seals)
 	blocks := bstorage.NewBlocks(db, headers, payloads)
+	collections := bstorage.NewCollections(db)
 
 	fnb.DB = db
 	fnb.Storage = Storage{
-		Headers:    headers,
-		Identities: identities,
-		Guarantees: guarantees,
-		Seals:      seals,
-		Index:      index,
-		Payloads:   payloads,
-		Blocks:     blocks,
+		Headers:     headers,
+		Identities:  identities,
+		Guarantees:  guarantees,
+		Seals:       seals,
+		Index:       index,
+		Payloads:    payloads,
+		Blocks:      blocks,
+		Collections: collections,
 	}
 }
 
@@ -619,7 +622,7 @@ func loadDKGPublicData(dir string) (*dkg.PublicData, error) {
 	if err != nil {
 		return nil, err
 	}
-	dkgPubData := &bootstrap.DKGDataPub{}
+	dkgPubData := &bootstrap.EncodableDKGDataPub{}
 	err = json.Unmarshal(data, dkgPubData)
 	return dkgPubData.ForHotStuff(), err
 }

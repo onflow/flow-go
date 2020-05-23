@@ -151,7 +151,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 	arg1, _ := jsoncdc.Encode(cadence.NewInt(42))
 	arg2, _ := jsoncdc.Encode(cadence.NewString("foo"))
 
-	var transactionArgsTests = []struct {
+	var tests = []struct {
 		label       string
 		script      string
 		args        [][]byte
@@ -203,7 +203,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 		},
 	}
 
-	for _, tt := range transactionArgsTests {
+	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
 			tx := flow.NewTransactionBody().
 				SetScript([]byte(tt.script)).
@@ -219,6 +219,82 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 			err = execTestutil.SignTransactionByRoot(tx, 0)
 			require.NoError(t, err)
 			//seq++
+
+			result, err := bc.ExecuteTransaction(ledger, tx)
+			require.NoError(t, err)
+
+			tt.check(t, result)
+		})
+	}
+}
+
+func gasLimitScript(depth int) string {
+	return fmt.Sprintf(`
+		pub fun foo(_ i: Int) {
+			if i <= 0 {
+				return
+			}
+			log("foo")
+			foo(i-1)
+		}
+		
+		transaction { execute { foo(%d) } }
+	`, depth)
+}
+func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
+	rt := runtime.NewInterpreterRuntime()
+
+	h := unittest.BlockHeaderFixture()
+
+	vm, err := virtualmachine.New(rt)
+	assert.NoError(t, err)
+	bc := vm.NewBlockContext(&h)
+
+	var tests = []struct {
+		label    string
+		script   string
+		gasLimit uint64
+		check    func(t *testing.T, result *virtualmachine.TransactionResult)
+	}{
+		{
+			label:    "zero",
+			script:   gasLimitScript(100), // 100 function calls
+			gasLimit: 0,
+			check: func(t *testing.T, result *virtualmachine.TransactionResult) {
+				// gas limit of zero is ignored by runtime
+				require.Nil(t, result.Error)
+			},
+		},
+		{
+			label:    "insufficient",
+			script:   gasLimitScript(100), // 100 function calls
+			gasLimit: 5,
+			check: func(t *testing.T, result *virtualmachine.TransactionResult) {
+				assert.NotNil(t, result.Error)
+			},
+		},
+		{
+			label:    "sufficient",
+			script:   gasLimitScript(100), // 100 function calls
+			gasLimit: 1000,
+			check: func(t *testing.T, result *virtualmachine.TransactionResult) {
+				require.Nil(t, result.Error)
+				require.Len(t, result.Logs, 100)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.label, func(t *testing.T) {
+			tx := flow.NewTransactionBody().
+				SetScript([]byte(tt.script)).
+				SetGasLimit(tt.gasLimit)
+
+			ledger, err := execTestutil.RootBootstrappedLedger()
+			require.NoError(t, err)
+
+			err = execTestutil.SignTransactionByRoot(tx, 0)
+			require.NoError(t, err)
 
 			result, err := bc.ExecuteTransaction(ledger, tx)
 			require.NoError(t, err)

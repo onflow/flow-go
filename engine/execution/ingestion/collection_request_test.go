@@ -48,6 +48,9 @@ func TestCollectionRequests(t *testing.T) {
 		ctx.blocks.EXPECT().Store(gomock.Eq(&block))
 		ctx.state.On("AtBlockID", block.ID()).Return(ctx.snapshot).Maybe()
 
+		ctx.collections.EXPECT().ByID(gomock.Any()).Return(nil, realStorage.ErrNotFound).AnyTimes()
+		ctx.collections.EXPECT().Store(gomock.Any()).AnyTimes()
+
 		ctx.collectionConduit.EXPECT().Submit(
 			&colReqMatcher{req: &messages.CollectionRequest{ID: guarantees[0].ID(), Nonce: rand.Uint64()}},
 			gomock.Eq([]flow.Identifier{collection1Identity.NodeID, collection3Identity.NodeID}),
@@ -112,6 +115,8 @@ func TestValidatingCollectionResponse(t *testing.T) {
 		executableBlock := unittest.ExecutableBlockFixture([][]flow.Identifier{{collection1Identity.NodeID}})
 		executableBlock.StartState = unittest.StateCommitmentFixture()
 
+		ctx.collections.EXPECT().ByID(gomock.Any()).Return(nil, realStorage.ErrNotFound).AnyTimes()
+		ctx.collections.EXPECT().Store(gomock.Any()).AnyTimes()
 		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlock.Block))
 
 		id := executableBlock.Collections()[0].Guarantee.ID()
@@ -176,7 +181,8 @@ func TestNoBlockExecutedUntilAllCollectionsArePosted(t *testing.T) {
 		}
 
 		ctx.state.On("AtBlockID", executableBlock.ID()).Return(ctx.snapshot)
-
+		ctx.collections.EXPECT().ByID(gomock.Any()).Return(nil, realStorage.ErrNotFound).AnyTimes()
+		ctx.collections.EXPECT().Store(gomock.Any()).AnyTimes()
 		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlock.Block))
 		ctx.executionState.
 			On("StateCommitmentByBlockID", mock.Anything, executableBlock.Block.Header.ParentID).
@@ -228,7 +234,8 @@ func TestRequestsAreRepeated(t *testing.T) {
 		}
 
 		ctx.state.On("AtBlockID", executableBlock.ID()).Return(ctx.snapshot)
-
+		ctx.collections.EXPECT().ByID(gomock.Any()).Return(nil, realStorage.ErrNotFound).AnyTimes()
+		ctx.collections.EXPECT().Store(gomock.Any()).AnyTimes()
 		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlock.Block))
 		ctx.executionState.
 			On("StateCommitmentByBlockID", mock.Anything, executableBlock.Block.Header.ParentID).
@@ -279,6 +286,8 @@ func TestCollectionSharedByMultipleBlocks(t *testing.T) {
 
 		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlockA.Block))
 		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlockB.Block))
+		ctx.collections.EXPECT().ByID(gomock.Any()).Return(nil, realStorage.ErrNotFound).AnyTimes()
+		ctx.collections.EXPECT().Store(gomock.Any()).AnyTimes()
 		ctx.state.On("AtBlockID", blockA.ID()).Return(ctx.snapshot).Maybe()
 		ctx.state.On("AtBlockID", blockB.ID()).Return(ctx.snapshot).Maybe()
 
@@ -311,6 +320,83 @@ func TestCollectionSharedByMultipleBlocks(t *testing.T) {
 		}
 
 		err = ctx.engine.ProcessLocal(&rightResponse)
+
+		require.NoError(t, err)
+	})
+}
+
+func TestCollectionStoredAndLoaded(t *testing.T) {
+
+	runWithEngine(t, func(ctx testingContext) {
+
+		blockA := unittest.BlockFixture()
+		blockB := unittest.BlockFixture()
+
+		completeCollection := unittest.CompleteCollectionFixture()
+		completeCollection.Guarantee.SignerIDs = []flow.Identifier{collection1Identity.NodeID}
+
+		blockA.Payload.Guarantees = []*flow.CollectionGuarantee{completeCollection.Guarantee}
+		blockA.Header.PayloadHash = blockA.Payload.Hash()
+		executableBlockA := entity.ExecutableBlock{
+			Block:               &blockA,
+			CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{completeCollection.Guarantee.CollectionID: completeCollection},
+			StartState:          unittest.StateCommitmentFixture(),
+		}
+
+		blockB.Payload.Guarantees = []*flow.CollectionGuarantee{completeCollection.Guarantee}
+		blockB.Header.PayloadHash = blockB.Payload.Hash()
+		executableBlockB := entity.ExecutableBlock{
+			Block:               &blockB,
+			CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{completeCollection.Guarantee.CollectionID: completeCollection},
+			StartState:          unittest.StateCommitmentFixture(),
+		}
+
+		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlockA.Block))
+		ctx.blocks.EXPECT().Store(gomock.Eq(executableBlockB.Block))
+		ctx.state.On("AtBlockID", blockA.ID()).Return(ctx.snapshot).Maybe()
+		ctx.state.On("AtBlockID", blockB.ID()).Return(ctx.snapshot).Maybe()
+
+		collection := flow.Collection{Transactions: completeCollection.Transactions}
+		gomock.InOrder(
+			ctx.collections.EXPECT().ByID(completeCollection.Guarantee.ID()).Return(nil, realStorage.ErrNotFound),
+			ctx.collections.EXPECT().Store(&collection).Return(nil),
+			ctx.collections.EXPECT().ByID(completeCollection.Guarantee.ID()).Return(&collection, nil),
+		)
+
+		ctx.collectionConduit.EXPECT().Submit(
+			&colReqMatcher{req: &messages.CollectionRequest{ID: completeCollection.Guarantee.ID(), Nonce: rand.Uint64()}},
+			gomock.Any(),
+		).Times(1)
+
+		ctx.executionState.
+			On("StateCommitmentByBlockID", mock.Anything, blockA.Header.ParentID).
+			Return(executableBlockA.StartState, nil)
+
+		ctx.executionState.
+			On("StateCommitmentByBlockID", mock.Anything, blockB.Header.ParentID).
+			Return(executableBlockB.StartState, nil)
+
+		proposalA := unittest.ProposalFromBlock(executableBlockA.Block)
+		err := ctx.engine.ProcessLocal(proposalA)
+		require.NoError(t, err)
+
+		rightResponse := messages.CollectionResponse{
+			Collection: collection,
+		}
+
+		ctx.assertSuccessfulBlockComputation(&executableBlockA, unittest.IdentifierFixture())
+		err = ctx.engine.ProcessLocal(&rightResponse)
+		require.NoError(t, err)
+
+		ctx.engine.Wait()
+
+		// make sure only one block has been executed
+		ctx.computationManager.AssertCalled(t, "ComputeBlock", mock.Anything, &executableBlockA, mock.Anything)
+		ctx.computationManager.AssertNotCalled(t, "ComputeBlock", mock.Anything, &executableBlockB, mock.Anything)
+
+		ctx.assertSuccessfulBlockComputation(&executableBlockB, unittest.IdentifierFixture())
+		proposalB := unittest.ProposalFromBlock(executableBlockB.Block)
+		err = ctx.engine.ProcessLocal(proposalB)
 
 		require.NoError(t, err)
 	})

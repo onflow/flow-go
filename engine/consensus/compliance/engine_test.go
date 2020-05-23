@@ -223,21 +223,31 @@ func (cs *ComplianceSuite) SetupTest() {
 	cs.pending.On("Size").Return(uint(0))
 	cs.pending.On("PruneByHeight", mock.Anything).Return()
 
+	closed := func() <-chan struct{} {
+		channel := make(chan struct{})
+		close(channel)
+		return channel
+	}()
+
 	// set up hotstuff module mock
 	cs.hotstuff = &module.HotStuff{}
 	cs.hotstuff.On("SubmitProposal", mock.Anything, mock.Anything).Return()
 	cs.hotstuff.On("SubmitVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
+	cs.hotstuff.On("Done", mock.Anything).Return(closed)
 
 	// set up synchronization module mock
 	cs.sync = &module.Synchronization{}
 	cs.sync.On("RequestBlock", mock.Anything).Return(nil)
+
+	cs.sync.On("Done", mock.Anything).Return(closed)
 
 	// set up no-op metrics mock
 	cs.metrics = metrics.NewNoopCollector()
 
 	// initialize the engine
 	log := zerolog.New(os.Stderr)
-	e, err := New(log, cs.metrics, cs.metrics, cs.metrics, cs.net, cs.me, cs.cleaner, cs.headers, cs.payloads, cs.state, cs.prov, cs.pending)
+	blockRateDelay := time.Duration(0)
+	e, err := New(log, cs.metrics, cs.metrics, cs.metrics, cs.net, cs.me, cs.cleaner, cs.headers, cs.payloads, cs.state, cs.prov, cs.pending, blockRateDelay)
 	require.NoError(cs.T(), err, "engine initialization should pass")
 
 	// assign engine with consensus & synchronization
@@ -264,7 +274,7 @@ func (cs *ComplianceSuite) TestSendVote() {
 	cs.con.AssertCalled(cs.T(), "Submit", &vote, recipientID)
 }
 
-func (cs *ComplianceSuite) TestBroadcastProposal() {
+func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 
 	// add execution node to participants to make sure we exclude them from broadcast
 	cs.participants = append(cs.participants, unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)))
@@ -288,7 +298,7 @@ func (cs *ComplianceSuite) TestBroadcastProposal() {
 	block.Header.Height = 0
 
 	// submit to broadcast proposal
-	err := cs.e.BroadcastProposal(block.Header)
+	err := cs.e.BroadcastProposalWithDelay(block.Header, 0)
 	require.NoError(cs.T(), err, "header broadcast should pass")
 
 	// make sure chain ID and height were reconstructed and
@@ -299,23 +309,26 @@ func (cs *ComplianceSuite) TestBroadcastProposal() {
 		Header:  header,
 		Payload: block.Payload,
 	}
+
+	<-time.After(10 * time.Millisecond)
+	<-cs.e.Done()
 	cs.con.AssertCalled(cs.T(), "Submit", msg, cs.participants[1].NodeID, cs.participants[2].NodeID)
 
 	// should fail with wrong proposer
 	header.ProposerID = unittest.IdentifierFixture()
-	err = cs.e.BroadcastProposal(header)
+	err = cs.e.BroadcastProposalWithDelay(header, 0)
 	require.Error(cs.T(), err, "should fail with wrong proposer")
 	header.ProposerID = cs.myID
 
 	// should fail with changed (missing) parent
 	header.ParentID[0]++
-	err = cs.e.BroadcastProposal(header)
+	err = cs.e.BroadcastProposalWithDelay(header, 0)
 	require.Error(cs.T(), err, "should fail with missing parent")
 	header.ParentID[0]--
 
 	// should fail with wrong block ID (payload unavailable)
 	header.View++
-	err = cs.e.BroadcastProposal(header)
+	err = cs.e.BroadcastProposalWithDelay(header, 0)
 	require.Error(cs.T(), err, "should fail with missing payload")
 	header.View--
 }
@@ -459,7 +472,7 @@ func (cs *ComplianceSuite) TestProcessPendingChildren() {
 	cs.hotstuff.AssertCalled(cs.T(), "SubmitProposal", block3.Header, parent.Header.View)
 
 	// make sure we drop the cache after trying to process
-	cs.pending.AssertCalled(cs.T(), "DropForParent", parent.Header)
+	cs.pending.AssertCalled(cs.T(), "DropForParent", parent.Header.ID())
 }
 
 func (cs *ComplianceSuite) TestProposalBufferingOrder() {

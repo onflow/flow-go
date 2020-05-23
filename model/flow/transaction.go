@@ -219,12 +219,12 @@ func (tb *TransactionBody) signerMap() map[Address]int {
 	return signers
 }
 
-//SignPayload signs the transaction payload with the specified account key.
+// SignPayload signs the transaction payload with the specified account key.
 //
-//The resulting signature is combined with the account address and key ID before
-//being added to the transaction.
+// The resulting signature is combined with the account address and key ID before
+// being added to the transaction.
 //
-//This function returns an error if the signature cannot be generated.
+// This function returns an error if the signature cannot be generated.
 func (tb *TransactionBody) SignPayload(address Address, keyID uint64, privateKey crypto.PrivateKey, hasher hash.Hasher) error {
 
 	sig, err := privateKey.Sign(tb.PayloadMessage(), hasher)
@@ -237,12 +237,12 @@ func (tb *TransactionBody) SignPayload(address Address, keyID uint64, privateKey
 	return nil
 }
 
-//SignEnvelope signs the full transaction (payload + payload signatures) with the specified account key.
+// SignEnvelope signs the full transaction (payload + payload signatures) with the specified account key.
 //
-//The resulting signature is combined with the account address and key ID before
-//being added to the transaction.
+// The resulting signature is combined with the account address and key ID before
+// being added to the transaction.
 //
-//This function returns an error if the signature cannot be generated.
+// This function returns an error if the signature cannot be generated.
 func (tb *TransactionBody) SignEnvelope(address Address, keyID uint64, privateKey crypto.PrivateKey, hasher hash.Hasher) error {
 
 	sig, err := privateKey.Sign(tb.EnvelopeMessage(), hasher)
@@ -301,6 +301,7 @@ func (tb *TransactionBody) payloadCanonicalForm() interface{} {
 
 	return struct {
 		Script                    []byte
+		Arguments                 [][]byte
 		ReferenceBlockID          []byte
 		GasLimit                  uint64
 		ProposalKeyAddress        []byte
@@ -309,14 +310,15 @@ func (tb *TransactionBody) payloadCanonicalForm() interface{} {
 		Payer                     []byte
 		Authorizers               [][]byte
 	}{
-		tb.Script,
-		tb.ReferenceBlockID[:],
-		tb.GasLimit,
-		tb.ProposalKey.Address.Bytes(),
-		uint64(tb.ProposalKey.KeyID),
-		tb.ProposalKey.SequenceNumber,
-		tb.Payer.Bytes(),
-		authorizers,
+		Script:                    tb.Script,
+		Arguments:                 tb.Arguments,
+		ReferenceBlockID:          tb.ReferenceBlockID[:],
+		GasLimit:                  tb.GasLimit,
+		ProposalKeyAddress:        tb.ProposalKey.Address.Bytes(),
+		ProposalKeyID:             tb.ProposalKey.KeyID,
+		ProposalKeySequenceNumber: tb.ProposalKey.SequenceNumber,
+		Payer:                     tb.Payer.Bytes(),
+		Authorizers:               authorizers,
 	}
 }
 

@@ -34,13 +34,13 @@ func (c *Collections) StoreLight(collection *flow.LightCollection) error {
 func (c *Collections) Store(collection *flow.Collection) error {
 	return operation.RetryOnConflict(c.db.Update, func(btx *badger.Txn) error {
 		light := collection.Light()
-		err := operation.InsertCollection(&light)(btx)
+		err := operation.SkipDuplicates(operation.InsertCollection(&light))(btx)
 		if err != nil {
 			return fmt.Errorf("could not insert collection: %w", err)
 		}
 
 		for _, tx := range collection.Transactions {
-			err = operation.InsertTransaction(tx)(btx)
+			err = operation.SkipDuplicates(operation.InsertTransaction(tx))(btx)
 			if err != nil {
 				return err
 			}

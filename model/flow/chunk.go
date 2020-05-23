@@ -43,6 +43,7 @@ type ChunkDataPack struct {
 	ChunkID         Identifier
 	StartState      StateCommitment
 	RegisterTouches []RegisterTouch
+	CollectionID    Identifier
 }
 
 // GetRegisterValues returns a map of register key values
