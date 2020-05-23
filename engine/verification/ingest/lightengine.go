@@ -175,7 +175,7 @@ func (l *LightEngine) process(originID flow.Identifier, event interface{}) error
 	case *flow.Collection:
 		return l.handleCollection(originID, flow.RoleCollection, resource)
 	case *messages.ChunkDataResponse:
-		return l.handleChunkDataPack(originID, &resource.ChunkDataPack)
+		return l.handleChunkDataResponse(originID, resource)
 	default:
 		return ErrInvType
 	}
@@ -435,7 +435,7 @@ func (l *LightEngine) requestChunkData(chunkID, blockID flow.Identifier) error {
 		Nonce:   rand.Uint64(),
 	}
 
-	// TODO we should only submit to execution node that generated execution receipt
+	// TODO we should only submit to execution node that generated extecution receipt
 	err = l.chunksConduit.Submit(req, execNodes.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not submit request for collection (id=%s): %w", chunkID, err)

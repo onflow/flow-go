@@ -572,6 +572,7 @@ func setupMockExeNode(t *testing.T,
 							// publishes the chunk data pack response to the network
 							res := &messages.ChunkDataResponse{
 								ChunkDataPack: *completeER.ChunkDataPacks[i],
+								Collection:    *completeER.Collections[i],
 								Nonce:         rand.Uint64(),
 							}
 							err := exeChunkDataConduit.Submit(res, originID)
