@@ -486,7 +486,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 
 	// generate the root account
-	hardcoded, err := hex.DecodeString(flow.RootAccountPrivateKeyHex)
+	hardcoded, err := hex.DecodeString(flow.ServiceAccountPrivateKeyHex)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -139,7 +139,7 @@ func (tb *TransactionBody) MissingFields() []string {
 		missingFields = append(missingFields, TransactionFieldRefBlockID.String())
 	}
 
-	if tb.Payer == ZeroAddress {
+	if tb.Payer == ZeroAddress() {
 		missingFields = append(missingFields, TransactionFieldPayer.String())
 	}
 
@@ -169,11 +169,11 @@ func (tb *TransactionBody) signerList() []Address {
 		seen[address] = struct{}{}
 	}
 
-	if tb.ProposalKey.Address != ZeroAddress {
+	if tb.ProposalKey.Address != ZeroAddress() {
 		addSigner(tb.ProposalKey.Address)
 	}
 
-	if tb.Payer != ZeroAddress {
+	if tb.Payer != ZeroAddress() {
 		addSigner(tb.Payer)
 	}
 
