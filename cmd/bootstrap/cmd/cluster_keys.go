@@ -51,8 +51,10 @@ func (c collector) NodeID() flow.Identifier {
 func generateAdditionalInternalCollectors(nClusters, minPerCluster int, internalNodes, partnerNodes []model.NodeInfo) []model.NodeInfo {
 	// Check if we need to add any internal nodes at all
 	currentTotal := len(internalNodes) + len(partnerNodes)
-	maxPerCluster := currentTotal / nClusters
-	if len(partnerNodes) < maxPerCluster/3 {
+	// Use floor, since we want the smaller value, e.g. 10 nodes, 3 clusters, would result in cluster sizes of 4, 3, 3
+	// we actually want to compare against the worst case, which would be 3
+	nodesPerClusterFloor := currentTotal / nClusters
+	if len(partnerNodes) < nodesPerClusterFloor/3 {
 		return []model.NodeInfo{}
 	}
 
@@ -62,9 +64,9 @@ func generateAdditionalInternalCollectors(nClusters, minPerCluster int, internal
 	}
 	nTotal := calcTotalCollectors(nClusters, minPerCluster, len(partnerNodes))
 
-	// require 2at least 1/3 of collectors to be randomly generated
+	// require at least 1/3 of collectors to be randomly generated
 	if len(internalNodes)+len(partnerNodes) >= nTotal*2/3 {
-		log.Fatal().Msgf("at least 1/3 of %v total requried collectors should be available for hash grinding, got %v "+
+		log.Fatal().Msgf("at least 1/3 of %v total required collectors should be available for hash grinding, got %v "+
 			"internal nodes and %v partner nodes – please reduce the number of internal nodes", nTotal,
 			len(internalNodes), len(partnerNodes))
 	}
