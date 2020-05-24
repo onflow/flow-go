@@ -11,11 +11,10 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
-
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	protocolRecovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"

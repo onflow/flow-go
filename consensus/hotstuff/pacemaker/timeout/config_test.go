@@ -37,13 +37,13 @@ func TestConstructor(t *testing.T) {
 	c, err = NewConfig(2200*time.Millisecond, 1200*time.Millisecond, 0.73, 1.0, 0.85, time.Second)
 	require.Error(t, err)
 
-	// should not timeoutDecrease to be zero or 1.0
+	// should not allow timeoutDecrease to be zero or 1.0
 	c, err = NewConfig(2200*time.Millisecond, 1200*time.Millisecond, 0.73, 1.5, 0, time.Second)
 	require.Error(t, err)
 	c, err = NewConfig(2200*time.Millisecond, 1200*time.Millisecond, 0.73, 1.5, 1, time.Second)
 	require.Error(t, err)
 
-	// should not blockRateDelay to be zero negative
+	// should not allow blockRateDelay to be zero negative
 	c, err = NewConfig(2200*time.Millisecond, 1200*time.Millisecond, 0.73, 1.5, 0.85, -1*time.Nanosecond)
 	require.Error(t, err)
 }

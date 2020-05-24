@@ -58,7 +58,7 @@ func NewDefaultConfig() Config {
 	)
 	if err != nil {
 		// we check in a unit test that this does not happen
-		panic("Default config is not compliant with tiemout Config requirements")
+		panic("Default config is not compliant with timeout Config requirements")
 	}
 
 	return conf
@@ -98,7 +98,7 @@ func NewConfig(
 		return Config{}, &model.ErrorConfiguration{Msg: "timeoutDecrease must be in range (0,1)"}
 	}
 	if blockRateDelay < 0 {
-		return Config{}, &model.ErrorConfiguration{Msg: "TimeoutIncrease must be strictly bigger than 1"}
+		return Config{}, &model.ErrorConfiguration{Msg: "blockRateDelay must be must be non-negative"}
 	}
 
 	tc := Config{
