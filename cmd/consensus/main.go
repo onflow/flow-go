@@ -170,6 +170,7 @@ func main() {
 			// TODO: we should probably find a way to initialize mutually dependent engines separately
 
 			// initialize the entity database accessors
+			// TODO frequency of 0 turns off the cleaner, turn back on once we know the proper tuning
 			cleaner := bstorage.NewCleaner(node.Logger, node.DB, 0)
 
 			// initialize the pending blocks cache
