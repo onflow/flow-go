@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -60,10 +61,16 @@ func TestSyncFlow(t *testing.T) {
 	tx4 := execTestutil.AddToCounterTransaction()
 	err = execTestutil.SignTransactionByRoot(&tx4, seq)
 	require.NoError(t, err)
+	seq++
+
+	tx5 := execTestutil.AddToCounterTransaction()
+	err = execTestutil.SignTransactionByRoot(&tx5, seq)
+	require.NoError(t, err)
 
 	col1 := flow.Collection{Transactions: []*flow.TransactionBody{&tx1}}
 	col2 := flow.Collection{Transactions: []*flow.TransactionBody{&tx2}}
 	col4 := flow.Collection{Transactions: []*flow.TransactionBody{&tx4}}
+	col5 := flow.Collection{Transactions: []*flow.TransactionBody{&tx5}}
 
 	//Create three blocks, with one tx each
 	block1 := unittest.BlockWithParentFixture(genesis)
@@ -103,16 +110,29 @@ func TestSyncFlow(t *testing.T) {
 		},
 	})
 
+	block5 := unittest.BlockWithParentFixture(block4.Header)
+	block5.Header.View = 47
+	block5.SetPayload(flow.Payload{
+		Guarantees: []*flow.CollectionGuarantee{
+			{
+				CollectionID: col5.ID(),
+				SignerIDs:    []flow.Identifier{colID.NodeID},
+			},
+		},
+	})
+
 	proposal1 := unittest.ProposalFromBlock(&block1)
 	proposal2 := unittest.ProposalFromBlock(&block2)
 	proposal3 := unittest.ProposalFromBlock(&block3)
 	proposal4 := unittest.ProposalFromBlock(&block4)
+	proposal5 := unittest.ProposalFromBlock(&block5)
 
 	fmt.Printf("block0 ID %x parent %x\n", genesis.ID(), genesis.ParentID)
 	fmt.Printf("block1 ID %x parent %x\n", block1.ID(), block1.Header.ParentID)
 	fmt.Printf("block2 ID %x parent %x\n", block2.ID(), block2.Header.ParentID)
 	fmt.Printf("block3 ID %x parent %x\n", block3.ID(), block3.Header.ParentID)
 	fmt.Printf("block4 ID %x parent %x\n", block4.ID(), block4.Header.ParentID)
+	fmt.Printf("block5 ID %x parent %x\n", block5.ID(), block5.Header.ParentID)
 
 	collectionEngine := new(network.Engine)
 	colConduit, _ := collectionNode.Net.Register(engine.CollectionProvider, collectionEngine)
@@ -125,6 +145,9 @@ func TestSyncFlow(t *testing.T) {
 	}).Return(nil)
 	collectionEngine.On("Submit", exe1ID.NodeID, mock.MatchedBy(func(r *messages.CollectionRequest) bool { return r.ID == col4.ID() })).Run(func(args mock.Arguments) {
 		_ = colConduit.Submit(&messages.CollectionResponse{Collection: col4}, exe1ID.NodeID)
+	}).Return(nil)
+	collectionEngine.On("Submit", exe1ID.NodeID, mock.MatchedBy(func(r *messages.CollectionRequest) bool { return r.ID == col5.ID() })).Run(func(args mock.Arguments) {
+		_ = colConduit.Submit(&messages.CollectionResponse{Collection: col5}, exe1ID.NodeID)
 	}).Return(nil)
 
 	var receipt *flow.ExecutionReceipt
@@ -187,6 +210,47 @@ func TestSyncFlow(t *testing.T) {
 		}
 		return block3ok && block4ok
 	})
+
+	// make sure collections are saved and synced as well
+	rCol1, err := exeNode1.Collections.ByID(col1.ID())
+	require.NoError(t, err)
+	assert.Equal(t, col1, *rCol1)
+
+	rCol2, err := exeNode1.Collections.ByID(col2.ID())
+	require.NoError(t, err)
+	assert.Equal(t, col2, *rCol2)
+
+	rCol4, err := exeNode1.Collections.ByID(col4.ID())
+	require.NoError(t, err)
+	assert.Equal(t, col4, *rCol4)
+
+	rCol1, err = exeNode2.Collections.ByID(col1.ID())
+	require.NoError(t, err)
+	assert.Equal(t, col1, *rCol1)
+
+	rCol2, err = exeNode2.Collections.ByID(col2.ID())
+	require.NoError(t, err)
+	assert.Equal(t, col2, *rCol2)
+
+	// node two didn't get block4
+	_, err = exeNode2.Collections.ByID(col4.ID())
+	require.Error(t, err)
+
+	exeNode1.AssertHighestExecutedBlock(t, block4.Header)
+
+	// submit block5, to make sure we're still processing any incoming blocks after sync is complete
+	exeNode1.IngestionEngine.Submit(conID.NodeID, proposal5)
+	hub.Eventually(t, func() bool {
+		ebMutex.RLock()
+		defer ebMutex.RUnlock()
+
+		if nodeId, ok := executedBlocks[block5.ID()]; ok {
+			return *nodeId == exe1ID.NodeID
+		}
+		return false
+	})
+
+	exeNode1.AssertHighestExecutedBlock(t, block5.Header)
 
 	collectionEngine.AssertExpectations(t)
 	verificationEngine.AssertExpectations(t)

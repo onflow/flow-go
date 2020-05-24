@@ -63,7 +63,12 @@ func BootstrapExecutionDatabase(db *badger.DB, commit flow.StateCommitment, gene
 
 func BootstrapView(view *delta.View) {
 	ledgerAccess := virtualmachine.LedgerDAL{Ledger: view}
-	_, err := ledgerAccess.CreateAccountInLedger([]flow.AccountPublicKey{flow.RootAccountPrivateKey.PublicKey(1000)})
+
+	// initialize the account addressing state
+	ledgerAccess.SetAddressState(flow.ZeroAddressState)
+
+	// create the root account
+	_, err := ledgerAccess.CreateAccountInLedger([]flow.AccountPublicKey{flow.ServiceAccountPrivateKey.PublicKey(1000)})
 	if err != nil {
 		panic(fmt.Sprintf("error while creating account in ledger: %s ", err))
 	}

@@ -11,12 +11,22 @@ type Attestation struct {
 	ChunkIndex        uint64     // index of the approved chunk
 }
 
+// ID generates a unique identifier using attestation
+func (a Attestation) ID() Identifier {
+	return MakeID(a)
+}
+
 // ResultApprovalBody holds body part of a result approval
 type ResultApprovalBody struct {
 	Attestation
 	ApproverID           Identifier       // node id generating this result approval
 	AttestationSignature crypto.Signature // signature over attestation, this has been separated for BLS aggregation
 	Spock                Spock            // proof of re-computation, one per each chunk
+}
+
+// ID generates a unique identifier using ResultApprovalBody
+func (rab ResultApprovalBody) ID() Identifier {
+	return MakeID(rab)
 }
 
 // ResultApproval includes an approval for a chunk, verified by a verification node

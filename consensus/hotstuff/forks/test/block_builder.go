@@ -102,11 +102,11 @@ func makePayloadHash(view uint64, qc *model.QuorumCertificate, blockVersion int)
 	return flow.MakeID(struct {
 		View         uint64
 		QC           *model.QuorumCertificate
-		BlockVersion int
+		BlockVersion uint64
 	}{
 		View:         view,
 		QC:           qc,
-		BlockVersion: blockVersion,
+		BlockVersion: uint64(blockVersion),
 	})
 }
 

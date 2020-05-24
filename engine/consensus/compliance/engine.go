@@ -209,13 +209,11 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 	}
 
 	// fill in the fields that can't be populated by HotStuff
-	//TODO clean this up - currently we set these fields in builder, then lose
-	// them in HotStuff, then need to set them again here
 	header.ChainID = parent.ChainID
 	header.Height = parent.Height + 1
 
 	log := e.log.With().
-		Str("chain_id", header.ChainID).
+		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
 		Hex("block_id", logging.Entity(header)).
@@ -245,6 +243,9 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 	}
 
 	e.unit.LaunchAfter(delay, func() {
+
+		go e.hotstuff.SubmitProposal(header, parent.View)
+
 		// NOTE: some fields are not needed for the message
 		// - proposer ID is conveyed over the network message
 		// - the payload hash is deduced from the payload
@@ -326,7 +327,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	header := proposal.Header
 
 	log := e.log.With().
-		Str("chain_id", header.ChainID).
+		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
 		Hex("block_id", logging.Entity(header)).
@@ -446,7 +447,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	header := proposal.Header
 
 	log := e.log.With().
-		Str("chain_id", header.ChainID).
+		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
 		Hex("block_id", logging.Entity(header)).

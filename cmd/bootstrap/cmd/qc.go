@@ -5,6 +5,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
+	"github.com/dapperlabs/flow-go/model/dkg"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
 )
@@ -29,17 +30,22 @@ func GenerateQCParticipantData(allNodes, internalNodes []model.NodeInfo, dkgData
 	}
 
 	// length of DKG participants needs to match stakingNodes, since we run DKG for external and internal validators
-	if len(allNodes) != len(dkgData.Participants) {
-		log.Fatal().Int("len(stakingNodes)", len(allNodes)).Int("len(dkgData.Participants)", len(dkgData.Participants)).
+	if len(allNodes) != len(dkgData.PrivKeyShares) {
+		log.Fatal().Int("len(stakingNodes)", len(allNodes)).Int("len(dkgData.PrivKeyShares)", len(dkgData.PrivKeyShares)).
 			Msg("need exactly the same number of staking public keys as DKG private participants")
 	}
 
 	sd := run.ParticipantData{}
 
+	participantLookup := make(map[flow.Identifier]*dkg.Participant)
+
 	// the QC will be signed by everyone in internalNodes
-	for _, node := range internalNodes {
-		// find the corresponding entry in dkg
-		part := findDKGParticipant(dkgData, node.NodeID)
+	for i, node := range internalNodes {
+		// assign a node to a DGKdata entry, using the canonical ordering
+		participantLookup[node.NodeID] = &dkg.Participant{
+			PublicKeyShare: dkgData.PubKeyShares[i],
+			Index:          uint(i),
+		}
 
 		if node.NodeID == flow.ZeroID {
 			log.Fatal().Str("Address", node.Address).Msg("NodeID must not be zero")
@@ -51,22 +57,14 @@ func GenerateQCParticipantData(allNodes, internalNodes []model.NodeInfo, dkgData
 
 		sd.Participants = append(sd.Participants, run.Participant{
 			NodeInfo:            node,
-			RandomBeaconPrivKey: part.KeyShare,
+			RandomBeaconPrivKey: dkgData.PrivKeyShares[i],
 		})
 	}
 
-	dkgPubData := dkgData.Public()
-	sd.DKGState = wrapper.NewState(dkgPubData.ForHotStuff())
+	sd.DKGState = wrapper.NewState(&dkg.PublicData{
+		GroupPubKey:     dkgData.PubGroupKey,
+		IDToParticipant: participantLookup,
+	})
 
 	return sd
-}
-
-func findDKGParticipant(dkg model.DKGData, nodeID flow.Identifier) model.DKGParticipant {
-	for _, part := range dkg.Participants {
-		if part.NodeID == nodeID {
-			return part
-		}
-	}
-	log.Fatal().Str("nodeID", nodeID.String()).Msg("could not find nodeID in public DKG data")
-	return model.DKGParticipant{}
 }

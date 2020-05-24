@@ -13,12 +13,12 @@ import (
 // ClusterBlocks implements a simple block storage around a badger DB.
 type ClusterBlocks struct {
 	db       *badger.DB
-	chainID  string
+	chainID  flow.ChainID
 	headers  *Headers
 	payloads *ClusterPayloads
 }
 
-func NewClusterBlocks(db *badger.DB, chainID string, headers *Headers, payloads *ClusterPayloads) *ClusterBlocks {
+func NewClusterBlocks(db *badger.DB, chainID flow.ChainID, headers *Headers, payloads *ClusterPayloads) *ClusterBlocks {
 	b := &ClusterBlocks{
 		db:       db,
 		chainID:  chainID,
