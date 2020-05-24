@@ -283,7 +283,7 @@ func (e *Engine) handleBlockProposal(ctx context.Context, proposal *messages.Blo
 
 			stateCommitment, err := e.execState.StateCommitmentByBlockID(ctx, block.Header.ParentID)
 			// if state commitment doesn't exist and there are no known blocks which will produce
-			// it soon (execution queue) that we save it as orphaned
+			// it soon (execution queue) then we save it as orphaned
 			if errors.Is(err, storage.ErrNotFound) {
 				queue, added := enqueue(executableBlock, orphanQueues)
 				if !added {
@@ -957,17 +957,26 @@ func (e *Engine) StartSync(ctx context.Context, firstKnown *entity.ExecutableBlo
 	// TODO - this doesn't make sense if we treat every block as finalized (MVP)
 
 	targetBlockID := firstKnown.Block.Header.ParentID
+	targetHeight := firstKnown.Block.Header.Height - 1
 
 	e.syncTargetBlockID.Store(targetBlockID)
 
-	e.log.Info().Msg("starting state synchronisation")
+	e.log.Info().
+		Hex("target_id", targetBlockID[:]).
+		Uint64("target_id", targetHeight).
+		Msg("starting state synchronization")
 
 	lastExecutedHeight, lastExecutedBlockID, err := e.execState.GetHighestExecutedBlockID(ctx)
 	if err != nil {
 		e.log.Fatal().Err(err).Msg("error while starting sync - cannot find highest executed block")
 	}
 
-	e.log.Debug().Msgf("sync from height %d to height %d", lastExecutedHeight, firstKnown.Block.Header.Height-1)
+	if lastExecutedHeight == targetHeight && lastExecutedBlockID != targetBlockID {
+		e.log.Fatal().Err(err).Msg("error while starting sync - first known not on same branch as last executed block")
+	}
+
+	e.log.Debug().
+		Msgf("syncing from height %d to height %d", lastExecutedHeight, targetHeight)
 
 	otherNodes, err := e.state.Final().Identities(filter.And(filter.HasRole(flow.RoleExecution), e.me.NotMeFilter()))
 	if err != nil {
@@ -1012,41 +1021,40 @@ func (e *Engine) handleExecutionStateDelta(
 ) error {
 
 	return e.mempool.SyncQueues.Run(func(backdata *stdmap.QueuesBackdata) error {
+		log := e.log.With().
+			Hex("block_id", logging.Entity(executionStateDelta.Block)).
+			Uint64("block_height", executionStateDelta.Block.Header.Height).
+			Logger()
 
 		// try enqueue
 		if queue, added := tryEnqueue(executionStateDelta, backdata); added {
-			e.log.Debug().
-				Hex("block_id", logging.Entity(executionStateDelta.Block)).
-				Uint64("block_height", executionStateDelta.Block.Header.Height).
+			log.Debug().
 				Msg("added block to existing orphan queue")
 
 			e.tryRequeueOrphans(executionStateDelta, queue, backdata)
 			return nil
 		}
 
-		stateCommitment, err := e.execState.StateCommitmentByBlockID(ctx, executionStateDelta.ParentID())
-		// if state commitment doesn't exist and there are no known deltas which will produce
-		// it soon (sync queue) that we save it as orphaned
-		if errors.Is(err, storage.ErrNotFound) {
-			_, added := enqueue(executionStateDelta, backdata)
-			if !added {
-				panic(fmt.Sprintf("cannot create new queue for sync delta: %s", err))
-			}
-			return nil
-		}
-		if err != nil {
-			panic(fmt.Sprintf("unexpected error while accessing storage for sync deltas, shutting down: %v", err))
+		stateCommitment, getStateCommitmentErr := e.execState.StateCommitmentByBlockID(ctx, executionStateDelta.ParentID())
+		if getStateCommitmentErr != nil && !errors.Is(getStateCommitmentErr, storage.ErrNotFound) {
+			log.Fatal().Msgf("unexpected error while accessing storage for sync deltas, shutting down: %v", getStateCommitmentErr)
 		}
 
-		newQueue, added := enqueue(executionStateDelta, backdata) // TODO - redundant? - should always produce new queue (otherwise it would be enqueued at the beginning)
+		newQueue, added := enqueue(executionStateDelta, backdata)
 		if !added {
-			panic(fmt.Sprintf("cannot enqueue sync delta: %s", err))
+			log.Fatal().Msgf("cannot enqueue sync delta: %s", getStateCommitmentErr)
 		}
 
 		e.tryRequeueOrphans(executionStateDelta, newQueue, backdata)
 
+		if errors.Is(getStateCommitmentErr, storage.ErrNotFound) {
+			// if state commitment doesn't exist and there are no known deltas which will produce
+			// it soon (sync queue) then we save it as orphaned
+			return nil
+		}
+
 		if !bytes.Equal(stateCommitment, executionStateDelta.StartState) {
-			return fmt.Errorf("internal incosistency with delta - state commitment for parent retirieved from DB different from start state in delta! ")
+			return fmt.Errorf("internal inconsistency with delta - state commitment for parent retrieved from DB different from start state in delta! ")
 		}
 
 		e.syncWg.Add(1)
@@ -1068,8 +1076,11 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 	// synchronize DB writing to avoid tx conflicts with multiple blocks arriving fast
 	err := e.blocks.Store(executionStateDelta.Block)
 	if err != nil {
-		log.Fatal().
-			Err(err).Msg("could  not store block from delta")
+		// It's possible for the parent of the target block to have arrived already. Don't fail here
+		if !errors.Is(err, storage.ErrAlreadyExists) {
+			log.Fatal().
+				Err(err).Msg("could not store block from delta")
+		}
 	}
 
 	for _, collection := range executionStateDelta.CompleteCollections {
@@ -1106,6 +1117,7 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 
 	// last block was saved
 	if targetBlockID == executionStateDelta.Block.ID() {
+		log.Debug().Msg("final target sync block received, processing")
 
 		err = e.mempool.Run(
 			func(
@@ -1124,7 +1136,7 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 					}
 				}
 				if !hadQueue {
-					panic(fmt.Sprintf("orphan queues do not contain final block ID (%s)", targetBlockID))
+					log.Fatal().Msgf("orphan queues do not contain final block ID (%s)", targetBlockID)
 				}
 
 				orphanQueues.Rem(syncedQueue.ID())
@@ -1141,7 +1153,7 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 				if executableBlock.IsComplete() {
 					added := executionQueues.Add(syncedQueue)
 					if !added {
-						panic(fmt.Sprintf("cannot add queue to execution queues"))
+						log.Fatal().Msgf("cannot add queue to execution queues")
 					}
 
 					log.Debug().Msg("block complete - executing")
@@ -1149,6 +1161,7 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 					e.wg.Add(1)
 					go e.executeBlock(context.Background(), executableBlock)
 				}
+				log.Debug().Msg("final target sync block processed")
 
 				return nil
 			})
