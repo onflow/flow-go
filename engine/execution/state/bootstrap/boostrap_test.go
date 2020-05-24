@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -18,9 +17,9 @@ func TestGenerateGenesisStateCommitment(t *testing.T) {
 		ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 		require.NoError(t, err)
 
-		newStateCommitment, err := BootstrapLedger(ls, flow.ServiceAccountPublicKey)
+		newStateCommitment, err := BootstrapLedger(ls, unittest.ServiceAccountPublicKey)
 		require.NoError(t, err)
 
-		require.Equal(t, flow.GenesisStateCommitment, newStateCommitment)
+		require.Equal(t, unittest.GenesisStateCommitment, newStateCommitment)
 	})
 }

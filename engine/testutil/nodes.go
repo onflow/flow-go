@@ -70,7 +70,7 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	require.NoError(t, err)
 
 	genesis := flow.Genesis(participants)
-	err = state.Mutate().Bootstrap(flow.GenesisStateCommitment, genesis)
+	err = state.Mutate().Bootstrap(unittest.GenesisStateCommitment, genesis)
 	require.NoError(t, err)
 
 	for _, option := range options {
@@ -237,7 +237,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	genesisHead, err := node.State.Final().Head()
 	require.NoError(t, err)
 
-	commit, err := bootstrap.BootstrapLedger(ls, flow.ServiceAccountPublicKey)
+	commit, err := bootstrap.BootstrapLedger(ls, unittest.ServiceAccountPublicKey)
 	require.NoError(t, err)
 
 	err = bootstrap.BootstrapExecutionDatabase(node.DB, commit, genesisHead)

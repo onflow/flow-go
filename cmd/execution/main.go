@@ -91,7 +91,7 @@ func main() {
 			}
 
 			if !bytes.Equal(bootstrappedStateCommitment, node.GenesisCommit) {
-				panic(fmt.Sprintf("genesis seal state commitment (%x) different from precalculated (%x)", node.GenesisCommit, flow.GenesisStateCommitment))
+				panic(fmt.Sprintf("genesis seal state commitment (%x) different from precalculated (%x)", bootstrappedStateCommitment, node.GenesisCommit))
 			}
 
 			err = bootstrap.BootstrapExecutionDatabase(node.DB, bootstrappedStateCommitment, block.Header)

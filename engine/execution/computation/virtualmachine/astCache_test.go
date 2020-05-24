@@ -111,7 +111,7 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 
 	// Create FungibleToken deployment transaction.
 	deployFungibleTokenContractTx := execTestutil.CreateDeployFungibleTokenContractInterfaceTransaction(accounts[0])
-	err = execTestutil.SignTransaction(&deployFungibleTokenContractTx, accounts[0], flow.ServiceAccountPrivateKey, 0)
+	err = execTestutil.SignTransaction(&deployFungibleTokenContractTx, accounts[0], unittest.ServiceAccountPrivateKey, 0)
 	require.NoError(t, err)
 
 	// Create FlowToken deployment transaction.
@@ -183,7 +183,7 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 
 	// Create FungibleToken deployment transaction.
 	deployFungibleTokenContractTx := execTestutil.CreateDeployFungibleTokenContractInterfaceTransaction(accounts[0])
-	err = execTestutil.SignTransaction(&deployFungibleTokenContractTx, accounts[0], flow.ServiceAccountPrivateKey, 0)
+	err = execTestutil.SignTransaction(&deployFungibleTokenContractTx, accounts[0], unittest.ServiceAccountPrivateKey, 0)
 	require.NoError(b, err)
 
 	// Create FlowToken deployment transaction.
@@ -267,7 +267,7 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 
 	// Create FungibleToken deployment transaction.
 	deployFungibleTokenContractTx := execTestutil.CreateDeployFungibleTokenContractInterfaceTransaction(accounts[0])
-	err = execTestutil.SignTransaction(&deployFungibleTokenContractTx, accounts[0], flow.ServiceAccountPrivateKey, 0)
+	err = execTestutil.SignTransaction(&deployFungibleTokenContractTx, accounts[0], unittest.ServiceAccountPrivateKey, 0)
 	require.NoError(b, err)
 
 	// Create FlowToken deployment transaction.
@@ -337,7 +337,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 
 	// Create FungibleToken deployment transaction.
 	deployFungibleTokenContractTx := execTestutil.CreateDeployFungibleTokenContractInterfaceTransaction(accounts[0])
-	err = execTestutil.SignTransaction(&deployFungibleTokenContractTx, accounts[0], flow.ServiceAccountPrivateKey, 0)
+	err = execTestutil.SignTransaction(&deployFungibleTokenContractTx, accounts[0], unittest.ServiceAccountPrivateKey, 0)
 	require.NoError(t, err)
 
 	// Create FlowToken deployment transaction.

@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func CreateContractDeploymentTransaction(contract string, authorizer flow.Address) flow.TransactionBody {
@@ -92,9 +93,9 @@ func RootBootstrappedLedger() (virtualmachine.Ledger, error) {
 func BootstrapLedgerWithServiceAccount(ledger virtualmachine.Ledger) error {
 	ledgerAccess := virtualmachine.NewLedgerDAL(ledger)
 
-	serviceAccountPublicKey := flow.ServiceAccountPrivateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold)
+	accountKey := unittest.ServiceAccountPrivateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold)
 
-	_, err := ledgerAccess.CreateAccount([]flow.AccountPublicKey{serviceAccountPublicKey})
+	_, err := ledgerAccess.CreateAccount([]flow.AccountPublicKey{accountKey})
 	if err != nil {
 		return err
 	}
