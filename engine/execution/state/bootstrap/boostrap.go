@@ -69,7 +69,7 @@ func BootstrapView(ledger virtualmachine.Ledger, serviceAccountPublicKey flow.Ac
 	// initialize the account addressing state
 	l.SetAddressState(flow.ZeroAddressState)
 
-	root := createRootAccount(l, serviceAccountPublicKey)
+	root := createRootAccount(ledger, serviceAccountPublicKey)
 
 	rt := runtime.NewInterpreterRuntime()
 	vm, err := virtualmachine.New(rt)
