@@ -78,12 +78,12 @@ type HotstuffMetrics interface {
 	SignerProcessingDuration(duration time.Duration)
 
 	// ValidatorProcessingDuration measures the time which the HotStuff's core logic
-	// spends in the hotstuff.Validator component, i.e. the with verifying higher-level
+	// spends in the hotstuff.Validator component, i.e. the with verifying
 	// consensus messages.
 	ValidatorProcessingDuration(duration time.Duration)
 
 	// PayloadProductionDuration measures the time which the HotStuff's core logic
-	// spends in the module.Builder component, i.e. the with generating block payloads
+	// spends in the module.Builder component, i.e. the with generating block payloads.
 	PayloadProductionDuration(duration time.Duration)
 }
 

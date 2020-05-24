@@ -9,15 +9,17 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 )
 
-// ValidatorMetricsWrapper measures the time which the HotStuff's core logic
-// spends in the hotstuff.Validator component, i.e. the with verifying higher-level
-// consensus messages.
+// ValidatorMetricsWrapper implements the hotstuff.Validator interface.
+// It wraps a hotstuff.Validator instance and measures the time which the HotStuff's core logic
+// spends in the hotstuff.Validator component, i.e. the with verifying higher-level consensus
+// messages. The measured time durations are reported as values for the
+// ValidatorProcessingDuration metric.
 type ValidatorMetricsWrapper struct {
 	validator hotstuff.Validator
 	metrics   module.HotstuffMetrics
 }
 
-func NewMetricsWrapper(validator hotstuff.Validator, metrics module.HotstuffMetrics) hotstuff.Validator {
+func NewMetricsWrapper(validator hotstuff.Validator, metrics module.HotstuffMetrics) *ValidatorMetricsWrapper {
 	return &ValidatorMetricsWrapper{
 		validator: validator,
 		metrics:   metrics,

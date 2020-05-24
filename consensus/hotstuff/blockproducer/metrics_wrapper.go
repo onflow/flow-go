@@ -7,14 +7,17 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 )
 
-// BlockBuilderMetricsWrapper measures the time which the HotStuff's core logic
-// spends in the module.Builder component, i.e. the with generating block payloads
+// BlockBuilderMetricsWrapper implements the module.Builder interface.
+// It wraps a module.Builder instance and measures the time which HotStuff's core logic
+// spends in the module.Builder component, i.e. the with generating block payloads.
+// The measured time durations are reported as values for the
+// PayloadProductionDuration metric.
 type BlockBuilderMetricsWrapper struct {
 	builder module.Builder
 	metrics module.HotstuffMetrics
 }
 
-func NewMetricsWrapper(builder module.Builder, metrics module.HotstuffMetrics) module.Builder {
+func NewMetricsWrapper(builder module.Builder, metrics module.HotstuffMetrics) *BlockBuilderMetricsWrapper {
 	return &BlockBuilderMetricsWrapper{
 		builder: builder,
 		metrics: metrics,

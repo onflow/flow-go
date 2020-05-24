@@ -9,15 +9,17 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 )
 
-// CommitteeMetricsWrapper measures the time which the HotStuff's core logic
-// spends in the hotstuff.Committee component, i.e. the time determining consensus
-// committee relations.
+// CommitteeMetricsWrapper implements the hotstuff.Committee interface.
+// It wraps a hotstuff.Committee instance and measures the time which the HotStuff's core logic
+// spends in the hotstuff.Committee component, i.e. the time determining consensus committee
+// relations. The measured time durations are reported as values for the
+// CommitteeProcessingDuration metric.
 type CommitteeMetricsWrapper struct {
 	committee hotstuff.Committee
 	metrics   module.HotstuffMetrics
 }
 
-func NewMetricsWrapper(committee hotstuff.Committee, metrics module.HotstuffMetrics) hotstuff.Committee {
+func NewMetricsWrapper(committee hotstuff.Committee, metrics module.HotstuffMetrics) *CommitteeMetricsWrapper {
 	return &CommitteeMetricsWrapper{
 		committee: committee,
 		metrics:   metrics,

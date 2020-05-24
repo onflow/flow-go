@@ -22,18 +22,17 @@ const (
 // clusters. We do this by adding the label `committeeID` to the HotStuff metrics and
 // allowing for configurable name space.
 type HotstuffCollector struct {
-	busyDuration          *prometheus.HistogramVec
-	busyDurationCsCounter *prometheus.CounterVec
-	idleDuration          prometheus.Histogram
-	idleDurationCsCounter prometheus.Counter
-	waitDuration          *prometheus.HistogramVec
-	waitDurationCsCounter *prometheus.CounterVec
-	curView               prometheus.Gauge
-	qcView                prometheus.Gauge
-	skips                 prometheus.Counter
-	timeouts              prometheus.Counter
-	timeoutDuration       prometheus.Gauge
-
+	busyDuration                   *prometheus.HistogramVec
+	busyDurationCsCounter          *prometheus.CounterVec
+	idleDuration                   prometheus.Histogram
+	idleDurationCsCounter          prometheus.Counter
+	waitDuration                   *prometheus.HistogramVec
+	waitDurationCsCounter          *prometheus.CounterVec
+	curView                        prometheus.Gauge
+	qcView                         prometheus.Gauge
+	skips                          prometheus.Counter
+	timeouts                       prometheus.Counter
+	timeoutDuration                prometheus.Gauge
 	committeeComputationsCsCounter prometheus.Counter
 	signerComputationsCsCounter    prometheus.Counter
 	validatorComputationsCsCounter prometheus.Counter
@@ -48,7 +47,7 @@ func NewHotstuffCollector(chain string) *HotstuffCollector {
 			Name:        "busy_duration_seconds",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
-			Help:        "the duration of how long hotstuff's event loop has been busy processing one event",
+			Help:        "the duration of how long HotStuff's event loop has been busy processing one event",
 			Buckets:     []float64{0.05, 0.2, 0.5, 1, 2, 5},
 			ConstLabels: prometheus.Labels{LabelChain: chain},
 		}, []string{"event_type"}),
@@ -56,7 +55,7 @@ func NewHotstuffCollector(chain string) *HotstuffCollector {
 			Name:        "busy_duration_cseconds_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
-			Help:        "total count of cs [units of 10ms = cs] of how long hotstuff's event loop has been busy processing events",
+			Help:        "total count of cs [units of 10ms = cs] of how long HotStuff's event loop has been busy processing events",
 			ConstLabels: prometheus.Labels{LabelChain: chain},
 		}, []string{"event_type"}),
 
@@ -64,7 +63,7 @@ func NewHotstuffCollector(chain string) *HotstuffCollector {
 			Name:        "idle_duration_seconds",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
-			Help:        "the duration of how long hotstuff's event loop has been idle without processing any event",
+			Help:        "the duration of how long HotStuff's event loop has been idle without processing any event",
 			Buckets:     []float64{0.05, 0.2, 0.5, 1, 2, 5},
 			ConstLabels: prometheus.Labels{LabelChain: chain},
 		}),
@@ -72,7 +71,7 @@ func NewHotstuffCollector(chain string) *HotstuffCollector {
 			Name:        "idle_duration_cseconds_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
-			Help:        "total count of cs [units of 10ms = cs] of how long hotstuff's event loop has been idle without processing any event",
+			Help:        "total count of cs [units of 10ms = cs] of how long HotStuff's event loop has been idle without processing any event",
 			ConstLabels: prometheus.Labels{LabelChain: chain},
 		}),
 
@@ -80,7 +79,7 @@ func NewHotstuffCollector(chain string) *HotstuffCollector {
 			Name:        "wait_duration_seconds",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
-			Help:        "the duration of how long an event has been waited in the hotstuff event loop queue before being processed.",
+			Help:        "the duration of how long an event has been waited in the HotStuff event loop queue before being processed.",
 			Buckets:     []float64{0.05, 0.2, 0.5, 1, 2, 5},
 			ConstLabels: prometheus.Labels{LabelChain: chain},
 		}, []string{"event_type"}),
@@ -88,7 +87,7 @@ func NewHotstuffCollector(chain string) *HotstuffCollector {
 			Name:        "wait_duration_cseconds_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
-			Help:        "total count of cs [units of 10ms = cs] of how long an event has been waited in the hotstuff event loop queue before being processed.",
+			Help:        "total count of cs [units of 10ms = cs] of how long an event has been waited in the HotStuff event loop queue before being processed.",
 			ConstLabels: prometheus.Labels{LabelChain: chain},
 		}, []string{"event_type"}),
 
@@ -104,7 +103,7 @@ func NewHotstuffCollector(chain string) *HotstuffCollector {
 			Name:        "qc_view",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
-			Help:        "The view of the newest known qc from hotstuff",
+			Help:        "The view of the newest known qc from HotStuff",
 			ConstLabels: prometheus.Labels{LabelChain: chain},
 		}),
 
@@ -172,7 +171,7 @@ func NewHotstuffCollector(chain string) *HotstuffCollector {
 func (hc *HotstuffCollector) HotStuffBusyDuration(duration time.Duration, event string) {
 	hc.busyDuration.WithLabelValues(event).Observe(duration.Seconds())
 
-	// We report the time in centi-seconds, i.e. in units of 1/100 seconds
+	// We count the number of wall-clock ticks in units of centi-seconds, i.e. in units of 1/100 seconds
 	hc.busyDurationCsCounter.WithLabelValues(event).Add(float64(duration.Milliseconds()) * 0.1)
 }
 
@@ -180,7 +179,7 @@ func (hc *HotstuffCollector) HotStuffBusyDuration(duration time.Duration, event 
 func (hc *HotstuffCollector) HotStuffIdleDuration(duration time.Duration) {
 	hc.idleDuration.Observe(duration.Seconds())
 
-	// We report the time in centi-seconds, i.e. in units of 1/100 seconds
+	// We count the number of wall-clock ticks in units of centi-seconds, i.e. in units of 1/100 seconds
 	hc.idleDurationCsCounter.Add(float64(duration.Milliseconds()) * 0.1)
 }
 
@@ -188,7 +187,7 @@ func (hc *HotstuffCollector) HotStuffIdleDuration(duration time.Duration) {
 func (hc *HotstuffCollector) HotStuffWaitDuration(duration time.Duration, event string) {
 	hc.waitDuration.WithLabelValues(event).Observe(duration.Seconds())
 
-	// We report the time in centi-seconds, i.e. in units of 1/100 seconds
+	// We count the number of wall-clock ticks in units of centi-seconds, i.e. in units of 1/100 seconds
 	hc.waitDurationCsCounter.WithLabelValues(event).Add(float64(duration.Milliseconds()) * 0.1)
 }
 
@@ -217,16 +216,18 @@ func (hc *HotstuffCollector) SetTimeout(duration time.Duration) {
 	hc.timeoutDuration.Set(duration.Seconds())
 }
 
-// CommitteeProcessingDuration reports time spend computing consensus committee relations
+// CommitteeProcessingDuration measures the time which the HotStuff's core logic
+// spends in the hotstuff.Committee component, i.e. the time determining consensus
+// committee relations.
 func (hc *HotstuffCollector) CommitteeProcessingDuration(duration time.Duration) {
-	// We report the time in centi-seconds, i.e. in units of 1/100 seconds
+	// We count the number of wall-clock ticks in units of centi-seconds, i.e. in units of 1/100 seconds
 	hc.committeeComputationsCsCounter.Add(float64(duration.Milliseconds()) * 0.1)
 }
 
 // SignerProcessingDuration reports the time which the HotStuff's core logic
 // spends in the hotstuff.Signer component, i.e. the with crypto-related operations.
 func (hc *HotstuffCollector) SignerProcessingDuration(duration time.Duration) {
-	// We report the time in centi-seconds, i.e. in units of 1/100 seconds
+	// We count the number of wall-clock ticks in units of centi-seconds, i.e. in units of 1/100 seconds
 	hc.signerComputationsCsCounter.Add(float64(duration.Milliseconds()) * 0.1)
 }
 
@@ -234,13 +235,13 @@ func (hc *HotstuffCollector) SignerProcessingDuration(duration time.Duration) {
 // spends in the hotstuff.Validator component, i.e. the with verifying higher-level
 // consensus messages.
 func (hc *HotstuffCollector) ValidatorProcessingDuration(duration time.Duration) {
-	// We report the time in centi-seconds, i.e. in units of 1/100 seconds
+	// We count the number of wall-clock ticks in units of centi-seconds, i.e. in units of 1/100 seconds
 	hc.validatorComputationsCsCounter.Add(float64(duration.Milliseconds()) * 0.1)
 }
 
 // PayloadProductionDuration reports the time which the HotStuff's core logic
 // spends in the module.Builder component, i.e. the with generating block payloads
 func (hc *HotstuffCollector) PayloadProductionDuration(duration time.Duration) {
-	// We report the time in centi-seconds, i.e. in units of 1/100 seconds
+	// We count the number of wall-clock ticks in units of centi-seconds, i.e. in units of 1/100 seconds
 	hc.payloadProductionCsCounter.Add(float64(duration.Milliseconds()) * 0.1)
 }
