@@ -277,7 +277,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 					log("Script %d")
 					let v <- FlowToken.createEmptyVault()
 					destroy v
-				}s
+				}
 			`, virtualmachine.FlowTokenAddress, id)))
 			if !assert.True(t, result.Succeeded()) {
 				t.Log(result.Error.ErrorMessage())
