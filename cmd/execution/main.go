@@ -96,7 +96,7 @@ func main() {
 
 			err = bootstrap.BootstrapExecutionDatabase(node.DB, bootstrappedStateCommitment, block.Header)
 			if err != nil {
-				panic(fmt.Sprintf("error while boostrapping execution state - cannot bootstrap database: %s", err))
+				panic(fmt.Sprintf("error while bootstrapping execution state - cannot bootstrap database: %s", err))
 			}
 		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
