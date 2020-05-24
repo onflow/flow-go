@@ -66,7 +66,6 @@ func TestSyncFlow(t *testing.T) {
 	tx5 := execTestutil.AddToCounterTransaction()
 	err = execTestutil.SignTransactionByRoot(&tx5, seq)
 	require.NoError(t, err)
-	seq++
 
 	col1 := flow.Collection{Transactions: []*flow.TransactionBody{&tx1}}
 	col2 := flow.Collection{Transactions: []*flow.TransactionBody{&tx2}}
