@@ -6,7 +6,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/model/encoding/rlp"
+	"github.com/dapperlabs/flow-go/model/fingerprint"
 )
 
 // TransactionBody includes the main contents of a transaction
@@ -50,6 +50,30 @@ type TransactionBody struct {
 // NewTransactionBody initializes and returns an empty transaction body
 func NewTransactionBody() *TransactionBody {
 	return &TransactionBody{}
+}
+
+func (tb TransactionBody) Fingerprint() []byte {
+	return fingerprint.Fingerprint(struct {
+		ReferenceBlockID   Identifier
+		Script             []byte
+		Arguments          [][]byte
+		GasLimit           uint64
+		ProposalKey        ProposalKey
+		Payer              Address
+		Authorizers        []Address
+		PayloadSignatures  []byte
+		EnvelopeSignatures []byte
+	}{
+		ReferenceBlockID:   tb.ReferenceBlockID,
+		Script:             tb.Script,
+		Arguments:          tb.Arguments,
+		GasLimit:           tb.GasLimit,
+		ProposalKey:        tb.ProposalKey,
+		Payer:              tb.Payer,
+		Authorizers:        tb.Authorizers,
+		PayloadSignatures:  signaturesList(tb.PayloadSignatures).Fingerprint(),
+		EnvelopeSignatures: signaturesList(tb.EnvelopeSignatures).Fingerprint(),
+	})
 }
 
 func (tb TransactionBody) ID() Identifier {
@@ -266,9 +290,7 @@ func (tb *TransactionBody) createSignature(address Address, keyID uint64, sig []
 }
 
 func (tb *TransactionBody) PayloadMessage() []byte {
-	temp := tb.payloadCanonicalForm()
-	encoder := rlp.NewEncoder()
-	return encoder.MustEncode(temp)
+	return fingerprint.Fingerprint(tb.payloadCanonicalForm())
 }
 
 func (tb *TransactionBody) payloadCanonicalForm() interface{} {
@@ -304,8 +326,7 @@ func (tb *TransactionBody) payloadCanonicalForm() interface{} {
 //
 // This message is only signed by the payer account.
 func (tb *TransactionBody) EnvelopeMessage() []byte {
-	temp := tb.envelopeCanonicalForm()
-	return rlp.NewEncoder().MustEncode(temp)
+	return fingerprint.Fingerprint(tb.envelopeCanonicalForm())
 }
 
 func (tb *TransactionBody) envelopeCanonicalForm() interface{} {
@@ -318,27 +339,8 @@ func (tb *TransactionBody) envelopeCanonicalForm() interface{} {
 	}
 }
 
-// Encode serializes the full transaction data including the payload and all signatures.
-func (tb TransactionBody) Encode() []byte {
-	temp := struct {
-		Payload            interface{}
-		PayloadSignatures  interface{}
-		EnvelopeSignatures interface{}
-	}{
-		Payload:            tb.payloadCanonicalForm(),
-		PayloadSignatures:  signaturesList(tb.PayloadSignatures).canonicalForm(),
-		EnvelopeSignatures: signaturesList(tb.EnvelopeSignatures).canonicalForm(),
-	}
-
-	encoder := rlp.NewEncoder()
-	return encoder.MustEncode(temp)
-}
-
 func (tx *Transaction) PayloadMessage() []byte {
-	body := tx.TransactionBody
-	temp := body.payloadCanonicalForm()
-	encoder := rlp.NewEncoder()
-	return encoder.MustEncode(temp)
+	return fingerprint.Fingerprint(tx.TransactionBody.payloadCanonicalForm())
 }
 
 // Checksum provides a cryptographic commitment for a chunk content
@@ -402,6 +404,10 @@ type TransactionSignature struct {
 	Signature   []byte
 }
 
+func (s TransactionSignature) Fingerprint() []byte {
+	return fingerprint.Fingerprint(s.canonicalForm())
+}
+
 func (s TransactionSignature) canonicalForm() interface{} {
 	return struct {
 		SignerIndex uint
@@ -423,6 +429,10 @@ func compareSignatures(signatures []TransactionSignature) func(i, j int) bool {
 }
 
 type signaturesList []TransactionSignature
+
+func (s signaturesList) Fingerprint() []byte {
+	return fingerprint.Fingerprint(s.canonicalForm())
+}
 
 func (s signaturesList) canonicalForm() interface{} {
 	signatures := make([]interface{}, len(s))
