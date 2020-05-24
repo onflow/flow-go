@@ -10,6 +10,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func CreateContractDeploymentTransaction(contract string, authorizer flow.Address) flow.TransactionBody {
@@ -67,7 +68,7 @@ func GenerateAccountPrivateKeys(numberOfPrivateKeys int) ([]flow.AccountPrivateK
 func BootstrappedLedger(ledger virtualmachine.Ledger, privateKeys []flow.AccountPrivateKey) ([]flow.Address, error) {
 	ledgerAccess := virtualmachine.NewLedgerDAL(ledger)
 
-	privateKeysIncludingRoot := []flow.AccountPrivateKey{flow.RootAccountPrivateKey}
+	privateKeysIncludingRoot := []flow.AccountPrivateKey{unittest.RootAccountPrivateKey}
 	if len(privateKeys) > 0 {
 		privateKeysIncludingRoot = append(privateKeysIncludingRoot, privateKeys...)
 	}
@@ -87,19 +88,19 @@ func BootstrappedLedger(ledger virtualmachine.Ledger, privateKeys []flow.Account
 }
 
 func SignTransactionByRoot(tx *flow.TransactionBody, seqNum uint64) error {
-	return SignTransaction(tx, flow.RootAddress, flow.RootAccountPrivateKey, seqNum)
+	return SignTransaction(tx, flow.RootAddress, unittest.RootAccountPrivateKey, seqNum)
 }
 
 func RootBootstrappedLedger() virtualmachine.Ledger {
 	ledger := make(virtualmachine.MapLedger)
-	bootstrap.BootstrapView(ledger, flow.RootAccountPrivateKey)
+	bootstrap.BootstrapView(ledger, unittest.RootAccountPublicKey)
 	return ledger
 }
 
 func CreateRootAccountInLedger(ledger virtualmachine.Ledger) error {
 	l := virtualmachine.NewLedgerDAL(ledger)
 
-	accountKey := flow.RootAccountPrivateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold)
+	accountKey := unittest.RootAccountPrivateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold)
 
 	return l.CreateAccountWithAddress(
 		flow.RootAddress,

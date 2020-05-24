@@ -420,10 +420,10 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 		sequenceNumber++
 
-		rootHasher, err := hash.NewHasher(flow.RootAccountPrivateKey.HashAlgo)
+		rootHasher, err := hash.NewHasher(unittest.RootAccountPrivateKey.HashAlgo)
 		require.NoError(t, err)
 
-		err = tx.SignEnvelope(flow.RootAddress, 0, flow.RootAccountPrivateKey.PrivateKey, rootHasher)
+		err = tx.SignEnvelope(flow.RootAddress, 0, unittest.RootAccountPrivateKey.PrivateKey, rootHasher)
 		require.NoError(t, err)
 
 		// execute the transaction

@@ -16,10 +16,10 @@ import (
 )
 
 // BootstrapLedger adds the above root account to the ledger and initializes execution node-only data
-func BootstrapLedger(ledger storage.Ledger, rootPrivateKey flow.AccountPrivateKey) (flow.StateCommitment, error) {
+func BootstrapLedger(ledger storage.Ledger, rootPublicKey flow.AccountPublicKey) (flow.StateCommitment, error) {
 	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.EmptyStateCommitment()))
 
-	BootstrapView(view, rootPrivateKey)
+	BootstrapView(view, rootPublicKey)
 
 	newStateCommitment, err := state.CommitDelta(ledger, view.Delta(), ledger.EmptyStateCommitment())
 	if err != nil {
@@ -63,8 +63,8 @@ func BootstrapExecutionDatabase(db *badger.DB, commit flow.StateCommitment, gene
 	return nil
 }
 
-func BootstrapView(ledger virtualmachine.Ledger, rootPrivateKey flow.AccountPrivateKey) {
-	root := createRootAccount(ledger, rootPrivateKey)
+func BootstrapView(ledger virtualmachine.Ledger, rootPublicKey flow.AccountPublicKey) {
+	root := createRootAccount(ledger, rootPublicKey)
 
 	rt := runtime.NewInterpreterRuntime()
 	vm, err := virtualmachine.New(rt)
@@ -92,10 +92,8 @@ func createAccount(ledger virtualmachine.Ledger) flow.Address {
 	return addr
 }
 
-func createRootAccount(ledger virtualmachine.Ledger, privateKey flow.AccountPrivateKey) flow.Address {
+func createRootAccount(ledger virtualmachine.Ledger, accountKey flow.AccountPublicKey) flow.Address {
 	l := virtualmachine.NewLedgerDAL(ledger)
-
-	accountKey := privateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold)
 
 	err := l.CreateAccountWithAddress(
 		flow.RootAddress,
