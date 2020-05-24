@@ -193,12 +193,12 @@ func deployContract(ctx virtualmachine.BlockContext, ledger virtualmachine.Ledge
 
 	script := []byte(
 		fmt.Sprintf(`
-			transaction {
-				prepare(signer: AuthAccount) {
-				  signer.setCode("%s".decodeHex())
-				}
+            transaction {
+              prepare(signer: AuthAccount) {
+                signer.setCode("%s".decodeHex())
+              }
             }
-		`, contract),
+        `, contract),
 	)
 
 	tx := flow.NewTransactionBody().
@@ -221,12 +221,12 @@ func deployContractToAccount(
 ) {
 	script := []byte(
 		fmt.Sprintf(`
-			transaction {
-              	prepare(acct: AuthAccount) {
-					 acct.setCode("%s".decodeHex())
-              	}
+            transaction {
+              prepare(acct: AuthAccount) {
+                acct.setCode("%s".decodeHex())
+              }
             }
-		`, contract),
+        `, contract),
 	)
 
 	tx := flow.NewTransactionBody().
