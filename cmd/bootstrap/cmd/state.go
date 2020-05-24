@@ -20,15 +20,15 @@ func genGenesisExecutionState() flow.StateCommitment {
 	enc := serviceAccountPriv.PrivateKey.Encode()
 	writeJSON(bootstrap.PathServiceAccountPriv, enc)
 
-	accountKey := serviceAccountPriv.PublicKey(virtualmachine.AccountKeyWeightThreshold)
-	writeJSON(bootstrap.PathServiceAccountPublicKey, accountKey)
+	serviceAccountKey := serviceAccountPriv.PublicKey(virtualmachine.AccountKeyWeightThreshold)
+	writeJSON(bootstrap.PathServiceAccountPublicKey, serviceAccountKey)
 
-	dbpath := filepath.Join(flagOutdir, bootstrap.DirnameExecutionState)
-	stateCommitment, err := run.GenerateExecutionState(dbpath, accountKey)
+	dbPath := filepath.Join(flagOutdir, bootstrap.DirnameExecutionState)
+	stateCommitment, err := run.GenerateExecutionState(dbPath, serviceAccountKey)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error generating execution state")
 	}
-	log.Info().Msgf("wrote execution state db to directory %v", dbpath)
+	log.Info().Msgf("wrote execution state db to directory %v", dbPath)
 
 	writeJSON(bootstrap.PathGenesisCommit, stateCommitment)
 

@@ -93,7 +93,7 @@ func SignTransactionByRoot(tx *flow.TransactionBody, seqNum uint64) error {
 
 func RootBootstrappedLedger() virtualmachine.Ledger {
 	ledger := make(virtualmachine.MapLedger)
-	bootstrap.BootstrapView(ledger, flow.RootAccountPrivateKey)
+	bootstrap.BootstrapView(ledger, unittest.RootAccountPublicKey)
 	return ledger
 }
 

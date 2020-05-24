@@ -63,8 +63,8 @@ func BootstrapExecutionDatabase(db *badger.DB, commit flow.StateCommitment, gene
 	return nil
 }
 
-func BootstrapView(view *delta.View, rootPublicKey flow.AccountPublicKey) {
-	root := createRootAccount(virtualmachine.NewLedgerDAL(view), rootPublicKey)
+func BootstrapView(ledger virtualmachine.Ledger, rootPublicKey flow.AccountPublicKey) {
+	root := createRootAccount(ledger, rootPublicKey)
 
 	rt := runtime.NewInterpreterRuntime()
 	vm, err := virtualmachine.New(rt)
@@ -92,7 +92,7 @@ func createAccount(ledger virtualmachine.Ledger) flow.Address {
 	return addr
 }
 
-func createRootAccount(l virtualmachine.LedgerDAL, accountKey flow.AccountPublicKey) flow.Address {
+func createRootAccount(ledger virtualmachine.Ledger, accountKey flow.AccountPublicKey) flow.Address {
 	l := virtualmachine.NewLedgerDAL(ledger)
 
 	err := l.CreateAccountWithAddress(
