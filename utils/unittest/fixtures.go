@@ -140,7 +140,7 @@ func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDe
 
 func GenesisFixture(identities flow.IdentityList) *flow.Block {
 	genesis := flow.Genesis(identities)
-	genesis.Header.ChainID = flow.TestingChainID
+	genesis.Header.ChainID = flow.Emulator
 	return genesis
 }
 
@@ -148,7 +148,7 @@ func BlockHeaderFixture() flow.Header {
 	height := uint64(rand.Uint32())
 	view := height + uint64(rand.Intn(1000))
 	return BlockHeaderWithParentFixture(&flow.Header{
-		ChainID:  flow.TestingChainID,
+		ChainID:  flow.Emulator,
 		ParentID: IdentifierFixture(),
 		Height:   height,
 		View:     view,

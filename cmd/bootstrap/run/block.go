@@ -12,7 +12,7 @@ func GenerateRootBlock(identityList flow.IdentityList) *flow.Block {
 		Seals:      nil,
 	}
 	header := flow.Header{
-		ChainID:        flow.DefaultChainID,
+		ChainID:        flow.GetChainID(),
 		ParentID:       flow.ZeroID,
 		Height:         0,
 		PayloadHash:    payload.Hash(),

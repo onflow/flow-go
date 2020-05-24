@@ -13,12 +13,12 @@ import (
 
 type State struct {
 	db       *badger.DB
-	chainID  string // aka cluster ID
+	chainID  flow.ChainID // aka cluster ID
 	headers  storage.Headers
 	payloads storage.ClusterPayloads
 }
 
-func NewState(db *badger.DB, chainID string, headers storage.Headers, payloads storage.ClusterPayloads) (*State, error) {
+func NewState(db *badger.DB, chainID flow.ChainID, headers storage.Headers, payloads storage.ClusterPayloads) (*State, error) {
 	state := &State{
 		db:       db,
 		chainID:  chainID,

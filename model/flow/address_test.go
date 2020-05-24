@@ -58,25 +58,13 @@ func TestShort(t *testing.T) {
 	}
 }
 
-func TestSetAccountAdressing(t *testing.T) {
-
-	err := SetAccountAddressing(networkType(1))
-	assert.Error(t, err)
-	err = SetAccountAddressing(Emulator)
-	assert.NoError(t, err)
-	err = SetAccountAddressing(Testnet)
-	assert.NoError(t, err)
-	err = SetAccountAddressing(Mainnet)
-	assert.NoError(t, err)
-}
-
-func TestFlowAdressConstants(t *testing.T) {
+func TestFlowAddressConstants(t *testing.T) {
 	// check n and k fit in 8 and 6 bytes
 	assert.LessOrEqual(t, linearCodeN, 8*8)
 	assert.LessOrEqual(t, linearCodeK, 6*8)
 
 	// Test addresses for all type of networks
-	networks := []networkType{
+	networks := []ChainID{
 		Mainnet,
 		Testnet,
 		Emulator,
@@ -85,13 +73,13 @@ func TestFlowAdressConstants(t *testing.T) {
 	for _, net := range networks {
 
 		// set the network
-		_ = SetAccountAddressing(net)
+		setChainID(net)
 
-		//check the Zero and Root constants
-		expected := Uint64ToAddress(uint64(net))
-		assert.Equal(t, ZeroAddress(), Address(expected))
-		expected = Uint64ToAddress(generatorMatrixRows[0] ^ uint64(net))
-		assert.Equal(t, ServiceAddress(), Address(expected))
+		// check the Zero and Root constants
+		expected := Uint64ToAddress(uint64(getNetworkType()))
+		assert.Equal(t, ZeroAddress(), expected)
+		expected = Uint64ToAddress(generatorMatrixRows[0] ^ uint64(getNetworkType()))
+		assert.Equal(t, ServiceAddress(), expected)
 
 		// check the transition from account zero to root
 		state := ZeroAddressState
@@ -123,7 +111,7 @@ func TestAddressGeneration(t *testing.T) {
 	const loop = 50
 
 	// Test addresses for all type of networks
-	networks := []networkType{
+	networks := []ChainID{
 		Mainnet,
 		Testnet,
 		Emulator,
@@ -132,7 +120,7 @@ func TestAddressGeneration(t *testing.T) {
 	for _, net := range networks {
 
 		// set the network
-		_ = SetAccountAddressing(net)
+		setChainID(net)
 
 		// sanity check of AccountAddress function consistency
 		state := ZeroAddressState
@@ -215,7 +203,7 @@ func TestAddressesIntersection(t *testing.T) {
 	const loop = 50
 
 	// Test addresses for all type of networks
-	networks := []networkType{
+	networks := []ChainID{
 		Testnet,
 		Emulator,
 	}
@@ -223,7 +211,7 @@ func TestAddressesIntersection(t *testing.T) {
 	for _, net := range networks {
 
 		// set the network
-		_ = SetAccountAddressing(net)
+		setChainID(net)
 
 		// All valid test addresses must fail Flow Mainnet check
 		r := rand.Intn(maxState - loop)
@@ -232,9 +220,9 @@ func TestAddressesIntersection(t *testing.T) {
 			address, stateResult, err := AccountAddress(state)
 			state = stateResult
 			require.NoError(t, err)
-			_ = SetAccountAddressing(Mainnet)
+			setChainID(Mainnet)
 			check := address.IsValid()
-			_ = SetAccountAddressing(net)
+			setChainID(net)
 			assert.False(t, check, "test account address format should be invalid in Flow")
 		}
 
@@ -242,9 +230,9 @@ func TestAddressesIntersection(t *testing.T) {
 		r = rand.Intn(maxState - loop)
 		state = AddressState(r)
 		for i := 0; i < loop; i++ {
-			_ = SetAccountAddressing(Mainnet)
+			setChainID(Mainnet)
 			invalidAddress, stateResult, err := AccountAddress(state)
-			_ = SetAccountAddressing(net)
+			setChainID(net)
 			state = stateResult
 			require.NoError(t, err)
 			check := invalidAddress.IsValid()
@@ -254,13 +242,13 @@ func TestAddressesIntersection(t *testing.T) {
 		// sanity check of invalid account addresses in all networks
 		require.NotEqual(t, invalidCodeWord, uint64(0))
 		invalidAddress := Uint64ToAddress(invalidCodeWord)
-		_ = SetAccountAddressing(net)
+		setChainID(net)
 		check := invalidAddress.IsValid()
 		assert.False(t, check, "account address format should be invalid")
 		r = rand.Intn(maxState - loop)
 		state = AddressState(r)
 		for i := 0; i < loop; i++ {
-			_ = SetAccountAddressing(net)
+			setChainID(net)
 			address, stateResult, err := AccountAddress(state)
 			state = stateResult
 			require.NoError(t, err)
@@ -269,7 +257,7 @@ func TestAddressesIntersection(t *testing.T) {
 			check = invalidAddress.IsValid()
 			assert.False(t, check, "account address format should be invalid")
 			// must fail mainnet check
-			_ = SetAccountAddressing(Mainnet)
+			setChainID(Mainnet)
 			check := invalidAddress.IsValid()
 			assert.False(t, check, "account address format should be invalid")
 		}

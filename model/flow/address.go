@@ -4,9 +4,7 @@ package flow
 
 import (
 	"encoding/binary"
-	"encoding/gob"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"strings"
 )
@@ -31,34 +29,25 @@ const (
 	ServiceAddressState = AddressState(1)
 )
 
-// network is the type of network for which account addresses
+// networkType is the type of network for which account addresses
 // are generated and checked.
+//
 // A valid address in one network is invalid in the other networks.
 type networkType uint64
 
-const (
-	Mainnet  = networkType(0)
-	Testnet  = networkType(invalidCodeTestnet)
-	Emulator = networkType(invalidCodeEmulator)
-)
-
-var (
-	// network is the network type used in the adressing logic in all this file
-	network = Mainnet
-)
-
-// SetAccountAddressing sets the network of the account addressing
-// logic (mainnet, testnet, emulator).
-//
-// The setting should be called at the node initialization.
-// Addresses generated for one network type are invalid for the other
-// networks.
-func SetAccountAddressing(net networkType) error {
-	if net != Mainnet && net != Testnet && net != Emulator {
-		return errors.New("network setting is invalid")
+// getNetworkType derives the network type used for address generation from the globally
+// configured chain ID.
+func getNetworkType() networkType {
+	switch GetChainID() {
+	case Mainnet:
+		return networkType(0)
+	case Testnet:
+		return networkType(invalidCodeTestnet)
+	case Emulator:
+		return networkType(invalidCodeEmulator)
+	default:
+		panic("chain ID is invalid or not set")
 	}
-	network = net
-	return nil
 }
 
 // ZeroAddress represents the "zero address" (account that no one owns).
@@ -69,10 +58,6 @@ func ZeroAddress() Address {
 // ServiceAddress represents the root (first) generated account address.
 func ServiceAddress() Address {
 	return generateAddress(ServiceAddressState)
-}
-
-func init() {
-	gob.Register(ZeroAddress())
 }
 
 // HexToAddress converts a hex string to an Address.
@@ -249,7 +234,7 @@ func generateAddress(state AddressState) Address {
 	}
 
 	// customize the code word for a specific network
-	address ^= uint64(network)
+	address ^= uint64(getNetworkType())
 	return Uint64ToAddress(address)
 }
 
@@ -264,7 +249,7 @@ func generateAddress(state AddressState) Address {
 // in Flow is assigned to ZeroAddress().
 func (a *Address) IsValid() bool {
 	codeWord := a.Uint64()
-	codeWord ^= uint64(network)
+	codeWord ^= uint64(getNetworkType())
 
 	if codeWord == 0 {
 		return false

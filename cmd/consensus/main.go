@@ -117,7 +117,7 @@ func main() {
 			return nil
 		}).
 		Module("hotstuff main metrics", func(node *cmd.FlowNodeBuilder) error {
-			mainMetrics = metrics.NewHotstuffCollector(flow.DefaultChainID)
+			mainMetrics = metrics.NewHotstuffCollector(flow.GetChainID())
 			return nil
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {

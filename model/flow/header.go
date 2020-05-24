@@ -14,7 +14,7 @@ import (
 // the combined payload of the entire block. It is what consensus nodes agree
 // on after validating the contents against the payload hash.
 type Header struct {
-	ChainID        string     // ChainID is a chain-specific value to prevent replay attacks.
+	ChainID        ChainID    // ChainID is a chain-specific value to prevent replay attacks.
 	ParentID       Identifier // ParentID is the ID of this block's parent.
 	Height         uint64
 	PayloadHash    Identifier       // PayloadHash is a hash of the payload of this block.
@@ -29,7 +29,7 @@ type Header struct {
 // Body returns the immutable part of the block header.
 func (h Header) Body() interface{} {
 	return struct {
-		ChainID        string
+		ChainID        ChainID
 		ParentID       Identifier
 		Height         uint64
 		PayloadHash    Identifier
