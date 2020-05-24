@@ -963,7 +963,7 @@ func (e *Engine) StartSync(ctx context.Context, firstKnown *entity.ExecutableBlo
 
 	e.log.Info().
 		Hex("target_id", targetBlockID[:]).
-		Uint64("target_id", targetHeight).
+		Uint64("target_height", targetHeight).
 		Msg("starting state synchronization")
 
 	lastExecutedHeight, lastExecutedBlockID, err := e.execState.GetHighestExecutedBlockID(ctx)
@@ -972,7 +972,10 @@ func (e *Engine) StartSync(ctx context.Context, firstKnown *entity.ExecutableBlo
 	}
 
 	if lastExecutedHeight == targetHeight && lastExecutedBlockID != targetBlockID {
-		e.log.Fatal().Err(err).Msg("error while starting sync - first known not on same branch as last executed block")
+		e.log.Error().Err(err).Msg("error while starting sync - first known not on same branch as last executed block")
+		// Mark sync as no longer in progress, and allow any additional incoming blocks to kick off sync again with a different block
+		e.syncInProgress.Store(false)
+		return
 	}
 
 	e.log.Debug().
@@ -1070,7 +1073,7 @@ func (e *Engine) saveDelta(ctx context.Context, executionStateDelta *messages.Ex
 
 	log := e.log.With().
 		Hex("block_id", logging.Entity(executionStateDelta.Block)).
-		Uint64("block_id", executionStateDelta.Block.Header.Height).
+		Uint64("block_height", executionStateDelta.Block.Header.Height).
 		Logger()
 
 	// synchronize DB writing to avoid tx conflicts with multiple blocks arriving fast
