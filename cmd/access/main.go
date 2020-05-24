@@ -88,7 +88,8 @@ func main() {
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
-			cleaner := storage.NewCleaner(node.Logger, node.DB)
+			// TODO frequency of 0 turns off the cleaner, turn back on once we know the proper tuning
+			cleaner := storage.NewCleaner(node.Logger, node.DB, 0)
 
 			// create a finalizer that will handle updating the protocol
 			// state when the follower detects newly finalized blocks
