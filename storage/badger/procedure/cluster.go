@@ -110,7 +110,7 @@ func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
 		}
 
 		// get the chain ID, which determines which cluster state to query
-		chainID := header.ChainID
+		chainID := header.ChainID.String()
 
 		// retrieve the current finalized state boundary
 		var boundary uint64

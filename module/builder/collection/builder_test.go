@@ -58,7 +58,7 @@ func (suite *BuilderSuite) SetupTest() {
 	rand.Seed(time.Now().UnixNano())
 
 	suite.genesis = model.Genesis()
-	suite.chainID = suite.genesis.Header.ChainID
+	suite.chainID = suite.genesis.Header.ChainID.String()
 
 	suite.pool, err = stdmap.NewTransactions(1000)
 	suite.Require().Nil(err)

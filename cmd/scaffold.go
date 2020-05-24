@@ -262,7 +262,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		Network:    metrics.NewNetworkCollector(),
 		Engine:     metrics.NewEngineCollector(),
 		Compliance: metrics.NewComplianceCollector(),
-		Cache:      metrics.NewCacheCollector(flow.DefaultChainID),
+		Cache:      metrics.NewCacheCollector(flow.GetChainID()),
 		Mempool:    metrics.NewMempoolCollector(),
 	}
 }
