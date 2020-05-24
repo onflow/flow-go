@@ -58,7 +58,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
 			Help:        "total count of cs [units of 10ms = cs] of how long HotStuff's event loop has been busy processing events",
-			ConstLabels: prometheus.Labels{LabelChain: chain},
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}, []string{"event_type"}),
 
 		idleDuration: promauto.NewHistogram(prometheus.HistogramOpts{
@@ -74,7 +74,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
 			Help:        "total count of cs [units of 10ms = cs] of how long HotStuff's event loop has been idle without processing any event",
-			ConstLabels: prometheus.Labels{LabelChain: chain},
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
 		waitDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
@@ -90,7 +90,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
 			Help:        "total count of cs [units of 10ms = cs] of how long an event has been waited in the HotStuff event loop queue before being processed.",
-			ConstLabels: prometheus.Labels{LabelChain: chain},
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}, []string{"event_type"}),
 
 		curView: promauto.NewGauge(prometheus.GaugeOpts{
@@ -138,7 +138,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
 			Help:        "total count of cs [units of 10ms = cs] of how long HotStuff sends computing consensus committee relations",
-			ConstLabels: prometheus.Labels{LabelChain: chain},
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
 		signerComputationsCsCounter: promauto.NewCounter(prometheus.CounterOpts{
@@ -146,7 +146,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
 			Help:        "total count of cs [units of 10ms = cs] of how long HotStuff sends with crypto-related operations",
-			ConstLabels: prometheus.Labels{LabelChain: chain},
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
 		validatorComputationsCsCounter: promauto.NewCounter(prometheus.CounterOpts{
@@ -154,7 +154,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
 			Help:        "total count of cs [units of 10ms = cs] of how long HotStuff sends with message-validation",
-			ConstLabels: prometheus.Labels{LabelChain: chain},
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
 		payloadProductionCsCounter: promauto.NewCounter(prometheus.CounterOpts{
@@ -162,7 +162,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
 			Help:        "total count of cs [units of 10ms = cs] of how long HotStuff sends with payload production",
-			ConstLabels: prometheus.Labels{LabelChain: chain},
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 	}
 
