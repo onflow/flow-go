@@ -33,7 +33,7 @@ func TestHeaderFingerprint(t *testing.T) {
 	headerID := header.ID()
 	data := header.Fingerprint()
 	var decoded struct {
-		ChainID        string
+		ChainID        flow.ChainID
 		ParentID       flow.Identifier
 		Height         uint64
 		PayloadHash    flow.Identifier
