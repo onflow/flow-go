@@ -344,16 +344,6 @@ func (r *TransactionContext) GetBlockAtHeight(height uint64) (hash runtime.Block
 	panic("implement me")
 }
 
-func (r *TransactionContext) isValidSigningAccount(address runtime.Address) bool {
-	for _, accountAddress := range r.GetSigningAccounts() {
-		if accountAddress == address {
-			return true
-		}
-	}
-
-	return false
-}
-
 // checkProgram checks the given code for syntactic and semantic correctness.
 func (r *TransactionContext) checkProgram(code []byte, address runtime.Address) error {
 	if code == nil {
