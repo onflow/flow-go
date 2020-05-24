@@ -139,7 +139,7 @@ func (r *TransactionContext) CreateAccount(payer runtime.Address) (runtime.Addre
 
 func (r *TransactionContext) initDefaultToken(addr flow.Address) (FlowError, error) {
 	tx := flow.NewTransactionBody().
-		SetScript(InitDefaultTokenScript).
+		SetScript(InitDefaultTokenTransaction).
 		AddAuthorizer(addr)
 
 	// TODO: propagate computation limit
@@ -157,7 +157,7 @@ func (r *TransactionContext) initDefaultToken(addr flow.Address) (FlowError, err
 
 func (r *TransactionContext) deductAccountCreationFee(addr flow.Address) (FlowError, error) {
 	tx := flow.NewTransactionBody().
-		SetScript(DeductAccountCreationFeeScript).
+		SetScript(DeductAccountCreationFeeTransaction).
 		AddAuthorizer(addr)
 
 	// TODO: propagate computation limit
@@ -539,7 +539,7 @@ func hasSufficientKeyWeight(weights map[flow.Address]int, address flow.Address) 
 	return weights[address] >= AccountKeyWeightThreshold
 }
 
-var InitDefaultTokenScript = []byte(fmt.Sprintf(`
+var InitDefaultTokenTransaction = []byte(fmt.Sprintf(`
 	import ServiceAccount from 0x%s
 
 	transaction {

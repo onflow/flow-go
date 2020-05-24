@@ -140,7 +140,7 @@ func initRootAccount(
 	)
 
 	tx := flow.NewTransactionBody().
-		SetScript(virtualmachine.InitDefaultTokenScript).
+		SetScript(virtualmachine.InitDefaultTokenTransaction).
 		AddAuthorizer(root)
 
 	executeTransaction(ctx, ledger, tx)
