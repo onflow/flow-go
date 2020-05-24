@@ -75,7 +75,7 @@ func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*b
 
 // RetrieveLatestFinalizedClusterHeader retrieves the latest finalized for the
 // given cluster chain ID.
-func RetrieveLatestFinalizedClusterHeader(chainID string, final *flow.Header) func(tx *badger.Txn) error {
+func RetrieveLatestFinalizedClusterHeader(chainID flow.ChainID, final *flow.Header) func(tx *badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		var boundary uint64
 		err := operation.RetrieveClusterFinalizedHeight(chainID, &boundary)(tx)
@@ -110,7 +110,7 @@ func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
 		}
 
 		// get the chain ID, which determines which cluster state to query
-		chainID := header.ChainID.String()
+		chainID := header.ChainID
 
 		// retrieve the current finalized state boundary
 		var boundary uint64

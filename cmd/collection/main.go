@@ -74,7 +74,7 @@ func main() {
 		conCache *buffer.PendingBlocks        // pending block cache for follower
 
 		myCluster    flow.IdentityList // cluster identity list
-		clusterID    string            // chain ID for the cluster
+		clusterID    flow.ChainID      // chain ID for the cluster
 		clusterState *clusterkv.State  // chain state for the cluster
 
 		// from bootstrap files
@@ -174,7 +174,7 @@ func main() {
 
 				node.Logger.Info().
 					Hex("genesis_id", logging.ID(clusterGenesis.ID())).
-					Str("cluster_id", clusterID).
+					Str("cluster_id", clusterID.String()).
 					Str("cluster_members", fmt.Sprintf("%v", myCluster.NodeIDs())).
 					Msg("bootstrapped cluster state")
 			}
@@ -403,7 +403,7 @@ func initClusterCommittee(node *cmd.FlowNodeBuilder, colPayloads *storagekv.Clus
 	return committee.New(node.State, translator, node.Me.NodeID(), selector, cluster.NodeIDs()), nil
 }
 
-func loadClusterBlock(path string, clusterID string) (*clustermodel.Block, error) {
+func loadClusterBlock(path string, clusterID flow.ChainID) (*clustermodel.Block, error) {
 	filename := fmt.Sprintf(bootstrap.PathGenesisClusterBlock, clusterID)
 	data, err := ioutil.ReadFile(filepath.Join(path, filename))
 	if err != nil {
@@ -418,7 +418,7 @@ func loadClusterBlock(path string, clusterID string) (*clustermodel.Block, error
 	return &block, nil
 }
 
-func loadClusterQC(path string, clusterID string) (*hotstuffmodel.QuorumCertificate, error) {
+func loadClusterQC(path string, clusterID flow.ChainID) (*hotstuffmodel.QuorumCertificate, error) {
 	filename := fmt.Sprintf(bootstrap.PathGenesisClusterQC, clusterID)
 	data, err := ioutil.ReadFile(filepath.Join(path, filename))
 	if err != nil {

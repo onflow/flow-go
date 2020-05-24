@@ -79,7 +79,7 @@ func (cc *CollectionCollector) ClusterBlockProposed(block *cluster.Block) {
 	collection := block.Payload.Collection.Light()
 
 	cc.proposals.
-		With(prometheus.Labels{LabelChain: block.Header.ChainID}).
+		With(prometheus.Labels{LabelChain: block.Header.ChainID.String()}).
 		Observe(float64(collection.Len()))
 
 	followsFrom := make([]opentracing.StartSpanOption, 0, len(collection.Transactions))
@@ -102,10 +102,10 @@ func (cc *CollectionCollector) ClusterBlockFinalized(block *cluster.Block) {
 	chainID := block.Header.ChainID
 
 	cc.finalizedHeight.
-		With(prometheus.Labels{LabelChain: chainID}).
+		With(prometheus.Labels{LabelChain: chainID.String()}).
 		Set(float64(block.Header.Height))
 	cc.guarantees.
-		With(prometheus.Labels{LabelChain: block.Header.ChainID}).
+		With(prometheus.Labels{LabelChain: block.Header.ChainID.String()}).
 		Observe(float64(collection.Len()))
 
 	for _, txID := range collection.Transactions {

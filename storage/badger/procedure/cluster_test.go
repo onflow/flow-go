@@ -35,24 +35,22 @@ func TestFinalizeClusterBlock(t *testing.T) {
 		err := db.Update(InsertClusterBlock(&block))
 		require.NoError(t, err)
 
-		err = db.Update(operation.IndexClusterBlockHeight(
-			block.Header.ChainID.String(), parent.Header.Height, parent.ID()),
-		)
+		err = db.Update(operation.IndexClusterBlockHeight(block.Header.ChainID, parent.Header.Height, parent.ID()))
 		require.NoError(t, err)
 
-		err = db.Update(operation.InsertClusterFinalizedHeight(block.Header.ChainID.String(), parent.Header.Height))
+		err = db.Update(operation.InsertClusterFinalizedHeight(block.Header.ChainID, parent.Header.Height))
 		require.NoError(t, err)
 
 		err = db.Update(FinalizeClusterBlock(block.Header.ID()))
 		require.NoError(t, err)
 
 		var boundary uint64
-		err = db.View(operation.RetrieveClusterFinalizedHeight(block.Header.ChainID.String(), &boundary))
+		err = db.View(operation.RetrieveClusterFinalizedHeight(block.Header.ChainID, &boundary))
 		require.NoError(t, err)
 		require.Equal(t, block.Header.Height, boundary)
 
 		var headID flow.Identifier
-		err = db.View(operation.LookupClusterBlockHeight(block.Header.ChainID.String(), boundary, &headID))
+		err = db.View(operation.LookupClusterBlockHeight(block.Header.ChainID, boundary, &headID))
 		require.NoError(t, err)
 		require.Equal(t, block.ID(), headID)
 	})
