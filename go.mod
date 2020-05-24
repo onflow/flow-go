@@ -4,9 +4,9 @@ go 1.13
 
 require (
 	cloud.google.com/go/storage v1.6.0
-	github.com/antlr/antlr4 v0.0.0-20200503195918-621b933c7a7f // indirect
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
+	github.com/dapperlabs/flow-core-contracts/contracts v0.0.0-20200524064149-d1534e511f44
 	github.com/dapperlabs/flow-go/crypto v0.3.2-0.20200312195452-df4550a863b7
 	github.com/dgraph-io/badger/v2 v2.0.2
 	github.com/ethereum/go-ethereum v1.9.9
@@ -36,7 +36,6 @@ require (
 	github.com/prometheus/client_golang v1.3.0
 	github.com/prometheus/tsdb v0.7.1
 	github.com/rs/zerolog v1.15.0
-	github.com/segmentio/fasthash v1.0.2 // indirect
 	github.com/spf13/cobra v0.0.6
 	github.com/spf13/pflag v1.0.3
 	github.com/spf13/viper v1.4.0

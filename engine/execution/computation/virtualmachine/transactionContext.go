@@ -536,11 +536,11 @@ func hasSufficientKeyWeight(weights map[flow.Address]int, address flow.Address) 
 }
 
 var InitDefaultTokenTransaction = []byte(fmt.Sprintf(`
-	import ServiceAccount from 0x%s
+	import FlowServiceAccount from 0x%s
 
 	transaction {
 		prepare(acct: AuthAccount) {
-			ServiceAccount.initDefaultToken(acct)
+			FlowServiceAccount.initDefaultToken(acct)
 		}
 	}
 `, flow.RootAddress))
