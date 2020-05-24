@@ -170,7 +170,7 @@ func main() {
 			// TODO: we should probably find a way to initialize mutually dependent engines separately
 
 			// initialize the entity database accessors
-			cleaner := bstorage.NewCleaner(node.Logger, node.DB)
+			cleaner := bstorage.NewCleaner(node.Logger, node.DB, 0)
 
 			// initialize the pending blocks cache
 			proposals := buffer.NewPendingBlocks()

@@ -186,7 +186,7 @@ func main() {
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
-			cleaner := storagekv.NewCleaner(node.Logger, node.DB)
+			cleaner := storagekv.NewCleaner(node.Logger, node.DB, 0)
 
 			// create a finalizer that will handling updating the protocol
 			// state when the follower detects newly finalized blocks
