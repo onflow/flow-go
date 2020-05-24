@@ -23,6 +23,9 @@ type BlockContext interface {
 
 	// ExecuteScript computes the result of a read-only script.
 	ExecuteScript(ledger Ledger, script []byte) (*ScriptResult, error)
+
+	// GetAccount reads an account from this block context.
+	GetAccount(ledger Ledger, addr flow.Address) (*flow.Account, error)
 }
 
 type blockContext struct {
@@ -42,6 +45,7 @@ func (bc *blockContext) newTransactionContext(
 	}
 
 	ctx := &TransactionContext{
+		bc:              bc,
 		astCache:        bc.vm.cache,
 		ledger:          NewLedgerDAL(ledger),
 		signingAccounts: signingAccounts,
@@ -155,6 +159,25 @@ func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte) (*ScriptResu
 		Logs:     ctx.Logs(),
 		Events:   ctx.events,
 	}, nil
+}
+
+func (bc *blockContext) GetAccount(ledger Ledger, addr flow.Address) (*flow.Account, error) {
+	ledgerAccess := NewLedgerDAL(ledger)
+	acct := ledgerAccess.GetAccount(addr)
+	if acct == nil {
+		return nil, nil
+	}
+
+	result, err := bc.ExecuteScript(ledger, DefaultTokenBalanceScript(addr))
+	if err != nil {
+		return nil, err
+	}
+
+	if result.Error == nil {
+		acct.Balance = result.Value.ToGoValue().(uint64)
+	}
+
+	return acct, nil
 }
 
 // ConvertEvents creates flow.Events from runtime.events

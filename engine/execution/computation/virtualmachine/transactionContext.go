@@ -17,6 +17,7 @@ const scriptGasLimit = 100000
 type CheckerFunc func([]byte, runtime.Location) error
 
 type TransactionContext struct {
+	bc               BlockContext
 	ledger           LedgerDAL
 	astCache         ASTCache
 	signingAccounts  []runtime.Address
@@ -82,24 +83,94 @@ func (r *TransactionContext) ValueExists(owner, controller, key []byte) (exists 
 // CreateAccount creates a new account and inserts it into the world state.
 //
 // This function returns an error if the input is invalid.
-//
-// After creating the account, this function calls the onAccountCreated callback registered
-// with this context.
-func (r *TransactionContext) CreateAccount(publicKeysBytes [][]byte) (runtime.Address, error) {
+func (r *TransactionContext) CreateAccount(payer runtime.Address) (runtime.Address, error) {
 
-	publicKeys := make([]flow.AccountPublicKey, len(publicKeysBytes))
-	var err error
-	for i, keyBytes := range publicKeysBytes {
-		publicKeys[i], err = flow.DecodeRuntimeAccountPublicKey(keyBytes, 0)
-		if err != nil {
-			return runtime.Address{}, fmt.Errorf("cannot decode public key %d: %w", i, err)
+	flowErr, fatalErr := r.deductAccountCreationFee(flow.Address(payer))
+	if fatalErr != nil {
+		return runtime.Address{}, fatalErr
+	}
+
+	if flowErr != nil {
+		// TODO: properly propagate this error
+
+		switch err := flowErr.(type) {
+		case *CodeExecutionError:
+			return runtime.Address{}, err.RuntimeError.Unwrap()
+		default:
+			// Account creation should fail due to insufficient balance, which is reported in `flowErr`.
+			// Should we tree other FlowErrors as fatal?
+			return runtime.Address{}, fmt.Errorf(
+				"failed to deduct account creation fee: %s",
+				err.ErrorMessage(),
+			)
 		}
 	}
 
-	accountAddress, err := r.ledger.CreateAccount(publicKeys)
-	r.Log(fmt.Sprintf("Created new account with address: %x", accountAddress))
+	var err error
 
-	return runtime.Address(accountAddress), err
+	addr, err := r.ledger.CreateAccount(nil)
+	if err != nil {
+		return runtime.Address{}, err
+	}
+
+	r.Log(fmt.Sprintf("Created new account with address: %s", addr))
+
+	flowErr, fatalErr = r.initDefaultToken(addr)
+	if fatalErr != nil {
+		return runtime.Address{}, fatalErr
+	}
+
+	if flowErr != nil {
+		// TODO: properly propagate this error
+
+		switch err := flowErr.(type) {
+		case *CodeExecutionError:
+			return runtime.Address{}, err.RuntimeError.Unwrap()
+		default:
+			return runtime.Address{}, fmt.Errorf(
+				"failed to initialize default token: %s",
+				err.ErrorMessage(),
+			)
+		}
+	}
+
+	return runtime.Address(addr), nil
+}
+
+func (r *TransactionContext) initDefaultToken(addr flow.Address) (FlowError, error) {
+	tx := flow.NewTransactionBody().
+		SetScript(InitDefaultTokenTransaction).
+		AddAuthorizer(addr)
+
+	// TODO: propagate computation limit
+	result, err := r.bc.ExecuteTransaction(r.ledger, tx, SkipVerification)
+	if err != nil {
+		return nil, err
+	}
+
+	if result.Error != nil {
+		return result.Error, nil
+	}
+
+	return nil, nil
+}
+
+func (r *TransactionContext) deductAccountCreationFee(addr flow.Address) (FlowError, error) {
+	tx := flow.NewTransactionBody().
+		SetScript(DeductAccountCreationFeeTransaction).
+		AddAuthorizer(addr)
+
+	// TODO: propagate computation limit
+	result, err := r.bc.ExecuteTransaction(r.ledger, tx, SkipVerification)
+	if err != nil {
+		return nil, err
+	}
+
+	if result.Error != nil {
+		return result.Error, nil
+	}
+
+	return nil, nil
 }
 
 // AddAccountKey adds a public key to an existing account.
@@ -258,8 +329,6 @@ func (r *TransactionContext) GetCurrentBlockHeight() uint64 {
 func (r *TransactionContext) GetBlockAtHeight(height uint64) (hash runtime.BlockHash, timestamp int64, exists bool) {
 	panic("implement me")
 }
-
-// GetAccount gets an account by address.
 
 func (r *TransactionContext) isValidSigningAccount(address runtime.Address) bool {
 	for _, accountAddress := range r.GetSigningAccounts() {
@@ -470,12 +539,33 @@ func hasSufficientKeyWeight(weights map[flow.Address]int, address flow.Address) 
 	return weights[address] >= AccountKeyWeightThreshold
 }
 
-var InitDefaultTokenScript = []byte(fmt.Sprintf(`
+var InitDefaultTokenTransaction = []byte(fmt.Sprintf(`
 	import ServiceAccount from 0x%s
 
 	transaction {
 		prepare(acct: AuthAccount) {
 			ServiceAccount.initDefaultToken(acct)
+		}
+	}
+`, flow.RootAddress))
+
+func DefaultTokenBalanceScript(addr flow.Address) []byte {
+	return []byte(fmt.Sprintf(`
+		import ServiceAccount from 0x%s
+	
+		pub fun main(): UFix64 {
+			let acct = getAccount(0x%s)
+			return ServiceAccount.defaultTokenBalance(acct)
+		}
+	`, flow.RootAddress, addr))
+}
+
+var DeductAccountCreationFeeTransaction = []byte(fmt.Sprintf(`
+	import ServiceAccount from 0x%s
+
+	transaction {
+		prepare(acct: AuthAccount) {
+			ServiceAccount.deductAccountCreationFee(acct)
 		}
 	}
 `, flow.RootAddress))
