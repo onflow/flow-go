@@ -39,5 +39,5 @@ func AddressFromSDK(sdkAddr sdk.Address) flow.Address {
 }
 
 func ToSDKAddress(addr flow.Address) sdk.Address {
-	return sdk.BytesToAddress(addr[:])
+	return sdk.BytesToAddress(addr.Bytes())
 }

@@ -184,8 +184,8 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		return e.handleCollection(originID, resource)
 	case *messages.CollectionResponse:
 		return e.handleCollection(originID, &resource.Collection)
-	case *messages.ChunkDataPackResponse:
-		return e.handleChunkDataPack(originID, &resource.Data)
+	case *messages.ChunkDataResponse:
+		return e.handleChunkDataPack(originID, &resource.ChunkDataPack)
 	default:
 		return ErrInvType
 	}
@@ -476,7 +476,7 @@ func (e *Engine) requestChunkDataPack(chunkID, blockID flow.Identifier) error {
 		return fmt.Errorf("could not load execution nodes identities: %w", err)
 	}
 
-	req := &messages.ChunkDataPackRequest{
+	req := &messages.ChunkDataRequest{
 		ChunkID: chunkID,
 		Nonce:   rand.Uint64(),
 	}

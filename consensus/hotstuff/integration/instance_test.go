@@ -224,15 +224,24 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.communicator.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Return(
 		func(header *flow.Header, delay time.Duration) error {
 
-			// check that we have the parent
-			parent, found := in.headers.Load(header.ParentID)
-			if !found {
-				return fmt.Errorf("can't broadcast with unknown parent")
+			// sender should always have the parent
+			parentBlob, exists := in.headers.Load(header.ParentID)
+			if !exists {
+				return fmt.Errorf("parent for proposal not found (sender: %x, parent: %x)", in.localID, header.ParentID)
 			}
+			parent := parentBlob.(*flow.Header)
 
 			// set the height and chain ID
-			header.ChainID = parent.(*flow.Header).ChainID
-			header.Height = parent.(*flow.Header).Height + 1
+			header.ChainID = parent.ChainID
+			header.Height = parent.Height + 1
+
+			// convert into proposal immediately
+			proposal := model.ProposalFromFlow(header, parent.View)
+
+			// store locally and loop back to engine for processing
+			in.headers.Store(header.ID(), header)
+			in.queue <- proposal
+
 			return nil
 		},
 	)

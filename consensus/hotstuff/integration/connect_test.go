@@ -41,6 +41,10 @@ func Connect(instances []*Instance) {
 				// convert into proposal immediately
 				proposal := model.ProposalFromFlow(header, parent.View)
 
+				// store locally and loop back to engine for processing
+				sender.headers.Store(header.ID(), header)
+				sender.queue <- proposal
+
 				// check if we should block the outgoing proposal
 				if sender.blockPropOut(proposal) {
 					return nil
