@@ -308,6 +308,9 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	})
 	fnb.MustNot(err).Msg("could not initialize max tracker")
 
+	// Collect any garbage on startup, before we've started using the DB.
+	_ = db.RunValueLogGC(0.2)
+
 	headers := bstorage.NewHeaders(fnb.Metrics.Cache, db)
 	identities := bstorage.NewIdentities(fnb.Metrics.Cache, db)
 	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, db)
