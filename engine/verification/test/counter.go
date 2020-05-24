@@ -120,7 +120,7 @@ func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExe
 		require.NoError(t, err)
 		defer led.Done()
 
-		startStateCommitment, err := bootstrap.BootstrapLedger(led, flow.RootAccountPublicKey)
+		startStateCommitment, err := bootstrap.BootstrapLedger(led, flow.ServiceAccountPublicKey)
 		require.NoError(t, err)
 
 		rt := runtime.NewInterpreterRuntime()
