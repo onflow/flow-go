@@ -2,7 +2,6 @@ package testnet
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -24,7 +23,6 @@ import (
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	bootstraprun "github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -486,19 +484,8 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, fmt.Errorf("failed to run DKG: %w", err)
 	}
 
-	// generate the root account
-	hardcoded, err := hex.DecodeString(flow.RootAccountPrivateKeyHex)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	account, err := flow.DecodeAccountPrivateKey(hardcoded)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	// generate the initial execution state
-	commit, err := run.GenerateExecutionState(filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState), account)
+	commit, err := run.GenerateExecutionState(filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState), flow.RootAccountPublicKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -516,7 +503,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 
 	// write common genesis bootstrap files
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathServiceAccountPublicKey), account.PublicKey(virtualmachine.AccountKeyWeightThreshold))
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathServiceAccountPublicKey), flow.RootAccountPublicKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -547,10 +534,10 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	for i, sk := range dkg.PrivKeyShares {
 		nodeID := consensusNodes[i].NodeID
 		encodableSk := bootstrap.EncodableRandomBeaconPrivKey{sk}
-		privParticpant := bootstrap.DKGParticipantPriv {
-			NodeID              :nodeID,
-			RandomBeaconPrivKey :encodableSk,
-			GroupIndex          :i,
+		privParticpant := bootstrap.DKGParticipantPriv{
+			NodeID:              nodeID,
+			RandomBeaconPrivKey: encodableSk,
+			GroupIndex:          i,
 		}
 		path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID)
 		err = writeJSON(filepath.Join(bootstrapDir, path), privParticpant)
