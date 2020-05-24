@@ -81,7 +81,7 @@ func main() {
 			return err
 		}).
 		GenesisHandler(func(node *cmd.FlowNodeBuilder, block *flow.Block) {
-			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage)
+			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage, flow.RootAccountPrivateKey)
 			if err != nil {
 				panic(fmt.Sprintf("error while bootstrapping execution state: %s", err))
 			}

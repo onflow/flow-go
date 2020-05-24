@@ -18,7 +18,7 @@ func TestGenerateGenesisStateCommitment(t *testing.T) {
 		ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 		require.NoError(t, err)
 
-		newStateCommitment, err := BootstrapLedger(ls)
+		newStateCommitment, err := BootstrapLedger(ls, flow.RootAccountPrivateKey)
 
 		require.NoError(t, err)
 		require.Equal(t, flow.GenesisStateCommitment, newStateCommitment)
