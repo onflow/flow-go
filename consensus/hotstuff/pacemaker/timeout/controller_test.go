@@ -9,11 +9,11 @@ import (
 )
 
 const (
-	startRepTimeout        float64 = 120 // Milliseconds
-	minRepTimeout          float64 = 100 // Milliseconds
-	voteTimeoutFraction    float64 = 0.5 // multiplicative factor
-	multiplicativeIncrease float64 = 1.5 // multiplicative factor
-	additiveDecrease       float64 = 50  // Milliseconds
+	startRepTimeout        float64 = 120  // Milliseconds
+	minRepTimeout          float64 = 100  // Milliseconds
+	voteTimeoutFraction    float64 = 0.5  // multiplicative factor
+	multiplicativeIncrease float64 = 1.5  // multiplicative factor
+	multiplicativeDecrease float64 = 0.85 // multiplicative factor
 )
 
 func initTimeoutController(t *testing.T) *Controller {
@@ -22,7 +22,8 @@ func initTimeoutController(t *testing.T) *Controller {
 		time.Duration(minRepTimeout*1e6),
 		voteTimeoutFraction,
 		multiplicativeIncrease,
-		time.Duration(additiveDecrease*1e6), 0)
+		multiplicativeDecrease,
+		0)
 	if err != nil {
 		t.Fail()
 	}
@@ -75,11 +76,11 @@ func Test_TimeoutDecrease(t *testing.T) {
 		tc.OnProgressBeforeTimeout()
 		assert.Equal(t,
 			tc.ReplicaTimeout().Milliseconds(),
-			int64(repTimeout-float64(i)*additiveDecrease),
+			int64(repTimeout*math.Pow(multiplicativeDecrease, float64(i))),
 		)
 		assert.Equal(t,
 			tc.VoteCollectionTimeout().Milliseconds(),
-			int64((repTimeout-float64(i)*additiveDecrease)*voteTimeoutFraction),
+			int64((repTimeout*math.Pow(multiplicativeDecrease, float64(i)))*voteTimeoutFraction),
 		)
 	}
 }
@@ -89,8 +90,10 @@ func Test_MinCutoff(t *testing.T) {
 	tc := initTimeoutController(t)
 
 	tc.OnTimeout()               // replica timeout increases 120 -> 1.5 * 120 = 180
-	tc.OnProgressBeforeTimeout() // replica timeout decreases 180 -> 180 - 50 = 130
-	tc.OnProgressBeforeTimeout() // replica timeout decreases 130 -> max(130 - 50, 100) = 100
+	tc.OnProgressBeforeTimeout() // replica timeout decreases 180 -> 180 * 0.85 = 153
+	tc.OnProgressBeforeTimeout() // replica timeout decreases 153 -> 153 * 0.85 = 130.05
+	tc.OnProgressBeforeTimeout() // replica timeout decreases 130.05 -> 130.05 * 0.85 = 110.5425
+	tc.OnProgressBeforeTimeout() // replica timeout decreases 110.5425 -> max(110.5425 * 0.85, 100) = 100
 
 	tc.OnProgressBeforeTimeout()
 	assert.Equal(t, tc.ReplicaTimeout().Milliseconds(), int64(minRepTimeout))
@@ -105,7 +108,7 @@ func Test_MaxCutoff(t *testing.T) {
 		time.Duration(minRepTimeout*float64(time.Millisecond)),
 		voteTimeoutFraction,
 		10,
-		time.Duration(additiveDecrease*float64(time.Millisecond)),
+		multiplicativeDecrease,
 		0)
 	if err != nil {
 		t.Fail()
@@ -126,7 +129,7 @@ func Test_BlockRateDelay(t *testing.T) {
 		time.Duration(minRepTimeout*float64(time.Millisecond)),
 		voteTimeoutFraction,
 		10,
-		time.Duration(additiveDecrease*float64(time.Millisecond)),
+		multiplicativeDecrease,
 		time.Second)
 	if err != nil {
 		t.Fail()
