@@ -647,7 +647,7 @@ func loadDKGPublicData(dir string) (*dkg.PublicData, error) {
 }
 
 func loadGenesisAccountPublicKey(dir string) (*flow.AccountPublicKey, error) {
-	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisCommit))
+	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathServiceAccountPublicKey))
 	if err != nil {
 		return nil, err
 	}
