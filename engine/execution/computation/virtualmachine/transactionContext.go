@@ -560,7 +560,7 @@ func DefaultTokenBalanceScript(addr flow.Address) []byte {
 	`, flow.RootAddress, addr))
 }
 
-var DeductAccountCreationFeeScript = []byte(fmt.Sprintf(`
+var DeductAccountCreationFeeTransaction = []byte(fmt.Sprintf(`
 	import ServiceAccount from 0x%s
 
 	transaction {
