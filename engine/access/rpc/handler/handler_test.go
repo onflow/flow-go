@@ -459,7 +459,7 @@ func (suite *Suite) TestGetNetworkParameters() {
 	npReq := &access.GetNetworkParametersRequest{}
 	npResp, err := handler.GetNetworkParameters(context.Background(), npReq)
 	suite.checkResponse(npResp, err)
-	suite.Require().Equal(expectedChainID, npResp.GetNetworkParameters().GetChainId())
+	suite.Require().Equal(expectedChainID, npResp.GetChainId())
 }
 
 func (suite *Suite) assertAllExpectations() {

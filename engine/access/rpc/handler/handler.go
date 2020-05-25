@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -150,11 +149,9 @@ func (h *Handler) GetAccount(ctx context.Context, req *access.GetAccountRequest)
 
 }
 
-func (h *Handler) GetNetworkParameters(ctx context.Context, request *access.GetNetworkParametersRequest) (*access.GetNetworkParametersResponse, error) {
+func (h *Handler) GetNetworkParameters(_ context.Context, _ *access.GetNetworkParametersRequest) (*access.GetNetworkParametersResponse, error) {
 	return &access.GetNetworkParametersResponse{
-		NetworkParameters: &entities.NetworkParameters{
-			ChainId: string(flow.GetChainID()),
-		},
+		ChainId: string(flow.GetChainID()),
 	}, nil
 }
 
