@@ -131,6 +131,7 @@ github.com/dapperlabs/flow-core-contracts/contracts v0.0.0-20200525005911-80693e
 github.com/dapperlabs/flow-core-contracts/contracts v0.0.0-20200525054906-59a8847654b8/go.mod h1:QEq8/xgaqW2w+EKgd9D7K+mlZElY/QhMyRpHEYB7El8=
 github.com/dapperlabs/flow-core-contracts/contracts v0.0.0-20200525060056-850be0bda3f5 h1:cJdm7VpEFtMU1k2u6Kx7KdXXfJS+wHuhb8npQTwhnT8=
 github.com/dapperlabs/flow-core-contracts/contracts v0.0.0-20200525060056-850be0bda3f5/go.mod h1:QEq8/xgaqW2w+EKgd9D7K+mlZElY/QhMyRpHEYB7El8=
+github.com/dapperlabs/flow-core-contracts/contracts v0.0.0-20200525213242-82ffa620c7c0/go.mod h1:TuHEDkxKl9BkNPti0dVu9lNYOPTvd/3KS/V9ehLerk8=
 github.com/dapperlabs/testingdock v0.4.2/go.mod h1:S45YfB1J1mbOeLHhJROx3dFZfMCVSxTgSU9vZ15Oq18=
 github.com/dapperlabs/testingdock v0.4.3-0.20200424073047-26b38aa03602 h1:0WZHK77ynnSPSUJmBt5jzeMF9y0hS2q3vORxe8laA8o=
 github.com/dapperlabs/testingdock v0.4.3-0.20200424073047-26b38aa03602/go.mod h1:HeTbuHG1J4yt4n7NlZSyuk5c5fmyz6hECbyV+36Ku7Q=
@@ -567,6 +568,7 @@ github.com/onflow/cadence v0.3.0-beta4.0.20200524043105-6b94cabe6a65 h1:1ZqKddG0
 github.com/onflow/cadence v0.3.0-beta4.0.20200524043105-6b94cabe6a65/go.mod h1:GaLQ7IsJi5bqpH66GprNs8uoQtperK/xbXXIOq11nZw=
 github.com/onflow/flow-ft/contracts v0.0.0-20200525002245-5690471c3a87 h1:NH3m1on5ep5ocwwiX0AugpHt0O8JFQutYOu0w1zKYCM=
 github.com/onflow/flow-ft/contracts v0.0.0-20200525002245-5690471c3a87/go.mod h1:KwzrK5thiLObKHTHaHf9lrvOS3HLr9jntNEZUQ4yJgw=
+github.com/onflow/flow-ft/contracts v0.0.0-20200525213023-47d0c1c71189/go.mod h1:KwzrK5thiLObKHTHaHf9lrvOS3HLr9jntNEZUQ4yJgw=
 github.com/onflow/flow-go-sdk v0.3.0-beta1 h1:HmAqosPHLoNmYfhUECsSFpvSD4kWIkJ+Xs8LAJijKDc=
 github.com/onflow/flow-go-sdk v0.3.0-beta1/go.mod h1:8v6vcYGh5/PtYcM3IXflLcCb00I91WDbnNF8SjirnlI=
 github.com/onflow/flow/protobuf/go/flow v0.1.4 h1:xRdLYCxR/V6lq03ElK3g0T/F8pCIpLrKs2IHQTYr9rM=

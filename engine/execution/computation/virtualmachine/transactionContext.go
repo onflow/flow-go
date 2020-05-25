@@ -158,7 +158,7 @@ func (r *TransactionContext) initDefaultToken(addr flow.Address) (FlowError, err
 
 func (r *TransactionContext) deductTransactionFee(addr flow.Address) (FlowError, error) {
 	tx := flow.NewTransactionBody().
-		SetScript(DeductTransactionFeeScript).
+		SetScript(DeductTransactionFeeTransaction).
 		AddAuthorizer(addr)
 
 	// TODO: propagate computation limit
@@ -562,12 +562,16 @@ var DeductAccountCreationFeeTransaction = []byte(fmt.Sprintf(`
 
     transaction {
         prepare(acct: AuthAccount) {
+			if !FlowServiceAccount.isAccountCreator(acct.address) {
+				panic("Account not authorized to create accounts")
+			}
+
             FlowServiceAccount.deductAccountCreationFee(acct)
         }
     }
 `, flow.RootAddress))
 
-var DeductTransactionFeeScript = []byte(fmt.Sprintf(`
+var DeductTransactionFeeTransaction = []byte(fmt.Sprintf(`
     import FlowServiceAccount from 0x%s
 
     transaction {
@@ -598,8 +602,8 @@ var MintDefaultTokenTransaction = []byte(fmt.Sprintf(`
       let tokenReceiver: &FlowToken.Vault{FungibleToken.Receiver}
 
       prepare(signer: AuthAccount) {
-        self.tokenAdmin = signer.
-          borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin) 
+        self.tokenAdmin = signer
+          .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin) 
           ?? panic("Signer is not the token admin")
 
         self.tokenReceiver = signer
