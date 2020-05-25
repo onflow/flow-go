@@ -245,7 +245,7 @@ func (suite *LightIngestTestSuite) TestHandleReceipt_MissingCollection() {
 
 	var submitWG sync.WaitGroup
 	submitWG.Add(1)
-	// expects a collection request is submitted
+	// expects a chunk data pack request is submitted
 	suite.chunksConduit.
 		On("Submit", testifymock.AnythingOfType("*messages.ChunkDataRequest"),
 			suite.execIdentity.NodeID).Run(func(args testifymock.Arguments) {
@@ -583,7 +583,8 @@ func (suite *LightIngestTestSuite) TestVerifyReady() {
 
 			// asserts verifier engine gets the call with a verifiable chunk
 			suite.verifierEng.AssertExpectations(suite.T())
-
+			// asserts the collection should not be requested
+			suite.collectionsConduit.AssertNotCalled(suite.T(), "Submit", testifymock.Anything, suite.collIdentity)
 			// asserts the chunk state should not be requested
 			suite.statesConduit.AssertNotCalled(suite.T(), "Submit", testifymock.Anything, suite.execIdentity)
 		})
