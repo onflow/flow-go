@@ -34,7 +34,9 @@ func NewCleaner(log zerolog.Logger, db *badger.DB, frequency int) *Cleaner {
 	}
 	// we don't want the entire network to run GC at the same time, so
 	// distribute evenly over time
-	c.calls = rand.Intn(c.freq)
+	if c.enabled {
+		c.calls = rand.Intn(c.freq)
+	}
 	return c
 }
 
