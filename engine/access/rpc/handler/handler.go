@@ -29,7 +29,6 @@ type Handler struct {
 	collectionRPC access.AccessAPIClient
 	log           zerolog.Logger
 	state         protocol.State
-	chainID       string
 
 	// storage
 	blocks       storage.Blocks
