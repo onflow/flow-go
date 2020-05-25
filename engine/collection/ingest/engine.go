@@ -21,10 +21,6 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-// MaxGasLimit is the maximum allowed gas limit for a transaction.
-// TODO: update the hardcoded number based on real world cases.
-const MaxGasLimit = 9999
-
 // Engine is the transaction ingestion engine, which ensures that new
 // transactions are delegated to the correct collection cluster, and prepared
 // to be included in a collection.
@@ -38,13 +34,7 @@ type Engine struct {
 	state      protocol.State
 	pool       mempool.Transactions
 
-	// the number of blocks that can be between the reference block and the
-	// finalized head before we consider the transaction expired
-	expiry uint
-	// the maximum gas limit for a transaction
-	gasLimit uint64
-	// whether or not we validate that transaction scripts are parseable
-	parseScripts bool
+	config Config
 }
 
 // New creates a new collection ingest engine.
@@ -56,9 +46,7 @@ func New(
 	colMetrics module.CollectionMetrics,
 	me module.Local,
 	pool mempool.Transactions,
-	expiryBuffer uint,
-	gasLimit uint64,
-	parseScripts bool,
+	config Config,
 ) (*Engine, error) {
 
 	logger := log.With().
@@ -73,12 +61,7 @@ func New(
 		me:         me,
 		state:      state,
 		pool:       pool,
-		// add some expiry buffer -- this is how much time a transaction has
-		// to be included in a collection, then for that collection to be
-		// included in a block
-		expiry:       flow.DefaultTransactionExpiry - expiryBuffer,
-		gasLimit:     gasLimit,
-		parseScripts: parseScripts,
+		config:     config,
 	}
 
 	con, err := net.Register(engine.CollectionIngest, e)
@@ -230,37 +213,17 @@ func (e *Engine) ValidateTransaction(tx *flow.TransactionBody) error {
 	}
 
 	// ensure the gas limit is not over the maximum
-	if tx.GasLimit > e.gasLimit {
-		return GasLimitExceededError{Actual: tx.GasLimit, Maximum: MaxGasLimit}
+	if tx.GasLimit > e.config.MaxGasLimit {
+		return GasLimitExceededError{Actual: tx.GasLimit, Maximum: e.config.MaxGasLimit}
 	}
 
-	// ensure the transaction is not expired
-	final, err := e.state.Final().Head()
+	// ensure the reference block is valid
+	err := e.checkReferenceBlock(tx)
 	if err != nil {
-		return fmt.Errorf("could not get finalized header: %w", err)
+		return err
 	}
 
-	ref, err := e.state.AtBlockID(tx.ReferenceBlockID).Head()
-	if errors.Is(err, storage.ErrNotFound) {
-		return ErrUnknownReferenceBlock
-	}
-	if err != nil {
-		return fmt.Errorf("could not get reference block: %w", err)
-	}
-
-	diff := final.Height - ref.Height
-	// check for overflow
-	if ref.Height > final.Height {
-		diff = 0
-	}
-	if uint(diff) > e.expiry {
-		return ExpiredTransactionError{
-			RefHeight:   ref.Height,
-			FinalHeight: final.Height,
-		}
-	}
-
-	if e.parseScripts {
+	if e.config.CheckScriptsParse {
 		// ensure the script is at least parse-able
 		_, _, err = parser.ParseProgram(string(tx.Script))
 		if err != nil {
@@ -269,6 +232,46 @@ func (e *Engine) ValidateTransaction(tx *flow.TransactionBody) error {
 	}
 
 	// TODO check account/payer signatures
+
+	return nil
+}
+
+// checkReferenceBlock checks whether a transaction's reference block ID is
+// valid. Returns nil if the reference is valid, returns an error if the
+// reference is invalid or we failed to check it.
+func (e *Engine) checkReferenceBlock(tx *flow.TransactionBody) error {
+
+	// look up the reference block
+	ref, err := e.state.AtBlockID(tx.ReferenceBlockID).Head()
+	if errors.Is(err, storage.ErrNotFound) {
+		// if we allow unknown reference blocks, we consider the transaction valid
+		if e.config.AllowUnknownReference {
+			return nil
+		}
+		return ErrUnknownReferenceBlock
+	}
+	if err != nil {
+		return fmt.Errorf("could not get reference block: %w", err)
+	}
+
+	// get the latest finalized block we know about
+	final, err := e.state.Final().Head()
+	if err != nil {
+		return fmt.Errorf("could not get finalized header: %w", err)
+	}
+
+	diff := final.Height - ref.Height
+	// check for overflow
+	if ref.Height > final.Height {
+		diff = 0
+	}
+	// discard expired transactions
+	if uint(diff) > flow.DefaultTransactionExpiry-e.config.ExpiryBuffer {
+		return ExpiredTransactionError{
+			RefHeight:   ref.Height,
+			FinalHeight: final.Height,
+		}
+	}
 
 	return nil
 }
