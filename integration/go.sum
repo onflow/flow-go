@@ -130,6 +130,9 @@ github.com/dapperlabs/flow-core-contracts v0.0.0-20200524062112-9460b8775b5f/go.
 github.com/dapperlabs/flow-core-contracts/contracts v0.0.0-20200524062112-9460b8775b5f/go.mod h1:FcATPXyjxEJk5qt9iYg8O2POl/b33IKfG6k/qvI/K1A=
 github.com/dapperlabs/flow-core-contracts/contracts v0.0.0-20200524064149-d1534e511f44 h1:K2LyjCm6ebzb4yaiW0LoF6V2PMU4Fh2Ofhf9dg4mqVI=
 github.com/dapperlabs/flow-core-contracts/contracts v0.0.0-20200524064149-d1534e511f44/go.mod h1:o1KaejHyRpTyipapSejBFImq/04Noalpq9oJnO/mAHI=
+github.com/dapperlabs/flow-core-contracts/contracts v0.0.0-20200524235601-824032f38c0a/go.mod h1:p88oxy3ggCp3Dh//8VMtjMfbRGsE1kvvarL7pnPiV8c=
+github.com/dapperlabs/flow-core-contracts/contracts v0.0.0-20200525000959-8a5eb50aa1db/go.mod h1:5NFUAlenb5oSbdzglvbjFBix0Xd8CwRdhSaN8xiqWj0=
+github.com/dapperlabs/flow-core-contracts/contracts v0.0.0-20200525005911-80693ea2cae0/go.mod h1:QEq8/xgaqW2w+EKgd9D7K+mlZElY/QhMyRpHEYB7El8=
 github.com/dapperlabs/testingdock v0.4.2/go.mod h1:S45YfB1J1mbOeLHhJROx3dFZfMCVSxTgSU9vZ15Oq18=
 github.com/dapperlabs/testingdock v0.4.3-0.20200424073047-26b38aa03602 h1:0WZHK77ynnSPSUJmBt5jzeMF9y0hS2q3vORxe8laA8o=
 github.com/dapperlabs/testingdock v0.4.3-0.20200424073047-26b38aa03602/go.mod h1:HeTbuHG1J4yt4n7NlZSyuk5c5fmyz6hECbyV+36Ku7Q=
@@ -569,6 +572,9 @@ github.com/onflow/cadence v0.3.0-beta4.0.20200524043105-6b94cabe6a65/go.mod h1:G
 github.com/onflow/flow-ft/contracts v0.0.0-20200524055247-f4074e03c658/go.mod h1:KwzrK5thiLObKHTHaHf9lrvOS3HLr9jntNEZUQ4yJgw=
 github.com/onflow/flow-ft/contracts v0.0.0-20200524063749-dc5b9393b9a4 h1:vFDtCDBhLqOAj6gVaZIMhAc6EFVR53RNSshx4hSAZrg=
 github.com/onflow/flow-ft/contracts v0.0.0-20200524063749-dc5b9393b9a4/go.mod h1:KwzrK5thiLObKHTHaHf9lrvOS3HLr9jntNEZUQ4yJgw=
+github.com/onflow/flow-ft/contracts v0.0.0-20200524225029-34ac69b1b752/go.mod h1:KwzrK5thiLObKHTHaHf9lrvOS3HLr9jntNEZUQ4yJgw=
+github.com/onflow/flow-ft/contracts v0.0.0-20200525000529-36a830924be8/go.mod h1:KwzrK5thiLObKHTHaHf9lrvOS3HLr9jntNEZUQ4yJgw=
+github.com/onflow/flow-ft/contracts v0.0.0-20200525002245-5690471c3a87/go.mod h1:KwzrK5thiLObKHTHaHf9lrvOS3HLr9jntNEZUQ4yJgw=
 github.com/onflow/flow-go-sdk v0.3.0-beta1 h1:HmAqosPHLoNmYfhUECsSFpvSD4kWIkJ+Xs8LAJijKDc=
 github.com/onflow/flow-go-sdk v0.3.0-beta1/go.mod h1:8v6vcYGh5/PtYcM3IXflLcCb00I91WDbnNF8SjirnlI=
 github.com/onflow/flow/protobuf/go/flow v0.1.4 h1:xRdLYCxR/V6lq03ElK3g0T/F8pCIpLrKs2IHQTYr9rM=
