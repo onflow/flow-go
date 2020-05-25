@@ -49,22 +49,22 @@ func TestSyncFlow(t *testing.T) {
 	seq := uint64(0)
 
 	tx1 := execTestutil.DeployCounterContractTransaction(flow.RootAddress)
-	err = execTestutil.SignTransactionByRoot(&tx1, seq)
+	err = execTestutil.SignTransactionByRoot(tx1, seq)
 	require.NoError(t, err)
 	seq++
 
 	tx2 := execTestutil.CreateCounterTransaction(flow.RootAddress, flow.RootAddress)
-	err = execTestutil.SignTransactionByRoot(&tx2, seq)
+	err = execTestutil.SignTransactionByRoot(tx2, seq)
 	require.NoError(t, err)
 	seq++
 
 	tx4 := execTestutil.AddToCounterTransaction(flow.RootAddress, flow.RootAddress)
-	err = execTestutil.SignTransactionByRoot(&tx4, seq)
+	err = execTestutil.SignTransactionByRoot(tx4, seq)
 	require.NoError(t, err)
 
-	col1 := flow.Collection{Transactions: []*flow.TransactionBody{&tx1}}
-	col2 := flow.Collection{Transactions: []*flow.TransactionBody{&tx2}}
-	col4 := flow.Collection{Transactions: []*flow.TransactionBody{&tx4}}
+	col1 := flow.Collection{Transactions: []*flow.TransactionBody{tx1}}
+	col2 := flow.Collection{Transactions: []*flow.TransactionBody{tx2}}
+	col4 := flow.Collection{Transactions: []*flow.TransactionBody{tx4}}
 
 	//Create three blocks, with one tx each
 	block1 := unittest.BlockWithParentFixture(genesis)

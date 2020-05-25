@@ -17,31 +17,50 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func CreateContractDeploymentTransaction(contract string, authorizer flow.Address) flow.TransactionBody {
+func CreateContractDeploymentTransaction(contract string, authorizer flow.Address) *flow.TransactionBody {
 	encoded := hex.EncodeToString([]byte(contract))
-	return flow.TransactionBody{
-		Script: []byte(fmt.Sprintf(`transaction {
+
+	return flow.NewTransactionBody().
+		SetScript([]byte(fmt.Sprintf(`transaction {
               prepare(signer: AuthAccount) {
                 signer.setCode("%s".decodeHex())
               }
             }`, encoded)),
-		Authorizers: []flow.Address{authorizer},
-	}
+		).
+		AddAuthorizer(authorizer)
 }
 
-func SignTransaction(tx *flow.TransactionBody, account flow.Address, privateKey flow.AccountPrivateKey, seqNum uint64) error {
+func SignPayload(
+	tx *flow.TransactionBody,
+	account flow.Address,
+	privateKey flow.AccountPrivateKey,
+) error {
 	hasher, err := hash.NewHasher(privateKey.HashAlgo)
 	if err != nil {
-		return fmt.Errorf("cannot create hasher: %w", err)
+		return fmt.Errorf("failed to create hasher: %w", err)
 	}
 
-	err = tx.SetPayer(account).
-		SetProposalKey(account, 0, seqNum).
-		SignEnvelope(account, 0, privateKey.PrivateKey, hasher)
+	err = tx.SignPayload(account, 0, privateKey.PrivateKey, hasher)
 
 	if err != nil {
-		return fmt.Errorf("cannot sign tx: %w", err)
+		return fmt.Errorf("failed to sign transaction: %w", err)
 	}
+
+	return nil
+}
+
+func SignEnvelope(tx *flow.TransactionBody, account flow.Address, privateKey flow.AccountPrivateKey) error {
+	hasher, err := hash.NewHasher(privateKey.HashAlgo)
+	if err != nil {
+		return fmt.Errorf("failed to create hasher: %w", err)
+	}
+
+	err = tx.SignEnvelope(account, 0, privateKey.PrivateKey, hasher)
+
+	if err != nil {
+		return fmt.Errorf("failed to sign transaction: %w", err)
+	}
+
 	return nil
 }
 
@@ -131,7 +150,9 @@ func CreateAccounts(
 }
 
 func SignTransactionByRoot(tx *flow.TransactionBody, seqNum uint64) error {
-	return SignTransaction(tx, flow.RootAddress, unittest.RootAccountPrivateKey, seqNum)
+	tx.SetProposalKey(flow.RootAddress, 0, seqNum)
+	tx.SetPayer(flow.RootAddress)
+	return SignEnvelope(tx, flow.RootAddress, unittest.RootAccountPrivateKey)
 }
 
 func RootBootstrappedLedger() virtualmachine.Ledger {

@@ -109,27 +109,35 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create deployment transaction that imports the FlowToken contract
-	useImportTx := flow.TransactionBody{
-		Authorizers: []flow.Address{accounts[0]},
-		Script: []byte(fmt.Sprintf(`
-			import FlowToken from 0x%s
-			transaction {
-				prepare(signer: AuthAccount) {}
-				execute {
-					let v <- FlowToken.createEmptyVault()
-					destroy v
+	useImportTx := flow.NewTransactionBody().
+		SetScript([]byte(fmt.Sprintf(`
+				import FlowToken from 0x%s
+				transaction {
+					prepare(signer: AuthAccount) {}
+					execute {
+						let v <- FlowToken.createEmptyVault()
+						destroy v
+					}
 				}
-			}
-		`, virtualmachine.FlowTokenAddress)),
-	}
-	err = testutil.SignTransaction(&useImportTx, accounts[0], privateKeys[0], 0)
+			`, virtualmachine.FlowTokenAddress)),
+		).
+		AddAuthorizer(accounts[0]).
+		SetProposalKey(accounts[0], 0, 0).
+		SetPayer(flow.RootAddress)
+
+	err = testutil.SignPayload(useImportTx, accounts[0], privateKeys[0])
+	require.NoError(t, err)
+
+	err = testutil.SignEnvelope(useImportTx, flow.RootAddress, unittest.RootAccountPrivateKey)
 	require.NoError(t, err)
 
 	// Run the Use import (FT Vault resource) transaction
-	result, err := bc.ExecuteTransaction(ledger, &useImportTx)
+	result, err := bc.ExecuteTransaction(ledger, useImportTx)
 	require.NoError(t, err)
-	require.True(t, result.Succeeded())
-	require.Nil(t, result.Error)
+
+	if !assert.Nil(t, result.Error) {
+		t.Fatal(result.Error.ErrorMessage())
+	}
 
 	// Determine location of transaction
 	txID := useImportTx.ID()
@@ -159,11 +167,11 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 	require.NoError(b, err)
 
 	// Create many transactions that import the FlowToken contract.
-	var txs []flow.TransactionBody
+	var txs []*flow.TransactionBody
+
 	for i := 0; i < 1000; i++ {
-		tx := flow.TransactionBody{
-			Authorizers: []flow.Address{accounts[0]},
-			Script: []byte(fmt.Sprintf(`
+		tx := flow.NewTransactionBody().
+			SetScript([]byte(fmt.Sprintf(`
 				import FlowToken from 0x%s
 				transaction {
 					prepare(signer: AuthAccount) {}
@@ -174,11 +182,17 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 					}
 				}
 			`, virtualmachine.FlowTokenAddress, i)),
-		}
-		err := testutil.SignTransaction(&tx, accounts[0], privateKeys[0], uint64(i))
-		if err != nil {
-			panic(err)
-		}
+			).
+			AddAuthorizer(accounts[0]).
+			SetProposalKey(accounts[0], 0, uint64(i)).
+			SetPayer(flow.RootAddress)
+
+		err = testutil.SignPayload(tx, accounts[0], privateKeys[0])
+		require.NoError(b, err)
+
+		err = testutil.SignEnvelope(tx, flow.RootAddress, unittest.RootAccountPrivateKey)
+		require.NoError(b, err)
+
 		txs = append(txs, tx)
 	}
 
@@ -187,9 +201,12 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		for _, tx := range txs {
 			// Run the Use import (FT Vault resource) transaction.
-			result, err := bc.ExecuteTransaction(ledger, &tx)
-			require.True(b, result.Succeeded())
+			result, err := bc.ExecuteTransaction(ledger, tx)
 			require.NoError(b, err)
+
+			if !assert.Nil(b, result.Error) {
+				b.Fatal(result.Error.ErrorMessage())
+			}
 		}
 	}
 
@@ -223,11 +240,11 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 	require.NoError(b, err)
 
 	// Create many transactions that import the FlowToken contract.
-	var txs []flow.TransactionBody
+	var txs []*flow.TransactionBody
+
 	for i := 0; i < 1000; i++ {
-		tx := flow.TransactionBody{
-			Authorizers: []flow.Address{accounts[0]},
-			Script: []byte(fmt.Sprintf(`
+		tx := flow.NewTransactionBody().
+			SetScript([]byte(fmt.Sprintf(`
 				import FlowToken from 0x%s
 				transaction {
 					prepare(signer: AuthAccount) {}
@@ -238,8 +255,14 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 					}
 				}
 			`, virtualmachine.FlowTokenAddress, i)),
-		}
-		_ = testutil.SignTransaction(&tx, accounts[0], privateKeys[0], uint64(i))
+			).
+			AddAuthorizer(accounts[0]).
+			SetPayer(accounts[0]).
+			SetProposalKey(accounts[0], 0, uint64(i))
+
+		err = testutil.SignEnvelope(tx, accounts[0], privateKeys[0])
+		require.NoError(b, err)
+
 		txs = append(txs, tx)
 	}
 
@@ -248,7 +271,7 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		for _, tx := range txs {
 			// Run the Use import (FT Vault resource) transaction.
-			result, err := bc.ExecuteTransaction(ledger, &tx)
+			result, err := bc.ExecuteTransaction(ledger, tx)
 			require.True(b, result.Succeeded())
 			require.NoError(b, err)
 		}
