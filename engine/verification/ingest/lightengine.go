@@ -174,8 +174,8 @@ func (l *LightEngine) process(originID flow.Identifier, event interface{}) error
 		return l.handleCollection(originID, resource)
 	case *messages.CollectionResponse:
 		return l.handleCollection(originID, &resource.Collection)
-	case *messages.ChunkDataPackResponse:
-		return l.handleChunkDataPack(originID, &resource.Data)
+	case *messages.ChunkDataResponse:
+		return l.handleChunkDataPack(originID, &resource.ChunkDataPack)
 	default:
 		return ErrInvType
 	}
@@ -362,7 +362,7 @@ func (l *LightEngine) requestChunkDataPack(chunkID, blockID flow.Identifier) err
 		return fmt.Errorf("could not load execution nodes identities: %w", err)
 	}
 
-	req := &messages.ChunkDataPackRequest{
+	req := &messages.ChunkDataRequest{
 		ChunkID: chunkID,
 		Nonce:   rand.Uint64(),
 	}

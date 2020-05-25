@@ -18,7 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestProviderEngine_onChunkDataPackRequest(t *testing.T) {
+func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 	t.Run("non-verification engine", func(t *testing.T) {
 		ps := new(protocol.State)
 		ss := new(protocol.Snapshot)
@@ -39,7 +39,7 @@ func TestProviderEngine_onChunkDataPackRequest(t *testing.T) {
 			Nonce:   rand.Uint64(),
 		}
 		// submit using origin ID with invalid role
-		err := e.onChunkDataPackRequest(context.Background(), originID, req)
+		err := e.onChunkDataRequest(context.Background(), originID, req)
 		assert.Error(t, err)
 
 		ps.AssertExpectations(t)
@@ -69,7 +69,7 @@ func TestProviderEngine_onChunkDataPackRequest(t *testing.T) {
 			ChunkID: chunkID,
 			Nonce:   rand.Uint64(),
 		}
-		err := e.onChunkDataPackRequest(context.Background(), originIdentity.NodeID, req)
+		err := e.onChunkDataRequest(context.Background(), originIdentity.NodeID, req)
 		assert.Error(t, err)
 
 		ps.AssertExpectations(t)
@@ -115,7 +115,7 @@ func TestProviderEngine_onChunkDataPackRequest(t *testing.T) {
 			Nonce:   rand.Uint64(),
 		}
 
-		err := e.onChunkDataPackRequest(context.Background(), originIdentity.NodeID, req)
+		err := e.onChunkDataRequest(context.Background(), originIdentity.NodeID, req)
 		assert.NoError(t, err)
 
 		ps.AssertExpectations(t)

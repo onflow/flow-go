@@ -307,7 +307,7 @@ func (suite *LightIngestTestSuite) TestHandleReceipt_MissingChunkDataPack() {
 	var submitWG sync.WaitGroup
 	submitWG.Add(1)
 	suite.chunksConduit.
-		On("Submit", testifymock.AnythingOfType("*messages.ChunkDataPackRequest"),
+		On("Submit", testifymock.AnythingOfType("*messages.ChunkDataRequest"),
 			suite.execIdentity.NodeID).Run(func(args testifymock.Arguments) {
 		submitWG.Done()
 	}).Return(nil).Once()
@@ -357,9 +357,9 @@ func (suite *LightIngestTestSuite) TestIngestedChunk() {
 
 	eng := suite.TestNewLightEngine()
 
-	chunkDataPackResponse := &messages.ChunkDataPackResponse{
-		Data:  *suite.chunkDataPack,
-		Nonce: rand.Uint64(),
+	chunkDataPackResponse := &messages.ChunkDataResponse{
+		ChunkDataPack: *suite.chunkDataPack,
+		Nonce:         rand.Uint64(),
 	}
 	// mocks this chunk id
 	suite.ingestedChunkIDs.On("Has", suite.chunkDataPack.ChunkID).Return(true)
@@ -570,9 +570,9 @@ func (suite *LightIngestTestSuite) TestChunkDataPackTracker_UntrackedChunkDataPa
 	eng := suite.TestNewLightEngine()
 
 	// creates a chunk fixture, its data pack, and the data pack response
-	chunkDataPackResponse := &messages.ChunkDataPackResponse{
-		Data:  *suite.chunkDataPack,
-		Nonce: rand.Uint64(),
+	chunkDataPackResponse := &messages.ChunkDataResponse{
+		ChunkDataPack: *suite.chunkDataPack,
+		Nonce:         rand.Uint64(),
 	}
 
 	// mocks absence of chunk data pack tracker
@@ -599,9 +599,9 @@ func (suite *LightIngestTestSuite) TestChunkDataPackTracker_HappyPath() {
 
 	eng := suite.TestNewLightEngine()
 
-	chunkDataPackResponse := &messages.ChunkDataPackResponse{
-		Data:  *suite.chunkDataPack,
-		Nonce: rand.Uint64(),
+	chunkDataPackResponse := &messages.ChunkDataResponse{
+		ChunkDataPack: *suite.chunkDataPack,
+		Nonce:         rand.Uint64(),
 	}
 
 	// mocks tracker to return the tracker for the chunk data pack
