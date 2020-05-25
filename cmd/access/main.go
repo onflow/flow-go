@@ -42,7 +42,6 @@ func main() {
 		collections     *storage.Collections
 		transactions    *storage.Transactions
 		conCache        *buffer.PendingBlocks // pending block cache for follower
-		chainID         string
 	)
 
 	cmd.FlowNode(flow.RoleAccess.String()).
@@ -53,7 +52,6 @@ func main() {
 			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "r", "localhost:9000", "the address the gRPC server listens on")
 			flags.StringVarP(&rpcConf.CollectionAddr, "ingress-addr", "i", "localhost:9000", "the address (of the collection node) to send transactions to")
 			flags.StringVarP(&rpcConf.ExecutionAddr, "script-addr", "s", "localhost:9000", "the address (of the execution node) forward the script to")
-			flags.StringVarP(&chainID, "chain-id", "c", "mainnet", "the chain id of the network")
 		}).
 		Module("collection node client", func(node *cmd.FlowNodeBuilder) error {
 			node.Logger.Info().Err(err).Msgf("Collection node Addr: %s", rpcConf.CollectionAddr)
@@ -151,7 +149,7 @@ func main() {
 			return follower.WithSynchronization(sync), nil
 		}).
 		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, node.Storage.Blocks, node.Storage.Headers, collections, transactions, chainID)
+			rpcEng := rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, node.Storage.Blocks, node.Storage.Headers, collections, transactions)
 			return rpcEng, nil
 		}).
 		Run()

@@ -19,8 +19,10 @@ type Fingerprinter interface {
 // fields not needed in the pre-image of the hash that comprises the Identifier, which could be different from the
 // encoding for sending entities in messages or for storing them.
 func Fingerprint(entity interface{}) []byte {
+
 	if fingerprinter, ok := entity.(Fingerprinter); ok {
 		return fingerprinter.Fingerprint()
 	}
+
 	return rlp.NewEncoder().MustEncode(entity)
 }

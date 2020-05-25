@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -46,8 +47,7 @@ func NewHandler(log zerolog.Logger,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
-	transactions storage.Transactions,
-	chainID string) *Handler {
+	transactions storage.Transactions) *Handler {
 	return &Handler{
 		executionRPC:  e,
 		collectionRPC: c,
@@ -56,7 +56,6 @@ func NewHandler(log zerolog.Logger,
 		collections:   collections,
 		transactions:  transactions,
 		state:         s,
-		chainID:       chainID,
 		log:           log,
 	}
 }
@@ -152,9 +151,11 @@ func (h *Handler) GetAccount(ctx context.Context, req *access.GetAccountRequest)
 
 }
 
-func (h *Handler) GetChainID(ctx context.Context, request *access.GetChainIDRequest) (*access.GetChainIDResponse, error) {
-	return &access.GetChainIDResponse{
-		ChainId: h.chainID,
+func (h *Handler) GetNetworkParameters(ctx context.Context, request *access.GetNetworkParametersRequest) (*access.GetNetworkParametersResponse, error) {
+	return &access.GetNetworkParametersResponse{
+		NetworkParameters: &entities.NetworkParameters{
+			ChainId: string(flow.GetChainID()),
+		},
 	}, nil
 }
 
