@@ -26,7 +26,6 @@ func Fingerprint(entity interface{}) []byte {
 		fmt.Printf("entity has Fingerprint(): %#v\n", entity)
 		return fingerprinter.Fingerprint()
 	}
-	// fmt.Printf("entity has not Fingerprint(): %#v\n", entity)
 
 	return rlp.NewEncoder().MustEncode(entity)
 }
