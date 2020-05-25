@@ -57,7 +57,7 @@ func (b *PendingResults) ByID(resultID flow.Identifier) (*flow.PendingResult, bo
 	defer b.RUnlock()
 
 	result, exists := b.byID[resultID]
-	if exists {
+	if !exists {
 		return nil, false
 	}
 

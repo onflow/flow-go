@@ -135,6 +135,13 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // the pending chunk list to be processed.
 // It stores the result in memory, in order to check if a chunk still needs to be processed.
 func (e *Engine) handleExecutionResult(originID flow.Identifier, r *flow.ExecutionResult) error {
+	log := e.log.With().
+		Hex("originID", originID[:]).
+		Hex("exeuction_result_id", logging.ID(r.ID())).
+		Logger()
+
+	log.Debug().Msg("process execution result")
+
 	result := &flow.PendingResult{
 		ExecutorID:      originID,
 		ExecutionResult: r,
@@ -145,7 +152,7 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, r *flow.Executi
 	// if a execution result has been added before, then don't process
 	// this result.
 	if !added {
-		return nil
+		return fmt.Errorf("exeuction result has been added before: %v", r.ID())
 	}
 
 	// different execution results can be chunked in parallel
@@ -160,6 +167,7 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, r *flow.Executi
 		_ = e.chunks.Add(status)
 	}
 
+	e.log.Debug().Msg("finish processing execution result")
 	return nil
 }
 
@@ -274,27 +282,36 @@ func (e *Engine) requestChunkDataPack(c *ChunkStatus) error {
 // handleChunkDataPack receives a chunk data pack, verifies its origin ID, pull other data to make a
 // VerifiableChunk, and pass it to the verifier engine to verify
 func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack) error {
-	// check origin is from a exeuction node
-	e.log.Info().
+	log := e.log.With().
 		Hex("executor_id", logging.ID(originID)).
-		Hex("chunk_data_pack_id", logging.Entity(chunkDataPack)).
-		Msg("chunk data pack received")
+		Hex("chunk_data_pack_id", logging.Entity(chunkDataPack)).Logger()
+	log.Info().Msg("chunk data pack received")
+
+	// check origin is from a exeuction node
+	// sender, err := e.state.Final().Identity(originID)
+	// if err != nil {
+	// 	return fmt.Errorf("could not find identity: %w", err)
+	// }
+	//
+	// if sender.Role != flow.RoleExecution {
+	// 	return fmt.Errorf("receives chunk data pack from a non-exeuction node")
+	// }
 
 	status, exists := e.chunks.ByID(chunkDataPack.ChunkID)
 	if !exists {
-		return nil
+		return fmt.Errorf("chunk does not exist, chunkID: %v", chunkDataPack.ChunkID)
 	}
 
 	// remove first to ensure concurrency issue
 	removed := e.chunks.Rem(chunkDataPack.ChunkID)
 	if !removed {
-		return nil
+		return fmt.Errorf("chunk has been removed, chunkID: %v", chunkDataPack.ChunkID)
 	}
 
 	result, exists := e.results.ByID(status.ExecutionResultID)
 	if !exists {
 		// result no longer exists
-		return nil
+		return fmt.Errorf("execution result ID no longer exist: %v", status.ExecutionResultID)
 	}
 
 	// header must exist in storage
@@ -312,7 +329,7 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	}
 
 	e.unit.Launch(func() {
-		e.verifier.Submit(status.ExecutorID, vchunk)
+		e.verifier.ProcessLocal(vchunk)
 	})
 
 	return nil
