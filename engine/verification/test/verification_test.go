@@ -361,7 +361,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	err := verNode.Blocks.Store(completeER.Block)
 	assert.Nil(t, err)
 	// starts the ingest engine
-	<-verNode.IngestEngine.Ready()
+	<-verNode.LightIngestEngine.Ready()
 	// starts verification node's network in continuous mode
 	verNet, ok := hub.GetNetwork(verIdentity.NodeID)
 	assert.True(t, ok)
@@ -388,6 +388,8 @@ func TestSingleCollectionProcessing(t *testing.T) {
 				// publishes the chunk data pack response to the network
 				res := &messages.ChunkDataResponse{
 					ChunkDataPack: *completeER.ChunkDataPacks[0],
+					Collection:    *completeER.Collections[0],
+					Nonce:         rand.Uint64(),
 				}
 				err := exeChunkDataConduit.Submit(res, verIdentity.NodeID)
 				assert.Nil(t, err)
@@ -410,7 +412,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	assert.Nil(t, err)
 
 	// send the ER from execution to verification node
-	err = verNode.IngestEngine.Process(exeIdentity.NodeID, completeER.Receipt)
+	err = verNode.LightIngestEngine.Process(exeIdentity.NodeID, completeER.Receipt)
 	assert.Nil(t, err)
 
 	unittest.RequireReturnsBefore(t, approvalWG.Wait, 5*time.Second)
@@ -428,7 +430,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	// stops verification node
 	// Note: this should be done prior to any evaluation to make sure that
 	// the process method of Ingest engines is done working.
-	<-verNode.IngestEngine.Done()
+	<-verNode.LightIngestEngine.Done()
 
 	// receipt ID should be added to the ingested results mempool
 	assert.True(t, verNode.IngestedResultIDs.Has(completeER.Receipt.ExecutionResult.ID()))
