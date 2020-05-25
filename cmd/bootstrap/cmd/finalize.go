@@ -54,7 +54,7 @@ running the DKG for generating the random beacon keys, generating genesis execut
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ constructing genesis seal and genesis block")
-		block := constructGenesisBlock(stakingNodes, dkgData)
+		block := constructGenesisBlock(stakingNodes)
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ constructing genesis QC")

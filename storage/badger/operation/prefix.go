@@ -84,6 +84,8 @@ func b(v interface{}) []byte {
 		return []byte{byte(i)}
 	case flow.Identifier:
 		return i[:]
+	case flow.ChainID:
+		return []byte(i)
 	default:
 		panic(fmt.Sprintf("unsupported type to convert (%T)", v))
 	}

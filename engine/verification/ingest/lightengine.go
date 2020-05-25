@@ -41,7 +41,6 @@ type LightEngine struct {
 	collections           mempool.Collections           // keeps collections
 	chunkDataPacks        mempool.ChunkDataPacks        // keeps chunk data packs with authenticated origin IDs
 	chunkDataPackTackers  mempool.ChunkDataPackTrackers // keeps track of chunk data pack requests that this engine made
-	collectionTrackers    mempool.CollectionTrackers    // keeps track of collection requests that this engine made
 	ingestedResultIDs     mempool.Identifiers           // keeps ids of ingested execution results
 	ingestedChunkIDs      mempool.Identifiers           // keeps ids of ingested chunks
 	assignedChunkIDs      mempool.Identifiers           // keeps ids of assigned chunk IDs pending for ingestion
@@ -87,7 +86,6 @@ func NewLightEngine(
 		receipts:              receipts,
 		chunkDataPacks:        chunkDataPacks,
 		chunkDataPackTackers:  chunkDataPackTrackers,
-		collectionTrackers:    collectionTrackers,
 		ingestedChunkIDs:      ingestedChunkIDs,
 		ingestedResultIDs:     ingestedResultIDs,
 		ingestedCollectionIDs: ingestedCollectionIDs,
@@ -175,11 +173,9 @@ func (l *LightEngine) process(originID flow.Identifier, event interface{}) error
 	case *flow.ExecutionReceipt:
 		return l.handleExecutionReceipt(originID, resource)
 	case *flow.Collection:
-		return l.handleCollection(originID, resource)
-	case *messages.CollectionResponse:
-		return l.handleCollection(originID, &resource.Collection)
+		return l.handleCollection(originID, flow.RoleCollection, resource)
 	case *messages.ChunkDataResponse:
-		return l.handleChunkDataPack(originID, &resource.ChunkDataPack)
+		return l.handleChunkDataResponse(originID, resource)
 	default:
 		return ErrInvType
 	}
@@ -335,6 +331,29 @@ func (l *LightEngine) handleChunkDataPack(originID flow.Identifier, chunkDataPac
 		Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
 		Msg("chunk data pack stored in mempool, tracker removed")
 
+	return nil
+}
+
+// handleChunkDataResponse receives a chunk data response and handles its chunk data pack and collection separately
+func (l *LightEngine) handleChunkDataResponse(originID flow.Identifier, chunkDataResponse *messages.ChunkDataResponse) error {
+	err := l.handleChunkDataPack(originID, &chunkDataResponse.ChunkDataPack)
+	if err != nil {
+		l.log.Error().
+			Err(err).
+			Hex("origin_id", logging.ID(originID)).
+			Hex("chunk_id", logging.ID(chunkDataResponse.ChunkDataPack.ChunkID)).
+			Msg("could not handle chunk data pack")
+	}
+
+	err = l.handleCollection(originID, flow.RoleExecution, &chunkDataResponse.Collection)
+	if err != nil {
+		l.log.Error().
+			Err(err).
+			Hex("origin_id", logging.ID(originID)).
+			Hex("collection_id", logging.Entity(chunkDataResponse.Collection)).
+			Msg("could not handle collection in chunk data pack")
+	}
+
 	l.checkPendingChunks(l.receipts.All())
 
 	return nil
@@ -342,7 +361,7 @@ func (l *LightEngine) handleChunkDataPack(originID flow.Identifier, chunkDataPac
 
 // handleCollection handles receipt of a new collection, either via push or
 // after a request. It adds the collection to the mempool.
-func (l *LightEngine) handleCollection(originID flow.Identifier, coll *flow.Collection) error {
+func (l *LightEngine) handleCollection(originID flow.Identifier, expectedRole flow.Role, coll *flow.Collection) error {
 	l.resourceHandlerLock.Lock()
 	defer l.resourceHandlerLock.Unlock()
 
@@ -378,50 +397,32 @@ func (l *LightEngine) handleCollection(originID flow.Identifier, coll *flow.Coll
 	}
 
 	// cleans tracker for the collection if any exists
-	l.collectionTrackers.Rem(collID)
 	l.log.Debug().
 		Hex("origin_id", logging.ID(originID)).
 		Hex("collection_id", logging.ID(collID)).
 		Msg("collection added to mempool, and tracker removed")
 
-	l.checkPendingChunks(l.receipts.All())
+	if expectedRole != flow.RoleExecution {
+		// collection coming from execution nodes means that it is part of
+		// chunk data response. Hence check pending chunk will be called
+		// by handleChunkDataResponse. Otherwise, the collection is handled
+		// separately and we should call checkPendingChunk
+		l.checkPendingChunks(l.receipts.All())
+	}
 
 	return nil
 }
 
-// requestCollection submits a request for the given collection to collection nodes,
-// or drops and logs the request if the tracker associated with the request goes beyond the
-// failure threshold
-func (l *LightEngine) requestCollection(collID, blockID flow.Identifier) error {
-	// extracts list of collection nodes id
-	//
-	collNodes, err := l.state.Final().Identities(filter.HasRole(flow.RoleCollection))
-	if err != nil {
-		return fmt.Errorf("could not load collection node identities: %w", err)
+// requestChunkData submits a request for the given chunk ID to the execution nodes to the network.
+// It also adds a tracker for the chunk data if it is successfully submitted.
+func (l *LightEngine) requestChunkData(chunkID, blockID flow.Identifier) error {
+	if l.chunkDataPackTackers.Has(chunkID) {
+		l.log.Debug().
+			Hex("chunk_id", logging.ID(chunkID)).
+			Msg("drops requesting an already requested chunk data pack")
+		return nil
 	}
 
-	req := &messages.CollectionRequest{
-		ID:    collID,
-		Nonce: rand.Uint64(),
-	}
-
-	// TODO we should only submit to cluster which owns the collection
-	err = l.collectionsConduit.Submit(req, collNodes.NodeIDs()...)
-	if err != nil {
-		return fmt.Errorf("could not submit request for collection (id=%s): %w", collID, err)
-	}
-
-	l.log.Debug().
-		Hex("collection_id", logging.ID(collID)).
-		Hex("block_id", logging.ID(blockID)).
-		Msg("collection request submitted")
-	return nil
-}
-
-// requestChunkDataPack submits a request for the given chunk ID to the execution nodes,
-// or drops and logs the request if the tracker associated with the request goes beyond the
-// failure threshold
-func (l *LightEngine) requestChunkDataPack(chunkID, blockID flow.Identifier) error {
 	// extracts list of execution nodes
 	//
 	execNodes, err := l.state.Final().Identities(filter.HasRole(flow.RoleExecution))
@@ -434,15 +435,14 @@ func (l *LightEngine) requestChunkDataPack(chunkID, blockID flow.Identifier) err
 		Nonce:   rand.Uint64(),
 	}
 
-	// TODO we should only submit to execution node that generated execution receipt
+	// TODO we should only submit to execution node that generated extecution receipt
 	err = l.chunksConduit.Submit(req, execNodes.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not submit request for collection (id=%s): %w", chunkID, err)
 	}
 
-	l.log.Debug().
-		Hex("chunk_id", logging.ID(chunkID)).
-		Msg("chunk data pack request submitted")
+	// adds a tracker for this collection
+	l.chunkDataPackTackers.Add(trackers.NewChunkDataPackTracker(chunkID, blockID))
 
 	return nil
 }
@@ -450,7 +450,7 @@ func (l *LightEngine) requestChunkDataPack(chunkID, blockID flow.Identifier) err
 // getChunkDataPackForReceipt checks the chunk data pack associated with a chunk ID and
 // execution receipt. If the chunk data pack is available locally, returns true
 // as well as the chunk data pack itself.
-func (l *LightEngine) getChunkDataPackForReceipt(receipt *flow.ExecutionReceipt, chunkID flow.Identifier) (*flow.ChunkDataPack, bool) {
+func (l *LightEngine) getChunkDataPackForReceipt(chunkID flow.Identifier) (*flow.ChunkDataPack, bool) {
 	// chunk data pack exists and retrieved and returned
 	chunkDataPack, exists := l.chunkDataPacks.ByChunkID(chunkID)
 	if exists {
@@ -460,39 +460,13 @@ func (l *LightEngine) getChunkDataPackForReceipt(receipt *flow.ExecutionReceipt,
 		return chunkDataPack, true
 	}
 
-	if l.chunkDataPackTackers.Has(chunkID) {
-		// chunk data pack has already been requested
-		// drops its request
-		l.log.Debug().
-			Hex("collection_id", logging.ID(chunkID)).
-			Msg("drops the request of already requested chunk")
-		return nil, false
-	}
-
-	// requests the chunk data pack from network
-	err := l.requestChunkDataPack(chunkID, receipt.ExecutionResult.BlockID)
-	if err != nil {
-		l.log.Error().
-			Err(err).
-			Hex("chunk_id", logging.ID(chunkID)).
-			Msg("could not make a request of chunk data pack to the network")
-		return nil, false
-	}
-
-	// adds a tracker for this collection
-	l.chunkDataPackTackers.Add(trackers.NewChunkDataPackTracker(chunkID, receipt.ExecutionResult.BlockID))
-
-	l.log.Debug().
-		Hex("chunk_id", logging.ID(chunkID)).
-		Msg("tracker added for the chunk data pack")
-
 	return nil, false
 }
 
 // getCollectionForChunk checks the collection depended on the
 // given execution receipt and chunk. Returns true if the collections is available
 // locally. If the collections is not available locally, registers a tracker for it.
-func (l *LightEngine) getCollectionForChunk(block *flow.Block, receipt *flow.ExecutionReceipt, chunk *flow.Chunk) (*flow.Collection, bool) {
+func (l *LightEngine) getCollectionForChunk(block *flow.Block, chunk *flow.Chunk) (*flow.Collection, bool) {
 	collIndex := int(chunk.CollectionIndex)
 
 	// ensure the collection index specified by the ER is valid
@@ -516,33 +490,6 @@ func (l *LightEngine) getCollectionForChunk(block *flow.Block, receipt *flow.Exe
 
 		return coll, true
 	}
-
-	if l.collectionTrackers.Has(collID) {
-		// collection has already been requested
-		// drops its request
-		l.log.Debug().
-			Hex("collection_id", logging.ID(collID)).
-			Msg("drops the request of already requested collection")
-		return nil, false
-	}
-
-	// requests the collection from network
-	err := l.requestCollection(collID, block.ID())
-	if err != nil {
-		l.log.Error().
-			Err(err).
-			Hex("collection_id", logging.ID(collID)).
-			Msg("could make a request of collection to the network")
-		return nil, false
-	}
-
-	// adds a tracker for this collection
-	l.collectionTrackers.Add(trackers.NewCollectionTracker(collID, block.ID()))
-
-	l.log.Debug().
-		Hex("collection_id", logging.ID(collID)).
-		Hex("chunk_id", logging.ID(chunk.ID())).
-		Msg("tracker added for collection")
 
 	return nil, false
 }
@@ -580,13 +527,22 @@ func (l *LightEngine) checkPendingChunks(receipts []*flow.ExecutionReceipt) {
 			}
 
 			// retrieves collection corresponding to the chunk
-			collection, collectionReady := l.getCollectionForChunk(block, receipt, chunk)
+			collection, collectionReady := l.getCollectionForChunk(block, chunk)
 			// retrieves chunk data pack for chunk
-			chunkDatapack, chunkDataPackReady := l.getChunkDataPackForReceipt(receipt, chunk.ID())
+			chunkDatapack, chunkDataPackReady := l.getChunkDataPackForReceipt(chunk.ID())
 
 			if !collectionReady || !chunkDataPackReady {
 				// receipt has at least one chunk pending for ingestion not ready to clean
 				readyToClean = false
+
+				// requests the chunk data from network
+				err := l.requestChunkData(chunkID, receipt.ExecutionResult.BlockID)
+				if err != nil {
+					l.log.Error().
+						Err(err).
+						Hex("chunk_id", logging.ID(chunkID)).
+						Msg("could not make a request of chunk data pack to the network")
+				}
 
 				// can not verify a chunk without its chunk data pack or collection moves to the next chunk
 				continue

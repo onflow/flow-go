@@ -37,7 +37,7 @@ type LightIngestTestSuite struct {
 	state *protocol.State
 	ss    *protocol.Snapshot
 	me    *module.Local
-	// mock conduit for requesting/receiving collections
+	// mock conduit for receiving collections
 	collectionsConduit *network.Conduit
 	// mock conduit for requesting/receiving chunk states
 	statesConduit *network.Conduit
@@ -86,8 +86,8 @@ func TestLightIngestEngine(t *testing.T) {
 // SetupTest initiates the test setups prior to each test.
 func (suite *LightIngestTestSuite) SetupTest() {
 	// initializing test suite fields
-	suite.collectionsConduit = &network.Conduit{}
 	suite.statesConduit = &network.Conduit{}
+	suite.collectionsConduit = &network.Conduit{}
 	suite.receiptsConduit = &network.Conduit{}
 	suite.chunksConduit = &network.Conduit{}
 	suite.net = &module.Network{}
@@ -214,7 +214,7 @@ func (suite *LightIngestTestSuite) TestHandleReceipt_MissingCollection() {
 	eng := suite.TestNewLightEngine()
 
 	// mocks state snapshot to return collIdentities as identity list of staked collection nodes
-	suite.ss.On("Identities", testifymock.AnythingOfType("flow.IdentityFilter")).Return(flow.IdentityList{suite.collIdentity}, nil)
+	suite.ss.On("Identities", testifymock.AnythingOfType("flow.IdentityFilter")).Return(flow.IdentityList{suite.execIdentity}, nil)
 
 	// mocks existing resources at the engine's disposal
 	//
@@ -243,17 +243,17 @@ func (suite *LightIngestTestSuite) TestHandleReceipt_MissingCollection() {
 	suite.receipts.On("Add", suite.receipt).Return(true).Once()
 
 	// mocks trackers functionality for the chunk
-	suite.collectionTrackers.On("Add", suite.collTracker).Return(true)
-	suite.collectionTrackers.On("Has", suite.collection.ID()).Return(false)
+	suite.chunkDataPackTrackers.On("Add", suite.chunkTracker).Return(true)
+	suite.chunkDataPackTrackers.On("Has", suite.chunk.ID()).Return(false)
 
 	var submitWG sync.WaitGroup
 	submitWG.Add(1)
 	// expects a collection request is submitted
-	suite.collectionsConduit.
-		On("Submit", testifymock.AnythingOfType("*messages.CollectionRequest"), suite.collIdentity.NodeID).
-		Run(func(args testifymock.Arguments) {
-			submitWG.Done()
-		}).Return(nil).Once()
+	suite.chunksConduit.
+		On("Submit", testifymock.AnythingOfType("*messages.ChunkDataRequest"),
+			suite.execIdentity.NodeID).Run(func(args testifymock.Arguments) {
+		submitWG.Done()
+	}).Return(nil).Once()
 
 	err := eng.Process(suite.execIdentity.NodeID, suite.receipt)
 	suite.Assert().Nil(err)
@@ -270,7 +270,6 @@ func (suite *LightIngestTestSuite) TestHandleReceipt_MissingCollection() {
 
 	// asserts necessary calls
 	suite.receipts.AssertExpectations(suite.T())
-	suite.collectionsConduit.AssertExpectations(suite.T())
 
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
@@ -374,10 +373,16 @@ func (suite *LightIngestTestSuite) TestIngestedChunk() {
 
 	chunkDataPackResponse := &messages.ChunkDataResponse{
 		ChunkDataPack: *suite.chunkDataPack,
+		Collection:    *suite.collection,
 		Nonce:         rand.Uint64(),
 	}
-	// mocks this chunk id
+	// mocks that the chunk and collection are ingested
 	suite.ingestedChunkIDs.On("Has", suite.chunkDataPack.ChunkID).Return(true)
+	// mocks this chunk id
+	suite.ingestedCollectionIDs.On("Has", suite.collection.ID()).Return(true)
+
+	// mocks that engine does not have any receipt to process
+	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{})
 
 	// nothing else is mocked, hence the process should simply return nil
 	err := eng.Process(unittest.IdentifierFixture(), chunkDataPackResponse)
@@ -585,8 +590,6 @@ func (suite *LightIngestTestSuite) TestVerifyReady() {
 			// asserts verifier engine gets the call with a verifiable chunk
 			suite.verifierEng.AssertExpectations(suite.T())
 
-			// asserts the collection should not be requested
-			suite.collectionsConduit.AssertNotCalled(suite.T(), "Submit", testifymock.Anything, suite.collIdentity)
 			// asserts the chunk state should not be requested
 			suite.statesConduit.AssertNotCalled(suite.T(), "Submit", testifymock.Anything, suite.execIdentity)
 		})
@@ -603,6 +606,7 @@ func (suite *LightIngestTestSuite) TestChunkDataPackTracker_HappyPath() {
 
 	chunkDataPackResponse := &messages.ChunkDataResponse{
 		ChunkDataPack: *suite.chunkDataPack,
+		Collection:    *suite.collection,
 		Nonce:         rand.Uint64(),
 	}
 
@@ -612,8 +616,15 @@ func (suite *LightIngestTestSuite) TestChunkDataPackTracker_HappyPath() {
 	suite.chunkDataPacks.On("Add", suite.chunkDataPack).Return(true).Once()
 	suite.chunkDataPackTrackers.On("Rem", suite.chunkDataPack.ChunkID).Return(true).Once()
 
-	// engine has not yet ingested this chunk
+	// engine should not already have the collection
+	suite.collections.On("Has", suite.collection.ID()).Return(false)
+	// collection should be successfully added to mempool
+	suite.collections.On("Add", suite.collection).Return(true).Once()
+
+	// engine has not yet ingested the chunk in the chunk data pack response
 	suite.ingestedChunkIDs.On("Has", suite.chunkDataPack.ChunkID).Return(false).Once()
+	// engine has not yet ingested the collection in the chunk data pack response
+	suite.ingestedCollectionIDs.On("Has", suite.collection.ID()).Return(false).Once()
 
 	// engine does not have any receipt
 	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{})
@@ -624,5 +635,6 @@ func (suite *LightIngestTestSuite) TestChunkDataPackTracker_HappyPath() {
 	suite.Assert().Nil(err)
 	suite.chunkDataPackTrackers.AssertExpectations(suite.T())
 	suite.chunkDataPacks.AssertExpectations(suite.T())
+	suite.collections.AssertExpectations(suite.T())
 	suite.ingestedChunkIDs.AssertExpectations(suite.T())
 }

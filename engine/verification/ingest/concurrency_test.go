@@ -206,13 +206,20 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, lightIng
 		<-verNode.IngestEngine.Ready()
 	}
 
-	collections := make([]*flow.Collection, 0)
-	for _, completeER := range ers {
-		collections = append(collections, completeER.Collections...)
-	}
+	// mocks a generic node depending on whether
+	var colNode mock.GenericNode
+	if !lightIngest {
+		// current version of original ingest engine queries the
+		// collections directly, however, the light ingest engine
+		// queries collections implicitly as part of chunk data pack
+		collections := make([]*flow.Collection, 0)
+		for _, completeER := range ers {
+			collections = append(collections, completeER.Collections...)
+		}
 
-	colNode := testutil.GenericNode(t, hub, colID, identities)
-	setupMockCollectionNode(t, colNode, verID.NodeID, collections)
+		colNode = testutil.GenericNode(t, hub, colID, identities)
+		setupMockCollectionNode(t, colNode, verID.NodeID, collections)
+	}
 
 	// mock the execution node with a generic node and mocked engine
 	// to handle requests for chunk state
@@ -321,9 +328,14 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, lightIng
 	}
 
 	exeNode.Done()
-	colNode.Done()
 	verNode.Done()
 
+	if !lightIngest {
+		// collection node is only involved in
+		// original ingest test, hence, it is terminated
+		// only at the end of ths
+		colNode.Done()
+	}
 	// to demarcate the logs
 	log.Debug().
 		Int("execution_receipt_count", erCount).
@@ -363,6 +375,7 @@ func setupMockExeNode(t *testing.T, node mock.GenericNode, verID flow.Identifier
 						if chunk.ID() == req.ChunkID {
 							res := &messages.ChunkDataResponse{
 								ChunkDataPack: *er.ChunkDataPacks[chunk.Index],
+								Collection:    *er.Collections[chunk.Index],
 								Nonce:         rand.Uint64(),
 							}
 							err := chunksConduit.Submit(res, verID)

@@ -9,7 +9,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/model/encoding"
+	"github.com/dapperlabs/flow-go/model/fingerprint"
 	"github.com/dapperlabs/flow-go/storage/merkle"
 )
 
@@ -67,18 +67,17 @@ func HashToID(hash []byte) Identifier {
 	return id
 }
 
-// MakeID creates an ID from the hash of encoded data.
-// By default, uses the default encoder. If the input defines its own
-// canonical encoding by implementing Encodable, uses that instead.
-func MakeID(body interface{}) Identifier {
-	var encoded []byte
-	if encodable, ok := body.(encoding.Encodable); ok {
-		encoded = encodable.Encode()
-	} else {
-		encoded = encoding.DefaultEncoder.MustEncode(body)
-	}
+// MakeID creates an ID from a hash of encoded data. MakeID uses `model.Fingerprint() []byte` to get the byte
+// representation of the entity, which uses RLP to encode the data. If the input defines its own canonical encoding by
+// implementing Fingerprinter, it uses that instead. That allows removal of non-unique fields from structs or
+// overwriting of the used encoder. We are using Fingerprint instead of the default encoding for two reasons: a) JSON
+// (the default encoding) does not specify an order for the elements of arrays and objects, which could lead to
+// different hashes depending on the JSON implementation and b) the Fingerprinter interface allows to exclude fields not
+// needed in the pre-image of the hash that comprises the Identifier, which could be different from the encoding for
+// sending entities in messages or for storing them.
+func MakeID(entity interface{}) Identifier {
 	hasher := hash.NewSHA3_256()
-	hash := hasher.ComputeHash(encoded)
+	hash := hasher.ComputeHash(fingerprint.Fingerprint(entity))
 	return HashToID(hash)
 }
 
