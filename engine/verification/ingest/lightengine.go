@@ -63,7 +63,6 @@ func NewLightEngine(
 	receipts mempool.Receipts,
 	collections mempool.Collections,
 	chunkDataPacks mempool.ChunkDataPacks,
-	collectionTrackers mempool.CollectionTrackers,
 	chunkDataPackTrackers mempool.ChunkDataPackTrackers,
 	ingestedChunkIDs mempool.Identifiers,
 	ingestedResultIDs mempool.Identifiers,

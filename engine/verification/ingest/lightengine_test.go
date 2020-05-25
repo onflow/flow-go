@@ -54,7 +54,6 @@ type LightIngestTestSuite struct {
 	collections           *mempool.Collections
 	chunkDataPacks        *mempool.ChunkDataPacks
 	chunkDataPackTrackers *mempool.ChunkDataPackTrackers
-	collectionTrackers    *mempool.CollectionTrackers
 	ingestedChunkIDs      *mempool.Identifiers
 	ingestedResultIDs     *mempool.Identifiers
 	ingestedCollectionIDs *mempool.Identifiers
@@ -102,7 +101,6 @@ func (suite *LightIngestTestSuite) SetupTest() {
 	suite.collections = &mempool.Collections{}
 	suite.chunkDataPacks = &mempool.ChunkDataPacks{}
 	suite.chunkDataPackTrackers = &mempool.ChunkDataPackTrackers{}
-	suite.collectionTrackers = &mempool.CollectionTrackers{}
 	suite.ingestedResultIDs = &mempool.Identifiers{}
 	suite.ingestedChunkIDs = &mempool.Identifiers{}
 	suite.assignedChunkIDs = &mempool.Identifiers{}
@@ -174,7 +172,6 @@ func (suite *LightIngestTestSuite) TestNewLightEngine() *ingest.LightEngine {
 		suite.receipts,
 		suite.collections,
 		suite.chunkDataPacks,
-		suite.collectionTrackers,
 		suite.chunkDataPackTrackers,
 		suite.ingestedChunkIDs,
 		suite.ingestedResultIDs,
@@ -413,9 +410,6 @@ func (suite *LightIngestTestSuite) TestHandleCollection() {
 	// mocks collection does not exist in authenticated and pending collections
 	suite.collections.On("Has", suite.collection.ID()).Return(false).Once()
 
-	// mocks collection tracker is cleaned up
-	suite.collectionTrackers.On("Rem", suite.collection.ID()).Return(true).Once()
-
 	err := eng.Process(suite.collIdentity.NodeID, suite.collection)
 	suite.Assert().Nil(err)
 
@@ -544,7 +538,7 @@ func (suite *LightIngestTestSuite) TestVerifyReady() {
 			suite.chunkDataPacks.On("Rem", suite.chunkDataPack.ID()).Return(true)
 			// mocks removing ingested receipt
 			suite.receipts.On("Rem", suite.receipt.ID()).Return(true)
-			suite.collectionTrackers.On("Rem", suite.collection.ID()).Return(true)
+
 			// mocks execution receipt is ingested literally
 			suite.ingestedResultIDs.On("Add", suite.receipt.ExecutionResult.ID()).Return(true)
 

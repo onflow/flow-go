@@ -188,7 +188,6 @@ func main() {
 				authReceipts,
 				authCollections,
 				chunkDataPacks,
-				collectionTrackers,
 				chunkDataPackTracker,
 				ingestedChunkIDs,
 				ingestedCollectionIDs,
