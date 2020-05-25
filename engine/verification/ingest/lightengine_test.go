@@ -210,7 +210,7 @@ func (suite *LightIngestTestSuite) TestHandleReceipt_MissingCollection() {
 
 	eng := suite.TestNewLightEngine()
 
-	// mocks state snapshot to return collIdentities as identity list of staked collection nodes
+	// mocks state snapshot to return identity of the execution node
 	suite.ss.On("Identities", testifymock.AnythingOfType("flow.IdentityFilter")).Return(flow.IdentityList{suite.execIdentity}, nil)
 
 	// mocks existing resources at the engine's disposal
