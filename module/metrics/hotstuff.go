@@ -5,6 +5,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // HotStuff Metrics
@@ -32,7 +34,7 @@ type HotstuffCollector struct {
 	timeoutDuration prometheus.Gauge
 }
 
-func NewHotstuffCollector(chain string) *HotstuffCollector {
+func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 
 	hc := &HotstuffCollector{
 
@@ -42,7 +44,7 @@ func NewHotstuffCollector(chain string) *HotstuffCollector {
 			Subsystem:   subsystemHotstuff,
 			Help:        "the duration of how long hotstuff's event loop has been busy processing one event",
 			Buckets:     []float64{0.05, 0.2, 0.5, 1, 2, 5},
-			ConstLabels: prometheus.Labels{LabelChain: chain},
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}, []string{"event_type"}),
 
 		idleDuration: promauto.NewHistogram(prometheus.HistogramOpts{
@@ -51,7 +53,7 @@ func NewHotstuffCollector(chain string) *HotstuffCollector {
 			Subsystem:   subsystemHotstuff,
 			Help:        "the duration of how long hotstuff's event loop has been idle without processing any event",
 			Buckets:     []float64{0.05, 0.2, 0.5, 1, 2, 5},
-			ConstLabels: prometheus.Labels{LabelChain: chain},
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
 		waitDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
@@ -60,7 +62,7 @@ func NewHotstuffCollector(chain string) *HotstuffCollector {
 			Subsystem:   subsystemHotstuff,
 			Help:        "the duration of how long an event has been waited in the hotstuff event loop queue before being processed.",
 			Buckets:     []float64{0.05, 0.2, 0.5, 1, 2, 5},
-			ConstLabels: prometheus.Labels{LabelChain: chain},
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}, []string{"event_type"}),
 
 		curView: promauto.NewGauge(prometheus.GaugeOpts{
@@ -68,7 +70,7 @@ func NewHotstuffCollector(chain string) *HotstuffCollector {
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
 			Help:        "the current view that the event handler has entered",
-			ConstLabels: prometheus.Labels{LabelChain: chain},
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
 		qcView: promauto.NewGauge(prometheus.GaugeOpts{
@@ -76,7 +78,7 @@ func NewHotstuffCollector(chain string) *HotstuffCollector {
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
 			Help:        "The view of the newest known qc from hotstuff",
-			ConstLabels: prometheus.Labels{LabelChain: chain},
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
 		skips: promauto.NewCounter(prometheus.CounterOpts{
@@ -84,7 +86,7 @@ func NewHotstuffCollector(chain string) *HotstuffCollector {
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
 			Help:        "The number of times we skipped ahead some views",
-			ConstLabels: prometheus.Labels{LabelChain: chain},
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
 		timeouts: promauto.NewCounter(prometheus.CounterOpts{
@@ -92,7 +94,7 @@ func NewHotstuffCollector(chain string) *HotstuffCollector {
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
 			Help:        "The number of times we timed out during a view",
-			ConstLabels: prometheus.Labels{LabelChain: chain},
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
 		timeoutDuration: promauto.NewGauge(prometheus.GaugeOpts{
@@ -100,7 +102,7 @@ func NewHotstuffCollector(chain string) *HotstuffCollector {
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
 			Help:        "The current length of the timeout",
-			ConstLabels: prometheus.Labels{LabelChain: chain},
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 	}
 

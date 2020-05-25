@@ -1,15 +1,15 @@
 package flow_test
 
 import (
-	"encoding/json"
+	//"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/vmihailenco/msgpack/v4"
+	//"github.com/stretchr/testify/require"
+	//"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	//"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestHexStringToIdentifier(t *testing.T) {
@@ -45,6 +45,7 @@ func TestHexStringToIdentifier(t *testing.T) {
 	}
 }
 
+/*
 func TestIdentityEncodingJSON(t *testing.T) {
 	identity := unittest.IdentityFixture(unittest.WithRandomPublicKeys())
 	enc, err := json.Marshal(identity)
@@ -64,3 +65,4 @@ func TestIdentityEncodingMsgpack(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, identity, &dec)
 }
+*/

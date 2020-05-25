@@ -76,7 +76,7 @@ func TestHappyPath(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		t.Run(fmt.Sprintf("%d-verification node %d-chunk number", tc.verNodeCount, tc.chunkCount), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%d-verification node %d-chunk number %t-light ingest", tc.verNodeCount, tc.chunkCount, tc.lightIngest), func(t *testing.T) {
 			mu.Lock()
 			defer mu.Unlock()
 			testHappyPath(t, tc.verNodeCount, tc.chunkCount, tc.lightIngest)
@@ -166,18 +166,27 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 		verNodes = append(verNodes, verNode)
 	}
 
-	// collection node
-	colNode := testutil.CollectionNode(t, hub, colIdentity, identities)
-	// injects the assigned collections into the collection node mempool
-	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
-		if IsAssigned(chunk.Index) {
-			err := colNode.Collections.Store(completeER.Collections[chunk.Index])
-			assert.Nil(t, err)
+	// light ingest engine does not interact with collection node
+	// but the current version of original ingest engine does
+	// TODO removing collection request from ORIGINAL ingest engine
+	// https://github.com/dapperlabs/flow-go/issues/3008
+	var colNode mock2.CollectionNode
+	var colNet *stub.Network
+	if !lightIngest {
+		// collection node
+		colNode = testutil.CollectionNode(t, hub, colIdentity, identities)
+		// injects the assigned collections into the collection node mempool
+		for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
+			if IsAssigned(chunk.Index) {
+				err := colNode.Collections.Store(completeER.Collections[chunk.Index])
+				assert.Nil(t, err)
+			}
 		}
+		net, ok := hub.GetNetwork(colIdentity.NodeID)
+		assert.True(t, ok)
+		colNet = net
+		colNet.StartConDev(100, true)
 	}
-	colNet, ok := hub.GetNetwork(colIdentity.NodeID)
-	assert.True(t, ok)
-	colNet.StartConDev(100, true)
 
 	// mock execution node
 	exeNode, exeEngine := setupMockExeNode(t, hub, exeIdentity, verIdentities, identities, completeER)
@@ -253,7 +262,14 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 	for _, verNet := range verNets {
 		verNet.StopConDev()
 	}
-	colNet.StopConDev()
+
+	// light ingest engine does not interact with collection node
+	// but the current version of original ingest engine does
+	// TODO removing collection request from ORIGINAL ingest engine
+	// https://github.com/dapperlabs/flow-go/issues/3008
+	if !lightIngest {
+		colNet.StopConDev()
+	}
 
 	// resource cleanup
 	//
@@ -284,9 +300,17 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 
 		verNode.Done()
 	}
-	colNode.Done()
+
 	conNode.Done()
 	exeNode.Done()
+
+	// light ingest engine does not interact with collection node
+	// but the current version of original ingest engine does
+	// TODO removing collection request from ORIGINAL ingest engine
+	// https://github.com/dapperlabs/flow-go/issues/3008
+	if !lightIngest {
+		colNode.Done()
+	}
 
 	// to demarcate the debug logs
 	log.Debug().
@@ -571,6 +595,7 @@ func setupMockExeNode(t *testing.T,
 							// publishes the chunk data pack response to the network
 							res := &messages.ChunkDataResponse{
 								ChunkDataPack: *completeER.ChunkDataPacks[i],
+								Collection:    *completeER.Collections[i],
 								Nonce:         rand.Uint64(),
 							}
 							err := exeChunkDataConduit.Submit(res, originID)

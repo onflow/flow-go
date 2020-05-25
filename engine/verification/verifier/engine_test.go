@@ -20,7 +20,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	chmodel "github.com/dapperlabs/flow-go/model/chunks"
-	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
@@ -128,12 +127,10 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 			suite.Assert().Equal(vChunk.Receipt.ExecutionResult.ID(), ra.Body.ExecutionResultID)
 
 			// verifies the signatures
-			batst, err := encoding.DefaultEncoder.Encode(ra.Body.Attestation)
-			suite.Assert().NoError(err)
-			suite.Assert().True(suite.sk.PublicKey().Verify(ra.Body.AttestationSignature, batst, suite.hasher))
-			bbody, err := encoding.DefaultEncoder.Encode(ra.Body)
-			suite.Assert().NoError(err)
-			suite.Assert().True(suite.sk.PublicKey().Verify(ra.VerifierSignature, bbody, suite.hasher))
+			atstID := ra.Body.Attestation.ID()
+			suite.Assert().True(suite.sk.PublicKey().Verify(ra.Body.AttestationSignature, atstID[:], suite.hasher))
+			bodyID := ra.Body.ID()
+			suite.Assert().True(suite.sk.PublicKey().Verify(ra.VerifierSignature, bodyID[:], suite.hasher))
 		}).
 		Once()
 

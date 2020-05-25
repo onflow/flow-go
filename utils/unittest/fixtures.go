@@ -17,7 +17,7 @@ import (
 )
 
 func AddressFixture() flow.Address {
-	return flow.RootAddress
+	return flow.ServiceAddress()
 }
 
 func TransactionSignatureFixture() flow.TransactionSignature {
@@ -140,7 +140,7 @@ func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDe
 
 func GenesisFixture(identities flow.IdentityList) *flow.Block {
 	genesis := flow.Genesis(identities)
-	genesis.Header.ChainID = flow.TestingChainID
+	genesis.Header.ChainID = flow.Emulator
 	return genesis
 }
 
@@ -148,7 +148,7 @@ func BlockHeaderFixture() flow.Header {
 	height := uint64(rand.Uint32())
 	view := height + uint64(rand.Intn(1000))
 	return BlockHeaderWithParentFixture(&flow.Header{
-		ChainID:  flow.TestingChainID,
+		ChainID:  flow.Emulator,
 		ParentID: IdentifierFixture(),
 		Height:   height,
 		View:     view,
@@ -585,7 +585,7 @@ func WithReferenceBlock(id flow.Identifier) func(tx *flow.TransactionBody) {
 
 func TransactionDSLFixture() dsl.Transaction {
 	return dsl.Transaction{
-		Import: dsl.Import{Address: flow.RootAddress},
+		Import: dsl.Import{Address: flow.ServiceAddress()},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
 				pub fun main() {}
