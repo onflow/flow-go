@@ -50,14 +50,17 @@ running the DKG for generating the random beacon keys, generating genesis execut
 		dkgData := runDKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
 		log.Info().Msg("")
 
+		// TODO: replace constant with argument
+		const initialTokenSupply uint64 = 1000000
+
 		if len(flagServiceAccountPublicKeyFile) > 0 {
 			publicKey := readServiceAccountPublicKey(flagServiceAccountPublicKeyFile)
 			log.Info().Msg("✨ using provided public key file for service account and generating genesis execution state")
-			genGenesisExecutionState(publicKey)
+			genGenesisExecutionState(publicKey, initialTokenSupply)
 			log.Info().Msg("")
 		} else {
 			log.Info().Msg("✨ generating private key for service account and generating genesis execution state")
-			genGenesisExecutionState(nil)
+			genGenesisExecutionState(nil, initialTokenSupply)
 			log.Info().Msg("")
 		}
 

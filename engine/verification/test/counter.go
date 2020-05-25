@@ -120,7 +120,11 @@ func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExe
 		require.NoError(t, err)
 		defer led.Done()
 
-		startStateCommitment, err := bootstrap.BootstrapLedger(led, unittest.RootAccountPublicKey)
+		startStateCommitment, err := bootstrap.BootstrapLedger(
+			led,
+			unittest.RootAccountPublicKey,
+			unittest.InitialTokenSupply,
+		)
 		require.NoError(t, err)
 
 		rt := runtime.NewInterpreterRuntime()

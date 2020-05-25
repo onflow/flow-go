@@ -22,6 +22,8 @@ var GenesisStateCommitment flow.StateCommitment
 var RootAccountPrivateKey flow.AccountPrivateKey
 var RootAccountPublicKey flow.AccountPublicKey
 
+const InitialTokenSupply uint64 = 1000000
+
 func init() {
 	var err error
 	GenesisStateCommitment, err = hex.DecodeString(GenesisStateCommitmentHex)
