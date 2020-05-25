@@ -119,6 +119,10 @@ func TestConcurrency(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
+		// skips tests of original ingest over CI
+		if !tc.lightIngest && os.Getenv("FLOWLOCAL") != "TRUE" {
+			continue
+		}
 
 		t.Run(fmt.Sprintf("%d-ers/%d-senders/%d-chunks/%t-lightIngest",
 			tc.erCount, tc.senderCount, tc.chunksNum, tc.lightIngest), func(t *testing.T) {
