@@ -270,19 +270,16 @@ func (ms *MatchSuite) TestChunkVerified() {
 		err := ms.e.Process(en.ID(), resp)
 		require.NoError(t, err)
 
-		time.Sleep(1 * time.Second)
+		time.Sleep(time.Millisecond)
 	}).Return(nil).Once()
 
 	// check verifier's method is called
 	ms.verifier.On("ProcessLocal", mock.Anything).Run(func(args mock.Arguments) {
 		vchunk := args.Get(0).(*verification.VerifiableChunkData)
-		require.Equal(t, verification.VerifiableChunkData{
-			Chunk:         myChunk,
-			Header:        ms.head,
-			Result:        result,
-			ChunkDataPack: &chunkDataPack,
-		}, vchunk)
-
+		require.Equal(t, myChunk, vchunk.Chunk)
+		require.Equal(t, ms.head, vchunk.Header)
+		require.Equal(t, result, vchunk.Result)
+		require.Equal(t, &chunkDataPack, vchunk.ChunkDataPack)
 	}).Return(nil).Once()
 
 	<-ms.e.Ready()
