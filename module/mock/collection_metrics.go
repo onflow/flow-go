@@ -2,6 +2,7 @@
 
 package mock
 
+import cluster "github.com/dapperlabs/flow-go/model/cluster"
 import flow "github.com/dapperlabs/flow-go/model/flow"
 import mock "github.com/stretchr/testify/mock"
 
@@ -10,22 +11,17 @@ type CollectionMetrics struct {
 	mock.Mock
 }
 
-// CollectionGuaranteed provides a mock function with given fields: collection
-func (_m *CollectionMetrics) CollectionGuaranteed(collection flow.LightCollection) {
-	_m.Called(collection)
+// ClusterBlockFinalized provides a mock function with given fields: block
+func (_m *CollectionMetrics) ClusterBlockFinalized(block *cluster.Block) {
+	_m.Called(block)
 }
 
-// CollectionProposed provides a mock function with given fields: collection
-func (_m *CollectionMetrics) ClusterBlockProposed(collection flow.LightCollection) {
-	_m.Called(collection)
+// ClusterBlockProposed provides a mock function with given fields: block
+func (_m *CollectionMetrics) ClusterBlockProposed(block *cluster.Block) {
+	_m.Called(block)
 }
 
-// PendingClusterBlocks provides a mock function with given fields: n
-func (_m *CollectionMetrics) PendingClusterBlocks(n uint) {
-	_m.Called(n)
-}
-
-// TransactionReceived provides a mock function with given fields: txID
-func (_m *CollectionMetrics) TransactionReceived(txID flow.Identifier) {
+// TransactionIngested provides a mock function with given fields: txID
+func (_m *CollectionMetrics) TransactionIngested(txID flow.Identifier) {
 	_m.Called(txID)
 }

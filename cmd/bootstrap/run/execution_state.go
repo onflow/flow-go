@@ -41,7 +41,7 @@ func GenerateExecutionState(dbDir string, priv flow.AccountPrivateKey) (flow.Sta
 func bootstrapLedger(ledger storage.Ledger, priv flow.AccountPrivateKey) (flow.StateCommitment, error) {
 	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.EmptyStateCommitment()))
 
-	err := createRootAccount(view, priv)
+	err := createServiceAccount(view, priv)
 	if err != nil {
 		return nil, err
 	}
@@ -54,8 +54,13 @@ func bootstrapLedger(ledger storage.Ledger, priv flow.AccountPrivateKey) (flow.S
 	return newStateCommitment, nil
 }
 
-func createRootAccount(view *delta.View, privateKey flow.AccountPrivateKey) error {
+func createServiceAccount(view *delta.View, privateKey flow.AccountPrivateKey) error {
 	ledgerAccess := virtualmachine.LedgerDAL{Ledger: view}
+
+	// initialize the account addressing state
+	ledgerAccess.SetAddressState(flow.ZeroAddressState)
+
+	// create the root account
 	_, err := ledgerAccess.CreateAccountInLedger([]flow.AccountPublicKey{privateKey.PublicKey(1000)})
 	if err != nil {
 		return fmt.Errorf("error while creating account in ledger: %w", err)

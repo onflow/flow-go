@@ -497,7 +497,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 
 	// generate the root account
-	hardcoded, err := hex.DecodeString(flow.RootAccountPrivateKeyHex)
+	hardcoded, err := hex.DecodeString(flow.ServiceAccountPrivateKeyHex)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -546,15 +546,24 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, err
 	}
 
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathDKGDataPub), dkg.Public())
+	// write public DKG data
+	consensusNodes := bootstrap.FilterByRole(toNodeInfoList(confs), flow.RoleConsensus)
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathDKGDataPub), dkg.Public(consensusNodes))
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// write private key files for each DKG participant
-	for _, part := range dkg.Participants {
-		path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, part.NodeID)
-		err = writeJSON(filepath.Join(bootstrapDir, path), part.Private())
+	for i, sk := range dkg.PrivKeyShares {
+		nodeID := consensusNodes[i].NodeID
+		encodableSk := bootstrap.EncodableRandomBeaconPrivKey{sk}
+		privParticpant := bootstrap.DKGParticipantPriv {
+			NodeID              :nodeID,
+			RandomBeaconPrivKey :encodableSk,
+			GroupIndex          :i,
+		}
+		path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID)
+		err = writeJSON(filepath.Join(bootstrapDir, path), privParticpant)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -683,18 +692,12 @@ func runDKG(confs []ContainerConfig) (bootstrap.DKGData, error) {
 	}
 
 	// sanity check
-	if nConsensusNodes != len(dkg.Participants) {
+	if nConsensusNodes != len(dkg.PrivKeyShares) {
 		return bootstrap.DKGData{}, fmt.Errorf(
 			"consensus node count does not match DKG participant count: nodes=%d, participants=%d",
 			nConsensusNodes,
-			len(dkg.Participants),
+			len(dkg.PrivKeyShares),
 		)
-	}
-
-	// set the node IDs in the dkg data
-	for i := range dkg.Participants {
-		nodeID := consensusNodes[i].NodeID
-		dkg.Participants[i].NodeID = nodeID
 	}
 
 	return dkg, nil

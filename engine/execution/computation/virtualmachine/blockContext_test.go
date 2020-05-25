@@ -151,7 +151,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 	arg1, _ := jsoncdc.Encode(cadence.NewInt(42))
 	arg2, _ := jsoncdc.Encode(cadence.NewString("foo"))
 
-	var transactionArgsTests = []struct {
+	var tests = []struct {
 		label       string
 		script      string
 		args        [][]byte
@@ -195,15 +195,15 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 					execute { log(x); log(y) }
 				}`,
 			args:        [][]byte{arg1, arg2},
-			authorizers: []flow.Address{flow.HexToAddress("01")},
+			authorizers: []flow.Address{flow.ServiceAddress()},
 			check: func(t *testing.T, result *virtualmachine.TransactionResult) {
 				require.Nil(t, result.Error)
-				assert.ElementsMatch(t, []string{"0x1", "42", `"foo"`}, result.Logs)
+				assert.ElementsMatch(t, []string{"0x" + flow.ServiceAddress().Hex(), "42", `"foo"`}, result.Logs)
 			},
 		},
 	}
 
-	for _, tt := range transactionArgsTests {
+	for _, tt := range tests {
 		t.Run(tt.label, func(t *testing.T) {
 			tx := flow.NewTransactionBody().
 				SetScript([]byte(tt.script)).
@@ -219,6 +219,82 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 			err = execTestutil.SignTransactionByRoot(tx, 0)
 			require.NoError(t, err)
 			//seq++
+
+			result, err := bc.ExecuteTransaction(ledger, tx)
+			require.NoError(t, err)
+
+			tt.check(t, result)
+		})
+	}
+}
+
+func gasLimitScript(depth int) string {
+	return fmt.Sprintf(`
+		pub fun foo(_ i: Int) {
+			if i <= 0 {
+				return
+			}
+			log("foo")
+			foo(i-1)
+		}
+		
+		transaction { execute { foo(%d) } }
+	`, depth)
+}
+func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
+	rt := runtime.NewInterpreterRuntime()
+
+	h := unittest.BlockHeaderFixture()
+
+	vm, err := virtualmachine.New(rt)
+	assert.NoError(t, err)
+	bc := vm.NewBlockContext(&h)
+
+	var tests = []struct {
+		label    string
+		script   string
+		gasLimit uint64
+		check    func(t *testing.T, result *virtualmachine.TransactionResult)
+	}{
+		{
+			label:    "zero",
+			script:   gasLimitScript(100), // 100 function calls
+			gasLimit: 0,
+			check: func(t *testing.T, result *virtualmachine.TransactionResult) {
+				// gas limit of zero is ignored by runtime
+				require.Nil(t, result.Error)
+			},
+		},
+		{
+			label:    "insufficient",
+			script:   gasLimitScript(100), // 100 function calls
+			gasLimit: 5,
+			check: func(t *testing.T, result *virtualmachine.TransactionResult) {
+				assert.NotNil(t, result.Error)
+			},
+		},
+		{
+			label:    "sufficient",
+			script:   gasLimitScript(100), // 100 function calls
+			gasLimit: 1000,
+			check: func(t *testing.T, result *virtualmachine.TransactionResult) {
+				require.Nil(t, result.Error)
+				require.Len(t, result.Logs, 100)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.label, func(t *testing.T) {
+			tx := flow.NewTransactionBody().
+				SetScript([]byte(tt.script)).
+				SetGasLimit(tt.gasLimit)
+
+			ledger, err := execTestutil.RootBootstrappedLedger()
+			require.NoError(t, err)
+
+			err = execTestutil.SignTransactionByRoot(tx, 0)
+			require.NoError(t, err)
 
 			result, err := bc.ExecuteTransaction(ledger, tx)
 			require.NoError(t, err)
@@ -348,9 +424,9 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		// create the transaction to create the account
 		tx := &flow.TransactionBody{
 			Script: []byte(script),
-			Payer:  flow.RootAddress,
+			Payer:  flow.ServiceAddress(),
 			ProposalKey: flow.ProposalKey{
-				Address:        flow.RootAddress,
+				Address:        flow.ServiceAddress(),
 				KeyID:          0,
 				SequenceNumber: uint64(sequenceNumber),
 			},
@@ -358,10 +434,10 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 		sequenceNumber++
 
-		rootHasher, err := hash.NewHasher(flow.RootAccountPrivateKey.HashAlgo)
+		rootHasher, err := hash.NewHasher(flow.ServiceAccountPrivateKey.HashAlgo)
 		require.NoError(t, err)
 
-		err = tx.SignEnvelope(flow.RootAddress, 0, flow.RootAccountPrivateKey.PrivateKey, rootHasher)
+		err = tx.SignEnvelope(flow.ServiceAddress(), 0, flow.ServiceAccountPrivateKey.PrivateKey, rootHasher)
 		require.NoError(t, err)
 
 		// execute the transaction
@@ -380,7 +456,11 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	// create a bunch of accounts
 	accounts := make(map[flow.Address]crypto.PublicKey, count)
+	state := flow.ServiceAddressState
 	for i := 0; i < count; i++ {
+		// increment the adddressing state
+		_, state, err = flow.AccountAddress(state)
+		require.NoError(t, err)
 		address, key := createAccount()
 		accounts[address] = key
 	}
@@ -399,7 +479,8 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	// non-happy path - get an account that was never created
 	t.Run("get a non-existing account", func(t *testing.T) {
-		address := flow.HexToAddress(fmt.Sprintf("%d", count+1))
+		address, _, err := flow.AccountAddress(state)
+		require.NoError(t, err)
 		account := ledgerAccess.GetAccount(address)
 		assert.Nil(t, account)
 	})

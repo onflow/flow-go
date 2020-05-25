@@ -472,7 +472,7 @@ func (cs *ComplianceSuite) TestProcessPendingChildren() {
 	cs.hotstuff.AssertCalled(cs.T(), "SubmitProposal", block3.Header, parent.Header.View)
 
 	// make sure we drop the cache after trying to process
-	cs.pending.AssertCalled(cs.T(), "DropForParent", parent.Header)
+	cs.pending.AssertCalled(cs.T(), "DropForParent", parent.Header.ID())
 }
 
 func (cs *ComplianceSuite) TestProposalBufferingOrder() {

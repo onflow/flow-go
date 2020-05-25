@@ -52,8 +52,8 @@ func (b *PendingBlocks) ByParentID(parentID flow.Identifier) ([]*flow.PendingBlo
 	return blocks, true
 }
 
-func (b *PendingBlocks) DropForParent(parent *flow.Header) {
-	b.backend.dropForParent(parent.ID())
+func (b *PendingBlocks) DropForParent(parentID flow.Identifier) {
+	b.backend.dropForParent(parentID)
 }
 
 func (b *PendingBlocks) PruneByHeight(height uint64) {

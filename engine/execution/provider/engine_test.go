@@ -34,7 +34,7 @@ func TestProviderEngine_onChunkDataPackRequest(t *testing.T) {
 		ss.On("Identity", originID).
 			Return(unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)), nil)
 
-		req := &messages.ChunkDataPackRequest{
+		req := &messages.ChunkDataRequest{
 			ChunkID: chunkID,
 			Nonce:   rand.Uint64(),
 		}
@@ -65,7 +65,7 @@ func TestProviderEngine_onChunkDataPackRequest(t *testing.T) {
 		ps.On("Final").Return(ss)
 		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil)
 
-		req := &messages.ChunkDataPackRequest{
+		req := &messages.ChunkDataRequest{
 			ChunkID: chunkID,
 			Nonce:   rand.Uint64(),
 		}
@@ -90,15 +90,16 @@ func TestProviderEngine_onChunkDataPackRequest(t *testing.T) {
 
 		chunkID := unittest.IdentifierFixture()
 		chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
+		collection := unittest.CollectionFixture(1)
 
 		ps.On("Final").Return(ss)
 		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil)
 		con.On("Submit", mock.Anything, originIdentity.NodeID).
 			Run(func(args mock.Arguments) {
-				res, ok := args[0].(*messages.ChunkDataPackResponse)
+				res, ok := args[0].(*messages.ChunkDataResponse)
 				require.True(t, ok)
 
-				actualChunkID := res.Data.ChunkID
+				actualChunkID := res.ChunkDataPack.ChunkID
 				assert.Equal(t, chunkID, actualChunkID)
 			}).
 			Return(nil)
@@ -107,7 +108,9 @@ func TestProviderEngine_onChunkDataPackRequest(t *testing.T) {
 			On("ChunkDataPackByChunkID", mock.Anything, chunkID).
 			Return(&chunkDataPack, nil)
 
-		req := &messages.ChunkDataPackRequest{
+		execState.On("GetCollection", chunkDataPack.CollectionID).Return(&collection, nil)
+
+		req := &messages.ChunkDataRequest{
 			ChunkID: chunkID,
 			Nonce:   rand.Uint64(),
 		}

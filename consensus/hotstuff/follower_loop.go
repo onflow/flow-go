@@ -42,7 +42,7 @@ func (fl *FollowerLoop) SubmitProposal(proposalHeader *flow.Header, parentView u
 	// the busy duration is measured as how long it takes from a block being
 	// received to a block being handled by the event handler.
 	busyDuration := time.Since(received)
-	fl.log.Debug().Hex("block_ID", logging.ID(proposal.Block.BlockID)).
+	fl.log.Debug().Hex("block_id", logging.ID(proposal.Block.BlockID)).
 		Uint64("view", proposal.Block.View).
 		Dur("busy_duration", busyDuration).
 		Msg("busy duration to handle a proposal")
@@ -65,7 +65,7 @@ func (fl *FollowerLoop) loop() {
 		case p := <-fl.proposals:
 			err := fl.followerLogic.AddBlock(p)
 			if err != nil { // all errors are fatal
-				fl.log.Error().Hex("block_ID", logging.ID(p.Block.BlockID)).
+				fl.log.Error().Hex("block_id", logging.ID(p.Block.BlockID)).
 					Uint64("view", p.Block.View).
 					Msg("fatal error processing proposal")
 				fl.log.Error().Msgf("terminating FollowerLoop: %s", err.Error())

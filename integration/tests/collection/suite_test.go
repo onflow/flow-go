@@ -224,7 +224,7 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 	deadline := time.Now().Add(waitFor)
 	for time.Now().Before(deadline) {
 
-		originID, msg, err := suite.reader.Next()
+		_, msg, err := suite.reader.Next()
 		require.Nil(suite.T(), err, "could not read next message")
 
 		switch val := msg.(type) {
@@ -249,12 +249,6 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 
 		case *flow.TransactionBody:
 			suite.T().Log("got tx: ", val.ID())
-
-		case *messages.ClusterBlockRequest:
-			suite.T().Logf("got block req: %x from=%x", val.BlockID, originID)
-
-		case *messages.ClusterBlockResponse:
-			suite.T().Logf("got block req: %x %d", val.Proposal.Header.ID(), val.Proposal.Header.Height)
 		}
 	}
 

@@ -46,6 +46,7 @@ const notSet = "not set"
 // BaseConfig is the general config for the FlowNodeBuilder
 type BaseConfig struct {
 	nodeIDHex        string
+	chainID          string
 	bindAddr         string
 	nodeRole         string
 	timeout          time.Duration
@@ -69,13 +70,14 @@ type Metrics struct {
 }
 
 type Storage struct {
-	Headers    storage.Headers
-	Index      storage.Index
-	Identities storage.Identities
-	Guarantees storage.Guarantees
-	Seals      storage.Seals
-	Payloads   storage.Payloads
-	Blocks     storage.Blocks
+	Headers     storage.Headers
+	Index       storage.Index
+	Identities  storage.Identities
+	Guarantees  storage.Guarantees
+	Seals       storage.Seals
+	Payloads    storage.Payloads
+	Blocks      storage.Blocks
+	Collections storage.Collections
 }
 
 type namedModuleFunc struct {
@@ -120,6 +122,7 @@ type FlowNodeBuilder struct {
 	doneObject        []namedDoneObject
 	sig               chan os.Signal
 	genesisHandler    func(node *FlowNodeBuilder, block *flow.Block)
+	genesisBootstrap  bool
 	postInitFns       []func(*FlowNodeBuilder)
 	stakingKey        crypto.PrivateKey
 	networkKey        crypto.PrivateKey
@@ -136,6 +139,7 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	datadir := filepath.Join(homedir, ".flow", "database")
 	// bind configuration parameters
 	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", notSet, "identity of our node")
+	fnb.flags.StringVar(&fnb.BaseConfig.chainID, "chainid", flow.Mainnet.String(), "chain ID to use for block generation")
 	fnb.flags.StringVar(&fnb.BaseConfig.bindAddr, "bind", notSet, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", "bootstrap", "path to the bootstrap directory")
 	fnb.flags.DurationVarP(&fnb.BaseConfig.timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
@@ -147,6 +151,10 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.profilerDir, "profiler-dir", "profiler", "directory to create auto-profiler profiles")
 	fnb.flags.DurationVar(&fnb.BaseConfig.profilerInterval, "profiler-interval", 15*time.Minute, "the interval between auto-profiler runs")
 	fnb.flags.DurationVar(&fnb.BaseConfig.profilerDuration, "profiler-duration", 10*time.Second, "the duration to run the auto-profile for")
+}
+
+func (fnb *FlowNodeBuilder) configureChainParams() {
+	flow.SetChainID(flow.ChainID(fnb.BaseConfig.chainID))
 }
 
 func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
@@ -254,7 +262,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		Network:    metrics.NewNetworkCollector(),
 		Engine:     metrics.NewEngineCollector(),
 		Compliance: metrics.NewComplianceCollector(),
-		Cache:      metrics.NewCacheCollector(flow.DefaultChainID),
+		Cache:      metrics.NewCacheCollector(flow.GetChainID()),
 		Mempool:    metrics.NewMempoolCollector(),
 	}
 }
@@ -307,16 +315,18 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	index := bstorage.NewIndex(fnb.Metrics.Cache, db)
 	payloads := bstorage.NewPayloads(index, identities, guarantees, seals)
 	blocks := bstorage.NewBlocks(db, headers, payloads)
+	collections := bstorage.NewCollections(db)
 
 	fnb.DB = db
 	fnb.Storage = Storage{
-		Headers:    headers,
-		Identities: identities,
-		Guarantees: guarantees,
-		Seals:      seals,
-		Index:      index,
-		Payloads:   payloads,
-		Blocks:     blocks,
+		Headers:     headers,
+		Identities:  identities,
+		Guarantees:  guarantees,
+		Seals:       seals,
+		Index:       index,
+		Payloads:    payloads,
+		Blocks:      blocks,
+		Collections: collections,
 	}
 }
 
@@ -339,6 +349,9 @@ func (fnb *FlowNodeBuilder) initState() {
 	head, err := state.Final().Head()
 	if errors.Is(err, storerr.ErrNotFound) {
 		// Bootstrap!
+
+		// Mark that we need to run the genesis handler
+		fnb.genesisBootstrap = true
 
 		fnb.Logger.Info().Msg("bootstrapping empty protocol state")
 
@@ -526,6 +539,8 @@ func FlowNode(role string) *FlowNodeBuilder {
 
 	builder.baseFlags()
 
+	builder.configureChainParams()
+
 	builder.enqueueNetworkInit()
 
 	builder.enqueueMetricsServerInit()
@@ -573,7 +588,7 @@ func (fnb *FlowNodeBuilder) Run() {
 		fnb.handleModule(f)
 	}
 
-	if fnb.GenesisBlock != nil && fnb.genesisHandler != nil {
+	if fnb.genesisBootstrap && fnb.GenesisBlock != nil && fnb.genesisHandler != nil {
 		fnb.genesisHandler(fnb, fnb.GenesisBlock)
 	}
 
@@ -619,7 +634,7 @@ func loadDKGPublicData(dir string) (*dkg.PublicData, error) {
 	if err != nil {
 		return nil, err
 	}
-	dkgPubData := &bootstrap.DKGDataPub{}
+	dkgPubData := &bootstrap.EncodableDKGDataPub{}
 	err = json.Unmarshal(data, dkgPubData)
 	return dkgPubData.ForHotStuff(), err
 }

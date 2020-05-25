@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	FungibleTokenContractsBaseURL = "https://raw.githubusercontent.com/onflow/flow-ft/master/contracts/"
+	FungibleTokenContractsBaseURL = "https://raw.githubusercontent.com/onflow/flow-ft/master/src/contracts/"
 
 	CustodialDeposit = "CustodialDeposit.cdc"
 	FlowToken        = "FlowToken.cdc"
@@ -36,7 +36,7 @@ const (
 
 const (
 	// More transactions listed here: https://github.com/onflow/flow-ft/tree/master/transactions
-	FungibleTokenTransactionsBaseURL = "https://raw.githubusercontent.com/onflow/flow-ft/master/transactions/"
+	FungibleTokenTransactionsBaseURL = "https://raw.githubusercontent.com/onflow/flow-ft/master/src/transactions/"
 
 	SetupAccount   = "setup_account.cdc"
 	MintTokens     = "mint_tokens.cdc"

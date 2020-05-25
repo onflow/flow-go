@@ -104,7 +104,7 @@ func (t *Controller) OnTimeout() {
 
 // OnProgressBeforeTimeout indicates to the Controller that progress was made _before_ the timeout was reached
 func (t *Controller) OnProgressBeforeTimeout() {
-	t.cfg.ReplicaTimeout = math.Max(t.cfg.ReplicaTimeout-t.cfg.TimeoutDecrease, t.cfg.MinReplicaTimeout)
+	t.cfg.ReplicaTimeout = math.Max(t.cfg.ReplicaTimeout*t.cfg.TimeoutDecrease, t.cfg.MinReplicaTimeout)
 }
 
 // BlockRateDelay is a delay to broadcast the proposal in order to control block production rate

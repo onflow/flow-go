@@ -2,6 +2,7 @@ package virtualmachine_test
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/onflow/cadence/runtime"
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
+	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/hash"
@@ -108,7 +110,7 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 
 	// Create FungibleToken deployment transaction.
 	deployFungibleTokenContractTx := execTestutil.CreateDeployFungibleTokenContractInterfaceTransaction(accounts[0])
-	err = execTestutil.SignTransaction(&deployFungibleTokenContractTx, accounts[0], flow.RootAccountPrivateKey, 0)
+	err = execTestutil.SignTransaction(&deployFungibleTokenContractTx, accounts[0], flow.ServiceAccountPrivateKey, 0)
 	require.NoError(t, err)
 
 	// Create FlowToken deployment transaction.
@@ -179,7 +181,7 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 
 	// Create FungibleToken deployment transaction.
 	deployFungibleTokenContractTx := execTestutil.CreateDeployFungibleTokenContractInterfaceTransaction(accounts[0])
-	err = execTestutil.SignTransaction(&deployFungibleTokenContractTx, accounts[0], flow.RootAccountPrivateKey, 0)
+	err = execTestutil.SignTransaction(&deployFungibleTokenContractTx, accounts[0], flow.ServiceAccountPrivateKey, 0)
 	require.NoError(b, err)
 
 	// Create FlowToken deployment transaction.
@@ -262,7 +264,7 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 
 	// Create FungibleToken deployment transaction.
 	deployFungibleTokenContractTx := execTestutil.CreateDeployFungibleTokenContractInterfaceTransaction(accounts[0])
-	err = execTestutil.SignTransaction(&deployFungibleTokenContractTx, accounts[0], flow.RootAccountPrivateKey, 0)
+	err = execTestutil.SignTransaction(&deployFungibleTokenContractTx, accounts[0], flow.ServiceAccountPrivateKey, 0)
 	require.NoError(b, err)
 
 	// Create FlowToken deployment transaction.
@@ -311,5 +313,70 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 			require.NoError(b, err)
 		}
 	}
+}
 
+func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
+	rt := runtime.NewInterpreterRuntime()
+	h := unittest.BlockHeaderFixture()
+
+	vm, err := virtualmachine.New(rt)
+	require.NoError(t, err)
+	bc := vm.NewBlockContext(&h)
+
+	// Create a number of account private keys.
+	privateKeys, err := execTestutil.GenerateAccountPrivateKeys(3)
+	require.NoError(t, err)
+
+	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+	ledger, accounts, err := execTestutil.BootstrappedLedger(make(virtualmachine.MapLedger), privateKeys)
+	require.NoError(t, err)
+
+	// Create FungibleToken deployment transaction.
+	deployFungibleTokenContractTx := execTestutil.CreateDeployFungibleTokenContractInterfaceTransaction(accounts[0])
+	err = execTestutil.SignTransaction(&deployFungibleTokenContractTx, accounts[0], flow.ServiceAccountPrivateKey, 0)
+	require.NoError(t, err)
+
+	// Create FlowToken deployment transaction.
+	deployFlowTokenContractTx := execTestutil.CreateDeployFlowTokenContractTransaction(accounts[1], accounts[0])
+	err = execTestutil.SignTransaction(&deployFlowTokenContractTx, accounts[1], privateKeys[0], 0)
+	require.NoError(t, err)
+
+	// Deploy the FungibleToken contract interface.
+	result, err := bc.ExecuteTransaction(ledger, &deployFungibleTokenContractTx)
+	require.True(t, result.Succeeded())
+	require.NoError(t, err)
+
+	// Deploy the FlowToken contract.
+	result, err = bc.ExecuteTransaction(ledger, &deployFlowTokenContractTx)
+	require.True(t, result.Succeeded())
+	require.NoError(t, err)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func(id int, wg *sync.WaitGroup) {
+			defer wg.Done()
+			view := delta.NewView(ledger.Get)
+			result, err := bc.ExecuteScript(view, []byte(fmt.Sprintf(`
+			import FlowToken from 0x%s
+			pub fun main() {
+				log("Transaction %d")
+				let v <- FlowToken.createEmptyVault()
+				destroy v
+			}
+		`, accounts[1], id)))
+			require.NoError(t, err)
+			require.True(t, result.Succeeded())
+		}(i, &wg)
+	}
+	wg.Wait()
+
+	// Determine location of transaction
+	txID := deployFlowTokenContractTx.ID()
+	location := runtime.TransactionLocation(txID[:])
+
+	// Get cached program
+	program, err := vm.ASTCache().GetProgram(location)
+	require.NotNil(t, program)
+	require.NoError(t, err)
 }

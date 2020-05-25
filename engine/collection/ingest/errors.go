@@ -54,3 +54,17 @@ func (e InvalidScriptError) Is(other error) bool {
 func (e InvalidScriptError) Unwrap() error {
 	return e.ParserErr
 }
+
+type GasLimitExceededError struct {
+	Maximum uint64
+	Actual  uint64
+}
+
+func (e GasLimitExceededError) Error() string {
+	return fmt.Sprintf("transaction's gas limit (%d) exceeds the allowed max gas limit (%d)", e.Actual, e.Maximum)
+}
+
+func (e GasLimitExceededError) Is(other error) bool {
+	_, ok := other.(GasLimitExceededError)
+	return ok
+}
