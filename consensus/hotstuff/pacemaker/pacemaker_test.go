@@ -21,7 +21,7 @@ const (
 	minRepTimeout          float64 = 100.0 // Milliseconds
 	voteTimeoutFraction    float64 = 0.5   // multiplicative factor
 	multiplicativeIncrease float64 = 1.5   // multiplicative factor
-	additiveDecrease       float64 = 50    // Milliseconds
+	multiplicativeDecrease float64 = 0.85  // multiplicative factor
 )
 
 func expectedTimerInfo(view uint64, mode model.TimeoutMode) interface{} {
@@ -45,7 +45,7 @@ func initPaceMaker(t *testing.T, view uint64) (hotstuff.PaceMaker, *mocks.Consum
 		time.Duration(minRepTimeout*1e6),
 		voteTimeoutFraction,
 		multiplicativeIncrease,
-		time.Duration(additiveDecrease*1e6),
+		multiplicativeDecrease,
 		0)
 	if err != nil {
 		t.Fail()
@@ -296,6 +296,62 @@ func Test_ReplicaTimeout(t *testing.T) {
 	assert.Equal(t, uint64(4), pm.CurView())
 }
 
+// Test_ViewChangeWithProgress tests that the PaceMaker respects the definition of Progress:
+// Progress is defined as entering view V for which the replica knows a QC with V = QC.view + 1
+// For this test, we feed it with a block for the current view containing a QC from the last view.
+// Hence, the PaceMaker should decrease the timeout (because the committee is synchronized).
+func Test_ViewChangeWithProgress(t *testing.T) {
+	pm, notifier := initPaceMaker(t, 5) // initPaceMaker also calls Start() on PaceMaker
+
+	// The pace maker should transition into view 6
+	// and decrease its timeout value by the following pacemaker call, as progress is made
+	notifier.On("OnStartingTimeout", expectedTimerInfo(6, model.ReplicaTimeout)).Return().Once()
+	start := time.Now()
+	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlock(4, 5), false)
+	assert.True(t, nveOccurred && nve.View == 6)
+	notifier.AssertExpectations(t)
+
+	select {
+	case <-pm.TimeoutChannel():
+		break // testing path: corresponds to EventLoop picking up timeout from channel
+	case <-time.After(time.Duration(2) * time.Duration(startRepTimeout) * time.Millisecond):
+		t.Fail() // to prevent test from hanging
+	}
+
+	actualTimeout := float64(time.Since(start).Milliseconds()) // in millisecond
+	expectedVoteCollectionTimeout := startRepTimeout * multiplicativeDecrease
+	assert.True(t, math.Abs(actualTimeout-expectedVoteCollectionTimeout) < 0.1*expectedVoteCollectionTimeout)
+	assert.Equal(t, uint64(6), pm.CurView())
+}
+
+// Test_ViewChangeWithoutProgress tests that the PaceMaker respects the definition of Progress:
+// Progress is defined as entering view V for which the replica knows a QC with V = QC.view + 1
+// For this test, we feed it with a block for the current view, but containing an old QC.
+// Hence, the PaceMaker should NOT decrease the timeout (because the committee is still not synchronized)
+func Test_ViewChangeWithoutProgress(t *testing.T) {
+	pm, notifier := initPaceMaker(t, 5) // initPaceMaker also calls Start() on PaceMaker
+
+	// while the pace maker should transition into view 6
+	// we are not expecting a change of timeout value by the following pacemaker call, because no progress is made
+	notifier.On("OnStartingTimeout", expectedTimerInfo(6, model.ReplicaTimeout)).Return().Once()
+	start := time.Now()
+	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlock(3, 5), false)
+	assert.True(t, nveOccurred && nve.View == 6)
+	notifier.AssertExpectations(t)
+
+	select {
+	case <-pm.TimeoutChannel():
+		break // testing path: corresponds to EventLoop picking up timeout from channel
+	case <-time.After(time.Duration(2) * time.Duration(startRepTimeout) * time.Millisecond):
+		t.Fail() // to prevent test from hanging
+	}
+
+	actualTimeout := float64(time.Since(start).Milliseconds()) // in millisecond
+	expectedVoteCollectionTimeout := startRepTimeout
+	assert.True(t, math.Abs(actualTimeout-expectedVoteCollectionTimeout) < 0.1*expectedVoteCollectionTimeout)
+	assert.Equal(t, uint64(6), pm.CurView())
+}
+
 func Test_ReplicaTimeoutAgain(t *testing.T) {
 	start := time.Now()
 	pm, notifier := initPaceMaker(t, 3) // initPaceMaker also calls Start() on PaceMaker
@@ -367,11 +423,11 @@ func Test_ReplicaTimeoutAgain(t *testing.T) {
 	case <-time.After(time.Duration(3) * time.Duration(startRepTimeout) * time.Millisecond):
 	}
 
-	actualTimeout = float64(time.Since(start).Milliseconds()) // in millisecond
-	// the actual timeout should be startRepTimeout * 1.5 *1.5- 2*additiveDecrease
+	actualTimeout = float64(time.Since(start).Microseconds()) * 0.001 // in millisecond
+	// the actual timeout should be startRepTimeout * 1.5 *1.5 * multiplicativeDecrease * multiplicativeDecrease
 	// because it hits timeout twice and then received blocks for current view twice
-	assert.GreaterOrEqual(t, actualTimeout, 1.5*1.5*startRepTimeout-2*additiveDecrease, "the actual timeout should be greater or equal to the timeout")
-	assert.Less(t, actualTimeout, 1.5*1.5*startRepTimeout-additiveDecrease, "the actual timeout is too long")
+	assert.GreaterOrEqual(t, actualTimeout, 1.5*1.5*startRepTimeout*multiplicativeDecrease*multiplicativeDecrease, "the actual timeout should be greater or equal to the timeout")
+	assert.Less(t, actualTimeout, 1.5*1.5*startRepTimeout*multiplicativeDecrease, "the actual timeout is too long")
 }
 
 // Test_VoteTimeout tests that vote timeout fires as expected
@@ -380,21 +436,20 @@ func Test_VoteTimeout(t *testing.T) {
 	start := time.Now()
 
 	notifier.On("OnStartingTimeout", expectedTimerInfo(3, model.VoteCollectionTimeout)).Return().Once()
+	// we are not expecting a change of timeout value by the following pacemaker call, because no view change happens
 	pm.UpdateCurViewWithBlock(makeBlock(2, 3), true)
 	notifier.AssertExpectations(t)
 
-	// the previous pacemaker update decreased the vote timeout by (additiveDecrease * voteTimeoutFraction)
-	expectedTimeout := (startRepTimeout - additiveDecrease) * voteTimeoutFraction
+	// the pacemaker should now be running the vote collection timeout:
+	expectedVoteCollectionTimeout := startRepTimeout * voteTimeoutFraction
 	select {
 	case <-pm.TimeoutChannel():
 		break // testing path: corresponds to EventLoop picking up timeout from channel
-	case <-time.After(time.Duration(2) * time.Duration(expectedTimeout) * time.Millisecond):
+	case <-time.After(2 * time.Duration(expectedVoteCollectionTimeout) * time.Millisecond):
 		t.Fail() // to prevent test from hanging
 	}
 	duration := float64(time.Since(start).Milliseconds()) // in millisecond
-	fmt.Println(duration)
-	fmt.Println(expectedTimeout)
-	assert.True(t, math.Abs(duration-expectedTimeout) < 0.1*expectedTimeout)
+	assert.True(t, math.Abs(duration-expectedVoteCollectionTimeout) < 0.1*expectedVoteCollectionTimeout)
 	// While the timeout event has been put in the channel,
 	// PaceMaker should NOT react on it without the timeout event being processed by the EventHandler
 	assert.Equal(t, uint64(3), pm.CurView())

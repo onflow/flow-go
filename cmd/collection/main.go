@@ -16,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
 	hotstuffmodel "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/consensus/recovery/cluster"
@@ -55,12 +56,16 @@ const (
 func main() {
 
 	var (
-		txLimit             uint
-		maxCollectionSize   uint
-		parseTxScripts      bool
-		ingressExpiryBuffer uint
-		builderExpiryBuffer uint
-		hotstuffTimeout     time.Duration
+		txLimit                                uint
+		maxCollectionSize                      uint
+		parseTxScripts                         bool
+		ingressExpiryBuffer                    uint
+		builderExpiryBuffer                    uint
+		hotstuffTimeout                        time.Duration
+		hotstuffMinTimeout                     time.Duration
+		hotstuffTimeoutIncreaseFactor          float64
+		hotstuffTimeoutDecreaseFactor          float64
+		hotstuffTimeoutVoteAggregationFraction float64
 
 		ingressConf     ingress.Config
 		pool            mempool.Transactions
@@ -96,7 +101,11 @@ func main() {
 			flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", 15, "expiry buffer for transactions in proposed collections")
 			flags.UintVar(&maxCollectionSize, "max-collection-size", 100, "maximum number of transactions in proposed collections")
 			flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000", "the address the ingress server listens on")
-			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", proposalTimeout, "the initial timeout for the hotstuff pacemaker")
+			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second, "the initial timeout for the hotstuff pacemaker")
+			flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", proposalTimeout, "the lower timeout bound for the hotstuff pacemaker")
+			flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor", timeout.DefaultConfig.TimeoutIncrease, "multiplicative increase of timeout value in case of time out event")
+			flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor", timeout.DefaultConfig.TimeoutDecrease, "multiplicative decrease of timeout value in case of progress")
+			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", timeout.DefaultConfig.VoteAggregationTimeoutFraction, "additional fraction of replica timeout that the primary will wait for votes")
 		}).
 		Module("transactions mempool", func(node *cmd.FlowNodeBuilder) error {
 			pool, err = stdmap.NewTransactions(txLimit)
@@ -363,7 +372,11 @@ func main() {
 				clusterQC,
 				finalized,
 				pending,
-				consensus.WithTimeout(hotstuffTimeout),
+				consensus.WithInitialTimeout(hotstuffTimeout),
+				consensus.WithMinTimeout(hotstuffMinTimeout),
+				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
+				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
+				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize hotstuff participant: %w", err)
