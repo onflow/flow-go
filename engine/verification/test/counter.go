@@ -47,7 +47,7 @@ func GetTxBodyDeployCounterContract() *flow.TransactionBody {
                 signer.setCode("%s".decodeHex())
               }
 			}`, encoded)),
-		Authorizers: []flow.Address{flow.RootAddress},
+		Authorizers: []flow.Address{flow.ServiceAddress()},
 	}
 }
 
@@ -64,7 +64,7 @@ func GetTxBodyCreateCounter() *flow.TransactionBody {
 					}
               	}
             }`),
-		Authorizers: []flow.Address{flow.RootAddress},
+		Authorizers: []flow.Address{flow.ServiceAddress()},
 	}
 }
 
@@ -78,7 +78,7 @@ func GetTxBodyAddToCounter() *flow.TransactionBody {
 					acc.storage[Container.Counter]?.add(2)
               	}
             }`),
-		Authorizers: []flow.Address{flow.RootAddress},
+		Authorizers: []flow.Address{flow.ServiceAddress()},
 	}
 }
 

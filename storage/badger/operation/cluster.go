@@ -13,27 +13,27 @@ import (
 
 // IndexClusterBlockHeight inserts a block number to block ID mapping for
 // the given cluster.
-func IndexClusterBlockHeight(clusterID string, number uint64, blockID flow.Identifier) func(*badger.Txn) error {
+func IndexClusterBlockHeight(clusterID flow.ChainID, number uint64, blockID flow.Identifier) func(*badger.Txn) error {
 	return insert(makePrefix(codeFinalizedCluster, clusterID, number), blockID)
 }
 
 // LookupClusterBlockHeight retrieves a block ID by number for the given cluster
-func LookupClusterBlockHeight(clusterID string, number uint64, blockID *flow.Identifier) func(*badger.Txn) error {
+func LookupClusterBlockHeight(clusterID flow.ChainID, number uint64, blockID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeFinalizedCluster, clusterID, number), blockID)
 }
 
 // InsertClusterFinalizedHeight inserts the finalized boundary for the given cluster.
-func InsertClusterFinalizedHeight(clusterID string, number uint64) func(*badger.Txn) error {
+func InsertClusterFinalizedHeight(clusterID flow.ChainID, number uint64) func(*badger.Txn) error {
 	return insert(makePrefix(codeClusterHeight, clusterID), number)
 }
 
 // UpdateClusterFinalizedHeight updates the finalized boundary for the given cluster.
-func UpdateClusterFinalizedHeight(clusterID string, number uint64) func(*badger.Txn) error {
+func UpdateClusterFinalizedHeight(clusterID flow.ChainID, number uint64) func(*badger.Txn) error {
 	return update(makePrefix(codeClusterHeight, clusterID), number)
 }
 
 // RetrieveClusterFinalizedHeight retrieves the finalized boundary for the given cluster.
-func RetrieveClusterFinalizedHeight(clusterID string, number *uint64) func(*badger.Txn) error {
+func RetrieveClusterFinalizedHeight(clusterID flow.ChainID, number *uint64) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeClusterHeight, clusterID), number)
 }
 

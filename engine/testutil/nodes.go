@@ -319,6 +319,7 @@ func VerificationNode(t testing.TB,
 	assigner module.ChunkAssigner,
 	requestIntervalMs uint,
 	failureThreshold uint,
+	lightIngestEngine bool,
 	opts ...VerificationOpt) mock.VerificationNode {
 
 	var err error
@@ -391,14 +392,48 @@ func VerificationNode(t testing.TB,
 		require.Nil(t, err)
 	}
 
-	if node.IngestEngine == nil {
-		node.IngestEngine, err = ingest.NewLightEngine(node.Log,
+	if node.AssignedChunkIDs == nil {
+		node.AssignedChunkIDs, err = stdmap.NewIdentifiers(1000)
+		require.Nil(t, err)
+	}
+
+	// creates a light ingest engine for the node if lightIngestEngine is set
+	if node.LightIngestEngine == nil && lightIngestEngine {
+		node.LightIngestEngine, err = ingest.NewLightEngine(node.Log,
 			node.Net,
 			node.State,
 			node.Me,
 			node.VerifierEngine,
 			node.AuthReceipts,
 			node.AuthCollections,
+			node.ChunkDataPacks,
+			node.CollectionTrackers,
+			node.ChunkDataPackTrackers,
+			node.IngestedChunkIDs,
+			node.IngestedResultIDs,
+			node.AssignedChunkIDs,
+			node.IngestedCollectionIDs,
+			node.Headers,
+			node.Blocks,
+			assigner,
+			requestIntervalMs,
+			failureThreshold,
+		)
+		require.Nil(t, err)
+	}
+
+	// otherwise, creates an (original) ingest engine for the node
+	if node.IngestEngine == nil && !lightIngestEngine {
+		node.IngestEngine, err = ingest.New(node.Log,
+			node.Net,
+			node.State,
+			node.Me,
+			node.VerifierEngine,
+			node.AuthReceipts,
+			node.PendingReceipts,
+			node.AuthCollections,
+			node.PendingCollections,
+			node.CollectionTrackers,
 			node.ChunkDataPacks,
 			node.ChunkDataPackTrackers,
 			node.IngestedChunkIDs,

@@ -349,7 +349,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 		Hex("block_id", logging.ID(header.ID())).
 		Uint64("block_height", header.Height).
 		Int("collection_size", payload.Collection.Len()).
-		Str("chain_id", header.ChainID).
+		Str("chain_id", header.ChainID.String()).
 		Hex("parent_id", logging.ID(header.ParentID)).
 		Logger()
 
@@ -467,7 +467,7 @@ func (e *Engine) processBlockProposal(proposal *messages.ClusterBlockProposal) e
 	header := proposal.Header
 
 	log := e.log.With().
-		Str("chain_id", header.ChainID).
+		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
 		Hex("block_id", logging.Entity(header)).

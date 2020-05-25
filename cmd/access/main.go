@@ -25,6 +25,7 @@ import (
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/signature"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
+	grpcutils "github.com/dapperlabs/flow-go/utils/grpc"
 )
 
 func main() {
@@ -55,7 +56,10 @@ func main() {
 		Module("collection node client", func(node *cmd.FlowNodeBuilder) error {
 			node.Logger.Info().Err(err).Msgf("Collection node Addr: %s", rpcConf.CollectionAddr)
 
-			collectionRPCConn, err := grpc.Dial(rpcConf.CollectionAddr, grpc.WithInsecure())
+			collectionRPCConn, err := grpc.Dial(
+				rpcConf.CollectionAddr,
+				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+				grpc.WithInsecure())
 			if err != nil {
 				return err
 			}
@@ -65,7 +69,10 @@ func main() {
 		Module("execution node client", func(node *cmd.FlowNodeBuilder) error {
 			node.Logger.Info().Err(err).Msgf("Execution node Addr: %s", rpcConf.ExecutionAddr)
 
-			executionRPCConn, err := grpc.Dial(rpcConf.ExecutionAddr, grpc.WithInsecure())
+			executionRPCConn, err := grpc.Dial(
+				rpcConf.ExecutionAddr,
+				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+				grpc.WithInsecure())
 			if err != nil {
 				return err
 			}
@@ -88,7 +95,8 @@ func main() {
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
-			cleaner := storage.NewCleaner(node.Logger, node.DB)
+			// TODO frequency of 0 turns off the cleaner, turn back on once we know the proper tuning
+			cleaner := storage.NewCleaner(node.Logger, node.DB, 0)
 
 			// create a finalizer that will handle updating the protocol
 			// state when the follower detects newly finalized blocks

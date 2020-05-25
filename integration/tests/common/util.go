@@ -46,7 +46,7 @@ var (
 	// CreateCounterTx is a transaction script for creating an instance of the counter in the account storage of the
 	// authorizing account NOTE: the counter contract must be deployed first
 	CreateCounterTx = dsl.Transaction{
-		Import: dsl.Import{Address: flow.RootAddress},
+		Import: dsl.Import{Address: flow.ServiceAddress()},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
 				var maybeCounter <- signer.load<@Testing.Counter>(from: /storage/counter)
@@ -78,7 +78,7 @@ var (
 	// manipulating state. It can be used to test whether execution state stays untouched/will revert. NOTE: the counter
 	// contract must be deployed first
 	CreateCounterPanicTx = dsl.Transaction{
-		Import: dsl.Import{Address: flow.RootAddress},
+		Import: dsl.Import{Address: flow.ServiceAddress()},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
 				var maybeCounter <- signer.load<@Testing.Counter>(from: /storage/counter)

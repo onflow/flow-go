@@ -26,7 +26,7 @@ type SnapshotSuite struct {
 	dbdir string
 
 	genesis *model.Block
-	chainID string
+	chainID flow.ChainID
 
 	state   cluster.State
 	mutator cluster.Mutator
