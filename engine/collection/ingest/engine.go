@@ -41,6 +41,8 @@ type Engine struct {
 	// the number of blocks that can be between the reference block and the
 	// finalized head before we consider the transaction expired
 	expiry uint
+	// the maximum gas limit for a transaction
+	gasLimit uint64
 	// whether or not we validate that transaction scripts are parseable
 	parseScripts bool
 }
@@ -55,6 +57,7 @@ func New(
 	me module.Local,
 	pool mempool.Transactions,
 	expiryBuffer uint,
+	gasLimit uint64,
 	parseScripts bool,
 ) (*Engine, error) {
 
@@ -74,6 +77,7 @@ func New(
 		// to be included in a collection, then for that collection to be
 		// included in a block
 		expiry:       flow.DefaultTransactionExpiry - expiryBuffer,
+		gasLimit:     gasLimit,
 		parseScripts: parseScripts,
 	}
 
@@ -226,7 +230,7 @@ func (e *Engine) ValidateTransaction(tx *flow.TransactionBody) error {
 	}
 
 	// ensure the gas limit is not over the maximum
-	if tx.GasLimit > MaxGasLimit {
+	if tx.GasLimit > e.gasLimit {
 		return GasLimitExceededError{Actual: tx.GasLimit, Maximum: MaxGasLimit}
 	}
 
