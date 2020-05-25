@@ -8,18 +8,31 @@ import (
 // TODO consolidate with PendingReceipts to preserve DRY
 // https://github.com/dapperlabs/flow-go/issues/3690
 
+type PendingCollectionsOpts func(*PendingCollections)
+
+func WithSizeMeter(f func(uint)) PendingCollectionsOpts {
+	return func(p *PendingCollections) {
+		p.sizeMeter = f
+	}
+}
+
 // PendingCollections implements a mempool storing collections.
 type PendingCollections struct {
 	*Backend
-	qe *QueueEjector
+	qe        *QueueEjector
+	sizeMeter func(uint) // keeps track of size variations of memory pool
 }
 
 // NewCollections creates a new memory pool for pending collection.
-func NewPendingCollections(limit uint) (*PendingCollections, error) {
+func NewPendingCollections(limit uint, opts ...PendingCollectionsOpts) (*PendingCollections, error) {
 	qe := NewQueueEjector(limit + 1)
 	p := &PendingCollections{
 		qe:      qe,
 		Backend: NewBackend(WithLimit(limit), WithEject(qe.Eject)),
+	}
+
+	for _, apply := range opts {
+		apply(p)
 	}
 
 	return p, nil
@@ -32,12 +45,21 @@ func (p *PendingCollections) Add(pcoll *verification.PendingCollection) bool {
 		p.qe.Push(pcoll.ID())
 	}
 
+	if p.sizeMeter != nil {
+		p.sizeMeter(p.Backend.Size())
+	}
+
 	return ok
 }
 
 // Rem removes a pending collection by ID from memory
 func (p *PendingCollections) Rem(collID flow.Identifier) bool {
-	return p.Backend.Rem(collID)
+	ok := p.Backend.Rem(collID)
+	if p.sizeMeter != nil {
+		p.sizeMeter(p.Backend.Size())
+	}
+
+	return ok
 }
 
 // ByID returns the pending collection with the given ID from the mempool.
