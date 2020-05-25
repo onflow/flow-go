@@ -1,8 +1,6 @@
 package fingerprint
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/flow-go/model/encoding/rlp"
 )
 
@@ -23,7 +21,6 @@ type Fingerprinter interface {
 func Fingerprint(entity interface{}) []byte {
 
 	if fingerprinter, ok := entity.(Fingerprinter); ok {
-		fmt.Printf("entity has Fingerprint(): %#v\n", entity)
 		return fingerprinter.Fingerprint()
 	}
 
