@@ -45,7 +45,6 @@ func New(
 	assigner module.ChunkAssigner,
 	state protocol.State,
 	chunks *Chunks,
-	con network.Conduit,
 	headers storage.Headers,
 	retryInterval time.Duration,
 ) (*Engine, error) {
@@ -58,15 +57,15 @@ func New(
 		assigner:      assigner,
 		state:         state,
 		chunks:        chunks,
-		con:           con,
 		headers:       headers,
 		retryInterval: retryInterval,
 	}
 
-	_, err := net.Register(engine.ChunkDataPackProvider, e)
+	con, err := net.Register(engine.ChunkDataPackProvider, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register chunk data pack provider engine: %w", err)
 	}
+	e.con = con
 	return e, nil
 }
 

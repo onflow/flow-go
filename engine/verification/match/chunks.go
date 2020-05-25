@@ -35,6 +35,13 @@ type Chunks struct {
 	*stdmap.Backend
 }
 
+func NewChunks(limit uint) *Chunks {
+	chunks := &Chunks{
+		Backend: stdmap.NewBackend(stdmap.WithLimit(limit)),
+	}
+	return chunks
+}
+
 func (cs *Chunks) All() []*ChunkStatus {
 	all := cs.Backend.All()
 	allChunks := make([]*ChunkStatus, 0, len(all))
