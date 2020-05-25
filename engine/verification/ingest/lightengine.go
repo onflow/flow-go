@@ -63,7 +63,6 @@ func NewLightEngine(
 	receipts mempool.Receipts,
 	collections mempool.Collections,
 	chunkDataPacks mempool.ChunkDataPacks,
-	collectionTrackers mempool.CollectionTrackers,
 	chunkDataPackTrackers mempool.ChunkDataPackTrackers,
 	ingestedChunkIDs mempool.Identifiers,
 	ingestedResultIDs mempool.Identifiers,
@@ -413,7 +412,7 @@ func (l *LightEngine) handleCollection(originID flow.Identifier, expectedRole fl
 	return nil
 }
 
-// requestChunkData submits a request for the given chunk ID to the execution nodes to the network.
+// requestChunkData submits a request for the given chunk ID to the execution nodes in the network.
 // It also adds a tracker for the chunk data if it is successfully submitted.
 func (l *LightEngine) requestChunkData(chunkID, blockID flow.Identifier) error {
 	if l.chunkDataPackTackers.Has(chunkID) {
@@ -435,13 +434,13 @@ func (l *LightEngine) requestChunkData(chunkID, blockID flow.Identifier) error {
 		Nonce:   rand.Uint64(),
 	}
 
-	// TODO we should only submit to execution node that generated extecution receipt
+	// TODO we should only submit to execution node that generated execution receipt
 	err = l.chunksConduit.Submit(req, execNodes.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not submit request for collection (id=%s): %w", chunkID, err)
 	}
 
-	// adds a tracker for this collection
+	// adds a tracker for this chunk
 	l.chunkDataPackTackers.Add(trackers.NewChunkDataPackTracker(chunkID, blockID))
 
 	return nil

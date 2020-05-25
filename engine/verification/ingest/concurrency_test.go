@@ -206,7 +206,10 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, lightIng
 		<-verNode.IngestEngine.Ready()
 	}
 
-	// mocks a generic node depending on whether
+	// light ingest engine does not interact with collection node
+	// but the current version of original ingest engine does
+	// TODO removing collection request from ORIGINAL ingest engine
+	// https://github.com/dapperlabs/flow-go/issues/3008
 	var colNode mock.GenericNode
 	if !lightIngest {
 		// current version of original ingest engine queries the
@@ -330,10 +333,11 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, lightIng
 	exeNode.Done()
 	verNode.Done()
 
+	// light ingest engine does not interact with collection node
+	// but the current version of original ingest engine does
+	// TODO removing collection request from ORIGINAL ingest engine
+	// https://github.com/dapperlabs/flow-go/issues/3008
 	if !lightIngest {
-		// collection node is only involved in
-		// original ingest test, hence, it is terminated
-		// only at the end of ths
 		colNode.Done()
 	}
 	// to demarcate the logs
