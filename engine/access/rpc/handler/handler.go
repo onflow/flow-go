@@ -28,6 +28,7 @@ type Handler struct {
 	collectionRPC access.AccessAPIClient
 	log           zerolog.Logger
 	state         protocol.State
+	chainID       string
 
 	// storage
 	blocks       storage.Blocks
@@ -45,7 +46,8 @@ func NewHandler(log zerolog.Logger,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
-	transactions storage.Transactions) *Handler {
+	transactions storage.Transactions,
+	chainID string) *Handler {
 	return &Handler{
 		executionRPC:  e,
 		collectionRPC: c,
@@ -54,6 +56,7 @@ func NewHandler(log zerolog.Logger,
 		collections:   collections,
 		transactions:  transactions,
 		state:         s,
+		chainID:       chainID,
 		log:           log,
 	}
 }
@@ -147,6 +150,12 @@ func (h *Handler) GetAccount(ctx context.Context, req *access.GetAccountRequest)
 		Account: exeResp.GetAccount(),
 	}, nil
 
+}
+
+func (h *Handler) GetChainID(ctx context.Context, request *access.GetChainIDRequest) (*access.GetChainIDResponse, error) {
+	return &access.GetChainIDResponse{
+		ChainId: h.chainID,
+	}, nil
 }
 
 func convertStorageError(err error) error {

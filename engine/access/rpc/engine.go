@@ -42,7 +42,8 @@ func New(log zerolog.Logger,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
-	transactions storage.Transactions) *Engine {
+	transactions storage.Transactions,
+	chainID string) *Engine {
 
 	log = log.With().Str("engine", "rpc").Logger()
 
@@ -53,7 +54,7 @@ func New(log zerolog.Logger,
 	eng := &Engine{
 		log:     log,
 		unit:    engine.NewUnit(),
-		handler: handler.NewHandler(log, state, executionRPC, collectionRPC, blocks, headers, collections, transactions),
+		handler: handler.NewHandler(log, state, executionRPC, collectionRPC, blocks, headers, collections, transactions, chainID),
 		server: grpc.NewServer(
 			grpc.MaxRecvMsgSize(config.MaxMsgSize),
 			grpc.MaxSendMsgSize(config.MaxMsgSize),

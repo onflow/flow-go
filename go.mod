@@ -27,7 +27,7 @@ require (
 	github.com/magiconair/properties v1.8.1 // indirect
 	github.com/multiformats/go-multiaddr v0.2.0
 	github.com/onflow/cadence v0.3.0-beta1
-	github.com/onflow/flow/protobuf/go/flow v0.1.4
+	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200525173345-3873f5437139
 	github.com/onsi/ginkgo v1.10.1 // indirect
 	github.com/onsi/gomega v1.7.0 // indirect
 	github.com/opentracing/opentracing-go v1.1.0
