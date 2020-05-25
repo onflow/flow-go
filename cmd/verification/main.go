@@ -64,7 +64,7 @@ func main() {
 		conCache        *buffer.PendingBlocks
 		authCollections *stdmap.Collections
 		// pendingCollections    *stdmap.PendingCollections
-		collectionTrackers    *stdmap.CollectionTrackers
+		// collectionTrackers    *stdmap.CollectionTrackers
 		chunkDataPacks        *stdmap.ChunkDataPacks
 		chunkDataPackTracker  *stdmap.ChunkDataPackTrackers
 		ingestedChunkIDs      *stdmap.Identifiers
@@ -101,10 +101,10 @@ func main() {
 		//	pendingCollections, err = stdmap.NewPendingCollections(collectionLimit)
 		//	return err
 		//}).
-		Module("collection trackers mempool", func(node *cmd.FlowNodeBuilder) error {
-			collectionTrackers, err = stdmap.NewCollectionTrackers(collectionLimit)
-			return err
-		}).
+		//Module("collection trackers mempool", func(node *cmd.FlowNodeBuilder) error {
+		//	collectionTrackers, err = stdmap.NewCollectionTrackers(collectionLimit)
+		//	return err
+		//}).
 		Module("chunk data pack mempool", func(node *cmd.FlowNodeBuilder) error {
 			chunkDataPacks, err = stdmap.NewChunkDataPacks(chunkLimit)
 			return err
@@ -188,7 +188,6 @@ func main() {
 				authReceipts,
 				authCollections,
 				chunkDataPacks,
-				collectionTrackers,
 				chunkDataPackTracker,
 				ingestedChunkIDs,
 				ingestedCollectionIDs,
