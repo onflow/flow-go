@@ -166,6 +166,10 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 		verNodes = append(verNodes, verNode)
 	}
 
+	// light ingest engine does not interact with collection node
+	// but the current version of original ingest engine does
+	// TODO removing collection request from ORIGINAL ingest engine
+	// https://github.com/dapperlabs/flow-go/issues/3008
 	var colNode mock2.CollectionNode
 	var colNet *stub.Network
 	if !lightIngest {
@@ -259,6 +263,10 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 		verNet.StopConDev()
 	}
 
+	// light ingest engine does not interact with collection node
+	// but the current version of original ingest engine does
+	// TODO removing collection request from ORIGINAL ingest engine
+	// https://github.com/dapperlabs/flow-go/issues/3008
 	if !lightIngest {
 		colNet.StopConDev()
 	}
@@ -296,6 +304,10 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 	conNode.Done()
 	exeNode.Done()
 
+	// light ingest engine does not interact with collection node
+	// but the current version of original ingest engine does
+	// TODO removing collection request from ORIGINAL ingest engine
+	// https://github.com/dapperlabs/flow-go/issues/3008
 	if !lightIngest {
 		colNode.Done()
 	}
