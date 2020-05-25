@@ -57,7 +57,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Name:        "busy_duration_cseconds_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
-			Help:        "total count of cs [units of 10ms = cs] of how long HotStuff's event loop has been busy processing events",
+			Help:        "total wall-clock time [unit: seconds; measured with millisecond resolution] of how long HotStuff's event loop has been busy processing events",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}, []string{"event_type"}),
 
@@ -73,7 +73,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Name:        "idle_duration_cseconds_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
-			Help:        "total count of cs [units of 10ms = cs] of how long HotStuff's event loop has been idle without processing any event",
+			Help:        "total wall-clock time [unit: seconds; with float64 resolution] of how long HotStuff's event loop has been idle without processing any event",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
@@ -89,7 +89,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Name:        "wait_duration_cseconds_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
-			Help:        "total count of cs [units of 10ms = cs] of how long an event has been waited in the HotStuff event loop queue before being processed.",
+			Help:        "total wall-clock time [unit: seconds; with float64 resolution] of how long an event has been waited in the HotStuff event loop queue before being processed.",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}, []string{"event_type"}),
 
@@ -137,7 +137,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Name:        "committee_computations_cseconds_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
-			Help:        "total count of cs [units of 10ms = cs] of how long HotStuff sends computing consensus committee relations",
+			Help:        "total wall-clock time [unit: seconds; with float64 resolution] of how long HotStuff sends computing consensus committee relations",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
@@ -145,7 +145,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Name:        "crypto_computations_cseconds_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
-			Help:        "total count of cs [units of 10ms = cs] of how long HotStuff sends with crypto-related operations",
+			Help:        "total wall-clock time [unit: seconds; with float64 resolution] of how long HotStuff sends with crypto-related operations",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
@@ -153,7 +153,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Name:        "message_validation_cseconds_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
-			Help:        "total count of cs [units of 10ms = cs] of how long HotStuff sends with message-validation",
+			Help:        "total wall-clock time [unit: seconds; with float64 resolution] of how long HotStuff sends with message-validation",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
@@ -161,7 +161,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Name:        "payload_production_cseconds_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
-			Help:        "total count of cs [units of 10ms = cs] of how long HotStuff sends with payload production",
+			Help:        "total wall-clock time [unit: seconds; with float64 resolution] of how long HotStuff sends with payload production",
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 	}
@@ -171,26 +171,23 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 
 // HotStuffBusyDuration reports Metrics C6 HotStuff Busy Duration
 func (hc *HotstuffCollector) HotStuffBusyDuration(duration time.Duration, event string) {
-	hc.busyDuration.WithLabelValues(event).Observe(duration.Seconds())
-
-	// We count the number of wall-clock ticks in units of centi-seconds, i.e. in units of 1/100 seconds
-	hc.busyDurationCsCounter.WithLabelValues(event).Add(float64(duration.Milliseconds()) * 0.1)
+	d := duration.Seconds() // duration in seconds with resolution as much as float64
+	hc.busyDuration.WithLabelValues(event).Observe(d)
+	hc.busyDurationCsCounter.WithLabelValues(event).Add(d) // we count the number of wall-clock time [unit: seconds]
 }
 
 // HotStuffIdleDuration reports Metrics C6 HotStuff Idle Duration
 func (hc *HotstuffCollector) HotStuffIdleDuration(duration time.Duration) {
-	hc.idleDuration.Observe(duration.Seconds())
-
-	// We count the number of wall-clock ticks in units of centi-seconds, i.e. in units of 1/100 seconds
-	hc.idleDurationCsCounter.Add(float64(duration.Milliseconds()) * 0.1)
+	d := duration.Seconds() // duration in seconds with resolution as much as float64
+	hc.idleDuration.Observe(d)
+	hc.idleDurationCsCounter.Add(d) // we count the number of wall-clock time [unit: seconds]
 }
 
 // HotStuffWaitDuration reports Metrics C6 HotStuff Wait Duration
 func (hc *HotstuffCollector) HotStuffWaitDuration(duration time.Duration, event string) {
-	hc.waitDuration.WithLabelValues(event).Observe(duration.Seconds())
-
-	// We count the number of wall-clock ticks in units of centi-seconds, i.e. in units of 1/100 seconds
-	hc.waitDurationCsCounter.WithLabelValues(event).Add(float64(duration.Milliseconds()) * 0.1)
+	d := duration.Seconds() // duration in seconds with resolution as much as float64
+	hc.waitDuration.WithLabelValues(event).Observe(d)
+	hc.waitDurationCsCounter.WithLabelValues(event).Add(d) // we count the number of wall-clock time [unit: seconds]
 }
 
 // HotstuffCollector reports Metrics C8: Current View
@@ -222,28 +219,28 @@ func (hc *HotstuffCollector) SetTimeout(duration time.Duration) {
 // spends in the hotstuff.Committee component, i.e. the time determining consensus
 // committee relations.
 func (hc *HotstuffCollector) CommitteeProcessingDuration(duration time.Duration) {
-	// We count the number of wall-clock ticks in units of centi-seconds, i.e. in units of 1/100 seconds
-	hc.committeeComputationsCsCounter.Add(float64(duration.Milliseconds()) * 0.1)
+	// we count the number of wall-clock time [unit: seconds] with resolution as much as float64
+	hc.committeeComputationsCsCounter.Add(duration.Seconds())
 }
 
 // SignerProcessingDuration reports the time which the HotStuff's core logic
 // spends in the hotstuff.Signer component, i.e. the with crypto-related operations.
 func (hc *HotstuffCollector) SignerProcessingDuration(duration time.Duration) {
-	// We count the number of wall-clock ticks in units of centi-seconds, i.e. in units of 1/100 seconds
-	hc.signerComputationsCsCounter.Add(float64(duration.Milliseconds()) * 0.1)
+	// we count the number of wall-clock time [unit: seconds] with resolution as much as float64
+	hc.signerComputationsCsCounter.Add(duration.Seconds())
 }
 
 // ValidatorProcessingDuration reports the time which the HotStuff's core logic
 // spends in the hotstuff.Validator component, i.e. the with verifying higher-level
 // consensus messages.
 func (hc *HotstuffCollector) ValidatorProcessingDuration(duration time.Duration) {
-	// We count the number of wall-clock ticks in units of centi-seconds, i.e. in units of 1/100 seconds
-	hc.validatorComputationsCsCounter.Add(float64(duration.Milliseconds()) * 0.1)
+	// we count the number of wall-clock time [unit: seconds] with resolution as much as float64
+	hc.validatorComputationsCsCounter.Add(duration.Seconds())
 }
 
 // PayloadProductionDuration reports the time which the HotStuff's core logic
 // spends in the module.Builder component, i.e. the with generating block payloads
 func (hc *HotstuffCollector) PayloadProductionDuration(duration time.Duration) {
-	// We count the number of wall-clock ticks in units of centi-seconds, i.e. in units of 1/100 seconds
-	hc.payloadProductionCsCounter.Add(float64(duration.Milliseconds()) * 0.1)
+	// we count the number of wall-clock time [unit: seconds] with resolution as much as float64
+	hc.payloadProductionCsCounter.Add(duration.Seconds())
 }
