@@ -13,7 +13,7 @@ func Genesis(identities IdentityList) *Block {
 
 	// create the header
 	header := Header{
-		ChainID:     DefaultChainID,
+		ChainID:     GetChainID(),
 		ParentID:    ZeroID,
 		Height:      0,
 		PayloadHash: payload.Hash(),

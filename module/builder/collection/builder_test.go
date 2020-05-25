@@ -34,7 +34,7 @@ type BuilderSuite struct {
 	dbdir string
 
 	genesis *model.Block
-	chainID string
+	chainID flow.ChainID
 
 	headers  *storage.Headers
 	payloads *storage.ClusterPayloads

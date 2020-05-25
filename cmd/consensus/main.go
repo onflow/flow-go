@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	protocolRecovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
@@ -40,15 +41,19 @@ import (
 func main() {
 
 	var (
-		guaranteeLimit  uint
-		resultLimit     uint
-		receiptLimit    uint
-		approvalLimit   uint
-		sealLimit       uint
-		minInterval     time.Duration
-		maxInterval     time.Duration
-		hotstuffTimeout time.Duration
-		blockRateDelay  time.Duration
+		guaranteeLimit                         uint
+		resultLimit                            uint
+		receiptLimit                           uint
+		approvalLimit                          uint
+		sealLimit                              uint
+		minInterval                            time.Duration
+		maxInterval                            time.Duration
+		hotstuffTimeout                        time.Duration
+		hotstuffMinTimeout                     time.Duration
+		hotstuffTimeoutIncreaseFactor          float64
+		hotstuffTimeoutDecreaseFactor          float64
+		hotstuffTimeoutVoteAggregationFraction float64
+		blockRateDelay                         time.Duration
 
 		err            error
 		privateDKGData *bootstrap.DKGParticipantPriv
@@ -72,12 +77,16 @@ func main() {
 			flags.UintVar(&approvalLimit, "approval-limit", 1000, "maximum number of result approvals in the memory pool")
 			flags.UintVar(&sealLimit, "seal-limit", 1000, "maximum number of block seals in the memory pool")
 			flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
-			flags.DurationVar(&maxInterval, "max-interval", 60*time.Second, "the maximum amount of time between two blocks")
-			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 2*time.Second, "the initial timeout for the hotstuff pacemaker")
+			flags.DurationVar(&maxInterval, "max-interval", 90*time.Second, "the maximum amount of time between two blocks")
+			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second, "the initial timeout for the hotstuff pacemaker")
+			flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond, "the lower timeout bound for the hotstuff pacemaker")
+			flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor", timeout.DefaultConfig.TimeoutIncrease, "multiplicative increase of timeout value in case of time out event")
+			flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor", timeout.DefaultConfig.TimeoutDecrease, "multiplicative decrease of timeout value in case of progress")
+			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", 0.6, "additional fraction of replica timeout that the primary will wait for votes")
 			// From the experiment,
 			// if block rate delay is 1 second, then 0.8 block will be finalized per second in average.
-			// if block rate delay is 1.5 second, then 0.5 block will be finalized per second in averge
-			flags.DurationVar(&blockRateDelay, "block-rate-delay", time.Second, "the delay to broadcast block proposal in order to control block production rate")
+			// if block rate delay is 1.5 second, then 0.5 block will be finalized per second in average
+			flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
 		}).
 		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
 			privateDKGData, err = loadDKGPrivateData(node.BaseConfig.BootstrapDir, node.NodeID)
@@ -108,7 +117,7 @@ func main() {
 			return nil
 		}).
 		Module("hotstuff main metrics", func(node *cmd.FlowNodeBuilder) error {
-			mainMetrics = metrics.NewHotstuffCollector(flow.DefaultChainID)
+			mainMetrics = metrics.NewHotstuffCollector(flow.GetChainID())
 			return nil
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -170,7 +179,8 @@ func main() {
 			// TODO: we should probably find a way to initialize mutually dependent engines separately
 
 			// initialize the entity database accessors
-			cleaner := bstorage.NewCleaner(node.Logger, node.DB)
+			// TODO frequency of 0 turns off the cleaner, turn back on once we know the proper tuning
+			cleaner := bstorage.NewCleaner(node.Logger, node.DB, 0)
 
 			// initialize the pending blocks cache
 			proposals := buffer.NewPendingBlocks()
@@ -290,7 +300,11 @@ func main() {
 				node.GenesisQC,
 				finalized,
 				pending,
-				consensus.WithTimeout(hotstuffTimeout),
+				consensus.WithInitialTimeout(hotstuffTimeout),
+				consensus.WithMinTimeout(hotstuffMinTimeout),
+				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
+				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
+				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
 				consensus.WithBlockRateDelay(blockRateDelay),
 			)
 			if err != nil {

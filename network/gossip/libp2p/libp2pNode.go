@@ -61,7 +61,7 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 
 	p.name = n.Name
 	p.logger = logger
-	addr := multiaddressStr(n)
+	addr := MultiaddressStr(n)
 	sourceMultiAddr, err := multiaddr.NewMultiaddr(addr)
 	if err != nil {
 		return err
@@ -258,7 +258,7 @@ func (p *P2PNode) tryCreateNewStream(ctx context.Context, n NodeAddress, targetI
 
 // GetPeerInfo generates the libp2p peer.AddrInfo for a Node/Peer given its node address
 func GetPeerInfo(p NodeAddress) (peer.AddrInfo, error) {
-	addr := multiaddressStr(p)
+	addr := MultiaddressStr(p)
 	maddr, err := multiaddr.NewMultiaddr(addr)
 	if err != nil {
 		return peer.AddrInfo{}, err
@@ -358,12 +358,12 @@ func (p *P2PNode) Publish(ctx context.Context, topic string, data []byte) error 
 	return nil
 }
 
-// multiaddressStr receives a node address and returns
+// MultiaddressStr receives a node address and returns
 // its corresponding Libp2p Multiaddress in string format
 // in current implementation IP part of the node address is
 // either an IP or a dns4
 // https://docs.libp2p.io/concepts/addressing/
-func multiaddressStr(address NodeAddress) string {
+func MultiaddressStr(address NodeAddress) string {
 	parsedIP := net.ParseIP(address.IP)
 	if parsedIP != nil {
 		// returns parsed ip version of the multi-address

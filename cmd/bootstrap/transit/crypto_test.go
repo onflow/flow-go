@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 )
 
@@ -55,4 +57,20 @@ func TestEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error unwrapping response: %s", err)
 	}
+}
+
+func TestMd5(t *testing.T) {
+	tmpFile, err := ioutil.TempFile(os.TempDir(), "prefix-")
+	assert.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
+
+	text := []byte("write some text to file")
+	_, err = tmpFile.Write(text)
+	assert.NoError(t, err)
+
+	assert.NoError(t, tmpFile.Close())
+
+	md5, err := getFileMd5(tmpFile.Name())
+	assert.NoError(t, err)
+	assert.Equal(t, "1b8e86521e7e04d647faa9e6192a65f5", md5)
 }

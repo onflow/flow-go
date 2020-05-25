@@ -7,13 +7,14 @@ import (
 	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/fingerprint"
 )
 
 // Header contains all meta-data for a block, as well as a hash representing
 // the combined payload of the entire block. It is what consensus nodes agree
 // on after validating the contents against the payload hash.
 type Header struct {
-	ChainID        string     // ChainID is a chain-specific value to prevent replay attacks.
+	ChainID        ChainID    // ChainID is a chain-specific value to prevent replay attacks.
 	ParentID       Identifier // ParentID is the ID of this block's parent.
 	Height         uint64
 	PayloadHash    Identifier       // PayloadHash is a hash of the payload of this block.
@@ -28,11 +29,11 @@ type Header struct {
 // Body returns the immutable part of the block header.
 func (h Header) Body() interface{} {
 	return struct {
-		ChainID        string
+		ChainID        ChainID
 		ParentID       Identifier
 		Height         uint64
 		PayloadHash    Identifier
-		Timestamp      time.Time
+		Timestamp      uint64
 		View           uint64
 		ParentVoterIDs []Identifier
 		ParentVoterSig crypto.Signature
@@ -42,12 +43,16 @@ func (h Header) Body() interface{} {
 		ParentID:       h.ParentID,
 		Height:         h.Height,
 		PayloadHash:    h.PayloadHash,
-		Timestamp:      h.Timestamp,
+		Timestamp:      uint64(h.Timestamp.UnixNano()),
 		View:           h.View,
 		ParentVoterIDs: h.ParentVoterIDs,
 		ParentVoterSig: h.ParentVoterSig,
 		ProposerID:     h.ProposerID,
 	}
+}
+
+func (h Header) Fingerprint() []byte {
+	return fingerprint.Fingerprint(h.Body())
 }
 
 // ID returns a unique ID to singularly identify the header and its block
@@ -58,7 +63,7 @@ func (h Header) ID() Identifier {
 	if h.Timestamp.Location() != time.UTC {
 		h.Timestamp = h.Timestamp.UTC()
 	}
-	return MakeID(h.Body())
+	return MakeID(h)
 }
 
 // Checksum returns the checksum of the header.
