@@ -373,10 +373,16 @@ func (suite *LightIngestTestSuite) TestIngestedChunk() {
 
 	chunkDataPackResponse := &messages.ChunkDataResponse{
 		ChunkDataPack: *suite.chunkDataPack,
+		Collection:    *suite.collection,
 		Nonce:         rand.Uint64(),
 	}
-	// mocks this chunk id
+	// mocks that the chunk and collection are ingested
 	suite.ingestedChunkIDs.On("Has", suite.chunkDataPack.ChunkID).Return(true)
+	// mocks this chunk id
+	suite.ingestedCollectionIDs.On("Has", suite.collection.ID()).Return(true)
+
+	// mocks that engine does not have any receipt to process
+	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{})
 
 	// nothing else is mocked, hence the process should simply return nil
 	err := eng.Process(unittest.IdentifierFixture(), chunkDataPackResponse)
@@ -600,6 +606,7 @@ func (suite *LightIngestTestSuite) TestChunkDataPackTracker_HappyPath() {
 
 	chunkDataPackResponse := &messages.ChunkDataResponse{
 		ChunkDataPack: *suite.chunkDataPack,
+		Collection:    *suite.collection,
 		Nonce:         rand.Uint64(),
 	}
 
@@ -609,8 +616,15 @@ func (suite *LightIngestTestSuite) TestChunkDataPackTracker_HappyPath() {
 	suite.chunkDataPacks.On("Add", suite.chunkDataPack).Return(true).Once()
 	suite.chunkDataPackTrackers.On("Rem", suite.chunkDataPack.ChunkID).Return(true).Once()
 
-	// engine has not yet ingested this chunk
+	// engine should not already have the collection
+	suite.collections.On("Has", suite.collection.ID()).Return(false)
+	// collection should be successfully added to mempool
+	suite.collections.On("Add", suite.collection).Return(true).Once()
+
+	// engine has not yet ingested the chunk in the chunk data pack response
 	suite.ingestedChunkIDs.On("Has", suite.chunkDataPack.ChunkID).Return(false).Once()
+	// engine has not yet ingested the collection in the chunk data pack response
+	suite.ingestedCollectionIDs.On("Has", suite.collection.ID()).Return(false).Once()
 
 	// engine does not have any receipt
 	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{})
@@ -621,5 +635,6 @@ func (suite *LightIngestTestSuite) TestChunkDataPackTracker_HappyPath() {
 	suite.Assert().Nil(err)
 	suite.chunkDataPackTrackers.AssertExpectations(suite.T())
 	suite.chunkDataPacks.AssertExpectations(suite.T())
+	suite.collections.AssertExpectations(suite.T())
 	suite.ingestedChunkIDs.AssertExpectations(suite.T())
 }
