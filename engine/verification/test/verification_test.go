@@ -3,6 +3,7 @@ package test
 import (
 	"fmt"
 	"math/rand"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -76,6 +77,10 @@ func TestHappyPath(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
+		// skips tests of original ingest over CI
+		if !tc.lightIngest && os.Getenv("FLOWLOCAL") != "TRUE" {
+			continue
+		}
 		t.Run(fmt.Sprintf("%d-verification node %d-chunk number %t-light ingest", tc.verNodeCount, tc.chunkCount, tc.lightIngest), func(t *testing.T) {
 			mu.Lock()
 			defer mu.Unlock()
