@@ -1,6 +1,7 @@
 package virtualmachine
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	"github.com/onflow/cadence"
@@ -536,45 +537,87 @@ func hasSufficientKeyWeight(weights map[flow.Address]int, address flow.Address) 
 }
 
 var InitDefaultTokenTransaction = []byte(fmt.Sprintf(`
-	import FlowServiceAccount from 0x%s
+    import FlowServiceAccount from 0x%s
 
-	transaction {
-		prepare(acct: AuthAccount) {
-			FlowServiceAccount.initDefaultToken(acct)
-		}
-	}
+    transaction {
+        prepare(acct: AuthAccount) {
+            FlowServiceAccount.initDefaultToken(acct)
+        }
+    }
 `, flow.RootAddress))
 
 func DefaultTokenBalanceScript(addr flow.Address) []byte {
 	return []byte(fmt.Sprintf(`
-		import ServiceAccount from 0x%s
-	
-		pub fun main(): UFix64 {
-			let acct = getAccount(0x%s)
-			return ServiceAccount.defaultTokenBalance(acct)
-		}
-	`, flow.RootAddress, addr))
+        import FlowServiceAccount from 0x%s
+    
+        pub fun main(): UFix64 {
+            let acct = getAccount(0x%s)
+            return FlowServiceAccount.defaultTokenBalance(acct)
+        }
+    `, flow.RootAddress, addr))
 }
 
 var DeductAccountCreationFeeTransaction = []byte(fmt.Sprintf(`
-	import ServiceAccount from 0x%s
+    import FlowServiceAccount from 0x%s
 
-	transaction {
-		prepare(acct: AuthAccount) {
-			ServiceAccount.deductAccountCreationFee(acct)
-		}
-	}
+    transaction {
+        prepare(acct: AuthAccount) {
+            FlowServiceAccount.deductAccountCreationFee(acct)
+        }
+    }
 `, flow.RootAddress))
 
 var DeductTransactionFeeScript = []byte(fmt.Sprintf(`
-	import ServiceAccount from 0x%s
+    import FlowServiceAccount from 0x%s
 
-	transaction {
-		prepare(acct: AuthAccount) {
-			ServiceAccount.deductTransactionFee(acct)
-		}
-	}
+    transaction {
+        prepare(acct: AuthAccount) {
+            FlowServiceAccount.deductTransactionFee(acct)
+        }
+    }
 `, flow.RootAddress))
+
+func DeployDefaultTokenTransaction(contract []byte) []byte {
+	return []byte(fmt.Sprintf(`
+        transaction {
+          prepare(flowTokenAcct: AuthAccount, serviceAcct: AuthAccount) {
+            let adminAcct = serviceAcct
+            flowTokenAcct.setCode("%s".decodeHex(), adminAcct)
+          }
+        }
+    `, hex.EncodeToString(contract)))
+}
+
+var MintDefaultTokenTransaction = []byte(fmt.Sprintf(`
+    import FungibleToken from 0x%s
+    import FlowToken from 0x%s
+
+    transaction(amount: UFix64) {
+
+      let tokenAdmin: &FlowToken.Administrator
+      let tokenReceiver: &FlowToken.Vault{FungibleToken.Receiver}
+
+      prepare(signer: AuthAccount) {
+        self.tokenAdmin = signer.
+          borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin) 
+          ?? panic("Signer is not the token admin")
+
+        self.tokenReceiver = signer
+          .getCapability(/public/flowTokenReceiver)!
+          .borrow<&FlowToken.Vault{FungibleToken.Receiver}>()
+          ?? panic("Unable to borrow receiver reference for recipient")
+      }
+
+      execute {
+        let minter <- self.tokenAdmin.createNewMinter(allowedAmount: amount)
+        let mintedVault <- minter.mintTokens(amount: amount)
+
+        self.tokenReceiver.deposit(from: <-mintedVault)
+    
+        destroy minter
+      }
+    }
+`, FungibleTokenAddress, FlowTokenAddress))
 
 // TODO: assign these values after bootstrapping
 var FungibleTokenAddress = flow.HexToAddress("02")
