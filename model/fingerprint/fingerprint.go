@@ -1,8 +1,6 @@
 package fingerprint
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/flow-go/model/encoding/rlp"
 )
 
@@ -21,12 +19,8 @@ type Fingerprinter interface {
 // fields not needed in the pre-image of the hash that comprises the Identifier, which could be different from the
 // encoding for sending entities in messages or for storing them.
 func Fingerprint(entity interface{}) []byte {
-
 	if fingerprinter, ok := entity.(Fingerprinter); ok {
-		fmt.Printf("entity has Fingerprint(): %#v\n", entity)
 		return fingerprinter.Fingerprint()
 	}
-	fmt.Printf("entity has not Fingerprint(): %#v\n", entity)
-
 	return rlp.NewEncoder().MustEncode(entity)
 }
