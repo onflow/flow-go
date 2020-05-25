@@ -1,6 +1,7 @@
 package virtualmachine_test
 
 import (
+	"crypto"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -12,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
@@ -206,6 +206,35 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 		assert.Nil(t, result.Error)
+
+		// Transfer account to new key
+		pk, err := execTestutil.GenerateAccountPrivateKey()
+		require.NoError(t, err)
+
+		tx = execTestutil.CreateAddAccountKeyTransaction(t, &pk)
+		tx.AddAuthorizer(flow.RootAddress)
+
+		err = execTestutil.SignTransactionByRoot(&tx, 1)
+		require.NoError(t, err)
+
+		result, err = bc.ExecuteTransaction(ledger, &tx)
+
+		assert.NoError(t, err)
+		assert.True(t, result.Succeeded())
+		assert.Nil(t, result.Error)
+
+		tx = execTestutil.CreateRemoveAccountKeyTransaction(t, 0)
+		tx.AddAuthorizer(flow.RootAddress)
+
+		err = execTestutil.SignTransactionByRoot(&tx, 2)
+		require.NoError(t, err)
+
+		result, err = bc.ExecuteTransaction(ledger, &tx)
+
+		assert.NoError(t, err)
+		assert.True(t, result.Succeeded())
+		assert.Nil(t, result.Error)
+
 	})
 
 	t.Run("account creation with code fails as not root", func(t *testing.T) {
@@ -688,7 +717,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		// read the address of the account created (e.g. "0x01" and convert it to flow.address)
 		address := flow.BytesToAddress(result.Events[0].Fields[0].(cadence.Address).Bytes())
 
-		return address, key.PublicKey()
+		return address, key.PublicKey(1000).PublicKey
 	}
 
 	// create a bunch of accounts

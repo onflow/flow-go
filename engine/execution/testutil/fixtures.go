@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
@@ -84,33 +83,37 @@ func SignTransactionByRoot(tx *flow.TransactionBody, seqNum uint64) error {
 	return SignTransaction(tx, flow.ServiceAddress(), unittest.ServiceAccountPrivateKey, seqNum)
 }
 
-// Generate a number of private keys
-func GenerateAccountPrivateKeys(numKeys int) ([]flow.AccountPrivateKey, error) {
+// GenerateAccountPrivateKeys generates a number of private keys.
+func GenerateAccountPrivateKeys(numberOfPrivateKeys int) ([]flow.AccountPrivateKey, error) {
 	var privateKeys []flow.AccountPrivateKey
-
-	for i := 0; i < numKeys; i++ {
-		seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
-
-		_, err := rand.Read(seed)
+	for i := 0; i < numberOfPrivateKeys; i++ {
+		pk, err := GenerateAccountPrivateKey()
 		if err != nil {
 			return nil, err
 		}
-
-		privateKey, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
-		if err != nil {
-			return nil, err
-		}
-
-		flowPrivateKey := flow.AccountPrivateKey{
-			PrivateKey: privateKey,
-			SignAlgo:   crypto.ECDSAP256,
-			HashAlgo:   hash.SHA2_256,
-		}
-
-		privateKeys = append(privateKeys, flowPrivateKey)
+		privateKeys = append(privateKeys, pk)
 	}
 
 	return privateKeys, nil
+}
+
+// GenerateAccountPrivateKey generates a private key.
+func GenerateAccountPrivateKey() (flow.AccountPrivateKey, error) {
+	seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
+	_, err := rand.Read(seed)
+	if err != nil {
+		return flow.AccountPrivateKey{}, err
+	}
+	privateKey, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
+	if err != nil {
+		return flow.AccountPrivateKey{}, err
+	}
+	pk := flow.AccountPrivateKey{
+		PrivateKey: privateKey,
+		SignAlgo:   crypto.ECDSAP256,
+		HashAlgo:   hash.SHA2_256,
+	}
+	return pk, nil
 }
 
 // CreateAccounts inserts accounts into the ledger using the provided private keys.
@@ -190,24 +193,12 @@ func CreateCreateAccountTransaction(
 	t *testing.T,
 	code []byte,
 	authorizers []flow.Address,
-) (crypto.PrivateKey, *flow.TransactionBody) {
-	// create a random seed for the key
-	seed := make([]byte, 48)
-	_, err := rand.Read(seed)
-	require.Nil(t, err)
+) (flow.AccountPrivateKey, *flow.TransactionBody) {
+	accountKey, err := GenerateAccountPrivateKey()
+	require.NoError(t, err)
 
-	// generate a unique key
-	key, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
-	assert.NoError(t, err)
-
-	// get the key bytes
-	accountKey := flow.AccountPublicKey{
-		PublicKey: key.PublicKey(),
-		SignAlgo:  key.Algorithm(),
-		HashAlgo:  hash.SHA3_256,
-	}
-	keyBytes, err := flow.EncodeRuntimeAccountPublicKey(accountKey)
-	assert.NoError(t, err)
+	keyBytes, err := flow.EncodeRuntimeAccountPublicKey(accountKey.PublicKey(1000))
+	require.NoError(t, err)
 
 	// encode the bytes to cadence string
 	encodedKey := languageEncodeBytesArray(keyBytes)
@@ -235,7 +226,50 @@ func CreateCreateAccountTransaction(
 		Authorizers: authorizers,
 	}
 
-	return key, &tx
+	return accountKey, &tx
+}
+
+// CreateAddAccountKeyTransaction generates a tx that adds a key to an account.
+func CreateAddAccountKeyTransaction(t *testing.T, accountKey *flow.AccountPrivateKey) flow.TransactionBody {
+	keyBytes, err := flow.EncodeRuntimeAccountPublicKey(accountKey.PublicKey(1000))
+	require.NoError(t, err)
+
+	// encode the bytes to cadence string
+	encodedKey := languageEncodeBytes(keyBytes)
+
+	script := fmt.Sprintf(`
+        transaction {
+          prepare(signer: AuthAccount) {
+            signer.addPublicKey(%s)
+          }
+        }
+   	`, encodedKey)
+
+	return flow.TransactionBody{
+		Script: []byte(script),
+	}
+}
+
+// CreateRemoveAccountKeyTransaction generates a tx that removes a key from an account.
+func CreateRemoveAccountKeyTransaction(t *testing.T, index int) flow.TransactionBody {
+	script := fmt.Sprintf(`
+		transaction {
+		  prepare(signer: AuthAccount) {
+	    	signer.removePublicKey(%d)
+		  }
+		}
+	`, index)
+
+	return flow.TransactionBody{
+		Script: []byte(script),
+	}
+}
+
+func languageEncodeBytes(b []byte) string {
+	if len(b) == 0 {
+		return "[]"
+	}
+	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
 }
 
 func languageEncodeBytesArray(b []byte) string {
