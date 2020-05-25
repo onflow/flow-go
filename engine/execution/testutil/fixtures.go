@@ -5,6 +5,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -62,6 +67,21 @@ func SignEnvelope(tx *flow.TransactionBody, account flow.Address, privateKey flo
 	}
 
 	return nil
+}
+
+func SignTransaction(
+	tx *flow.TransactionBody,
+	address flow.Address,
+	privateKey flow.AccountPrivateKey,
+	seqNum uint64,
+) error {
+	tx.SetProposalKey(address, 0, seqNum)
+	tx.SetPayer(address)
+	return SignEnvelope(tx, address, privateKey)
+}
+
+func SignTransactionByRoot(tx *flow.TransactionBody, seqNum uint64) error {
+	return SignTransaction(tx, flow.ServiceAddress(), unittest.ServiceAccountPrivateKey, seqNum)
 }
 
 // Generate a number of private keys
@@ -149,12 +169,6 @@ func CreateAccounts(
 	return accounts, nil
 }
 
-func SignTransactionByRoot(tx *flow.TransactionBody, seqNum uint64) error {
-	tx.SetProposalKey(flow.ServiceAddress(), 0, seqNum)
-	tx.SetPayer(flow.ServiceAddress())
-	return SignEnvelope(tx, flow.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-}
-
 func RootBootstrappedLedger() virtualmachine.Ledger {
 	ledger := make(virtualmachine.MapLedger)
 	bootstrap.BootstrapView(ledger, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply)
@@ -168,4 +182,65 @@ func bytesToCadenceArray(l []byte) cadence.Array {
 	}
 
 	return cadence.NewArray(values)
+}
+
+// CreateCreateAccountTransaction creates a transaction which will create a new account and returns the randomly
+// generated private key and the transaction
+func CreateCreateAccountTransaction(
+	t *testing.T,
+	code []byte,
+	authorizers []flow.Address,
+) (crypto.PrivateKey, *flow.TransactionBody) {
+	// create a random seed for the key
+	seed := make([]byte, 48)
+	_, err := rand.Read(seed)
+	require.Nil(t, err)
+
+	// generate a unique key
+	key, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
+	assert.NoError(t, err)
+
+	// get the key bytes
+	accountKey := flow.AccountPublicKey{
+		PublicKey: key.PublicKey(),
+		SignAlgo:  key.Algorithm(),
+		HashAlgo:  hash.SHA3_256,
+	}
+	keyBytes, err := flow.EncodeRuntimeAccountPublicKey(accountKey)
+	assert.NoError(t, err)
+
+	// encode the bytes to cadence string
+	encodedKey := languageEncodeBytesArray(keyBytes)
+
+	prepare := "prepare("
+	for i := range authorizers {
+		prepare += fmt.Sprintf("signer%v: AuthAccount", i)
+	}
+	prepare += ") { }"
+
+	// define the cadence script
+	script := fmt.Sprintf(`
+			transaction {
+			  %s
+			  execute {
+			    AuthAccount(publicKeys: %s, code: "%s".decodeHex())
+			  }
+			}
+		`,
+		prepare, encodedKey, hex.EncodeToString(code))
+
+	// create the transaction to create the account
+	tx := flow.TransactionBody{
+		Script:      []byte(script),
+		Authorizers: authorizers,
+	}
+
+	return key, &tx
+}
+
+func languageEncodeBytesArray(b []byte) string {
+	if len(b) == 0 {
+		return "[]"
+	}
+	return strings.Join(strings.Fields(fmt.Sprintf("%d", [][]byte{b})), ",")
 }

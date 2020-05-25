@@ -1,7 +1,6 @@
 package virtualmachine_test
 
 import (
-	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -135,6 +134,108 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		require.Len(t, result.Events, 1)
 		assert.EqualValues(t, "flow.AccountCreated", result.Events[0].EventType.ID())
+	})
+}
+
+func TestBlockContext_DeployContract(t *testing.T) {
+	// seed the RNG
+	rand.Seed(time.Now().UnixNano())
+	rt := runtime.NewInterpreterRuntime()
+
+	h := unittest.BlockHeaderFixture()
+
+	vm, err := virtualmachine.New(rt)
+	require.NoError(t, err)
+	bc := vm.NewBlockContext(&h)
+
+	t.Run("account update with set code succeeds as service account", func(t *testing.T) {
+		ledger := execTestutil.RootBootstrappedLedger()
+
+		tx := execTestutil.DeployCounterContractTransaction(flow.ServiceAddress())
+
+		err := execTestutil.SignTransactionByRoot(tx, 0)
+		require.NoError(t, err)
+
+		result, err := bc.ExecuteTransaction(ledger, tx)
+		assert.NoError(t, err)
+
+		assert.True(t, result.Succeeded())
+		assert.Nil(t, result.Error)
+	})
+
+	t.Run("account update with set code fails as not root", func(t *testing.T) {
+		// Create an account private key.
+		privateKeys, err := execTestutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		ledger := execTestutil.RootBootstrappedLedger()
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := execTestutil.CreateAccounts(vm, ledger, privateKeys)
+		require.NoError(t, err)
+
+		tx := execTestutil.DeployCounterContractTransaction(accounts[1])
+
+		err = execTestutil.SignTransaction(tx, accounts[1], privateKeys[0], 0)
+		require.NoError(t, err)
+
+		result, err := bc.ExecuteTransaction(ledger, tx)
+
+		assert.NoError(t, err)
+		assert.False(t, result.Succeeded())
+		assert.NotNil(t, result.Error)
+		assert.Equal(t, "code execution failed: Execution failed:\ncode can only be created and updated if account 0 has signed the transaction\n", result.Error.ErrorMessage())
+		assert.Equal(t, uint32(9), result.Error.StatusCode())
+	})
+
+	t.Run("account creation with code succeeds as service account", func(t *testing.T) {
+		// Get transaction that will create an account with code, add root as the authorizer
+		_, tx := execTestutil.CreateCreateAccountTransaction(
+			t,
+			[]byte(execTestutil.CounterContract),
+			[]flow.Address{flow.ServiceAddress()},
+		)
+
+		err := execTestutil.SignTransactionByRoot(tx, 0)
+		require.NoError(t, err)
+
+		ledger := execTestutil.RootBootstrappedLedger()
+
+		result, err := bc.ExecuteTransaction(ledger, tx)
+
+		assert.NoError(t, err)
+		assert.True(t, result.Succeeded())
+		assert.Nil(t, result.Error)
+	})
+
+	t.Run("account creation with code fails as not root", func(t *testing.T) {
+		// Create an account private key.
+		privateKeys, err := execTestutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		ledger := execTestutil.RootBootstrappedLedger()
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := execTestutil.CreateAccounts(vm, ledger, privateKeys)
+		require.NoError(t, err)
+
+		// Get transaction that will create an account with code, add the account we just created as the authorizer
+		_, tx := execTestutil.CreateCreateAccountTransaction(
+			t,
+			[]byte(execTestutil.CounterContract),
+			[]flow.Address{accounts[1]},
+		)
+
+		err = execTestutil.SignTransaction(tx, accounts[1], privateKeys[0], 0)
+		require.NoError(t, err)
+
+		result, err := bc.ExecuteTransaction(ledger, tx)
+
+		assert.NoError(t, err)
+		assert.False(t, result.Succeeded())
+		assert.NotNil(t, result.Error)
+		assert.Equal(t, "code execution failed: Execution failed:\ncode can only be created and updated if account 0 has signed the transaction\n", result.Error.ErrorMessage())
+		assert.Equal(t, uint32(9), result.Error.StatusCode())
 	})
 }
 
@@ -552,48 +653,17 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	require.NoError(t, err)
 	bc := vm.NewBlockContext(&h)
 
-	sequenceNumber := 0
+	sequenceNumber := uint64(0)
 
 	ledger := execTestutil.RootBootstrappedLedger()
 
 	ledgerAccess := virtualmachine.NewLedgerDAL(ledger)
 
 	createAccount := func() (flow.Address, crypto.PublicKey) {
+		key, tx := execTestutil.CreateCreateAccountTransaction(t, nil, nil)
 
-		// create a random seed for the key
-		seed := make([]byte, 48)
-		_, err := rand.Read(seed)
-		require.Nil(t, err)
-
-		// generate a unique key
-		key, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
-		assert.NoError(t, err)
-
-		// get the key bytes
-		accountKey := flow.AccountPublicKey{
-			PublicKey: key.PublicKey(),
-			SignAlgo:  key.Algorithm(),
-			HashAlgo:  hash.SHA3_256,
-		}
-		keyBytes, err := flow.EncodeRuntimeAccountPublicKey(accountKey)
-		assert.NoError(t, err)
-
-		// define the cadence script
-		script := fmt.Sprintf(`
-			transaction {
-			  prepare(signer: AuthAccount) {
-				let acct = AuthAccount(payer: signer)
-				acct.addPublicKey("%s".decodeHex())
-			  }
-			}
-		`, hex.EncodeToString(keyBytes))
-
-		// create the transaction to create the account
-		tx := flow.NewTransactionBody().
-			SetScript([]byte(script)).
-			SetPayer(flow.ServiceAddress()).
-			SetProposalKey(flow.ServiceAddress(), 0, uint64(sequenceNumber)).
-			AddAuthorizer(flow.ServiceAddress())
+		err := execTestutil.SignTransactionByRoot(tx, sequenceNumber)
+		require.NoError(t, err)
 
 		sequenceNumber++
 

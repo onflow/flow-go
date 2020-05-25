@@ -1,6 +1,7 @@
 package virtualmachine
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 
@@ -268,6 +269,18 @@ func (r *TransactionContext) CheckCode(address runtime.Address, code []byte) (er
 func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []byte, checkPermission bool) (err error) {
 	accountAddress := address.Bytes()
 
+	key := fullKeyHash(string(accountAddress), string(accountAddress), keyCode)
+
+	prevCode, err := r.ledger.Get(key)
+	if err != nil {
+		return fmt.Errorf("cannot retreive previous code: %w", err)
+	}
+
+	// skip checks and updating if the new code equals the old
+	if bytes.Equal(prevCode, code) {
+		return nil
+	}
+
 	// currently, every transaction that sets account code (deploys/updates contracts)
 	// must be signed by the service account
 	if !r.isValidSigningAccount(runtime.Address(flow.ServiceAddress())) {
@@ -279,7 +292,7 @@ func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []b
 		return err
 	}
 
-	r.ledger.Set(fullKeyHash(string(accountAddress), string(accountAddress), keyCode), code)
+	r.ledger.Set(key, code)
 
 	return nil
 }
