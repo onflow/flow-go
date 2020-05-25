@@ -46,7 +46,7 @@ func TestInvalidTransaction(t *testing.T) {
 
 	t.Run("gas limit exceeds the maximum allowed", func(t *testing.T) {
 		tx := unittest.TransactionBodyFixture()
-		tx.GasLimit = flow.DefaultGasLimit + 1
+		tx.GasLimit = flow.DefaultMaxGasLimit + 1
 
 		err := node.IngestionEngine.ProcessLocal(&tx)
 		if assert.Error(t, err) {

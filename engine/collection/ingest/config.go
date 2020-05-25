@@ -20,7 +20,7 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		ExpiryBuffer:          30,
-		MaxGasLimit:           flow.DefaultGasLimit,
+		MaxGasLimit:           flow.DefaultMaxGasLimit,
 		AllowUnknownReference: false,
 		CheckScriptsParse:     true,
 	}
