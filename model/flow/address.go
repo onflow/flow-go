@@ -7,8 +7,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
-
-	"github.com/onflow/flow-go-sdk"
 )
 
 // Address represents the 8 byte address of an account.

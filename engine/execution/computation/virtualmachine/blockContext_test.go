@@ -446,10 +446,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	// create a bunch of accounts
 	accounts := make(map[flow.Address]crypto.PublicKey, count)
-	state := flow.ServiceAddressState
 	for i := 0; i < count; i++ {
-		// increment the adddressing state
-		_, state, err = flow.AccountAddress(state)
 		require.NoError(t, err)
 		address, key := createAccount()
 		accounts[address] = key
@@ -469,7 +466,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	// non-happy path - get an account that was never created
 	t.Run("get a non-existing account", func(t *testing.T) {
-		address, _, err := flow.AccountAddress(state)
+		address, _, err := flow.AccountAddress(flow.AddressState(42))
 		require.NoError(t, err)
 		account := ledgerAccess.GetAccount(address)
 		assert.Nil(t, account)

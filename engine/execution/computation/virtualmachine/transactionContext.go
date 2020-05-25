@@ -581,5 +581,5 @@ var DeductTransactionFeeScript = []byte(fmt.Sprintf(`
 `, flow.ServiceAddress()))
 
 // TODO: assign these values after bootstrapping
-var FungibleTokenAddress = flow.HexToAddress("02")
-var FlowTokenAddress = flow.HexToAddress("03")
+var FungibleTokenAddress, _, _ = flow.AccountAddress(flow.AddressState(1))
+var FlowTokenAddress, _, _ = flow.AccountAddress(flow.AddressState(2))

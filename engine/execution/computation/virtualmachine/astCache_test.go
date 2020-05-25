@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
+	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/hash"
@@ -127,8 +128,10 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 	// Run the Use import (FT Vault resource) transaction
 	result, err := bc.ExecuteTransaction(ledger, &useImportTx)
 	require.NoError(t, err)
-	require.True(t, result.Succeeded())
-	require.Nil(t, result.Error)
+
+	if !assert.Nil(t, result.Error) {
+		t.Error(result.Error.ErrorMessage())
+	}
 
 	// Determine location of transaction
 	txID := useImportTx.ID()
