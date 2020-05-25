@@ -230,7 +230,7 @@ func CreateCreateAccountTransaction(
 }
 
 // CreateAddAccountKeyTransaction generates a tx that adds a key to an account.
-func CreateAddAccountKeyTransaction(t *testing.T, accountKey *flow.AccountPrivateKey) flow.TransactionBody {
+func CreateAddAccountKeyTransaction(t *testing.T, accountKey *flow.AccountPrivateKey) *flow.TransactionBody {
 	keyBytes, err := flow.EncodeRuntimeAccountPublicKey(accountKey.PublicKey(1000))
 	require.NoError(t, err)
 
@@ -245,13 +245,13 @@ func CreateAddAccountKeyTransaction(t *testing.T, accountKey *flow.AccountPrivat
         }
    	`, encodedKey)
 
-	return flow.TransactionBody{
+	return &flow.TransactionBody{
 		Script: []byte(script),
 	}
 }
 
 // CreateRemoveAccountKeyTransaction generates a tx that removes a key from an account.
-func CreateRemoveAccountKeyTransaction(t *testing.T, index int) flow.TransactionBody {
+func CreateRemoveAccountKeyTransaction(index int) *flow.TransactionBody {
 	script := fmt.Sprintf(`
 		transaction {
 		  prepare(signer: AuthAccount) {
@@ -260,7 +260,7 @@ func CreateRemoveAccountKeyTransaction(t *testing.T, index int) flow.Transaction
 		}
 	`, index)
 
-	return flow.TransactionBody{
+	return &flow.TransactionBody{
 		Script: []byte(script),
 	}
 }

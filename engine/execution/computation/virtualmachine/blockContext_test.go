@@ -174,9 +174,9 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		accounts, err := execTestutil.CreateAccounts(vm, ledger, privateKeys)
 		require.NoError(t, err)
 
-		tx := execTestutil.DeployCounterContractTransaction(accounts[1])
+		tx := execTestutil.DeployCounterContractTransaction(accounts[0])
 
-		err = execTestutil.SignTransaction(tx, accounts[1], privateKeys[0], 0)
+		err = execTestutil.SignTransaction(tx, accounts[0], privateKeys[0], 0)
 		require.NoError(t, err)
 
 		result, err := bc.ExecuteTransaction(ledger, tx)
@@ -212,29 +212,28 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		tx = execTestutil.CreateAddAccountKeyTransaction(t, &pk)
-		tx.AddAuthorizer(flow.RootAddress)
+		tx.AddAuthorizer(flow.ServiceAddress())
 
-		err = execTestutil.SignTransactionByRoot(&tx, 1)
+		err = execTestutil.SignTransactionByRoot(tx, 1)
 		require.NoError(t, err)
 
-		result, err = bc.ExecuteTransaction(ledger, &tx)
+		result, err = bc.ExecuteTransaction(ledger, tx)
 
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 		assert.Nil(t, result.Error)
 
-		tx = execTestutil.CreateRemoveAccountKeyTransaction(t, 0)
-		tx.AddAuthorizer(flow.RootAddress)
+		tx = execTestutil.CreateRemoveAccountKeyTransaction(0)
+		tx.AddAuthorizer(flow.ServiceAddress())
 
-		err = execTestutil.SignTransactionByRoot(&tx, 2)
+		err = execTestutil.SignTransactionByRoot(tx, 2)
 		require.NoError(t, err)
 
-		result, err = bc.ExecuteTransaction(ledger, &tx)
+		result, err = bc.ExecuteTransaction(ledger, tx)
 
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 		assert.Nil(t, result.Error)
-
 	})
 
 	t.Run("account creation with code fails as not root", func(t *testing.T) {
@@ -249,13 +248,14 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		// Get transaction that will create an account with code, add the account we just created as the authorizer
+
 		_, tx := execTestutil.CreateCreateAccountTransaction(
 			t,
 			[]byte(execTestutil.CounterContract),
-			[]flow.Address{accounts[1]},
+			[]flow.Address{accounts[0]},
 		)
 
-		err = execTestutil.SignTransaction(tx, accounts[1], privateKeys[0], 0)
+		err = execTestutil.SignTransaction(tx, accounts[0], privateKeys[0], 0)
 		require.NoError(t, err)
 
 		result, err := bc.ExecuteTransaction(ledger, tx)
