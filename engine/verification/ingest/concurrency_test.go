@@ -44,78 +44,78 @@ func TestConcurrency(t *testing.T) {
 		chunksNum int // number of chunks in each execution receipt
 		lightIngest bool // indicates if light ingest engine should replace the original one
 	}{
-		//{
-		//	erCount:     1,
-		//	senderCount: 1,
-		//	chunksNum:   2,
-		//	lightIngest: true,
-		//},
+		{
+			erCount:     1,
+			senderCount: 1,
+			chunksNum:   2,
+			lightIngest: true,
+		},
 		{
 			erCount:     1,
 			senderCount: 5,
 			chunksNum:   2,
 			lightIngest: true,
 		},
-		//{
-		//	erCount:     5,
-		//	senderCount: 1,
-		//	chunksNum:   2,
-		//	lightIngest: true,
-		//},
-		//{
-		//	erCount:     5,
-		//	senderCount: 5,
-		//	chunksNum:   2,
-		//	lightIngest: true,
-		//},
-		//{
-		//	erCount:     1,
-		//	senderCount: 1,
-		//	chunksNum:   10, // choosing a higher number makes the test longer and longer timeout needed
-		//	lightIngest: true,
-		//},
-		//{
-		//	erCount:     2,
-		//	senderCount: 5,
-		//	chunksNum:   4,
-		//	lightIngest: true,
-		//},
-		//{
-		//	erCount:     1,
-		//	senderCount: 1,
-		//	chunksNum:   2,
-		//	lightIngest: true,
-		//},
-		//{
-		//	erCount:     1,
-		//	senderCount: 5,
-		//	chunksNum:   2,
-		//	lightIngest: false,
-		//},
-		//{
-		//	erCount:     5,
-		//	senderCount: 1,
-		//	chunksNum:   2,
-		//	lightIngest: false,
-		//},
-		//{
-		//	erCount:     5,
-		//	senderCount: 5,
-		//	chunksNum:   2,
-		//	lightIngest: false,
-		//},
-		//{
-		//	erCount:     1,
-		//	senderCount: 1,
-		//	chunksNum:   10, // choosing a higher number makes the test longer and longer timeout needed
-		//	lightIngest: false,
-		//},
-		//{
-		//	erCount:     2,
-		//	senderCount: 5,
-		//	chunksNum:   4,
-		//	lightIngest: false,
-		//},
+		{
+			erCount:     5,
+			senderCount: 1,
+			chunksNum:   2,
+			lightIngest: true,
+		},
+		{
+			erCount:     5,
+			senderCount: 5,
+			chunksNum:   2,
+			lightIngest: true,
+		},
+		{
+			erCount:     1,
+			senderCount: 1,
+			chunksNum:   10, // choosing a higher number makes the test longer and longer timeout needed
+			lightIngest: true,
+		},
+		{
+			erCount:     2,
+			senderCount: 5,
+			chunksNum:   4,
+			lightIngest: true,
+		},
+		{
+			erCount:     1,
+			senderCount: 1,
+			chunksNum:   2,
+			lightIngest: true,
+		},
+		{
+			erCount:     1,
+			senderCount: 5,
+			chunksNum:   2,
+			lightIngest: false,
+		},
+		{
+			erCount:     5,
+			senderCount: 1,
+			chunksNum:   2,
+			lightIngest: false,
+		},
+		{
+			erCount:     5,
+			senderCount: 5,
+			chunksNum:   2,
+			lightIngest: false,
+		},
+		{
+			erCount:     1,
+			senderCount: 1,
+			chunksNum:   10, // choosing a higher number makes the test longer and longer timeout needed
+			lightIngest: false,
+		},
+		{
+			erCount:     2,
+			senderCount: 5,
+			chunksNum:   4,
+			lightIngest: false,
+		},
 	}
 
 	for _, tc := range testcases {
@@ -206,13 +206,20 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, lightIng
 		<-verNode.IngestEngine.Ready()
 	}
 
-	collections := make([]*flow.Collection, 0)
-	for _, completeER := range ers {
-		collections = append(collections, completeER.Collections...)
-	}
+	// mocks a generic node depending on whether
+	var colNode mock.GenericNode
+	if !lightIngest {
+		// current version of original ingest engine queries the
+		// collections directly, however, the light ingest engine
+		// queries collections implicitly as part of chunk data pack
+		collections := make([]*flow.Collection, 0)
+		for _, completeER := range ers {
+			collections = append(collections, completeER.Collections...)
+		}
 
-	colNode := testutil.GenericNode(t, hub, colID, identities)
-	setupMockCollectionNode(t, colNode, verID.NodeID, collections)
+		colNode = testutil.GenericNode(t, hub, colID, identities)
+		setupMockCollectionNode(t, colNode, verID.NodeID, collections)
+	}
 
 	// mock the execution node with a generic node and mocked engine
 	// to handle requests for chunk state
@@ -321,9 +328,14 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, lightIng
 	}
 
 	exeNode.Done()
-	colNode.Done()
 	verNode.Done()
 
+	if !lightIngest {
+		// collection node is only involved in
+		// original ingest test, hence, it is terminated
+		// only at the end of ths
+		colNode.Done()
+	}
 	// to demarcate the logs
 	log.Debug().
 		Int("execution_receipt_count", erCount).
