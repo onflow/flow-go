@@ -48,6 +48,10 @@ func (nc *NoopCollector) SetQCView(view uint64)                                 
 func (nc *NoopCollector) CountSkipped()                                             {}
 func (nc *NoopCollector) CountTimeout()                                             {}
 func (nc *NoopCollector) SetTimeout(duration time.Duration)                         {}
+func (nc *NoopCollector) CommitteeProcessingDuration(duration time.Duration)        {}
+func (nc *NoopCollector) SignerProcessingDuration(duration time.Duration)           {}
+func (nc *NoopCollector) ValidatorProcessingDuration(duration time.Duration)        {}
+func (nc *NoopCollector) PayloadProductionDuration(duration time.Duration)          {}
 func (nc *NoopCollector) TransactionIngested(txID flow.Identifier)                  {}
 func (nc *NoopCollector) ClusterBlockProposed(*cluster.Block)                       {}
 func (nc *NoopCollector) ClusterBlockFinalized(*cluster.Block)                      {}
