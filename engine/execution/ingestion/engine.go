@@ -767,7 +767,7 @@ func (e *Engine) saveExecutionResults(
 		chunk := generateChunk(i, startState, endState)
 
 		// chunkDataPack
-		allRegisters := view.RegisterTouches()
+		allRegisters := view.AllRegisters()
 
 		values, proofs, err := e.execState.GetRegistersWithProofs(childCtx, chunk.StartState, allRegisters)
 		if err != nil {
