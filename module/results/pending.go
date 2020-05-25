@@ -11,6 +11,12 @@ type PendingResults struct {
 	byID map[flow.Identifier]*flow.PendingResult
 }
 
+func NewPendingResults() *PendingResults {
+	return &PendingResults{
+		byID: make(map[flow.Identifier]*flow.PendingResult),
+	}
+}
+
 func (b *PendingResults) Add(result *flow.PendingResult) bool {
 	b.Lock()
 	defer b.Unlock()
