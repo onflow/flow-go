@@ -58,6 +58,12 @@ func (nc *NoopCollector) StartBlockToSeal(blockID flow.Identifier)              
 func (nc *NoopCollector) FinishBlockToSeal(blockID flow.Identifier)                 {}
 func (nc *NoopCollector) OnChunkVerificationStarted(chunkID flow.Identifier)        {}
 func (nc *NoopCollector) OnChunkVerificationFinished(chunkID flow.Identifier)       {}
+func (nc *NoopCollector) OnAuthenticatedReceiptsUpdated(size uint)                  {}
+func (nc *NoopCollector) OnPendingReceiptsUpdated(size uint)                        {}
+func (nc *NoopCollector) OnAuthenticatedCollectionsUpdated(size uint)               {}
+func (nc *NoopCollector) OnChunkDataPacksUpdated(size uint)                         {}
+func (nc *NoopCollector) OnPendingCollectionsUpdated(size uint)                     {}
+func (nc *NoopCollector) OnChunkTrackersUpdated(size uint)                          {}
 func (nc *NoopCollector) OnResultApproval()                                         {}
 func (nc *NoopCollector) OnChunkDataAdded(chunkID flow.Identifier, size float64)    {}
 func (nc *NoopCollector) OnChunkDataRemoved(chunkID flow.Identifier, size float64)  {}
