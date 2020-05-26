@@ -271,10 +271,3 @@ func languageEncodeBytes(b []byte) string {
 	}
 	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
 }
-
-func languageEncodeBytesArray(b []byte) string {
-	if len(b) == 0 {
-		return "[]"
-	}
-	return strings.Join(strings.Fields(fmt.Sprintf("%d", [][]byte{b})), ",")
-}
