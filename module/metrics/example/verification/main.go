@@ -6,6 +6,8 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/model/verification"
+	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/metrics/example"
 	"github.com/dapperlabs/flow-go/module/trace"
@@ -20,28 +22,69 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		collector := struct {
-			*metrics.HotstuffCollector
-			*metrics.VerificationCollector
-			*metrics.NetworkCollector
-		}{
-			HotstuffCollector:     metrics.NewHotstuffCollector("some_chain_id"),
-			VerificationCollector: metrics.NewVerificationCollector(tracer),
-			NetworkCollector:      metrics.NewNetworkCollector(),
+
+		verificationCollector := metrics.NewVerificationCollector(tracer)
+
+		//authReceipts, err := stdmap.NewReceipts(10)
+		//if err != nil {
+		//	panic(err)
+		//}
+		//
+
+		pendingReceipts, err := stdmap.NewPendingReceipts(10,
+			stdmap.WithSizeMeterPendingReceipts(verificationCollector.OnPendingReceiptsUpdated))
+		if err != nil {
+			panic(err)
 		}
+		//
+		//authCollections, err := stdmap.NewCollections(10)
+		//if err != nil {
+		//	panic(err)
+		//}
+
+		pendingCollections, err := stdmap.NewPendingCollections(10,
+			stdmap.WithSizeMeterPendingCollections(verificationCollector.OnPendingCollectionsUpdated))
+		if err != nil {
+			panic(err)
+		}
+
+		//chunkDataPacks, err := stdmap.NewChunkDataPacks(10)
+		//if err != nil {
+		//	panic(err)
+		//}
+		//
+		//chunkDataPackTrackers, err := stdmap.NewChunkDataPackTrackers(10)
+		//if err != nil {
+		//	panic(err)
+		//}
+
 		for i := 0; i < 100; i++ {
 			chunkID := unittest.ChunkFixture().ID()
-			collector.OnResultApproval()
-			collector.OnChunkVerificationStarted(chunkID)
+			verificationCollector.OnResultApproval()
+			verificationCollector.OnChunkVerificationStarted(chunkID)
+
+			// adds a collection to pending collections mempool
+			coll := unittest.CollectionFixture(1)
+			pendingCollections.Add(&verification.PendingCollection{
+				Collection: &coll,
+				OriginID:   unittest.IdentifierFixture(),
+			})
+
+			// adds a receipt to the pending receipts
+			receipt := unittest.ExecutionReceiptFixture()
+			pendingReceipts.Add(&verification.PendingReceipt{
+				Receipt:  receipt,
+				OriginID: unittest.IdentifierFixture(),
+			})
 
 			// adds a synthetic 1 s delay for verification duration
 			time.Sleep(1 * time.Second)
-			collector.OnChunkVerificationFinished(chunkID)
-			collector.OnResultApproval()
+			verificationCollector.OnChunkVerificationFinished(chunkID)
+			verificationCollector.OnResultApproval()
 
 			// storage tests
 			// making randomized verifiable chunks that capture all storage per chunk
-			collector.OnVerifiableChunkSubmitted(rand.Float64() * 10000.0)
+			verificationCollector.OnVerifiableChunkSubmitted(rand.Float64() * 10000.0)
 		}
 	})
 }

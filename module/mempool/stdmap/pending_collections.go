@@ -10,7 +10,7 @@ import (
 
 type PendingCollectionsOpts func(*PendingCollections)
 
-func WithSizeMeter(f func(uint)) PendingCollectionsOpts {
+func WithSizeMeterPendingCollections(f func(uint)) PendingCollectionsOpts {
 	return func(p *PendingCollections) {
 		p.sizeMeter = f
 	}
@@ -27,8 +27,9 @@ type PendingCollections struct {
 func NewPendingCollections(limit uint, opts ...PendingCollectionsOpts) (*PendingCollections, error) {
 	qe := NewQueueEjector(limit + 1)
 	p := &PendingCollections{
-		qe:      qe,
-		Backend: NewBackend(WithLimit(limit), WithEject(qe.Eject)),
+		qe:        qe,
+		Backend:   NewBackend(WithLimit(limit), WithEject(qe.Eject)),
+		sizeMeter: nil,
 	}
 
 	for _, apply := range opts {

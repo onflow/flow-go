@@ -13,17 +13,32 @@ import (
 // used to store execution receipts and to generate block seals.
 type PendingReceipts struct {
 	*Backend
-	qe *QueueEjector
+	qe        *QueueEjector
+	sizeMeter func(uint)
+}
+
+type PendingReceiptsOpts func(*PendingReceipts)
+
+func WithSizeMeterPendingReceipts(f func(uint)) PendingReceiptsOpts {
+	return func(p *PendingReceipts) {
+		p.sizeMeter = f
+	}
 }
 
 // NewReceipts creates a new memory pool for execution receipts.
-func NewPendingReceipts(limit uint) (*PendingReceipts, error) {
+func NewPendingReceipts(limit uint, opts ...PendingReceiptsOpts) (*PendingReceipts, error) {
 	// create the receipts memory pool with the lookup maps
 	qe := NewQueueEjector(limit + 1)
 	r := &PendingReceipts{
-		qe:      qe,
-		Backend: NewBackend(WithLimit(limit), WithEject(qe.Eject)),
+		qe:        qe,
+		Backend:   NewBackend(WithLimit(limit), WithEject(qe.Eject)),
+		sizeMeter: nil,
 	}
+
+	for _, apply := range opts {
+		apply(r)
+	}
+
 	return r, nil
 }
 
@@ -34,12 +49,24 @@ func (p *PendingReceipts) Add(preceipt *verification.PendingReceipt) bool {
 		p.qe.Push(preceipt.ID())
 	}
 
+	// tracks the size updates
+	if p.sizeMeter != nil {
+		p.sizeMeter(p.Backend.Size())
+	}
+
 	return ok
 }
 
 // Rem will remove a pending receipt by ID.
 func (p *PendingReceipts) Rem(preceiptID flow.Identifier) bool {
-	return p.Backend.Rem(preceiptID)
+	ok := p.Backend.Rem(preceiptID)
+
+	// tracks the size updates
+	if p.sizeMeter != nil {
+		p.sizeMeter(p.Backend.Size())
+	}
+
+	return ok
 }
 
 // All will return all pending execution receipts in the memory pool.
