@@ -59,9 +59,22 @@ func TestDefaultConfig(t *testing.T) {
 	require.Equal(t, float64(0), c.BlockRateDelayMS)
 }
 
+// TestStandardVoteAggregationTimeoutFraction tests the computation of the standard
+// value for `VoteAggregationTimeoutFraction`.
+//
 func TestStandardVoteAggregationTimeoutFraction(t *testing.T) {
+	// test numerical computation for one specific parameter setting
 	f := StandardVoteAggregationTimeoutFraction(1200*time.Millisecond, 500*time.Millisecond)
 	require.Equal(t, (0.5*1200.0+500.0)/(1200.0+500.0), f)
+
+	// for no blockRateDelay, the standard value should be 0.5
+	f = StandardVoteAggregationTimeoutFraction(123456*time.Millisecond, 0)
+	require.Equal(t, 0.5, f)
+
+	// for _very_ large blockRateDelay, the standard value should converge to one
+	f = StandardVoteAggregationTimeoutFraction(123456*time.Millisecond, 10000*time.Hour)
+	require.True(t, f <= 1.0)
+	require.True(t, math.Abs(f-1.0) < 1e-5)
 }
 
 func TestStandardTimeoutDecreaseFactor(t *testing.T) {
