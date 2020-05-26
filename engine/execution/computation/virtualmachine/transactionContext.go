@@ -19,23 +19,28 @@ const scriptGasLimit = 100000
 type CheckerFunc func([]byte, runtime.Location) error
 
 type TransactionContext struct {
-	bc               BlockContext
-	ledger           LedgerDAL
-	astCache         ASTCache
-	signingAccounts  []runtime.Address
-	checker          CheckerFunc
-	logs             []string
-	events           []cadence.Event
-	tx               *flow.TransactionBody
-	gasLimit         uint64
-	uuid             uint64 // TODO: implement proper UUID
-	skipVerification bool
+	bc                        BlockContext
+	ledger                    LedgerDAL
+	astCache                  ASTCache
+	signingAccounts           []runtime.Address
+	checker                   CheckerFunc
+	logs                      []string
+	events                    []cadence.Event
+	tx                        *flow.TransactionBody
+	gasLimit                  uint64
+	uuid                      uint64 // TODO: implement proper UUID
+	skipVerification          bool
+	skipDeploymentRestriction bool
 }
 
 type TransactionContextOption func(*TransactionContext)
 
 func SkipVerification(ctx *TransactionContext) {
 	ctx.skipVerification = true
+}
+
+func SkipDeploymentRestriction(ctx *TransactionContext) {
+	ctx.skipDeploymentRestriction = true
 }
 
 // GetSigningAccounts gets the signing accounts for this context.
@@ -282,7 +287,7 @@ func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []b
 
 	// currently, every transaction that sets account code (deploys/updates contracts)
 	// must be signed by the service account
-	if !r.isValidSigningAccount(runtime.Address(flow.ServiceAddress())) {
+	if !r.skipDeploymentRestriction && !r.isValidSigningAccount(runtime.Address(flow.ServiceAddress())) {
 		return fmt.Errorf("code deployment requires authorization from the service account")
 	}
 
