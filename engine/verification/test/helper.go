@@ -2,99 +2,59 @@ package test
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"sync"
 	"testing"
 
+	"github.com/onflow/cadence/runtime"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto/random"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
+	"github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
+	"github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	chmodel "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-// CompleteExecutionResultFixture returns complete execution result with an
-// execution receipt referencing the block/collections.
-// chunkCount determines the number of chunks inside each receipt
-func CompleteExecutionResultFixture(t testing.TB, chunkCount int) verification.CompleteExecutionResult {
-	chunks := make([]*flow.Chunk, 0)
-	collections := make([]*flow.Collection, 0, chunkCount)
-	guarantees := make([]*flow.CollectionGuarantee, 0, chunkCount)
-	chunkDataPacks := make([]*flow.ChunkDataPack, 0, chunkCount)
+// // CompleteExecutionResultFixture returns complete execution result with an
+// // execution receipt referencing the block/collections.
+// // chunkCount determines the number of chunks inside each receipt
+func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.CompleteExecutionResult {
 
-	for i := 0; i < chunkCount; i++ {
-		// creates one guaranteed collection per chunk
-		coll := unittest.CollectionFixture(3)
-		guarantee := coll.Guarantee()
-		collections = append(collections, &coll)
-		guarantees = append(guarantees, &guarantee)
+	// setup collection
+	tx1 := testutil.DeployCounterContractTransaction(flow.ServiceAddress())
+	err := testutil.SignTransactionByRoot(tx1, 0)
+	require.NoError(t, err)
+	tx2 := testutil.CreateCounterTransaction(flow.ServiceAddress(), flow.ServiceAddress())
+	err = testutil.SignTransactionByRoot(tx2, 1)
+	require.NoError(t, err)
+	tx3 := testutil.CreateCounterPanicTransaction(flow.ServiceAddress(), flow.ServiceAddress())
+	err = testutil.SignTransactionByRoot(tx3, 2)
+	require.NoError(t, err)
+	transactions := []*flow.TransactionBody{tx1, tx2, tx3}
 
-		// registerTouch and State setup
-		id1 := make([]byte, 32)
-		value1 := []byte{'a'}
+	col := flow.Collection{Transactions: transactions}
+	collections := []*flow.Collection{&col}
 
-		id2 := make([]byte, 32)
-		id2[0] = byte(5)
-		value2 := []byte{'b'}
-
-		ids := make([][]byte, 0)
-		values := make([][]byte, 0)
-
-		// bootstrap with root account as it is retrieved by VM to check for permissions
-		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
-			return nil, nil
-		})
-
-		rootRegisterIDs, rootRegisterValues := view.Interactions().Delta.RegisterUpdates()
-
-		ids = append(ids, id1, id2)
-		ids = append(ids, rootRegisterIDs...)
-		values = append(values, value1, value2)
-		values = append(values, rootRegisterValues...)
-
-		metricsCollector := &metrics.NoopCollector{}
-
-		unittest.RunWithTempDir(t, func(dir string) {
-			f, err := ledger.NewMTrieStorage(dir, 100, metricsCollector, nil)
-			defer f.Done()
-			require.NoError(t, err)
-
-			startState, err := f.UpdateRegisters(ids, values, f.EmptyStateCommitment())
-			require.NoError(t, err)
-
-			regTs, err := f.GetRegisterTouches(ids, startState)
-			require.NoError(t, err)
-
-			chunk := &flow.Chunk{
-				ChunkBody: flow.ChunkBody{
-					CollectionIndex: uint(i),
-					StartState:      startState,
-					EventCollection: unittest.IdentifierFixture(),
-				},
-				Index: uint64(i),
-			}
-			chunks = append(chunks, chunk)
-
-			// creates a chunk data pack for the chunk
-			chunkDataPack := flow.ChunkDataPack{
-				ChunkID:         chunk.ID(),
-				StartState:      startState,
-				RegisterTouches: regTs,
-			}
-			chunkDataPacks = append(chunkDataPacks, &chunkDataPack)
-		})
-	}
+	// setup block
+	guarantee := col.Guarantee()
+	guarantees := []*flow.CollectionGuarantee{&guarantee}
 
 	payload := flow.Payload{
-		Identities: nil,
+		Identities: unittest.IdentityListFixture(32),
 		Guarantees: guarantees,
 	}
 	header := unittest.BlockHeaderFixture()
@@ -106,17 +66,190 @@ func CompleteExecutionResultFixture(t testing.TB, chunkCount int) verification.C
 		Payload: &payload,
 	}
 
+	// Setup chunk and chunk data package
+	chunks := make([]*flow.Chunk, 0)
+	chunkDataPacks := make([]*flow.ChunkDataPack, 0)
+
+	metricsCollector := &metrics.NoopCollector{}
+
+	unittest.RunWithTempDir(t, func(dir string) {
+		led, err := ledger.NewMTrieStorage(dir, 100, metricsCollector, nil)
+		require.NoError(t, err)
+		defer led.Done()
+
+		startStateCommitment, err := bootstrap.BootstrapLedger(
+			led,
+			unittest.ServiceAccountPublicKey,
+			unittest.GenesisTokenSupply,
+		)
+		require.NoError(t, err)
+
+		rt := runtime.NewInterpreterRuntime()
+		vm, err := virtualmachine.New(rt)
+		require.NoError(t, err)
+
+		// create state.View
+		view := delta.NewView(state.LedgerGetRegister(led, startStateCommitment))
+
+		// create BlockComputer
+		bc := computer.NewBlockComputer(vm, nil)
+
+		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
+		completeColls[guarantee.ID()] = &entity.CompleteCollection{
+			Guarantee:    &guarantee,
+			Transactions: transactions,
+		}
+
+		executableBlock := &entity.ExecutableBlock{
+			Block:               &block,
+			CompleteCollections: completeColls,
+			StartState:          startStateCommitment,
+		}
+
+		// *execution.ComputationResult, error
+		_, err = bc.ExecuteBlock(context.Background(), executableBlock, view)
+		require.NoError(t, err, "error executing block")
+
+		ids, values := view.Delta().RegisterUpdates()
+
+		// TODO: update CommitDelta to also return proofs
+		endStateCommitment, err := led.UpdateRegisters(ids, values, startStateCommitment)
+		require.NoError(t, err, "error updating registers")
+
+		chunk := &flow.Chunk{
+			ChunkBody: flow.ChunkBody{
+				CollectionIndex: uint(0),
+				StartState:      startStateCommitment,
+				// TODO: include event collection hash
+				EventCollection: flow.ZeroID,
+				// TODO: record gas used
+				TotalComputationUsed: 0,
+				// TODO: record number of txs
+				NumberOfTransactions: 0,
+			},
+			Index:    0,
+			EndState: endStateCommitment,
+		}
+		chunks = append(chunks, chunk)
+
+		// chunkDataPack
+		allRegisters := view.Interactions().AllRegisters()
+		values, proofs, err := led.GetRegistersWithProof(allRegisters, chunk.StartState)
+		require.NoError(t, err, "error reading registers with proofs from ledger")
+
+		regTs := make([]flow.RegisterTouch, len(allRegisters))
+		for i, reg := range allRegisters {
+			regTs[i] = flow.RegisterTouch{RegisterID: reg,
+				Value: values[i],
+				Proof: proofs[i],
+			}
+		}
+		chdp := &flow.ChunkDataPack{
+			ChunkID:         chunk.ID(),
+			StartState:      chunk.StartState,
+			RegisterTouches: regTs,
+			CollectionID:    col.ID(),
+		}
+		chunkDataPacks = append(chunkDataPacks, chdp)
+		startStateCommitment = endStateCommitment
+
+		for i := 1; i < chunkCount; i++ {
+
+			tx3 = testutil.CreateCounterPanicTransaction(flow.ServiceAddress(), flow.ServiceAddress())
+			err = testutil.SignTransactionByRoot(tx3, 3+uint64(i))
+			require.NoError(t, err)
+
+			transactions := []*flow.TransactionBody{tx3}
+			col := flow.Collection{Transactions: transactions}
+			collections = append(collections, &col)
+			g := col.Guarantee()
+			guarantees = append(guarantees, &g)
+
+			completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
+			completeColls[guarantee.ID()] = &entity.CompleteCollection{
+				Guarantee:    &guarantee,
+				Transactions: transactions,
+			}
+
+			executableBlock := &entity.ExecutableBlock{
+				Block:               &block,
+				CompleteCollections: completeColls,
+				StartState:          startStateCommitment,
+			}
+
+			// *execution.ComputationResult, error
+			_, err = bc.ExecuteBlock(context.Background(), executableBlock, view)
+			require.NoError(t, err, "error executing block")
+
+			ids, values := view.Delta().RegisterUpdates()
+
+			// TODO: update CommitDelta to also return proofs
+			endStateCommitment, err := led.UpdateRegisters(ids, values, startStateCommitment)
+			require.NoError(t, err, "error updating registers")
+
+			chunk := &flow.Chunk{
+				ChunkBody: flow.ChunkBody{
+					CollectionIndex: uint(i),
+					StartState:      startStateCommitment,
+					// TODO: include event collection hash
+					EventCollection: flow.ZeroID,
+					// TODO: record gas used
+					TotalComputationUsed: 0,
+					// TODO: record number of txs
+					NumberOfTransactions: 0,
+				},
+				Index:    uint64(i),
+				EndState: endStateCommitment,
+			}
+			chunks = append(chunks, chunk)
+
+			// chunkDataPack
+			allRegisters := view.Interactions().AllRegisters()
+			values, proofs, err := led.GetRegistersWithProof(allRegisters, chunk.StartState)
+			require.NoError(t, err, "error reading registers with proofs from ledger")
+
+			regTs := make([]flow.RegisterTouch, len(allRegisters))
+			for i, reg := range allRegisters {
+				regTs[i] = flow.RegisterTouch{RegisterID: reg,
+					Value: values[i],
+					Proof: proofs[i],
+				}
+			}
+			chdp := &flow.ChunkDataPack{
+				ChunkID:         chunk.ID(),
+				StartState:      chunk.StartState,
+				RegisterTouches: regTs,
+				CollectionID:    col.ID(),
+			}
+			chunkDataPacks = append(chunkDataPacks, chdp)
+			startStateCommitment = endStateCommitment
+		}
+	})
+
+	payload = flow.Payload{
+		Identities: unittest.IdentityListFixture(32),
+		Guarantees: guarantees,
+	}
+	header = unittest.BlockHeaderFixture()
+	header.Height = 0
+	header.PayloadHash = payload.Hash()
+
+	block = flow.Block{
+		Header:  &header,
+		Payload: &payload,
+	}
+
 	result := flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
-			BlockID: block.ID(),
-			Chunks:  chunks,
+			BlockID:          block.ID(),
+			Chunks:           chunks,
+			FinalStateCommit: chunks[len(chunks)-1].EndState,
 		},
 	}
 
 	receipt := flow.ExecutionReceipt{
 		ExecutionResult: result,
 	}
-
 	return verification.CompleteExecutionResult{
 		Receipt:        &receipt,
 		Block:          &block,
