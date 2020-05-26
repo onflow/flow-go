@@ -50,72 +50,72 @@ func TestConcurrency(t *testing.T) {
 			chunksNum:   2,
 			lightIngest: true,
 		},
-		{
-			erCount:     1,
-			senderCount: 5,
-			chunksNum:   2,
-			lightIngest: true,
-		},
-		{
-			erCount:     5,
-			senderCount: 1,
-			chunksNum:   2,
-			lightIngest: true,
-		},
-		{
-			erCount:     5,
-			senderCount: 5,
-			chunksNum:   2,
-			lightIngest: true,
-		},
-		{
-			erCount:     1,
-			senderCount: 1,
-			chunksNum:   10, // choosing a higher number makes the test longer and longer timeout needed
-			lightIngest: true,
-		},
-		{
-			erCount:     2,
-			senderCount: 5,
-			chunksNum:   4,
-			lightIngest: true,
-		},
-		{
-			erCount:     1,
-			senderCount: 1,
-			chunksNum:   2,
-			lightIngest: true,
-		},
-		{
-			erCount:     1,
-			senderCount: 5,
-			chunksNum:   2,
-			lightIngest: false,
-		},
-		{
-			erCount:     5,
-			senderCount: 1,
-			chunksNum:   2,
-			lightIngest: false,
-		},
-		{
-			erCount:     5,
-			senderCount: 5,
-			chunksNum:   2,
-			lightIngest: false,
-		},
-		{
-			erCount:     1,
-			senderCount: 1,
-			chunksNum:   10, // choosing a higher number makes the test longer and longer timeout needed
-			lightIngest: false,
-		},
-		{
-			erCount:     2,
-			senderCount: 5,
-			chunksNum:   4,
-			lightIngest: false,
-		},
+		//{
+		//	erCount:     1,
+		//	senderCount: 5,
+		//	chunksNum:   2,
+		//	lightIngest: true,
+		//},
+		//{
+		//	erCount:     5,
+		//	senderCount: 1,
+		//	chunksNum:   2,
+		//	lightIngest: true,
+		//},
+		//{
+		//	erCount:     5,
+		//	senderCount: 5,
+		//	chunksNum:   2,
+		//	lightIngest: true,
+		//},
+		//{
+		//	erCount:     1,
+		//	senderCount: 1,
+		//	chunksNum:   10, // choosing a higher number makes the test longer and longer timeout needed
+		//	lightIngest: true,
+		//},
+		//{
+		//	erCount:     2,
+		//	senderCount: 5,
+		//	chunksNum:   4,
+		//	lightIngest: true,
+		//},
+		//{
+		//	erCount:     1,
+		//	senderCount: 1,
+		//	chunksNum:   2,
+		//	lightIngest: true,
+		//},
+		//{
+		//	erCount:     1,
+		//	senderCount: 5,
+		//	chunksNum:   2,
+		//	lightIngest: false,
+		//},
+		//{
+		//	erCount:     5,
+		//	senderCount: 1,
+		//	chunksNum:   2,
+		//	lightIngest: false,
+		//},
+		//{
+		//	erCount:     5,
+		//	senderCount: 5,
+		//	chunksNum:   2,
+		//	lightIngest: false,
+		//},
+		//{
+		//	erCount:     1,
+		//	senderCount: 1,
+		//	chunksNum:   10, // choosing a higher number makes the test longer and longer timeout needed
+		//	lightIngest: false,
+		//},
+		//{
+		//	erCount:     2,
+		//	senderCount: 5,
+		//	chunksNum:   4,
+		//	lightIngest: false,
+		//},
 	}
 
 	for _, tc := range testcases {

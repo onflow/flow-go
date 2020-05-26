@@ -32,7 +32,6 @@ import (
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
-	mock2 "github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/stub"
@@ -170,8 +169,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	results, err := stdmap.NewResults(1000)
 	require.NoError(t, err)
 
-	collector := mock2.MempoolMetrics{}
-	receipts, err := stdmap.NewReceipts(1000, &collector)
+	receipts, err := stdmap.NewReceipts(1000, nil)
 	require.NoError(t, err)
 
 	approvals, err := stdmap.NewApprovals(1000)
@@ -334,8 +332,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.AuthReceipts == nil {
-		collector := mock2.MempoolMetrics{}
-		node.AuthReceipts, err = stdmap.NewReceipts(1000, &collector)
+		node.AuthReceipts, err = stdmap.NewReceipts(1000, nil)
 		require.Nil(t, err)
 	}
 
