@@ -621,12 +621,21 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		return address, key.PublicKey()
 	}
 
+	addressGen := flow.NewAddressGenerator()
+	// skip the addresses of 4 reserved accounts
+	for i := 0; i < 4; i++ {
+		_, err := addressGen.AccountAddress()
+		require.NoError(t, err)
+	}
+
 	// create a bunch of accounts
 	accounts := make(map[flow.Address]crypto.PublicKey, count)
 	for i := 0; i < count; i++ {
 		require.NoError(t, err)
 		address, key := createAccount()
+		expectedAddress, err := addressGen.AccountAddress()
 		require.NoError(t, err)
+		assert.Equal(t, expectedAddress, address)
 		accounts[address] = key
 	}
 
@@ -644,11 +653,6 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	// non-happy path - get an account that was never created
 	t.Run("get a non-existing account", func(t *testing.T) {
-		addressGen := flow.NewAddressGenerator()
-		// evolve the addressing state to a new state
-		for i := 0; i < count; i++ {
-			_, err = addressGen.AccountAddress()
-		}
 		address, err := addressGen.AccountAddress()
 		require.NoError(t, err)
 		account := ledgerAccess.GetAccount(address)
