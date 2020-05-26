@@ -177,112 +177,164 @@ docker-ci-integration-team-city:
 
 .PHONY: docker-build-collection
 docker-build-collection:
-	docker build -f cmd/Dockerfile --build-arg TARGET=collection --target production \
-		-t gcr.io/dl-flow/collection:latest -t "gcr.io/dl-flow/collection:$(SHORT_COMMIT)" -t gcr.io/dl-flow/collection:$(IMAGE_TAG) .
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=collection --target production \
+		-t gcr.io/dl-flow/collection:candidate1 \
+		-t gcr.io/flow-container-registry/collection:latest \
+		-t "gcr.io/flow-container-registry/collection:$(SHORT_COMMIT)" \
+		-t gcr.io/flow-container-registry/collection:$(IMAGE_TAG) \
+		.
 
 .PHONY: docker-build-collection-debug
 docker-build-collection-debug:
-	docker build -f cmd/Dockerfile --build-arg TARGET=collection --target debug \
-		-t gcr.io/dl-flow/collection-debug:latest -t "gcr.io/dl-flow/collection-debug:$(SHORT_COMMIT)" -t gcr.io/dl-flow/collection-debug:$(IMAGE_TAG) .
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=collection --target debug \
+		-t gcr.io/flow-container-registry/collection-debug:latest \
+		-t "gcr.io/flow-container-registry/collection-debug:$(SHORT_COMMIT)" \
+		-t gcr.io/flow-container-registry/collection-debug:$(IMAGE_TAG) \
+		.
 
 .PHONY: docker-build-consensus
 docker-build-consensus:
-	docker build -f cmd/Dockerfile --build-arg TARGET=consensus --target production \
-		-t gcr.io/dl-flow/consensus:latest -t "gcr.io/dl-flow/consensus:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/consensus:$(IMAGE_TAG)" .
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=consensus --target production \
+		-t gcr.io/dl-flow/consensus:candidate1 \
+		-t gcr.io/flow-container-registry/consensus:latest \
+		-t "gcr.io/flow-container-registry/consensus:$(SHORT_COMMIT)" \
+		-t "gcr.io/flow-container-registry/consensus:$(IMAGE_TAG)" \
+		.
 
 .PHONY: docker-build-consensus-debug
 docker-build-consensus-debug:
-	docker build -f cmd/Dockerfile --build-arg TARGET=consensus --target debug \
-		-t gcr.io/dl-flow/consensus-debug:latest -t "gcr.io/dl-flow/consensus-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/consensus-debug:$(IMAGE_TAG)" .
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=consensus --target debug \
+		-t gcr.io/flow-container-registry/consensus-debug:latest \
+		-t "gcr.io/flow-container-registry/consensus-debug:$(SHORT_COMMIT)" \
+		-t "gcr.io/flow-container-registry/consensus-debug:$(IMAGE_TAG)" \
+		.
 
 .PHONY: docker-build-execution
 docker-build-execution:
-	docker build -f cmd/Dockerfile --build-arg TARGET=execution --target production \
-		-t gcr.io/dl-flow/execution:latest -t "gcr.io/dl-flow/execution:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/execution:$(IMAGE_TAG)" .
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=execution --target production \
+		-t gcr.io/dl-flow/execution:candidate1 \
+		-t gcr.io/flow-container-registry/execution:latest \
+		-t "gcr.io/flow-container-registry/execution:$(SHORT_COMMIT)" \
+		-t "gcr.io/flow-container-registry/execution:$(IMAGE_TAG)" \
+		.
 
 .PHONY: docker-build-execution-debug
 docker-build-execution-debug:
-	docker build -f cmd/Dockerfile --build-arg TARGET=execution --target debug \
-		-t gcr.io/dl-flow/execution-debug:latest -t "gcr.io/dl-flow/execution-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/execution-debug:$(IMAGE_TAG)" .
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=execution --target debug \
+		-t gcr.io/flow-container-registry/execution-debug:latest \
+		-t "gcr.io/flow-container-registry/execution-debug:$(SHORT_COMMIT)" \
+		-t "gcr.io/flow-container-registry/execution-debug:$(IMAGE_TAG)" \
+		.
 
 .PHONY: docker-build-verification
 docker-build-verification:
-	docker build -f cmd/Dockerfile --build-arg TARGET=verification --target production \
-		-t gcr.io/dl-flow/verification:latest -t "gcr.io/dl-flow/verification:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/verification:$(IMAGE_TAG)" .
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=verification --target production \
+		-t gcr.io/dl-flow/verification:candidate1 \
+		-t gcr.io/flow-container-registry/verification:latest \
+		-t "gcr.io/flow-container-registry/verification:$(SHORT_COMMIT)" \
+		-t "gcr.io/flow-container-registry/verification:$(IMAGE_TAG)" \
+		.
 
 .PHONY: docker-build-verification-debug
 docker-build-verification-debug:
-	docker build -f cmd/Dockerfile --build-arg TARGET=verification --target debug \
-		-t gcr.io/dl-flow/verification-debug:latest -t "gcr.io/dl-flow/verification-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/verification-debug:$(IMAGE_TAG)" .
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=verification --target debug \
+		-t gcr.io/flow-container-registry/verification-debug:latest \
+		-t "gcr.io/flow-container-registry/verification-debug:$(SHORT_COMMIT)" \
+		-t "gcr.io/flow-container-registry/verification-debug:$(IMAGE_TAG)" \
+		.
 
 .PHONY: docker-build-access
 docker-build-access:
-	docker build -f cmd/Dockerfile --build-arg TARGET=access --target production \
-		-t gcr.io/dl-flow/access:latest -t "gcr.io/dl-flow/access:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/access:$(IMAGE_TAG)" .
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=access --target production \
+		-t gcr.io/dl-flow/access:candidate1 \
+		-t gcr.io/flow-container-registry/access:latest \
+		-t "gcr.io/flow-container-registry/access:$(SHORT_COMMIT)" \
+		-t "gcr.io/flow-container-registry/access:$(IMAGE_TAG)" \
+		.
 
 .PHONY: docker-build-access-debug
 docker-build-access-debug:
-	docker build -f cmd/Dockerfile --build-arg TARGET=access --target debug \
-		-t gcr.io/dl-flow/access-debug:latest -t "gcr.io/dl-flow/access-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/access-debug:$(IMAGE_TAG)" .
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=access --target debug \
+		-t gcr.io/flow-container-registry/access-debug:latest \
+		-t "gcr.io/flow-container-registry/access-debug:$(SHORT_COMMIT)" \
+		-t "gcr.io/flow-container-registry/access-debug:$(IMAGE_TAG)" \
+		.
 
 .PHONY: docker-build-ghost
 docker-build-ghost:
-	docker build -f cmd/Dockerfile --build-arg TARGET=ghost --target production \
-		-t gcr.io/dl-flow/ghost:latest -t "gcr.io/dl-flow/ghost:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/ghost:$(IMAGE_TAG)" .
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=ghost --target production \
+		-t gcr.io/flow-container-registry/ghost:latest \
+		-t "gcr.io/flow-container-registry/ghost:$(SHORT_COMMIT)" \
+		-t "gcr.io/flow-container-registry/ghost:$(IMAGE_TAG)" \
+		.
 
 .PHONY: docker-build-ghost-debug
 docker-build-ghost-debug:
-	docker build -f cmd/Dockerfile --build-arg TARGET=ghost --target debug \
-		-t gcr.io/dl-flow/ghost-debug:latest -t "gcr.io/dl-flow/ghost-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/ghost-debug:$(IMAGE_TAG)" .
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=ghost --target debug \
+		-t gcr.io/flow-container-registry/ghost-debug:latest \
+		-t "gcr.io/flow-container-registry/ghost-debug:$(SHORT_COMMIT)" \
+		-t "gcr.io/flow-container-registry/ghost-debug:$(IMAGE_TAG)" \
+		.
 
 PHONY: docker-build-bootstrap
 docker-build-bootstrap:
-	docker build -f cmd/Dockerfile --build-arg TARGET=bootstrap --target production \
-		-t gcr.io/dl-flow/bootstrap:latest -t "gcr.io/dl-flow/bootstrap:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/bootstrap:$(IMAGE_TAG)" .
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=bootstrap --target production \
+		-t gcr.io/flow-container-registry/bootstrap:latest \
+		-t "gcr.io/flow-container-registry/bootstrap:$(SHORT_COMMIT)" \
+		-t "gcr.io/flow-container-registry/bootstrap:$(IMAGE_TAG)" \
+		.
 
 .PHONY: docker-build-bootstrap-transit
 docker-build-bootstrap-transit:
-	docker build -f cmd/Dockerfile --build-arg TARGET=bootstrap/transit --target production-nocgo \
-		-t gcr.io/dl-flow/bootstrap-transit:latest -t "gcr.io/dl-flow/bootstrap-transit:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/bootstrap-transit:$(IMAGE_TAG)" .
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=bootstrap/transit --target production-nocgo \
+		-t gcr.io/flow-container-registry/bootstrap-transit:latest \
+		-t "gcr.io/flow-container-registry/bootstrap-transit:$(SHORT_COMMIT)" \
+		-t "gcr.io/flow-container-registry/bootstrap-transit:$(IMAGE_TAG)" \
+		.
 
 .PHONY: docker-build-flow
 docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access docker-build-ghost
 
 .PHONY: docker-push-collection
 docker-push-collection:
-	docker push gcr.io/dl-flow/collection:latest
-	docker push "gcr.io/dl-flow/collection:$(SHORT_COMMIT)"
-	docker push "gcr.io/dl-flow/collection:$(IMAGE_TAG)"
+	docker push gcr.io/dl-flow/collection:candidate1
+	docker push gcr.io/flow-container-registry/collection:latest
+	docker push "gcr.io/flow-container-registry/collection:$(SHORT_COMMIT)"
+	docker push "gcr.io/flow-container-registry/collection:$(IMAGE_TAG)"
 
 .PHONY: docker-push-consensus
 docker-push-consensus:
-	docker push gcr.io/dl-flow/consensus:latest
-	docker push "gcr.io/dl-flow/consensus:$(SHORT_COMMIT)"
-	docker push "gcr.io/dl-flow/consensus:$(IMAGE_TAG)"
+	docker push gcr.io/dl-flow/consensus:candidate1
+	docker push gcr.io/flow-container-registry/consensus:latest
+	docker push "gcr.io/flow-container-registry/consensus:$(SHORT_COMMIT)"
+	docker push "gcr.io/flow-container-registry/consensus:$(IMAGE_TAG)"
 
 .PHONY: docker-push-execution
 docker-push-execution:
-	docker push gcr.io/dl-flow/execution:latest
-	docker push "gcr.io/dl-flow/execution:$(SHORT_COMMIT)"
-	docker push "gcr.io/dl-flow/execution:$(IMAGE_TAG)"
+	docker push gcr.io/dl-flow/execution:candidate1
+	docker push gcr.io/flow-container-registry/execution:latest
+	docker push "gcr.io/flow-container-registry/execution:$(SHORT_COMMIT)"
+	docker push "gcr.io/flow-container-registry/execution:$(IMAGE_TAG)"
 
 .PHONY: docker-push-verification
 docker-push-verification:
-	docker push gcr.io/dl-flow/verification:latest
-	docker push "gcr.io/dl-flow/verification:$(SHORT_COMMIT)"
-	docker push "gcr.io/dl-flow/verification:$(IMAGE_TAG)"
+	docker push gcr.io/dl-flow/verification:candidate1
+	docker push gcr.io/flow-container-registry/verification:latest
+	docker push "gcr.io/flow-container-registry/verification:$(SHORT_COMMIT)"
+	docker push "gcr.io/flow-container-registry/verification:$(IMAGE_TAG)"
 
 .PHONY: docker-push-access
 docker-push-access:
-	docker push gcr.io/dl-flow/access:latest
-	docker push "gcr.io/dl-flow/access:$(SHORT_COMMIT)"
-	docker push "gcr.io/dl-flow/access:$(IMAGE_TAG)"
+	docker push gcr.io/dl-flow/access:candidate1
+	docker push gcr.io/flow-container-registry/access:latest
+	docker push "gcr.io/flow-container-registry/access:$(SHORT_COMMIT)"
+	docker push "gcr.io/flow-container-registry/access:$(IMAGE_TAG)"
 
 .PHONY: docker-push-ghost
 docker-push-ghost:
-	docker push gcr.io/dl-flow/ghost:latest
-	docker push "gcr.io/dl-flow/ghost:$(SHORT_COMMIT)"
-	docker push "gcr.io/dl-flow/ghost:$(IMAGE_TAG)"
+	docker push gcr.io/flow-container-registry/ghost:latest
+	docker push "gcr.io/flow-container-registry/ghost:$(SHORT_COMMIT)"
+	docker push "gcr.io/flow-container-registry/ghost:$(IMAGE_TAG)"
 
 .PHONY: docker-push-flow
 docker-push-flow: docker-push-collection docker-push-consensus docker-push-execution docker-push-verification docker-push-access
