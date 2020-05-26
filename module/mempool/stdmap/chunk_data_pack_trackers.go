@@ -10,19 +10,41 @@ import (
 // ChunkDataPackTrackers implements the ChunkDataPackTrackers memory pool.
 type ChunkDataPackTrackers struct {
 	*Backend
+	sizeMeter func(uint) // keeps track of size variations of memory pool
+}
+
+type ChunkDataPackTrackersOpts func(*ChunkDataPackTrackers)
+
+func WithSizeMeterChunkDataPackTrackers(f func(uint)) ChunkDataPackTrackersOpts {
+	return func(c *ChunkDataPackTrackers) {
+		c.sizeMeter = f
+	}
 }
 
 // NewChunkDataPackTrackers creates a new memory pool for ChunkDataPackTrackers.
-func NewChunkDataPackTrackers(limit uint) (*ChunkDataPackTrackers, error) {
+func NewChunkDataPackTrackers(limit uint, opts ...ChunkDataPackTrackersOpts) (*ChunkDataPackTrackers, error) {
 	a := &ChunkDataPackTrackers{
-		Backend: NewBackend(WithLimit(limit)),
+		Backend:   NewBackend(WithLimit(limit)),
+		sizeMeter: nil,
 	}
+
+	for _, apply := range opts {
+		apply(a)
+	}
+
 	return a, nil
 }
 
 // Add adds a ChunkDataPackTracker to the mempool.
 func (c *ChunkDataPackTrackers) Add(cdpt *tracker.ChunkDataPackTracker) bool {
-	return c.Backend.Add(cdpt)
+	added := c.Backend.Add(cdpt)
+
+	// tracks size updates
+	if c.sizeMeter != nil {
+		c.sizeMeter(c.Backend.Size())
+	}
+
+	return added
 }
 
 // Has checks whether the ChunkDataPackTracker with the given chunkID is currently in
@@ -33,7 +55,14 @@ func (c *ChunkDataPackTrackers) Has(chunkID flow.Identifier) bool {
 
 // Rem removes tracker with the given chunk ID.
 func (c *ChunkDataPackTrackers) Rem(chunkID flow.Identifier) bool {
-	return c.Backend.Rem(chunkID)
+	removed := c.Backend.Rem(chunkID)
+
+	// tracks size updates
+	if c.sizeMeter != nil {
+		c.sizeMeter(c.Backend.Size())
+	}
+
+	return removed
 }
 
 // Inc atomically increases the counter of tracker by one and returns the updated tracker

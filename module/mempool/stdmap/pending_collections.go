@@ -8,19 +8,19 @@ import (
 // TODO consolidate with PendingReceipts to preserve DRY
 // https://github.com/dapperlabs/flow-go/issues/3690
 
+// PendingCollections implements a mempool storing collections.
+type PendingCollections struct {
+	*Backend
+	qe        *QueueEjector
+	sizeMeter func(uint) // keeps track of size variations of memory pool
+}
+
 type PendingCollectionsOpts func(*PendingCollections)
 
 func WithSizeMeterPendingCollections(f func(uint)) PendingCollectionsOpts {
 	return func(p *PendingCollections) {
 		p.sizeMeter = f
 	}
-}
-
-// PendingCollections implements a mempool storing collections.
-type PendingCollections struct {
-	*Backend
-	qe        *QueueEjector
-	sizeMeter func(uint) // keeps track of size variations of memory pool
 }
 
 // NewCollections creates a new memory pool for pending collection.
@@ -46,6 +46,7 @@ func (p *PendingCollections) Add(pcoll *verification.PendingCollection) bool {
 		p.qe.Push(pcoll.ID())
 	}
 
+	// tracks size updates
 	if p.sizeMeter != nil {
 		p.sizeMeter(p.Backend.Size())
 	}

@@ -8,12 +8,26 @@ import (
 // ChunkDataPacks implements the ChunkDataPack memory pool.
 type ChunkDataPacks struct {
 	*Backend
+	sizeMeter func(uint) // keeps track of size variations of memory pool
+}
+
+type ChunkDataPacksOpts func(*ChunkDataPacks)
+
+func WithSizeMeterChunkDataPack(f func(uint)) ChunkDataPacksOpts {
+	return func(c *ChunkDataPacks) {
+		c.sizeMeter = f
+	}
 }
 
 // NewChunkDataPacks creates a new memory pool for ChunkDataPacks.
-func NewChunkDataPacks(limit uint) (*ChunkDataPacks, error) {
+func NewChunkDataPacks(limit uint, opts ...ChunkDataPacksOpts) (*ChunkDataPacks, error) {
 	a := &ChunkDataPacks{
-		Backend: NewBackend(WithLimit(limit)),
+		Backend:   NewBackend(WithLimit(limit)),
+		sizeMeter: nil,
+	}
+
+	for _, apply := range opts {
+		apply(a)
 	}
 
 	return a, nil
@@ -27,12 +41,24 @@ func (c *ChunkDataPacks) Has(chunkID flow.Identifier) bool {
 
 // Add adds an chunkDataPack to the mempool.
 func (c *ChunkDataPacks) Add(cdp *flow.ChunkDataPack) bool {
-	return c.Backend.Add(cdp)
+	added := c.Backend.Add(cdp)
+
+	// tracks size updates
+	if c.sizeMeter != nil {
+		c.sizeMeter(c.Backend.Size())
+	}
+
+	return added
 }
 
 // Rem will remove chunk data pack by ID
 func (c *ChunkDataPacks) Rem(chunkID flow.Identifier) bool {
-	return c.Backend.Rem(chunkID)
+	removed := c.Backend.Rem(chunkID)
+	// tracks size updates
+	if c.sizeMeter != nil {
+		c.sizeMeter(c.Backend.Size())
+	}
+	return removed
 }
 
 // ByChunkID returns the chunk data pack with the given chunkID from the mempool.
