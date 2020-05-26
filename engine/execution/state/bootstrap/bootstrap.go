@@ -183,7 +183,7 @@ func mintInitialTokens(
 	}
 
 	tx := flow.NewTransactionBody().
-		SetScript(virtualmachine.MintDefaultTokenTransaction).
+		SetScript(virtualmachine.MintDefaultTokenTransaction()).
 		AddArgument(initialSupplyArg).
 		AddAuthorizer(service)
 
