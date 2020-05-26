@@ -32,7 +32,7 @@ func TestCanTry(t *testing.T) {
 	t.Run("maxAttempt=3", func(t *testing.T) {
 		maxAttempt := 3
 		chunks := NewChunks(10)
-		chunk := NewChunkStatus(ChunkWithIndex(0), flow.Identifier{0xaa}, flow.Identifier{0xbb})
+		chunk := NewChunkStatus(ChunkWithIndex(flow.Identifier{0x11}, 0), flow.Identifier{0xaa}, flow.Identifier{0xbb})
 		chunks.Add(chunk)
 		results := []bool{}
 		for i := 0; i < 5; i++ {
@@ -208,28 +208,29 @@ func createExecutionResult(blockID flow.Identifier, options ...func(result *flow
 	return result, assignments
 }
 
-func WithChunks(setAssignees ...func(uint64, *chunks.Assignment) *flow.Chunk) func(*flow.ExecutionResult, *chunks.Assignment) {
-	return func(results *flow.ExecutionResult, assignment *chunks.Assignment) {
+func WithChunks(setAssignees ...func(flow.Identifier, uint64, *chunks.Assignment) *flow.Chunk) func(*flow.ExecutionResult, *chunks.Assignment) {
+	return func(result *flow.ExecutionResult, assignment *chunks.Assignment) {
 		for i, setAssignee := range setAssignees {
-			chunk := setAssignee(uint64(i), assignment)
-			results.ExecutionResultBody.Chunks.Insert(chunk)
+			chunk := setAssignee(result.BlockID, uint64(i), assignment)
+			result.ExecutionResultBody.Chunks.Insert(chunk)
 		}
 	}
 }
 
-func ChunkWithIndex(index int) *flow.Chunk {
+func ChunkWithIndex(blockID flow.Identifier, index int) *flow.Chunk {
 	chunk := &flow.Chunk{
 		Index: uint64(index),
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex: uint(index),
+			EventCollection: blockID, // ensure chunks from different blocks with the same index will have different chunk ID
 		},
 	}
 	return chunk
 }
 
-func WithAssignee(assignee flow.Identifier) func(uint64, *chunks.Assignment) *flow.Chunk {
-	return func(index uint64, assignment *chunks.Assignment) *flow.Chunk {
-		chunk := ChunkWithIndex(int(index))
+func WithAssignee(assignee flow.Identifier) func(flow.Identifier, uint64, *chunks.Assignment) *flow.Chunk {
+	return func(blockID flow.Identifier, index uint64, assignment *chunks.Assignment) *flow.Chunk {
+		chunk := ChunkWithIndex(blockID, int(index))
 		fmt.Printf("with assignee: %v, chunk id: %v\n", index, chunk.ID())
 		assignment.Add(chunk, flow.IdentifierList{assignee})
 		return chunk
