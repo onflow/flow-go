@@ -60,8 +60,8 @@ func TestDefaultConfig(t *testing.T) {
 }
 
 func TestStandardVoteAggregationTimeoutFraction(t *testing.T) {
-	f := StandardVoteAggregationTimeoutFraction(0.5, 1200*time.Millisecond, 500*time.Millisecond)
-	require.Equal(t, 0.5*(1200.0+500.0)/1200.0, f)
+	f := StandardVoteAggregationTimeoutFraction(1200*time.Millisecond, 500*time.Millisecond)
+	require.Equal(t, (0.5*1200.0+500.0)/(1200.0+500.0), f)
 }
 
 func TestStandardTimeoutDecreaseFactor(t *testing.T) {
