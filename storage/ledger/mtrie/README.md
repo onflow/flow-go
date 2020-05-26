@@ -18,8 +18,8 @@ In the store, there are a fixed number of storage slots, which we refer to as **
 By convention, each register has a key (memory address) and a value 
 (the binary blob stored in that memory slot). While all register keys have the same fixed length
 (measured in bits), the values are variable-length byte slices.
-We define an _unallocated_ register as holding no data, i.e. an empty byte slice.
-By default, each register is unallocated. In contrast, an _allocated_ register
+We define an **unallocated register** as holding no data, i.e. an empty byte slice.
+By default, each register is unallocated. In contrast, an **allocated_ register**
 holds a value with positive storage size, i.e. a byte slice with length larger than zero.
 Note that do not introduce the concept of registers values being `nil`. 
 
@@ -28,7 +28,7 @@ spans _all_ registers (even if they are unallocated).
 Therefore, we have two different node types in the tree:
  * A **LEAF** node represents a register:
     - holding a `key` and a `value`; 
-    - following establish graph-theoretic conventions, the **height** of a leaf is zero.
+    - following establish graph-theoretic conventions, the `height` of a leaf is zero.
     - the `hash` value is defined as:
       - For and _unallocated_ register, the `hash` is just the hash of a global constant.
         Therefore, the leafs for all unallocated registers have the same hash.
