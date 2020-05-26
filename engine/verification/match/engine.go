@@ -367,7 +367,9 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 
 	e.unit.Launch(func() {
 		err := e.verifier.ProcessLocal(vchunk)
-		log.Warn().Err(err).Msg("failed to verify chunk")
+		if err != nil {
+			log.Warn().Err(err).Msg("failed to verify chunk")
+		}
 	})
 
 	return nil

@@ -600,39 +600,41 @@ func TestMaxRetry(t *testing.T) {
 	e.Done()
 }
 
-// Concurrency: When 2 different ER are received concurrently, chunks from both
+// Concurrency: When 3 different ER are received concurrently, chunks from both
 // results will be processed
 func TestProcessExecutionResultConcurrently(t *testing.T) {
-	t.Skip()
-	e, participants, myID, _, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner :=
+	e, participants, myID, _, _, _, con, _, _, headerDB, _, _, _, verifier, _, assigner :=
 		SetupTest(t, 1)
-	// create a execution result that assigns to me
-	result, assignment := createExecutionResult(
-		head.ID(),
-		WithChunks(
-			WithAssignee(myID),
-		),
-	)
 
-	// add assignment to assigner
-	assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
+	ers := make([]*flow.ExecutionResult, 0)
 
-	// block header has been received
-	headerDB[result.BlockID] = head
+	for i := 0; i < 3; i++ {
+		header := &flow.Header{View: uint64(i)}
+		// create a execution result that assigns to me
+		result, assignment := createExecutionResult(
+			header.ID(),
+			WithChunks(
+				WithAssignee(myID),
+			),
+		)
+		fmt.Printf("headerid;, resultID %v, %v\n", header.ID(), result.ID())
+		ers = append(ers, result)
+
+		// add assignment to assigner
+		assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
+
+		// block header has been received
+		headerDB[result.BlockID] = header
+	}
 
 	// find the execution node id that created the execution result
 	en := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
-	// create chunk data pack
-	myChunk := result.ExecutionResultBody.Chunks[0]
-
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(3)
 	con.On("Submit", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		req := args.Get(0).(*messages.ChunkDataPackRequest)
-		fmt.Printf("con.Submit is called\n")
-		// assert the right ID was requested manually as we don't know what nonce was used
-		require.Equal(t, myChunk.ID(), req.ChunkID)
+		fmt.Printf("con.Submit is called for chunk: %v\n", req.ChunkID)
 
 		resp := &messages.ChunkDataPackResponse{
 			Data:  FromChunkID(req.ChunkID),
@@ -644,16 +646,20 @@ func TestProcessExecutionResultConcurrently(t *testing.T) {
 
 		time.Sleep(time.Millisecond)
 		wg.Done()
-	}).Return(nil).Times(2)
+	}).Return(nil).Times(3)
 
 	// check verifier's method is called
-	verifier.On("ProcessLocal", mock.Anything).Return(nil).Twice()
+	verifier.On("ProcessLocal", mock.Anything).Return(nil).Times(3)
 
 	<-e.Ready()
 	fmt.Printf("match.Engine.Process is called\n")
-	// engine processes the execution result
-	err := e.Process(en.ID(), result)
-	require.NoError(t, err)
+	// engine processes the execution result concurrently
+	for _, result := range ers {
+		go func(result *flow.ExecutionResult) {
+			err := e.Process(en.ID(), result)
+			require.NoError(t, err)
+		}(result)
+	}
 
 	wg.Wait()
 
