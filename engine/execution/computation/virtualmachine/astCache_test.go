@@ -119,7 +119,7 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 						destroy v
 					}
 				}
-			`, virtualmachine.FlowTokenAddress)),
+			`, virtualmachine.FlowTokenAddress())),
 		).
 		AddAuthorizer(accounts[0]).
 		SetProposalKey(accounts[0], 0, 0).
@@ -181,7 +181,7 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 						destroy v
 					}
 				}
-			`, virtualmachine.FlowTokenAddress, i)),
+			`, virtualmachine.FlowTokenAddress(), i)),
 			).
 			AddAuthorizer(accounts[0]).
 			SetProposalKey(accounts[0], 0, uint64(i)).
@@ -254,7 +254,7 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 						destroy v
 					}
 				}
-			`, virtualmachine.FlowTokenAddress, i)),
+			`, virtualmachine.FlowTokenAddress(), i)),
 			).
 			AddAuthorizer(accounts[0]).
 			SetPayer(accounts[0]).
@@ -302,7 +302,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 					let v <- FlowToken.createEmptyVault()
 					destroy v
 				}
-			`, virtualmachine.FlowTokenAddress, id)))
+			`, virtualmachine.FlowTokenAddress(), id)))
 			if !assert.True(t, result.Succeeded()) {
 				t.Log(result.Error.ErrorMessage())
 			}
@@ -312,7 +312,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 	}
 	wg.Wait()
 
-	location := runtime.AddressLocation(virtualmachine.FlowTokenAddress.Bytes())
+	location := runtime.AddressLocation(virtualmachine.FlowTokenAddress().Bytes())
 
 	// Get cached program
 	program, err := vm.ASTCache().GetProgram(location)
