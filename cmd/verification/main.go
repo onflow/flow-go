@@ -85,8 +85,13 @@ func main() {
 			flags.UintVar(&chunkLimit, "chunk-limit", 10000, "maximum number of chunk states in the memory pool")
 			flags.UintVar(&alpha, "alpha", 10, "maximum number of chunk states in the memory pool")
 		}).
+		Module("verification metrics", func(node *cmd.FlowNodeBuilder) error {
+			collector = metrics.NewNoopCollector()
+			return nil
+		}).
 		Module("execution authenticated receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-			authReceipts, err = stdmap.NewReceipts(receiptLimit)
+			authReceipts, err = stdmap.NewReceipts(receiptLimit,
+				stdmap.WithSizeMeterReceipts(collector.OnAuthenticatedReceiptsUpdated))
 			return err
 		}).
 		//Module("execution pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
@@ -94,7 +99,8 @@ func main() {
 		//	return err
 		//}).
 		Module("authenticated collections mempool", func(node *cmd.FlowNodeBuilder) error {
-			authCollections, err = stdmap.NewCollections(collectionLimit)
+			authCollections, err = stdmap.NewCollections(collectionLimit,
+				stdmap.WithSizeMeterCollections(collector.OnAuthenticatedCollectionsUpdated))
 			return err
 		}).
 		//Module("pending collections mempool", func(node *cmd.FlowNodeBuilder) error {
@@ -106,11 +112,13 @@ func main() {
 		//	return err
 		//}).
 		Module("chunk data pack mempool", func(node *cmd.FlowNodeBuilder) error {
-			chunkDataPacks, err = stdmap.NewChunkDataPacks(chunkLimit)
+			chunkDataPacks, err = stdmap.NewChunkDataPacks(chunkLimit,
+				stdmap.WithSizeMeterChunkDataPack(collector.OnChunkDataPacksUpdated))
 			return err
 		}).
 		Module("chunk data pack tracker mempool", func(node *cmd.FlowNodeBuilder) error {
-			chunkDataPackTracker, err = stdmap.NewChunkDataPackTrackers(chunkLimit)
+			chunkDataPackTracker, err = stdmap.NewChunkDataPackTrackers(chunkLimit,
+				stdmap.WithSizeMeterChunkDataPackTrackers(collector.OnChunkTrackersUpdated))
 			return err
 		}).
 		Module("ingested chunk ids mempool", func(node *cmd.FlowNodeBuilder) error {
@@ -132,10 +140,6 @@ func main() {
 		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
 			// consensus cache for follower engine
 			conCache = buffer.NewPendingBlocks()
-			return nil
-		}).
-		Module("verification metrics", func(node *cmd.FlowNodeBuilder) error {
-			collector = metrics.NewNoopCollector()
 			return nil
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {

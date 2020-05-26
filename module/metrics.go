@@ -117,6 +117,30 @@ type VerificationMetrics interface {
 	// OnChunkDataRemoved is called whenever something is removed that is related to chunkID from the in-memory mempools
 	// of verification node. It records the size of stored object.
 	OnChunkDataRemoved(chunkID flow.Identifier, size float64)
+
+	// OnAuthenticatedReceiptsUpdated is called whenever size of AuthenticatedReceipts mempool gets changed.
+	// It records the latest value of its size.
+	OnAuthenticatedReceiptsUpdated(size uint)
+
+	// OnPendingReceiptsUpdated is called whenever size of PendingReceipts mempool gets changed.
+	// It records the latest value of its size.
+	OnPendingReceiptsUpdated(size uint)
+
+	// OnAuthenticatedCollectionsUpdated is called whenever size of AuthenticatedCollections mempool gets changed.
+	// It records the latest value of its size.
+	OnAuthenticatedCollectionsUpdated(size uint)
+
+	// OnChunkDataPacksUpdated is called whenever size of ChunkDataPacks mempool gets changed.
+	// It records the latest value of its size.
+	OnChunkDataPacksUpdated(size uint)
+
+	// OnPendingCollectionsUpdated is called whenever size of PendingCollections mempool gets changed.
+	// It records the latest value of its size.
+	OnPendingCollectionsUpdated(size uint)
+
+	// OnChunkTrackersUpdated is called whenever size of ChunkTrackers mempool gets changed.
+	// It records the latest value of its size.
+	OnChunkTrackersUpdated(size uint)
 }
 
 // LedgerMetrics provides an interface to record Ledger Storage metrics.
