@@ -186,7 +186,7 @@ func SetupTest(t *testing.T, maxTry int) (
 	chunks = NewChunks(10)
 
 	log := zerolog.New(os.Stderr)
-	retryInterval := time.Second
+	retryInterval := 20 * time.Millisecond
 
 	e, err := New(log, net, me, er, verifier, assigner, state, chunks, headers, retryInterval, maxTry)
 	require.NoError(t, err)
