@@ -444,13 +444,11 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 		validTx := flow.NewTransactionBody().
 			SetScript(createAccountScript).
 			SetPayer(accounts[0]).
+			SetProposalKey(accounts[0], 0, 0).
 			AddAuthorizer(accounts[0])
 
-		err = execTestutil.SignPayload(validTx, accounts[0], privateKeys[0])
+		err = execTestutil.SignEnvelope(validTx, accounts[0], privateKeys[0])
 		require.NoError(t, err)
-
-		// err = execTestutil.SignTransactionByRoot(validTx, 2)
-		// require.NoError(t, err)
 
 		result, err := bc.ExecuteTransaction(ledger, validTx)
 		require.NoError(t, err)
@@ -468,12 +466,11 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 
 		invalidTx := flow.NewTransactionBody().
 			SetScript(createAccountScript).
+			SetPayer(accounts[0]).
+			SetProposalKey(accounts[0], 0, 0).
 			AddAuthorizer(accounts[0])
 
-		err = execTestutil.SignPayload(invalidTx, accounts[0], privateKeys[0])
-		require.NoError(t, err)
-
-		err = execTestutil.SignTransactionByRoot(invalidTx, 0)
+		err = execTestutil.SignEnvelope(invalidTx, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
 		result, err := bc.ExecuteTransaction(ledger, invalidTx)
