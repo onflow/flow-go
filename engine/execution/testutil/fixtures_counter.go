@@ -28,6 +28,10 @@ func DeployCounterContractTransaction(authorizer flow.Address) *flow.Transaction
 	return CreateContractDeploymentTransaction(CounterContract, authorizer)
 }
 
+func DeployUnauthorizedCounterContractTransaction(authorizer flow.Address) *flow.TransactionBody {
+	return CreateUnauthorizedContractDeploymentTransaction(CounterContract, authorizer)
+}
+
 func CreateCounterTransaction(counter, signer flow.Address) *flow.TransactionBody {
 	return flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`

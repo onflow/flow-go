@@ -151,24 +151,9 @@ func TestBlockContext_DeployContract(t *testing.T) {
 	t.Run("account update with set code succeeds as service account", func(t *testing.T) {
 		ledger := execTestutil.RootBootstrappedLedger()
 
-		tx := execTestutil.DeployCounterContractTransaction(flow.ServiceAddress())
-
-		err := execTestutil.SignTransactionByRoot(tx, 0)
-		require.NoError(t, err)
-
-		result, err := bc.ExecuteTransaction(ledger, tx)
-		assert.NoError(t, err)
-
-		assert.True(t, result.Succeeded())
-		assert.Nil(t, result.Error)
-	})
-
-	t.Run("account update with set code fails as not root", func(t *testing.T) {
 		// Create an account private key.
 		privateKeys, err := execTestutil.GenerateAccountPrivateKeys(1)
 		require.NoError(t, err)
-
-		ledger := execTestutil.RootBootstrappedLedger()
 
 		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
 		accounts, err := execTestutil.CreateAccounts(vm, ledger, privateKeys)
@@ -176,84 +161,37 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx := execTestutil.DeployCounterContractTransaction(accounts[0])
 
-		err = execTestutil.SignTransaction(tx, accounts[0], privateKeys[0], 0)
+		tx.SetProposalKey(flow.ServiceAddress(), 0, 0)
+		tx.SetPayer(flow.ServiceAddress())
+
+		err = execTestutil.SignPayload(tx, accounts[0], privateKeys[0])
+		require.NoError(t, err)
+
+		err = execTestutil.SignEnvelope(tx, flow.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
 		result, err := bc.ExecuteTransaction(ledger, tx)
-
 		assert.NoError(t, err)
-		assert.False(t, result.Succeeded())
-		assert.NotNil(t, result.Error)
-		assert.Equal(t, "code execution failed: Execution failed:\ncode can only be created and updated if account 0 has signed the transaction\n", result.Error.ErrorMessage())
-		assert.Equal(t, uint32(9), result.Error.StatusCode())
+
+		assert.True(t, result.Succeeded())
+
+		if !assert.Nil(t, result.Error) {
+			t.Log(result.Error.ErrorMessage())
+		}
 	})
 
-	t.Run("account creation with code succeeds as service account", func(t *testing.T) {
-		// Get transaction that will create an account with code, add root as the authorizer
-		_, tx := execTestutil.CreateCreateAccountTransaction(
-			t,
-			[]byte(execTestutil.CounterContract),
-			[]flow.Address{flow.ServiceAddress()},
-		)
-
-		err := execTestutil.SignTransactionByRoot(tx, 0)
-		require.NoError(t, err)
-
+	t.Run("account update with set code fails if not signed by service account", func(t *testing.T) {
 		ledger := execTestutil.RootBootstrappedLedger()
 
-		result, err := bc.ExecuteTransaction(ledger, tx)
-
-		assert.NoError(t, err)
-		assert.True(t, result.Succeeded())
-		assert.Nil(t, result.Error)
-
-		// Transfer account to new key
-		pk, err := execTestutil.GenerateAccountPrivateKey()
-		require.NoError(t, err)
-
-		tx = execTestutil.CreateAddAccountKeyTransaction(t, &pk)
-		tx.AddAuthorizer(flow.ServiceAddress())
-
-		err = execTestutil.SignTransactionByRoot(tx, 1)
-		require.NoError(t, err)
-
-		result, err = bc.ExecuteTransaction(ledger, tx)
-
-		assert.NoError(t, err)
-		assert.True(t, result.Succeeded())
-		assert.Nil(t, result.Error)
-
-		tx = execTestutil.CreateRemoveAccountKeyTransaction(0)
-		tx.AddAuthorizer(flow.ServiceAddress())
-
-		err = execTestutil.SignTransactionByRoot(tx, 2)
-		require.NoError(t, err)
-
-		result, err = bc.ExecuteTransaction(ledger, tx)
-
-		assert.NoError(t, err)
-		assert.True(t, result.Succeeded())
-		assert.Nil(t, result.Error)
-	})
-
-	t.Run("account creation with code fails as not root", func(t *testing.T) {
 		// Create an account private key.
 		privateKeys, err := execTestutil.GenerateAccountPrivateKeys(1)
 		require.NoError(t, err)
-
-		ledger := execTestutil.RootBootstrappedLedger()
 
 		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
 		accounts, err := execTestutil.CreateAccounts(vm, ledger, privateKeys)
 		require.NoError(t, err)
 
-		// Get transaction that will create an account with code, add the account we just created as the authorizer
-
-		_, tx := execTestutil.CreateCreateAccountTransaction(
-			t,
-			[]byte(execTestutil.CounterContract),
-			[]flow.Address{accounts[0]},
-		)
+		tx := execTestutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
 
 		err = execTestutil.SignTransaction(tx, accounts[0], privateKeys[0], 0)
 		require.NoError(t, err)
@@ -263,7 +201,10 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		assert.NoError(t, err)
 		assert.False(t, result.Succeeded())
 		assert.NotNil(t, result.Error)
-		assert.Equal(t, "code execution failed: Execution failed:\ncode can only be created and updated if account 0 has signed the transaction\n", result.Error.ErrorMessage())
+
+		expectedErr := "code execution failed: Execution failed:\ncode deployment requires authorization from the service account\n"
+
+		assert.Equal(t, expectedErr, result.Error.ErrorMessage())
 		assert.Equal(t, uint32(9), result.Error.StatusCode())
 	})
 }
@@ -448,11 +389,11 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 	require.NoError(t, err)
 
 	createAccountScript := []byte(`
-	transaction {
-		prepare(signer: AuthAccount) {
-			let acct = AuthAccount(payer: signer)
+		transaction {
+			prepare(signer: AuthAccount) {
+				let acct = AuthAccount(payer: signer)
+			}
 		}
-	}
 	`)
 
 	addAccountCreatorTemplate := `
@@ -689,7 +630,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	ledgerAccess := virtualmachine.NewLedgerDAL(ledger)
 
 	createAccount := func() (flow.Address, crypto.PublicKey) {
-		key, tx := execTestutil.CreateCreateAccountTransaction(t, nil, nil)
+		privateKey, tx := execTestutil.CreateAccountCreationTransaction(t)
 
 		err := execTestutil.SignTransactionByRoot(tx, sequenceNumber)
 		require.NoError(t, err)
@@ -699,7 +640,12 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		rootHasher, err := hash.NewHasher(unittest.ServiceAccountPrivateKey.HashAlgo)
 		require.NoError(t, err)
 
-		err = tx.SignEnvelope(flow.ServiceAddress(), 0, unittest.ServiceAccountPrivateKey.PrivateKey, rootHasher)
+		err = tx.SignEnvelope(
+			flow.ServiceAddress(),
+			0,
+			unittest.ServiceAccountPrivateKey.PrivateKey,
+			rootHasher,
+		)
 		require.NoError(t, err)
 
 		// execute the transaction
@@ -717,7 +663,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		// read the address of the account created (e.g. "0x01" and convert it to flow.address)
 		address := flow.BytesToAddress(result.Events[0].Fields[0].(cadence.Address).Bytes())
 
-		return address, key.PublicKey(1000).PublicKey
+		return address, privateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold).PublicKey
 	}
 
 	// create a bunch of accounts

@@ -86,7 +86,6 @@ func (r *TransactionContext) ValueExists(owner, controller, key []byte) (exists 
 //
 // This function returns an error if the input is invalid.
 func (r *TransactionContext) CreateAccount(payer runtime.Address) (runtime.Address, error) {
-
 	flowErr, fatalErr := r.deductAccountCreationFee(flow.Address(payer))
 	if fatalErr != nil {
 		return runtime.Address{}, fatalErr
@@ -557,6 +556,16 @@ func sigIsForProposalKey(txSig flow.TransactionSignature, proposalKey flow.Propo
 
 func hasSufficientKeyWeight(weights map[flow.Address]int, address flow.Address) bool {
 	return weights[address] >= AccountKeyWeightThreshold
+}
+
+func (r *TransactionContext) isValidSigningAccount(address runtime.Address) bool {
+	for _, accountAddress := range r.GetSigningAccounts() {
+		if accountAddress == address {
+			return true
+		}
+	}
+
+	return false
 }
 
 var InitDefaultTokenTransaction = []byte(fmt.Sprintf(`

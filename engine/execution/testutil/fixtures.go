@@ -26,6 +26,20 @@ func CreateContractDeploymentTransaction(contract string, authorizer flow.Addres
 
 	return flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`transaction {
+              prepare(signer: AuthAccount, service: AuthAccount) {
+                signer.setCode("%s".decodeHex())
+              }
+            }`, encoded)),
+		).
+		AddAuthorizer(authorizer).
+		AddAuthorizer(flow.ServiceAddress())
+}
+
+func CreateUnauthorizedContractDeploymentTransaction(contract string, authorizer flow.Address) *flow.TransactionBody {
+	encoded := hex.EncodeToString([]byte(contract))
+
+	return flow.NewTransactionBody().
+		SetScript([]byte(fmt.Sprintf(`transaction {
               prepare(signer: AuthAccount) {
                 signer.setCode("%s".decodeHex())
               }
@@ -187,46 +201,32 @@ func bytesToCadenceArray(l []byte) cadence.Array {
 	return cadence.NewArray(values)
 }
 
-// CreateCreateAccountTransaction creates a transaction which will create a new account and returns the randomly
-// generated private key and the transaction
-func CreateCreateAccountTransaction(
-	t *testing.T,
-	code []byte,
-	authorizers []flow.Address,
-) (flow.AccountPrivateKey, *flow.TransactionBody) {
+// CreateAccountCreationTransaction creates a transaction which will create a new account.
+//
+// This function returns a randomly generated private key and the transaction.
+func CreateAccountCreationTransaction(t *testing.T) (flow.AccountPrivateKey, *flow.TransactionBody) {
 	accountKey, err := GenerateAccountPrivateKey()
 	require.NoError(t, err)
 
 	keyBytes, err := flow.EncodeRuntimeAccountPublicKey(accountKey.PublicKey(1000))
 	require.NoError(t, err)
 
-	// encode the bytes to cadence string
-	encodedKey := languageEncodeBytesArray(keyBytes)
-
-	prepare := "prepare("
-	for i := range authorizers {
-		prepare += fmt.Sprintf("signer%v: AuthAccount", i)
-	}
-	prepare += ") { }"
-
 	// define the cadence script
-	script := fmt.Sprintf(`
-			transaction {
-			  %s
-			  execute {
-			    AuthAccount(publicKeys: %s, code: "%s".decodeHex())
-			  }
-			}
-		`,
-		prepare, encodedKey, hex.EncodeToString(code))
+	script := fmt.Sprintf(`	
+		transaction {	
+		  prepare(signer: AuthAccount) {	
+			let acct = AuthAccount(payer: signer)	
+			acct.addPublicKey("%s".decodeHex())	
+		  }	
+		}	
+	`, hex.EncodeToString(keyBytes))
 
 	// create the transaction to create the account
-	tx := flow.TransactionBody{
-		Script:      []byte(script),
-		Authorizers: authorizers,
-	}
+	tx := flow.NewTransactionBody().
+		SetScript([]byte(script)).
+		AddAuthorizer(flow.ServiceAddress())
 
-	return accountKey, &tx
+	return accountKey, tx
 }
 
 // CreateAddAccountKeyTransaction generates a tx that adds a key to an account.
