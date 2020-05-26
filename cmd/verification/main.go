@@ -111,8 +111,7 @@ func main() {
 		//	return err
 		//}).
 		Module("chunk data pack mempool", func(node *cmd.FlowNodeBuilder) error {
-			chunkDataPacks, err = stdmap.NewChunkDataPacks(chunkLimit,
-				stdmap.WithSizeMeterChunkDataPack(collector.OnChunkDataPacksUpdated))
+			chunkDataPacks, err = stdmap.NewChunkDataPacks(chunkLimit, node.Metrics.Mempool)
 			return err
 		}).
 		Module("chunk data pack tracker mempool", func(node *cmd.FlowNodeBuilder) error {

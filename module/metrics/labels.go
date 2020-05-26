@@ -44,6 +44,7 @@ const (
 	ResourceTransaction     = "transaction"
 	ResourceClusterPayload  = "cluster_payload"
 	ResourceClusterProposal = "cluster_proposal"
+	ResourceChunkDataPack   = "chunk_data_pack"
 )
 
 const (

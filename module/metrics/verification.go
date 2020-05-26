@@ -20,7 +20,6 @@ type VerificationCollector struct {
 	authenticatedCollectionsNum prometheus.Gauge
 	pendingReceiptsNum          prometheus.Gauge
 	chunkTrackersNum            prometheus.Gauge
-	chunkDataPacksNum           prometheus.Gauge
 }
 
 func NewVerificationCollector(tracer *trace.OpenTracer) *VerificationCollector {
@@ -62,12 +61,6 @@ func NewVerificationCollector(tracer *trace.OpenTracer) *VerificationCollector {
 			Name:      "pending_receipts_latest_number_total",
 			Namespace: namespaceVerification,
 			Help:      "latest number of pending receipts in mempool",
-		}),
-
-		chunkDataPacksNum: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "chunk_data_packs_latest_number_total",
-			Namespace: namespaceVerification,
-			Help:      "latest number of chunk data packs in mempool",
 		}),
 
 		chunkTrackersNum: promauto.NewGauge(prometheus.GaugeOpts{

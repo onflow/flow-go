@@ -50,8 +50,7 @@ func main() {
 			panic(err)
 		}
 
-		chunkDataPacks, err := stdmap.NewChunkDataPacks(10,
-			stdmap.WithSizeMeterChunkDataPack(verificationCollector.OnChunkDataPacksUpdated))
+		chunkDataPacks, err := stdmap.NewChunkDataPacks(10, mempoolcollector)
 		if err != nil {
 			panic(err)
 		}

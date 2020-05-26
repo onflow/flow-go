@@ -357,7 +357,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.ChunkDataPacks == nil {
-		node.ChunkDataPacks, err = stdmap.NewChunkDataPacks(1000)
+		node.ChunkDataPacks, err = stdmap.NewChunkDataPacks(1000, nil)
 		require.Nil(t, err)
 	}
 
