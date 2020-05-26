@@ -167,7 +167,7 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, r *flow.Executi
 		_ = e.chunks.Add(status)
 	}
 
-	e.log.Debug().Msg("finish processing execution result")
+	e.log.Debug().Int("chunks", len(chunks)).Uint("pending", e.chunks.Size()).Msg("finish processing execution result")
 	return nil
 }
 
@@ -213,6 +213,7 @@ func myAssignements(assigner module.ChunkAssigner, myID flow.Identifier, verifie
 			return nil, fmt.Errorf("chunk out of range requested: %v", index)
 		}
 
+		fmt.Printf("chunkID: %v, index: %v\n", chunk.ID(), index)
 		mine = append(mine, chunk)
 	}
 
@@ -226,10 +227,13 @@ func myAssignements(assigner module.ChunkAssigner, myID flow.Identifier, verifie
 func (e *Engine) onTimer() {
 	allChunks := e.chunks.All()
 
+	now := time.Now()
+	e.log.Debug().Int("total", len(allChunks)).Msg("start processing all pending chunks")
 	for _, chunk := range allChunks {
 		exists := e.results.Has(chunk.ExecutionResultID)
 
 		cid := chunk.ID()
+		fmt.Printf("processing chunk: %v\n", cid)
 
 		log := e.log.With().
 			Hex("chunk_id", cid[:]).
@@ -248,7 +252,12 @@ func (e *Engine) onTimer() {
 		if err != nil {
 			log.Warn().Msg("could not request chunk data pack")
 		}
+		log.Debug().Msg("chunk data requested")
 	}
+
+	e.log.Debug().Int("total", len(allChunks)).
+		Dur("duration", time.Since(now)).
+		Msg("finish processing all pending chunks")
 }
 
 // request the chunk data pack from the execution node.
