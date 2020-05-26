@@ -69,7 +69,7 @@ func GetCompleteExecutionResultForCounter(t *testing.T, chunkCount int) verifica
 		startStateCommitment, err := bootstrap.BootstrapLedger(
 			led,
 			unittest.ServiceAccountPublicKey,
-			unittest.InitialTokenSupply,
+			unittest.GenesisTokenSupply,
 		)
 		require.NoError(t, err)
 

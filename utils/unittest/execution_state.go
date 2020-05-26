@@ -16,14 +16,14 @@ import (
 const ServiceAccountPrivateKeyHex = "e3a08ae3d0461cfed6d6f49bfc25fa899351c39d1bd21fdba8c87595b6c49bb4cc430201"
 
 // Pre-calculated state commitment with root account with the above private key
-const GenesisStateCommitmentHex = "b142c1892045964cc21e3a28aaa2399f0f3d2ceafe38d1fa811e1003ba21f290"
+const GenesisStateCommitmentHex = "575d83270d90f83c3fb906943c9888da21b2fc0644cbbfb7614e8f6da2696d25"
 
 var GenesisStateCommitment flow.StateCommitment
 
+const GenesisTokenSupply uint64 = 1_000_000_000_000_000
+
 var ServiceAccountPrivateKey flow.AccountPrivateKey
 var ServiceAccountPublicKey flow.AccountPublicKey
-
-const InitialTokenSupply uint64 = 1_000_000_000_000_000
 
 func init() {
 	var err error
