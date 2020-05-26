@@ -363,10 +363,9 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 		result, err := bc.ExecuteTransaction(ledger, validTx)
 		require.NoError(t, err)
 
-		if !result.Succeeded() {
-			fmt.Println(result.Error.ErrorMessage())
+		if !assert.True(t, result.Succeeded()) {
+			t.Log(result.Error.ErrorMessage())
 		}
-		assert.True(t, result.Succeeded())
 	}
 
 	removeAccountCreatorTemplate := `
