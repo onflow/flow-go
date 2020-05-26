@@ -30,21 +30,22 @@ const (
 )
 
 const (
-	ResourceUndefined       = "undefined"
-	ResourceProposal        = "proposal"
-	ResourceHeader          = "header"
-	ResourceIndex           = "index"
-	ResourceIdentity        = "identity"
-	ResourceGuarantee       = "guarantee"
-	ResourceResult          = "result"
-	ResourceReceipt         = "receipt"
-	ResourceApproval        = "approval"
-	ResourceSeal            = "seal"
-	ResourceCommit          = "commit"
-	ResourceTransaction     = "transaction"
-	ResourceClusterPayload  = "cluster_payload"
-	ResourceClusterProposal = "cluster_proposal"
-	ResourceChunkDataPack   = "chunk_data_pack"
+	ResourceUndefined            = "undefined"
+	ResourceProposal             = "proposal"
+	ResourceHeader               = "header"
+	ResourceIndex                = "index"
+	ResourceIdentity             = "identity"
+	ResourceGuarantee            = "guarantee"
+	ResourceResult               = "result"
+	ResourceReceipt              = "receipt"
+	ResourceApproval             = "approval"
+	ResourceSeal                 = "seal"
+	ResourceCommit               = "commit"
+	ResourceTransaction          = "transaction"
+	ResourceClusterPayload       = "cluster_payload"
+	ResourceClusterProposal      = "cluster_proposal"
+	ResourceChunkDataPack        = "chunk_data_pack"
+	ResourceChunkDataPackTracker = "chunk_data_pack_tracker"
 )
 
 const (

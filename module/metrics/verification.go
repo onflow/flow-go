@@ -19,7 +19,6 @@ type VerificationCollector struct {
 	pendingCollectionsNum       prometheus.Gauge
 	authenticatedCollectionsNum prometheus.Gauge
 	pendingReceiptsNum          prometheus.Gauge
-	chunkTrackersNum            prometheus.Gauge
 }
 
 func NewVerificationCollector(tracer *trace.OpenTracer) *VerificationCollector {
@@ -62,12 +61,6 @@ func NewVerificationCollector(tracer *trace.OpenTracer) *VerificationCollector {
 			Namespace: namespaceVerification,
 			Help:      "latest number of pending receipts in mempool",
 		}),
-
-		chunkTrackersNum: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "chunk_trackers_latest_number_total",
-			Namespace: namespaceVerification,
-			Help:      "latest number of chunk trackers",
-		}),
 	}
 
 	return vc
@@ -105,22 +98,10 @@ func (vc *VerificationCollector) OnAuthenticatedCollectionsUpdated(size uint) {
 	vc.authenticatedCollectionsNum.Set(float64(size))
 }
 
-// OnChunkDataPacksUpdated is called whenever size of ChunkDataPacks mempool gets changed.
-// It records the latest value of its size.
-func (vc *VerificationCollector) OnChunkDataPacksUpdated(size uint) {
-	vc.chunkDataPacksNum.Set(float64(size))
-}
-
 // OnPendingCollectionsUpdated is called whenever size of PendingCollections mempool gets changed.
 // It records the latest value of its size.
 func (vc *VerificationCollector) OnPendingCollectionsUpdated(size uint) {
 	vc.pendingCollectionsNum.Set(float64(size))
-}
-
-// OnChunkTrackersUpdated is called whenever size of ChunkTrackers mempool gets changed.
-// It records the latest value of its size.
-func (vc *VerificationCollector) OnChunkTrackersUpdated(size uint) {
-	vc.chunkTrackersNum.Set(float64(size))
 }
 
 // OnChunkVerificationStarted is called whenever the verification of a chunk is started.

@@ -5,31 +5,19 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/verification/tracker"
+	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 )
 
 // ChunkDataPackTrackers implements the ChunkDataPackTrackers memory pool.
 type ChunkDataPackTrackers struct {
 	*Backend
-	sizeMeter func(uint) // keeps track of size variations of memory pool
-}
-
-type ChunkDataPackTrackersOpts func(*ChunkDataPackTrackers)
-
-func WithSizeMeterChunkDataPackTrackers(f func(uint)) ChunkDataPackTrackersOpts {
-	return func(c *ChunkDataPackTrackers) {
-		c.sizeMeter = f
-	}
 }
 
 // NewChunkDataPackTrackers creates a new memory pool for ChunkDataPackTrackers.
-func NewChunkDataPackTrackers(limit uint, opts ...ChunkDataPackTrackersOpts) (*ChunkDataPackTrackers, error) {
+func NewChunkDataPackTrackers(limit uint, collector module.MempoolMetrics) (*ChunkDataPackTrackers, error) {
 	a := &ChunkDataPackTrackers{
-		Backend:   NewBackend(WithLimit(limit)),
-		sizeMeter: nil,
-	}
-
-	for _, apply := range opts {
-		apply(a)
+		Backend: NewBackend(WithLimit(limit), WithMetrics(collector, metrics.ResourceChunkDataPackTracker)),
 	}
 
 	return a, nil
@@ -38,12 +26,6 @@ func NewChunkDataPackTrackers(limit uint, opts ...ChunkDataPackTrackersOpts) (*C
 // Add adds a ChunkDataPackTracker to the mempool.
 func (c *ChunkDataPackTrackers) Add(cdpt *tracker.ChunkDataPackTracker) bool {
 	added := c.Backend.Add(cdpt)
-
-	// tracks size updates
-	if c.sizeMeter != nil {
-		c.sizeMeter(c.Backend.Size())
-	}
-
 	return added
 }
 
@@ -56,12 +38,6 @@ func (c *ChunkDataPackTrackers) Has(chunkID flow.Identifier) bool {
 // Rem removes tracker with the given chunk ID.
 func (c *ChunkDataPackTrackers) Rem(chunkID flow.Identifier) bool {
 	removed := c.Backend.Rem(chunkID)
-
-	// tracks size updates
-	if c.sizeMeter != nil {
-		c.sizeMeter(c.Backend.Size())
-	}
-
 	return removed
 }
 
