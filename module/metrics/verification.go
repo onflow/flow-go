@@ -48,37 +48,37 @@ func NewVerificationCollector(tracer *trace.OpenTracer) *VerificationCollector {
 		}),
 
 		pendingCollectionsNum: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "pending_collections_latest_number_collections",
+			Name:      "pending_collections_latest_number_total",
 			Namespace: namespaceVerification,
 			Help:      "latest number of pending collections in mempool",
 		}),
 
 		authenticatedCollectionsNum: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "authenticated_collections_latest_number_collections",
+			Name:      "authenticated_collections_latest_number_total",
 			Namespace: namespaceVerification,
 			Help:      "latest number of authenticated collections in mempool",
 		}),
 
 		pendingReceiptsNum: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "pending_receipts_latest_number_receipts",
+			Name:      "pending_receipts_latest_number_total",
 			Namespace: namespaceVerification,
 			Help:      "latest number of pending receipts in mempool",
 		}),
 
 		authenticatedReceiptsNum: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "authenticated_receipts_latest_number_receipts",
+			Name:      "authenticated_receipts_latest_number_total",
 			Namespace: namespaceVerification,
 			Help:      "latest number of authenticated receipts in mempool",
 		}),
 
 		chunkDataPacksNum: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "chunk_data_packs_latest_number_chunks",
+			Name:      "chunk_data_packs_latest_number_total",
 			Namespace: namespaceVerification,
 			Help:      "latest number of chunk data packs in mempool",
 		}),
 
 		chunkTrackersNum: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "chunk_trackers_number_latest_number_trackers",
+			Name:      "chunk_trackers_latest_number_total",
 			Namespace: namespaceVerification,
 			Help:      "latest number of chunk trackers",
 		}),
