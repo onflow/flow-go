@@ -524,24 +524,15 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, err
 	}
 
-	// write public DKG data
-	consensusNodes := bootstrap.FilterByRole(toNodeInfoList(confs), flow.RoleConsensus)
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathDKGDataPub), dkg.Public(consensusNodes))
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathDKGDataPub), dkg.Public())
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// write private key files for each DKG participant
-	for i, sk := range dkg.PrivKeyShares {
-		nodeID := consensusNodes[i].NodeID
-		encodableSk := bootstrap.EncodableRandomBeaconPrivKey{sk}
-		privParticpant := bootstrap.DKGParticipantPriv{
-			NodeID:              nodeID,
-			RandomBeaconPrivKey: encodableSk,
-			GroupIndex:          i,
-		}
-		path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID)
-		err = writeJSON(filepath.Join(bootstrapDir, path), privParticpant)
+	for _, part := range dkg.Participants {
+		path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, part.NodeID)
+		err = writeJSON(filepath.Join(bootstrapDir, path), part.Private())
 		if err != nil {
 			return nil, nil, err
 		}
@@ -670,12 +661,18 @@ func runDKG(confs []ContainerConfig) (bootstrap.DKGData, error) {
 	}
 
 	// sanity check
-	if nConsensusNodes != len(dkg.PrivKeyShares) {
+	if nConsensusNodes != len(dkg.Participants) {
 		return bootstrap.DKGData{}, fmt.Errorf(
 			"consensus node count does not match DKG participant count: nodes=%d, participants=%d",
 			nConsensusNodes,
-			len(dkg.PrivKeyShares),
+			len(dkg.Participants),
 		)
+	}
+
+	// set the node IDs in the dkg data
+	for i := range dkg.Participants {
+		nodeID := consensusNodes[i].NodeID
+		dkg.Participants[i].NodeID = nodeID
 	}
 
 	return dkg, nil

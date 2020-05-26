@@ -27,22 +27,16 @@ func runDKG(nodes []model.NodeInfo) model.DKGData {
 	}
 	log.Info().Msgf("finished running DKG")
 
-	for i, privKey := range dkgData.PrivKeyShares {
+	for i, participant := range dkgData.Participants {
 		nodeID := nodes[i].NodeID
+		dkgData.Participants[i].NodeID = nodeID
 
 		log.Debug().Int("i", i).Str("nodeId", nodeID.String()).Msg("assembling dkg data")
 
-		encKey := model.EncodableRandomBeaconPrivKey{PrivateKey: privKey}
-		privParticpant := model.DKGParticipantPriv{
-			NodeID:              nodeID,
-			RandomBeaconPrivKey: encKey,
-			GroupIndex:          i,
-		}
-
-		writeJSON(fmt.Sprintf(model.PathRandomBeaconPriv, nodeID), privParticpant)
+		writeJSON(fmt.Sprintf(model.PathRandomBeaconPriv, nodeID), participant.Private())
 	}
 
-	writeJSON(model.PathDKGDataPub, dkgData.Public(nodes))
+	writeJSON(model.PathDKGDataPub, dkgData.Public())
 
 	return dkgData
 }

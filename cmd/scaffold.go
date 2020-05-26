@@ -648,7 +648,7 @@ func loadDKGPublicData(dir string) (*dkg.PublicData, error) {
 	if err != nil {
 		return nil, err
 	}
-	dkgPubData := &bootstrap.EncodableDKGDataPub{}
+	dkgPubData := &bootstrap.DKGDataPub{}
 	err = json.Unmarshal(data, dkgPubData)
 	return dkgPubData.ForHotStuff(), err
 }
