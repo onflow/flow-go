@@ -23,14 +23,15 @@ func RegisterBadgerMetrics() {
 			fmt.Sprintf("%s_%s_memtable_gets_total", namespaceStorage, subsystemBadger), "number of memtable gets", nil, nil),
 		"badger_puts_total": prometheus.NewDesc(
 			fmt.Sprintf("%s_%s_puts_total", namespaceStorage, subsystemBadger), "number of puts", nil, nil),
-		"badger_blocked_puts_total": prometheus.NewDesc(
-			fmt.Sprintf("%s_%s_blocked_puts_total", namespaceStorage, subsystemBadger), "number of blocked puts", nil, nil),
+		// NOTE: variable exists, but not used in badger yet
+		//"badger_blocked_puts_total": prometheus.NewDesc(
+		//	fmt.Sprintf("%s_%s_blocked_puts_total", namespaceStorage, subsystemBadger), "number of blocked puts", nil, nil),
 		"badger_pending_writes_total": prometheus.NewDesc(
-			fmt.Sprintf("badger_pending_writes_total", namespaceStorage, subsystemBadger), "tracks the number of pending writes", []string{"path"}, nil),
+			fmt.Sprintf("%s_%s_badger_pending_writes_total", namespaceStorage, subsystemBadger), "tracks the number of pending writes", []string{"path"}, nil),
 		"badger_lsm_bloom_hits_total": prometheus.NewDesc(
-			fmt.Sprintf("%s_%s_lsm_bloom_hits_total", namespaceStorage, subsystemBadger), "number of LSM bloom hits", []string{"path"}, nil),
+			fmt.Sprintf("%s_%s_lsm_bloom_hits_total", namespaceStorage, subsystemBadger), "number of LSM bloom hits", []string{"level"}, nil),
 		"badger_lsm_level_gets_total": prometheus.NewDesc(
-			fmt.Sprintf("%s_%s_lsm_level_gets_total", namespaceStorage, subsystemBadger), "number of LSM gets", []string{"path"}, nil),
+			fmt.Sprintf("%s_%s_lsm_level_gets_total", namespaceStorage, subsystemBadger), "number of LSM gets", []string{"level"}, nil),
 		"badger_lsm_size_bytes": prometheus.NewDesc(
 			fmt.Sprintf("%s_%s_lsm_size_bytes", namespaceStorage, subsystemBadger), "size of the LSM in bytes", []string{"path"}, nil),
 		"badger_vlog_size_bytes": prometheus.NewDesc(
