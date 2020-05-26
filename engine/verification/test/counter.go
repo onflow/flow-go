@@ -25,18 +25,18 @@ func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExe
 
 	// setup collection
 
-	tx1 := testutil.DeployCounterContractTransaction()
-	err := testutil.SignTransactionByRoot(&tx1, 0)
+	tx1 := testutil.DeployCounterContractTransaction(flow.ServiceAddress())
+	err := testutil.SignTransactionByRoot(tx1, 0)
 	require.NoError(t, err)
-	tx2 := testutil.CreateCounterTransaction()
-	err = testutil.SignTransactionByRoot(&tx2, 1)
+	tx2 := testutil.CreateCounterTransaction(flow.ServiceAddress(), flow.ServiceAddress())
+	err = testutil.SignTransactionByRoot(tx2, 1)
 	require.NoError(t, err)
-	tx3 := testutil.CreateCounterPanicTransaction()
-	err = testutil.SignTransactionByRoot(&tx3, 2)
+	tx3 := testutil.CreateCounterPanicTransaction(flow.ServiceAddress(), flow.ServiceAddress())
+	err = testutil.SignTransactionByRoot(tx3, 2)
 	require.NoError(t, err)
-	transactions := []*flow.TransactionBody{&tx1, &tx2, &tx3}
+	transactions := []*flow.TransactionBody{tx1, tx2, tx3}
 
-	transactions = append(transactions, &tx3)
+	transactions = append(transactions, tx3)
 	col := flow.Collection{Transactions: transactions}
 	collections := []*flow.Collection{&col}
 
