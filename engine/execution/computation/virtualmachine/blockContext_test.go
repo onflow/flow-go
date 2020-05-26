@@ -326,7 +326,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 	`)
 
 	addAccountCreatorTemplate := `
-	import FlowServiceAccount from 0x1
+	import FlowServiceAccount from 0x%s
 	transaction {
 		let serviceAccountAdmin: &FlowServiceAccount.Administrator
 		prepare(signer: AuthAccount) {
@@ -346,11 +346,16 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 	`
 
 	addAccountCreator := func(account flow.Address, seqNum uint64) {
-		script := []byte(fmt.Sprintf(addAccountCreatorTemplate, account.String()))
+		script := []byte(
+			fmt.Sprintf(addAccountCreatorTemplate,
+				flow.ServiceAddress().String(),
+				account.String(),
+			),
+		)
 
 		validTx := flow.NewTransactionBody().
 			SetScript(script).
-			AddAuthorizer(flow.RootAddress)
+			AddAuthorizer(flow.ServiceAddress())
 
 		err = execTestutil.SignTransactionByRoot(validTx, seqNum)
 		require.NoError(t, err)
@@ -358,11 +363,14 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 		result, err := bc.ExecuteTransaction(ledger, validTx)
 		require.NoError(t, err)
 
+		if !result.Succeeded() {
+			fmt.Println(result.Error.ErrorMessage())
+		}
 		assert.True(t, result.Succeeded())
 	}
 
 	removeAccountCreatorTemplate := `
-	import FlowServiceAccount from 0x1
+	import FlowServiceAccount from 0x%s
 	transaction {
 		let serviceAccountAdmin: &FlowServiceAccount.Administrator
 		prepare(signer: AuthAccount) {
@@ -382,11 +390,17 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 	`
 
 	removeAccountCreator := func(account flow.Address, seqNum uint64) {
-		script := []byte(fmt.Sprintf(removeAccountCreatorTemplate, account.String()))
+		script := []byte(
+			fmt.Sprintf(
+				removeAccountCreatorTemplate,
+				flow.ServiceAddress(),
+				account.String(),
+			),
+		)
 
 		validTx := flow.NewTransactionBody().
 			SetScript(script).
-			AddAuthorizer(flow.RootAddress)
+			AddAuthorizer(flow.ServiceAddress())
 
 		err = execTestutil.SignTransactionByRoot(validTx, seqNum)
 		require.NoError(t, err)
