@@ -11,6 +11,11 @@ type HotstuffMetrics struct {
 	mock.Mock
 }
 
+// CommitteeProcessingDuration provides a mock function with given fields: duration
+func (_m *HotstuffMetrics) CommitteeProcessingDuration(duration time.Duration) {
+	_m.Called(duration)
+}
+
 // CountSkipped provides a mock function with given fields:
 func (_m *HotstuffMetrics) CountSkipped() {
 	_m.Called()
@@ -36,6 +41,11 @@ func (_m *HotstuffMetrics) HotStuffWaitDuration(duration time.Duration, event st
 	_m.Called(duration, event)
 }
 
+// PayloadProductionDuration provides a mock function with given fields: duration
+func (_m *HotstuffMetrics) PayloadProductionDuration(duration time.Duration) {
+	_m.Called(duration)
+}
+
 // SetCurView provides a mock function with given fields: view
 func (_m *HotstuffMetrics) SetCurView(view uint64) {
 	_m.Called(view)
@@ -48,5 +58,15 @@ func (_m *HotstuffMetrics) SetQCView(view uint64) {
 
 // SetTimeout provides a mock function with given fields: duration
 func (_m *HotstuffMetrics) SetTimeout(duration time.Duration) {
+	_m.Called(duration)
+}
+
+// SignerProcessingDuration provides a mock function with given fields: duration
+func (_m *HotstuffMetrics) SignerProcessingDuration(duration time.Duration) {
+	_m.Called(duration)
+}
+
+// ValidatorProcessingDuration provides a mock function with given fields: duration
+func (_m *HotstuffMetrics) ValidatorProcessingDuration(duration time.Duration) {
 	_m.Called(duration)
 }

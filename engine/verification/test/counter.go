@@ -2,8 +2,6 @@ package test
 
 import (
 	"context"
-	"encoding/hex"
-	"fmt"
 	"testing"
 
 	"github.com/onflow/cadence/runtime"
@@ -14,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
+	"github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
@@ -22,73 +21,22 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-// GetTxBodyDeployCounterContract returns transaction body for deploying counter smart contract
-func GetTxBodyDeployCounterContract() *flow.TransactionBody {
-	encoded := hex.EncodeToString([]byte(`
-			access(all) contract Container {
-				access(all) resource Counter {
-					pub var count: Int
-
-					init(_ v: Int) {
-						self.count = v
-					}
-					pub fun add(_ count: Int) {
-						self.count = self.count + count
-					}
-				}
-				pub fun createCounter(_ v: Int): @Counter {
-					return <-create Counter(v)
-				}
-			}`))
-
-	return &flow.TransactionBody{
-		Script: []byte(fmt.Sprintf(`transaction {
-              prepare(signer: AuthAccount) {
-                signer.setCode("%s".decodeHex())
-              }
-			}`, encoded)),
-		Authorizers: []flow.Address{flow.ServiceAddress()},
-	}
-}
-
-// GetTxBodyCreateCounter returns transaction body for creating a new counter inside the smart contract
-func GetTxBodyCreateCounter() *flow.TransactionBody {
-	return &flow.TransactionBody{
-		Script: []byte(`
-			import 0x01
-			transaction {
-				prepare(acc: AuthAccount) {
-					if acc.storage[Container.Counter] == nil {
-                		let existing <- acc.storage[Container.Counter] <- Container.createCounter(3)
-                		destroy existing
-					}
-              	}
-            }`),
-		Authorizers: []flow.Address{flow.ServiceAddress()},
-	}
-}
-
-// GetTxBodyAddToCounter returns transaction body for adding a value to the counter
-func GetTxBodyAddToCounter() *flow.TransactionBody {
-	return &flow.TransactionBody{
-		Script: []byte(`
-			import 0x01
-			transaction {
-				prepare(acc: AuthAccount) {
-					acc.storage[Container.Counter]?.add(2)
-              	}
-            }`),
-		Authorizers: []flow.Address{flow.ServiceAddress()},
-	}
-}
-
 func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExecutionResult {
 
 	// setup collection
-	transactions := make([]*flow.TransactionBody, 0)
-	transactions = append(transactions, GetTxBodyDeployCounterContract())
-	transactions = append(transactions, GetTxBodyCreateCounter())
-	transactions = append(transactions, GetTxBodyAddToCounter())
+
+	tx1 := testutil.DeployCounterContractTransaction()
+	err := testutil.SignTransactionByRoot(&tx1, 0)
+	require.NoError(t, err)
+	tx2 := testutil.CreateCounterTransaction()
+	err = testutil.SignTransactionByRoot(&tx2, 1)
+	require.NoError(t, err)
+	tx3 := testutil.CreateCounterPanicTransaction()
+	err = testutil.SignTransactionByRoot(&tx3, 2)
+	require.NoError(t, err)
+	transactions := []*flow.TransactionBody{&tx1, &tx2, &tx3}
+
+	transactions = append(transactions, &tx3)
 	col := flow.Collection{Transactions: transactions}
 	collections := []*flow.Collection{&col}
 
@@ -176,7 +124,7 @@ func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExe
 		chunks = append(chunks, chunk)
 
 		// chunkDataPack
-		allRegisters := view.Interactions().RegisterTouches()
+		allRegisters := view.Interactions().AllRegisters()
 		values, proofs, err := led.GetRegistersWithProof(allRegisters, chunk.StartState)
 		require.NoError(t, err, "error reading registers with proofs from ledger")
 

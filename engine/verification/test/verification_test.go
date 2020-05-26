@@ -3,6 +3,7 @@ package test
 import (
 	"fmt"
 	"math/rand"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -76,7 +77,11 @@ func TestHappyPath(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		t.Run(fmt.Sprintf("%d-verification node %d-chunk number", tc.verNodeCount, tc.chunkCount), func(t *testing.T) {
+		// skips tests of original ingest over CI
+		if !tc.lightIngest && os.Getenv("FLOWLOCAL") != "TRUE" {
+			continue
+		}
+		t.Run(fmt.Sprintf("%d-verification node %d-chunk number %t-light ingest", tc.verNodeCount, tc.chunkCount, tc.lightIngest), func(t *testing.T) {
 			mu.Lock()
 			defer mu.Unlock()
 			testHappyPath(t, tc.verNodeCount, tc.chunkCount, tc.lightIngest)
@@ -166,18 +171,27 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 		verNodes = append(verNodes, verNode)
 	}
 
-	// collection node
-	colNode := testutil.CollectionNode(t, hub, colIdentity, identities)
-	// injects the assigned collections into the collection node mempool
-	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
-		if IsAssigned(chunk.Index) {
-			err := colNode.Collections.Store(completeER.Collections[chunk.Index])
-			assert.Nil(t, err)
+	// light ingest engine does not interact with collection node
+	// but the current version of original ingest engine does
+	// TODO removing collection request from ORIGINAL ingest engine
+	// https://github.com/dapperlabs/flow-go/issues/3008
+	var colNode mock2.CollectionNode
+	var colNet *stub.Network
+	if !lightIngest {
+		// collection node
+		colNode = testutil.CollectionNode(t, hub, colIdentity, identities)
+		// injects the assigned collections into the collection node mempool
+		for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
+			if IsAssigned(chunk.Index) {
+				err := colNode.Collections.Store(completeER.Collections[chunk.Index])
+				assert.Nil(t, err)
+			}
 		}
+		net, ok := hub.GetNetwork(colIdentity.NodeID)
+		assert.True(t, ok)
+		colNet = net
+		colNet.StartConDev(100, true)
 	}
-	colNet, ok := hub.GetNetwork(colIdentity.NodeID)
-	assert.True(t, ok)
-	colNet.StartConDev(100, true)
 
 	// mock execution node
 	exeNode, exeEngine := setupMockExeNode(t, hub, exeIdentity, verIdentities, identities, completeER)
@@ -253,7 +267,14 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 	for _, verNet := range verNets {
 		verNet.StopConDev()
 	}
-	colNet.StopConDev()
+
+	// light ingest engine does not interact with collection node
+	// but the current version of original ingest engine does
+	// TODO removing collection request from ORIGINAL ingest engine
+	// https://github.com/dapperlabs/flow-go/issues/3008
+	if !lightIngest {
+		colNet.StopConDev()
+	}
 
 	// resource cleanup
 	//
@@ -284,9 +305,17 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 
 		verNode.Done()
 	}
-	colNode.Done()
+
 	conNode.Done()
 	exeNode.Done()
+
+	// light ingest engine does not interact with collection node
+	// but the current version of original ingest engine does
+	// TODO removing collection request from ORIGINAL ingest engine
+	// https://github.com/dapperlabs/flow-go/issues/3008
+	if !lightIngest {
+		colNode.Done()
+	}
 
 	// to demarcate the debug logs
 	log.Debug().
@@ -299,12 +328,11 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 // path assuming a single collection (including transactions on counter example)
 // are submited to the verification node.
 func TestSingleCollectionProcessing(t *testing.T) {
-	// TODO unskip this :(
-	t.Skip()
-
 	// ingest engine parameters
-	requestInterval := uint(1)
-	failureThreshold := uint(1)
+	// set based on following issue
+	// https://github.com/dapperlabs/flow-go/issues/3443
+	requestInterval := uint(1000)
+	failureThreshold := uint(2)
 
 	// network identity setup
 	hub := stub.NewNetworkHub()
@@ -331,18 +359,28 @@ func TestSingleCollectionProcessing(t *testing.T) {
 		Return(assignment, nil)
 
 	// setup nodes
-
+	//
 	// verification node
 	verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold, true)
 	// inject block
 	err := verNode.Blocks.Store(completeER.Block)
 	assert.Nil(t, err)
+	// starts the ingest engine
+	<-verNode.LightIngestEngine.Ready()
+	// starts verification node's network in continuous mode
+	verNet, ok := hub.GetNetwork(verIdentity.NodeID)
+	assert.True(t, ok)
+	verNet.StartConDev(100, true)
 
 	// collection node
 	colNode := testutil.CollectionNode(t, hub, colIdentity, identities)
 	// inject the collection
 	err = colNode.Collections.Store(completeER.Collections[0])
 	assert.Nil(t, err)
+	// starts collection node's network in continuous mode
+	colNet, ok := hub.GetNetwork(colIdentity.NodeID)
+	assert.True(t, ok)
+	colNet.StartConDev(100, true)
 
 	// execution node
 	exeNode := testutil.GenericNode(t, hub, exeIdentity, identities)
@@ -355,6 +393,8 @@ func TestSingleCollectionProcessing(t *testing.T) {
 				// publishes the chunk data pack response to the network
 				res := &messages.ChunkDataResponse{
 					ChunkDataPack: *completeER.ChunkDataPacks[0],
+					Collection:    *completeER.Collections[0],
+					Nonce:         rand.Uint64(),
 				}
 				err := exeChunkDataConduit.Submit(res, verIdentity.NodeID)
 				assert.Nil(t, err)
@@ -364,48 +404,38 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	// consensus node
 	conNode := testutil.GenericNode(t, hub, conIdentity, identities)
 	conEngine := new(network.Engine)
+	approvalWG := sync.WaitGroup{}
+	approvalWG.Add(1)
 	conEngine.On("Process", verIdentity.NodeID, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
 			_, ok := args[1].(*flow.ResultApproval)
 			assert.True(t, ok)
+			approvalWG.Done()
 		}).Return(nil).Once()
 
 	_, err = conNode.Net.Register(engine.ApprovalProvider, conEngine)
 	assert.Nil(t, err)
 
 	// send the ER from execution to verification node
-	err = verNode.IngestEngine.Process(exeIdentity.NodeID, completeER.Receipt)
+	err = verNode.LightIngestEngine.Process(exeIdentity.NodeID, completeER.Receipt)
 	assert.Nil(t, err)
 
-	// the receipt should be added to the mempool
-	// sleep for 1 second to make sure that receipt finds its way to
-	// authReceipts pool
-	assert.Eventually(t, func() bool {
-		return verNode.AuthReceipts.Has(completeER.Receipt.ID())
-	}, time.Second, 50*time.Millisecond)
-
-	// flush the collection request
-	verNet, ok := hub.GetNetwork(verIdentity.NodeID)
-	assert.True(t, ok)
-	verNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
-		return m.ChannelID == engine.CollectionProvider
-	})
-
-	// flush the collection response
-	colNet, ok := hub.GetNetwork(colIdentity.NodeID)
-	assert.True(t, ok)
-	colNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
-		return m.ChannelID == engine.CollectionProvider
-	})
-
-	// flush the result approval broadcast
-	verNet.DeliverAll(true)
+	unittest.RequireReturnsBefore(t, approvalWG.Wait, 5*time.Second)
 
 	// assert that the RA was received
 	conEngine.AssertExpectations(t)
 
 	// assert proper number of calls made
 	exeEngine.AssertExpectations(t)
+
+	// stop continuous delivery mode of the network
+	verNet.StopConDev()
+	colNet.StopConDev()
+
+	// stops verification node
+	// Note: this should be done prior to any evaluation to make sure that
+	// the process method of Ingest engines is done working.
+	<-verNode.LightIngestEngine.Done()
 
 	// receipt ID should be added to the ingested results mempool
 	assert.True(t, verNode.IngestedResultIDs.Has(completeER.Receipt.ExecutionResult.ID()))
@@ -572,6 +602,7 @@ func setupMockExeNode(t *testing.T,
 							// publishes the chunk data pack response to the network
 							res := &messages.ChunkDataResponse{
 								ChunkDataPack: *completeER.ChunkDataPacks[i],
+								Collection:    *completeER.Collections[i],
 								Nonce:         rand.Uint64(),
 							}
 							err := exeChunkDataConduit.Submit(res, originID)

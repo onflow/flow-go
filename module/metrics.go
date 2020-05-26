@@ -67,6 +67,24 @@ type HotstuffMetrics interface {
 
 	// SetTimeout sets the current timeout duration
 	SetTimeout(duration time.Duration)
+
+	// CommitteeProcessingDuration measures the time which the HotStuff's core logic
+	// spends in the hotstuff.Committee component, i.e. the time determining consensus
+	// committee relations.
+	CommitteeProcessingDuration(duration time.Duration)
+
+	// SignerProcessingDuration measures the time which the HotStuff's core logic
+	// spends in the hotstuff.Signer component, i.e. the with crypto-related operations.
+	SignerProcessingDuration(duration time.Duration)
+
+	// ValidatorProcessingDuration measures the time which the HotStuff's core logic
+	// spends in the hotstuff.Validator component, i.e. the with verifying
+	// consensus messages.
+	ValidatorProcessingDuration(duration time.Duration)
+
+	// PayloadProductionDuration measures the time which the HotStuff's core logic
+	// spends in the module.Builder component, i.e. the with generating block payloads.
+	PayloadProductionDuration(duration time.Duration)
 }
 
 type CollectionMetrics interface {

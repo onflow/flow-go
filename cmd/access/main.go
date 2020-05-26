@@ -25,6 +25,7 @@ import (
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/signature"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
+	grpcutils "github.com/dapperlabs/flow-go/utils/grpc"
 )
 
 func main() {
@@ -55,7 +56,10 @@ func main() {
 		Module("collection node client", func(node *cmd.FlowNodeBuilder) error {
 			node.Logger.Info().Err(err).Msgf("Collection node Addr: %s", rpcConf.CollectionAddr)
 
-			collectionRPCConn, err := grpc.Dial(rpcConf.CollectionAddr, grpc.WithInsecure())
+			collectionRPCConn, err := grpc.Dial(
+				rpcConf.CollectionAddr,
+				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+				grpc.WithInsecure())
 			if err != nil {
 				return err
 			}
@@ -65,7 +69,10 @@ func main() {
 		Module("execution node client", func(node *cmd.FlowNodeBuilder) error {
 			node.Logger.Info().Err(err).Msgf("Execution node Addr: %s", rpcConf.ExecutionAddr)
 
-			executionRPCConn, err := grpc.Dial(rpcConf.ExecutionAddr, grpc.WithInsecure())
+			executionRPCConn, err := grpc.Dial(
+				rpcConf.ExecutionAddr,
+				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+				grpc.WithInsecure())
 			if err != nil {
 				return err
 			}
