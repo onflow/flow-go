@@ -126,8 +126,7 @@ github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f/go.mod h1:E3G3o1h8I7cfc
 github.com/cpuguy83/go-md2man v1.0.10/go.mod h1:SmD6nW6nTyfqj6ABTjUi3V3JVMnlJmwcJI5acqYI6dE=
 github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d/go.mod h1:maD7wRr/U5Z6m/iR4s+kqSMx2CaBsrgA7czyZG/E6dU=
 github.com/cpuguy83/go-md2man/v2 v2.0.0/go.mod h1:maD7wRr/U5Z6m/iR4s+kqSMx2CaBsrgA7czyZG/E6dU=
-github.com/dapperlabs/flow-core-contracts/contracts v0.0.0-20200526001227-61deca1d27eb h1:ZOkxsBkNVfRjYZyXaQNAQA307TqrdvxbeweZ0h6Ywj4=
-github.com/dapperlabs/flow-core-contracts/contracts v0.0.0-20200526001227-61deca1d27eb/go.mod h1:6SQ2GUde3Wj3EIRFq9Vu12IhSx3PiY3nVxLOEVehlmY=
+github.com/dapperlabs/flow-core-contracts/contracts v0.0.0-20200526041238-ad2360621a1a h1:8qta1Pfh3RbkcvRVOvO6/ACpZmP0W5sIaaoCUF8JOQM=
 github.com/dapperlabs/flow-core-contracts/contracts v0.0.0-20200526041238-ad2360621a1a/go.mod h1:6SQ2GUde3Wj3EIRFq9Vu12IhSx3PiY3nVxLOEVehlmY=
 github.com/dapperlabs/testingdock v0.4.3-0.20200424073047-26b38aa03602 h1:0WZHK77ynnSPSUJmBt5jzeMF9y0hS2q3vORxe8laA8o=
 github.com/dapperlabs/testingdock v0.4.3-0.20200424073047-26b38aa03602/go.mod h1:HeTbuHG1J4yt4n7NlZSyuk5c5fmyz6hECbyV+36Ku7Q=
