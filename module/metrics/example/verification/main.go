@@ -38,7 +38,8 @@ func main() {
 			panic(err)
 		}
 
-		authCollections, err := stdmap.NewCollections(10)
+		authCollections, err := stdmap.NewCollections(10,
+			stdmap.WithSizeMeterCollections(verificationCollector.OnAuthenticatedReceiptsUpdated))
 		if err != nil {
 			panic(err)
 		}
