@@ -49,30 +49,30 @@ func TestSyncFlow(t *testing.T) {
 	seq := uint64(0)
 
 	tx1 := execTestutil.DeployCounterContractTransaction(flow.ServiceAddress())
-	err = execTestutil.SignTransactionByRoot(&tx1, seq)
+	err = execTestutil.SignTransactionByRoot(tx1, seq)
 	require.NoError(t, err)
 	seq++
 
 	tx2 := execTestutil.CreateCounterTransaction(flow.ServiceAddress(), flow.ServiceAddress())
-	err = execTestutil.SignTransactionByRoot(&tx2, seq)
+	err = execTestutil.SignTransactionByRoot(tx2, seq)
 	require.NoError(t, err)
 	seq++
 
 	tx4 := execTestutil.AddToCounterTransaction(flow.ServiceAddress(), flow.ServiceAddress())
-	err = execTestutil.SignTransactionByRoot(&tx4, seq)
+	err = execTestutil.SignTransactionByRoot(tx4, seq)
 	require.NoError(t, err)
 	seq++
 
 	tx5 := execTestutil.AddToCounterTransaction(flow.ServiceAddress(), flow.ServiceAddress())
-	err = execTestutil.SignTransactionByRoot(&tx5, seq)
+	err = execTestutil.SignTransactionByRoot(tx5, seq)
 	require.NoError(t, err)
 
-	col1 := flow.Collection{Transactions: []*flow.TransactionBody{&tx1}}
-	col2 := flow.Collection{Transactions: []*flow.TransactionBody{&tx2}}
-	col4 := flow.Collection{Transactions: []*flow.TransactionBody{&tx4}}
-	col5 := flow.Collection{Transactions: []*flow.TransactionBody{&tx5}}
+	col1 := flow.Collection{Transactions: []*flow.TransactionBody{tx1}}
+	col2 := flow.Collection{Transactions: []*flow.TransactionBody{tx2}}
+	col4 := flow.Collection{Transactions: []*flow.TransactionBody{tx4}}
+	col5 := flow.Collection{Transactions: []*flow.TransactionBody{tx5}}
 
-	//Create three blocks, with one tx each
+	// Create three blocks, with one tx each
 	block1 := unittest.BlockWithParentFixture(genesis)
 	block1.Header.View = 42
 	block1.SetPayload(flow.Payload{

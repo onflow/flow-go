@@ -19,7 +19,7 @@ func TestGenerateGenesisStateCommitment(t *testing.T) {
 		ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 		require.NoError(t, err)
 
-		newStateCommitment, err := BootstrapLedger(ls, unittest.ServiceAccountPublicKey)
+		newStateCommitment, err := BootstrapLedger(ls, unittest.ServiceAccountPublicKey, unittest.InitialTokenSupply)
 		require.NoError(t, err)
 
 		if !assert.Equal(t, unittest.GenesisStateCommitment, newStateCommitment) {

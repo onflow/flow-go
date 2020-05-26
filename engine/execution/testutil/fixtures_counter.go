@@ -6,7 +6,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func DeployCounterContractTransaction(signer flow.Address) flow.TransactionBody {
+func DeployCounterContractTransaction(signer flow.Address) *flow.TransactionBody {
 	return CreateContractDeploymentTransaction(`
 		access(all) contract Container {
 			access(all) resource Counter {
@@ -25,9 +25,9 @@ func DeployCounterContractTransaction(signer flow.Address) flow.TransactionBody 
 		}`, signer)
 }
 
-func CreateCounterTransaction(counter, signer flow.Address) flow.TransactionBody {
-	return flow.TransactionBody{
-		Script: []byte(fmt.Sprintf(`
+func CreateCounterTransaction(counter, signer flow.Address) *flow.TransactionBody {
+	return flow.NewTransactionBody().
+		SetScript([]byte(fmt.Sprintf(`
 			import 0x%s
 
 			transaction {
@@ -41,14 +41,14 @@ func CreateCounterTransaction(counter, signer flow.Address) flow.TransactionBody
 					acc.save(<-maybeCounter!, to: /storage/counter)
 				}
 			}`, counter)),
-		Authorizers: []flow.Address{signer},
-	}
+		).
+		AddAuthorizer(signer)
 }
 
 // CreateCounterPanicTransaction returns a transaction that will manipulate state by writing a new counter into storage
 // and then panic. It can be used to test whether execution state stays untouched/will revert
-func CreateCounterPanicTransaction(counter, signer flow.Address) flow.TransactionBody {
-	return flow.TransactionBody{
+func CreateCounterPanicTransaction(counter, signer flow.Address) *flow.TransactionBody {
+	return &flow.TransactionBody{
 		Script: []byte(fmt.Sprintf(`
 			import 0x%s
 
@@ -60,14 +60,13 @@ func CreateCounterPanicTransaction(counter, signer flow.Address) flow.Transactio
 
 					panic("fail for testing purposes")
               	}
-
             }`, counter)),
 		Authorizers: []flow.Address{signer},
 	}
 }
 
-func AddToCounterTransaction(counter, signer flow.Address) flow.TransactionBody {
-	return flow.TransactionBody{
+func AddToCounterTransaction(counter, signer flow.Address) *flow.TransactionBody {
+	return &flow.TransactionBody{
 		Script: []byte(fmt.Sprintf(`
 			import 0x%s
 

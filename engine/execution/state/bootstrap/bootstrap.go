@@ -4,7 +4,10 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/dapperlabs/flow-core-contracts/contracts"
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
@@ -16,10 +19,14 @@ import (
 )
 
 // BootstrapLedger adds the above root account to the ledger and initializes execution node-only data
-func BootstrapLedger(ledger storage.Ledger, rootPublicKey flow.AccountPublicKey) (flow.StateCommitment, error) {
+func BootstrapLedger(
+	ledger storage.Ledger,
+	rootPublicKey flow.AccountPublicKey,
+	initialTokenSupply uint64,
+) (flow.StateCommitment, error) {
 	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.EmptyStateCommitment()))
 
-	BootstrapView(view, rootPublicKey)
+	BootstrapView(view, rootPublicKey, initialTokenSupply)
 
 	newStateCommitment, err := state.CommitDelta(ledger, view.Delta(), ledger.EmptyStateCommitment())
 	if err != nil {
@@ -63,13 +70,17 @@ func BootstrapExecutionDatabase(db *badger.DB, commit flow.StateCommitment, gene
 	return nil
 }
 
-func BootstrapView(ledger virtualmachine.Ledger, serviceAccountPublicKey flow.AccountPublicKey) {
+func BootstrapView(
+	ledger virtualmachine.Ledger,
+	serviceAccountPublicKey flow.AccountPublicKey,
+	initialTokenSupply uint64,
+) {
 	l := virtualmachine.NewLedgerDAL(ledger)
 
 	// initialize the account addressing state
 	l.SetAddressState(flow.ZeroAddressState)
 
-	root := createRootAccount(ledger, serviceAccountPublicKey)
+	service := createServiceAccount(ledger, serviceAccountPublicKey)
 
 	rt := runtime.NewInterpreterRuntime()
 	vm, err := virtualmachine.New(rt)
@@ -80,10 +91,12 @@ func BootstrapView(ledger virtualmachine.Ledger, serviceAccountPublicKey flow.Ac
 	ctx := vm.NewBlockContext(nil)
 
 	fungibleToken := deployFungibleToken(ctx, ledger)
-	flowToken := deployFlowToken(ctx, ledger, fungibleToken)
-	feeContract := deployFeeContract(ctx, ledger, fungibleToken, flowToken)
+	flowToken := deployFlowToken(ctx, ledger, service, fungibleToken)
+	feeContract := deployFlowFees(ctx, ledger, fungibleToken, flowToken)
 
-	initRootAccount(ctx, ledger, root, fungibleToken, flowToken, feeContract)
+	mintInitialTokens(ctx, ledger, service, initialTokenSupply)
+
+	initServiceAccount(ctx, ledger, service, fungibleToken, flowToken, feeContract)
 }
 
 func createAccount(ledger virtualmachine.Ledger) flow.Address {
@@ -97,97 +110,83 @@ func createAccount(ledger virtualmachine.Ledger) flow.Address {
 	return addr
 }
 
-func createRootAccount(ledger virtualmachine.Ledger, accountKey flow.AccountPublicKey) flow.Address {
+func createServiceAccount(ledger virtualmachine.Ledger, accountKey flow.AccountPublicKey) flow.Address {
 	l := virtualmachine.NewLedgerDAL(ledger)
 
 	addr, err := l.CreateAccount([]flow.AccountPublicKey{accountKey})
 	if err != nil {
-		panic(fmt.Sprintf("failed to create root account: %s", err))
+		panic(fmt.Sprintf("failed to create service account: %s", err))
 	}
 
 	return addr
 }
 
 func deployFungibleToken(ctx virtualmachine.BlockContext, ledger virtualmachine.Ledger) flow.Address {
-	return deployContract(ctx, ledger, fungibleTokenContract())
+	return deployContract(ctx, ledger, contracts.FungibleToken())
 }
 
 func deployFlowToken(
 	ctx virtualmachine.BlockContext,
 	ledger virtualmachine.Ledger,
-	fungibleToken flow.Address,
+	service, fungibleToken flow.Address,
 ) flow.Address {
-	return deployContract(ctx, ledger, flowTokenContract(fungibleToken))
+	flowToken := createAccount(ledger)
+
+	contract := contracts.FlowToken(fungibleToken.Hex())
+
+	tx := flow.NewTransactionBody().
+		SetScript(virtualmachine.DeployDefaultTokenTransaction(contract)).
+		AddAuthorizer(flowToken).
+		AddAuthorizer(service)
+
+	result := executeTransaction(ctx, ledger, tx)
+	if result.Error != nil {
+		panic(fmt.Sprintf("failed to deploy default token contract: %s", result.Error.ErrorMessage()))
+	}
+
+	return flowToken
 }
 
-func deployFeeContract(
+func deployFlowFees(
 	ctx virtualmachine.BlockContext,
 	ledger virtualmachine.Ledger,
 	fungibleToken, flowToken flow.Address,
 ) flow.Address {
-	return deployContract(ctx, ledger, feeContract(fungibleToken, flowToken))
+	return deployContract(ctx, ledger, contracts.FlowFees(fungibleToken.Hex(), flowToken.Hex()))
 }
 
-func initRootAccount(
+func mintInitialTokens(
 	ctx virtualmachine.BlockContext,
 	ledger virtualmachine.Ledger,
-	root, fungibleToken, flowToken, feeContract flow.Address,
+	service flow.Address,
+	initialSupply uint64,
 ) {
-
-	deployContractToAccount(
-		ctx, ledger, root, serviceAccountContract(fungibleToken, flowToken, feeContract),
-	)
+	initialSupplyArg, err := jsoncdc.Encode(cadence.NewUFix64(initialSupply))
+	if err != nil {
+		panic(fmt.Sprintf("failed to encode initial token supply: %s", err.Error()))
+	}
 
 	tx := flow.NewTransactionBody().
-		SetScript(virtualmachine.InitDefaultTokenTransaction).
-		AddAuthorizer(root)
+		SetScript(virtualmachine.MintDefaultTokenTransaction).
+		AddArgument(initialSupplyArg).
+		AddAuthorizer(service)
 
-	executeTransaction(ctx, ledger, tx)
-}
-
-func fungibleTokenContract() string {
-	code, err := Asset("contracts/FungibleToken.cdc")
-	if err != nil {
-		panic(err)
+	result := executeTransaction(ctx, ledger, tx)
+	if result.Error != nil {
+		panic(fmt.Sprintf("failed to mint initial token supply: %s", result.Error.ErrorMessage()))
 	}
-
-	return hex.EncodeToString(code)
 }
 
-func flowTokenContract(fungibleToken flow.Address) string {
-	tpl, err := AssetString("contracts/FlowToken.cdc")
-	if err != nil {
-		panic(err)
-	}
-
-	code := fmt.Sprintf(tpl, fungibleToken.Hex())
-
-	return hex.EncodeToString([]byte(code))
+func initServiceAccount(
+	ctx virtualmachine.BlockContext,
+	ledger virtualmachine.Ledger,
+	service, fungibleToken, flowToken, feeContract flow.Address,
+) {
+	serviceAccountContract := contracts.FlowServiceAccount(fungibleToken.Hex(), flowToken.Hex(), feeContract.Hex())
+	deployContractToAccount(ctx, ledger, service, serviceAccountContract)
 }
 
-func feeContract(fungibleToken, flowToken flow.Address) string {
-	tpl, err := AssetString("contracts/FeeContract.cdc")
-	if err != nil {
-		panic(err)
-	}
-
-	code := fmt.Sprintf(tpl, fungibleToken.Hex(), flowToken.Hex())
-
-	return hex.EncodeToString([]byte(code))
-}
-
-func serviceAccountContract(fungibleToken, flowToken, feeContract flow.Address) string {
-	tpl, err := AssetString("contracts/ServiceAccount.cdc")
-	if err != nil {
-		panic(err)
-	}
-
-	code := fmt.Sprintf(tpl, fungibleToken.Hex(), flowToken.Hex(), feeContract.Hex())
-
-	return hex.EncodeToString([]byte(code))
-}
-
-func deployContract(ctx virtualmachine.BlockContext, ledger virtualmachine.Ledger, contract string) flow.Address {
+func deployContract(ctx virtualmachine.BlockContext, ledger virtualmachine.Ledger, contract []byte) flow.Address {
 	addr := createAccount(ledger)
 
 	script := []byte(
@@ -197,7 +196,7 @@ func deployContract(ctx virtualmachine.BlockContext, ledger virtualmachine.Ledge
                 signer.setCode("%s".decodeHex())
               }
             }
-        `, contract),
+		`, hex.EncodeToString(contract)),
 	)
 
 	tx := flow.NewTransactionBody().
@@ -216,7 +215,7 @@ func deployContractToAccount(
 	ctx virtualmachine.BlockContext,
 	ledger virtualmachine.Ledger,
 	acct flow.Address,
-	contract string,
+	contract []byte,
 ) {
 	script := []byte(
 		fmt.Sprintf(`
@@ -225,14 +224,17 @@ func deployContractToAccount(
                 acct.setCode("%s".decodeHex())
               }
             }
-        `, contract),
+		`, hex.EncodeToString(contract)),
 	)
 
 	tx := flow.NewTransactionBody().
 		SetScript(script).
 		AddAuthorizer(acct)
 
-	executeTransaction(ctx, ledger, tx)
+	result := executeTransaction(ctx, ledger, tx)
+	if result.Error != nil {
+		panic(fmt.Sprintf("failed to deploy contract: %s", result.Error.ErrorMessage()))
+	}
 }
 
 func executeTransaction(

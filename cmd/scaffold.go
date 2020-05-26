@@ -133,6 +133,7 @@ type FlowNodeBuilder struct {
 	GenesisBlock            *flow.Block
 	GenesisQC               *model.QuorumCertificate
 	GenesisAccountPublicKey *flow.AccountPublicKey
+	GenesisTokenSupply      uint64
 }
 
 func (fnb *FlowNodeBuilder) baseFlags() {
@@ -379,6 +380,9 @@ func (fnb *FlowNodeBuilder) initState() {
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
 		}
+
+		// TODO: load token supply from bootstrap config
+		fnb.GenesisTokenSupply = 1000000
 
 		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
 		if err != nil {

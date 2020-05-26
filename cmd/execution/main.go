@@ -82,10 +82,10 @@ func main() {
 		}).
 		GenesisHandler(func(node *cmd.FlowNodeBuilder, block *flow.Block) {
 			if node.GenesisAccountPublicKey == nil {
-				panic(fmt.Sprintf("error while bootstrapping execution state: no root account public key"))
+				panic(fmt.Sprintf("error while bootstrapping execution state: no service account public key"))
 			}
 
-			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage, *node.GenesisAccountPublicKey)
+			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage, *node.GenesisAccountPublicKey, node.GenesisTokenSupply)
 			if err != nil {
 				panic(fmt.Sprintf("error while bootstrapping execution state: %s", err))
 			}

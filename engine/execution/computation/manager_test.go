@@ -10,11 +10,12 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
-	"github.com/dapperlabs/flow-go/engine/execution/state/unittest"
+	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	module "github.com/dapperlabs/flow-go/module/mock"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestComputeBlockWithStorage(t *testing.T) {
@@ -31,15 +32,26 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NoError(t, err)
 
 	tx1 := testutil.DeployCounterContractTransaction(accounts[0])
+	tx1.SetProposalKey(flow.ServiceAddress(), 0, 0).
+		SetPayer(flow.ServiceAddress())
+
+	err = testutil.SignPayload(tx1, accounts[0], privateKeys[0])
+	require.NoError(t, err)
+
+	err = testutil.SignEnvelope(tx1, flow.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+	require.NoError(t, err)
+
 	tx2 := testutil.CreateCounterTransaction(accounts[0], accounts[1])
+	tx2.SetProposalKey(flow.ServiceAddress(), 0, 0).
+		SetPayer(flow.ServiceAddress())
 
-	err = testutil.SignTransaction(&tx1, accounts[0], privateKeys[0], 0)
+	err = testutil.SignPayload(tx2, accounts[1], privateKeys[1])
 	require.NoError(t, err)
 
-	err = testutil.SignTransaction(&tx2, accounts[1], privateKeys[1], 0)
+	err = testutil.SignEnvelope(tx2, flow.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 	require.NoError(t, err)
 
-	transactions := []*flow.TransactionBody{&tx1, &tx2}
+	transactions := []*flow.TransactionBody{tx1, tx2}
 
 	col := flow.Collection{Transactions: transactions}
 
@@ -77,7 +89,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		me:            me,
 	}
 
-	view := unittest.LedgerView(ledger)
+	view := delta.NewView(ledger.Get)
 	blockView := view.NewChild()
 
 	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)

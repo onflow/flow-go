@@ -237,7 +237,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	genesisHead, err := node.State.Final().Head()
 	require.NoError(t, err)
 
-	commit, err := bootstrap.BootstrapLedger(ls, unittest.ServiceAccountPublicKey)
+	commit, err := bootstrap.BootstrapLedger(ls, unittest.ServiceAccountPublicKey, unittest.InitialTokenSupply)
 	require.NoError(t, err)
 
 	err = bootstrap.BootstrapExecutionDatabase(node.DB, commit, genesisHead)

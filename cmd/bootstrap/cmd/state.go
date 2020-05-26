@@ -11,7 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func genGenesisExecutionState(serviceAccountKey *flow.AccountPublicKey) flow.StateCommitment {
+func genGenesisExecutionState(serviceAccountKey *flow.AccountPublicKey, initialTokenSupply uint64) flow.StateCommitment {
 	serviceAccountPriv, err := run.GenerateServiceAccountPrivateKey(generateRandomSeed())
 	if err != nil {
 		log.Fatal().Err(err).Msg("error generating account 0 private key")
@@ -27,7 +27,7 @@ func genGenesisExecutionState(serviceAccountKey *flow.AccountPublicKey) flow.Sta
 	}
 
 	dbPath := filepath.Join(flagOutdir, bootstrap.DirnameExecutionState)
-	stateCommitment, err := run.GenerateExecutionState(dbPath, *serviceAccountKey)
+	stateCommitment, err := run.GenerateExecutionState(dbPath, *serviceAccountKey, initialTokenSupply)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error generating execution state")
 	}

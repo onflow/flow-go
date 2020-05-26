@@ -301,6 +301,62 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 	}
 }
 
+func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
+	rt := runtime.NewInterpreterRuntime()
+
+	h := unittest.BlockHeaderFixture()
+
+	vm, err := virtualmachine.New(rt)
+	assert.NoError(t, err)
+	bc := vm.NewBlockContext(&h)
+
+	privateKeys, err := execTestutil.GenerateAccountPrivateKeys(1)
+	require.NoError(t, err)
+
+	ledger := execTestutil.RootBootstrappedLedger()
+	accounts, err := execTestutil.CreateAccounts(vm, ledger, privateKeys)
+	require.NoError(t, err)
+
+	createAccountScript := []byte(`
+	  transaction {
+	    prepare(signer: AuthAccount) {
+	  	  let acct = AuthAccount(payer: signer)
+	    }
+	  }
+	`)
+
+	t.Run("Invalid account creator", func(t *testing.T) {
+		invalidTx := flow.NewTransactionBody().
+			SetScript(createAccountScript).
+			AddAuthorizer(accounts[0])
+
+		err = execTestutil.SignPayload(invalidTx, accounts[0], privateKeys[0])
+		require.NoError(t, err)
+
+		err = execTestutil.SignTransactionByRoot(invalidTx, 0)
+		require.NoError(t, err)
+
+		result, err := bc.ExecuteTransaction(ledger, invalidTx)
+		require.NoError(t, err)
+
+		assert.False(t, result.Succeeded())
+	})
+
+	t.Run("Valid account creator", func(t *testing.T) {
+		validTx := flow.NewTransactionBody().
+			SetScript(createAccountScript).
+			AddAuthorizer(flow.ServiceAddress())
+
+		err = execTestutil.SignTransactionByRoot(validTx, 0)
+		require.NoError(t, err)
+
+		result, err := bc.ExecuteTransaction(ledger, validTx)
+		require.NoError(t, err)
+
+		assert.True(t, result.Succeeded())
+	})
+}
+
 func TestBlockContext_ExecuteScript(t *testing.T) {
 	// seed the RNG
 	rand.Seed(time.Now().UnixNano())
