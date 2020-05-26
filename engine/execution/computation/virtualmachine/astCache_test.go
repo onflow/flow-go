@@ -312,7 +312,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 	}
 	wg.Wait()
 
-	location := runtime.AddressLocation(virtualmachine.FlowTokenAddress.Bytes())
+	location := runtime.AddressLocation(virtualmachine.FlowTokenAddress().Bytes())
 
 	// Get cached program
 	program, err := vm.ASTCache().GetProgram(location)

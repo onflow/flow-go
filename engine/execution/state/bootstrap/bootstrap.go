@@ -78,7 +78,7 @@ func BootstrapView(
 	l := virtualmachine.NewLedgerDAL(ledger)
 
 	// initialize the account addressing state
-	l.SetAddressState(flow.ZeroAddressState)
+	l.SetAddressState(flow.NewAddressGenerator())
 
 	service := createServiceAccount(ledger, serviceAccountPublicKey)
 

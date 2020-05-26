@@ -82,16 +82,16 @@ func TestFlowAddressConstants(t *testing.T) {
 		assert.Equal(t, ServiceAddress(), expected)
 
 		// check the transition from account zero to root
-		state := ZeroAddressState
-		address, _, err := AccountAddress(state)
+		state := NewAddressGenerator()
+		address, err := state.AccountAddress()
 		require.NoError(t, err)
 		assert.Equal(t, address, ServiceAddress())
 
 		// check high state values: generation should fail for high value states
-		state = AddressState(maxState)
-		_, state, err = AccountAddress(state)
+		state = newAddressGeneratorAtState(maxState)
+		_, err = state.AccountAddress()
 		assert.NoError(t, err)
-		_, _, err = AccountAddress(state)
+		_, err = state.AccountAddress()
 		assert.Error(t, err)
 
 		// check ZeroAddress() is an invalid addresse
@@ -123,14 +123,13 @@ func TestAddressGeneration(t *testing.T) {
 		setChainID(net)
 
 		// sanity check of AccountAddress function consistency
-		state := ZeroAddressState
-		expectedState := ZeroAddressState
+		state := NewAddressGenerator()
+		expectedState := uint64(0)
 		for i := 0; i < loop; i++ {
-			address, stateResult, err := AccountAddress(state)
-			state = stateResult
+			address, err := state.AccountAddress()
 			require.NoError(t, err)
 			expectedState++
-			expectedAddress := generateAddress(expectedState)
+			expectedAddress := newAddressGeneratorAtState(expectedState).generateAddress()
 			assert.Equal(t, address, expectedAddress)
 		}
 
@@ -138,11 +137,10 @@ func TestAddressGeneration(t *testing.T) {
 		// All addresses hamming weights must be less than d.
 		// this is only a sanity check of the implementation and not an exhaustive proof
 		if net == Mainnet {
-			r := rand.Intn(maxState - loop)
-			state = AddressState(r)
+			r := uint64(rand.Intn(maxState - loop))
+			state = newAddressGeneratorAtState(r)
 			for i := 0; i < loop; i++ {
-				address, stateResult, err := AccountAddress(state)
-				state = stateResult
+				address, err := state.AccountAddress()
 				require.NoError(t, err)
 				weight := bits.OnesCount64(address.Uint64())
 				assert.LessOrEqual(t, linearCodeD, weight)
@@ -152,14 +150,12 @@ func TestAddressGeneration(t *testing.T) {
 		// sanity check of address distances.
 		// All distances between any two addresses must be less than d.
 		// this is only a sanity check of the implementation and not an exhaustive proof
-		r := rand.Intn(maxState - loop - 1)
-		state = AddressState(r)
-		refAddress, stateResult, err := AccountAddress(state)
-		state = stateResult
+		r := uint64(rand.Intn(maxState - loop - 1))
+		state = newAddressGeneratorAtState(r)
+		refAddress, err := state.AccountAddress()
 		require.NoError(t, err)
 		for i := 0; i < loop; i++ {
-			address, stateResult, err := AccountAddress(state)
-			state = stateResult
+			address, err := state.AccountAddress()
 			require.NoError(t, err)
 			distance := bits.OnesCount64(address.Uint64() ^ refAddress.Uint64())
 			assert.LessOrEqual(t, linearCodeD, distance)
@@ -167,11 +163,10 @@ func TestAddressGeneration(t *testing.T) {
 
 		// sanity check of valid account addresses.
 		// All valid addresses must pass IsValid.
-		r = rand.Intn(maxState - loop)
-		state = AddressState(r)
+		r = uint64(rand.Intn(maxState - loop))
+		state = newAddressGeneratorAtState(r)
 		for i := 0; i < loop; i++ {
-			address, stateResult, err := AccountAddress(state)
-			state = stateResult
+			address, err := state.AccountAddress()
 			require.NoError(t, err)
 			check := address.IsValid()
 			assert.True(t, check, "account address format should be valid")
@@ -182,11 +177,10 @@ func TestAddressGeneration(t *testing.T) {
 		invalidAddress := Uint64ToAddress(invalidCodeWord)
 		check := invalidAddress.IsValid()
 		assert.False(t, check, "account address format should be invalid")
-		r = rand.Intn(maxState - loop)
-		state = AddressState(r)
+		r = uint64(rand.Intn(maxState - loop))
+		state = newAddressGeneratorAtState(r)
 		for i := 0; i < loop; i++ {
-			address, stateResult, err := AccountAddress(state)
-			state = stateResult
+			address, err := state.AccountAddress()
 			require.NoError(t, err)
 			invalidAddress = Uint64ToAddress(address.Uint64() ^ invalidCodeWord)
 			check := invalidAddress.IsValid()
@@ -214,11 +208,10 @@ func TestAddressesIntersection(t *testing.T) {
 		setChainID(net)
 
 		// All valid test addresses must fail Flow Mainnet check
-		r := rand.Intn(maxState - loop)
-		state := AddressState(r)
+		r := uint64(rand.Intn(maxState - loop))
+		state := newAddressGeneratorAtState(r)
 		for i := 0; i < loop; i++ {
-			address, stateResult, err := AccountAddress(state)
-			state = stateResult
+			address, err := state.AccountAddress()
 			require.NoError(t, err)
 			setChainID(Mainnet)
 			check := address.IsValid()
@@ -227,14 +220,13 @@ func TestAddressesIntersection(t *testing.T) {
 		}
 
 		// sanity check: mainnet addresses must fail the test check
-		r = rand.Intn(maxState - loop)
-		state = AddressState(r)
+		r = uint64(rand.Intn(maxState - loop))
+		state = newAddressGeneratorAtState(r)
 		for i := 0; i < loop; i++ {
 			setChainID(Mainnet)
-			invalidAddress, stateResult, err := AccountAddress(state)
-			setChainID(net)
-			state = stateResult
+			invalidAddress, err := state.AccountAddress()
 			require.NoError(t, err)
+			setChainID(net)
 			check := invalidAddress.IsValid()
 			assert.False(t, check, "account address format should be invalid")
 		}
@@ -245,12 +237,11 @@ func TestAddressesIntersection(t *testing.T) {
 		setChainID(net)
 		check := invalidAddress.IsValid()
 		assert.False(t, check, "account address format should be invalid")
-		r = rand.Intn(maxState - loop)
-		state = AddressState(r)
+		r = uint64(rand.Intn(maxState - loop))
+		state = newAddressGeneratorAtState(r)
 		for i := 0; i < loop; i++ {
 			setChainID(net)
-			address, stateResult, err := AccountAddress(state)
-			state = stateResult
+			address, err := state.AccountAddress()
 			require.NoError(t, err)
 			invalidAddress = Uint64ToAddress(address.Uint64() ^ invalidCodeWord)
 			// must fail test network check
@@ -272,7 +263,7 @@ func TestUint48(t *testing.T) {
 	// test consistensy of putUint48 and uint48
 	for i := 0; i < loop; i++ {
 		r := uint64(rand.Intn(1 << linearCodeK))
-		b := make([]byte, AddressStateLength)
+		b := make([]byte, addressStateLength)
 		putUint48(b, r)
 		res := uint48(b)
 		assert.Equal(t, r, res)

@@ -13,20 +13,33 @@ import (
 type Address [AddressLength]byte
 
 // AddressState represents the internal state of the address generation mechanism
-type AddressState uint64
+type AddressState struct {
+	state uint64
+}
+
+// NewAddressGenerator returns a new AddressState with an
+// initialized state.
+func NewAddressGenerator() *AddressState {
+	return &AddressState{
+		state: 0,
+	}
+}
+
+// newAddressGenerator returns a new AddressState with the
+// given state.
+func newAddressGeneratorAtState(state uint64) *AddressState {
+	return &AddressState{
+		state: state,
+	}
+}
 
 const (
 	// AddressLength is the size of an account address in bytes.
 	// (n) is the size of an account address in bits.
 	AddressLength = (linearCodeN + 7) >> 3
-	// AddressStateLength is the size of an account address state in bytes.
+	// addressStateLength is the size of an account address state in bytes.
 	// (k) is the size of an account address in bits.
-	AddressStateLength = (linearCodeK + 7) >> 3
-
-	// ZeroAddressState is the addressing state when Flow is bootstrapped
-	ZeroAddressState = AddressState(0)
-	// ServiceAddressState is the initial addressing state for account creations
-	ServiceAddressState = AddressState(1)
+	addressStateLength = (linearCodeK + 7) >> 3
 )
 
 // networkType is the type of network for which account addresses
@@ -50,16 +63,25 @@ func getNetworkType() networkType {
 	}
 }
 
+// EmptyAddress is the default value of a variable of type Address
 var EmptyAddress = Address{}
 
-// ZeroAddress represents the "zero address" (account that no one owns).
+// ZeroAddress returns the "zero address" (account that no one owns).
 func ZeroAddress() Address {
-	return generateAddress(ZeroAddressState)
+	return NewAddressGenerator().generateAddress()
 }
 
-// ServiceAddress represents the root (first) generated account address.
+// ServiceAddress returns the root (first) generated account address.
 func ServiceAddress() Address {
-	return generateAddress(ServiceAddressState)
+	return newAddressGeneratorAtState(1).generateAddress()
+}
+
+// AddressAtState returns the nth generated account address.
+func AddressAtIndex(index uint64) (Address, error) {
+	if index >= maxState {
+		return EmptyAddress, fmt.Errorf("index must be less than %x", maxState)
+	}
+	return newAddressGeneratorAtState(index).generateAddress(), nil
 }
 
 // HexToAddress converts a hex string to an Address.
@@ -133,20 +155,20 @@ func putUint48(b []byte, v uint64) {
 }
 
 // BytesToAddressState converts an array of bytes into an adress state
-func BytesToAddressState(b []byte) AddressState {
-	if len(b) > AddressStateLength {
-		b = b[len(b)-AddressStateLength:]
+func BytesToAddressState(b []byte) *AddressState {
+	if len(b) > addressStateLength {
+		b = b[len(b)-addressStateLength:]
 	}
-	var stateBytes [AddressStateLength]byte
-	copy(stateBytes[AddressStateLength-len(b):], b)
+	var stateBytes [addressStateLength]byte
+	copy(stateBytes[addressStateLength-len(b):], b)
 	state := uint48(stateBytes[:])
-	return AddressState(state)
+	return newAddressGeneratorAtState(state)
 }
 
 // Bytes converts an addresse state into a slice of bytes
-func (state *AddressState) Bytes() []byte {
-	stateBytes := make([]byte, AddressStateLength)
-	putUint48(stateBytes, uint64(*state))
+func (gen *AddressState) Bytes() []byte {
+	stateBytes := make([]byte, addressStateLength)
+	putUint48(stateBytes, gen.state)
 	return stateBytes
 }
 
@@ -185,24 +207,23 @@ const (
 // as states.
 // ZeroAddress() corresponds to the state "0" while ServiceAddress() corresponds to the
 // state "1".
-func AccountAddress(state AddressState) (Address, AddressState, error) {
-	newState, err := nextState(state)
+func (gen *AddressState) AccountAddress() (Address, error) {
+	err := gen.nextState()
 	if err != nil {
-		return ZeroAddress(), ZeroAddressState, err
+		return ZeroAddress(), err
 	}
-	address := generateAddress(newState)
-	return address, newState, nil
+	address := gen.generateAddress()
+	return address, nil
 }
 
 // returns the next state given an addressing state.
 // The state values are incremented from 0 to 2^k-1
-func nextState(state AddressState) (AddressState, error) {
-	if uint64(state) > maxState {
-		return ZeroAddressState,
-			fmt.Errorf("the state value is not valid, it must be less or equal to %x", maxState)
+func (gen *AddressState) nextState() error {
+	if uint64(gen.state) > maxState {
+		return fmt.Errorf("the state value is not valid, it must be less or equal to %x", maxState)
 	}
-	newState := state + 1
-	return newState, nil
+	gen.state += 1
+	return nil
 }
 
 // Uint64ToAddress returns an address with value v
@@ -223,8 +244,8 @@ func (a *Address) Uint64() uint64 {
 // (network) specifies the network to generate the address for (Flow Mainnet, testent..)
 // The function assumes the state is valid (<2^k) which means
 // a check on the state should be done before calling this function.
-func generateAddress(state AddressState) Address {
-	index := uint64(state)
+func (gen *AddressState) generateAddress() Address {
+	index := gen.state
 
 	// Multiply the index GF(2) vector by the code generator matrix
 	address := uint64(0)

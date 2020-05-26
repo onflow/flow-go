@@ -144,29 +144,29 @@ func (r *LedgerDAL) GetAccount(address flow.Address) *flow.Account {
 	}
 }
 
-func (r *LedgerDAL) GetAddressState() (flow.AddressState, error) {
+func (r *LedgerDAL) GetAddressState() (*flow.AddressState, error) {
 	stateBytes, err := r.Get(fullKeyHash("", "", keyAddressState))
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	state := flow.BytesToAddressState(stateBytes)
 	return state, nil
 }
 
-func (r *LedgerDAL) SetAddressState(state flow.AddressState) {
+func (r *LedgerDAL) SetAddressState(state *flow.AddressState) {
 	stateBytes := state.Bytes()
 	r.Set(fullKeyHash("", "", keyAddressState), stateBytes)
 }
 
 func (r *LedgerDAL) CreateAccount(publicKeys []flow.AccountPublicKey) (flow.Address, error) {
-	currentAddressState, err := r.GetAddressState()
+	addressGen, err := r.GetAddressState()
 	if err != nil {
 		return flow.Address{}, err
 	}
 	// generate the new account address
-	newAddress, newAddressState, err := flow.AccountAddress(currentAddressState)
+	newAddress, err := addressGen.AccountAddress()
 	if err != nil {
-		return flow.Address{}, err
+		return flow.EmptyAddress, err
 	}
 
 	err = r.CreateAccountWithAddress(newAddress, publicKeys)
@@ -175,7 +175,7 @@ func (r *LedgerDAL) CreateAccount(publicKeys []flow.AccountPublicKey) (flow.Addr
 	}
 
 	// update the address state
-	r.SetAddressState(newAddressState)
+	r.SetAddressState(addressGen)
 
 	return newAddress, nil
 }

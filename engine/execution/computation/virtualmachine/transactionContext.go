@@ -625,8 +625,14 @@ var MintDefaultTokenTransaction = []byte(fmt.Sprintf(`
         destroy minter
       }
     }
-`, FungibleTokenAddress, FlowTokenAddress))
+`, FungibleTokenAddress(), FlowTokenAddress()))
 
-// TODO: assign these values after bootstrapping
-var FungibleTokenAddress, _, _ = flow.AccountAddress(flow.AddressState(1))
-var FlowTokenAddress, _, _ = flow.AccountAddress(flow.AddressState(2))
+func FungibleTokenAddress() flow.Address {
+	address, _ := flow.AddressAtIndex(2)
+	return address
+}
+
+func FlowTokenAddress() flow.Address {
+	address, _ := flow.AddressAtIndex(3)
+	return address
+}
