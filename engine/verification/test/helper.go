@@ -6,11 +6,13 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/onflow/cadence/runtime"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto/random"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/engine/verification"
@@ -49,12 +51,19 @@ func CompleteExecutionResultFixture(t testing.TB, chunkCount int) verification.C
 		ids := make([][]byte, 0)
 		values := make([][]byte, 0)
 
-		// bootstrap with root account as it is retrieved by VM to check for permissions
-		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
-			return nil, nil
-		})
+		// // bootstrap with root account as it is retrieved by VM to check for permissions
+		// view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+		// 	return nil, nil
+		// })
 
-		err := testutil.CreateRootAccountInLedger(view)
+		l := testutil.RootBootstrappedLedger()
+
+		vm, err := virtualmachine.New(runtime.NewInterpreterRuntime())
+		require.NoError(t, err)
+
+		view := delta.NewView(l.Get)
+
+		_, err = testutil.CreateAccounts(vm, view, []flow.AccountPrivateKey{unittest.ServiceAccountPrivateKey})
 		require.NoError(t, err)
 
 		rootRegisterIDs, rootRegisterValues := view.Interactions().Delta.RegisterUpdates()

@@ -128,7 +128,7 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 	err = testutil.SignPayload(useImportTx, accounts[0], privateKeys[0])
 	require.NoError(t, err)
 
-	err = testutil.SignEnvelope(useImportTx, flow.ServiceAddress(), unittest.RootAccountPrivateKey)
+	err = testutil.SignEnvelope(useImportTx, flow.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 	require.NoError(t, err)
 
 	// Run the Use import (FT Vault resource) transaction
@@ -190,7 +190,7 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 		err = testutil.SignPayload(tx, accounts[0], privateKeys[0])
 		require.NoError(b, err)
 
-		err = testutil.SignEnvelope(tx, flow.ServiceAddress(), unittest.RootAccountPrivateKey)
+		err = testutil.SignEnvelope(tx, flow.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 		require.NoError(b, err)
 
 		txs = append(txs, tx)

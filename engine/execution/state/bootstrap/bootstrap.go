@@ -115,7 +115,7 @@ func createServiceAccount(ledger virtualmachine.Ledger, accountKey flow.AccountP
 
 	addr, err := l.CreateAccount([]flow.AccountPublicKey{accountKey})
 	if err != nil {
-		panic(fmt.Sprintf("failed to create root account: %s", err))
+		panic(fmt.Sprintf("failed to create service account: %s", err))
 	}
 
 	return addr

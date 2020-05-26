@@ -122,7 +122,7 @@ func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExe
 
 		startStateCommitment, err := bootstrap.BootstrapLedger(
 			led,
-			unittest.RootAccountPublicKey,
+			unittest.ServiceAccountPublicKey,
 			unittest.InitialTokenSupply,
 		)
 		require.NoError(t, err)

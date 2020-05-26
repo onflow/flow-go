@@ -152,7 +152,7 @@ func CreateAccounts(
 func SignTransactionByRoot(tx *flow.TransactionBody, seqNum uint64) error {
 	tx.SetProposalKey(flow.ServiceAddress(), 0, seqNum)
 	tx.SetPayer(flow.ServiceAddress())
-	return SignEnvelope(tx, flow.ServiceAddress(), unittest.RootAccountPrivateKey)
+	return SignEnvelope(tx, flow.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 }
 
 func RootBootstrappedLedger() virtualmachine.Ledger {

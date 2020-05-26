@@ -38,7 +38,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	err = testutil.SignPayload(tx1, accounts[0], privateKeys[0])
 	require.NoError(t, err)
 
-	err = testutil.SignEnvelope(tx1, flow.ServiceAddress(), unittest.RootAccountPrivateKey)
+	err = testutil.SignEnvelope(tx1, flow.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 	require.NoError(t, err)
 
 	tx2 := testutil.CreateCounterTransaction(accounts[0], accounts[1])
@@ -48,7 +48,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	err = testutil.SignPayload(tx2, accounts[1], privateKeys[1])
 	require.NoError(t, err)
 
-	err = testutil.SignEnvelope(tx2, flow.ServiceAddress(), unittest.RootAccountPrivateKey)
+	err = testutil.SignEnvelope(tx2, flow.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 	require.NoError(t, err)
 
 	transactions := []*flow.TransactionBody{tx1, tx2}
