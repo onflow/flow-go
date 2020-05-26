@@ -218,7 +218,7 @@ func (e *Engine) ValidateTransaction(tx *flow.TransactionBody) error {
 	}
 
 	// ensure the reference block is valid
-	err := e.checkReferenceBlock(tx)
+	err := e.checkTransactionExpiry(tx)
 	if err != nil {
 		return err
 	}
@@ -236,15 +236,16 @@ func (e *Engine) ValidateTransaction(tx *flow.TransactionBody) error {
 	return nil
 }
 
-// checkReferenceBlock checks whether a transaction's reference block ID is
+// checkTransactionExpiry checks whether a transaction's reference block ID is
 // valid. Returns nil if the reference is valid, returns an error if the
 // reference is invalid or we failed to check it.
-func (e *Engine) checkReferenceBlock(tx *flow.TransactionBody) error {
+func (e *Engine) checkTransactionExpiry(tx *flow.TransactionBody) error {
 
 	// look up the reference block
 	ref, err := e.state.AtBlockID(tx.ReferenceBlockID).Head()
 	if errors.Is(err, storage.ErrNotFound) {
-		// if we allow unknown reference blocks, we consider the transaction valid
+		// the transaction references an unknown block - at this point we decide
+		// whether to consider it expired based on configuration
 		if e.config.AllowUnknownReference {
 			return nil
 		}
@@ -265,7 +266,8 @@ func (e *Engine) checkReferenceBlock(tx *flow.TransactionBody) error {
 	if ref.Height > final.Height {
 		diff = 0
 	}
-	// discard expired transactions
+	// discard transactions that are expired, or that will expire sooner than
+	// our configured buffer allows
 	if uint(diff) > flow.DefaultTransactionExpiry-e.config.ExpiryBuffer {
 		return ExpiredTransactionError{
 			RefHeight:   ref.Height,
