@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/model/verification"
+	"github.com/dapperlabs/flow-go/model/verification/tracker"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/metrics/example"
@@ -25,22 +26,22 @@ func main() {
 
 		verificationCollector := metrics.NewVerificationCollector(tracer)
 
-		//authReceipts, err := stdmap.NewReceipts(10)
-		//if err != nil {
-		//	panic(err)
-		//}
-		//
+		authReceipts, err := stdmap.NewReceipts(10,
+			stdmap.WithSizeMeterReceipts(verificationCollector.OnAuthenticatedReceiptsUpdated))
+		if err != nil {
+			panic(err)
+		}
 
 		pendingReceipts, err := stdmap.NewPendingReceipts(10,
 			stdmap.WithSizeMeterPendingReceipts(verificationCollector.OnPendingReceiptsUpdated))
 		if err != nil {
 			panic(err)
 		}
-		//
-		//authCollections, err := stdmap.NewCollections(10)
-		//if err != nil {
-		//	panic(err)
-		//}
+
+		authCollections, err := stdmap.NewCollections(10)
+		if err != nil {
+			panic(err)
+		}
 
 		pendingCollections, err := stdmap.NewPendingCollections(10,
 			stdmap.WithSizeMeterPendingCollections(verificationCollector.OnPendingCollectionsUpdated))
@@ -48,27 +49,30 @@ func main() {
 			panic(err)
 		}
 
-		//chunkDataPacks, err := stdmap.NewChunkDataPacks(10)
-		//if err != nil {
-		//	panic(err)
-		//}
-		//
-		//chunkDataPackTrackers, err := stdmap.NewChunkDataPackTrackers(10)
-		//if err != nil {
-		//	panic(err)
-		//}
+		chunkDataPacks, err := stdmap.NewChunkDataPacks(10,
+			stdmap.WithSizeMeterChunkDataPack(verificationCollector.OnChunkDataPacksUpdated))
+		if err != nil {
+			panic(err)
+		}
+
+		chunkDataPackTrackers, err := stdmap.NewChunkDataPackTrackers(10,
+			stdmap.WithSizeMeterChunkDataPackTrackers(verificationCollector.OnChunkTrackersUpdated))
+		if err != nil {
+			panic(err)
+		}
 
 		for i := 0; i < 100; i++ {
 			chunkID := unittest.ChunkFixture().ID()
 			verificationCollector.OnResultApproval()
 			verificationCollector.OnChunkVerificationStarted(chunkID)
 
-			// adds a collection to pending collections mempool
+			// adds a collection to pending and authenticated collections mempool
 			coll := unittest.CollectionFixture(1)
 			pendingCollections.Add(&verification.PendingCollection{
 				Collection: &coll,
 				OriginID:   unittest.IdentifierFixture(),
 			})
+			authCollections.Add(&coll)
 
 			// adds a receipt to the pending receipts
 			receipt := unittest.ExecutionReceiptFixture()
@@ -76,9 +80,16 @@ func main() {
 				Receipt:  receipt,
 				OriginID: unittest.IdentifierFixture(),
 			})
+			authReceipts.Add(receipt)
+
+			// adds a chunk data pack as well as a chunk tracker
+			cdp := unittest.ChunkDataPackFixture(unittest.IdentifierFixture())
+			chunkDataPacks.Add(&cdp)
+			chunkDataPackTrackers.Add(tracker.NewChunkDataPackTracker(unittest.IdentifierFixture(),
+				unittest.IdentifierFixture()))
 
 			// adds a synthetic 1 s delay for verification duration
-			time.Sleep(1 * time.Second)
+			time.Sleep(3 * time.Second)
 			verificationCollector.OnChunkVerificationFinished(chunkID)
 			verificationCollector.OnResultApproval()
 
