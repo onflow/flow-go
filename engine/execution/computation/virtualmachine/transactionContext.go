@@ -133,7 +133,7 @@ func (r *TransactionContext) CreateAccount(payer runtime.Address) (runtime.Addre
 		}
 	}
 
-	r.Log(fmt.Sprintf("Created new account with address: %s", addr))
+	r.Log(fmt.Sprintf("Created new account with address: 0x%s", addr))
 
 	return runtime.Address(addr), nil
 }
