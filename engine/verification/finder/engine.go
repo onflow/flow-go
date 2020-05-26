@@ -1,21 +1,28 @@
 package finder
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
+	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 type Engine struct {
-	unit  *engine.Unit
-	log   zerolog.Logger
-	me    module.Local
-	match network.Engine
+	unit          *engine.Unit
+	log           zerolog.Logger
+	me            module.Local
+	match         network.Engine
+	receipts      mempool.Receipts // used to keep the receipts as mempool
+	headerStorage storage.Headers  // used to check block existence to improve performance
 }
 
 func New(
@@ -23,12 +30,16 @@ func New(
 	net module.Network,
 	me module.Local,
 	match network.Engine,
+	receipts mempool.Receipts,
+	headerStorage storage.Headers,
 ) (*Engine, error) {
 	e := &Engine{
-		unit:  engine.NewUnit(),
-		log:   log,
-		me:    me,
-		match: match,
+		unit:          engine.NewUnit(),
+		log:           log,
+		me:            me,
+		match:         match,
+		receipts:      receipts,
+		headerStorage: headerStorage,
 	}
 
 	_, err := net.Register(engine.ExecutionReceiptProvider, e)
@@ -96,5 +107,39 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	// TODO: find the the block that include the guarantees of the collections
 	// decides whether this exuection receipt is processable.
 	// if processable, pass it to match engine
+
 	return nil
 }
+
+// To implement FinalizationConsumer
+func (e *Engine) OnBlockIncorporated(*model.Block) {
+
+}
+
+// OnFinalizedBlock is part of implementing FinalizationConsumer interface
+//
+// OnFinalizedBlock notifications are produced by the Finalization Logic whenever
+// a block has been finalized. They are emitted in the order the blocks are finalized.
+// Prerequisites:
+// Implementation must be concurrency safe; Non-blocking;
+// and must handle repetition of the same events (with some processing overhead).
+func (e *Engine) OnFinalizedBlock(block *model.Block) {
+
+	// block should be in the storage
+	_, err := e.headerStorage.ByBlockID(block.BlockID)
+	if errors.Is(err, storage.ErrNotFound) {
+		e.log.Error().
+			Hex("block_id", logging.ID(block.BlockID)).
+			Msg("block is not available in storage")
+		return
+	}
+	if err != nil {
+		e.log.Error().
+			Hex("block_id", logging.ID(block.BlockID)).
+			Msg("could not check block availability in storage")
+		return
+	}
+}
+
+// To implement FinalizationConsumer
+func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {}
