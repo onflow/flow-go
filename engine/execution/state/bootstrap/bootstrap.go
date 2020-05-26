@@ -94,7 +94,9 @@ func BootstrapView(
 	flowToken := deployFlowToken(ctx, ledger, service, fungibleToken)
 	feeContract := deployFlowFees(ctx, ledger, fungibleToken, flowToken)
 
-	mintInitialTokens(ctx, ledger, service, initialTokenSupply)
+	if initialTokenSupply > 0 {
+		mintInitialTokens(ctx, ledger, service, initialTokenSupply)
+	}
 
 	initServiceAccount(ctx, ledger, service, fungibleToken, flowToken, feeContract)
 }
