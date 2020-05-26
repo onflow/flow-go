@@ -253,9 +253,12 @@ func (e *Engine) onTimer() {
 			Logger()
 
 		// check if has reached max try
-		if CanTry(e.maxAttempt, chunk) {
+		if !CanTry(e.maxAttempt, chunk) {
 			e.chunks.Rem(cid)
-			log.Debug().Msg("max attampts reached")
+			log.Debug().
+				Int("max_attempt", e.maxAttempt).
+				Int("actual_attempts", chunk.Attempt).
+				Msg("max attampts reached")
 			continue
 		}
 
@@ -370,6 +373,8 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	return nil
 }
 
+// CanTry returns checks the history attempts and determine whether a chunk request
+// can be tried again.
 func CanTry(maxAttempt int, chunk *ChunkStatus) bool {
 	return chunk.Attempt < maxAttempt
 }

@@ -29,16 +29,18 @@ import (
 
 // when maxAttempt is set to 3, CanTry will only return true for the first 3 times.
 func TestCanTry(t *testing.T) {
-	maxAttempt := 3
-	chunks := NewChunks(10)
-	chunk := NewChunkStatus(ChunkWithIndex(0), flow.Identifier{0xaa}, flow.Identifier{0xbb})
-	chunks.Add(chunk)
-	results := []bool{}
-	for i := 0; i < 5; i++ {
-		results = append(results, CanTry(maxAttempt, chunk))
-		chunks.IncrementAttempt(chunk.ID())
-	}
-	require.Equal(t, []bool{true, true, true, false, false}, results)
+	t.Run("maxAttempt=3", func(t *testing.T) {
+		maxAttempt := 3
+		chunks := NewChunks(10)
+		chunk := NewChunkStatus(ChunkWithIndex(0), flow.Identifier{0xaa}, flow.Identifier{0xbb})
+		chunks.Add(chunk)
+		results := []bool{}
+		for i := 0; i < 5; i++ {
+			results = append(results, CanTry(maxAttempt, chunk))
+			chunks.IncrementAttempt(chunk.ID())
+		}
+		require.Equal(t, []bool{true, true, true, false, false}, results)
+	})
 }
 
 func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
@@ -324,7 +326,7 @@ func TestNoAssignment(t *testing.T) {
 	)
 
 	// add assignment to assigner
-	assigner.On("Assign", mock.Anything, mock.Anything, mock.Anything).Return(assignment, nil).Once()
+	assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
 
 	// block header has been received
 	headerDB[result.BlockID] = head
@@ -363,7 +365,7 @@ func TestMultiAssignment(t *testing.T) {
 	)
 
 	// add assignment to assigner
-	assigner.On("Assign", mock.Anything, mock.Anything, mock.Anything).Return(assignment, nil).Once()
+	assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
 
 	// block header has been received
 	headerDB[result.BlockID] = head
@@ -436,7 +438,7 @@ func TestDuplication(t *testing.T) {
 	)
 
 	// add assignment to assigner
-	assigner.On("Assign", mock.Anything, mock.Anything, mock.Anything).Return(assignment, nil).Once()
+	assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
 
 	// block header has been received
 	headerDB[result.BlockID] = head
@@ -500,7 +502,7 @@ func TestRetry(t *testing.T) {
 	)
 
 	// add assignment to assigner
-	assigner.On("Assign", mock.Anything, mock.Anything, mock.Anything).Return(assignment, nil).Once()
+	assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
 
 	// block header has been received
 	headerDB[result.BlockID] = head
@@ -559,7 +561,8 @@ func TestRetry(t *testing.T) {
 // MaxRetry: When receives 1 ER, and 1 chunk is assigned assigned to me, if max retry is 2,
 // and the execution node fails to return data for the first 2 requests, then no verifiable chunk will be produced
 func TestMaxRetry(t *testing.T) {
-	e, participants, myID, _, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, 1)
+	maxAttempt := 3
+	e, participants, myID, _, head, _, con, _, _, headerDB, _, _, _, _, _, assigner := SetupTest(t, maxAttempt)
 	// create a execution result that assigns to me
 	result, assignment := createExecutionResult(
 		head.ID(),
@@ -569,7 +572,7 @@ func TestMaxRetry(t *testing.T) {
 	)
 
 	// add assignment to assigner
-	assigner.On("Assign", mock.Anything, mock.Anything, mock.Anything).Return(assignment, nil).Once()
+	assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
 
 	// block header has been received
 	headerDB[result.BlockID] = head
@@ -579,15 +582,9 @@ func TestMaxRetry(t *testing.T) {
 
 	var wg sync.WaitGroup
 	wg.Add(3)
-	// chunk data was requested once, and return the chunk data pack when requested
-	// called with 3 mock.Anything, the first is the request, the second and third are the 2
-	// execution nodes
 	con.On("Submit", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		wg.Done()
 	}).Return(nil).Times(3)
-
-	// check verifier's method is called
-	verifier.On("ProcessLocal", mock.Anything).Return(nil).Once()
 
 	<-e.Ready()
 	fmt.Printf("match.Engine.Process is called\n")
@@ -600,12 +597,73 @@ func TestMaxRetry(t *testing.T) {
 
 	assigner.AssertExpectations(t)
 	con.AssertExpectations(t)
+	e.Done()
+}
+
+// Concurrency: When 2 different ER are received concurrently, chunks from both
+// results will be processed
+func TestProcessExecutionResultConcurrently(t *testing.T) {
+	t.Skip()
+	e, participants, myID, _, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner :=
+		SetupTest(t, 1)
+	// create a execution result that assigns to me
+	result, assignment := createExecutionResult(
+		head.ID(),
+		WithChunks(
+			WithAssignee(myID),
+		),
+	)
+
+	// add assignment to assigner
+	assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
+
+	// block header has been received
+	headerDB[result.BlockID] = head
+
+	// find the execution node id that created the execution result
+	en := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
+
+	// create chunk data pack
+	myChunk := result.ExecutionResultBody.Chunks[0]
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	con.On("Submit", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		req := args.Get(0).(*messages.ChunkDataPackRequest)
+		fmt.Printf("con.Submit is called\n")
+		// assert the right ID was requested manually as we don't know what nonce was used
+		require.Equal(t, myChunk.ID(), req.ChunkID)
+
+		resp := &messages.ChunkDataPackResponse{
+			Data:  FromChunkID(req.ChunkID),
+			Nonce: req.Nonce,
+		}
+
+		err := e.Process(en.ID(), resp)
+		require.NoError(t, err)
+
+		time.Sleep(time.Millisecond)
+		wg.Done()
+	}).Return(nil).Times(2)
+
+	// check verifier's method is called
+	verifier.On("ProcessLocal", mock.Anything).Return(nil).Twice()
+
+	<-e.Ready()
+	fmt.Printf("match.Engine.Process is called\n")
+	// engine processes the execution result
+	err := e.Process(en.ID(), result)
+	require.NoError(t, err)
+
+	wg.Wait()
+
+	assigner.AssertExpectations(t)
+	con.AssertExpectations(t)
 	verifier.AssertExpectations(t)
 	e.Done()
 }
 
-// // Concurrency: When 2 different ER are received concurrently, chunks from both
-// // results will be processed
-//
-// // Concurrency: When chunk data pack are sent concurrently, match engine is able to receive
-// // all of them, and process concurrently.
+// Concurrency: When chunk data pack are sent concurrently, match engine is able to receive
+// all of them, and process concurrently.
+func TestProcessChunkDataPackConcurrently(t *testing.T) {
+}
