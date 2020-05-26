@@ -32,20 +32,31 @@ type TransactionContext struct {
 	tx                        *flow.TransactionBody
 	gasLimit                  uint64
 	uuid                      uint64 // TODO: implement proper UUID
-	skipVerification          bool
-	skipDeploymentRestriction bool
 	header                    *flow.Header
 	blocks                    Blocks
+	signatureVerificationDisabled     bool
+	restrictedAccountCreationDisabled bool
+	restrictedDeploymentDisabled      bool
 }
 
 type TransactionContextOption func(*TransactionContext)
 
-func SkipVerification(ctx *TransactionContext) {
-	ctx.skipVerification = true
+func WithSignatureVerification(enabled bool) TransactionContextOption {
+	return func(ctx *TransactionContext) {
+		ctx.signatureVerificationDisabled = !enabled
+	}
 }
 
-func SkipDeploymentRestriction(ctx *TransactionContext) {
-	ctx.skipDeploymentRestriction = true
+func WithRestrictedDeployment(enabled bool) TransactionContextOption {
+	return func(ctx *TransactionContext) {
+		ctx.restrictedDeploymentDisabled = !enabled
+	}
+}
+
+func WithRestrictedAccountCreation(enabled bool) TransactionContextOption {
+	return func(ctx *TransactionContext) {
+		ctx.restrictedAccountCreationDisabled = !enabled
+	}
 }
 
 // GetSigningAccounts gets the signing accounts for this context.
@@ -154,7 +165,7 @@ func (r *TransactionContext) initDefaultToken(addr flow.Address) (FlowError, err
 		AddAuthorizer(addr)
 
 	// TODO: propagate computation limit
-	result, err := r.bc.ExecuteTransaction(r.ledger, tx, SkipVerification)
+	result, err := r.bc.ExecuteTransaction(r.ledger, tx, WithSignatureVerification(false))
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +183,7 @@ func (r *TransactionContext) deductTransactionFee(addr flow.Address) (FlowError,
 		AddAuthorizer(addr)
 
 	// TODO: propagate computation limit
-	result, err := r.bc.ExecuteTransaction(r.ledger, tx, SkipVerification)
+	result, err := r.bc.ExecuteTransaction(r.ledger, tx, WithSignatureVerification(false))
 	if err != nil {
 		return nil, err
 	}
@@ -185,12 +196,19 @@ func (r *TransactionContext) deductTransactionFee(addr flow.Address) (FlowError,
 }
 
 func (r *TransactionContext) deductAccountCreationFee(addr flow.Address) (FlowError, error) {
+	var script []byte
+	if r.restrictedDeploymentDisabled {
+		script = DeductAccountCreationFeeTransaction()
+	} else {
+		script = DeductAccountCreationFeeWithWhitelistTransaction()
+	}
+
 	tx := flow.NewTransactionBody().
-		SetScript(DeductAccountCreationFeeTransaction()).
+		SetScript(script).
 		AddAuthorizer(addr)
 
 	// TODO: propagate computation limit
-	result, err := r.bc.ExecuteTransaction(r.ledger, tx, SkipVerification)
+	result, err := r.bc.ExecuteTransaction(r.ledger, tx, WithSignatureVerification(false))
 	if err != nil {
 		return nil, err
 	}
@@ -292,7 +310,7 @@ func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []b
 
 	// currently, every transaction that sets account code (deploys/updates contracts)
 	// must be signed by the service account
-	if !r.skipDeploymentRestriction && !r.isValidSigningAccount(runtime.Address(flow.ServiceAddress())) {
+	if !r.restrictedDeploymentDisabled && !r.isValidSigningAccount(runtime.Address(flow.ServiceAddress())) {
 		return fmt.Errorf("code deployment requires authorization from the service account")
 	}
 
@@ -398,10 +416,6 @@ func (r *TransactionContext) checkProgram(code []byte, address runtime.Address) 
 //
 // An error is returned if any of the expected signatures are invalid or missing.
 func (r *TransactionContext) verifySignatures() FlowError {
-	if r.skipVerification {
-		return nil
-	}
-
 	if r.tx.Payer == flow.EmptyAddress {
 		return &MissingPayerError{}
 	}
@@ -615,6 +629,18 @@ func DeductAccountCreationFeeTransaction() []byte {
 	return []byte(fmt.Sprintf(`
 		import FlowServiceAccount from 0x%s
 
+		transaction {
+			prepare(acct: AuthAccount) {
+				FlowServiceAccount.deductAccountCreationFee(acct)
+			}
+		}
+	`, flow.ServiceAddress()))
+}
+
+func DeductAccountCreationFeeWithWhitelistTransaction() []byte {
+	return []byte(fmt.Sprintf(`
+		import FlowServiceAccount from 0x%s
+	
 		transaction {
 			prepare(acct: AuthAccount) {
 				if !FlowServiceAccount.isAccountCreator(acct.address) {

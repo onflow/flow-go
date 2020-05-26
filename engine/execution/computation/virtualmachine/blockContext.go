@@ -96,7 +96,7 @@ func (bc *blockContext) ExecuteTransaction(
 
 	ctx := bc.newTransactionContext(ledger, tx, options...)
 
-	if !ctx.skipVerification {
+	if !ctx.signatureVerificationDisabled {
 		flowErr := ctx.verifySignatures()
 		if flowErr != nil {
 			return &TransactionResult{
