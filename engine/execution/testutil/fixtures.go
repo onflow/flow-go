@@ -3,102 +3,169 @@ package testutil
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
+
+	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
+	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func CreateContractDeploymentTransaction(contract string, authorizer flow.Address) flow.TransactionBody {
+func CreateContractDeploymentTransaction(contract string, authorizer flow.Address) *flow.TransactionBody {
 	encoded := hex.EncodeToString([]byte(contract))
-	return flow.TransactionBody{
-		Script: []byte(fmt.Sprintf(`transaction {
+
+	return flow.NewTransactionBody().
+		SetScript([]byte(fmt.Sprintf(`transaction {
               prepare(signer: AuthAccount) {
                 signer.setCode("%s".decodeHex())
               }
             }`, encoded)),
-		Authorizers: []flow.Address{authorizer},
-	}
+		).
+		AddAuthorizer(authorizer)
 }
 
-func SignTransaction(tx *flow.TransactionBody, account flow.Address, privateKey flow.AccountPrivateKey, seqNum uint64) error {
+func SignPayload(
+	tx *flow.TransactionBody,
+	account flow.Address,
+	privateKey flow.AccountPrivateKey,
+) error {
 	hasher, err := hash.NewHasher(privateKey.HashAlgo)
 	if err != nil {
-		return fmt.Errorf("cannot create hasher: %w", err)
+		return fmt.Errorf("failed to create hasher: %w", err)
 	}
 
-	err = tx.SetPayer(account).
-		SetProposalKey(account, 0, seqNum).
-		SignEnvelope(account, 0, privateKey.PrivateKey, hasher)
+	err = tx.SignPayload(account, 0, privateKey.PrivateKey, hasher)
 
 	if err != nil {
-		return fmt.Errorf("cannot sign tx: %w", err)
+		return fmt.Errorf("failed to sign transaction: %w", err)
 	}
+
+	return nil
+}
+
+func SignEnvelope(tx *flow.TransactionBody, account flow.Address, privateKey flow.AccountPrivateKey) error {
+	hasher, err := hash.NewHasher(privateKey.HashAlgo)
+	if err != nil {
+		return fmt.Errorf("failed to create hasher: %w", err)
+	}
+
+	err = tx.SignEnvelope(account, 0, privateKey.PrivateKey, hasher)
+
+	if err != nil {
+		return fmt.Errorf("failed to sign transaction: %w", err)
+	}
+
 	return nil
 }
 
 // Generate a number of private keys
-func GenerateAccountPrivateKeys(numberOfPrivateKeys int) ([]flow.AccountPrivateKey, error) {
+func GenerateAccountPrivateKeys(numKeys int) ([]flow.AccountPrivateKey, error) {
 	var privateKeys []flow.AccountPrivateKey
-	for i := 0; i < numberOfPrivateKeys; i++ {
+
+	for i := 0; i < numKeys; i++ {
 		seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
+
 		_, err := rand.Read(seed)
 		if err != nil {
 			return nil, err
 		}
+
 		privateKey, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
 		if err != nil {
 			return nil, err
 		}
+
 		flowPrivateKey := flow.AccountPrivateKey{
 			PrivateKey: privateKey,
 			SignAlgo:   crypto.ECDSAP256,
 			HashAlgo:   hash.SHA2_256,
 		}
+
 		privateKeys = append(privateKeys, flowPrivateKey)
 	}
+
 	return privateKeys, nil
 }
 
-// Create accounts on the ledger for the root account and for the private keys provided.
-func BootstrappedLedger(ledger virtualmachine.Ledger, privateKeys []flow.AccountPrivateKey) (virtualmachine.Ledger, []flow.Address, error) {
+// CreateAccounts inserts accounts into the ledger using the provided private keys.
+func CreateAccounts(
+	vm virtualmachine.VirtualMachine,
+	ledger virtualmachine.Ledger,
+	privateKeys []flow.AccountPrivateKey,
+) ([]flow.Address, error) {
+	ctx := vm.NewBlockContext(nil)
+
 	var accounts []flow.Address
-	ledgerAccess := virtualmachine.LedgerDAL{Ledger: ledger}
-	privateKeysIncludingRoot := []flow.AccountPrivateKey{flow.ServiceAccountPrivateKey}
-	if len(privateKeys) > 0 {
-		privateKeysIncludingRoot = append(privateKeysIncludingRoot, privateKeys...)
-	}
-	for _, account := range privateKeysIncludingRoot {
-		accountPublicKey := account.PublicKey(virtualmachine.AccountKeyWeightThreshold)
-		account, err := ledgerAccess.CreateAccountInLedger([]flow.AccountPublicKey{accountPublicKey})
+
+	script := []byte(`
+	  transaction(publicKey: [Int]) {
+	    prepare(signer: AuthAccount) {
+	  	  let acct = AuthAccount(payer: signer)
+	  	  acct.addPublicKey(publicKey)
+	    }
+	  }
+	`)
+
+	for _, privateKey := range privateKeys {
+		accountKey := privateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold)
+		encAccountKey, _ := flow.EncodeRuntimeAccountPublicKey(accountKey)
+		cadAccountKey := bytesToCadenceArray(encAccountKey)
+		encCadAccountKey, _ := jsoncdc.Encode(cadAccountKey)
+
+		tx := flow.NewTransactionBody().
+			SetScript(script).
+			AddArgument(encCadAccountKey).
+			AddAuthorizer(flow.ServiceAddress())
+
+		result, err := ctx.ExecuteTransaction(ledger, tx, virtualmachine.SkipVerification)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
-		accounts = append(accounts, account)
+
+		if result.Error != nil {
+			return nil, fmt.Errorf("failed to create account: %s", result.Error.ErrorMessage())
+		}
+
+		var addr flow.Address
+
+		for _, event := range result.Events {
+			if event.EventType.ID() == string(flow.EventAccountCreated) {
+				addr = event.Fields[0].ToGoValue().([8]byte)
+				break
+			}
+
+			return nil, errors.New("no account creation event emitted")
+		}
+
+		accounts = append(accounts, addr)
 	}
-	return ledger, accounts, nil
+
+	return accounts, nil
 }
 
 func SignTransactionByRoot(tx *flow.TransactionBody, seqNum uint64) error {
-	return SignTransaction(tx, flow.ServiceAddress(), flow.ServiceAccountPrivateKey, seqNum)
+	tx.SetProposalKey(flow.ServiceAddress(), 0, seqNum)
+	tx.SetPayer(flow.ServiceAddress())
+	return SignEnvelope(tx, flow.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 }
 
-func RootBootstrappedLedger() (virtualmachine.Ledger, error) {
+func RootBootstrappedLedger() virtualmachine.Ledger {
 	ledger := make(virtualmachine.MapLedger)
-	return ledger, BootstrapLedgerWithServiceAccount(ledger)
+	bootstrap.BootstrapView(ledger, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply)
+	return ledger
 }
 
-func BootstrapLedgerWithServiceAccount(ledger virtualmachine.Ledger) error {
-	ledgerAccess := virtualmachine.LedgerDAL{Ledger: ledger}
-
-	serviceAccountPublicKey := flow.ServiceAccountPrivateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold)
-
-	_, err := ledgerAccess.CreateAccountInLedger([]flow.AccountPublicKey{serviceAccountPublicKey})
-	if err != nil {
-		return err
+func bytesToCadenceArray(l []byte) cadence.Array {
+	values := make([]cadence.Value, len(l))
+	for i, b := range l {
+		values[i] = cadence.NewInt(int(b))
 	}
 
-	return nil
+	return cadence.NewArray(values)
 }

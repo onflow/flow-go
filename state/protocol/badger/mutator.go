@@ -124,7 +124,7 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 		seal := flow.Seal{
 			BlockID:      genesis.ID(),
 			ResultID:     result.ID(),
-			InitialState: flow.GenesisStateCommitment,
+			InitialState: commit,
 			FinalState:   result.FinalStateCommit,
 		}
 		err = operation.InsertSeal(seal.ID(), &seal)(tx)

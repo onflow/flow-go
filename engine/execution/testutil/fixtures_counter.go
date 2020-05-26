@@ -1,10 +1,12 @@
 package testutil
 
 import (
+	"fmt"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func DeployCounterContractTransaction() flow.TransactionBody {
+func DeployCounterContractTransaction(signer flow.Address) *flow.TransactionBody {
 	return CreateContractDeploymentTransaction(`
 		access(all) contract Container {
 			access(all) resource Counter {
@@ -20,13 +22,13 @@ func DeployCounterContractTransaction() flow.TransactionBody {
 			pub fun createCounter(_ v: Int): @Counter {
 				return <-create Counter(v)
 			}
-		}`, flow.ServiceAddress())
+		}`, signer)
 }
 
-func CreateCounterTransaction() flow.TransactionBody {
-	return flow.TransactionBody{
-		Script: []byte(`
-			import 0x01
+func CreateCounterTransaction(counter, signer flow.Address) *flow.TransactionBody {
+	return flow.NewTransactionBody().
+		SetScript([]byte(fmt.Sprintf(`
+			import 0x%s
 
 			transaction {
 				prepare(acc: AuthAccount) {
@@ -38,17 +40,17 @@ func CreateCounterTransaction() flow.TransactionBody {
 
 					acc.save(<-maybeCounter!, to: /storage/counter)
 				}
-			}`),
-		Authorizers: []flow.Address{flow.ServiceAddress()},
-	}
+			}`, counter)),
+		).
+		AddAuthorizer(signer)
 }
 
 // CreateCounterPanicTransaction returns a transaction that will manipulate state by writing a new counter into storage
 // and then panic. It can be used to test whether execution state stays untouched/will revert
-func CreateCounterPanicTransaction() flow.TransactionBody {
-	return flow.TransactionBody{
-		Script: []byte(`
-			import 0x01
+func CreateCounterPanicTransaction(counter, signer flow.Address) *flow.TransactionBody {
+	return &flow.TransactionBody{
+		Script: []byte(fmt.Sprintf(`
+			import 0x%s
 
 			transaction {
 				prepare(acc: AuthAccount) {
@@ -58,22 +60,22 @@ func CreateCounterPanicTransaction() flow.TransactionBody {
 
 					panic("fail for testing purposes")
               	}
-            }`),
-		Authorizers: []flow.Address{flow.ServiceAddress()},
+            }`, counter)),
+		Authorizers: []flow.Address{signer},
 	}
 }
 
-func AddToCounterTransaction() flow.TransactionBody {
-	return flow.TransactionBody{
-		Script: []byte(`
-			import 0x01
+func AddToCounterTransaction(counter, signer flow.Address) *flow.TransactionBody {
+	return &flow.TransactionBody{
+		Script: []byte(fmt.Sprintf(`
+			import 0x%s
 
 			transaction {
 				prepare(acc: AuthAccount) {
 					let counter = acc.borrow<&Container.Counter>(from: /storage/counter)
 					counter?.add(2)
 				}
-			}`),
-		Authorizers: []flow.Address{flow.ServiceAddress()},
+			}`, counter)),
+		Authorizers: []flow.Address{signer},
 	}
 }

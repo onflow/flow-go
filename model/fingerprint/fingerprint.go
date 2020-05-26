@@ -22,5 +22,6 @@ func Fingerprint(entity interface{}) []byte {
 	if fingerprinter, ok := entity.(Fingerprinter); ok {
 		return fingerprinter.Fingerprint()
 	}
+
 	return rlp.NewEncoder().MustEncode(entity)
 }
