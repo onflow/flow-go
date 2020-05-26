@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
 )
 
 // Backdata implements a generic memory pool backed by a Go map.
@@ -95,16 +96,19 @@ func (b *Backdata) Hash() flow.Identifier {
 type Backend struct {
 	sync.RWMutex
 	Backdata
-	limit uint
-	eject EjectFunc
+	limit               uint
+	eject               EjectFunc
+	collector           module.MempoolMetrics // used to track metrics of mempool
+	metricResourceLabel string                // used to identify the overlay mempool on backend for metrics
 }
 
 // NewBackend creates a new memory pool backend.
 func NewBackend(options ...OptionFunc) *Backend {
 	b := Backend{
-		Backdata: NewBackdata(),
-		limit:    uint(math.MaxUint32),
-		eject:    EjectTrueRandom,
+		Backdata:  NewBackdata(),
+		limit:     uint(math.MaxUint32),
+		eject:     EjectTrueRandom,
+		collector: nil,
 	}
 	for _, option := range options {
 		option(&b)
@@ -126,6 +130,12 @@ func (b *Backend) Add(entity flow.Entity) bool {
 	defer b.Unlock()
 	added := b.Backdata.Add(entity)
 	b.reduce()
+
+	// updates metric collector with new size of mempool
+	if b.collector != nil {
+		b.collector.MempoolEntries(b.metricResourceLabel, b.Size())
+	}
+
 	return added
 }
 
@@ -134,6 +144,12 @@ func (b *Backend) Rem(entityID flow.Identifier) bool {
 	b.Lock()
 	defer b.Unlock()
 	removed := b.Backdata.Rem(entityID)
+
+	// updates metric collector with new size of mempool
+	if b.collector != nil {
+		b.collector.MempoolEntries(b.metricResourceLabel, b.Size())
+	}
+
 	return removed
 }
 

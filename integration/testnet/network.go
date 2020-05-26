@@ -546,10 +546,10 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	for i, sk := range dkg.PrivKeyShares {
 		nodeID := consensusNodes[i].NodeID
 		encodableSk := bootstrap.EncodableRandomBeaconPrivKey{sk}
-		privParticpant := bootstrap.DKGParticipantPriv {
-			NodeID              :nodeID,
-			RandomBeaconPrivKey :encodableSk,
-			GroupIndex          :i,
+		privParticpant := bootstrap.DKGParticipantPriv{
+			NodeID:              nodeID,
+			RandomBeaconPrivKey: encodableSk,
+			GroupIndex:          i,
 		}
 		path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID)
 		err = writeJSON(filepath.Join(bootstrapDir, path), privParticpant)

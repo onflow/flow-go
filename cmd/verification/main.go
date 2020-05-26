@@ -90,8 +90,7 @@ func main() {
 			return nil
 		}).
 		Module("execution authenticated receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-			authReceipts, err = stdmap.NewReceipts(receiptLimit,
-				stdmap.WithSizeMeterReceipts(collector.OnAuthenticatedReceiptsUpdated))
+			authReceipts, err = stdmap.NewReceipts(receiptLimit, node.Metrics.Mempool)
 			return err
 		}).
 		//Module("execution pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {

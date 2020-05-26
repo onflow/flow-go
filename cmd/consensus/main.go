@@ -101,7 +101,7 @@ func main() {
 			return err
 		}).
 		Module("execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-			receipts, err = stdmap.NewReceipts(receiptLimit)
+			receipts, err = stdmap.NewReceipts(receiptLimit, node.Metrics.Mempool)
 			return err
 		}).
 		Module("result approvals mempool", func(node *cmd.FlowNodeBuilder) error {

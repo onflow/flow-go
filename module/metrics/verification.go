@@ -19,7 +19,6 @@ type VerificationCollector struct {
 	pendingCollectionsNum       prometheus.Gauge
 	authenticatedCollectionsNum prometheus.Gauge
 	pendingReceiptsNum          prometheus.Gauge
-	authenticatedReceiptsNum    prometheus.Gauge
 	chunkTrackersNum            prometheus.Gauge
 	chunkDataPacksNum           prometheus.Gauge
 }
@@ -65,12 +64,6 @@ func NewVerificationCollector(tracer *trace.OpenTracer) *VerificationCollector {
 			Help:      "latest number of pending receipts in mempool",
 		}),
 
-		authenticatedReceiptsNum: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "authenticated_receipts_latest_number_total",
-			Namespace: namespaceVerification,
-			Help:      "latest number of authenticated receipts in mempool",
-		}),
-
 		chunkDataPacksNum: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "chunk_data_packs_latest_number_total",
 			Namespace: namespaceVerification,
@@ -105,12 +98,6 @@ func (vc *VerificationCollector) OnResultApproval() {
 // https://github.com/dapperlabs/flow-go/issues/3183
 func (vc *VerificationCollector) OnVerifiableChunkSubmitted(size float64) {
 	vc.storagePerChunk.Set(size)
-}
-
-// OnAuthenticatedReceiptsUpdated is called whenever size of AuthenticatedReceipts mempool gets changed.
-// It records the latest value of its size.
-func (vc *VerificationCollector) OnAuthenticatedReceiptsUpdated(size uint) {
-	vc.authenticatedReceiptsNum.Set(float64(size))
 }
 
 // OnPendingReceiptsUpdated is called whenever size of PendingReceipts mempool gets changed.
