@@ -22,12 +22,12 @@ func GenerateServiceAccountPrivateKey(seed []byte) (flow.AccountPrivateKey, erro
 	}, nil
 }
 
-func GenerateExecutionState(dbDir string, accountKey flow.AccountPublicKey, initialTokenSupply uint64) (flow.StateCommitment, error) {
+func GenerateExecutionState(dbDir string, accountKey flow.AccountPublicKey, genesisTokenSupply uint64) (flow.StateCommitment, error) {
 	metricsCollector := &metrics.NoopCollector{}
 	ledgerStorage, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 	defer ledgerStorage.CloseStorage()
 	if err != nil {
 		return nil, err
 	}
-	return bootstrap.BootstrapLedger(ledgerStorage, accountKey, initialTokenSupply)
+	return bootstrap.BootstrapLedger(ledgerStorage, accountKey, genesisTokenSupply)
 }

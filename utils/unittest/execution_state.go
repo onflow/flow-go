@@ -20,10 +20,10 @@ const GenesisStateCommitmentHex = "575d83270d90f83c3fb906943c9888da21b2fc0644cbb
 
 var GenesisStateCommitment flow.StateCommitment
 
+const GenesisTokenSupply uint64 = 1_000_000_000_000_000
+
 var ServiceAccountPrivateKey flow.AccountPrivateKey
 var ServiceAccountPublicKey flow.AccountPublicKey
-
-const InitialTokenSupply uint64 = 1_000_000_000_000_000
 
 func init() {
 	var err error

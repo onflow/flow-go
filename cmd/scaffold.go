@@ -43,6 +43,9 @@ import (
 
 const notSet = "not set"
 
+// TODO: load token supply from bootstrap config
+const genesisTokenSupply = 0
+
 // BaseConfig is the general config for the FlowNodeBuilder
 type BaseConfig struct {
 	nodeIDHex        string
@@ -382,7 +385,7 @@ func (fnb *FlowNodeBuilder) initState() {
 		}
 
 		// TODO: load token supply from bootstrap config
-		fnb.GenesisTokenSupply = 1000000
+		fnb.GenesisTokenSupply = genesisTokenSupply
 
 		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
 		if err != nil {

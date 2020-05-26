@@ -486,7 +486,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 
 	// generate the initial execution state
 	dbDir := filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState)
-	commit, err := run.GenerateExecutionState(dbDir, unittest.ServiceAccountPublicKey, unittest.InitialTokenSupply)
+	commit, err := run.GenerateExecutionState(dbDir, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply)
 	if err != nil {
 		return nil, nil, err
 	}
