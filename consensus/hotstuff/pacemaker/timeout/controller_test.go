@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -64,7 +65,7 @@ func Test_TimeoutIncrease(t *testing.T) {
 	}
 }
 
-// Test_TimeoutDecrease verifies that timeout decreases linearly
+// Test_TimeoutDecrease verifies that timeout decreases exponentially
 func Test_TimeoutDecrease(t *testing.T) {
 	tc := initTimeoutController(t)
 	tc.OnTimeout()
@@ -100,7 +101,7 @@ func Test_MinCutoff(t *testing.T) {
 	assert.Equal(t, tc.VoteCollectionTimeout().Milliseconds(), int64(minRepTimeout*voteTimeoutFraction))
 }
 
-// Test_MinCutoff verifies that timeout does not decrease below minRepTimeout
+// Test_MinCutoff verifies that timeout does not increase beyond timeout cap
 func Test_MaxCutoff(t *testing.T) {
 	// here we use a different timeout controller with a larger timeoutIncrease to avoid too many iterations
 	c, err := NewConfig(
@@ -120,6 +121,35 @@ func Test_MaxCutoff(t *testing.T) {
 		assert.True(t, float64(tc.ReplicaTimeout().Milliseconds()) <= timeoutCap)
 		assert.True(t, float64(tc.VoteCollectionTimeout().Milliseconds()) <= timeoutCap*voteTimeoutFraction)
 	}
+}
+
+// Test_CombinedIncreaseDecreaseDynamics verifies that timeout increases and decreases
+// work as expected in combination
+func Test_CombinedIncreaseDecreaseDynamics(t *testing.T) {
+	increase, decrease := true, false
+	testDynamicSequence := func(seq []bool) {
+		tc := initTimeoutController(t)
+		var numberIncreases int = 0
+		var numberDecreases int = 0
+		for _, increase := range seq {
+			if increase {
+				numberIncreases += 1
+				tc.OnTimeout()
+			} else {
+				numberDecreases += 1
+				tc.OnProgressBeforeTimeout()
+			}
+		}
+
+		expectedRepTimeout := startRepTimeout * math.Pow(multiplicativeIncrease, float64(numberIncreases)) * math.Pow(multiplicativeDecrease, float64(numberDecreases))
+		numericalError := math.Abs(expectedRepTimeout - float64(tc.ReplicaTimeout().Milliseconds()))
+		require.True(t, numericalError <= 1.0) // at most one millisecond numerical error
+		numericalError = math.Abs(expectedRepTimeout*voteTimeoutFraction - float64(tc.VoteCollectionTimeout().Milliseconds()))
+		require.True(t, numericalError <= 1.0) // at most one millisecond numerical error
+	}
+
+	testDynamicSequence([]bool{increase, increase, increase, decrease, decrease, decrease})
+	testDynamicSequence([]bool{increase, decrease, increase, decrease, increase, decrease})
 }
 
 func Test_BlockRateDelay(t *testing.T) {

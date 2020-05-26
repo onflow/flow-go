@@ -1,7 +1,6 @@
 package timeout
 
 import (
-	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -84,7 +83,6 @@ func TestStandardTimeoutDecreaseFactor(t *testing.T) {
 	f := StandardTimeoutDecreaseFactor(offlineFraction, timeoutIncreaseFactor)
 	expected := math.Pow(timeoutIncreaseFactor, offlineFraction) * math.Pow(f, 1.0-offlineFraction)
 	numericalError := math.Abs(expected - 1.0)
-	fmt.Println(numericalError)
 	require.True(t, numericalError < 1e-15)
 
 	offlineFraction = 0.2
