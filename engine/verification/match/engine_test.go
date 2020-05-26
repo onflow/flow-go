@@ -27,6 +27,20 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
+// when maxAttempt is set to 3, CanTry will only return true for the first 3 times.
+func TestCanTry(t *testing.T) {
+	maxAttempt := 3
+	chunks := NewChunks(10)
+	chunk := NewChunkStatus(ChunkWithIndex(0), flow.Identifier{0xaa}, flow.Identifier{0xbb})
+	chunks.Add(chunk)
+	results := []bool{}
+	for i := 0; i < 5; i++ {
+		results = append(results, CanTry(maxAttempt, chunk))
+		chunks.IncrementAttempt(chunk.ID())
+	}
+	require.Equal(t, []bool{true, true, true, false, false}, results)
+}
+
 func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
 	*flow.Block, *protocol.Snapshot, *protocol.State) {
 	block := unittest.BlockFixture()
@@ -201,14 +215,19 @@ func WithChunks(setAssignees ...func(uint64, *chunks.Assignment) *flow.Chunk) fu
 	}
 }
 
+func ChunkWithIndex(index int) *flow.Chunk {
+	chunk := &flow.Chunk{
+		Index: uint64(index),
+		ChunkBody: flow.ChunkBody{
+			CollectionIndex: uint(index),
+		},
+	}
+	return chunk
+}
+
 func WithAssignee(assignee flow.Identifier) func(uint64, *chunks.Assignment) *flow.Chunk {
 	return func(index uint64, assignment *chunks.Assignment) *flow.Chunk {
-		chunk := &flow.Chunk{
-			Index: index,
-			ChunkBody: flow.ChunkBody{
-				CollectionIndex: uint(index),
-			},
-		}
+		chunk := ChunkWithIndex(int(index))
 		fmt.Printf("with assignee: %v, chunk id: %v\n", index, chunk.ID())
 		assignment.Add(chunk, flow.IdentifierList{assignee})
 		return chunk
@@ -491,7 +510,6 @@ func TestRetry(t *testing.T) {
 
 	// create chunk data pack
 	myChunk := result.ExecutionResultBody.Chunks[0]
-	chunkDataPack := FromChunkID(myChunk.ID())
 
 	var wg sync.WaitGroup
 	wg.Add(3)
@@ -522,13 +540,7 @@ func TestRetry(t *testing.T) {
 	}).Return(nil).Times(3) // retry 3 times
 
 	// check verifier's method is called
-	verifier.On("ProcessLocal", mock.Anything).Run(func(args mock.Arguments) {
-		vchunk := args.Get(0).(*verification.VerifiableChunkData)
-		require.Equal(t, myChunk, vchunk.Chunk)
-		require.Equal(t, head, vchunk.Header)
-		require.Equal(t, result, vchunk.Result)
-		require.Equal(t, &chunkDataPack, vchunk.ChunkDataPack)
-	}).Return(nil).Once()
+	verifier.On("ProcessLocal", mock.Anything).Return(nil).Once()
 
 	<-e.Ready()
 	fmt.Printf("match.Engine.Process is called\n")
@@ -544,46 +556,54 @@ func TestRetry(t *testing.T) {
 	e.Done()
 }
 
-// // MaxRetry: When receives 1 ER, and 1 chunk is assigned assigned to me, if max retry is 2,
-// // and the execution node fails to return data for the first 2 requests, then no verifiable chunk will be produced
-// func (ms *MatchSuite) TestRetry(t *testing.T) {
-// 	// create a execution result that assigns to me
-// 	result, assignments := createExecutionResult(
-// 		WithChunks(
-// 			WithAssignee(ms.myID),
-// 		),
-// 	)
-//
-// 	// add assignments to assigner
-// 	AddAssignments(ms.assigner, assignments)
-//
-// 	// find the execution node id that created the execution result
-// 	en := ms.participants.Filter(filter.HasRole(flow.RoleExecution))[0]
-//
-// 	// proess the result
-// 	err := ms.e.Process(en, result)
-// 	require.NoError(t, err)
-//
-// 	// when the execution node receives chunk data pack request, it will
-// 	// reject the first 3 requests
-// 	OnChunkDataRequest(ms, func(m *messages.ChunkDataPackRequest) error {
-// 		count, exists := ms.request[m.ChunkID]
-// 		if !exists || count < 3 {
-// 			return nil
-// 		}
-//
-// 		chunkDataPack := ForChunk(1)
-// 		err = ms.e.Process(en.ID(), chunkDataPack)
-// 		require.NoError(ms.T(), err)
-// 		return nil
-// 	})
-//
-// 	// verify that the verifier engine was not called, no verifiable chunk was produced
-// 	ms.assertVerifiable(func(t *testing.T, verifiableChunks []*verification.VerifiableChunkData) {
-// 		require.Len(t, verifiableChunks, 0)
-// 	}, t)
-// }
-//
+// MaxRetry: When receives 1 ER, and 1 chunk is assigned assigned to me, if max retry is 2,
+// and the execution node fails to return data for the first 2 requests, then no verifiable chunk will be produced
+func TestMaxRetry(t *testing.T) {
+	e, participants, myID, _, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, 1)
+	// create a execution result that assigns to me
+	result, assignment := createExecutionResult(
+		head.ID(),
+		WithChunks(
+			WithAssignee(myID),
+		),
+	)
+
+	// add assignment to assigner
+	assigner.On("Assign", mock.Anything, mock.Anything, mock.Anything).Return(assignment, nil).Once()
+
+	// block header has been received
+	headerDB[result.BlockID] = head
+
+	// find the execution node id that created the execution result
+	en := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
+
+	var wg sync.WaitGroup
+	wg.Add(3)
+	// chunk data was requested once, and return the chunk data pack when requested
+	// called with 3 mock.Anything, the first is the request, the second and third are the 2
+	// execution nodes
+	con.On("Submit", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		wg.Done()
+	}).Return(nil).Times(3)
+
+	// check verifier's method is called
+	verifier.On("ProcessLocal", mock.Anything).Return(nil).Once()
+
+	<-e.Ready()
+	fmt.Printf("match.Engine.Process is called\n")
+	// engine processes the execution result
+	err := e.Process(en.ID(), result)
+	require.NoError(t, err)
+
+	// wait until 3 retry attampts are done
+	wg.Wait()
+
+	assigner.AssertExpectations(t)
+	con.AssertExpectations(t)
+	verifier.AssertExpectations(t)
+	e.Done()
+}
+
 // // Concurrency: When 2 different ER are received concurrently, chunks from both
 // // results will be processed
 //

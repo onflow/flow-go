@@ -223,7 +223,6 @@ func myAssignements(assigner module.ChunkAssigner, myID flow.Identifier, verifie
 			return nil, fmt.Errorf("chunk out of range requested: %v", index)
 		}
 
-		fmt.Printf("chunkID: %v, index: %v\n", chunk.ID(), index)
 		mine = append(mine, chunk)
 	}
 
@@ -246,16 +245,21 @@ func (e *Engine) onTimer() {
 		Msg("finish processing all pending chunks")
 
 	for _, chunk := range allChunks {
-		exists := e.results.Has(chunk.ExecutionResultID)
-
 		cid := chunk.ID()
-		fmt.Printf("processing chunk: %v\n", cid)
 
 		log := e.log.With().
 			Hex("chunk_id", cid[:]).
 			Hex("result_id", chunk.ExecutionResultID[:]).
 			Logger()
 
+		// check if has reached max try
+		if CanTry(e.maxAttempt, chunk) {
+			e.chunks.Rem(cid)
+			log.Debug().Msg("max attampts reached")
+			continue
+		}
+
+		exists := e.results.Has(chunk.ExecutionResultID)
 		// if execution result has been removed, no need to request
 		// the chunk data any more.
 		if !exists {
@@ -264,14 +268,11 @@ func (e *Engine) onTimer() {
 			continue
 		}
 
-		// check if has reached max try
-		if chunk.Attempt >= e.maxAttempt {
-			e.chunks.Rem(cid)
-			log.Debug().Msg("max attampts reached")
+		exists = e.chunks.IncrementAttempt(cid)
+		if !exists {
+			log.Debug().Msg("skip if chunk no longer exists")
 			continue
 		}
-
-		e.chunks.IncrementAttempt(cid)
 
 		err := e.requestChunkDataPack(chunk)
 		if err != nil {
@@ -367,4 +368,8 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	})
 
 	return nil
+}
+
+func CanTry(maxAttempt int, chunk *ChunkStatus) bool {
+	return chunk.Attempt < maxAttempt
 }
