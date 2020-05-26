@@ -1,7 +1,7 @@
 package virtualmachine_test
 
 import (
-	"encoding/hex"
+	"crypto"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
@@ -135,6 +134,78 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		require.Len(t, result.Events, 1)
 		assert.EqualValues(t, "flow.AccountCreated", result.Events[0].EventType.ID())
+	})
+}
+
+func TestBlockContext_DeployContract(t *testing.T) {
+	// seed the RNG
+	rand.Seed(time.Now().UnixNano())
+	rt := runtime.NewInterpreterRuntime()
+
+	h := unittest.BlockHeaderFixture()
+
+	vm, err := virtualmachine.New(rt)
+	require.NoError(t, err)
+	bc := vm.NewBlockContext(&h)
+
+	t.Run("account update with set code succeeds as service account", func(t *testing.T) {
+		ledger := execTestutil.RootBootstrappedLedger()
+
+		// Create an account private key.
+		privateKeys, err := execTestutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := execTestutil.CreateAccounts(vm, ledger, privateKeys)
+		require.NoError(t, err)
+
+		tx := execTestutil.DeployCounterContractTransaction(accounts[0])
+
+		tx.SetProposalKey(flow.ServiceAddress(), 0, 0)
+		tx.SetPayer(flow.ServiceAddress())
+
+		err = execTestutil.SignPayload(tx, accounts[0], privateKeys[0])
+		require.NoError(t, err)
+
+		err = execTestutil.SignEnvelope(tx, flow.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		require.NoError(t, err)
+
+		result, err := bc.ExecuteTransaction(ledger, tx)
+		assert.NoError(t, err)
+
+		assert.True(t, result.Succeeded())
+
+		if !assert.Nil(t, result.Error) {
+			t.Log(result.Error.ErrorMessage())
+		}
+	})
+
+	t.Run("account update with set code fails if not signed by service account", func(t *testing.T) {
+		ledger := execTestutil.RootBootstrappedLedger()
+
+		// Create an account private key.
+		privateKeys, err := execTestutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := execTestutil.CreateAccounts(vm, ledger, privateKeys)
+		require.NoError(t, err)
+
+		tx := execTestutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
+
+		err = execTestutil.SignTransaction(tx, accounts[0], privateKeys[0], 0)
+		require.NoError(t, err)
+
+		result, err := bc.ExecuteTransaction(ledger, tx)
+
+		assert.NoError(t, err)
+		assert.False(t, result.Succeeded())
+		assert.NotNil(t, result.Error)
+
+		expectedErr := "code execution failed: Execution failed:\ncode deployment requires authorization from the service account\n"
+
+		assert.Equal(t, expectedErr, result.Error.ErrorMessage())
+		assert.Equal(t, uint32(9), result.Error.StatusCode())
 	})
 }
 
@@ -318,11 +389,11 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 	require.NoError(t, err)
 
 	createAccountScript := []byte(`
-	transaction {
-		prepare(signer: AuthAccount) {
-			let acct = AuthAccount(payer: signer)
+		transaction {
+			prepare(signer: AuthAccount) {
+				let acct = AuthAccount(payer: signer)
+			}
 		}
-	}
 	`)
 
 	addAccountCreatorTemplate := `
@@ -552,55 +623,29 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	require.NoError(t, err)
 	bc := vm.NewBlockContext(&h)
 
-	sequenceNumber := 0
+	sequenceNumber := uint64(0)
 
 	ledger := execTestutil.RootBootstrappedLedger()
 
 	ledgerAccess := virtualmachine.NewLedgerDAL(ledger)
 
 	createAccount := func() (flow.Address, crypto.PublicKey) {
+		privateKey, tx := execTestutil.CreateAccountCreationTransaction(t)
 
-		// create a random seed for the key
-		seed := make([]byte, 48)
-		_, err := rand.Read(seed)
-		require.Nil(t, err)
-
-		// generate a unique key
-		key, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
-		assert.NoError(t, err)
-
-		// get the key bytes
-		accountKey := flow.AccountPublicKey{
-			PublicKey: key.PublicKey(),
-			SignAlgo:  key.Algorithm(),
-			HashAlgo:  hash.SHA3_256,
-		}
-		keyBytes, err := flow.EncodeRuntimeAccountPublicKey(accountKey)
-		assert.NoError(t, err)
-
-		// define the cadence script
-		script := fmt.Sprintf(`
-			transaction {
-			  prepare(signer: AuthAccount) {
-				let acct = AuthAccount(payer: signer)
-				acct.addPublicKey("%s".decodeHex())
-			  }
-			}
-		`, hex.EncodeToString(keyBytes))
-
-		// create the transaction to create the account
-		tx := flow.NewTransactionBody().
-			SetScript([]byte(script)).
-			SetPayer(flow.ServiceAddress()).
-			SetProposalKey(flow.ServiceAddress(), 0, uint64(sequenceNumber)).
-			AddAuthorizer(flow.ServiceAddress())
+		err := execTestutil.SignTransactionByRoot(tx, sequenceNumber)
+		require.NoError(t, err)
 
 		sequenceNumber++
 
 		rootHasher, err := hash.NewHasher(unittest.ServiceAccountPrivateKey.HashAlgo)
 		require.NoError(t, err)
 
-		err = tx.SignEnvelope(flow.ServiceAddress(), 0, unittest.ServiceAccountPrivateKey.PrivateKey, rootHasher)
+		err = tx.SignEnvelope(
+			flow.ServiceAddress(),
+			0,
+			unittest.ServiceAccountPrivateKey.PrivateKey,
+			rootHasher,
+		)
 		require.NoError(t, err)
 
 		// execute the transaction
@@ -618,7 +663,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		// read the address of the account created (e.g. "0x01" and convert it to flow.address)
 		address := flow.BytesToAddress(result.Events[0].Fields[0].(cadence.Address).Bytes())
 
-		return address, key.PublicKey()
+		return address, privateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold).PublicKey
 	}
 
 	// create a bunch of accounts

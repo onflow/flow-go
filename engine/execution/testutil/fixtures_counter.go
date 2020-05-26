@@ -6,23 +6,30 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func DeployCounterContractTransaction(signer flow.Address) *flow.TransactionBody {
-	return CreateContractDeploymentTransaction(`
-		access(all) contract Container {
-			access(all) resource Counter {
-				pub var count: Int
+const CounterContract = `
+access(all) contract Container {
+	access(all) resource Counter {
+		pub var count: Int
 
-				init(_ v: Int) {
-					self.count = v
-				}
-				pub fun add(_ count: Int) {
-					self.count = self.count + count
-				}
-			}
-			pub fun createCounter(_ v: Int): @Counter {
-				return <-create Counter(v)
-			}
-		}`, signer)
+		init(_ v: Int) {
+			self.count = v
+		}
+		pub fun add(_ count: Int) {
+			self.count = self.count + count
+		}
+	}
+	pub fun createCounter(_ v: Int): @Counter {
+		return <-create Counter(v)
+	}
+}
+`
+
+func DeployCounterContractTransaction(authorizer flow.Address) *flow.TransactionBody {
+	return CreateContractDeploymentTransaction(CounterContract, authorizer)
+}
+
+func DeployUnauthorizedCounterContractTransaction(authorizer flow.Address) *flow.TransactionBody {
+	return CreateUnauthorizedContractDeploymentTransaction(CounterContract, authorizer)
 }
 
 func CreateCounterTransaction(counter, signer flow.Address) *flow.TransactionBody {

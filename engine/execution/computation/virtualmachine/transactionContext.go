@@ -1,6 +1,7 @@
 package virtualmachine
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 
@@ -85,7 +86,6 @@ func (r *TransactionContext) ValueExists(owner, controller, key []byte) (exists 
 //
 // This function returns an error if the input is invalid.
 func (r *TransactionContext) CreateAccount(payer runtime.Address) (runtime.Address, error) {
-
 	flowErr, fatalErr := r.deductAccountCreationFee(flow.Address(payer))
 	if fatalErr != nil {
 		return runtime.Address{}, fatalErr
@@ -268,12 +268,30 @@ func (r *TransactionContext) CheckCode(address runtime.Address, code []byte) (er
 func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []byte, checkPermission bool) (err error) {
 	accountAddress := address.Bytes()
 
+	key := fullKeyHash(string(accountAddress), string(accountAddress), keyCode)
+
+	prevCode, err := r.ledger.Get(key)
+	if err != nil {
+		return fmt.Errorf("cannot retreive previous code: %w", err)
+	}
+
+	// skip checks and updating if the new code equals the old
+	if bytes.Equal(prevCode, code) {
+		return nil
+	}
+
+	// currently, every transaction that sets account code (deploys/updates contracts)
+	// must be signed by the service account
+	if !r.isValidSigningAccount(runtime.Address(flow.ServiceAddress())) {
+		return fmt.Errorf("code deployment requires authorization from the service account")
+	}
+
 	err = r.ledger.CheckAccountExists(accountAddress)
 	if err != nil {
 		return err
 	}
 
-	r.ledger.Set(fullKeyHash(string(accountAddress), string(accountAddress), keyCode), code)
+	r.ledger.Set(key, code)
 
 	return nil
 }
@@ -538,6 +556,16 @@ func sigIsForProposalKey(txSig flow.TransactionSignature, proposalKey flow.Propo
 
 func hasSufficientKeyWeight(weights map[flow.Address]int, address flow.Address) bool {
 	return weights[address] >= AccountKeyWeightThreshold
+}
+
+func (r *TransactionContext) isValidSigningAccount(address runtime.Address) bool {
+	for _, accountAddress := range r.GetSigningAccounts() {
+		if accountAddress == address {
+			return true
+		}
+	}
+
+	return false
 }
 
 var InitDefaultTokenTransaction = []byte(fmt.Sprintf(`
