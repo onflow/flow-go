@@ -53,6 +53,7 @@ func CompleteExecutionResultFixture(t testing.TB, chunkCount int) verification.C
 		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
 		})
+
 		err := testutil.CreateRootAccountInLedger(view)
 		require.NoError(t, err)
 

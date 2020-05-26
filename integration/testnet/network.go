@@ -486,7 +486,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 
 	// generate the initial execution state
 	dbDir := filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState)
-	commit, err := run.GenerateExecutionState(dbDir, unittest.RootAccountPublicKey, unittest.InitialTokenSupply)
+	commit, err := run.GenerateExecutionState(dbDir, unittest.ServiceAccountPublicKey, unittest.InitialTokenSupply)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -504,7 +504,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 
 	// write common genesis bootstrap files
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathServiceAccountPublicKey), unittest.RootAccountPublicKey)
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathServiceAccountPublicKey), unittest.ServiceAccountPublicKey)
 	if err != nil {
 		return nil, nil, err
 	}

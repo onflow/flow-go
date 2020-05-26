@@ -3,6 +3,8 @@ package metrics
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 type CacheCollector struct {
@@ -11,7 +13,7 @@ type CacheCollector struct {
 	misses  *prometheus.CounterVec
 }
 
-func NewCacheCollector(chain string) *CacheCollector {
+func NewCacheCollector(chain flow.ChainID) *CacheCollector {
 
 	cm := &CacheCollector{
 
@@ -20,7 +22,7 @@ func NewCacheCollector(chain string) *CacheCollector {
 			Namespace:   namespaceStorage,
 			Subsystem:   subsystemCache,
 			Help:        "the number of entries in the cache",
-			ConstLabels: prometheus.Labels{LabelChain: chain},
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}, []string{LabelResource}),
 
 		hits: promauto.NewCounterVec(prometheus.CounterOpts{
@@ -28,7 +30,7 @@ func NewCacheCollector(chain string) *CacheCollector {
 			Namespace:   namespaceStorage,
 			Subsystem:   subsystemCache,
 			Help:        "the number of hits for the cache",
-			ConstLabels: prometheus.Labels{LabelChain: chain},
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}, []string{LabelResource}),
 
 		misses: promauto.NewCounterVec(prometheus.CounterOpts{
@@ -36,7 +38,7 @@ func NewCacheCollector(chain string) *CacheCollector {
 			Namespace:   namespaceStorage,
 			Subsystem:   subsystemCache,
 			Help:        "the number of misses for the cache",
-			ConstLabels: prometheus.Labels{LabelChain: chain},
+			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}, []string{LabelResource}),
 	}
 

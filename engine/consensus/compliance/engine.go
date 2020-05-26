@@ -213,7 +213,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 	header.Height = parent.Height + 1
 
 	log := e.log.With().
-		Str("chain_id", header.ChainID).
+		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
 		Hex("block_id", logging.Entity(header)).
@@ -327,7 +327,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	header := proposal.Header
 
 	log := e.log.With().
-		Str("chain_id", header.ChainID).
+		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
 		Hex("block_id", logging.Entity(header)).
@@ -447,7 +447,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	header := proposal.Header
 
 	log := e.log.With().
-		Str("chain_id", header.ChainID).
+		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
 		Hex("block_id", logging.Entity(header)).

@@ -121,7 +121,7 @@ func CreateAccounts(
 		tx := flow.NewTransactionBody().
 			SetScript(script).
 			AddArgument(encCadAccountKey).
-			AddAuthorizer(flow.RootAddress)
+			AddAuthorizer(flow.ServiceAddress())
 
 		result, err := ctx.ExecuteTransaction(ledger, tx, virtualmachine.SkipVerification)
 		if err != nil {
@@ -150,26 +150,15 @@ func CreateAccounts(
 }
 
 func SignTransactionByRoot(tx *flow.TransactionBody, seqNum uint64) error {
-	tx.SetProposalKey(flow.RootAddress, 0, seqNum)
-	tx.SetPayer(flow.RootAddress)
-	return SignEnvelope(tx, flow.RootAddress, unittest.RootAccountPrivateKey)
+	tx.SetProposalKey(flow.ServiceAddress(), 0, seqNum)
+	tx.SetPayer(flow.ServiceAddress())
+	return SignEnvelope(tx, flow.ServiceAddress(), unittest.RootAccountPrivateKey)
 }
 
 func RootBootstrappedLedger() virtualmachine.Ledger {
 	ledger := make(virtualmachine.MapLedger)
-	bootstrap.BootstrapView(ledger, unittest.RootAccountPublicKey, unittest.InitialTokenSupply)
+	bootstrap.BootstrapView(ledger, unittest.ServiceAccountPublicKey, unittest.InitialTokenSupply)
 	return ledger
-}
-
-func CreateRootAccountInLedger(ledger virtualmachine.Ledger) error {
-	l := virtualmachine.NewLedgerDAL(ledger)
-
-	accountKey := unittest.RootAccountPrivateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold)
-
-	return l.CreateAccountWithAddress(
-		flow.RootAddress,
-		[]flow.AccountPublicKey{accountKey},
-	)
 }
 
 func bytesToCadenceArray(l []byte) cadence.Array {

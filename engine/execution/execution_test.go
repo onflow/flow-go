@@ -236,7 +236,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	seq := uint64(0)
 
 	// transaction that will change state and succeed, used to test that state commitment changes
-	tx1 := execTestutil.DeployCounterContractTransaction(flow.RootAddress)
+	tx1 := execTestutil.DeployCounterContractTransaction(flow.ServiceAddress())
 	err = execTestutil.SignTransactionByRoot(tx1, seq)
 	require.NoError(t, err)
 	seq++
@@ -254,7 +254,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	proposal1 := unittest.ProposalFromBlock(&block1)
 
 	// transaction that will change state but then panic and revert, used to test that state commitment stays identical
-	tx2 := execTestutil.CreateCounterPanicTransaction(flow.RootAddress, flow.RootAddress)
+	tx2 := execTestutil.CreateCounterPanicTransaction(flow.ServiceAddress(), flow.ServiceAddress())
 	err = execTestutil.SignTransactionByRoot(tx2, seq)
 	require.NoError(t, err)
 

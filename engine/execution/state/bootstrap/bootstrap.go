@@ -70,8 +70,17 @@ func BootstrapExecutionDatabase(db *badger.DB, commit flow.StateCommitment, gene
 	return nil
 }
 
-func BootstrapView(ledger virtualmachine.Ledger, rootPublicKey flow.AccountPublicKey, initialTokenSupply uint64) {
-	service := createServiceAccount(ledger, rootPublicKey)
+func BootstrapView(
+	ledger virtualmachine.Ledger,
+	serviceAccountPublicKey flow.AccountPublicKey,
+	initialTokenSupply uint64,
+) {
+	l := virtualmachine.NewLedgerDAL(ledger)
+
+	// initialize the account addressing state
+	l.SetAddressState(flow.ZeroAddressState)
+
+	service := createServiceAccount(ledger, serviceAccountPublicKey)
 
 	rt := runtime.NewInterpreterRuntime()
 	vm, err := virtualmachine.New(rt)
@@ -104,16 +113,12 @@ func createAccount(ledger virtualmachine.Ledger) flow.Address {
 func createServiceAccount(ledger virtualmachine.Ledger, accountKey flow.AccountPublicKey) flow.Address {
 	l := virtualmachine.NewLedgerDAL(ledger)
 
-	err := l.CreateAccountWithAddress(
-		flow.RootAddress,
-		[]flow.AccountPublicKey{accountKey},
-	)
-
+	addr, err := l.CreateAccount([]flow.AccountPublicKey{accountKey})
 	if err != nil {
-		panic(fmt.Sprintf("failed to create service account: %s", err))
+		panic(fmt.Sprintf("failed to create root account: %s", err))
 	}
 
-	return flow.RootAddress
+	return addr
 }
 
 func deployFungibleToken(ctx virtualmachine.BlockContext, ledger virtualmachine.Ledger) flow.Address {

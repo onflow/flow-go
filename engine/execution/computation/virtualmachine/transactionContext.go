@@ -114,8 +114,6 @@ func (r *TransactionContext) CreateAccount(payer runtime.Address) (runtime.Addre
 		return runtime.Address{}, err
 	}
 
-	r.Log(fmt.Sprintf("Created new account with address: %s", addr))
-
 	flowErr, fatalErr = r.initDefaultToken(addr)
 	if fatalErr != nil {
 		return runtime.Address{}, fatalErr
@@ -134,6 +132,8 @@ func (r *TransactionContext) CreateAccount(payer runtime.Address) (runtime.Addre
 			)
 		}
 	}
+
+	r.Log(fmt.Sprintf("Created new account with address: %s", addr))
 
 	return runtime.Address(addr), nil
 }
@@ -197,9 +197,9 @@ func (r *TransactionContext) deductAccountCreationFee(addr flow.Address) (FlowEr
 // This function returns an error if the specified account does not exist or
 // if the key insertion fails.
 func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []byte) error {
-	accountID := address[:]
+	accountAddress := address.Bytes()
 
-	err := r.ledger.CheckAccountExists(accountID)
+	err := r.ledger.CheckAccountExists(accountAddress)
 	if err != nil {
 		return err
 	}
@@ -209,14 +209,14 @@ func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []
 		return fmt.Errorf("cannot decode runtime public account key: %w", err)
 	}
 
-	publicKeys, err := r.ledger.GetAccountPublicKeys(accountID)
+	publicKeys, err := r.ledger.GetAccountPublicKeys(accountAddress)
 	if err != nil {
 		return err
 	}
 
 	publicKeys = append(publicKeys, runtimePublicKey)
 
-	return r.ledger.SetAccountPublicKeys(accountID, publicKeys)
+	return r.ledger.SetAccountPublicKeys(accountAddress, publicKeys)
 }
 
 // RemoveAccountKey removes a public key by index from an existing account.
@@ -224,14 +224,14 @@ func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []
 // This function returns an error if the specified account does not exist, the
 // provided key is invalid, or if key deletion fails.
 func (r *TransactionContext) RemoveAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
-	accountID := address[:]
+	accountAddress := address.Bytes()
 
-	err = r.ledger.CheckAccountExists(accountID)
+	err = r.ledger.CheckAccountExists(accountAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	publicKeys, err := r.ledger.GetAccountPublicKeys(accountID)
+	publicKeys, err := r.ledger.GetAccountPublicKeys(accountAddress)
 	if err != nil {
 		return publicKey, err
 	}
@@ -244,7 +244,7 @@ func (r *TransactionContext) RemoveAccountKey(address runtime.Address, index int
 
 	publicKeys = append(publicKeys[:index], publicKeys[index+1:]...)
 
-	err = r.ledger.SetAccountPublicKeys(accountID, publicKeys)
+	err = r.ledger.SetAccountPublicKeys(accountAddress, publicKeys)
 	if err != nil {
 		return publicKey, err
 	}
@@ -266,14 +266,14 @@ func (r *TransactionContext) CheckCode(address runtime.Address, code []byte) (er
 // This function returns an error if the specified account does not exist or is
 // not a valid signing account.
 func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []byte, checkPermission bool) (err error) {
-	accountID := address[:]
+	accountAddress := address.Bytes()
 
-	err = r.ledger.CheckAccountExists(accountID)
+	err = r.ledger.CheckAccountExists(accountAddress)
 	if err != nil {
 		return err
 	}
 
-	r.ledger.Set(fullKeyHash(string(accountID), string(accountID), keyCode), code)
+	r.ledger.Set(fullKeyHash(string(accountAddress), string(accountAddress), keyCode), code)
 
 	return nil
 }
@@ -290,15 +290,15 @@ func (r *TransactionContext) ResolveImport(location runtime.Location) ([]byte, e
 
 	address := flow.BytesToAddress(addressLocation)
 
-	accountID := address.Bytes()
+	accountAddress := address.Bytes()
 
-	code, err := r.ledger.Get(fullKeyHash(string(accountID), string(accountID), keyCode))
+	code, err := r.ledger.Get(fullKeyHash(string(accountAddress), string(accountAddress), keyCode))
 	if err != nil {
 		return nil, err
 	}
 
 	if code == nil {
-		return nil, fmt.Errorf("no code deployed at address %x", accountID)
+		return nil, fmt.Errorf("no code deployed at address %x", accountAddress)
 	}
 
 	return code, nil
@@ -360,7 +360,11 @@ func (r *TransactionContext) checkProgram(code []byte, address runtime.Address) 
 //
 // An error is returned if any of the expected signatures are invalid or missing.
 func (r *TransactionContext) verifySignatures() FlowError {
-	if r.tx.Payer == flow.ZeroAddress {
+	if r.skipVerification {
+		return nil
+	}
+
+	if r.tx.Payer == flow.EmptyAddress {
 		return &MissingPayerError{}
 	}
 
@@ -544,7 +548,7 @@ var InitDefaultTokenTransaction = []byte(fmt.Sprintf(`
             FlowServiceAccount.initDefaultToken(acct)
         }
     }
-`, flow.RootAddress))
+`, flow.ServiceAddress()))
 
 func DefaultTokenBalanceScript(addr flow.Address) []byte {
 	return []byte(fmt.Sprintf(`
@@ -554,7 +558,7 @@ func DefaultTokenBalanceScript(addr flow.Address) []byte {
             let acct = getAccount(0x%s)
             return FlowServiceAccount.defaultTokenBalance(acct)
         }
-    `, flow.RootAddress, addr))
+    `, flow.ServiceAddress(), addr))
 }
 
 var DeductAccountCreationFeeTransaction = []byte(fmt.Sprintf(`
@@ -569,7 +573,7 @@ var DeductAccountCreationFeeTransaction = []byte(fmt.Sprintf(`
             FlowServiceAccount.deductAccountCreationFee(acct)
         }
     }
-`, flow.RootAddress))
+`, flow.ServiceAddress()))
 
 var DeductTransactionFeeTransaction = []byte(fmt.Sprintf(`
     import FlowServiceAccount from 0x%s
@@ -579,7 +583,7 @@ var DeductTransactionFeeTransaction = []byte(fmt.Sprintf(`
             FlowServiceAccount.deductTransactionFee(acct)
         }
     }
-`, flow.RootAddress))
+`, flow.ServiceAddress()))
 
 func DeployDefaultTokenTransaction(contract []byte) []byte {
 	return []byte(fmt.Sprintf(`
@@ -624,5 +628,5 @@ var MintDefaultTokenTransaction = []byte(fmt.Sprintf(`
 `, FungibleTokenAddress, FlowTokenAddress))
 
 // TODO: assign these values after bootstrapping
-var FungibleTokenAddress = flow.HexToAddress("02")
-var FlowTokenAddress = flow.HexToAddress("03")
+var FungibleTokenAddress, _, _ = flow.AccountAddress(flow.AddressState(1))
+var FlowTokenAddress, _, _ = flow.AccountAddress(flow.AddressState(2))

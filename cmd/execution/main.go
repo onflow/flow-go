@@ -84,10 +84,12 @@ func main() {
 			if node.GenesisAccountPublicKey == nil {
 				panic(fmt.Sprintf("error while bootstrapping execution state: no root account public key"))
 			}
+
 			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage, *node.GenesisAccountPublicKey, node.GenesisTokenSupply)
 			if err != nil {
 				panic(fmt.Sprintf("error while bootstrapping execution state: %s", err))
 			}
+
 			if !bytes.Equal(bootstrappedStateCommitment, node.GenesisCommit) {
 				panic(fmt.Sprintf("genesis seal state commitment (%x) different from precalculated (%x)", bootstrappedStateCommitment, node.GenesisCommit))
 			}

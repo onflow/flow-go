@@ -123,12 +123,12 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 		).
 		AddAuthorizer(accounts[0]).
 		SetProposalKey(accounts[0], 0, 0).
-		SetPayer(flow.RootAddress)
+		SetPayer(flow.ServiceAddress())
 
 	err = testutil.SignPayload(useImportTx, accounts[0], privateKeys[0])
 	require.NoError(t, err)
 
-	err = testutil.SignEnvelope(useImportTx, flow.RootAddress, unittest.RootAccountPrivateKey)
+	err = testutil.SignEnvelope(useImportTx, flow.ServiceAddress(), unittest.RootAccountPrivateKey)
 	require.NoError(t, err)
 
 	// Run the Use import (FT Vault resource) transaction
@@ -185,12 +185,12 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 			).
 			AddAuthorizer(accounts[0]).
 			SetProposalKey(accounts[0], 0, uint64(i)).
-			SetPayer(flow.RootAddress)
+			SetPayer(flow.ServiceAddress())
 
 		err = testutil.SignPayload(tx, accounts[0], privateKeys[0])
 		require.NoError(b, err)
 
-		err = testutil.SignEnvelope(tx, flow.RootAddress, unittest.RootAccountPrivateKey)
+		err = testutil.SignEnvelope(tx, flow.ServiceAddress(), unittest.RootAccountPrivateKey)
 		require.NoError(b, err)
 
 		txs = append(txs, tx)
