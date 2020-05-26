@@ -10,7 +10,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/chunks"
@@ -27,34 +26,6 @@ import (
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
-
-func TestMatchEngine(t *testing.T) {
-	suite.Run(t, new(MatchSuite))
-}
-
-type MatchSuite struct {
-	suite.Suite
-
-	participants flow.IdentityList
-	myID         flow.Identifier
-	otherID      flow.Identifier
-	head         *flow.Header
-
-	me       *module.Local
-	con      *network.Conduit
-	net      *module.Network
-	headers  *storage.Headers
-	headerDB map[flow.Identifier]*flow.Header
-	state    *protocol.State
-	snapshot *protocol.Snapshot
-	results  *results.PendingResults
-	verifier *network.Engine
-	chunks   *Chunks
-	assigner *module.ChunkAssigner
-
-	// engine under test
-	e *Engine
-}
 
 func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
 	*flow.Block, *protocol.Snapshot, *protocol.State) {
@@ -153,9 +124,26 @@ func CreateNParticipantsWithMyRole(myRole flow.Role, otherRoles ...flow.Role) (
 	return participants, myID, me
 }
 
-func (ms *MatchSuite) SetupTest() {
+func SetupTest(t *testing.T, maxTry int) (
+	e *Engine,
+	participants flow.IdentityList,
+	myID flow.Identifier,
+	otherID flow.Identifier,
+	head *flow.Header,
+	me *module.Local,
+	con *network.Conduit,
+	net *module.Network,
+	headers *storage.Headers,
+	headerDB map[flow.Identifier]*flow.Header,
+	state *protocol.State,
+	snapshot *protocol.Snapshot,
+	er *results.PendingResults,
+	verifier *network.Engine,
+	chunks *Chunks,
+	assigner *module.ChunkAssigner,
+) {
 	// set up local module mock
-	participants, myID, me := CreateNParticipantsWithMyRole(flow.RoleVerification,
+	participants, myID, me = CreateNParticipantsWithMyRole(flow.RoleVerification,
 		flow.RoleVerification,
 		flow.RoleCollection,
 		flow.RoleConsensus,
@@ -163,39 +151,30 @@ func (ms *MatchSuite) SetupTest() {
 		flow.RoleExecution,
 		flow.RoleExecution,
 	)
-	ms.participants = participants
-	ms.myID = myID
-	ms.me = me
 
 	// set up network conduit mock
-	net, con := RegisterNetwork()
-	ms.net = net
-	ms.con = con
+	net, con = RegisterNetwork()
 
 	// set up header storage mock
-	ms.headerDB = make(map[flow.Identifier]*flow.Header)
-	ms.headers = HeadersFromMap(ms.headerDB)
+	headerDB = make(map[flow.Identifier]*flow.Header)
+	headers = HeadersFromMap(headerDB)
 
 	// setup protocol state
-	block, snapshot, state := FinalizedProtocolStateWithParticipants(ms.participants)
-	ms.head = block.Header
-	ms.snapshot = snapshot
-	ms.state = state
+	block, snapshot, state := FinalizedProtocolStateWithParticipants(participants)
+	head = block.Header
 
 	// setup other dependencies
-	ms.results = results.NewPendingResults()
-	ms.verifier = &network.Engine{}
-	ms.assigner = &module.ChunkAssigner{}
-	ms.chunks = NewChunks(10)
+	er = results.NewPendingResults()
+	verifier = &network.Engine{}
+	assigner = &module.ChunkAssigner{}
+	chunks = NewChunks(10)
 
 	log := zerolog.New(os.Stderr)
 	retryInterval := time.Second
-	maxTry := 1
 
-	e, err := New(log, ms.net, ms.me, ms.results, ms.verifier, ms.assigner, ms.state, ms.chunks, ms.headers, retryInterval, maxTry)
-	require.NoError(ms.T(), err)
-
-	ms.e = e
+	e, err := New(log, net, me, er, verifier, assigner, state, chunks, headers, retryInterval, maxTry)
+	require.NoError(t, err)
+	return e, participants, myID, otherID, head, me, con, net, headers, headerDB, state, snapshot, er, verifier, chunks, assigner
 }
 
 func createExecutionResult(blockID flow.Identifier, options ...func(result *flow.ExecutionResult, assignments *chunks.Assignment)) (*flow.ExecutionResult, *chunks.Assignment) {
@@ -244,37 +223,35 @@ func FromChunkID(chunkID flow.Identifier) flow.ChunkDataPack {
 
 // Happy Path: When receives a ER, and 1 chunk is assigned to me,
 // it will fetch that collection and chunk data, and produces a verifiable chunk
-func (ms *MatchSuite) TestChunkVerified() {
+func TestChunkVerified(t *testing.T) {
+	e, participants, myID, _, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, 1)
 	// create a execution result that assigns to me
 	result, assignment := createExecutionResult(
-		ms.head.ID(),
+		head.ID(),
 		WithChunks(
-			WithAssignee(ms.myID),
+			WithAssignee(myID),
 		),
 	)
 
 	// add assignment to assigner
-	ms.assigner.On("Assign", mock.Anything, mock.Anything, mock.Anything).Return(assignment, nil).Once()
+	assigner.On("Assign", mock.Anything, mock.Anything, mock.Anything).Return(assignment, nil).Once()
 
 	// block header has been received
-	ms.headerDB[result.BlockID] = ms.head
+	headerDB[result.BlockID] = head
 
-	// find the exeuction node id that created the execution result
-	en := ms.participants.Filter(filter.HasRole(flow.RoleExecution))[0]
+	// find the execution node id that created the execution result
+	en := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
 	// create chunk data pack
 	myChunk := result.ExecutionResultBody.Chunks[0]
 	chunkDataPack := FromChunkID(myChunk.ID())
-
-	t := ms.T()
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 	// chunk data was requested once, and return the chunk data pack when requested
 	// called with 3 mock.Anything, the first is the request, the second and third are the 2
 	// execution nodes
-	ms.con.On("Submit", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		defer wg.Done()
+	con.On("Submit", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		req := args.Get(0).(*messages.ChunkDataPackRequest)
 		fmt.Printf("con.Submit is called\n")
 		// assert the right ID was requested manually as we don't know what nonce was used
@@ -285,60 +262,62 @@ func (ms *MatchSuite) TestChunkVerified() {
 			Nonce: req.Nonce,
 		}
 
-		err := ms.e.Process(en.ID(), resp)
+		err := e.Process(en.ID(), resp)
 		require.NoError(t, err)
 
 		time.Sleep(time.Millisecond)
+		wg.Done()
 	}).Return(nil).Once()
 
 	// check verifier's method is called
-	ms.verifier.On("ProcessLocal", mock.Anything).Run(func(args mock.Arguments) {
+	verifier.On("ProcessLocal", mock.Anything).Run(func(args mock.Arguments) {
 		vchunk := args.Get(0).(*verification.VerifiableChunkData)
 		require.Equal(t, myChunk, vchunk.Chunk)
-		require.Equal(t, ms.head, vchunk.Header)
+		require.Equal(t, head, vchunk.Header)
 		require.Equal(t, result, vchunk.Result)
 		require.Equal(t, &chunkDataPack, vchunk.ChunkDataPack)
 	}).Return(nil).Once()
 
-	<-ms.e.Ready()
+	<-e.Ready()
 	fmt.Printf("match.Engine.Process is called\n")
 	// engine processes the execution result
-	err := ms.e.Process(en.ID(), result)
+	err := e.Process(en.ID(), result)
 	require.NoError(t, err)
 
 	wg.Wait()
 
-	ms.assigner.AssertExpectations(t)
-	ms.con.AssertExpectations(t)
-	ms.verifier.AssertExpectations(t)
-	ms.e.Done()
+	assigner.AssertExpectations(t)
+	con.AssertExpectations(t)
+	verifier.AssertExpectations(t)
+	e.Done()
 }
 
 // No assignment: When receives a ER, and no chunk is assigned to me, then I won’t fetch any collection or chunk,
 // nor produce any verifiable chunk
-func (ms *MatchSuite) TestNoAssignment() {
+func TestNoAssignment(t *testing.T) {
+	e, participants, _, otherID, head, _, _, _, _, headerDB, _, _, _, _, _, assigner := SetupTest(t, 1)
 	// create a execution result that assigns to me
 	result, assignment := createExecutionResult(
-		ms.head.ID(),
+		head.ID(),
 		WithChunks(
-			WithAssignee(ms.otherID),
+			WithAssignee(otherID),
 		),
 	)
 
 	// add assignment to assigner
-	ms.assigner.On("Assign", mock.Anything, mock.Anything, mock.Anything).Return(assignment, nil).Once()
+	assigner.On("Assign", mock.Anything, mock.Anything, mock.Anything).Return(assignment, nil).Once()
 
 	// block header has been received
-	ms.headerDB[result.BlockID] = ms.head
+	headerDB[result.BlockID] = head
 
-	// find the exeuction node id that created the execution result
-	en := ms.participants.Filter(filter.HasRole(flow.RoleExecution))[0]
+	// find the execution node id that created the execution result
+	en := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
-	<-ms.e.Ready()
+	<-e.Ready()
 
-	err := ms.e.Process(en.ID(), result)
-	require.NoError(ms.T(), err)
-	ms.e.Done()
+	err := e.Process(en.ID(), result)
+	require.NoError(t, err)
+	e.Done()
 }
 
 func findChunk(result *flow.ExecutionResult, chunkID flow.Identifier) (*flow.Chunk, bool) {
@@ -352,28 +331,26 @@ func findChunk(result *flow.ExecutionResult, chunkID flow.Identifier) (*flow.Chu
 
 // Multiple Assignments: When receives a ER, and 2 chunks out of 3 are assigned to me,
 // it will produce 2 verifiable chunks.
-func (ms *MatchSuite) TestMultiAssignment() {
+func TestMultiAssignment(t *testing.T) {
+	e, participants, myID, otherID, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, 1)
 	// create a execution result that assigns to me
 	result, assignment := createExecutionResult(
-		ms.head.ID(),
+		head.ID(),
 		WithChunks(
-			WithAssignee(ms.myID),
-			WithAssignee(ms.otherID),
-			WithAssignee(ms.myID),
+			WithAssignee(myID),
+			WithAssignee(otherID),
+			WithAssignee(myID),
 		),
 	)
 
 	// add assignment to assigner
-	ms.assigner.On("Assign", mock.Anything, mock.Anything, mock.Anything).Return(assignment, nil).Once()
+	assigner.On("Assign", mock.Anything, mock.Anything, mock.Anything).Return(assignment, nil).Once()
 
 	// block header has been received
-	ms.headerDB[result.BlockID] = ms.head
+	headerDB[result.BlockID] = head
 
-	// find the exeuction node id that created the execution result
-	en := ms.participants.Filter(filter.HasRole(flow.RoleExecution))[0]
-
-	// create chunk data pack
-	t := ms.T()
+	// find the execution node id that created the execution result
+	en := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
 	expectedChunkID := make(map[flow.Identifier]struct{})
 	expectedChunkID[result.ExecutionResultBody.Chunks[0].ID()] = struct{}{}
@@ -382,8 +359,7 @@ func (ms *MatchSuite) TestMultiAssignment() {
 	var wg sync.WaitGroup
 	wg.Add(2)
 	// chunk data was requested once, and return the chunk data pack when requested
-	ms.con.On("Submit", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		defer wg.Done()
+	con.On("Submit", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		req := args.Get(0).(*messages.ChunkDataPackRequest)
 		fmt.Printf("con.Submit is called\n")
 		_, exists := findChunk(result, req.ChunkID)
@@ -395,66 +371,64 @@ func (ms *MatchSuite) TestMultiAssignment() {
 			Nonce: req.Nonce,
 		}
 
-		err := ms.e.Process(en.ID(), resp)
+		err := e.Process(en.ID(), resp)
 		require.NoError(t, err)
 
 		time.Sleep(time.Millisecond)
 		delete(expectedChunkID, req.ChunkID)
+		wg.Done()
 	}).Return(nil).Twice()
 
-	ms.verifier.On("ProcessLocal", mock.Anything).Run(func(args mock.Arguments) {
+	verifier.On("ProcessLocal", mock.Anything).Run(func(args mock.Arguments) {
 		vchunk := args.Get(0).(*verification.VerifiableChunkData)
 		chunk, exists := findChunk(result, vchunk.Chunk.ID())
 		require.True(t, exists)
 		require.Equal(t, chunk, vchunk.Chunk)
-		require.Equal(t, ms.head, vchunk.Header)
+		require.Equal(t, head, vchunk.Header)
 		require.Equal(t, result, vchunk.Result)
 		chunkDataPack := FromChunkID(chunk.ID())
 		require.Equal(t, &chunkDataPack, vchunk.ChunkDataPack)
 	}).Return(nil).Twice()
 
-	<-ms.e.Ready()
+	<-e.Ready()
 	// engine processes the execution result
-	err := ms.e.Process(en.ID(), result)
+	err := e.Process(en.ID(), result)
 	require.NoError(t, err)
 
 	wg.Wait()
 
 	require.Equal(t, 0, len(expectedChunkID))
-	ms.assigner.AssertExpectations(t)
-	ms.con.AssertExpectations(t)
-	ms.verifier.AssertExpectations(t)
-	ms.e.Done()
+	assigner.AssertExpectations(t)
+	con.AssertExpectations(t)
+	verifier.AssertExpectations(t)
+	e.Done()
 }
 
 // Duplication: When receives 2 ER for the same block, which only has 1 chunk, only 1 verifiable chunk will be produced.
-func (ms *MatchSuite) TestDuplication() {
+func TestDuplication(t *testing.T) {
+	e, participants, myID, otherID, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, 1)
 	// create a execution result that assigns to me
 	result, assignment := createExecutionResult(
-		ms.head.ID(),
+		head.ID(),
 		WithChunks(
-			WithAssignee(ms.myID),
-			WithAssignee(ms.otherID),
+			WithAssignee(myID),
+			WithAssignee(otherID),
 		),
 	)
 
 	// add assignment to assigner
-	ms.assigner.On("Assign", mock.Anything, mock.Anything, mock.Anything).Return(assignment, nil).Once()
+	assigner.On("Assign", mock.Anything, mock.Anything, mock.Anything).Return(assignment, nil).Once()
 
 	// block header has been received
-	ms.headerDB[result.BlockID] = ms.head
+	headerDB[result.BlockID] = head
 
-	// find the exeuction node id that created the execution result
-	en := ms.participants.Filter(filter.HasRole(flow.RoleExecution))[0]
-
-	// create chunk data pack
-	t := ms.T()
+	// find the execution node id that created the execution result
+	en := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 	// chunk data was requested once, and return the chunk data pack when requested
-	ms.con.On("Submit", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		defer wg.Done()
+	con.On("Submit", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		req := args.Get(0).(*messages.ChunkDataPackRequest)
 		fmt.Printf("con.Submit is called\n")
 		_, exists := findChunk(result, req.ChunkID)
@@ -466,65 +440,125 @@ func (ms *MatchSuite) TestDuplication() {
 			Nonce: req.Nonce,
 		}
 
-		err := ms.e.Process(en.ID(), resp)
+		err := e.Process(en.ID(), resp)
 		require.NoError(t, err)
 
 		time.Sleep(time.Millisecond)
+		wg.Done()
 	}).Return(nil).Once()
 
-	ms.verifier.On("ProcessLocal", mock.Anything).Return(nil).Once()
+	verifier.On("ProcessLocal", mock.Anything).Return(nil).Once()
 
-	<-ms.e.Ready()
+	<-e.Ready()
 	// engine processes the execution result
-	err := ms.e.Process(en.ID(), result)
+	err := e.Process(en.ID(), result)
 	require.NoError(t, err)
 
 	// engine processes the execution result again
-	err = ms.e.Process(en.ID(), result)
+	err = e.Process(en.ID(), result)
 	require.Contains(t, err.Error(), "execution result has been added")
 	wg.Wait()
 
-	ms.assigner.AssertExpectations(t)
-	ms.con.AssertExpectations(t)
-	ms.verifier.AssertExpectations(t)
+	assigner.AssertExpectations(t)
+	con.AssertExpectations(t)
+	verifier.AssertExpectations(t)
 
-	ms.e.Done()
+	e.Done()
 }
 
-// // Retry: When receives 1 ER, and 1 chunk is assigned assigned to me, if max retry is 3,
-// // the execution node fails to return data for the first 2 requests,
-// // and successful to return in the 3rd try, a verifiable chunk will be produced
-// func (ms *MatchSuite) TestRetry(t *testing.T) {
-// 	result, assignments := createExecutionResult(
-// 		WithChunks(
-// 			WithAssignee(ms.myID),
-// 		),
-// 	)
-//
-// 	AddAssignments(ms.assigner, assignments)
-//
-// 	en, err := findNodeByRoleAndIndex(Role.ExecutionNode, 0)
-// 	require.NoError(t, err)
-//
-// 	err = ms.e.Process(en, result)
-// 	require.NoError(t, err)
-//
-// 	OnChunkDataRequest(ms, func(m *messages.ChunkDataPackRequest) error {
-// 		count, exists := ms.request[m.ChunkID]
-// 		if !exists || count < 2 {
-// 			return nil
-// 		}
-//
-// 		chunkDataPack := ForChunk(1)
-// 		err = ms.e.Process(en, chunkDataPack)
-// 		require.NoError(ms.T(), err)
-// 		return nil
-// 	})
-//
-// 	ms.assertVerifiable(func(t *testing.T, verifiableChunks []*verification.VerifiableChunkData) {
-// 		require.Len(t, verifiableChunks, 1)
-// 	}, t)
-// }
+// Retry: When receives 1 ER, and 1 chunk is assigned assigned to me, if max retry is 3,
+// the execution node fails to return data for the first 2 requests,
+// and successful to return in the 3rd try, a verifiable chunk will be produced
+func TestRetry(t *testing.T) {
+	maxTry := 3
+	e, participants, myID, otherID, head, me, con, net, headers, headerDB, state, snapshot, er, verifier, chunks, assigner := SetupTest(t, maxTry)
+	// create a execution result that assigns to me
+	result, assignment := createExecutionResult(
+		head.ID(),
+		WithChunks(
+			WithAssignee(myID),
+		),
+	)
+
+	// add assignment to assigner
+	assigner.On("Assign", mock.Anything, mock.Anything, mock.Anything).Return(assignment, nil).Once()
+
+	// block header has been received
+	headerDB[result.BlockID] = head
+
+	// find the execution node id that created the execution result
+	en := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
+
+	// create chunk data pack
+	myChunk := result.ExecutionResultBody.Chunks[0]
+	chunkDataPack := FromChunkID(myChunk.ID())
+
+	var wg sync.WaitGroup
+	wg.Add(3)
+	// chunk data was requested once, and return the chunk data pack when requested
+	// called with 3 mock.Anything, the first is the request, the second and third are the 2
+	// execution nodes
+	callCount := 0
+	con.On("Submit", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		req := args.Get(0).(*messages.ChunkDataPackRequest)
+		fmt.Printf("con.Submit is called\n")
+		// assert the right ID was requested manually as we don't know what nonce was used
+		require.Equal(t, myChunk.ID(), req.ChunkID)
+
+		callCount++
+		if callCount == 3 {
+
+			resp := &messages.ChunkDataPackResponse{
+				Data:  FromChunkID(req.ChunkID),
+				Nonce: req.Nonce,
+			}
+
+			err := e.Process(en.ID(), resp)
+			require.NoError(t, err)
+
+			time.Sleep(time.Millisecond)
+		}
+		wg.Done()
+	}).Return(nil).Times(3) // retry 3 times
+
+	// check verifier's method is called
+	verifier.On("ProcessLocal", mock.Anything).Run(func(args mock.Arguments) {
+		vchunk := args.Get(0).(*verification.VerifiableChunkData)
+		require.Equal(t, myChunk, vchunk.Chunk)
+		require.Equal(t, head, vchunk.Header)
+		require.Equal(t, result, vchunk.Result)
+		require.Equal(t, &chunkDataPack, vchunk.ChunkDataPack)
+	}).Return(nil).Once()
+
+	<-e.Ready()
+	fmt.Printf("match.Engine.Process is called\n")
+	// engine processes the execution result
+	err := e.Process(en.ID(), result)
+	require.NoError(t, err)
+
+	wg.Wait()
+
+	assigner.AssertExpectations(t)
+	con.AssertExpectations(t)
+	verifier.AssertExpectations(t)
+	e.Done()
+
+	OnChunkDataRequest(ms, func(m *messages.ChunkDataPackRequest) error {
+		count, exists := ms.request[m.ChunkID]
+		if !exists || count < 2 {
+			return nil
+		}
+
+		chunkDataPack := ForChunk(1)
+		err = ms.e.Process(en, chunkDataPack)
+		require.NoError(ms.T(), err)
+		return nil
+	})
+
+	ms.assertVerifiable(func(t *testing.T, verifiableChunks []*verification.VerifiableChunkData) {
+		require.Len(t, verifiableChunks, 1)
+	}, t)
+}
 
 // // MaxRetry: When receives 1 ER, and 1 chunk is assigned assigned to me, if max retry is 2,
 // // and the execution node fails to return data for the first 2 requests, then no verifiable chunk will be produced
@@ -539,7 +573,7 @@ func (ms *MatchSuite) TestDuplication() {
 // 	// add assignments to assigner
 // 	AddAssignments(ms.assigner, assignments)
 //
-// 	// find the exeuction node id that created the execution result
+// 	// find the execution node id that created the execution result
 // 	en := ms.participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 //
 // 	// proess the result
