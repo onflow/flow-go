@@ -190,8 +190,9 @@ func (ms *MatchSuite) SetupTest() {
 
 	log := zerolog.New(os.Stderr)
 	retryInterval := time.Second
+	maxTry := 1
 
-	e, err := New(log, ms.net, ms.me, ms.results, ms.verifier, ms.assigner, ms.state, ms.chunks, ms.headers, retryInterval)
+	e, err := New(log, ms.net, ms.me, ms.results, ms.verifier, ms.assigner, ms.state, ms.chunks, ms.headers, retryInterval, maxTry)
 	require.NoError(ms.T(), err)
 
 	ms.e = e
@@ -310,6 +311,7 @@ func (ms *MatchSuite) TestChunkVerified() {
 	ms.assigner.AssertExpectations(t)
 	ms.con.AssertExpectations(t)
 	ms.verifier.AssertExpectations(t)
+	ms.e.Done()
 }
 
 // No assignment: When receives a ER, and no chunk is assigned to me, then I won’t fetch any collection or chunk,
@@ -336,6 +338,7 @@ func (ms *MatchSuite) TestNoAssignment() {
 
 	err := ms.e.Process(en.ID(), result)
 	require.NoError(ms.T(), err)
+	ms.e.Done()
 }
 
 func findChunk(result *flow.ExecutionResult, chunkID flow.Identifier) (*flow.Chunk, bool) {
@@ -421,31 +424,73 @@ func (ms *MatchSuite) TestMultiAssignment() {
 	ms.assigner.AssertExpectations(t)
 	ms.con.AssertExpectations(t)
 	ms.verifier.AssertExpectations(t)
+	ms.e.Done()
 }
 
-// // Duplication: When receives 2 ER for the same block, which only has 1 chunk, only 1 verifiable chunk will be produced.
-// func (ms *MatchSuite) TestNoAssignment(t *testing.T) {
-// 	result, assignments := createExecutionResult(
-// 		WithChunks(
-// 			WithAssignee(ms.myID),
-// 		),
-// 	)
-//
-// 	AddAssignments(ms.assigner, assignments)
-//
-// 	en, err := findNodeByRoleAndIndex(Role.ExecutionNode, 0)
-// 	require.NoError(t, err)
-//
-// 	err = ms.e.Process(en, result)
-// 	require.NoError(t, err)
-//
-// 	chunkDataPack := ForChunk(1)
-// 	err = ms.e.Process(en, chunkDataPack)
-// 	require.NoError(ms.T(), err)
-//
-// 	ms.verifier.On("Submit", mock.Anything).Return(nil).Twice()
-// }
-//
+// Duplication: When receives 2 ER for the same block, which only has 1 chunk, only 1 verifiable chunk will be produced.
+func (ms *MatchSuite) TestDuplication() {
+	// create a execution result that assigns to me
+	result, assignment := createExecutionResult(
+		ms.head.ID(),
+		WithChunks(
+			WithAssignee(ms.myID),
+			WithAssignee(ms.otherID),
+		),
+	)
+
+	// add assignment to assigner
+	ms.assigner.On("Assign", mock.Anything, mock.Anything, mock.Anything).Return(assignment, nil).Once()
+
+	// block header has been received
+	ms.headerDB[result.BlockID] = ms.head
+
+	// find the exeuction node id that created the execution result
+	en := ms.participants.Filter(filter.HasRole(flow.RoleExecution))[0]
+
+	// create chunk data pack
+	t := ms.T()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	// chunk data was requested once, and return the chunk data pack when requested
+	ms.con.On("Submit", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		defer wg.Done()
+		req := args.Get(0).(*messages.ChunkDataPackRequest)
+		fmt.Printf("con.Submit is called\n")
+		_, exists := findChunk(result, req.ChunkID)
+		require.True(t, exists)
+		chunkDataPack := FromChunkID(req.ChunkID)
+
+		resp := &messages.ChunkDataPackResponse{
+			Data:  chunkDataPack,
+			Nonce: req.Nonce,
+		}
+
+		err := ms.e.Process(en.ID(), resp)
+		require.NoError(t, err)
+
+		time.Sleep(time.Millisecond)
+	}).Return(nil).Once()
+
+	ms.verifier.On("ProcessLocal", mock.Anything).Return(nil).Once()
+
+	<-ms.e.Ready()
+	// engine processes the execution result
+	err := ms.e.Process(en.ID(), result)
+	require.NoError(t, err)
+
+	// engine processes the execution result again
+	err = ms.e.Process(en.ID(), result)
+	require.Contains(t, err.Error(), "execution result has been added")
+	wg.Wait()
+
+	ms.assigner.AssertExpectations(t)
+	ms.con.AssertExpectations(t)
+	ms.verifier.AssertExpectations(t)
+
+	ms.e.Done()
+}
+
 // // Retry: When receives 1 ER, and 1 chunk is assigned assigned to me, if max retry is 3,
 // // the execution node fails to return data for the first 2 requests,
 // // and successful to return in the 3rd try, a verifiable chunk will be produced
@@ -480,7 +525,7 @@ func (ms *MatchSuite) TestMultiAssignment() {
 // 		require.Len(t, verifiableChunks, 1)
 // 	}, t)
 // }
-//
+
 // // MaxRetry: When receives 1 ER, and 1 chunk is assigned assigned to me, if max retry is 2,
 // // and the execution node fails to return data for the first 2 requests, then no verifiable chunk will be produced
 // func (ms *MatchSuite) TestRetry(t *testing.T) {

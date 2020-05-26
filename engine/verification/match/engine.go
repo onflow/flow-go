@@ -34,6 +34,7 @@ type Engine struct {
 	con           network.Conduit       // used to send the chunk data request
 	headers       storage.Headers       // used to fetch the block header when chunk data is ready to be verified
 	retryInterval time.Duration         // determines time in milliseconds for retrying chunk data requests
+	maxAttempt    int                   // max time of retries to fetch the chunk data pack for a chunk
 }
 
 func New(
@@ -47,6 +48,7 @@ func New(
 	chunks *Chunks,
 	headers storage.Headers,
 	retryInterval time.Duration,
+	maxAttempt int,
 ) (*Engine, error) {
 	e := &Engine{
 		unit:          engine.NewUnit(),
@@ -59,6 +61,11 @@ func New(
 		chunks:        chunks,
 		headers:       headers,
 		retryInterval: retryInterval,
+		maxAttempt:    maxAttempt,
+	}
+
+	if maxAttempt == 0 {
+		return nil, fmt.Errorf("max retry can not be 0")
 	}
 
 	con, err := net.Register(engine.ChunkDataPackProvider, e)
@@ -131,16 +138,16 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	}
 }
 
-// handleExecutionResult takes a exeuction result and find chunks that are assigned to me, and add them to
+// handleExecutionResult takes a execution result and find chunks that are assigned to me, and add them to
 // the pending chunk list to be processed.
 // It stores the result in memory, in order to check if a chunk still needs to be processed.
 func (e *Engine) handleExecutionResult(originID flow.Identifier, r *flow.ExecutionResult) error {
 	log := e.log.With().
 		Hex("originID", originID[:]).
-		Hex("exeuction_result_id", logging.ID(r.ID())).
+		Hex("execution_result_id", logging.ID(r.ID())).
 		Logger()
 
-	log.Debug().Msg("process execution result")
+	log.Debug().Msg("start processing execution result")
 
 	result := &flow.PendingResult{
 		ExecutorID:      originID,
@@ -152,7 +159,7 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, r *flow.Executi
 	// if a execution result has been added before, then don't process
 	// this result.
 	if !added {
-		return fmt.Errorf("exeuction result has been added before: %v", r.ID())
+		return fmt.Errorf("execution result has been added before: %v", r.ID())
 	}
 
 	// different execution results can be chunked in parallel
@@ -167,7 +174,10 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, r *flow.Executi
 		_ = e.chunks.Add(status)
 	}
 
-	e.log.Debug().Int("chunks", len(chunks)).Uint("pending", e.chunks.Size()).Msg("finish processing execution result")
+	log.Debug().
+		Int("chunks", len(chunks)).
+		Uint("pending", e.chunks.Size()).
+		Msg("finish processing execution result")
 	return nil
 }
 
@@ -229,6 +239,12 @@ func (e *Engine) onTimer() {
 
 	now := time.Now()
 	e.log.Debug().Int("total", len(allChunks)).Msg("start processing all pending chunks")
+	defer e.log.Debug().
+		Int("processed", len(allChunks)-int(e.chunks.Size())).
+		Uint("left", e.chunks.Size()).
+		Dur("duration", time.Since(now)).
+		Msg("finish processing all pending chunks")
+
 	for _, chunk := range allChunks {
 		exists := e.results.Has(chunk.ExecutionResultID)
 
@@ -240,24 +256,32 @@ func (e *Engine) onTimer() {
 			Hex("result_id", chunk.ExecutionResultID[:]).
 			Logger()
 
-		// if exeuction result has been removed, no need to request
+		// if execution result has been removed, no need to request
 		// the chunk data any more.
 		if !exists {
 			e.chunks.Rem(cid)
-			log.Debug().Msg("remove chunk since exeuction result no longer exists")
+			log.Debug().Msg("remove chunk since execution result no longer exists")
 			continue
 		}
+
+		// check if has reached max try
+		if chunk.Attempt > e.maxAttempt {
+			e.chunks.Rem(cid)
+			log.Debug().Msg("max attampts reached")
+			continue
+		}
+
+		e.chunks.IncrementAttempt(cid)
 
 		err := e.requestChunkDataPack(chunk)
 		if err != nil {
 			log.Warn().Msg("could not request chunk data pack")
+			continue
 		}
+
 		log.Debug().Msg("chunk data requested")
 	}
 
-	e.log.Debug().Int("total", len(allChunks)).
-		Dur("duration", time.Since(now)).
-		Msg("finish processing all pending chunks")
 }
 
 // request the chunk data pack from the execution node.
@@ -296,14 +320,14 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		Hex("chunk_data_pack_id", logging.Entity(chunkDataPack)).Logger()
 	log.Info().Msg("chunk data pack received")
 
-	// check origin is from a exeuction node
+	// check origin is from a execution node
 	// sender, err := e.state.Final().Identity(originID)
 	// if err != nil {
 	// 	return fmt.Errorf("could not find identity: %w", err)
 	// }
 	//
 	// if sender.Role != flow.RoleExecution {
-	// 	return fmt.Errorf("receives chunk data pack from a non-exeuction node")
+	// 	return fmt.Errorf("receives chunk data pack from a non-execution node")
 	// }
 
 	status, exists := e.chunks.ByID(chunkDataPack.ChunkID)
@@ -338,7 +362,8 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	}
 
 	e.unit.Launch(func() {
-		e.verifier.ProcessLocal(vchunk)
+		err := e.verifier.ProcessLocal(vchunk)
+		log.Warn().Err(err).Msg("failed to verify chunk")
 	})
 
 	return nil

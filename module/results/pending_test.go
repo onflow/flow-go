@@ -3,10 +3,11 @@ package results_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/results"
-	"github.com/stretchr/testify/require"
 )
 
 // check the implementation

@@ -1,6 +1,7 @@
 package match
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -11,8 +12,8 @@ type ChunkStatus struct {
 	Chunk             *flow.Chunk
 	ExecutionResultID flow.Identifier
 	ExecutorID        flow.Identifier
-	LastFetched       time.Time
-	Retry             int
+	LastAttempt       time.Time
+	Attempt           int
 }
 
 func (s *ChunkStatus) ID() flow.Identifier {
@@ -67,4 +68,19 @@ func (cs *Chunks) Add(chunk *ChunkStatus) bool {
 
 func (cs *Chunks) Rem(chunkID flow.Identifier) bool {
 	return cs.Backend.Rem(chunkID)
+}
+
+func (cs *Chunks) IncrementAttempt(chunkID flow.Identifier) bool {
+	err := cs.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+		entity, exists := backdata[chunkID]
+		if !exists {
+			return fmt.Errorf("not exist")
+		}
+		chunk := entity.(*ChunkStatus)
+		chunk.Attempt++
+		chunk.LastAttempt = time.Now()
+		return nil
+	})
+
+	return err == nil
 }
