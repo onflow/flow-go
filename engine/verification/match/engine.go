@@ -265,7 +265,7 @@ func (e *Engine) onTimer() {
 		}
 
 		// check if has reached max try
-		if chunk.Attempt > e.maxAttempt {
+		if chunk.Attempt >= e.maxAttempt {
 			e.chunks.Rem(cid)
 			log.Debug().Msg("max attampts reached")
 			continue

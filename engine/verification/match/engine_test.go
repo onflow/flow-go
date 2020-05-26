@@ -471,7 +471,7 @@ func TestDuplication(t *testing.T) {
 // and successful to return in the 3rd try, a verifiable chunk will be produced
 func TestRetry(t *testing.T) {
 	maxTry := 3
-	e, participants, myID, otherID, head, me, con, net, headers, headerDB, state, snapshot, er, verifier, chunks, assigner := SetupTest(t, maxTry)
+	e, participants, myID, _, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, maxTry)
 	// create a execution result that assigns to me
 	result, assignment := createExecutionResult(
 		head.ID(),
@@ -542,22 +542,6 @@ func TestRetry(t *testing.T) {
 	con.AssertExpectations(t)
 	verifier.AssertExpectations(t)
 	e.Done()
-
-	OnChunkDataRequest(ms, func(m *messages.ChunkDataPackRequest) error {
-		count, exists := ms.request[m.ChunkID]
-		if !exists || count < 2 {
-			return nil
-		}
-
-		chunkDataPack := ForChunk(1)
-		err = ms.e.Process(en, chunkDataPack)
-		require.NoError(ms.T(), err)
-		return nil
-	})
-
-	ms.assertVerifiable(func(t *testing.T, verifiableChunks []*verification.VerifiableChunkData) {
-		require.Len(t, verifiableChunks, 1)
-	}, t)
 }
 
 // // MaxRetry: When receives 1 ER, and 1 chunk is assigned assigned to me, if max retry is 2,
