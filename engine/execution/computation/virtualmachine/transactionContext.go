@@ -624,6 +624,17 @@ func DeployDefaultTokenTransaction(contract []byte) []byte {
     `, hex.EncodeToString(contract)))
 }
 
+func DeployFlowFeesTransaction(contract []byte) []byte {
+	return []byte(fmt.Sprintf(`
+        transaction {
+          prepare(flowFees: AuthAccount, serviceAcct: AuthAccount) {
+            let adminAcct = serviceAcct
+            flowFees.setCode("%s".decodeHex(), adminAcct)
+          }
+        }
+    `, hex.EncodeToString(contract)))
+}
+
 var MintDefaultTokenTransaction = []byte(fmt.Sprintf(`
     import FungibleToken from 0x%s
     import FlowToken from 0x%s

@@ -92,7 +92,7 @@ func BootstrapView(
 
 	fungibleToken := deployFungibleToken(ctx, ledger)
 	flowToken := deployFlowToken(ctx, ledger, service, fungibleToken)
-	feeContract := deployFlowFees(ctx, ledger, fungibleToken, flowToken)
+	feeContract := deployFlowFees(ctx, ledger, service, fungibleToken, flowToken)
 
 	if initialTokenSupply > 0 {
 		mintInitialTokens(ctx, ledger, service, initialTokenSupply)
@@ -152,9 +152,23 @@ func deployFlowToken(
 func deployFlowFees(
 	ctx virtualmachine.BlockContext,
 	ledger virtualmachine.Ledger,
-	fungibleToken, flowToken flow.Address,
+	service, fungibleToken, flowToken flow.Address,
 ) flow.Address {
-	return deployContract(ctx, ledger, contracts.FlowFees(fungibleToken.Hex(), flowToken.Hex()))
+	flowFees := createAccount(ledger)
+
+	contract := contracts.FlowFees(fungibleToken.Hex(), flowToken.Hex())
+
+	tx := flow.NewTransactionBody().
+		SetScript(virtualmachine.DeployFlowFeesTransaction(contract)).
+		AddAuthorizer(flowFees).
+		AddAuthorizer(service)
+
+	result := executeTransaction(ctx, ledger, tx)
+	if result.Error != nil {
+		panic(fmt.Sprintf("failed to deploy fees contract: %s", result.Error.ErrorMessage()))
+	}
+
+	return flowFees
 }
 
 func mintInitialTokens(
