@@ -18,14 +18,25 @@ import (
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
 )
 
-// MTrie is a fully in memory trie with option to persist to disk
-// TODO: UPDATE to this DEFINITION:
+// MTrie is a fully in memory trie with option to persist to disk.
+// Formally, an MTrie represents a perfect, full binary Merkle tree with uniform height.
+// For a detailed description of the storage model, please consult `mtrie/README.md`
+//
+// A MTrie is a thin wrapper around a the trie's root Node. An MTrie implements the
+// logic for forming MTrie-graphs from the elementary nodes. Specifically:
+//   * how Nodes (graph vertices) form a Trie,
+//   * how register values are read from the trie,
+//   * how Merkle proofs are generated from a trie, and
+//   * how a new Trie with updated values is generated.
+//
+// DEFINITIONS and CONVENTIONS:
 //   * HEIGHT of a node v in a tree is the number of edges on the longest downward path
-//    between v and a tree leaf. The height of a tree is the heights of its root.
+//     between v and a tree leaf. The height of a tree is the heights of its root.
+//     The height of a Trie is always the height of the fully-expanded tree.
 type MTrie struct {
 	root           *node.Node
 	number         uint64
-	maxHeight      int
+	height         int
 	parentRootHash []byte
 }
 
