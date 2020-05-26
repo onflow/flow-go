@@ -318,31 +318,31 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 	require.NoError(t, err)
 
 	createAccountScript := []byte(`
-		transaction {
-			prepare(signer: AuthAccount) {
-				let acct = AuthAccount(payer: signer)
-			}
+	transaction {
+		prepare(signer: AuthAccount) {
+			let acct = AuthAccount(payer: signer)
 		}
+	}
 	`)
 
 	addAccountCreatorTemplate := `
-		import FlowServiceAccount from 0x1
-		transaction {
-			let serviceAccountAdmin: &FlowServiceAccount.Administrator
-			prepare(signer: AuthAccount) {
-				// Borrow reference to FlowServiceAccount Administrator resource.
-				//
-				self.serviceAccountAdmin = signer.borrow<&FlowServiceAccount.Administrator>(from: /storage/flowServiceAdmin)
-					?? panic("Unable to borrow reference to administrator resource")
-			}
-			execute {
-				// Add account to account creator whitelist.
-				//
-				// Will emit AccountCreatorAdded(accountCreator: accountCreator).
-				//
-				self.serviceAccountAdmin.addAccountCreator(0x%s)
-			}
+	import FlowServiceAccount from 0x1
+	transaction {
+		let serviceAccountAdmin: &FlowServiceAccount.Administrator
+		prepare(signer: AuthAccount) {
+			// Borrow reference to FlowServiceAccount Administrator resource.
+			//
+			self.serviceAccountAdmin = signer.borrow<&FlowServiceAccount.Administrator>(from: /storage/flowServiceAdmin)
+				?? panic("Unable to borrow reference to administrator resource")
 		}
+		execute {
+			// Add account to account creator whitelist.
+			//
+			// Will emit AccountCreatorAdded(accountCreator: accountCreator).
+			//
+			self.serviceAccountAdmin.addAccountCreator(0x%s)
+		}
+	}
 	`
 
 	addAccountCreator := func(account flow.Address, seqNum uint64) {
@@ -358,32 +358,27 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 		result, err := bc.ExecuteTransaction(ledger, validTx)
 		require.NoError(t, err)
 
-		if !result.Succeeded() {
-			fmt.Println(result.Logs)
-			fmt.Println(result.Events)
-			fmt.Println(result.Error.ErrorMessage())
-		}
 		assert.True(t, result.Succeeded())
 	}
 
 	removeAccountCreatorTemplate := `
-		import FlowServiceAccount from 0x1
-		transaction {
-			let serviceAccountAdmin: &FlowServiceAccount.Administrator
-			prepare(signer: AuthAccount) {
-				// Borrow reference to FlowServiceAccount Administrator resource.
-				//
-				self.serviceAccountAdmin = signer.borrow<&FlowServiceAccount.Administrator>(from: /storage/flowServiceAdmin)
-					?? panic("Unable to borrow reference to administrator resource")
-			}
-			execute {
-				// Remove account from account creator whitelist.
-				//
-				// Will emit AccountCreatorRemoved(accountCreator: accountCreator).
-				//
-				self.serviceAccountAdmin.removeAccountCreator(0x%s)
-			}
+	import FlowServiceAccount from 0x1
+	transaction {
+		let serviceAccountAdmin: &FlowServiceAccount.Administrator
+		prepare(signer: AuthAccount) {
+			// Borrow reference to FlowServiceAccount Administrator resource.
+			//
+			self.serviceAccountAdmin = signer.borrow<&FlowServiceAccount.Administrator>(from: /storage/flowServiceAdmin)
+				?? panic("Unable to borrow reference to administrator resource")
 		}
+		execute {
+			// Remove account from account creator whitelist.
+			//
+			// Will emit AccountCreatorRemoved(accountCreator: accountCreator).
+			//
+			self.serviceAccountAdmin.removeAccountCreator(0x%s)
+		}
+	}
 	`
 
 	removeAccountCreator := func(account flow.Address, seqNum uint64) {
@@ -399,11 +394,6 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 		result, err := bc.ExecuteTransaction(ledger, validTx)
 		require.NoError(t, err)
 
-		if !result.Succeeded() {
-			fmt.Println(result.Logs)
-			fmt.Println(result.Events)
-			fmt.Println(result.Error.ErrorMessage())
-		}
 		assert.True(t, result.Succeeded())
 	}
 
@@ -453,11 +443,6 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 		result, err := bc.ExecuteTransaction(ledger, validTx)
 		require.NoError(t, err)
 
-		if !result.Succeeded() {
-			fmt.Println(result.Logs)
-			fmt.Println(result.Events)
-			fmt.Println(result.Error.ErrorMessage())
-		}
 		assert.True(t, result.Succeeded())
 	})
 
