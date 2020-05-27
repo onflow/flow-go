@@ -38,7 +38,9 @@ const (
 	ResourceGuarantee            = "guarantee"
 	ResourceResult               = "result"
 	ResourceReceipt              = "receipt"
+	ResourcePendingReceipt       = "pending_receipt" // used at verification node
 	ResourceCollection           = "collection"
+	ResourcePendingCollection    = "pending_collection" // used at verification node
 	ResourceApproval             = "approval"
 	ResourceSeal                 = "seal"
 	ResourceCommit               = "commit"
