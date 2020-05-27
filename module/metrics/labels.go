@@ -38,6 +38,7 @@ const (
 	ResourceGuarantee            = "guarantee"
 	ResourceResult               = "result"
 	ResourceReceipt              = "receipt"
+	ResourceCollection           = "collection"
 	ResourceApproval             = "approval"
 	ResourceSeal                 = "seal"
 	ResourceCommit               = "commit"

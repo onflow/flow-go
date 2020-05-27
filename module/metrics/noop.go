@@ -7,8 +7,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-type NoopCollector struct {
-}
+type NoopCollector struct{}
 
 func NewNoopCollector() *NoopCollector {
 	nc := &NoopCollector{}
@@ -40,6 +39,7 @@ func (nc *NoopCollector) CacheEntries(resource string, entries uint)            
 func (nc *NoopCollector) CacheHit(resource string)                                  {}
 func (nc *NoopCollector) CacheMiss(resource string)                                 {}
 func (nc *NoopCollector) MempoolEntries(resource string, entries uint)              {}
+func (nm *NoopCollector) Register(resource string, entriesFunc EntriesFunc) error   { return nil }
 func (nc *NoopCollector) HotStuffBusyDuration(duration time.Duration, event string) {}
 func (nc *NoopCollector) HotStuffIdleDuration(duration time.Duration)               {}
 func (nc *NoopCollector) HotStuffWaitDuration(duration time.Duration, event string) {}
