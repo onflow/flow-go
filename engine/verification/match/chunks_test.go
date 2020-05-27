@@ -3,8 +3,9 @@ package match
 import (
 	"testing"
 
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // when maxAttempt is set to 3, CanTry will only return true for the first 3 times.

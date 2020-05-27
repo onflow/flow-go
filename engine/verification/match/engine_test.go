@@ -142,7 +142,9 @@ func SetupTest(t *testing.T, maxTry int) (
 	chunks *Chunks,
 	assigner *module.ChunkAssigner,
 ) {
-	// set up local module mock
+	// setup the network with 2 verification nodes, 3 execution nodes
+	// 2 verification nodes are needed to verify chunks, which are assigned to other verification nodes, are ignored.
+	// 3 execution nodes are needed to verify chunk data pack requests are sent to only 2 execution nodes
 	participants, myID, me = CreateNParticipantsWithMyRole(flow.RoleVerification,
 		flow.RoleVerification,
 		flow.RoleCollection,
@@ -227,6 +229,69 @@ func FromChunkID(chunkID flow.Identifier) flow.ChunkDataPack {
 	}
 }
 
+func ChunkDataPackIsRequestedNTimes(con *network.Conduit, n int, f func(*messages.ChunkDataRequest)) <-chan []*messages.ChunkDataRequest {
+	reqs := make([]*messages.ChunkDataRequest, 0)
+	c := make(chan []*messages.ChunkDataRequest, 1)
+
+	var wg sync.WaitGroup
+	wg.Add(n)
+	// chunk data was requested once, and return the chunk data pack when requested
+	// called with 3 mock.Anything, the first is the request, the second and third are the 2
+	// execution nodes
+	con.On("Submit", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		req := args.Get(0).(*messages.ChunkDataRequest)
+		reqs = append(reqs, req)
+
+		fmt.Printf("con.Submit is called\n")
+
+		go func() {
+			f(req)
+			wg.Done()
+		}()
+
+	}).Return(nil).Times(n)
+
+	go func() {
+		wg.Wait()
+		c <- reqs
+		close(c)
+	}()
+
+	return c
+}
+
+func RespondChunkDataPack(t *testing.T, engine *Engine, en flow.Identifier) func(*messages.ChunkDataRequest) {
+	return func(req *messages.ChunkDataRequest) {
+		resp := &messages.ChunkDataResponse{
+			ChunkDataPack: FromChunkID(req.ChunkID),
+			Nonce:         req.Nonce,
+		}
+
+		err := engine.Process(en, resp)
+		require.NoError(t, err)
+	}
+}
+
+func VerifierCalledNTimes(verifier *network.Engine, n int) <-chan []*verification.VerifiableChunkData {
+	var wg sync.WaitGroup
+	vchunks := make([]*verification.VerifiableChunkData, 0)
+	c := make(chan []*verification.VerifiableChunkData, 1)
+
+	wg.Add(n)
+	verifier.On("ProcessLocal", mock.Anything).Run(func(args mock.Arguments) {
+		vchunk := args.Get(0).(*verification.VerifiableChunkData)
+		vchunks = append(vchunks, vchunk)
+		wg.Done()
+	}).Return(nil).Times(n)
+
+	go func() {
+		wg.Wait()
+		c <- vchunks
+		close(c)
+	}()
+	return c
+}
+
 // Happy Path: When receives a ER, and 1 chunk is assigned to me,
 // it will fetch that collection and chunk data, and produces a verifiable chunk
 func TestChunkVerified(t *testing.T) {
@@ -240,7 +305,7 @@ func TestChunkVerified(t *testing.T) {
 	)
 
 	// add assignment to assigner
-	assigner.On("Assign", mock.Anything, mock.Anything, mock.Anything).Return(assignment, nil).Once()
+	assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
 
 	// block header has been received
 	headerDB[result.BlockID] = head
@@ -252,49 +317,32 @@ func TestChunkVerified(t *testing.T) {
 	myChunk := result.ExecutionResultBody.Chunks[0]
 	chunkDataPack := FromChunkID(myChunk.ID())
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	// chunk data was requested once, and return the chunk data pack when requested
-	// called with 3 mock.Anything, the first is the request, the second and third are the 2
-	// execution nodes
-	con.On("Submit", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		req := args.Get(0).(*messages.ChunkDataPackRequest)
-		fmt.Printf("con.Submit is called\n")
-		// assert the right ID was requested manually as we don't know what nonce was used
-		require.Equal(t, myChunk.ID(), req.ChunkID)
-
-		resp := &messages.ChunkDataPackResponse{
-			Data:  FromChunkID(req.ChunkID),
-			Nonce: req.Nonce,
-		}
-
-		err := e.Process(en.ID(), resp)
-		require.NoError(t, err)
-
-		time.Sleep(time.Millisecond)
-		wg.Done()
-	}).Return(nil).Once()
+	// setup conduit to return requested chunk data packs
+	// return received requests
+	reqsC := ChunkDataPackIsRequestedNTimes(con, 1, RespondChunkDataPack(t, e, en.ID()))
 
 	// check verifier's method is called
-	verifier.On("ProcessLocal", mock.Anything).Run(func(args mock.Arguments) {
-		vchunk := args.Get(0).(*verification.VerifiableChunkData)
-		require.Equal(t, myChunk, vchunk.Chunk)
-		require.Equal(t, head, vchunk.Header)
-		require.Equal(t, result, vchunk.Result)
-		require.Equal(t, &chunkDataPack, vchunk.ChunkDataPack)
-	}).Return(nil).Once()
+	vchunksC := VerifierCalledNTimes(verifier, 1)
 
 	<-e.Ready()
-	fmt.Printf("match.Engine.Process is called\n")
+
 	// engine processes the execution result
 	err := e.Process(en.ID(), result)
 	require.NoError(t, err)
 
-	wg.Wait()
+	// wait until verifier has been called
+	vchunks := <-vchunksC
+	reqs := <-reqsC
 
-	assigner.AssertExpectations(t)
-	con.AssertExpectations(t)
-	verifier.AssertExpectations(t)
+	require.Equal(t, 1, len(reqs))
+	require.Equal(t, myChunk.ID(), reqs[0].ChunkID)
+
+	require.Equal(t, 1, len(vchunks))
+	require.Equal(t, head, vchunks[0].Header)
+	require.Equal(t, result, vchunks[0].Result)
+	require.Equal(t, &chunkDataPack, vchunks[0].ChunkDataPack)
+
+	mock.AssertExpectationsForObjects(t, assigner, con, verifier)
 	e.Done()
 }
 
@@ -358,55 +406,25 @@ func TestMultiAssignment(t *testing.T) {
 	// find the execution node id that created the execution result
 	en := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
-	expectedChunkID := make(map[flow.Identifier]struct{})
-	expectedChunkID[result.ExecutionResultBody.Chunks[0].ID()] = struct{}{}
-	expectedChunkID[result.ExecutionResultBody.Chunks[2].ID()] = struct{}{}
+	// setup conduit to return requested chunk data packs
+	// return received requests
+	_ = ChunkDataPackIsRequestedNTimes(con, 2, RespondChunkDataPack(t, e, en.ID()))
 
-	var wg sync.WaitGroup
-	wg.Add(2)
-	// chunk data was requested once, and return the chunk data pack when requested
-	con.On("Submit", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		req := args.Get(0).(*messages.ChunkDataPackRequest)
-		fmt.Printf("con.Submit is called\n")
-		_, exists := findChunk(result, req.ChunkID)
-		require.True(t, exists)
-		chunkDataPack := FromChunkID(req.ChunkID)
-
-		resp := &messages.ChunkDataPackResponse{
-			Data:  chunkDataPack,
-			Nonce: req.Nonce,
-		}
-
-		err := e.Process(en.ID(), resp)
-		require.NoError(t, err)
-
-		time.Sleep(time.Millisecond)
-		delete(expectedChunkID, req.ChunkID)
-		wg.Done()
-	}).Return(nil).Twice()
-
-	verifier.On("ProcessLocal", mock.Anything).Run(func(args mock.Arguments) {
-		vchunk := args.Get(0).(*verification.VerifiableChunkData)
-		chunk, exists := findChunk(result, vchunk.Chunk.ID())
-		require.True(t, exists)
-		require.Equal(t, chunk, vchunk.Chunk)
-		require.Equal(t, head, vchunk.Header)
-		require.Equal(t, result, vchunk.Result)
-		chunkDataPack := FromChunkID(chunk.ID())
-		require.Equal(t, &chunkDataPack, vchunk.ChunkDataPack)
-	}).Return(nil).Twice()
+	// check verifier's method is called
+	vchunksC := VerifierCalledNTimes(verifier, 2)
 
 	<-e.Ready()
+
 	// engine processes the execution result
 	err := e.Process(en.ID(), result)
 	require.NoError(t, err)
 
-	wg.Wait()
+	// wait until verifier has been called
+	vchunks := <-vchunksC
 
-	require.Equal(t, 0, len(expectedChunkID))
-	assigner.AssertExpectations(t)
-	con.AssertExpectations(t)
-	verifier.AssertExpectations(t)
+	require.Equal(t, 2, len(vchunks))
+
+	mock.AssertExpectationsForObjects(t, assigner, con, verifier)
 	e.Done()
 }
 
@@ -431,31 +449,15 @@ func TestDuplication(t *testing.T) {
 	// find the execution node id that created the execution result
 	en := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	// chunk data was requested once, and return the chunk data pack when requested
-	con.On("Submit", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		req := args.Get(0).(*messages.ChunkDataPackRequest)
-		fmt.Printf("con.Submit is called\n")
-		_, exists := findChunk(result, req.ChunkID)
-		require.True(t, exists)
-		chunkDataPack := FromChunkID(req.ChunkID)
+	// setup conduit to return requested chunk data packs
+	// return received requests
+	_ = ChunkDataPackIsRequestedNTimes(con, 1, RespondChunkDataPack(t, e, en.ID()))
 
-		resp := &messages.ChunkDataPackResponse{
-			Data:  chunkDataPack,
-			Nonce: req.Nonce,
-		}
-
-		err := e.Process(en.ID(), resp)
-		require.NoError(t, err)
-
-		time.Sleep(time.Millisecond)
-		wg.Done()
-	}).Return(nil).Once()
-
-	verifier.On("ProcessLocal", mock.Anything).Return(nil).Once()
+	// check verifier's method is called
+	vchunksC := VerifierCalledNTimes(verifier, 1)
 
 	<-e.Ready()
+
 	// engine processes the execution result
 	err := e.Process(en.ID(), result)
 	require.NoError(t, err)
@@ -463,12 +465,11 @@ func TestDuplication(t *testing.T) {
 	// engine processes the execution result again
 	err = e.Process(en.ID(), result)
 	require.Contains(t, err.Error(), "execution result has been added")
-	wg.Wait()
 
-	assigner.AssertExpectations(t)
-	con.AssertExpectations(t)
-	verifier.AssertExpectations(t)
+	// wait until verifier has been called
+	_ = <-vchunksC
 
+	mock.AssertExpectationsForObjects(t, assigner, con, verifier)
 	e.Done()
 }
 
@@ -495,51 +496,33 @@ func TestRetry(t *testing.T) {
 	// find the execution node id that created the execution result
 	en := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
-	// create chunk data pack
-	myChunk := result.ExecutionResultBody.Chunks[0]
-
-	var wg sync.WaitGroup
-	wg.Add(3)
-	// chunk data was requested once, and return the chunk data pack when requested
-	// called with 3 mock.Anything, the first is the request, the second and third are the 2
-	// execution nodes
-	callCount := 0
-	con.On("Submit", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		req := args.Get(0).(*messages.ChunkDataPackRequest)
-		fmt.Printf("con.Submit is called\n")
-		// assert the right ID was requested manually as we don't know what nonce was used
-		require.Equal(t, myChunk.ID(), req.ChunkID)
-
-		callCount++
-		if callCount == 3 {
-
-			resp := &messages.ChunkDataPackResponse{
-				Data:  FromChunkID(req.ChunkID),
-				Nonce: req.Nonce,
-			}
-
-			err := e.Process(en.ID(), resp)
-			require.NoError(t, err)
-
-			time.Sleep(time.Millisecond)
+	// setup conduit to return requested chunk data packs
+	// return received requests
+	called := 0
+	_ = ChunkDataPackIsRequestedNTimes(con, 3, func(req *messages.ChunkDataRequest) {
+		called++
+		if called >= 3 {
+			RespondChunkDataPack(t, e, en.ID())(req)
 		}
-		wg.Done()
-	}).Return(nil).Times(3) // retry 3 times
+	})
 
 	// check verifier's method is called
-	verifier.On("ProcessLocal", mock.Anything).Return(nil).Once()
+	vchunksC := VerifierCalledNTimes(verifier, 1)
 
 	<-e.Ready()
-	fmt.Printf("match.Engine.Process is called\n")
+
 	// engine processes the execution result
 	err := e.Process(en.ID(), result)
 	require.NoError(t, err)
 
-	wg.Wait()
+	// engine processes the execution result again
+	err = e.Process(en.ID(), result)
+	require.Contains(t, err.Error(), "execution result has been added")
 
-	assigner.AssertExpectations(t)
-	con.AssertExpectations(t)
-	verifier.AssertExpectations(t)
+	// wait until verifier has been called
+	_ = <-vchunksC
+
+	mock.AssertExpectationsForObjects(t, assigner, con, verifier)
 	e.Done()
 }
 
@@ -565,23 +548,19 @@ func TestMaxRetry(t *testing.T) {
 	// find the execution node id that created the execution result
 	en := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
-	var wg sync.WaitGroup
-	wg.Add(3)
-	con.On("Submit", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		wg.Done()
-	}).Return(nil).Times(3)
+	// never returned any chunk data pack
+	reqsC := ChunkDataPackIsRequestedNTimes(con, 3, func(req *messages.ChunkDataRequest) {})
 
 	<-e.Ready()
-	fmt.Printf("match.Engine.Process is called\n")
+
 	// engine processes the execution result
 	err := e.Process(en.ID(), result)
 	require.NoError(t, err)
 
 	// wait until 3 retry attampts are done
-	wg.Wait()
+	_ = <-reqsC
 
-	assigner.AssertExpectations(t)
-	con.AssertExpectations(t)
+	mock.AssertExpectationsForObjects(t, assigner, con)
 	e.Done()
 }
 
@@ -603,8 +582,6 @@ func TestProcessExecutionResultConcurrently(t *testing.T) {
 				WithAssignee(myID),
 			),
 		)
-		fmt.Printf("headerid;, resultID %v, %v\n", header.ID(), result.ID())
-		ers = append(ers, result)
 
 		// add assignment to assigner
 		assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
@@ -616,29 +593,14 @@ func TestProcessExecutionResultConcurrently(t *testing.T) {
 	// find the execution node id that created the execution result
 	en := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
-	var wg sync.WaitGroup
-	wg.Add(count)
-	con.On("Submit", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		req := args.Get(0).(*messages.ChunkDataPackRequest)
-		fmt.Printf("con.Submit is called for chunk: %v\n", req.ChunkID)
-
-		resp := &messages.ChunkDataPackResponse{
-			Data:  FromChunkID(req.ChunkID),
-			Nonce: req.Nonce,
-		}
-
-		err := e.Process(en.ID(), resp)
-		require.NoError(t, err)
-
-		time.Sleep(time.Millisecond)
-		wg.Done()
-	}).Return(nil).Times(count)
+	_ = ChunkDataPackIsRequestedNTimes(con, count, RespondChunkDataPack(t, e, en.ID()))
 
 	// check verifier's method is called
-	verifier.On("ProcessLocal", mock.Anything).Return(nil).Times(count)
+	vchunksC := VerifierCalledNTimes(verifier, count)
 
 	<-e.Ready()
-	fmt.Printf("match.Engine.Process is called\n")
+
+	fmt.Printf("calling match.Engine.Process\n")
 	// engine processes the execution result concurrently
 	for _, result := range ers {
 		go func(result *flow.ExecutionResult) {
@@ -647,11 +609,10 @@ func TestProcessExecutionResultConcurrently(t *testing.T) {
 		}(result)
 	}
 
-	wg.Wait()
+	// wait until verifier has been called
+	_ = <-vchunksC
 
-	assigner.AssertExpectations(t)
-	con.AssertExpectations(t)
-	verifier.AssertExpectations(t)
+	mock.AssertExpectationsForObjects(t, assigner, con, verifier)
 	e.Done()
 }
 
@@ -684,41 +645,32 @@ func TestProcessChunkDataPackConcurrently(t *testing.T) {
 	en := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
 	count := 6
-	var wg sync.WaitGroup
-	wg.Add(count)
-	con.On("Submit", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		wg.Done()
-	}).Return(nil).Times(count)
+	reqsC := ChunkDataPackIsRequestedNTimes(con, count, func(*messages.ChunkDataRequest) {})
 
 	// check verifier's method is called
-	verifier.On("ProcessLocal", mock.Anything).Return(nil).Times(count)
+	vchunksC := VerifierCalledNTimes(verifier, count)
 
 	<-e.Ready()
-	fmt.Printf("match.Engine.Process is called\n")
+
+	fmt.Printf("calling match.Engine.Process\n")
 
 	// engine processes the execution result concurrently
 	err := e.Process(en.ID(), result)
 	require.NoError(t, err)
 
-	wg.Wait()
+	_ = <-vchunksC
+	reqs := <-reqsC
 
-	for i := 0; i < count; i++ {
+	var wg sync.WaitGroup
+	for _, req := range reqs {
 		wg.Add(1)
-		go func(index int) {
-			resp := &messages.ChunkDataPackResponse{
-				Data:  FromChunkID(result.Chunks[index].ID()),
-				Nonce: uint64(index),
-			}
-
-			err := e.Process(en.ID(), resp)
-			require.NoError(t, err)
+		go func(req *messages.ChunkDataRequest) {
+			RespondChunkDataPack(t, e, en.ID())(req)
 			wg.Done()
-		}(i)
+		}(req)
 	}
 	wg.Wait()
 
-	assigner.AssertExpectations(t)
-	con.AssertExpectations(t)
-	verifier.AssertExpectations(t)
+	mock.AssertExpectationsForObjects(t, assigner, con, verifier)
 	e.Done()
 }

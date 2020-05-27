@@ -131,8 +131,8 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch resource := event.(type) {
 	case *flow.ExecutionResult:
 		return e.handleExecutionResult(originID, resource)
-	case *messages.ChunkDataPackResponse:
-		return e.handleChunkDataPack(originID, &resource.Data)
+	case *messages.ChunkDataResponse:
+		return e.handleChunkDataPack(originID, &resource.ChunkDataPack)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -303,7 +303,7 @@ func (e *Engine) requestChunkDataPack(c *ChunkStatus) error {
 	nodes := execNodes.Filter(filter.Not(filter.HasNodeID(c.ExecutorID, e.me.NodeID()))).Sample(1).NodeIDs()
 	nodes = append(nodes, c.ExecutorID)
 
-	req := &messages.ChunkDataPackRequest{
+	req := &messages.ChunkDataRequest{
 		ChunkID: chunkID,
 		Nonce:   rand.Uint64(), // prevent the request from being deduplicated by the receiver
 	}
