@@ -15,17 +15,15 @@ import (
 // PendingCollections implements a mempool storing collections.
 type PendingCollections struct {
 	*Backend
-	qe        *QueueEjector
-	sizeMeter func(uint) // keeps track of size variations of memory pool
+	qe *QueueEjector
 }
 
 // NewCollections creates a new memory pool for pending collection.
 func NewPendingCollections(limit uint, collector module.MempoolMetrics) (*PendingCollections, error) {
 	qe := NewQueueEjector(limit + 1)
 	p := &PendingCollections{
-		qe:        qe,
-		Backend:   NewBackend(WithLimit(limit), WithEject(qe.Eject)),
-		sizeMeter: nil,
+		qe:      qe,
+		Backend: NewBackend(WithLimit(limit), WithEject(qe.Eject)),
 	}
 
 	// registers size method of backend for metrics
@@ -43,22 +41,12 @@ func (p *PendingCollections) Add(pcoll *verification.PendingCollection) bool {
 	if ok {
 		p.qe.Push(pcoll.ID())
 	}
-
-	// tracks size updates
-	if p.sizeMeter != nil {
-		p.sizeMeter(p.Backend.Size())
-	}
-
 	return ok
 }
 
 // Rem removes a pending collection by ID from memory
 func (p *PendingCollections) Rem(collID flow.Identifier) bool {
 	ok := p.Backend.Rem(collID)
-	if p.sizeMeter != nil {
-		p.sizeMeter(p.Backend.Size())
-	}
-
 	return ok
 }
 
