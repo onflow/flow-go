@@ -511,13 +511,9 @@ func TestRetry(t *testing.T) {
 
 	<-e.Ready()
 
-	// engine processes the execution result
+	fmt.Printf("calling match.Engine.Process\n")
 	err := e.Process(en.ID(), result)
 	require.NoError(t, err)
-
-	// engine processes the execution result again
-	err = e.Process(en.ID(), result)
-	require.Contains(t, err.Error(), "execution result has been added")
 
 	// wait until verifier has been called
 	_ = <-vchunksC
@@ -588,6 +584,7 @@ func TestProcessExecutionResultConcurrently(t *testing.T) {
 
 		// block header has been received
 		headerDB[result.BlockID] = header
+		ers = append(ers, result)
 	}
 
 	// find the execution node id that created the execution result
@@ -600,10 +597,10 @@ func TestProcessExecutionResultConcurrently(t *testing.T) {
 
 	<-e.Ready()
 
-	fmt.Printf("calling match.Engine.Process\n")
 	// engine processes the execution result concurrently
 	for _, result := range ers {
 		go func(result *flow.ExecutionResult) {
+			fmt.Printf("calling match.Engine.Process\n")
 			err := e.Process(en.ID(), result)
 			require.NoError(t, err)
 		}(result)
@@ -644,7 +641,7 @@ func TestProcessChunkDataPackConcurrently(t *testing.T) {
 	// find the execution node id that created the execution result
 	en := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
-	count := 6
+	count := len(result.Chunks)
 	reqsC := ChunkDataPackIsRequestedNTimes(con, count, func(*messages.ChunkDataRequest) {})
 
 	// check verifier's method is called
@@ -658,9 +655,10 @@ func TestProcessChunkDataPackConcurrently(t *testing.T) {
 	err := e.Process(en.ID(), result)
 	require.NoError(t, err)
 
-	_ = <-vchunksC
+	// wait until all chunk data requests have received
 	reqs := <-reqsC
 
+	// send chunk data pack responses concurrently
 	var wg sync.WaitGroup
 	for _, req := range reqs {
 		wg.Add(1)
@@ -670,6 +668,9 @@ func TestProcessChunkDataPackConcurrently(t *testing.T) {
 		}(req)
 	}
 	wg.Wait()
+
+	// wait until verifier are called
+	_ = <-vchunksC
 
 	mock.AssertExpectationsForObjects(t, assigner, con, verifier)
 	e.Done()
