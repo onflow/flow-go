@@ -25,7 +25,7 @@ func main() {
 		}
 
 		verificationCollector := metrics.NewVerificationCollector(tracer)
-		mempoolcollector := metrics.NewMempoolCollector()
+		mempoolcollector := metrics.NewMempoolCollector(5*time.Second, 0)
 
 		authReceipts, err := stdmap.NewReceipts(10, mempoolcollector)
 		if err != nil {
