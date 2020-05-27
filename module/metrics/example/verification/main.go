@@ -32,8 +32,7 @@ func main() {
 			panic(err)
 		}
 
-		pendingReceipts, err := stdmap.NewPendingReceipts(10,
-			stdmap.WithSizeMeterPendingReceipts(verificationCollector.OnPendingReceiptsUpdated))
+		pendingReceipts, err := stdmap.NewPendingReceipts(10, mempoolcollector)
 		if err != nil {
 			panic(err)
 		}
@@ -43,8 +42,7 @@ func main() {
 			panic(err)
 		}
 
-		pendingCollections, err := stdmap.NewPendingCollections(10,
-			stdmap.WithSizeMeterPendingCollections(verificationCollector.OnPendingCollectionsUpdated))
+		pendingCollections, err := stdmap.NewPendingCollections(10, mempoolcollector)
 		if err != nil {
 			panic(err)
 		}
