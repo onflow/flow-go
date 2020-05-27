@@ -51,7 +51,7 @@ func NewDefaultConfig() Config {
 	conf, err := NewConfig(
 		replicaTimeout,
 		minReplicaTimeout+blockRateDelay,
-		StandardVoteAggregationTimeoutFraction(0.5, minReplicaTimeout, blockRateDelay), // resulting value here is 0.5
+		StandardVoteAggregationTimeoutFraction(minReplicaTimeout, blockRateDelay), // resulting value here is 0.5
 		timeoutIncreaseFactor,
 		StandardTimeoutDecreaseFactor(1.0/3.0, timeoutIncreaseFactor), // resulting value is 1/sqrt(2)
 		blockRateDelay,
@@ -112,12 +112,17 @@ func NewConfig(
 	return tc, nil
 }
 
-// StandardVoteAggregationTimeoutFraction calculates a standard value for the
-// VoteAggregationTimeoutFraction in case a block delay is used
-func StandardVoteAggregationTimeoutFraction(voteAggregationTimeoutFraction float64, minReplicaTimeout time.Duration, blockRateDelay time.Duration) float64 {
+// StandardVoteAggregationTimeoutFraction calculates a standard value for the VoteAggregationTimeoutFraction in case a block delay is used.
+// The motivation for the standard value is as follows:
+//  * the next primary receives the block it ideally would extend at some time t
+//  * the best guess the primary has, when other nodes would receive the block is at time t as well
+//  * the primary needs to get its block to the other replicas, before they time out:
+//    the primary uses its own timeout as estimator for the other replicas' timeout
+func StandardVoteAggregationTimeoutFraction(minReplicaTimeout time.Duration, blockRateDelay time.Duration) float64 {
+	standardVoteAggregationTimeoutFraction := 0.5
 	minReplicaTimeoutMS := float64(minReplicaTimeout.Milliseconds())
 	blockRateDelayMS := float64(blockRateDelay.Milliseconds())
-	return 0.5 * (minReplicaTimeoutMS + blockRateDelayMS) / minReplicaTimeoutMS
+	return (standardVoteAggregationTimeoutFraction*minReplicaTimeoutMS + blockRateDelayMS) / (minReplicaTimeoutMS + blockRateDelayMS)
 }
 
 // StandardTimeoutDecreaseFactor calculates a standard value for TimeoutDecreaseFactor
