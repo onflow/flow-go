@@ -274,6 +274,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		Mempool:    mempools,
 	}
 
+	// registers mempools as a Component so that its Ready method is invoked upon startup
 	fnb.Component("mempools metrics", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
 		return mempools, nil
 	})

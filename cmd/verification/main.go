@@ -86,7 +86,7 @@ func main() {
 			flags.UintVar(&alpha, "alpha", 10, "maximum number of chunk states in the memory pool")
 		}).
 		Module("verification metrics", func(node *cmd.FlowNodeBuilder) error {
-			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegisterer)
+			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegisterer, node.Logger)
 			return nil
 		}).
 		Module("execution authenticated receipts mempool", func(node *cmd.FlowNodeBuilder) error {

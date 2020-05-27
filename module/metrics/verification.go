@@ -3,6 +3,7 @@ package metrics
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/trace"
@@ -18,7 +19,7 @@ type VerificationCollector struct {
 	storagePerChunk         prometheus.Gauge
 }
 
-func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer) *VerificationCollector {
+func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer, log zerolog.Logger) *VerificationCollector {
 
 	chunksCheckedPerBlock := promauto.NewCounter(prometheus.CounterOpts{
 		Name:      "checked_chunks_total",
@@ -36,9 +37,18 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 		Help:      "latest ingested chunk resources storage (bytes)",
 	})
 
-	registerer.MustRegister(chunksCheckedPerBlock)
-	registerer.MustRegister(resultApprovalsPerBlock)
-	registerer.MustRegister(storagePerChunk)
+	err := registerer.Register(chunksCheckedPerBlock)
+	if err != nil {
+		log.Debug().Err(err).Msg("could not register chunksCheckedPerBlock metric")
+	}
+	err = registerer.Register(resultApprovalsPerBlock)
+	if err != nil {
+		log.Debug().Err(err).Msg("could not register resultApprovalsPerBlock metric")
+	}
+	err = registerer.Register(storagePerChunk)
+	if err != nil {
+		log.Debug().Err(err).Msg("could not register storagePerChunk metric")
+	}
 
 	vc := &VerificationCollector{
 		tracer:                  tracer,
