@@ -2,10 +2,6 @@
 
 package stdmap
 
-import (
-	"github.com/dapperlabs/flow-go/module"
-)
-
 // OptionFunc is a function that can be provided to the backend on creation in
 // order to set a certain custom option.
 type OptionFunc func(*Backend)
@@ -24,15 +20,5 @@ func WithLimit(limit uint) OptionFunc {
 func WithEject(eject EjectFunc) OptionFunc {
 	return func(be *Backend) {
 		be.eject = eject
-	}
-}
-
-// WithMetrics can be provided to the backend on creation in order to set a custom metric collector.
-// metricResourceLabel is the label that the metric is identified with. As a convention, it represents
-// the name of mempool that is implemented on top of this backend instance.
-func WithMetrics(collector module.MempoolMetrics, metricResourceLabel string) OptionFunc {
-	return func(be *Backend) {
-		be.collector = collector
-		be.metricResourceLabel = metricResourceLabel
 	}
 }
