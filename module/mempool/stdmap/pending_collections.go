@@ -1,8 +1,12 @@
 package stdmap
 
 import (
+	"fmt"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/verification"
+	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 )
 
 // TODO consolidate with PendingReceipts to preserve DRY
@@ -15,16 +19,8 @@ type PendingCollections struct {
 	sizeMeter func(uint) // keeps track of size variations of memory pool
 }
 
-type PendingCollectionsOpts func(*PendingCollections)
-
-func WithSizeMeterPendingCollections(f func(uint)) PendingCollectionsOpts {
-	return func(p *PendingCollections) {
-		p.sizeMeter = f
-	}
-}
-
 // NewCollections creates a new memory pool for pending collection.
-func NewPendingCollections(limit uint, opts ...PendingCollectionsOpts) (*PendingCollections, error) {
+func NewPendingCollections(limit uint, collector module.MempoolMetrics) (*PendingCollections, error) {
 	qe := NewQueueEjector(limit + 1)
 	p := &PendingCollections{
 		qe:        qe,
@@ -32,8 +28,10 @@ func NewPendingCollections(limit uint, opts ...PendingCollectionsOpts) (*Pending
 		sizeMeter: nil,
 	}
 
-	for _, apply := range opts {
-		apply(p)
+	// registers size method of backend for metrics
+	err := collector.Register(metrics.ResourcePendingCollection, p.Backend.Size)
+	if err != nil {
+		return nil, fmt.Errorf("could not register backend metric: %w", err)
 	}
 
 	return p, nil
