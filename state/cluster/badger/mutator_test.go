@@ -75,7 +75,7 @@ func (suite *MutatorSuite) Bootstrap() {
 
 	// just bootstrap with a genesis block, we'll use this as reference
 	genesis := unittest.GenesisFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
-	err := suite.protoState.Mutate().Bootstrap(flow.GenesisStateCommitment, genesis)
+	err := suite.protoState.Mutate().Bootstrap(unittest.GenesisStateCommitment, genesis)
 	suite.Require().Nil(err)
 
 	// bootstrap cluster chain

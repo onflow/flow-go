@@ -1,14 +1,13 @@
 package flow
 
-import (
-	"github.com/dapperlabs/flow-go/crypto/hash"
-)
+// RegisterID (key part of key value)
+type RegisterID = []byte
 
-// Ledger is a map of register values.
-type Ledger map[string][]byte
+// RegisterValue (value part of Register)
+type RegisterValue = []byte
 
-type IntermediateRegisters struct {
-	TransactionHash hash.Hash
-	Registers       Ledger
-	ComputeUsed     uint64
-}
+// StorageProof (proof of a read or update to the state, Merkle path of some sort)
+type StorageProof = []byte
+
+// StateCommitment holds the root hash of the tree (Snapshot)
+type StateCommitment = []byte

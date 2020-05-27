@@ -43,8 +43,7 @@ install-tools: crypto/relic/build check-go-version
 	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@v1.9.0; \
 	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@v0.0.0-20181123154057-e78b021dcbb5; \
 	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1; \
-	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master; \
-	GO111MODULE=on go get github.com/kevinburke/go-bindata/...@v3.11.0;
+	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master;
 
 .PHONY: unittest
 unittest:

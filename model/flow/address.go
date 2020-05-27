@@ -50,6 +50,8 @@ func getNetworkType() networkType {
 	}
 }
 
+var EmptyAddress = Address{}
+
 // ZeroAddress represents the "zero address" (account that no one owns).
 func ZeroAddress() Address {
 	return generateAddress(ZeroAddressState)

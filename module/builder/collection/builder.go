@@ -1,6 +1,7 @@
 package collection
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -178,6 +179,9 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 			// retrieve the main chain header that was used as reference
 			refHeader, err := b.mainHeaders.ByBlockID(tx.ReferenceBlockID)
+			if errors.Is(err, storage.ErrNotFound) {
+				continue // in case we are configured with liberal transaction ingest rules
+			}
 			if err != nil {
 				return fmt.Errorf("could not retrieve reference header: %w", err)
 			}

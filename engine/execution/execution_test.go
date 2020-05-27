@@ -233,16 +233,15 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	genesis, err := exe1Node.State.AtHeight(0).Head()
 	require.NoError(t, err)
 
-	// transaction that will change state and succeed, used to test that state commitment changes
-	tx1 := execTestutil.DeployCounterContractTransaction()
-
 	seq := uint64(0)
 
-	err = execTestutil.SignTransactionByRoot(&tx1, seq)
+	// transaction that will change state and succeed, used to test that state commitment changes
+	tx1 := execTestutil.DeployCounterContractTransaction(flow.ServiceAddress())
+	err = execTestutil.SignTransactionByRoot(tx1, seq)
 	require.NoError(t, err)
 	seq++
 
-	col1 := flow.Collection{Transactions: []*flow.TransactionBody{&tx1}}
+	col1 := flow.Collection{Transactions: []*flow.TransactionBody{tx1}}
 	block1 := unittest.BlockWithParentFixture(genesis)
 	block1.Header.View = 1
 	block1.Header.ProposerID = conID.ID()
@@ -255,11 +254,11 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	proposal1 := unittest.ProposalFromBlock(&block1)
 
 	// transaction that will change state but then panic and revert, used to test that state commitment stays identical
-	tx2 := execTestutil.CreateCounterPanicTransaction()
-	err = execTestutil.SignTransactionByRoot(&tx2, seq)
+	tx2 := execTestutil.CreateCounterPanicTransaction(flow.ServiceAddress(), flow.ServiceAddress())
+	err = execTestutil.SignTransactionByRoot(tx2, seq)
 	require.NoError(t, err)
 
-	col2 := flow.Collection{Transactions: []*flow.TransactionBody{&tx2}}
+	col2 := flow.Collection{Transactions: []*flow.TransactionBody{tx2}}
 	block2 := unittest.BlockWithParentFixture(block1.Header)
 	block2.Header.View = 2
 	block2.Header.ProposerID = conID.ID()

@@ -40,10 +40,12 @@ func ProposalKeyFixture() flow.ProposalKey {
 // AccountKeyFixture returns a randomly generated ECDSA/SHA3 account key.
 func AccountKeyFixture() (*flow.AccountPrivateKey, error) {
 	seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
+
 	_, err := crand.Read(seed)
 	if err != nil {
 		return nil, err
 	}
+
 	key, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
 	if err != nil {
 		return nil, err

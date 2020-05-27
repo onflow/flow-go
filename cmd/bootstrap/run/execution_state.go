@@ -1,20 +1,15 @@
 package run
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
-	"github.com/dapperlabs/flow-go/engine/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
+	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 )
 
-func GenerateAccount0PrivateKey(seed []byte) (flow.AccountPrivateKey, error) {
+func GenerateServiceAccountPrivateKey(seed []byte) (flow.AccountPrivateKey, error) {
 	priv, err := crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
 	if err != nil {
 		return flow.AccountPrivateKey{}, err
@@ -27,44 +22,12 @@ func GenerateAccount0PrivateKey(seed []byte) (flow.AccountPrivateKey, error) {
 	}, nil
 }
 
-func GenerateExecutionState(dbDir string, priv flow.AccountPrivateKey) (flow.StateCommitment, error) {
+func GenerateExecutionState(dbDir string, accountKey flow.AccountPublicKey, genesisTokenSupply uint64) (flow.StateCommitment, error) {
 	metricsCollector := &metrics.NoopCollector{}
 	ledgerStorage, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 	defer ledgerStorage.CloseStorage()
 	if err != nil {
 		return nil, err
 	}
-
-	return bootstrapLedger(ledgerStorage, priv)
-}
-
-func bootstrapLedger(ledger storage.Ledger, priv flow.AccountPrivateKey) (flow.StateCommitment, error) {
-	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.EmptyStateCommitment()))
-
-	err := createServiceAccount(view, priv)
-	if err != nil {
-		return nil, err
-	}
-
-	newStateCommitment, err := state.CommitDelta(ledger, view.Delta(), ledger.EmptyStateCommitment())
-	if err != nil {
-		return nil, err
-	}
-
-	return newStateCommitment, nil
-}
-
-func createServiceAccount(view *delta.View, privateKey flow.AccountPrivateKey) error {
-	ledgerAccess := virtualmachine.LedgerDAL{Ledger: view}
-
-	// initialize the account addressing state
-	ledgerAccess.SetAddressState(flow.ZeroAddressState)
-
-	// create the root account
-	_, err := ledgerAccess.CreateAccountInLedger([]flow.AccountPublicKey{privateKey.PublicKey(1000)})
-	if err != nil {
-		return fmt.Errorf("error while creating account in ledger: %w", err)
-	}
-
-	return nil
+	return bootstrap.BootstrapLedger(ledgerStorage, accountKey, genesisTokenSupply)
 }

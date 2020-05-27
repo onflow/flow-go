@@ -95,7 +95,7 @@ func (suite *BuilderSuite) Bootstrap() {
 
 	// just bootstrap with a genesis block, we'll use this as reference
 	genesis := unittest.GenesisFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
-	err := suite.protoState.Mutate().Bootstrap(flow.GenesisStateCommitment, genesis)
+	err := suite.protoState.Mutate().Bootstrap(unittest.GenesisStateCommitment, genesis)
 	suite.Require().Nil(err)
 
 	// bootstrap cluster chain
@@ -173,6 +173,34 @@ func (suite *BuilderSuite) TestBuildOn_Success() {
 	mempoolTransactions := suite.pool.All()
 	suite.Assert().Len(builtCollection.Transactions, 3)
 	suite.Assert().True(collectionContains(builtCollection, flow.GetIDs(mempoolTransactions)...))
+}
+
+// when there are transactions with an unknown reference block in the pool,
+// we should not include them in collections
+func (suite *BuilderSuite) TestBuildOn_WithUnknownReferenceBlock() {
+
+	// before modifying the mempool, note the valid transactions already in the pool
+	validMempoolTransactions := suite.pool.All()
+
+	// add a transaction unknown reference block to the pool
+	unknownReferenceTx := unittest.TransactionBodyFixture()
+	unknownReferenceTx.ReferenceBlockID = unittest.IdentifierFixture()
+	suite.pool.Add(&unknownReferenceTx)
+
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
+	suite.Require().Nil(err)
+
+	// should be able to retrieve built block from storage
+	var built model.Block
+	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+	suite.Assert().Nil(err)
+	builtCollection := built.Payload.Collection
+
+	suite.Assert().Len(builtCollection.Transactions, 3)
+	// payload should include only the transactions with a valid reference block
+	suite.Assert().True(collectionContains(builtCollection, flow.GetIDs(validMempoolTransactions)...))
+	// should not contain the the unknown-reference transaction
+	suite.Assert().False(collectionContains(builtCollection, unknownReferenceTx.ID()))
 }
 
 func (suite *BuilderSuite) TestBuildOn_WithForks() {
