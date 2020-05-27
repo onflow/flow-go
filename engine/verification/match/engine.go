@@ -132,7 +132,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	case *flow.ExecutionResult:
 		return e.handleExecutionResult(originID, resource)
 	case *messages.ChunkDataResponse:
-		return e.handleChunkDataPack(originID, &resource.ChunkDataPack)
+		return e.handleChunkDataPack(originID, &resource.ChunkDataPack, &resource.Collection)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -318,7 +318,7 @@ func (e *Engine) requestChunkDataPack(c *ChunkStatus) error {
 
 // handleChunkDataPack receives a chunk data pack, verifies its origin ID, pull other data to make a
 // VerifiableChunk, and pass it to the verifier engine to verify
-func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack) error {
+func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) error {
 	log := e.log.With().
 		Hex("executor_id", logging.ID(originID)).
 		Hex("chunk_data_pack_id", logging.Entity(chunkDataPack)).Logger()
@@ -338,6 +338,8 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	if !exists {
 		return fmt.Errorf("chunk does not exist, chunkID: %v", chunkDataPack.ChunkID)
 	}
+
+	// TODO: verify the collection ID matches with the collection guarantee in the block payload
 
 	// remove first to ensure concurrency issue
 	removed := e.chunks.Rem(chunkDataPack.ChunkID)
@@ -362,6 +364,7 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		Chunk:         status.Chunk,
 		Header:        header,
 		Result:        result.ExecutionResult,
+		Collection:    collection,
 		ChunkDataPack: chunkDataPack,
 	}
 
@@ -369,7 +372,9 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		err := e.verifier.ProcessLocal(vchunk)
 		if err != nil {
 			log.Warn().Err(err).Msg("failed to verify chunk")
+			return
 		}
+		log.Info().Msg("chunk verified")
 	})
 
 	return nil
