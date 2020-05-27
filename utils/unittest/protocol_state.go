@@ -22,6 +22,14 @@ func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
 		},
 		nil,
 	)
+	snapshot.On("Identity", mock.Anything).Return(func(id flow.Identifier) *flow.Identity {
+		for _, n := range participants {
+			if n.ID() == id {
+				return n
+			}
+		}
+		return nil
+	}, nil)
 	snapshot.On("Head").Return(
 		func() *flow.Header {
 			return head

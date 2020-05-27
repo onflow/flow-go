@@ -325,14 +325,14 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	log.Info().Msg("chunk data pack received")
 
 	// check origin is from a execution node
-	// sender, err := e.state.Final().Identity(originID)
-	// if err != nil {
-	// 	return fmt.Errorf("could not find identity: %w", err)
-	// }
-	//
-	// if sender.Role != flow.RoleExecution {
-	// 	return fmt.Errorf("receives chunk data pack from a non-execution node")
-	// }
+	sender, err := e.state.Final().Identity(originID)
+	if err != nil {
+		return fmt.Errorf("could not find identity: %w", err)
+	}
+
+	if sender.Role != flow.RoleExecution {
+		return fmt.Errorf("receives chunk data pack from a non-execution node")
+	}
 
 	status, exists := e.chunks.ByID(chunkDataPack.ChunkID)
 	if !exists {
