@@ -357,12 +357,12 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.ChunkDataPacks == nil {
-		node.ChunkDataPacks, err = stdmap.NewChunkDataPacks(1000, nil)
+		node.ChunkDataPacks, err = stdmap.NewChunkDataPacks(1000, node.Metrics)
 		require.Nil(t, err)
 	}
 
 	if node.ChunkDataPackTrackers == nil {
-		node.ChunkDataPackTrackers, err = stdmap.NewChunkDataPackTrackers(1000, nil)
+		node.ChunkDataPackTrackers, err = stdmap.NewChunkDataPackTrackers(1000, node.Metrics)
 		require.Nil(t, err)
 	}
 
