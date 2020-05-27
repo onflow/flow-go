@@ -3,8 +3,12 @@
 package stdmap
 
 import (
+	"fmt"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/verification"
+	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 )
 
 // TODO consolidate with PendingCollections to preserve DRY
@@ -13,30 +17,22 @@ import (
 // used to store execution receipts and to generate block seals.
 type PendingReceipts struct {
 	*Backend
-	qe        *QueueEjector
-	sizeMeter func(uint)
-}
-
-type PendingReceiptsOpts func(*PendingReceipts)
-
-func WithSizeMeterPendingReceipts(f func(uint)) PendingReceiptsOpts {
-	return func(p *PendingReceipts) {
-		p.sizeMeter = f
-	}
+	qe *QueueEjector
 }
 
 // NewReceipts creates a new memory pool for execution receipts.
-func NewPendingReceipts(limit uint, opts ...PendingReceiptsOpts) (*PendingReceipts, error) {
+func NewPendingReceipts(limit uint, collector module.MempoolMetrics) (*PendingReceipts, error) {
 	// create the receipts memory pool with the lookup maps
 	qe := NewQueueEjector(limit + 1)
 	r := &PendingReceipts{
-		qe:        qe,
-		Backend:   NewBackend(WithLimit(limit), WithEject(qe.Eject)),
-		sizeMeter: nil,
+		qe:      qe,
+		Backend: NewBackend(WithLimit(limit), WithEject(qe.Eject)),
 	}
 
-	for _, apply := range opts {
-		apply(r)
+	// registers size method of backend for metrics
+	err := collector.Register(metrics.ResourcePendingReceipt, r.Backend.Size)
+	if err != nil {
+		return nil, fmt.Errorf("could not register backend metric: %w", err)
 	}
 
 	return r, nil
@@ -48,24 +44,12 @@ func (p *PendingReceipts) Add(preceipt *verification.PendingReceipt) bool {
 	if ok {
 		p.qe.Push(preceipt.ID())
 	}
-
-	// tracks the size updates
-	if p.sizeMeter != nil {
-		p.sizeMeter(p.Backend.Size())
-	}
-
 	return ok
 }
 
 // Rem will remove a pending receipt by ID.
 func (p *PendingReceipts) Rem(preceiptID flow.Identifier) bool {
 	ok := p.Backend.Rem(preceiptID)
-
-	// tracks the size updates
-	if p.sizeMeter != nil {
-		p.sizeMeter(p.Backend.Size())
-	}
-
 	return ok
 }
 
