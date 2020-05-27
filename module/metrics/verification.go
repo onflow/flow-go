@@ -18,28 +18,33 @@ type VerificationCollector struct {
 	storagePerChunk         prometheus.Gauge
 }
 
-func NewVerificationCollector(tracer *trace.OpenTracer) *VerificationCollector {
+func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer) *VerificationCollector {
+
+	chunksCheckedPerBlock := promauto.NewCounter(prometheus.CounterOpts{
+		Name:      "checked_chunks_total",
+		Namespace: namespaceVerification,
+		Help:      "total number of chunks checked",
+	})
+	resultApprovalsPerBlock := promauto.NewCounter(prometheus.CounterOpts{
+		Name:      "result_approvals_total",
+		Namespace: namespaceVerification,
+		Help:      "total number of emitted result approvals",
+	})
+	storagePerChunk := promauto.NewGauge(prometheus.GaugeOpts{
+		Name:      "storage_latest_chunk_size_bytes",
+		Namespace: namespaceVerification,
+		Help:      "latest ingested chunk resources storage (bytes)",
+	})
+
+	registerer.MustRegister(chunksCheckedPerBlock)
+	registerer.MustRegister(resultApprovalsPerBlock)
+	registerer.MustRegister(storagePerChunk)
 
 	vc := &VerificationCollector{
-		tracer: tracer,
-
-		chunksCheckedPerBlock: promauto.NewCounter(prometheus.CounterOpts{
-			Name:      "checked_chunks_total",
-			Namespace: namespaceVerification,
-			Help:      "total number of chunks checked",
-		}),
-
-		resultApprovalsPerBlock: promauto.NewCounter(prometheus.CounterOpts{
-			Name:      "result_approvals_total",
-			Namespace: namespaceVerification,
-			Help:      "total number of emitted result approvals",
-		}),
-
-		storagePerChunk: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "storage_latest_chunk_size_bytes",
-			Namespace: namespaceVerification,
-			Help:      "latest ingested chunk resources storage (bytes)",
-		}),
+		tracer:                  tracer,
+		chunksCheckedPerBlock:   chunksCheckedPerBlock,
+		resultApprovalsPerBlock: resultApprovalsPerBlock,
+		storagePerChunk:         storagePerChunk,
 	}
 
 	return vc

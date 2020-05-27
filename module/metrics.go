@@ -130,37 +130,13 @@ type VerificationMetrics interface {
 	// it increases the result approval counter for this chunk
 	OnResultApproval()
 
-	// OnChunkDataAdded is called whenever something is added to related to chunkID to the in-memory mempools
-	// of verification node. It records the size of stored object.
-	OnChunkDataAdded(chunkID flow.Identifier, size float64)
-
-	// OnChunkDataRemoved is called whenever something is removed that is related to chunkID from the in-memory mempools
-	// of verification node. It records the size of stored object.
-	OnChunkDataRemoved(chunkID flow.Identifier, size float64)
-
-	// OnAuthenticatedReceiptsUpdated is called whenever size of AuthenticatedReceipts mempool gets changed.
-	// It records the latest value of its size.
-	OnAuthenticatedReceiptsUpdated(size uint)
-
-	// OnPendingReceiptsUpdated is called whenever size of PendingReceipts mempool gets changed.
-	// It records the latest value of its size.
-	OnPendingReceiptsUpdated(size uint)
-
-	// OnAuthenticatedCollectionsUpdated is called whenever size of AuthenticatedCollections mempool gets changed.
-	// It records the latest value of its size.
-	OnAuthenticatedCollectionsUpdated(size uint)
-
-	// OnChunkDataPacksUpdated is called whenever size of ChunkDataPacks mempool gets changed.
-	// It records the latest value of its size.
-	OnChunkDataPacksUpdated(size uint)
-
-	// OnPendingCollectionsUpdated is called whenever size of PendingCollections mempool gets changed.
-	// It records the latest value of its size.
-	OnPendingCollectionsUpdated(size uint)
-
-	// OnChunkTrackersUpdated is called whenever size of ChunkTrackers mempool gets changed.
-	// It records the latest value of its size.
-	OnChunkTrackersUpdated(size uint)
+	// OnVerifiableChunkSubmitted is called whenever a verifiable chunk is shaped for a specific
+	// chunk. It adds the size of the verifiable chunk to the histogram. A verifiable chunk is assumed
+	// to capture all the resources needed to verify a chunk.
+	// The purpose of this function is to track the overall chunk resources size on disk.
+	// Todo wire this up to do monitoring
+	// https://github.com/dapperlabs/flow-go/issues/3183
+	OnVerifiableChunkSubmitted(size float64)
 }
 
 // LedgerMetrics provides an interface to record Ledger Storage metrics.

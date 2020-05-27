@@ -69,7 +69,12 @@ func (mc *MempoolCollector) Done() <-chan struct{} {
 	return mc.unit.Done()
 }
 
+// gaugeEntries iterates over the registered entries functions
+// and calls MempoolEntries on them to capture the size of registered mempools
 func (mc *MempoolCollector) gaugeEntries() {
+	mc.RLock()
+	defer mc.RUnlock()
+
 	for r, f := range mc.entriesFuncs {
 		mc.MempoolEntries(r, f())
 	}

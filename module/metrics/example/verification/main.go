@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/model/verification"
@@ -19,40 +20,43 @@ import (
 // increases result approvals counter and checked chunks counter 100 times each
 func main() {
 	example.WithMetricsServer(func(logger zerolog.Logger) {
-		tracer, err := trace.NewTracer(logger, "collection")
+		tracer, err := trace.NewTracer(logger, "verification")
 		if err != nil {
 			panic(err)
 		}
 
-		verificationCollector := metrics.NewVerificationCollector(tracer)
-		mempoolcollector := metrics.NewMempoolCollector(5*time.Second, 0)
+		verificationCollector := metrics.NewVerificationCollector(tracer, prometheus.DefaultRegisterer)
+		mempoolCollector := metrics.NewMempoolCollector(5*time.Second, 0)
 
-		authReceipts, err := stdmap.NewReceipts(10, mempoolcollector)
+		// starts periodic launch of mempoolCollector
+		<-mempoolCollector.Ready()
+
+		authReceipts, err := stdmap.NewReceipts(100, mempoolCollector)
 		if err != nil {
 			panic(err)
 		}
 
-		pendingReceipts, err := stdmap.NewPendingReceipts(10, mempoolcollector)
+		pendingReceipts, err := stdmap.NewPendingReceipts(100, mempoolCollector)
 		if err != nil {
 			panic(err)
 		}
 
-		authCollections, err := stdmap.NewCollections(10, mempoolcollector)
+		authCollections, err := stdmap.NewCollections(100, mempoolCollector)
 		if err != nil {
 			panic(err)
 		}
 
-		pendingCollections, err := stdmap.NewPendingCollections(10, mempoolcollector)
+		pendingCollections, err := stdmap.NewPendingCollections(100, mempoolCollector)
 		if err != nil {
 			panic(err)
 		}
 
-		chunkDataPacks, err := stdmap.NewChunkDataPacks(10, mempoolcollector)
+		chunkDataPacks, err := stdmap.NewChunkDataPacks(100, mempoolCollector)
 		if err != nil {
 			panic(err)
 		}
 
-		chunkDataPackTrackers, err := stdmap.NewChunkDataPackTrackers(10, mempoolcollector)
+		chunkDataPackTrackers, err := stdmap.NewChunkDataPackTrackers(100, mempoolCollector)
 		if err != nil {
 			panic(err)
 		}
@@ -85,7 +89,7 @@ func main() {
 				unittest.IdentifierFixture()))
 
 			// adds a synthetic 1 s delay for verification duration
-			time.Sleep(3 * time.Second)
+			time.Sleep(1 * time.Second)
 			verificationCollector.OnChunkVerificationFinished(chunkID)
 			verificationCollector.OnResultApproval()
 
