@@ -17,7 +17,13 @@ type ChunkDataPackTrackers struct {
 // NewChunkDataPackTrackers creates a new memory pool for ChunkDataPackTrackers.
 func NewChunkDataPackTrackers(limit uint, collector module.MempoolMetrics) (*ChunkDataPackTrackers, error) {
 	a := &ChunkDataPackTrackers{
-		Backend: NewBackend(WithLimit(limit), WithMetrics(collector, metrics.ResourceChunkDataPackTracker)),
+		Backend: NewBackend(WithLimit(limit)),
+	}
+
+	// registers size method of backend for metrics
+	err := collector.Register(metrics.ResourceChunkDataPackTracker, a.Backend.Size)
+	if err != nil {
+		return nil, fmt.Errorf("could not register backend metric: %w", err)
 	}
 
 	return a, nil
