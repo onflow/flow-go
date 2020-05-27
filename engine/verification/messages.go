@@ -16,7 +16,7 @@ type VerifiableChunk struct {
 }
 
 type VerifiableChunkData struct {
-	Chunk         *flow.Chunk           // index of the chunk to be verified
+	Chunk         *flow.Chunk           // the chunk to be verified
 	Header        *flow.Header          // BlockHeader that contains this chunk
 	Result        *flow.ExecutionResult // execution result of this block
 	Collection    *flow.Collection      // collection corresponding to the chunk

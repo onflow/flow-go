@@ -360,7 +360,7 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	}
 
 	// creates a verifiable chunk for assigned chunk
-	vchunk := &verification.VerifiableChunkData{
+	vchunk := &verification.VerifiableChunk{
 		Chunk:         status.Chunk,
 		Header:        header,
 		Result:        result.ExecutionResult,
