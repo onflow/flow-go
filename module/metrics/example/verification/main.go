@@ -38,8 +38,7 @@ func main() {
 			panic(err)
 		}
 
-		authCollections, err := stdmap.NewCollections(10,
-			stdmap.WithSizeMeterCollections(verificationCollector.OnAuthenticatedCollectionsUpdated))
+		authCollections, err := stdmap.NewCollections(10, mempoolcollector)
 		if err != nil {
 			panic(err)
 		}
