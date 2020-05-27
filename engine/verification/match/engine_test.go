@@ -18,111 +18,11 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/module/results"
-	netint "github.com/dapperlabs/flow-go/network"
 	network "github.com/dapperlabs/flow-go/network/mock"
-	protint "github.com/dapperlabs/flow-go/state/protocol"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
-	storerr "github.com/dapperlabs/flow-go/storage"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
-
-func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
-	*flow.Block, *protocol.Snapshot, *protocol.State) {
-	block := unittest.BlockFixture()
-	head := block.Header
-
-	// set up protocol snapshot mock
-	snapshot := &protocol.Snapshot{}
-	snapshot.On("Identities", mock.Anything).Return(
-		func(filter flow.IdentityFilter) flow.IdentityList {
-			return participants.Filter(filter)
-		},
-		nil,
-	)
-	snapshot.On("Head").Return(
-		func() *flow.Header {
-			return head
-		},
-		nil,
-	)
-
-	// set up protocol state mock
-	state := &protocol.State{}
-	state.On("Final").Return(
-		func() protint.Snapshot {
-			return snapshot
-		},
-	)
-	state.On("AtBlockID", mock.Anything).Return(
-		func(blockID flow.Identifier) protint.Snapshot {
-			return snapshot
-		},
-	)
-	return &block, snapshot, state
-}
-
-func RegisterNetwork() (*module.Network, *network.Conduit) {
-	con := &network.Conduit{}
-
-	// set up network module mock
-	net := &module.Network{}
-	net.On("Register", mock.Anything, mock.Anything).Return(
-		func(code uint8, engine netint.Engine) netint.Conduit {
-			return con
-		},
-		nil,
-	)
-
-	return net, con
-}
-
-func HeadersFromMap(headerDB map[flow.Identifier]*flow.Header) *storage.Headers {
-	headers := &storage.Headers{}
-	headers.On("Store", mock.Anything).Return(
-		func(header *flow.Header) error {
-			headerDB[header.ID()] = header
-			return nil
-		},
-	)
-	headers.On("ByBlockID", mock.Anything).Return(
-		func(blockID flow.Identifier) *flow.Header {
-			return headerDB[blockID]
-		},
-		func(blockID flow.Identifier) error {
-			_, exists := headerDB[blockID]
-			if !exists {
-				return storerr.ErrNotFound
-			}
-			return nil
-		},
-	)
-
-	return headers
-}
-
-func CreateNParticipantsWithMyRole(myRole flow.Role, otherRoles ...flow.Role) (
-	flow.IdentityList, flow.Identifier, *module.Local) {
-	// initialize the paramaters
-	// participants := unittest.IdentityFixture(myRole)
-	participants := make(flow.IdentityList, 0)
-	myIdentity := unittest.IdentityFixture(unittest.WithRole(myRole))
-	myID := myIdentity.ID()
-	participants = append(participants, myIdentity)
-	for _, role := range otherRoles {
-		id := unittest.IdentityFixture(unittest.WithRole(role))
-		participants = append(participants, id)
-	}
-
-	// set up local module mock
-	me := &module.Local{}
-	me.On("NodeID").Return(
-		func() flow.Identifier {
-			return myID
-		},
-	)
-	return participants, myID, me
-}
 
 func SetupTest(t *testing.T, maxTry int) (
 	e *Engine,
@@ -145,7 +45,7 @@ func SetupTest(t *testing.T, maxTry int) (
 	// setup the network with 2 verification nodes, 3 execution nodes
 	// 2 verification nodes are needed to verify chunks, which are assigned to other verification nodes, are ignored.
 	// 3 execution nodes are needed to verify chunk data pack requests are sent to only 2 execution nodes
-	participants, myID, me = CreateNParticipantsWithMyRole(flow.RoleVerification,
+	participants, myID, me = unittest.CreateNParticipantsWithMyRole(flow.RoleVerification,
 		flow.RoleVerification,
 		flow.RoleCollection,
 		flow.RoleConsensus,
@@ -155,14 +55,14 @@ func SetupTest(t *testing.T, maxTry int) (
 	)
 
 	// set up network conduit mock
-	net, con = RegisterNetwork()
+	net, con = unittest.RegisterNetwork()
 
 	// set up header storage mock
 	headerDB = make(map[flow.Identifier]*flow.Header)
-	headers = HeadersFromMap(headerDB)
+	headers = unittest.HeadersFromMap(headerDB)
 
 	// setup protocol state
-	block, snapshot, state := FinalizedProtocolStateWithParticipants(participants)
+	block, snapshot, state := unittest.FinalizedProtocolStateWithParticipants(participants)
 	head = block.Header
 
 	// setup other dependencies
@@ -372,15 +272,6 @@ func TestNoAssignment(t *testing.T) {
 	err := e.Process(en.ID(), result)
 	require.NoError(t, err)
 	e.Done()
-}
-
-func findChunk(result *flow.ExecutionResult, chunkID flow.Identifier) (*flow.Chunk, bool) {
-	for _, chunk := range result.ExecutionResultBody.Chunks {
-		if chunk.ID() == chunkID {
-			return chunk, true
-		}
-	}
-	return nil, false
 }
 
 // Multiple Assignments: When receives a ER, and 2 chunks out of 3 are assigned to me,
