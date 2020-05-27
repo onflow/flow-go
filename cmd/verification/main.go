@@ -98,8 +98,7 @@ func main() {
 		//	return err
 		//}).
 		Module("authenticated collections mempool", func(node *cmd.FlowNodeBuilder) error {
-			authCollections, err = stdmap.NewCollections(collectionLimit,
-				stdmap.WithSizeMeterCollections(collector.OnAuthenticatedCollectionsUpdated))
+			authCollections, err = stdmap.NewCollections(collectionLimit, node.Metrics.Mempool)
 			return err
 		}).
 		//Module("pending collections mempool", func(node *cmd.FlowNodeBuilder) error {
