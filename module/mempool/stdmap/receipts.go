@@ -3,6 +3,8 @@
 package stdmap
 
 import (
+	"fmt"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -18,9 +20,14 @@ type Receipts struct {
 func NewReceipts(limit uint, collector module.MempoolMetrics) (*Receipts, error) {
 	// create the receipts memory pool with the lookup maps
 	r := &Receipts{
-		Backend: NewBackend(WithLimit(limit), WithMetrics(collector, metrics.ResourceReceipt)),
+		Backend: NewBackend(WithLimit(limit)),
 	}
 
+	// registers size method of backend for metrics
+	err := collector.Register(metrics.ResourceReceipt, r.Backend.Size)
+	if err != nil {
+		return nil, fmt.Errorf("could not register backend metric: %w", err)
+	}
 	return r, nil
 }
 

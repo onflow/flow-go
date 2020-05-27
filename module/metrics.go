@@ -5,6 +5,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/metrics"
 )
 
 type NetworkMetrics interface {
@@ -41,6 +42,7 @@ type CacheMetrics interface {
 
 type MempoolMetrics interface {
 	MempoolEntries(resource string, entries uint)
+	Register(resource string, entriesFunc metrics.EntriesFunc) error
 }
 
 type HotstuffMetrics interface {
