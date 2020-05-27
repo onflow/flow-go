@@ -358,7 +358,7 @@ func TestDuplication(t *testing.T) {
 	require.Contains(t, err.Error(), "execution result has been added")
 
 	// wait until verifier has been called
-	_ = <-vchunksC
+	<-vchunksC
 
 	mock.AssertExpectationsForObjects(t, assigner, con, verifier)
 	e.Done()
@@ -407,7 +407,7 @@ func TestRetry(t *testing.T) {
 	require.NoError(t, err)
 
 	// wait until verifier has been called
-	_ = <-vchunksC
+	<-vchunksC
 
 	mock.AssertExpectationsForObjects(t, assigner, con, verifier)
 	e.Done()
@@ -445,7 +445,7 @@ func TestMaxRetry(t *testing.T) {
 	require.NoError(t, err)
 
 	// wait until 3 retry attampts are done
-	_ = <-reqsC
+	<-reqsC
 
 	mock.AssertExpectationsForObjects(t, assigner, con)
 	e.Done()
@@ -498,7 +498,7 @@ func TestProcessExecutionResultConcurrently(t *testing.T) {
 	}
 
 	// wait until verifier has been called
-	_ = <-vchunksC
+	<-vchunksC
 
 	mock.AssertExpectationsForObjects(t, assigner, con, verifier)
 	e.Done()
@@ -561,7 +561,7 @@ func TestProcessChunkDataPackConcurrently(t *testing.T) {
 	wg.Wait()
 
 	// wait until verifier are called
-	_ = <-vchunksC
+	<-vchunksC
 
 	mock.AssertExpectationsForObjects(t, assigner, con, verifier)
 	e.Done()
