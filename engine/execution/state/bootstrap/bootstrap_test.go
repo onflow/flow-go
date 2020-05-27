@@ -33,7 +33,7 @@ func TestGenerateGenesisState(t *testing.T) {
 }
 
 func TestGenerateGenesisState_ZeroTokenSupply(t *testing.T) {
-	var expectedStateCommitment, _ = hex.DecodeString("7be63e52810f64c7bcbf4f7c38374ff12d7d0e6ae5e18c22af550987f1fa5787")
+	var expectedStateCommitment, _ = hex.DecodeString("9e9cb57df31949260de41afa7fe534396f04bfeb54279ad8aef5922a3974cbf0")
 
 	unittest.RunWithTempDir(t, func(dbDir string) {
 

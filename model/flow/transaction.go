@@ -54,25 +54,13 @@ func NewTransactionBody() *TransactionBody {
 
 func (tb TransactionBody) Fingerprint() []byte {
 	return fingerprint.Fingerprint(struct {
-		ReferenceBlockID   Identifier
-		Script             []byte
-		Arguments          [][]byte
-		GasLimit           uint64
-		ProposalKey        ProposalKey
-		Payer              Address
-		Authorizers        []Address
-		PayloadSignatures  []byte
-		EnvelopeSignatures []byte
+		Payload            interface{}
+		PayloadSignatures  interface{}
+		EnvelopeSignatures interface{}
 	}{
-		ReferenceBlockID:   tb.ReferenceBlockID,
-		Script:             tb.Script,
-		Arguments:          tb.Arguments,
-		GasLimit:           tb.GasLimit,
-		ProposalKey:        tb.ProposalKey,
-		Payer:              tb.Payer,
-		Authorizers:        tb.Authorizers,
-		PayloadSignatures:  signaturesList(tb.PayloadSignatures).Fingerprint(),
-		EnvelopeSignatures: signaturesList(tb.EnvelopeSignatures).Fingerprint(),
+		Payload:            tb.payloadCanonicalForm(),
+		PayloadSignatures:  signaturesList(tb.PayloadSignatures).canonicalForm(),
+		EnvelopeSignatures: signaturesList(tb.EnvelopeSignatures).canonicalForm(),
 	})
 }
 
@@ -429,10 +417,6 @@ func compareSignatures(signatures []TransactionSignature) func(i, j int) bool {
 }
 
 type signaturesList []TransactionSignature
-
-func (s signaturesList) Fingerprint() []byte {
-	return fingerprint.Fingerprint(s.canonicalForm())
-}
 
 func (s signaturesList) canonicalForm() interface{} {
 	signatures := make([]interface{}, len(s))
