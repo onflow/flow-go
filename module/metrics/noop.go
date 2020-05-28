@@ -5,6 +5,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
 )
 
 type NoopCollector struct{}
@@ -13,6 +14,8 @@ func NewNoopCollector() *NoopCollector {
 	nc := &NoopCollector{}
 	return nc
 }
+
+var _ module.ExecutionMetrics = &NoopCollector{}
 
 func (nc *NoopCollector) NetworkMessageSent(sizeBytes int, topic string)            {}
 func (nc *NoopCollector) NetworkMessageReceived(sizeBytes int, topic string)        {}
@@ -84,3 +87,5 @@ func (nc *NoopCollector) ReadValuesNumber(number uint64)                        
 func (nc *NoopCollector) ReadValuesSize(byte uint64)                                {}
 func (nc *NoopCollector) ReadDuration(duration time.Duration)                       {}
 func (nc *NoopCollector) ReadDurationPerItem(duration time.Duration)                {}
+func (nc *NoopCollector) ExecutionCollectionRequestSent()                           {}
+func (nc *NoopCollector) ExecutionCollectionRequestRetried()                        {}

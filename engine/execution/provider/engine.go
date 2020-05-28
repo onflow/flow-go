@@ -111,7 +111,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 		var err error
 		switch v := event.(type) {
 		case *messages.ChunkDataRequest:
-			err = e.onChunkDataPackRequest(ctx, originID, v)
+			err = e.onChunkDataRequest(ctx, originID, v)
 		default:
 			err = errors.Errorf("invalid event type (%T)", event)
 		}
@@ -122,10 +122,10 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-// onChunkDataPackRequest receives a request for the chunk data pack associated with chunkID from the
+// onChunkDataRequest receives a request for the chunk data pack associated with chunkID from the
 // requester `originID`. If such a chunk data pack is available in the execution state, it is sent to the
 // requester.
-func (e *Engine) onChunkDataPackRequest(
+func (e *Engine) onChunkDataRequest(
 	ctx context.Context,
 	originID flow.Identifier,
 	req *messages.ChunkDataRequest,

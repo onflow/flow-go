@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
@@ -390,6 +391,10 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			containerPort := "9000/tcp"
 
 			nodeContainer.bindPort(hostPort, containerPort)
+
+			// set a low timeout so that all nodes agree on the current view more quickly
+			nodeContainer.addFlag("hotstuff-timeout", time.Second.String())
+			nodeContainer.addFlag("hotstuff-min-timeout", time.Second.String())
 
 			nodeContainer.addFlag("ingress-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 			nodeContainer.Ports[ColNodeAPIPort] = hostPort
