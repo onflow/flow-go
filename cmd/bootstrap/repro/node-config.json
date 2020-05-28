@@ -1,0 +1,527 @@
+[
+  {
+    "Role": "collection",
+    "Address": "collection-001.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-002.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-003.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-004.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-005.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-006.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-007.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-008.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-009.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-010.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-011.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-012.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-013.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-014.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-015.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-016.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-017.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-018.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-019.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-020.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-021.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-022.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-023.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-024.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-025.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-026.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-027.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-028.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-029.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-030.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-031.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-032.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-033.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-034.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-035.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-036.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-037.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-038.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-039.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-040.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-001.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-002.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-003.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-004.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-005.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-006.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-007.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-008.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-009.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-010.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-011.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-012.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-013.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-014.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-015.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-016.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-017.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-018.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-019.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-020.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-021.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-022.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-023.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-024.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-025.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-026.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-027.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-028.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-029.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-030.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-031.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-032.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-033.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-034.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-035.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-036.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-037.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-038.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-039.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-040.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-041.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-042.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-043.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-044.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-045.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-046.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-047.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-048.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-049.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-050.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "execution",
+    "Address": "execution-001.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "execution",
+    "Address": "execution-002.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "execution",
+    "Address": "execution-003.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "execution",
+    "Address": "execution-004.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "verification",
+    "Address": "verification-001.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "verification",
+    "Address": "verification-002.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "verification",
+    "Address": "verification-003.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "verification",
+    "Address": "verification-004.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "verification",
+    "Address": "verification-005.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "verification",
+    "Address": "verification-006.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "verification",
+    "Address": "verification-007.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "verification",
+    "Address": "verification-008.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "verification",
+    "Address": "verification-009.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "verification",
+    "Address": "verification-010.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  },
+  {
+    "Role": "access",
+    "Address": "access-001.candidate1.nodes.onflow.org:3569",
+    "Stake": 1000
+  }
+]

@@ -1,0 +1,1 @@
+go run -tags relic ./cmd/bootstrap finalize --config ./cmd/bootstrap/repro/node-config.json --partner-dir ./cmd/bootstrap/example_files/partner-node-infos --partner-stakes ./cmd/bootstrap/example_files/partner-stakes.json -o ./genesis-infos-repro --collection-clusters 2 --fast-kg
