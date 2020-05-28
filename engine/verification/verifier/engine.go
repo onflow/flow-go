@@ -18,7 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-// Engine (verifier engine) verifies chunks, generates result approvals and raises challenges.
+// Engine (verifier engine) verifies chunks, generates result approvals or raises challenges.
 // as input it accepts verifiable chunks (chunk + all data needed) and perform verification by
 // constructing a partial trie, executing transactions and check the final state commitment and
 // other chunk meta data (e.g. tx count)

@@ -16,7 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
-	"github.com/dapperlabs/flow-go/engine/verification/test"
+	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	chmodel "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -107,7 +107,7 @@ func (suite *LightIngestTestSuite) SetupTest() {
 	suite.ingestedCollectionIDs = &mempool.Identifiers{}
 	suite.assigner = &module.ChunkAssigner{}
 
-	completeER := test.CompleteExecutionResultFixture(suite.T(), 1)
+	completeER := utils.CompleteExecutionResultFixture(suite.T(), 1)
 	suite.collection = completeER.Collections[0]
 	suite.block = completeER.Block
 	suite.receipt = completeER.Receipt
