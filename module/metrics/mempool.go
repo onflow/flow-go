@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -14,7 +13,6 @@ import (
 type EntriesFunc func() uint
 
 type MempoolCollector struct {
-	sync.RWMutex
 	unit         *engine.Unit
 	entries      *prometheus.GaugeVec
 	interval     time.Duration
@@ -47,8 +45,8 @@ func (mc *MempoolCollector) MempoolEntries(resource string, entries uint) {
 
 // Register registers entriesFunc for a resource
 func (mc *MempoolCollector) Register(resource string, entriesFunc EntriesFunc) error {
-	mc.Lock()
-	defer mc.Unlock()
+	mc.unit.Lock()
+	defer mc.unit.Unlock()
 
 	if _, ok := mc.entriesFuncs[resource]; ok {
 		return fmt.Errorf("cannot register resource, already exists: %s", resource)
@@ -72,9 +70,6 @@ func (mc *MempoolCollector) Done() <-chan struct{} {
 // gaugeEntries iterates over the registered entries functions
 // and calls MempoolEntries on them to capture the size of registered mempools
 func (mc *MempoolCollector) gaugeEntries() {
-	mc.RLock()
-	defer mc.RUnlock()
-
 	for r, f := range mc.entriesFuncs {
 		mc.MempoolEntries(r, f())
 	}
