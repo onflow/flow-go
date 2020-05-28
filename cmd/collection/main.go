@@ -58,8 +58,6 @@ func main() {
 	var (
 		txLimit                                uint
 		maxCollectionSize                      uint
-		parseTxScripts                         bool
-		ingressExpiryBuffer                    uint
 		builderExpiryBuffer                    uint
 		hotstuffTimeout                        time.Duration
 		hotstuffMinTimeout                     time.Duration
@@ -67,7 +65,9 @@ func main() {
 		hotstuffTimeoutDecreaseFactor          float64
 		hotstuffTimeoutVoteAggregationFraction float64
 
-		ingressConf     ingress.Config
+		ingestConf  ingest.Config
+		ingressConf ingress.Config
+
 		pool            mempool.Transactions
 		transactions    *storagekv.Transactions
 		colHeaders      *storagekv.Headers
@@ -96,11 +96,14 @@ func main() {
 	cmd.FlowNode(flow.RoleCollection.String()).
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&txLimit, "tx-limit", 50000, "maximum number of transactions in the memory pool")
-			flags.BoolVar(&parseTxScripts, "ingress-parse-scripts", true, "whether we check that inbound transactions are parse-able")
-			flags.UintVar(&ingressExpiryBuffer, "ingress-expiry-buffer", 30, "expiry buffer for inbound transactions")
-			flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", 15, "expiry buffer for transactions in proposed collections")
-			flags.UintVar(&maxCollectionSize, "max-collection-size", 100, "maximum number of transactions in proposed collections")
 			flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000", "the address the ingress server listens on")
+			flags.Uint64Var(&ingestConf.MaxGasLimit, "ingest-max-gas-limit", flow.DefaultMaxGasLimit, "maximum per-transaction gas limit")
+			flags.BoolVar(&ingestConf.CheckScriptsParse, "ingest-check-scripts-parse", true, "whether we check that inbound transactions are parse-able")
+			flags.BoolVar(&ingestConf.AllowUnknownReference, "ingest-allow-unknown-reference", true, "whether we ingest transactions referencing an unknown block")
+			flags.UintVar(&ingestConf.ExpiryBuffer, "ingest-expiry-buffer", 30, "expiry buffer for inbound transactions")
+			flags.UintVar(&ingestConf.PropagationRedundancy, "ingest-tx-propagation-redundancy", 2, "how many additional cluster members we propagate transactions to")
+			flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", 15, "expiry buffer for transactions in proposed collections")
+			flags.UintVar(&maxCollectionSize, "builder-max-collection-size", 100, "maximum number of transactions in proposed collections")
 			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second, "the initial timeout for the hotstuff pacemaker")
 			flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", proposalTimeout, "the lower timeout bound for the hotstuff pacemaker")
 			flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor", timeout.DefaultConfig.TimeoutIncrease, "multiplicative increase of timeout value in case of time out event")
@@ -286,8 +289,7 @@ func main() {
 				colMetrics,
 				node.Me,
 				pool,
-				ingressExpiryBuffer,
-				parseTxScripts,
+				ingestConf,
 			)
 			return ing, err
 		}).

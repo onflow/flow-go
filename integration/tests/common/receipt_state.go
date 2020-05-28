@@ -65,7 +65,7 @@ func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *
 	*flow.ExecutionReceipt) {
 
 	// get the state commitment for the highest finalized block
-	initialFinalizedSC := flow.GenesisStateCommitment
+	initialFinalizedSC := flow.StateCommitment{}
 	b1, ok := bs.HighestFinalized()
 	if ok {
 		r1 := rs.WaitForReceiptFromAny(t, b1.Header.ID())

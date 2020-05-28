@@ -21,8 +21,9 @@ import (
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/integration/testnet"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 const (
@@ -77,7 +78,7 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 	flowClient, err := client.New(fmt.Sprintf(":%s", gs.net.AccessPorts[testnet.AccessNodeAPIPort]), grpc.WithInsecure())
 	require.NoError(gs.T(), err, "could not get client")
 
-	gs.rootAcctAddr, gs.rootAcctKey, gs.rootSigner = RootAccountWithKey(flowClient, flow.RootAccountPrivateKeyHexNew)
+	gs.rootAcctAddr, gs.rootAcctKey, gs.rootSigner = RootAccountWithKey(flowClient, unittest.ServiceAccountPrivateKeyHex)
 
 	// wait for first finalized block, called blockA
 	// blockA := gs.BlockState.WaitForFirstFinalized(gs.T())
@@ -425,7 +426,8 @@ func RootAccountWithKey(flowClient *client.Client, key string) (flowsdk.Address,
 
 	accountKey := acc.Keys[0]
 
-	signer := crypto.NewInMemorySigner(privateKey, accountKey.HashAlgo)
+	hasher, err := hash.NewHasher(unittest.ServiceAccountPrivateKey.HashAlgo)
+	signer := crypto.NewInMemorySigner(unittest.ServiceAccountPrivateKey, crypto.HashAlgorithm(unittest.ServiceAccountPrivateKey.HashAlgo))
 
 	return addr, accountKey, signer
 }

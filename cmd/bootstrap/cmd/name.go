@@ -8,6 +8,8 @@ import (
 
 // shhh ;)
 var names = []string{
+	"", // blanks to buffer single-node gen
+	"",
 	"Alex Hentschel",
 	"Andrew Burian",
 	"Bastian Muller",
@@ -40,6 +42,10 @@ func getNameID() (flow.Identifier, bool) {
 
 	name := names[0]
 	names = names[1:]
+
+	if name == "" {
+		return flow.Identifier{0}, false
+	}
 
 	offset := len(name)
 	id := make([]byte, 32)

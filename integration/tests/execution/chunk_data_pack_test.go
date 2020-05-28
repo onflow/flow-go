@@ -34,7 +34,7 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 	erExe1BlockA := gs.ReceiptState.WaitForReceiptFrom(gs.T(), blockA.Header.ID(), gs.exe1ID)
 	gs.T().Logf("got erExe1BlockA with SC %x", erExe1BlockA.ExecutionResult.FinalStateCommit)
 
-	// assert there were no ChunkDataPackRequests from the verification node yet
+	// assert there were no ChunkDataRequests from the verification node yet
 	require.Equal(gs.T(), 0, gs.MsgState.LenFrom(gs.verID),
 		"expected no ChunkDataRequest to be sent before a transaction existed")
 
@@ -63,7 +63,8 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 
 	// send a ChunkDataRequest from Ghost node
 	err = gs.Ghost().Send(context.Background(), engine.ExecutionReceiptProvider,
-		&messages.ChunkDataRequest{ChunkID: chunkID, Nonce: rand.Uint64()}, []flow.Identifier{gs.exe1ID}...)
+		&messages.ChunkDataRequest{ChunkID: chunkID, Nonce: rand.Uint64()},
+		[]flow.Identifier{gs.exe1ID}...)
 	require.NoError(gs.T(), err)
 
 	// wait for ChunkDataResponse

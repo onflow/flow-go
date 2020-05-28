@@ -76,9 +76,9 @@ func decode(env Envelope) (interface{}, error) {
 	case CodeExecutionStateDelta:
 		v = &messages.ExecutionStateDelta{}
 
-	case CodeChunkDataPackRequest:
+	case CodeChunkDataRequest:
 		v = &messages.ChunkDataRequest{}
-	case CodeChunkDataPackResponse:
+	case CodeChunkDataResponse:
 		v = &messages.ChunkDataResponse{}
 
 	case CodeResultApproval:

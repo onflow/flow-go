@@ -2,7 +2,6 @@ package testnet
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -496,19 +495,9 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, fmt.Errorf("failed to run DKG: %w", err)
 	}
 
-	// generate the root account
-	hardcoded, err := hex.DecodeString(flow.ServiceAccountPrivateKeyHex)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	account, err := flow.DecodeAccountPrivateKey(hardcoded)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	// generate the initial execution state
-	commit, err := run.GenerateExecutionState(filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState), account)
+	dbDir := filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState)
+	commit, err := run.GenerateExecutionState(dbDir, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -526,7 +515,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 
 	// write common genesis bootstrap files
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathAccount0Priv), account)
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathServiceAccountPublicKey), unittest.ServiceAccountPublicKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -557,10 +546,10 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	for i, sk := range dkg.PrivKeyShares {
 		nodeID := consensusNodes[i].NodeID
 		encodableSk := bootstrap.EncodableRandomBeaconPrivKey{sk}
-		privParticpant := bootstrap.DKGParticipantPriv {
-			NodeID              :nodeID,
-			RandomBeaconPrivKey :encodableSk,
-			GroupIndex          :i,
+		privParticpant := bootstrap.DKGParticipantPriv{
+			NodeID:              nodeID,
+			RandomBeaconPrivKey: encodableSk,
+			GroupIndex:          i,
 		}
 		path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID)
 		err = writeJSON(filepath.Join(bootstrapDir, path), privParticpant)

@@ -17,7 +17,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
@@ -598,6 +597,9 @@ func (e *Engine) submitCollectionRequest(timer **time.Timer, collID flow.Identif
 
 	if retry > 0 {
 		e.log.Info().Hex("collection_id", collID[:]).Uint("retry", retry).Msg("retrying request for collection")
+		e.metrics.ExecutionCollectionRequestRetried()
+	} else {
+		e.metrics.ExecutionCollectionRequestSent()
 	}
 
 	err := e.collectionConduit.Submit(
@@ -688,16 +690,20 @@ func (e *Engine) ExecuteScriptAtBlockID(ctx context.Context, script []byte, bloc
 	return e.computationManager.ExecuteScript(script, block, blockView)
 }
 
-func (e *Engine) GetAccount(ctx context.Context, address flow.Address, blockID flow.Identifier) (*flow.Account, error) {
+func (e *Engine) GetAccount(ctx context.Context, addr flow.Address, blockID flow.Identifier) (*flow.Account, error) {
 	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
 	}
 
+	block, err := e.state.AtBlockID(blockID).Head()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get block (%s): %w", blockID, err)
+	}
+
 	blockView := e.execState.NewView(stateCommit)
 
-	ledgerAccess := virtualmachine.LedgerDAL{Ledger: blockView}
-	return ledgerAccess.GetAccount(address), nil
+	return e.computationManager.GetAccount(addr, block, blockView)
 }
 
 func (e *Engine) handleComputationResult(
@@ -767,7 +773,7 @@ func (e *Engine) saveExecutionResults(
 		chunk := generateChunk(i, startState, endState)
 
 		// chunkDataPack
-		allRegisters := view.RegisterTouches()
+		allRegisters := view.AllRegisters()
 
 		values, proofs, err := e.execState.GetRegistersWithProofs(childCtx, chunk.StartState, allRegisters)
 		if err != nil {
