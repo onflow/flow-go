@@ -8,7 +8,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/verification"
-	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -19,7 +18,7 @@ import (
 func TestPendingCollectionLRUEject(t *testing.T) {
 	var total uint = 4
 	// creates a mempool with capacity one less than `total`
-	p, err := NewPendingCollections(total-1, metrics.NewNoopCollector())
+	p, err := NewPendingCollections(total - 1)
 	require.Nil(t, err)
 
 	// generates `total` collections and adds them to the mempool

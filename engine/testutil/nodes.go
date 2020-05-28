@@ -347,7 +347,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.PendingCollections == nil {
-		node.PendingCollections, err = stdmap.NewPendingCollections(1000, node.Metrics)
+		node.PendingCollections, err = stdmap.NewPendingCollections(1000)
 		require.Nil(t, err)
 	}
 

@@ -100,7 +100,7 @@ func main() {
 		Module("authenticated collections mempool", func(node *cmd.FlowNodeBuilder) error {
 			authCollections, err = stdmap.NewCollections(collectionLimit)
 			if err != nil {
-				return fmt.Errorf("could not create collections mempool: %w", err)
+				return err
 			}
 
 			// registers size method of backend for metrics
@@ -113,7 +113,16 @@ func main() {
 		}).
 		//Module("pending collections mempool", func(node *cmd.FlowNodeBuilder) error {
 		//	pendingCollections, err = stdmap.NewPendingCollections(collectionLimit)
-		//	return err
+		//	if err != nil{
+		//		return err
+		//	}
+		//
+		//	// registers size method of backend for metrics
+		//	err = node.Metrics.Mempool.Register(metrics.ResourcePendingCollection, pendingCollections.Size)
+		//	if err != nil {
+		//		return fmt.Errorf("could not register backend metric: %w", err)
+		//	}
+		//	return nil
 		//}).
 		//Module("collection trackers mempool", func(node *cmd.FlowNodeBuilder) error {
 		//	collectionTrackers, err = stdmap.NewCollectionTrackers(collectionLimit)
@@ -122,7 +131,7 @@ func main() {
 		Module("chunk data pack mempool", func(node *cmd.FlowNodeBuilder) error {
 			chunkDataPacks, err = stdmap.NewChunkDataPacks(chunkLimit)
 			if err != nil {
-				return fmt.Errorf("could not create chunk data packs mempool: %w", err)
+				return err
 			}
 
 			// registers size method of backend for metrics
@@ -136,7 +145,7 @@ func main() {
 		Module("chunk data pack tracker mempool", func(node *cmd.FlowNodeBuilder) error {
 			chunkDataPackTracker, err = stdmap.NewChunkDataPackTrackers(chunkLimit)
 			if err != nil {
-				return fmt.Errorf("could not create chunk data pack trackers mempool: %w", err)
+				return err
 			}
 
 			// registers size method of backend for metrics

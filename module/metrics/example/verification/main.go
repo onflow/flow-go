@@ -46,7 +46,7 @@ func main() {
 			panic(err)
 		}
 
-		pendingCollections, err := stdmap.NewPendingCollections(100, mempoolCollector)
+		pendingCollections, err := stdmap.NewPendingCollections(100)
 		if err != nil {
 			panic(err)
 		}
