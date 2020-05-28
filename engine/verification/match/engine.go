@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -26,22 +27,22 @@ type Engine struct {
 	unit          *engine.Unit
 	log           zerolog.Logger
 	me            module.Local
-	results       module.PendingResults // used to store all the execution results along with their senders
-	verifier      network.Engine        // the verifier engine
-	assigner      module.ChunkAssigner  // used to determine chunks this node needs to verify
-	state         protocol.State        // used to verify the request origin
-	chunks        *Chunks               // used to store all the chunks that assigned to me
-	con           network.Conduit       // used to send the chunk data request
-	headers       storage.Headers       // used to fetch the block header when chunk data is ready to be verified
-	retryInterval time.Duration         // determines time in milliseconds for retrying chunk data requests
-	maxAttempt    int                   // max time of retries to fetch the chunk data pack for a chunk
+	results       mempool.PendingResults // used to store all the execution results along with their senders
+	verifier      network.Engine         // the verifier engine
+	assigner      module.ChunkAssigner   // used to determine chunks this node needs to verify
+	state         protocol.State         // used to verify the request origin
+	chunks        *Chunks                // used to store all the chunks that assigned to me
+	con           network.Conduit        // used to send the chunk data request
+	headers       storage.Headers        // used to fetch the block header when chunk data is ready to be verified
+	retryInterval time.Duration          // determines time in milliseconds for retrying chunk data requests
+	maxAttempt    int                    // max time of retries to fetch the chunk data pack for a chunk
 }
 
 func New(
 	log zerolog.Logger,
 	net module.Network,
 	me module.Local,
-	results module.PendingResults,
+	results mempool.PendingResults,
 	verifier network.Engine,
 	assigner module.ChunkAssigner,
 	state protocol.State,
@@ -181,9 +182,8 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, r *flow.Executi
 	return nil
 }
 
-// myUningestedChunks returns the list of chunks in the chunk list that this verifier node
-// is assigned to, and are not ingested yet. A chunk is ingested once a verifiable chunk is
-// formed out of it and is passed to verify engine
+// myChunkAssignments returns the list of chunks in the chunk list that this verification node
+// is assigned to.
 func (e *Engine) myChunkAssignments(result *flow.ExecutionResult) (flow.ChunkList, error) {
 	verifiers, err := e.state.Final().
 		Identities(filter.HasRole(flow.RoleVerification))
@@ -288,7 +288,7 @@ func (e *Engine) onTimer() {
 
 }
 
-// request the chunk data pack from the execution node.
+// requestChunkDataPack request the chunk data pack from the execution node.
 // the chunk data pack includes the collection and statecommitments that
 // needed to make a VerifiableChunk
 func (e *Engine) requestChunkDataPack(c *ChunkStatus) error {
@@ -360,7 +360,8 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	}
 
 	// creates a verifiable chunk for assigned chunk
-	vchunk := &verification.VerifiableChunk{
+	// TODO: replace with VerifiableChunk
+	vchunk := &verification.VerifiableChunkData{
 		Chunk:         status.Chunk,
 		Header:        header,
 		Result:        result.ExecutionResult,

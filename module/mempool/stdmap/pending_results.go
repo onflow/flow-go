@@ -1,4 +1,4 @@
-package results
+package stdmap
 
 import (
 	"sync"

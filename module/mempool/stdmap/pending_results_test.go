@@ -1,4 +1,4 @@
-package results_test
+package stdmap_test
 
 import (
 	"sync"
@@ -8,11 +8,11 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/results"
+	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 )
 
 // check the implementation
-var _ module.PendingResults = (*results.PendingResults)(nil)
+var _ module.PendingResults = (*stdmap.PendingResults)(nil)
 
 func TestAddByID(t *testing.T) {
 	results := results.NewPendingResults()
