@@ -10,36 +10,6 @@ type VerificationMetrics struct {
 	mock.Mock
 }
 
-// OnAuthenticatedCollectionsUpdated provides a mock function with given fields: size
-func (_m *VerificationMetrics) OnAuthenticatedCollectionsUpdated(size uint) {
-	_m.Called(size)
-}
-
-// OnAuthenticatedReceiptsUpdated provides a mock function with given fields: size
-func (_m *VerificationMetrics) OnAuthenticatedReceiptsUpdated(size uint) {
-	_m.Called(size)
-}
-
-// OnChunkDataAdded provides a mock function with given fields: chunkID, size
-func (_m *VerificationMetrics) OnChunkDataAdded(chunkID flow.Identifier, size float64) {
-	_m.Called(chunkID, size)
-}
-
-// OnChunkDataPacksUpdated provides a mock function with given fields: size
-func (_m *VerificationMetrics) OnChunkDataPacksUpdated(size uint) {
-	_m.Called(size)
-}
-
-// OnChunkDataRemoved provides a mock function with given fields: chunkID, size
-func (_m *VerificationMetrics) OnChunkDataRemoved(chunkID flow.Identifier, size float64) {
-	_m.Called(chunkID, size)
-}
-
-// OnChunkTrackersUpdated provides a mock function with given fields: size
-func (_m *VerificationMetrics) OnChunkTrackersUpdated(size uint) {
-	_m.Called(size)
-}
-
 // OnChunkVerificationFinished provides a mock function with given fields: chunkID
 func (_m *VerificationMetrics) OnChunkVerificationFinished(chunkID flow.Identifier) {
 	_m.Called(chunkID)
