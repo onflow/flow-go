@@ -26,7 +26,7 @@ func main() {
 		}
 
 		verificationCollector := metrics.NewVerificationCollector(tracer, prometheus.DefaultRegisterer, logger)
-		mempoolCollector := metrics.NewMempoolCollector(5*time.Second, 0)
+		mempoolCollector := metrics.NewMempoolCollector(5 * time.Second)
 
 		// starts periodic launch of mempoolCollector
 		<-mempoolCollector.Ready()

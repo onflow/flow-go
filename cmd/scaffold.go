@@ -264,7 +264,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 	fnb.MetricsRegisterer = prometheus.DefaultRegisterer
 	fnb.Tracer = tracer
 
-	mempools := metrics.NewMempoolCollector(5*time.Second, 0)
+	mempools := metrics.NewMempoolCollector(5 * time.Second)
 
 	fnb.Metrics = Metrics{
 		Network:    metrics.NewNetworkCollector(),

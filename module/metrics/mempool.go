@@ -20,12 +20,12 @@ type MempoolCollector struct {
 	entriesFuncs map[string]EntriesFunc // keeps map of registered EntriesFunc of mempools
 }
 
-func NewMempoolCollector(interval time.Duration, delay time.Duration) *MempoolCollector {
+func NewMempoolCollector(interval time.Duration) *MempoolCollector {
 
 	mc := &MempoolCollector{
 		unit:         engine.NewUnit(),
 		interval:     interval,
-		delay:        delay,
+		delay:        0,
 		entriesFuncs: make(map[string]EntriesFunc),
 
 		entries: promauto.NewGaugeVec(prometheus.GaugeOpts{

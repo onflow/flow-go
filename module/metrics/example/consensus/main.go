@@ -32,7 +32,7 @@ func main() {
 			ConsensusCollector:  metrics.NewConsensusCollector(tracer),
 			NetworkCollector:    metrics.NewNetworkCollector(),
 			ComplianceCollector: metrics.NewComplianceCollector(),
-			MempoolCollector:    metrics.NewMempoolCollector(5*time.Second, 0),
+			MempoolCollector:    metrics.NewMempoolCollector(5 * time.Second),
 		}
 
 		for i := 0; i < 100; i++ {
