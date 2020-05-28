@@ -10,32 +10,40 @@ import (
 )
 
 type Cleaner struct {
-	log   zerolog.Logger
-	db    *badger.DB
-	ratio float64
-	freq  int
-	calls int
+	log     zerolog.Logger
+	db      *badger.DB
+	enabled bool
+	ratio   float64
+	freq    int
+	calls   int
 }
 
-func NewCleaner(log zerolog.Logger, db *badger.DB) *Cleaner {
+// NewCleaner returns a cleaner that runs the badger value log garbage collection once every `frequency` calls
+// if a frequency of zero is passed in, we will not run the GC at all
+func NewCleaner(log zerolog.Logger, db *badger.DB, frequency int) *Cleaner {
 	// NOTE: we run garbage collection frequently at points in our business
 	// logic where we are likely to have a small breather in activity; it thus
 	// makes sense to run garbage collection often, with a smaller ratio, rather
 	// than running it rarely and having big rewrites at once
 	c := &Cleaner{
-		log:   log.With().Str("component", "cleaner").Logger(),
-		db:    db,
-		ratio: 0.2,
-		freq:  1000,
+		log:     log.With().Str("component", "cleaner").Logger(),
+		db:      db,
+		ratio:   0.2,
+		freq:    frequency,
+		enabled: frequency > 0, // Disable if passed in 0 as frequency
 	}
 	// we don't want the entire network to run GC at the same time, so
 	// distribute evenly over time
-	c.calls = rand.Intn(c.freq)
+	if c.enabled {
+		c.calls = rand.Intn(c.freq)
+	}
 	return c
 }
 
 func (c *Cleaner) RunGC() {
-
+	if !c.enabled {
+		return
+	}
 	// only actually run approximately every frequency number of calls
 	c.calls++
 	if c.calls < c.freq {

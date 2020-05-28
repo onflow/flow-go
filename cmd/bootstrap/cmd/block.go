@@ -6,16 +6,16 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func constructGenesisBlock(nodes []model.NodeInfo, dkg model.DKGData) *flow.Block {
-	identityList := generateIdentityList(nodes, dkg)
+func constructGenesisBlock(nodes []model.NodeInfo) *flow.Block {
+	identityList := generateIdentityList(nodes)
 	block := run.GenerateRootBlock(identityList)
 
-	writeJSON(model.FilenameGenesisBlock, block)
+	writeJSON(model.PathGenesisBlock, block)
 
 	return block
 }
 
-func generateIdentityList(nodes []model.NodeInfo, dkgData model.DKGData) flow.IdentityList {
+func generateIdentityList(nodes []model.NodeInfo) flow.IdentityList {
 
 	list := make([]*flow.Identity, 0, len(nodes))
 

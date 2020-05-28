@@ -41,18 +41,16 @@ func main() {
 		executionState     state.ExecutionState
 		triedir            string
 		collector          module.ExecutionMetrics
-		useMtrie           bool
 		mTrieCacheSize     uint32
 	)
 
-	cmd.FlowNode("execution").
+	cmd.FlowNode(flow.RoleExecution.String()).
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			homedir, _ := os.UserHomeDir()
 			datadir := filepath.Join(homedir, ".flow", "execution")
 
 			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
 			flags.StringVar(&triedir, "triedir", datadir, "directory to store the execution State")
-			flags.BoolVar(&useMtrie, "mtrie", false, "use experimental MTrie for Execution State")
 			flags.Uint32Var(&mTrieCacheSize, "mtrie-cache-size", 1000, "cache size for MTrie")
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
@@ -73,35 +71,33 @@ func main() {
 
 			return nil
 		}).
+		Module("execution metrics", func(node *cmd.FlowNodeBuilder) error {
+			collector = metrics.NewExecutionCollector(node.Tracer, node.MetricsRegisterer)
+			return nil
+		}).
 		// Trie storage is required to bootstrap, but also should be handled while shutting down
 		Module("ledger storage", func(node *cmd.FlowNodeBuilder) error {
-			if useMtrie {
-				ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), node.MetricsRegisterer)
-			} else {
-				ledgerStorage, err = ledger.NewTrieStorage(triedir)
-			}
+			ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), collector, node.MetricsRegisterer)
 
 			return err
 		}).
-		Module("execution metrics", func(node *cmd.FlowNodeBuilder) error {
-			collector = metrics.NewExecutionCollector(node.Tracer)
-			return nil
-		}).
 		GenesisHandler(func(node *cmd.FlowNodeBuilder, block *flow.Block) {
-			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage)
+			if node.GenesisAccountPublicKey == nil {
+				panic(fmt.Sprintf("error while bootstrapping execution state: no service account public key"))
+			}
+
+			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage, *node.GenesisAccountPublicKey, node.GenesisTokenSupply)
 			if err != nil {
 				panic(fmt.Sprintf("error while bootstrapping execution state: %s", err))
 			}
-			if !bytes.Equal(bootstrappedStateCommitment, flow.GenesisStateCommitment) {
-				panic("error while bootstrapping execution state - resulting state is different than precalculated!")
-			}
-			if !bytes.Equal(flow.GenesisStateCommitment, node.GenesisCommit) {
-				panic(fmt.Sprintf("genesis seal state commitment (%x) different from precalculated (%x)", node.GenesisCommit, flow.GenesisStateCommitment))
+
+			if !bytes.Equal(bootstrappedStateCommitment, node.GenesisCommit) {
+				panic(fmt.Sprintf("genesis seal state commitment (%x) different from precalculated (%x)", bootstrappedStateCommitment, node.GenesisCommit))
 			}
 
 			err = bootstrap.BootstrapExecutionDatabase(node.DB, bootstrappedStateCommitment, block.Header)
 			if err != nil {
-				panic(fmt.Sprintf("error while boostrapping execution state - cannot bootstrap database: %s", err))
+				panic(fmt.Sprintf("error while bootstrapping execution state - cannot bootstrap database: %s", err))
 			}
 		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -116,6 +112,7 @@ func main() {
 				ledgerStorage,
 				stateCommitments,
 				node.Storage.Blocks,
+				node.Storage.Collections,
 				chunkDataPacks,
 				executionResults,
 				node.DB,
@@ -168,6 +165,6 @@ func main() {
 		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, events, txResults)
 			return rpcEng, nil
-		}).Run(flow.RoleExecution.String())
+		}).Run()
 
 }

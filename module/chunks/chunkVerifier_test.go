@@ -14,6 +14,7 @@ import (
 	chModels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/chunks"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	mockStorage "github.com/dapperlabs/flow-go/storage/mock"
@@ -149,8 +150,10 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 
 	var verifiableChunk verification.VerifiableChunk
 
+	metricsCollector := &metrics.NoopCollector{}
+
 	unittest.RunWithTempDir(t, func(dbDir string) {
-		f, _ := ledger.NewTrieStorage(dbDir)
+		f, _ := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 		startState, _ := f.UpdateRegisters(ids, values, f.EmptyStateCommitment())
 		regTs, _ := f.GetRegisterTouches(ids, startState)
 
@@ -261,8 +264,8 @@ func (bc *blockContextMock) ExecuteScript(
 	return nil, nil
 }
 
-func (bc *blockContextMock) GetAccount(ledger virtualmachine.Ledger, address flow.Address) *flow.Account {
-	return nil
+func (bc *blockContextMock) GetAccount(_ virtualmachine.Ledger, _ flow.Address) (*flow.Account, error) {
+	return nil, nil
 }
 
 // virtualMachineMock is a mocked virtualMachine

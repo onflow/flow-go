@@ -2,6 +2,7 @@ package debug
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"runtime/pprof"
@@ -17,9 +18,10 @@ type AutoProfiler struct {
 	dir      string // where we store profiles
 	log      zerolog.Logger
 	interval time.Duration
+	duration time.Duration
 }
 
-func NewAutoProfiler(dir string, log zerolog.Logger) (*AutoProfiler, error) {
+func NewAutoProfiler(log zerolog.Logger, dir string, interval time.Duration, duration time.Duration) (*AutoProfiler, error) {
 
 	err := os.MkdirAll(dir, os.ModePerm)
 	if err != nil {
@@ -28,15 +30,17 @@ func NewAutoProfiler(dir string, log zerolog.Logger) (*AutoProfiler, error) {
 
 	p := &AutoProfiler{
 		unit:     engine.NewUnit(),
-		log:      log.With().Str("debug", "auto-profiler").Logger(),
+		log:      log.With().Str("component", "profiler").Logger(),
 		dir:      dir,
-		interval: time.Minute * 3,
+		interval: interval,
+		duration: duration,
 	}
 	return p, nil
 }
 
 func (p *AutoProfiler) Ready() <-chan struct{} {
-	p.unit.Launch(p.start)
+	delay := time.Duration(float64(p.interval) * rand.Float64())
+	p.unit.LaunchPeriodically(p.start, p.interval, delay)
 	return p.unit.Ready()
 }
 
@@ -45,27 +49,14 @@ func (p *AutoProfiler) Done() <-chan struct{} {
 }
 
 func (p *AutoProfiler) start() {
-
-	tick := time.NewTicker(p.interval)
-	defer tick.Stop()
-
-	for {
-		p.log.Info().Msg("starting profile trace")
-		// write pprof trace files
-		p.pprof("heap")
-		p.pprof("goroutine")
-		p.pprof("block")
-		p.pprof("mutex")
-		p.cpu()
-		p.log.Info().Msg("finished profile trace")
-
-		select {
-		case <-p.unit.Quit():
-			return
-		case <-tick.C:
-			continue
-		}
-	}
+	p.log.Info().Msg("starting profile trace")
+	// write pprof trace files
+	p.pprof("heap")
+	p.pprof("goroutine")
+	p.pprof("block")
+	p.pprof("mutex")
+	p.cpu()
+	p.log.Info().Msg("finished profile trace")
 }
 
 func (p *AutoProfiler) pprof(profile string) {
@@ -95,7 +86,7 @@ func (p *AutoProfiler) pprof(profile string) {
 func (p *AutoProfiler) cpu() {
 	path := filepath.Join(p.dir, fmt.Sprintf("cpu-%s", time.Now().Format(time.RFC3339)))
 	log := p.log.With().Str("file", path).Logger()
-	log.Debug().Msgf("capturing cpu profile")
+	log.Debug().Msg("capturing cpu profile")
 
 	f, err := os.Create(path)
 	if err != nil {
@@ -114,6 +105,11 @@ func (p *AutoProfiler) cpu() {
 		p.log.Error().Err(err).Msg("failed to start CPU profile")
 		return
 	}
-	time.Sleep(time.Second * 10)
-	pprof.StopCPUProfile()
+
+	defer pprof.StopCPUProfile()
+
+	select {
+	case <-time.After(p.duration):
+	case <-p.unit.Quit():
+	}
 }

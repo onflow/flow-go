@@ -26,12 +26,12 @@ const (
 	minRepTimeout          float64 = 100.0 // Milliseconds
 	voteTimeoutFraction    float64 = 0.5   // multiplicative factor
 	multiplicativeIncrease float64 = 1.5   // multiplicative factor
-	additiveDecrease       float64 = 50    // Milliseconds
+	multiplicativeDecrease float64 = 0.85  // multiplicative factor
 )
 
 // TestPaceMaker is a real pacemaker module with logging for view changes
 type TestPaceMaker struct {
-	*pacemaker.FlowPaceMaker
+	hotstuff.PaceMaker
 	t *testing.T
 }
 
@@ -40,29 +40,26 @@ func NewTestPaceMaker(t *testing.T, startView uint64, timeoutController *timeout
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &TestPaceMaker{
-		FlowPaceMaker: p,
-		t:             t,
-	}
+	return &TestPaceMaker{p, t}
 }
 
 func (p *TestPaceMaker) UpdateCurViewWithQC(qc *model.QuorumCertificate) (*model.NewViewEvent, bool) {
 	oldView := p.CurView()
-	newView, changed := p.FlowPaceMaker.UpdateCurViewWithQC(qc)
+	newView, changed := p.PaceMaker.UpdateCurViewWithQC(qc)
 	p.t.Logf("pacemaker.UpdateCurViewWithQC old view: %v, new view: %v\n", oldView, p.CurView())
 	return newView, changed
 }
 
 func (p *TestPaceMaker) UpdateCurViewWithBlock(block *model.Block, isLeaderForNextView bool) (*model.NewViewEvent, bool) {
 	oldView := p.CurView()
-	newView, changed := p.FlowPaceMaker.UpdateCurViewWithBlock(block, isLeaderForNextView)
+	newView, changed := p.PaceMaker.UpdateCurViewWithBlock(block, isLeaderForNextView)
 	p.t.Logf("pacemaker.UpdateCurViewWithBlock old view: %v, new view: %v\n", oldView, p.CurView())
 	return newView, changed
 }
 
 func (p *TestPaceMaker) OnTimeout() *model.NewViewEvent {
 	oldView := p.CurView()
-	newView := p.FlowPaceMaker.OnTimeout()
+	newView := p.PaceMaker.OnTimeout()
 	p.t.Logf("pacemaker.OnTimeout old view: %v, new view: %v\n", oldView, p.CurView())
 	return newView
 }
@@ -75,7 +72,8 @@ func initPaceMaker(t *testing.T, view uint64) hotstuff.PaceMaker {
 		time.Duration(minRepTimeout*1e6),
 		voteTimeoutFraction,
 		multiplicativeIncrease,
-		time.Duration(additiveDecrease*1e6))
+		multiplicativeDecrease,
+		0)
 	if err != nil {
 		t.Fail()
 	}
@@ -178,6 +176,7 @@ func (v *Voter) ProduceVoteIfVotable(block *model.Block, curView uint64) (*model
 // Forks mock allows to customize the Add QC and AddBlock function by specifying the addQC and addBlock callbacks
 type Forks struct {
 	mocks.Forks
+	// blocks stores all the blocks that have been added to the forks
 	blocks    map[flow.Identifier]*model.Block
 	finalized uint64
 	t         *testing.T
@@ -341,7 +340,7 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.persist.On("PutStarted", mock.Anything).Return(nil)
 	es.blockProducer = &BlockProducer{}
 	es.communicator = &mocks.Communicator{}
-	es.communicator.On("BroadcastProposal", mock.Anything).Return(nil)
+	es.communicator.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Return(nil)
 	es.communicator.On("SendVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	es.committee = NewCommittee()
 	es.voteAggregator = NewVoteAggregator(es.T())
@@ -519,12 +518,17 @@ func (es *EventHandlerSuite) TestInNewView_NotLeader_HasBlock_NoVote_IsNextLeade
 	es.voteAggregator.qcs[newviewblock.BlockID] = createQC(newviewblock)
 	// view change by this qc
 	es.endView++
-	// not leader in next view, viewchange
-	es.endView++
 
 	err := es.eventhandler.OnReceiveVote(es.vote)
 	require.NoError(es.T(), err)
-	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
+
+	lastCall := es.communicator.Calls[len(es.communicator.Calls)-1]
+	// the last call is BroadcastProposal
+	require.Equal(es.T(), "BroadcastProposalWithDelay", lastCall.Method)
+	header, ok := lastCall.Arguments[0].(*flow.Header)
+	require.True(es.T(), ok)
+	// it should broadcast a header as the same as endView
+	require.Equal(es.T(), es.endView, header.View)
 }
 
 // in the newview, I'm not the leader, and I have the cur block,
@@ -695,12 +699,18 @@ func (es *EventHandlerSuite) TestOnReceiveProposal_ForCurView_NoVote_IsNextLeade
 	es.endView++
 	// I'm the leader of cur view (7)
 	// I'm not the leader of next view (8), trigger view change
-	es.endView++
-	// I'm not the leader of cur view(8)
-	// no block for curView, over
 
 	err := es.eventhandler.OnReceiveProposal(proposal)
 	require.NoError(es.T(), err)
+
+	lastCall := es.communicator.Calls[len(es.communicator.Calls)-1]
+	// the last call is BroadcastProposal
+	require.Equal(es.T(), "BroadcastProposalWithDelay", lastCall.Method)
+	header, ok := lastCall.Arguments[0].(*flow.Header)
+	require.True(es.T(), ok)
+	// it should broadcast a header as the same as endView
+	require.Equal(es.T(), es.endView, header.View)
+
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
 }
 
@@ -736,29 +746,40 @@ func (es *EventHandlerSuite) Test100Timeout() {
 
 // a leader builds 100 blocks one after another
 func (es *EventHandlerSuite) TestLeaderBuild100Blocks() {
-	proposal := createProposal(es.initView, es.initView-1)
+	// I'm the leader for the first view
+	es.committee.leaders[es.initView] = struct{}{}
 
-	for i := 0; i < 100; i++ {
+	totalView := 100
+	for i := 0; i < totalView; i++ {
 		// I'm the leader for 100 views
-		es.committee.leaders[es.initView+uint64(i)] = struct{}{}
+		// I'm the next leader
+		es.committee.leaders[es.initView+uint64(i+1)] = struct{}{}
 		// I can build qc for all 100 views
 		proposal := createProposal(es.initView+uint64(i), es.initView+uint64(i)-1)
 		es.voteAggregator.qcs[proposal.Block.BlockID] = createQC(proposal.Block)
 		es.voter.votable[proposal.Block.BlockID] = struct{}{}
 		// should trigger 100 view change
 		es.endView++
+
+		err := es.eventhandler.OnReceiveProposal(proposal)
+		require.NoError(es.T(), err)
+		lastCall := es.communicator.Calls[len(es.communicator.Calls)-1]
+		require.Equal(es.T(), "BroadcastProposalWithDelay", lastCall.Method)
+		header, ok := lastCall.Arguments[0].(*flow.Header)
+		require.True(es.T(), ok)
+		require.Equal(es.T(), proposal.Block.View+1, header.View)
 	}
 
-	err := es.eventhandler.OnReceiveProposal(proposal)
-	require.NoError(es.T(), err)
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
-	require.Equal(es.T(), 100, len(es.forks.blocks))
+	require.Equal(es.T(), totalView, len(es.forks.blocks))
 }
 
 // a follower receives 100 blocks
 func (es *EventHandlerSuite) TestFollowerFollows100Blocks() {
 	for i := 0; i < 100; i++ {
+		// create each proposal as if they are created by some leader
 		proposal := createProposal(es.initView+uint64(i), es.initView+uint64(i)-1)
+		// as a follower, I receive these propsals
 		err := es.eventhandler.OnReceiveProposal(proposal)
 		require.NoError(es.T(), err)
 		es.endView++
@@ -770,7 +791,9 @@ func (es *EventHandlerSuite) TestFollowerFollows100Blocks() {
 // a follower receives 100 forks built on top of the same block
 func (es *EventHandlerSuite) TestFollowerReceives100Forks() {
 	for i := 0; i < 100; i++ {
+		// create each proposal as if they are created by some leader
 		proposal := createProposal(es.initView+uint64(i)+1, es.initView-1)
+		// as a follower, I receive these propsals
 		err := es.eventhandler.OnReceiveProposal(proposal)
 		require.NoError(es.T(), err)
 	}

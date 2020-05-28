@@ -40,7 +40,7 @@ func Test2TimeoutOutof7Instances(t *testing.T) {
 	participants := unittest.IdentityListFixture(numPass + numFail)
 	instances := make([]*Instance, 0, numPass+numFail)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 0.5, 1.5, 1*time.Second)
+	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 0.5, 1.5, 0.85, 0)
 	require.NoError(t, err)
 
 	// set up five instances that work fully
@@ -113,7 +113,7 @@ func Test1TimeoutOutof4Instances(t *testing.T) {
 	participants := unittest.IdentityListFixture(numPass + numFail)
 	instances := make([]*Instance, 0, numPass+numFail)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 0.5, 1.5, 1*time.Second)
+	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 0.5, 1.5, 0.85, 0)
 	require.NoError(t, err)
 
 	// set up three instances that work fully
@@ -185,7 +185,7 @@ func Test1TimeoutOutof5Instances(t *testing.T) {
 	participants := unittest.IdentityListFixture(numPass + numFail)
 	instances := make([]*Instance, 0, numPass+numFail)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 0.5, 1.5, 1*time.Second)
+	timeouts, err := timeout.NewConfig(pmTimeout, pmTimeout, 0.5, 1.5, 0.85, 0)
 	require.NoError(t, err)
 
 	// set up instances that work fully

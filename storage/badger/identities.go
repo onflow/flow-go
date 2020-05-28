@@ -9,6 +9,8 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
+const IdentitiesCacheSize = 500
+
 type Identities struct {
 	db    *badger.DB
 	cache *Cache
@@ -29,7 +31,7 @@ func NewIdentities(collector module.CacheMetrics, db *badger.DB) *Identities {
 	i := &Identities{
 		db: db,
 		cache: newCache(collector,
-			withLimit(100),
+			withLimit(IdentitiesCacheSize),
 			withStore(store),
 			withRetrieve(retrieve),
 			withResource(metrics.ResourceIdentity),

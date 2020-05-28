@@ -24,10 +24,12 @@ type BlockContext interface {
 
 	// ExecuteScript computes the result of a read-only script.
 	ExecuteScript(ledger Ledger, script []byte) (*ScriptResult, error)
+
+	// GetAccount reads an account from this block context.
+	GetAccount(ledger Ledger, addr flow.Address) (*flow.Account, error)
 }
 
 type blockContext struct {
-	LedgerDAL
 	vm     *virtualMachine
 	header *flow.Header
 	blocks storage.Blocks
@@ -46,12 +48,14 @@ func (bc *blockContext) newTransactionContext(
 
 	ctx := &TransactionContext{
 		logger:          bc.vm.logger,
+		bc:              bc,
 		astCache:        bc.vm.cache,
-		LedgerDAL:       LedgerDAL{ledger},
+		ledger:          NewLedgerDAL(ledger),
 		signingAccounts: signingAccounts,
 		tx:              tx,
 		header:          bc.header,
 		blocks:          bc.blocks,
+		gasLimit:        tx.GasLimit,
 	}
 
 	for _, option := range options {
@@ -63,11 +67,13 @@ func (bc *blockContext) newTransactionContext(
 
 func (bc *blockContext) newScriptContext(ledger Ledger) *TransactionContext {
 	return &TransactionContext{
-		logger:    bc.vm.logger,
-		astCache:  bc.vm.cache,
-		LedgerDAL: LedgerDAL{ledger},
-		header:    bc.header,
-		blocks:    bc.blocks,
+		logger:   bc.vm.logger,
+		bc:       bc,
+		astCache: bc.vm.cache,
+		ledger:   NewLedgerDAL(ledger),
+		header:   bc.header,
+		blocks:   bc.blocks,
+		gasLimit: scriptGasLimit,
 	}
 }
 
@@ -87,26 +93,40 @@ func (bc *blockContext) ExecuteTransaction(
 
 	ctx := bc.newTransactionContext(ledger, tx, options...)
 
-	flowErr := ctx.verifySignatures()
-	if flowErr != nil {
-		return &TransactionResult{
-			TransactionID: txID,
-			Error:         flowErr,
-		}, nil
+	if !ctx.skipVerification {
+		flowErr := ctx.verifySignatures()
+		if flowErr != nil {
+			return &TransactionResult{
+				TransactionID: txID,
+				Error:         flowErr,
+			}, nil
+		}
+
+		flowErr, err := ctx.checkAndIncrementSequenceNumber()
+		if err != nil {
+			return nil, err
+		}
+		if flowErr != nil {
+			return &TransactionResult{
+				TransactionID: txID,
+				Error:         flowErr,
+			}, nil
+		}
+
+		flowErr, err = ctx.deductTransactionFee(tx.Payer)
+		if err != nil {
+			return nil, err
+		}
+
+		if flowErr != nil {
+			return &TransactionResult{
+				TransactionID: txID,
+				Error:         flowErr,
+			}, nil
+		}
 	}
 
-	flowErr, err := ctx.checkAndIncrementSequenceNumber()
-	if err != nil {
-		return nil, err
-	}
-	if flowErr != nil {
-		return &TransactionResult{
-			TransactionID: txID,
-			Error:         flowErr,
-		}, nil
-	}
-
-	err = bc.vm.executeTransaction(tx.Script, tx.Arguments, ctx, location)
+	err := bc.vm.executeTransaction(tx.Script, tx.Arguments, ctx, location)
 	if err != nil {
 		possibleRuntimeError := runtime.Error{}
 		if errors.As(err, &possibleRuntimeError) {
@@ -129,7 +149,7 @@ func (bc *blockContext) ExecuteTransaction(
 		Error:         nil,
 		Events:        ctx.Events(),
 		Logs:          ctx.Logs(),
-		GasUsed:       ctx.gasUsed,
+		GasUsed:       0, // TODO: record gas usage
 	}, nil
 }
 
@@ -162,6 +182,25 @@ func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte) (*ScriptResu
 		Logs:     ctx.Logs(),
 		Events:   ctx.events,
 	}, nil
+}
+
+func (bc *blockContext) GetAccount(ledger Ledger, addr flow.Address) (*flow.Account, error) {
+	ledgerAccess := NewLedgerDAL(ledger)
+	acct := ledgerAccess.GetAccount(addr)
+	if acct == nil {
+		return nil, nil
+	}
+
+	result, err := bc.ExecuteScript(ledger, DefaultTokenBalanceScript(addr))
+	if err != nil {
+		return nil, err
+	}
+
+	if result.Error == nil {
+		acct.Balance = result.Value.ToGoValue().(uint64)
+	}
+
+	return acct, nil
 }
 
 // ConvertEvents creates flow.Events from runtime.events

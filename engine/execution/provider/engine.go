@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"math/rand"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -109,8 +110,8 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 		ctx := context.Background()
 		var err error
 		switch v := event.(type) {
-		case *messages.ChunkDataPackRequest:
-			err = e.onChunkDataPackRequest(ctx, originID, v)
+		case *messages.ChunkDataRequest:
+			err = e.onChunkDataRequest(ctx, originID, v)
 		default:
 			err = errors.Errorf("invalid event type (%T)", event)
 		}
@@ -121,13 +122,13 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-// onChunkDataPackRequest receives a request for the chunk data pack associated with chunkID from the
+// onChunkDataRequest receives a request for the chunk data pack associated with chunkID from the
 // requester `originID`. If such a chunk data pack is available in the execution state, it is sent to the
 // requester.
-func (e *Engine) onChunkDataPackRequest(
+func (e *Engine) onChunkDataRequest(
 	ctx context.Context,
 	originID flow.Identifier,
-	req *messages.ChunkDataPackRequest,
+	req *messages.ChunkDataRequest,
 ) error {
 
 	// extracts list of verifier nodes id
@@ -155,8 +156,15 @@ func (e *Engine) onChunkDataPackRequest(
 		return fmt.Errorf("could not retrieve chunk ID (%s): %w", origin, err)
 	}
 
-	response := &messages.ChunkDataPackResponse{
-		Data: *cdp,
+	collection, err := e.execState.GetCollection(cdp.CollectionID)
+	if err != nil {
+		return fmt.Errorf("cannot retrieve collection %x for chunk %x: %w", cdp.CollectionID, cdp.ChunkID, err)
+	}
+
+	response := &messages.ChunkDataResponse{
+		ChunkDataPack: *cdp,
+		Nonce:         rand.Uint64(),
+		Collection:    *collection,
 	}
 
 	log.Debug().Msg("sending chunk data pack response")

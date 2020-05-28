@@ -2,8 +2,6 @@ package test
 
 import (
 	"context"
-	"encoding/hex"
-	"fmt"
 	"testing"
 
 	"github.com/onflow/cadence/runtime"
@@ -15,81 +13,30 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
+	"github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-// GetTxBodyDeployCounterContract returns transaction body for deploying counter smart contract
-func GetTxBodyDeployCounterContract() *flow.TransactionBody {
-	encoded := hex.EncodeToString([]byte(`
-			access(all) contract Container {
-				access(all) resource Counter {
-					pub var count: Int
-
-					init(_ v: Int) {
-						self.count = v
-					}
-					pub fun add(_ count: Int) {
-						self.count = self.count + count
-					}
-				}
-				pub fun createCounter(_ v: Int): @Counter {
-					return <-create Counter(v)
-				}
-			}`))
-
-	return &flow.TransactionBody{
-		Script: []byte(fmt.Sprintf(`transaction {
-              prepare(signer: AuthAccount) {
-                signer.setCode("%s".decodeHex())
-              }
-			}`, encoded)),
-		Authorizers: []flow.Address{flow.RootAddress},
-	}
-}
-
-// GetTxBodyCreateCounter returns transaction body for creating a new counter inside the smart contract
-func GetTxBodyCreateCounter() *flow.TransactionBody {
-	return &flow.TransactionBody{
-		Script: []byte(`
-			import 0x01
-			transaction {
-				prepare(acc: AuthAccount) {
-					if acc.storage[Container.Counter] == nil {
-                		let existing <- acc.storage[Container.Counter] <- Container.createCounter(3)
-                		destroy existing
-					}
-              	}
-            }`),
-		Authorizers: []flow.Address{flow.RootAddress},
-	}
-}
-
-// GetTxBodyAddToCounter returns transaction body for adding a value to the counter
-func GetTxBodyAddToCounter() *flow.TransactionBody {
-	return &flow.TransactionBody{
-		Script: []byte(`
-			import 0x01
-			transaction {
-				prepare(acc: AuthAccount) {
-					acc.storage[Container.Counter]?.add(2)
-              	}
-            }`),
-		Authorizers: []flow.Address{flow.RootAddress},
-	}
-}
-
-func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExecutionResult {
+func GetCompleteExecutionResultForCounter(t *testing.T, chunkCount int) verification.CompleteExecutionResult {
 
 	// setup collection
-	transactions := make([]*flow.TransactionBody, 0)
-	transactions = append(transactions, GetTxBodyDeployCounterContract())
-	transactions = append(transactions, GetTxBodyCreateCounter())
-	transactions = append(transactions, GetTxBodyAddToCounter())
+	tx1 := testutil.DeployCounterContractTransaction(flow.ServiceAddress())
+	err := testutil.SignTransactionByRoot(tx1, 0)
+	require.NoError(t, err)
+	tx2 := testutil.CreateCounterTransaction(flow.ServiceAddress(), flow.ServiceAddress())
+	err = testutil.SignTransactionByRoot(tx2, 1)
+	require.NoError(t, err)
+	tx3 := testutil.CreateCounterPanicTransaction(flow.ServiceAddress(), flow.ServiceAddress())
+	err = testutil.SignTransactionByRoot(tx3, 2)
+	require.NoError(t, err)
+	transactions := []*flow.TransactionBody{tx1, tx2, tx3}
+
 	col := flow.Collection{Transactions: transactions}
 	collections := []*flow.Collection{&col}
 
@@ -114,12 +61,18 @@ func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExe
 	chunks := make([]*flow.Chunk, 0)
 	chunkDataPacks := make([]*flow.ChunkDataPack, 0)
 
+	metricsCollector := &metrics.NoopCollector{}
+
 	unittest.RunWithTempDir(t, func(dir string) {
-		led, err := ledger.NewTrieStorage(dir)
+		led, err := ledger.NewMTrieStorage(dir, 100, metricsCollector, nil)
 		require.NoError(t, err)
 		defer led.Done()
 
-		startStateCommitment, err := bootstrap.BootstrapLedger(led)
+		startStateCommitment, err := bootstrap.BootstrapLedger(
+			led,
+			unittest.ServiceAccountPublicKey,
+			unittest.GenesisTokenSupply,
+		)
 		require.NoError(t, err)
 
 		rt := runtime.NewInterpreterRuntime()
@@ -171,7 +124,7 @@ func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExe
 		chunks = append(chunks, chunk)
 
 		// chunkDataPack
-		allRegisters := view.Interactions().RegisterTouches()
+		allRegisters := view.Interactions().AllRegisters()
 		values, proofs, err := led.GetRegistersWithProof(allRegisters, chunk.StartState)
 		require.NoError(t, err, "error reading registers with proofs from ledger")
 
@@ -186,16 +139,102 @@ func GetCompleteExecutionResultForCounter(t *testing.T) verification.CompleteExe
 			ChunkID:         chunk.ID(),
 			StartState:      chunk.StartState,
 			RegisterTouches: regTs,
+			CollectionID:    col.ID(),
 		}
 		chunkDataPacks = append(chunkDataPacks, chdp)
+		startStateCommitment = endStateCommitment
 
+		for i := 1; i < chunkCount; i++ {
+
+			tx3 = testutil.CreateCounterPanicTransaction(flow.ServiceAddress(), flow.ServiceAddress())
+			err = testutil.SignTransactionByRoot(tx3, 3+uint64(i))
+			require.NoError(t, err)
+
+			transactions := []*flow.TransactionBody{tx3}
+			col := flow.Collection{Transactions: transactions}
+			collections = append(collections, &col)
+			g := col.Guarantee()
+			guarantees = append(guarantees, &g)
+
+			completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
+			completeColls[guarantee.ID()] = &entity.CompleteCollection{
+				Guarantee:    &guarantee,
+				Transactions: transactions,
+			}
+
+			executableBlock := &entity.ExecutableBlock{
+				Block:               &block,
+				CompleteCollections: completeColls,
+				StartState:          startStateCommitment,
+			}
+
+			// *execution.ComputationResult, error
+			_, err = bc.ExecuteBlock(context.Background(), executableBlock, view)
+			require.NoError(t, err, "error executing block")
+
+			ids, values := view.Delta().RegisterUpdates()
+
+			// TODO: update CommitDelta to also return proofs
+			endStateCommitment, err := led.UpdateRegisters(ids, values, startStateCommitment)
+			require.NoError(t, err, "error updating registers")
+
+			chunk := &flow.Chunk{
+				ChunkBody: flow.ChunkBody{
+					CollectionIndex: uint(i),
+					StartState:      startStateCommitment,
+					// TODO: include event collection hash
+					EventCollection: flow.ZeroID,
+					// TODO: record gas used
+					TotalComputationUsed: 0,
+					// TODO: record number of txs
+					NumberOfTransactions: 0,
+				},
+				Index:    uint64(i),
+				EndState: endStateCommitment,
+			}
+			chunks = append(chunks, chunk)
+
+			// chunkDataPack
+			allRegisters := view.Interactions().AllRegisters()
+			values, proofs, err := led.GetRegistersWithProof(allRegisters, chunk.StartState)
+			require.NoError(t, err, "error reading registers with proofs from ledger")
+
+			regTs := make([]flow.RegisterTouch, len(allRegisters))
+			for i, reg := range allRegisters {
+				regTs[i] = flow.RegisterTouch{RegisterID: reg,
+					Value: values[i],
+					Proof: proofs[i],
+				}
+			}
+			chdp := &flow.ChunkDataPack{
+				ChunkID:         chunk.ID(),
+				StartState:      chunk.StartState,
+				RegisterTouches: regTs,
+				CollectionID:    col.ID(),
+			}
+			chunkDataPacks = append(chunkDataPacks, chdp)
+			startStateCommitment = endStateCommitment
+		}
 	})
+
+	payload = flow.Payload{
+		Identities: unittest.IdentityListFixture(32),
+		Guarantees: guarantees,
+	}
+	header = unittest.BlockHeaderFixture()
+	header.Height = 0
+	header.PayloadHash = payload.Hash()
+
+	block = flow.Block{
+		Header:  &header,
+		Payload: &payload,
+	}
 
 	result := flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
 			BlockID:          block.ID(),
 			Chunks:           chunks,
-			FinalStateCommit: chunks[0].EndState,
+			FinalStateCommit: chunks[len(chunks)-1].EndState,
 		},
 	}
 

@@ -48,7 +48,7 @@ func genNetworkAndStakingKeys(partnerNodes []model.NodeInfo) []model.NodeInfo {
 			log.Fatal().Err(err).Msg("could not access private key for internal node")
 		}
 
-		writeJSON(fmt.Sprintf(model.FilenameNodeInfoPriv, nodeInfo.NodeID), private)
+		writeJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID), private)
 	}
 
 	log.Debug().Msgf("will generate additionally needed collector nodes to have majority in each cluster")
@@ -70,17 +70,20 @@ func genNetworkAndStakingKeys(partnerNodes []model.NodeInfo) []model.NodeInfo {
 			log.Fatal().Err(err).Msg("could not access private key for internal node")
 		}
 
-		writeJSON(fmt.Sprintf(model.FilenameNodeInfoPriv, nodeInfo.NodeID), private)
+		writeJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID), private)
 	}
 
 	return internalNodes
 }
 
 func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto.PrivateKey) model.NodeInfo {
-
-	nodeID, err := flow.PublicKeyToID(stakingKey.PublicKey())
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot generate NodeID from PublicKey")
+	var err error
+	nodeID, found := getNameID()
+	if !found {
+		nodeID, err = flow.PublicKeyToID(stakingKey.PublicKey())
+		if err != nil {
+			log.Fatal().Err(err).Msg("cannot generate NodeID from PublicKey")
+		}
 	}
 
 	log.Debug().

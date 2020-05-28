@@ -38,6 +38,13 @@ func New(logger zerolog.Logger, rt runtime.Runtime) (VirtualMachine, error) {
 	}, nil
 }
 
+func NewWithCache(rt runtime.Runtime, cache ASTCache) (VirtualMachine, error) {
+	return &virtualMachine{
+		rt:    rt,
+		cache: cache,
+	}, nil
+}
+
 type virtualMachine struct {
 	logger zerolog.Logger
 	rt     runtime.Runtime

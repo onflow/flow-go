@@ -198,14 +198,14 @@ void ep2_print_(char* s, ep2_st* p) {
 
 // generates a random number less than the order r
 void bn_randZr(bn_t x) {
-    bn_t r;
-    bn_new(r); 
-    g2_get_ord(r);
+    bn_st r;
+    bn_new(&r); 
+    g2_get_ord(&r);
 
-    bn_new_size(x, bn_size_raw(r));
+    bn_new_size(x, bn_size_raw(&r));
     if (x)
-        bn_rand_mod(x,r);
-    bn_free(r);
+        bn_rand_mod(x,&r);
+    bn_free(&r);
 }
 
 // reads a scalar from an array and maps it to Zr

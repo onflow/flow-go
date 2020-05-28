@@ -124,7 +124,7 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 		seal := flow.Seal{
 			BlockID:      genesis.ID(),
 			ResultID:     result.ID(),
-			InitialState: flow.GenesisStateCommitment,
+			InitialState: commit,
 			FinalState:   result.FinalStateCommit,
 		}
 		err = operation.InsertSeal(seal.ID(), &seal)(tx)
@@ -278,9 +278,14 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 
 	// FIFTH: For compliance of the seal payload, we need them to create a valid
 	// chain of seals on our branch of the chain, starting at the block directly
-	// after the last sealed block all the way to at most the parent.
+	// after the last sealed block all the way to at most the parent. We use
+	// deterministic lookup by height for the finalized part of the chain and
+	// then make a list of unfinalized blocks for the remainder, if any seals
+	// remain.
 
-	// create a mapping of all payload seals to their sealed block
+	// map each seal to the block it is sealing for easy lookup; we will need to
+	// successfully connect _all_ of these seals to the last sealed block for
+	// the payload to be valid
 	byBlock := make(map[flow.Identifier]*flow.Seal)
 	for _, seal := range payload.Seals {
 		byBlock[seal.BlockID] = seal
@@ -289,48 +294,82 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		return fmt.Errorf("multiple seals for the same block")
 	}
 
-	// create a list of ancestors from parent to just before last sealed
+	// get the parent's block seal, which constitutes the beginning of the
+	// sealing chain; if no seals are part of the payload, it will also be used
+	// for the candidate block, which remains at the same sealed state
 	last, err := m.state.seals.ByBlockID(header.ParentID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve parent seal (%x): %w", header.ParentID, err)
 	}
+
+	// get the last sealed block; we use its height to iterate forwards through
+	// the finalized blocks which still need sealing
+	sealed, err := m.state.headers.ByBlockID(last.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve sealed block (%x): %w", last.BlockID, err)
+	}
+
+	// we now go from last sealed height plus one to finalized height and check
+	// if we have the seal for each of them step by step; often we will not even
+	// enter this loop, because last sealed height is higher than finalized
+	for height := sealed.Height + 1; height <= finalized; height++ {
+		if len(byBlock) == 0 {
+			break
+		}
+		header, err := m.state.headers.ByHeight(height)
+		if err != nil {
+			return fmt.Errorf("could not get block for height (%d): %w", height, err)
+		}
+		blockID := header.ID()
+		next, found := byBlock[blockID]
+		if !found {
+			return fmt.Errorf("chain of seals broken for finalized (missing: %x)", blockID)
+		}
+		if !bytes.Equal(next.InitialState, last.FinalState) {
+			return fmt.Errorf("seal execution states do not connect in finalized")
+		}
+		delete(byBlock, blockID)
+		last = next
+	}
+
+	// NOTE: We could skip the remaining part in case no seals are left; it is,
+	// however, cheap, and it's what we will always do during normal operation,
+	// where we only seal the last 1-3 blocks, which are not yet finalized.
+
+	// Once we have filled in seals for all finalized blocks we need to check
+	// the non-finalized blocks backwards; collect all of them, from direct
+	// parent to just before finalized, and see if we can use up the rest of the
+	// seals. We need to stop collecting ancestors either when reaching the
+	// finalized state, or when reaching the last sealed block.
 	ancestorID = header.ParentID
-	var sealableIDs []flow.Identifier
-	for ancestorID != last.BlockID {
-		sealableIDs = append(sealableIDs, ancestorID)
+	var pendingIDs []flow.Identifier
+	for ancestorID != finalID && ancestorID != last.BlockID {
+		pendingIDs = append(pendingIDs, ancestorID)
 		ancestor, err := m.state.headers.ByBlockID(ancestorID)
 		if err != nil {
 			return fmt.Errorf("could not get sealable ancestor (%x): %w", ancestorID, err)
 		}
 		ancestorID = ancestor.ParentID
 	}
-
-	// iterate backwards from just after the last sealed to parent and build a
-	// chain for the payload seals until we fail or all are used up
-	for i := len(sealableIDs) - 1; i >= 0; i-- {
-		sealableID := sealableIDs[i]
-
-		// if no seals are left, we successfully matched them all
+	for i := len(pendingIDs) - 1; i >= 0; i-- {
 		if len(byBlock) == 0 {
 			break
 		}
-
-		// if we don't find a next seal, we fail the check
-		next, found := byBlock[sealableID]
+		pendingID := pendingIDs[i]
+		next, found := byBlock[pendingID]
 		if !found {
-			return fmt.Errorf("not all seals matched to chain")
+			return fmt.Errorf("chain of seals broken for pending (missing: %x)", pendingID)
 		}
-
-		// check that the state transition actually matches
 		if !bytes.Equal(next.InitialState, last.FinalState) {
-			return fmt.Errorf("seal execution states do not connect")
+			return fmt.Errorf("seal execution states do not connect in pending")
 		}
-
-		// if it does, remove the seal from the to-be-added seals
-		delete(byBlock, sealableID)
-
-		// keep track of last seal to check state connection
+		delete(byBlock, pendingID)
 		last = next
+	}
+
+	// this is just a sanity check; at this point, no seals should be left
+	if len(byBlock) > 0 {
+		return fmt.Errorf("not all seals connected to state (left: %d)", len(byBlock))
 	}
 
 	// SIXTH: Both the header itself and its payload are in compliance with the

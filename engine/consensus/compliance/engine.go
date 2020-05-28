@@ -5,6 +5,7 @@ package compliance
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
@@ -56,6 +57,7 @@ func New(
 	state protocol.State,
 	prov network.Engine,
 	pending module.PendingBlockBuffer,
+	blockRateDelay time.Duration,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
@@ -191,9 +193,9 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 	return nil
 }
 
-// BroadcastProposal will propagate a block proposal to all non-local consensus nodes.
+// BroadcastProposalWithDelay will propagate a block proposal to all non-local consensus nodes.
 // Note the header has incomplete fields, because it was converted from a hotstuff.
-func (e *Engine) BroadcastProposal(header *flow.Header) error {
+func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Duration) error {
 
 	// first, check that we are the proposer of the block
 	if header.ProposerID != e.me.NodeID() {
@@ -207,13 +209,11 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	}
 
 	// fill in the fields that can't be populated by HotStuff
-	//TODO clean this up - currently we set these fields in builder, then lose
-	// them in HotStuff, then need to set them again here
 	header.ChainID = parent.ChainID
 	header.Height = parent.Height + 1
 
 	log := e.log.With().
-		Str("chain_id", header.ChainID).
+		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
 		Hex("block_id", logging.Entity(header)).
@@ -222,6 +222,7 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
 		Int("num_signers", len(header.ParentVoterIDs)).
+		Dur("delay", delay).
 		Logger()
 
 	log.Info().Msg("processing proposal broadcast request from hotstuff")
@@ -241,29 +242,40 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		return fmt.Errorf("could not get consensus recipients: %w", err)
 	}
 
-	// NOTE: some fields are not needed for the message
-	// - proposer ID is conveyed over the network message
-	// - the payload hash is deduced from the payload
-	proposal := &messages.BlockProposal{
-		Header:  header,
-		Payload: payload,
-	}
+	e.unit.LaunchAfter(delay, func() {
 
-	// broadcast the proposal to consensus nodes
-	err = e.con.Submit(proposal, recipients.NodeIDs()...)
-	if err != nil {
-		return fmt.Errorf("could not send proposal message: %w", err)
-	}
+		go e.hotstuff.SubmitProposal(header, parent.View)
 
-	e.metrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockProposal)
+		// NOTE: some fields are not needed for the message
+		// - proposer ID is conveyed over the network message
+		// - the payload hash is deduced from the payload
+		proposal := &messages.BlockProposal{
+			Header:  header,
+			Payload: payload,
+		}
 
-	log.Info().Msg("block proposal broadcasted")
+		// broadcast the proposal to consensus nodes
+		err = e.con.Submit(proposal, recipients.NodeIDs()...)
+		if err != nil {
+			log.Error().Err(err).Msg("could not send proposal message")
+		}
 
-	// submit the proposal to the provider engine to forward it to other
-	// node roles
-	e.prov.SubmitLocal(proposal)
+		e.metrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockProposal)
+
+		log.Info().Msg("block proposal broadcasted")
+
+		// submit the proposal to the provider engine to forward it to other
+		// node roles
+		e.prov.SubmitLocal(proposal)
+	})
 
 	return nil
+}
+
+// BroadcastProposal will propagate a block proposal to all non-local consensus nodes.
+// Note the header has incomplete fields, because it was converted from a hotstuff.
+func (e *Engine) BroadcastProposal(header *flow.Header) error {
+	return e.BroadcastProposalWithDelay(header, 0)
 }
 
 // process processes events for the propagation engine on the consensus node.
@@ -315,7 +327,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	header := proposal.Header
 
 	log := e.log.With().
-		Str("chain_id", header.ChainID).
+		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
 		Hex("block_id", logging.Entity(header)).
@@ -370,15 +382,20 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 		// go to the first missing ancestor
 		ancestorID := ancestor.Header.ParentID
+		ancestorHeight := ancestor.Header.Height - 1
 		for {
 			ancestor, found := e.pending.ByID(ancestorID)
 			if !found {
 				break
 			}
 			ancestorID = ancestor.Header.ParentID
+			ancestorHeight = ancestor.Header.Height - 1
 		}
 
-		log.Debug().Msg("requesting missing ancestor for proposal")
+		log.Debug().
+			Uint64("ancestor_height", ancestorHeight).
+			Hex("ancestor_id", ancestorID[:]).
+			Msg("requesting missing ancestor for proposal")
 
 		e.sync.RequestBlock(ancestorID)
 
@@ -430,7 +447,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	header := proposal.Header
 
 	log := e.log.With().
-		Str("chain_id", header.ChainID).
+		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
 		Hex("block_id", logging.Entity(header)).
@@ -496,12 +513,17 @@ func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.BlockVote)
 // parent block that was just processed; if this is the case, they should now
 // all be validly connected to the finalized state and we should process them.
 func (e *Engine) processPendingChildren(header *flow.Header) error {
+	blockID := header.ID()
 
 	// check if there are any children for this parent in the cache
-	children, has := e.pending.ByParentID(header.ID())
+	children, has := e.pending.ByParentID(blockID)
 	if !has {
 		return nil
 	}
+
+	e.log.Debug().
+		Int("children", len(children)).
+		Msg("processing pending children")
 
 	// then try to process children only this once
 	var result *multierror.Error
@@ -517,7 +539,7 @@ func (e *Engine) processPendingChildren(header *flow.Header) error {
 	}
 
 	// drop all of the children that should have been processed now
-	e.pending.DropForParent(header)
+	e.pending.DropForParent(blockID)
 
 	e.mempool.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
 
@@ -534,8 +556,9 @@ func (e *Engine) prunePendingCache() {
 		return
 	}
 
-	// remove everything at or below final height
+	// remove all pending blocks at or below the finalized height
 	e.pending.PruneByHeight(final.Height)
 
+	// always record the metric
 	e.mempool.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
 }

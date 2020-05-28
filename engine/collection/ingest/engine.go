@@ -34,9 +34,7 @@ type Engine struct {
 	state      protocol.State
 	pool       mempool.Transactions
 
-	// the number of blocks that can be between the reference block and the
-	// finalized head before we consider the transaction expired
-	expiry uint
+	config Config
 }
 
 // New creates a new collection ingest engine.
@@ -48,7 +46,7 @@ func New(
 	colMetrics module.CollectionMetrics,
 	me module.Local,
 	pool mempool.Transactions,
-	expiryBuffer uint,
+	config Config,
 ) (*Engine, error) {
 
 	logger := log.With().
@@ -63,10 +61,7 @@ func New(
 		me:         me,
 		state:      state,
 		pool:       pool,
-		// add some expiry buffer -- this is how much time a transaction has
-		// to be included in a collection, then for that collection to be
-		// included in a block
-		expiry: flow.DefaultTransactionExpiry - expiryBuffer,
+		config:     config,
 	}
 
 	con, err := net.Register(engine.CollectionIngest, e)
@@ -128,8 +123,6 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
 	case *flow.TransactionBody:
 		e.engMetrics.MessageReceived(metrics.EngineCollectionIngest, metrics.MessageTransaction)
-		e.unit.Lock()
-		defer e.unit.Unlock()
 		defer e.engMetrics.MessageHandled(metrics.EngineCollectionIngest, metrics.MessageTransaction)
 		return e.onTransaction(originID, ev)
 	default:
@@ -183,14 +176,19 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// if our cluster is responsible for the transaction, store it
 	if localCluster.Fingerprint() == txCluster.Fingerprint() {
 		_ = e.pool.Add(tx)
-		e.colMetrics.TransactionReceived(tx.ID())
+		e.colMetrics.TransactionIngested(tx.ID())
 		log.Debug().Msg("added transaction to pool")
 	}
 
 	// if the message was submitted internally (ie. via the Access API)
 	// propagate it to all members of the responsible cluster
 	if originID == localID {
-		targetIDs := txCluster.Filter(filter.Not(filter.HasNodeID(localID)))
+
+		// always send the transaction to one node in the responsible cluster,
+		// send to additional nodes based on configuration
+		targetIDs := txCluster.
+			Filter(filter.Not(filter.HasNodeID(localID))).
+			Sample(e.config.PropagationRedundancy + 1)
 
 		log.Debug().
 			Str("recipients", fmt.Sprintf("%v", targetIDs.NodeIDs())).
@@ -219,18 +217,53 @@ func (e *Engine) ValidateTransaction(tx *flow.TransactionBody) error {
 		return IncompleteTransactionError{Missing: missingFields}
 	}
 
-	// ensure the transaction is not expired
-	final, err := e.state.Final().Head()
-	if err != nil {
-		return fmt.Errorf("could not get finalized header: %w", err)
+	// ensure the gas limit is not over the maximum
+	if tx.GasLimit > e.config.MaxGasLimit {
+		return GasLimitExceededError{Actual: tx.GasLimit, Maximum: e.config.MaxGasLimit}
 	}
 
+	// ensure the reference block is valid
+	err := e.checkTransactionExpiry(tx)
+	if err != nil {
+		return err
+	}
+
+	if e.config.CheckScriptsParse {
+		// ensure the script is at least parse-able
+		_, _, err = parser.ParseProgram(string(tx.Script))
+		if err != nil {
+			return InvalidScriptError{ParserErr: err}
+		}
+	}
+
+	// TODO check account/payer signatures
+
+	return nil
+}
+
+// checkTransactionExpiry checks whether a transaction's reference block ID is
+// valid. Returns nil if the reference is valid, returns an error if the
+// reference is invalid or we failed to check it.
+func (e *Engine) checkTransactionExpiry(tx *flow.TransactionBody) error {
+
+	// look up the reference block
 	ref, err := e.state.AtBlockID(tx.ReferenceBlockID).Head()
 	if errors.Is(err, storage.ErrNotFound) {
+		// the transaction references an unknown block - at this point we decide
+		// whether to consider it expired based on configuration
+		if e.config.AllowUnknownReference {
+			return nil
+		}
 		return ErrUnknownReferenceBlock
 	}
 	if err != nil {
 		return fmt.Errorf("could not get reference block: %w", err)
+	}
+
+	// get the latest finalized block we know about
+	final, err := e.state.Final().Head()
+	if err != nil {
+		return fmt.Errorf("could not get finalized header: %w", err)
 	}
 
 	diff := final.Height - ref.Height
@@ -238,20 +271,14 @@ func (e *Engine) ValidateTransaction(tx *flow.TransactionBody) error {
 	if ref.Height > final.Height {
 		diff = 0
 	}
-	if uint(diff) > e.expiry {
+	// discard transactions that are expired, or that will expire sooner than
+	// our configured buffer allows
+	if uint(diff) > flow.DefaultTransactionExpiry-e.config.ExpiryBuffer {
 		return ExpiredTransactionError{
 			RefHeight:   ref.Height,
 			FinalHeight: final.Height,
 		}
 	}
-
-	// ensure the script is at least parse-able
-	_, _, err = parser.ParseProgram(string(tx.Script))
-	if err != nil {
-		return InvalidScriptError{ParserErr: err}
-	}
-
-	// TODO check account/payer signatures
 
 	return nil
 }

@@ -3,6 +3,8 @@
 package flow
 
 import (
+	"encoding/json"
+
 	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/crypto"
@@ -28,6 +30,48 @@ type AccountPublicKey struct {
 	HashAlgo  hash.HashingAlgorithm
 	SeqNumber uint64
 	Weight    int
+}
+
+func (a AccountPublicKey) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		PublicKey []byte
+		SignAlgo  crypto.SigningAlgorithm
+		HashAlgo  hash.HashingAlgorithm
+		SeqNumber uint64
+		Weight    int
+	}{
+		a.PublicKey.Encode(),
+		a.SignAlgo,
+		a.HashAlgo,
+		a.SeqNumber,
+		a.Weight,
+	})
+}
+
+func (a *AccountPublicKey) UnmarshalJSON(data []byte) error {
+	temp := struct {
+		PublicKey []byte
+		SignAlgo  crypto.SigningAlgorithm
+		HashAlgo  hash.HashingAlgorithm
+		SeqNumber uint64
+		Weight    int
+	}{}
+	err := json.Unmarshal(data, &temp)
+	if err != nil {
+		return err
+	}
+	if a == nil {
+		a = new(AccountPublicKey)
+	}
+	a.PublicKey, err = crypto.DecodePublicKey(temp.SignAlgo, temp.PublicKey)
+	if err != nil {
+		return err
+	}
+	a.SignAlgo = temp.SignAlgo
+	a.HashAlgo = temp.HashAlgo
+	a.SeqNumber = temp.SeqNumber
+	a.Weight = temp.Weight
+	return nil
 }
 
 // Validate returns an error if this account key is invalid.
@@ -61,6 +105,18 @@ func (a AccountPrivateKey) PublicKey(weight int) AccountPublicKey {
 		HashAlgo:  a.HashAlgo,
 		Weight:    weight,
 	}
+}
+
+func (a AccountPrivateKey) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		PrivateKey []byte
+		SignAlgo   crypto.SigningAlgorithm
+		HashAlgo   hash.HashingAlgorithm
+	}{
+		a.PrivateKey.Encode(),
+		a.SignAlgo,
+		a.HashAlgo,
+	})
 }
 
 // CompatibleAlgorithms returns true if the signature and hash algorithms are compatible.

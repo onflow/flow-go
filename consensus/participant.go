@@ -15,9 +15,10 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
+	validatorImpl "github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voter"
+	"github.com/dapperlabs/flow-go/consensus/recovery"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/storage"
@@ -36,7 +37,8 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 		TimeoutMinimum:             time.Duration(defTimeout.MinReplicaTimeout) * time.Millisecond,
 		TimeoutAggregationFraction: defTimeout.VoteAggregationTimeoutFraction,
 		TimeoutIncreaseFactor:      defTimeout.TimeoutIncrease,
-		TimeoutDecreaseStep:        time.Duration(defTimeout.TimeoutDecrease) * time.Millisecond,
+		TimeoutDecreaseFactor:      defTimeout.TimeoutDecrease,
+		BlockRateDelay:             time.Duration(defTimeout.BlockRateDelayMS) * time.Millisecond,
 	}
 
 	// apply the configuration options
@@ -52,7 +54,9 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	}
 
 	// initialize the validator
-	validator := validator.New(committee, forks, signer)
+	var validator hotstuff.Validator
+	validator = validatorImpl.New(committee, forks, signer)
+	validator = validatorImpl.NewMetricsWrapper(validator, metrics) // wrapper for measuring time spent in Validator component
 
 	// get the last view we started
 	started, err := persist.GetStarted()
@@ -71,7 +75,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 
 	// recover the hotstuff state, mainly to recover all pending blocks
 	// in forks
-	err = Recover(log, forks, aggregator, validator, finalized, pending)
+	err = recovery.Participant(log, forks, aggregator, validator, finalized, pending)
 	if err != nil {
 		return nil, fmt.Errorf("could not recover hotstuff state: %w", err)
 	}
@@ -82,7 +86,8 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 		cfg.TimeoutMinimum,
 		cfg.TimeoutAggregationFraction,
 		cfg.TimeoutIncreaseFactor,
-		cfg.TimeoutDecreaseStep,
+		cfg.TimeoutDecreaseFactor,
+		cfg.BlockRateDelay,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize timeout config: %w", err)
@@ -120,14 +125,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 }
 
 func initForks(final *flow.Header, headers storage.Headers, updater module.Finalizer, notifier hotstuff.Consumer, rootHeader *flow.Header, rootQC *model.QuorumCertificate) (*forks.Forks, error) {
-	// recover the trusted root
-	trustedRoot, err := recoverTrustedRoot(final, headers, rootHeader, rootQC)
-	if err != nil {
-		return nil, fmt.Errorf("could not recover trusted root: %w", err)
-	}
-
-	// initialize the finalizer
-	finalizer, err := finalizer.New(trustedRoot, updater, notifier)
+	finalizer, err := initFinalizer(final, headers, updater, notifier, rootHeader, rootQC)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize finalizer: %w", err)
 	}
@@ -141,6 +139,22 @@ func initForks(final *flow.Header, headers storage.Headers, updater module.Final
 	// initialize the forks manager
 	forks := forks.New(finalizer, forkchoice)
 	return forks, nil
+}
+
+func initFinalizer(final *flow.Header, headers storage.Headers, updater module.Finalizer, notifier hotstuff.FinalizationConsumer, rootHeader *flow.Header, rootQC *model.QuorumCertificate) (*finalizer.Finalizer, error) {
+	// recover the trusted root
+	trustedRoot, err := recoverTrustedRoot(final, headers, rootHeader, rootQC)
+	if err != nil {
+		return nil, fmt.Errorf("could not recover trusted root: %w", err)
+	}
+
+	// initialize the finalizer
+	finalizer, err := finalizer.New(trustedRoot, updater, notifier)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize finalizer: %w", err)
+	}
+
+	return finalizer, nil
 }
 
 func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader *flow.Header, rootQC *model.QuorumCertificate) (*forks.BlockQC, error) {

@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 
 	"gopkg.in/yaml.v2"
 
@@ -14,6 +15,7 @@ import (
 
 const (
 	BootstrapDir             = "./bootstrap"
+	ProfilerDir              = "./profiler"
 	DockerComposeFile        = "./docker-compose.nodes.yml"
 	DockerComposeFileVersion = "3.7"
 	PrometheusTargetsFile    = "./targets.nodes.json"
@@ -23,6 +25,7 @@ const (
 	DefaultVerificationCount = 1
 	DefaultAccessCount       = 1
 	DefaultNClusters         = 1
+	DefaultProfiler          = false
 	AccessAPIPort            = 3569
 	MetricsPort              = 8080
 	RPCPort                  = 9000
@@ -35,6 +38,7 @@ var (
 	verificationCount int
 	accessCount       int
 	nClusters         uint
+	profiler          bool
 )
 
 func init() {
@@ -44,6 +48,7 @@ func init() {
 	flag.IntVar(&verificationCount, "verification", DefaultVerificationCount, "number of verification nodes")
 	flag.IntVar(&accessCount, "access", DefaultAccessCount, "number of access nodes")
 	flag.UintVar(&nClusters, "nclusters", DefaultNClusters, "number of collector clusters")
+	flag.BoolVar(&profiler, "profiler", DefaultProfiler, "whether to enable the auto-profiler")
 }
 
 func main() {
@@ -63,14 +68,17 @@ func main() {
 	conf := testnet.NewNetworkConfig("localnet", nodes, testnet.WithClusters(nClusters))
 
 	err := os.RemoveAll(BootstrapDir)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			panic(err)
-		}
+	if err != nil && !os.IsNotExist(err) {
+		panic(err)
 	}
 
 	err = os.Mkdir(BootstrapDir, 0755)
 	if err != nil {
+		panic(err)
+	}
+
+	err = os.Mkdir(ProfilerDir, 0755)
+	if err != nil && !os.IsExist(err) {
 		panic(err)
 	}
 
@@ -167,7 +175,7 @@ func prepareServices(containers []testnet.ContainerConfig) Services {
 	for _, container := range containers {
 		switch container.Role {
 		case flow.RoleConsensus:
-			services[container.ContainerName] = prepareService(container, numConsensus)
+			services[container.ContainerName] = prepareConsensusService(container, numConsensus)
 			numConsensus++
 		case flow.RoleCollection:
 			services[container.ContainerName] = prepareCollectionService(container, numCollection)
@@ -195,10 +203,14 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 			"--bootstrapdir=/bootstrap",
 			"--datadir=/flowdb",
 			"--loglevel=DEBUG",
+			fmt.Sprintf("--profiler-enabled=%t", profiler),
+			"--profiler-dir=/profiler",
+			"--profiler-interval=2m",
 			fmt.Sprintf("--nclusters=%d", nClusters),
 		},
 		Volumes: []string{
 			fmt.Sprintf("%s:/bootstrap", BootstrapDir),
+			fmt.Sprintf("%s:/profiler", ProfilerDir),
 		},
 		Environment: []string{
 			"JAEGER_AGENT_HOST=jaeger",
@@ -222,6 +234,17 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 			fmt.Sprintf("%s_1", container.Role),
 		}
 	}
+
+	return service
+}
+
+func prepareConsensusService(container testnet.ContainerConfig, i int) Service {
+	service := prepareService(container, i)
+
+	service.Command = append(
+		service.Command,
+		fmt.Sprintf("--block-rate-delay=%s", time.Duration(0)),
+	)
 
 	return service
 }

@@ -60,8 +60,11 @@ func (suite *Suite) SetupTest() {
 	suite.payloads.On("Store", mock.Anything, mock.Anything).Return(nil)
 	suite.state.On("Mutate").Return(suite.mutator)
 	suite.state.On("Final").Return(suite.snapshot)
+	suite.cache.On("PruneByHeight", mock.Anything).Return()
+	suite.cache.On("Size", mock.Anything).Return(uint(0))
 
-	eng, err := follower.New(zerolog.Logger{}, suite.net, suite.me, metrics.NewNoopCollector(), suite.cleaner, suite.headers, suite.payloads, suite.state, suite.cache, suite.follower)
+	metrics := metrics.NewNoopCollector()
+	eng, err := follower.New(zerolog.Logger{}, suite.net, suite.me, metrics, metrics, suite.cleaner, suite.headers, suite.payloads, suite.state, suite.cache, suite.follower)
 	require.Nil(suite.T(), err)
 	eng.WithSynchronization(suite.sync)
 
@@ -181,7 +184,7 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	}
 	suite.cache.On("ByParentID", block.ID()).Return(pending, true)
 	suite.cache.On("ByParentID", child.ID()).Return(nil, false)
-	suite.cache.On("DropForParent", block.Header).Once()
+	suite.cache.On("DropForParent", block.ID()).Once()
 
 	// submit the block proposal
 	proposal := unittest.ProposalFromBlock(&block)

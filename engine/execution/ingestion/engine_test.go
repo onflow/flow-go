@@ -21,7 +21,6 @@ import (
 	state "github.com/dapperlabs/flow-go/engine/execution/state/mock"
 	executionUnittest "github.com/dapperlabs/flow-go/engine/execution/state/unittest"
 	mocklocal "github.com/dapperlabs/flow-go/engine/testutil/mocklocal"
-	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -108,7 +107,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	identityList := flow.IdentityList{myIdentity, collection1Identity, collection2Identity, collection3Identity}
 
-	executionState.On("Size").Return(int64(1024*1024), nil).Maybe()
+	executionState.On("DiskSize").Return(int64(1024*1024), nil).Maybe()
 
 	snapshot.On("Identities", mock.Anything).Return(func(selector flow.IdentityFilter) flow.IdentityList {
 		return identityList.Filter(selector)
@@ -242,10 +241,8 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 			assert.NoError(ctx.t, err, "could not find executor in protocol state")
 
 			// verify the signature
-			b, err := encoding.DefaultEncoder.Encode(receipt.Body())
-			assert.NoError(ctx.t, err)
-
-			validSig, err := executor.StakingPubKey.Verify(receipt.ExecutorSignature, b, ctx.engine.receiptHasher)
+			id := receipt.ID()
+			validSig, err := executor.StakingPubKey.Verify(receipt.ExecutorSignature, id[:], ctx.engine.receiptHasher)
 			assert.NoError(ctx.t, err)
 
 			assert.True(ctx.t, validSig, "execution receipt signature invalid")

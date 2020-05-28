@@ -58,7 +58,7 @@ type Import struct {
 }
 
 func (i Import) ToCadence() string {
-	if i.Address != flow.ZeroAddress {
+	if i.Address != flow.EmptyAddress {
 		return fmt.Sprintf("import 0x%s", i.Address.Short())
 	}
 	return ""

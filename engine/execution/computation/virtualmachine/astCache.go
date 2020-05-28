@@ -33,7 +33,14 @@ func NewLRUASTCache(size int) (*LRUASTCache, error) {
 func (cache *LRUASTCache) GetProgram(location ast.Location) (*ast.Program, error) {
 	program, found := cache.lru.Get(location.ID())
 	if found {
-		return program.(*ast.Program), nil
+		cachedProgram, ok := program.(*ast.Program)
+		if !ok {
+			return nil, fmt.Errorf("could not convert cached value to ast.Program")
+		}
+		// Return a new program to clear importedPrograms.
+		// This will avoid a concurrent map write when attempting to
+		// resolveImports.
+		return &ast.Program{Declarations: cachedProgram.Declarations}, nil
 	}
 	return nil, nil
 }

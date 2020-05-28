@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"os/user"
+	"path/filepath"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/integration/client"
@@ -71,18 +73,30 @@ func toNodeInfoList(confs []ContainerConfig) []bootstrap.NodeInfo {
 func getSeeds(n int) ([][]byte, error) {
 	seeds := make([][]byte, n)
 	for i := 0; i < n; i++ {
-		seed := make([]byte, crypto.SeedMinLenDKG)
-		n, err := rand.Read(seed)
-		if err != nil || n != crypto.SeedMinLenDKG {
+		seed, err := getSeed()
+		if err != nil {
 			return nil, err
 		}
-
 		seeds[i] = seed
 	}
 	return seeds, nil
 }
 
+func getSeed() ([]byte, error) {
+	seed := make([]byte, crypto.SeedMinLenDKG)
+	n, err := rand.Read(seed)
+	if err != nil || n != crypto.SeedMinLenDKG {
+		return nil, err
+	}
+	return seed, nil
+}
+
 func writeJSON(path string, data interface{}) error {
+	err := os.MkdirAll(filepath.Dir(path), 0755)
+	if err != nil {
+		return err
+	}
+
 	marshaled, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return err

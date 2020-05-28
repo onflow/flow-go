@@ -9,14 +9,15 @@ const (
 )
 
 const (
-	ChannelNone = "none"
+	ChannelOneToOne = "OneToOne"
 )
 
 const (
 	// collection
-	EngineProposal           = "proposal"
-	EngineCollectionIngest   = "collection_ingest"
-	EngineCollectionProvider = "collection_provider"
+	EngineProposal               = "proposal"
+	EngineCollectionIngest       = "collection_ingest"
+	EngineCollectionProvider     = "collection_provider"
+	EngineClusterSynchronization = "cluster-sync"
 	// consensus
 	EnginePropagation        = "propagation"
 	EngineCompliance         = "compliance"
@@ -29,18 +30,20 @@ const (
 )
 
 const (
-	ResourceUndefined      = "undefined"
-	ResourceProposal       = "proposal"
-	ResourceHeader         = "header"
-	ResourceIndex          = "index"
-	ResourceIdentity       = "identity"
-	ResourceGuarantee      = "guarantee"
-	ResourceResult         = "result"
-	ResourceReceipt        = "receipt"
-	ResourceApproval       = "approval"
-	ResourceSeal           = "seal"
-	ResourceCommit         = "commit"
-	ResourceClusterPayload = "cluster_payload"
+	ResourceUndefined       = "undefined"
+	ResourceProposal        = "proposal"
+	ResourceHeader          = "header"
+	ResourceIndex           = "index"
+	ResourceIdentity        = "identity"
+	ResourceGuarantee       = "guarantee"
+	ResourceResult          = "result"
+	ResourceReceipt         = "receipt"
+	ResourceApproval        = "approval"
+	ResourceSeal            = "seal"
+	ResourceCommit          = "commit"
+	ResourceTransaction     = "transaction"
+	ResourceClusterPayload  = "cluster_payload"
+	ResourceClusterProposal = "cluster_proposal"
 )
 
 const (
@@ -57,8 +60,8 @@ const (
 	MessageSyncedBlock          = "synced_block"
 	MessageClusterBlockProposal = "cluster_proposal"
 	MessageClusterBlockVote     = "cluster_vote"
-	MessageClusterBlockRequest  = "cluster_block_request"
 	MessageClusterBlockResponse = "cluster_block_response"
+	MessageSyncedClusterBlock   = "synced_cluster_block"
 	MessageTransaction          = "transaction"
 	MessageSubmitGuarantee      = "submit_guarantee"
 	MessageCollectionRequest    = "collection_request"

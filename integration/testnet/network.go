@@ -2,7 +2,6 @@ package testnet
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -485,19 +484,9 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, fmt.Errorf("failed to run DKG: %w", err)
 	}
 
-	// generate the root account
-	hardcoded, err := hex.DecodeString(flow.RootAccountPrivateKeyHex)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	account, err := flow.DecodeAccountPrivateKey(hardcoded)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	// generate the initial execution state
-	commit, err := run.GenerateExecutionState(filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState), account)
+	dbDir := filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState)
+	commit, err := run.GenerateExecutionState(dbDir, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -515,35 +504,44 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 
 	// write common genesis bootstrap files
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameAccount0Priv), account)
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathServiceAccountPublicKey), unittest.ServiceAccountPublicKey)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameGenesisCommit), commit)
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathGenesisCommit), commit)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameGenesisBlock), genesis)
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathGenesisBlock), genesis)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameGenesisQC), qc)
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathGenesisQC), qc)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.FilenameDKGDataPub), dkg.Public())
+	// write public DKG data
+	consensusNodes := bootstrap.FilterByRole(toNodeInfoList(confs), flow.RoleConsensus)
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathDKGDataPub), dkg.Public(consensusNodes))
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// write private key files for each DKG participant
-	for _, part := range dkg.Participants {
-		filename := fmt.Sprintf(bootstrap.FilenameRandomBeaconPriv, part.NodeID)
-		err = writeJSON(filepath.Join(bootstrapDir, filename), part.Private())
+	for i, sk := range dkg.PrivKeyShares {
+		nodeID := consensusNodes[i].NodeID
+		encodableSk := bootstrap.EncodableRandomBeaconPrivKey{sk}
+		privParticpant := bootstrap.DKGParticipantPriv{
+			NodeID:              nodeID,
+			RandomBeaconPrivKey: encodableSk,
+			GroupIndex:          i,
+		}
+		path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID)
+		err = writeJSON(filepath.Join(bootstrapDir, path), privParticpant)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -551,7 +549,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 
 	// write private key files for each node
 	for _, nodeConfig := range confs {
-		path := filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.FilenameNodeInfoPriv, nodeConfig.NodeID))
+		path := filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, nodeConfig.NodeID))
 
 		// retrieve private representation of the node
 		private, err := nodeConfig.NodeInfo.Private()
@@ -579,13 +577,13 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		// cluster ID is equivalent to chain ID
 		clusterID := clusterGenesis.Header.ChainID
 
-		clusterGenesisPath := fmt.Sprintf(bootstrap.FilenameGenesisClusterBlock, clusterID)
+		clusterGenesisPath := fmt.Sprintf(bootstrap.PathGenesisClusterBlock, clusterID)
 		err = writeJSON(filepath.Join(bootstrapDir, clusterGenesisPath), clusterGenesis)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		clusterQCPath := fmt.Sprintf(bootstrap.FilenameGenesisClusterQC, clusterID)
+		clusterQCPath := fmt.Sprintf(bootstrap.PathGenesisClusterQC, clusterID)
 		err = writeJSON(filepath.Join(bootstrapDir, clusterQCPath), clusterQC)
 		if err != nil {
 			return nil, nil, err
@@ -661,29 +659,23 @@ func runDKG(confs []ContainerConfig) (bootstrap.DKGData, error) {
 	nConsensusNodes := len(consensusNodes)
 
 	// run the core dkg algorithm
-	dkgSeeds, err := getSeeds(nConsensusNodes)
+	dkgSeed, err := getSeed()
 	if err != nil {
 		return bootstrap.DKGData{}, err
 	}
 
-	dkg, err := bootstraprun.RunDKG(nConsensusNodes, dkgSeeds)
+	dkg, err := bootstraprun.RunFastKG(nConsensusNodes, dkgSeed)
 	if err != nil {
 		return bootstrap.DKGData{}, err
 	}
 
 	// sanity check
-	if nConsensusNodes != len(dkg.Participants) {
+	if nConsensusNodes != len(dkg.PrivKeyShares) {
 		return bootstrap.DKGData{}, fmt.Errorf(
 			"consensus node count does not match DKG participant count: nodes=%d, participants=%d",
 			nConsensusNodes,
-			len(dkg.Participants),
+			len(dkg.PrivKeyShares),
 		)
-	}
-
-	// set the node IDs in the dkg data
-	for i := range dkg.Participants {
-		nodeID := consensusNodes[i].NodeID
-		dkg.Participants[i].NodeID = nodeID
 	}
 
 	return dkg, nil

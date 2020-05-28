@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"errors"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,7 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestProviderEngine_onChunkDataPackRequest(t *testing.T) {
+func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 	t.Run("non-verification engine", func(t *testing.T) {
 		ps := new(protocol.State)
 		ss := new(protocol.Snapshot)
@@ -33,9 +34,12 @@ func TestProviderEngine_onChunkDataPackRequest(t *testing.T) {
 		ss.On("Identity", originID).
 			Return(unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)), nil)
 
-		req := &messages.ChunkDataPackRequest{ChunkID: chunkID}
+		req := &messages.ChunkDataRequest{
+			ChunkID: chunkID,
+			Nonce:   rand.Uint64(),
+		}
 		// submit using origin ID with invalid role
-		err := e.onChunkDataPackRequest(context.Background(), originID, req)
+		err := e.onChunkDataRequest(context.Background(), originID, req)
 		assert.Error(t, err)
 
 		ps.AssertExpectations(t)
@@ -61,8 +65,11 @@ func TestProviderEngine_onChunkDataPackRequest(t *testing.T) {
 		ps.On("Final").Return(ss)
 		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil)
 
-		req := &messages.ChunkDataPackRequest{ChunkID: chunkID}
-		err := e.onChunkDataPackRequest(context.Background(), originIdentity.NodeID, req)
+		req := &messages.ChunkDataRequest{
+			ChunkID: chunkID,
+			Nonce:   rand.Uint64(),
+		}
+		err := e.onChunkDataRequest(context.Background(), originIdentity.NodeID, req)
 		assert.Error(t, err)
 
 		ps.AssertExpectations(t)
@@ -83,15 +90,16 @@ func TestProviderEngine_onChunkDataPackRequest(t *testing.T) {
 
 		chunkID := unittest.IdentifierFixture()
 		chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
+		collection := unittest.CollectionFixture(1)
 
 		ps.On("Final").Return(ss)
 		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil)
 		con.On("Submit", mock.Anything, originIdentity.NodeID).
 			Run(func(args mock.Arguments) {
-				res, ok := args[0].(*messages.ChunkDataPackResponse)
+				res, ok := args[0].(*messages.ChunkDataResponse)
 				require.True(t, ok)
 
-				actualChunkID := res.Data.ChunkID
+				actualChunkID := res.ChunkDataPack.ChunkID
 				assert.Equal(t, chunkID, actualChunkID)
 			}).
 			Return(nil)
@@ -100,9 +108,14 @@ func TestProviderEngine_onChunkDataPackRequest(t *testing.T) {
 			On("ChunkDataPackByChunkID", mock.Anything, chunkID).
 			Return(&chunkDataPack, nil)
 
-		req := &messages.ChunkDataPackRequest{ChunkID: chunkID}
+		execState.On("GetCollection", chunkDataPack.CollectionID).Return(&collection, nil)
 
-		err := e.onChunkDataPackRequest(context.Background(), originIdentity.NodeID, req)
+		req := &messages.ChunkDataRequest{
+			ChunkID: chunkID,
+			Nonce:   rand.Uint64(),
+		}
+
+		err := e.onChunkDataRequest(context.Background(), originIdentity.NodeID, req)
 		assert.NoError(t, err)
 
 		ps.AssertExpectations(t)

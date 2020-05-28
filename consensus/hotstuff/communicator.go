@@ -1,6 +1,8 @@
 package hotstuff
 
 import (
+	"time"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -14,4 +16,9 @@ type Communicator interface {
 	// BroadcastProposal broadcasts the given block proposal to all actors of
 	// the consensus process.
 	BroadcastProposal(proposal *flow.Header) error
+
+	// BroadcastProposalWithDelay broadcasts the given block proposal to all actors of
+	// the consensus process.
+	// delay is to hold the proposal before broadcasting it. Useful to control the block production rate.
+	BroadcastProposalWithDelay(proposal *flow.Header, delay time.Duration) error
 }
