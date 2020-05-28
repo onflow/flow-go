@@ -163,7 +163,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, lightIng
 	assignment := chmodel.NewAssignment()
 
 	// create `erCount` ER fixtures that will be concurrently delivered
-	ers := make([]verification.CompleteExecutionResult, 0)
+	ers := make([]utils.CompleteExecutionResult, 0)
 	// list of assigned chunks to the verifier node
 	vChunks := make([]*verification.VerifiableChunk, 0)
 	// a counter to assign chunks every other one, so to check if
@@ -358,7 +358,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, lightIng
 // chunk states. Any requests that don't correspond to an execution receipt in
 // the input ers list result in the test failing.
 // It also drops the first request for each chunk to evaluate retrials.
-func setupMockExeNode(t *testing.T, node mock.GenericNode, verID flow.Identifier, ers []verification.CompleteExecutionResult) {
+func setupMockExeNode(t *testing.T, node mock.GenericNode, verID flow.Identifier, ers []utils.CompleteExecutionResult) {
 	eng := new(network.Engine)
 	chunksConduit, err := node.Net.Register(engine.ChunkDataPackProvider, eng)
 	assert.Nil(t, err)

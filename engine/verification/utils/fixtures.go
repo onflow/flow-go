@@ -13,7 +13,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/engine/execution/testutil"
-	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -21,10 +20,21 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
+// CompleteExecutionResult represents an execution result that is ready to
+// be verified. It contains all execution result and all resources required to
+// verify it.
+// TODO update this as needed based on execution requirements
+type CompleteExecutionResult struct {
+	Receipt        *flow.ExecutionReceipt
+	Block          *flow.Block
+	Collections    []*flow.Collection
+	ChunkDataPacks []*flow.ChunkDataPack
+}
+
 // CompleteExecutionResultFixture returns complete execution result with an
 // execution receipt referencing the block/collections.
 // chunkCount determines the number of chunks inside each receipt
-func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.CompleteExecutionResult {
+func CompleteExecutionResultFixture(t *testing.T, chunkCount int) CompleteExecutionResult {
 
 	// setup collection
 	tx1 := testutil.DeployCounterContractTransaction(flow.ServiceAddress())
@@ -242,7 +252,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.C
 	receipt := flow.ExecutionReceipt{
 		ExecutionResult: result,
 	}
-	return verification.CompleteExecutionResult{
+	return CompleteExecutionResult{
 		Receipt:        &receipt,
 		Block:          &block,
 		Collections:    collections,
@@ -254,7 +264,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) verification.C
 // execution receipt referencing the block/collections. In the light version of execution result,
 // everything is wired properly, but with the minimum viable content provided. This version is basically used
 // for profiling.
-func LightExecutionResultFixture(chunkCount int) verification.CompleteExecutionResult {
+func LightExecutionResultFixture(chunkCount int) CompleteExecutionResult {
 	chunks := make([]*flow.Chunk, 0)
 	collections := make([]*flow.Collection, 0, chunkCount)
 	guarantees := make([]*flow.CollectionGuarantee, 0, chunkCount)
@@ -308,7 +318,7 @@ func LightExecutionResultFixture(chunkCount int) verification.CompleteExecutionR
 		ExecutionResult: result,
 	}
 
-	return verification.CompleteExecutionResult{
+	return CompleteExecutionResult{
 		Receipt:        &receipt,
 		Block:          &block,
 		Collections:    collections,

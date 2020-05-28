@@ -36,7 +36,7 @@ func setupMockExeNode(t *testing.T,
 	exeIdentity *flow.Identity,
 	verIdentities flow.IdentityList,
 	othersIdentity flow.IdentityList,
-	completeER verification.CompleteExecutionResult) (*mock2.GenericNode, *network.Engine) {
+	completeER utils.CompleteExecutionResult) (*mock2.GenericNode, *network.Engine) {
 	// mock the execution node with a generic node and mocked engine
 	// to handle request for chunk state
 	exeNode := testutil.GenericNode(t, hub, exeIdentity, othersIdentity)
@@ -111,7 +111,7 @@ func setupMockConsensusNode(t *testing.T,
 	conIdentity *flow.Identity,
 	verIdentities flow.IdentityList,
 	othersIdentity flow.IdentityList,
-	completeER verification.CompleteExecutionResult) (*mock2.GenericNode, *network.Engine, *sync.WaitGroup) {
+	completeER utils.CompleteExecutionResult) (*mock2.GenericNode, *network.Engine, *sync.WaitGroup) {
 	// determines the expected number of result approvals this node should receive
 	approvalsCount := 0
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
