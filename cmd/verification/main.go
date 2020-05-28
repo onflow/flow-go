@@ -110,8 +110,18 @@ func main() {
 		//	return err
 		//}).
 		Module("chunk data pack mempool", func(node *cmd.FlowNodeBuilder) error {
-			chunkDataPacks, err = stdmap.NewChunkDataPacks(chunkLimit, node.Metrics.Mempool)
-			return err
+			chunkDataPacks, err = stdmap.NewChunkDataPacks(chunkLimit)
+			if err != nil {
+				return fmt.Errorf("could not create chunk data packs mempool: %w", err)
+			}
+
+			// registers size method of backend for metrics
+			err := node.Metrics.Mempool.Register(metrics.ResourceChunkDataPack, chunkDataPacks.Size)
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
+			}
+
+			return nil
 		}).
 		Module("chunk data pack tracker mempool", func(node *cmd.FlowNodeBuilder) error {
 			chunkDataPackTracker, err = stdmap.NewChunkDataPackTrackers(chunkLimit)

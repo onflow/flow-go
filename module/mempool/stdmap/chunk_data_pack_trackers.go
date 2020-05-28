@@ -5,8 +5,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/verification/tracker"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/metrics"
 )
 
 // ChunkDataPackTrackers implements the ChunkDataPackTrackers memory pool.
@@ -15,17 +13,10 @@ type ChunkDataPackTrackers struct {
 }
 
 // NewChunkDataPackTrackers creates a new memory pool for ChunkDataPackTrackers.
-func NewChunkDataPackTrackers(limit uint, collector module.MempoolMetrics) (*ChunkDataPackTrackers, error) {
+func NewChunkDataPackTrackers(limit uint) (*ChunkDataPackTrackers, error) {
 	a := &ChunkDataPackTrackers{
 		Backend: NewBackend(WithLimit(limit)),
 	}
-
-	// registers size method of backend for metrics
-	err := collector.Register(metrics.ResourceChunkDataPackTracker, a.Backend.Size)
-	if err != nil {
-		return nil, fmt.Errorf("could not register backend metric: %w", err)
-	}
-
 	return a, nil
 }
 
@@ -73,6 +64,11 @@ func (c *ChunkDataPackTrackers) ByChunkID(chunkID flow.Identifier) (*tracker.Chu
 	}
 	chunkDataPackTracker := entity.(*tracker.ChunkDataPackTracker)
 	return chunkDataPackTracker, true
+}
+
+// Size returns the total number of trackers in the mempool
+func (c *ChunkDataPackTrackers) Size() uint {
+	return c.Backend.Size()
 }
 
 // All returns all chunk data pack trackers from the pool.

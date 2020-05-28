@@ -2,11 +2,7 @@
 package stdmap
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/metrics"
 )
 
 // ChunkDataPacks implements the ChunkDataPack memory pool.
@@ -15,17 +11,10 @@ type ChunkDataPacks struct {
 }
 
 // NewChunkDataPacks creates a new memory pool for ChunkDataPacks.
-func NewChunkDataPacks(limit uint, collector module.MempoolMetrics) (*ChunkDataPacks, error) {
+func NewChunkDataPacks(limit uint) (*ChunkDataPacks, error) {
 	a := &ChunkDataPacks{
 		Backend: NewBackend(WithLimit(limit)),
 	}
-
-	// registers size method of backend for metrics
-	err := collector.Register(metrics.ResourceChunkDataPack, a.Backend.Size)
-	if err != nil {
-		return nil, fmt.Errorf("could not register backend metric: %w", err)
-	}
-
 	return a, nil
 }
 
