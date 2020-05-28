@@ -36,7 +36,7 @@ import (
 type MTrie struct {
 	root           *node.Node
 	number         uint64
-	height         int
+	maxHeight      int
 	parentRootHash []byte
 }
 
