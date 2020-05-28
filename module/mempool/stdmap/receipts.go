@@ -3,11 +3,7 @@
 package stdmap
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/metrics"
 )
 
 // Receipts implements the execution receipts memory pool of the consensus node,
@@ -17,16 +13,10 @@ type Receipts struct {
 }
 
 // NewReceipts creates a new memory pool for execution receipts.
-func NewReceipts(limit uint, collector module.MempoolMetrics) (*Receipts, error) {
+func NewReceipts(limit uint) (*Receipts, error) {
 	// create the receipts memory pool with the lookup maps
 	r := &Receipts{
 		Backend: NewBackend(WithLimit(limit)),
-	}
-
-	// registers size method of backend for metrics
-	err := collector.Register(metrics.ResourceReceipt, r.Backend.Size)
-	if err != nil {
-		return nil, fmt.Errorf("could not register backend metric: %w", err)
 	}
 	return r, nil
 }

@@ -90,12 +90,29 @@ func main() {
 			return nil
 		}).
 		Module("execution authenticated receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-			authReceipts, err = stdmap.NewReceipts(receiptLimit, node.Metrics.Mempool)
-			return err
+			authReceipts, err = stdmap.NewReceipts(receiptLimit)
+			if err != nil {
+				return err
+			}
+			// registers size method of backend for metrics
+			err := node.Metrics.Mempool.Register(metrics.ResourceReceipt, authReceipts.Size)
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
+			}
+			return nil
 		}).
 		//Module("execution pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
 		//	pendingReceipts, err = stdmap.NewPendingReceipts(receiptLimit)
-		//	return err
+		//	if err != nil{
+		//		return err
+		//	}
+		//
+		//	// registers size method of backend for metrics
+		//	err = node.Metrics.Mempool.Register(metrics.ResourcePendingReceipt, pendingReceipts.Size)
+		//	if err != nil {
+		//		return fmt.Errorf("could not register backend metric: %w", err)
+		//	}
+		//	return nil
 		//}).
 		Module("authenticated collections mempool", func(node *cmd.FlowNodeBuilder) error {
 			authCollections, err = stdmap.NewCollections(collectionLimit)

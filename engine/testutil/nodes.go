@@ -169,7 +169,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	results, err := stdmap.NewResults(1000)
 	require.NoError(t, err)
 
-	receipts, err := stdmap.NewReceipts(1000, node.Metrics)
+	receipts, err := stdmap.NewReceipts(1000)
 	require.NoError(t, err)
 
 	approvals, err := stdmap.NewApprovals(1000)
@@ -332,12 +332,12 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.AuthReceipts == nil {
-		node.AuthReceipts, err = stdmap.NewReceipts(1000, node.Metrics)
+		node.AuthReceipts, err = stdmap.NewReceipts(1000)
 		require.Nil(t, err)
 	}
 
 	if node.PendingReceipts == nil {
-		node.PendingReceipts, err = stdmap.NewPendingReceipts(1000, node.Metrics)
+		node.PendingReceipts, err = stdmap.NewPendingReceipts(1000)
 		require.Nil(t, err)
 	}
 

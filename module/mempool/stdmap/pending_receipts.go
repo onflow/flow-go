@@ -3,12 +3,8 @@
 package stdmap
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/verification"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/metrics"
 )
 
 // TODO consolidate with PendingCollections to preserve DRY
@@ -21,18 +17,12 @@ type PendingReceipts struct {
 }
 
 // NewReceipts creates a new memory pool for execution receipts.
-func NewPendingReceipts(limit uint, collector module.MempoolMetrics) (*PendingReceipts, error) {
+func NewPendingReceipts(limit uint) (*PendingReceipts, error) {
 	// create the receipts memory pool with the lookup maps
 	qe := NewQueueEjector(limit + 1)
 	r := &PendingReceipts{
 		qe:      qe,
 		Backend: NewBackend(WithLimit(limit), WithEject(qe.Eject)),
-	}
-
-	// registers size method of backend for metrics
-	err := collector.Register(metrics.ResourcePendingReceipt, r.Backend.Size)
-	if err != nil {
-		return nil, fmt.Errorf("could not register backend metric: %w", err)
 	}
 
 	return r, nil

@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -17,7 +16,7 @@ func TestReceiptPool(t *testing.T) {
 	item1 := unittest.ExecutionReceiptFixture()
 	item2 := unittest.ExecutionReceiptFixture()
 
-	pool, err := stdmap.NewReceipts(1000, metrics.NewNoopCollector())
+	pool, err := stdmap.NewReceipts(1000)
 	require.NoError(t, err)
 
 	t.Run("should be able to add first", func(t *testing.T) {

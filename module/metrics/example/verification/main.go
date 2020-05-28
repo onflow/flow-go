@@ -31,12 +31,12 @@ func main() {
 		// starts periodic launch of mempoolCollector
 		<-mempoolCollector.Ready()
 
-		authReceipts, err := stdmap.NewReceipts(100, mempoolCollector)
+		authReceipts, err := stdmap.NewReceipts(100)
 		if err != nil {
 			panic(err)
 		}
 
-		pendingReceipts, err := stdmap.NewPendingReceipts(100, mempoolCollector)
+		pendingReceipts, err := stdmap.NewPendingReceipts(100)
 		if err != nil {
 			panic(err)
 		}
