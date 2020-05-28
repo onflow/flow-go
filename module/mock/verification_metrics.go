@@ -20,17 +20,12 @@ func (_m *VerificationMetrics) OnChunkVerificationStarted(chunkID flow.Identifie
 	_m.Called(chunkID)
 }
 
-// OnPendingCollectionsUpdated provides a mock function with given fields: size
-func (_m *VerificationMetrics) OnPendingCollectionsUpdated(size uint) {
-	_m.Called(size)
-}
-
-// OnPendingReceiptsUpdated provides a mock function with given fields: size
-func (_m *VerificationMetrics) OnPendingReceiptsUpdated(size uint) {
-	_m.Called(size)
-}
-
 // OnResultApproval provides a mock function with given fields:
 func (_m *VerificationMetrics) OnResultApproval() {
 	_m.Called()
+}
+
+// OnVerifiableChunkSubmitted provides a mock function with given fields: size
+func (_m *VerificationMetrics) OnVerifiableChunkSubmitted(size float64) {
+	_m.Called(size)
 }
