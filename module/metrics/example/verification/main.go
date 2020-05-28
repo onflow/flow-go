@@ -56,7 +56,7 @@ func main() {
 			panic(err)
 		}
 
-		chunkDataPackTrackers, err := stdmap.NewChunkDataPackTrackers(100, mempoolCollector)
+		chunkDataPackTrackers, err := stdmap.NewChunkDataPackTrackers(100)
 		if err != nil {
 			panic(err)
 		}
