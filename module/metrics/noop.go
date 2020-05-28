@@ -62,6 +62,7 @@ func (nc *NoopCollector) StartBlockToSeal(blockID flow.Identifier)              
 func (nc *NoopCollector) FinishBlockToSeal(blockID flow.Identifier)                 {}
 func (nc *NoopCollector) OnChunkVerificationStarted(chunkID flow.Identifier)        {}
 func (nc *NoopCollector) OnChunkVerificationFinished(chunkID flow.Identifier)       {}
+func (nc *NoopCollector) OnVerifiableChunkSubmitted(size float64)                   {}
 func (nc *NoopCollector) OnResultApproval()                                         {}
 func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)      {}
 func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)     {}
