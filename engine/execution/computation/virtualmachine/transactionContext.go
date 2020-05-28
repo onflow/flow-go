@@ -22,40 +22,40 @@ type CheckerFunc func([]byte, runtime.Location) error
 
 type TransactionContext struct {
 	LedgerDAL
-	bc                        BlockContext
-	ledger                    LedgerDAL
-	astCache                  ASTCache
-	signingAccounts           []runtime.Address
-	checker                   CheckerFunc
-	logs                      []string
-	events                    []cadence.Event
-	tx                        *flow.TransactionBody
-	gasLimit                  uint64
-	uuid                      uint64 // TODO: implement proper UUID
-	header                    *flow.Header
-	blocks                    Blocks
-	signatureVerificationDisabled     bool
-	restrictedAccountCreationDisabled bool
-	restrictedDeploymentDisabled      bool
+	bc                               BlockContext
+	ledger                           LedgerDAL
+	astCache                         ASTCache
+	signingAccounts                  []runtime.Address
+	checker                          CheckerFunc
+	logs                             []string
+	events                           []cadence.Event
+	tx                               *flow.TransactionBody
+	gasLimit                         uint64
+	uuid                             uint64 // TODO: implement proper UUID
+	header                           *flow.Header
+	blocks                           Blocks
+	signatureVerificationEnabled     bool
+	restrictedAccountCreationEnabled bool
+	restrictedDeploymentEnabled      bool
 }
 
 type TransactionContextOption func(*TransactionContext)
 
 func WithSignatureVerification(enabled bool) TransactionContextOption {
 	return func(ctx *TransactionContext) {
-		ctx.signatureVerificationDisabled = !enabled
+		ctx.signatureVerificationEnabled = enabled
 	}
 }
 
 func WithRestrictedDeployment(enabled bool) TransactionContextOption {
 	return func(ctx *TransactionContext) {
-		ctx.restrictedDeploymentDisabled = !enabled
+		ctx.restrictedAccountCreationEnabled = enabled
 	}
 }
 
 func WithRestrictedAccountCreation(enabled bool) TransactionContextOption {
 	return func(ctx *TransactionContext) {
-		ctx.restrictedAccountCreationDisabled = !enabled
+		ctx.restrictedDeploymentEnabled = enabled
 	}
 }
 
@@ -197,10 +197,10 @@ func (r *TransactionContext) deductTransactionFee(addr flow.Address) (FlowError,
 
 func (r *TransactionContext) deductAccountCreationFee(addr flow.Address) (FlowError, error) {
 	var script []byte
-	if r.restrictedDeploymentDisabled {
-		script = DeductAccountCreationFeeTransaction()
-	} else {
+	if r.restrictedAccountCreationEnabled {
 		script = DeductAccountCreationFeeWithWhitelistTransaction()
+	} else {
+		script = DeductAccountCreationFeeTransaction()
 	}
 
 	tx := flow.NewTransactionBody().
@@ -310,7 +310,7 @@ func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []b
 
 	// currently, every transaction that sets account code (deploys/updates contracts)
 	// must be signed by the service account
-	if !r.restrictedDeploymentDisabled && !r.isValidSigningAccount(runtime.Address(flow.ServiceAddress())) {
+	if r.restrictedDeploymentEnabled && !r.isValidSigningAccount(runtime.Address(flow.ServiceAddress())) {
 		return fmt.Errorf("code deployment requires authorization from the service account")
 	}
 
