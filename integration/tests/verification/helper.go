@@ -12,12 +12,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/rand"
 
-	"github.com/dapperlabs/flow-go/crypto/random"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
 	mock2 "github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/engine/verification"
-	chmodel "github.com/dapperlabs/flow-go/model/chunks"
+	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	network "github.com/dapperlabs/flow-go/network/mock"
@@ -42,8 +41,6 @@ func setupMockExeNode(t *testing.T,
 	exeNode := testutil.GenericNode(t, hub, exeIdentity, othersIdentity)
 	exeEngine := new(network.Engine)
 
-	var mu sync.Mutex // to secure the mutual exclusion of process method
-
 	// determines the expected number of result chunk data pack requests
 	chunkDataPackCount := 0
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
@@ -59,9 +56,6 @@ func setupMockExeNode(t *testing.T,
 
 	exeEngine.On("Process", testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
-			mu.Lock()
-			defer mu.Unlock()
-
 			if originID, ok := args[0].(flow.Identifier); ok {
 				if req, ok := args[1].(*messages.ChunkDataRequest); ok {
 					require.True(t, ok)
@@ -236,7 +230,7 @@ func SetupMockVerifierEng(t testing.TB, vChunks []*verification.VerifiableChunk)
 	return eng, &wg
 }
 
-func VerifiableChunk(chunkIndex uint64, er verification.CompleteExecutionResult) *verification.VerifiableChunk {
+func VerifiableChunk(chunkIndex uint64, er utils.CompleteExecutionResult) *verification.VerifiableChunk {
 	var endState flow.StateCommitment
 	// last chunk
 	if int(chunkIndex) == len(er.Receipt.ExecutionResult.Chunks)-1 {
@@ -253,4 +247,9 @@ func VerifiableChunk(chunkIndex uint64, er verification.CompleteExecutionResult)
 		Collection:    er.Collections[chunkIndex],
 		ChunkDataPack: er.ChunkDataPacks[chunkIndex],
 	}
+}
+
+// IsAssigned is a helper function that returns true for the even indices in [0, chunkNum-1]
+func IsAssigned(index uint64) bool {
+	return index%2 == 0
 }
