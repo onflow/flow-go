@@ -41,7 +41,7 @@ func main() {
 			panic(err)
 		}
 
-		authCollections, err := stdmap.NewCollections(100, mempoolCollector)
+		authCollections, err := stdmap.NewCollections(100)
 		if err != nil {
 			panic(err)
 		}
@@ -51,7 +51,7 @@ func main() {
 			panic(err)
 		}
 
-		chunkDataPacks, err := stdmap.NewChunkDataPacks(100, mempoolCollector)
+		chunkDataPacks, err := stdmap.NewChunkDataPacks(100)
 		if err != nil {
 			panic(err)
 		}

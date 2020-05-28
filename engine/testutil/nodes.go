@@ -342,7 +342,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.AuthCollections == nil {
-		node.AuthCollections, err = stdmap.NewCollections(1000, node.Metrics)
+		node.AuthCollections, err = stdmap.NewCollections(1000)
 		require.Nil(t, err)
 	}
 
@@ -357,7 +357,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.ChunkDataPacks == nil {
-		node.ChunkDataPacks, err = stdmap.NewChunkDataPacks(1000, node.Metrics)
+		node.ChunkDataPacks, err = stdmap.NewChunkDataPacks(1000)
 		require.Nil(t, err)
 	}
 

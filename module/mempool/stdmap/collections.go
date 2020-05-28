@@ -3,11 +3,7 @@
 package stdmap
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/metrics"
 )
 
 // Collections implements a mempool storing collections.
@@ -16,15 +12,9 @@ type Collections struct {
 }
 
 // NewCollections creates a new memory pool for collection.
-func NewCollections(limit uint, collector module.MempoolMetrics) (*Collections, error) {
+func NewCollections(limit uint) (*Collections, error) {
 	c := &Collections{
 		Backend: NewBackend(WithLimit(limit)),
-	}
-
-	// registers size method of backend for metrics
-	err := collector.Register(metrics.ResourceCollection, c.Backend.Size)
-	if err != nil {
-		return nil, fmt.Errorf("could not register backend metric: %w", err)
 	}
 	return c, nil
 }

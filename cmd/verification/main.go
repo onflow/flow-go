@@ -98,8 +98,18 @@ func main() {
 		//	return err
 		//}).
 		Module("authenticated collections mempool", func(node *cmd.FlowNodeBuilder) error {
-			authCollections, err = stdmap.NewCollections(collectionLimit, node.Metrics.Mempool)
-			return err
+			authCollections, err = stdmap.NewCollections(collectionLimit)
+			if err != nil {
+				return fmt.Errorf("could not create collections mempool: %w", err)
+			}
+
+			// registers size method of backend for metrics
+			err := node.Metrics.Mempool.Register(metrics.ResourceCollection, authCollections.Size)
+
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
+			}
+			return nil
 		}).
 		//Module("pending collections mempool", func(node *cmd.FlowNodeBuilder) error {
 		//	pendingCollections, err = stdmap.NewPendingCollections(collectionLimit)
