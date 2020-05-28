@@ -33,6 +33,10 @@ type ComplianceMetrics interface {
 	BlockSealed(*flow.Block)
 }
 
+type CleanerMetrics interface {
+	RanGC(took time.Duration)
+}
+
 type CacheMetrics interface {
 	CacheEntries(resource string, entries uint)
 	CacheHit(resource string)
