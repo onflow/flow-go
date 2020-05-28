@@ -78,7 +78,7 @@ func (c *Cleaner) RunGC() {
 			return
 		}
 
-		runtime := time.Now().Sub(started)
+		runtime := time.Since(started)
 		c.log.Debug().
 			Dur("gc_duration", runtime).
 			Msg("garbage collection on value log executed")
