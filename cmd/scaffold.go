@@ -156,7 +156,8 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 }
 
 func (fnb *FlowNodeBuilder) configureChainParams() {
-	flow.SetChainID(flow.ChainID(fnb.BaseConfig.chainID))
+	// Take chain id from genesis block instead
+	// flow.SetChainID(flow.ChainID(fnb.BaseConfig.chainID))
 }
 
 func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
@@ -383,6 +384,8 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
 		}
 
+		flow.SetChainID(fnb.GenesisBlock.Header.ChainID)
+
 		// load genesis QC and DKG data from bootstrap files
 		fnb.GenesisQC, err = loadRootBlockQC(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
@@ -420,6 +423,8 @@ func (fnb *FlowNodeBuilder) initState() {
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
 		}
+
+		flow.SetChainID(fnb.GenesisBlock.Header.ChainID)
 
 		// load genesis QC and DKG data from bootstrap files for recovery
 		fnb.GenesisQC, err = loadRootBlockQC(fnb.BaseConfig.BootstrapDir)
