@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
+	"github.com/dapperlabs/flow-go/engine/execution/utils"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -637,7 +637,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 		sequenceNumber++
 
-		rootHasher, err := hash.NewHasher(unittest.ServiceAccountPrivateKey.HashAlgo)
+		rootHasher, err := utils.NewHasher(unittest.ServiceAccountPrivateKey.HashAlgo)
 		require.NoError(t, err)
 
 		err = tx.SignEnvelope(

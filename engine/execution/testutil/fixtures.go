@@ -17,6 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
+	"github.com/dapperlabs/flow-go/engine/execution/utils"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -53,7 +54,7 @@ func SignPayload(
 	account flow.Address,
 	privateKey flow.AccountPrivateKey,
 ) error {
-	hasher, err := hash.NewHasher(privateKey.HashAlgo)
+	hasher, err := utils.NewHasher(privateKey.HashAlgo)
 	if err != nil {
 		return fmt.Errorf("failed to create hasher: %w", err)
 	}
@@ -68,7 +69,7 @@ func SignPayload(
 }
 
 func SignEnvelope(tx *flow.TransactionBody, account flow.Address, privateKey flow.AccountPrivateKey) error {
-	hasher, err := hash.NewHasher(privateKey.HashAlgo)
+	hasher, err := utils.NewHasher(privateKey.HashAlgo)
 	if err != nil {
 		return fmt.Errorf("failed to create hasher: %w", err)
 	}
