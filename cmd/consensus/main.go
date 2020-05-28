@@ -182,7 +182,7 @@ func main() {
 
 			// initialize the entity database accessors
 			// TODO frequency of 0 turns off the cleaner, turn back on once we know the proper tuning
-			cleaner := bstorage.NewCleaner(node.Logger, node.DB, 0)
+			cleaner := bstorage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), 0)
 
 			// initialize the pending blocks cache
 			proposals := buffer.NewPendingBlocks()
