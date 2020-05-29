@@ -23,8 +23,8 @@ In our terminology, we explicitly differentiate between:
 
 The storage model is defined for the tree. At its heart, it is a key-value store.
 In the store, there are a fixed number of storage slots, which we refer to as **registers**.
-By convention, each register has a key (memory address) and a value 
-(the binary blob stored in that memory slot). While all register keys have the same fixed length
+By convention, each register has a key (identifying  the storage slot) and a value 
+(binary blob) stored in that memory slot. While all register keys have the same fixed length
 (measured in bits), the values are variable-length byte slices.
 We define an **unallocated register** as holding no data, i.e. an empty byte slice.
 By default, each register is unallocated. In contrast, an **allocated_ register**
