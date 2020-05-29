@@ -16,9 +16,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
-	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
+	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	module "github.com/dapperlabs/flow-go/module/mock"
-	"github.com/dapperlabs/flow-go/module/results"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
@@ -38,7 +37,7 @@ func SetupTest(t *testing.T, maxTry int) (
 	headerDB map[flow.Identifier]*flow.Header,
 	state *protocol.State,
 	snapshot *protocol.Snapshot,
-	er *mempool.PendingResults,
+	er *stdmap.PendingResults,
 	verifier *network.Engine,
 	chunks *Chunks,
 	assigner *module.ChunkAssigner,
@@ -67,7 +66,7 @@ func SetupTest(t *testing.T, maxTry int) (
 	head = block.Header
 
 	// setup other dependencies
-	er = results.NewPendingResults()
+	er = stdmap.NewPendingResults()
 	verifier = &network.Engine{}
 	assigner = &module.ChunkAssigner{}
 	chunks = NewChunks(10)

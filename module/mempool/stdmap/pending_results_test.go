@@ -7,15 +7,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 )
 
 // check the implementation
-var _ module.PendingResults = (*stdmap.PendingResults)(nil)
+var _ mempool.PendingResults = (*stdmap.PendingResults)(nil)
 
 func TestAddByID(t *testing.T) {
-	results := results.NewPendingResults()
+	results := stdmap.NewPendingResults()
 	result := &flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
 			BlockID: flow.Identifier{0xbb},
@@ -37,7 +37,7 @@ func TestAddByID(t *testing.T) {
 }
 
 func TestConcurrency(t *testing.T) {
-	results := results.NewPendingResults()
+	results := stdmap.NewPendingResults()
 	var wg sync.WaitGroup
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
