@@ -107,7 +107,11 @@ func (suite *LightIngestTestSuite) SetupTest() {
 	suite.ingestedCollectionIDs = &mempool.Identifiers{}
 	suite.assigner = &module.ChunkAssigner{}
 
-	completeER := utils.CompleteExecutionResultFixture(suite.T(), 1)
+	suite.verIdentity = unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	suite.execIdentity = unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	suite.collIdentity = unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+
+	completeER := utils.CompleteExecutionResultFixture(suite.T(), 1, suite.execIdentity.NodeID)
 	suite.collection = completeER.Collections[0]
 	suite.block = completeER.Block
 	suite.receipt = completeER.Receipt
@@ -115,10 +119,6 @@ func (suite *LightIngestTestSuite) SetupTest() {
 	suite.chunkDataPack = completeER.ChunkDataPacks[0]
 	suite.collTracker = tracker.NewCollectionTracker(suite.collection.ID(), suite.block.ID())
 	suite.chunkTracker = tracker.NewChunkDataPackTracker(suite.chunk.ID(), suite.block.ID())
-
-	suite.verIdentity = unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-	suite.execIdentity = unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	suite.collIdentity = unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 
 	// parameters set based on following issue
 	// https://github.com/dapperlabs/flow-go/issues/3443
