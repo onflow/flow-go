@@ -31,13 +31,13 @@ func (p *PendingCollections) Add(pcoll *verification.PendingCollection) bool {
 	if ok {
 		p.qe.Push(pcoll.ID())
 	}
-
 	return ok
 }
 
 // Rem removes a pending collection by ID from memory
 func (p *PendingCollections) Rem(collID flow.Identifier) bool {
-	return p.Backend.Rem(collID)
+	ok := p.Backend.Rem(collID)
+	return ok
 }
 
 // ByID returns the pending collection with the given ID from the mempool.

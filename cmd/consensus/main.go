@@ -104,6 +104,16 @@ func main() {
 		}).
 		Module("execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
 			receipts, err = stdmap.NewReceipts(receiptLimit)
+			if err != nil {
+				return err
+			}
+
+			// registers size method of backend for metrics
+			err = node.Metrics.Mempool.Register(metrics.ResourceReceipt, receipts.Size)
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
+			}
+
 			return err
 		}).
 		Module("result approvals mempool", func(node *cmd.FlowNodeBuilder) error {
