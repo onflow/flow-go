@@ -90,7 +90,10 @@ func (suite *VerifierEngineTestSuite) TestInvalidSender() {
 	// mocks NodeID method of the local
 	suite.me.MockNodeID(myID)
 
-	completeRA := utils.CompleteExecutionResultFixture(suite.T(), 1)
+	// identity of execution node who assumed to generate the receipt
+	execIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+
+	completeRA := utils.CompleteExecutionResultFixture(suite.T(), 1, execIdentity.NodeID)
 
 	err := eng.Process(invalidID, &completeRA)
 	assert.Error(suite.T(), err)
