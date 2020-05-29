@@ -1,8 +1,16 @@
 # Memory-Trie: `MTrie`
 
 At its heart, an `MTrie` is an in-memory key-value store, with the ability to generate cryptographic proofs
-for the states of the stored registers.
-`MTrie` is a flavour of a Merkle [Radix Tree](https://en.wikipedia.org/wiki/Radix_tree). 
+for the states of the stored registers.  `MTrie` combines features of [Merkle trees](https://en.wikipedia.org/wiki/Merkle_tree) 
+(for generating cryptographic proofs for the stored register) and [Radix Trees](https://en.wikipedia.org/wiki/Radix_tree)
+(for optimized memory consumption).
+
+By construction, `MTrie`s are _immutable data structures_. Essentially, they represent a snapshot of the key-value store
+for one specific point in time. Updating register values is implemented through
+copy-on-write, which creates a new `MTrie`, i.e. a new snapshot of the updated key-value store.
+For minimal memory consumption, all sub-tries that where not affected by the write 
+operation are shared between the original `Mtrie` (before the register updates) and the updated `MTrie`
+(after the register writes).
 
 ## Storage Model
 Formally, an `MTrie` represents a *perfect*, *full*, *binary* Merkle tree with *uniform height*. 
