@@ -49,9 +49,8 @@ func TestErrorWrapping(t *testing.T) {
 		Msg: fmt.Sprintf("invalid input: %v", err),
 	}
 	require.True(t, errors.Is(err, InvalidInput{}))
-	// do this think we would want to assert a wrapped error
 	require.False(t, errors.Is(err, CustomizedError{}))
-	fmt.Printf("%v\n", err.Error())
+	require.Equal(t, "invalid input: customized", err.Error())
 
 	err = InvalidInput{
 		Msg: "invalid input",
