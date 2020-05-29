@@ -69,7 +69,9 @@ func GetCompleteExecutionResultForCounter(t *testing.T, chunkCount int) verifica
 		defer led.Done()
 
 		startStateCommitment, err := bootstrap.BootstrapLedger(
+			zerolog.Logger{},
 			led,
+			new(storage.Blocks),
 			unittest.ServiceAccountPublicKey,
 			unittest.GenesisTokenSupply,
 		)

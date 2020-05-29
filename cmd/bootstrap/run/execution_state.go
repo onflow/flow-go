@@ -1,12 +1,15 @@
 package run
 
 import (
+	"github.com/rs/zerolog"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
+	storage "github.com/dapperlabs/flow-go/storage/mock"
 )
 
 func GenerateServiceAccountPrivateKey(seed []byte) (flow.AccountPrivateKey, error) {
@@ -29,5 +32,5 @@ func GenerateExecutionState(dbDir string, accountKey flow.AccountPublicKey, gene
 	if err != nil {
 		return nil, err
 	}
-	return bootstrap.BootstrapLedger(ledgerStorage, accountKey, genesisTokenSupply)
+	return bootstrap.BootstrapLedger(zerolog.Logger{}, ledgerStorage, new(storage.Blocks), accountKey, genesisTokenSupply)
 }

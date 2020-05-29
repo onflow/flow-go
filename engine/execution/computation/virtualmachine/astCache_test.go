@@ -97,9 +97,9 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.New(rt)
+	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
 	require.NoError(t, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(storage.Blocks))
 
 	// Create a number of account private keys.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -155,9 +155,9 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.New(rt)
+	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
 	require.NoError(b, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(storage.Blocks))
 
 	// Create a number of account private keys.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -230,7 +230,7 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 
 	vm, err := virtualmachine.NewWithCache(rt, &nonFunctioningCache{})
 	require.NoError(b, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(storage.Blocks))
 
 	// Create a number of account private keys.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -284,9 +284,9 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.New(rt)
+	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
 	require.NoError(t, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(storage.Blocks))
 
 	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
 	ledger := testutil.RootBootstrappedLedger()

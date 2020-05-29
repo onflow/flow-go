@@ -385,14 +385,6 @@ func (r *TransactionContext) GetBlockAtHeight(height uint64) (hash runtime.Block
 	return runtime.BlockHash(block.ID()), block.Header.Timestamp.UnixNano(), true, nil
 }
 
-func (r *TransactionContext) isValidSigningAccount(address runtime.Address) bool {
-	for _, accountAddress := range r.GetSigningAccounts() {
-		if accountAddress == address {
-			return true
-		}
-	}
-}
-
 // checkProgram checks the given code for syntactic and semantic correctness.
 func (r *TransactionContext) checkProgram(code []byte, address runtime.Address) error {
 	if code == nil {

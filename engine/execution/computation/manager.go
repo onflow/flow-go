@@ -107,7 +107,7 @@ func (e *Manager) ComputeBlock(
 }
 
 func (e *Manager) GetAccount(addr flow.Address, blockHeader *flow.Header, view *delta.View) (*flow.Account, error) {
-	account, err := e.vm.NewBlockContext(blockHeader).GetAccount(view, addr)
+	account, err := e.vm.NewBlockContext(blockHeader, e.blocks).GetAccount(view, addr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get accounot at block (%s): %w", blockHeader.ID(), err)
 	}

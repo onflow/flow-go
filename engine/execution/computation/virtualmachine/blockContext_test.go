@@ -148,9 +148,9 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.New(rt)
+	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
 	require.NoError(t, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(storage.Blocks))
 
 	t.Run("account update with set code succeeds as service account", func(t *testing.T) {
 		ledger := execTestutil.RootBootstrappedLedger()
@@ -319,9 +319,9 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.New(rt)
+	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
 	assert.NoError(t, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(storage.Blocks))
 
 	var tests = []struct {
 		label    string
@@ -381,9 +381,9 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.New(rt)
+	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
 	assert.NoError(t, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(storage.Blocks))
 
 	privateKeys, err := execTestutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
@@ -650,7 +650,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		err := execTestutil.SignTransactionByRoot(tx, 0)
 		require.NoError(t, err)
 
-		ledger, err := execTestutil.RootBootstrappedLedger()
+		ledger := execTestutil.RootBootstrappedLedger()
 		require.NoError(t, err)
 
 		result, err := bc.ExecuteTransaction(ledger, tx)
@@ -676,7 +676,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 			}
 		`)
 
-		ledger, err := execTestutil.RootBootstrappedLedger()
+		ledger := execTestutil.RootBootstrappedLedger()
 		require.NoError(t, err)
 
 		result, err := bc.ExecuteScript(ledger, script)
@@ -705,7 +705,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		err := execTestutil.SignTransactionByRoot(tx, 0)
 		require.NoError(t, err)
 
-		ledger, err := execTestutil.RootBootstrappedLedger()
+		ledger := execTestutil.RootBootstrappedLedger()
 		require.NoError(t, err)
 
 		assert.PanicsWithValue(t, interpreter.ExternalError{
@@ -723,7 +723,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 			}
 		`)
 
-		ledger, err := execTestutil.RootBootstrappedLedger()
+		ledger := execTestutil.RootBootstrappedLedger()
 		require.NoError(t, err)
 
 		assert.PanicsWithValue(t, interpreter.ExternalError{

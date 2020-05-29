@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
@@ -18,6 +19,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
+	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -136,7 +138,7 @@ func CreateAccounts(
 	ledger virtualmachine.Ledger,
 	privateKeys []flow.AccountPrivateKey,
 ) ([]flow.Address, error) {
-	ctx := vm.NewBlockContext(nil)
+	ctx := vm.NewBlockContext(nil, new(storage.Blocks))
 
 	var accounts []flow.Address
 
@@ -188,7 +190,8 @@ func CreateAccounts(
 
 func RootBootstrappedLedger() virtualmachine.Ledger {
 	ledger := make(virtualmachine.MapLedger)
-	bootstrap.BootstrapView(ledger, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply)
+	bootstrap.BootstrapView(zerolog.Logger{}, ledger, new(storage.Blocks), unittest.ServiceAccountPublicKey,
+		unittest.GenesisTokenSupply)
 	return ledger
 }
 
@@ -212,13 +215,13 @@ func CreateAccountCreationTransaction(t *testing.T) (flow.AccountPrivateKey, *fl
 	require.NoError(t, err)
 
 	// define the cadence script
-	script := fmt.Sprintf(`	
-		transaction {	
-		  prepare(signer: AuthAccount) {	
-			let acct = AuthAccount(payer: signer)	
-			acct.addPublicKey("%s".decodeHex())	
-		  }	
-		}	
+	script := fmt.Sprintf(`
+		transaction {
+		  prepare(signer: AuthAccount) {
+			let acct = AuthAccount(payer: signer)
+			acct.addPublicKey("%s".decodeHex())
+		  }
+		}
 	`, hex.EncodeToString(keyBytes))
 
 	// create the transaction to create the account
