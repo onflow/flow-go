@@ -67,7 +67,7 @@ If seeds are not provided, the CLI will try to use the system's pseudo-random nu
 
 #### Example
 ```bash
-go run -tags relic ./cmd/bootstrap key --address "example.com" --role "consensus" -o ./bootstrap/partner-node-infos
+go run -tags relic ./cmd/bootstrap key --address "example.com:1234" --role "consensus" -o ./bootstrap/partner-node-infos
 ```
 
 #### Generated output files
