@@ -29,6 +29,11 @@ import (
 //   * how Merkle proofs are generated from a trie, and
 //   * how a new Trie with updated values is generated.
 //
+// `MTrie`s are _immutable_ data structures. Updating register values is implemented through
+// copy-on-write, which creates a new `MTrie`. For minimal memory consumption, all sub-tries
+// that where not affected by the write operation are shared between the original MTrie
+// (before the register updates) and the updated MTrie (after the register writes).
+//
 // DEFINITIONS and CONVENTIONS:
 //   * HEIGHT of a node v in a tree is the number of edges on the longest downward path
 //     between v and a tree leaf. The height of a tree is the heights of its root.
