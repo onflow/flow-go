@@ -33,8 +33,9 @@ type CompleteExecutionResult struct {
 
 // CompleteExecutionResultFixture returns complete execution result with an
 // execution receipt referencing the block/collections.
-// chunkCount determines the number of chunks inside each receipt
-func CompleteExecutionResultFixture(t *testing.T, chunkCount int) CompleteExecutionResult {
+// chunkCount determines the number of chunks inside each receipt.
+// exeID is the identifier of the execution node who generates this receipt.
+func CompleteExecutionResultFixture(t *testing.T, chunkCount int, exeID flow.Identifier) CompleteExecutionResult {
 
 	// setup collection
 	tx1 := testutil.DeployCounterContractTransaction(flow.ServiceAddress())
@@ -251,6 +252,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) CompleteExecut
 
 	receipt := flow.ExecutionReceipt{
 		ExecutionResult: result,
+		ExecutorID:      exeID,
 	}
 	return CompleteExecutionResult{
 		Receipt:        &receipt,
