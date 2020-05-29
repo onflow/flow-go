@@ -266,7 +266,8 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, exeID flow.Ide
 // execution receipt referencing the block/collections. In the light version of execution result,
 // everything is wired properly, but with the minimum viable content provided. This version is basically used
 // for profiling.
-func LightExecutionResultFixture(chunkCount int) CompleteExecutionResult {
+// exeID is the identifier of the execution node who generates this receipt.
+func LightExecutionResultFixture(chunkCount int, exeID flow.Identifier) CompleteExecutionResult {
 	chunks := make([]*flow.Chunk, 0)
 	collections := make([]*flow.Collection, 0, chunkCount)
 	guarantees := make([]*flow.CollectionGuarantee, 0, chunkCount)
@@ -318,6 +319,7 @@ func LightExecutionResultFixture(chunkCount int) CompleteExecutionResult {
 
 	receipt := flow.ExecutionReceipt{
 		ExecutionResult: result,
+		ExecutorID:      exeID,
 	}
 
 	return CompleteExecutionResult{

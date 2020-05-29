@@ -170,7 +170,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, lightIng
 	// ingest only sends the assigned chunks to verifier
 
 	for i := 0; i < erCount; i++ {
-		er := utils.LightExecutionResultFixture(chunksNum)
+		er := utils.LightExecutionResultFixture(chunksNum, exeID.NodeID)
 		ers = append(ers, er)
 		// assigns all chunks to the verifier node
 		for j, chunk := range er.Receipt.ExecutionResult.Chunks {
