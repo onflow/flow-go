@@ -21,7 +21,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -426,8 +425,7 @@ func RootAccountWithKey(flowClient *client.Client, key string) (flowsdk.Address,
 
 	accountKey := acc.Keys[0]
 
-	hasher, err := hash.NewHasher(unittest.ServiceAccountPrivateKey.HashAlgo)
-	signer := crypto.NewInMemorySigner(unittest.ServiceAccountPrivateKey, crypto.HashAlgorithm(unittest.ServiceAccountPrivateKey.HashAlgo))
+	signer := crypto.NewInMemorySigner(privateKey, accountKey.HashAlgo)
 
 	return addr, accountKey, signer
 }

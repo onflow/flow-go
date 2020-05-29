@@ -189,6 +189,12 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		return fmt.Errorf("could not send vote: %w", err)
 	}
 
+	e.log.Debug().
+		Hex("block_id", blockID[:]).
+		Uint64("view", view).
+		Hex("recipient_id", recipientID[:]).
+		Msg("sending vote")
+
 	e.engMetrics.MessageSent(metrics.EngineProposal, metrics.MessageClusterBlockVote)
 
 	return nil
@@ -549,6 +555,13 @@ func (e *Engine) processPendingChildren(header *flow.Header) error {
 // onBlockVote handles votes for blocks by passing them to the core consensus
 // algorithm
 func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.ClusterBlockVote) error {
+
+	e.log.Debug().
+		Hex("origin_id", originID[:]).
+		Hex("block_id", vote.BlockID[:]).
+		Uint64("view", vote.View).
+		Msg("received vote")
+
 	e.hotstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.SigData)
 	return nil
 }

@@ -33,11 +33,11 @@ func main() {
 	}
 
 	// Generate key
-	seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
-	if n, err := rand.Read(seed); err != nil || n != crypto.KeyGenSeedMinLenECDSAP256 {
+	seed := make([]byte, crypto.KeyGenSeedMinLenECDSA_P256)
+	if n, err := rand.Read(seed); err != nil || n != crypto.KeyGenSeedMinLenECDSA_P256 {
 		log.Fatal(err)
 	}
-	key, err := keys.GeneratePrivateKey(keys.ECDSAP256_SHA2_256, seed)
+	key, err := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA2_256, seed)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func main() {
 				ReferenceBlockHash: []byte{1, 2, 3, 4},
 				Nonce:              nonce,
 				ComputeLimit:       10,
-				PayerAccount:       sdk.ServiceAddress(),
+				PayerAccount:       sdk.RootAddress,
 			}
 
 			sig, err := keys.SignTransaction(tx, key)
@@ -67,7 +67,7 @@ func main() {
 				log.Fatal(err)
 			}
 
-			tx.AddSignature(sdk.ServiceAddress(), sig)
+			tx.AddSignature(sdk.RootAddress, sig)
 
 			err = c.SendTransaction(context.Background(), tx)
 			if err != nil {

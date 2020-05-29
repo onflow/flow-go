@@ -10,6 +10,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 const receiptStateTimeout = 60 * time.Second
@@ -65,7 +66,7 @@ func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *
 	*flow.ExecutionReceipt) {
 
 	// get the state commitment for the highest finalized block
-	initialFinalizedSC := flow.StateCommitment{}
+	initialFinalizedSC := unittest.GenesisStateCommitment
 	b1, ok := bs.HighestFinalized()
 	if ok {
 		r1 := rs.WaitForReceiptFromAny(t, b1.Header.ID())
