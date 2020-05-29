@@ -133,6 +133,7 @@ func main() {
 				node.Me,
 				resultsDB,
 				node.Storage.Headers,
+				node.Storage.Index,
 				results,
 				receipts,
 				approvals,

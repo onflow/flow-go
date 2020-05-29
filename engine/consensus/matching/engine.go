@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -22,6 +23,7 @@ import (
 var (
 	errUnknownBlock    = errors.New("result block unknown")
 	errUnknownPrevious = errors.New("previous result unknown")
+	errInvalidChunks   = errors.New("invalid chunk number")
 )
 
 // Engine is the propagation engine, which makes sure that new collections are
@@ -35,6 +37,7 @@ type Engine struct {
 	me        module.Local             // used to access local node information
 	resultsDB storage.ExecutionResults // used to permanently store results
 	headersDB storage.Headers          // used to check sealed headers
+	indexDB   storage.Index            // used to check payloads for resulcts
 	results   mempool.Results          // holds execution results in memory
 	receipts  mempool.Receipts         // holds execution receipts in memory
 	approvals mempool.Approvals        // holds result approvals in memory
@@ -43,7 +46,7 @@ type Engine struct {
 }
 
 // New creates a new collection propagation engine.
-func New(log zerolog.Logger, collector module.EngineMetrics, mempool module.MempoolMetrics, net module.Network, state protocol.State, me module.Local, resultsDB storage.ExecutionResults, headersDB storage.Headers, results mempool.Results, receipts mempool.Receipts, approvals mempool.Approvals, seals mempool.Seals) (*Engine, error) {
+func New(log zerolog.Logger, collector module.EngineMetrics, mempool module.MempoolMetrics, net module.Network, state protocol.State, me module.Local, resultsDB storage.ExecutionResults, headersDB storage.Headers, indexDB storage.Index, results mempool.Results, receipts mempool.Receipts, approvals mempool.Approvals, seals mempool.Seals) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
@@ -55,6 +58,7 @@ func New(log zerolog.Logger, collector module.EngineMetrics, mempool module.Memp
 		me:        me,
 		resultsDB: resultsDB,
 		headersDB: headersDB,
+		indexDB:   indexDB,
 		results:   results,
 		receipts:  receipts,
 		approvals: approvals,
@@ -194,11 +198,9 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	// store the receipt in the memory pool
 	added := e.receipts.Add(receipt)
 	if !added {
-		log.Debug().Msg("skipping receipt already in mempool")
+		log.Debug().Msg("discarding receipt already in mempool")
 		return nil
 	}
-
-	log.Info().Msg("execution receipt added to mempool")
 
 	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
 
@@ -308,6 +310,11 @@ func (e *Engine) checkSealing() {
 			Logger()
 
 		err := e.sealResult(result)
+		if err == errInvalidChunks {
+			_ = e.results.Rem(result.ID())
+			log.Warn().Msg("removing sealable result with invalid number of chunks")
+			continue
+		}
 		if err == errUnknownBlock {
 			log.Debug().Msg("skipping sealable result with unknown sealed block")
 			continue
@@ -345,34 +352,67 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 	}
 	threshold := verifiers.TotalStake() / 3 * 2
 
-	// get all available approvals once
-	approvals := e.approvals.All()
+	// get all available approvals once, and map them to their result
+	byResult := make(map[flow.Identifier]([]*flow.ResultApproval))
+	for _, approval := range e.approvals.All() {
+		resultID := approval.Body.ExecutionResultID
+		byResult[resultID] = append(byResult[resultID], approval)
+	}
 
 	// go through all results and check which ones we have enough approvals for
+ResultLoop:
 	for _, result := range e.results.All() {
-
-		// get the node IDs for all approvers of this result
-		// TODO: check for duplicate approver
-		var approverIDs []flow.Identifier
 		resultID := result.ID()
-		for _, approval := range approvals {
-			if approval.Body.ExecutionResultID == resultID {
-				approverIDs = append(approverIDs, approval.Body.ApproverID)
+
+		// get the approvals for this result
+		approvals := byResult[resultID]
+
+		// go through all the chunks of this result and check that each of them
+		// have a qualified majority of verifier stake approving
+		for _, chunk := range result.Chunks {
+
+			log := e.log.With().
+				Hex("block", result.BlockID[:]).
+				Hex("result", logging.Entity(result)).
+				Uint64("chunk", chunk.Index).
+				Logger()
+
+			// we use this to check for duplicate approvals by one approver
+			dupCheck := make(map[flow.Identifier]bool)
+
+			// get the node IDs for all approvers of this chunk
+			var approverIDs []flow.Identifier
+			for _, approval := range approvals {
+				if approval.Body.ChunkIndex == chunk.Index {
+					approverID := approval.Body.ApproverID
+					if dupCheck[approverID] {
+						_ = e.approvals.Rem(approval.ID())
+						log.Warn().
+							Hex("approver", approverID[:]).
+							Msg("dropping duplicate approval")
+						continue
+					}
+					dupCheck[approverID] = true
+					approverIDs = append(approverIDs, approverID)
+				}
+			}
+
+			// get all of the approver identities and check threshold
+			approvers := verifiers.Filter(filter.HasNodeID(approverIDs...))
+			voted := approvers.TotalStake()
+
+			log = log.With().
+				Uint64("voted", voted).
+				Uint64("threshold", threshold).
+				Logger()
+
+			if voted <= threshold {
+				log.Debug().Msg("ignoring result with insufficient verification")
+				continue ResultLoop
 			}
 		}
 
-		// get all of the approver identities and check threshold
-		approvers := verifiers.Filter(filter.And(
-			filter.HasRole(flow.RoleVerification),
-			filter.HasStake(true),
-			filter.HasNodeID(approverIDs...),
-		))
-		voted := approvers.TotalStake()
-		if voted <= threshold { // nolint: emptybranch
-			// NOTE: we are currently generating a seal for every result, regardless of approvals
-			// e.log.Debug().Msg("ignoring result with insufficient verification")
-			// continue
-		}
+		log.Info().Msg("adding result with sufficient verification")
 
 		// add the result to the results that should be sealed
 		results = append(results, result)
@@ -383,13 +423,22 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 
 func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 
-	// check if we know the block the result pertains to
-	_, err := e.headersDB.ByBlockID(result.BlockID)
+	// we create one chunk per collection (at least for now), so we can
+	// check if the chunk number matches with the number of guarantees; this
+	// will ensure the execution receipt can not lie about having less
+	// chunks and having the remaining ones approved
+	index, err := e.indexDB.ByBlockID(result.BlockID)
 	if errors.Is(err, storage.ErrNotFound) {
+		// if we have not received the block yet, we will just keep
+		// rechecking until the block has been received or the result has
+		// been purged
 		return errUnknownBlock
 	}
 	if err != nil {
-		return fmt.Errorf("could not check sealed header: %w", err)
+		return fmt.Errorf("could not retrieve payload index: %w", err)
+	}
+	if len(result.Chunks) != len(index.CollectionIDs) {
+		return errInvalidChunks
 	}
 
 	// get the previous result from our mempool or storage
