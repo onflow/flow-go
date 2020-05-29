@@ -170,9 +170,7 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, r *flow.Executi
 	// different execution results can be chunked in parallel
 	chunks, err := e.myChunkAssignments(result.ExecutionResult)
 	if err != nil {
-		return InvalidInput{
-			Msg: fmt.Sprintf("could not find my chunk assignments: %v", err),
-		}
+		return fmt.Errorf("could not find my chunk assignments: %w", err)
 	}
 
 	// add each chunk to a pending list to be processed by onTimer
@@ -336,9 +334,7 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	// TODO check the origin is a node that we requested before
 	sender, err := e.state.Final().Identity(originID)
 	if err == storage.ErrNotFound {
-		return InvalidInput{
-			Msg: fmt.Sprintf("origin is unstaked: %v", originID),
-		}
+		return NewInvalidInput(fmt.Sprintf("origin is unstaked: %v", originID))
 	} else if err != nil {
 		return fmt.Errorf("could not find identity for chunkID %v: %w", chunkID, err)
 	}
