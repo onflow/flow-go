@@ -48,7 +48,7 @@ func (g *Events) New() flow.Event {
 
 	payload, err := encoding.Encode(testEvent)
 	if err != nil {
-		panic(fmt.Sprintf("unexpected error while encoding events "))
+		panic(fmt.Sprintf("unexpected error while encoding events: %s", err))
 	}
 	event := flow.Event{
 		Type:             flow.EventType(typeID),
