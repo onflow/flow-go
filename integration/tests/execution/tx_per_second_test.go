@@ -77,7 +77,7 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 	flowClient, err := client.New(fmt.Sprintf(":%s", gs.net.AccessPorts[testnet.AccessNodeAPIPort]), grpc.WithInsecure())
 	require.NoError(gs.T(), err, "could not get client")
 
-	gs.rootAcctAddr, gs.rootAcctKey, gs.rootSigner = RootAccountWithKey(flowClient, unittest.ServiceAccountPrivateKeyHex)
+	gs.rootAcctAddr, gs.rootAcctKey, gs.rootSigner = RootAccountWithKey(flowClient, unittest.ServiceAccountPrivateKeyHexSDK)
 
 	// wait for first finalized block, called blockA
 	// blockA := gs.BlockState.WaitForFirstFinalized(gs.T())
@@ -173,6 +173,16 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 
 }
 
+func (gs *TransactionsPerSecondSuite) SetTokenAddresses() {
+	addressGen := flowsdk.NewAddressGenerator(flowsdk.Testnet)
+	_, err := addressGen.NextAddress()
+	examples.Handle(err)
+	fungibleTokenAddress, err = addressGen.NextAddress()
+	examples.Handle(err)
+	flowTokenAddress, err = addressGen.NextAddress()
+	examples.Handle(err)
+}
+
 func (gs *TransactionsPerSecondSuite) DeployFungibleAndFlowTokens(flowClient *client.Client) {
 	ctx := context.Background()
 	// Deploy the FT contract
@@ -183,6 +193,7 @@ func (gs *TransactionsPerSecondSuite) DeployFungibleAndFlowTokens(flowClient *cl
 
 	deployContractTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(gs.ref.ID).
+		AddAuthorizer(gs.rootAcctAddr).
 		SetScript(deployFTScript).
 		SetProposalKey(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootAcctKey.SequenceNumber).
 		SetPayer(gs.rootAcctAddr)
@@ -227,6 +238,7 @@ func (gs *TransactionsPerSecondSuite) DeployFungibleAndFlowTokens(flowClient *cl
 
 	deployFlowTokenContractTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(gs.ref.ID).
+		AddAuthorizer(gs.rootAcctAddr).
 		SetScript(deployFlowTokenScript).
 		SetProposalKey(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootAcctKey.SequenceNumber).
 		SetPayer(gs.rootAcctAddr)
@@ -275,6 +287,7 @@ func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(flowClient *clien
 
 	createAccountTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(gs.ref.ID).
+		AddAuthorizer(gs.rootAcctAddr).
 		SetScript(createAccountScript).
 		SetProposalKey(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootAcctKey.SequenceNumber).
 		SetPayer(gs.rootAcctAddr)
@@ -411,12 +424,7 @@ func DownloadFile(url string) ([]byte, error) {
 const defaultRootKeySeed = "elephant ears space cowboy octopus rodeo potato cannon pineapple"
 
 func RootAccountWithKey(flowClient *client.Client, key string) (flowsdk.Address, *flowsdk.AccountKey, crypto.Signer) {
-	privateKey, err := crypto.DecodePrivateKeyHex(crypto.ECDSA_P256, key)
-	if err != nil {
-		panic(err)
-	}
-	// root account always has address 0x01
-	addr := flowsdk.HexToAddress("01")
+	addr := flowsdk.ServiceAddress(flowsdk.Mainnet)
 
 	acc, err := flowClient.GetAccount(context.Background(), addr)
 	if err != nil {
@@ -424,6 +432,11 @@ func RootAccountWithKey(flowClient *client.Client, key string) (flowsdk.Address,
 	}
 
 	accountKey := acc.Keys[0]
+
+	privateKey, err := crypto.DecodePrivateKeyHex(accountKey.SigAlgo, key)
+	if err != nil {
+		panic(err)
+	}
 
 	signer := crypto.NewInMemorySigner(privateKey, accountKey.HashAlgo)
 
