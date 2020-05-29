@@ -31,32 +31,62 @@ func main() {
 		// starts periodic launch of mempoolCollector
 		<-mempoolCollector.Ready()
 
+		// creates a receipt mempool and registers a metric on its size
 		authReceipts, err := stdmap.NewReceipts(100)
 		if err != nil {
 			panic(err)
 		}
+		err = mempoolCollector.Register(metrics.ResourceReceipt, authReceipts.Size)
+		if err != nil {
+			panic(err)
+		}
 
+		// creates a pending receipt mempool and registers a metric on its size
 		pendingReceipts, err := stdmap.NewPendingReceipts(100)
 		if err != nil {
 			panic(err)
 		}
+		err = mempoolCollector.Register(metrics.ResourcePendingReceipt, pendingReceipts.Size)
+		if err != nil {
+			panic(err)
+		}
 
+		// creates an authenticated collection mempool and registers a metric on its size
 		authCollections, err := stdmap.NewCollections(100)
 		if err != nil {
 			panic(err)
 		}
+		err = mempoolCollector.Register(metrics.ResourceCollection, authCollections.Size)
+		if err != nil {
+			panic(err)
+		}
 
+		// creates a pending collection mempool and registers a metric on its size
 		pendingCollections, err := stdmap.NewPendingCollections(100)
 		if err != nil {
 			panic(err)
 		}
-
-		chunkDataPacks, err := stdmap.NewChunkDataPacks(100)
+		err = mempoolCollector.Register(metrics.ResourcePendingCollection, pendingCollections.Size)
 		if err != nil {
 			panic(err)
 		}
 
+		// creates a chunk data pack mempool and registers a metric on its size
+		chunkDataPacks, err := stdmap.NewChunkDataPacks(100)
+		if err != nil {
+			panic(err)
+		}
+		err = mempoolCollector.Register(metrics.ResourceChunkDataPack, chunkDataPacks.Size)
+		if err != nil {
+			panic(err)
+		}
+
+		// creates a chunk data pack tracker mempool and registers a metric on its size
 		chunkDataPackTrackers, err := stdmap.NewChunkDataPackTrackers(100)
+		if err != nil {
+			panic(err)
+		}
+		err = mempoolCollector.Register(metrics.ResourceChunkDataPackTracker, chunkDataPackTrackers.Size)
 		if err != nil {
 			panic(err)
 		}
