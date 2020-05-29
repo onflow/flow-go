@@ -10,7 +10,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/integration/tests/common"
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
@@ -61,9 +60,9 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 	// require.Equal(gs.T(), erExe1BlockB.ExecutionResult.Chunks[0].ID(), pack.ChunkDataPack.ChunkID
 	// TODO clear messages
 
-	// send a ChunkDataRequest from Ghost node
-	err = gs.Ghost().Send(context.Background(), engine.ExecutionReceiptProvider, []flow.Identifier{gs.exe1ID},
-		&messages.ChunkDataRequest{ChunkID: chunkID, Nonce: rand.Uint64()})
+	// send a ChunkDataPackRequest from Ghost node
+	err = gs.Ghost().Send(context.Background(), engine.ExecutionReceiptProvider,
+		&messages.ChunkDataPackRequest{ChunkID: chunkID, Nonce: rand.Uint64()}, gs.exe1ID)
 	require.NoError(gs.T(), err)
 
 	// wait for ChunkDataResponse

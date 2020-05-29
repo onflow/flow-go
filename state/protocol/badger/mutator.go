@@ -111,6 +111,7 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 			BlockID:          genesis.ID(),
 			FinalStateCommit: commit,
 		}}
+
 		err = operation.InsertExecutionResult(&result)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis result: %w", err)
