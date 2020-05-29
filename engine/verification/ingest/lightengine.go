@@ -404,9 +404,9 @@ func (l *LightEngine) handleCollection(originID flow.Identifier, expectedRole fl
 	return nil
 }
 
-// requestChunkData submits a request for the given chunk ID to the execution nodes in the network.
+// requestChunkData submits a request for the given chunk ID to the execution node denoted by `originID` in the network.
 // It also adds a tracker for the chunk data if it is successfully submitted.
-func (l *LightEngine) requestChunkData(chunkID, blockID flow.Identifier) error {
+func (l *LightEngine) requestChunkData(chunkID, blockID, originID flow.Identifier) error {
 	if l.chunkDataPackTackers.Has(chunkID) {
 		l.log.Debug().
 			Hex("chunk_id", logging.ID(chunkID)).
@@ -414,20 +414,13 @@ func (l *LightEngine) requestChunkData(chunkID, blockID flow.Identifier) error {
 		return nil
 	}
 
-	// extracts list of execution nodes
-	//
-	execNodes, err := l.state.Final().Identities(filter.HasRole(flow.RoleExecution))
-	if err != nil {
-		return fmt.Errorf("could not load execution nodes identities: %w", err)
-	}
-
 	req := &messages.ChunkDataRequest{
 		ChunkID: chunkID,
 		Nonce:   rand.Uint64(),
 	}
 
-	// TODO we should only submit to execution node that generated execution receipt
-	err = l.chunksConduit.Submit(req, execNodes.NodeIDs()...)
+	// requests chunk data pack from the execution node who originate the execution receipt
+	err := l.chunksConduit.Submit(req, originID)
 	if err != nil {
 		return fmt.Errorf("could not submit request for collection (id=%s): %w", chunkID, err)
 	}
@@ -530,8 +523,8 @@ func (l *LightEngine) checkPendingChunks(receipts []*flow.ExecutionReceipt) {
 				// receipt has at least one chunk pending for ingestion not ready to clean
 				readyToClean = false
 
-				// requests the chunk data from network
-				err := l.requestChunkData(chunkID, receipt.ExecutionResult.BlockID)
+				// requests the chunk data from the execution node who generated receipt
+				err := l.requestChunkData(chunkID, receipt.ExecutionResult.BlockID, receipt.ExecutorID)
 				if err != nil {
 					l.log.Error().
 						Err(err).
