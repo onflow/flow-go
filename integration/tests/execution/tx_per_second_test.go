@@ -70,6 +70,7 @@ type TransactionsPerSecondSuite struct {
 }
 
 func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
+	gs.SetTokenAddresses()
 	gs.accounts = map[flowsdk.Address]*flowsdk.AccountKey{}
 	gs.privateKeys = map[string][]byte{}
 	gs.signers = map[flowsdk.Address]crypto.InMemorySigner{}
