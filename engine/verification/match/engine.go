@@ -333,6 +333,7 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	log.Info().Msg("chunk data pack received")
 
 	// check origin is from a execution node
+	// TODO check the origin is a node that we requested before
 	sender, err := e.state.Final().Identity(originID)
 	if err == storage.ErrNotFound {
 		return InvalidInput{
@@ -367,9 +368,7 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 
 	// header must exist in storage
 	header, err := e.headers.ByBlockID(result.ExecutionResult.ExecutionResultBody.BlockID)
-	if err == storage.ErrNotFound {
-		return NewInvalidInput(fmt.Sprintf("block not found: %v", result.ExecutionResult.ExecutionResultBody.BlockID))
-	} else if err != nil {
+	if err != nil {
 		return fmt.Errorf("could not find block header: %w for chunkID: %v", err, chunkID)
 	}
 
