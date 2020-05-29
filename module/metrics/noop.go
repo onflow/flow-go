@@ -24,6 +24,7 @@ func (nc *NoopCollector) NetworkDuplicateMessagesDropped(topic string)          
 func (nc *NoopCollector) MessageSent(engine string, message string)                 {}
 func (nc *NoopCollector) MessageReceived(engine string, message string)             {}
 func (nc *NoopCollector) MessageHandled(engine string, message string)              {}
+func (nc *NoopCollector) RanGC(duration time.Duration)                              {}
 func (nc *NoopCollector) BadgerLSMSize(sizeBytes int64)                             {}
 func (nc *NoopCollector) BadgerVLogSize(sizeBytes int64)                            {}
 func (nc *NoopCollector) BadgerNumReads(n int64)                                    {}
@@ -58,7 +59,6 @@ func (nc *NoopCollector) PayloadProductionDuration(duration time.Duration)      
 func (nc *NoopCollector) TransactionIngested(txID flow.Identifier)                  {}
 func (nc *NoopCollector) ClusterBlockProposed(*cluster.Block)                       {}
 func (nc *NoopCollector) ClusterBlockFinalized(*cluster.Block)                      {}
-func (nc *NoopCollector) PendingClusterBlocks(n uint)                               {}
 func (nc *NoopCollector) StartCollectionToFinalized(collectionID flow.Identifier)   {}
 func (nc *NoopCollector) FinishCollectionToFinalized(collectionID flow.Identifier)  {}
 func (nc *NoopCollector) StartBlockToSeal(blockID flow.Identifier)                  {}
