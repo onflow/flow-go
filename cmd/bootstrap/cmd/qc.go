@@ -61,10 +61,19 @@ func GenerateQCParticipantData(allNodes, internalNodes []model.NodeInfo, dkgData
 		})
 	}
 
+	// add the external nodes to the look-up table
+	for i := len(internalNodes); i < len(allNodes); i++ {
+		// assign a node to a DGKdata entry, using the canonical ordering
+		node := allNodes[i]
+		participantLookup[node.NodeID] = &dkg.Participant{
+			PublicKeyShare: dkgData.PubKeyShares[i],
+			Index:          uint(i),
+		}
+	}
+
 	sd.DKGState = wrapper.NewState(&dkg.PublicData{
 		GroupPubKey:     dkgData.PubGroupKey,
 		IDToParticipant: participantLookup,
 	})
-
 	return sd
 }
