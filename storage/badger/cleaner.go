@@ -79,9 +79,6 @@ func (c *Cleaner) RunGC() {
 		}
 
 		runtime := time.Since(started)
-		c.log.Debug().
-			Dur("gc_duration", runtime).
-			Msg("garbage collection on value log executed")
 		c.metrics.RanGC(runtime)
 	}()
 }
