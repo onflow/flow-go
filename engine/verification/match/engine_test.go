@@ -72,7 +72,7 @@ func SetupTest(t *testing.T, maxTry int) (
 	chunks = NewChunks(10)
 
 	log := zerolog.New(os.Stderr)
-	retryInterval := 20 * time.Millisecond
+	retryInterval := 100 * time.Millisecond
 
 	e, err := New(log, net, me, er, verifier, assigner, state, chunks, headers, retryInterval, maxTry)
 	require.NoError(t, err)
@@ -142,7 +142,7 @@ func ChunkDataPackIsRequestedNTimes(con *network.Conduit, n int, f func(*message
 		req := args.Get(0).(*messages.ChunkDataRequest)
 		reqs = append(reqs, req)
 
-		fmt.Printf("con.Submit is called\n")
+		fmt.Printf("con.Submit is called for chunk:%v\n", req.ChunkID)
 
 		go func() {
 			f(req)

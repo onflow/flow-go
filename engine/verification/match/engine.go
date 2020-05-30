@@ -356,14 +356,16 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		return NewInvalidInput(fmt.Sprintf("chunk has been removed, chunkID: %v", chunkID))
 	}
 
-	result, exists := e.results.ByID(status.ExecutionResultID)
+	resultID := status.ExecutionResultID
+	result, exists := e.results.ByID(resultID)
 	if !exists {
 		// result no longer exists
 		return NewInvalidInput(fmt.Sprintf("execution result ID no longer exist: %v, for chunkID :%v", status.ExecutionResultID, chunkID))
 	}
 
+	blockID := result.ExecutionResult.ExecutionResultBody.BlockID
 	// header must exist in storage
-	header, err := e.headers.ByBlockID(result.ExecutionResult.ExecutionResultBody.BlockID)
+	header, err := e.headers.ByBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not find block header: %w for chunkID: %v", err, chunkID)
 	}
@@ -380,6 +382,10 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 
 	e.unit.Launch(func() {
 		err := e.verifier.ProcessLocal(vchunk)
+		log = log.With().
+			Hex("block_id", blockID[:]).
+			Hex("result_id", resultID[:]).
+			Logger()
 		if err != nil {
 			log.Warn().Err(err).Msg("failed to verify chunk")
 			return
