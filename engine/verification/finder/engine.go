@@ -103,6 +103,9 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	}
 }
 
+// handleExecutionReceipt receives an execution receipt and adds it to receipts mempool if all of following
+// conditions are satisfied:
+// - It has not yet been added to the mempool
 func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
 	// avoids race condition in processing receipts
 	e.receiptHandlerLock.Lock()
@@ -116,6 +119,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		Hex("origin_id", logging.ID(originID)).
 		Hex("receipt_id", logging.ID(receiptID)).
 		Hex("result_id", logging.ID(resultID)).Logger()
+	log.Info().Msg("receipt arrived")
 
 	// checks against duplicate
 	if e.receipts.Has(receiptID) {
@@ -130,7 +134,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		return nil
 	}
 
-	log.Info().Msg("receipt successfully handled mempool")
+	log.Info().Msg("receipt successfully handled")
 
 	return nil
 }
