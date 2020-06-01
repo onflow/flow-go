@@ -32,10 +32,10 @@ func New(
 	headerStorage storage.Headers,
 ) (*Engine, error) {
 	e := &Engine{
-		unit:  engine.NewUnit(),
-		log:   log.With().Str("engine", "finder").Logger(),
-		me:    me,
-		match: match,
+		unit:          engine.NewUnit(),
+		log:           log.With().Str("engine", "finder").Logger(),
+		me:            me,
+		match:         match,
 		headerStorage: headerStorage,
 		receipts:      receipts,
 	}

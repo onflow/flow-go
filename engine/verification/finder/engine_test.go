@@ -105,9 +105,6 @@ func (suite *FinderEngineTestSuite) TestNewFinderEngine() *finder.Engine {
 func (suite *FinderEngineTestSuite) TestHandleReceipt_HappyPath() {
 	e := suite.TestNewFinderEngine()
 
-	// mocks this receipt is not in the receipts mempool
-	suite.receipts.On("Has", suite.receipt.ID()).Return(false).Once()
-
 	// mocks adding receipt to the receipts mempool
 	suite.receipts.On("Add", suite.receipt).Return(true).Once()
 
