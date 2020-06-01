@@ -119,22 +119,22 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		Hex("origin_id", logging.ID(originID)).
 		Hex("receipt_id", logging.ID(receiptID)).
 		Hex("result_id", logging.ID(resultID)).Logger()
-	log.Info().Msg("receipt arrived")
+	log.Info().Msg("execution receipt arrived")
 
 	// checks against duplicate
 	if e.receipts.Has(receiptID) {
-		log.Debug().Msg("drops duplicate receipts")
+		log.Debug().Msg("drops duplicate execution receipts")
 		return nil
 	}
 
 	// adds the execution receipt in the mempool
 	added := e.receipts.Add(receipt)
 	if !added {
-		log.Debug().Msg("could not add receipt to mempool")
+		log.Debug().Msg("could not add execution receipt to mempool")
 		return nil
 	}
 
-	log.Info().Msg("receipt successfully handled")
+	log.Info().Msg("execution receipt successfully handled")
 
 	return nil
 }
