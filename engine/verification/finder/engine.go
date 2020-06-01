@@ -8,14 +8,19 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
+	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 type Engine struct {
-	unit  *engine.Unit
-	log   zerolog.Logger
-	me    module.Local
-	match network.Engine
+	unit          *engine.Unit
+	log           zerolog.Logger
+	me            module.Local
+	match         network.Engine
+	receipts      mempool.Receipts // used to keep the receipts as mempool
+	headerStorage storage.Headers  // used to check block existence before verifying
 }
 
 func New(
@@ -23,12 +28,16 @@ func New(
 	net module.Network,
 	me module.Local,
 	match network.Engine,
+	receipts mempool.Receipts,
+	headerStorage storage.Headers,
 ) (*Engine, error) {
 	e := &Engine{
-		unit:  engine.NewUnit(),
-		log:   log.With().Str("engine", "finder").Logger(),
-		me:    me,
-		match: match,
+		unit:          engine.NewUnit(),
+		log:           log.With().Str("engine", "finder").Logger(),
+		me:            me,
+		match:         match,
+		headerStorage: headerStorage,
+		receipts:      receipts,
 	}
 
 	_, err := net.Register(engine.ExecutionReceiptProvider, e)
@@ -92,9 +101,28 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	}
 }
 
+// handleExecutionReceipt receives an execution receipt and adds it to receipts mempool if all of following
+// conditions are satisfied:
+// - It has not yet been added to the mempool
 func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
-	// TODO: find the the block that include the guarantees of the collections
-	// decides whether this exuection receipt is processable.
-	// if processable, pass it to match engine
+	receiptID := receipt.ID()
+	resultID := receipt.ExecutionResult.ID()
+
+	log := e.log.With().
+		Str("engine", "finder").
+		Hex("origin_id", logging.ID(originID)).
+		Hex("receipt_id", logging.ID(receiptID)).
+		Hex("result_id", logging.ID(resultID)).Logger()
+	log.Info().Msg("execution receipt arrived")
+
+	// adds the execution receipt in the mempool
+	added := e.receipts.Add(receipt)
+	if !added {
+		log.Debug().Msg("drops adding duplicate receipt")
+		return nil
+	}
+
+	log.Info().Msg("execution receipt successfully handled")
+
 	return nil
 }
