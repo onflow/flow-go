@@ -45,7 +45,7 @@ func New(
 
 	e := &Engine{
 		unit:    engine.NewUnit(),
-		log:     log,
+		log:     log.With().Str("engine", "verifier").Logger(),
 		metrics: metrics,
 		state:   state,
 		me:      me,

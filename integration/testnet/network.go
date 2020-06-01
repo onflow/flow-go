@@ -529,6 +529,11 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, err
 	}
 
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathGenesisTokenSupply), unittest.GenesisTokenSupply)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	// write public DKG data
 	consensusNodes := bootstrap.FilterByRole(toNodeInfoList(confs), flow.RoleConsensus)
 	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathDKGDataPub), dkg.Public(consensusNodes))
@@ -539,7 +544,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	// write private key files for each DKG participant
 	for i, sk := range dkg.PrivKeyShares {
 		nodeID := consensusNodes[i].NodeID
-		encodableSk := bootstrap.EncodableRandomBeaconPrivKey{sk}
+		encodableSk := bootstrap.EncodableRandomBeaconPrivKey{PrivateKey: sk}
 		privParticpant := bootstrap.DKGParticipantPriv{
 			NodeID:              nodeID,
 			RandomBeaconPrivKey: encodableSk,
