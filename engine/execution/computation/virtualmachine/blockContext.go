@@ -28,9 +28,16 @@ type BlockContext interface {
 	GetAccount(ledger Ledger, addr flow.Address) (*flow.Account, error)
 }
 
+type Blocks interface {
+	// ByHeight returns the block at the given height. It is only available
+	// for finalized blocks.
+	ByHeight(height uint64) (*flow.Block, error)
+}
+
 type blockContext struct {
 	vm     *virtualMachine
 	header *flow.Header
+	blocks Blocks
 }
 
 func (bc *blockContext) newTransactionContext(
@@ -50,6 +57,8 @@ func (bc *blockContext) newTransactionContext(
 		ledger:          NewLedgerDAL(ledger),
 		signingAccounts: signingAccounts,
 		tx:              tx,
+		header:          bc.header,
+		blocks:          bc.blocks,
 		gasLimit:        tx.GasLimit,
 	}
 
@@ -62,8 +71,11 @@ func (bc *blockContext) newTransactionContext(
 
 func (bc *blockContext) newScriptContext(ledger Ledger) *TransactionContext {
 	return &TransactionContext{
+		bc:       bc,
 		astCache: bc.vm.cache,
 		ledger:   NewLedgerDAL(ledger),
+		header:   bc.header,
+		blocks:   bc.blocks,
 		gasLimit: scriptGasLimit,
 	}
 }

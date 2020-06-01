@@ -18,7 +18,7 @@ const (
 // to execute transactions.
 type VirtualMachine interface {
 	// NewBlockContext creates a new block context for executing transactions.
-	NewBlockContext(b *flow.Header) BlockContext
+	NewBlockContext(b *flow.Header, blocks Blocks) BlockContext
 	// GetCache returns the program AST cache.
 	ASTCache() ASTCache
 }
@@ -47,10 +47,11 @@ type virtualMachine struct {
 	cache ASTCache
 }
 
-func (vm *virtualMachine) NewBlockContext(header *flow.Header) BlockContext {
+func (vm *virtualMachine) NewBlockContext(header *flow.Header, blocks Blocks) BlockContext {
 	return &blockContext{
 		vm:     vm,
 		header: header,
+		blocks: blocks,
 	}
 }
 

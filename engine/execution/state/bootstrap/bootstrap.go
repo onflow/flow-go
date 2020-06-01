@@ -88,7 +88,7 @@ func BootstrapView(
 		panic(err)
 	}
 
-	ctx := vm.NewBlockContext(nil)
+	ctx := vm.NewBlockContext(nil, nil)
 
 	fungibleToken := deployFungibleToken(ctx, ledger)
 	flowToken := deployFlowToken(ctx, ledger, service, fungibleToken)
