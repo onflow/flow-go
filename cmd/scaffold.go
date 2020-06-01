@@ -389,7 +389,7 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
 		}
 
-		// TODO: load token supply from bootstrap config
+		// load token supply from bootstrap config
 		fnb.GenesisTokenSupply, err = loadGenesisTokenSupply(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis token supply")
