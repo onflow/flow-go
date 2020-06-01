@@ -95,7 +95,7 @@ Each input is a config file specified as a command line parameter:
 
 #### Example
 ```bash
-go run -tags relic ./cmd/bootstrap finalize --config ./cmd/bootstrap/example_files/node-config.json --partner-dir ./cmd/bootstrap/example_files/partner-node-infos --partner-stakes ./cmd/bootstrap/example_files/partner-stakes.json -o ./bootstrap/genesis-infos
+go run -tags relic ./cmd/bootstrap finalize --config ./cmd/bootstrap/example_files/node-config.json --partner-dir ./cmd/bootstrap/example_files/partner-node-infos --partner-stakes ./cmd/bootstrap/example_files/partner-stakes.json --genesis-token-supply 1000_000_000 -o ./bootstrap/genesis-infos
 ```
 
 #### Generated output files
