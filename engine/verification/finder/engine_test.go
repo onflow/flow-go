@@ -117,21 +117,3 @@ func (suite *FinderEngineTestSuite) TestHandleReceipt_HappyPath() {
 
 	suite.receipts.AssertExpectations(suite.T())
 }
-
-// TestHandleReceipt_Duplicate evaluates that handling a receipt that is duplicate,
-// ends up dropping that receipt.
-func (suite *FinderEngineTestSuite) TestHandleReceipt_Duplicate() {
-	e := suite.TestNewFinderEngine()
-
-	// mocks this receipt is already in the receipts mempool
-	suite.receipts.On("Has", suite.receipt.ID()).Return(true).Once()
-
-	// sends receipt to finder engine
-	err := e.Process(suite.execIdentity.NodeID, suite.receipt)
-	require.NoError(suite.T(), err)
-
-	// duplicate receipt should not be added to the mempool
-	suite.receipts.AssertNotCalled(suite.T(), "Add", suite.receipt)
-
-	suite.receipts.AssertExpectations(suite.T())
-}

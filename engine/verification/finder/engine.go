@@ -2,7 +2,6 @@ package finder
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/rs/zerolog"
 
@@ -16,13 +15,12 @@ import (
 )
 
 type Engine struct {
-	unit               *engine.Unit
-	log                zerolog.Logger
-	me                 module.Local
-	match              network.Engine
-	receipts           mempool.Receipts // used to keep the receipts as mempool
-	headerStorage      storage.Headers  // used to check block existence before verifying
-	receiptHandlerLock sync.Mutex       // used to avoid race condition in handling receipts
+	unit          *engine.Unit
+	log           zerolog.Logger
+	me            module.Local
+	match         network.Engine
+	receipts      mempool.Receipts // used to keep the receipts as mempool
+	headerStorage storage.Headers  // used to check block existence before verifying
 }
 
 func New(
@@ -107,10 +105,6 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // conditions are satisfied:
 // - It has not yet been added to the mempool
 func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
-	// avoids race condition in processing receipts
-	e.receiptHandlerLock.Lock()
-	defer e.receiptHandlerLock.Unlock()
-
 	receiptID := receipt.ID()
 	resultID := receipt.ExecutionResult.ID()
 
@@ -121,16 +115,10 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		Hex("result_id", logging.ID(resultID)).Logger()
 	log.Info().Msg("execution receipt arrived")
 
-	// checks against duplicate
-	if e.receipts.Has(receiptID) {
-		log.Debug().Msg("drops duplicate execution receipts")
-		return nil
-	}
-
 	// adds the execution receipt in the mempool
 	added := e.receipts.Add(receipt)
 	if !added {
-		log.Debug().Msg("could not add execution receipt to mempool")
+		log.Debug().Msg("drops adding duplicate receipt")
 		return nil
 	}
 
