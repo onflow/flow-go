@@ -18,9 +18,9 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
+	vmMock "github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine/mock"
 	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/model/flow"
-	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -33,7 +33,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
 	require.NoError(t, err)
-	bc := vm.NewBlockContext(&h, new(storage.Blocks))
+	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	t.Run("transaction success", func(t *testing.T) {
 		tx := flow.NewTransactionBody().
@@ -150,7 +150,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
 	require.NoError(t, err)
-	bc := vm.NewBlockContext(&h, new(storage.Blocks))
+	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	t.Run("account update with set code succeeds as service account", func(t *testing.T) {
 		ledger := execTestutil.RootBootstrappedLedger()
@@ -220,7 +220,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 
 	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
 	assert.NoError(t, err)
-	bc := vm.NewBlockContext(&h, new(storage.Blocks))
+	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	arg1, _ := jsoncdc.Encode(cadence.NewInt(42))
 	arg2, _ := jsoncdc.Encode(cadence.NewString("foo"))
@@ -321,7 +321,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 
 	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
 	assert.NoError(t, err)
-	bc := vm.NewBlockContext(&h, new(storage.Blocks))
+	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	var tests = []struct {
 		label    string
@@ -383,7 +383,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 
 	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
 	assert.NoError(t, err)
-	bc := vm.NewBlockContext(&h, new(storage.Blocks))
+	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	privateKeys, err := execTestutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
@@ -562,7 +562,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
 	require.NoError(t, err)
-	bc := vm.NewBlockContext(&h, new(storage.Blocks))
+	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	t.Run("script success", func(t *testing.T) {
 		script := []byte(`
@@ -626,7 +626,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
 	require.NoError(t, err)
-	blocks := new(storage.Blocks)
+	blocks := new(vmMock.Blocks)
 	bc := vm.NewBlockContext(block1.Header, blocks)
 	blocks.On("ByHeight", block1.Header.Height).Return(&block1, nil)
 	blocks.On("ByHeight", block2.Header.Height).Return(&block2, nil)
@@ -744,7 +744,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
 	require.NoError(t, err)
-	bc := vm.NewBlockContext(&h, new(storage.Blocks))
+	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	sequenceNumber := uint64(0)
 

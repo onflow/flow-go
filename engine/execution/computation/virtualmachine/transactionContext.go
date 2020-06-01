@@ -36,7 +36,7 @@ type TransactionContext struct {
 	skipVerification          bool
 	skipDeploymentRestriction bool
 	header                    *flow.Header
-	blocks                    storage.Blocks
+	blocks                    Blocks
 	logger                    zerolog.Logger
 }
 

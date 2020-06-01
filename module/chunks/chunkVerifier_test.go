@@ -15,7 +15,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	mockStorage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -205,7 +204,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 type blockContextMock struct {
 	vm     *virtualMachineMock
 	header *flow.Header
-	blocks storage.Blocks
+	blocks virtualmachine.Blocks
 }
 
 func (bc *blockContextMock) ExecuteTransaction(
@@ -272,7 +271,7 @@ func (bc *blockContextMock) GetAccount(_ virtualmachine.Ledger, _ flow.Address) 
 type virtualMachineMock struct {
 }
 
-func (vm *virtualMachineMock) NewBlockContext(header *flow.Header, blocks storage.Blocks) virtualmachine.BlockContext {
+func (vm *virtualMachineMock) NewBlockContext(header *flow.Header, blocks virtualmachine.Blocks) virtualmachine.BlockContext {
 	return &blockContextMock{
 		vm:     vm,
 		header: header,

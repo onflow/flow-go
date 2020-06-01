@@ -10,7 +10,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/hash"
-	"github.com/dapperlabs/flow-go/storage"
 )
 
 // A BlockContext is used to execute transactions in the context of a block.
@@ -29,10 +28,16 @@ type BlockContext interface {
 	GetAccount(ledger Ledger, addr flow.Address) (*flow.Account, error)
 }
 
+type Blocks interface {
+	// ByHeight returns the block at the given height. It is only available
+	// for finalized blocks.
+	ByHeight(height uint64) (*flow.Block, error)
+}
+
 type blockContext struct {
 	vm     *virtualMachine
 	header *flow.Header
-	blocks storage.Blocks
+	blocks Blocks
 }
 
 func (bc *blockContext) newTransactionContext(
