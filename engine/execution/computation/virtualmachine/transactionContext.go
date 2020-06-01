@@ -373,6 +373,7 @@ func (r *TransactionContext) GetCurrentBlockHeight() uint64 {
 // GetBlockAtHeight returns the block at the given height.
 func (r *TransactionContext) GetBlockAtHeight(height uint64) (hash runtime.BlockHash, timestamp int64, exists bool, err error) {
 	block, err := r.blocks.ByHeight(height)
+	// TODO remove dependency on storage
 	if errors.Is(err, storage.ErrNotFound) {
 		return runtime.BlockHash{}, 0, false, nil
 	} else if err != nil {
