@@ -1,7 +1,38 @@
+
 # Contributing to Flow Go
 
 The following is a set of guidelines for contributing to the Flow Go SDK. These are mostly guidelines, 
 not rules. Use your best judgment, and feel free to propose changes to this document in a pull request.
+
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+## Table of Contents
+
+- [Work streams](#work-streams)
+- [How Can I Contribute?](#how-can-i-contribute)
+  - [Reporting Bugs](#reporting-bugs)
+    - [Before Submitting A Bug Report](#before-submitting-a-bug-report)
+    - [How Do I Submit A (Good) Bug Report?](#how-do-i-submit-a-good-bug-report)
+  - [Suggesting Enhancements](#suggesting-enhancements)
+    - [Before Submitting An Enhancement Suggestion](#before-submitting-an-enhancement-suggestion)
+    - [How Do I Submit A (Good) Enhancement Suggestion?](#how-do-i-submit-a-good-enhancement-suggestion)
+  - [Your First Code Contribution](#your-first-code-contribution)
+- [Workflow](#workflow)
+  - [Issues](#issues)
+  - [Branches](#branches)
+    - [Feature Branches](#feature-branches)
+    - [Pull Requests](#pull-requests)
+    - [Code Review](#code-review)
+  - [Testing](#testing)
+  - [Documentation](#documentation)
+    - [Stream Owner Documentation](#stream-owner-documentation)
+- [Style Guide](#style-guide)
+  - [Git Commit Messages](#git-commit-messages)
+  - [Go Style Guide](#go-style-guide)
+- [Additional Notes](#additional-notes)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 
 ## Work streams
 
