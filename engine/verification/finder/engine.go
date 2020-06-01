@@ -114,68 +114,23 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	resultID := receipt.ExecutionResult.ID()
 
 	log := e.log.With().
-		Hex("origin_id", logging.ID(originID)).
-		Hex("receipt_id", logging.ID(receiptID))
-
-	if l.ingestedResultIDs.Has(resultID) {
-		l.log.Debug().
-			Hex("origin_id", logging.ID(originID)).
-			Hex("receipt_id", logging.ID(receiptID)).
-			Msg("execution receipt with already ingested result discarded")
-		// discards the receipt if its result has already been ingested
-		return nil
-	}
-
-	// stores the execution receipt in the mempool
-	ok := l.receipts.Add(receipt)
-	l.log.Debug().
+		Str("engine", "finder").
 		Hex("origin_id", logging.ID(originID)).
 		Hex("receipt_id", logging.ID(receiptID)).
-		Bool("mempool_insertion", ok).
-		Msg("execution receipt added to mempool")
+		Hex("result_id", logging.ID(resultID)).Logger()
 
-	// checks if the execution result has empty chunk
-	if receipt.ExecutionResult.Chunks.Len() == 0 {
-		// TODO potential attack on availability
-		l.log.Debug().
-			Hex("receipt_id", logging.ID(receiptID)).
-			Hex("result_id", logging.ID(resultID)).
-			Msg("could not ingest execution result with zero chunks")
-		return nil
+	// checks against duplicate
+	if e.receipts.Has(receiptID) {
+		log.Debug().Msg("drops duplicate receipts")
 	}
 
-	mychunks, err := l.myAssignedChunks(&receipt.ExecutionResult)
-	// extracts list of chunks assigned to this Verification node
-	if err != nil {
-		l.log.Error().
-			Err(err).
-			Hex("result_id", logging.Entity(receipt.ExecutionResult)).
-			Msg("could not fetch assigned chunks")
-		return fmt.Errorf("could not perfrom chunk assignment on receipt: %w", err)
+	// adds the execution receipt in the mempool
+	added := e.receipts.Add(receipt)
+	if !added {
+		log.Debug().Msg("could not add receipt to mempool")
 	}
 
-	l.log.Debug().
-		Hex("receipt_id", logging.ID(receiptID)).
-		Hex("result_id", logging.ID(resultID)).
-		Int("total_chunks", receipt.ExecutionResult.Chunks.Len()).
-		Int("assigned_chunks", len(mychunks)).
-		Msg("chunk assignment is done")
-
-	for _, chunk := range mychunks {
-		err := l.handleChunk(chunk, receipt)
-		if err != nil {
-			l.log.Err(err).
-				Hex("receipt_id", logging.ID(receiptID)).
-				Hex("result_id", logging.ID(resultID)).
-				Hex("chunk_id", logging.ID(chunk.ID())).
-				Msg("could not handle chunk")
-		}
-	}
-
-	// checks pending chunks for this receipt
-	l.checkPendingChunks([]*flow.ExecutionReceipt{receipt})
-
-	return nil
+	log.Info().Msg("receipt successfully handled mempool")
 
 	return nil
 }
