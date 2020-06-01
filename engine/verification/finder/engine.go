@@ -1,13 +1,11 @@
 package finder
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
@@ -122,48 +120,17 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	// checks against duplicate
 	if e.receipts.Has(receiptID) {
 		log.Debug().Msg("drops duplicate receipts")
+		return nil
 	}
 
 	// adds the execution receipt in the mempool
 	added := e.receipts.Add(receipt)
 	if !added {
 		log.Debug().Msg("could not add receipt to mempool")
+		return nil
 	}
 
 	log.Info().Msg("receipt successfully handled mempool")
 
 	return nil
 }
-
-// To implement FinalizationConsumer
-func (e *Engine) OnBlockIncorporated(*model.Block) {
-
-}
-
-// OnFinalizedBlock is part of implementing FinalizationConsumer interface
-//
-// OnFinalizedBlock notifications are produced by the Finalization Logic whenever
-// a block has been finalized. They are emitted in the order the blocks are finalized.
-// Prerequisites:
-// Implementation must be concurrency safe; Non-blocking;
-// and must handle repetition of the same events (with some processing overhead).
-func (e *Engine) OnFinalizedBlock(block *model.Block) {
-
-	// block should be in the storage
-	_, err := e.headerStorage.ByBlockID(block.BlockID)
-	if errors.Is(err, storage.ErrNotFound) {
-		e.log.Error().
-			Hex("block_id", logging.ID(block.BlockID)).
-			Msg("block is not available in storage")
-		return
-	}
-	if err != nil {
-		e.log.Error().
-			Hex("block_id", logging.ID(block.BlockID)).
-			Msg("could not check block availability in storage")
-		return
-	}
-}
-
-// To implement FinalizationConsumer
-func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {}

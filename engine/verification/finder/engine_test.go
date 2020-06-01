@@ -103,15 +103,35 @@ func (suite *FinderEngineTestSuite) TestNewFinderEngine() *finder.Engine {
 // TestFinderEngine_HappyPath evaluates that handling a receipt that is not duplicate,
 // and its result has not processed yet ends by adding to receipt mempool.
 func (suite *FinderEngineTestSuite) TestHandleReceipt_HappyPath() {
-	engine := suite.TestNewFinderEngine()
+	e := suite.TestNewFinderEngine()
 
 	// mocks this receipt is not in the receipts mempool
 	suite.receipts.On("Has", suite.receipt.ID()).Return(false).Once()
 
 	// mocks adding receipt to the receipts mempool
-	suite.receipts.On("Add", suite.receipt).Return(true)
+	suite.receipts.On("Add", suite.receipt).Return(true).Once()
 
 	// sends receipt to finder engine
-	err := engine.Process(suite.execIdentity.NodeID, suite.receipt)
+	err := e.Process(suite.execIdentity.NodeID, suite.receipt)
 	require.NoError(suite.T(), err)
+
+	suite.receipts.AssertExpectations(suite.T())
+}
+
+// TestHandleReceipt_Duplicate evaluates that handling a receipt that is duplicate,
+// ends up dropping that receipt.
+func (suite *FinderEngineTestSuite) TestHandleReceipt_Duplicate() {
+	e := suite.TestNewFinderEngine()
+
+	// mocks this receipt is already in the receipts mempool
+	suite.receipts.On("Has", suite.receipt.ID()).Return(true).Once()
+
+	// sends receipt to finder engine
+	err := e.Process(suite.execIdentity.NodeID, suite.receipt)
+	require.NoError(suite.T(), err)
+
+	// duplicate receipt should not be added to the mempool
+	suite.receipts.AssertNotCalled(suite.T(), "Add", suite.receipt)
+
+	suite.receipts.AssertExpectations(suite.T())
 }
