@@ -9,7 +9,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
-	storage "github.com/dapperlabs/flow-go/storage/mock"
 )
 
 func GenerateServiceAccountPrivateKey(seed []byte) (flow.AccountPrivateKey, error) {
@@ -32,5 +31,5 @@ func GenerateExecutionState(dbDir string, accountKey flow.AccountPublicKey, gene
 	if err != nil {
 		return nil, err
 	}
-	return bootstrap.BootstrapLedger(zerolog.Logger{}, ledgerStorage, new(storage.Blocks), accountKey, genesisTokenSupply)
+	return bootstrap.BootstrapLedger(zerolog.Logger{}, ledgerStorage, accountKey, genesisTokenSupply)
 }

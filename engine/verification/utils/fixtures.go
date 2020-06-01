@@ -84,7 +84,6 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) CompleteExecut
 		startStateCommitment, err := bootstrap.BootstrapLedger(
 			zerolog.Logger{},
 			led,
-			new(storage.Blocks),
 			unittest.ServiceAccountPublicKey,
 			unittest.GenesisTokenSupply,
 		)

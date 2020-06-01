@@ -86,7 +86,7 @@ func main() {
 				panic(fmt.Sprintf("error while bootstrapping execution state: no service account public key"))
 			}
 
-			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(node.Logger, ledgerStorage, node.Storage.Blocks, *node.GenesisAccountPublicKey, node.GenesisTokenSupply)
+			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(node.Logger, ledgerStorage, *node.GenesisAccountPublicKey, node.GenesisTokenSupply)
 			if err != nil {
 				panic(fmt.Sprintf("error while bootstrapping execution state: %s", err))
 			}

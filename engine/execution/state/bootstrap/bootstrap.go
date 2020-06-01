@@ -23,13 +23,12 @@ import (
 func BootstrapLedger(
 	logger zerolog.Logger,
 	ledger storage.Ledger,
-	blocks virtualmachine.Blocks,
 	rootPublicKey flow.AccountPublicKey,
 	initialTokenSupply uint64,
 ) (flow.StateCommitment, error) {
 	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.EmptyStateCommitment()))
 
-	BootstrapView(logger, view, blocks, rootPublicKey, initialTokenSupply)
+	BootstrapView(logger, view, rootPublicKey, initialTokenSupply)
 
 	newStateCommitment, err := state.CommitDelta(ledger, view.Delta(), ledger.EmptyStateCommitment())
 	if err != nil {
@@ -76,7 +75,6 @@ func BootstrapExecutionDatabase(db *badger.DB, commit flow.StateCommitment, gene
 func BootstrapView(
 	logger zerolog.Logger,
 	ledger virtualmachine.Ledger,
-	blocks virtualmachine.Blocks,
 	serviceAccountPublicKey flow.AccountPublicKey,
 	initialTokenSupply uint64,
 ) {
@@ -93,7 +91,7 @@ func BootstrapView(
 		panic(err)
 	}
 
-	ctx := vm.NewBlockContext(nil, blocks)
+	ctx := vm.NewBlockContext(nil, nil)
 
 	fungibleToken := deployFungibleToken(ctx, ledger)
 	flowToken := deployFlowToken(ctx, ledger, service, fungibleToken)
