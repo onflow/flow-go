@@ -83,10 +83,10 @@ func (suite *FinderEngineTestSuite) SetupTest() {
 	suite.me.On("NodeID").Return(suite.verIdentity.NodeID)
 }
 
-// TestFinderEngine tests the establishment of the network registration upon
+// TestNewFinderEngine tests the establishment of the network registration upon
 // creation of an instance of FinderEngine using the New method.
 // It also returns an instance of new engine to be used in the later tests.
-func (suite *FinderEngineTestSuite) TestFinderEngine() *finder.Engine {
+func (suite *FinderEngineTestSuite) TestNewFinderEngine() *finder.Engine {
 	e, err := finder.New(zerolog.Logger{},
 		suite.net,
 		suite.me,
@@ -98,4 +98,20 @@ func (suite *FinderEngineTestSuite) TestFinderEngine() *finder.Engine {
 	suite.net.AssertExpectations(suite.T())
 
 	return e
+}
+
+// TestFinderEngine_HappyPath evaluates that handling a receipt that is not duplicate,
+// and its result has not processed yet ends by adding to receipt mempool.
+func (suite *FinderEngineTestSuite) TestHandleReceipt_HappyPath() {
+	engine := suite.TestNewFinderEngine()
+
+	// mocks this receipt is not in the receipts mempool
+	suite.receipts.On("Has", suite.receipt.ID()).Return(false).Once()
+
+	// mocks adding receipt to the receipts mempool
+	suite.receipts.On("Add", suite.receipt).Return(true)
+
+	// sends receipt to finder engine
+	err := engine.Process(suite.execIdentity.NodeID, suite.receipt)
+	require.NoError(suite.T(), err)
 }
