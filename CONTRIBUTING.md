@@ -1,4 +1,4 @@
-# Contributing to Flow
+# Contributing to Flow Go
 
 This guide provides a comprehensive overview of our development processes, guidelines,
 and steps required to contribute to the project.

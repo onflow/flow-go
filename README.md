@@ -102,7 +102,7 @@ live within the module they are testing. Integration tests live in `integration/
 Run the unit test suite:
 
 ```bash
-make unit-test
+make test
 ```
 
 Run the integration test suite:

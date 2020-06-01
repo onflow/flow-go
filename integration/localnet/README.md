@@ -1,6 +1,6 @@
 # Flow Local Instrumented Test Environment (FLITE)
 
-FLITE is a tool for running a full version of the Flow blockchain
+FLITE is a tool for running a full version of the Flow blockchain.
 
 ## Bootstrapping
 
