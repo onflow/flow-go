@@ -263,13 +263,21 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 	fnb.MustNot(err).Msg("could not initialize tracer")
 	fnb.MetricsRegisterer = prometheus.DefaultRegisterer
 	fnb.Tracer = tracer
+
+	mempools := metrics.NewMempoolCollector(5 * time.Second)
+
 	fnb.Metrics = Metrics{
 		Network:    metrics.NewNetworkCollector(),
 		Engine:     metrics.NewEngineCollector(),
 		Compliance: metrics.NewComplianceCollector(),
 		Cache:      metrics.NewCacheCollector(flow.GetChainID()),
-		Mempool:    metrics.NewMempoolCollector(),
+		Mempool:    mempools,
 	}
+
+	// registers mempools as a Component so that its Ready method is invoked upon startup
+	fnb.Component("mempools metrics", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		return mempools, nil
+	})
 }
 
 func (fnb *FlowNodeBuilder) initProfiler() {
@@ -431,6 +439,14 @@ func (fnb *FlowNodeBuilder) initState() {
 
 	self, err := state.Final().Identity(myID)
 	fnb.MustNot(err).Msg("could not get identity")
+
+	// ensure that the configured staking/network keys are consistent with the protocol state
+	if !self.NetworkPubKey.Equals(fnb.networkKey.PublicKey()) {
+		fnb.Logger.Fatal().Msg("configured networking key does not match protocol state")
+	}
+	if !self.StakingPubKey.Equals(fnb.stakingKey.PublicKey()) {
+		fnb.Logger.Fatal().Msg("configured staking key does not match protocol state")
+	}
 
 	fnb.Me, err = local.New(self, fnb.stakingKey)
 	fnb.MustNot(err).Msg("could not initialize local")

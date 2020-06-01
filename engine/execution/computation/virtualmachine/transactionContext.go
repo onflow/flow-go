@@ -145,7 +145,7 @@ func (r *TransactionContext) CreateAccount(payer runtime.Address) (runtime.Addre
 
 func (r *TransactionContext) initDefaultToken(addr flow.Address) (FlowError, error) {
 	tx := flow.NewTransactionBody().
-		SetScript(InitDefaultTokenTransaction).
+		SetScript(InitDefaultTokenTransaction()).
 		AddAuthorizer(addr)
 
 	// TODO: propagate computation limit
@@ -163,7 +163,7 @@ func (r *TransactionContext) initDefaultToken(addr flow.Address) (FlowError, err
 
 func (r *TransactionContext) deductTransactionFee(addr flow.Address) (FlowError, error) {
 	tx := flow.NewTransactionBody().
-		SetScript(DeductTransactionFeeTransaction).
+		SetScript(DeductTransactionFeeTransaction()).
 		AddAuthorizer(addr)
 
 	// TODO: propagate computation limit
@@ -181,7 +181,7 @@ func (r *TransactionContext) deductTransactionFee(addr flow.Address) (FlowError,
 
 func (r *TransactionContext) deductAccountCreationFee(addr flow.Address) (FlowError, error) {
 	tx := flow.NewTransactionBody().
-		SetScript(DeductAccountCreationFeeTransaction).
+		SetScript(DeductAccountCreationFeeTransaction()).
 		AddAuthorizer(addr)
 
 	// TODO: propagate computation limit
@@ -573,15 +573,17 @@ func (r *TransactionContext) isValidSigningAccount(address runtime.Address) bool
 	return false
 }
 
-var InitDefaultTokenTransaction = []byte(fmt.Sprintf(`
-    import FlowServiceAccount from 0x%s
-
-    transaction {
-        prepare(acct: AuthAccount) {
-            FlowServiceAccount.initDefaultToken(acct)
-        }
-    }
-`, flow.ServiceAddress()))
+func InitDefaultTokenTransaction() []byte {
+	return []byte(fmt.Sprintf(`
+		import FlowServiceAccount from 0x%s
+	
+		transaction {
+			prepare(acct: AuthAccount) {
+				FlowServiceAccount.initDefaultToken(acct)
+			}
+		}
+	`, flow.ServiceAddress()))
+}
 
 func DefaultTokenBalanceScript(addr flow.Address) []byte {
 	return []byte(fmt.Sprintf(`
@@ -594,29 +596,33 @@ func DefaultTokenBalanceScript(addr flow.Address) []byte {
     `, flow.ServiceAddress(), addr))
 }
 
-var DeductAccountCreationFeeTransaction = []byte(fmt.Sprintf(`
-    import FlowServiceAccount from 0x%s
-
-    transaction {
-        prepare(acct: AuthAccount) {
-			if !FlowServiceAccount.isAccountCreator(acct.address) {
-				panic("Account not authorized to create accounts")
+func DeductAccountCreationFeeTransaction() []byte {
+	return []byte(fmt.Sprintf(`
+		import FlowServiceAccount from 0x%s
+	
+		transaction {
+			prepare(acct: AuthAccount) {
+				if !FlowServiceAccount.isAccountCreator(acct.address) {
+					panic("Account not authorized to create accounts")
+				}
+	
+				FlowServiceAccount.deductAccountCreationFee(acct)
 			}
+		}
+	`, flow.ServiceAddress()))
+}
 
-            FlowServiceAccount.deductAccountCreationFee(acct)
-        }
-    }
-`, flow.ServiceAddress()))
-
-var DeductTransactionFeeTransaction = []byte(fmt.Sprintf(`
-    import FlowServiceAccount from 0x%s
-
-    transaction {
-        prepare(acct: AuthAccount) {
-            FlowServiceAccount.deductTransactionFee(acct)
-        }
-    }
-`, flow.ServiceAddress()))
+func DeductTransactionFeeTransaction() []byte {
+	return []byte(fmt.Sprintf(`
+		import FlowServiceAccount from 0x%s
+	
+		transaction {
+			prepare(acct: AuthAccount) {
+				FlowServiceAccount.deductTransactionFee(acct)
+			}
+		}
+	`, flow.ServiceAddress()))
+}
 
 func DeployDefaultTokenTransaction(contract []byte) []byte {
 	return []byte(fmt.Sprintf(`
@@ -640,37 +646,45 @@ func DeployFlowFeesTransaction(contract []byte) []byte {
     `, hex.EncodeToString(contract)))
 }
 
-var MintDefaultTokenTransaction = []byte(fmt.Sprintf(`
-    import FungibleToken from 0x%s
-    import FlowToken from 0x%s
+func MintDefaultTokenTransaction() []byte {
+	return []byte(fmt.Sprintf(`
+		import FungibleToken from 0x%s
+		import FlowToken from 0x%s
+	
+		transaction(amount: UFix64) {
+	
+		  let tokenAdmin: &FlowToken.Administrator
+		  let tokenReceiver: &FlowToken.Vault{FungibleToken.Receiver}
+	
+		  prepare(signer: AuthAccount) {
+			self.tokenAdmin = signer
+			  .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin) 
+			  ?? panic("Signer is not the token admin")
+	
+			self.tokenReceiver = signer
+			  .getCapability(/public/flowTokenReceiver)!
+			  .borrow<&FlowToken.Vault{FungibleToken.Receiver}>()
+			  ?? panic("Unable to borrow receiver reference for recipient")
+		  }
+	
+		  execute {
+			let minter <- self.tokenAdmin.createNewMinter(allowedAmount: amount)
+			let mintedVault <- minter.mintTokens(amount: amount)
+	
+			self.tokenReceiver.deposit(from: <-mintedVault)
+		
+			destroy minter
+		  }
+		}
+	`, FungibleTokenAddress(), FlowTokenAddress()))
+}
 
-    transaction(amount: UFix64) {
+func FungibleTokenAddress() flow.Address {
+	address, _ := flow.AddressAtIndex(2)
+	return address
+}
 
-      let tokenAdmin: &FlowToken.Administrator
-      let tokenReceiver: &FlowToken.Vault{FungibleToken.Receiver}
-
-      prepare(signer: AuthAccount) {
-        self.tokenAdmin = signer
-          .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin) 
-          ?? panic("Signer is not the token admin")
-
-        self.tokenReceiver = signer
-          .getCapability(/public/flowTokenReceiver)!
-          .borrow<&FlowToken.Vault{FungibleToken.Receiver}>()
-          ?? panic("Unable to borrow receiver reference for recipient")
-      }
-
-      execute {
-        let minter <- self.tokenAdmin.createNewMinter(allowedAmount: amount)
-        let mintedVault <- minter.mintTokens(amount: amount)
-
-        self.tokenReceiver.deposit(from: <-mintedVault)
-    
-        destroy minter
-      }
-    }
-`, FungibleTokenAddress, FlowTokenAddress))
-
-// TODO: assign these values after bootstrapping
-var FungibleTokenAddress, _, _ = flow.AccountAddress(flow.AddressState(1))
-var FlowTokenAddress, _, _ = flow.AccountAddress(flow.AddressState(2))
+func FlowTokenAddress() flow.Address {
+	address, _ := flow.AddressAtIndex(3)
+	return address
+}

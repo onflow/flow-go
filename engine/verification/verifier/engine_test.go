@@ -16,7 +16,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	mocklocal "github.com/dapperlabs/flow-go/engine/testutil/mocklocal"
 	"github.com/dapperlabs/flow-go/engine/verification"
-	"github.com/dapperlabs/flow-go/engine/verification/test"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	chmodel "github.com/dapperlabs/flow-go/model/chunks"
@@ -91,7 +90,7 @@ func (suite *VerifierEngineTestSuite) TestInvalidSender() {
 	// mocks NodeID method of the local
 	suite.me.MockNodeID(myID)
 
-	completeRA := test.CompleteExecutionResultFixture(suite.T(), 1)
+	completeRA := utils.CompleteExecutionResultFixture(suite.T(), 1)
 
 	err := eng.Process(invalidID, &completeRA)
 	assert.Error(suite.T(), err)

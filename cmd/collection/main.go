@@ -101,6 +101,7 @@ func main() {
 			flags.BoolVar(&ingestConf.CheckScriptsParse, "ingest-check-scripts-parse", true, "whether we check that inbound transactions are parse-able")
 			flags.BoolVar(&ingestConf.AllowUnknownReference, "ingest-allow-unknown-reference", true, "whether we ingest transactions referencing an unknown block")
 			flags.UintVar(&ingestConf.ExpiryBuffer, "ingest-expiry-buffer", 30, "expiry buffer for inbound transactions")
+			flags.UintVar(&ingestConf.PropagationRedundancy, "ingest-tx-propagation-redundancy", 2, "how many additional cluster members we propagate transactions to")
 			flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", 15, "expiry buffer for transactions in proposed collections")
 			flags.UintVar(&maxCollectionSize, "builder-max-collection-size", 100, "maximum number of transactions in proposed collections")
 			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second, "the initial timeout for the hotstuff pacemaker")
@@ -198,7 +199,7 @@ func main() {
 
 			// initialize cleaner for DB
 			// TODO frequency of 0 turns off the cleaner, turn back on once we know the proper tuning
-			cleaner := storagekv.NewCleaner(node.Logger, node.DB, 0)
+			cleaner := storagekv.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), 0)
 
 			// create a finalizer that will handling updating the protocol
 			// state when the follower detects newly finalized blocks

@@ -78,7 +78,7 @@ func BootstrapView(
 	l := virtualmachine.NewLedgerDAL(ledger)
 
 	// initialize the account addressing state
-	l.SetAddressState(flow.ZeroAddressState)
+	l.SetAddressState(flow.NewAddressGenerator())
 
 	service := createServiceAccount(ledger, serviceAccountPublicKey)
 
@@ -183,7 +183,7 @@ func mintInitialTokens(
 	}
 
 	tx := flow.NewTransactionBody().
-		SetScript(virtualmachine.MintDefaultTokenTransaction).
+		SetScript(virtualmachine.MintDefaultTokenTransaction()).
 		AddArgument(initialSupplyArg).
 		AddAuthorizer(service)
 

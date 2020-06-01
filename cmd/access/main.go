@@ -23,6 +23,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 	grpcutils "github.com/dapperlabs/flow-go/utils/grpc"
@@ -96,7 +97,7 @@ func main() {
 
 			// initialize cleaner for DB
 			// TODO frequency of 0 turns off the cleaner, turn back on once we know the proper tuning
-			cleaner := storage.NewCleaner(node.Logger, node.DB, 0)
+			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), 0)
 
 			// create a finalizer that will handle updating the protocol
 			// state when the follower detects newly finalized blocks

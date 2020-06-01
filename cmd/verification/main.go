@@ -85,21 +85,61 @@ func main() {
 			flags.UintVar(&chunkLimit, "chunk-limit", 10000, "maximum number of chunk states in the memory pool")
 			flags.UintVar(&alpha, "alpha", 10, "maximum number of chunk states in the memory pool")
 		}).
+		Module("verification metrics", func(node *cmd.FlowNodeBuilder) error {
+			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegisterer, node.Logger)
+			return nil
+		}).
 		Module("execution authenticated receipts mempool", func(node *cmd.FlowNodeBuilder) error {
 			authReceipts, err = stdmap.NewReceipts(receiptLimit)
-			return err
+			if err != nil {
+				return err
+			}
+			// registers size method of backend for metrics
+			err := node.Metrics.Mempool.Register(metrics.ResourceReceipt, authReceipts.Size)
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
+			}
+			return nil
 		}).
 		//Module("execution pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
 		//	pendingReceipts, err = stdmap.NewPendingReceipts(receiptLimit)
-		//	return err
+		//	if err != nil{
+		//		return err
+		//	}
+		//
+		//	// registers size method of backend for metrics
+		//	err = node.Metrics.Mempool.Register(metrics.ResourcePendingReceipt, pendingReceipts.Size)
+		//	if err != nil {
+		//		return fmt.Errorf("could not register backend metric: %w", err)
+		//	}
+		//	return nil
 		//}).
 		Module("authenticated collections mempool", func(node *cmd.FlowNodeBuilder) error {
 			authCollections, err = stdmap.NewCollections(collectionLimit)
-			return err
+			if err != nil {
+				return err
+			}
+
+			// registers size method of backend for metrics
+			err := node.Metrics.Mempool.Register(metrics.ResourceCollection, authCollections.Size)
+
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
+			}
+			return nil
 		}).
 		//Module("pending collections mempool", func(node *cmd.FlowNodeBuilder) error {
 		//	pendingCollections, err = stdmap.NewPendingCollections(collectionLimit)
-		//	return err
+		//	if err != nil{
+		//		return err
+		//	}
+		//
+		//	// registers size method of backend for metrics
+		//	err = node.Metrics.Mempool.Register(metrics.ResourcePendingCollection, pendingCollections.Size)
+		//	if err != nil {
+		//		return fmt.Errorf("could not register backend metric: %w", err)
+		//	}
+		//	return nil
 		//}).
 		//Module("collection trackers mempool", func(node *cmd.FlowNodeBuilder) error {
 		//	collectionTrackers, err = stdmap.NewCollectionTrackers(collectionLimit)
@@ -107,11 +147,31 @@ func main() {
 		//}).
 		Module("chunk data pack mempool", func(node *cmd.FlowNodeBuilder) error {
 			chunkDataPacks, err = stdmap.NewChunkDataPacks(chunkLimit)
-			return err
+			if err != nil {
+				return err
+			}
+
+			// registers size method of backend for metrics
+			err := node.Metrics.Mempool.Register(metrics.ResourceChunkDataPack, chunkDataPacks.Size)
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
+			}
+
+			return nil
 		}).
 		Module("chunk data pack tracker mempool", func(node *cmd.FlowNodeBuilder) error {
 			chunkDataPackTracker, err = stdmap.NewChunkDataPackTrackers(chunkLimit)
-			return err
+			if err != nil {
+				return err
+			}
+
+			// registers size method of backend for metrics
+			err = node.Metrics.Mempool.Register(metrics.ResourceChunkDataPackTracker, chunkDataPackTracker.Size)
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
+			}
+
+			return nil
 		}).
 		Module("ingested chunk ids mempool", func(node *cmd.FlowNodeBuilder) error {
 			ingestedChunkIDs, err = stdmap.NewIdentifiers(chunkLimit)
@@ -132,10 +192,6 @@ func main() {
 		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
 			// consensus cache for follower engine
 			conCache = buffer.NewPendingBlocks()
-			return nil
-		}).
-		Module("verification metrics", func(node *cmd.FlowNodeBuilder) error {
-			collector = metrics.NewNoopCollector()
 			return nil
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -204,7 +260,7 @@ func main() {
 
 			// initialize cleaner for DB
 			// TODO frequency of 0 turns off the cleaner, turn back on once we know the proper tuning
-			cleaner := storage.NewCleaner(node.Logger, node.DB, 0)
+			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), 0)
 
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks

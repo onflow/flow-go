@@ -597,6 +597,9 @@ func (e *Engine) submitCollectionRequest(timer **time.Timer, collID flow.Identif
 
 	if retry > 0 {
 		e.log.Info().Hex("collection_id", collID[:]).Uint("retry", retry).Msg("retrying request for collection")
+		e.metrics.ExecutionCollectionRequestRetried()
+	} else {
+		e.metrics.ExecutionCollectionRequestSent()
 	}
 
 	err := e.collectionConduit.Submit(
