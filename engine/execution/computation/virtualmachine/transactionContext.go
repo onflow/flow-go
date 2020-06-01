@@ -680,11 +680,11 @@ func MintDefaultTokenTransaction() []byte {
 }
 
 func FungibleTokenAddress() flow.Address {
-	address, _, _ := flow.AccountAddress(flow.AddressState(1))
+	address, _ := flow.AddressAtIndex(2)
 	return address
 }
 
 func FlowTokenAddress() flow.Address {
-	address, _, _ := flow.AccountAddress(flow.AddressState(2))
+	address, _ := flow.AddressAtIndex(3)
 	return address
 }

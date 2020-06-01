@@ -263,13 +263,21 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 	fnb.MustNot(err).Msg("could not initialize tracer")
 	fnb.MetricsRegisterer = prometheus.DefaultRegisterer
 	fnb.Tracer = tracer
+
+	mempools := metrics.NewMempoolCollector(5 * time.Second)
+
 	fnb.Metrics = Metrics{
 		Network:    metrics.NewNetworkCollector(),
 		Engine:     metrics.NewEngineCollector(),
 		Compliance: metrics.NewComplianceCollector(),
 		Cache:      metrics.NewCacheCollector(flow.GetChainID()),
-		Mempool:    metrics.NewMempoolCollector(),
+		Mempool:    mempools,
 	}
+
+	// registers mempools as a Component so that its Ready method is invoked upon startup
+	fnb.Component("mempools metrics", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		return mempools, nil
+	})
 }
 
 func (fnb *FlowNodeBuilder) initProfiler() {

@@ -22,7 +22,8 @@ func NewChunkDataPackTrackers(limit uint) (*ChunkDataPackTrackers, error) {
 
 // Add adds a ChunkDataPackTracker to the mempool.
 func (c *ChunkDataPackTrackers) Add(cdpt *tracker.ChunkDataPackTracker) bool {
-	return c.Backend.Add(cdpt)
+	added := c.Backend.Add(cdpt)
+	return added
 }
 
 // Has checks whether the ChunkDataPackTracker with the given chunkID is currently in
@@ -33,7 +34,8 @@ func (c *ChunkDataPackTrackers) Has(chunkID flow.Identifier) bool {
 
 // Rem removes tracker with the given chunk ID.
 func (c *ChunkDataPackTrackers) Rem(chunkID flow.Identifier) bool {
-	return c.Backend.Rem(chunkID)
+	removed := c.Backend.Rem(chunkID)
+	return removed
 }
 
 // Inc atomically increases the counter of tracker by one and returns the updated tracker
@@ -62,6 +64,11 @@ func (c *ChunkDataPackTrackers) ByChunkID(chunkID flow.Identifier) (*tracker.Chu
 	}
 	chunkDataPackTracker := entity.(*tracker.ChunkDataPackTracker)
 	return chunkDataPackTracker, true
+}
+
+// Size returns the total number of trackers in the mempool
+func (c *ChunkDataPackTrackers) Size() uint {
+	return c.Backend.Size()
 }
 
 // All returns all chunk data pack trackers from the pool.

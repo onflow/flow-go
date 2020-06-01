@@ -41,3 +41,5 @@ language/tools/vscode-extension/out/*
 
 # Mock generation
 **/gomock_reflect*/*
+
+

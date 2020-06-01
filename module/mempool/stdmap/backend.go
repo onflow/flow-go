@@ -154,11 +154,10 @@ func (b *Backend) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 }
 
 // Run executes a function giving it exclusive access to the backdata
-func (b *Backend) Run(f func(backdata *Backdata) error) error {
+func (b *Backend) Run(f func(backdata map[flow.Identifier]flow.Entity) error) error {
 	b.Lock()
 	defer b.Unlock()
-	err := f(&b.Backdata)
-	b.reduce()
+	err := f(b.Backdata.entities)
 	return err
 }
 
