@@ -5,18 +5,14 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
 )
 
-type NoopCollector struct {
-}
+type NoopCollector struct{}
 
 func NewNoopCollector() *NoopCollector {
 	nc := &NoopCollector{}
 	return nc
 }
-
-var _ module.ExecutionMetrics = &NoopCollector{}
 
 func (nc *NoopCollector) NetworkMessageSent(sizeBytes int, topic string)            {}
 func (nc *NoopCollector) NetworkMessageReceived(sizeBytes int, topic string)        {}
@@ -44,6 +40,7 @@ func (nc *NoopCollector) CacheEntries(resource string, entries uint)            
 func (nc *NoopCollector) CacheHit(resource string)                                  {}
 func (nc *NoopCollector) CacheMiss(resource string)                                 {}
 func (nc *NoopCollector) MempoolEntries(resource string, entries uint)              {}
+func (nm *NoopCollector) Register(resource string, entriesFunc EntriesFunc) error   { return nil }
 func (nc *NoopCollector) HotStuffBusyDuration(duration time.Duration, event string) {}
 func (nc *NoopCollector) HotStuffIdleDuration(duration time.Duration)               {}
 func (nc *NoopCollector) HotStuffWaitDuration(duration time.Duration, event string) {}
@@ -65,9 +62,8 @@ func (nc *NoopCollector) StartBlockToSeal(blockID flow.Identifier)              
 func (nc *NoopCollector) FinishBlockToSeal(blockID flow.Identifier)                 {}
 func (nc *NoopCollector) OnChunkVerificationStarted(chunkID flow.Identifier)        {}
 func (nc *NoopCollector) OnChunkVerificationFinished(chunkID flow.Identifier)       {}
+func (nc *NoopCollector) OnVerifiableChunkSubmitted(size float64)                   {}
 func (nc *NoopCollector) OnResultApproval()                                         {}
-func (nc *NoopCollector) OnChunkDataAdded(chunkID flow.Identifier, size float64)    {}
-func (nc *NoopCollector) OnChunkDataRemoved(chunkID flow.Identifier, size float64)  {}
 func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)      {}
 func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)     {}
 func (nc *NoopCollector) ExecutionGasUsedPerBlock(gas uint64)                       {}
