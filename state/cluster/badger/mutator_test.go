@@ -29,7 +29,7 @@ type MutatorSuite struct {
 	dbdir string
 
 	genesis *model.Block
-	chainID string
+	chainID flow.ChainID
 
 	// protocol state for reference blocks for transactions
 	protoState *protocol.State
@@ -75,7 +75,7 @@ func (suite *MutatorSuite) Bootstrap() {
 
 	// just bootstrap with a genesis block, we'll use this as reference
 	genesis := unittest.GenesisFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
-	err := suite.protoState.Mutate().Bootstrap(flow.GenesisStateCommitment, genesis)
+	err := suite.protoState.Mutate().Bootstrap(unittest.GenesisStateCommitment, genesis)
 	suite.Require().Nil(err)
 
 	// bootstrap cluster chain
@@ -94,7 +94,7 @@ func TestMutator(t *testing.T) {
 }
 
 func (suite *MutatorSuite) TestBootstrap_InvalidChainID() {
-	suite.genesis.Header.ChainID = fmt.Sprintf("%s-invalid", suite.genesis.Header.ChainID)
+	suite.genesis.Header.ChainID = flow.ChainID(fmt.Sprintf("%s-invalid", suite.genesis.Header.ChainID))
 
 	err := suite.mutator.Bootstrap(suite.genesis)
 	suite.Assert().Error(err)
@@ -183,7 +183,7 @@ func (suite *MutatorSuite) TestExtend_InvalidChainID() {
 
 	block := unittest.ClusterBlockWithParent(suite.genesis)
 	// change the chain ID
-	block.Header.ChainID = fmt.Sprintf("%s-invalid", block.Header.ChainID)
+	block.Header.ChainID = flow.ChainID(fmt.Sprintf("%s-invalid", block.Header.ChainID))
 
 	err := suite.mutator.Extend(&block)
 	suite.Assert().Error(err)

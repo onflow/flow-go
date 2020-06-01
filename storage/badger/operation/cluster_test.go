@@ -17,13 +17,13 @@ import (
 func TestClusterHeights(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		var (
-			clusterID        = "cluster"
-			height    uint64 = 42
-			expected         = unittest.IdentifierFixture()
+			clusterID flow.ChainID = "cluster"
+			height    uint64       = 42
+			expected               = unittest.IdentifierFixture()
 			err       error
 		)
 
-		t.Run("retrieve non-existant", func(t *testing.T) {
+		t.Run("retrieve non-existent", func(t *testing.T) {
 			var actual flow.Identifier
 			err = db.View(operation.LookupClusterBlockHeight(clusterID, height, &actual))
 			t.Log(err)
@@ -43,7 +43,7 @@ func TestClusterHeights(t *testing.T) {
 		t.Run("multiple chain IDs", func(t *testing.T) {
 			for i := 0; i < 3; i++ {
 				// use different cluster ID but same block height
-				clusterID = fmt.Sprintf("cluster-%d", i)
+				clusterID = flow.ChainID(fmt.Sprintf("cluster-%d", i))
 				expected = unittest.IdentifierFixture()
 
 				var actual flow.Identifier
@@ -64,8 +64,8 @@ func TestClusterHeights(t *testing.T) {
 func TestClusterBoundaries(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		var (
-			clusterID        = "cluster"
-			expected  uint64 = 42
+			clusterID flow.ChainID = "cluster"
+			expected  uint64       = 42
 			err       error
 		)
 
@@ -92,7 +92,7 @@ func TestClusterBoundaries(t *testing.T) {
 		t.Run("multiple chain IDs", func(t *testing.T) {
 			for i := 0; i < 3; i++ {
 				// use different cluster ID but same boundary
-				clusterID = fmt.Sprintf("cluster-%d", i)
+				clusterID = flow.ChainID(fmt.Sprintf("cluster-%d", i))
 				expected = uint64(i)
 
 				var actual uint64

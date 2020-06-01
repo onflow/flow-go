@@ -79,7 +79,7 @@ func (l *LibP2PNodeTestSuite) TestMultiAddress() {
 	}
 
 	for _, tc := range tt {
-		actualAddress := multiaddressStr(tc.address)
+		actualAddress := MultiaddressStr(tc.address)
 		assert.Equal(l.Suite.T(), tc.multiaddress, actualAddress, "incorrect multi-address translation")
 	}
 

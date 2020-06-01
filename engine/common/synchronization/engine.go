@@ -24,6 +24,9 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
+//TODO this is duplicated in collection/synchronization
+// We should refactor both engines using module/synchronization/core
+
 // Engine is the synchronization engine, responsible for synchronizing chain state.
 type Engine struct {
 	unit     *engine.Unit
@@ -521,6 +524,10 @@ func (e *Engine) prune() {
 		return
 	}
 
+	// track how many statuses we are pruning
+	initialHeights := len(e.heights)
+	initialBlockIDs := len(e.blockIDs)
+
 	for height := range e.heights {
 		if height <= final.Height {
 			delete(e.heights, height)
@@ -538,12 +545,21 @@ func (e *Engine) prune() {
 			}
 		}
 	}
+
+	prunedHeights := len(e.heights) - initialHeights
+	prunedBlockIDs := len(e.blockIDs) - initialBlockIDs
+	e.log.Debug().
+		Uint64("final_height", final.Height).
+		Msgf("pruned %d heights, %d block IDs", prunedHeights, prunedBlockIDs)
 }
 
 // scanPending will check which items shall be requested.
 func (e *Engine) scanPending() ([]uint64, []flow.Identifier, error) {
 	e.unit.Lock()
 	defer e.unit.Unlock()
+
+	// first, prune any finalized heights
+	e.prune()
 
 	// TODO: we will probably want to limit the maximum amount of in-flight
 	// requests and maximum amount of blocks requested at the same time here;

@@ -15,7 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
+	validatorImpl "github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voter"
 	"github.com/dapperlabs/flow-go/consensus/recovery"
@@ -37,7 +37,8 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 		TimeoutMinimum:             time.Duration(defTimeout.MinReplicaTimeout) * time.Millisecond,
 		TimeoutAggregationFraction: defTimeout.VoteAggregationTimeoutFraction,
 		TimeoutIncreaseFactor:      defTimeout.TimeoutIncrease,
-		TimeoutDecreaseStep:        time.Duration(defTimeout.TimeoutDecrease) * time.Millisecond,
+		TimeoutDecreaseFactor:      defTimeout.TimeoutDecrease,
+		BlockRateDelay:             time.Duration(defTimeout.BlockRateDelayMS) * time.Millisecond,
 	}
 
 	// apply the configuration options
@@ -53,7 +54,9 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	}
 
 	// initialize the validator
-	validator := validator.New(committee, forks, signer)
+	var validator hotstuff.Validator
+	validator = validatorImpl.New(committee, forks, signer)
+	validator = validatorImpl.NewMetricsWrapper(validator, metrics) // wrapper for measuring time spent in Validator component
 
 	// get the last view we started
 	started, err := persist.GetStarted()
@@ -83,7 +86,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 		cfg.TimeoutMinimum,
 		cfg.TimeoutAggregationFraction,
 		cfg.TimeoutIncreaseFactor,
-		cfg.TimeoutDecreaseStep,
+		cfg.TimeoutDecreaseFactor,
 		cfg.BlockRateDelay,
 	)
 	if err != nil {

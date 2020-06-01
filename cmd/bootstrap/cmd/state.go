@@ -6,26 +6,34 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func genGenesisExecutionState() flow.StateCommitment {
-	account0Priv, err := run.GenerateAccount0PrivateKey(generateRandomSeed())
+func genGenesisExecutionState(serviceAccountKey *flow.AccountPublicKey, genesisTokenSupply uint64) flow.StateCommitment {
+	serviceAccountPriv, err := run.GenerateServiceAccountPrivateKey(generateRandomSeed())
 	if err != nil {
 		log.Fatal().Err(err).Msg("error generating account 0 private key")
 	}
 
-	enc := account0Priv.PrivateKey.Encode()
-	writeJSON(bootstrap.PathAccount0Priv, enc)
+	if serviceAccountKey == nil {
+		enc := serviceAccountPriv.PrivateKey.Encode()
+		writeJSON(bootstrap.PathServiceAccountPriv, enc)
 
-	dbpath := filepath.Join(flagOutdir, bootstrap.DirnameExecutionState)
-	stateCommitment, err := run.GenerateExecutionState(dbpath, account0Priv)
+		serviceAccountKey = new(flow.AccountPublicKey)
+		*serviceAccountKey = serviceAccountPriv.PublicKey(virtualmachine.AccountKeyWeightThreshold)
+		writeJSON(bootstrap.PathServiceAccountPublicKey, serviceAccountKey)
+	}
+
+	dbPath := filepath.Join(flagOutdir, bootstrap.DirnameExecutionState)
+	stateCommitment, err := run.GenerateExecutionState(dbPath, *serviceAccountKey, genesisTokenSupply)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error generating execution state")
 	}
-	log.Info().Msgf("wrote execution state db to directory %v", dbpath)
+	log.Info().Msgf("wrote execution state db to directory %v", dbPath)
 
+	writeJSON(bootstrap.PathGenesisTokenSupply, genesisTokenSupply)
 	writeJSON(bootstrap.PathGenesisCommit, stateCommitment)
 
 	return stateCommitment

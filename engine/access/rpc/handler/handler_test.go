@@ -453,6 +453,15 @@ func (suite *Suite) TestGetAccount() {
 	})
 }
 
+func (suite *Suite) TestGetNetworkParameters() {
+	expectedChainID := string(flow.Mainnet)
+	handler := NewHandler(suite.log, nil, nil, nil, nil, nil, nil, nil)
+	npReq := &access.GetNetworkParametersRequest{}
+	npResp, err := handler.GetNetworkParameters(context.Background(), npReq)
+	suite.checkResponse(npResp, err)
+	suite.Require().Equal(expectedChainID, npResp.GetChainId())
+}
+
 func (suite *Suite) assertAllExpectations() {
 	suite.snapshot.AssertExpectations(suite.T())
 	suite.state.AssertExpectations(suite.T())

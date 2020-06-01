@@ -7,8 +7,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-type NoopCollector struct {
-}
+type NoopCollector struct{}
 
 func NewNoopCollector() *NoopCollector {
 	nc := &NoopCollector{}
@@ -21,6 +20,7 @@ func (nc *NoopCollector) NetworkDuplicateMessagesDropped(topic string)          
 func (nc *NoopCollector) MessageSent(engine string, message string)                 {}
 func (nc *NoopCollector) MessageReceived(engine string, message string)             {}
 func (nc *NoopCollector) MessageHandled(engine string, message string)              {}
+func (nc *NoopCollector) RanGC(duration time.Duration)                              {}
 func (nc *NoopCollector) BadgerLSMSize(sizeBytes int64)                             {}
 func (nc *NoopCollector) BadgerVLogSize(sizeBytes int64)                            {}
 func (nc *NoopCollector) BadgerNumReads(n int64)                                    {}
@@ -40,6 +40,7 @@ func (nc *NoopCollector) CacheEntries(resource string, entries uint)            
 func (nc *NoopCollector) CacheHit(resource string)                                  {}
 func (nc *NoopCollector) CacheMiss(resource string)                                 {}
 func (nc *NoopCollector) MempoolEntries(resource string, entries uint)              {}
+func (nm *NoopCollector) Register(resource string, entriesFunc EntriesFunc) error   { return nil }
 func (nc *NoopCollector) HotStuffBusyDuration(duration time.Duration, event string) {}
 func (nc *NoopCollector) HotStuffIdleDuration(duration time.Duration)               {}
 func (nc *NoopCollector) HotStuffWaitDuration(duration time.Duration, event string) {}
@@ -48,19 +49,21 @@ func (nc *NoopCollector) SetQCView(view uint64)                                 
 func (nc *NoopCollector) CountSkipped()                                             {}
 func (nc *NoopCollector) CountTimeout()                                             {}
 func (nc *NoopCollector) SetTimeout(duration time.Duration)                         {}
+func (nc *NoopCollector) CommitteeProcessingDuration(duration time.Duration)        {}
+func (nc *NoopCollector) SignerProcessingDuration(duration time.Duration)           {}
+func (nc *NoopCollector) ValidatorProcessingDuration(duration time.Duration)        {}
+func (nc *NoopCollector) PayloadProductionDuration(duration time.Duration)          {}
 func (nc *NoopCollector) TransactionIngested(txID flow.Identifier)                  {}
 func (nc *NoopCollector) ClusterBlockProposed(*cluster.Block)                       {}
 func (nc *NoopCollector) ClusterBlockFinalized(*cluster.Block)                      {}
-func (nc *NoopCollector) PendingClusterBlocks(n uint)                               {}
 func (nc *NoopCollector) StartCollectionToFinalized(collectionID flow.Identifier)   {}
 func (nc *NoopCollector) FinishCollectionToFinalized(collectionID flow.Identifier)  {}
 func (nc *NoopCollector) StartBlockToSeal(blockID flow.Identifier)                  {}
 func (nc *NoopCollector) FinishBlockToSeal(blockID flow.Identifier)                 {}
 func (nc *NoopCollector) OnChunkVerificationStarted(chunkID flow.Identifier)        {}
 func (nc *NoopCollector) OnChunkVerificationFinished(chunkID flow.Identifier)       {}
+func (nc *NoopCollector) OnVerifiableChunkSubmitted(size float64)                   {}
 func (nc *NoopCollector) OnResultApproval()                                         {}
-func (nc *NoopCollector) OnChunkDataAdded(chunkID flow.Identifier, size float64)    {}
-func (nc *NoopCollector) OnChunkDataRemoved(chunkID flow.Identifier, size float64)  {}
 func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)      {}
 func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)     {}
 func (nc *NoopCollector) ExecutionGasUsedPerBlock(gas uint64)                       {}
@@ -81,3 +84,5 @@ func (nc *NoopCollector) ReadValuesNumber(number uint64)                        
 func (nc *NoopCollector) ReadValuesSize(byte uint64)                                {}
 func (nc *NoopCollector) ReadDuration(duration time.Duration)                       {}
 func (nc *NoopCollector) ReadDurationPerItem(duration time.Duration)                {}
+func (nc *NoopCollector) ExecutionCollectionRequestSent()                           {}
+func (nc *NoopCollector) ExecutionCollectionRequestRetried()                        {}

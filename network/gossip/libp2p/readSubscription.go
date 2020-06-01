@@ -2,6 +2,7 @@ package libp2p
 
 import (
 	"context"
+	"strings"
 	"sync"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -48,33 +49,35 @@ func (r *ReadSubscription) stop() {
 // RceiveLoop must be run in a goroutine. It takes care of continuously receiving
 // messages from the peer connection until the connection fails
 func (r *ReadSubscription) ReceiveLoop() {
-	defer r.stop()
 	// close and drain the inbound channel
 	defer close(r.inbound)
 
 	c := context.Background()
 
-RecvLoop:
 	for {
 		// check if we should stop
 		select {
 		case <-r.done:
 			r.log.Debug().Msg("exiting receive routine")
-			break RecvLoop
+			return
 		default:
 		}
 		var msg message.Message
 
 		rawMsg, err := r.sub.Next(c)
 		if err != nil {
-			r.log.Err(err).Msg("failed to read subscription message")
-			break RecvLoop
+			// subscription may have just been cancelled if node is being stopped, don't log error in that case
+			// (https://github.com/ipsn/go-ipfs/blob/master/gxlibs/github.com/libp2p/go-libp2p-pubsub/pubsub.go#L435)
+			if !strings.Contains(err.Error(), "subscription cancelled") {
+				r.log.Err(err).Msg("failed to read subscription message")
+			}
+			return
 		}
 
 		err = msg.Unmarshal(rawMsg.Data)
 		if err != nil {
 			r.log.Err(err).Str("topic_message", msg.String()).Msg("failed to unmarshal message")
-			break RecvLoop
+			return
 		}
 
 		// stash the received message into the inbound queue for handling

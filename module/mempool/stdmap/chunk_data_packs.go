@@ -15,7 +15,6 @@ func NewChunkDataPacks(limit uint) (*ChunkDataPacks, error) {
 	a := &ChunkDataPacks{
 		Backend: NewBackend(WithLimit(limit)),
 	}
-
 	return a, nil
 }
 
@@ -27,12 +26,14 @@ func (c *ChunkDataPacks) Has(chunkID flow.Identifier) bool {
 
 // Add adds an chunkDataPack to the mempool.
 func (c *ChunkDataPacks) Add(cdp *flow.ChunkDataPack) bool {
-	return c.Backend.Add(cdp)
+	added := c.Backend.Add(cdp)
+	return added
 }
 
 // Rem will remove chunk data pack by ID
 func (c *ChunkDataPacks) Rem(chunkID flow.Identifier) bool {
-	return c.Backend.Rem(chunkID)
+	removed := c.Backend.Rem(chunkID)
+	return removed
 }
 
 // ByChunkID returns the chunk data pack with the given chunkID from the mempool.

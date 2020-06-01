@@ -66,6 +66,7 @@ func main() {
 				node.Me,
 				node.State,
 				vm,
+				node.Storage.Blocks,
 			)
 
 			return nil
@@ -81,20 +82,22 @@ func main() {
 			return err
 		}).
 		GenesisHandler(func(node *cmd.FlowNodeBuilder, block *flow.Block) {
-			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage)
+			if node.GenesisAccountPublicKey == nil {
+				panic(fmt.Sprintf("error while bootstrapping execution state: no service account public key"))
+			}
+
+			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage, *node.GenesisAccountPublicKey, node.GenesisTokenSupply)
 			if err != nil {
 				panic(fmt.Sprintf("error while bootstrapping execution state: %s", err))
 			}
-			if !bytes.Equal(bootstrappedStateCommitment, flow.GenesisStateCommitment) {
-				panic("error while bootstrapping execution state - resulting state is different than precalculated!")
-			}
-			if !bytes.Equal(flow.GenesisStateCommitment, node.GenesisCommit) {
-				panic(fmt.Sprintf("genesis seal state commitment (%x) different from precalculated (%x)", node.GenesisCommit, flow.GenesisStateCommitment))
+
+			if !bytes.Equal(bootstrappedStateCommitment, node.GenesisCommit) {
+				panic(fmt.Sprintf("genesis seal state commitment (%x) different from precalculated (%x)", bootstrappedStateCommitment, node.GenesisCommit))
 			}
 
 			err = bootstrap.BootstrapExecutionDatabase(node.DB, bootstrappedStateCommitment, block.Header)
 			if err != nil {
-				panic(fmt.Sprintf("error while boostrapping execution state - cannot bootstrap database: %s", err))
+				panic(fmt.Sprintf("error while bootstrapping execution state - cannot bootstrap database: %s", err))
 			}
 		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -109,6 +112,7 @@ func main() {
 				ledgerStorage,
 				stateCommitments,
 				node.Storage.Blocks,
+				node.Storage.Collections,
 				chunkDataPacks,
 				executionResults,
 				node.DB,

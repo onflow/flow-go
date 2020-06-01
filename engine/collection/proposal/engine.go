@@ -5,7 +5,6 @@ package proposal
 import (
 	"errors"
 	"fmt"
-	"math/rand"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/cluster"
+	"github.com/dapperlabs/flow-go/model/events"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -46,6 +46,7 @@ type Engine struct {
 	pending        module.PendingClusterBlockBuffer // pending block cache
 	participants   flow.IdentityList                // consensus participants in our cluster
 
+	sync     module.Synchronization
 	hotstuff module.HotStuff
 }
 
@@ -87,7 +88,11 @@ func New(
 		payloads:       payloads,
 		pending:        cache,
 		participants:   participants,
+		sync:           nil, // use WithSynchronization
+		hotstuff:       nil, // use WithHotStuff
 	}
+
+	e.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, e.pending.Size())
 
 	con, err := net.Register(engine.ProtocolClusterConsensus, e)
 	if err != nil {
@@ -96,6 +101,13 @@ func New(
 	e.con = con
 
 	return e, nil
+}
+
+// WithSynchronization adds the synchronization engine responsible for bringing the node
+// up to speed to the compliance engine.
+func (e *Engine) WithSynchronization(sync module.Synchronization) *Engine {
+	e.sync = sync
+	return e
 }
 
 // WithConsensus adds the consensus algorithm to the engine. This must be
@@ -109,11 +121,14 @@ func (e *Engine) WithConsensus(hot module.HotStuff) *Engine {
 // started. For proposal engine, this is true once the underlying consensus
 // algorithm has started.
 func (e *Engine) Ready() <-chan struct{} {
-	if e.hotstuff == nil {
-		panic("cannot start proposal engine without consensus algorithm")
+	if e.sync == nil {
+		panic("must initialize compliance engine with synchronization module")
 	}
-
+	if e.hotstuff == nil {
+		panic("must initialize compliance engine with hotstuff engine")
+	}
 	return e.unit.Ready(func() {
+		<-e.sync.Ready()
 		<-e.hotstuff.Ready()
 	})
 }
@@ -121,7 +136,11 @@ func (e *Engine) Ready() <-chan struct{} {
 // Done returns a done channel that is closed once the engine has fully stopped.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
+		e.log.Debug().Msg("shutting down synchronization engine")
+		<-e.sync.Done()
+		e.log.Debug().Msg("shutting down hotstuff eventloop")
 		<-e.hotstuff.Done()
+		e.log.Debug().Msg("all components have been shut down")
 	})
 }
 
@@ -155,52 +174,6 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-// process processes events for the proposal engine on the collection node.
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-
-	//TODO currently it is possible for network messages to be received
-	// and passed to the engine before the engine has been setup
-	// (ie had Ready called). This is a quickfix to get around the issue
-	// but ultimately we should start receiving over the network only
-	// once all the engines are ready.
-	if e.hotstuff == nil {
-		return fmt.Errorf("missing hotstuff dependency")
-	}
-
-	// just process one event at a time for now
-
-	switch ev := event.(type) {
-	case *messages.ClusterBlockProposal:
-		e.before(metrics.MessageClusterBlockProposal)
-		defer e.after(metrics.MessageClusterBlockProposal)
-		return e.onBlockProposal(originID, ev)
-	case *messages.ClusterBlockVote:
-		e.before(metrics.MessageClusterBlockVote)
-		defer e.after(metrics.MessageClusterBlockVote)
-		return e.onBlockVote(originID, ev)
-	case *messages.ClusterBlockRequest:
-		e.before(metrics.MessageClusterBlockRequest)
-		defer e.after(metrics.MessageClusterBlockRequest)
-		return e.onBlockRequest(originID, ev)
-	case *messages.ClusterBlockResponse:
-		e.before(metrics.MessageClusterBlockResponse)
-		defer e.after(metrics.MessageClusterBlockResponse)
-		return e.onBlockResponse(originID, ev)
-	default:
-		return fmt.Errorf("invalid event type (%T)", event)
-	}
-}
-
-func (e *Engine) before(msg string) {
-	e.engMetrics.MessageReceived(metrics.EngineProposal, msg)
-	e.unit.Lock()
-}
-
-func (e *Engine) after(msg string) {
-	e.unit.Unlock()
-	e.engMetrics.MessageHandled(metrics.EngineProposal, msg)
-}
-
 // SendVote will send a vote to the desired node.
 func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) error {
 
@@ -215,6 +188,12 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 	if err != nil {
 		return fmt.Errorf("could not send vote: %w", err)
 	}
+
+	e.log.Debug().
+		Hex("block_id", blockID[:]).
+		Uint64("view", view).
+		Hex("recipient_id", recipientID[:]).
+		Msg("sending vote")
 
 	e.engMetrics.MessageSent(metrics.EngineProposal, metrics.MessageClusterBlockVote)
 
@@ -273,6 +252,9 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 	}
 
 	e.unit.LaunchAfter(delay, func() {
+
+		go e.hotstuff.SubmitProposal(header, parent.View)
+
 		// create the proposal message for the collection
 		msg := &messages.ClusterBlockProposal{
 			Header:  header,
@@ -300,6 +282,68 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 	return nil
 }
 
+// process processes events for the proposal engine on the collection node.
+func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+
+	//TODO currently it is possible for network messages to be received
+	// and passed to the engine before the engine has been setup
+	// (ie had Ready called). This is a quickfix to get around the issue
+	// but ultimately we should start receiving over the network only
+	// once all the engines are ready.
+	if e.sync == nil {
+		return fmt.Errorf("missing sync dependency")
+	}
+	if e.hotstuff == nil {
+		return fmt.Errorf("missing hotstuff dependency")
+	}
+
+	// just process one event at a time for now
+
+	switch ev := event.(type) {
+	case *events.SyncedClusterBlock:
+		e.before(metrics.MessageSyncedClusterBlock)
+		defer e.after(metrics.MessageSyncedClusterBlock)
+		return e.onSyncedBlock(originID, ev)
+	case *messages.ClusterBlockProposal:
+		e.before(metrics.MessageClusterBlockProposal)
+		defer e.after(metrics.MessageClusterBlockProposal)
+		return e.onBlockProposal(originID, ev)
+	case *messages.ClusterBlockVote:
+		e.before(metrics.MessageClusterBlockVote)
+		defer e.after(metrics.MessageClusterBlockVote)
+		return e.onBlockVote(originID, ev)
+	default:
+		return fmt.Errorf("invalid event type (%T)", event)
+	}
+}
+
+func (e *Engine) before(msg string) {
+	e.engMetrics.MessageReceived(metrics.EngineProposal, msg)
+	e.unit.Lock()
+}
+
+func (e *Engine) after(msg string) {
+	e.unit.Unlock()
+	e.engMetrics.MessageHandled(metrics.EngineProposal, msg)
+}
+
+// onSyncedBlock processes a block synced by the assembly engine.
+func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedClusterBlock) error {
+
+	// a block that is synced has to come locally, from the synchronization engine
+	// the block itself will contain the proposer to indicate who created it
+	if originID != e.me.NodeID() {
+		return fmt.Errorf("synced block with non-local origin (local: %x, origin: %x)", e.me.NodeID(), originID)
+	}
+
+	// process as proposal
+	proposal := &messages.ClusterBlockProposal{
+		Header:  synced.Block.Header,
+		Payload: synced.Block.Payload,
+	}
+	return e.onBlockProposal(synced.Block.Header.ProposerID, proposal)
+}
+
 // onBlockProposal handles proposals for new blocks.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
 
@@ -311,7 +355,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 		Hex("block_id", logging.ID(header.ID())).
 		Uint64("block_height", header.Height).
 		Int("collection_size", payload.Collection.Len()).
-		Str("chain_id", header.ChainID).
+		Str("chain_id", header.ChainID.String()).
 		Hex("parent_id", logging.ID(header.ParentID)).
 		Logger()
 
@@ -320,18 +364,29 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	e.prunePendingCache()
 	e.mempoolMetrics.MempoolEntries(metrics.ResourceTransaction, e.pool.Size())
 
-	// retrieve the parent block
-	// if the parent is not in storage, it has not yet been processed
-	parent, err := e.headers.ByBlockID(header.ParentID)
-	if errors.Is(err, storage.ErrNotFound) {
-		log.Debug().Msg("processing block as pending")
-		return e.processPendingProposal(originID, proposal)
-	}
-	if err != nil {
-		return fmt.Errorf("could not retrieve proposal parent: %w", err)
+	// first, we reject all blocks that we don't need to process:
+	// 1) blocks already in the cache; they will already be processed later
+	// 2) blocks already on disk; they were processed and await finalization
+
+	// ignore proposals that are already cached
+	_, cached := e.pending.ByID(header.ID())
+	if cached {
+		log.Debug().Msg("skipping already cached proposal")
+		return nil
 	}
 
-	// validate any transactions we haven't yet seen
+	// ignore proposals that were already processed
+	_, err := e.headers.ByBlockID(header.ID())
+	if err == nil {
+		log.Debug().Msg("skipping already processed proposal")
+		return nil
+	}
+	if !errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("could not check proposal: %w", err)
+	}
+
+	// we haven't seen this proposal yet, so at this point validate any
+	// transactions we haven't yet seen
 	var merr *multierror.Error
 	for _, tx := range payload.Collection.Transactions {
 		if !e.pool.Has(tx.ID()) {
@@ -345,27 +400,130 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 		return fmt.Errorf("cannot validate block proposal (id=%x) with invalid transactions: %w", header.ID(), err)
 	}
 
-	// create a cluster block representing the proposal
-	block := &cluster.Block{
-		Header:  header,
-		Payload: payload,
+	// there are two possibilities if the proposal is neither already pending
+	// processing in the cache, nor has already been processed:
+	// 1) the proposal is unverifiable because parent or ancestor is unknown
+	// => we cache the proposal and request the missing link
+	// 2) the proposal is connected to finalized state through an unbroken chain
+	// => we verify the proposal and forward it to hotstuff if valid
+
+	// if we can connect the proposal to an ancestor in the cache, it means
+	// there is a missing link; we cache it and request the missing link
+	ancestor, found := e.pending.ByID(header.ParentID)
+	if found {
+
+		// add the block to the cache
+		_ = e.pending.Add(originID, proposal)
+
+		e.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, e.pending.Size())
+
+		// go to the first missing ancestor
+		ancestorID := ancestor.Header.ParentID
+		ancestorHeight := ancestor.Header.Height - 1
+		for {
+			ancestor, found := e.pending.ByID(ancestorID)
+			if !found {
+				break
+			}
+			ancestorID = ancestor.Header.ParentID
+			ancestorHeight = ancestor.Header.Height - 1
+		}
+
+		log.Debug().
+			Uint64("ancestor_height", ancestorHeight).
+			Hex("ancestor_id", ancestorID[:]).
+			Msg("requesting missing ancestor for proposal")
+
+		e.sync.RequestBlock(ancestorID)
+
+		return nil
 	}
+
+	// if the proposal is connected to a block that is neither in the cache, nor
+	// in persistent storage, its direct parent is missing; cache the proposal
+	// and request the parent
+	_, err = e.headers.ByBlockID(header.ParentID)
+	if errors.Is(err, storage.ErrNotFound) {
+
+		// add the block to the cache
+		_ = e.pending.Add(originID, proposal)
+
+		e.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, e.pending.Size())
+
+		log.Debug().Msg("requesting missing parent for proposal")
+
+		e.sync.RequestBlock(header.ParentID)
+
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("could not check parent: %w", err)
+	}
+
+	err = e.processBlockProposal(proposal)
+	if err != nil {
+		return fmt.Errorf("could not process block proposal: %w", err)
+	}
+
+	return nil
+}
+
+func (e *Engine) processBlockProposal(proposal *messages.ClusterBlockProposal) error {
+
+	header := proposal.Header
+
+	log := e.log.With().
+		Str("chain_id", header.ChainID.String()).
+		Uint64("block_height", header.Height).
+		Uint64("block_view", header.View).
+		Hex("block_id", logging.Entity(header)).
+		Hex("parent_id", header.ParentID[:]).
+		Hex("payload_hash", header.PayloadHash[:]).
+		Time("timestamp", header.Timestamp).
+		Hex("proposer", header.ProposerID[:]).
+		Int("num_signers", len(header.ParentVoterIDs)).
+		Logger()
+
+	log.Info().Msg("processing cluster block proposal")
 
 	// extend the state with the proposal -- if it is an invalid extension,
 	// we will throw an error here
-	err = e.clusterState.Mutate().Extend(block)
+	block := &cluster.Block{
+		Header:  proposal.Header,
+		Payload: proposal.Payload,
+	}
+	err := e.clusterState.Mutate().Extend(block)
 	if err != nil {
 		return fmt.Errorf("could not extend cluster state: %w", err)
 	}
 
+	// retrieve the parent
+	parent, err := e.headers.ByBlockID(header.ParentID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve proposal parent: %w", err)
+	}
+
+	log.Info().Msg("forwarding cluster block proposal to hotstuff")
+
 	// submit the proposal to hotstuff for processing
 	e.hotstuff.SubmitProposal(header, parent.View)
 
-	// report proposed (case that we are follower)
+	// report proposed (case that we are not leader)
 	e.colMetrics.ClusterBlockProposed(block)
 
+	err = e.processPendingChildren(header)
+	if err != nil {
+		return fmt.Errorf("could not process pending children: %w", err)
+	}
+
+	return nil
+
+}
+
+func (e *Engine) processPendingChildren(header *flow.Header) error {
 	blockID := header.ID()
 
+	// check if there are any children for this parent in the cache
 	children, ok := e.pending.ByParentID(blockID)
 	if !ok {
 		return nil
@@ -375,13 +533,14 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 		Int("children", len(children)).
 		Msg("processing pending children")
 
+	// then try to process children only this once
 	var result *multierror.Error
 	for _, child := range children {
 		proposal := &messages.ClusterBlockProposal{
 			Header:  child.Header,
 			Payload: child.Payload,
 		}
-		err := e.onBlockProposal(child.OriginID, proposal)
+		err := e.processBlockProposal(proposal)
 		if err != nil {
 			result = multierror.Append(result, err)
 		}
@@ -396,121 +555,14 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 // onBlockVote handles votes for blocks by passing them to the core consensus
 // algorithm
 func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.ClusterBlockVote) error {
-	e.hotstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.SigData)
-	return nil
-}
 
-// onBlockRequest handles requests from other nodes for blocks we have.
-// We always respond to these requests if we have the block in question.
-func (e *Engine) onBlockRequest(originID flow.Identifier, req *messages.ClusterBlockRequest) error {
-
-	log := e.log.With().
-		Hex("origin_id", logging.ID(originID)).
-		Hex("req_block_id", logging.ID(req.BlockID)).
-		Logger()
-
-	log.Debug().Msg("received block request")
-
-	// retrieve the block header
-	header, err := e.headers.ByBlockID(req.BlockID)
-	if err != nil {
-		return fmt.Errorf("could not find requested block: %w", err)
-	}
-
-	// retrieve the block payload
-	payload, err := e.payloads.ByBlockID(header.ID())
-	if err != nil {
-		return fmt.Errorf("could not find requested block: %w", err)
-	}
-
-	proposal := &messages.ClusterBlockProposal{
-		Header:  header,
-		Payload: payload,
-	}
-
-	res := &messages.ClusterBlockResponse{
-		Proposal: proposal,
-		Nonce:    req.Nonce,
-	}
-
-	err = e.con.Submit(res, originID)
-	if err != nil {
-		return fmt.Errorf("could not send block response: %w", err)
-	}
-
-	e.engMetrics.MessageSent(metrics.EngineProposal, metrics.MessageClusterBlockResponse)
-
-	return nil
-}
-
-// onBlockResponse handles responses to queries for particular blocks we have made.
-func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.ClusterBlockResponse) error {
-
-	header := res.Proposal.Header
 	e.log.Debug().
-		Hex("origin_id", logging.ID(originID)).
-		Hex("block_id", logging.ID(header.ID())).
-		Uint64("block_height", header.Height).
-		Msg("received block response")
+		Hex("origin_id", originID[:]).
+		Hex("block_id", vote.BlockID[:]).
+		Uint64("view", vote.View).
+		Msg("received vote")
 
-	// process the block response as we would a regular proposal
-	err := e.onBlockProposal(originID, res.Proposal)
-	if err != nil {
-		return fmt.Errorf("could not process block response: %w", err)
-	}
-
-	return nil
-}
-
-// processPendingProposal handles proposals where the parent is missing.
-func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
-
-	pendingBlock := &cluster.PendingBlock{
-		OriginID: originID,
-		Header:   proposal.Header,
-		Payload:  proposal.Payload,
-	}
-
-	// cache the block
-	e.pending.Add(pendingBlock)
-
-	// request the missing block - typically this is the pending block's direct
-	// parent, but in general we walk the block's pending ancestors until we find
-	// the oldest one that is missing its parent.
-	missingID := proposal.Header.ParentID
-	for {
-		nextBlock, ok := e.pending.ByID(missingID)
-		if !ok {
-			break
-		}
-		missingID = nextBlock.Header.ParentID
-	}
-
-	req := &messages.ClusterBlockRequest{
-		BlockID: missingID,
-		Nonce:   rand.Uint64(),
-	}
-
-	// select a set of other nodes to request the missing block from
-	// always including the sender of the pending block
-	recipients := e.participants.
-		Filter(filter.Not(filter.HasNodeID(originID, e.me.NodeID()))).
-		Sample(1).
-		NodeIDs()
-	recipients = append(recipients, originID)
-
-	err := e.con.Submit(req, recipients...)
-	if err != nil {
-		return fmt.Errorf("could not send block request: %w", err)
-	}
-
-	e.engMetrics.MessageSent(metrics.EngineProposal, metrics.MessageClusterBlockRequest)
-
-	// NOTE: at this point, if we can't find the parent, we should probably think about a way
-	// to blacklist him, as this can be exploited by sending us lots of children without parent;
-	// a second mitigation strategy is to put a strict limit on children we cache, and possibly a
-	// limit on children we cache coming from a single other node
-
+	e.hotstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.SigData)
 	return nil
 }
 

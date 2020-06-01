@@ -1,0 +1,729 @@
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":0,"update_time_ms":211.985755,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.157709,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":10.716794,"time_to_const_psmt_ms":256.448137,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":0,"update_time_ms":345.223541,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":1.655718,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":7.62339,"time_to_const_psmt_ms":241.633066,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":0,"update_time_ms":380.315872,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.326564,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":9.047988,"time_to_const_psmt_ms":304.095742,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":0,"update_time_ms":396.023005,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.003684,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":8.821948,"time_to_const_psmt_ms":244.879564,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":0,"update_time_ms":368.448282,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":1.95339,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":9.277599,"time_to_const_psmt_ms":254.828309,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":0,"update_time_ms":507.486027,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.602605,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":9.852681,"time_to_const_psmt_ms":311.253707,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":0,"update_time_ms":377.475694,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":3.343347,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":12.204271,"time_to_const_psmt_ms":329.595499,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":0,"update_time_ms":378.174266,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":3.562464,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":11.544209,"time_to_const_psmt_ms":439.386246,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":0,"update_time_ms":626.750159,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.646963,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":25.853865,"time_to_const_psmt_ms":441.61571,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":0,"update_time_ms":678.999075,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.281894,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":8.570573,"time_to_const_psmt_ms":290.441053,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":0,"update_time_ms":408.983176,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":1.942761,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":9.915106,"time_to_const_psmt_ms":566.817685,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":0,"update_time_ms":970.176945,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":3.459266,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":27.206469,"time_to_const_psmt_ms":444.673654,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":0,"update_time_ms":468.184324,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":4.302073,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":9.242652,"time_to_const_psmt_ms":278.961531,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":0,"update_time_ms":389.433069,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":1.767253,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":17.038527,"time_to_const_psmt_ms":273.160505,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":0,"update_time_ms":384.257399,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.208018,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":12.577968,"time_to_const_psmt_ms":359.390416,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":0,"update_time_ms":574.090457,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.126889,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":13.368889,"time_to_const_psmt_ms":539.170468,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":0,"update_time_ms":533.798328,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":4.363277,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":11.651819,"time_to_const_psmt_ms":567.312905,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":0,"update_time_ms":426.443356,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.782969,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":9.719424,"time_to_const_psmt_ms":456.808034,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":0,"update_time_ms":525.02579,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":1.822237,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":14.570626,"time_to_const_psmt_ms":412.32716,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":1,"update_time_ms":419.256584,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.037671,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":8.95371,"time_to_const_psmt_ms":376.968091,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":1,"update_time_ms":420.170411,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.285538,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":11.119272,"time_to_const_psmt_ms":371.559528,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":1,"update_time_ms":559.083112,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":4.907217,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":8.951372,"time_to_const_psmt_ms":300.484318,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":1,"update_time_ms":420.941805,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":4.52344,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":12.074921,"time_to_const_psmt_ms":376.28169,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":1,"update_time_ms":455.5048,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":4.935209,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":18.111256,"time_to_const_psmt_ms":463.277585,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":1,"update_time_ms":394.359274,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":4.828297,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":12.706005,"time_to_const_psmt_ms":274.689957,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":1,"update_time_ms":365.952592,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":4.651034,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":15.269339,"time_to_const_psmt_ms":354.12613,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":1,"update_time_ms":471.771368,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":7.250152,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":49.22882,"time_to_const_psmt_ms":306.260345,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":1,"update_time_ms":523.650756,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":3.97719,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":12.747417,"time_to_const_psmt_ms":374.108615,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":1,"update_time_ms":453.271716,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":4.519147,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":10.896944,"time_to_const_psmt_ms":303.213102,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":1,"update_time_ms":398.618832,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":4.808745,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":13.591986,"time_to_const_psmt_ms":325.498408,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":1,"update_time_ms":431.044951,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":4.196437,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":23.221047,"time_to_const_psmt_ms":297.815295,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":1,"update_time_ms":530.194268,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.242744,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":18.981541,"time_to_const_psmt_ms":513.343048,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":1,"update_time_ms":569.245045,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":4.840534,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":14.215587,"time_to_const_psmt_ms":336.150731,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":1,"update_time_ms":403.003007,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":3.706424,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":11.013024,"time_to_const_psmt_ms":377.746159,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":1,"update_time_ms":532.182409,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.299971,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":33.779203,"time_to_const_psmt_ms":448.526017,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":1,"update_time_ms":508.331233,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":3.50171,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":18.717628,"time_to_const_psmt_ms":314.382565,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":1,"update_time_ms":407.263483,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.98864,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":12.834085,"time_to_const_psmt_ms":295.273654,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":1,"update_time_ms":439.416247,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":4.812103,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":13.552999,"time_to_const_psmt_ms":290.938511,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":2,"update_time_ms":490.874225,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":3.705955,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":15.410257,"time_to_const_psmt_ms":386.257629,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":2,"update_time_ms":587.178133,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":4.887398,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":20.660914,"time_to_const_psmt_ms":316.174142,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":2,"update_time_ms":418.188161,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":1.974955,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":11.265211,"time_to_const_psmt_ms":308.606592,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":2,"update_time_ms":471.855437,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":4.910171,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":23.073599,"time_to_const_psmt_ms":581.229632,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":2,"update_time_ms":471.176342,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":6.143863,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":13.310761,"time_to_const_psmt_ms":344.036333,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":2,"update_time_ms":640.088144,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.592747,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":70.829611,"time_to_const_psmt_ms":644.378371,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":2,"update_time_ms":502.86533,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.988571,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":12.607506,"time_to_const_psmt_ms":379.39059,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":2,"update_time_ms":594.98459,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.001634,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":28.27161,"time_to_const_psmt_ms":477.839715,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":2,"update_time_ms":737.584661,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":14.421461,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":34.860633,"time_to_const_psmt_ms":580.429959,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":2,"update_time_ms":837.952259,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.132137,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":11.951968,"time_to_const_psmt_ms":334.864964,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":2,"update_time_ms":447.721428,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.125195,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":15.757626,"time_to_const_psmt_ms":715.939187,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":2,"update_time_ms":989.601056,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":8.404359,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":32.445342,"time_to_const_psmt_ms":316.314233,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":2,"update_time_ms":727.460242,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":6.789782,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":32.417113,"time_to_const_psmt_ms":518.169905,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":2,"update_time_ms":412.571485,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":4.932258,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":18.807011,"time_to_const_psmt_ms":276.009442,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":2,"update_time_ms":455.787961,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":4.152984,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":11.664158,"time_to_const_psmt_ms":308.880975,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":2,"update_time_ms":476.710272,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":3.001933,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":11.719398,"time_to_const_psmt_ms":331.490107,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":2,"update_time_ms":476.766728,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.078492,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":25.38028,"time_to_const_psmt_ms":347.168208,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":2,"update_time_ms":480.501658,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":3.664696,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":11.445429,"time_to_const_psmt_ms":337.172014,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":2,"update_time_ms":481.471353,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":4.941141,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":21.88786,"time_to_const_psmt_ms":330.806174,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":2,"update_time_ms":598.161704,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.407729,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":9.762986,"time_to_const_psmt_ms":309.825154,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":3,"update_time_ms":486.147328,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.237764,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":54.260151,"time_to_const_psmt_ms":414.056936,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":3,"update_time_ms":434.163795,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.121921,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":14.247682,"time_to_const_psmt_ms":387.756203,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":3,"update_time_ms":602.389535,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.247697,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":14.216917,"time_to_const_psmt_ms":439.989862,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":3,"update_time_ms":427.331321,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.126761,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":29.537888,"time_to_const_psmt_ms":455.396352,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":3,"update_time_ms":434.13293,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":3.190708,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":10.067573,"time_to_const_psmt_ms":348.614425,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":3,"update_time_ms":434.684193,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.207196,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":28.200849,"time_to_const_psmt_ms":348.626118,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":3,"update_time_ms":680.143704,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.890574,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":17.765043,"time_to_const_psmt_ms":366.09195,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":3,"update_time_ms":474.385277,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.233214,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":21.376432,"time_to_const_psmt_ms":355.462245,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":3,"update_time_ms":691.07645,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":16.187024,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":107.565594,"time_to_const_psmt_ms":396.191188,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":3,"update_time_ms":503.786818,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.583319,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":70.670794,"time_to_const_psmt_ms":360.701497,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":3,"update_time_ms":744.305099,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":3.893717,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":12.865506,"time_to_const_psmt_ms":421.595724,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":3,"update_time_ms":517.182974,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.450682,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":14.497882,"time_to_const_psmt_ms":323.810732,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":3,"update_time_ms":689.576883,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":26.835202,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":35.184363,"time_to_const_psmt_ms":351.71588,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":3,"update_time_ms":385.793302,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.31023,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":15.839886,"time_to_const_psmt_ms":295.279018,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":3,"update_time_ms":420.013082,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":6.01599,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":25.965281,"time_to_const_psmt_ms":279.622912,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":3,"update_time_ms":386.269277,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.254421,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":32.428797,"time_to_const_psmt_ms":316.708373,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":3,"update_time_ms":380.906357,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.194842,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":26.121041,"time_to_const_psmt_ms":295.042393,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":3,"update_time_ms":404.288884,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.305082,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":27.292284,"time_to_const_psmt_ms":277.703313,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":3,"update_time_ms":433.406304,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":4.997386,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":27.627928,"time_to_const_psmt_ms":286.806679,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":4,"update_time_ms":406.643237,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":3.046818,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":14.984109,"time_to_const_psmt_ms":346.209544,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":4,"update_time_ms":378.819867,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.521878,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":16.784826,"time_to_const_psmt_ms":292.284844,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":4,"update_time_ms":397.441399,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.086471,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":27.085592,"time_to_const_psmt_ms":295.204604,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":4,"update_time_ms":402.096468,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.299455,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":10.178499,"time_to_const_psmt_ms":311.092976,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":4,"update_time_ms":370.181762,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.333019,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":26.589161,"time_to_const_psmt_ms":294.368014,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":4,"update_time_ms":400.275595,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.366241,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":12.46407,"time_to_const_psmt_ms":401.645847,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":4,"update_time_ms":400.957924,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.290295,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":10.874963,"time_to_const_psmt_ms":308.289161,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":4,"update_time_ms":409.123105,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.535827,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":23.408706,"time_to_const_psmt_ms":293.625338,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":4,"update_time_ms":408.942974,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.54041,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":16.417399,"time_to_const_psmt_ms":289.887717,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":4,"update_time_ms":365.764506,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.337396,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":26.253804,"time_to_const_psmt_ms":292.069969,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":4,"update_time_ms":378.629722,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.208999,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":25.881591,"time_to_const_psmt_ms":292.239084,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":4,"update_time_ms":432.139674,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.436181,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":25.635178,"time_to_const_psmt_ms":298.236492,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":4,"update_time_ms":382.279395,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.988031,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":31.469878,"time_to_const_psmt_ms":252.576539,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":4,"update_time_ms":428.204652,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.363078,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":20.300791,"time_to_const_psmt_ms":294.177285,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":4,"update_time_ms":418.747541,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":7.193093,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":28.00034,"time_to_const_psmt_ms":292.833497,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":4,"update_time_ms":394.358473,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.060641,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":26.668276,"time_to_const_psmt_ms":316.084921,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":4,"update_time_ms":343.954691,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.088383,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":10.290601,"time_to_const_psmt_ms":299.022611,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":4,"update_time_ms":449.795693,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":3.10336,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":10.218675,"time_to_const_psmt_ms":320.726747,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":4,"update_time_ms":423.917441,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.690783,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":23.766607,"time_to_const_psmt_ms":298.013529,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":4,"update_time_ms":374.520404,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.18887,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":27.609174,"time_to_const_psmt_ms":288.762288,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":5,"update_time_ms":396.421512,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.024467,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":25.837646,"time_to_const_psmt_ms":266.635378,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":5,"update_time_ms":424.166626,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.559371,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":27.678967,"time_to_const_psmt_ms":295.822764,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":5,"update_time_ms":371.956971,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.338293,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":22.119806,"time_to_const_psmt_ms":278.437545,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":5,"update_time_ms":396.031615,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.216836,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":27.002263,"time_to_const_psmt_ms":298.721026,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":5,"update_time_ms":407.140841,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.211951,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":27.881685,"time_to_const_psmt_ms":296.237598,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":5,"update_time_ms":415.043614,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":4.178054,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":28.50933,"time_to_const_psmt_ms":295.049104,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":5,"update_time_ms":370.533103,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":4.373309,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":26.847276,"time_to_const_psmt_ms":274.710225,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":5,"update_time_ms":423.464652,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.533014,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":34.309954,"time_to_const_psmt_ms":296.399445,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":5,"update_time_ms":463.386306,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.641364,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":28.554992,"time_to_const_psmt_ms":287.96191,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":5,"update_time_ms":434.218736,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.12012,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":26.288136,"time_to_const_psmt_ms":289.37684,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":5,"update_time_ms":414.982745,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.354324,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":27.446911,"time_to_const_psmt_ms":305.768656,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":5,"update_time_ms":413.53263,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.084839,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":27.191366,"time_to_const_psmt_ms":286.193977,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":5,"update_time_ms":402.331853,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":4.769269,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":30.421957,"time_to_const_psmt_ms":297.348077,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":5,"update_time_ms":395.242371,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":3.512929,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":28.269695,"time_to_const_psmt_ms":316.500414,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":5,"update_time_ms":398.468181,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.502905,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":11.103441,"time_to_const_psmt_ms":333.258971,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":5,"update_time_ms":411.398898,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.140986,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":10.991966,"time_to_const_psmt_ms":340.967572,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":5,"update_time_ms":407.167258,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":3.416622,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":12.159439,"time_to_const_psmt_ms":276.591671,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":5,"update_time_ms":429.697098,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.21914,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":36.093783,"time_to_const_psmt_ms":296.84553,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":5,"update_time_ms":432.984589,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":6.282898,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":21.016816,"time_to_const_psmt_ms":346.532116,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":6,"update_time_ms":413.348696,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.40673,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":12.036689,"time_to_const_psmt_ms":271.411262,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":6,"update_time_ms":463.90553,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.412248,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":32.22339,"time_to_const_psmt_ms":293.118011,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":6,"update_time_ms":437.878857,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.473616,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":11.755588,"time_to_const_psmt_ms":321.091389,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":6,"update_time_ms":333.599125,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.498361,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":11.077225,"time_to_const_psmt_ms":338.966054,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":6,"update_time_ms":360.354232,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.328864,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":26.880077,"time_to_const_psmt_ms":286.698281,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":6,"update_time_ms":408.915692,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.918862,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":18.878517,"time_to_const_psmt_ms":334.860984,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":6,"update_time_ms":376.439784,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.509081,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":27.461351,"time_to_const_psmt_ms":281.812655,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":6,"update_time_ms":417.306784,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.441703,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":12.490923,"time_to_const_psmt_ms":298.242806,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":6,"update_time_ms":373.18892,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.185286,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":13.042934,"time_to_const_psmt_ms":335.535242,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":6,"update_time_ms":371.13491,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.21923,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":33.191073,"time_to_const_psmt_ms":289.305471,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":6,"update_time_ms":376.413284,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.227825,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":12.341607,"time_to_const_psmt_ms":315.51966,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":6,"update_time_ms":383.356693,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.347394,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":14.113068,"time_to_const_psmt_ms":341.804429,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":6,"update_time_ms":375.017859,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.415775,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":27.195496,"time_to_const_psmt_ms":301.405739,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":6,"update_time_ms":412.710616,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.355424,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":33.925862,"time_to_const_psmt_ms":278.627086,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":6,"update_time_ms":342.993278,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.31964,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":11.157195,"time_to_const_psmt_ms":367.725448,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":6,"update_time_ms":368.294532,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.635657,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":26.628713,"time_to_const_psmt_ms":297.651147,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":6,"update_time_ms":454.495888,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.520798,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":16.866991,"time_to_const_psmt_ms":276.416145,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":6,"update_time_ms":468.671145,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.393897,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":28.798189,"time_to_const_psmt_ms":285.779205,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":6,"update_time_ms":407.721659,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.10119,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":27.595873,"time_to_const_psmt_ms":283.090817,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":7,"update_time_ms":570.48696,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":4.884989,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":15.320161,"time_to_const_psmt_ms":354.652027,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":7,"update_time_ms":370.176225,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.357982,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":29.254324,"time_to_const_psmt_ms":308.58315,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":7,"update_time_ms":400.078995,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":7.260186,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":28.659019,"time_to_const_psmt_ms":296.988964,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":7,"update_time_ms":416.221736,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.508705,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":28.114285,"time_to_const_psmt_ms":311.037332,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":7,"update_time_ms":409.336635,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.298546,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":12.825077,"time_to_const_psmt_ms":277.148872,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":7,"update_time_ms":423.114705,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.432805,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":26.780169,"time_to_const_psmt_ms":284.852315,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":7,"update_time_ms":400.189375,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.237071,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":41.236506,"time_to_const_psmt_ms":297.774125,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":7,"update_time_ms":445.918562,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.534726,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":27.746531,"time_to_const_psmt_ms":285.411388,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":7,"update_time_ms":375.753619,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.363188,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":12.937898,"time_to_const_psmt_ms":281.88513,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":7,"update_time_ms":425.719123,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.699287,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":37.814919,"time_to_const_psmt_ms":311.509052,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":7,"update_time_ms":413.28226,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.296077,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":31.474261,"time_to_const_psmt_ms":392.202595,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":7,"update_time_ms":451.167096,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.469858,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":27.656061,"time_to_const_psmt_ms":331.073069,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":7,"update_time_ms":426.876452,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.111667,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":24.152782,"time_to_const_psmt_ms":288.167845,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":7,"update_time_ms":382.335762,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.35631,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":30.859028,"time_to_const_psmt_ms":328.084368,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":7,"update_time_ms":366.160661,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.34103,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":26.930712,"time_to_const_psmt_ms":349.487551,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":7,"update_time_ms":342.749055,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.510907,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":27.312068,"time_to_const_psmt_ms":347.843781,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":7,"update_time_ms":357.915102,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.635552,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":15.811056,"time_to_const_psmt_ms":290.789435,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":7,"update_time_ms":548.097355,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.450799,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":28.072778,"time_to_const_psmt_ms":294.216734,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":7,"update_time_ms":412.433498,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.469877,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":30.337304,"time_to_const_psmt_ms":355.805787,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":7,"update_time_ms":376.527274,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.608406,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":23.941934,"time_to_const_psmt_ms":343.354518,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":8,"update_time_ms":361.13794,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.276857,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":13.768175,"time_to_const_psmt_ms":313.145685,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":8,"update_time_ms":564.779712,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.737537,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":23.771621,"time_to_const_psmt_ms":322.946037,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":8,"update_time_ms":645.736418,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.725392,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":27.804754,"time_to_const_psmt_ms":363.900017,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":8,"update_time_ms":460.90538,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.61918,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":29.704625,"time_to_const_psmt_ms":379.803476,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":8,"update_time_ms":406.863645,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.667543,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":27.696884,"time_to_const_psmt_ms":396.09528,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":8,"update_time_ms":392.730359,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":4.250238,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":30.321083,"time_to_const_psmt_ms":315.662844,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":8,"update_time_ms":444.729777,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.270109,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":11.186856,"time_to_const_psmt_ms":297.430706,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":8,"update_time_ms":482.354767,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.16486,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":28.324051,"time_to_const_psmt_ms":395.170246,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":8,"update_time_ms":478.766982,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.467003,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":30.4737,"time_to_const_psmt_ms":358.846751,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":8,"update_time_ms":346.856969,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.405224,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":29.426672,"time_to_const_psmt_ms":282.586838,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":8,"update_time_ms":329.143607,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.418665,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":29.449901,"time_to_const_psmt_ms":305.009838,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":8,"update_time_ms":398.742673,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.832874,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":12.09155,"time_to_const_psmt_ms":436.784646,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":8,"update_time_ms":514.802019,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":7.354093,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":83.031819,"time_to_const_psmt_ms":445.461813,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":8,"update_time_ms":457.660136,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":3.066539,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":25.1916,"time_to_const_psmt_ms":479.913534,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":8,"update_time_ms":499.879405,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.266189,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":30.314928,"time_to_const_psmt_ms":462.278295,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":8,"update_time_ms":441.984645,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.821866,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":26.647101,"time_to_const_psmt_ms":365.489353,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":8,"update_time_ms":377.70585,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.400877,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":27.993884,"time_to_const_psmt_ms":302.419701,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":8,"update_time_ms":389.237586,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.563765,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":27.182977,"time_to_const_psmt_ms":313.551576,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":8,"update_time_ms":387.978645,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":7.69587,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":51.224208,"time_to_const_psmt_ms":316.893002,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":9,"update_time_ms":314.063089,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.381289,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":28.91583,"time_to_const_psmt_ms":319.478955,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":9,"update_time_ms":607.689382,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.625612,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":28.529971,"time_to_const_psmt_ms":498.439248,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":9,"update_time_ms":460.604016,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.291285,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":16.883908,"time_to_const_psmt_ms":372.220836,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":9,"update_time_ms":484.126484,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.273961,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":32.779337,"time_to_const_psmt_ms":357.362386,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":9,"update_time_ms":385.886185,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.538493,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":32.187383,"time_to_const_psmt_ms":311.539171,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":9,"update_time_ms":515.562706,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.337598,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":31.429859,"time_to_const_psmt_ms":358.317289,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":9,"update_time_ms":572.988876,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":4.847297,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":64.34506,"time_to_const_psmt_ms":456.403722,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":9,"update_time_ms":382.828664,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.264688,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":29.111834,"time_to_const_psmt_ms":396.836737,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":9,"update_time_ms":676.525848,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":6.727403,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":39.717494,"time_to_const_psmt_ms":436.376767,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":9,"update_time_ms":425.289282,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.141444,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":28.03925,"time_to_const_psmt_ms":334.773044,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":9,"update_time_ms":498.324054,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.095164,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":27.902061,"time_to_const_psmt_ms":390.193636,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":9,"update_time_ms":350.864413,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.177326,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":31.676371,"time_to_const_psmt_ms":304.468015,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":9,"update_time_ms":416.237518,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.354185,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":29.312325,"time_to_const_psmt_ms":268.535515,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":9,"update_time_ms":447.187454,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.134596,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":27.688539,"time_to_const_psmt_ms":296.387234,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":9,"update_time_ms":391.191835,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.495332,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":32.959217,"time_to_const_psmt_ms":296.188142,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":9,"update_time_ms":563.126542,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":6.100881,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":45.510083,"time_to_const_psmt_ms":313.551427,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":9,"update_time_ms":389.313666,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.45374,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":38.383849,"time_to_const_psmt_ms":419.859371,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":9,"update_time_ms":578.660415,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.945357,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":39.118246,"time_to_const_psmt_ms":402.595858,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":9,"update_time_ms":556.282663,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.354346,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":34.532821,"time_to_const_psmt_ms":402.636179,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":9,"update_time_ms":547.682314,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.351683,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":28.293392,"time_to_const_psmt_ms":476.383975,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":10,"update_time_ms":563.616691,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.463697,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":31.209035,"time_to_const_psmt_ms":432.922553,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":10,"update_time_ms":522.250288,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.811114,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":29.656476,"time_to_const_psmt_ms":330.56502,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":10,"update_time_ms":818.040387,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.114501,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":27.710554,"time_to_const_psmt_ms":437.365379,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":10,"update_time_ms":355.977547,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.78457,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":13.777377,"time_to_const_psmt_ms":412.308706,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":10,"update_time_ms":861.036088,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":7.161349,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":68.144071,"time_to_const_psmt_ms":390.5884,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":10,"update_time_ms":278.882354,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":3.008811,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":13.326754,"time_to_const_psmt_ms":375.974074,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":10,"update_time_ms":735.331427,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":6.181748,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":30.908268,"time_to_const_psmt_ms":377.747702,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":10,"update_time_ms":557.905439,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.702761,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":47.6171,"time_to_const_psmt_ms":354.52187,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":10,"update_time_ms":544.974587,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":8.900664,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":21.874956,"time_to_const_psmt_ms":469.565602,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":10,"update_time_ms":474.943136,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.143081,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":29.96929,"time_to_const_psmt_ms":584.627968,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":10,"update_time_ms":658.798454,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.063156,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":28.760535,"time_to_const_psmt_ms":321.059049,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":10,"update_time_ms":696.190668,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":6.055133,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":43.90746,"time_to_const_psmt_ms":593.513893,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":10,"update_time_ms":642.239706,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.448337,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":28.060261,"time_to_const_psmt_ms":373.705081,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":10,"update_time_ms":568.47214,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.702569,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":30.170748,"time_to_const_psmt_ms":691.242391,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":10,"update_time_ms":593.669979,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.812628,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":28.127752,"time_to_const_psmt_ms":589.873901,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":10,"update_time_ms":673.295222,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":6.098216,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":42.53429,"time_to_const_psmt_ms":390.408455,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":10,"update_time_ms":666.478727,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":4.720879,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":24.717122,"time_to_const_psmt_ms":353.963347,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":10,"update_time_ms":516.501535,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.008138,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":21.611995,"time_to_const_psmt_ms":674.243332,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":10,"update_time_ms":651.021507,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":9.043307,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":38.998102,"time_to_const_psmt_ms":332.343695,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":11,"update_time_ms":716.226139,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.694841,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":35.617376,"time_to_const_psmt_ms":449.396372,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":11,"update_time_ms":627.397602,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.35082,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":38.927437,"time_to_const_psmt_ms":340.949483,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":11,"update_time_ms":467.113163,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.15318,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":28.700411,"time_to_const_psmt_ms":375.835288,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":11,"update_time_ms":563.749936,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.872622,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":29.431252,"time_to_const_psmt_ms":364.86071,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":11,"update_time_ms":776.383951,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":6.553868,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":39.848673,"time_to_const_psmt_ms":445.959324,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":11,"update_time_ms":503.498216,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.522221,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":28.744664,"time_to_const_psmt_ms":491.970137,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":11,"update_time_ms":497.765583,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.500836,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":30.245764,"time_to_const_psmt_ms":402.725423,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":11,"update_time_ms":552.856605,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.495386,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":30.273276,"time_to_const_psmt_ms":391.389974,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":11,"update_time_ms":704.585065,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":7.680513,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":40.966107,"time_to_const_psmt_ms":376.834863,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":11,"update_time_ms":780.062071,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.550216,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":49.115209,"time_to_const_psmt_ms":423.803768,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":11,"update_time_ms":960.441204,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.503364,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":36.233549,"time_to_const_psmt_ms":680.234762,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":11,"update_time_ms":755.062401,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.331569,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":32.912559,"time_to_const_psmt_ms":459.871128,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":11,"update_time_ms":658.136293,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.477456,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":42.62645,"time_to_const_psmt_ms":404.237866,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":11,"update_time_ms":567.002027,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.672409,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":66.583607,"time_to_const_psmt_ms":508.842576,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":11,"update_time_ms":716.137289,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.50451,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":33.175551,"time_to_const_psmt_ms":356.309948,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":11,"update_time_ms":605.937207,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":62.023106,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":27.735103,"time_to_const_psmt_ms":522.212422,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":11,"update_time_ms":621.075156,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.15555,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":32.377487,"time_to_const_psmt_ms":656.396722,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":1,"storage_size_mb":11,"update_time_ms":1026.142472,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":7.07409,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":93.383838,"time_to_const_psmt_ms":486.55548,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":11,"update_time_ms":554.305868,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.349179,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":28.688501,"time_to_const_psmt_ms":470.767348,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":12,"update_time_ms":600.441815,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":8.866985,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":78.149681,"time_to_const_psmt_ms":491.370266,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":12,"update_time_ms":631.023091,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.811577,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":30.962823,"time_to_const_psmt_ms":613.720244,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":12,"update_time_ms":797.676241,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":11.245052,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":40.217294,"time_to_const_psmt_ms":448.31529,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":12,"update_time_ms":795.866622,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.465664,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":33.46664,"time_to_const_psmt_ms":689.010455,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":12,"update_time_ms":936.514632,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.68492,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":111.907295,"time_to_const_psmt_ms":807.240404,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":12,"update_time_ms":421.105109,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.518645,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":34.321608,"time_to_const_psmt_ms":445.947184,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":12,"update_time_ms":425.003689,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.231775,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":30.401738,"time_to_const_psmt_ms":373.834346,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":12,"update_time_ms":545.933225,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.939872,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":49.254861,"time_to_const_psmt_ms":418.888298,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":12,"update_time_ms":516.090016,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":2.335382,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":16.368023,"time_to_const_psmt_ms":471.814697,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":12,"update_time_ms":639.389447,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":5.376382,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":28.714806,"time_to_const_psmt_ms":582.364953,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","update_time_per_reg_ms":0,"storage_size_mb":12,"update_time_ms":467.635043,"message":"update register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":7.571674,"message":"read register"}
+{"level":"info","time":"2020-05-29T13:50:05-07:00","read_time_per_reg_ms":0,"reg_count":1000,"read_time_ms":46.476966,"time_to_const_psmt_ms":430.738549,"time_to_const_psmt_per_reg_ms":0,"message":"read register with proof"}

@@ -26,4 +26,7 @@ type ChunkDataPackTrackers interface {
 
 	// All will return a list of chunk data pack trackers in mempool.
 	All() []*tracker.ChunkDataPackTracker
+
+	// Size returns the total number of trackers in the mempool
+	Size() uint
 }

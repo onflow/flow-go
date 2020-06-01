@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/model/encoding"
+	"github.com/dapperlabs/flow-go/model/fingerprint"
 )
 
 // List of built-in account event types.
@@ -46,11 +47,14 @@ func (e *Event) Body() interface{} {
 	return wrapEvent(*e)
 }
 
-// Encode returns the canonical encoding of the event, containing only the
-// fields necessary to uniquely identify it.
+// Encode returns the canonical encoding of this event, containing only the fields necessary to uniquely identify it.
 func (e Event) Encode() []byte {
 	w := wrapEvent(e)
 	return encoding.DefaultEncoder.MustEncode(w)
+}
+
+func (e Event) Fingerprint() []byte {
+	return fingerprint.Fingerprint(wrapEvent(e))
 }
 
 // Defines only the fields needed to uniquely identify an event.

@@ -16,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
+	mockStorage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -29,7 +30,7 @@ type ChunkVerifierTestSuite struct {
 func (s *ChunkVerifierTestSuite) SetupTest() {
 	// seed the RNG
 	rand.Seed(time.Now().UnixNano())
-	s.verifier = chunks.NewChunkVerifier(&virtualMachineMock{})
+	s.verifier = chunks.NewChunkVerifier(&virtualMachineMock{}, new(mockStorage.Blocks))
 }
 
 // TestChunkVerifier invokes all the tests in this test suite
@@ -203,6 +204,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 type blockContextMock struct {
 	vm     *virtualMachineMock
 	header *flow.Header
+	blocks virtualmachine.Blocks
 }
 
 func (bc *blockContextMock) ExecuteTransaction(
@@ -261,18 +263,19 @@ func (bc *blockContextMock) ExecuteScript(
 	return nil, nil
 }
 
-func (bc *blockContextMock) GetAccount(ledger virtualmachine.Ledger, address flow.Address) *flow.Account {
-	return nil
+func (bc *blockContextMock) GetAccount(_ virtualmachine.Ledger, _ flow.Address) (*flow.Account, error) {
+	return nil, nil
 }
 
 // virtualMachineMock is a mocked virtualMachine
 type virtualMachineMock struct {
 }
 
-func (vm *virtualMachineMock) NewBlockContext(header *flow.Header) virtualmachine.BlockContext {
+func (vm *virtualMachineMock) NewBlockContext(header *flow.Header, blocks virtualmachine.Blocks) virtualmachine.BlockContext {
 	return &blockContextMock{
 		vm:     vm,
 		header: header,
+		blocks: blocks,
 	}
 }
 

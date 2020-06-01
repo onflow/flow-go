@@ -149,6 +149,12 @@ func (h *Handler) GetAccount(ctx context.Context, req *access.GetAccountRequest)
 
 }
 
+func (h *Handler) GetNetworkParameters(_ context.Context, _ *access.GetNetworkParametersRequest) (*access.GetNetworkParametersResponse, error) {
+	return &access.GetNetworkParametersResponse{
+		ChainId: string(flow.GetChainID()),
+	}, nil
+}
+
 func convertStorageError(err error) error {
 	if errors.Is(err, storage.ErrNotFound) {
 		return status.Errorf(codes.NotFound, "not found: %v", err)

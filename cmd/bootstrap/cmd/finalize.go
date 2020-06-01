@@ -17,8 +17,10 @@ var (
 	flagCollectionClusters                           uint16
 	flagGeneratedCollectorAddressTemplate            string
 	flagGeneratedCollectorStake                      uint64
+	flagGenesisTokenSupply                           uint64
 	flagPartnerNodeInfoDir                           string
 	flagPartnerStakes                                string
+	flagServiceAccountPublicKeyFile                  string
 	flagCollectorGenerationMaxHashGrindingIterations uint
 	flagFastKG                                       bool
 )
@@ -49,12 +51,19 @@ running the DKG for generating the random beacon keys, generating genesis execut
 		dkgData := runDKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
 		log.Info().Msg("")
 
-		log.Info().Msg("✨ generating private key for account 0 and generating genesis execution state")
-		genGenesisExecutionState()
-		log.Info().Msg("")
+		if len(flagServiceAccountPublicKeyFile) > 0 {
+			publicKey := readServiceAccountPublicKey(flagServiceAccountPublicKeyFile)
+			log.Info().Msg("✨ using provided public key file for service account and generating genesis execution state")
+			genGenesisExecutionState(publicKey, flagGenesisTokenSupply)
+			log.Info().Msg("")
+		} else {
+			log.Info().Msg("✨ generating private key for service account and generating genesis execution state")
+			genGenesisExecutionState(nil, flagGenesisTokenSupply)
+			log.Info().Msg("")
+		}
 
 		log.Info().Msg("✨ constructing genesis seal and genesis block")
-		block := constructGenesisBlock(stakingNodes, dkgData)
+		block := constructGenesisBlock(stakingNodes)
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ constructing genesis QC")
@@ -95,12 +104,16 @@ func init() {
 			"will be replaced by an index)")
 	finalizeCmd.Flags().Uint64Var(&flagGeneratedCollectorStake, "generated-collector-stake", 100,
 		"stake for collector nodes that will be generated")
+	finalizeCmd.Flags().Uint64Var(&flagGenesisTokenSupply, "genesis-token-supply", 0,
+		"number of tokens that exist at the genesis execution state")
 	finalizeCmd.Flags().UintVar(&flagCollectorGenerationMaxHashGrindingIterations, "collector-gen-max-iter", 1000,
 		"max hash grinding iterations for collector generation")
 	finalizeCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", fmt.Sprintf("path to directory "+
 		"containing one JSON file starting with %v for every partner node (fields Role, Address, NodeID, "+
 		"NetworkPubKey, StakingPubKey)", model.PathPartnerNodeInfoPrefix))
 	_ = finalizeCmd.MarkFlagRequired("partner-dir")
+	finalizeCmd.Flags().StringVar(&flagServiceAccountPublicKeyFile, "public-key", "", "path to a JSON file containing "+
+		"the public key of the root account. A private key will be generated if no public key is provided")
 	finalizeCmd.Flags().StringVar(&flagPartnerStakes, "partner-stakes", "", "path to a JSON file containing "+
 		"a map from partner node's NodeID to their stake")
 	_ = finalizeCmd.MarkFlagRequired("partner-stakes")
@@ -208,4 +221,10 @@ func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) []model.NodeIn
 	}
 
 	return nodes
+}
+
+func readServiceAccountPublicKey(filename string) *flow.AccountPublicKey {
+	publicKey := &flow.AccountPublicKey{}
+	readJSON(filename, publicKey)
+	return publicKey
 }
