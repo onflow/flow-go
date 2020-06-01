@@ -101,7 +101,7 @@ func (suite *FinderEngineTestSuite) TestNewFinderEngine() *finder.Engine {
 }
 
 // TestHandleReceipt_HappyPath evaluates that handling a receipt that is not duplicate,
-// and its result has not processed yet ends by adding to receipt mempool.
+// and its result has not been processed yet ends by adding to receipt mempool.
 func (suite *FinderEngineTestSuite) TestHandleReceipt_HappyPath() {
 	e := suite.TestNewFinderEngine()
 
