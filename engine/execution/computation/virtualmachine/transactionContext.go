@@ -10,7 +10,6 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
-	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -37,7 +36,6 @@ type TransactionContext struct {
 	skipDeploymentRestriction bool
 	header                    *flow.Header
 	blocks                    Blocks
-	logger                    zerolog.Logger
 }
 
 type TransactionContextOption func(*TransactionContext)
@@ -378,9 +376,8 @@ func (r *TransactionContext) GetBlockAtHeight(height uint64) (hash runtime.Block
 	if errors.Is(err, storage.ErrNotFound) {
 		return runtime.BlockHash{}, 0, false, nil
 	} else if err != nil {
-		r.logger.Error().Err(err).Str("tx ID", r.tx.ID().String()).Uint64("height", height).
-			Msg("unexpected failure of GetBlockAtHeight")
-		return runtime.BlockHash{}, 0, false, err
+		return runtime.BlockHash{}, 0, false, fmt.Errorf(
+			"unexpected failure of GetBlockAtHeight, tx ID %s, height %v: %w", r.tx.ID().String(), height, err)
 	}
 	return runtime.BlockHash(block.ID()), block.Header.Timestamp.UnixNano(), true, nil
 }

@@ -5,7 +5,6 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
-	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -25,15 +24,14 @@ type VirtualMachine interface {
 }
 
 // New creates a new virtual machine instance with the provided runtime.
-func New(logger zerolog.Logger, rt runtime.Runtime) (VirtualMachine, error) {
+func New(rt runtime.Runtime) (VirtualMachine, error) {
 	cache, err := NewLRUASTCache(MaxProgramASTCacheSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vm ast cache, %w", err)
 	}
 	return &virtualMachine{
-		logger: logger,
-		rt:     rt,
-		cache:  cache,
+		rt:    rt,
+		cache: cache,
 	}, nil
 }
 
@@ -45,9 +43,8 @@ func NewWithCache(rt runtime.Runtime, cache ASTCache) (VirtualMachine, error) {
 }
 
 type virtualMachine struct {
-	logger zerolog.Logger
-	rt     runtime.Runtime
-	cache  ASTCache
+	rt    runtime.Runtime
+	cache ASTCache
 }
 
 func (vm *virtualMachine) NewBlockContext(header *flow.Header, blocks Blocks) BlockContext {

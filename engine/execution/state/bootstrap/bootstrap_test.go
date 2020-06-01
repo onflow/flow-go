@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -21,7 +20,6 @@ func TestGenerateGenesisState(t *testing.T) {
 		require.NoError(t, err)
 
 		stateCommitment, err := BootstrapLedger(
-			zerolog.Logger{},
 			ls,
 			unittest.ServiceAccountPublicKey,
 			unittest.GenesisTokenSupply,
@@ -43,7 +41,7 @@ func TestGenerateGenesisState_ZeroTokenSupply(t *testing.T) {
 		ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 		require.NoError(t, err)
 
-		stateCommitment, err := BootstrapLedger(zerolog.Logger{}, ls, unittest.ServiceAccountPublicKey, 0)
+		stateCommitment, err := BootstrapLedger(ls, unittest.ServiceAccountPublicKey, 0)
 		require.NoError(t, err)
 
 		if !assert.Equal(t, expectedStateCommitment, stateCommitment) {

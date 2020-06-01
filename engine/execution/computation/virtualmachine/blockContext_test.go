@@ -11,7 +11,6 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -31,7 +30,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
+	vm, err := virtualmachine.New(rt)
 	require.NoError(t, err)
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
@@ -148,7 +147,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
+	vm, err := virtualmachine.New(rt)
 	require.NoError(t, err)
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
@@ -218,7 +217,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
+	vm, err := virtualmachine.New(rt)
 	assert.NoError(t, err)
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
@@ -319,7 +318,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
+	vm, err := virtualmachine.New(rt)
 	assert.NoError(t, err)
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
@@ -381,7 +380,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
+	vm, err := virtualmachine.New(rt)
 	assert.NoError(t, err)
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
@@ -560,7 +559,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
+	vm, err := virtualmachine.New(rt)
 	require.NoError(t, err)
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
@@ -624,7 +623,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 	block2 := unittest.BlockWithParentFixture(block1.Header)
 	block3 := unittest.BlockWithParentFixture(block2.Header)
 
-	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
+	vm, err := virtualmachine.New(rt)
 	require.NoError(t, err)
 	blocks := new(vmMock.Blocks)
 	bc := vm.NewBlockContext(block1.Header, blocks)
@@ -742,7 +741,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
+	vm, err := virtualmachine.New(rt)
 	require.NoError(t, err)
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 

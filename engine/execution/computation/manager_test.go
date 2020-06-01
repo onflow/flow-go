@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/runtime"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -23,7 +22,7 @@ import (
 func TestComputeBlockWithStorage(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 
-	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
+	vm, err := virtualmachine.New(rt)
 	require.NoError(t, err)
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(2)

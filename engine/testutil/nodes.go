@@ -237,7 +237,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	genesisHead, err := node.State.Final().Head()
 	require.NoError(t, err)
 
-	commit, err := bootstrap.BootstrapLedger(node.Log, ls, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply)
+	commit, err := bootstrap.BootstrapLedger(ls, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply)
 	require.NoError(t, err)
 
 	err = bootstrap.BootstrapExecutionDatabase(node.DB, commit, genesisHead)
@@ -255,7 +255,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	rt := runtime.NewInterpreterRuntime()
-	vm, err := virtualmachine.New(node.Log, rt)
+	vm, err := virtualmachine.New(rt)
 
 	require.NoError(t, err)
 
@@ -369,7 +369,7 @@ func VerificationNode(t testing.TB,
 
 	if node.VerifierEngine == nil {
 		rt := runtime.NewInterpreterRuntime()
-		vm, err := virtualmachine.New(node.Log, rt)
+		vm, err := virtualmachine.New(rt)
 		require.NoError(t, err)
 		chunkVerifier := chunks.NewChunkVerifier(vm, node.Blocks)
 

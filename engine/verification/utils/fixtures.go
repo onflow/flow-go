@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/runtime"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
@@ -82,7 +81,6 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) CompleteExecut
 		defer led.Done()
 
 		startStateCommitment, err := bootstrap.BootstrapLedger(
-			zerolog.Logger{},
 			led,
 			unittest.ServiceAccountPublicKey,
 			unittest.GenesisTokenSupply,
@@ -90,7 +88,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) CompleteExecut
 		require.NoError(t, err)
 
 		rt := runtime.NewInterpreterRuntime()
-		vm, err := virtualmachine.New(zerolog.Logger{}, rt)
+		vm, err := virtualmachine.New(rt)
 		require.NoError(t, err)
 
 		// create state.View

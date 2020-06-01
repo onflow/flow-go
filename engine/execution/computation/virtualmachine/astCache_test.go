@@ -7,7 +7,6 @@ import (
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -23,7 +22,7 @@ import (
 func TestTransactionASTCache(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
-	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
+	vm, err := virtualmachine.New(rt)
 	require.NoError(t, err)
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
@@ -63,7 +62,7 @@ func TestTransactionASTCache(t *testing.T) {
 func TestScriptASTCache(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
-	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
+	vm, err := virtualmachine.New(rt)
 
 	require.NoError(t, err)
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
@@ -97,7 +96,7 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
+	vm, err := virtualmachine.New(rt)
 	require.NoError(t, err)
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
@@ -155,7 +154,7 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
+	vm, err := virtualmachine.New(rt)
 	require.NoError(b, err)
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
@@ -284,7 +283,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.New(zerolog.Logger{}, rt)
+	vm, err := virtualmachine.New(rt)
 	require.NoError(t, err)
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 

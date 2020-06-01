@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
-	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
@@ -21,14 +20,13 @@ import (
 
 // BootstrapLedger adds the above root account to the ledger and initializes execution node-only data
 func BootstrapLedger(
-	logger zerolog.Logger,
 	ledger storage.Ledger,
 	rootPublicKey flow.AccountPublicKey,
 	initialTokenSupply uint64,
 ) (flow.StateCommitment, error) {
 	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.EmptyStateCommitment()))
 
-	BootstrapView(logger, view, rootPublicKey, initialTokenSupply)
+	BootstrapView(view, rootPublicKey, initialTokenSupply)
 
 	newStateCommitment, err := state.CommitDelta(ledger, view.Delta(), ledger.EmptyStateCommitment())
 	if err != nil {
@@ -73,7 +71,6 @@ func BootstrapExecutionDatabase(db *badger.DB, commit flow.StateCommitment, gene
 }
 
 func BootstrapView(
-	logger zerolog.Logger,
 	ledger virtualmachine.Ledger,
 	serviceAccountPublicKey flow.AccountPublicKey,
 	initialTokenSupply uint64,
@@ -86,7 +83,7 @@ func BootstrapView(
 	service := createServiceAccount(ledger, serviceAccountPublicKey)
 
 	rt := runtime.NewInterpreterRuntime()
-	vm, err := virtualmachine.New(logger, rt)
+	vm, err := virtualmachine.New(rt)
 	if err != nil {
 		panic(err)
 	}
