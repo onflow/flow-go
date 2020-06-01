@@ -21,7 +21,7 @@ type Engine struct {
 	me                 module.Local
 	match              network.Engine
 	receipts           mempool.Receipts // used to keep the receipts as mempool
-	headerStorage      storage.Headers  // used to check block existence to improve performance
+	headerStorage      storage.Headers  // used to check block existence before verifying
 	receiptHandlerLock sync.Mutex       // used to avoid race condition in handling receipts
 }
 
