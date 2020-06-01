@@ -23,7 +23,7 @@ import (
 func BootstrapLedger(
 	logger zerolog.Logger,
 	ledger storage.Ledger,
-	blocks storage.Blocks,
+	blocks virtualmachine.Blocks,
 	rootPublicKey flow.AccountPublicKey,
 	initialTokenSupply uint64,
 ) (flow.StateCommitment, error) {
@@ -76,7 +76,7 @@ func BootstrapExecutionDatabase(db *badger.DB, commit flow.StateCommitment, gene
 func BootstrapView(
 	logger zerolog.Logger,
 	ledger virtualmachine.Ledger,
-	blocks storage.Blocks,
+	blocks virtualmachine.Blocks,
 	serviceAccountPublicKey flow.AccountPublicKey,
 	initialTokenSupply uint64,
 ) {
