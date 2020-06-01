@@ -88,7 +88,7 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 
 	gs.ref = finalizedBlock
 
-	gs.DeployFungibleAndFlowTokens(flowClient)
+	//gs.DeployFungibleAndFlowTokens(flowClient) // not needed since flow contract is now deployed by default
 
 	// createAccountWG := sync.WaitGroup{}
 	for i := 0; i < 50; i++ {
