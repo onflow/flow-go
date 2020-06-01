@@ -3,7 +3,7 @@
 The consensus stream covers all aspects where final decisions are made about the
 network's computation state. 
 
-More specifically, collection covers the following:
+More specifically, consensus covers the following:
 
 **Block Production** 
 - Receiving collections from Collector Nodes
