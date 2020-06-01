@@ -190,8 +190,7 @@ func CreateAccounts(
 
 func RootBootstrappedLedger() virtualmachine.Ledger {
 	ledger := make(virtualmachine.MapLedger)
-	bootstrap.BootstrapView(zerolog.Logger{}, ledger, new(storage.Blocks), unittest.ServiceAccountPublicKey,
-		unittest.GenesisTokenSupply)
+	bootstrap.BootstrapView(zerolog.Logger{}, ledger, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply)
 	return ledger
 }
 
