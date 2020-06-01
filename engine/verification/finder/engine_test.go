@@ -44,9 +44,9 @@ type FinderEngineTestSuite struct {
 	verIdentity  *flow.Identity // verification node
 	execIdentity *flow.Identity // execution node
 
-	// other engines
-	// mock match engine, should be called when all dependent resources
-	// for a receipt have been received by the finder engine.
+	// other engine
+	// mock Match engine, should be called when Finder engine completely
+	// processes a receipt
 	matchEng *network.Engine
 }
 
