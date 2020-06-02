@@ -400,8 +400,8 @@ func TestRandomProofs(t *testing.T) {
 			})
 
 			newTrie2, err := mForest.Update(root, updateKeys, updateValues)
-			root2 := newTrie2.RootHash()
 			require.NoError(t, err, "error updating trie")
+			root2 := newTrie2.RootHash()
 
 			proot2, _, err := psmt.Update(updateKeys, updateValues)
 			require.NoError(t, err, "error updating partial trie")

@@ -42,6 +42,7 @@ type MTrie struct {
 	root           *node.Node
 	number         uint64
 	height         int
+	keyByteSize    int
 	parentRootHash []byte
 }
 
@@ -53,6 +54,7 @@ func NewEmptyMTrie(keyByteSize int, number uint64, parentRootHash []byte) (*MTri
 	return &MTrie{
 		root:           node.NewEmptyTreeRoot(height),
 		number:         number,
+		keyByteSize:    keyByteSize,
 		height:         height,
 		parentRootHash: parentRootHash,
 	}, nil
@@ -75,9 +77,9 @@ func (mt *MTrie) Number() uint64 { return mt.number }
 // Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) ParentRootHash() []byte { return mt.parentRootHash }
 
-// Height return the trie height. The height is identical to the key length [in bit].
+// KeyLength return the length [in bytes] the trie operates with.
 // Concurrency safe (as Tries are immutable structures by convention)
-func (mt *MTrie) Height() int { return mt.height }
+func (mt *MTrie) KeyLength() int { return mt.keyByteSize }
 
 // StringRootHash returns the trie's string representation.
 // Concurrency safe (as Tries are immutable structures by convention)
@@ -156,6 +158,7 @@ func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedRegisterKeys [][]byte
 		root:           updatedRoot,
 		number:         parentTrie.number + 1,
 		height:         parentTrie.height,
+		keyByteSize:    parentTrie.keyByteSize,
 		parentRootHash: parentTrie.RootHash(),
 	}
 	return updatedTrie, nil
@@ -363,7 +366,10 @@ func (mt *MTrie) Equals(o *MTrie) bool {
 	if o == nil {
 		return false
 	}
-	return o.Number() == mt.Number() && o.Height() == mt.Height() && bytes.Equal(o.RootHash(), mt.RootHash())
+	return o.Number() == mt.Number() &&
+		o.KeyLength() == mt.KeyLength() &&
+		bytes.Equal(o.RootHash(), mt.RootHash()) &&
+		bytes.Equal(o.ParentRootHash(), mt.ParentRootHash())
 }
 
 // Store stores the trie key Values to a file
@@ -390,9 +396,9 @@ func (mt *MTrie) Store(path string) error {
 		return err
 	}
 
-	// then 2 bytes capture the maxHeight
+	// then 2 bytes capture the trie's key size
 	b2 := make([]byte, 2)
-	binary.LittleEndian.PutUint16(b2, uint16(mt.height))
+	binary.LittleEndian.PutUint16(b2, uint16(mt.keyByteSize))
 	_, err = writer.Write(b2)
 	if err != nil {
 		return err
@@ -473,7 +479,7 @@ func Load(path string) (*MTrie, error) {
 		return nil, errors.New("trie store/load version doesn't match")
 	}
 
-	// next 8 bytes captures trie number
+	// next 8 bytes capture trie number
 	trieNumberB := make([]byte, 8)
 	_, err = fi.Read(trieNumberB)
 	if err != nil {
@@ -481,17 +487,13 @@ func Load(path string) (*MTrie, error) {
 	}
 	trieNumber := binary.LittleEndian.Uint64(trieNumberB)
 
-	// next 2 bytes capture the maxHeight
-	trieHeightB := make([]byte, 2)
-	_, err = fi.Read(trieHeightB)
+	// next 2 bytes capture the trie's key size
+	keyByteSizeB := make([]byte, 2)
+	_, err = fi.Read(keyByteSizeB)
 	if err != nil {
 		return nil, err
 	}
-	treeHeight := binary.LittleEndian.Uint16(trieHeightB)
-	if treeHeight%8 != 0 {
-		return nil, errors.New("trie height must be integer-multiple of 8")
-	}
-	keyByteSize := treeHeight / 8
+	keyByteSize := int(binary.LittleEndian.Uint16(keyByteSizeB))
 
 	// next 32 bytes are parent rootHash
 	parentRootHash := make([]byte, 32)
@@ -538,7 +540,7 @@ func Load(path string) (*MTrie, error) {
 	}
 
 	// reconstruct trie
-	trie, err := constructTrieFromKeyValuePairs(int(treeHeight), trieNumber, parentRootHash, keys, values)
+	trie, err := constructTrieFromKeyValuePairs(keyByteSize, trieNumber, parentRootHash, keys, values)
 	if err != nil {
 		return nil, err
 	}
@@ -552,7 +554,8 @@ func Load(path string) (*MTrie, error) {
 // constructTrieFromKeyValuePairs constructs a trie from the given key-value pairs.
 // UNSAFE: function requires the following conditions to be satisfied, but does not explicitly check them:
 //   * keys must have the same keyLength
-func constructTrieFromKeyValuePairs(treeHeight int, number uint64, parentRootHash []byte, keys [][]byte, values [][]byte) (*MTrie, error) {
+func constructTrieFromKeyValuePairs(keyByteSize int, number uint64, parentRootHash []byte, keys [][]byte, values [][]byte) (*MTrie, error) {
+	treeHeight := 8 * keyByteSize
 	root, err := constructSubtrie(treeHeight, treeHeight, keys, values)
 	if err != nil {
 		return nil, fmt.Errorf("constructing trie from key-value pairs failed: %w", err)
@@ -562,6 +565,12 @@ func constructTrieFromKeyValuePairs(treeHeight int, number uint64, parentRootHas
 		root:           root,
 		number:         number,
 		height:         treeHeight,
+		keyByteSize:    keyByteSize,
 		parentRootHash: parentRootHash,
 	}, nil
+}
+
+// EmptyTrieRootHash returns the rootHash of an empty Trie for the specified key size [bytes]
+func EmptyTrieRootHash(keyByteSize int) []byte {
+	return node.NewEmptyTreeRoot(8 * keyByteSize).Hash()
 }

@@ -11,7 +11,6 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/node"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 	"github.com/dapperlabs/flow-go/utils/io"
@@ -36,7 +35,6 @@ type MForest struct {
 	dir            string
 	forestCapacity int
 	onTreeEvicted  func(tree *trie.MTrie) error
-	height         int // height of the trees
 	keyByteSize    int // length [bytes] of register keys
 	metrics        module.LedgerMetrics
 }
@@ -72,12 +70,10 @@ func NewMForest(keyByteSize int, trieStorageDir string, forestCapacity int, metr
 	if keyByteSize < 1 {
 		return nil, errors.New("trie's key size [in bytes] must be positive")
 	}
-	height := keyByteSize * 8
 	forest := &MForest{tries: cache,
 		dir:            trieStorageDir,
 		forestCapacity: forestCapacity,
 		onTreeEvicted:  onTreeEvicted,
-		height:         height,
 		keyByteSize:    keyByteSize,
 		metrics:        metrics,
 	}
@@ -94,6 +90,10 @@ func NewMForest(keyByteSize int, trieStorageDir string, forestCapacity int, metr
 	}
 	return forest, nil
 }
+
+// KeyLength return the length [in bytes] the trie operates with.
+// Concurrency safe (as Tries are immutable structures by convention)
+func (f *MForest) KeyLength() int { return f.keyByteSize }
 
 // getTrie returns trie at specific rootHash
 // warning, use this function for read-only operation
@@ -119,8 +119,8 @@ func (f *MForest) addTrie(newTrie *trie.MTrie) error {
 	if newTrie == nil {
 		return nil
 	}
-	if newTrie.Height() != f.height {
-		return fmt.Errorf("forest holds tries of uniform height %d, but new trie has height %d", f.height, newTrie.Height())
+	if newTrie.KeyLength() != f.keyByteSize {
+		return fmt.Errorf("forest has key length %d, but new trie has key length %d", f.keyByteSize, newTrie.KeyLength())
 	}
 
 	// TODO: check Thread safety
@@ -148,7 +148,7 @@ func (f *MForest) RemoveTrie(rootHash []byte) {
 
 // GetEmptyRootHash returns the rootHash of empty Trie
 func (f *MForest) GetEmptyRootHash() []byte {
-	return node.NewEmptyTreeRoot(f.height).Hash()
+	return trie.EmptyTrieRootHash(f.keyByteSize)
 }
 
 // Read reads values for an slice of keys and returns values and error (if any)
