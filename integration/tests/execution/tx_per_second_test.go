@@ -60,13 +60,26 @@ func TestTransactionsPerSecondBenchmark(t *testing.T) {
 
 type TransactionsPerSecondSuite struct {
 	Suite
-	ref          *flowsdk.BlockHeader
-	accounts     map[flowsdk.Address]*flowsdk.AccountKey
-	privateKeys  map[string][]byte
-	signers      map[flowsdk.Address]crypto.InMemorySigner
-	rootAcctAddr flowsdk.Address
-	rootAcctKey  *flowsdk.AccountKey
-	rootSigner   crypto.Signer
+	ref           *flowsdk.BlockHeader
+	accounts      map[flowsdk.Address]*flowsdk.AccountKey
+	privateKeys   map[string][]byte
+	signers       map[flowsdk.Address]crypto.InMemorySigner
+	rootAcctAddr  flowsdk.Address
+	rootAcctKey   *flowsdk.AccountKey
+	rootSigner    crypto.Signer
+	accessAddr    string
+	privateKeyHex string
+	metricsAddr   string
+}
+
+func (gs *TransactionsPerSecondSuite) SetupTest() {
+	// this sets up the testing network. no need to run if testing against a non-local network
+	gs.Suite.SetupTest()
+
+	// Change these to corresponding values if using against non-local testnet
+	gs.accessAddr = fmt.Sprintf(":%s", gs.net.AccessPorts[testnet.AccessNodeAPIPort])
+	gs.privateKeyHex = unittest.ServiceAccountPrivateKeyHexSDK
+	gs.metricsAddr = fmt.Sprintf("http://localhost:%s/metrics", gs.net.AccessPorts[testnet.ExeNodeMetricsPort])
 }
 
 func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
@@ -75,35 +88,34 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 	gs.privateKeys = map[string][]byte{}
 	gs.signers = map[flowsdk.Address]crypto.InMemorySigner{}
 
-	flowClient, err := client.New(fmt.Sprintf(":%s", gs.net.AccessPorts[testnet.AccessNodeAPIPort]), grpc.WithInsecure())
+	flowClient, err := client.New(gs.accessAddr, grpc.WithInsecure())
 	require.NoError(gs.T(), err, "could not get client")
 
-	gs.rootAcctAddr, gs.rootAcctKey, gs.rootSigner = RootAccountWithKey(flowClient, unittest.ServiceAccountPrivateKeyHexSDK)
+	gs.rootAcctAddr, gs.rootAcctKey, gs.rootSigner = ServiceAccountWithKey(flowClient, gs.privateKeyHex)
 
-	// wait for first finalized block, called blockA
-	// blockA := gs.BlockState.WaitForFirstFinalized(gs.T())
-	// gs.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
 	finalizedBlock, err := flowClient.GetLatestBlockHeader(context.Background(), false)
 	require.NoError(gs.T(), err, "could not get client")
 
 	gs.ref = finalizedBlock
 
-	//gs.DeployFungibleAndFlowTokens(flowClient) // not needed since flow contract is now deployed by default
+	// flow token is deployed by default, can just start creating test accounts
 
-	// createAccountWG := sync.WaitGroup{}
 	for i := 0; i < 50; i++ {
+		// Refresh finalized block we're using as reference
 		finalizedBlock, err := flowClient.GetLatestBlockHeader(context.Background(), false)
 		gs.ref = finalizedBlock
 		examples.Handle(err)
+
+		// Create an account and transfer some funds to it.
 		addr, key := gs.CreateAccountAndTransfer(flowClient)
 		gs.accounts[addr] = key
 	}
 
-	resp, err := http.Get(fmt.Sprintf("http://localhost:%s/metrics", gs.net.AccessPorts[testnet.ExeNodeMetricsPort]))
+	resp, err := http.Get(gs.metricsAddr)
 	require.NoError(gs.T(), err, "could not get metrics")
 	startNum := 0
 	startTime := time.Now()
-	// body, err := ioutil.ReadAll(resp.Body)
+
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -118,7 +130,6 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 
 	fmt.Println("==========START", startNum, startTime)
 
-	// for i := 0; i < 10; i++ {
 	fmt.Println("Transfering tokens")
 	rounds := 10
 	transferWG := sync.WaitGroup{}
@@ -138,14 +149,16 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 		prevAddr = accountAddr
 	}
 
+	logged := false
+
 	go func() {
 		time.Sleep(60 * time.Second)
-		resp, err := http.Get(fmt.Sprintf("http://localhost:%s/metrics", gs.net.AccessPorts[testnet.ExeNodeMetricsPort]))
+		resp, err := http.Get(gs.metricsAddr)
 		require.NoError(gs.T(), err, "could not get metrics")
 		endNum := 0
 		endTime := time.Now()
 		defer resp.Body.Close()
-		// body, err := ioutil.ReadAll(resp.Body)
+
 		scanner := bufio.NewScanner(resp.Body)
 		for scanner.Scan() {
 			line := scanner.Text()
@@ -165,13 +178,12 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 		fmt.Println("==========TPS", tps)
 		err = logTPSToFile(tps)
 		require.NoErrorf(gs.T(), err, "failed to write tps to file")
+		logged = true
 	}()
 
 	transferWG.Wait()
-	// }
 
-	gs.T().FailNow()
-
+	require.True(gs.T(), logged, "did not log TPS to file, may need to increase timeout")
 }
 
 func (gs *TransactionsPerSecondSuite) SetTokenAddresses() {
@@ -332,9 +344,6 @@ func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(flowClient *clien
 		SetPayer(gs.rootAcctAddr).
 		AddAuthorizer(gs.rootAcctAddr)
 
-	// err = transferTx.SignPayload(flowTokenAddress, flowTokenAccKey.ID, rootSigner)
-	// examples.Handle(err)
-
 	err = transferTx.SignEnvelope(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootSigner)
 	examples.Handle(err)
 
@@ -361,9 +370,6 @@ func (gs *TransactionsPerSecondSuite) Transfer10Tokens(flowClient *client.Client
 		SetPayer(fromAddr).
 		AddAuthorizer(fromAddr)
 
-	// err = transferTx.SignPayload(flowTokenAddress, flowTokenAccKey.ID, rootSigner)
-	// examples.Handle(err)
-
 	err := transferTx.SignEnvelope(fromAddr, fromKey.ID, gs.signers[fromAddr])
 	examples.Handle(err)
 
@@ -382,6 +388,14 @@ func (gs *TransactionsPerSecondSuite) Transfer10Tokens(flowClient *client.Client
 	}
 }
 
+func logTPSToFile(tps float64) error {
+	resultFileName := fmt.Sprintf(ResultFile, time.Now().Format("2006_01_02_15_04_05"))
+	tpsStr := fmt.Sprintf("%f\n", tps)
+	return ioutil.WriteFile(resultFileName, []byte(tpsStr), 0644)
+}
+
+// TODO: Consider moving some of the following helpers to a common package, or just use any that are in the SDK once they're added there
+
 // DownloadFile will download a url a byte slice
 func DownloadFile(url string) ([]byte, error) {
 
@@ -395,9 +409,7 @@ func DownloadFile(url string) ([]byte, error) {
 	return ioutil.ReadAll(resp.Body)
 }
 
-const defaultRootKeySeed = "elephant ears space cowboy octopus rodeo potato cannon pineapple"
-
-func RootAccountWithKey(flowClient *client.Client, key string) (flowsdk.Address, *flowsdk.AccountKey, crypto.Signer) {
+func ServiceAccountWithKey(flowClient *client.Client, key string) (flowsdk.Address, *flowsdk.AccountKey, crypto.Signer) {
 	addr := flowsdk.ServiceAddress(flowsdk.Testnet)
 
 	acc, err := flowClient.GetAccount(context.Background(), addr)
@@ -446,31 +458,7 @@ func WaitForFinalized(ctx context.Context, c *client.Client, id flowsdk.Identifi
 	return result
 }
 
-func GenerateSetupAccountScript(ftAddr, flowToken flowsdk.Address) []byte {
-	setupCode, err := DownloadFile(FungibleTokenTransactionsBaseURL + SetupAccount)
-	examples.Handle(err)
-
-	withFTAddr := strings.ReplaceAll(string(setupCode), "0x02", "0x"+ftAddr.Hex())
-	withFlowTokenAddr := strings.ReplaceAll(string(withFTAddr), "0x03", "0x"+flowToken.Hex())
-
-	return []byte(withFlowTokenAddr)
-}
-
-// GenerateMintScript Creates a script that mints an 10 FTs
-func GenerateMintScript(ftAddr, flowToken, toAddr flowsdk.Address) []byte {
-	mintCode, err := DownloadFile(FungibleTokenTransactionsBaseURL + MintTokens)
-	examples.Handle(err)
-
-	withFTAddr := strings.ReplaceAll(string(mintCode), "0x02", "0x"+ftAddr.Hex())
-	withFlowTokenAddr := strings.Replace(string(withFTAddr), "0x03", "0x"+flowToken.Hex(), 1)
-	withToAddr := strings.Replace(string(withFlowTokenAddr), "0x03", "0x"+toAddr.Hex(), 1)
-
-	withAmount := strings.Replace(string(withToAddr), "10.0", "1.0", 1)
-
-	return []byte(withAmount)
-}
-
-// GenerateTransferScript Creates a script that mints an 10 FTs
+// GenerateTransferScript Creates a script that transfer some amount of FTs
 func GenerateTransferScript(ftAddr, flowToken, toAddr flowsdk.Address, amount int) []byte {
 	mintCode, err := DownloadFile(FungibleTokenTransactionsBaseURL + TransferTokens)
 	examples.Handle(err)
@@ -482,10 +470,4 @@ func GenerateTransferScript(ftAddr, flowToken, toAddr flowsdk.Address, amount in
 	withAmount := strings.Replace(string(withToAddr), fmt.Sprintf("%d.0", amount), "0.01", 1)
 
 	return []byte(withAmount)
-}
-
-func logTPSToFile(tps float64) error {
-	resultFileName := fmt.Sprintf(ResultFile, time.Now().Format("2006_01_02_15_04_05"))
-	tpsStr := fmt.Sprintf("%f\n", tps)
-	return ioutil.WriteFile(resultFileName, []byte(tpsStr), 0644)
 }
