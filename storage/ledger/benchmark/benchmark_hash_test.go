@@ -1,4 +1,4 @@
-package main
+package benchmark
 
 import (
 	"encoding/hex"
@@ -82,7 +82,7 @@ func Test_BenchmarkHashingWithConstantHasher(t *testing.T) {
 // Benchmark_Hash benchmarks how many heap allocations result from
 // computing a hash. Here we use a constant Hasher, i.e. the heap allocations
 // are purely from the Hasher clearing its internal state.
-func Benchmark_Hash(t *testing.B) {
+func Benchmark_Hash(b *testing.B) {
 	keys := utils.GetRandomKeysFixedN(2, keyByteSize)
 	k1 := keys[0]
 	k2 := keys[1]
@@ -91,7 +91,7 @@ func Benchmark_Hash(t *testing.B) {
 
 	var totalElapsed uint64 = 0
 	var res []byte
-	for i := 0; i < t.N; i++ {
+	for i := 0; i < b.N; i++ {
 		res = make([]byte, 0, keyByteSize)
 
 		start := time.Now()
@@ -109,7 +109,7 @@ func Benchmark_Hash(t *testing.B) {
 
 		totalElapsed += uint64(elapsed)
 	}
-	fmt.Printf(">" + hex.EncodeToString(res) + "\n\n")
+	b.Log(">" + hex.EncodeToString(res) + "\n\n")
 }
 
 // Benchmark_SinleCycle benchmarks the time for a few CPU operations.
