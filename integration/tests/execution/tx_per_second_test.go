@@ -323,56 +323,29 @@ func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(flowClient *clien
 	gs.signers[accountAddress] = mySigner
 	gs.privateKeys[accountAddress.String()] = myPrivateKey.Encode()
 
-	// Setup the account
-	accountSetupScript := GenerateSetupAccountScript(fungibleTokenAddress, flowTokenAddress)
-
-	accountSetupTx := flowsdk.NewTransaction().
+	// Transfer 1000 tokens
+	transferScript := GenerateTransferScript(fungibleTokenAddress, flowTokenAddress, accountAddress, 1000)
+	transferTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(gs.ref.ID).
-		SetScript(accountSetupScript).
-		SetProposalKey(accountAddress, accountKey.ID, accountKey.SequenceNumber).
-		SetPayer(accountAddress).
-		AddAuthorizer(accountAddress)
+		SetScript(transferScript).
+		SetProposalKey(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootAcctKey.SequenceNumber).
+		SetPayer(gs.rootAcctAddr).
+		AddAuthorizer(gs.rootAcctAddr)
 
-	err = accountSetupTx.SignEnvelope(accountAddress, accountKey.ID, mySigner)
+	// err = transferTx.SignPayload(flowTokenAddress, flowTokenAccKey.ID, rootSigner)
+	// examples.Handle(err)
+
+	err = transferTx.SignEnvelope(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootSigner)
 	examples.Handle(err)
 
-	err = flowClient.SendTransaction(ctx, *accountSetupTx)
+	err = flowClient.SendTransaction(ctx, *transferTx)
 	examples.Handle(err)
 
-	accountSetupTxResp := WaitForFinalized(ctx, flowClient, accountSetupTx.ID())
-	examples.Handle(accountSetupTxResp.Error)
+	transferTxResp := WaitForFinalized(ctx, flowClient, transferTx.ID())
+	examples.Handle(transferTxResp.Error)
 
 	// Successful Tx, increment sequence number
-	accountKey.SequenceNumber++
-
-	// Mint to the new account
-	flowTokenAcc, err := flowClient.GetAccount(context.Background(), flowTokenAddress)
-	examples.Handle(err)
-	flowTokenAccKey := flowTokenAcc.Keys[0]
-
-	// Mint 10 tokens
-	mintScript := GenerateMintScript(fungibleTokenAddress, flowTokenAddress, accountAddress)
-	mintTx := flowsdk.NewTransaction().
-		SetReferenceBlockID(gs.ref.ID).
-		SetScript(mintScript).
-		SetProposalKey(accountAddress, accountKey.ID, accountKey.SequenceNumber).
-		SetPayer(accountAddress).
-		AddAuthorizer(flowTokenAddress)
-
-	err = mintTx.SignPayload(flowTokenAddress, flowTokenAccKey.ID, gs.rootSigner)
-	examples.Handle(err)
-
-	err = mintTx.SignEnvelope(accountAddress, accountKey.ID, mySigner)
-	examples.Handle(err)
-
-	err = flowClient.SendTransaction(ctx, *mintTx)
-	examples.Handle(err)
-
-	mintTxResp := WaitForFinalized(ctx, flowClient, mintTx.ID())
-	examples.Handle(mintTxResp.Error)
-
-	// Successful Tx, increment sequence number
-	accountKey.SequenceNumber++
+	gs.rootAcctKey.SequenceNumber++
 	return accountAddress, accountKey
 }
 
@@ -380,7 +353,7 @@ func (gs *TransactionsPerSecondSuite) Transfer10Tokens(flowClient *client.Client
 	ctx := context.Background()
 
 	// Transfer 10 tokens
-	transferScript := GenerateTransferScript(fungibleTokenAddress, flowTokenAddress, toAddr)
+	transferScript := GenerateTransferScript(fungibleTokenAddress, flowTokenAddress, toAddr, 10)
 	transferTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(gs.ref.ID).
 		SetScript(transferScript).
@@ -425,7 +398,7 @@ func DownloadFile(url string) ([]byte, error) {
 const defaultRootKeySeed = "elephant ears space cowboy octopus rodeo potato cannon pineapple"
 
 func RootAccountWithKey(flowClient *client.Client, key string) (flowsdk.Address, *flowsdk.AccountKey, crypto.Signer) {
-	addr := flowsdk.ServiceAddress(flowsdk.Mainnet)
+	addr := flowsdk.ServiceAddress(flowsdk.Testnet)
 
 	acc, err := flowClient.GetAccount(context.Background(), addr)
 	if err != nil {
@@ -498,7 +471,7 @@ func GenerateMintScript(ftAddr, flowToken, toAddr flowsdk.Address) []byte {
 }
 
 // GenerateTransferScript Creates a script that mints an 10 FTs
-func GenerateTransferScript(ftAddr, flowToken, toAddr flowsdk.Address) []byte {
+func GenerateTransferScript(ftAddr, flowToken, toAddr flowsdk.Address, amount int) []byte {
 	mintCode, err := DownloadFile(FungibleTokenTransactionsBaseURL + TransferTokens)
 	examples.Handle(err)
 
@@ -506,7 +479,7 @@ func GenerateTransferScript(ftAddr, flowToken, toAddr flowsdk.Address) []byte {
 	withFlowTokenAddr := strings.Replace(string(withFTAddr), "0x03", "0x"+flowToken.Hex(), 1)
 	withToAddr := strings.Replace(string(withFlowTokenAddr), "0x04", "0x"+toAddr.Hex(), 1)
 
-	withAmount := strings.Replace(string(withToAddr), "10.0", "0.01", 1)
+	withAmount := strings.Replace(string(withToAddr), fmt.Sprintf("%d.0", amount), "0.01", 1)
 
 	return []byte(withAmount)
 }
