@@ -10,33 +10,45 @@ about it [here](https://github.com/onflow/flow).
 
 - [Getting started](#getting-started)
 - [Documentation](#documentation)
-- [Contributing](#contributing)
 - [Installation](#installation)
   - [Install Go](#install-go)
   - [Install tooling dependencies](#install-tooling-dependencies)
-- [Building](#building)
-- [Local Network](#local-network)
-- [Testing](#testing)
-- [Code Generation](#code-generation)
+- [Development Workflow](#development-workflow)
+  - [Building](#building)
+  - [Testing](#testing)
+  - [Code Generation](#code-generation)
+  - [Local Network](#local-network)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ## Getting started
 
-* Read through the [project setup](#installation) instructions to install required tools
-* Read the documentation pertaining to [your stream](#work-streams)
-* Familiarize yourself with the [workflow](#workflow) below
-* Browse the rest of this README to get up to speed on concepts like testing, code style, and common code patterns
-* Contact your stream owner to receive your first task!
+* To install all dependencies and tools, see the [project setup](#installation) guide
+* To dig into more documentation about Flow, see the [documentation](#documentation)
+* To learn how to contribute, see the [contributing guide](/CONTRIBUTING.md)
+* To see information on developing Flow, see the [development workflow](#development-workflow)
 
 ## Documentation
 
-You can find a high-level overview of the Flow architecture on the [documentation website](https://www.onflow.org/primer). 
-Module-level documentation lives along with the corresponding code [within the packages of this repository](#code-documentation).
+You can find an overview of the Flow architecture on the [documentation website](https://www.onflow.org/primer). 
 
-## Contributing
+Development on Flow is divided into work streams. Each work stream has a home 
+directory containing high-level documentation for the stream, as well as links
+to documentation for relevant components used by that work stream. 
 
-To learn how to contribute, please read the [Contributing Guide](/CONTRIBUTING.md).
+The following table lists all work streams and links to their home directory and documentation:
+
+| Work Stream    | Home directory  |
+| -------------- | --------------- |
+| Access Node | [/cmd/access](/cmd/access) |
+| Collection Node | [/cmd/collection](/engine/collection) |
+| Consensus Node | [/cmd/consensus](/engine/consensus) |
+| Execution Node | [/cmd/execution](/cmd/execution) |
+| Verification Node | [/engine/verification](/cmd/verification) |
+| HotStuff | [/consensus/hotstuff](/consensus/hotstuff) |
+| Storage | [/storage](/storage) |
+| Networking | [/network](/network/) |
+| Cryptography | [/crypto](/crypto) |
 
 ## Installation
 
@@ -75,7 +87,9 @@ make install-tools
 
 At this point, you should be ready to build, test, and run Flow! 🎉
 
-## Building
+## Development Workflow
+
+### Building
 
 The recommended way to build and run Flow for local development is using Docker. 
 
@@ -89,12 +103,7 @@ Build a Docker image for a particular node role (replace `$ROLE` with `collectio
 make docker-build-$ROLE
 ```
 
-## Local Network
-
-A local version of the network can be run for manual testing and integration. 
-See the [Local Network Guide](/integration/localnet/README.md) for instructions.
-
-## Testing
+### Testing
 
 Flow has a unit test suite and an integration test suite. Unit tests for a module 
 live within the module they are testing. Integration tests live in `integration/tests`.
@@ -111,7 +120,7 @@ Run the integration test suite:
 make integration-test
 ```
 
-## Code Generation
+### Code Generation
 
 Generated code is kept up to date in the repository, so should be committed whenever it changes. 
 
@@ -132,3 +141,8 @@ Generate mocks used for unit tests:
 ```bash
 make generate-mocks
 ```
+
+### Local Network
+
+A local version of the network can be run for manual testing and integration. 
+See the [Local Network Guide](/integration/localnet/README.md) for instructions.
