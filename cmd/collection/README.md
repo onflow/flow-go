@@ -27,9 +27,11 @@ includes links to the appropriate package, which may contain more detailed docum
 ## Terminology
 
 * **Collection** - a set of transactions proposed by a cluster of collection nodes.
-* **Guaranteed Collection** - a collection which a quorum of nodes in the cluster has
-  committed to storing. When we are referring only to the commitment, not the full 
-  collection, this is referred to as a **collection guarantee** or simply **guarantee**.
+* **Guaranteed Collection** - a collection that a quorum of nodes in the cluster has
+  committed to storing. 
+* **Collection Guarantee** - the attestation to a collection that has been guaranteed.
+  Concretely, this is a hash over the collection and signatures from a quorum of 
+  cluster members. (Sometimes simply referred to as `guarantee`.)
 * **Cluster** - a group of collection nodes that work together to create collections.
   Each cluster is responsible for a different subset of transactions.
 
@@ -47,7 +49,7 @@ Consequently, the validation performed at this stage is best-effort.
 
 The `proposal` engine is responsible for handling the consensus process for the cluster. 
 It runs an instance of [HotStuff](../../consensus/hotstuff) within the cluster. 
-This results in each cluster building a tertiary blockchain, where each block 
+This results in each cluster building a secondary blockchain, where each block 
 represents a proposed collection.
 
 ### [Synchronization](../../engine/collection/synchronization)
@@ -74,8 +76,8 @@ The cluster state implements a storage layer for the blockchain produced by the
 which is the storage layer for the main Flow blockchain produced by consensus nodes.
 
 Since the core HotStuff logic is only aware of blocks, we sometimes use the term 
-"cluster block" to refer to a block within a cluster's tertiary blockchain. 
-Thus, the term "cluster block" is interchangeable with "collection".
+"cluster block" to refer to a block within a cluster's auxiliary blockchain. Each
+cluster block contains a single proposed collection.
 
 #### [Collection Builder](../../module/builder/collection)
 
