@@ -9,6 +9,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/wal"
 )
 
@@ -27,7 +29,7 @@ func NewMTrieStorage(dbDir string, cacheSize int, metrics module.LedgerMetrics, 
 		return nil, fmt.Errorf("cannot create WAL: %w", err)
 	}
 
-	mForest, err := mtrie.NewMForest(257, dbDir, cacheSize, metrics, func(evictedTrie *mtrie.MTrie) error {
+	mForest, err := mtrie.NewMForest(257, dbDir, cacheSize, metrics, func(evictedTrie *trie.MTrie) error {
 		return w.RecordDelete(evictedTrie.RootHash())
 	})
 	if err != nil {
@@ -41,7 +43,7 @@ func NewMTrieStorage(dbDir string, cacheSize int, metrics module.LedgerMetrics, 
 
 	err = w.Replay(
 		func(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
-			_, err = trie.mForest.Update(keys, values, stateCommitment)
+			_, err = trie.mForest.Update(stateCommitment, keys, values)
 			// _, err := trie.UpdateRegisters(keys, values, stateCommitment)
 			return err
 		},
@@ -89,8 +91,7 @@ func (f *MTrieStorage) GetRegisters(
 	err error,
 ) {
 	start := time.Now()
-
-	values, err = f.mForest.Read(registerIDs, stateCommitment)
+	values, err = f.mForest.Read(stateCommitment, registerIDs)
 	// values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
 
 	f.metrics.ReadValuesNumber(uint64(len(registerIDs)))
@@ -140,8 +141,8 @@ func (f *MTrieStorage) UpdateRegisters(
 		return nil, fmt.Errorf("cannot update state, error while writing WAL: %w", err)
 	}
 
-	newStateCommitment, err = f.mForest.Update(ids, values, stateCommitment)
-	// newStateCommitment, err = f.tree.Update(ids, values, stateCommitment)
+	newTrie, err := f.mForest.Update(stateCommitment, ids, values)
+	newStateCommitment = newTrie.RootHash()
 	if err != nil {
 		return nil, fmt.Errorf("cannot update state: %w", err)
 	}
@@ -178,13 +179,13 @@ func (f *MTrieStorage) GetRegistersWithProof(
 		return nil, nil, fmt.Errorf("Could not get register values: %w", err)
 	}
 
-	batchProof, err := f.mForest.Proofs(registerIDs, stateCommitment)
+	batchProof, err := f.mForest.Proofs(stateCommitment, registerIDs)
 	// batchProof, err := f.tree.GetBatchProof(registerIDs, stateCommitment)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Could not get proofs: %w", err)
 	}
 
-	proofToGo, totalProofLength := mtrie.EncodeBatchProof(batchProof)
+	proofToGo, totalProofLength := proof.EncodeBatchProof(batchProof)
 
 	if len(proofToGo) > 0 {
 		f.metrics.ProofSize(uint32(totalProofLength / len(proofToGo)))
