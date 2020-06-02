@@ -77,7 +77,7 @@ func NewLightEngine(
 
 	e := &LightEngine{
 		unit:                  engine.NewUnit(),
-		log:                   log,
+		log:                   log.With().Str("engine", "ingest_light").Logger(),
 		state:                 state,
 		me:                    me,
 		verifierEng:           verifierEng,
@@ -216,7 +216,7 @@ func (l *LightEngine) handleExecutionReceipt(originID flow.Identifier, receipt *
 		l.log.Debug().
 			Hex("receipt_id", logging.ID(receiptID)).
 			Hex("result_id", logging.ID(resultID)).
-			Msg("could not ingest execution result with zero chunks")
+			Msg("skipping receipt for execution result with zero chunks")
 		return nil
 	}
 

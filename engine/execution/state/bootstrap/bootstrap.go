@@ -78,7 +78,7 @@ func BootstrapView(
 	l := virtualmachine.NewLedgerDAL(ledger)
 
 	// initialize the account addressing state
-	l.SetAddressState(flow.ZeroAddressState)
+	l.SetAddressState(flow.NewAddressGenerator())
 
 	service := createServiceAccount(ledger, serviceAccountPublicKey)
 
@@ -88,7 +88,7 @@ func BootstrapView(
 		panic(err)
 	}
 
-	ctx := vm.NewBlockContext(nil)
+	ctx := vm.NewBlockContext(nil, nil)
 
 	fungibleToken := deployFungibleToken(ctx, ledger)
 	flowToken := deployFlowToken(ctx, ledger, service, fungibleToken)
@@ -258,7 +258,7 @@ func executeTransaction(
 	ledger virtualmachine.Ledger,
 	tx *flow.TransactionBody,
 ) *virtualmachine.TransactionResult {
-	result, err := ctx.ExecuteTransaction(ledger, tx, virtualmachine.SkipVerification)
+	result, err := ctx.ExecuteTransaction(ledger, tx, virtualmachine.WithSignatureVerification(false))
 	if err != nil {
 		panic(err)
 	}

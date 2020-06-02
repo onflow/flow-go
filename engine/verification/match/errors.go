@@ -30,8 +30,3 @@ func (e InvalidInput) Error() string {
 	}
 	return e.Msg
 }
-
-func (e InvalidInput) Is(other error) bool {
-	_, ok := other.(InvalidInput)
-	return ok
-}

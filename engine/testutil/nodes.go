@@ -265,6 +265,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Me,
 		node.State,
 		vm,
+		node.Blocks,
 	)
 	require.NoError(t, err)
 
@@ -370,7 +371,7 @@ func VerificationNode(t testing.TB,
 		rt := runtime.NewInterpreterRuntime()
 		vm, err := virtualmachine.New(rt)
 		require.NoError(t, err)
-		chunkVerifier := chunks.NewChunkVerifier(vm)
+		chunkVerifier := chunks.NewChunkVerifier(vm, node.Blocks)
 
 		require.NoError(t, err)
 		node.VerifierEngine, err = verifier.New(node.Log, node.Metrics, node.Net, node.State, node.Me, chunkVerifier)
