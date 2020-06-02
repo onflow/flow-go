@@ -29,7 +29,6 @@ func StorageBenchmark() {
 	numInsPerStep := 1000
 	keyByteSize := 32
 	valueMaxByteSize := 32
-	trieHeight := keyByteSize*8 + 1 // 257
 
 	absPath, err := filepath.Abs("./logs.txt")
 	if err != nil {
@@ -98,7 +97,7 @@ func StorageBenchmark() {
 		elapsed = time.Since(start)
 		start = time.Now()
 		// validate proofs as a batch
-		_, err = ptrie.NewPSMT(newState, trieHeight, keys, retValues, proofs)
+		_, err = ptrie.NewPSMT(newState, keyByteSize, keys, retValues, proofs)
 		if err != nil {
 			panic("failed to create PSMT")
 		}

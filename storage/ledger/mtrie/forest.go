@@ -99,8 +99,8 @@ func NewMForest(keyByteSize int, trieStorageDir string, forestCapacity int, metr
 // warning, use this function for read-only operation
 func (f *MForest) getTrie(rootHash []byte) (*trie.MTrie, error) {
 	encRootHash := hex.EncodeToString(rootHash)
-	// if in the cache
 
+	// if in memory
 	if ent, ok := f.tries.Get(encRootHash); ok {
 		return ent.(*trie.MTrie), nil
 	}
@@ -108,7 +108,7 @@ func (f *MForest) getTrie(rootHash []byte) (*trie.MTrie, error) {
 	// otherwise try to load from disk
 	trie, err := f.LoadTrie(filepath.Join(f.dir, encRootHash))
 	if err != nil {
-		return nil, fmt.Errorf("trie with the given rootHash [%v] not found: %w", hex.EncodeToString(rootHash), err)
+		return nil, fmt.Errorf("trie with the given rootHash [%v] not found: %w", encRootHash, err)
 	}
 
 	return trie, nil
@@ -143,7 +143,6 @@ func (f *MForest) RemoveTrie(rootHash []byte) {
 	// TODO remove from the file as well
 	encRootHash := hex.EncodeToString(rootHash)
 	f.tries.Remove(encRootHash)
-
 	f.metrics.ForestNumberOfTrees(uint64(f.tries.Len()))
 }
 
@@ -174,13 +173,13 @@ func (f *MForest) Read(rootHash []byte, keys [][]byte) ([][]byte, error) {
 		if len(key) != f.keyByteSize {
 			return nil, fmt.Errorf("key size doesn't match the trie height: %x", key)
 		}
-		// only collect dupplicated keys once
-		if _, ok := keyOrgIndex[hex.EncodeToString(key)]; !ok {
+		// only collect duplicated keys once
+		if _, ok := keyOrgIndex[string(key)]; !ok {
 			sortedKeys = append(sortedKeys, key)
-			keyOrgIndex[hex.EncodeToString(key)] = []int{i}
+			keyOrgIndex[string(key)] = []int{i}
 		} else {
 			// handles duplicated keys
-			keyOrgIndex[hex.EncodeToString(key)] = append(keyOrgIndex[hex.EncodeToString(key)], i)
+			keyOrgIndex[string(key)] = append(keyOrgIndex[string(key)], i)
 		}
 	}
 
@@ -199,7 +198,7 @@ func (f *MForest) Read(rootHash []byte, keys [][]byte) ([][]byte, error) {
 	// reconstruct the values in the same key order that called the method
 	orderedValues := make([][]byte, len(keys))
 	for i, k := range sortedKeys {
-		for _, j := range keyOrgIndex[hex.EncodeToString(k)] {
+		for _, j := range keyOrgIndex[string(k)] {
 			orderedValues[j] = values[i]
 			totalValuesSize += len(values[i])
 		}
@@ -210,7 +209,9 @@ func (f *MForest) Read(rootHash []byte, keys [][]byte) ([][]byte, error) {
 	return orderedValues, nil
 }
 
-// Update updates the Values for the registers and returns rootHash and error (if any)
+// Update updates the Values for the registers and returns rootHash and error (if any).
+// In case there are multiple updates to the same register, Update will persist the latest
+// written value.
 func (f *MForest) Update(rootHash []byte, keys [][]byte, values [][]byte) (*trie.MTrie, error) {
 	parentTrie, err := f.getTrie(rootHash)
 	if err != nil {
@@ -231,13 +232,11 @@ func (f *MForest) Update(rootHash []byte, keys [][]byte, values [][]byte) (*trie
 			return nil, fmt.Errorf("key size doesn't match the trie height: %x", key)
 		}
 		// check if doesn't exist
-		if _, ok := valueMap[hex.EncodeToString(key)]; !ok {
+		if _, ok := valueMap[string(key)]; !ok {
 			//do something here
 			sortedKeys = append(sortedKeys, key)
-			valueMap[hex.EncodeToString(key)] = values[i]
-		} else {
-			valueMap[hex.EncodeToString(key)] = values[i]
 		}
+		valueMap[string(key)] = values[i]
 		totalValuesSize += len(values[i])
 	}
 
@@ -250,7 +249,7 @@ func (f *MForest) Update(rootHash []byte, keys [][]byte, values [][]byte) (*trie
 
 	sortedValues := make([][]byte, 0, len(sortedKeys))
 	for _, key := range sortedKeys {
-		sortedValues = append(sortedValues, valueMap[hex.EncodeToString(key)])
+		sortedValues = append(sortedValues, valueMap[string(key)])
 	}
 
 	newTrie, err := trie.NewTrieWithUpdatedRegisters(parentTrie, sortedKeys, sortedValues)
@@ -276,7 +275,7 @@ func (f *MForest) Proofs(rootHash []byte, keys [][]byte) (*proof.BatchProof, err
 		return proof.NewBatchProof(), nil
 	}
 
-	// look up for non exisitng keys
+	// look up for non existing keys
 	notFoundKeys := make([][]byte, 0)
 	notFoundValues := make([][]byte, 0)
 	retValues, err := f.Read(rootHash, keys)
@@ -292,9 +291,9 @@ func (f *MForest) Proofs(rootHash []byte, keys [][]byte) (*proof.BatchProof, err
 			return nil, fmt.Errorf("key size doesn't match the trie height: %x", key)
 		}
 		// only collect duplicated keys once
-		if _, ok := keyOrgIndex[hex.EncodeToString(key)]; !ok {
+		if _, ok := keyOrgIndex[string(key)]; !ok {
 			sortedKeys = append(sortedKeys, key)
-			keyOrgIndex[hex.EncodeToString(key)] = []int{i}
+			keyOrgIndex[string(key)] = []int{i}
 
 			// add it only once
 			if len(retValues[i]) == 0 {
@@ -303,7 +302,7 @@ func (f *MForest) Proofs(rootHash []byte, keys [][]byte) (*proof.BatchProof, err
 			}
 		} else {
 			// handles duplicated keys
-			keyOrgIndex[hex.EncodeToString(key)] = append(keyOrgIndex[hex.EncodeToString(key)], i)
+			keyOrgIndex[string(key)] = append(keyOrgIndex[string(key)], i)
 		}
 
 	}
@@ -350,7 +349,7 @@ func (f *MForest) Proofs(rootHash []byte, keys [][]byte) (*proof.BatchProof, err
 	// reconstruct the proofs in the same key order that called the method
 	retbp := proof.NewBatchProofWithEmptyProofs(len(keys))
 	for i, k := range sortedKeys {
-		for _, j := range keyOrgIndex[hex.EncodeToString(k)] {
+		for _, j := range keyOrgIndex[string(k)] {
 			retbp.Proofs[j] = bp.Proofs[i]
 		}
 	}

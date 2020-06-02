@@ -56,7 +56,7 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 		require.NoError(t, err, "error getting proofs values")
 
 		encBP, _ := proof.EncodeBatchProof(bp)
-		psmt, err := NewPSMT(rootHash, 8*keyByteSize+1, keys, retValues, encBP) // ChainSafe defined the height of a Trie as the number of nodes from the root to the leaf
+		psmt, err := NewPSMT(rootHash, keyByteSize, keys, retValues, encBP)
 
 		require.NoError(t, err, "error building partial trie")
 		if !bytes.Equal(rootHash, psmt.root.ComputeValue()) {
@@ -123,7 +123,7 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 		require.NoError(t, err, "error getting batch proof")
 
 		encBP, _ := proof.EncodeBatchProof(bp)
-		psmt, err := NewPSMT(newRoot, 8*keyByteSize+1, keys, retvalues, encBP)
+		psmt, err := NewPSMT(newRoot, keyByteSize, keys, retvalues, encBP)
 		require.NoError(t, err, "error building partial trie")
 
 		if !bytes.Equal(newRoot, psmt.root.ComputeValue()) {
@@ -176,7 +176,7 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 		require.NoError(t, err, "error getting batch proof")
 
 		encBP, _ := proof.EncodeBatchProof(bp)
-		psmt, err := NewPSMT(mForest.GetEmptyRootHash(), 8*keyByteSize+1, keys, retvalues, encBP)
+		psmt, err := NewPSMT(mForest.GetEmptyRootHash(), keyByteSize, keys, retvalues, encBP)
 		require.NoError(t, err, "error building partial trie")
 
 		if !bytes.Equal(mForest.GetEmptyRootHash(), psmt.root.ComputeValue()) {
@@ -234,7 +234,7 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 		require.NoError(t, err, "error getting batch proof")
 
 		encBP, _ := proof.EncodeBatchProof(bp)
-		psmt, err := NewPSMT(mForest.GetEmptyRootHash(), 8*keyByteSize+1, keys, retvalues, encBP)
+		psmt, err := NewPSMT(mForest.GetEmptyRootHash(), keyByteSize, keys, retvalues, encBP)
 		require.NoError(t, err, "error building partial trie")
 
 		if !bytes.Equal(mForest.GetEmptyRootHash(), psmt.root.ComputeValue()) {
@@ -301,7 +301,7 @@ func TestMixProof(t *testing.T) {
 		require.NoError(t, err, "error getting batch proof")
 
 		encBP, _ := proof.EncodeBatchProof(bp)
-		psmt, err := NewPSMT(newRoot, 8*keyByteSize+1, keys, retvalues, encBP)
+		psmt, err := NewPSMT(newRoot, keyByteSize, keys, retvalues, encBP)
 		require.NoError(t, err, "error building partial trie")
 
 		if !bytes.Equal(newRoot, psmt.root.ComputeValue()) {
@@ -383,7 +383,7 @@ func TestRandomProofs(t *testing.T) {
 			require.NoError(t, err, "error getting batch proof")
 
 			encBP, _ := proof.EncodeBatchProof(bp)
-			psmt, err := NewPSMT(root, 8*keyByteSize+1, keys, retvalues, encBP)
+			psmt, err := NewPSMT(root, keyByteSize, keys, retvalues, encBP)
 			require.NoError(t, err, "error building partial trie")
 
 			if !bytes.Equal(root, psmt.root.ComputeValue()) {

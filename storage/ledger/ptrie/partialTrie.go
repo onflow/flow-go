@@ -2,6 +2,7 @@ package ptrie
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/common"
@@ -13,20 +14,24 @@ import (
 // state commitment (no historic views). It avoids compact nodes to differentiate between
 // unpopulated branches and parts that are compact. It is fully stored in memory and doesn't use
 // a database.
+//
+// DEFINITIONS and CONVENTIONS:
+//   * HEIGHT of a node v in a tree is the number of edges on the longest downward path
+//     between v and a tree leaf. The height of a tree is the heights of its root.
+//     The height of a Trie is always the height of the fully-expanded tree.
 type PSMT struct {
 	root        *node // Root
-	height      int   // Height of the tree
-	keyByteSize int   // acceptable size of key (in bytes)
+	keyByteSize int   // expected size [bytes] of register key
 	keyLookUp   map[string]*node
 }
 
-// GetHeight returns the Height of the SMT
-func (p *PSMT) GetHeight() int {
-	return p.height
+// KeySize returns the expected expected size [bytes] of register key
+func (p *PSMT) KeySize() int {
+	return p.keyByteSize
 }
 
 // GetRootHash returns the rootNode value of the SMT
-func (p *PSMT) GetRootHash() []byte {
+func (p *PSMT) RootHash() []byte {
 	return p.root.ComputeValue()
 }
 
@@ -54,31 +59,30 @@ func (p *PSMT) Update(registerIDs [][]byte, values [][]byte) ([]byte, []string, 
 // NewPSMT builds a Partial Sparse Merkle Tree (PMST) given a chunkdatapack registertouches
 func NewPSMT(
 	rootValue []byte, // stateCommitment
-	height int,
+	keyByteSize int,
 	keys [][]byte,
 	values [][]byte,
 	proofs [][]byte,
 ) (*PSMT, error) {
 
+	if keyByteSize < 1 {
+		return nil, errors.New("trie's key size [in bytes] must be positive")
+	}
+	psmt := PSMT{newNode(nil, keyByteSize*8), keyByteSize, make(map[string]*node)}
+
+	// Decode proof encodings
 	if len(proofs) < 1 {
 		return nil, fmt.Errorf("at least a proof is needed to be able to contruct a partial trie")
 	}
-	if height < 1 {
-		return nil, fmt.Errorf("minimum acceptable value for the  hight is 1")
-	}
-	psmt := PSMT{newNode(nil, height-1), height, (height - 1) / 8, make(map[string]*node)}
-
-	// We need to decode proof encodings
 	batchProof, err := proof.DecodeBatchProof(proofs)
 	if err != nil {
 		return nil, fmt.Errorf("decoding proof failed: %w", err)
 	}
 
-	// check size of key, values and proofs
+	// check size of key, values and proofs are consistent
 	if len(keys) != len(values) {
 		return nil, fmt.Errorf("keys' size (%d) and values' size (%d) doesn't match", len(keys), len(values))
 	}
-
 	if len(keys) != batchProof.Size() {
 		return nil, fmt.Errorf("keys' size (%d) and values' size (%d) doesn't match", len(keys), batchProof.Size())
 	}
@@ -88,8 +92,8 @@ func NewPSMT(
 		key := keys[i]
 		value := values[i]
 		// check key size
-		if len(key) != psmt.keyByteSize {
-			return nil, fmt.Errorf("key [%x] size (%d) doesn't match the trie height (%d)", key, len(key), height)
+		if len(key) != keyByteSize {
+			return nil, fmt.Errorf("key [%x] size (%d) doesn't match the expected value (%d)", key, len(key), keyByteSize)
 		}
 
 		// we keep track of our progress through proofs by proofIndex

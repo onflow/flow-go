@@ -12,7 +12,9 @@ func (r Root) String() string {
 	return hex.EncodeToString(r)
 }
 
-// node is a struct for constructing our Tree
+// node is a struct for constructing our Tree.
+// HEIGHT DEFINITION: the height of a node v in a tree is the number
+// of edges on the longest downward path between v and a tree leaf.
 type node struct {
 	value  Root   // Hash
 	lChild *node  // Left Child

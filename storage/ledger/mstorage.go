@@ -16,7 +16,7 @@ import (
 
 const (
 	// ExecutionStateRegisterKeySize is the size of a Execution register's key [bytes]
-	ExecutionStateTreeHeight = 32
+	RegisterKeySize = 32
 )
 
 type MTrieStorage struct {
@@ -34,7 +34,7 @@ func NewMTrieStorage(dbDir string, cacheSize int, metrics module.LedgerMetrics, 
 		return nil, fmt.Errorf("cannot create WAL: %w", err)
 	}
 
-	mForest, err := mtrie.NewMForest(ExecutionStateTreeHeight, dbDir, cacheSize, metrics, func(evictedTrie *trie.MTrie) error {
+	mForest, err := mtrie.NewMForest(RegisterKeySize, dbDir, cacheSize, metrics, func(evictedTrie *trie.MTrie) error {
 		return w.RecordDelete(evictedTrie.RootHash())
 	})
 	if err != nil {
@@ -83,7 +83,6 @@ func (f *MTrieStorage) Done() <-chan struct{} {
 
 func (f *MTrieStorage) EmptyStateCommitment() flow.StateCommitment {
 	return f.mForest.GetEmptyRootHash()
-	// return trie.GetDefaultHashForHeight(f.tree.GetHeight() - 1)
 }
 
 // GetRegisters read the values at the given registers at the given flow.StateCommitment
