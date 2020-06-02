@@ -43,9 +43,6 @@ import (
 
 const notSet = "not set"
 
-// TODO: load token supply from bootstrap config
-const genesisTokenSupply = 0
-
 // BaseConfig is the general config for the FlowNodeBuilder
 type BaseConfig struct {
 	nodeIDHex        string
@@ -395,8 +392,11 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
 		}
 
-		// TODO: load token supply from bootstrap config
-		fnb.GenesisTokenSupply = genesisTokenSupply
+		// load token supply from bootstrap config
+		fnb.GenesisTokenSupply, err = loadGenesisTokenSupply(fnb.BaseConfig.BootstrapDir)
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis token supply")
+		}
 
 		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
@@ -724,4 +724,14 @@ func loadPrivateNodeInfo(dir string, myID flow.Identifier) (*bootstrap.NodeInfoP
 	var info bootstrap.NodeInfoPriv
 	err = json.Unmarshal(data, &info)
 	return &info, err
+}
+
+func loadGenesisTokenSupply(dir string) (uint64, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisTokenSupply))
+	if err != nil {
+		return 0, err
+	}
+	var supply uint64
+	err = json.Unmarshal(data, &supply)
+	return supply, err
 }

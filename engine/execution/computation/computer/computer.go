@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/module/trace"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
 // A BlockComputer executes the transactions in a block.
@@ -23,13 +24,15 @@ type BlockComputer interface {
 type blockComputer struct {
 	tracer module.Tracer
 	vm     virtualmachine.VirtualMachine
+	blocks storage.Blocks
 }
 
 // NewBlockComputer creates a new block executor.
-func NewBlockComputer(vm virtualmachine.VirtualMachine, tracer module.Tracer) BlockComputer {
+func NewBlockComputer(vm virtualmachine.VirtualMachine, tracer module.Tracer, blocks storage.Blocks) BlockComputer {
 	return &blockComputer{
 		tracer: tracer,
 		vm:     vm,
+		blocks: blocks,
 	}
 }
 
@@ -61,7 +64,7 @@ func (e *blockComputer) executeBlock(
 	stateView *delta.View,
 ) (*execution.ComputationResult, error) {
 
-	blockCtx := e.vm.NewBlockContext(block.Block.Header)
+	blockCtx := e.vm.NewBlockContext(block.Block.Header, e.blocks)
 
 	collections := block.Collections()
 

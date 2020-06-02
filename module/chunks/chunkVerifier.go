@@ -9,20 +9,23 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification"
 	chmodels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/ledger/trie"
+	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/storage/ledger/ptrie"
 )
 
 // ChunkVerifier is a verifier based on the current definitions of the flow network
 type ChunkVerifier struct {
 	vm        virtualmachine.VirtualMachine
 	trieDepth int
+	blocks    storage.Blocks
 }
 
 // NewChunkVerifier creates a chunk verifier containing a flow virtual machine
-func NewChunkVerifier(vm virtualmachine.VirtualMachine) *ChunkVerifier {
+func NewChunkVerifier(vm virtualmachine.VirtualMachine, blocks storage.Blocks) *ChunkVerifier {
 	return &ChunkVerifier{
 		vm:        vm,
 		trieDepth: 257,
+		blocks:    blocks,
 	}
 }
 
@@ -44,13 +47,13 @@ func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) (chmodels.Chu
 	if ch.Block == nil {
 		return nil, fmt.Errorf("missing block")
 	}
-	blockCtx := fcv.vm.NewBlockContext(ch.Block.Header)
+	blockCtx := fcv.vm.NewBlockContext(ch.Block.Header, fcv.blocks)
 
 	// constructing a partial trie given chunk data package
 	if ch.ChunkDataPack == nil {
 		return nil, fmt.Errorf("missing chunk data pack")
 	}
-	ptrie, err := trie.NewPSMT(ch.ChunkDataPack.StartState,
+	psmt, err := ptrie.NewPSMT(ch.ChunkDataPack.StartState,
 		fcv.trieDepth,
 		ch.ChunkDataPack.Registers(),
 		ch.ChunkDataPack.Values(),
@@ -107,7 +110,7 @@ func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) (chmodels.Chu
 	// this returns the expected end state commitment after updates and the list of
 	// register keys that was not provided by the chunk data package (err).
 	regs, values := chunkView.Delta().RegisterUpdates()
-	expEndStateComm, failedKeys, err := ptrie.Update(regs, values)
+	expEndStateComm, failedKeys, err := psmt.Update(regs, values)
 	if err != nil {
 		return chmodels.NewCFMissingRegisterTouch(failedKeys, chIndex, execResID), nil
 	}

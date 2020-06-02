@@ -3,6 +3,7 @@ package virtualmachine
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"fmt"
 
 	"github.com/onflow/cadence"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
 const scriptGasLimit = 100000
@@ -19,6 +21,7 @@ const scriptGasLimit = 100000
 type CheckerFunc func([]byte, runtime.Location) error
 
 type TransactionContext struct {
+	LedgerDAL
 	bc                        BlockContext
 	ledger                    LedgerDAL
 	astCache                  ASTCache
@@ -31,6 +34,8 @@ type TransactionContext struct {
 	uuid                      uint64 // TODO: implement proper UUID
 	skipVerification          bool
 	skipDeploymentRestriction bool
+	header                    *flow.Header
+	blocks                    Blocks
 }
 
 type TransactionContextOption func(*TransactionContext)
@@ -360,12 +365,22 @@ func (r *TransactionContext) DecodeArgument(b []byte, t cadence.Type) (cadence.V
 	return jsoncdc.Decode(b)
 }
 
+// GetCurrentBlockHeight returns the current block height.
 func (r *TransactionContext) GetCurrentBlockHeight() uint64 {
-	panic("implement me")
+	return r.header.Height
 }
 
-func (r *TransactionContext) GetBlockAtHeight(height uint64) (hash runtime.BlockHash, timestamp int64, exists bool) {
-	panic("implement me")
+// GetBlockAtHeight returns the block at the given height.
+func (r *TransactionContext) GetBlockAtHeight(height uint64) (hash runtime.BlockHash, timestamp int64, exists bool, err error) {
+	block, err := r.blocks.ByHeight(height)
+	// TODO remove dependency on storage
+	if errors.Is(err, storage.ErrNotFound) {
+		return runtime.BlockHash{}, 0, false, nil
+	} else if err != nil {
+		return runtime.BlockHash{}, 0, false, fmt.Errorf(
+			"unexpected failure of GetBlockAtHeight, tx ID %s, height %v: %w", r.tx.ID().String(), height, err)
+	}
+	return runtime.BlockHash(block.ID()), block.Header.Timestamp.UnixNano(), true, nil
 }
 
 // checkProgram checks the given code for syntactic and semantic correctness.
@@ -576,7 +591,7 @@ func (r *TransactionContext) isValidSigningAccount(address runtime.Address) bool
 func InitDefaultTokenTransaction() []byte {
 	return []byte(fmt.Sprintf(`
 		import FlowServiceAccount from 0x%s
-	
+
 		transaction {
 			prepare(acct: AuthAccount) {
 				FlowServiceAccount.initDefaultToken(acct)
@@ -588,7 +603,7 @@ func InitDefaultTokenTransaction() []byte {
 func DefaultTokenBalanceScript(addr flow.Address) []byte {
 	return []byte(fmt.Sprintf(`
         import FlowServiceAccount from 0x%s
-    
+
         pub fun main(): UFix64 {
             let acct = getAccount(0x%s)
             return FlowServiceAccount.defaultTokenBalance(acct)
@@ -599,13 +614,13 @@ func DefaultTokenBalanceScript(addr flow.Address) []byte {
 func DeductAccountCreationFeeTransaction() []byte {
 	return []byte(fmt.Sprintf(`
 		import FlowServiceAccount from 0x%s
-	
+
 		transaction {
 			prepare(acct: AuthAccount) {
 				if !FlowServiceAccount.isAccountCreator(acct.address) {
 					panic("Account not authorized to create accounts")
 				}
-	
+
 				FlowServiceAccount.deductAccountCreationFee(acct)
 			}
 		}
@@ -615,7 +630,7 @@ func DeductAccountCreationFeeTransaction() []byte {
 func DeductTransactionFeeTransaction() []byte {
 	return []byte(fmt.Sprintf(`
 		import FlowServiceAccount from 0x%s
-	
+
 		transaction {
 			prepare(acct: AuthAccount) {
 				FlowServiceAccount.deductTransactionFee(acct)
@@ -650,29 +665,29 @@ func MintDefaultTokenTransaction() []byte {
 	return []byte(fmt.Sprintf(`
 		import FungibleToken from 0x%s
 		import FlowToken from 0x%s
-	
+
 		transaction(amount: UFix64) {
-	
+
 		  let tokenAdmin: &FlowToken.Administrator
 		  let tokenReceiver: &FlowToken.Vault{FungibleToken.Receiver}
-	
+
 		  prepare(signer: AuthAccount) {
 			self.tokenAdmin = signer
-			  .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin) 
+			  .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)
 			  ?? panic("Signer is not the token admin")
-	
+
 			self.tokenReceiver = signer
 			  .getCapability(/public/flowTokenReceiver)!
 			  .borrow<&FlowToken.Vault{FungibleToken.Receiver}>()
 			  ?? panic("Unable to borrow receiver reference for recipient")
 		  }
-	
+
 		  execute {
 			let minter <- self.tokenAdmin.createNewMinter(allowedAmount: amount)
 			let mintedVault <- minter.mintTokens(amount: amount)
-	
+
 			self.tokenReceiver.deposit(from: <-mintedVault)
-		
+
 			destroy minter
 		  }
 		}

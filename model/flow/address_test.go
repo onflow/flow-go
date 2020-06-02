@@ -269,3 +269,18 @@ func TestUint48(t *testing.T) {
 		assert.Equal(t, r, res)
 	}
 }
+
+func TestCurrentAddress(t *testing.T) {
+	// seed random generator
+	rand.Seed(time.Now().UnixNano())
+
+	const loop = 5
+	// test consistensy of putUint48 and uint48
+	r := uint64(rand.Intn(maxState - loop - 1))
+	state := newAddressGeneratorAtState(r)
+	for i := 0; i < loop; i++ {
+		address, err := state.NextAddress()
+		require.NoError(t, err)
+		require.Equal(t, address.Hex(), state.CurrentAddress().Hex())
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"runtime"
 	"runtime/pprof"
 	"time"
@@ -14,8 +15,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/storage/ledger/trie"
-	utils "github.com/dapperlabs/flow-go/storage/ledger/utils"
+	"github.com/dapperlabs/flow-go/storage/ledger/ptrie"
+	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
 var dir = "./db/"
@@ -30,7 +31,12 @@ func StorageBenchmark() {
 	valueMaxByteSize := 32
 	trieHeight := keyByteSize*8 + 1 // 257
 
-	f, err := os.Create("./logs.txt")
+	absPath, err := filepath.Abs("./logs.txt")
+	if err != nil {
+		panic("can't creat log file")
+	}
+	fmt.Printf("Writing log file to '%s'\n", absPath)
+	f, err := os.Create(absPath)
 	if err != nil {
 		panic("can't creat log file")
 	}
@@ -39,8 +45,7 @@ func StorageBenchmark() {
 	rand.Seed(time.Now().UnixNano())
 
 	metricsCollector := &metrics.NoopCollector{}
-
-	led, err := ledger.NewMTrieStorage(dir, 100, metricsCollector, nil)
+	led, err := ledger.NewMTrieStorage(dir, steps+1, metricsCollector, nil)
 	defer func() {
 		led.Done()
 		os.RemoveAll(dir)
@@ -93,7 +98,7 @@ func StorageBenchmark() {
 		elapsed = time.Since(start)
 		start = time.Now()
 		// validate proofs as a batch
-		_, err = trie.NewPSMT(newState, trieHeight, keys, retValues, proofs)
+		_, err = ptrie.NewPSMT(newState, trieHeight, keys, retValues, proofs)
 		if err != nil {
 			panic("failed to create PSMT")
 		}

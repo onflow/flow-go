@@ -220,6 +220,12 @@ func (gen *AddressGenerator) NextAddress() (Address, error) {
 	return address, nil
 }
 
+// CurrentAddress returns the last generated address.
+func (gen *AddressGenerator) CurrentAddress() Address {
+	address := gen.generateAddress()
+	return address
+}
+
 // returns the next state given an addressing state.
 //
 // The state values are incremented from 0 to 2^k-1

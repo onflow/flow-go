@@ -9,6 +9,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
 )
 
 func TestBatchProofEncoderDecoder(t *testing.T) {
@@ -20,20 +21,18 @@ func TestBatchProofEncoderDecoder(t *testing.T) {
 	metricsCollector := &metrics.NoopCollector{}
 	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
-	rootHash := fStore.GetEmptyRootHash()
 
 	k1 := []byte([]uint8{uint8(1)})
 	v1 := []byte{'A'}
 	keys := [][]byte{k1}
 	values := [][]byte{v1}
-	rootHash, err = fStore.Update(keys, values, rootHash)
+	testTrie, err := fStore.Update(fStore.GetEmptyRootHash(), keys, values)
 	require.NoError(t, err)
-	batchProof, err := fStore.Proofs(keys, rootHash)
+	batchProof, err := fStore.Proofs(testTrie.RootHash(), keys)
 	require.NoError(t, err)
 
-	encodeBatchProof, _ := mtrie.EncodeBatchProof(batchProof)
-	p, err := mtrie.DecodeBatchProof(encodeBatchProof)
+	encProf, _ := proof.EncodeBatchProof(batchProof)
+	p, err := proof.DecodeBatchProof(encProf)
 	require.NoError(t, err)
 	require.Equal(t, p, batchProof, "Proof encoder and/or decoder has an issue")
-
 }
