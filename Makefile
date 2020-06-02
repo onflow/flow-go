@@ -59,6 +59,10 @@ test: generate-mocks unittest
 integration-test: docker-build-flow
 	$(MAKE) -C integration integration-test
 
+.PHONY: benchmark
+benchmark: docker-build-flow
+	$(MAKE) -C integration benchmark
+
 .PHONY: coverage
 coverage:
 ifeq ($(COVER), true)

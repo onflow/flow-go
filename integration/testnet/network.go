@@ -479,6 +479,9 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 }
 
 func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Block, []ContainerConfig, error) {
+	// Setup as Testnet
+	flow.SetChainID(flow.Testnet)
+
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
 	if nNodes == 0 {

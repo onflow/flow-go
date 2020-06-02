@@ -25,3 +25,7 @@ common-tests:
 .PHONY: execution-tests
 execution-tests:
 	GO111MODULE=on go test -tags relic -count=1 ./tests/execution
+
+.PHONY: benchmark
+benchmark:
+	GO111MODULE=on go test -tags relic -timeout 30m ./tests/execution -run Benchmark
