@@ -14,6 +14,11 @@ import (
 	"github.com/dapperlabs/flow-go/storage/ledger/wal"
 )
 
+const (
+	// ExecutionStateRegisterKeySize is the size of a Execution register's key [bytes]
+	ExecutionStateTreeHeight = 32
+)
+
 type MTrieStorage struct {
 	mForest *mtrie.MForest
 	wal     *wal.WAL
@@ -29,7 +34,7 @@ func NewMTrieStorage(dbDir string, cacheSize int, metrics module.LedgerMetrics, 
 		return nil, fmt.Errorf("cannot create WAL: %w", err)
 	}
 
-	mForest, err := mtrie.NewMForest(257, dbDir, cacheSize, metrics, func(evictedTrie *trie.MTrie) error {
+	mForest, err := mtrie.NewMForest(ExecutionStateTreeHeight*8, dbDir, cacheSize, metrics, func(evictedTrie *trie.MTrie) error {
 		return w.RecordDelete(evictedTrie.RootHash())
 	})
 	if err != nil {

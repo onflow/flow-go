@@ -18,25 +18,42 @@ import (
 	"github.com/dapperlabs/flow-go/utils/io"
 )
 
-// MForest is an in memory forest (collection of tries)
+// MForest is a collection of MTries of uniform height.
+//
+// MForest has a limit, the forestCapacity, on the number of tries it is able to store.
+// If more tries are added than the capacity, the Least Recently Used trie is
+// removed (evicted) from the MForest. THIS IS A ROUGH HEURISTIC as it might evict
+// tries that are still needed. In fully matured Flow, we will have an
+// explicit eviction policy.
+//
+// TODO: Storage Eviction Policy for MForrest
+//       For the execution node: we only evict on sealing a result.
 type MForest struct {
-	tries         *lru.Cache // TODO: add godoc about meaning of LRU chache
-	dir           string
-	cacheSize     int
-	maxHeight     int // height of the tree
-	keyByteSize   int // acceptable number of bytes for key
-	onTreeEvicted func(tree *trie.MTrie) error
-	metrics       module.LedgerMetrics
+	// tries stores all MTries in the forest. It is NOT a CACHE in the conventional sense:
+	// there is no mechanism to load a trie from disk in case of a cache miss. Missing a
+	// needed trie in the forest might cause a fatal application logic error.
+	tries          *lru.Cache
+	dir            string
+	forestCapacity int
+	onTreeEvicted  func(tree *trie.MTrie) error
+	height         int // height of the trees
+	keyByteSize    int // acceptable number of bytes for key
+	metrics        module.LedgerMetrics
 }
 
-// NewMForest returns a new instance of memory forest
-func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int, metrics module.LedgerMetrics, onTreeEvicted func(tree *trie.MTrie) error) (*MForest, error) {
-
+// NewMForest returns a new instance of memory forest.
+//
+// CAUTION on forestCapacity: the specified capacity MUST be SUFFICIENT to store all needed MTries in the forest.
+// If more tries are added than the capacity, the Least Recently Used trie is removed (evicted) from the MForest.
+// THIS IS A ROUGH HEURISTIC as it might evict tries that are still needed.
+// Make sure you chose a sufficiently large forestCapacity, such that, when reaching the capacity, the
+// Least Recently Used trie will never be needed again.
+func NewMForest(keyByteSize uint, trieStorageDir string, forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted func(tree *trie.MTrie) error) (*MForest, error) {
+	// init LRU cache as a SHORTCUT for a usage-related storage eviction policy
 	var cache *lru.Cache
 	var err error
-
 	if onTreeEvicted != nil {
-		cache, err = lru.NewWithEvict(trieCacheSize, func(key interface{}, value interface{}) {
+		cache, err = lru.NewWithEvict(forestCapacity, func(key interface{}, value interface{}) {
 			trie, ok := value.(*trie.MTrie)
 			if !ok {
 				panic(fmt.Sprintf("cache contains item of type %T", value))
@@ -45,24 +62,28 @@ func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int, metrics
 			_ = onTreeEvicted(trie)
 		})
 	} else {
-		cache, err = lru.New(trieCacheSize)
+		cache, err = lru.New(forestCapacity)
 	}
-
 	if err != nil {
 		return nil, fmt.Errorf("cannot create forest cache: %w", err)
 	}
 
+	// init Forrest and add an empty trie
+	if keyByteSize < 1 {
+		return nil, errors.New("trie's key size [in bytes] must be positive")
+	}
+	height := keyByteSize * 8
 	forest := &MForest{tries: cache,
-		maxHeight:     maxHeight,
-		dir:           trieStorageDir,
-		cacheSize:     trieCacheSize,
-		keyByteSize:   (maxHeight - 1) / 8,
-		onTreeEvicted: onTreeEvicted,
-		metrics:       metrics,
+		dir:            trieStorageDir,
+		forestCapacity: forestCapacity,
+		onTreeEvicted:  onTreeEvicted,
+		height:         height,
+		keyByteSize:    keyByteSize,
+		metrics:        metrics,
 	}
 
 	// add empty roothash
-	emptyTrie, err := trie.NewEmptyMTrie(maxHeight, 0, nil)
+	emptyTrie, err := trie.NewEmptyMTrie(height, 0, nil)
 	if err != nil {
 		return nil, fmt.Errorf("constructing empty trie for forest failed: %w", err)
 	}
@@ -98,9 +119,8 @@ func (f *MForest) addTrie(newTrie *trie.MTrie) error {
 	if newTrie == nil {
 		return nil
 	}
-	expectedHeight := f.maxHeight - 1
-	if newTrie.Height() != expectedHeight {
-		return fmt.Errorf("forest holds tries of uniform height %d, but new trie has height %d", expectedHeight, newTrie.Height())
+	if newTrie.Height() != f.height {
+		return fmt.Errorf("forest holds tries of uniform height %d, but new trie has height %d", f.height, newTrie.Height())
 	}
 
 	// TODO: check Thread safety
@@ -129,7 +149,7 @@ func (f *MForest) RemoveTrie(rootHash []byte) {
 
 // GetEmptyRootHash returns the rootHash of empty Trie
 func (f *MForest) GetEmptyRootHash() []byte {
-	return node.NewEmptyTreeRoot(f.maxHeight - 1).Hash()
+	return node.NewEmptyTreeRoot(f.height).Hash()
 }
 
 // Read reads values for an slice of keys and returns values and error (if any)

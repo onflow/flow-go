@@ -18,7 +18,7 @@ import (
 
 func withMForest(
 	t *testing.T,
-	trieHeight int,
+	keyByteSize uint,
 	numberOfActiveTries int, f func(t *testing.T, mForest *mtrie.MForest)) {
 
 	dir, err := ioutil.TempDir("", "test-mtrie-")
@@ -26,7 +26,7 @@ func withMForest(
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	mForest, err := mtrie.NewMForest(trieHeight, dir, numberOfActiveTries, metricsCollector, nil)
+	mForest, err := mtrie.NewMForest(keyByteSize, dir, numberOfActiveTries, metricsCollector, nil)
 	require.NoError(t, err)
 
 	f(t, mForest)
@@ -34,8 +34,8 @@ func withMForest(
 
 func TestPartialTrieEmptyTrie(t *testing.T) {
 
-	trieHeight := 9 // should be key size (in bits) + 1
-	withMForest(t, trieHeight, 10, func(t *testing.T, mForest *mtrie.MForest) {
+	keyByteSize := 1 // key size of 8 bits
+	withMForest(t, keyByteSize, 10, func(t *testing.T, mForest *mtrie.MForest) {
 
 		// add key1 and value1 to the empty trie
 		key1 := make([]byte, 1) // 00000000 (0)
@@ -56,7 +56,7 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 		require.NoError(t, err, "error getting proofs values")
 
 		encBP, _ := proof.EncodeBatchProof(bp)
-		psmt, err := NewPSMT(rootHash, trieHeight, keys, retValues, encBP)
+		psmt, err := NewPSMT(rootHash, 8*keyByteSize+1, keys, retValues, encBP) // ChainSafe defined the height of a Trie as the number of nodes from the root to the leaf
 
 		require.NoError(t, err, "error building partial trie")
 		if !bytes.Equal(rootHash, psmt.root.ComputeValue()) {
@@ -94,8 +94,8 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 
 func TestPartialTrieLeafUpdates(t *testing.T) {
 
-	trieHeight := 9 // should be key size (in bits) + 1
-	withMForest(t, trieHeight, 10, func(t *testing.T, mForest *mtrie.MForest) {
+	keyByteSize := 1 // key size of 8 bits
+	withMForest(t, keyByteSize, 10, func(t *testing.T, mForest *mtrie.MForest) {
 
 		// add key1 and value1 to the empty trie
 		key1 := make([]byte, 1) // 00000000 (0)
@@ -123,7 +123,7 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 		require.NoError(t, err, "error getting batch proof")
 
 		encBP, _ := proof.EncodeBatchProof(bp)
-		psmt, err := NewPSMT(newRoot, trieHeight, keys, retvalues, encBP)
+		psmt, err := NewPSMT(newRoot, 8*keyByteSize+1, keys, retvalues, encBP)
 		require.NoError(t, err, "error building partial trie")
 
 		if !bytes.Equal(newRoot, psmt.root.ComputeValue()) {
@@ -148,8 +148,8 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 
 func TestPartialTrieMiddleBranching(t *testing.T) {
 
-	trieHeight := 9 // should be key size (in bits) + 1
-	withMForest(t, trieHeight, 10, func(t *testing.T, mForest *mtrie.MForest) {
+	keyByteSize := 1 // key size of 8 bits
+	withMForest(t, keyByteSize, 10, func(t *testing.T, mForest *mtrie.MForest) {
 		key1 := make([]byte, 1) // 00000000 (0)
 		value1 := []byte{'a'}
 		updatedValue1 := []byte{'A'}
@@ -176,7 +176,7 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 		require.NoError(t, err, "error getting batch proof")
 
 		encBP, _ := proof.EncodeBatchProof(bp)
-		psmt, err := NewPSMT(mForest.GetEmptyRootHash(), trieHeight, keys, retvalues, encBP)
+		psmt, err := NewPSMT(mForest.GetEmptyRootHash(), 8*keyByteSize+1, keys, retvalues, encBP)
 		require.NoError(t, err, "error building partial trie")
 
 		if !bytes.Equal(mForest.GetEmptyRootHash(), psmt.root.ComputeValue()) {
@@ -210,8 +210,8 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 }
 
 func TestPartialTrieRootUpdates(t *testing.T) {
-	trieHeight := 9 // should be key size (in bits) + 1
-	withMForest(t, trieHeight, 10, func(t *testing.T, mForest *mtrie.MForest) {
+	keyByteSize := 1 // key size of 8 bits
+	withMForest(t, keyByteSize, 10, func(t *testing.T, mForest *mtrie.MForest) {
 
 		key1 := make([]byte, 1) // 00000000 (0)
 		value1 := []byte{'a'}
@@ -234,7 +234,7 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 		require.NoError(t, err, "error getting batch proof")
 
 		encBP, _ := proof.EncodeBatchProof(bp)
-		psmt, err := NewPSMT(mForest.GetEmptyRootHash(), trieHeight, keys, retvalues, encBP)
+		psmt, err := NewPSMT(mForest.GetEmptyRootHash(), 8*keyByteSize+1, keys, retvalues, encBP)
 		require.NoError(t, err, "error building partial trie")
 
 		if !bytes.Equal(mForest.GetEmptyRootHash(), psmt.root.ComputeValue()) {
@@ -269,8 +269,8 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 }
 
 func TestMixProof(t *testing.T) {
-	trieHeight := 9 // should be key size (in bits) + 1
-	withMForest(t, trieHeight, 10, func(t *testing.T, mForest *mtrie.MForest) {
+	keyByteSize := 1 // key size of 8 bits
+	withMForest(t, keyByteSize, 10, func(t *testing.T, mForest *mtrie.MForest) {
 		key1 := make([]byte, 1) // 00000001 (1)
 		utils.SetBit(key1, 7)
 		value1 := []byte{'a'}
@@ -301,7 +301,7 @@ func TestMixProof(t *testing.T) {
 		require.NoError(t, err, "error getting batch proof")
 
 		encBP, _ := proof.EncodeBatchProof(bp)
-		psmt, err := NewPSMT(newRoot, trieHeight, keys, retvalues, encBP)
+		psmt, err := NewPSMT(newRoot, 8*keyByteSize+1, keys, retvalues, encBP)
 		require.NoError(t, err, "error building partial trie")
 
 		if !bytes.Equal(newRoot, psmt.root.ComputeValue()) {
@@ -330,10 +330,10 @@ func TestMixProof(t *testing.T) {
 }
 
 func TestRandomProofs(t *testing.T) {
-	trieHeight := 17 // should be key size (in bits) + 1
+	keyByteSize := 2 // key size of 16 bits
 	experimentRep := 20
 	for e := 0; e < experimentRep; e++ {
-		withMForest(t, trieHeight, experimentRep+1, func(t *testing.T, mForest *mtrie.MForest) {
+		withMForest(t, keyByteSize, experimentRep+1, func(t *testing.T, mForest *mtrie.MForest) {
 
 			// insert some values to an empty trie
 			keys := make([][]byte, 0)
@@ -383,7 +383,7 @@ func TestRandomProofs(t *testing.T) {
 			require.NoError(t, err, "error getting batch proof")
 
 			encBP, _ := proof.EncodeBatchProof(bp)
-			psmt, err := NewPSMT(root, trieHeight, keys, retvalues, encBP)
+			psmt, err := NewPSMT(root, 8*keyByteSize+1, keys, retvalues, encBP)
 			require.NoError(t, err, "error building partial trie")
 
 			if !bytes.Equal(root, psmt.root.ComputeValue()) {
