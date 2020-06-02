@@ -1,7 +1,6 @@
 package finder_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -17,7 +16,6 @@ import (
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
-	"github.com/dapperlabs/flow-go/utils/logging"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 

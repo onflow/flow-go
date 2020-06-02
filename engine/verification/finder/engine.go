@@ -90,8 +90,8 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-// process receives and submits an event to the verifier engine for processing.
-// It returns an error so the verifier engine will not propagate an event unless
+// process receives and submits an event to the finder engine for processing.
+// It returns an error so the finder engine will not propagate an event unless
 // it is successfully processed by the engine.
 // The origin ID indicates the node which originally submitted the event to
 // the peer-to-peer network.
@@ -118,6 +118,11 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		Hex("result_id", logging.ID(resultID)).Logger()
 	log.Info().Msg("execution receipt arrived")
 
+	// checks if the result has already been handled
+	if e.processedResult.Has(resultID) {
+		log.Debug().Msg("drops handling already processed result")
+	}
+
 	// adds the execution receipt in the mempool
 	added := e.receipts.Add(receipt)
 	if !added {
@@ -126,6 +131,9 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	}
 
 	log.Info().Msg("execution receipt successfully handled")
+
+	// checks receipt being processable
+	e.checkReceipts([]*flow.ExecutionReceipt{receipt})
 
 	return nil
 }
@@ -143,7 +151,6 @@ func (e *Engine) OnBlockIncorporated(*model.Block) {
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 func (e *Engine) OnFinalizedBlock(block *model.Block) {
-
 	// block should be in the storage
 	_, err := e.headerStorage.ByBlockID(block.BlockID)
 	if errors.Is(err, storage.ErrNotFound) {
@@ -158,6 +165,8 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 			Msg("could not check block availability in storage")
 		return
 	}
+
+	e.checkReceipts(e.receipts.All())
 }
 
 // To implement FinalizationConsumer
@@ -173,9 +182,11 @@ func (e *Engine) isProcessable(result *flow.ExecutionResult) bool {
 	return true
 }
 
-// processResult submits the result to the match engine, and marks it
-// as processed.
+// processResult submits the result to the match engine.
 func (e *Engine) processResult(result *flow.ExecutionResult) error {
+	if e.processedResult.Has(result.ID()) {
+		return fmt.Errorf("result already processed")
+	}
 	err := e.match.ProcessLocal(result)
 	if err != nil {
 		return fmt.Errorf("submission error to match engine: %w", err)
@@ -184,8 +195,50 @@ func (e *Engine) processResult(result *flow.ExecutionResult) error {
 	return nil
 }
 
-func (e *Engine) onNewBlock(blockID flow.Identifier) {
-	for _, receipt := range e.receipts.All() {
+// onResultProcessed is called whenever a result is processed completely and
+// is passed to the match engine. It marks the result as processed, and removes
+// all receipts with the same result from mempool.
+func (e *Engine) onResultProcessed(resultID flow.Identifier) {
+	log := e.log.With().
+		Hex("result_id", logging.ID(resultID)).
+		Logger()
 
+	// marks result as processed
+	added := e.processedResult.Add(resultID)
+	if !added {
+		log.Debug().Msg("result marked as processed")
+	}
+
+	// drops all receipts with the same result
+	for _, receipt := range e.receipts.All() {
+		if receipt.ExecutionResult.ID() == resultID {
+			receiptID := receipt.ID()
+			e.receipts.Rem(receiptID)
+			log.Debug().
+				Hex("receipt_id", logging.ID(receiptID)).
+				Msg("processed result cleaned up")
+		}
+	}
+}
+
+// checkReceipts receives a set of receipts and evaluates each of them
+// against being processable. If a receipt is processable, it gets processed.
+func (e *Engine) checkReceipts(receipts []*flow.ExecutionReceipt) {
+	for _, receipt := range receipts {
+		if e.isProcessable(&receipt.ExecutionResult) {
+			// checks if result is ready to process
+			err := e.processResult(&receipt.ExecutionResult)
+			if err != nil {
+				e.log.Error().
+					Err(err).
+					Hex("receipt_id", logging.Entity(receipt)).
+					Hex("result_id", logging.Entity(receipt.ExecutionResult)).
+					Msg("could not process result")
+				continue
+			}
+
+			// performs clean up
+			e.onResultProcessed(receipt.ExecutionResult.ID())
+		}
 	}
 }
