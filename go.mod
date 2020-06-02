@@ -25,8 +25,7 @@ require (
 	github.com/libp2p/go-libp2p-transport-upgrader v0.1.1
 	github.com/libp2p/go-tcp-transport v0.1.1
 	github.com/multiformats/go-multiaddr v0.2.0
-	github.com/onflow/cadence v0.4.0-beta1.0.20200528102553-06110caee6bf
-	github.com/onflow/flow-go-sdk v0.4.0-beta1.0.20200602171133-99bba437c939 // indirect
+	github.com/onflow/cadence v0.4.0
 	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200601215056-34a11def1d6b
 	github.com/onsi/ginkgo v1.10.1 // indirect
 	github.com/onsi/gomega v1.7.0 // indirect
@@ -47,6 +46,7 @@ require (
 	go.uber.org/atomic v1.5.1
 	golang.org/x/crypto v0.0.0-20200423211502-4bdfaf469ed5
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
+	golang.org/x/tools v0.0.0-20200323144430-8dcfad9e016e // indirect
 	google.golang.org/api v0.18.0
 	google.golang.org/grpc v1.28.0
 )
