@@ -293,7 +293,7 @@ func (r *TransactionContext) CheckCode(address runtime.Address, code []byte) (er
 //
 // This function returns an error if the specified account does not exist or is
 // not a valid signing account.
-func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []byte, checkPermission bool) (err error) {
+func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []byte) (err error) {
 	accountAddress := address.Bytes()
 
 	key := fullKeyHash(string(accountAddress), string(accountAddress), keyCode)
