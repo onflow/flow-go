@@ -41,11 +41,11 @@ import (
 type MTrie struct {
 	root           *node.Node
 	number         uint64
-	height         uint
+	height         int
 	parentRootHash []byte
 }
 
-func NewEmptyMTrie(keyByteSize uint, number uint64, parentRootHash []byte) (*MTrie, error) {
+func NewEmptyMTrie(keyByteSize int, number uint64, parentRootHash []byte) (*MTrie, error) {
 	if keyByteSize < 1 {
 		return nil, errors.New("trie's key size [in bytes] must be positive")
 	}

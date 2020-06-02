@@ -892,7 +892,7 @@ func TestProofGenerationInclusion(t *testing.T) {
 	require.NoError(t, err)
 	proof, err := fStore.Proofs(updatedTrie.RootHash(), keys)
 	require.NoError(t, err)
-	require.True(t, proof.Verify(keys, values, updatedTrie.RootHash(), keyByteSize))
+	require.True(t, proof.Verify(keys, values, updatedTrie.RootHash(), trieLevels))
 }
 
 // TestPurgeAndLoad this test updates the Tries repeatedly until the forest should

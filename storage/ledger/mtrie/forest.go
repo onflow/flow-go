@@ -11,14 +11,14 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/dapperlabs/flow-go/module"
-
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/node"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 	"github.com/dapperlabs/flow-go/utils/io"
 )
 
-// MForest is a collection of MTries of uniform height.
+// MForest is a a forest of in-memory tries. As MForest is a storage-abstraction layer,
+// we assume that all registers are addressed via keys of pre-defined uniform length.
 //
 // MForest has a limit, the forestCapacity, on the number of tries it is able to store.
 // If more tries are added than the capacity, the Least Recently Used trie is
@@ -37,7 +37,7 @@ type MForest struct {
 	forestCapacity int
 	onTreeEvicted  func(tree *trie.MTrie) error
 	height         int // height of the trees
-	keyByteSize    int // acceptable number of bytes for key
+	keyByteSize    int // length [bytes] of register keys
 	metrics        module.LedgerMetrics
 }
 
@@ -48,7 +48,7 @@ type MForest struct {
 // THIS IS A ROUGH HEURISTIC as it might evict tries that are still needed.
 // Make sure you chose a sufficiently large forestCapacity, such that, when reaching the capacity, the
 // Least Recently Used trie will never be needed again.
-func NewMForest(keyByteSize uint, trieStorageDir string, forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted func(tree *trie.MTrie) error) (*MForest, error) {
+func NewMForest(keyByteSize int, trieStorageDir string, forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted func(tree *trie.MTrie) error) (*MForest, error) {
 	// init LRU cache as a SHORTCUT for a usage-related storage eviction policy
 	var cache *lru.Cache
 	var err error
@@ -83,7 +83,7 @@ func NewMForest(keyByteSize uint, trieStorageDir string, forestCapacity int, met
 	}
 
 	// add empty roothash
-	emptyTrie, err := trie.NewEmptyMTrie(height, 0, nil)
+	emptyTrie, err := trie.NewEmptyMTrie(keyByteSize, 0, nil)
 	if err != nil {
 		return nil, fmt.Errorf("constructing empty trie for forest failed: %w", err)
 	}

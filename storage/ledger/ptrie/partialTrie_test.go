@@ -18,7 +18,7 @@ import (
 
 func withMForest(
 	t *testing.T,
-	keyByteSize uint,
+	keyByteSize int,
 	numberOfActiveTries int, f func(t *testing.T, mForest *mtrie.MForest)) {
 
 	dir, err := ioutil.TempDir("", "test-mtrie-")

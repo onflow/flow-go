@@ -34,7 +34,7 @@ func NewMTrieStorage(dbDir string, cacheSize int, metrics module.LedgerMetrics, 
 		return nil, fmt.Errorf("cannot create WAL: %w", err)
 	}
 
-	mForest, err := mtrie.NewMForest(ExecutionStateTreeHeight*8, dbDir, cacheSize, metrics, func(evictedTrie *trie.MTrie) error {
+	mForest, err := mtrie.NewMForest(ExecutionStateTreeHeight, dbDir, cacheSize, metrics, func(evictedTrie *trie.MTrie) error {
 		return w.RecordDelete(evictedTrie.RootHash())
 	})
 	if err != nil {
