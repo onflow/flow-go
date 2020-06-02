@@ -105,7 +105,7 @@ func (w *LedgerWAL) replay(
 
 	startSegment := from
 	if loadedCheckpoint {
-		startSegment = latestCheckpoint
+		startSegment = latestCheckpoint + 1
 	}
 
 	sr, err := prometheusWAL.NewSegmentsRangeReader(prometheusWAL.SegmentRange{

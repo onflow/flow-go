@@ -45,73 +45,71 @@ func checkpointerWithFiles(t *testing.T, names ...interface{}) {
 
 func Test_WAL(t *testing.T) {
 
-	//t.Skip()
-
 	numInsPerStep := 2
 	keyByteSize := 32
 	valueMaxByteSize := 2 << 16 //16kB
 	size := 10
 	metricsCollector := &metrics.NoopCollector{}
 
-	//unittest.RunWithTempDir(t, func(dir string) {
+	unittest.RunWithTempDir(t, func(dir string) {
 
-	f, err := ledger.NewMTrieStorage(dir, size*10, metricsCollector, nil)
-	require.NoError(t, err)
-
-	var stateCommitment = f.EmptyStateCommitment()
-
-	//saved data after updates
-	savedData := make(map[string]map[string][]byte)
-
-	// WAL segments are 32kB, so here we generate 2 keys 16kB each, times `size`
-	// so we should get at least `size` segments
-	for i := 0; i < size; i++ {
-
-		keys := utils.GetRandomKeysFixedN(numInsPerStep, keyByteSize)
-		values := utils.GetRandomValues(len(keys), 10, valueMaxByteSize)
-
-		stateCommitment, err = f.UpdateRegisters(keys, values, stateCommitment)
+		f, err := ledger.NewMTrieStorage(dir, size*10, metricsCollector, nil)
 		require.NoError(t, err)
 
-		fmt.Printf("Updated with %x\n", stateCommitment)
+		var stateCommitment = f.EmptyStateCommitment()
 
-		data := make(map[string][]byte, len(keys))
-		for j, key := range keys {
-			data[string(key)] = values[j]
+		//saved data after updates
+		savedData := make(map[string]map[string][]byte)
+
+		// WAL segments are 32kB, so here we generate 2 keys 16kB each, times `size`
+		// so we should get at least `size` segments
+		for i := 0; i < size; i++ {
+
+			keys := utils.GetRandomKeysFixedN(numInsPerStep, keyByteSize)
+			values := utils.GetRandomValues(len(keys), 10, valueMaxByteSize)
+
+			stateCommitment, err = f.UpdateRegisters(keys, values, stateCommitment)
+			require.NoError(t, err)
+
+			fmt.Printf("Updated with %x\n", stateCommitment)
+
+			data := make(map[string][]byte, len(keys))
+			for j, key := range keys {
+				data[string(key)] = values[j]
+			}
+
+			savedData[string(stateCommitment)] = data
 		}
 
-		savedData[string(stateCommitment)] = data
-	}
+		<-f.Done()
 
-	<-f.Done()
-
-	f2, err := ledger.NewMTrieStorage(dir, (size*10)+10, metricsCollector, nil)
-	require.NoError(t, err)
-
-	// random map iteration order is a benefit here
-	for stateCommitment, data := range savedData {
-
-		keys := make([][]byte, 0, len(data))
-		for keyString := range data {
-			key := []byte(keyString)
-			keys = append(keys, key)
-		}
-
-		fmt.Printf("Querying with %x\n", stateCommitment)
-
-		registerValues, err := f2.GetRegisters(keys, []byte(stateCommitment))
+		f2, err := ledger.NewMTrieStorage(dir, (size*10)+10, metricsCollector, nil)
 		require.NoError(t, err)
 
-		for i, key := range keys {
-			registerValue := registerValues[i]
+		// random map iteration order is a benefit here
+		for stateCommitment, data := range savedData {
 
-			assert.Equal(t, data[string(key)], registerValue)
+			keys := make([][]byte, 0, len(data))
+			for keyString := range data {
+				key := []byte(keyString)
+				keys = append(keys, key)
+			}
+
+			fmt.Printf("Querying with %x\n", stateCommitment)
+
+			registerValues, err := f2.GetRegisters(keys, []byte(stateCommitment))
+			require.NoError(t, err)
+
+			for i, key := range keys {
+				registerValue := registerValues[i]
+
+				assert.Equal(t, data[string(key)], registerValue)
+			}
 		}
-	}
 
-	<-f2.Done()
+		<-f2.Done()
 
-	//})
+	})
 }
 
 func Test_Checkpointing(t *testing.T) {
@@ -251,6 +249,63 @@ func Test_Checkpointing(t *testing.T) {
 		}
 	}
 
+	//generate one more segment
+	wal4, err := realWAL.NewWAL(nil, nil, dir, size*10, 33)
+	require.NoError(t, err)
+
+	keys2 := utils.GetRandomKeysFixedN(numInsPerStep, keyByteSize)
+	values2 := utils.GetRandomValues(len(keys2), valueMaxByteSize, valueMaxByteSize)
+
+	err = wal4.RecordUpdate(stateCommitment, keys2, values2)
+	require.NoError(t, err)
+
+	stateCommitment, err = f.Update(keys2, values2, stateCommitment)
+	require.NoError(t, err)
+
+	err = wal4.Close()
+	require.NoError(t, err)
+
+	require.FileExists(t, path.Join(dir, "00000011")) //make sure we have extra segment
+
+	f5, err := mtrie.NewMForest(33, dir, size*10, metricsCollector, func(tree *mtrie.MTrie) error { return nil })
+	require.NoError(t, err)
+
+	wal5, err := realWAL.NewWAL(nil, nil, dir, size*10, 33)
+	require.NoError(t, err)
+
+	updatesLeft := 1 // there should be only one update
+
+	err = wal5.Replay(
+		func(nodes []*mtrie.StorableNode, tries []*mtrie.StorableTrie) error {
+			return f5.LoadStorables(nodes, tries)
+		},
+		func(commitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
+			if updatesLeft == 0 {
+				return fmt.Errorf("more updates called then expected")
+			}
+			_, err := f5.Update(keys, values, commitment)
+			updatesLeft--
+			return err
+		},
+		func(commitment flow.StateCommitment) error {
+			return fmt.Errorf("I should fail as there should be no deletions")
+		},
+	)
+	require.NoError(t, err)
+
+	err = wal5.Close()
+	require.NoError(t, err)
+
+	registerValues, err := f.Read(keys2, []byte(stateCommitment))
+	require.NoError(t, err)
+
+	registerValues5, err := f5.Read(keys2, []byte(stateCommitment))
+	require.NoError(t, err)
+
+	for i, _ := range keys2 {
+		require.Equal(t, values2[i], registerValues[i])
+		require.Equal(t, values2[i], registerValues5[i])
+	}
 	//})
 }
 
@@ -344,17 +399,4 @@ func Test_NoGapBetweenSegmentsAndLastCheckpoint(t *testing.T) {
 		_, _, err = checkpointer.NotCheckpointedSegments()
 		require.Error(t, err)
 	})
-}
-
-func Test_CheckpointCreation(t *testing.T) {
-	wal, err := realWAL.NewWAL(nil, nil, dir, 10, 257)
-	require.NoError(t, err)
-
-	checkpointer, err := wal.Checkpointer()
-	require.NoError(t, err)
-
-	err = checkpointer.Checkpoint(5, func() (io.WriteCloser, error) {
-		return checkpointer.CheckpointWriter(5)
-	})
-	require.NoError(t, err)
 }

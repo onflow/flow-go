@@ -89,6 +89,9 @@ func writeShortData(buffer []byte, location int, data []byte) int {
 }
 
 func readFromBuffer(reader io.Reader, length int) ([]byte, error) {
+	if length == 0 {
+		return nil, nil
+	}
 	buf := make([]byte, length)
 	_, err := io.ReadFull(reader, buf)
 	if err != nil {
