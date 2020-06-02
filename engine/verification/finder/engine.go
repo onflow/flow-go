@@ -123,6 +123,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	// checks if the result has already been handled
 	if e.processedResult.Has(resultID) {
 		log.Debug().Msg("drops handling already processed result")
+		return nil
 	}
 
 	// adds the execution receipt in the mempool
