@@ -27,6 +27,7 @@ require (
 	github.com/multiformats/go-multiaddr v0.2.0
 	github.com/onflow/cadence v0.4.0-beta1.0.20200528102553-06110caee6bf
 	github.com/onflow/flow-go-sdk v0.4.0-beta1.0.20200602171133-99bba437c939 // indirect
+	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200601215056-34a11def1d6b
 	github.com/onsi/ginkgo v1.10.1 // indirect
 	github.com/onsi/gomega v1.7.0 // indirect
 	github.com/opentracing/opentracing-go v1.1.0
