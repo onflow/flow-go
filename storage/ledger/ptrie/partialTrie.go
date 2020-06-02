@@ -9,9 +9,9 @@ import (
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
-// PSMT (Partial Sparse Merkle Tree) holds a subset of a sparse merkle tree (SMT) at specific
-// state commitment (no historic views). It avoids compact nodes to differentiate between
-// unpopulated branches and parts that are compact. It is fully stored in memory and doesn't use
+// PSMT (Partial Sparse Merkle Tree) holds a subset of an sparse merkle tree at specific
+// state commitment (no historic views). Instead of keeping any unneeded branch, it only keeps
+// the hash of subtree. This implementation is fully stored in memory and doesn't use
 // a database.
 type PSMT struct {
 	root        *node // Root
