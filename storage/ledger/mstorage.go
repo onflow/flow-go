@@ -173,8 +173,8 @@ func (f *MTrieStorage) UpdateRegisters(
 	return newStateCommitment, nil
 }
 
-// GetRegistersWithProof read the values at the given registers at the given flow.StateCommitment
-// This is untrusted so a proof is generated
+// GetRegistersWithProof read the values at the given registers at the given state commitment
+// it returns values, inclusion proofs and errors (if any)
 func (f *MTrieStorage) GetRegistersWithProof(
 	registerIDs []flow.RegisterID,
 	stateCommitment flow.StateCommitment,
@@ -206,6 +206,8 @@ func (f *MTrieStorage) GetRegistersWithProof(
 	return values, proofToGo, err
 }
 
+// GetRegisterTouches reads values and proofs for the given registers and
+// returns an slice of register touches
 func (f *MTrieStorage) GetRegisterTouches(
 	registerIDs []flow.RegisterID,
 	stateCommitment flow.StateCommitment,
@@ -229,8 +231,8 @@ func (f *MTrieStorage) GetRegisterTouches(
 	return rets, nil
 }
 
-// UpdateRegistersWithProof updates the values at the given registers
-// This is untrusted so a proof is generated
+// UpdateRegistersWithProof updates the values at the given registers and
+// provides proof for those registers after update
 func (f *MTrieStorage) UpdateRegistersWithProof(
 	ids []flow.RegisterID,
 	values []flow.RegisterValue,
