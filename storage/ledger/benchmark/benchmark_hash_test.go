@@ -1,4 +1,4 @@
-package common
+package main
 
 import (
 	"encoding/hex"
@@ -8,6 +8,7 @@ import (
 
 	"golang.org/x/crypto/sha3"
 
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/common"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
@@ -33,7 +34,7 @@ func Test_BenchmarkHashingWithAllocation(t *testing.T) {
 		k2 := keys[2*i+1]
 
 		start := time.Now()
-		res = HashInterNode(k1, k2)
+		res = common.HashInterNode(k1, k2)
 		elapsed := time.Since(start)
 
 		totalElapsed += uint64(elapsed)
