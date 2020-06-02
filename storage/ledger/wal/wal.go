@@ -8,85 +8,151 @@ import (
 	prometheusWAL "github.com/prometheus/tsdb/wal"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
 )
 
-type WAL struct {
-	wal *prometheusWAL.WAL
+type LedgerWAL struct {
+	wal       *prometheusWAL.WAL
+	cacheSize int
+	maxHeight int
 }
 
 // TODO use real loger and metrics, but that would require passing them to Trie storage
-func NewWAL(logger log.Logger, reg prometheus.Registerer, dir string) (*WAL, error) {
-	w, err := prometheusWAL.New(logger, reg, dir)
+func NewWAL(logger log.Logger, reg prometheus.Registerer, dir string, cacheSize int, maxHeight int) (*LedgerWAL, error) {
+	w, err := prometheusWAL.NewSize(logger, reg, dir, 32*1024)
 	if err != nil {
 		return nil, err
 	}
-	return &WAL{
-		wal: w,
+	return &LedgerWAL{
+		wal:       w,
+		cacheSize: cacheSize,
+		maxHeight: maxHeight,
 	}, nil
 }
 
-func (w *WAL) RecordUpdate(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
+func (w *LedgerWAL) RecordUpdate(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
 	bytes := EncodeUpdate(stateCommitment, keys, values)
 
 	err := w.wal.Log(bytes)
 
 	if err != nil {
-		return fmt.Errorf("error while recording update in WAL: %w", err)
+		return fmt.Errorf("error while recording update in LedgerWAL: %w", err)
 	}
 	return nil
 }
 
-func (w *WAL) RecordDelete(stateCommitment flow.StateCommitment) error {
+func (w *LedgerWAL) RecordDelete(stateCommitment flow.StateCommitment) error {
 	bytes := EncodeDelete(stateCommitment)
 
 	err := w.wal.Log(bytes)
 
 	if err != nil {
-		return fmt.Errorf("error while recording delete in WAL: %w", err)
+		return fmt.Errorf("error while recording delete in LedgerWAL: %w", err)
 	}
 	return nil
 }
 
-func (w *WAL) Replay(
+func (w *LedgerWAL) Replay(
+	checkpointFn func([]*mtrie.StorableNode, []*mtrie.StorableTrie) error,
+	updateFn func(flow.StateCommitment, [][]byte, [][]byte) error,
+	deleteFn func(flow.StateCommitment) error,
+) error {
+	from, to, err := w.wal.Segments()
+	if err != nil {
+		return err
+	}
+	return w.replay(from, to, checkpointFn, updateFn, deleteFn)
+}
+
+func (w *LedgerWAL) replay(
+	from, to int,
+	checkpointFn func([]*mtrie.StorableNode, []*mtrie.StorableTrie) error,
 	updateFn func(flow.StateCommitment, [][]byte, [][]byte) error,
 	deleteFn func(flow.StateCommitment) error,
 ) error {
 
-	sr, err := prometheusWAL.NewSegmentsReader(w.wal.Dir())
+	if to < from {
+		return fmt.Errorf("end of range cannot be smaller than beginning")
+	}
+
+	checkpointer, err := w.Checkpointer()
+	if err != nil {
+		return fmt.Errorf("cannot create checkpointer: %w", err)
+	}
+
+	latestCheckpoint, err := checkpointer.LatestCheckpoint()
+	if err != nil {
+		return fmt.Errorf("cannot get latest checkpoint: %w", err)
+	}
+
+	loadedCheckpoint := false
+
+	if latestCheckpoint >= from {
+		storedNodes, storedTris, err := checkpointer.LoadCheckpoint(latestCheckpoint)
+		if err != nil {
+			return fmt.Errorf("cannot load checkpoint %d: %w", latestCheckpoint, err)
+		}
+		err = checkpointFn(storedNodes, storedTris)
+		if err != nil {
+			return fmt.Errorf("error while handling checkpoint: %w", err)
+		}
+		loadedCheckpoint = true
+	}
+
+	if loadedCheckpoint && to == latestCheckpoint {
+		return nil
+	}
+
+	startSegment := from
+	if loadedCheckpoint {
+		startSegment = latestCheckpoint
+	}
+
+	sr, err := prometheusWAL.NewSegmentsRangeReader(prometheusWAL.SegmentRange{
+		Dir:   w.wal.Dir(),
+		First: startSegment,
+		Last:  to,
+	})
 	if err != nil {
 		return fmt.Errorf("cannot create segment reader: %w", err)
 	}
 
 	reader := prometheusWAL.NewReader(sr)
 
+	defer sr.Close()
+
 	for reader.Next() {
 		record := reader.Record()
 		operation, commitment, keys, values, err := Decode(record)
 		if err != nil {
-			return fmt.Errorf("cannot decode WAL record: %w", err)
+			return fmt.Errorf("cannot decode LedgerWAL record: %w", err)
 		}
 
 		switch operation {
 		case WALUpdate:
 			err = updateFn(commitment, keys, values)
 			if err != nil {
-				return fmt.Errorf("error while processing WAL update: %w", err)
+				return fmt.Errorf("error while processing LedgerWAL update: %w", err)
 			}
 		case WALDelete:
 			err = deleteFn(commitment)
 			if err != nil {
-				return fmt.Errorf("error while processing WAL deletion: %w", err)
+				return fmt.Errorf("error while processing LedgerWAL deletion: %w", err)
 			}
 		}
 
 		err = reader.Err()
 		if err != nil {
-			return fmt.Errorf("cannot read WAL: %w", err)
+			return fmt.Errorf("cannot read LedgerWAL: %w", err)
 		}
 	}
 	return nil
 }
 
-func (w *WAL) Close() error {
+func (w *LedgerWAL) Checkpointer() (*Checkpointer, error) {
+	return NewCheckpointer(w, w.maxHeight, w.cacheSize), nil
+}
+
+func (w *LedgerWAL) Close() error {
 	return w.wal.Close()
 }

@@ -18,7 +18,7 @@ const (
 
 // HotstuffCollector implements only the metrics emitted by the HotStuff core logic.
 // We have multiple instances of HotStuff running within Flow: Consensus Nodes form
-// the main consensus committee. In addition each Collector Node cluster runs their
+// the main consensus committee. In addition each Collector node cluster runs their
 // own HotStuff instance. Depending on the node role, the name space is different. Furthermore,
 // even within the `collection` name space, we need to separate metrics between the different
 // clusters. We do this by adding the label `committeeID` to the HotStuff metrics and

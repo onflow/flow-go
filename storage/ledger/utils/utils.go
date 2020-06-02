@@ -69,10 +69,13 @@ func GetRandomKeysFixedN(n int, byteSize int) [][]byte {
 	return keys
 }
 
-func GetRandomValues(n int, maxByteSize int) [][]byte {
+func GetRandomValues(n int, minByteSize, maxByteSize int) [][]byte {
 	values := make([][]byte, 0)
 	for i := 0; i < n; i++ {
-		byteSize := rand.Intn(maxByteSize)
+		var byteSize = maxByteSize
+		if minByteSize < maxByteSize {
+			byteSize = minByteSize + rand.Intn(maxByteSize-minByteSize)
+		}
 		value := make([]byte, byteSize)
 		rand.Read(value)
 		values = append(values, value)

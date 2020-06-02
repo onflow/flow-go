@@ -54,7 +54,7 @@ func StorageBenchmark() {
 		fmt.Println("Step: ", i)
 
 		keys := utils.GetRandomKeysFixedN(numInsPerStep, keyByteSize)
-		values := utils.GetRandomValues(len(keys), valueMaxByteSize)
+		values := utils.GetRandomValues(len(keys), 0, valueMaxByteSize)
 
 		start := time.Now()
 		newState, err := led.UpdateRegisters(keys, values, stateCommitment)

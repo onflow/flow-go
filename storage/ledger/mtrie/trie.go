@@ -12,18 +12,18 @@ import (
 
 // MTrie is a fully in memory trie with option to persist to disk
 type MTrie struct {
-	root           *node
-	number         uint64
-	maxHeight      int
-	values         map[string][]byte
+	root      *node
+	number    uint64
+	maxHeight int
+	//values         map[string][]byte
 	rootHash       []byte
 	parentRootHash []byte
 }
 
 // NewMTrie returns the same root
 func NewMTrie(maxHeight int) *MTrie {
-	return &MTrie{root: newNode(maxHeight - 1),
-		values:    make(map[string][]byte),
+	return &MTrie{root: NewNode(maxHeight - 1),
+		//values:    make(map[string][]byte),
 		maxHeight: maxHeight}
 }
 
@@ -238,7 +238,7 @@ func (mt *MTrie) load(n *node, level int, keys [][]byte, values [][]byte) error 
 		return err
 	}
 	if len(lkeys) > 0 {
-		n.lChild = newNode(n.height - 1)
+		n.lChild = NewNode(n.height - 1)
 		err := mt.load(n.lChild, level+1, lkeys, lvalues)
 		if err != nil {
 			return err
@@ -246,11 +246,15 @@ func (mt *MTrie) load(n *node, level int, keys [][]byte, values [][]byte) error 
 	}
 
 	if len(rkeys) > 0 {
-		n.rChild = newNode(n.height - 1)
+		n.rChild = NewNode(n.height - 1)
 		err := mt.load(n.rChild, level+1, rkeys, rvalues)
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func (mt *MTrie) GetNodes() []*node {
+	return mt.root.GetNodes()
 }

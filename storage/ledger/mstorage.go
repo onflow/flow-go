@@ -14,20 +14,22 @@ import (
 
 type MTrieStorage struct {
 	mForest *mtrie.MForest
-	wal     *wal.WAL
+	wal     *wal.LedgerWAL
 	metrics module.LedgerMetrics
 }
+
+var maxHeight = 257
 
 // NewMTrieStorage creates a new in-memory trie-backed ledger storage with persistence.
 func NewMTrieStorage(dbDir string, cacheSize int, metrics module.LedgerMetrics, reg prometheus.Registerer) (*MTrieStorage, error) {
 
-	w, err := wal.NewWAL(nil, reg, dbDir)
+	w, err := wal.NewWAL(nil, reg, dbDir, cacheSize, maxHeight)
 
 	if err != nil {
-		return nil, fmt.Errorf("cannot create WAL: %w", err)
+		return nil, fmt.Errorf("cannot create LedgerWAL: %w", err)
 	}
 
-	mForest, err := mtrie.NewMForest(257, dbDir, cacheSize, metrics, func(evictedTrie *mtrie.MTrie) error {
+	mForest, err := mtrie.NewMForest(maxHeight, dbDir, cacheSize, metrics, func(evictedTrie *mtrie.MTrie) error {
 		return w.RecordDelete(evictedTrie.RootHash())
 	})
 	if err != nil {
@@ -40,6 +42,9 @@ func NewMTrieStorage(dbDir string, cacheSize int, metrics module.LedgerMetrics, 
 	}
 
 	err = w.Replay(
+		func(storableNodes []*mtrie.StorableNode, storableTries []*mtrie.StorableTrie) error {
+			return trie.mForest.LoadStorables(storableNodes, storableTries)
+		},
 		func(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
 			_, err = trie.mForest.Update(keys, values, stateCommitment)
 			// _, err := trie.UpdateRegisters(keys, values, stateCommitment)
@@ -52,7 +57,7 @@ func NewMTrieStorage(dbDir string, cacheSize int, metrics module.LedgerMetrics, 
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("cannot restore WAL: %w", err)
+		return nil, fmt.Errorf("cannot restore LedgerWAL: %w", err)
 	}
 
 	// TODO update to proper value once https://github.com/dapperlabs/flow-go/pull/3720 is merged
@@ -137,7 +142,7 @@ func (f *MTrieStorage) UpdateRegisters(
 
 	err = f.wal.RecordUpdate(stateCommitment, ids, values)
 	if err != nil {
-		return nil, fmt.Errorf("cannot update state, error while writing WAL: %w", err)
+		return nil, fmt.Errorf("cannot update state, error while writing LedgerWAL: %w", err)
 	}
 
 	newStateCommitment, err = f.mForest.Update(ids, values, stateCommitment)

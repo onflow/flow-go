@@ -16,8 +16,8 @@ type node struct {
 	hashValue []byte
 }
 
-// newNode creates a new node with the provided value and no children
-func newNode(height int) *node {
+// NewNode creates a new node with the provided value and no children
+func NewNode(height int) *node {
 	return &node{
 		lChild:    nil,
 		rChild:    nil,
@@ -115,4 +115,24 @@ func (n *node) Equals(o *node) bool {
 	}
 
 	return true
+}
+
+func (n *node) GetNodes() []*node {
+	nodes := make([]*node, 1)
+	nodes = append(nodes, n)
+	if n.lChild != nil {
+		nodes = append(nodes, n.lChild.GetNodes()...)
+	}
+	if n.rChild != nil {
+		nodes = append(nodes, n.rChild.GetNodes()...)
+	}
+	return nodes
+}
+
+func (n *node) GetLeft() *node {
+	return n.lChild
+}
+
+func (n *node) GetRight() *node {
+	return n.rChild
 }
