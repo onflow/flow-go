@@ -33,14 +33,16 @@ func New(
 	match network.Engine,
 	receipts mempool.Receipts,
 	headerStorage storage.Headers,
+	processedResults mempool.Identifiers,
 ) (*Engine, error) {
 	e := &Engine{
-		unit:          engine.NewUnit(),
-		log:           log.With().Str("engine", "finder").Logger(),
-		me:            me,
-		match:         match,
-		headerStorage: headerStorage,
-		receipts:      receipts,
+		unit:            engine.NewUnit(),
+		log:             log.With().Str("engine", "finder").Logger(),
+		me:              me,
+		match:           match,
+		headerStorage:   headerStorage,
+		receipts:        receipts,
+		processedResult: processedResults,
 	}
 
 	_, err := net.Register(engine.ExecutionReceiptProvider, e)
@@ -213,10 +215,12 @@ func (e *Engine) onResultProcessed(resultID flow.Identifier) {
 	for _, receipt := range e.receipts.All() {
 		if receipt.ExecutionResult.ID() == resultID {
 			receiptID := receipt.ID()
-			e.receipts.Rem(receiptID)
-			log.Debug().
-				Hex("receipt_id", logging.ID(receiptID)).
-				Msg("processed result cleaned up")
+			removed := e.receipts.Rem(receiptID)
+			if removed {
+				log.Debug().
+					Hex("receipt_id", logging.ID(receiptID)).
+					Msg("processed result cleaned up")
+			}
 		}
 	}
 }

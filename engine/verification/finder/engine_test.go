@@ -31,6 +31,8 @@ type FinderEngineTestSuite struct {
 	// mock mempool for receipts
 	receipts *mempool.Receipts
 
+	// mock mempool for processed result IDs
+	processedResults *mempool.Identifiers
 	// mock mempool for header storage of blocks
 	headerStorage *storage.Headers
 	// resources fixtures
@@ -62,6 +64,8 @@ func (suite *FinderEngineTestSuite) SetupTest() {
 	suite.me = &module.Local{}
 	suite.headerStorage = &storage.Headers{}
 	suite.receipts = &mempool.Receipts{}
+	suite.processedResults = &mempool.Identifiers{}
+	suite.matchEng = &network.Engine{}
 
 	// generates an execution result with a single collection, chunk, and transaction.
 	completeER := utils.LightExecutionResultFixture(1)
@@ -92,7 +96,8 @@ func (suite *FinderEngineTestSuite) TestNewFinderEngine() *finder.Engine {
 		suite.me,
 		suite.matchEng,
 		suite.receipts,
-		suite.headerStorage)
+		suite.headerStorage,
+		suite.processedResults)
 	require.Nil(suite.T(), err, "could not create finder engine")
 
 	suite.net.AssertExpectations(suite.T())
@@ -101,16 +106,37 @@ func (suite *FinderEngineTestSuite) TestNewFinderEngine() *finder.Engine {
 }
 
 // TestHandleReceipt_HappyPath evaluates that handling a receipt that is not duplicate,
-// and its result has not been processed yet ends by adding to receipt mempool.
+// and its result has not been processed yet ends by:
+// - sending its result to match engine.
+// - marking its result as processed.
+// - removing it from mempool.
 func (suite *FinderEngineTestSuite) TestHandleReceipt_HappyPath() {
 	e := suite.TestNewFinderEngine()
 
+	// mocks result has not yet processed
+	suite.processedResults.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
+
 	// mocks adding receipt to the receipts mempool
 	suite.receipts.On("Add", suite.receipt).Return(true).Once()
+
+	// mocks block associated with receipt
+	suite.headerStorage.On("ByBlockID", suite.block.ID()).Return(&flow.Header{}, nil).Once()
+
+	// mocks successful submission to match engine
+	suite.matchEng.On("ProcessLocal", &suite.receipt.ExecutionResult).Return(nil).Once()
+
+	// mocks marking receipt as processed
+	suite.processedResults.On("Add", suite.receipt.ExecutionResult.ID()).Return(true)
+
+	// mocks receipt clean up after result is processed
+	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt})
+	suite.receipts.On("Rem", suite.receipt.ID()).Return(true)
 
 	// sends receipt to finder engine
 	err := e.Process(suite.execIdentity.NodeID, suite.receipt)
 	require.NoError(suite.T(), err)
 
 	suite.receipts.AssertExpectations(suite.T())
+	suite.headerStorage.AssertExpectations(suite.T())
+	suite.matchEng.AssertExpectations(suite.T())
 }
