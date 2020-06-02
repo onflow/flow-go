@@ -1,10 +1,12 @@
 package finder
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
@@ -15,12 +17,13 @@ import (
 )
 
 type Engine struct {
-	unit          *engine.Unit
-	log           zerolog.Logger
-	me            module.Local
-	match         network.Engine
-	receipts      mempool.Receipts // used to keep the receipts as mempool
-	headerStorage storage.Headers  // used to check block existence before verifying
+	unit            *engine.Unit
+	log             zerolog.Logger
+	me              module.Local
+	match           network.Engine
+	receipts        mempool.Receipts    // used to keep the receipts as mempool
+	headerStorage   storage.Headers     // used to check block existence before verifying
+	processedResult mempool.Identifiers // used to keep track of the processed results
 }
 
 func New(
@@ -125,4 +128,64 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	log.Info().Msg("execution receipt successfully handled")
 
 	return nil
+}
+
+// To implement FinalizationConsumer
+func (e *Engine) OnBlockIncorporated(*model.Block) {
+
+}
+
+// OnFinalizedBlock is part of implementing FinalizationConsumer interface
+//
+// OnFinalizedBlock notifications are produced by the Finalization Logic whenever
+// a block has been finalized. They are emitted in the order the blocks are finalized.
+// Prerequisites:
+// Implementation must be concurrency safe; Non-blocking;
+// and must handle repetition of the same events (with some processing overhead).
+func (e *Engine) OnFinalizedBlock(block *model.Block) {
+
+	// block should be in the storage
+	_, err := e.headerStorage.ByBlockID(block.BlockID)
+	if errors.Is(err, storage.ErrNotFound) {
+		e.log.Error().
+			Hex("block_id", logging.ID(block.BlockID)).
+			Msg("block is not available in storage")
+		return
+	}
+	if err != nil {
+		e.log.Error().
+			Hex("block_id", logging.ID(block.BlockID)).
+			Msg("could not check block availability in storage")
+		return
+	}
+}
+
+// To implement FinalizationConsumer
+func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {}
+
+func (e *Engine) isProcessable(result *flow.ExecutionResult) bool {
+	// checks existence of block that result points to
+	_, err := e.headerStorage.ByBlockID(result.BlockID)
+	if err != nil {
+		return false
+	}
+
+	return true
+}
+
+// processResult submits the result to the match engine, and marks it
+// as processed.
+func (e *Engine) processResult(result *flow.ExecutionResult) error {
+	err := e.match.ProcessLocal(result)
+	if err != nil {
+		return fmt.Errorf("submission error to match engine: %w", err)
+	}
+
+	return nil
+}
+
+func (e *Engine) onNewBlock(blockID flow.Identifier) {
+	for _, receipt := range e.receipts.All() {
+
+	}
 }
