@@ -1,4 +1,4 @@
-package mtrie_test
+package proof_test
 
 import (
 	"io/ioutil"
