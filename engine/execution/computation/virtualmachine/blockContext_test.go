@@ -572,7 +572,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		ledger := execTestutil.RootBootstrappedLedger()
 
-		result, err := bc.ExecuteScript(ledger, script)
+		result, err := bc.ExecuteScript(ledger, script, nil)
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 	})
@@ -587,7 +587,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		ledger := execTestutil.RootBootstrappedLedger()
 
-		result, err := bc.ExecuteScript(ledger, script)
+		result, err := bc.ExecuteScript(ledger, script, nil)
 
 		assert.NoError(t, err)
 		assert.False(t, result.Succeeded())
@@ -605,7 +605,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		ledger := execTestutil.RootBootstrappedLedger()
 
-		result, err := bc.ExecuteScript(ledger, script)
+		result, err := bc.ExecuteScript(ledger, script, nil)
 		assert.NoError(t, err)
 
 		require.Len(t, result.Logs, 2)
@@ -728,7 +728,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		assert.PanicsWithValue(t, interpreter.ExternalError{
 			Recovered: logPanic{},
 		}, func() {
-			_, _ = bc.ExecuteScript(ledger, script)
+			_, _ = bc.ExecuteScript(ledger, script, nil)
 		})
 	})
 }
