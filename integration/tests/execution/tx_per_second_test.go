@@ -42,7 +42,7 @@ const (
 	// total test accounts to create
 	TotalAccounts = 10
 	// each account transfers token to the next account in a round. RoundsOfTransfer is the number of such rounds for each account
-	RoundsOfTransfer = 10
+	RoundsOfTransfer = 50
 )
 
 var (
@@ -79,6 +79,12 @@ func (gs *TransactionsPerSecondSuite) SetupTest() {
 	gs.metricsAddr = fmt.Sprintf("http://localhost:%s/metrics", gs.net.AccessPorts[testnet.ExeNodeMetricsPort])
 }
 
+// TestTransactionsPerSecond submits transactions and measures the average transaction per second of the execution node
+// It does following:
+// 1. Create new TotalAccounts number of accounts and transfers token to each account
+// 2. Transfers 10 tokens from one account the the other repeatedly RoundsOfTransfer times.
+// 3. While executing step 2, it samples the total execution metric from the execution node every 1 min
+// 4. Prints the instantaneous values and the average Transaction per second to output file
 func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 	gs.SetTokenAddresses()
 	gs.accounts = map[flowsdk.Address]*flowsdk.AccountKey{}
@@ -158,6 +164,10 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 	require.FileExists(gs.T(), resultFileName, "did not log TPS to file, may need to increase timeout")
 }
 
+// SetTokenAddresses sets the addresses for the Fungible token and the Flow token contract.
+// The function assumes that Fungible token contract and the Flow token contract are both deployed during execution node bootstrap
+// and since address generation is deterministic, the second and the third address are assumed to be that of Fungible
+// Token and Flow token
 func (gs *TransactionsPerSecondSuite) SetTokenAddresses() {
 	addressGen := flowsdk.NewAddressGenerator(flowsdk.Testnet)
 	_ = addressGen.NextAddress()
@@ -279,7 +289,7 @@ func logTPSToFile(startSec string, tps float64, resultFileName string) error {
 	if _, err := resultFile.WriteString(tpsStr); err != nil {
 		return err
 	}
-	fmt.Printf("Wrote Transactions Per Second %f to file: %s", tps, resultFileName)
+	fmt.Printf("Wrote Transactions Per Second %f to file: %s\n", tps, resultFileName)
 	return nil
 }
 
