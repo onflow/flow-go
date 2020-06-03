@@ -43,13 +43,9 @@ import (
 
 const notSet = "not set"
 
-// TODO: load token supply from bootstrap config
-const genesisTokenSupply = 0
-
 // BaseConfig is the general config for the FlowNodeBuilder
 type BaseConfig struct {
 	nodeIDHex        string
-	chainID          string
 	bindAddr         string
 	nodeRole         string
 	timeout          time.Duration
@@ -144,7 +140,6 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	datadir := filepath.Join(homedir, ".flow", "database")
 	// bind configuration parameters
 	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", notSet, "identity of our node")
-	fnb.flags.StringVar(&fnb.BaseConfig.chainID, "chainid", flow.Mainnet.String(), "chain ID to use for block generation")
 	fnb.flags.StringVar(&fnb.BaseConfig.bindAddr, "bind", notSet, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", "bootstrap", "path to the bootstrap directory")
 	fnb.flags.DurationVarP(&fnb.BaseConfig.timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
@@ -156,10 +151,6 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.profilerDir, "profiler-dir", "profiler", "directory to create auto-profiler profiles")
 	fnb.flags.DurationVar(&fnb.BaseConfig.profilerInterval, "profiler-interval", 15*time.Minute, "the interval between auto-profiler runs")
 	fnb.flags.DurationVar(&fnb.BaseConfig.profilerDuration, "profiler-duration", 10*time.Second, "the duration to run the auto-profile for")
-}
-
-func (fnb *FlowNodeBuilder) configureChainParams() {
-	flow.SetChainID(flow.ChainID(fnb.BaseConfig.chainID))
 }
 
 func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
@@ -263,13 +254,21 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 	fnb.MustNot(err).Msg("could not initialize tracer")
 	fnb.MetricsRegisterer = prometheus.DefaultRegisterer
 	fnb.Tracer = tracer
+
+	mempools := metrics.NewMempoolCollector(5 * time.Second)
+
 	fnb.Metrics = Metrics{
 		Network:    metrics.NewNetworkCollector(),
 		Engine:     metrics.NewEngineCollector(),
 		Compliance: metrics.NewComplianceCollector(),
 		Cache:      metrics.NewCacheCollector(flow.GetChainID()),
-		Mempool:    metrics.NewMempoolCollector(),
+		Mempool:    mempools,
 	}
+
+	// registers mempools as a Component so that its Ready method is invoked upon startup
+	fnb.Component("mempools metrics", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		return mempools, nil
+	})
 }
 
 func (fnb *FlowNodeBuilder) initProfiler() {
@@ -378,14 +377,19 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
 		}
 
+		flow.SetChainID(fnb.GenesisBlock.Header.ChainID)
+
 		// load genesis QC and DKG data from bootstrap files
 		fnb.GenesisQC, err = loadRootBlockQC(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
 		}
 
-		// TODO: load token supply from bootstrap config
-		fnb.GenesisTokenSupply = genesisTokenSupply
+		// load token supply from bootstrap config
+		fnb.GenesisTokenSupply, err = loadGenesisTokenSupply(fnb.BaseConfig.BootstrapDir)
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis token supply")
+		}
 
 		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
@@ -413,6 +417,8 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
 		}
 
+		flow.SetChainID(fnb.GenesisBlock.Header.ChainID)
+
 		// load genesis QC and DKG data from bootstrap files for recovery
 		fnb.GenesisQC, err = loadRootBlockQC(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
@@ -431,6 +437,14 @@ func (fnb *FlowNodeBuilder) initState() {
 
 	self, err := state.Final().Identity(myID)
 	fnb.MustNot(err).Msg("could not get identity")
+
+	// ensure that the configured staking/network keys are consistent with the protocol state
+	if !self.NetworkPubKey.Equals(fnb.networkKey.PublicKey()) {
+		fnb.Logger.Fatal().Msg("configured networking key does not match protocol state")
+	}
+	if !self.StakingPubKey.Equals(fnb.stakingKey.PublicKey()) {
+		fnb.Logger.Fatal().Msg("configured staking key does not match protocol state")
+	}
 
 	fnb.Me, err = local.New(self, fnb.stakingKey)
 	fnb.MustNot(err).Msg("could not initialize local")
@@ -552,8 +566,6 @@ func FlowNode(role string) *FlowNodeBuilder {
 	}
 
 	builder.baseFlags()
-
-	builder.configureChainParams()
 
 	builder.enqueueNetworkInit()
 
@@ -703,4 +715,14 @@ func loadPrivateNodeInfo(dir string, myID flow.Identifier) (*bootstrap.NodeInfoP
 	var info bootstrap.NodeInfoPriv
 	err = json.Unmarshal(data, &info)
 	return &info, err
+}
+
+func loadGenesisTokenSupply(dir string) (uint64, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisTokenSupply))
+	if err != nil {
+		return 0, err
+	}
+	var supply uint64
+	err = json.Unmarshal(data, &supply)
+	return supply, err
 }

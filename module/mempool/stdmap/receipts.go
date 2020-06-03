@@ -14,12 +14,10 @@ type Receipts struct {
 
 // NewReceipts creates a new memory pool for execution receipts.
 func NewReceipts(limit uint) (*Receipts, error) {
-
 	// create the receipts memory pool with the lookup maps
 	r := &Receipts{
 		Backend: NewBackend(WithLimit(limit)),
 	}
-
 	return r, nil
 }
 

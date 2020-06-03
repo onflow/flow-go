@@ -15,6 +15,7 @@ var (
 	PathGenesisClusterQC        = filepath.Join(DirnamePublicGenesis, "genesis-cluster-qc.%v.json")    // %v will be replaced by cluster ID
 	PathGenesisCommit           = filepath.Join(DirnamePublicGenesis, "genesis-commit.json")
 	PathGenesisQC               = filepath.Join(DirnamePublicGenesis, "genesis-qc.json")
+	PathGenesisTokenSupply      = filepath.Join(DirnamePublicGenesis, "genesis-token-supply.json")
 	PathServiceAccountPublicKey = filepath.Join(DirnamePublicGenesis, "service-account.pub.json")
 	PathNodeInfosPub            = filepath.Join(DirnamePublicGenesis, "node-infos.pub.json")
 	PathNodeInfoPub             = filepath.Join(DirnamePublicGenesis, "node-info.pub.%v.json") // %v will be replaced by NodeID

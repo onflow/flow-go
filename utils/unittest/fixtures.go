@@ -486,10 +486,10 @@ func WithAllRolesExcept(except ...flow.Role) func(*flow.Identity) {
 // CompleteIdentitySet takes a number of identities and completes the missing roles.
 func CompleteIdentitySet(identities ...*flow.Identity) flow.IdentityList {
 	required := map[flow.Role]struct{}{
-		flow.RoleCollection:   struct{}{},
-		flow.RoleConsensus:    struct{}{},
-		flow.RoleExecution:    struct{}{},
-		flow.RoleVerification: struct{}{},
+		flow.RoleCollection:   {},
+		flow.RoleConsensus:    {},
+		flow.RoleExecution:    {},
+		flow.RoleVerification: {},
 	}
 	for _, identity := range identities {
 		delete(required, identity.Role)
@@ -662,7 +662,7 @@ func ChunkDataPackFixture(identifier flow.Identifier) flow.ChunkDataPack {
 	return flow.ChunkDataPack{
 		ChunkID:         identifier,
 		StartState:      StateCommitmentFixture(),
-		RegisterTouches: []flow.RegisterTouch{flow.RegisterTouch{RegisterID: []byte{'1'}, Value: []byte{'a'}, Proof: []byte{'p'}}},
+		RegisterTouches: []flow.RegisterTouch{{RegisterID: []byte{'1'}, Value: []byte{'a'}, Proof: []byte{'p'}}},
 		CollectionID:    IdentifierFixture(),
 	}
 }

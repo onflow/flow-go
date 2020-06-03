@@ -40,7 +40,7 @@ func (s *Suite) AccessClient() *testnet.Client {
 	return client
 }
 
-func (s *ChunkDataPacksSuite) SetupTest() {
+func (s *Suite) SetupTest() {
 
 	// need one access node
 	acsConfig := testnet.NewNodeConfig(flow.RoleAccess)
@@ -93,6 +93,6 @@ func (s *ChunkDataPacksSuite) SetupTest() {
 }
 
 func (s *Suite) TearDownTest() {
-	gs.net.Remove()
-	gs.cancel()
+	s.net.Remove()
+	s.cancel()
 }

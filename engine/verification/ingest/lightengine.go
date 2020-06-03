@@ -77,7 +77,7 @@ func NewLightEngine(
 
 	e := &LightEngine{
 		unit:                  engine.NewUnit(),
-		log:                   log,
+		log:                   log.With().Str("engine", "ingest_light").Logger(),
 		state:                 state,
 		me:                    me,
 		verifierEng:           verifierEng,
@@ -216,7 +216,7 @@ func (l *LightEngine) handleExecutionReceipt(originID flow.Identifier, receipt *
 		l.log.Debug().
 			Hex("receipt_id", logging.ID(receiptID)).
 			Hex("result_id", logging.ID(resultID)).
-			Msg("could not ingest execution result with zero chunks")
+			Msg("skipping receipt for execution result with zero chunks")
 		return nil
 	}
 
@@ -353,8 +353,6 @@ func (l *LightEngine) handleChunkDataResponse(originID flow.Identifier, chunkDat
 			Msg("could not handle collection in chunk data pack")
 	}
 
-	l.checkPendingChunks(l.receipts.All())
-
 	return nil
 }
 
@@ -401,13 +399,7 @@ func (l *LightEngine) handleCollection(originID flow.Identifier, expectedRole fl
 		Hex("collection_id", logging.ID(collID)).
 		Msg("collection added to mempool, and tracker removed")
 
-	if expectedRole != flow.RoleExecution {
-		// collection coming from execution nodes means that it is part of
-		// chunk data response. Hence check pending chunk will be called
-		// by handleChunkDataResponse. Otherwise, the collection is handled
-		// separately and we should call checkPendingChunk
-		l.checkPendingChunks(l.receipts.All())
-	}
+	l.checkPendingChunks(l.receipts.All())
 
 	return nil
 }
@@ -442,6 +434,10 @@ func (l *LightEngine) requestChunkData(chunkID, blockID flow.Identifier) error {
 
 	// adds a tracker for this chunk
 	l.chunkDataPackTackers.Add(trackers.NewChunkDataPackTracker(chunkID, blockID))
+
+	l.log.Debug().
+		Hex("chunk_id", logging.ID(chunkID)).
+		Msg("chunk data pack requested from network, tracker registered")
 
 	return nil
 }

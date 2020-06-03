@@ -33,6 +33,7 @@ func genGenesisExecutionState(serviceAccountKey *flow.AccountPublicKey, genesisT
 	}
 	log.Info().Msgf("wrote execution state db to directory %v", dbPath)
 
+	writeJSON(bootstrap.PathGenesisTokenSupply, genesisTokenSupply)
 	writeJSON(bootstrap.PathGenesisCommit, stateCommitment)
 
 	return stateCommitment

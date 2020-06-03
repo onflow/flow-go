@@ -18,7 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-// Engine (verifier engine) verifies chunks, generates result approvals and raises challenges.
+// Engine (verifier engine) verifies chunks, generates result approvals or raises challenges.
 // as input it accepts verifiable chunks (chunk + all data needed) and perform verification by
 // constructing a partial trie, executing transactions and check the final state commitment and
 // other chunk meta data (e.g. tx count)
@@ -45,7 +45,7 @@ func New(
 
 	e := &Engine{
 		unit:    engine.NewUnit(),
-		log:     log,
+		log:     log.With().Str("engine", "verifier").Logger(),
 		metrics: metrics,
 		state:   state,
 		me:      me,
@@ -120,12 +120,13 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // initiating engine that the verification must be re-tried.
 func (e *Engine) verify(originID flow.Identifier, chunk *verification.VerifiableChunk) error {
 	// log it first
-	e.log.Info().
-		Timestamp().
+	log := e.log.With().Timestamp().
 		Hex("origin", logging.ID(originID)).
 		Uint64("chunk_index", chunk.ChunkIndex).
-		Hex("execution_receipt", logging.Entity(chunk.Receipt)).
-		Msg("verifiable chunk received by verifier engine")
+		Hex("execution_result_id", logging.Entity(chunk.Receipt.ExecutionResult)).
+		Logger()
+
+	log.Info().Msg("verifiable chunk received by verifier engine")
 
 	// only accept internal calls
 	if originID != e.me.NodeID() {
@@ -147,7 +148,7 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 	if !ok {
 		return fmt.Errorf("chunk out of range requested: %v", chunk.ChunkIndex)
 	}
-	chunkID := ch.ID()
+	log.With().Hex("chunk_id", logging.Entity(ch)).Logger()
 
 	// execute the assigned chunk
 	chFault, err := e.chVerif.Verify(chunk)
@@ -161,29 +162,12 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 	if chFault != nil {
 		switch chFault.(type) {
 		case *chmodels.CFMissingRegisterTouch:
-			// TODO raise challenge
-			e.log.Warn().
-				Timestamp().
-				Hex("origin", logging.ID(originID)).
-				Uint64("chunkIndex", chunk.ChunkIndex).
-				Hex("execution receipt", logging.Entity(chunk.Receipt)).
-				Msg(chFault.String())
 		case *chmodels.CFNonMatchingFinalState:
 			// TODO raise challenge
-			e.log.Warn().
-				Timestamp().
-				Hex("origin", logging.ID(originID)).
-				Uint64("chunkIndex", chunk.ChunkIndex).
-				Hex("execution receipt", logging.Entity(chunk.Receipt)).
-				Msg(chFault.String())
+			e.log.Warn().Msg(chFault.String())
 		case *chmodels.CFInvalidVerifiableChunk:
 			// TODO raise challenge
-			e.log.Error().
-				Timestamp().
-				Hex("origin", logging.ID(originID)).
-				Uint64("chunkIndex", chunk.ChunkIndex).
-				Hex("execution receipt", logging.Entity(chunk.Receipt)).
-				Msg(chFault.String())
+			e.log.Error().Msg(chFault.String())
 		default:
 			return fmt.Errorf("unknown type of chunk fault is recieved (type: %T) : %v", chFault, chFault.String())
 		}
@@ -192,7 +176,7 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 	}
 
 	// Generate result approval
-	approval, err := e.GenerateResultApproval(chunk.ChunkIndex, chunk.Receipt.ExecutionResult.ID(), chunk.Block.ID())
+	approval, err := e.GenerateResultApproval(chunk.ChunkIndex, chunk.Receipt.ExecutionResult.ID(), chunk.Block.Header.ID())
 	if err != nil {
 		return fmt.Errorf("couldn't generate a result approval: %w", err)
 	}
@@ -203,12 +187,7 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 		// TODO this error needs more advance handling after MVP
 		return fmt.Errorf("could not submit result approval: %w", err)
 	}
-	e.log.Info().
-		Timestamp().
-		Hex("chunk_id", logging.ID(chunkID)).
-		Uint64("chunk_index", chunk.ChunkIndex).
-		Hex("execution_receipt", logging.Entity(chunk.Receipt)).
-		Msg("result approval submitted")
+	log.Info().Msg("result approval submitted")
 	// tracks number of emitted result approvals for this block
 	e.metrics.OnResultApproval()
 

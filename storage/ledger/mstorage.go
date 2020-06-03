@@ -9,9 +9,22 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/wal"
 )
 
+// MTrieStorage is a fast memory-efficient fork-aware thread-safe trie-based key/value storage.
+// MTrieStorage holds an array of registers (key value pairs) and keep tracks of changes over a limited time.
+// Each register is referenced by an ID (key) and holds a value (byte slice).
+// MTrieStorage provides atomic batched update and read (with or without proofs) operation given a list of keys.
+// Every update to the MTrieStorage creates a new state commitment which captures the state of the storage.
+// Under the hood, it uses binary merkle tries to generate inclusion and noninclusion proofs.
+// MTrieStorage is fork-aware that means any update can applied at any previous statecommitments which forms a tree of tries (forest).
+// The forrest is in memory but all changes (e.g. register updates) are captured inside write-ahead-logs for crash recovery reasons.
+// In order to limit the memory usage and maintain the performance storage only keeps limited number of
+// tries and purge the old ones (LRU-based); in other words MTrieStorage is not designed to be used
+// for archival use but make it possible for other software components to reconstruct very old tries using write-ahead logs.
 type MTrieStorage struct {
 	mForest *mtrie.MForest
 	wal     *wal.LedgerWAL
@@ -29,7 +42,7 @@ func NewMTrieStorage(dbDir string, cacheSize int, metrics module.LedgerMetrics, 
 		return nil, fmt.Errorf("cannot create LedgerWAL: %w", err)
 	}
 
-	mForest, err := mtrie.NewMForest(maxHeight, dbDir, cacheSize, metrics, func(evictedTrie *mtrie.MTrie) error {
+	mForest, err := mtrie.NewMForest(maxHeight, dbDir, cacheSize, metrics, func(evictedTrie *trie.MTrie) error {
 		return w.RecordDelete(evictedTrie.RootHash())
 	})
 	if err != nil {
@@ -46,7 +59,7 @@ func NewMTrieStorage(dbDir string, cacheSize int, metrics module.LedgerMetrics, 
 			return trie.mForest.LoadStorables(storableNodes, storableTries)
 		},
 		func(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
-			_, err = trie.mForest.Update(keys, values, stateCommitment)
+			_, err = trie.mForest.Update(stateCommitment, keys, values)
 			// _, err := trie.UpdateRegisters(keys, values, stateCommitment)
 			return err
 		},
@@ -66,12 +79,16 @@ func NewMTrieStorage(dbDir string, cacheSize int, metrics module.LedgerMetrics, 
 	return trie, nil
 }
 
+// Ready implements interface module.ReadyDoneAware
+// it starts the EventLoop's internal processing loop.
 func (f *MTrieStorage) Ready() <-chan struct{} {
 	ready := make(chan struct{})
 	close(ready)
 	return ready
 }
 
+// Done implements interface module.ReadyDoneAware
+// it closes all the open write-ahead log files.
 func (f *MTrieStorage) Done() <-chan struct{} {
 	_ = f.wal.Close()
 	done := make(chan struct{})
@@ -79,13 +96,13 @@ func (f *MTrieStorage) Done() <-chan struct{} {
 	return done
 }
 
+// EmptyStateCommitment returns the state commitment of an empty store (initial state)
 func (f *MTrieStorage) EmptyStateCommitment() flow.StateCommitment {
 	return f.mForest.GetEmptyRootHash()
-	// return trie.GetDefaultHashForHeight(f.tree.GetHeight() - 1)
 }
 
-// GetRegisters read the values at the given registers at the given flow.StateCommitment
-// This is trusted so no proof is generated
+// GetRegisters read the values of the given register IDs at the given state commitment
+// it returns the values in the same order as given registerIDs and errors (if any)
 func (f *MTrieStorage) GetRegisters(
 	registerIDs []flow.RegisterID,
 	stateCommitment flow.StateCommitment,
@@ -94,14 +111,10 @@ func (f *MTrieStorage) GetRegisters(
 	err error,
 ) {
 	start := time.Now()
-
-	values, err = f.mForest.Read(registerIDs, stateCommitment)
-	// values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
+	values, err = f.mForest.Read(stateCommitment, registerIDs)
 
 	f.metrics.ReadValuesNumber(uint64(len(registerIDs)))
-
 	readDuration := time.Since(start)
-
 	f.metrics.ReadDuration(readDuration)
 
 	if len(registerIDs) > 0 {
@@ -112,8 +125,8 @@ func (f *MTrieStorage) GetRegisters(
 	return values, err
 }
 
-// UpdateRegisters updates the values at the given registers
-// This is trusted so no proof is generated
+// UpdateRegisters updates the values by register ID given the state commitment
+// it returns a new state commitment (state after update) and errors (if any)
 func (f *MTrieStorage) UpdateRegisters(
 	ids []flow.RegisterID,
 	values []flow.RegisterValue,
@@ -145,8 +158,8 @@ func (f *MTrieStorage) UpdateRegisters(
 		return nil, fmt.Errorf("cannot update state, error while writing LedgerWAL: %w", err)
 	}
 
-	newStateCommitment, err = f.mForest.Update(ids, values, stateCommitment)
-	// newStateCommitment, err = f.tree.Update(ids, values, stateCommitment)
+	newTrie, err := f.mForest.Update(stateCommitment, ids, values)
+	newStateCommitment = newTrie.RootHash()
 	if err != nil {
 		return nil, fmt.Errorf("cannot update state: %w", err)
 	}
@@ -165,8 +178,8 @@ func (f *MTrieStorage) UpdateRegisters(
 	return newStateCommitment, nil
 }
 
-// GetRegistersWithProof read the values at the given registers at the given flow.StateCommitment
-// This is untrusted so a proof is generated
+// GetRegistersWithProof read the values at the given registers at the given state commitment
+// it returns values, inclusion proofs and errors (if any)
 func (f *MTrieStorage) GetRegistersWithProof(
 	registerIDs []flow.RegisterID,
 	stateCommitment flow.StateCommitment,
@@ -183,13 +196,13 @@ func (f *MTrieStorage) GetRegistersWithProof(
 		return nil, nil, fmt.Errorf("Could not get register values: %w", err)
 	}
 
-	batchProof, err := f.mForest.Proofs(registerIDs, stateCommitment)
+	batchProof, err := f.mForest.Proofs(stateCommitment, registerIDs)
 	// batchProof, err := f.tree.GetBatchProof(registerIDs, stateCommitment)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Could not get proofs: %w", err)
 	}
 
-	proofToGo, totalProofLength := mtrie.EncodeBatchProof(batchProof)
+	proofToGo, totalProofLength := proof.EncodeBatchProof(batchProof)
 
 	if len(proofToGo) > 0 {
 		f.metrics.ProofSize(uint32(totalProofLength / len(proofToGo)))
@@ -198,6 +211,8 @@ func (f *MTrieStorage) GetRegistersWithProof(
 	return values, proofToGo, err
 }
 
+// GetRegisterTouches reads values and proofs for the given registers and
+// returns an slice of register touches
 func (f *MTrieStorage) GetRegisterTouches(
 	registerIDs []flow.RegisterID,
 	stateCommitment flow.StateCommitment,
@@ -221,8 +236,8 @@ func (f *MTrieStorage) GetRegisterTouches(
 	return rets, nil
 }
 
-// UpdateRegistersWithProof updates the values at the given registers
-// This is untrusted so a proof is generated
+// UpdateRegistersWithProof updates the values at the given registers and
+// provides proof for those registers after update
 func (f *MTrieStorage) UpdateRegistersWithProof(
 	ids []flow.RegisterID,
 	values []flow.RegisterValue,
@@ -246,10 +261,12 @@ func (f *MTrieStorage) CloseStorage() {
 	_ = f.wal.Close()
 }
 
+// DiskSize returns the amount of disk space used by the storage (in bytes)
 func (f *MTrieStorage) DiskSize() (int64, error) {
 	return f.mForest.DiskSize()
 }
 
+// ForestSize returns the number of tries stored in the forest
 func (f *MTrieStorage) ForestSize() int {
 	return f.mForest.Size()
 }

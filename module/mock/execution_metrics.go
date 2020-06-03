@@ -12,6 +12,16 @@ type ExecutionMetrics struct {
 	mock.Mock
 }
 
+// ExecutionCollectionRequestRetried provides a mock function with given fields:
+func (_m *ExecutionMetrics) ExecutionCollectionRequestRetried() {
+	_m.Called()
+}
+
+// ExecutionCollectionRequestSent provides a mock function with given fields:
+func (_m *ExecutionMetrics) ExecutionCollectionRequestSent() {
+	_m.Called()
+}
+
 // ExecutionGasUsedPerBlock provides a mock function with given fields: gas
 func (_m *ExecutionMetrics) ExecutionGasUsedPerBlock(gas uint64) {
 	_m.Called(gas)

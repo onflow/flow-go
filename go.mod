@@ -10,7 +10,6 @@ require (
 	github.com/dapperlabs/flow-go/crypto v0.3.2-0.20200312195452-df4550a863b7
 	github.com/dgraph-io/badger/v2 v2.0.2
 	github.com/ethereum/go-ethereum v1.9.9
-	github.com/gammazero/deque v0.0.0-20200310222745-50fa758af896
 	github.com/go-kit/kit v0.9.0
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/mock v1.4.3
@@ -26,8 +25,8 @@ require (
 	github.com/libp2p/go-libp2p-transport-upgrader v0.1.1
 	github.com/libp2p/go-tcp-transport v0.1.1
 	github.com/multiformats/go-multiaddr v0.2.0
-	github.com/onflow/cadence v0.4.0-beta1
-	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200526000504-c8bea9c16771
+	github.com/onflow/cadence v0.4.0
+	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200601215056-34a11def1d6b
 	github.com/onsi/ginkgo v1.10.1 // indirect
 	github.com/onsi/gomega v1.7.0 // indirect
 	github.com/opentracing/opentracing-go v1.1.0
@@ -39,7 +38,6 @@ require (
 	github.com/spf13/pflag v1.0.3
 	github.com/spf13/viper v1.4.0
 	github.com/stretchr/testify v1.5.1
-	github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
 	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
@@ -48,6 +46,7 @@ require (
 	go.uber.org/atomic v1.5.1
 	golang.org/x/crypto v0.0.0-20200423211502-4bdfaf469ed5
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
+	golang.org/x/tools v0.0.0-20200323144430-8dcfad9e016e // indirect
 	google.golang.org/api v0.18.0
 	google.golang.org/grpc v1.28.0
 	gotest.tools v2.2.0+incompatible

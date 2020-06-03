@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
+	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -136,7 +137,7 @@ func CreateAccounts(
 	ledger virtualmachine.Ledger,
 	privateKeys []flow.AccountPrivateKey,
 ) ([]flow.Address, error) {
-	ctx := vm.NewBlockContext(nil)
+	ctx := vm.NewBlockContext(nil, new(storage.Blocks))
 
 	var accounts []flow.Address
 
@@ -160,7 +161,7 @@ func CreateAccounts(
 			AddArgument(encCadAccountKey).
 			AddAuthorizer(flow.ServiceAddress())
 
-		result, err := ctx.ExecuteTransaction(ledger, tx, virtualmachine.SkipVerification)
+		result, err := ctx.ExecuteTransaction(ledger, tx, virtualmachine.WithSignatureVerification(false))
 		if err != nil {
 			return nil, err
 		}
@@ -212,13 +213,13 @@ func CreateAccountCreationTransaction(t *testing.T) (flow.AccountPrivateKey, *fl
 	require.NoError(t, err)
 
 	// define the cadence script
-	script := fmt.Sprintf(`	
-		transaction {	
-		  prepare(signer: AuthAccount) {	
-			let acct = AuthAccount(payer: signer)	
-			acct.addPublicKey("%s".decodeHex())	
-		  }	
-		}	
+	script := fmt.Sprintf(`
+		transaction {
+		  prepare(signer: AuthAccount) {
+			let acct = AuthAccount(payer: signer)
+			acct.addPublicKey("%s".decodeHex())
+		  }
+		}
 	`, hex.EncodeToString(keyBytes))
 
 	// create the transaction to create the account
