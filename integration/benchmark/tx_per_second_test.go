@@ -41,7 +41,7 @@ const (
 const (
 	// total test accounts to create
 	TotalAccounts = 10
-	// each account transfers token to the next account in a round. RoundsOfTransfer is the number of such rounds for each account
+	// each account transfers 10 tokens to the next account RoundsOfTransfer number of times
 	RoundsOfTransfer = 50
 )
 
@@ -121,25 +121,7 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 		gs.accounts[addr] = key
 	}
 
-	// Grab metrics to get base line for calculating TPS
-	resp, err := http.Get(gs.metricsAddr)
-	require.NoError(gs.T(), err, "could not get metrics")
-	startNum := 0
-	startTime := time.Now()
-
-	scanner := bufio.NewScanner(resp.Body)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "execution_runtime_total_executed_transactions") {
-			startNum, err = strconv.Atoi(strings.Split(line, " ")[1])
-			require.NoError(gs.T(), err, "could not get metrics")
-		}
-	}
-	err = scanner.Err()
-	require.NoError(gs.T(), err, "could not get metrics")
-	resp.Body.Close()
-
-	// Transfering Tokens
+	// Transferring Tokens
 	transferWG := sync.WaitGroup{}
 	prevAddr := flowTokenAddress
 	finalizedBlock, err = flowClient.GetLatestBlockHeader(context.Background(), false)
@@ -164,17 +146,17 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 	done := make(chan struct{})
 	go gs.sampleTotalExecutedTransactionMetric(resultFileName, done) // kick of the sampler
 
+	// wait for all transfer rounds to finish
 	transferWG.Wait()
 
 	close(done) // stop the sampler
 	require.FileExists(gs.T(), resultFileName, "did not log TPS to file, may need to increase timeout")
 }
 
-// SetTokenAddresses sets the addresses for the Fungible token and the Flow token contract.
+// SetTokenAddresses sets the addresses for the Fungible token and the Flow token contract that were bootstrapped as part of genesis state
 // The function assumes that Fungible token contract and the Flow token contract are both deployed during execution node bootstrap
 // and since address generation is deterministic, the second and the third address are assumed to be that of Fungible
 // Token and Flow token
-// SetTokenAddresses Sets the token addresses that were bootstrapped as part of genesis state
 func (gs *TransactionsPerSecondSuite) SetTokenAddresses() {
 	addressGen := flowsdk.NewAddressGenerator(flowsdk.Testnet)
 	_ = addressGen.NextAddress()
