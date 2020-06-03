@@ -366,7 +366,7 @@ func (f *MForest) Size() int {
 	return f.tries.Len()
 }
 
-// DiskSize returns the disk size of the directory used by the forest
+// DiskSize returns the disk size of the directory used by the forest (in bytes)
 func (f *MForest) DiskSize() (int64, error) {
 	return io.DirSize(f.dir)
 }
