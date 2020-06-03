@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/flow-go/integration/testnet"
+	"github.com/dapperlabs/flow-go/integration/tests/execution"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -56,7 +56,7 @@ func TestTransactionsPerSecondBenchmark(t *testing.T) {
 }
 
 type TransactionsPerSecondSuite struct {
-	Suite
+	execution.Suite
 	ref           *flowsdk.BlockHeader
 	accounts      map[flowsdk.Address]*flowsdk.AccountKey
 	privateKeys   map[string][]byte
@@ -74,9 +74,9 @@ func (gs *TransactionsPerSecondSuite) SetupTest() {
 	gs.Suite.SetupTest()
 
 	// Change these to corresponding values if using against non-local testnet
-	gs.accessAddr = fmt.Sprintf(":%s", gs.net.AccessPorts[testnet.AccessNodeAPIPort])
+	gs.accessAddr = fmt.Sprintf(":%s", gs.AccessPort())
 	gs.privateKeyHex = unittest.ServiceAccountPrivateKeyHexSDK
-	gs.metricsAddr = fmt.Sprintf("http://localhost:%s/metrics", gs.net.AccessPorts[testnet.ExeNodeMetricsPort])
+	gs.metricsAddr = fmt.Sprintf("http://localhost:%s/metrics", gs.MetricsPort())
 }
 
 func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
