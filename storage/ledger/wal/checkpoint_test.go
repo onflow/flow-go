@@ -19,8 +19,6 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-var dir = "./wal"
-
 func RunWithWALCheckpointerWithFiles(t *testing.T, names ...interface{}) {
 	f := names[len(names)-1].(func(*testing.T, *realWAL.LedgerWAL, *realWAL.Checkpointer))
 
@@ -320,7 +318,7 @@ func Test_Checkpointing(t *testing.T) {
 			registerValues5, err := f5.Read(keys2, []byte(stateCommitment))
 			require.NoError(t, err)
 
-			for i, _ := range keys2 {
+			for i := range keys2 {
 				require.Equal(t, values2[i], registerValues[i])
 				require.Equal(t, values2[i], registerValues5[i])
 			}

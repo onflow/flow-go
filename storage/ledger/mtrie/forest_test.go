@@ -882,6 +882,7 @@ func TestForestStoreAndLoad(t *testing.T) {
 	assert.Equal(t, *mForest, *newMForest)
 
 	retValues, err := mForest.Read(keys, rootHash)
+	require.NoError(t, err)
 	newRetValues, err := newMForest.Read(keys, rootHash)
 	require.NoError(t, err)
 	for i := range keys {

@@ -310,7 +310,7 @@ func ReadStorableNode(reader io.Reader) (*mtrie.StorableNode, error) {
 
 	storableNode.Height, pos = readUint16(buf, pos)
 	storableNode.LIndex, pos = readUint64(buf, pos)
-	storableNode.RIndex, pos = readUint64(buf, pos)
+	storableNode.RIndex, _ = readUint64(buf, pos)
 
 	storableNode.Key, err = readShortDataFromReader(reader)
 	if err != nil {
@@ -347,7 +347,7 @@ func EncodeStorableTrie(storableTrie *mtrie.StorableTrie) []byte {
 	pos = writeUint64(buf, pos, storableTrie.Number)
 	pos = writeUint64(buf, pos, storableTrie.RootIndex)
 	pos = writeShortData(buf, pos, storableTrie.RootHash)
-	pos = writeShortData(buf, pos, storableTrie.ParentRootHash)
+	writeShortData(buf, pos, storableTrie.ParentRootHash)
 
 	return buf
 }
@@ -370,7 +370,7 @@ func ReadStorableTrie(reader io.Reader) (*mtrie.StorableTrie, error) {
 
 	storableNode.MaxHeight, pos = readUint16(buf, pos)
 	storableNode.Number, pos = readUint64(buf, pos)
-	storableNode.RootIndex, pos = readUint64(buf, pos)
+	storableNode.RootIndex, _ = readUint64(buf, pos)
 
 	storableNode.RootHash, err = readShortDataFromReader(reader)
 	if err != nil {
