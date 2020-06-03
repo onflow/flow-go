@@ -24,7 +24,7 @@ func TestDeterministicKeyGen(t *testing.T) {
 	assert.True(t, sk1.Equals(sk2), "private keys should be equal")
 }
 
-// test the deterministicity of the relic PRG (used by the DKG polynimials)
+// test the deterministicity of the relic PRG (used by the DKG polynomials)
 func TestPRGseeding(t *testing.T) {
 	_ = newBLSBLS12381()
 	// 2 scalars generated with the same seed should be equal
@@ -36,14 +36,12 @@ func TestPRGseeding(t *testing.T) {
 	err = seedRelic(seed)
 	require.Nil(t, err)
 	var sk1 PrKeyBLSBLS12381
-	err = randZr(&sk1.scalar)
-	require.Nil(t, err)
+	randZr(&sk1.scalar)
 	// 2nd scalar (wrapped in a private key)
 	err = seedRelic(seed)
 	require.Nil(t, err)
 	var sk2 PrKeyBLSBLS12381
-	err = randZr(&sk2.scalar)
-	require.Nil(t, err)
+	randZr(&sk2.scalar)
 	// compare the 2 scalars (by comparing the private keys)
 	assert.True(t, sk1.Equals(&sk2), "private keys should be equal")
 }

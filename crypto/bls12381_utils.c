@@ -194,24 +194,32 @@ void ep_print_(char* s, ep_st* p) {
 void ep2_print_(char* s, ep2_st* p) {
     printf("[%s]:\n", s);
     g2_print(p);
-} 
+}
 
 // generates a random number less than the order r
-void bn_randZr(bn_t x) {
+void bn_randZr_star(bn_st* x) {
+    int seed_len = BITS_TO_BYTES(Fr_BITS + SEC_BITS);
+    byte* seed = (byte*) malloc(seed_len);
+    rand_bytes(seed, seed_len);
+    bn_map_to_Zr_star(x, seed, seed_len);
+}
+
+// generates a random number less than the order r
+void bn_randZr(bn_st* x) {
     bn_st r;
     bn_new(&r); 
     g2_get_ord(&r);
 
-    bn_new_size(x, bn_size_raw(&r));
-    if (x)
-        bn_rand_mod(x,&r);
+    bn_new_size(x, BITS_TO_DIGITS(Fr_BITS + SEC_BITS));
+    bn_rand(x, RLC_POS, Fr_BITS + SEC_BITS);
+    bn_mod(x, x, &r);
     bn_free(&r);
 }
 
 // reads a scalar from an array and maps it to Zr
 // the resulting scalar is in the range 0 < a < r
 // len must be less than BITS_TO_BYTES(RLC_BN_BITS)
-void bn_map_to_Zr(bn_st* a, const uint8_t* bin, int len) {
+void bn_map_to_Zr_star(bn_st* a, const uint8_t* bin, int len) {
     bn_st tmp;
     bn_new(&tmp);
     bn_new_size(&tmp, BYTES_TO_DIGITS(len));

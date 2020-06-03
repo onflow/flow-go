@@ -20,6 +20,7 @@ typedef uint8_t byte;
 #define MIN(a,b) ((a)>(b)?(b):(a))
 
 // Fields and Group serialization lengths
+#define SEC_BITS  128
 #define Fp_BITS   381
 #define Fr_BITS   255
 #define Fp_BYTES  BITS_TO_BYTES(Fp_BITS)
@@ -76,7 +77,8 @@ void     ep_mult(ep_st*, const ep_st*, const bn_st*);
 void     ep2_mult_gen(ep2_st*, const bn_st*);
 
 void     bn_randZr(bn_t);
-void     bn_map_to_Zr(bn_st*, const uint8_t*, int);
+void     bn_randZr_star(bn_t);
+void     bn_map_to_Zr_star(bn_st*, const uint8_t*, int);
 
 // Debugging related functions
 void     bytes_print_(char*, byte*, int);
