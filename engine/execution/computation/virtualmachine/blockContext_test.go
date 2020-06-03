@@ -577,6 +577,39 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 		assert.True(t, result.Succeeded())
 	})
 
+	t.Run("script with arguments success", func(t *testing.T) {
+		script := []byte(`
+			pub fun main(val: Int): Int {
+				return val
+			}
+		`)
+
+		ledger := execTestutil.RootBootstrappedLedger()
+		arg1, _ := jsoncdc.Encode(cadence.NewInt(42))
+
+		result, err := bc.ExecuteScript(ledger, script, [][]byte{arg1})
+		assert.NoError(t, err)
+		assert.True(t, result.Succeeded())
+	})
+
+	t.Run("script with multiple arguments success", func(t *testing.T) {
+		script := []byte(`
+			pub fun main(a: Int, b: Int): Int {
+				log(a + b)
+				return a + b
+			}
+		`)
+
+		ledger := execTestutil.RootBootstrappedLedger()
+		arg1, _ := jsoncdc.Encode(cadence.NewInt(10))
+		arg2, _ := jsoncdc.Encode(cadence.NewInt(5))
+
+		result, err := bc.ExecuteScript(ledger, script, [][]byte{arg1, arg2})
+		assert.NoError(t, err)
+		assert.True(t, result.Succeeded())
+		assert.Equal(t, result.Logs[0], "15")
+	})
+
 	t.Run("script failure", func(t *testing.T) {
 		script := []byte(`
 			pub fun main(): Int {
@@ -678,7 +711,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		ledger := execTestutil.RootBootstrappedLedger()
 		require.NoError(t, err)
 
-		result, err := bc.ExecuteScript(ledger, script)
+		result, err := bc.ExecuteScript(ledger, script, nil)
 		assert.NoError(t, err)
 
 		assert.True(t, result.Succeeded())
