@@ -1,6 +1,7 @@
 package finder_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -181,5 +182,37 @@ func (suite *FinderEngineTestSuite) TestHandleReceipt_Processed() {
 	// should not be any attempt on storing receipt in mempools
 	suite.receipts.AssertNotCalled(suite.T(), "Add", suite.receipt)
 
+	suite.processedResults.AssertExpectations(suite.T())
+}
+
+// TestHandleReceipt_BlockMissing evaluates that handling a receipt that its
+// corresponding block is not available yet results in:
+// - storing receipt in receipts mempool
+// - no invocation of match engine
+// - no attempt on marking its result as processed
+func (suite *FinderEngineTestSuite) TestHandleReceipt_BlockMissing() {
+	e := suite.TestNewFinderEngine()
+
+	// mocks result has not yet processed
+	suite.processedResults.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
+
+	// mocks adding receipt to the receipts mempool
+	suite.receipts.On("Add", suite.receipt).Return(true).Once()
+
+	// mocks block associated with receipt missing
+	suite.headerStorage.On("ByBlockID", suite.block.ID()).Return(nil, fmt.Errorf("block not available")).Once()
+
+	// should not be any attempt on sending result to match engine
+	suite.matchEng.AssertNotCalled(suite.T(), "ProcessLocal", suite.receipt.ExecutionResult)
+
+	// should not be any attempt on marking receipt as processed
+	suite.processedResults.AssertNotCalled(suite.T(), "Add", suite.receipt)
+
+	// sends receipt to finder engine
+	err := e.Process(suite.execIdentity.NodeID, suite.receipt)
+	require.NoError(suite.T(), err)
+
+	suite.receipts.AssertExpectations(suite.T())
+	suite.headerStorage.AssertExpectations(suite.T())
 	suite.processedResults.AssertExpectations(suite.T())
 }
