@@ -370,38 +370,23 @@ func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resul
 	var instantaneous []float64   // a slice to store instantaneous values
 	totalExecutedTx := 0          // cumulative count of total transactions
 
-	sample := func(startTime, endTime time.Time) {
-		// Grab metrics to get base line for calculating TPS
+	sample := func() int {
+		var txCount int
 		resp, err := http.Get(gs.metricsAddr)
 		require.NoError(gs.T(), err, "could not get metrics")
-		newTotal := 0
-		endTime = time.Now()
 		defer resp.Body.Close()
-
 		scanner := bufio.NewScanner(resp.Body)
 		for scanner.Scan() {
 			line := scanner.Text()
 			if strings.HasPrefix(line, "execution_runtime_total_executed_transactions") {
-				newTotal, err = strconv.Atoi(strings.Split(line, " ")[1])
+				txCount, err = strconv.Atoi(strings.Split(line, " ")[1])
 				require.NoError(gs.T(), err, "could not get metrics")
+				return txCount
 			}
 		}
 		err = scanner.Err()
-		require.NoError(gs.T(), err, "could not get metrics")
-
-		dur := endTime.Sub(startTime)
-		tps := float64(newTotal-totalExecutedTx) / dur.Seconds()
-
-		startStr := startTime.Format("3:04:04 PM")
-		fmt.Printf("TPS ===========> %s: %f\n", startStr, tps)
-
-		instantaneous = append(instantaneous, tps)
-
-		err = logTPSToFile(fmt.Sprintf("%s: %f", startStr, tps), resultFileName)
-		require.NoErrorf(gs.T(), err, "failed to write instantaneous tps to file")
-
-		// reset
-		totalExecutedTx = newTotal
+		require.Failf(gs.T(), "could not get metrics: %w", "%w", err)
+		return 0
 	}
 
 	avg := func() {
@@ -419,6 +404,8 @@ func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resul
 	// sample every 1 minute
 	minTicker := time.NewTicker(sampleTime)
 	startTime := time.Now()
+	totalExecutedTx = sample() // baseline the executed tx count
+
 	for {
 		select {
 		case <-done:
@@ -427,7 +414,20 @@ func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resul
 			return
 		case <-minTicker.C:
 			endTime := time.Now()
-			sample(startTime, endTime)
+			newTotal := sample()
+			dur := endTime.Sub(startTime)
+			tps := float64(newTotal-totalExecutedTx) / dur.Seconds()
+
+			startStr := startTime.Format("3:04:04 PM")
+			fmt.Printf("TPS ===========> %s: %f\n", startStr, tps)
+
+			instantaneous = append(instantaneous, tps)
+
+			err := logTPSToFile(fmt.Sprintf("%s: %f", startStr, tps), resultFileName)
+			require.NoErrorf(gs.T(), err, "failed to write instantaneous tps to file")
+
+			// reset
+			totalExecutedTx = newTotal
 			startTime = endTime
 		}
 	}
