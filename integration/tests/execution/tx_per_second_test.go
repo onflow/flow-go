@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -26,27 +27,22 @@ import (
 )
 
 const (
-	FungibleTokenContractsBaseURL = "https://raw.githubusercontent.com/onflow/flow-ft/master/src/contracts/"
-
-	CustodialDeposit = "CustodialDeposit.cdc"
-	FlowToken        = "FlowToken.cdc"
-	FungibleToken    = "FungibleToken.cdc"
-	TokenForwarding  = "TokenForwarding.cdc"
-)
-
-const (
 	// More transactions listed here: https://github.com/onflow/flow-ft/tree/master/transactions
 	FungibleTokenTransactionsBaseURL = "https://raw.githubusercontent.com/onflow/flow-ft/master/src/transactions/"
-
-	SetupAccount   = "setup_account.cdc"
-	MintTokens     = "mint_tokens.cdc"
-	GetSupply      = "get_supply.cdc"
-	GetBalance     = "get_balance.cdc"
-	TransferTokens = "transfer_tokens.cdc"
+	TransferTokens                   = "transfer_tokens.cdc"
 )
 
+// Output file which records the transaction per second for a test run
 const (
 	ResultFile = "/tmp/tx_per_second_test_%s.txt"
+)
+
+// This is a long running test. On a local environment use more conservative numbers for TotalAccounts (~3) amd RoundsOfTransfer (~5)
+const (
+	// total test accounts to create
+	TotalAccounts = 10
+	// each account transfers token to the next account in a round. RoundsOfTransfer is the number of such rounds for each account
+	RoundsOfTransfer = 10
 )
 
 var (
@@ -54,6 +50,7 @@ var (
 	flowTokenAddress     flowsdk.Address
 )
 
+// TestTransactionsPerSecondBenchmark measures the average number of transactions executed per second by an execution node
 func TestTransactionsPerSecondBenchmark(t *testing.T) {
 	suite.Run(t, new(TransactionsPerSecondSuite))
 }
@@ -100,7 +97,7 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 
 	// flow token is deployed by default, can just start creating test accounts
 
-	for i := 0; i < 50; i++ {
+	for i := 0; i < TotalAccounts; i++ {
 		// Refresh finalized block we're using as reference
 		finalizedBlock, err := flowClient.GetLatestBlockHeader(context.Background(), false)
 		gs.ref = finalizedBlock
@@ -130,8 +127,7 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 
 	fmt.Println("==========START", startNum, startTime)
 
-	fmt.Println("Transfering tokens")
-	rounds := 10
+	fmt.Println("Transferring tokens")
 	transferWG := sync.WaitGroup{}
 	prevAddr := flowTokenAddress
 	finalizedBlock, err = flowClient.GetLatestBlockHeader(context.Background(), false)
@@ -139,51 +135,27 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 	examples.Handle(err)
 
 	for accountAddr, accountKey := range gs.accounts {
-		transferWG.Add(rounds)
-		go func(fromAddr, toAddr flowsdk.Address, accKey *flowsdk.AccountKey) {
-			for i := 0; i < rounds; i++ {
-				gs.Transfer10Tokens(flowClient, fromAddr, toAddr, accKey)
-				transferWG.Done()
-			}
-		}(accountAddr, prevAddr, accountKey)
+		if prevAddr != flowTokenAddress {
+			transferWG.Add(RoundsOfTransfer)
+			go func(fromAddr, toAddr flowsdk.Address, accKey *flowsdk.AccountKey) {
+				for i := 0; i < RoundsOfTransfer; i++ {
+					gs.Transfer10Tokens(flowClient, fromAddr, toAddr, accKey)
+					transferWG.Done()
+				}
+			}(accountAddr, prevAddr, accountKey)
+		}
 		prevAddr = accountAddr
 	}
 
-	logged := false
-
-	go func() {
-		time.Sleep(60 * time.Second)
-		resp, err := http.Get(gs.metricsAddr)
-		require.NoError(gs.T(), err, "could not get metrics")
-		endNum := 0
-		endTime := time.Now()
-		defer resp.Body.Close()
-
-		scanner := bufio.NewScanner(resp.Body)
-		for scanner.Scan() {
-			line := scanner.Text()
-			if strings.HasPrefix(line, "execution_runtime_total_executed_transactions") {
-				endNum, err = strconv.Atoi(strings.Split(line, " ")[1])
-				require.NoError(gs.T(), err, "could not get metrics")
-			}
-		}
-		err = scanner.Err()
-		require.NoError(gs.T(), err, "could not get metrics")
-
-		fmt.Println("==========END", endNum, endTime)
-
-		dur := endTime.Sub(startTime)
-		tps := float64(endNum-startNum) / dur.Seconds()
-
-		fmt.Println("==========TPS", tps)
-		err = logTPSToFile(tps)
-		require.NoErrorf(gs.T(), err, "failed to write tps to file")
-		logged = true
-	}()
+	resultFileName := fmt.Sprintf(ResultFile, time.Now().Format("2006_01_02_15_04_05"))
+	done := make(chan struct{})
+	go gs.sampleTotalExecutedTransactionMetric(resultFileName, done) // kick of the sampler
 
 	transferWG.Wait()
 
-	require.True(gs.T(), logged, "did not log TPS to file, may need to increase timeout")
+	close(done) // stop the sampler
+	fmt.Println("==========END")
+	require.FileExists(gs.T(), resultFileName, "did not log TPS to file, may need to increase timeout")
 }
 
 func (gs *TransactionsPerSecondSuite) SetTokenAddresses() {
@@ -194,94 +166,6 @@ func (gs *TransactionsPerSecondSuite) SetTokenAddresses() {
 	examples.Handle(err)
 	flowTokenAddress, err = addressGen.NextAddress()
 	examples.Handle(err)
-}
-
-func (gs *TransactionsPerSecondSuite) DeployFungibleAndFlowTokens(flowClient *client.Client) {
-	ctx := context.Background()
-	// Deploy the FT contract
-	ftCode, err := DownloadFile(FungibleTokenContractsBaseURL + FungibleToken)
-	require.NoError(gs.T(), err)
-	deployFTScript, err := templates.CreateAccount(nil, ftCode)
-	require.NoError(gs.T(), err)
-
-	deployContractTx := flowsdk.NewTransaction().
-		SetReferenceBlockID(gs.ref.ID).
-		AddAuthorizer(gs.rootAcctAddr).
-		SetScript(deployFTScript).
-		SetProposalKey(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootAcctKey.SequenceNumber).
-		SetPayer(gs.rootAcctAddr)
-
-	err = deployContractTx.SignEnvelope(
-		gs.rootAcctAddr,
-		gs.rootAcctKey.ID,
-		gs.rootSigner,
-	)
-	require.NoError(gs.T(), err)
-
-	err = flowClient.SendTransaction(ctx, *deployContractTx)
-	require.NoError(gs.T(), err)
-
-	deployContractTxResp := WaitForFinalized(ctx, flowClient, deployContractTx.ID())
-	require.NoError(gs.T(), deployContractTxResp.Error)
-
-	// Successful Tx, increment sequence number
-	gs.rootAcctKey.SequenceNumber++
-
-	for _, event := range deployContractTxResp.Events {
-		fmt.Printf("EVENT %+v\n", event)
-		fmt.Println(event.ID())
-		fmt.Println(event.Type)
-		fmt.Println(event.Value)
-		if event.Type == flowsdk.EventAccountCreated {
-			accountCreatedEvent := flowsdk.AccountCreatedEvent(event)
-			fungibleTokenAddress = accountCreatedEvent.Address()
-		}
-	}
-
-	fmt.Println("FT Address:", fungibleTokenAddress.Hex())
-
-	// Deploy the Flow Token contract
-	flowTokenCodeRaw, err := DownloadFile(FungibleTokenContractsBaseURL + FlowToken)
-	require.NoError(gs.T(), err)
-	flowTokenCode := strings.ReplaceAll(string(flowTokenCodeRaw), "0x02", "0x"+fungibleTokenAddress.Hex())
-
-	// Use the same root account key for simplicity
-	deployFlowTokenScript, err := templates.CreateAccount([]*flowsdk.AccountKey{gs.rootAcctKey}, []byte(flowTokenCode))
-	require.NoError(gs.T(), err)
-
-	deployFlowTokenContractTx := flowsdk.NewTransaction().
-		SetReferenceBlockID(gs.ref.ID).
-		AddAuthorizer(gs.rootAcctAddr).
-		SetScript(deployFlowTokenScript).
-		SetProposalKey(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootAcctKey.SequenceNumber).
-		SetPayer(gs.rootAcctAddr)
-
-	err = deployFlowTokenContractTx.SignEnvelope(
-		gs.rootAcctAddr,
-		gs.rootAcctKey.ID,
-		gs.rootSigner,
-	)
-	require.NoError(gs.T(), err)
-
-	err = flowClient.SendTransaction(ctx, *deployFlowTokenContractTx)
-	require.NoError(gs.T(), err)
-
-	deployFlowTokenContractTxResp := WaitForFinalized(ctx, flowClient, deployFlowTokenContractTx.ID())
-	require.NoError(gs.T(), deployFlowTokenContractTxResp.Error)
-
-	// Successful Tx, increment sequence number
-	gs.rootAcctKey.SequenceNumber++
-
-	for _, event := range deployFlowTokenContractTxResp.Events {
-		fmt.Printf("%+v\n", event)
-
-		if event.Type == flowsdk.EventAccountCreated {
-			accountCreatedEvent := flowsdk.AccountCreatedEvent(event)
-			flowTokenAddress = accountCreatedEvent.Address()
-		}
-	}
-
-	fmt.Println("Flow Token Address:", flowTokenAddress.Hex())
 }
 
 func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(flowClient *client.Client) (flowsdk.Address, *flowsdk.AccountKey) {
@@ -388,10 +272,18 @@ func (gs *TransactionsPerSecondSuite) Transfer10Tokens(flowClient *client.Client
 	}
 }
 
-func logTPSToFile(tps float64) error {
-	resultFileName := fmt.Sprintf(ResultFile, time.Now().Format("2006_01_02_15_04_05"))
-	tpsStr := fmt.Sprintf("%f\n", tps)
-	return ioutil.WriteFile(resultFileName, []byte(tpsStr), 0644)
+func logTPSToFile(startSec string, tps float64, resultFileName string) error {
+	tpsStr := fmt.Sprintf("%s: %f\n", startSec, tps)
+	resultFile, err := os.OpenFile(resultFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer resultFile.Close()
+	if _, err := resultFile.WriteString(tpsStr); err != nil {
+		return err
+	}
+	fmt.Printf("Wrote Transactions Per Second %f to file: %s", tps, resultFileName)
+	return nil
 }
 
 // TODO: Consider moving some of the following helpers to a common package, or just use any that are in the SDK once they're added there
@@ -470,4 +362,69 @@ func GenerateTransferScript(ftAddr, flowToken, toAddr flowsdk.Address, amount in
 	withAmount := strings.Replace(string(withToAddr), fmt.Sprintf("%d.0", amount), "0.01", 1)
 
 	return []byte(withAmount)
+}
+
+// Sample the ExecutedTransactionMetric Prometheus metric from the execution node every 1 minute
+func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resultFileName string, done chan struct{}) {
+	fmt.Println("===== Starting metric sampler ======")
+	sampleTime := 1 * time.Minute
+	var instantaneous []float64
+	startNum := 0
+	var startTime, endTime time.Time
+	startTime = time.Now()
+
+	sample := func() {
+		resp, err := http.Get(gs.metricsAddr)
+		require.NoError(gs.T(), err, "could not get metrics")
+		endNum := 0
+		endTime = time.Now()
+		defer resp.Body.Close()
+
+		scanner := bufio.NewScanner(resp.Body)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.HasPrefix(line, "execution_runtime_total_executed_transactions") {
+				endNum, err = strconv.Atoi(strings.Split(line, " ")[1])
+				require.NoError(gs.T(), err, "could not get metrics")
+			}
+		}
+		err = scanner.Err()
+		require.NoError(gs.T(), err, "could not get metrics")
+
+		dur := endTime.Sub(startTime)
+		tps := float64(endNum-startNum) / dur.Seconds()
+
+		startStr := startTime.Format("2006_01_02_15_04_05")
+		fmt.Printf("TPS ===========> %s: %f\n", startStr, tps)
+
+		instantaneous = append(instantaneous, tps)
+		err = logTPSToFile(startStr, tps, resultFileName)
+		require.NoErrorf(gs.T(), err, "failed to write instantaneous tps to file")
+	}
+
+	avg := func() {
+		total := 0.0
+		for _, inst := range instantaneous {
+			total = total + inst
+		}
+		avg := total / (float64(len(instantaneous)) * sampleTime.Seconds())
+
+		fmt.Printf("Average TPS ===========> : %f\n", avg)
+		logTPSToFile("average TPS", avg, resultFileName)
+	}
+
+	// sample every 1 minute
+	minTicker := time.NewTicker(sampleTime)
+	for {
+		select {
+		case <-done:
+			minTicker.Stop()
+			avg()
+			fmt.Println("===== Stopping metric sampler ======")
+			return
+		case <-minTicker.C:
+			sample()
+			startTime = time.Now() // reset start time
+		}
+	}
 }
