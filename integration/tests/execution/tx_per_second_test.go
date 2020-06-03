@@ -160,12 +160,9 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 
 func (gs *TransactionsPerSecondSuite) SetTokenAddresses() {
 	addressGen := flowsdk.NewAddressGenerator(flowsdk.Testnet)
-	_, err := addressGen.NextAddress()
-	examples.Handle(err)
-	fungibleTokenAddress, err = addressGen.NextAddress()
-	examples.Handle(err)
-	flowTokenAddress, err = addressGen.NextAddress()
-	examples.Handle(err)
+	_ = addressGen.NextAddress()
+	fungibleTokenAddress = addressGen.NextAddress()
+	flowTokenAddress = addressGen.NextAddress()
 }
 
 func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(flowClient *client.Client) (flowsdk.Address, *flowsdk.AccountKey) {

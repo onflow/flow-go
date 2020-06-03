@@ -364,7 +364,7 @@ func (mt *MTrie) Equals(o *MTrie) bool {
 	if o == nil {
 		return false
 	}
-	return o.Number() == mt.Number() && o.Height() == mt.Height() && bytes.Equal(o.RootHash(), mt.RootHash())
+	return o.Height() == mt.Height() && bytes.Equal(o.RootHash(), mt.RootHash())
 }
 
 // Store stores the trie key Values to a file

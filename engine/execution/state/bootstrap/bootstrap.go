@@ -258,7 +258,7 @@ func executeTransaction(
 	ledger virtualmachine.Ledger,
 	tx *flow.TransactionBody,
 ) *virtualmachine.TransactionResult {
-	result, err := ctx.ExecuteTransaction(ledger, tx, virtualmachine.SkipVerification)
+	result, err := ctx.ExecuteTransaction(ledger, tx, virtualmachine.WithSignatureVerification(false))
 	if err != nil {
 		panic(err)
 	}

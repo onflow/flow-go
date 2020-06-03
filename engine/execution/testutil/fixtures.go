@@ -161,7 +161,7 @@ func CreateAccounts(
 			AddArgument(encCadAccountKey).
 			AddAuthorizer(flow.ServiceAddress())
 
-		result, err := ctx.ExecuteTransaction(ledger, tx, virtualmachine.SkipVerification)
+		result, err := ctx.ExecuteTransaction(ledger, tx, virtualmachine.WithSignatureVerification(false))
 		if err != nil {
 			return nil, err
 		}
