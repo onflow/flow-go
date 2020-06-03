@@ -271,17 +271,15 @@ func (gs *TransactionsPerSecondSuite) Transfer10Tokens(flowClient *client.Client
 }
 
 // logTPSToFile records the instantaneous as average values to the output file
-func logTPSToFile(startSec string, tps float64, resultFileName string) error {
-	tpsStr := fmt.Sprintf("%s: %f\n", startSec, tps)
+func logTPSToFile(msg string, resultFileName string) error {
 	resultFile, err := os.OpenFile(resultFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
 	defer resultFile.Close()
-	if _, err := resultFile.WriteString(tpsStr); err != nil {
+	if _, err := resultFile.WriteString(msg + "\n"); err != nil {
 		return err
 	}
-	fmt.Printf("Wrote Transactions Per Second %f to file: %s\n", tps, resultFileName)
 	return nil
 }
 
@@ -366,29 +364,14 @@ func GenerateTransferScript(ftAddr, flowToken, toAddr flowsdk.Address, amount in
 // Sample the ExecutedTransactionMetric Prometheus metric from the execution node every 1 minute
 func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resultFileName string, done chan struct{}) {
 	fmt.Println("===== Starting metric sampler ======")
-	sampleTime := 1 * time.Minute
-	var instantaneous []float64
-	totalExecutedTx := 0
-	var startTime, endTime time.Time
+	defer fmt.Println("===== Stopping metric sampler ======")
 
-	// Grab metrics to get base line for calculating TPS
-	resp, err := http.Get(gs.metricsAddr)
-	require.NoError(gs.T(), err, "could not get metrics")
-	startTime = time.Now()
+	sampleTime := 1 * time.Minute // sampling frequency
+	var instantaneous []float64   // a slice to store instantaneous values
+	totalExecutedTx := 0          // cumulative count of total transactions
 
-	scanner := bufio.NewScanner(resp.Body)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "execution_runtime_total_executed_transactions") {
-			totalExecutedTx, err = strconv.Atoi(strings.Split(line, " ")[1])
-			require.NoError(gs.T(), err, "could not get metrics")
-		}
-	}
-	err = scanner.Err()
-	require.NoError(gs.T(), err, "could not get metrics")
-	resp.Body.Close()
-
-	sample := func() {
+	sample := func(startTime, endTime time.Time) {
+		// Grab metrics to get base line for calculating TPS
 		resp, err := http.Get(gs.metricsAddr)
 		require.NoError(gs.T(), err, "could not get metrics")
 		newTotal := 0
@@ -413,12 +396,12 @@ func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resul
 		fmt.Printf("TPS ===========> %s: %f\n", startStr, tps)
 
 		instantaneous = append(instantaneous, tps)
-		err = logTPSToFile(startStr, tps, resultFileName)
+
+		err = logTPSToFile(fmt.Sprintf("%s: %f", startStr, tps), resultFileName)
 		require.NoErrorf(gs.T(), err, "failed to write instantaneous tps to file")
 
 		// reset
 		totalExecutedTx = newTotal
-		startTime = endTime
 	}
 
 	avg := func() {
@@ -428,21 +411,24 @@ func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resul
 		}
 		avg := total / (float64(len(instantaneous)))
 
+		logTPSToFile(fmt.Sprintf("total transactions %d", totalExecutedTx), resultFileName)
 		fmt.Printf("Average TPS ===========> : %f\n", avg)
-		logTPSToFile("average TPS", avg, resultFileName)
+		logTPSToFile(fmt.Sprintf("average TPS %f", avg), resultFileName)
 	}
 
 	// sample every 1 minute
 	minTicker := time.NewTicker(sampleTime)
+	startTime := time.Now()
 	for {
 		select {
 		case <-done:
 			minTicker.Stop()
 			avg()
-			fmt.Println("===== Stopping metric sampler ======")
 			return
 		case <-minTicker.C:
-			sample()
+			endTime := time.Now()
+			sample(startTime, endTime)
+			startTime = endTime
 		}
 	}
 }
