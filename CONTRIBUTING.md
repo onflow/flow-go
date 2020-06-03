@@ -1,14 +1,13 @@
 
 # Contributing to Flow Go
 
-The following is a set of guidelines for contributing to the Flow Go SDK. These are mostly guidelines, 
+The following is a set of guidelines for contributing to Flow Go. These are mostly guidelines, 
 not rules. Use your best judgment, and feel free to propose changes to this document in a pull request.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 ## Table of Contents
 
-- [Work streams](#work-streams)
 - [How Can I Contribute?](#how-can-i-contribute)
   - [Reporting Bugs](#reporting-bugs)
     - [Before Submitting A Bug Report](#before-submitting-a-bug-report)
@@ -17,45 +16,13 @@ not rules. Use your best judgment, and feel free to propose changes to this docu
     - [Before Submitting An Enhancement Suggestion](#before-submitting-an-enhancement-suggestion)
     - [How Do I Submit A (Good) Enhancement Suggestion?](#how-do-i-submit-a-good-enhancement-suggestion)
   - [Your First Code Contribution](#your-first-code-contribution)
-- [Workflow](#workflow)
-  - [Issues](#issues)
-  - [Branches](#branches)
-    - [Feature Branches](#feature-branches)
-    - [Pull Requests](#pull-requests)
-    - [Code Review](#code-review)
-  - [Testing](#testing)
-  - [Documentation](#documentation)
-    - [Stream Owner Documentation](#stream-owner-documentation)
+- [Pull Request Checklist](#pull-request-checklist)
 - [Style Guide](#style-guide)
   - [Git Commit Messages](#git-commit-messages)
   - [Go Style Guide](#go-style-guide)
 - [Additional Notes](#additional-notes)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
-
-## Work streams
-
-Flow development is divided across several streams of work with the goal of separating
-concerns and facilitating rapid development.
-
-Each stream is owned by a Flow core team member who oversees and directs all development
-within that stream. As a contributor, you will communicate primarily with your stream owner.
-
-Stream owners will assign tasks to contributors and ensure that all TODOs are tracked.
-
-| Stream         | Owner(s)                    | Home directory  |
-| -------------- | --------------------------- | --------- |
-| Access | [Vishal Changrani](https://github.com/vishalchangraniaxiom), [Peter Siemens](https://github.com/psiemens)     | [/cmd/access](/cmd/access) |
-| Collection  | [Jordan Schalm](https://github.com/jordanschalm), [Peter Siemens](https://github.com/psiemens) | [/cmd/collection](/engine/collection) |
-| Consensus | [Alexander Hentschel](https://github.com/AlexHentschel), [Leo Zhang](https://github.com/zhangchiqing), [Max Wolter](https://github.com/awfm), [Jordan Schalm](https://github.com/jordanschalm) | [/cmd/consensus](/engine/consensus) |
-| Execution | [Maks Pawlak](https://github.com/m4ksio) | [/cmd/execution](/cmd/execution) |
-| Verification | [Ramtin Seraj](https://github.com/ramtinms), [Yahya Hassanzadeh](https://github.com/yhassanzadeh) | [/engine/verification](/cmd/verification) |
-| Networking | [Yahya Hassanzadeh](https://github.com/yhassanzadeh), [Vishal Changrani](https://github.com/vishalchangraniaxiom)     | [/network](/network/) |
-| Cryptography | [Tarak Ben Youssef](https://github.com/tarakby)     | [/crypto](/crypto) |
-| SDK & Emulator| [Peter Siemens](https://github.com/psiemens)     | [Flow Go SDK](https://github.com/onflow/flow-go-sdk) |
-| Language & Runtime | [Bastian Müller](https://github.com/turbolent) | [Cadence](https://github.com/onflow/cadence) |
-| Ops & Performance | [Leo Zhang](https://github.com/zhangchiqing) | |
 
 ## How Can I Contribute?
 
@@ -111,10 +78,9 @@ Create an issue and provide the following information:
 - **Describe the current behavior** and **explain which behavior you expected to see instead** and why.
 - **Explain why this enhancement would be useful** to users.
 
-
 ### Your First Code Contribution
 
-Unsure where to begin contributing to the Flow Go SDK?
+Unsure where to begin contributing to Flow Go?
 You can start by looking through these `good-first-issue` and `help-wanted` issues:
 
 - [Good first issues](https://github.com/onflow/flow-go/labels/good%20first%20issue):
@@ -125,79 +91,15 @@ You can start by looking through these `good-first-issue` and `help-wanted` issu
 Both issue lists are sorted by total number of comments.
 While not perfect, number of comments is a reasonable proxy for impact a given change will have.
 
-Read the [Workflow](#workflow) section for a detailed guide on the development workflow.
+When you're ready to start, see the [development workflow](/README.md#development-workflow), 
+[PR checklist](#pull-request-checklist), and [style guide](#style-guide) for more information.
 
-## Workflow
+## Pull Request Checklist
 
-### Issues
-
-Development tasks are assigned using GitHub issues. Each issue will contain a breakdown 
-of the required task and any necessary background information, as well as an estimate 
-of the required work. Please track task progress and updates by commenting in the issue. 
-
-If you need to create a new issue, please use the provided issue templates to ensure that 
-all necessary information is included.
-
-### Branches
-
-Work for a specific task should be completed in a separate branch corresponding to the issue for that task.
-
-We use the following convention for naming branches: `<your-name>/<issue-number>-<issue-description>`.
-
-For example, `peter/125-update-transaction` is the name of a branch Peter is working on, 
-and corresponds to issue #125 regarding transaction updates.
-
-#### Feature Branches
-
-When working on a larger feature, feel free to create a feature branch to track progress.
-
-We use the the following convention for naming feature branches: `feature/<feature-name>`.
-
-#### Pull Requests
-
-You should open a pull request when you have completed work for a task and would like to 
-receive a review from teammates and stream owners. Please use the provided pull request 
-template when opening a PR.
-
-Feel free to open a Work-In-Progress PR to track ongoing work or receive feedback on an
-early version of a feature.
-
-#### Code Review
-
-You should request a review from any relevant team members who are also working within 
-your stream. The stream owner will automatically be requested for review.
-
-A PR can be merged once all CI checks pass and it is approved by at least two people, including the stream owner.
-
-If you are reviewing another contributor's PR, please keep feedback constructive and friendly.
-
-### Testing
-
-Each PR that you open should include necessary tests to ensure the correctness and stability 
-of your code. Any specific testing requirements for each task will be defined in the issue itself.
-
-### Documentation
-
-All new code should include appropriate documentation to ensure it is readable and maintainable.
-
-All public variables and functions should be documented using `godoc`. 
-
-High-level module documentation should be included in the appropriate package's `README`.
-
-#### Stream Owner Documentation
-
-Stream owners are responsible for ensuring that all code owned by their stream is well-documented. 
-Documentation for a stream should accomplish the following:
-
-1. Provide an overview of all stream functions
-2. Outline the different packages used by the stream
-3. Highlight dependencies on other streams
-
-Each stream should contain a README in its home directory. This page, which acts as a 
-jumping-off point for new contributors, should list each function of the stream along
-with a short description and links to relevant packages.
-
-Here's an example: [cmd/consensus/README.md](cmd/consensus/README.md)
+* Ensure your PR is up-to-date with `master` and has no conflicts
+* Ensure your PR passes existing tests and the linter
+* Ensure your PR adds relevant tests for any fixed bugs or added features
+* Ensure your PR adds or updates any relevant documentation
 
 ## Style Guide
 
