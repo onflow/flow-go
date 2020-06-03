@@ -37,9 +37,9 @@ const (
 	ResultFile = "/tmp/tx_per_second_test_%s.txt"
 )
 
-// This is a long running test. On a local environment use more conservative numbers for TotalAccounts (~3) amd RoundsOfTransfer (~5)
 const (
 	// total test accounts to create
+	// This is a long running test. On a local environment use more conservative numbers for TotalAccounts (~3)
 	TotalAccounts = 10
 	// each account transfers 10 tokens to the next account RoundsOfTransfer number of times
 	RoundsOfTransfer = 50
@@ -270,6 +270,7 @@ func (gs *TransactionsPerSecondSuite) Transfer10Tokens(flowClient *client.Client
 	}
 }
 
+// logTPSToFile records the instantaneous as average values to the output file
 func logTPSToFile(startSec string, tps float64, resultFileName string) error {
 	tpsStr := fmt.Sprintf("%s: %f\n", startSec, tps)
 	resultFile, err := os.OpenFile(resultFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
@@ -367,14 +368,30 @@ func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resul
 	fmt.Println("===== Starting metric sampler ======")
 	sampleTime := 1 * time.Minute
 	var instantaneous []float64
-	startNum := 0
+	totalExecutedTx := 0
 	var startTime, endTime time.Time
+
+	// Grab metrics to get base line for calculating TPS
+	resp, err := http.Get(gs.metricsAddr)
+	require.NoError(gs.T(), err, "could not get metrics")
 	startTime = time.Now()
+
+	scanner := bufio.NewScanner(resp.Body)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "execution_runtime_total_executed_transactions") {
+			totalExecutedTx, err = strconv.Atoi(strings.Split(line, " ")[1])
+			require.NoError(gs.T(), err, "could not get metrics")
+		}
+	}
+	err = scanner.Err()
+	require.NoError(gs.T(), err, "could not get metrics")
+	resp.Body.Close()
 
 	sample := func() {
 		resp, err := http.Get(gs.metricsAddr)
 		require.NoError(gs.T(), err, "could not get metrics")
-		endNum := 0
+		newTotal := 0
 		endTime = time.Now()
 		defer resp.Body.Close()
 
@@ -382,7 +399,7 @@ func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resul
 		for scanner.Scan() {
 			line := scanner.Text()
 			if strings.HasPrefix(line, "execution_runtime_total_executed_transactions") {
-				endNum, err = strconv.Atoi(strings.Split(line, " ")[1])
+				newTotal, err = strconv.Atoi(strings.Split(line, " ")[1])
 				require.NoError(gs.T(), err, "could not get metrics")
 			}
 		}
@@ -390,7 +407,7 @@ func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resul
 		require.NoError(gs.T(), err, "could not get metrics")
 
 		dur := endTime.Sub(startTime)
-		tps := float64(endNum-startNum) / dur.Seconds()
+		tps := float64(newTotal-totalExecutedTx) / dur.Seconds()
 
 		startStr := startTime.Format("2006_01_02_15_04_05")
 		fmt.Printf("TPS ===========> %s: %f\n", startStr, tps)
@@ -398,6 +415,10 @@ func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resul
 		instantaneous = append(instantaneous, tps)
 		err = logTPSToFile(startStr, tps, resultFileName)
 		require.NoErrorf(gs.T(), err, "failed to write instantaneous tps to file")
+
+		// reset
+		totalExecutedTx = newTotal
+		startTime = endTime
 	}
 
 	avg := func() {
@@ -422,7 +443,6 @@ func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resul
 			return
 		case <-minTicker.C:
 			sample()
-			startTime = time.Now() // reset start time
 		}
 	}
 }
