@@ -197,7 +197,7 @@ func (bc *blockContext) GetAccount(ledger Ledger, addr flow.Address) (*flow.Acco
 		return nil, nil
 	}
 
-	result, err := bc.ExecuteScript(ledger, DefaultTokenBalanceScript(addr))
+	result, err := bc.ExecuteScript(ledger, DefaultTokenBalanceScript(addr), nil)
 	if err != nil {
 		return nil, err
 	}

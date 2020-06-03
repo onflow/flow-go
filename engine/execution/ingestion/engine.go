@@ -673,7 +673,7 @@ func (e *Engine) matchOrRequestCollections(
 	return nil
 }
 
-func (e *Engine) ExecuteScriptAtBlockID(ctx context.Context, script []byte, blockID flow.Identifier) ([]byte, error) {
+func (e *Engine) ExecuteScriptAtBlockID(ctx context.Context, script []byte, arguments [][]byte, blockID flow.Identifier) ([]byte, error) {
 
 	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
 	if err != nil {
@@ -687,7 +687,7 @@ func (e *Engine) ExecuteScriptAtBlockID(ctx context.Context, script []byte, bloc
 
 	blockView := e.execState.NewView(stateCommit)
 
-	return e.computationManager.ExecuteScript(script, block, blockView)
+	return e.computationManager.ExecuteScript(script, arguments, block, blockView)
 }
 
 func (e *Engine) GetAccount(ctx context.Context, addr flow.Address, blockID flow.Identifier) (*flow.Account, error) {

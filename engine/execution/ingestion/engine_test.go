@@ -389,7 +389,7 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 			Return(scriptResult, nil)
 
 		// Execute our script and expect no error
-		res, err := ctx.engine.ExecuteScriptAtBlockID(context.Background(), script, executableBlock.Block.ID())
+		res, err := ctx.engine.ExecuteScriptAtBlockID(context.Background(), script, nil, executableBlock.Block.ID())
 		assert.NoError(t, err)
 		assert.Equal(t, scriptResult, res)
 
