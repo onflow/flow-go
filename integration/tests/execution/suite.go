@@ -40,6 +40,14 @@ func (s *Suite) AccessClient() *testnet.Client {
 	return client
 }
 
+func (s *Suite) AccessPort() string {
+	return s.net.AccessPorts[testnet.AccessNodeAPIPort]
+}
+
+func (s *Suite) MetricsPort() string {
+	return s.net.AccessPorts[testnet.ExeNodeMetricsPort]
+}
+
 func (s *Suite) SetupTest() {
 
 	// need one access node

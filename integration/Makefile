@@ -28,4 +28,4 @@ execution-tests:
 
 .PHONY: benchmark
 benchmark:
-	GO111MODULE=on go test -tags relic -timeout 30m ./tests/execution -run Benchmark
+	GO111MODULE=on go test -tags relic -timeout 30m ./benchmark -run Benchmark
