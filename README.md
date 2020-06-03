@@ -52,34 +52,20 @@ The following table lists all work streams and links to their home directory and
 
 ## Installation
 
-### Install Go
+### Clone Repository
 
-- Download and install [Go 1.13](https://golang.org/doc/install) or later
-- Create your workspace `$GOPATH` directory and update your `bash_profile` to contain the following:
-
-```bash
-export `$GOPATH=$HOME/path-to-your-go-workspace/`
-```
-
-- Confirm that Go was installed correctly: https://golang.org/doc/install#testing
-- Clone this repository to `$GOPATH/src/github.com/onflow/flow-go/`
+- Clone this repository
 - Clone this repository's submodules:
 ```bash
 git submodule update --init --recursive
 ```
+### Install Dependencies
 
-💡 Since this repository uses [Go modules](https://github.com/golang/go/wiki/Modules) 
-and we prepend every `go` command with `GO111MODULE=on`, you can also clone this repo 
-anywhere you want.
-
-### Install tooling dependencies
-
-First, install [CMake](https://cmake.org/install/) as it is used for code generation of some tools.
-
-Next, install [Docker](https://docs.docker.com/get-docker/) as it is used for running a local 
-network and integration tests.
-
-All other tooling dependencies can be installed automatically with this command:
+- Install [Go](https://golang.org/doc/install) (Flow supports Go 1.13 and later)
+- Install [CMake](https://cmake.org/install/), which is used for building the crypto library
+- Install [Docker](https://docs.docker.com/get-docker/), which is used for running
+  a local network and integration tests
+- All remaining dependencies can be installed automatically:
 
 ```bash
 make install-tools
