@@ -84,7 +84,7 @@ func (gs *TransactionsPerSecondSuite) SetupTest() {
 // 1. Create new TotalAccounts number of accounts and transfers token to each account
 // 2. Transfers 10 tokens from one account the the other repeatedly RoundsOfTransfer times.
 // 3. While executing step 2, it samples the total execution metric from the execution node every 1 min
-// 4. Prints the instantaneous values and the average Transaction per second to output file
+// 4. Prints the instantaneous and the average transaction per second values to an output file
 func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 	// Addresses are deterministic, so we should know what the FT interface and Flow Token contract addresses are
 	// therefore lets just set them here
@@ -409,7 +409,7 @@ func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resul
 		dur := endTime.Sub(startTime)
 		tps := float64(newTotal-totalExecutedTx) / dur.Seconds()
 
-		startStr := startTime.Format("2006_01_02_15_04_05")
+		startStr := startTime.Format("3:04:04 PM")
 		fmt.Printf("TPS ===========> %s: %f\n", startStr, tps)
 
 		instantaneous = append(instantaneous, tps)
@@ -426,7 +426,7 @@ func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resul
 		for _, inst := range instantaneous {
 			total = total + inst
 		}
-		avg := total / (float64(len(instantaneous)) * sampleTime.Seconds())
+		avg := total / (float64(len(instantaneous)))
 
 		fmt.Printf("Average TPS ===========> : %f\n", avg)
 		logTPSToFile("average TPS", avg, resultFileName)
