@@ -46,10 +46,10 @@ func Test_Compactor(t *testing.T) {
 			checkpointer, err := wal.Checkpointer()
 			require.NoError(t, err)
 
-			compactor := NewCompactor(checkpointer)
+			compactor := NewCompactor(checkpointer, 5*time.Millisecond)
 
 			// Run Compactor in background.
-			go compactor.Start(5 * time.Millisecond)
+			<-compactor.Ready()
 
 			// Generate the tree and create WAL
 			for i := 0; i < size; i++ {

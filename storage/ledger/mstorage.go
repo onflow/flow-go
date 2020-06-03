@@ -253,3 +253,11 @@ func (f *MTrieStorage) DiskSize() (int64, error) {
 func (f *MTrieStorage) ForestSize() int {
 	return f.mForest.Size()
 }
+
+func (f *MTrieStorage) Checkpointer() (*wal.Checkpointer, error) {
+	checkpointer, err := f.wal.Checkpointer()
+	if err != nil {
+		return nil, fmt.Errorf("cannot create checkpointer for compactor: %w", err)
+	}
+	return checkpointer, nil
+}

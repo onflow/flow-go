@@ -12,18 +12,25 @@ type Compactor struct {
 	done         chan struct{}
 	stopc        chan struct{}
 	wg           sync.WaitGroup
+	sync.Mutex
+	interval time.Duration
 }
 
-func NewCompactor(checkpointer *Checkpointer) *Compactor {
+func NewCompactor(checkpointer *Checkpointer, interval time.Duration) *Compactor {
 	return &Compactor{
 		checkpointer: checkpointer,
 		done:         make(chan struct{}),
 		stopc:        make(chan struct{}),
+		interval:     interval,
 	}
 }
 
 func (c *Compactor) Ready() <-chan struct{} {
 	ch := make(chan struct{})
+
+	c.wg.Add(1)
+	go c.start()
+
 	defer close(ch)
 	return ch
 }
@@ -45,8 +52,7 @@ func (c *Compactor) Done() <-chan struct{} {
 // This function blocks until the `Done()` is called, so it's advised to
 // run in it different thread.
 // If called more then once, behaviour is undefined.
-func (c *Compactor) Start(interval time.Duration) {
-	c.wg.Add(1)
+func (c *Compactor) start() {
 
 	for {
 		if err := c.Run(); err != nil {
@@ -57,12 +63,15 @@ func (c *Compactor) Start(interval time.Duration) {
 		case <-c.stopc:
 			c.wg.Done()
 			return
-		case <-time.After(interval):
+		case <-time.After(c.interval):
 		}
 	}
 }
 
 func (c *Compactor) Run() error {
+	c.Lock()
+	defer c.Unlock()
+
 	from, to, err := c.checkpointer.NotCheckpointedSegments()
 	if err != nil {
 		return fmt.Errorf("cannot get latest checkpoint: %w", err)
