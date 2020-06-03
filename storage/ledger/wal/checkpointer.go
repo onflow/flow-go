@@ -156,8 +156,13 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 	return err
 }
 
+func numberToFilenamePart(n int) string {
+	return fmt.Sprintf("%08d", n)
+}
+
 func numberToFilename(n int) string {
-	return fmt.Sprintf("%s%08d", checkpointFilenamePrefix, n)
+
+	return fmt.Sprintf("%s%s", checkpointFilenamePrefix, numberToFilenamePart(n))
 }
 
 type SyncOnCloseFile struct {

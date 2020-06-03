@@ -87,7 +87,7 @@ func (w *LedgerWAL) replay(
 
 	loadedCheckpoint := false
 
-	if latestCheckpoint >= from {
+	if latestCheckpoint != -1 && latestCheckpoint+1 >= from { //+1 to account for connected checkpoint and segments
 		storedNodes, storedTris, err := checkpointer.LoadCheckpoint(latestCheckpoint)
 		if err != nil {
 			return fmt.Errorf("cannot load checkpoint %d: %w", latestCheckpoint, err)

@@ -21,8 +21,8 @@ import (
 
 var dir = "./wal"
 
-func checkpointerWithFiles(t *testing.T, names ...interface{}) {
-	f := names[len(names)-1].(func(*testing.T, *realWAL.Checkpointer))
+func RunWithWALCheckpointerWithFiles(t *testing.T, names ...interface{}) {
+	f := names[len(names)-1].(func(*testing.T, *realWAL.LedgerWAL, *realWAL.Checkpointer))
 
 	fileNames := make([]string, len(names)-1)
 
@@ -39,7 +39,7 @@ func checkpointerWithFiles(t *testing.T, names ...interface{}) {
 		checkpointer, err := wal.Checkpointer()
 		require.NoError(t, err)
 
-		f(t, checkpointer)
+		f(t, wal, checkpointer)
 	})
 }
 
@@ -326,97 +326,5 @@ func Test_Checkpointing(t *testing.T) {
 			}
 		})
 
-	})
-}
-
-func Test_emptyDir(t *testing.T) {
-	checkpointerWithFiles(t, func(t *testing.T, checkpointer *realWAL.Checkpointer) {
-		latestCheckpoint, err := checkpointer.LatestCheckpoint()
-		require.NoError(t, err)
-		require.Equal(t, -1, latestCheckpoint)
-
-		// here when starting LedgerWAL, it creates empty file for writing, hence directory isn't really empty
-		from, to, err := checkpointer.NotCheckpointedSegments()
-		require.NoError(t, err)
-		require.Equal(t, 0, from)
-		require.Equal(t, 0, to)
-	})
-}
-
-// Prometheus WAL require files to be 8 characters, otherwise it gets confused
-
-func Test_noCheckpoints(t *testing.T) {
-	checkpointerWithFiles(t, "00000000", "00000001", "00000002", func(t *testing.T, checkpointer *realWAL.Checkpointer) {
-		latestCheckpoint, err := checkpointer.LatestCheckpoint()
-		require.NoError(t, err)
-		require.Equal(t, -1, latestCheckpoint)
-
-		from, to, err := checkpointer.NotCheckpointedSegments()
-		require.NoError(t, err)
-		require.Equal(t, 0, from)
-		require.Equal(t, 2, to)
-	})
-}
-
-func Test_someCheckpoints(t *testing.T) {
-	checkpointerWithFiles(t, "00000000", "00000001", "00000002", "00000003", "00000004", "00000005", "checkpoint.00000002", func(t *testing.T, checkpointer *realWAL.Checkpointer) {
-		latestCheckpoint, err := checkpointer.LatestCheckpoint()
-		require.NoError(t, err)
-		require.Equal(t, 2, latestCheckpoint)
-
-		from, to, err := checkpointer.NotCheckpointedSegments()
-		require.NoError(t, err)
-		require.Equal(t, 3, from)
-		require.Equal(t, 5, to)
-	})
-}
-
-func Test_loneCheckpoint(t *testing.T) {
-	checkpointerWithFiles(t, "checkpoint.00000005", func(t *testing.T, checkpointer *realWAL.Checkpointer) {
-		latestCheckpoint, err := checkpointer.LatestCheckpoint()
-		require.NoError(t, err)
-		require.Equal(t, 5, latestCheckpoint)
-
-		from, to, err := checkpointer.NotCheckpointedSegments()
-		require.NoError(t, err)
-		require.Equal(t, -1, from)
-		require.Equal(t, -1, to)
-	})
-}
-
-func Test_checkpointWithoutPrecedingSegments(t *testing.T) {
-	checkpointerWithFiles(t, "checkpoint.00000005", "00000006", "00000007", func(t *testing.T, checkpointer *realWAL.Checkpointer) {
-		latestCheckpoint, err := checkpointer.LatestCheckpoint()
-		require.NoError(t, err)
-		require.Equal(t, 5, latestCheckpoint)
-
-		from, to, err := checkpointer.NotCheckpointedSegments()
-		require.NoError(t, err)
-		require.Equal(t, 6, from)
-		require.Equal(t, 7, to)
-	})
-}
-
-func Test_checkpointWithSameSegment(t *testing.T) {
-	checkpointerWithFiles(t, "checkpoint.00000005", "00000005", "00000006", "00000007", func(t *testing.T, checkpointer *realWAL.Checkpointer) {
-		latestCheckpoint, err := checkpointer.LatestCheckpoint()
-		require.NoError(t, err)
-		require.Equal(t, 5, latestCheckpoint)
-
-		from, to, err := checkpointer.NotCheckpointedSegments()
-		require.NoError(t, err)
-		require.Equal(t, 6, from)
-		require.Equal(t, 7, to)
-	})
-}
-
-func Test_NoGapBetweenSegmentsAndLastCheckpoint(t *testing.T) {
-	checkpointerWithFiles(t, "checkpoint.00000004", "00000006", "00000007", func(t *testing.T, checkpointer *realWAL.Checkpointer) {
-		latestCheckpoint, err := checkpointer.LatestCheckpoint()
-		require.NoError(t, err)
-		require.Equal(t, 4, latestCheckpoint)
-
-		_, _, err = checkpointer.NotCheckpointedSegments()
-		require.Error(t, err)
 	})
 }
