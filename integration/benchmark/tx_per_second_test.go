@@ -80,16 +80,23 @@ func (gs *TransactionsPerSecondSuite) SetupTest() {
 }
 
 func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
+	// Addresses are deterministic, so we should know what the FT interface and Flow Token contract addresses are
+	// therefore lets just set them here
 	gs.SetTokenAddresses()
+
+	// Initialize some book keeping
 	gs.accounts = map[flowsdk.Address]*flowsdk.AccountKey{}
 	gs.privateKeys = map[string][]byte{}
 	gs.signers = map[flowsdk.Address]crypto.InMemorySigner{}
 
+	// Setup the client, not using the suite to generate client since we may want to call external testnets
 	flowClient, err := client.New(gs.accessAddr, grpc.WithInsecure())
 	require.NoError(gs.T(), err, "could not get client")
 
+	// Grab the service account info
 	gs.rootAcctAddr, gs.rootAcctKey, gs.rootSigner = ServiceAccountWithKey(flowClient, gs.privateKeyHex)
 
+	// Set last finalized block to be used as ref for transactions
 	finalizedBlock, err := flowClient.GetLatestBlockHeader(context.Background(), false)
 	require.NoError(gs.T(), err, "could not get client")
 
@@ -108,6 +115,7 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 		gs.accounts[addr] = key
 	}
 
+	// Grab metrics to get base line for calculating TPS
 	resp, err := http.Get(gs.metricsAddr)
 	require.NoError(gs.T(), err, "could not get metrics")
 	startNum := 0
@@ -125,9 +133,7 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 	require.NoError(gs.T(), err, "could not get metrics")
 	resp.Body.Close()
 
-	fmt.Println("==========START", startNum, startTime)
-
-	fmt.Println("Transferring tokens")
+	// Transfering Tokens
 	transferWG := sync.WaitGroup{}
 	prevAddr := flowTokenAddress
 	finalizedBlock, err = flowClient.GetLatestBlockHeader(context.Background(), false)
@@ -147,6 +153,7 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 		prevAddr = accountAddr
 	}
 
+	// Record the TPS
 	resultFileName := fmt.Sprintf(ResultFile, time.Now().Format("2006_01_02_15_04_05"))
 	done := make(chan struct{})
 	go gs.sampleTotalExecutedTransactionMetric(resultFileName, done) // kick of the sampler
@@ -154,10 +161,10 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 	transferWG.Wait()
 
 	close(done) // stop the sampler
-	fmt.Println("==========END")
 	require.FileExists(gs.T(), resultFileName, "did not log TPS to file, may need to increase timeout")
 }
 
+// SetTokenAddresses Sets the token addresses that were bootstrapped as part of genesis state
 func (gs *TransactionsPerSecondSuite) SetTokenAddresses() {
 	addressGen := flowsdk.NewAddressGenerator(flowsdk.Testnet)
 	_ = addressGen.NextAddress()
@@ -165,6 +172,7 @@ func (gs *TransactionsPerSecondSuite) SetTokenAddresses() {
 	flowTokenAddress = addressGen.NextAddress()
 }
 
+// CreateAccountAndTransfer will create an account and transfer 1000 tokens to it
 func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(flowClient *client.Client) (flowsdk.Address, *flowsdk.AccountKey) {
 	ctx := context.Background()
 
@@ -239,6 +247,7 @@ func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(flowClient *clien
 	return accountAddress, accountKey
 }
 
+// Transfer10Tokens transfers 10 tokens
 func (gs *TransactionsPerSecondSuite) Transfer10Tokens(flowClient *client.Client, fromAddr, toAddr flowsdk.Address, fromKey *flowsdk.AccountKey) {
 	ctx := context.Background()
 
