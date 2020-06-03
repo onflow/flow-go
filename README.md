@@ -11,13 +11,13 @@ about it [here](https://github.com/onflow/flow).
 - [Getting started](#getting-started)
 - [Documentation](#documentation)
 - [Installation](#installation)
-  - [Install Go](#install-go)
-  - [Install tooling dependencies](#install-tooling-dependencies)
+  - [Clone Repository](#clone-repository)
+  - [Install Dependencies](#install-dependencies)
 - [Development Workflow](#development-workflow)
-  - [Building](#building)
   - [Testing](#testing)
-  - [Code Generation](#code-generation)
+  - [Building](#building)
   - [Local Network](#local-network)
+  - [Code Generation](#code-generation)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -56,9 +56,11 @@ The following table lists all work streams and links to their home directory and
 
 - Clone this repository
 - Clone this repository's submodules:
+
 ```bash
 git submodule update --init --recursive
 ```
+
 ### Install Dependencies
 
 - Install [Go](https://golang.org/doc/install) (Flow supports Go 1.13 and later)
@@ -74,20 +76,6 @@ make install-tools
 At this point, you should be ready to build, test, and run Flow! 🎉
 
 ## Development Workflow
-
-### Building
-
-The recommended way to build and run Flow for local development is using Docker. 
-
-Build a Docker image for all nodes:
-```bash
-make docker-build-flow
-```
-
-Build a Docker image for a particular node role (replace `$ROLE` with `collection`, `consensus`, etc.):
-```bash
-make docker-build-$ROLE
-```
 
 ### Testing
 
@@ -105,6 +93,25 @@ Run the integration test suite:
 ```bash
 make integration-test
 ```
+
+### Building
+
+The recommended way to build and run Flow for local development is using Docker. 
+
+Build a Docker image for all nodes:
+```bash
+make docker-build-flow
+```
+
+Build a Docker image for a particular node role (replace `$ROLE` with `collection`, `consensus`, etc.):
+```bash
+make docker-build-$ROLE
+```
+
+### Local Network
+
+A local version of the network can be run for manual testing and integration. 
+See the [Local Network Guide](/integration/localnet/README.md) for instructions.
 
 ### Code Generation
 
@@ -127,8 +134,3 @@ Generate mocks used for unit tests:
 ```bash
 make generate-mocks
 ```
-
-### Local Network
-
-A local version of the network can be run for manual testing and integration. 
-See the [Local Network Guide](/integration/localnet/README.md) for instructions.
