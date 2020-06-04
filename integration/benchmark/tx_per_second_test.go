@@ -57,16 +57,17 @@ func TestTransactionsPerSecondBenchmark(t *testing.T) {
 
 type TransactionsPerSecondSuite struct {
 	execution.Suite
-	ref           *flowsdk.BlockHeader
-	accounts      map[flowsdk.Address]*flowsdk.AccountKey
-	privateKeys   map[string][]byte
-	signers       map[flowsdk.Address]crypto.InMemorySigner
-	rootAcctAddr  flowsdk.Address
-	rootAcctKey   *flowsdk.AccountKey
-	rootSigner    crypto.Signer
-	accessAddr    string
-	privateKeyHex string
-	metricsAddr   string
+	ref             *flowsdk.BlockHeader
+	accounts        map[flowsdk.Address]*flowsdk.AccountKey
+	privateKeys     map[string][]byte
+	signers         map[flowsdk.Address]crypto.InMemorySigner
+	rootAcctAddr    flowsdk.Address
+	rootAcctKey     *flowsdk.AccountKey
+	rootSigner      crypto.Signer
+	sequenceNumbers []int
+	accessAddr      string
+	privateKeyHex   string
+	metricsAddr     string
 }
 
 func (gs *TransactionsPerSecondSuite) SetupTest() {
@@ -108,18 +109,28 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 
 	gs.ref = finalizedBlock
 
+	gs.AddKeys(flowClient)
+
 	// flow token is deployed by default, can just start creating test accounts
+	accountsWG := sync.WaitGroup{}
 
-	for i := 0; i < TotalAccounts; i++ {
+	for i := 1; i < TotalAccounts; i++ {
 		// Refresh finalized block we're using as reference
-		finalizedBlock, err := flowClient.GetLatestBlockHeader(context.Background(), false)
-		gs.ref = finalizedBlock
-		examples.Handle(err)
+		// finalizedBlock, err := flowClient.GetLatestBlockHeader(context.Background(), false)
+		// gs.ref = finalizedBlock
+		// examples.Handle(err)
+		accountsWG.Add(1)
+		go func() {
+			keyIndex := i
+			// Create an account and transfer some funds to it.
+			addr, key := gs.CreateAccountAndTransfer(flowClient, keyIndex)
+			gs.accounts[addr] = key
+			accountsWG.Done()
+		}()
 
-		// Create an account and transfer some funds to it.
-		addr, key := gs.CreateAccountAndTransfer(flowClient)
-		gs.accounts[addr] = key
 	}
+
+	accountsWG.Wait()
 
 	// Transferring Tokens
 	transferWG := sync.WaitGroup{}
@@ -165,7 +176,7 @@ func (gs *TransactionsPerSecondSuite) SetTokenAddresses() {
 }
 
 // CreateAccountAndTransfer will create an account and transfer 1000 tokens to it
-func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(flowClient *client.Client) (flowsdk.Address, *flowsdk.AccountKey) {
+func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(flowClient *client.Client, keyIndex int) (flowsdk.Address, *flowsdk.AccountKey) {
 	ctx := context.Background()
 
 	myPrivateKey := examples.RandomPrivateKey()
@@ -183,10 +194,10 @@ func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(flowClient *clien
 		SetReferenceBlockID(gs.ref.ID).
 		AddAuthorizer(gs.rootAcctAddr).
 		SetScript(createAccountScript).
-		SetProposalKey(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootAcctKey.SequenceNumber).
+		SetProposalKey(gs.rootAcctAddr, keyIndex, gs.rootAcctKey.SequenceNumber).
 		SetPayer(gs.rootAcctAddr)
 
-	err = createAccountTx.SignEnvelope(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootSigner)
+	err = createAccountTx.SignEnvelope(gs.rootAcctAddr, keyIndex, gs.rootSigner)
 	examples.Handle(err)
 
 	err = flowClient.SendTransaction(ctx, *createAccountTx)
@@ -196,7 +207,7 @@ func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(flowClient *clien
 	examples.Handle(accountCreationTxRes.Error)
 
 	// Successful Tx, increment sequence number
-	gs.rootAcctKey.SequenceNumber++
+	gs.sequenceNumbers[keyIndex]++
 	accountAddress := flowsdk.Address{}
 	if len(accountCreationTxRes.Events) == 0 {
 		accountCreationTxRes = examples.WaitForSeal(ctx, flowClient, createAccountTx.ID())
@@ -221,11 +232,11 @@ func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(flowClient *clien
 	transferTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(gs.ref.ID).
 		SetScript(transferScript).
-		SetProposalKey(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootAcctKey.SequenceNumber).
+		SetProposalKey(gs.rootAcctAddr, keyIndex, gs.rootAcctKey.SequenceNumber).
 		SetPayer(gs.rootAcctAddr).
 		AddAuthorizer(gs.rootAcctAddr)
 
-	err = transferTx.SignEnvelope(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootSigner)
+	err = transferTx.SignEnvelope(gs.rootAcctAddr, keyIndex, gs.rootSigner)
 	examples.Handle(err)
 
 	err = flowClient.SendTransaction(ctx, *transferTx)
@@ -235,7 +246,7 @@ func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(flowClient *clien
 	examples.Handle(transferTxResp.Error)
 
 	// Successful Tx, increment sequence number
-	gs.rootAcctKey.SequenceNumber++
+	gs.sequenceNumbers[keyIndex]++
 	return accountAddress, accountKey
 }
 
@@ -359,6 +370,55 @@ func GenerateTransferScript(ftAddr, flowToken, toAddr flowsdk.Address, amount in
 	withAmount := strings.Replace(string(withToAddr), fmt.Sprintf("%d.0", amount), "0.01", 1)
 
 	return []byte(withAmount)
+}
+
+// languageEncodeBytes converts a byte slice to a comma-separated list of uint8 integers.
+func languageEncodeBytes(b []byte) string {
+	if len(b) == 0 {
+		return "[]"
+	}
+
+	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
+}
+
+func (gs *TransactionsPerSecondSuite) AddKeys(flowClient *client.Client) {
+	ctx := context.Background()
+
+	gs.sequenceNumbers = make([]int, TotalAccounts)
+	publicKeysStr := strings.Builder{}
+
+	for i := 0; i < TotalAccounts; i++ {
+
+		publicKeysStr.WriteString(languageEncodeBytes(gs.rootAcctKey.PublicKey.Encode()))
+		publicKeysStr.WriteString("\n")
+	}
+	script := fmt.Sprintf(`
+	transaction {
+	  prepare(signer: AuthAccount) {
+			%s
+		}
+	}
+`, publicKeysStr.String())
+
+	addKeysTx := flowsdk.NewTransaction().
+		SetReferenceBlockID(gs.ref.ID).
+		SetScript([]byte(script)).
+		SetProposalKey(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootAcctKey.SequenceNumber).
+		SetPayer(gs.rootAcctAddr).
+		AddAuthorizer(gs.rootAcctAddr)
+
+	err := addKeysTx.SignEnvelope(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootSigner)
+	examples.Handle(err)
+
+	err = flowClient.SendTransaction(ctx, *addKeysTx)
+	examples.Handle(err)
+
+	addKeysTxResp := WaitForFinalized(ctx, flowClient, addKeysTx.ID())
+	examples.Handle(addKeysTxResp.Error)
+
+	// Successful Tx, increment sequence number
+	gs.rootAcctKey.SequenceNumber++
+
 }
 
 // Sample the ExecutedTransactionMetric Prometheus metric from the execution node every 1 minute
