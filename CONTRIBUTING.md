@@ -1,6 +1,8 @@
 
 # Contributing to Flow Go
 
+Thank you for your interest in contributing to Flow!
+
 The following is a set of guidelines for contributing to Flow Go. These are mostly guidelines, 
 not rules. Use your best judgment, and feel free to propose changes to this document in a pull request.
 
@@ -20,7 +22,6 @@ not rules. Use your best judgment, and feel free to propose changes to this docu
 - [Style Guide](#style-guide)
   - [Git Commit Messages](#git-commit-messages)
   - [Go Style Guide](#go-style-guide)
-- [Additional Notes](#additional-notes)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -30,12 +31,14 @@ not rules. Use your best judgment, and feel free to propose changes to this docu
 
 #### Before Submitting A Bug Report
 
-- **Search existing issues** to see if the problem has already been reported.
-  If it has **and the issue is still open**, add a comment to the existing issue instead of opening a new one.
+Please **search existing issues** to see if the problem has already been reported.
+If it has **and the issue is still open**, add a comment to the existing issue instead of opening a new one.
 
 #### How Do I Submit A (Good) Bug Report?
 
-Explain the problem and include additional details to help maintainers reproduce the problem:
+Descriptive and detailed bug reports are incredibly valuable to help maintainers reproduce and
+diagnose the problem. When writing a bug report, consider the following guidelines for making
+it as impactful as possible.
 
 - **Use a clear and descriptive title** for the issue to identify the problem.
 - **Describe the exact steps which reproduce the problem** in as many details as possible.
@@ -62,13 +65,13 @@ Include details about your configuration and environment:
 
 #### Before Submitting An Enhancement Suggestion
 
-- **Perform a cursory search** to see if the enhancement has already been suggested.
-  If it has, add a comment to the existing issue instead of opening a new one.
+Please **search existing issues** to see if the enhancement has already been suggested.
+If it has, add a comment to the existing issue instead of opening a new one.
 
 #### How Do I Submit A (Good) Enhancement Suggestion?
 
 Enhancement suggestions are tracked as [GitHub issues](https://guides.github.com/features/issues/).
-Create an issue and provide the following information:
+When suggesting an enhancement, consider the following guidelines for 
 
 - **Use a clear and descriptive title** for the issue to identify the suggestion.
 - **Provide a step-by-step description of the suggested enhancement** in as many details as possible.
@@ -96,14 +99,22 @@ When you're ready to start, see the [development workflow](/README.md#developmen
 
 ## Pull Request Checklist
 
+When you're ready for your contribution to be reviewed, please ensure it satisfies the
+following when creating your pull request:
+
 * Ensure your PR is up-to-date with `master` and has no conflicts
 * Ensure your PR passes existing tests and the linter
 * Ensure your PR adds relevant tests for any fixed bugs or added features
 * Ensure your PR adds or updates any relevant documentation
 
+A reviewer will be assigned automatically when your PR is created.
+
 ## Style Guide
 
-Before contributing, make sure to examine the project to get familiar with the patterns and style already being used.
+The following is a brief summary of the coding style used in Flow. 
+
+The best way to familiarize yourself with the patterns and styles in use in this project 
+is to read through some code!
 
 ### Git Commit Messages
 
@@ -114,7 +125,7 @@ Before contributing, make sure to examine the project to get familiar with the p
 
 ### Go Style Guide
 
-The majority of this project is written Go.
+The majority of this project is written in Go.
 
 We try to follow the coding guidelines from the Go community.
 
@@ -126,6 +137,3 @@ We try to follow the coding guidelines from the Go community.
 - Code should be commented
 - Code should pass all tests: `make test`
 
-## Additional Notes
-
-Thank you for your interest in contributing to Flow!
