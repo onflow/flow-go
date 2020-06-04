@@ -41,7 +41,7 @@ const (
 const (
 	// total test accounts to create
 	// This is a long running test. On a local environment use more conservative numbers for TotalAccounts (~3)
-	TotalAccounts = 50
+	TotalAccounts = 1000
 	// each account transfers 10 tokens to the next account RoundsOfTransfer number of times
 	RoundsOfTransfer = 50
 )
@@ -58,6 +58,7 @@ func TestTransactionsPerSecondBenchmark(t *testing.T) {
 
 type TransactionsPerSecondSuite struct {
 	execution.Suite
+	flowClient      *client.Client
 	ref             *flowsdk.BlockHeader
 	accounts        map[flowsdk.Address]*flowsdk.AccountKey
 	privateKeys     map[string][]byte
@@ -101,14 +102,14 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 	// Setup the client, not using the suite to generate client since we may want to call external testnets
 	flowClient, err := client.New(gs.accessAddr, grpc.WithInsecure())
 	require.NoError(gs.T(), err, "could not get client")
+	gs.flowClient = flowClient
 
 	// Grab the service account info
 	gs.rootAcctAddr, gs.rootAcctKey, gs.rootSigner = ServiceAccountWithKey(flowClient, gs.privateKeyHex)
 
 	// Set last finalized block to be used as ref for transactions
 	finalizedBlock, err := flowClient.GetLatestBlockHeader(context.Background(), false)
-	require.NoError(gs.T(), err, "could not get client")
-
+	require.NoError(gs.T(), err, "could not update finalized block")
 	gs.ref = finalizedBlock
 
 	gs.AddKeys(flowClient)
@@ -124,7 +125,7 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 		accountsWG.Add(1)
 		go func(keyIndex int) {
 			// Create an account and transfer some funds to it.
-			addr, key := gs.CreateAccountAndTransfer(flowClient, keyIndex)
+			addr, key := gs.CreateAccountAndTransfer(keyIndex)
 			gs.accounts[addr] = key
 			accountsWG.Done()
 		}(i)
@@ -136,8 +137,7 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 	// Transferring Tokens
 	transferWG := sync.WaitGroup{}
 	prevAddr := flowTokenAddress
-	finalizedBlock, err = flowClient.GetLatestBlockHeader(context.Background(), false)
-	gs.ref = finalizedBlock
+	gs.ref, err = flowClient.GetLatestBlockHeader(context.Background(), false)
 	examples.Handle(err)
 
 	for accountAddr, accountKey := range gs.accounts {
@@ -179,7 +179,7 @@ func (gs *TransactionsPerSecondSuite) SetTokenAddresses() {
 }
 
 // CreateAccountAndTransfer will create an account and transfer 1000 tokens to it
-func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(flowClient *client.Client, keyIndex int) (flowsdk.Address, *flowsdk.AccountKey) {
+func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(keyIndex int) (flowsdk.Address, *flowsdk.AccountKey) {
 	ctx := context.Background()
 
 	myPrivateKey := examples.RandomPrivateKey()
@@ -204,21 +204,24 @@ func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(flowClient *clien
 	err = createAccountTx.SignEnvelope(gs.rootAcctAddr, keyIndex, gs.rootSigner)
 	examples.Handle(err)
 
-	err = flowClient.SendTransaction(ctx, *createAccountTx)
+	gs.ref, err = gs.flowClient.GetLatestBlockHeader(context.Background(), false)
+	examples.Handle(err)
+
+	err = gs.flowClient.SendTransaction(ctx, *createAccountTx)
 	examples.Handle(err)
 
 	createAccountTxID := createAccountTx.ID()
 
 	gs.rootSignerLock.Unlock()
 
-	accountCreationTxRes := WaitForFinalized(ctx, flowClient, createAccountTxID)
+	accountCreationTxRes := WaitForFinalized(ctx, gs.flowClient, createAccountTxID)
 	examples.Handle(accountCreationTxRes.Error)
 
 	// Successful Tx, increment sequence number
 	gs.sequenceNumbers[keyIndex]++
 	accountAddress := flowsdk.Address{}
 	for len(accountCreationTxRes.Events) == 0 {
-		accountCreationTxRes = WaitForFinalized(ctx, flowClient, createAccountTxID)
+		accountCreationTxRes = WaitForFinalized(ctx, gs.flowClient, createAccountTxID)
 	}
 	for _, event := range accountCreationTxRes.Events {
 		fmt.Println(event)
@@ -248,13 +251,16 @@ func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(flowClient *clien
 	err = transferTx.SignEnvelope(gs.rootAcctAddr, keyIndex, gs.rootSigner)
 	examples.Handle(err)
 
-	err = flowClient.SendTransaction(ctx, *transferTx)
+	gs.ref, err = gs.flowClient.GetLatestBlockHeader(context.Background(), false)
+	examples.Handle(err)
+
+	err = gs.flowClient.SendTransaction(ctx, *transferTx)
 	examples.Handle(err)
 
 	transferTxID := transferTx.ID()
 	gs.rootSignerLock.Unlock()
 
-	transferTxResp := WaitForFinalized(ctx, flowClient, transferTxID)
+	transferTxResp := WaitForFinalized(ctx, gs.flowClient, transferTxID)
 	examples.Handle(transferTxResp.Error)
 
 	// Successful Tx, increment sequence number
@@ -501,6 +507,10 @@ func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resul
 			// reset
 			totalExecutedTx = newTotal
 			startTime = endTime
+
+			// Update finalized block so it doesn't get to stale
+			gs.ref, err = gs.flowClient.GetLatestBlockHeader(context.Background(), false)
+			require.NoError(gs.T(), err, "could not update finalized block")
 		}
 	}
 }
