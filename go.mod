@@ -26,7 +26,7 @@ require (
 	github.com/libp2p/go-tcp-transport v0.1.1
 	github.com/multiformats/go-multiaddr v0.2.0
 	github.com/onflow/cadence v0.4.0
-	github.com/onflow/flow-go-sdk v0.4.0 // indirect
+	github.com/onflow/flow-go-sdk v0.4.0
 	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200601215056-34a11def1d6b
 	github.com/onsi/ginkgo v1.10.1 // indirect
 	github.com/onsi/gomega v1.7.0 // indirect
