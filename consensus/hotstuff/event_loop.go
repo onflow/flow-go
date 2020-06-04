@@ -83,6 +83,12 @@ func (el *EventLoop) loop() {
 				el.log.Fatal().Err(err).Msg("could not process timeout")
 			}
 
+			// At this point, we have received and processed an event from the timeout channel.
+			// A timeout also means, we have made progress. At this point, a new timeout will have
+			// been started and el.eventHandler.TimeoutChannel() will be a NEW channel (for the just-started timeout)
+			// Very important to start the for loop from the beginning, to continue the with the new timeout channel!
+			continue
+
 		default:
 			// fall through to non-priority events
 		}
