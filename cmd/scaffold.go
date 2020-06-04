@@ -37,6 +37,7 @@ import (
 	storerr "github.com/dapperlabs/flow-go/storage"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	sutil "github.com/dapperlabs/flow-go/storage/util"
 	"github.com/dapperlabs/flow-go/utils/debug"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
@@ -293,6 +294,8 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
 	fnb.MustNot(err).Str("dir", fnb.BaseConfig.datadir).Msg("could not create datadir")
 
+	log := sutil.NewLogger(fnb.Logger)
+
 	// we initialize the database with options that allow us to keep the maximum
 	// item size in the trie itself (up to 1MB) and where we keep all level zero
 	// tables in-memory as well; this slows down compaction and increases memory
@@ -300,7 +303,7 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	opts := badger.
 		DefaultOptions(fnb.BaseConfig.datadir).
 		WithKeepL0InMemory(true).
-		WithLogger(nil)
+		WithLogger(log)
 	db, err := badger.Open(opts)
 	fnb.MustNot(err).Msg("could not open key-value store")
 
