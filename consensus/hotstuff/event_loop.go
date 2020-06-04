@@ -82,7 +82,7 @@ func (el *EventLoop) loop() {
 			if err != nil {
 				el.log.Fatal().Err(err).Msg("could not process timeout")
 			}
-
+			continue
 		default:
 			// fall through to non-priority events
 		}
