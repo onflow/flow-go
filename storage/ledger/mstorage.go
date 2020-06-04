@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/node"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/wal"
@@ -48,23 +49,23 @@ func NewMTrieStorage(dbDir string, cacheSize int, metrics module.LedgerMetrics, 
 	if err != nil {
 		return nil, fmt.Errorf("cannot create MForest: %w", err)
 	}
-	trie := &MTrieStorage{
+	storage := &MTrieStorage{
 		mForest: mForest,
 		wal:     w,
 		metrics: metrics,
 	}
 
 	err = w.Replay(
-		func(storableNodes []*mtrie.StorableNode, storableTries []*mtrie.StorableTrie) error {
-			return trie.mForest.LoadStorables(storableNodes, storableTries)
+		func(storableNodes []*node.StorableNode, storableTries []*trie.StorableTrie) error {
+			return storage.mForest.LoadStorables(storableNodes, storableTries)
 		},
 		func(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
-			_, err = trie.mForest.Update(stateCommitment, keys, values)
+			_, err = storage.mForest.Update(stateCommitment, keys, values)
 			// _, err := trie.UpdateRegisters(keys, values, stateCommitment)
 			return err
 		},
 		func(stateCommitment flow.StateCommitment) error {
-			trie.mForest.RemoveTrie(stateCommitment)
+			storage.mForest.RemoveTrie(stateCommitment)
 			return nil
 		},
 	)
@@ -76,7 +77,7 @@ func NewMTrieStorage(dbDir string, cacheSize int, metrics module.LedgerMetrics, 
 	// TODO update to proper value once https://github.com/dapperlabs/flow-go/pull/3720 is merged
 	metrics.ForestApproxMemorySize(0)
 
-	return trie, nil
+	return storage, nil
 }
 
 // Ready implements interface module.ReadyDoneAware

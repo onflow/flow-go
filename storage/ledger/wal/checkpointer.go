@@ -14,6 +14,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/node"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 )
 
 var checkpointFilenamePrefix = "checkpoint."
@@ -116,7 +118,7 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 		return fmt.Errorf("no segments to checkpoint to %d, latests not checkpointed segment: %d", to, notCheckpointedTo)
 	}
 
-	mForest, err := mtrie.NewMForest(c.maxHeight, c.dir, c.cacheSize, &metrics.NoopCollector{}, func(evictedTrie *mtrie.MTrie) error {
+	mForest, err := mtrie.NewMForest(c.maxHeight, c.dir, c.cacheSize, &metrics.NoopCollector{}, func(evictedTrie *trie.MTrie) error {
 		return nil
 	})
 	if err != nil {
@@ -124,11 +126,11 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 	}
 
 	err = c.wal.replay(0, to,
-		func(storableNodes []*mtrie.StorableNode, storableTries []*mtrie.StorableTrie) error {
+		func(storableNodes []*node.StorableNode, storableTries []*trie.StorableTrie) error {
 			return mForest.LoadStorables(storableNodes, storableTries)
 		},
 		func(commitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
-			_, err := mForest.Update(keys, values, commitment)
+			_, err := mForest.Update(commitment, keys, values)
 			return err
 		}, func(commitment flow.StateCommitment) error {
 			return nil
@@ -196,7 +198,7 @@ func (c *Checkpointer) CheckpointWriter(to int) (io.WriteCloser, error) {
 	}, nil
 }
 
-func (c *Checkpointer) StoreCheckpoint(storableNodes []*mtrie.StorableNode, storableTries []*mtrie.StorableTrie, writer io.WriteCloser) error {
+func (c *Checkpointer) StoreCheckpoint(storableNodes []*node.StorableNode, storableTries []*trie.StorableTrie, writer io.WriteCloser) error {
 
 	header := make([]byte, 8+2)
 
@@ -228,7 +230,7 @@ func (c *Checkpointer) StoreCheckpoint(storableNodes []*mtrie.StorableNode, stor
 	return nil
 }
 
-func (c *Checkpointer) LoadCheckpoint(checkpoint int) ([]*mtrie.StorableNode, []*mtrie.StorableTrie, error) {
+func (c *Checkpointer) LoadCheckpoint(checkpoint int) ([]*node.StorableNode, []*trie.StorableTrie, error) {
 
 	filepath := path.Join(c.dir, numberToFilename(checkpoint))
 	file, err := os.Open(filepath)
@@ -251,8 +253,8 @@ func (c *Checkpointer) LoadCheckpoint(checkpoint int) ([]*mtrie.StorableNode, []
 	nodesCount, pos := readUint64(header, 0)
 	triesCount, _ := readUint16(header, pos)
 
-	nodes := make([]*mtrie.StorableNode, nodesCount+1) //+1 for 0 index meaning nil
-	tries := make([]*mtrie.StorableTrie, triesCount)
+	nodes := make([]*node.StorableNode, nodesCount+1) //+1 for 0 index meaning nil
+	tries := make([]*trie.StorableTrie, triesCount)
 
 	for i := uint64(1); i <= nodesCount; i++ {
 		storableNode, err := ReadStorableNode(reader)

@@ -29,23 +29,6 @@ type MForest struct {
 	metrics       module.LedgerMetrics
 }
 
-type StorableNode struct {
-	LIndex    uint64
-	RIndex    uint64
-	Height    uint16 // Height where the node is at
-	Key       []byte
-	Value     []byte
-	HashValue []byte
-}
-
-type StorableTrie struct {
-	RootIndex      uint64
-	Number         uint64
-	MaxHeight      uint16
-	RootHash       []byte
-	ParentRootHash []byte
-}
-
 // NewMForest returns a new instance of memory forest
 func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int, metrics module.LedgerMetrics, onTreeEvicted func(tree *trie.MTrie) error) (*MForest, error) {
 
@@ -84,7 +67,7 @@ func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int, metrics
 		return nil, fmt.Errorf("constructing empty trie for forest failed: %w", err)
 	}
 
-	err = forest.addTrie(emptyTrie)
+	err = forest.AddTrie(emptyTrie)
 	if err != nil {
 		return nil, fmt.Errorf("adding empty trie to forest failed: %w", err)
 	}
@@ -129,62 +112,57 @@ func (f *MForest) GetCachedRootHashes() ([][]byte, error) {
 // are replaced by index  in the slice, and list of storable tries, referncing root node by index
 // 0 is a special index, meaning nil, but is included in this list for ease of use and
 // removing need to add/subtract indexes
-func (f *MForest) ToStorables() ([]*StorableNode, []*StorableTrie, error) {
+func (f *MForest) ToStorables() ([]*node.StorableNode, []*trie.StorableTrie, error) {
 	rootHashes, err := f.GetCachedRootHashes()
 	if err != nil {
 		return nil, nil, fmt.Errorf("canot get cached tries root hashes: %w", err)
 	}
 
-	storableTries := make([]*StorableTrie, len(rootHashes))
+	storableTries := make([]*trie.StorableTrie, len(rootHashes))
 
 	// assign unique value to every node
-	allNodes := make(map[*node]uint64)
+	allNodes := make(map[*node.Node]uint64)
 	allNodes[nil] = 0
 
 	// start from 1, as 0 marks nil
 	counter := uint64(1)
 
 	for i, rootHash := range rootHashes {
-		trie, err := f.GetTrie(rootHash)
+		t, err := f.getTrie(rootHash)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		nodes := trie.GetNodes()
-		for _, node := range nodes {
+		nodes := t.GetNodes()
+		for _, n := range nodes {
 			// if node not in map
-			if _, has := allNodes[node]; !has {
-				allNodes[node] = counter
+			if _, has := allNodes[n]; !has {
+				allNodes[n] = counter
 				counter++
 			}
 		}
 		//fix root nodes indices
 		// since we indexed all nodes, root must be present
-		storableTries[i] = &StorableTrie{
-			RootIndex:      allNodes[trie.root],
-			Number:         trie.number,
-			MaxHeight:      uint16(trie.maxHeight),
-			RootHash:       trie.rootHash,
-			ParentRootHash: trie.parentRootHash,
-		}
+		storableTries[i] = t.ToStorableTrie(allNodes)
+
 	}
 
-	storableNodes := make([]*StorableNode, len(allNodes))
+	storableNodes := make([]*node.StorableNode, len(allNodes))
 
-	for node, index := range allNodes {
-		if node == nil {
+	for n, index := range allNodes {
+		if n == nil {
 			continue // skip nils
 		}
-		leftIndex := allNodes[node.GetLeft()]
-		rightIndex := allNodes[node.GetRight()]
+		leftIndex := allNodes[n.LeftChild()]
+		rightIndex := allNodes[n.RigthChild()]
 
-		storableNodes[index] = &StorableNode{
+		storableNodes[index] = &node.StorableNode{
 			LIndex:    leftIndex,
 			RIndex:    rightIndex,
-			Height:    uint16(node.height),
-			Key:       node.key,
-			Value:     node.value,
-			HashValue: node.hashValue,
+			Height:    uint16(n.Height()),
+			Key:       n.Key(),
+			Value:     n.Value(),
+			HashValue: n.Hash(),
 		}
 	}
 
@@ -336,7 +314,7 @@ func (f *MForest) Update(rootHash []byte, keys [][]byte, values [][]byte) (*trie
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
 
-	err = f.addTrie(newTrie)
+	err = f.AddTrie(newTrie)
 	if err != nil {
 		return nil, fmt.Errorf("adding updated trie to forest failed: %w", err)
 	}
@@ -451,7 +429,7 @@ func (f *MForest) LoadTrie(path string) (*trie.MTrie, error) {
 	if err != nil {
 		return nil, fmt.Errorf("loading trie from '%s' failed: %w", path, err)
 	}
-	err = f.addTrie(newTrie)
+	err = f.AddTrie(newTrie)
 	if err != nil {
 		return nil, fmt.Errorf("adding loaded trie from '%s' to forest failed: %w", path, err)
 	}
@@ -469,47 +447,24 @@ func (f *MForest) DiskSize() (int64, error) {
 	return io.DirSize(f.dir)
 }
 
-func (f *MForest) LoadStorables(storableNodes []*StorableNode, storableTries []*StorableTrie) error {
+func (f *MForest) LoadStorables(storableNodes []*node.StorableNode, storableTries []*trie.StorableTrie) error {
 
-	nodes := make([]*node, len(storableNodes))
-
-	for i := 1; i < len(storableNodes); i++ {
-		storableNode := storableNodes[i]
-
-		nodes[i] = &node{
-			lChild:    nil,
-			rChild:    nil,
-			height:    int(storableNode.Height),
-			key:       storableNode.Key,
-			value:     storableNode.Value,
-			hashValue: storableNode.HashValue,
-		}
-	}
-
-	//fix references now
-	for i := 1; i < len(storableNodes); i++ {
-		storableNode := storableNodes[i]
-
-		if storableNode.LIndex > 0 {
-			nodes[i].lChild = nodes[storableNode.LIndex]
-		}
-
-		if storableNode.RIndex > 0 {
-			nodes[i].rChild = nodes[storableNode.RIndex]
-		}
-	}
+	nodes := node.RebuildFromStorables(storableNodes)
 
 	//restore tries
 	for _, storableTrie := range storableTries {
-		mtrie := &MTrie{
-			root:           nodes[storableTrie.RootIndex],
-			number:         storableTrie.Number,
-			maxHeight:      int(storableTrie.MaxHeight),
-			rootHash:       storableTrie.RootHash,
-			parentRootHash: storableTrie.ParentRootHash,
+		mtrie, err := trie.NewMTrie(
+			nodes[storableTrie.RootIndex],
+			storableTrie.Number,
+			int(storableTrie.MaxHeight),
+			storableTrie.ParentRootHash,
+		)
+
+		if err != nil {
+			return fmt.Errorf("cannot create new restored trie: %w", err)
 		}
 
-		err := f.AddTrie(mtrie)
+		err = f.AddTrie(mtrie)
 		if err != nil {
 			return fmt.Errorf("cannot restore trie: %w", err)
 		}

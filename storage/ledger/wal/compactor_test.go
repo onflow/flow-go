@@ -13,6 +13,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/node"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -27,7 +29,7 @@ func Test_Compactor(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		f, err := mtrie.NewMForest(33, dir, size*10, metricsCollector, func(tree *mtrie.MTrie) error { return nil })
+		f, err := mtrie.NewMForest(33, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		var stateCommitment = f.GetEmptyRootHash()
@@ -60,7 +62,8 @@ func Test_Compactor(t *testing.T) {
 				err = wal.RecordUpdate(stateCommitment, keys, values)
 				require.NoError(t, err)
 
-				stateCommitment, err = f.Update(keys, values, stateCommitment)
+				newTrie, err := f.Update(stateCommitment, keys, values)
+				stateCommitment := newTrie.RootHash()
 				require.NoError(t, err)
 
 				require.FileExists(t, path.Join(dir, numberToFilenamePart(i)))
@@ -104,7 +107,7 @@ func Test_Compactor(t *testing.T) {
 			}
 		})
 
-		f2, err := mtrie.NewMForest(33, dir, size*10, metricsCollector, func(tree *mtrie.MTrie) error { return nil })
+		f2, err := mtrie.NewMForest(33, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		t.Run("load data from checkpoint and WAL", func(t *testing.T) {
@@ -112,11 +115,11 @@ func Test_Compactor(t *testing.T) {
 			require.NoError(t, err)
 
 			err = wal2.Replay(
-				func(nodes []*mtrie.StorableNode, tries []*mtrie.StorableTrie) error {
+				func(nodes []*node.StorableNode, tries []*trie.StorableTrie) error {
 					return f2.LoadStorables(nodes, tries)
 				},
 				func(commitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
-					_, err := f2.Update(keys, values, commitment)
+					_, err := f2.Update(commitment, keys, values)
 					return err
 				},
 				func(commitment flow.StateCommitment) error {
@@ -140,10 +143,10 @@ func Test_Compactor(t *testing.T) {
 					keys = append(keys, key)
 				}
 
-				registerValues, err := f.Read(keys, []byte(stateCommitment))
+				registerValues, err := f.Read([]byte(stateCommitment), keys)
 				require.NoError(t, err)
 
-				registerValues2, err := f2.Read(keys, []byte(stateCommitment))
+				registerValues2, err := f2.Read([]byte(stateCommitment), keys)
 				require.NoError(t, err)
 
 				for i, key := range keys {

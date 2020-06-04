@@ -45,12 +45,33 @@ type MTrie struct {
 	parentRootHash []byte
 }
 
+// StorableTrie is a data structure for storing trie
+type StorableTrie struct {
+	RootIndex      uint64
+	Number         uint64
+	MaxHeight      uint16
+	RootHash       []byte
+	ParentRootHash []byte
+}
+
 func NewEmptyMTrie(maxHeight int, number uint64, parentRootHash []byte) (*MTrie, error) {
-	if (maxHeight-1)%8 != 0 {
+	if !checkHeight(maxHeight) {
 		return nil, errors.New("key length of trie must be integer-multiple of 8")
 	}
 	return &MTrie{
 		root:           node.NewEmptyTreeRoot(maxHeight - 1),
+		number:         number,
+		maxHeight:      maxHeight,
+		parentRootHash: parentRootHash,
+	}, nil
+}
+
+func NewMTrie(root *node.Node, number uint64, maxHeight int, parentRootHash []byte) (*MTrie, error) {
+	if !checkHeight(maxHeight) {
+		return nil, errors.New("key length of trie must be integer-multiple of 8")
+	}
+	return &MTrie{
+		root:           root,
 		number:         number,
 		maxHeight:      maxHeight,
 		parentRootHash: parentRootHash,
@@ -565,4 +586,22 @@ func constructTrieFromKeyValuePairs(keys [][]byte, keyLength int, values [][]byt
 		maxHeight:      keyLength + 1, // TODO: fix me when replacing maxHeight definition
 		parentRootHash: parentRootHash,
 	}, nil
+}
+
+func (mt *MTrie) GetNodes() []*node.Node {
+	return mt.root.GetNodes()
+}
+
+func (mt *MTrie) ToStorableTrie(allNodes map[*node.Node]uint64) *StorableTrie {
+	return &StorableTrie{
+		RootIndex:      allNodes[mt.root],
+		Number:         mt.number,
+		MaxHeight:      uint16(mt.maxHeight),
+		RootHash:       mt.RootHash(),
+		ParentRootHash: mt.parentRootHash,
+	}
+}
+
+func checkHeight(height int) bool {
+	return (height-1)%8 == 0
 }

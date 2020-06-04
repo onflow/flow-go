@@ -236,3 +236,15 @@ func (n *Node) Equals(o *Node) bool {
 
 	return true
 }
+
+func (n *Node) GetNodes() []*Node {
+	nodes := make([]*Node, 1)
+	nodes = append(nodes, n)
+	if n.lChild != nil {
+		nodes = append(nodes, n.lChild.GetNodes()...)
+	}
+	if n.rChild != nil {
+		nodes = append(nodes, n.rChild.GetNodes()...)
+	}
+	return nodes
+}

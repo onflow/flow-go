@@ -13,6 +13,8 @@ import (
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/node"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 	realWAL "github.com/dapperlabs/flow-go/storage/ledger/wal"
 	"github.com/dapperlabs/flow-go/storage/util"
@@ -120,7 +122,7 @@ func Test_Checkpointing(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		f, err := mtrie.NewMForest(33, dir, size*10, metricsCollector, func(tree *mtrie.MTrie) error { return nil })
+		f, err := mtrie.NewMForest(33, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		var stateCommitment = f.GetEmptyRootHash()
@@ -145,7 +147,8 @@ func Test_Checkpointing(t *testing.T) {
 				err = wal.RecordUpdate(stateCommitment, keys, values)
 				require.NoError(t, err)
 
-				stateCommitment, err = f.Update(keys, values, stateCommitment)
+				newTrie, err := f.Update(stateCommitment, keys, values)
+				stateCommitment := newTrie.RootHash()
 				require.NoError(t, err)
 
 				fmt.Printf("Updated with %x\n", stateCommitment)
@@ -164,7 +167,7 @@ func Test_Checkpointing(t *testing.T) {
 		})
 
 		// create a new forest and reply WAL
-		f2, err := mtrie.NewMForest(33, dir, size*10, metricsCollector, func(tree *mtrie.MTrie) error { return nil })
+		f2, err := mtrie.NewMForest(33, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		t.Run("replay WAL and create checkpoint", func(t *testing.T) {
@@ -175,11 +178,11 @@ func Test_Checkpointing(t *testing.T) {
 			require.NoError(t, err)
 
 			err = wal2.Replay(
-				func(nodes []*mtrie.StorableNode, tries []*mtrie.StorableTrie) error {
+				func(nodes []*node.StorableNode, tries []*trie.StorableTrie) error {
 					return fmt.Errorf("I should fail as there should be no checkpoints")
 				},
 				func(commitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
-					_, err := f2.Update(keys, values, commitment)
+					_, err := f2.Update(commitment, keys, values)
 					return err
 				},
 				func(commitment flow.StateCommitment) error {
@@ -202,7 +205,7 @@ func Test_Checkpointing(t *testing.T) {
 			require.NoError(t, err)
 		})
 
-		f3, err := mtrie.NewMForest(33, dir, size*10, metricsCollector, func(tree *mtrie.MTrie) error { return nil })
+		f3, err := mtrie.NewMForest(33, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		t.Run("read checkpoint", func(t *testing.T) {
@@ -210,7 +213,7 @@ func Test_Checkpointing(t *testing.T) {
 			require.NoError(t, err)
 
 			err = wal3.Replay(
-				func(nodes []*mtrie.StorableNode, tries []*mtrie.StorableTrie) error {
+				func(nodes []*node.StorableNode, tries []*trie.StorableTrie) error {
 					return f3.LoadStorables(nodes, tries)
 				},
 				func(commitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
@@ -240,13 +243,13 @@ func Test_Checkpointing(t *testing.T) {
 
 				fmt.Printf("Querying with %x\n", stateCommitment)
 
-				registerValues, err := f.Read(keys, []byte(stateCommitment))
+				registerValues, err := f.Read([]byte(stateCommitment), keys)
 				require.NoError(t, err)
 
-				registerValues2, err := f2.Read(keys, []byte(stateCommitment))
+				registerValues2, err := f2.Read([]byte(stateCommitment), keys)
 				require.NoError(t, err)
 
-				registerValues3, err := f3.Read(keys, []byte(stateCommitment))
+				registerValues3, err := f3.Read([]byte(stateCommitment), keys)
 				require.NoError(t, err)
 
 				for i, key := range keys {
@@ -271,8 +274,9 @@ func Test_Checkpointing(t *testing.T) {
 			err = wal4.RecordUpdate(stateCommitment, keys2, values2)
 			require.NoError(t, err)
 
-			stateCommitment, err = f.Update(keys2, values2, stateCommitment)
+			newTrie, err := f.Update(stateCommitment, keys2, values2)
 			require.NoError(t, err)
+			stateCommitment = newTrie.RootHash()
 
 			err = wal4.Close()
 			require.NoError(t, err)
@@ -280,7 +284,7 @@ func Test_Checkpointing(t *testing.T) {
 			require.FileExists(t, path.Join(dir, "00000011")) //make sure we have extra segment
 		})
 
-		f5, err := mtrie.NewMForest(33, dir, size*10, metricsCollector, func(tree *mtrie.MTrie) error { return nil })
+		f5, err := mtrie.NewMForest(33, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		t.Run("replay both checkpoint and updates after checkpoint", func(t *testing.T) {
@@ -290,14 +294,14 @@ func Test_Checkpointing(t *testing.T) {
 			updatesLeft := 1 // there should be only one update
 
 			err = wal5.Replay(
-				func(nodes []*mtrie.StorableNode, tries []*mtrie.StorableTrie) error {
+				func(nodes []*node.StorableNode, tries []*trie.StorableTrie) error {
 					return f5.LoadStorables(nodes, tries)
 				},
 				func(commitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
 					if updatesLeft == 0 {
 						return fmt.Errorf("more updates called then expected")
 					}
-					_, err := f5.Update(keys, values, commitment)
+					_, err := f5.Update(commitment, keys, values)
 					updatesLeft--
 					return err
 				},
@@ -312,10 +316,10 @@ func Test_Checkpointing(t *testing.T) {
 		})
 
 		t.Run("extra updates were applied correctly", func(t *testing.T) {
-			registerValues, err := f.Read(keys2, []byte(stateCommitment))
+			registerValues, err := f.Read([]byte(stateCommitment), keys2)
 			require.NoError(t, err)
 
-			registerValues5, err := f5.Read(keys2, []byte(stateCommitment))
+			registerValues5, err := f5.Read([]byte(stateCommitment), keys2)
 			require.NoError(t, err)
 
 			for i := range keys2 {

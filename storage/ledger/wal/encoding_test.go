@@ -7,7 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/node"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 )
 
 func TestUpdate(t *testing.T) {
@@ -68,7 +69,7 @@ func TestUpdate(t *testing.T) {
 }
 func TestStorableNode(t *testing.T) {
 
-	storableNode := &mtrie.StorableNode{
+	storableNode := &node.StorableNode{
 		LIndex:    0,
 		RIndex:    1,
 		Height:    2137,
@@ -106,7 +107,7 @@ func TestStorableNode(t *testing.T) {
 
 func TestStorableTrie(t *testing.T) {
 
-	storableTrie := &mtrie.StorableTrie{
+	storableTrie := &trie.StorableTrie{
 		RootIndex:      21,
 		Number:         37,
 		MaxHeight:      44,

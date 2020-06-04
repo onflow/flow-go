@@ -43,7 +43,7 @@ func TestTrieOperations(t *testing.T) {
 	require.NoError(t, err)
 
 	// Add trie
-	err = fStore.addTrie(updatedTrie)
+	err = fStore.AddTrie(updatedTrie)
 	require.NoError(t, err)
 
 	// Get trie
@@ -1015,7 +1015,6 @@ func TestTrieStoreAndLoad(t *testing.T) {
 	//}
 }
 
-
 func TestForestStoreAndLoad(t *testing.T) {
 	trieHeight := 9
 	dir, err := ioutil.TempDir("", "test-mtrie-")
@@ -1023,7 +1022,7 @@ func TestForestStoreAndLoad(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	mForest, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
+	mForest, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash := mForest.GetEmptyRootHash()
 
@@ -1040,16 +1039,18 @@ func TestForestStoreAndLoad(t *testing.T) {
 
 	keys := [][]byte{k1, k2, k3, k4, k5}
 	values := [][]byte{v1, v2, v3, v4, v5}
-	rootHash, err = mForest.Update(keys, values, rootHash)
+	newTrie, err := mForest.Update(rootHash, keys, values)
 	require.NoError(t, err)
+	rootHash = newTrie.RootHash()
 
 	k6 := []byte([]uint8{uint8(133)})
 	v6 := []byte{'F'}
 
 	keys6 := [][]byte{k6}
 	values6 := [][]byte{v6}
-	rootHash, err = mForest.Update(keys6, values6, rootHash)
+	newTrie, err = mForest.Update(rootHash, keys6, values6)
 	require.NoError(t, err)
+	rootHash = newTrie.RootHash()
 
 	file, err := ioutil.TempFile("", "flow-mtrie-load")
 	if err != nil {
@@ -1060,7 +1061,7 @@ func TestForestStoreAndLoad(t *testing.T) {
 	storableNodes, storableTrees, err := mForest.ToStorables()
 	require.NoError(t, err)
 
-	newMForest, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
+	newMForest, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
 	//forests are different
@@ -1072,9 +1073,9 @@ func TestForestStoreAndLoad(t *testing.T) {
 	//forests are the same now
 	assert.Equal(t, *mForest, *newMForest)
 
-	retValues, err := mForest.Read(keys, rootHash)
+	retValues, err := mForest.Read(rootHash, keys)
 	require.NoError(t, err)
-	newRetValues, err := newMForest.Read(keys, rootHash)
+	newRetValues, err := newMForest.Read(rootHash, keys)
 	require.NoError(t, err)
 	for i := range keys {
 		require.True(t, bytes.Equal(values[i], retValues[i]))
