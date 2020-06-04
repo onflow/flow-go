@@ -11,13 +11,13 @@ type BlockContext struct {
 	mock.Mock
 }
 
-// ExecuteScript provides a mock function with given fields: ledger, script
-func (_m *BlockContext) ExecuteScript(ledger virtualmachine.Ledger, script []byte) (*virtualmachine.ScriptResult, error) {
-	ret := _m.Called(ledger, script)
+// ExecuteScript provides a mock function with given fields: ledger, script, arguments
+func (_m *BlockContext) ExecuteScript(ledger virtualmachine.Ledger, script []byte, arguments [][]byte) (*virtualmachine.ScriptResult, error) {
+	ret := _m.Called(ledger, script, arguments)
 
 	var r0 *virtualmachine.ScriptResult
-	if rf, ok := ret.Get(0).(func(virtualmachine.Ledger, []byte) *virtualmachine.ScriptResult); ok {
-		r0 = rf(ledger, script)
+	if rf, ok := ret.Get(0).(func(virtualmachine.Ledger, []byte, [][]byte) *virtualmachine.ScriptResult); ok {
+		r0 = rf(ledger, script, arguments)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*virtualmachine.ScriptResult)
@@ -25,8 +25,8 @@ func (_m *BlockContext) ExecuteScript(ledger virtualmachine.Ledger, script []byt
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(virtualmachine.Ledger, []byte) error); ok {
-		r1 = rf(ledger, script)
+	if rf, ok := ret.Get(1).(func(virtualmachine.Ledger, []byte, [][]byte) error); ok {
+		r1 = rf(ledger, script, arguments)
 	} else {
 		r1 = ret.Error(1)
 	}

@@ -385,7 +385,7 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 
 		// Successful call to computation manager
 		ctx.computationManager.
-			On("ExecuteScript", script, executableBlock.Block.Header, view).
+			On("ExecuteScript", script, [][]byte(nil), executableBlock.Block.Header, view).
 			Return(scriptResult, nil)
 
 		// Execute our script and expect no error
