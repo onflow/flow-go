@@ -64,6 +64,7 @@ type TransactionsPerSecondSuite struct {
 	rootAcctAddr    flowsdk.Address
 	rootAcctKey     *flowsdk.AccountKey
 	rootSigner      crypto.Signer
+	rootSignerLock  sync.Mutex
 	sequenceNumbers []int
 	accessAddr      string
 	privateKeyHex   string
@@ -197,7 +198,9 @@ func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(flowClient *clien
 		SetProposalKey(gs.rootAcctAddr, keyIndex, gs.rootAcctKey.SequenceNumber).
 		SetPayer(gs.rootAcctAddr)
 
+	gs.rootSignerLock.Lock()
 	err = createAccountTx.SignEnvelope(gs.rootAcctAddr, keyIndex, gs.rootSigner)
+	gs.rootSignerLock.Unlock()
 	examples.Handle(err)
 
 	err = flowClient.SendTransaction(ctx, *createAccountTx)
@@ -236,7 +239,9 @@ func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(flowClient *clien
 		SetPayer(gs.rootAcctAddr).
 		AddAuthorizer(gs.rootAcctAddr)
 
+	gs.rootSignerLock.Lock()
 	err = transferTx.SignEnvelope(gs.rootAcctAddr, keyIndex, gs.rootSigner)
+	gs.rootSignerLock.Unlock()
 	examples.Handle(err)
 
 	err = flowClient.SendTransaction(ctx, *transferTx)
