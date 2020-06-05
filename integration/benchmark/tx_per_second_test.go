@@ -3,6 +3,7 @@ package execution
 import (
 	"bufio"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -23,6 +24,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/dapperlabs/flow-go/integration/tests/execution"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -41,7 +43,7 @@ const (
 const (
 	// total test accounts to create
 	// This is a long running test. On a local environment use more conservative numbers for TotalAccounts (~3)
-	TotalAccounts = 1000
+	TotalAccounts = 10
 	// each account transfers 10 tokens to the next account RoundsOfTransfer number of times
 	RoundsOfTransfer = 50
 )
@@ -79,8 +81,24 @@ func (gs *TransactionsPerSecondSuite) SetupTest() {
 
 	// Change these to corresponding values if using against non-local testnet
 	gs.accessAddr = fmt.Sprintf(":%s", gs.AccessPort())
-	gs.privateKeyHex = unittest.ServiceAccountPrivateKeyHexSDK
+	gs.privateKeyHex = gs.privateKey()
 	gs.metricsAddr = fmt.Sprintf("http://localhost:%s/metrics", gs.MetricsPort())
+}
+
+func (gs *TransactionsPerSecondSuite) privateKey() string {
+	serviceAccountPrivateKeyBytes, err := hex.DecodeString(unittest.ServiceAccountPrivateKeyHex)
+	if err != nil {
+		panic("error while hex decoding hardcoded root key")
+	}
+
+	// RLP decode the key
+	ServiceAccountPrivateKey, err := flow.DecodeAccountPrivateKey(serviceAccountPrivateKeyBytes)
+	if err != nil {
+		panic("error while decoding hardcoded root key bytes")
+	}
+
+	// get the private key string
+	return hex.EncodeToString(ServiceAccountPrivateKey.PrivateKey.Encode())
 }
 
 // TestTransactionsPerSecond submits transactions and measures the average transaction per second of the execution node
@@ -474,9 +492,11 @@ func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resul
 		}
 		avg := total / (float64(len(instantaneous)))
 
-		logTPSToFile(fmt.Sprintf("total transactions %d", totalExecutedTx), resultFileName)
 		fmt.Printf("Average TPS ===========> : %f\n", avg)
 		logTPSToFile(fmt.Sprintf("average TPS %f", avg), resultFileName)
+
+		fmt.Printf("Total transactions ===========> : %d\n", totalExecutedTx)
+		logTPSToFile(fmt.Sprintf("total transactions %d", totalExecutedTx), resultFileName)
 	}
 
 	// sample every 1 minute
@@ -508,7 +528,7 @@ func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resul
 			totalExecutedTx = newTotal
 			startTime = endTime
 
-			// Update finalized block so it doesn't get to stale
+			// Update finalized block so it doesn't get too stale
 			gs.ref, err = gs.flowClient.GetLatestBlockHeader(context.Background(), false)
 			require.NoError(gs.T(), err, "could not update finalized block")
 		}
