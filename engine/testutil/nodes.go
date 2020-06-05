@@ -121,8 +121,8 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 	pool, err := stdmap.NewTransactions(1000)
 	require.NoError(t, err)
 
-	collections := storage.NewCollections(node.DB)
-	transactions := storage.NewTransactions(node.DB)
+	transactions := storage.NewTransactions(node.Metrics, node.DB)
+	collections := storage.NewCollections(node.DB, transactions)
 
 	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, pool, collectioningest.DefaultConfig())
 	require.Nil(t, err)
@@ -221,7 +221,8 @@ func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int) []mock.ConsensusNod
 func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, syncThreshold uint64) mock.ExecutionNode {
 	node := GenericNode(t, hub, identity, identities)
 
-	collectionsStorage := storage.NewCollections(node.DB)
+	transactionsStorage := storage.NewTransactions(node.Metrics, node.DB)
+	collectionsStorage := storage.NewCollections(node.DB, transactionsStorage)
 	eventsStorage := storage.NewEvents(node.DB)
 	txResultStorage := storage.NewTransactionResults(node.DB)
 	commitsStorage := storage.NewCommits(node.Metrics, node.DB)

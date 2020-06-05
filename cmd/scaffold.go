@@ -70,14 +70,15 @@ type Metrics struct {
 }
 
 type Storage struct {
-	Headers     storage.Headers
-	Index       storage.Index
-	Identities  storage.Identities
-	Guarantees  storage.Guarantees
-	Seals       storage.Seals
-	Payloads    storage.Payloads
-	Blocks      storage.Blocks
-	Collections storage.Collections
+	Headers      storage.Headers
+	Index        storage.Index
+	Identities   storage.Identities
+	Guarantees   storage.Guarantees
+	Seals        storage.Seals
+	Payloads     storage.Payloads
+	Blocks       storage.Blocks
+	Transactions storage.Transactions
+	Collections  storage.Collections
 }
 
 type namedModuleFunc struct {
@@ -322,18 +323,20 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	index := bstorage.NewIndex(fnb.Metrics.Cache, db)
 	payloads := bstorage.NewPayloads(db, index, identities, guarantees, seals)
 	blocks := bstorage.NewBlocks(db, headers, payloads)
-	collections := bstorage.NewCollections(db)
+	transactions := bstorage.NewTransactions(fnb.Metrics.Cache, db)
+	collections := bstorage.NewCollections(db, transactions)
 
 	fnb.DB = db
 	fnb.Storage = Storage{
-		Headers:     headers,
-		Identities:  identities,
-		Guarantees:  guarantees,
-		Seals:       seals,
-		Index:       index,
-		Payloads:    payloads,
-		Blocks:      blocks,
-		Collections: collections,
+		Headers:      headers,
+		Identities:   identities,
+		Guarantees:   guarantees,
+		Seals:        seals,
+		Index:        index,
+		Payloads:     payloads,
+		Blocks:       blocks,
+		Transactions: transactions,
+		Collections:  collections,
 	}
 }
 
