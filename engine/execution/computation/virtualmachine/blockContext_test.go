@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"fmt"
 	"math/rand"
+	"strconv"
 	"testing"
 	"time"
 
@@ -730,6 +731,45 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		}, func() {
 			_, _ = bc.ExecuteScript(ledger, script)
 		})
+	})
+}
+
+func TestBlockContext_UnsafeRandom(t *testing.T) {
+	// seed the RNG
+	rand.Seed(time.Now().Unix())
+	rt := runtime.NewInterpreterRuntime()
+
+	vm, err := virtualmachine.New(rt)
+	require.NoError(t, err)
+	block := unittest.BlockFixture()
+	blocks := new(vmMock.Blocks)
+	bc := vm.NewBlockContext(block.Header, blocks)
+
+	t.Run("works as transaction", func(t *testing.T) {
+		tx := flow.NewTransactionBody().
+			SetScript([]byte(`
+				transaction {
+					execute {
+						let rand = unsafeRandom()
+						log(rand)
+					}
+				}
+			`))
+
+		err := execTestutil.SignTransactionByRoot(tx, 0)
+		require.NoError(t, err)
+
+		ledger := execTestutil.RootBootstrappedLedger()
+		require.NoError(t, err)
+
+		result, err := bc.ExecuteTransaction(ledger, tx)
+		assert.NoError(t, err)
+
+		assert.True(t, result.Succeeded())
+
+		require.Len(t, result.Logs, 1)
+		_, err = strconv.ParseUint(result.Logs[0], 10, 64)
+		require.NoError(t, err)
 	})
 }
 

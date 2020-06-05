@@ -60,3 +60,5 @@ replace github.com/dapperlabs/flow-go/crypto => ./crypto
 replace github.com/dapperlabs/flow-go/protobuf => ./protobuf
 
 replace github.com/dapperlabs/flow-go/integration => ./integration
+
+replace github.com/onflow/cadence => ../cadence

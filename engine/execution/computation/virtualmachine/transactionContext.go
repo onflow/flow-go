@@ -2,6 +2,8 @@ package virtualmachine
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -399,6 +401,14 @@ func (r *TransactionContext) GetBlockAtHeight(height uint64) (hash runtime.Block
 			"unexpected failure of GetBlockAtHeight, tx ID %s, height %v: %w", r.tx.ID().String(), height, err)
 	}
 	return runtime.BlockHash(block.ID()), block.Header.Timestamp.UnixNano(), true, nil
+}
+
+// UnsafeRandom returns a random uint64, where the process of random number derivation is not cryptographically
+// secure.
+func (r *TransactionContext) UnsafeRandom() uint64 {
+	buf := make([]byte, 8)
+	_, _ = rand.Read(buf) // Always succeeds, no need to check error
+	return binary.LittleEndian.Uint64(buf)
 }
 
 // checkProgram checks the given code for syntactic and semantic correctness.
