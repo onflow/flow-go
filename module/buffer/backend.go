@@ -71,7 +71,7 @@ func (b *backend) byID(id flow.Identifier) (*item, bool) {
 	return item, true
 }
 
-// ByParentID returns a list of cached blocks with the given parent. If no such
+// byParentID returns a list of cached blocks with the given parent. If no such
 // blocks exist, returns false.
 func (b *backend) byParentID(parentID flow.Identifier) ([]*item, bool) {
 
@@ -108,8 +108,8 @@ func (b *backend) dropForParent(parentID flow.Identifier) {
 	delete(b.blocksByParent, parentID)
 }
 
-// pruneByHeight prunes any items in the cache that have height below the
-// given height. The pruning height should be the finalized height.
+// pruneByHeight prunes any items in the cache that have height less than or
+// equal to the given height. The pruning height should be the finalized height.
 func (b *backend) pruneByHeight(height uint64) {
 
 	b.mu.Lock()
