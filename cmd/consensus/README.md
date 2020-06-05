@@ -1,6 +1,6 @@
 # Consensus 
 
-The consensus node is responsible for deciding on the subjective ordering of the transactions that will be executed by the execution nodes. They do so by running a consensus algorithm for the blockchain, whereas each block payload contains an ordered list of collection guarantees received by collection node clusters.
+The consensus node is responsible for deciding on the subjective ordering of the transactions that will be executed by the execution nodes. They do so by running a consensus algorithm for the blockchain, whereas each block payload contains an ordered list of collection guarantees received from collection node clusters.
 
 Consensus nodes are also responsible for maintaining the protocol state, which encompasses epochs with their respective set of node identities, as well as the adjudication of all slashing challenges which maintain the economic incentives that serve as the foundation of the bigger Flow system.
 
@@ -37,12 +37,12 @@ This document provides a high-level overview of the consensus node architecture.
 - **Guarantee**, also _Collection Guarantee_ - an attestation for a collection guaranteed by a collection cluster, containing a hash over the collection contents and signed by a qualified majority of the participants of the cluster.
 - **Result**, also _Execution Result_ - a summary representing the delta of the execution state resulting from the execution of a specific block, containing a reference to the previous state and a state commitment for the resulting state.
 - **Receipt**, also _Execution Receipt_ - a proof of execution linked to a specific execution node, containing an execution result, data on execution chunks and a signature of the execution node.
-- **Aproval**, also _Result Approval_ - an approval of the execution of a chunk of an execution result, as verified by a specific verification node.
+- **Approval**, also _Result Approval_ - an approval of the execution of a chunk of an execution result, as verified by a specific verification node.
 - **Seal**, also _Block Seal_ - an attestation of correct execution of a block in the blockchain, built by the consensus node after receiving the necessary execution receipts and result approvals.
 - **Header**, also _Block Header_ - a data structure containing the meta-data for a block, including the merkle root hash for the payload as well as the relevant consensus node signatures.
 - **Payload**, also _Block Payload_ - a list of entities included in a block, currently consisting of collection guarantees and block seals.
 - **Index**, also _Payload Index_ - a list of entitie IDs included in a block, currently consising of a list of collection guarantee IDs and block seal IDs.
-- **Block** - the combination of a block header with a block contents, representing all of the data necessary to construct the and validate the entirety of the block.
+- **Block** - the combination of a block header with a block contents, representing all of the data necessary to construct and validate the entirety of the block.
 
 
 ## Processes
@@ -63,7 +63,7 @@ On an implementation level, each process is implemented by a number of node engi
 
 1. Execution receipts are received from execution nodes.
 2. Result approvals are received from verification nodes.
-3. Execution receipts are result approvals are introduced into the memory pool.
+3. Execution receipts and result approvals are introduced into the memory pool.
 4. Execution receipts are matched with result approvals for block seal generation.
 5. Generated blocks seals are introduced into the memory pool.
 6. Execution receipts and result approvals are removed from the memory pool when a seal is generated.
