@@ -320,7 +320,7 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, db)
 	seals := bstorage.NewSeals(fnb.Metrics.Cache, db)
 	index := bstorage.NewIndex(fnb.Metrics.Cache, db)
-	payloads := bstorage.NewPayloads(index, identities, guarantees, seals)
+	payloads := bstorage.NewPayloads(db, index, identities, guarantees, seals)
 	blocks := bstorage.NewBlocks(db, headers, payloads)
 	collections := bstorage.NewCollections(db)
 

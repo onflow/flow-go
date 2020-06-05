@@ -44,6 +44,12 @@ func (g *Guarantees) Store(guarantee *flow.CollectionGuarantee) error {
 	return g.cache.Put(guarantee.ID(), guarantee)
 }
 
+func (g *Guarantees) storeTx(guarantee *flow.CollectionGuarantee) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		return operation.SkipDuplicates(operation.InsertGuarantee(guarantee.ID(), guarantee))(tx)
+	}
+}
+
 func (g *Guarantees) ByCollectionID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
 	guarantee, err := g.cache.Get(collID)
 	if err != nil {

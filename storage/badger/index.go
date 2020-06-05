@@ -79,6 +79,24 @@ func (i *Index) Store(blockID flow.Identifier, index flow.Index) error {
 	return i.index.Put(blockID, index)
 }
 
+func (i *Index) storeTx(blockID flow.Identifier, index flow.Index) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		err := operation.IndexPayloadIdentities(blockID, index.NodeIDs)(tx)
+		if err != nil {
+			return fmt.Errorf("could not store identity index: %w", err)
+		}
+		err = operation.IndexPayloadGuarantees(blockID, index.CollectionIDs)(tx)
+		if err != nil {
+			return fmt.Errorf("could not store guarantee index: %w", err)
+		}
+		err = operation.IndexPayloadSeals(blockID, index.SealIDs)(tx)
+		if err != nil {
+			return fmt.Errorf("could not store seal index: %w", err)
+		}
+		return nil
+	}
+}
+
 func (i *Index) ByBlockID(blockID flow.Identifier) (flow.Index, error) {
 	index, err := i.index.Get(blockID)
 	if err != nil {

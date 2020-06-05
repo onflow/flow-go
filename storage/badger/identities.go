@@ -44,6 +44,12 @@ func (i *Identities) Store(identity *flow.Identity) error {
 	return i.cache.Put(identity.NodeID, identity)
 }
 
+func (i *Identities) storeTx(idty *flow.Identity) func(tx *badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		return operation.SkipDuplicates(operation.InsertIdentity(idty.NodeID, idty))(tx)
+	}
+}
+
 func (i *Identities) ByNodeID(nodeID flow.Identifier) (*flow.Identity, error) {
 	identity, err := i.cache.Get(nodeID)
 	if err != nil {

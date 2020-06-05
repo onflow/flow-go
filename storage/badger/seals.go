@@ -47,6 +47,12 @@ func (s *Seals) Store(seal *flow.Seal) error {
 	return s.cache.Put(seal.ID(), seal)
 }
 
+func (s *Seals) storeTx(seal *flow.Seal) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		return operation.SkipDuplicates(operation.InsertSeal(seal.ID(), seal))(tx)
+	}
+}
+
 func (s *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {
 	seal, err := s.cache.Get(sealID)
 	if err != nil {

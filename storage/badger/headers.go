@@ -49,6 +49,12 @@ func (h *Headers) Store(header *flow.Header) error {
 	return h.cache.Put(header.ID(), header)
 }
 
+func (h *Headers) storeTx(header *flow.Header) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		return operation.InsertHeader(header.ID(), header)(tx)
+	}
+}
+
 func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
 	header, err := h.cache.Get(blockID)
 	if err != nil {
