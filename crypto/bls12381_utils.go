@@ -16,6 +16,7 @@ import (
 )
 
 // Go wrappers to Relic C types
+// Relic is compiled with ALLOC=AUTO
 type pointG1 C.ep_st
 type pointG2 C.ep2_st
 type scalar C.bn_st
