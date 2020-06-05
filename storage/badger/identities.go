@@ -18,8 +18,10 @@ type Identities struct {
 
 func NewIdentities(collector module.CacheMetrics, db *badger.DB) *Identities {
 
+	i := &Identities{db: db}
+
 	store := func(nodeID flow.Identifier, identity interface{}) error {
-		return operation.RetryOnConflict(db.Update, operation.SkipDuplicates(operation.InsertIdentity(nodeID, identity.(*flow.Identity))))
+		return operation.RetryOnConflict(db.Update, i.storeTx(identity.(*flow.Identity)))
 	}
 
 	retrieve := func(nodeID flow.Identifier) (interface{}, error) {
@@ -28,15 +30,12 @@ func NewIdentities(collector module.CacheMetrics, db *badger.DB) *Identities {
 		return &identity, err
 	}
 
-	i := &Identities{
-		db: db,
-		cache: newCache(collector,
-			withLimit(IdentitiesCacheSize),
-			withStore(store),
-			withRetrieve(retrieve),
-			withResource(metrics.ResourceIdentity),
-		),
-	}
+	i.cache = newCache(collector,
+		withLimit(IdentitiesCacheSize),
+		withStore(store),
+		withRetrieve(retrieve),
+		withResource(metrics.ResourceIdentity))
+
 	return i
 }
 

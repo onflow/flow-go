@@ -22,8 +22,10 @@ type Headers struct {
 
 func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 
+	h := &Headers{db: db}
+
 	store := func(headerID flow.Identifier, header interface{}) error {
-		return operation.RetryOnConflict(db.Update, operation.InsertHeader(headerID, header.(*flow.Header)))
+		return operation.RetryOnConflict(db.Update, h.storeTx(header.(*flow.Header)))
 	}
 
 	retrieve := func(blockID flow.Identifier) (interface{}, error) {
@@ -32,15 +34,11 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 		return &header, err
 	}
 
-	h := &Headers{
-		db: db,
-		cache: newCache(collector,
-			withLimit(flow.DefaultTransactionExpiry+100),
-			withStore(store),
-			withRetrieve(retrieve),
-			withResource(metrics.ResourceHeader),
-		),
-	}
+	h.cache = newCache(collector,
+		withLimit(flow.DefaultTransactionExpiry+100),
+		withStore(store),
+		withRetrieve(retrieve),
+		withResource(metrics.ResourceIndex))
 
 	return h
 }
