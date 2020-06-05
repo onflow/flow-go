@@ -1,6 +1,6 @@
 # Access Node
 
-The access node provides a single point of contact to interact with the flow network. It implements the [Access API](https://github.com/onflow/flow/blob/master/docs/access-api-spec.md)
+The access node provides a single point of contact to interact with the Flow network. It implements the [Access API](https://github.com/onflow/flow/blob/master/docs/access-api-spec.md)
 
 It is a GRPC server which also connects to a collection node and an execution node via GRPC.
 
