@@ -22,8 +22,10 @@ type ClusterPayloads struct {
 
 func NewClusterPayloads(cacheMetrics module.CacheMetrics, db *badger.DB) *ClusterPayloads {
 
+	cp := &ClusterPayloads{db: db}
+
 	store := func(blockID flow.Identifier, payload interface{}) error {
-		return operation.RetryOnConflict(db.Update, procedure.InsertClusterPayload(blockID, payload.(*cluster.Payload)))
+		return operation.RetryOnConflict(db.Update, cp.storeTx(blockID, payload.(*cluster.Payload)))
 	}
 
 	retrieve := func(blockID flow.Identifier) (interface{}, error) {
@@ -32,20 +34,23 @@ func NewClusterPayloads(cacheMetrics module.CacheMetrics, db *badger.DB) *Cluste
 		return &payload, err
 	}
 
-	cp := &ClusterPayloads{
-		db: db,
-		cache: newCache(cacheMetrics,
-			withLimit(flow.DefaultTransactionExpiry+100),
-			withStore(store),
-			withRetrieve(retrieve),
-			withResource(metrics.ResourceClusterPayload)),
-	}
+	cp.cache = newCache(cacheMetrics,
+		withLimit(flow.DefaultTransactionExpiry+100),
+		withStore(store),
+		withRetrieve(retrieve),
+		withResource(metrics.ResourceIndex))
 
 	return cp
 }
 
 func (cp *ClusterPayloads) Store(blockID flow.Identifier, payload *cluster.Payload) error {
 	return cp.cache.Put(blockID, payload)
+}
+
+func (cp *ClusterPayloads) storeTx(blockID flow.Identifier, payload *cluster.Payload) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		return procedure.InsertClusterPayload(blockID, payload)(tx)
+	}
 }
 
 func (cp *ClusterPayloads) ByBlockID(blockID flow.Identifier) (*cluster.Payload, error) {
