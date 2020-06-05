@@ -5,6 +5,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/metrics"
 )
 
 type NetworkMetrics interface {
@@ -33,6 +34,10 @@ type ComplianceMetrics interface {
 	BlockSealed(*flow.Block)
 }
 
+type CleanerMetrics interface {
+	RanGC(took time.Duration)
+}
+
 type CacheMetrics interface {
 	CacheEntries(resource string, entries uint)
 	CacheHit(resource string)
@@ -41,6 +46,7 @@ type CacheMetrics interface {
 
 type MempoolMetrics interface {
 	MempoolEntries(resource string, entries uint)
+	Register(resource string, entriesFunc metrics.EntriesFunc) error
 }
 
 type HotstuffMetrics interface {
@@ -128,13 +134,13 @@ type VerificationMetrics interface {
 	// it increases the result approval counter for this chunk
 	OnResultApproval()
 
-	// OnChunkDataAdded is called whenever something is added to related to chunkID to the in-memory mempools
-	// of verification node. It records the size of stored object.
-	OnChunkDataAdded(chunkID flow.Identifier, size float64)
-
-	// OnChunkDataRemoved is called whenever something is removed that is related to chunkID from the in-memory mempools
-	// of verification node. It records the size of stored object.
-	OnChunkDataRemoved(chunkID flow.Identifier, size float64)
+	// OnVerifiableChunkSubmitted is called whenever a verifiable chunk is shaped for a specific
+	// chunk. It adds the size of the verifiable chunk to the histogram. A verifiable chunk is assumed
+	// to capture all the resources needed to verify a chunk.
+	// The purpose of this function is to track the overall chunk resources size on disk.
+	// Todo wire this up to do monitoring
+	// https://github.com/dapperlabs/flow-go/issues/3183
+	OnVerifiableChunkSubmitted(size float64)
 }
 
 // LedgerMetrics provides an interface to record Ledger Storage metrics.

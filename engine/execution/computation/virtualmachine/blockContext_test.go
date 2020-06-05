@@ -10,10 +10,13 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
+	vmMock "github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine/mock"
 	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/engine/execution/utils"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -29,7 +32,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 	vm, err := virtualmachine.New(rt)
 	require.NoError(t, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	t.Run("transaction success", func(t *testing.T) {
 		tx := flow.NewTransactionBody().
@@ -146,7 +149,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 	vm, err := virtualmachine.New(rt)
 	require.NoError(t, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	t.Run("account update with set code succeeds as service account", func(t *testing.T) {
 		ledger := execTestutil.RootBootstrappedLedger()
@@ -216,7 +219,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 
 	vm, err := virtualmachine.New(rt)
 	assert.NoError(t, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	arg1, _ := jsoncdc.Encode(cadence.NewInt(42))
 	arg2, _ := jsoncdc.Encode(cadence.NewString("foo"))
@@ -317,7 +320,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 
 	vm, err := virtualmachine.New(rt)
 	assert.NoError(t, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	var tests = []struct {
 		label    string
@@ -379,7 +382,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 
 	vm, err := virtualmachine.New(rt)
 	assert.NoError(t, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	privateKeys, err := execTestutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
@@ -558,7 +561,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 	vm, err := virtualmachine.New(rt)
 	require.NoError(t, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	t.Run("script success", func(t *testing.T) {
 		script := []byte(`
@@ -611,6 +614,125 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 	})
 }
 
+func TestBlockContext_GetBlockInfo(t *testing.T) {
+	// seed the RNG
+	rand.Seed(time.Now().UnixNano())
+	rt := runtime.NewInterpreterRuntime()
+
+	block1 := unittest.BlockFixture()
+	block2 := unittest.BlockWithParentFixture(block1.Header)
+	block3 := unittest.BlockWithParentFixture(block2.Header)
+
+	vm, err := virtualmachine.New(rt)
+	require.NoError(t, err)
+	blocks := new(vmMock.Blocks)
+	bc := vm.NewBlockContext(block1.Header, blocks)
+	blocks.On("ByHeight", block1.Header.Height).Return(&block1, nil)
+	blocks.On("ByHeight", block2.Header.Height).Return(&block2, nil)
+	type logPanic struct{}
+	blocks.On("ByHeight", block3.Header.Height).Run(func(args mock.Arguments) { panic(logPanic{}) })
+
+	t.Run("works as transaction", func(t *testing.T) {
+		tx := flow.NewTransactionBody().
+			SetScript([]byte(`
+				transaction {
+					execute {
+						let block = getCurrentBlock()
+						log(block)
+
+						let nextBlock = getBlock(at: block.height + UInt64(1))
+						log(nextBlock)
+					}
+				}
+			`))
+
+		err := execTestutil.SignTransactionByRoot(tx, 0)
+		require.NoError(t, err)
+
+		ledger := execTestutil.RootBootstrappedLedger()
+		require.NoError(t, err)
+
+		result, err := bc.ExecuteTransaction(ledger, tx)
+		assert.NoError(t, err)
+
+		assert.True(t, result.Succeeded())
+
+		require.Len(t, result.Logs, 2)
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, id: 0x%x, timestamp: %.8f)", block1.Header.Height, block1.ID(),
+			float64(block1.Header.Timestamp.Unix())), result.Logs[0])
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height, block2.ID(),
+			float64(block2.Header.Timestamp.Unix())), result.Logs[1])
+	})
+
+	t.Run("works as script", func(t *testing.T) {
+		script := []byte(`
+			pub fun main() {
+				let block = getCurrentBlock()
+				log(block)
+
+				let nextBlock = getBlock(at: block.height + UInt64(1))
+				log(nextBlock)
+			}
+		`)
+
+		ledger := execTestutil.RootBootstrappedLedger()
+		require.NoError(t, err)
+
+		result, err := bc.ExecuteScript(ledger, script)
+		assert.NoError(t, err)
+
+		assert.True(t, result.Succeeded())
+
+		require.Len(t, result.Logs, 2)
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, id: 0x%x, timestamp: %.8f)", block1.Header.Height, block1.ID(),
+			float64(block1.Header.Timestamp.Unix())), result.Logs[0])
+		assert.Equal(t, fmt.Sprintf("Block(height: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height, block2.ID(),
+			float64(block2.Header.Timestamp.Unix())), result.Logs[1])
+	})
+
+	t.Run("panics if external function panics in transaction", func(t *testing.T) {
+		tx := flow.NewTransactionBody().
+			SetScript([]byte(`
+				transaction {
+					execute {
+						let block = getCurrentBlock()
+						let nextBlock = getBlock(at: block.height + UInt64(2))
+					}
+				}
+			`))
+
+		err := execTestutil.SignTransactionByRoot(tx, 0)
+		require.NoError(t, err)
+
+		ledger := execTestutil.RootBootstrappedLedger()
+		require.NoError(t, err)
+
+		assert.PanicsWithValue(t, interpreter.ExternalError{
+			Recovered: logPanic{},
+		}, func() {
+			_, _ = bc.ExecuteTransaction(ledger, tx)
+		})
+	})
+
+	t.Run("panics if external function panics in script", func(t *testing.T) {
+		script := []byte(`
+			pub fun main() {
+				let block = getCurrentBlock()
+				let nextBlock = getBlock(at: block.height + UInt64(2))
+			}
+		`)
+
+		ledger := execTestutil.RootBootstrappedLedger()
+		require.NoError(t, err)
+
+		assert.PanicsWithValue(t, interpreter.ExternalError{
+			Recovered: logPanic{},
+		}, func() {
+			_, _ = bc.ExecuteScript(ledger, script)
+		})
+	})
+}
+
 func TestBlockContext_GetAccount(t *testing.T) {
 	// seed the RNG
 	rand.Seed(time.Now().UnixNano())
@@ -621,7 +743,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	vm, err := virtualmachine.New(rt)
 	require.NoError(t, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	sequenceNumber := uint64(0)
 
@@ -666,11 +788,21 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		return address, privateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold).PublicKey
 	}
 
+	addressGen := flow.NewAddressGenerator()
+	// skip the addresses of 4 reserved accounts
+	for i := 0; i < 4; i++ {
+		_, err := addressGen.NextAddress()
+		require.NoError(t, err)
+	}
+
 	// create a bunch of accounts
 	accounts := make(map[flow.Address]crypto.PublicKey, count)
 	for i := 0; i < count; i++ {
 		require.NoError(t, err)
 		address, key := createAccount()
+		expectedAddress, err := addressGen.NextAddress()
+		require.NoError(t, err)
+		assert.Equal(t, expectedAddress, address)
 		accounts[address] = key
 	}
 
@@ -688,9 +820,10 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	// non-happy path - get an account that was never created
 	t.Run("get a non-existing account", func(t *testing.T) {
-		address, _, err := flow.AccountAddress(flow.AddressState(42))
+		address, err := addressGen.NextAddress()
 		require.NoError(t, err)
 		account := ledgerAccess.GetAccount(address)
 		assert.Nil(t, account)
 	})
+
 }

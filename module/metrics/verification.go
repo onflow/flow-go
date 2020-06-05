@@ -3,6 +3,7 @@ package metrics
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/trace"
@@ -12,69 +13,48 @@ import (
 const chunkExecutionSpanner = "chunk_execution_duration"
 
 type VerificationCollector struct {
-	tracer                      *trace.OpenTracer
-	chunksCheckedPerBlock       prometheus.Counter
-	resultApprovalsPerBlock     prometheus.Counter
-	storagePerChunk             prometheus.Gauge
-	pendingCollectionsNum       prometheus.Gauge
-	authenticatedCollectionsNum prometheus.Gauge
-	pendingReceiptsNum          prometheus.Gauge
-	authenticatedReceiptsNum    prometheus.Gauge
-	chunkTrackersNum            prometheus.Gauge
+	tracer                  *trace.OpenTracer
+	chunksCheckedPerBlock   prometheus.Counter
+	resultApprovalsPerBlock prometheus.Counter
+	storagePerChunk         prometheus.Gauge
 }
 
-func NewVerificationCollector(tracer *trace.OpenTracer) *VerificationCollector {
+func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer, log zerolog.Logger) *VerificationCollector {
+
+	chunksCheckedPerBlock := promauto.NewCounter(prometheus.CounterOpts{
+		Name:      "checked_chunks_total",
+		Namespace: namespaceVerification,
+		Help:      "total number of chunks checked",
+	})
+	resultApprovalsPerBlock := promauto.NewCounter(prometheus.CounterOpts{
+		Name:      "result_approvals_total",
+		Namespace: namespaceVerification,
+		Help:      "total number of emitted result approvals",
+	})
+	storagePerChunk := promauto.NewGauge(prometheus.GaugeOpts{
+		Name:      "storage_latest_chunk_size_bytes",
+		Namespace: namespaceVerification,
+		Help:      "latest ingested chunk resources storage (bytes)",
+	})
+
+	err := registerer.Register(chunksCheckedPerBlock)
+	if err != nil {
+		log.Debug().Err(err).Msg("could not register chunksCheckedPerBlock metric")
+	}
+	err = registerer.Register(resultApprovalsPerBlock)
+	if err != nil {
+		log.Debug().Err(err).Msg("could not register resultApprovalsPerBlock metric")
+	}
+	err = registerer.Register(storagePerChunk)
+	if err != nil {
+		log.Debug().Err(err).Msg("could not register storagePerChunk metric")
+	}
 
 	vc := &VerificationCollector{
-		tracer: tracer,
-
-		chunksCheckedPerBlock: promauto.NewCounter(prometheus.CounterOpts{
-			Name:      "checked_chunks_total",
-			Namespace: namespaceVerification,
-			Help:      "total number of chunks checked",
-		}),
-
-		resultApprovalsPerBlock: promauto.NewCounter(prometheus.CounterOpts{
-			Name:      "result_approvals_total",
-			Namespace: namespaceVerification,
-			Help:      "total number of emitted result approvals",
-		}),
-
-		storagePerChunk: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "storage_latest_chunk_size_bytes",
-			Namespace: namespaceVerification,
-			Help:      "latest ingested chunk resources storage (bytes)",
-		}),
-
-		pendingCollectionsNum: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "pending_collections_latest_number_collections",
-			Namespace: namespaceVerification,
-			Help:      "latest number of pending collections in mempool",
-		}),
-
-		authenticatedCollectionsNum: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "authenticated_collections_latest_number_collections",
-			Namespace: namespaceVerification,
-			Help:      "latest number of authenticated collections in mempool",
-		}),
-
-		pendingReceiptsNum: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "pending_receipts_latest_number_receipts",
-			Namespace: namespaceVerification,
-			Help:      "latest number of pending receipts in mempool",
-		}),
-
-		authenticatedReceiptsNum: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "authenticated_receipts_latest_number_receipts",
-			Namespace: namespaceVerification,
-			Help:      "latest number of authenticated receipts in mempool",
-		}),
-
-		chunkTrackersNum: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "chunk_trackers_number_latest_number_trackers",
-			Namespace: namespaceVerification,
-			Help:      "latest number of chunk trackers",
-		}),
+		tracer:                  tracer,
+		chunksCheckedPerBlock:   chunksCheckedPerBlock,
+		resultApprovalsPerBlock: resultApprovalsPerBlock,
+		storagePerChunk:         storagePerChunk,
 	}
 
 	return vc
@@ -98,36 +78,6 @@ func (vc *VerificationCollector) OnResultApproval() {
 // https://github.com/dapperlabs/flow-go/issues/3183
 func (vc *VerificationCollector) OnVerifiableChunkSubmitted(size float64) {
 	vc.storagePerChunk.Set(size)
-}
-
-// OnAuthenticatedReceiptsUpdated is called whenever size of AuthenticatedReceipts mempool gets changed.
-// It records the latest value of its size.
-func (vc *VerificationCollector) OnAuthenticatedReceiptsUpdated(size uint) {
-	vc.authenticatedReceiptsNum.Set(float64(size))
-}
-
-// OnPendingReceiptsUpdated is called whenever size of PendingReceipts mempool gets changed.
-// It records the latest value of its size.
-func (vc *VerificationCollector) OnPendingReceiptsUpdated(size uint) {
-	vc.pendingReceiptsNum.Set(float64(size))
-}
-
-// OnAuthenticatedCollectionsUpdated is called whenever size of AuthenticatedCollections mempool gets changed.
-// It records the latest value of its size.
-func (vc *VerificationCollector) OnAuthenticatedCollectionsUpdated(size uint) {
-	vc.authenticatedCollectionsNum.Set(float64(size))
-}
-
-// OnPendingCollectionsUpdated is called whenever size of PendingCollections mempool gets changed.
-// It records the latest value of its size.
-func (vc *VerificationCollector) OnPendingCollectionsUpdated(size uint) {
-	vc.pendingCollectionsNum.Set(float64(size))
-}
-
-// OnChunkTrackersUpdated is called whenever size of ChunkTrackers mempool gets changed.
-// It records the latest value of its size.
-func (vc *VerificationCollector) OnChunkTrackersUpdated(size uint) {
-	vc.chunkTrackersNum.Set(float64(size))
 }
 
 // OnChunkVerificationStarted is called whenever the verification of a chunk is started.
