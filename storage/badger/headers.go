@@ -38,7 +38,7 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 		withLimit(flow.DefaultTransactionExpiry+100),
 		withStore(store),
 		withRetrieve(retrieve),
-		withResource(metrics.ResourceIndex))
+		withResource(metrics.ResourceHeader))
 
 	return h
 }
