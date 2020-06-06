@@ -3,6 +3,7 @@ package virtualmachine
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"fmt"
 
 	"github.com/onflow/cadence"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
 const scriptGasLimit = 100000
@@ -19,28 +21,42 @@ const scriptGasLimit = 100000
 type CheckerFunc func([]byte, runtime.Location) error
 
 type TransactionContext struct {
-	bc                        BlockContext
-	ledger                    LedgerDAL
-	astCache                  ASTCache
-	signingAccounts           []runtime.Address
-	checker                   CheckerFunc
-	logs                      []string
-	events                    []cadence.Event
-	tx                        *flow.TransactionBody
-	gasLimit                  uint64
-	uuid                      uint64 // TODO: implement proper UUID
-	skipVerification          bool
-	skipDeploymentRestriction bool
+	LedgerDAL
+	bc                               BlockContext
+	ledger                           LedgerDAL
+	astCache                         ASTCache
+	signingAccounts                  []runtime.Address
+	checker                          CheckerFunc
+	logs                             []string
+	events                           []cadence.Event
+	tx                               *flow.TransactionBody
+	gasLimit                         uint64
+	uuid                             uint64 // TODO: implement proper UUID
+	header                           *flow.Header
+	blocks                           Blocks
+	signatureVerificationEnabled     bool
+	restrictedAccountCreationEnabled bool
+	restrictedDeploymentEnabled      bool
 }
 
 type TransactionContextOption func(*TransactionContext)
 
-func SkipVerification(ctx *TransactionContext) {
-	ctx.skipVerification = true
+func WithSignatureVerification(enabled bool) TransactionContextOption {
+	return func(ctx *TransactionContext) {
+		ctx.signatureVerificationEnabled = enabled
+	}
 }
 
-func SkipDeploymentRestriction(ctx *TransactionContext) {
-	ctx.skipDeploymentRestriction = true
+func WithRestrictedDeployment(enabled bool) TransactionContextOption {
+	return func(ctx *TransactionContext) {
+		ctx.restrictedAccountCreationEnabled = enabled
+	}
+}
+
+func WithRestrictedAccountCreation(enabled bool) TransactionContextOption {
+	return func(ctx *TransactionContext) {
+		ctx.restrictedDeploymentEnabled = enabled
+	}
 }
 
 // GetSigningAccounts gets the signing accounts for this context.
@@ -149,7 +165,7 @@ func (r *TransactionContext) initDefaultToken(addr flow.Address) (FlowError, err
 		AddAuthorizer(addr)
 
 	// TODO: propagate computation limit
-	result, err := r.bc.ExecuteTransaction(r.ledger, tx, SkipVerification)
+	result, err := r.bc.ExecuteTransaction(r.ledger, tx, WithSignatureVerification(false))
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +183,7 @@ func (r *TransactionContext) deductTransactionFee(addr flow.Address) (FlowError,
 		AddAuthorizer(addr)
 
 	// TODO: propagate computation limit
-	result, err := r.bc.ExecuteTransaction(r.ledger, tx, SkipVerification)
+	result, err := r.bc.ExecuteTransaction(r.ledger, tx, WithSignatureVerification(false))
 	if err != nil {
 		return nil, err
 	}
@@ -180,12 +196,19 @@ func (r *TransactionContext) deductTransactionFee(addr flow.Address) (FlowError,
 }
 
 func (r *TransactionContext) deductAccountCreationFee(addr flow.Address) (FlowError, error) {
+	var script []byte
+	if r.restrictedAccountCreationEnabled {
+		script = DeductAccountCreationFeeWithWhitelistTransaction()
+	} else {
+		script = DeductAccountCreationFeeTransaction()
+	}
+
 	tx := flow.NewTransactionBody().
-		SetScript(DeductAccountCreationFeeTransaction()).
+		SetScript(script).
 		AddAuthorizer(addr)
 
 	// TODO: propagate computation limit
-	result, err := r.bc.ExecuteTransaction(r.ledger, tx, SkipVerification)
+	result, err := r.bc.ExecuteTransaction(r.ledger, tx, WithSignatureVerification(false))
 	if err != nil {
 		return nil, err
 	}
@@ -270,7 +293,7 @@ func (r *TransactionContext) CheckCode(address runtime.Address, code []byte) (er
 //
 // This function returns an error if the specified account does not exist or is
 // not a valid signing account.
-func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []byte, checkPermission bool) (err error) {
+func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []byte) (err error) {
 	accountAddress := address.Bytes()
 
 	key := fullKeyHash(string(accountAddress), string(accountAddress), keyCode)
@@ -287,7 +310,7 @@ func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []b
 
 	// currently, every transaction that sets account code (deploys/updates contracts)
 	// must be signed by the service account
-	if !r.skipDeploymentRestriction && !r.isValidSigningAccount(runtime.Address(flow.ServiceAddress())) {
+	if r.restrictedDeploymentEnabled && !r.isValidSigningAccount(runtime.Address(flow.ServiceAddress())) {
 		return fmt.Errorf("code deployment requires authorization from the service account")
 	}
 
@@ -360,12 +383,22 @@ func (r *TransactionContext) DecodeArgument(b []byte, t cadence.Type) (cadence.V
 	return jsoncdc.Decode(b)
 }
 
+// GetCurrentBlockHeight returns the current block height.
 func (r *TransactionContext) GetCurrentBlockHeight() uint64 {
-	panic("implement me")
+	return r.header.Height
 }
 
-func (r *TransactionContext) GetBlockAtHeight(height uint64) (hash runtime.BlockHash, timestamp int64, exists bool) {
-	panic("implement me")
+// GetBlockAtHeight returns the block at the given height.
+func (r *TransactionContext) GetBlockAtHeight(height uint64) (hash runtime.BlockHash, timestamp int64, exists bool, err error) {
+	block, err := r.blocks.ByHeight(height)
+	// TODO remove dependency on storage
+	if errors.Is(err, storage.ErrNotFound) {
+		return runtime.BlockHash{}, 0, false, nil
+	} else if err != nil {
+		return runtime.BlockHash{}, 0, false, fmt.Errorf(
+			"unexpected failure of GetBlockAtHeight, tx ID %s, height %v: %w", r.tx.ID().String(), height, err)
+	}
+	return runtime.BlockHash(block.ID()), block.Header.Timestamp.UnixNano(), true, nil
 }
 
 // checkProgram checks the given code for syntactic and semantic correctness.
@@ -383,10 +416,6 @@ func (r *TransactionContext) checkProgram(code []byte, address runtime.Address) 
 //
 // An error is returned if any of the expected signatures are invalid or missing.
 func (r *TransactionContext) verifySignatures() FlowError {
-	if r.skipVerification {
-		return nil
-	}
-
 	if r.tx.Payer == flow.EmptyAddress {
 		return &MissingPayerError{}
 	}
@@ -576,7 +605,7 @@ func (r *TransactionContext) isValidSigningAccount(address runtime.Address) bool
 func InitDefaultTokenTransaction() []byte {
 	return []byte(fmt.Sprintf(`
 		import FlowServiceAccount from 0x%s
-	
+
 		transaction {
 			prepare(acct: AuthAccount) {
 				FlowServiceAccount.initDefaultToken(acct)
@@ -588,7 +617,7 @@ func InitDefaultTokenTransaction() []byte {
 func DefaultTokenBalanceScript(addr flow.Address) []byte {
 	return []byte(fmt.Sprintf(`
         import FlowServiceAccount from 0x%s
-    
+
         pub fun main(): UFix64 {
             let acct = getAccount(0x%s)
             return FlowServiceAccount.defaultTokenBalance(acct)
@@ -599,13 +628,25 @@ func DefaultTokenBalanceScript(addr flow.Address) []byte {
 func DeductAccountCreationFeeTransaction() []byte {
 	return []byte(fmt.Sprintf(`
 		import FlowServiceAccount from 0x%s
+
+		transaction {
+			prepare(acct: AuthAccount) {
+				FlowServiceAccount.deductAccountCreationFee(acct)
+			}
+		}
+	`, flow.ServiceAddress()))
+}
+
+func DeductAccountCreationFeeWithWhitelistTransaction() []byte {
+	return []byte(fmt.Sprintf(`
+		import FlowServiceAccount from 0x%s
 	
 		transaction {
 			prepare(acct: AuthAccount) {
 				if !FlowServiceAccount.isAccountCreator(acct.address) {
 					panic("Account not authorized to create accounts")
 				}
-	
+
 				FlowServiceAccount.deductAccountCreationFee(acct)
 			}
 		}
@@ -615,7 +656,7 @@ func DeductAccountCreationFeeTransaction() []byte {
 func DeductTransactionFeeTransaction() []byte {
 	return []byte(fmt.Sprintf(`
 		import FlowServiceAccount from 0x%s
-	
+
 		transaction {
 			prepare(acct: AuthAccount) {
 				FlowServiceAccount.deductTransactionFee(acct)
@@ -650,29 +691,29 @@ func MintDefaultTokenTransaction() []byte {
 	return []byte(fmt.Sprintf(`
 		import FungibleToken from 0x%s
 		import FlowToken from 0x%s
-	
+
 		transaction(amount: UFix64) {
-	
+
 		  let tokenAdmin: &FlowToken.Administrator
 		  let tokenReceiver: &FlowToken.Vault{FungibleToken.Receiver}
-	
+
 		  prepare(signer: AuthAccount) {
 			self.tokenAdmin = signer
-			  .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin) 
+			  .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)
 			  ?? panic("Signer is not the token admin")
-	
+
 			self.tokenReceiver = signer
 			  .getCapability(/public/flowTokenReceiver)!
 			  .borrow<&FlowToken.Vault{FungibleToken.Receiver}>()
 			  ?? panic("Unable to borrow receiver reference for recipient")
 		  }
-	
+
 		  execute {
 			let minter <- self.tokenAdmin.createNewMinter(allowedAmount: amount)
 			let mintedVault <- minter.mintTokens(amount: amount)
-	
+
 			self.tokenReceiver.deposit(from: <-mintedVault)
-		
+
 			destroy minter
 		  }
 		}

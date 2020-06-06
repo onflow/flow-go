@@ -17,15 +17,13 @@ var (
 	flagCollectionClusters                           uint16
 	flagGeneratedCollectorAddressTemplate            string
 	flagGeneratedCollectorStake                      uint64
+	flagGenesisTokenSupply                           uint64
 	flagPartnerNodeInfoDir                           string
 	flagPartnerStakes                                string
 	flagServiceAccountPublicKeyFile                  string
 	flagCollectorGenerationMaxHashGrindingIterations uint
 	flagFastKG                                       bool
 )
-
-// TODO: replace constant with configuration parameter
-const genesisTokenSupply uint64 = 0
 
 type PartnerStakes map[flow.Identifier]uint64
 
@@ -56,11 +54,11 @@ running the DKG for generating the random beacon keys, generating genesis execut
 		if len(flagServiceAccountPublicKeyFile) > 0 {
 			publicKey := readServiceAccountPublicKey(flagServiceAccountPublicKeyFile)
 			log.Info().Msg("✨ using provided public key file for service account and generating genesis execution state")
-			genGenesisExecutionState(publicKey, genesisTokenSupply)
+			genGenesisExecutionState(publicKey, flagGenesisTokenSupply)
 			log.Info().Msg("")
 		} else {
 			log.Info().Msg("✨ generating private key for service account and generating genesis execution state")
-			genGenesisExecutionState(nil, genesisTokenSupply)
+			genGenesisExecutionState(nil, flagGenesisTokenSupply)
 			log.Info().Msg("")
 		}
 
@@ -106,6 +104,8 @@ func init() {
 			"will be replaced by an index)")
 	finalizeCmd.Flags().Uint64Var(&flagGeneratedCollectorStake, "generated-collector-stake", 100,
 		"stake for collector nodes that will be generated")
+	finalizeCmd.Flags().Uint64Var(&flagGenesisTokenSupply, "genesis-token-supply", 0,
+		"number of tokens that exist at the genesis execution state")
 	finalizeCmd.Flags().UintVar(&flagCollectorGenerationMaxHashGrindingIterations, "collector-gen-max-iter", 1000,
 		"max hash grinding iterations for collector generation")
 	finalizeCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", fmt.Sprintf("path to directory "+

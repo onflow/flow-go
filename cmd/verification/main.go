@@ -200,7 +200,7 @@ func main() {
 			if err != nil {
 				return nil, err
 			}
-			chunkVerifier := chunks.NewChunkVerifier(vm)
+			chunkVerifier := chunks.NewChunkVerifier(vm, node.Storage.Blocks)
 			verifierEng, err = verifier.New(node.Logger, collector, node.Network, node.State, node.Me, chunkVerifier)
 			return verifierEng, err
 		}).

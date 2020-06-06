@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
+	vmMock "github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine/mock"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -23,7 +24,7 @@ func TestTransactionASTCache(t *testing.T) {
 	h := unittest.BlockHeaderFixture()
 	vm, err := virtualmachine.New(rt)
 	require.NoError(t, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	t.Run("transaction execution results in cached program", func(t *testing.T) {
 		tx := &flow.TransactionBody{
@@ -64,7 +65,7 @@ func TestScriptASTCache(t *testing.T) {
 	vm, err := virtualmachine.New(rt)
 
 	require.NoError(t, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	t.Run("script execution results in cached program", func(t *testing.T) {
 		script := []byte(`
@@ -97,7 +98,7 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 
 	vm, err := virtualmachine.New(rt)
 	require.NoError(t, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	// Create a number of account private keys.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -155,7 +156,7 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 
 	vm, err := virtualmachine.New(rt)
 	require.NoError(b, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	// Create a number of account private keys.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -228,7 +229,7 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 
 	vm, err := virtualmachine.NewWithCache(rt, &nonFunctioningCache{})
 	require.NoError(b, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	// Create a number of account private keys.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -284,7 +285,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 
 	vm, err := virtualmachine.New(rt)
 	require.NoError(t, err)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
 	ledger := testutil.RootBootstrappedLedger()

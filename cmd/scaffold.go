@@ -37,19 +37,16 @@ import (
 	storerr "github.com/dapperlabs/flow-go/storage"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	sutil "github.com/dapperlabs/flow-go/storage/util"
 	"github.com/dapperlabs/flow-go/utils/debug"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 const notSet = "not set"
 
-// TODO: load token supply from bootstrap config
-const genesisTokenSupply = 0
-
 // BaseConfig is the general config for the FlowNodeBuilder
 type BaseConfig struct {
 	nodeIDHex        string
-	chainID          string
 	bindAddr         string
 	nodeRole         string
 	timeout          time.Duration
@@ -144,7 +141,6 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	datadir := filepath.Join(homedir, ".flow", "database")
 	// bind configuration parameters
 	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", notSet, "identity of our node")
-	fnb.flags.StringVar(&fnb.BaseConfig.chainID, "chainid", flow.Mainnet.String(), "chain ID to use for block generation")
 	fnb.flags.StringVar(&fnb.BaseConfig.bindAddr, "bind", notSet, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", "bootstrap", "path to the bootstrap directory")
 	fnb.flags.DurationVarP(&fnb.BaseConfig.timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
@@ -156,10 +152,6 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.profilerDir, "profiler-dir", "profiler", "directory to create auto-profiler profiles")
 	fnb.flags.DurationVar(&fnb.BaseConfig.profilerInterval, "profiler-interval", 15*time.Minute, "the interval between auto-profiler runs")
 	fnb.flags.DurationVar(&fnb.BaseConfig.profilerDuration, "profiler-duration", 10*time.Second, "the duration to run the auto-profile for")
-}
-
-func (fnb *FlowNodeBuilder) configureChainParams() {
-	flow.SetChainID(flow.ChainID(fnb.BaseConfig.chainID))
 }
 
 func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
@@ -302,6 +294,8 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
 	fnb.MustNot(err).Str("dir", fnb.BaseConfig.datadir).Msg("could not create datadir")
 
+	log := sutil.NewLogger(fnb.Logger)
+
 	// we initialize the database with options that allow us to keep the maximum
 	// item size in the trie itself (up to 1MB) and where we keep all level zero
 	// tables in-memory as well; this slows down compaction and increases memory
@@ -309,7 +303,7 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	opts := badger.
 		DefaultOptions(fnb.BaseConfig.datadir).
 		WithKeepL0InMemory(true).
-		WithLogger(nil)
+		WithLogger(log)
 	db, err := badger.Open(opts)
 	fnb.MustNot(err).Msg("could not open key-value store")
 
@@ -386,14 +380,19 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
 		}
 
+		flow.SetChainID(fnb.GenesisBlock.Header.ChainID)
+
 		// load genesis QC and DKG data from bootstrap files
 		fnb.GenesisQC, err = loadRootBlockQC(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
 		}
 
-		// TODO: load token supply from bootstrap config
-		fnb.GenesisTokenSupply = genesisTokenSupply
+		// load token supply from bootstrap config
+		fnb.GenesisTokenSupply, err = loadGenesisTokenSupply(fnb.BaseConfig.BootstrapDir)
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis token supply")
+		}
 
 		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
@@ -420,6 +419,8 @@ func (fnb *FlowNodeBuilder) initState() {
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
 		}
+
+		flow.SetChainID(fnb.GenesisBlock.Header.ChainID)
 
 		// load genesis QC and DKG data from bootstrap files for recovery
 		fnb.GenesisQC, err = loadRootBlockQC(fnb.BaseConfig.BootstrapDir)
@@ -569,8 +570,6 @@ func FlowNode(role string) *FlowNodeBuilder {
 
 	builder.baseFlags()
 
-	builder.configureChainParams()
-
 	builder.enqueueNetworkInit()
 
 	builder.enqueueMetricsServerInit()
@@ -719,4 +718,14 @@ func loadPrivateNodeInfo(dir string, myID flow.Identifier) (*bootstrap.NodeInfoP
 	var info bootstrap.NodeInfoPriv
 	err = json.Unmarshal(data, &info)
 	return &info, err
+}
+
+func loadGenesisTokenSupply(dir string) (uint64, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisTokenSupply))
+	if err != nil {
+		return 0, err
+	}
+	var supply uint64
+	err = json.Unmarshal(data, &supply)
+	return supply, err
 }
