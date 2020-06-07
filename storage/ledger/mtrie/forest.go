@@ -76,7 +76,7 @@ func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int, metrics
 
 // getTrie returns trie at specific rootHash
 // warning, use this function for read-only operation
-func (f *MForest) getTrie(rootHash []byte) (*trie.MTrie, error) {
+func (f *MForest) GetTrie(rootHash []byte) (*trie.MTrie, error) {
 	encRootHash := hex.EncodeToString(rootHash)
 	// if in the cache
 
@@ -109,7 +109,7 @@ func (f *MForest) GetCachedRootHashes() ([][]byte, error) {
 }
 
 // ToStorables returns forest as a list of storable nodes, where references to nodes
-// are replaced by index  in the slice, and list of storable tries, referncing root node by index
+// are replaced by index  in the slice, and list of storable tries, referencing root node by index
 // 0 is a special index, meaning nil, but is included in this list for ease of use and
 // removing need to add/subtract indexes
 func (f *MForest) ToStorables() ([]*node.StorableNode, []*trie.StorableTrie, error) {
@@ -128,7 +128,7 @@ func (f *MForest) ToStorables() ([]*node.StorableNode, []*trie.StorableTrie, err
 	counter := uint64(1)
 
 	for i, rootHash := range rootHashes {
-		t, err := f.getTrie(rootHash)
+		t, err := f.GetTrie(rootHash)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -217,7 +217,7 @@ func (f *MForest) Read(rootHash []byte, keys [][]byte) ([][]byte, error) {
 	}
 
 	// lookup the trie by rootHash
-	trie, err := f.getTrie(rootHash)
+	trie, err := f.GetTrie(rootHash)
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +268,7 @@ func (f *MForest) Read(rootHash []byte, keys [][]byte) ([][]byte, error) {
 
 // Update updates the Values for the registers and returns rootHash and error (if any)
 func (f *MForest) Update(rootHash []byte, keys [][]byte, values [][]byte) (*trie.MTrie, error) {
-	parentTrie, err := f.getTrie(rootHash)
+	parentTrie, err := f.GetTrie(rootHash)
 	if err != nil {
 		return nil, err
 	}
@@ -364,7 +364,7 @@ func (f *MForest) Proofs(rootHash []byte, keys [][]byte) (*proof.BatchProof, err
 
 	}
 
-	stateTrie, err := f.getTrie(rootHash)
+	stateTrie, err := f.GetTrie(rootHash)
 	if err != nil {
 		return nil, err
 	}
@@ -416,7 +416,7 @@ func (f *MForest) Proofs(rootHash []byte, keys [][]byte) (*proof.BatchProof, err
 
 // StoreTrie stores a trie on disk
 func (f *MForest) StoreTrie(rootHash []byte, path string) error {
-	trie, err := f.getTrie(rootHash)
+	trie, err := f.GetTrie(rootHash)
 	if err != nil {
 		return err
 	}

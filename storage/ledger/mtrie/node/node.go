@@ -35,7 +35,23 @@ type Node struct {
 	hashValue []byte
 }
 
+// NewNode creates a new Node.
+// UNCHECKED requirement: combination of values must conform to
+// a valid node type (see documentation of `Node` for details)
+func NewNode(height int, lchild, rchild *Node, key, value, hashValue []byte) *Node {
+	n := &Node{
+		lChild:    lchild,
+		rChild:    rchild,
+		height:    height,
+		key:       key,
+		value:     value,
+		hashValue: hashValue,
+	}
+	return n
+}
+
 // NewLeaf creates a compact leaf Node
+// UNCHECKED requirement: height must be non-negative
 func NewEmptyTreeRoot(height int) *Node {
 	n := &Node{
 		lChild: nil,
@@ -49,6 +65,7 @@ func NewEmptyTreeRoot(height int) *Node {
 }
 
 // NewLeaf creates a compact leaf Node
+// UNCHECKED requirement: height must be non-negative
 func NewLeaf(key, value []byte, height int) *Node {
 	n := &Node{
 		lChild: nil,
@@ -61,7 +78,8 @@ func NewLeaf(key, value []byte, height int) *Node {
 	return n
 }
 
-// newNode creates a new Node with the provided value and no children
+// newNode creates a new Node with the provided value and no children.
+// UNCHECKED requirement: lchild.height and rchild.height must be smaller than height
 func NewInterimNode(height int, lchild, rchild *Node) *Node {
 	n := &Node{
 		lChild: lchild,
@@ -235,16 +253,4 @@ func (n *Node) Equals(o *Node) bool {
 	}
 
 	return true
-}
-
-func (n *Node) GetNodes() []*Node {
-	nodes := make([]*Node, 1)
-	nodes = append(nodes, n)
-	if n.lChild != nil {
-		nodes = append(nodes, n.lChild.GetNodes()...)
-	}
-	if n.rChild != nil {
-		nodes = append(nodes, n.rChild.GetNodes()...)
-	}
-	return nodes
 }
