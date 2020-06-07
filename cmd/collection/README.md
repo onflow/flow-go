@@ -12,6 +12,9 @@ includes links to the appropriate package, which may contain more detailed docum
 ## Table of Contents
 
 - [Terminology](#terminology)
+- [Processes](#processes)
+  - [Transaction Lifecycle](#transaction-lifecycle)
+  - [Collection Lifecycle](#collection-lifecycle)
 - [Engines](#engines)
   - [Ingest](#ingest)
   - [Proposal](#proposal)
