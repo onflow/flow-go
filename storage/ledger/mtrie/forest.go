@@ -98,7 +98,7 @@ func (f *MForest) GetTries() ([]*trie.MTrie, error) {
 	// ToDo needs concurrency safety
 	keys := f.tries.Keys()
 	tries := make([]*trie.MTrie, 0, len(keys))
-	for key := range keys {
+	for _, key := range keys {
 		t, ok := f.tries.Get(key)
 		if !ok {
 			return nil, errors.New("concurrent MForest modification")

@@ -42,7 +42,7 @@ func newNodeIterator(trieRoot *node.Node, trieHeight int) *NodeIterator {
 	i := &NodeIterator{
 		stack: make([]*node.Node, 0, trieHeight),
 	}
-	i.digg(trieRoot)
+	i.dig(trieRoot)
 	return i
 }
 
@@ -51,9 +51,15 @@ func (i *NodeIterator) Next() (*node.Node, bool) {
 		return nil, false
 	}
 	head := i.pop()
-	parent := i.peek()
-	if parent.LeftChild() == head {
-		i.digg(parent.RigthChild())
+	if len(i.stack) > 0 {
+		// if there are more elements on the stack, the next element on the stack is head's parent
+		// before returning head, we need to dig into the other parent's child to leave the stack
+		// in the required condition:
+		// the head of the stack always contains a node, whose descendents have already benn iterated.
+		parent := i.peek()
+		if parent.LeftChild() == head {
+			i.dig(parent.RigthChild())
+		}
 	}
 	return head, true
 }
@@ -69,7 +75,10 @@ func (i *NodeIterator) peek() *node.Node {
 	return i.stack[len(i.stack)-1]
 }
 
-func (i *NodeIterator) digg(n *node.Node) {
+func (i *NodeIterator) dig(n *node.Node) {
+	if n == nil {
+		return
+	}
 	for {
 		i.stack = append(i.stack, n)
 		if lChild := n.LeftChild(); lChild != nil {

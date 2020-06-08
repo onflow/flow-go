@@ -329,7 +329,6 @@ func ReadStorableNode(reader io.Reader) (*sequencer.StorableNode, error) {
 }
 
 // EncodeStorableTrie encodes StorableTrie
-// 2-bytes Big Endian uint16 MaxHeight
 // 8-bytes Big Endian uint64 Number
 // 8-bytes Big Endian uint64 RootIndex
 // 2-bytes Big Endian uint16 RootHash length
@@ -337,7 +336,7 @@ func ReadStorableNode(reader io.Reader) (*sequencer.StorableNode, error) {
 // 2-bytes Big Endian uint16 ParentRootHash length
 // ParentRootHash bytes
 func EncodeStorableTrie(storableTrie *sequencer.StorableTrie) []byte {
-	length := 2 + 8 + 8 + 2 + len(storableTrie.RootHash) + 2 + len(storableTrie.ParentRootHash)
+	length := 8 + 8 + 2 + len(storableTrie.RootHash) + 2 + len(storableTrie.ParentRootHash)
 
 	buf := make([]byte, length)
 
@@ -353,7 +352,7 @@ func EncodeStorableTrie(storableTrie *sequencer.StorableTrie) []byte {
 
 func ReadStorableTrie(reader io.Reader) (*sequencer.StorableTrie, error) {
 
-	buf := make([]byte, 2+8+8)
+	buf := make([]byte, 8+8)
 
 	read, err := reader.Read(buf)
 	if err != nil {
