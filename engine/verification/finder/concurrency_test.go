@@ -98,16 +98,15 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	identities := flow.IdentityList{colID, conID, exeID, verID}
 
 	// create `erCount` execution receipt fixtures that will be concurrently delivered
-	ers := make([]utils.CompleteExecutionResult, 0)
-	results := make([]flow.ExecutionResult, len(ers))
-
+	ers := make([]utils.CompleteExecutionResult, erCount)
+	results := make([]flow.ExecutionResult, erCount)
 	for i := 0; i < erCount; i++ {
 		er := utils.LightExecutionResultFixture(chunksNum)
-		ers = append(ers, er)
-		results = append(results, er.Receipt.ExecutionResult)
+		ers[i] = er
+		results[i] = er.Receipt.ExecutionResult
 	}
 
-	// set up mock maching engine that asserts each receipt is submitted exactly once.
+	// set up mock matching engine that asserts each receipt is submitted exactly once.
 	requestInterval := uint(1000)
 	failureThreshold := uint(2)
 	matchEng, matchEngWG := SetupMockMatchEng(t, results)
