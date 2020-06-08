@@ -117,16 +117,15 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 		assigner, requestInterval, failureThreshold, true,
 		true, testutil.WithMatchEngine(matchEng))
 
-	// the wait group tracks goroutines for each Execution Receipt sent to Finder engine
+	// the wait group tracks goroutines for each Execution Receipt sent to finder engine
 	var senderWG sync.WaitGroup
 	senderWG.Add(erCount * senderCount)
 
+	// blockStorageLock is needed to provide a concurrency-safe imitation of consensus follower engine
 	var blockStorageLock sync.Mutex
 
 	for _, completeER := range ers {
-
-		// spin up `senderCount` sender goroutines to mimic receiving
-		// the same resource multiple times
+		// spins up `senderCount` sender goroutines to mimic receiving concurrent execution receipts of same copies
 		for i := 0; i < senderCount; i++ {
 			go func(j int, id flow.Identifier, block *flow.Block, receipt *flow.ExecutionReceipt) {
 
@@ -160,17 +159,18 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 					require.NoError(t, err)
 				}
 
+				// chooses randomly between sending the receipt first, or the block
 				switch j % 2 {
 				case 0:
 					// block then receipt
 					sendBlock()
-					// allow another goroutine to run before sending receipt
+					// allows another goroutine to run before sending receipt
 					time.Sleep(time.Nanosecond)
 					sendReceipt()
 				case 1:
 					// receipt then block
 					sendReceipt()
-					// allow another goroutine to run before sending block
+					// allows another goroutine to run before sending block
 					time.Sleep(time.Nanosecond)
 					sendBlock()
 				}
@@ -201,13 +201,13 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 }
 
 // SetupMockMatchEng sets up a mock match engine that asserts the followings:
-// - that a set execution results are delivered to it.
+// - that a set of execution results are delivered to it.
 // - that each execution result is delivered only once.
 // SetupMockMatchEng returns the mock engine and a wait group that unblocks when all results are received.
 func SetupMockMatchEng(t testing.TB, ers []flow.ExecutionResult) (*network.Engine, *sync.WaitGroup) {
 	eng := new(network.Engine)
 
-	// keep track of which verifiable chunks we have received
+	// keeps track of which execution results it has received
 	receivedERs := make(map[flow.Identifier]struct{})
 	var (
 		// decrement the wait group when each verifiable chunk received
