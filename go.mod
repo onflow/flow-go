@@ -26,10 +26,7 @@ require (
 	github.com/libp2p/go-tcp-transport v0.1.1
 	github.com/multiformats/go-multiaddr v0.2.0
 	github.com/onflow/cadence v0.4.0
-	github.com/onflow/flow-go-sdk v0.4.0 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200601215056-34a11def1d6b
-	github.com/onsi/ginkgo v1.10.1 // indirect
-	github.com/onsi/gomega v1.7.0 // indirect
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.3.0
@@ -40,7 +37,6 @@ require (
 	github.com/spf13/viper v1.4.0
 	github.com/stretchr/testify v1.5.1
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
-	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/vmihailenco/msgpack/v4 v4.3.11
 	github.com/whyrusleeping/go-logging v0.0.1
