@@ -563,88 +563,146 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 	require.NoError(t, err)
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
-	t.Run("script success", func(t *testing.T) {
-		script := []byte(`
-			pub fun main(): Int {
-				return 42
-			}
-		`)
+	var tests = []struct {
+		label  string
+		script string
+		args   [][]byte
+		check  func(t *testing.T, result *virtualmachine.ScriptResult)
+	}{
+		{
+			label: "script success",
+			script: `
+				pub fun main(): Int {
+					return 42
+				}
+			`,
+			check: func(t *testing.T, result *virtualmachine.ScriptResult) {
+				assert.True(t, result.Succeeded())
+			},
+		},
+		{
+			label: "script failure",
+			script: `
+				pub fun main(): Int {
+					assert 1 == 2
+					return 42
+				}
+			`,
+			check: func(t *testing.T, result *virtualmachine.ScriptResult) {
+				assert.False(t, result.Succeeded())
+				assert.NotNil(t, result.Error)
+			},
+		},
+		{
+			label: "script logs",
+			script: `
+				pub fun main(): Int {
+					log("foo")
+					log("bar")
+					return 42
+				}
+			`,
+			check: func(t *testing.T, result *virtualmachine.ScriptResult) {
+				require.Len(t, result.Logs, 2)
+				assert.Equal(t, "\"foo\"", result.Logs[0])
+				assert.Equal(t, "\"bar\"", result.Logs[1])
+			},
+		},
+	}
 
-		ledger := execTestutil.RootBootstrappedLedger()
+	for _, tt := range tests {
+		t.Run(tt.label, func(t *testing.T) {
+			ledger := execTestutil.RootBootstrappedLedger()
+			result, err := bc.ExecuteScript(ledger, []byte(tt.script), tt.args)
+			require.NoError(t, err)
+			tt.check(t, result)
+		})
+	}
+}
 
-		result, err := bc.ExecuteScript(ledger, script, nil)
-		assert.NoError(t, err)
-		assert.True(t, result.Succeeded())
-	})
+func TestBlockContext_ExecuteScript_WithArguments(t *testing.T) {
+	// seed the RNG
+	rand.Seed(time.Now().UnixNano())
+	rt := runtime.NewInterpreterRuntime()
 
-	t.Run("script with arguments success", func(t *testing.T) {
-		script := []byte(`
-			pub fun main(val: Int): Int {
-				return val
-			}
-		`)
+	h := unittest.BlockHeaderFixture()
 
-		ledger := execTestutil.RootBootstrappedLedger()
-		arg1, _ := jsoncdc.Encode(cadence.NewInt(42))
+	vm, err := virtualmachine.New(rt)
+	require.NoError(t, err)
+	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
-		result, err := bc.ExecuteScript(ledger, script, [][]byte{arg1})
-		assert.NoError(t, err)
-		assert.True(t, result.Succeeded())
-	})
+	arg1, _ := jsoncdc.Encode(cadence.NewInt(42))
+	arg2, _ := jsoncdc.Encode(cadence.NewInt(10))
+	arg3, _ := jsoncdc.Encode(cadence.NewInt(5))
 
-	t.Run("script with multiple arguments success", func(t *testing.T) {
-		script := []byte(`
-			pub fun main(a: Int, b: Int): Int {
-				log(a + b)
-				return a + b
-			}
-		`)
+	var tests = []struct {
+		label  string
+		script string
+		args   [][]byte
+		check  func(t *testing.T, result *virtualmachine.ScriptResult)
+	}{
+		{
+			label: "script success, no arguments",
+			script: `
+				pub fun main(): Int {
+					return 42
+				}
+			`,
+			check: func(t *testing.T, result *virtualmachine.ScriptResult) {
+				assert.True(t, result.Succeeded())
+			},
+		},
+		{
+			label: "script with arguments success",
+			args:  [][]byte{arg1},
+			script: `
+				pub fun main(val: Int): Int {
+					return val
+				}
+			`,
+			check: func(t *testing.T, result *virtualmachine.ScriptResult) {
+				assert.True(t, result.Succeeded())
+			},
+		},
+		{
+			label: "script with multiple arguments success",
+			args:  [][]byte{arg2, arg3},
+			script: `
+				pub fun main(a: Int, b: Int): Int {
+					log(a + b)
+					return a + b
+				}
+			`,
+			check: func(t *testing.T, result *virtualmachine.ScriptResult) {
+				assert.True(t, result.Succeeded())
+				assert.Contains(t, result.Logs, "15")
+				assert.Equal(t, cadence.NewInt(15), result.Value)
+			},
+		},
+		{
+			label: "script failure",
+			script: `
+				pub fun main(): Int {
+					assert 1 == 2
+					return 42
+				}
+			`,
+			args: nil,
+			check: func(t *testing.T, result *virtualmachine.ScriptResult) {
+				assert.False(t, result.Succeeded())
+				assert.NotNil(t, result.Error)
+			},
+		},
+	}
 
-		ledger := execTestutil.RootBootstrappedLedger()
-		arg1, _ := jsoncdc.Encode(cadence.NewInt(10))
-		arg2, _ := jsoncdc.Encode(cadence.NewInt(5))
-
-		result, err := bc.ExecuteScript(ledger, script, [][]byte{arg1, arg2})
-		assert.NoError(t, err)
-		assert.True(t, result.Succeeded())
-		assert.Equal(t, result.Logs[0], "15")
-	})
-
-	t.Run("script failure", func(t *testing.T) {
-		script := []byte(`
-			pub fun main(): Int {
-				assert 1 == 2
-				return 42
-			}
-		`)
-
-		ledger := execTestutil.RootBootstrappedLedger()
-
-		result, err := bc.ExecuteScript(ledger, script, nil)
-
-		assert.NoError(t, err)
-		assert.False(t, result.Succeeded())
-		assert.NotNil(t, result.Error)
-	})
-
-	t.Run("script logs", func(t *testing.T) {
-		script := []byte(`
-			pub fun main(): Int {
-				log("foo")
-				log("bar")
-				return 42
-			}
-		`)
-
-		ledger := execTestutil.RootBootstrappedLedger()
-
-		result, err := bc.ExecuteScript(ledger, script, nil)
-		assert.NoError(t, err)
-
-		require.Len(t, result.Logs, 2)
-		assert.Equal(t, "\"foo\"", result.Logs[0])
-		assert.Equal(t, "\"bar\"", result.Logs[1])
-	})
+	for _, tt := range tests {
+		t.Run(tt.label, func(t *testing.T) {
+			ledger := execTestutil.RootBootstrappedLedger()
+			result, err := bc.ExecuteScript(ledger, []byte(tt.script), tt.args)
+			require.NoError(t, err)
+			tt.check(t, result)
+		})
+	}
 }
 
 func TestBlockContext_GetBlockInfo(t *testing.T) {
