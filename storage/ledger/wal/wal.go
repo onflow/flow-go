@@ -7,9 +7,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	prometheusWAL "github.com/prometheus/tsdb/wal"
 
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/sequencer"
+
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/node"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 )
 
 type LedgerWAL struct {
@@ -54,7 +54,7 @@ func (w *LedgerWAL) RecordDelete(stateCommitment flow.StateCommitment) error {
 }
 
 func (w *LedgerWAL) Replay(
-	checkpointFn func([]*node.StorableNode, []*trie.StorableTrie) error,
+	checkpointFn func([]*sequencer.StorableNode, []*sequencer.StorableTrie) error,
 	updateFn func(flow.StateCommitment, [][]byte, [][]byte) error,
 	deleteFn func(flow.StateCommitment) error,
 ) error {
@@ -67,7 +67,7 @@ func (w *LedgerWAL) Replay(
 
 func (w *LedgerWAL) replay(
 	from, to int,
-	checkpointFn func([]*node.StorableNode, []*trie.StorableTrie) error,
+	checkpointFn func([]*sequencer.StorableNode, []*sequencer.StorableTrie) error,
 	updateFn func(flow.StateCommitment, [][]byte, [][]byte) error,
 	deleteFn func(flow.StateCommitment) error,
 ) error {

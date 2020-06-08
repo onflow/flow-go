@@ -13,7 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/node"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/sequencer"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -115,8 +115,8 @@ func Test_Compactor(t *testing.T) {
 			require.NoError(t, err)
 
 			err = wal2.Replay(
-				func(nodes []*node.StorableNode, tries []*trie.StorableTrie) error {
-					return f2.LoadStorables(nodes, tries)
+				func(nodes []*sequencer.StorableNode, tries []*sequencer.StorableTrie) error {
+					return loadIntoForest(f2, nodes, tries)
 				},
 				func(commitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
 					_, err := f2.Update(commitment, keys, values)
@@ -156,15 +156,30 @@ func Test_Compactor(t *testing.T) {
 			}
 
 			// check for
-			rootHashes, err := f.GetCachedRootHashes()
+			forestTries, err := f.GetTries()
 			require.NoError(t, err)
 
-			rootHashes2, err := f2.GetCachedRootHashes()
+			forestTries2, err := f2.GetTries()
 			require.NoError(t, err)
 
 			// order might be different
-			require.Equal(t, len(rootHashes), len(rootHashes2))
+			require.Equal(t, len(forestTries), len(forestTries2))
 		})
 
 	})
+}
+
+func loadIntoForest(forest *mtrie.MForest, storableNodes []*sequencer.StorableNode, storableTries []*sequencer.StorableTrie) error {
+	forestSequencing := &sequencer.MForestSequencing{storableNodes, storableTries}
+	tries, err := sequencer.RebuildTries(forestSequencing)
+	if err != nil {
+		return err
+	}
+	for _, t := range tries {
+		err := forest.AddTrie(t)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

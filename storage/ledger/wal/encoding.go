@@ -6,8 +6,7 @@ import (
 	"io"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/node"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/sequencer"
 )
 
 type WALOperation uint8
@@ -279,7 +278,7 @@ func Decode(data []byte) (operation WALOperation, stateCommitment flow.StateComm
 // value bytes
 // 2-bytes Big Endian uint16 hashValue length
 // hash value bytes
-func EncodeStorableNode(storableNode *node.StorableNode) []byte {
+func EncodeStorableNode(storableNode *sequencer.StorableNode) []byte {
 
 	length := 2 + 8 + 8 + 2 + len(storableNode.Key) + 4 + len(storableNode.Value) + 2 + len(storableNode.HashValue)
 
@@ -296,7 +295,7 @@ func EncodeStorableNode(storableNode *node.StorableNode) []byte {
 	return buf
 }
 
-func ReadStorableNode(reader io.Reader) (*node.StorableNode, error) {
+func ReadStorableNode(reader io.Reader) (*sequencer.StorableNode, error) {
 
 	buf := make([]byte, 2+8+8)
 
@@ -307,7 +306,7 @@ func ReadStorableNode(reader io.Reader) (*node.StorableNode, error) {
 
 	pos := 0
 
-	storableNode := &node.StorableNode{}
+	storableNode := &sequencer.StorableNode{}
 
 	storableNode.Height, pos = readUint16(buf, pos)
 	storableNode.LIndex, pos = readUint64(buf, pos)
@@ -337,14 +336,13 @@ func ReadStorableNode(reader io.Reader) (*node.StorableNode, error) {
 // RootHash bytes
 // 2-bytes Big Endian uint16 ParentRootHash length
 // ParentRootHash bytes
-func EncodeStorableTrie(storableTrie *trie.StorableTrie) []byte {
+func EncodeStorableTrie(storableTrie *sequencer.StorableTrie) []byte {
 	length := 2 + 8 + 8 + 2 + len(storableTrie.RootHash) + 2 + len(storableTrie.ParentRootHash)
 
 	buf := make([]byte, length)
 
 	pos := 0
 
-	pos = writeUint16(buf, pos, storableTrie.MaxHeight)
 	pos = writeUint64(buf, pos, storableTrie.Number)
 	pos = writeUint64(buf, pos, storableTrie.RootIndex)
 	pos = writeShortData(buf, pos, storableTrie.RootHash)
@@ -353,7 +351,7 @@ func EncodeStorableTrie(storableTrie *trie.StorableTrie) []byte {
 	return buf
 }
 
-func ReadStorableTrie(reader io.Reader) (*trie.StorableTrie, error) {
+func ReadStorableTrie(reader io.Reader) (*sequencer.StorableTrie, error) {
 
 	buf := make([]byte, 2+8+8)
 
@@ -367,9 +365,8 @@ func ReadStorableTrie(reader io.Reader) (*trie.StorableTrie, error) {
 
 	pos := 0
 
-	storableNode := &trie.StorableTrie{}
+	storableNode := &sequencer.StorableTrie{}
 
-	storableNode.MaxHeight, pos = readUint16(buf, pos)
 	storableNode.Number, pos = readUint64(buf, pos)
 	storableNode.RootIndex, _ = readUint64(buf, pos)
 

@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/sequencer"
+
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/common"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
@@ -1058,7 +1060,7 @@ func TestForestStoreAndLoad(t *testing.T) {
 	}
 	defer os.Remove(file.Name())
 
-	storableNodes, storableTrees, err := mForest.ToStorables()
+	forestSequencing, err := sequencer.SequenceForest(mForest)
 	require.NoError(t, err)
 
 	newMForest, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
@@ -1067,7 +1069,9 @@ func TestForestStoreAndLoad(t *testing.T) {
 	//forests are different
 	assert.NotEqual(t, mForest, newMForest)
 
-	err = newMForest.LoadStorables(storableNodes, storableTrees)
+	rebuiltTries, err := sequencer.RebuildTries(forestSequencing)
+	require.NoError(t, err)
+	err = newMForest.AddTries(rebuiltTries)
 	require.NoError(t, err)
 
 	//forests are the same now

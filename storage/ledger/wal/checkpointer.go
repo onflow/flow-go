@@ -14,7 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/node"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/sequencer"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 )
 
@@ -126,8 +126,19 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 	}
 
 	err = c.wal.replay(0, to,
-		func(storableNodes []*node.StorableNode, storableTries []*trie.StorableTrie) error {
-			return mForest.LoadStorables(storableNodes, storableTries)
+		func(storableNodes []*sequencer.StorableNode, storableTries []*sequencer.StorableTrie) error {
+			forestSequencing := &sequencer.MForestSequencing{storableNodes, storableTries}
+			tries, err := sequencer.RebuildTries(forestSequencing)
+			if err != nil {
+				return err
+			}
+			for _, t := range tries {
+				err := mForest.AddTrie(t)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
 		},
 		func(commitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
 			_, err := mForest.Update(commitment, keys, values)
@@ -142,7 +153,7 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 
 	fmt.Printf("Got the tries...\n")
 
-	storableNodes, storableTries, err := mForest.ToStorables()
+	forestSequencing, err := sequencer.SequenceForest(mForest)
 	if err != nil {
 		return fmt.Errorf("cannot get storables: %w", err)
 	}
@@ -153,7 +164,7 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 	}
 	defer writer.Close()
 
-	err = c.StoreCheckpoint(storableNodes, storableTries, writer)
+	err = c.StoreCheckpoint(forestSequencing.Nodes, forestSequencing.Tries, writer)
 
 	return err
 }
@@ -198,7 +209,7 @@ func (c *Checkpointer) CheckpointWriter(to int) (io.WriteCloser, error) {
 	}, nil
 }
 
-func (c *Checkpointer) StoreCheckpoint(storableNodes []*node.StorableNode, storableTries []*trie.StorableTrie, writer io.WriteCloser) error {
+func (c *Checkpointer) StoreCheckpoint(storableNodes []*sequencer.StorableNode, storableTries []*sequencer.StorableTrie, writer io.WriteCloser) error {
 
 	header := make([]byte, 8+2)
 
@@ -230,7 +241,7 @@ func (c *Checkpointer) StoreCheckpoint(storableNodes []*node.StorableNode, stora
 	return nil
 }
 
-func (c *Checkpointer) LoadCheckpoint(checkpoint int) ([]*node.StorableNode, []*trie.StorableTrie, error) {
+func (c *Checkpointer) LoadCheckpoint(checkpoint int) ([]*sequencer.StorableNode, []*sequencer.StorableTrie, error) {
 
 	filepath := path.Join(c.dir, numberToFilename(checkpoint))
 	file, err := os.Open(filepath)
@@ -253,8 +264,8 @@ func (c *Checkpointer) LoadCheckpoint(checkpoint int) ([]*node.StorableNode, []*
 	nodesCount, pos := readUint64(header, 0)
 	triesCount, _ := readUint16(header, pos)
 
-	nodes := make([]*node.StorableNode, nodesCount+1) //+1 for 0 index meaning nil
-	tries := make([]*trie.StorableTrie, triesCount)
+	nodes := make([]*sequencer.StorableNode, nodesCount+1) //+1 for 0 index meaning nil
+	tries := make([]*sequencer.StorableTrie, triesCount)
 
 	for i := uint64(1); i <= nodesCount; i++ {
 		storableNode, err := ReadStorableNode(reader)
