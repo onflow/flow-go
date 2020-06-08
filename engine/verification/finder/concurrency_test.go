@@ -111,6 +111,8 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	failureThreshold := uint(2)
 	matchEng, matchEngWG := SetupMockMatchEng(t, results)
 	assigner := utils.NewMockAssigner(verID.NodeID, utils.IsAssigned)
+
+	// creates a verification node with a real finder engine, and mock matching engine.
 	verNode := testutil.VerificationNode(t, hub, verID, identities,
 		assigner, requestInterval, failureThreshold, true,
 		true, testutil.WithMatchEngine(matchEng))
