@@ -31,3 +31,8 @@ func (m *MockAssigner) Assign(ids flow.IdentityList, chunks flow.ChunkList, rng 
 
 	return a, nil
 }
+
+// IsAssigned is a helper function that returns true for the even indices in [0, chunkNum-1]
+func IsAssigned(index uint64) bool {
+	return index%2 == 0
+}
