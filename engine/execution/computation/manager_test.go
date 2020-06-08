@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/engine/execution/testutil"
+	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	module "github.com/dapperlabs/flow-go/module/mock"
@@ -25,7 +25,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	chain := flow.Mainnet.Chain()
 
-	vm, err := virtualmachine.New(rt, chain)
+	vm, err := fvm.New(rt, chain)
 	require.NoError(t, err)
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(2)
