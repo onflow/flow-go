@@ -1,4 +1,4 @@
-package virtualmachine
+package fvm
 
 import (
 	"errors"
@@ -6,7 +6,6 @@ import (
 	"math/rand"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/model/flow"

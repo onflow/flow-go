@@ -1005,7 +1005,6 @@ func (e *Engine) StartSync(ctx context.Context, firstKnown *entity.ExecutableBlo
 		e.log.Debug().
 			Msgf("no other execution nodes found, request last block instead at height %d", targetHeight)
 		e.blockSync.RequestBlock(targetBlockID)
-		return
 	}
 
 	// select other node at random

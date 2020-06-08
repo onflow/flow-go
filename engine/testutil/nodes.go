@@ -18,7 +18,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
@@ -28,6 +27,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification/finder"
 	"github.com/dapperlabs/flow-go/engine/verification/match"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
+	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/chunks"
@@ -264,7 +264,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	rt := runtime.NewInterpreterRuntime()
-	vm, err := virtualmachine.New(rt, node.ChainID.Chain())
+	vm, err := fvm.New(rt, node.ChainID.Chain())
 
 	require.NoError(t, err)
 
@@ -428,8 +428,10 @@ func VerificationNode(t testing.TB,
 
 	if node.VerifierEngine == nil {
 		rt := runtime.NewInterpreterRuntime()
-		vm, err := virtualmachine.New(rt, node.ChainID.Chain())
+
+		vm, err := fvm.New(rt, node.ChainID.Chain())
 		require.NoError(t, err)
+
 		chunkVerifier := chunks.NewChunkVerifier(vm, node.Blocks)
 
 		require.NoError(t, err)
