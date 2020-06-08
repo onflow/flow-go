@@ -208,11 +208,11 @@ func SetupMockMatchEng(t testing.TB, ers []flow.ExecutionResult) (*network.Engin
 	eng := new(network.Engine)
 
 	// keeps track of which execution results it has received
-	receivedERs := make(map[flow.Identifier]struct{})
+	receivedResults := make(map[flow.Identifier]struct{})
 	var (
-		// decrement the wait group when each verifiable chunk received
+		// decrements the wait group per distinct execution result received
 		wg sync.WaitGroup
-		// check one verifiable chunk at a time to ensure dupe checking works
+		// serializes processing received execution receipts
 		mu sync.Mutex
 	)
 
@@ -231,7 +231,7 @@ func SetupMockMatchEng(t testing.TB, ers []flow.ExecutionResult) (*network.Engin
 			resultID := result.ID()
 
 			// verifies that it has not seen this result
-			_, alreadySeen := receivedERs[resultID]
+			_, alreadySeen := receivedResults[resultID]
 			if alreadySeen {
 				t.Logf("match engine received duplicate ER (id=%s)", result.ID())
 				t.Fail()
@@ -242,7 +242,7 @@ func SetupMockMatchEng(t testing.TB, ers []flow.ExecutionResult) (*network.Engin
 			for _, er := range ers {
 				if resultID == er.ID() {
 					// mark it as seen and decrement the waitgroup
-					receivedERs[resultID] = struct{}{}
+					receivedResults[resultID] = struct{}{}
 					wg.Done()
 					return
 				}
