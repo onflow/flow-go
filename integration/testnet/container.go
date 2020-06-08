@@ -6,11 +6,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/dapperlabs/testingdock"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/go-connections/nat"
 	"github.com/rs/zerolog"
+
+	"github.com/dapperlabs/testingdock"
 
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 )
@@ -67,17 +68,32 @@ func (c *Container) bindPort(hostPort, containerPort string) {
 		containerNATPort = nat.Port(fmt.Sprintf("%s/tcp", containerPort))
 	}
 
-	c.opts.Config.ExposedPorts = nat.PortSet{
-		containerNATPort: {},
+	if c.opts.Config.ExposedPorts == nil {
+		c.opts.Config.ExposedPorts = nat.PortSet{
+			containerNATPort: {},
+		}
+	} else {
+		c.opts.Config.ExposedPorts[containerNATPort] = struct{}{}
 	}
-	c.opts.HostConfig.PortBindings = nat.PortMap{
-		containerNATPort: []nat.PortBinding{
+
+	if c.opts.HostConfig.PortBindings == nil {
+		c.opts.HostConfig.PortBindings = nat.PortMap{
+			containerNATPort: []nat.PortBinding{
+				{
+					HostIP:   "0.0.0.0",
+					HostPort: hostPort,
+				},
+			},
+		}
+	} else {
+		c.opts.HostConfig.PortBindings[containerNATPort] = []nat.PortBinding{
 			{
 				HostIP:   "0.0.0.0",
 				HostPort: hostPort,
 			},
-		},
+		}
 	}
+
 }
 
 // addFlag adds a command line flag to the container's startup command.

@@ -40,14 +40,22 @@ func (s *Suite) AccessClient() *testnet.Client {
 	return client
 }
 
+func (s *Suite) AccessPort() string {
+	return s.net.AccessPorts[testnet.AccessNodeAPIPort]
+}
+
+func (s *Suite) MetricsPort() string {
+	return s.net.AccessPorts[testnet.ExeNodeMetricsPort]
+}
+
 func (s *Suite) SetupTest() {
 
 	// need one access node
 	acsConfig := testnet.NewNodeConfig(flow.RoleAccess)
 	s.nodeConfigs = append(s.nodeConfigs, acsConfig)
 
-	// generate the three consensus identities
-	s.nodeIDs = unittest.IdentifierListFixture(3)
+	// generate the four consensus identities
+	s.nodeIDs = unittest.IdentifierListFixture(4)
 	for _, nodeID := range s.nodeIDs {
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithID(nodeID),
 			testnet.WithLogLevel(zerolog.FatalLevel),
@@ -62,10 +70,10 @@ func (s *Suite) SetupTest() {
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
 	// need one verification node
-	s.verID = unittest.IdentifierFixture()
-	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithID(s.verID),
-		testnet.WithLogLevel(zerolog.InfoLevel))
-	s.nodeConfigs = append(s.nodeConfigs, verConfig)
+	// s.verID = unittest.IdentifierFixture()
+	// verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithID(s.verID),
+	// 	testnet.WithLogLevel(zerolog.InfoLevel))
+	// s.nodeConfigs = append(s.nodeConfigs, verConfig)
 
 	// need one collection node
 	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel))

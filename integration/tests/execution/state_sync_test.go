@@ -32,8 +32,6 @@ func (s *StateSyncSuite) SetupTest() {
 	exe2Config := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithID(s.exe2ID),
 		testnet.WithLogLevel(zerolog.ErrorLevel))
 	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
-
-	s.Suite.SetupTest()
 }
 
 func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
@@ -103,8 +101,9 @@ func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 	require.Equal(s.T(), erExe1BlockC.ExecutionResult.FinalStateCommit, erExe2BlockC.ExecutionResult.FinalStateCommit)
 
 	// send a ExecutionStateSyncRequest from Ghost node
-	err = s.Ghost().Send(context.Background(), engine.ExecutionSync, []flow.Identifier{s.exe1ID},
-		&messages.ExecutionStateSyncRequest{CurrentBlockID: blockA.Header.ID(), TargetBlockID: blockB.Header.ID()})
+	err = s.Ghost().Send(context.Background(), engine.ExecutionSync,
+		&messages.ExecutionStateSyncRequest{CurrentBlockID: blockA.Header.ID(), TargetBlockID: blockB.Header.ID()},
+		[]flow.Identifier{s.exe1ID}...)
 	require.NoError(s.T(), err)
 
 	// wait for ExecutionStateDelta
