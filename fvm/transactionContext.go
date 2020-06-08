@@ -20,19 +20,16 @@ import (
 
 const scriptGasLimit = 100000
 
-type CheckerFunc func([]byte, runtime.Location) error
-
 type TransactionContext struct {
 	LedgerDAL
 	runtime.Metrics
 	bc                               BlockContext
 	ledger                           LedgerDAL
 	astCache                         ASTCache
-	signingAccounts                  []runtime.Address
-	checker                          CheckerFunc
 	logs                             []string
 	events                           []cadence.Event
 	tx                               *flow.TransactionBody
+	signingAccounts                  []runtime.Address
 	gasLimit                         uint64
 	uuid                             uint64 // TODO: implement proper UUID
 	header                           *flow.Header
@@ -76,11 +73,6 @@ func WithMetricsCollector(mc *MetricsCollector) TransactionContextOption {
 // inside this context.
 func (r *TransactionContext) GetSigningAccounts() []runtime.Address {
 	return r.signingAccounts
-}
-
-// SetChecker sets the semantic checker function for this context.
-func (r *TransactionContext) SetChecker(checker CheckerFunc) {
-	r.checker = checker
 }
 
 // Events returns all events emitted by the runtime to this context.
@@ -299,11 +291,6 @@ func (r *TransactionContext) RemoveAccountKey(address runtime.Address, index int
 	return removedKeyBytes, nil
 }
 
-// CheckCode checks the code for its validity.
-func (r *TransactionContext) CheckCode(address runtime.Address, code []byte) (err error) {
-	return r.checkProgram(code, address)
-}
-
 func (r *TransactionContext) ServiceAddress() flow.Address {
 	return r.chain.ServiceAddress()
 }
@@ -424,17 +411,6 @@ func (r *TransactionContext) UnsafeRandom() uint64 {
 	buf := make([]byte, 8)
 	_, _ = r.rng.Read(buf) // Always succeeds, no need to check error
 	return binary.LittleEndian.Uint64(buf)
-}
-
-// checkProgram checks the given code for syntactic and semantic correctness.
-func (r *TransactionContext) checkProgram(code []byte, address runtime.Address) error {
-	if code == nil {
-		return nil
-	}
-
-	location := runtime.AddressLocation(address[:])
-
-	return r.checker(code, location)
 }
 
 // verifySignatures verifies that a transaction contains the necessary signatures.
