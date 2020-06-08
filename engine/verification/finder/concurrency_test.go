@@ -81,6 +81,7 @@ func TestConcurrency(t *testing.T) {
 func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
 	// to demarcate the logs
+	t.Logf("TestConcurrencyStarted: %d-receipts/%d-senders/%d-chunks", erCount, senderCount, chunksNum)
 	log.Debug().
 		Int("execution_receipt_count", erCount).
 		Int("sender_count", senderCount).
@@ -96,7 +97,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 
 	identities := flow.IdentityList{colID, conID, exeID, verID}
 
-	// create `erCount` ER fixtures that will be concurrently delivered
+	// create `erCount` execution receipt fixtures that will be concurrently delivered
 	ers := make([]utils.CompleteExecutionResult, 0)
 	results := make([]flow.ExecutionResult, len(ers))
 
