@@ -216,7 +216,7 @@ func SetupMockMatchEng(t testing.TB, ers []flow.ExecutionResult) (*network.Engin
 		mu sync.Mutex
 	)
 
-	// expects `len(er)` many execution results
+	// expects `len(er)` many distinct execution results
 	wg.Add(len(ers))
 
 	eng.On("ProcessLocal", testifymock.Anything).
@@ -233,12 +233,12 @@ func SetupMockMatchEng(t testing.TB, ers []flow.ExecutionResult) (*network.Engin
 			// verifies that it has not seen this result
 			_, alreadySeen := receivedResults[resultID]
 			if alreadySeen {
-				t.Logf("match engine received duplicate ER (id=%s)", result.ID())
+				t.Logf("match engine received duplicate ER (id=%s)", resultID)
 				t.Fail()
 				return
 			}
 
-			// ensure the received result matches one we expect
+			// ensures the received result matches one we expect
 			for _, er := range ers {
 				if resultID == er.ID() {
 					// mark it as seen and decrement the waitgroup
@@ -249,7 +249,7 @@ func SetupMockMatchEng(t testing.TB, ers []flow.ExecutionResult) (*network.Engin
 			}
 
 			// the received result doesn't match any expected result
-			t.Logf("received unexpected results (id=%s)", resultID)
+			t.Logf("match engine received unexpected results (id=%s)", resultID)
 			t.Fail()
 		}).
 		Return(nil)
