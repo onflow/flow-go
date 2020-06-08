@@ -1,4 +1,4 @@
-package finder
+package finder_test
 
 import (
 	"fmt"
@@ -15,7 +15,6 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/engine/testutil"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
-	"github.com/dapperlabs/flow-go/integration/tests/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
@@ -94,10 +93,12 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	hub := stub.NewNetworkHub()
 
 	// creates test id for each role
+	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
-	identities := flow.IdentityList{exeID, verID}
+	identities := flow.IdentityList{colID, conID, exeID, verID}
 
 	// create `erCount` ER fixtures that will be concurrently delivered
 	ers := make([]utils.CompleteExecutionResult, 0)
@@ -113,10 +114,10 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	requestInterval := uint(1000)
 	failureThreshold := uint(2)
 	matchEng, matchEngWG := SetupMockMatchEng(t, results)
-	assigner := utils.NewMockAssigner(verID.NodeID, verification.IsAssigned)
+	assigner := utils.NewMockAssigner(verID.NodeID, utils.IsAssigned)
 	verNode := testutil.VerificationNode(t, hub, verID, identities,
 		assigner, requestInterval, failureThreshold, true,
-		false, testutil.WithMatchEngine(matchEng))
+		true, testutil.WithMatchEngine(matchEng))
 
 	// the wait group tracks goroutines for each Execution Receipt sent to Finder engine
 	var senderWG sync.WaitGroup
@@ -250,7 +251,7 @@ func SetupMockMatchEng(t testing.TB, ers []flow.ExecutionResult) (*network.Engin
 			}
 
 			// the received result doesn't match any expected result
-			t.Logf("received unexpected ER (id=%s)", resultID)
+			t.Logf("received unexpected results (id=%s)", resultID)
 			t.Fail()
 		}).
 		Return(nil)
