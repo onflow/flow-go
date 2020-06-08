@@ -131,7 +131,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	// adds the execution receipt in the mempool
 	added := e.receipts.Add(receipt)
 	if !added {
-		log.Debug().Uint("size", e.receipts.Size()).Msg("drops adding duplicate receipt")
+		log.Debug().Msg("drops adding duplicate receipt")
 		return nil
 	}
 
