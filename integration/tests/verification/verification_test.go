@@ -156,7 +156,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 	// verification node
 	verNodes := make([]mock2.VerificationNode, 0)
 	for _, verIdentity := range verIdentities {
-		verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold, lightIngest)
+		verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold, lightIngest, false)
 
 		// starts the ingest engine
 		if lightIngest {
@@ -362,7 +362,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	// setup nodes
 	//
 	// verification node
-	verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold, true)
+	verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold, true, false)
 	// inject block
 	err := verNode.Blocks.Store(completeER.Block)
 	assert.Nil(t, err)
@@ -506,9 +506,7 @@ func ingestHappyPath(tb testing.TB, receiptCount int, chunkCount int, lightInges
 	//
 	// verification node
 	verifierEng, verifierEngWG := SetupMockVerifierEng(tb, vChunks)
-	verNode := testutil.VerificationNode(tb, hub, verIdentity, identities, assigner, requestInterval, failureThreshold,
-		lightIngest,
-		testutil.WithVerifierEngine(verifierEng))
+	verNode := testutil.VerificationNode(tb, hub, verIdentity, identities, assigner, requestInterval, failureThreshold, lightIngest, false, testutil.WithVerifierEngine(verifierEng))
 
 	// starts the ingest engine
 	if lightIngest {
