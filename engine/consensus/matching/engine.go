@@ -378,6 +378,24 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 		results = append(results, result)
 	}
 
+	// check for stored execution results that don't have a corresponding seal
+	sealed, err := e.state.Sealed().Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get sealed height: %w", err)
+	}
+	final, err := e.state.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get finalized height: %w", err)
+	}
+
+	for height := sealed.Height; height < final.Height; height++ {
+		break
+		//TODO suggested fix for #3999
+		// get the execution result for the block at this height
+		// if no seal exists for this ER in the DB, nor in the mempool:
+		//   create a new seal and add it to mempool
+	}
+
 	return results, nil
 }
 
