@@ -347,13 +347,40 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler ...network.StreamHa
 	// keeps track of errors on creating a node
 	var err error
 	var nodes []*P2PNode
-	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
+
 	defer func() {
 		if err != nil && nodes != nil {
 			// stops all nodes upon an error in starting even one single node
 			l.StopNodes(nodes)
 		}
 	}()
+
+	// creating nodes
+	var nodeAddrs []NodeAddress
+	for i := 1; i <= count; i++ {
+
+		name := fmt.Sprintf("node%d", i)
+		pkey, err := generateNetworkingKey(name)
+		require.NoError(l.Suite.T(), err)
+
+		// create a node on localhost with a random port assigned by the OS
+		n, nodeID := l.CreateNode(name, pkey, "0.0.0.0", "0", handler...)
+		nodes = append(nodes, n)
+		nodeAddrs = append(nodeAddrs, nodeID)
+	}
+	return nodes, nodeAddrs
+}
+
+func (l *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip string, port string,
+	handler ...network.StreamHandler) (*P2PNode, NodeAddress) {
+	n := &P2PNode{}
+	nodeID := NodeAddress{
+		Name:   name,
+		IP:     ip,
+		Port:   port,
+		PubKey: key.GetPublic(),
+	}
+	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 
 	var handlerFunc network.StreamHandler
 	if len(handler) > 0 {
@@ -364,46 +391,32 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler ...network.StreamHa
 		handlerFunc = func(network.Stream) {}
 	}
 
-	// creating nodes
-	var nodeAddrs []NodeAddress
-	for i := 1; i <= count; i++ {
+	err := n.Start(l.ctx, nodeID, logger, key, handlerFunc)
+	require.NoError(l.T(), err)
+	require.Eventuallyf(l.T(), func() bool {
+		ip, p := n.GetIPPort()
+		return ip != "" && p != ""
+	}, 3*time.Second, tickForAssertEventually, fmt.Sprintf("could not start node %s", name))
 
-		name := fmt.Sprintf("node%d", i)
-		pkey, err := generateNetworkingKey(name)
-		require.NoError(l.Suite.T(), err)
-
-		n := &P2PNode{}
-		nodeID := NodeAddress{
-			Name:   name,
-			IP:     "0.0.0.0",        // localhost
-			Port:   "0",              // random Port number
-			PubKey: pkey.GetPublic(), // the networking public key
-		}
-
-		err = n.Start(l.ctx, nodeID, logger, pkey, handlerFunc)
-		require.NoError(l.Suite.T(), err)
-		require.Eventuallyf(l.Suite.T(), func() bool {
-			ip, p := n.GetIPPort()
-			return ip != "" && p != ""
-		}, 3*time.Second, tickForAssertEventually, fmt.Sprintf("could not start node %d", i))
-		// get the actual IP and port that have been assigned by the subsystem
-		nodeID.IP, nodeID.Port = n.GetIPPort()
-		nodes = append(nodes, n)
-		nodeAddrs = append(nodeAddrs, nodeID)
-	}
-	return nodes, nodeAddrs
+	// get the actual IP and port that have been assigned by the subsystem
+	nodeID.IP, nodeID.Port = n.GetIPPort()
+	return n, nodeID
 }
 
 // StopNodes stop all nodes in the input slice
 func (l *LibP2PNodeTestSuite) StopNodes(nodes []*P2PNode) {
 	for _, n := range nodes {
-		done, err := n.Stop()
-		assert.NoError(l.Suite.T(), err)
-		<-done
+		l.StopNode(n)
 	}
 }
 
-// GetPublicKey generates a ECDSA key pair using the given seed
+func (l *LibP2PNodeTestSuite) StopNode(node *P2PNode) {
+	done, err := node.Stop()
+	assert.NoError(l.Suite.T(), err)
+	<-done
+}
+
+// generateNetworkingKey generates a ECDSA key pair using the given seed
 func generateNetworkingKey(seed string) (crypto.PrivKey, error) {
 	seedB := make([]byte, 100)
 	copy(seedB, seed)
