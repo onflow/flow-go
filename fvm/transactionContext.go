@@ -18,18 +18,15 @@ import (
 
 const scriptGasLimit = 100000
 
-type CheckerFunc func([]byte, runtime.Location) error
-
 type TransactionContext struct {
 	LedgerDAL
 	bc                               BlockContext
 	ledger                           LedgerDAL
 	astCache                         ASTCache
-	signingAccounts                  []runtime.Address
-	checker                          CheckerFunc
 	logs                             []string
 	events                           []cadence.Event
 	tx                               *flow.TransactionBody
+	signingAccounts                  []runtime.Address
 	gasLimit                         uint64
 	uuid                             uint64 // TODO: implement proper UUID
 	header                           *flow.Header
@@ -65,11 +62,6 @@ func WithRestrictedAccountCreation(enabled bool) TransactionContextOption {
 // inside this context.
 func (r *TransactionContext) GetSigningAccounts() []runtime.Address {
 	return r.signingAccounts
-}
-
-// SetChecker sets the semantic checker function for this context.
-func (r *TransactionContext) SetChecker(checker CheckerFunc) {
-	r.checker = checker
 }
 
 // Events returns all events emitted by the runtime to this context.
@@ -284,11 +276,6 @@ func (r *TransactionContext) RemoveAccountKey(address runtime.Address, index int
 	return removedKeyBytes, nil
 }
 
-// CheckCode checks the code for its validity.
-func (r *TransactionContext) CheckCode(address runtime.Address, code []byte) (err error) {
-	return r.checkProgram(code, address)
-}
-
 // UpdateAccountCode updates the deployed code on an existing account.
 //
 // This function returns an error if the specified account does not exist or is
@@ -399,17 +386,6 @@ func (r *TransactionContext) GetBlockAtHeight(height uint64) (hash runtime.Block
 			"unexpected failure of GetBlockAtHeight, tx ID %s, height %v: %w", r.tx.ID().String(), height, err)
 	}
 	return runtime.BlockHash(block.ID()), block.Header.Timestamp.UnixNano(), true, nil
-}
-
-// checkProgram checks the given code for syntactic and semantic correctness.
-func (r *TransactionContext) checkProgram(code []byte, address runtime.Address) error {
-	if code == nil {
-		return nil
-	}
-
-	location := runtime.AddressLocation(address[:])
-
-	return r.checker(code, location)
 }
 
 // verifySignatures verifies that a transaction contains the necessary signatures.
