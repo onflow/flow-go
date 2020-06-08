@@ -15,8 +15,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
+	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/model/flow"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -133,8 +133,8 @@ func GenerateAccountPrivateKey() (flow.AccountPrivateKey, error) {
 
 // CreateAccounts inserts accounts into the ledger using the provided private keys.
 func CreateAccounts(
-	vm virtualmachine.VirtualMachine,
-	ledger virtualmachine.Ledger,
+	vm fvm.VirtualMachine,
+	ledger fvm.Ledger,
 	privateKeys []flow.AccountPrivateKey,
 ) ([]flow.Address, error) {
 	ctx := vm.NewBlockContext(nil, new(storage.Blocks))
@@ -151,7 +151,7 @@ func CreateAccounts(
 	`)
 
 	for _, privateKey := range privateKeys {
-		accountKey := privateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold)
+		accountKey := privateKey.PublicKey(fvm.AccountKeyWeightThreshold)
 		encAccountKey, _ := flow.EncodeRuntimeAccountPublicKey(accountKey)
 		cadAccountKey := bytesToCadenceArray(encAccountKey)
 		encCadAccountKey, _ := jsoncdc.Encode(cadAccountKey)
@@ -161,7 +161,7 @@ func CreateAccounts(
 			AddArgument(encCadAccountKey).
 			AddAuthorizer(flow.ServiceAddress())
 
-		result, err := ctx.ExecuteTransaction(ledger, tx, virtualmachine.WithSignatureVerification(false))
+		result, err := ctx.ExecuteTransaction(ledger, tx, fvm.WithSignatureVerification(false))
 		if err != nil {
 			return nil, err
 		}
@@ -187,8 +187,8 @@ func CreateAccounts(
 	return accounts, nil
 }
 
-func RootBootstrappedLedger() virtualmachine.Ledger {
-	ledger := make(virtualmachine.MapLedger)
+func RootBootstrappedLedger() fvm.Ledger {
+	ledger := make(fvm.MapLedger)
 	bootstrap.BootstrapView(ledger, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply)
 	return ledger
 }

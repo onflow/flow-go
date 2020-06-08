@@ -17,7 +17,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
@@ -26,6 +25,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
+	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/chunks"
@@ -255,7 +255,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	rt := runtime.NewInterpreterRuntime()
-	vm, err := virtualmachine.New(rt)
+	vm, err := fvm.New(rt)
 
 	require.NoError(t, err)
 
@@ -369,7 +369,7 @@ func VerificationNode(t testing.TB,
 
 	if node.VerifierEngine == nil {
 		rt := runtime.NewInterpreterRuntime()
-		vm, err := virtualmachine.New(rt)
+		vm, err := fvm.New(rt)
 		require.NoError(t, err)
 		chunkVerifier := chunks.NewChunkVerifier(vm, node.Blocks)
 

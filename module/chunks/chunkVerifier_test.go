@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/verification"
+	"github.com/dapperlabs/flow-go/fvm"
 	chModels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/chunks"
@@ -204,22 +204,22 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 type blockContextMock struct {
 	vm     *virtualMachineMock
 	header *flow.Header
-	blocks virtualmachine.Blocks
+	blocks fvm.Blocks
 }
 
 func (bc *blockContextMock) ExecuteTransaction(
-	ledger virtualmachine.Ledger,
+	ledger fvm.Ledger,
 	tx *flow.TransactionBody,
-	options ...virtualmachine.TransactionContextOption,
-) (*virtualmachine.TransactionResult, error) {
-	var txRes virtualmachine.TransactionResult
+	options ...fvm.TransactionContextOption,
+) (*fvm.TransactionResult, error) {
+	var txRes fvm.TransactionResult
 	switch string(tx.Script) {
 	case "wrongEndState":
 		id1 := make([]byte, 32)
 		UpdatedValue1 := []byte{'F'}
 		// add updates to the ledger
 		ledger.Set(id1, UpdatedValue1)
-		txRes = virtualmachine.TransactionResult{
+		txRes = fvm.TransactionResult{
 			TransactionID: unittest.IdentifierFixture(),
 			Events:        []cadence.Event{},
 			Logs:          []string{"log1", "log2"},
@@ -231,11 +231,11 @@ func (bc *blockContextMock) ExecuteTransaction(
 		UpdatedValue1 := []byte{'F'}
 		// add updates to the ledger
 		ledger.Set(id1, UpdatedValue1)
-		txRes = virtualmachine.TransactionResult{
+		txRes = fvm.TransactionResult{
 			TransactionID: unittest.IdentifierFixture(),
 			Events:        []cadence.Event{},
 			Logs:          nil,
-			Error:         &virtualmachine.MissingPayerError{}, // inside the runtime (e.g. div by zero, access account)
+			Error:         &fvm.MissingPayerError{}, // inside the runtime (e.g. div by zero, access account)
 			GasUsed:       0,
 		}
 	default:
@@ -245,7 +245,7 @@ func (bc *blockContextMock) ExecuteTransaction(
 		UpdatedValue2 := []byte{'B'}
 		_, _ = ledger.Get(id1)
 		ledger.Set(id2, UpdatedValue2)
-		txRes = virtualmachine.TransactionResult{
+		txRes = fvm.TransactionResult{
 			TransactionID: unittest.IdentifierFixture(),
 			Events:        []cadence.Event{},
 			Logs:          []string{"log1", "log2"},
@@ -257,13 +257,13 @@ func (bc *blockContextMock) ExecuteTransaction(
 }
 
 func (bc *blockContextMock) ExecuteScript(
-	ledger virtualmachine.Ledger,
+	ledger fvm.Ledger,
 	script []byte,
-) (*virtualmachine.ScriptResult, error) {
+) (*fvm.ScriptResult, error) {
 	return nil, nil
 }
 
-func (bc *blockContextMock) GetAccount(_ virtualmachine.Ledger, _ flow.Address) (*flow.Account, error) {
+func (bc *blockContextMock) GetAccount(_ fvm.Ledger, _ flow.Address) (*flow.Account, error) {
 	return nil, nil
 }
 
@@ -271,7 +271,7 @@ func (bc *blockContextMock) GetAccount(_ virtualmachine.Ledger, _ flow.Address) 
 type virtualMachineMock struct {
 }
 
-func (vm *virtualMachineMock) NewBlockContext(header *flow.Header, blocks virtualmachine.Blocks) virtualmachine.BlockContext {
+func (vm *virtualMachineMock) NewBlockContext(header *flow.Header, blocks fvm.Blocks) fvm.BlockContext {
 	return &blockContextMock{
 		vm:     vm,
 		header: header,
@@ -279,8 +279,8 @@ func (vm *virtualMachineMock) NewBlockContext(header *flow.Header, blocks virtua
 	}
 }
 
-func (vm *virtualMachineMock) ASTCache() virtualmachine.ASTCache {
-	cache, err := virtualmachine.NewLRUASTCache(64)
+func (vm *virtualMachineMock) ASTCache() fvm.ASTCache {
+	cache, err := fvm.NewLRUASTCache(64)
 	if err != nil {
 		return nil
 	}

@@ -1,32 +1,32 @@
 package main
 
 import (
-	"fmt"
+    "fmt"
 
-	"github.com/spf13/pflag"
+    "github.com/spf13/pflag"
 
-	"github.com/onflow/cadence/runtime"
+    "github.com/onflow/cadence/runtime"
 
-	"github.com/dapperlabs/flow-go/cmd"
-	"github.com/dapperlabs/flow-go/consensus"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
-	protocolRecovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
-	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
-	"github.com/dapperlabs/flow-go/engine/common/synchronization"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
-	"github.com/dapperlabs/flow-go/engine/verification/ingest"
-	"github.com/dapperlabs/flow-go/engine/verification/verifier"
+    "github.com/dapperlabs/flow-go/cmd"
+    "github.com/dapperlabs/flow-go/consensus"
+    "github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
+    "github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
+    protocolRecovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
+    followereng "github.com/dapperlabs/flow-go/engine/common/follower"
+    "github.com/dapperlabs/flow-go/engine/common/synchronization"
+    "github.com/dapperlabs/flow-go/engine/verification/ingest"
+    "github.com/dapperlabs/flow-go/engine/verification/verifier"
+	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/model/encoding"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/buffer"
-	"github.com/dapperlabs/flow-go/module/chunks"
-	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
-	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/module/signature"
-	storage "github.com/dapperlabs/flow-go/storage/badger"
+    "github.com/dapperlabs/flow-go/model/flow"
+    "github.com/dapperlabs/flow-go/module"
+    "github.com/dapperlabs/flow-go/module/buffer"
+    "github.com/dapperlabs/flow-go/module/chunks"
+    finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
+    "github.com/dapperlabs/flow-go/module/mempool/stdmap"
+    "github.com/dapperlabs/flow-go/module/metrics"
+    "github.com/dapperlabs/flow-go/module/signature"
+    storage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
 const (
@@ -196,7 +196,7 @@ func main() {
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rt := runtime.NewInterpreterRuntime()
-			vm, err := virtualmachine.New(rt)
+			vm, err := fvm.New(rt)
 			if err != nil {
 				return nil, err
 			}

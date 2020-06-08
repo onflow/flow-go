@@ -7,8 +7,8 @@ import (
 	"github.com/opentracing/opentracing-go"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
+	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
@@ -23,12 +23,12 @@ type BlockComputer interface {
 
 type blockComputer struct {
 	tracer module.Tracer
-	vm     virtualmachine.VirtualMachine
+	vm     fvm.VirtualMachine
 	blocks storage.Blocks
 }
 
 // NewBlockComputer creates a new block executor.
-func NewBlockComputer(vm virtualmachine.VirtualMachine, tracer module.Tracer, blocks storage.Blocks) BlockComputer {
+func NewBlockComputer(vm fvm.VirtualMachine, tracer module.Tracer, blocks storage.Blocks) BlockComputer {
 	return &blockComputer{
 		tracer: tracer,
 		vm:     vm,
@@ -112,7 +112,7 @@ func (e *blockComputer) executeBlock(
 func (e *blockComputer) executeCollection(
 	ctx context.Context,
 	txIndex uint32,
-	blockCtx virtualmachine.BlockContext,
+	blockCtx fvm.BlockContext,
 	collectionView *delta.View,
 	collection *entity.CompleteCollection,
 ) ([]flow.Event, []flow.TransactionResult, uint32, uint64, error) {
@@ -144,7 +144,7 @@ func (e *blockComputer) executeCollection(
 				return fmt.Errorf("failed to execute transaction: %w", err)
 			}
 
-			txEvents, err := virtualmachine.ConvertEvents(txIndex, result)
+			txEvents, err := fvm.ConvertEvents(txIndex, result)
 			txIndex++
 			gasUsed += result.GasUsed
 

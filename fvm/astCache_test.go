@@ -1,4 +1,4 @@
-package virtualmachine_test
+package fvm_test
 
 import (
 	"fmt"
@@ -10,10 +10,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
-	vmMock "github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine/mock"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/engine/execution/testutil"
+	"github.com/dapperlabs/flow-go/fvm"
+	vmMock "github.com/dapperlabs/flow-go/fvm/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/hash"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -22,7 +22,7 @@ import (
 func TestTransactionASTCache(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
-	vm, err := virtualmachine.New(rt)
+	vm, err := fvm.New(rt)
 	require.NoError(t, err)
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
@@ -62,7 +62,7 @@ func TestTransactionASTCache(t *testing.T) {
 func TestScriptASTCache(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
-	vm, err := virtualmachine.New(rt)
+	vm, err := fvm.New(rt)
 
 	require.NoError(t, err)
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
@@ -96,7 +96,7 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.New(rt)
+	vm, err := fvm.New(rt)
 	require.NoError(t, err)
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
@@ -120,7 +120,7 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 						destroy v
 					}
 				}
-			`, virtualmachine.FlowTokenAddress())),
+			`, fvm.FlowTokenAddress())),
 		).
 		AddAuthorizer(accounts[0]).
 		SetProposalKey(accounts[0], 0, 0).
@@ -154,7 +154,7 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.New(rt)
+	vm, err := fvm.New(rt)
 	require.NoError(b, err)
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
@@ -182,7 +182,7 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 						destroy v
 					}
 				}
-			`, virtualmachine.FlowTokenAddress(), i)),
+			`, fvm.FlowTokenAddress(), i)),
 			).
 			AddAuthorizer(accounts[0]).
 			SetProposalKey(accounts[0], 0, uint64(i)).
@@ -227,7 +227,7 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.NewWithCache(rt, &nonFunctioningCache{})
+	vm, err := fvm.NewWithCache(rt, &nonFunctioningCache{})
 	require.NoError(b, err)
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
@@ -255,7 +255,7 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 						destroy v
 					}
 				}
-			`, virtualmachine.FlowTokenAddress(), i)),
+			`, fvm.FlowTokenAddress(), i)),
 			).
 			AddAuthorizer(accounts[0]).
 			SetPayer(accounts[0]).
@@ -283,7 +283,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.New(rt)
+	vm, err := fvm.New(rt)
 	require.NoError(t, err)
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
@@ -303,7 +303,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 					let v <- FlowToken.createEmptyVault()
 					destroy v
 				}
-			`, virtualmachine.FlowTokenAddress(), id)))
+			`, fvm.FlowTokenAddress(), id)))
 			if !assert.True(t, result.Succeeded()) {
 				t.Log(result.Error.ErrorMessage())
 			}
@@ -313,7 +313,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 	}
 	wg.Wait()
 
-	location := runtime.AddressLocation(virtualmachine.FlowTokenAddress().Bytes())
+	location := runtime.AddressLocation(fvm.FlowTokenAddress().Bytes())
 
 	// Get cached program
 	program, err := vm.ASTCache().GetProgram(location)

@@ -9,8 +9,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
+	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
@@ -34,7 +34,7 @@ type Manager struct {
 	log           zerolog.Logger
 	me            module.Local
 	protoState    protocol.State
-	vm            virtualmachine.VirtualMachine
+	vm            fvm.VirtualMachine
 	blockComputer computer.BlockComputer
 	blocks        storage.Blocks
 }
@@ -44,7 +44,7 @@ func New(
 	tracer module.Tracer,
 	me module.Local,
 	protoState protocol.State,
-	vm virtualmachine.VirtualMachine,
+	vm fvm.VirtualMachine,
 	blocks storage.Blocks,
 ) *Manager {
 	log := logger.With().Str("engine", "computation").Logger()
