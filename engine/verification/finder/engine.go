@@ -180,11 +180,7 @@ func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {}
 func (e *Engine) isProcessable(result *flow.ExecutionResult) bool {
 	// checks existence of block that result points to
 	_, err := e.headerStorage.ByBlockID(result.BlockID)
-	if err != nil {
-		return false
-	}
-
-	return true
+	return err == nil
 }
 
 // processResult submits the result to the match engine.
