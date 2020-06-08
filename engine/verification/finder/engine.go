@@ -3,6 +3,7 @@ package finder
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/rs/zerolog"
 
@@ -17,13 +18,14 @@ import (
 )
 
 type Engine struct {
-	unit            *engine.Unit
-	log             zerolog.Logger
-	me              module.Local
-	match           network.Engine
-	receipts        mempool.Receipts    // used to keep the receipts as mempool
-	headerStorage   storage.Headers     // used to check block existence before verifying
-	processedResult mempool.Identifiers // used to keep track of the processed results
+	unit              *engine.Unit
+	log               zerolog.Logger
+	me                module.Local
+	match             network.Engine
+	receipts          mempool.Receipts    // used to keep the receipts as mempool
+	headerStorage     storage.Headers     // used to check block existence before verifying
+	processedResult   mempool.Identifiers // used to keep track of the processed results
+	checkResourceLock sync.Mutex          // used to serialize checking receipts
 }
 
 func New(
@@ -129,7 +131,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	// adds the execution receipt in the mempool
 	added := e.receipts.Add(receipt)
 	if !added {
-		log.Debug().Msg("drops adding duplicate receipt")
+		log.Debug().Uint("size", e.receipts.Size()).Msg("drops adding duplicate receipt")
 		return nil
 	}
 
@@ -229,6 +231,9 @@ func (e *Engine) onResultProcessed(resultID flow.Identifier) {
 // checkReceipts receives a set of receipts and evaluates each of them
 // against being processable. If a receipt is processable, it gets processed.
 func (e *Engine) checkReceipts(receipts []*flow.ExecutionReceipt) {
+	e.checkResourceLock.Lock()
+	defer e.checkResourceLock.Unlock()
+
 	for _, receipt := range receipts {
 		if e.isProcessable(&receipt.ExecutionResult) {
 			// checks if result is ready to process
