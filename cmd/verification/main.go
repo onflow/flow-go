@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/spf13/pflag"
-
 	"github.com/onflow/cadence/runtime"
+	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus"

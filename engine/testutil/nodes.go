@@ -264,8 +264,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	rt := runtime.NewInterpreterRuntime()
-	vm, err := fvm.New(rt, node.ChainID.Chain())
 
+	vm, err := fvm.New(rt, node.ChainID.Chain())
 	require.NoError(t, err)
 
 	computationEngine := computation.New(
