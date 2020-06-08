@@ -458,6 +458,7 @@ func VerificationNode(t testing.TB,
 
 	if node.FinderEngine == nil && newArchitecture {
 		node.FinderEngine, err = finder.New(node.Log, node.Net, node.Me, node.MatchEngine, node.AuthReceipts, node.Headers, node.IngestedResultIDs)
+		require.Nil(t, err)
 	}
 
 	return node
