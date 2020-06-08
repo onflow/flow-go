@@ -52,14 +52,17 @@ func (bc *blockContext) newTransactionContext(
 	}
 
 	ctx := &TransactionContext{
-		bc:              bc,
-		astCache:        bc.vm.cache,
-		ledger:          NewLedgerDAL(ledger),
-		signingAccounts: signingAccounts,
-		tx:              tx,
-		header:          bc.header,
-		blocks:          bc.blocks,
-		gasLimit:        tx.GasLimit,
+		bc:                               bc,
+		astCache:                         bc.vm.cache,
+		ledger:                           NewLedgerDAL(ledger),
+		signingAccounts:                  signingAccounts,
+		tx:                               tx,
+		gasLimit:                         tx.GasLimit,
+		header:                           bc.header,
+		blocks:                           bc.blocks,
+		signatureVerificationEnabled:     true,
+		restrictedAccountCreationEnabled: true,
+		restrictedDeploymentEnabled:      true,
 	}
 
 	for _, option := range options {
@@ -96,7 +99,7 @@ func (bc *blockContext) ExecuteTransaction(
 
 	ctx := bc.newTransactionContext(ledger, tx, options...)
 
-	if !ctx.skipVerification {
+	if ctx.signatureVerificationEnabled {
 		flowErr := ctx.verifySignatures()
 		if flowErr != nil {
 			return &TransactionResult{

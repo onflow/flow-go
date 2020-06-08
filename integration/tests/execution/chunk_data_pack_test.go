@@ -13,7 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/storage/ledger/trie"
+	"github.com/dapperlabs/flow-go/storage/ledger/ptrie"
 )
 
 func TestExecutionChunkDataPacks(t *testing.T) {
@@ -62,8 +62,9 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 	// TODO clear messages
 
 	// send a ChunkDataRequest from Ghost node
-	err = gs.Ghost().Send(context.Background(), engine.ExecutionReceiptProvider, []flow.Identifier{gs.exe1ID},
-		&messages.ChunkDataRequest{ChunkID: chunkID, Nonce: rand.Uint64()})
+	err = gs.Ghost().Send(context.Background(), engine.ExecutionReceiptProvider,
+		&messages.ChunkDataRequest{ChunkID: chunkID, Nonce: rand.Uint64()},
+		[]flow.Identifier{gs.exe1ID}...)
 	require.NoError(gs.T(), err)
 
 	// wait for ChunkDataResponse
@@ -79,6 +80,6 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 	require.NoError(gs.T(), err, "error verifying chunk trie proofs")
 	require.True(gs.T(), isValid, "chunk trie proofs are not valid, but must be")
 
-	_, err = trie.NewPSMT(pack2.ChunkDataPack.StartState, 257, pack2.ChunkDataPack.Registers(), pack2.ChunkDataPack.Values(), pack2.ChunkDataPack.Proofs())
+	_, err = ptrie.NewPSMT(pack2.ChunkDataPack.StartState, 257, pack2.ChunkDataPack.Registers(), pack2.ChunkDataPack.Values(), pack2.ChunkDataPack.Proofs())
 	require.NoError(gs.T(), err, "error building PSMT")
 }
