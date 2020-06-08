@@ -170,7 +170,7 @@ func Test_Compactor(t *testing.T) {
 }
 
 func loadIntoForest(forest *mtrie.MForest, storableNodes []*sequencer.StorableNode, storableTries []*sequencer.StorableTrie) error {
-	forestSequencing := &sequencer.MForestSequencing{storableNodes, storableTries}
+	forestSequencing := &sequencer.MForestSequencing{Nodes: storableNodes, Tries: storableTries}
 	tries, err := sequencer.RebuildTries(forestSequencing)
 	if err != nil {
 		return err

@@ -113,7 +113,7 @@ func (f *MForest) AddTries(newTries []*trie.MTrie) error {
 	for _, t := range newTries {
 		err := f.AddTrie(t)
 		if err != nil {
-			fmt.Errorf("adding tries to forrest failed: %w", err)
+			return fmt.Errorf("adding tries to forrest failed: %w", err)
 		}
 	}
 	return nil

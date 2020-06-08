@@ -127,7 +127,7 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 
 	err = c.wal.replay(0, to,
 		func(storableNodes []*sequencer.StorableNode, storableTries []*sequencer.StorableTrie) error {
-			forestSequencing := &sequencer.MForestSequencing{storableNodes, storableTries}
+			forestSequencing := &sequencer.MForestSequencing{Nodes: storableNodes, Tries: storableTries}
 			tries, err := sequencer.RebuildTries(forestSequencing)
 			if err != nil {
 				return err

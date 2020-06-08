@@ -58,7 +58,7 @@ func NewMTrieStorage(dbDir string, cacheSize int, metrics module.LedgerMetrics, 
 
 	err = w.Replay(
 		func(storableNodes []*sequencer.StorableNode, storableTries []*sequencer.StorableTrie) error {
-			forestSequencing := &sequencer.MForestSequencing{storableNodes, storableTries}
+			forestSequencing := &sequencer.MForestSequencing{Nodes: storableNodes, Tries: storableTries}
 			rebuiltTries, err := sequencer.RebuildTries(forestSequencing)
 			if err != nil {
 				return fmt.Errorf("rebuilding forest from sequenced nodes failed: %w", err)
