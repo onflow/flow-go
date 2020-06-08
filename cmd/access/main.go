@@ -40,8 +40,6 @@ func main() {
 		collectionRPC   access.AccessAPIClient
 		executionRPC    execution.ExecutionAPIClient
 		err             error
-		collections     *storage.Collections
-		transactions    *storage.Transactions
 		conCache        *buffer.PendingBlocks // pending block cache for follower
 	)
 
@@ -80,17 +78,12 @@ func main() {
 			executionRPC = execution.NewExecutionAPIClient(executionRPCConn)
 			return nil
 		}).
-		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
-			collections = storage.NewCollections(node.DB)
-			transactions = storage.NewTransactions(node.DB)
-			return nil
-		}).
 		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
 			conCache = buffer.NewPendingBlocks()
 			return nil
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, node.Storage.Blocks, node.Storage.Headers, collections, transactions)
+			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions)
 			return ingestEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -150,7 +143,7 @@ func main() {
 			return follower.WithSynchronization(sync), nil
 		}).
 		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, node.Storage.Blocks, node.Storage.Headers, collections, transactions)
+			rpcEng := rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions)
 			return rpcEng, nil
 		}).
 		Run()

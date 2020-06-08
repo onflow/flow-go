@@ -28,15 +28,21 @@ func NewBlocks(db *badger.DB, headers *Headers, payloads *Payloads) *Blocks {
 }
 
 func (b *Blocks) Store(block *flow.Block) error {
-	err := b.headers.Store(block.Header)
-	if err != nil {
-		return fmt.Errorf("could not store header: %w", err)
+	return operation.RetryOnConflict(b.db.Update, b.storeTx(block))
+}
+
+func (b *Blocks) storeTx(block *flow.Block) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		err := b.headers.storeTx(block.Header)(tx)
+		if err != nil {
+			return fmt.Errorf("could not store header: %w", err)
+		}
+		err = b.payloads.storeTx(block.ID(), block.Payload)(tx)
+		if err != nil {
+			return fmt.Errorf("could not store payload: %w", err)
+		}
+		return nil
 	}
-	err = b.payloads.Store(block.ID(), block.Payload)
-	if err != nil {
-		return fmt.Errorf("could not store payload: %w", err)
-	}
-	return nil
 }
 
 func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {

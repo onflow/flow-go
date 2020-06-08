@@ -17,8 +17,10 @@ type Guarantees struct {
 
 func NewGuarantees(collector module.CacheMetrics, db *badger.DB) *Guarantees {
 
+	g := &Guarantees{db: db}
+
 	store := func(collID flow.Identifier, guarantee interface{}) error {
-		return operation.RetryOnConflict(db.Update, operation.SkipDuplicates(operation.InsertGuarantee(collID, guarantee.(*flow.CollectionGuarantee))))
+		return operation.RetryOnConflict(db.Update, g.storeTx(guarantee.(*flow.CollectionGuarantee)))
 	}
 
 	retrieve := func(collID flow.Identifier) (interface{}, error) {
@@ -27,21 +29,23 @@ func NewGuarantees(collector module.CacheMetrics, db *badger.DB) *Guarantees {
 		return &guarantee, err
 	}
 
-	g := &Guarantees{
-		db: db,
-		cache: newCache(collector,
-			withLimit(10*(flow.DefaultTransactionExpiry+100)),
-			withStore(store),
-			withRetrieve(retrieve),
-			withResource(metrics.ResourceGuarantee),
-		),
-	}
+	g.cache = newCache(collector,
+		withLimit(flow.DefaultTransactionExpiry+100),
+		withStore(store),
+		withRetrieve(retrieve),
+		withResource(metrics.ResourceGuarantee))
 
 	return g
 }
 
 func (g *Guarantees) Store(guarantee *flow.CollectionGuarantee) error {
 	return g.cache.Put(guarantee.ID(), guarantee)
+}
+
+func (g *Guarantees) storeTx(guarantee *flow.CollectionGuarantee) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		return operation.SkipDuplicates(operation.InsertGuarantee(guarantee.ID(), guarantee))(tx)
+	}
 }
 
 func (g *Guarantees) ByCollectionID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
