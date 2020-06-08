@@ -21,13 +21,9 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-// testConcurrency evaluates behavior of verification node against:
-// - ingest engine receives concurrent receipts from different sources
-// - not all chunks of the receipts are assigned to the ingest engine
-// - for each assigned chunk ingest engine emits a single result approval to verify engine only once
-// (even in presence of duplication)
-// - also the test stages to drop the first request on each collection to evaluate the retrial
-// - also the test stages to drop the first request on each chunk data pack to evaluate the retrial
+// testConcurrency evaluates behavior of finder engine against:
+// - finder engine receives concurrent receipts from different sources
+// - for each distinct receipt with an available block finder engine emits it to the matching engine
 func TestConcurrency(t *testing.T) {
 	var mu sync.Mutex
 	testcases := []struct {
