@@ -31,7 +31,7 @@ func (h *HardSpooningTestSuite) TestNetworkKeyChangedAfterHardSpoon() {
 	// create and start node 1 on localhost and random port
 	node1key, err := generateNetworkingKey("abc")
 	assert.NoError(h.T(), err)
-	node1, address1 := h.CreateNode("node1",  node1key, "0.0.0.0", "0")
+	node1, address1 := h.CreateNode("node1", node1key, "0.0.0.0", "0")
 	defer h.StopNode(node1)
 	h.T().Logf(" %s node started on %s:%s", node1.name, address1.IP, address1.Port)
 	h.T().Logf("libp2p ID for %s: %s", node1.name, node1.libP2PHost.ID())
@@ -78,7 +78,6 @@ func (h *HardSpooningTestSuite) TestNetworkKeyChangedAfterHardSpoon() {
 	assert.Regexp(h.T(), ".*failed to negotiate security protocol: connected to wrong peer.*", err)
 }
 
-
 // TestProtocolChangeAfterHardSpoon tests that a node from the old chain cannot talk to a node in the new chain if
 // the Flow libp2p protocol ID is updated but the network keys are kept the same.
 func (h *HardSpooningTestSuite) TestProtocolChangeAfterHardSpoon() {
@@ -89,7 +88,7 @@ func (h *HardSpooningTestSuite) TestProtocolChangeAfterHardSpoon() {
 	// create and start node 1 on localhost and random port
 	node1key, err := generateNetworkingKey("abc")
 	assert.NoError(h.T(), err)
-	node1, address1 := h.CreateNode("node1",  node1key, "0.0.0.0", "0")
+	node1, address1 := h.CreateNode("node1", node1key, "0.0.0.0", "0")
 	defer h.StopNode(node1)
 	h.T().Logf(" %s node started on %s:%s", node1.name, address1.IP, address1.Port)
 	h.T().Logf("libp2p ID for %s: %s", node1.name, node1.libP2PHost.ID())
