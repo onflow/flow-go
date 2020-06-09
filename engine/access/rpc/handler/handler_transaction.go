@@ -112,7 +112,9 @@ func (h *Handler) deriveTransactionStatus(tx *flow.TransactionBody, executed boo
 			return entities.TransactionStatus_UNKNOWN, err
 		}
 
-		if finalized.Height-referenceBlock.Height > flow.DefaultTransactionExpiry {
+		// Have to check if finalized height is greater than reference block height rather than rely on the subtraction, since
+		// heights are unsigned ints
+		if finalized.Height > referenceBlock.Height && finalized.Height-referenceBlock.Height > flow.DefaultTransactionExpiry {
 			return entities.TransactionStatus_EXPIRED, err
 		}
 
