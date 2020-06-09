@@ -171,7 +171,7 @@ func (l *LibP2PNodeTestSuite) TestCreateStream() {
 	address2 := addrs[1]
 
 	// Assert that there is no outbound stream to the target yet
-	require.Equal(l.T(), 0, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), FlowLibP2PProtocolID, network.DirOutbound))
+	require.Equal(l.T(), 0, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), FlowLibP2PProtocolIDVersion1, network.DirOutbound))
 
 	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
 	var streams []network.Stream
@@ -181,7 +181,7 @@ func (l *LibP2PNodeTestSuite) TestCreateStream() {
 		require.NoError(l.T(), err)
 		require.NotNil(l.T(), anotherStream)
 		// assert that the stream count within libp2p incremented (a new stream was created)
-		require.Equal(l.T(), i+1, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), FlowLibP2PProtocolID, network.DirOutbound))
+		require.Equal(l.T(), i+1, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), FlowLibP2PProtocolIDVersion1, network.DirOutbound))
 		// assert that the same connection is reused
 		require.Len(l.T(), nodes[0].libP2PHost.Network().Conns(), 1)
 		streams = append(streams, anotherStream)
@@ -198,7 +198,7 @@ func (l *LibP2PNodeTestSuite) TestCreateStream() {
 		}()
 		wg.Wait()
 		// assert that the stream count within libp2p decremented
-		require.Equal(l.T(), i, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), FlowLibP2PProtocolID, network.DirOutbound))
+		require.Equal(l.T(), i, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), FlowLibP2PProtocolIDVersion1, network.DirOutbound))
 	}
 }
 
