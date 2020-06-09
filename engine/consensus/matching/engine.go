@@ -455,6 +455,10 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 	if err != nil {
 		return fmt.Errorf("could not store sealing result: %w", err)
 	}
+	err = e.resultsDB.Index(result.BlockID, result.ID())
+	if err != nil {
+		return fmt.Errorf("could not index sealing result: %w", err)
+	}
 
 	// generate & store seal
 	seal := &flow.Seal{
