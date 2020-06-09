@@ -101,6 +101,21 @@ func (h *Handler) deriveTransactionStatus(tx *flow.TransactionBody, executed boo
 
 	block, err := h.lookupBlock(tx.ID())
 	if errors.Is(err, storage.ErrNotFound) {
+		// Not in a block, let's see if it's expired
+		referenceBlock, err := h.state.AtBlockID(tx.ReferenceBlockID).Head()
+		if err != nil {
+			return entities.TransactionStatus_UNKNOWN, err
+		}
+		// get the latest finalized block from the state
+		finalized, err := h.state.Final().Head()
+		if err != nil {
+			return entities.TransactionStatus_UNKNOWN, err
+		}
+
+		if finalized.Height-referenceBlock.Height > flow.DefaultTransactionExpiry {
+			return entities.TransactionStatus_EXPIRED, err
+		}
+
 		// tx found in transaction storage and collection storage but not in block storage
 		// However, this will not happen as of now since the ingestion engine doesn't subscribe
 		// for collections
