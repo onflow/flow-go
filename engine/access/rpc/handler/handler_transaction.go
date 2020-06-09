@@ -72,13 +72,13 @@ func (h *Handler) GetTransactionResult(ctx context.Context, req *access.GetTrans
 	txID := tx.ID()
 
 	// get events for the transaction
-	events, statusCode, txError, err := h.lookupTransactionResult(ctx, txID)
+	executed, events, statusCode, txError, err := h.lookupTransactionResult(ctx, txID)
 	if err != nil {
 		return nil, convertStorageError(err)
 	}
 
 	// derive status of the transaction
-	status, err := h.deriveTransactionStatus(tx)
+	status, err := h.deriveTransactionStatus(tx, executed)
 	if err != nil {
 		return nil, convertStorageError(err)
 	}
@@ -97,7 +97,7 @@ func (h *Handler) GetTransactionResult(ctx context.Context, req *access.GetTrans
 }
 
 // deriveTransactionStatus derives the transaction status based on current protocol state
-func (h *Handler) deriveTransactionStatus(tx *flow.TransactionBody) (entities.TransactionStatus, error) {
+func (h *Handler) deriveTransactionStatus(tx *flow.TransactionBody, executed bool) (entities.TransactionStatus, error) {
 
 	block, err := h.lookupBlock(tx.ID())
 	if errors.Is(err, storage.ErrNotFound) {
@@ -121,6 +121,12 @@ func (h *Handler) deriveTransactionStatus(tx *flow.TransactionBody) (entities.Tr
 	if block.Header.Height <= sealed.Height {
 		return entities.TransactionStatus_SEALED, nil
 	}
+
+	// We've explicitly seen some form of execution result, therefore this Tx must have been executed
+	if executed {
+		return entities.TransactionStatus_EXECUTED, nil
+	}
+
 	// otherwise, the finalized block of the transaction has not yet been sealed
 	// hence the transaction is finalized but not sealed
 	return entities.TransactionStatus_FINALIZED, nil
@@ -141,27 +147,27 @@ func (h *Handler) lookupBlock(txID flow.Identifier) (*flow.Block, error) {
 	return block, nil
 }
 
-func (h *Handler) lookupTransactionResult(ctx context.Context, txID flow.Identifier) ([]*entities.Event, uint32, string, error) {
+func (h *Handler) lookupTransactionResult(ctx context.Context, txID flow.Identifier) (bool, []*entities.Event, uint32, string, error) {
 
 	// find the block ID for the transaction
 	block, err := h.lookupBlock(txID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			// access node may not have the block if it hasn't yet been finalized
-			return nil, 0, "", nil
+			return false, nil, 0, "", nil
 		}
-		return nil, 0, "", convertStorageError(err)
+		return false, nil, 0, "", convertStorageError(err)
 	}
 
 	blockID := block.ID()
 
 	events, txStatus, message, err := h.getTransactionResultFromExecutionNode(ctx, blockID[:], txID[:])
 	if err != nil {
-		errStatus, _ := status.FromError(err)
-		if errStatus.Code() == codes.NotFound {
-			return nil, 0, "", nil
+		if status.Code(err) == codes.NotFound {
+			// No result yet, indicate that it has not been executed
+			return false, nil, 0, "", nil
 		}
 	}
-
-	return events, txStatus, message, nil
+	// considered executed as long as some result is returned, even if it's an error
+	return true, events, txStatus, message, nil
 }
