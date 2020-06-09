@@ -98,7 +98,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	guaranteesDB := storage.NewGuarantees(metrics, db)
 	sealsDB := storage.NewSeals(metrics, db)
 	indexDB := storage.NewIndex(metrics, db)
-	payloadsDB := storage.NewPayloads(indexDB, identitiesDB, guaranteesDB, sealsDB)
+	payloadsDB := storage.NewPayloads(db, indexDB, identitiesDB, guaranteesDB, sealsDB)
 	blocksDB := storage.NewBlocks(db, headersDB, payloadsDB)
 
 	state, err := protocol.NewState(metrics, db, headersDB, identitiesDB, sealsDB, payloadsDB, blocksDB)
