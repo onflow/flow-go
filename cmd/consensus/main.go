@@ -38,6 +38,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
 func main() {
@@ -132,8 +133,15 @@ func main() {
 			mainMetrics = metrics.NewHotstuffCollector(flow.GetChainID())
 			return nil
 		}).
+		Module("database migration", func(node *cmd.FlowNodeBuilder) error {
+			node.Logger.Info().Msg("starting execution result index migration...")
+			err := operation.IndexExecutionResultsByBlockID(node.DB)
+			node.Logger.Info().Msg("finished execution result index migration...")
+			return err
+		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			resultsDB := bstorage.NewExecutionResults(node.DB)
+			sealsDB := bstorage.NewSeals(node.Metrics.Cache, node.DB)
 			match, err := matching.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -142,6 +150,7 @@ func main() {
 				node.State,
 				node.Me,
 				resultsDB,
+				sealsDB,
 				node.Storage.Headers,
 				results,
 				receipts,
