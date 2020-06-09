@@ -177,6 +177,9 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 // To implement FinalizationConsumer
 func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {}
 
+// isProcessable returns true if the block for execution result is available in the storage
+// otherwise it returns false. In the current version, it checks solely against the block that
+// contains the collection guarantee.
 func (e *Engine) isProcessable(result *flow.ExecutionResult) bool {
 	// checks existence of block that result points to
 	_, err := e.headerStorage.ByBlockID(result.BlockID)
