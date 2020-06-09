@@ -1,7 +1,6 @@
 package finder
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 
@@ -156,21 +155,6 @@ func (e *Engine) OnBlockIncorporated(*model.Block) {
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 func (e *Engine) OnFinalizedBlock(block *model.Block) {
-	// block should be in the storage
-	_, err := e.headerStorage.ByBlockID(block.BlockID)
-	if errors.Is(err, storage.ErrNotFound) {
-		e.log.Error().
-			Hex("block_id", logging.ID(block.BlockID)).
-			Msg("block is not available in storage")
-		return
-	}
-	if err != nil {
-		e.log.Error().
-			Hex("block_id", logging.ID(block.BlockID)).
-			Msg("could not check block availability in storage")
-		return
-	}
-
 	e.checkReceipts(e.receipts.All())
 }
 
@@ -209,7 +193,7 @@ func (e *Engine) onResultProcessed(resultID flow.Identifier) {
 
 	// marks result as processed
 	added := e.processedResult.Add(resultID)
-	if !added {
+	if added {
 		log.Debug().Msg("result marked as processed")
 	}
 
