@@ -66,3 +66,39 @@ func TestResults_MassIndex(t *testing.T) {
 		}
 	})
 }
+
+func BenchmarkResults_MassIndex1000(b *testing.B) {
+	benchmarkResults_MassIndex(b, 1000)
+}
+
+func BenchmarkResults_MassIndex10000(b *testing.B) {
+	benchmarkResults_MassIndex(b, 10000)
+}
+
+func BenchmarkResults_MassIndex100000(b *testing.B) {
+	benchmarkResults_MassIndex(b, 100000)
+}
+
+func benchmarkResults_MassIndex(b *testing.B, n int) {
+	unittest.RunWithBadgerDB(b, func(db *badger.DB) {
+
+		setup := func() {
+			b.StopTimer()
+			err := db.DropPrefix(makePrefix(codeExecutionResult))
+			require.Nil(b, err)
+			results := make([]*flow.ExecutionResult, n)
+			for i := range results {
+				results[i] = unittest.ExecutionResultFixture()
+				err := db.Update(InsertExecutionResult(results[i]))
+				require.Nil(b, err)
+			}
+			b.StartTimer()
+		}
+
+		for i := 0; i < b.N; i++ {
+			setup()
+			err := IndexExecutionResultsByBlockID(db)
+			assert.Nil(b, err)
+		}
+	})
+}
