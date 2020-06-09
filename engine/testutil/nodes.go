@@ -97,20 +97,20 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	require.NoError(t, err)
 
 	return mock.GenericNode{
-		Log:        log,
-		Metrics:    metrics,
-		Tracer:     tracer,
-		DB:         db,
-		Headers:    headers,
-		Identities: identities,
-		Guarantees: guarantees,
-		Seals:      seals,
-		Payloads:   payloads,
-		Blocks:     blocks,
-		State:      state,
-		Me:         me,
-		Net:        stubnet,
-		DBDir:      dbDir,
+		Log:         log,
+		Metrics:     metrics,
+		Tracer:      tracer,
+		DB:          db,
+		Headers:     headers,
+		Identities:  identities,
+		Guarantees:  guarantees,
+		SealStorage: seals,
+		Payloads:    payloads,
+		Blocks:      blocks,
+		State:       state,
+		Me:          me,
+		Net:         stubnet,
+		DBDir:       dbDir,
 	}
 }
 
@@ -375,6 +375,27 @@ func VerificationNode(t testing.TB,
 		require.Nil(t, err)
 	}
 
+	if node.ResultStorage == nil {
+		node.ResultStorage = storage.NewExecutionResults(node.DB)
+	}
+
+	if node.Results == nil {
+		node.Results, err = stdmap.NewResults(1000)
+		require.Nil(t, err)
+	}
+
+	if node.HeaderStorage == nil {
+		node.HeaderStorage = storage.NewHeaders(node.Metrics, node.DB)
+	}
+
+	if node.Seals == nil {
+		node.Seals, err = stdmap.NewSeals(1000)
+	}
+
+	if node.Approvals == nil {
+		node.Approvals, err = stdmap.NewApprovals(1000)
+	}
+
 	if node.VerifierEngine == nil {
 		rt := runtime.NewInterpreterRuntime()
 		vm, err := virtualmachine.New(rt)
@@ -384,6 +405,21 @@ func VerificationNode(t testing.TB,
 		require.NoError(t, err)
 		node.VerifierEngine, err = verifier.New(node.Log, node.Metrics, node.Net, node.State, node.Me, chunkVerifier)
 		require.Nil(t, err)
+	}
+
+	if node.MatchEngine == nil {
+		node.MatchEngine, err = matching.New(node.Log,
+			node.Metrics,
+			node.Metrics,
+			node.Net,
+			node.State,
+			node.Me,
+			node.ResultStorage,
+			node.HeaderStorage,
+			node.Results,
+			node.AuthReceipts,
+			node.Approvals,
+			node.Seals)
 	}
 
 	if node.IngestedChunkIDs == nil {

@@ -33,20 +33,20 @@ import (
 
 // GenericNode implements a generic in-process node for tests.
 type GenericNode struct {
-	Log        zerolog.Logger
-	Metrics    *metrics.NoopCollector
-	Tracer     module.Tracer
-	DB         *badger.DB
-	Headers    storage.Headers
-	Identities storage.Identities
-	Guarantees storage.Guarantees
-	Seals      storage.Seals
-	Payloads   storage.Payloads
-	Blocks     storage.Blocks
-	State      protocol.State
-	Me         module.Local
-	Net        *stub.Network
-	DBDir      string
+	Log         zerolog.Logger
+	Metrics     *metrics.NoopCollector
+	Tracer      module.Tracer
+	DB          *badger.DB
+	Headers     storage.Headers
+	Identities  storage.Identities
+	Guarantees  storage.Guarantees
+	SealStorage storage.Seals
+	Payloads    storage.Payloads
+	Blocks      storage.Blocks
+	State       protocol.State
+	Me          module.Local
+	Net         *stub.Network
+	DBDir       string
 }
 
 func (g *GenericNode) Done() {
@@ -122,12 +122,17 @@ type VerificationNode struct {
 	AuthCollections       mempool.Collections
 	PendingCollections    mempool.PendingCollections
 	CollectionTrackers    mempool.CollectionTrackers
+	Results               mempool.Results
 	ChunkDataPacks        mempool.ChunkDataPacks
 	ChunkDataPackTrackers mempool.ChunkDataPackTrackers
+	Seals                 mempool.Seals
+	Approvals             mempool.Approvals
 	IngestedChunkIDs      mempool.Identifiers
 	IngestedResultIDs     mempool.Identifiers
 	IngestedCollectionIDs mempool.Identifiers
 	AssignedChunkIDs      mempool.Identifiers
+	ResultStorage         storage.ExecutionResults
+	HeaderStorage         storage.Headers
 	IngestEngine          *ingest.Engine
 	LightIngestEngine     *ingest.LightEngine // a lighter version of ingest engine
 	VerifierEngine        network.Engine
