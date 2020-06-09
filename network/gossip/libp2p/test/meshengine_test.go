@@ -218,7 +218,7 @@ func (m *MeshNetTestSuite) TestMaxMessageSize() {
 	wg := sync.WaitGroup{}
 
 	for i := range m.nets {
-		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, 1)
+		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, engine.CollectionIngest)
 		engs = append(engs, eng)
 	}
 

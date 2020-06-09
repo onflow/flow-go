@@ -70,5 +70,5 @@ func ChannelName(channelID uint8) (string, error) {
 	case SimulationColdstuff:
 		return "SimulationColdstuff", nil
 	}
-	return "", fmt.Errorf("invalid channel ID")
+	return "", fmt.Errorf("invalid channel ID: %d", channelID)
 }

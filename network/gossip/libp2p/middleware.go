@@ -358,7 +358,7 @@ ProcessLoop:
 // Subscribe will subscribe the middleware for a topic with the same name as the channelID
 func (m *Middleware) Subscribe(channelID uint8) error {
 
-	topic, err := topicFromChannelID(channelID)
+	topic, err := engine.ChannelName(channelID)
 	if err != nil {
 		return fmt.Errorf("failed to lookup topic for channel %d: %w", channelID, err)
 	}
@@ -438,7 +438,7 @@ func (m *Middleware) publish(channelID uint8, msg *message.Message) error {
 		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, m.maxPubSubMsgSize)
 	}
 
-	topic, err := topicFromChannelID(channelID)
+	topic, err := engine.ChannelName(channelID)
 	if err != nil {
 		return fmt.Errorf("failed to lookup topic for channel %d: %w", channelID, err)
 	}
@@ -460,9 +460,4 @@ func (m *Middleware) reportOutboundMsgSize(size int, channel string) {
 
 func (m *Middleware) reportInboundMsgSize(size int, channel string) {
 	m.metrics.NetworkMessageReceived(size, channel)
-}
-
-// topicFromChannelID converts a Flow channel ID to LibP2P pub-sub topic id e.g. 10 -> "CollectionProvider"
-func topicFromChannelID(channelID uint8) (string, error) {
-	return engine.ChannelName(channelID)
 }

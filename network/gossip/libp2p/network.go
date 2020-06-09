@@ -160,12 +160,20 @@ func (n *Network) SetIDs(ids flow.IdentityList) {
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
 	// checks the cache for deduplication and adds the message if not already present
 	if n.rcache.Add(message.EventID, message.ChannelID) {
-		// drops duplicate message
-		channelName := engine.ChannelName(uint8(message.ChannelID))
-		n.logger.Debug().
-			Str("channel", channelName).
+		log := n.logger.With().
 			Hex("sender_id", senderID[:]).
 			Hex("event_id", message.EventID).
+			Logger()
+
+		channelName, err := engine.ChannelName(uint8(message.ChannelID))
+		if err != nil {
+			log.Error().Err(err).Msg("dropping message due to an invalid channel ID")
+			return fmt.Errorf("message received with an invalid channel ID: %w", err)
+		}
+
+		// drops duplicate message
+		log.Debug().
+			Str("channel", channelName).
 			Msg("dropping message due to duplication")
 		n.metrics.NetworkDuplicateMessagesDropped(channelName)
 		return nil
