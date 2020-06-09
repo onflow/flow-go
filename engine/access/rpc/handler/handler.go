@@ -71,21 +71,6 @@ func (h *Handler) Ping(ctx context.Context, req *access.PingRequest) (*access.Pi
 	return &access.PingResponse{}, nil
 }
 
-func (h *Handler) getLatestSealedHeader() (*flow.Header, error) {
-	// lookup the latest seal to get latest blockid
-	seal, err := h.state.Final().Seal()
-	if err != nil {
-		return nil, fmt.Errorf("could not get latest sealed block ID: %w", err)
-	}
-
-	if seal.BlockID == flow.ZeroID {
-		// TODO: Figure out how to handle the very first seal, for now, just using latest finalized for script
-		return h.state.Final().Head()
-	}
-	// query header storage for that blockid
-	return h.headers.ByBlockID(seal.BlockID)
-}
-
 func (h *Handler) GetCollectionByID(_ context.Context, req *access.GetCollectionByIDRequest) (*access.CollectionResponse, error) {
 
 	id := flow.HashToID(req.Id)
@@ -135,7 +120,7 @@ func (h *Handler) GetAccount(ctx context.Context, req *access.GetAccountRequest)
 	}
 
 	// get the latest sealed header
-	latestHeader, err := h.getLatestSealedHeader()
+	latestHeader, err := h.state.Sealed().Head()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get latest sealed header: %v", err)
 	}
@@ -150,6 +135,11 @@ func (h *Handler) GetAccount(ctx context.Context, req *access.GetAccountRequest)
 
 	exeResp, err := h.executionRPC.GetAccountAtBlockID(ctx, &exeReq)
 	if err != nil {
+		errStatus, _ := status.FromError(err)
+		if errStatus.Code() == codes.NotFound {
+			return nil, err
+		}
+
 		return nil, status.Errorf(codes.Internal, "failed to get account from the execution node: %v", err)
 	}
 
@@ -157,6 +147,12 @@ func (h *Handler) GetAccount(ctx context.Context, req *access.GetAccountRequest)
 		Account: exeResp.GetAccount(),
 	}, nil
 
+}
+
+func (h *Handler) GetNetworkParameters(_ context.Context, _ *access.GetNetworkParametersRequest) (*access.GetNetworkParametersResponse, error) {
+	return &access.GetNetworkParametersResponse{
+		ChainId: string(flow.GetChainID()),
+	}, nil
 }
 
 func convertStorageError(err error) error {

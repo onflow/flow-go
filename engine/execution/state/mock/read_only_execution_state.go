@@ -2,6 +2,7 @@
 
 package mock
 
+import context "context"
 import delta "github.com/dapperlabs/flow-go/engine/execution/state/delta"
 import flow "github.com/dapperlabs/flow-go/model/flow"
 import messages "github.com/dapperlabs/flow-go/model/messages"
@@ -12,13 +13,13 @@ type ReadOnlyExecutionState struct {
 	mock.Mock
 }
 
-// ChunkDataPackByChunkID provides a mock function with given fields: _a0
-func (_m *ReadOnlyExecutionState) ChunkDataPackByChunkID(_a0 flow.Identifier) (*flow.ChunkDataPack, error) {
-	ret := _m.Called(_a0)
+// ChunkDataPackByChunkID provides a mock function with given fields: _a0, _a1
+func (_m *ReadOnlyExecutionState) ChunkDataPackByChunkID(_a0 context.Context, _a1 flow.Identifier) (*flow.ChunkDataPack, error) {
+	ret := _m.Called(_a0, _a1)
 
 	var r0 *flow.ChunkDataPack
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.ChunkDataPack); ok {
-		r0 = rf(_a0)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) *flow.ChunkDataPack); ok {
+		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.ChunkDataPack)
@@ -26,8 +27,8 @@ func (_m *ReadOnlyExecutionState) ChunkDataPackByChunkID(_a0 flow.Identifier) (*
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(_a0)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
+		r1 = rf(_a0, _a1)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -35,13 +36,57 @@ func (_m *ReadOnlyExecutionState) ChunkDataPackByChunkID(_a0 flow.Identifier) (*
 	return r0, r1
 }
 
-// GetExecutionResultID provides a mock function with given fields: blockID
-func (_m *ReadOnlyExecutionState) GetExecutionResultID(blockID flow.Identifier) (flow.Identifier, error) {
-	ret := _m.Called(blockID)
+// DiskSize provides a mock function with given fields:
+func (_m *ReadOnlyExecutionState) DiskSize() (int64, error) {
+	ret := _m.Called()
+
+	var r0 int64
+	if rf, ok := ret.Get(0).(func() int64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetCollection provides a mock function with given fields: identifier
+func (_m *ReadOnlyExecutionState) GetCollection(identifier flow.Identifier) (*flow.Collection, error) {
+	ret := _m.Called(identifier)
+
+	var r0 *flow.Collection
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Collection); ok {
+		r0 = rf(identifier)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Collection)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(identifier)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetExecutionResultID provides a mock function with given fields: _a0, _a1
+func (_m *ReadOnlyExecutionState) GetExecutionResultID(_a0 context.Context, _a1 flow.Identifier) (flow.Identifier, error) {
+	ret := _m.Called(_a0, _a1)
 
 	var r0 flow.Identifier
-	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Identifier); ok {
-		r0 = rf(blockID)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) flow.Identifier); ok {
+		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(flow.Identifier)
@@ -49,8 +94,8 @@ func (_m *ReadOnlyExecutionState) GetExecutionResultID(blockID flow.Identifier) 
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(blockID)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
+		r1 = rf(_a0, _a1)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -58,20 +103,20 @@ func (_m *ReadOnlyExecutionState) GetExecutionResultID(blockID flow.Identifier) 
 	return r0, r1
 }
 
-// GetHighestExecutedBlockID provides a mock function with given fields:
-func (_m *ReadOnlyExecutionState) GetHighestExecutedBlockID() (uint64, flow.Identifier, error) {
-	ret := _m.Called()
+// GetHighestExecutedBlockID provides a mock function with given fields: _a0
+func (_m *ReadOnlyExecutionState) GetHighestExecutedBlockID(_a0 context.Context) (uint64, flow.Identifier, error) {
+	ret := _m.Called(_a0)
 
 	var r0 uint64
-	if rf, ok := ret.Get(0).(func() uint64); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(context.Context) uint64); ok {
+		r0 = rf(_a0)
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
 
 	var r1 flow.Identifier
-	if rf, ok := ret.Get(1).(func() flow.Identifier); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(context.Context) flow.Identifier); ok {
+		r1 = rf(_a0)
 	} else {
 		if ret.Get(1) != nil {
 			r1 = ret.Get(1).(flow.Identifier)
@@ -79,8 +124,8 @@ func (_m *ReadOnlyExecutionState) GetHighestExecutedBlockID() (uint64, flow.Iden
 	}
 
 	var r2 error
-	if rf, ok := ret.Get(2).(func() error); ok {
-		r2 = rf()
+	if rf, ok := ret.Get(2).(func(context.Context) error); ok {
+		r2 = rf(_a0)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -88,13 +133,13 @@ func (_m *ReadOnlyExecutionState) GetHighestExecutedBlockID() (uint64, flow.Iden
 	return r0, r1, r2
 }
 
-// GetRegisters provides a mock function with given fields: _a0, _a1
-func (_m *ReadOnlyExecutionState) GetRegisters(_a0 []byte, _a1 [][]byte) ([][]byte, error) {
-	ret := _m.Called(_a0, _a1)
+// GetRegisters provides a mock function with given fields: _a0, _a1, _a2
+func (_m *ReadOnlyExecutionState) GetRegisters(_a0 context.Context, _a1 []byte, _a2 [][]byte) ([][]byte, error) {
+	ret := _m.Called(_a0, _a1, _a2)
 
 	var r0 [][]byte
-	if rf, ok := ret.Get(0).(func([]byte, [][]byte) [][]byte); ok {
-		r0 = rf(_a0, _a1)
+	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte) [][]byte); ok {
+		r0 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([][]byte)
@@ -102,8 +147,8 @@ func (_m *ReadOnlyExecutionState) GetRegisters(_a0 []byte, _a1 [][]byte) ([][]by
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func([]byte, [][]byte) error); ok {
-		r1 = rf(_a0, _a1)
+	if rf, ok := ret.Get(1).(func(context.Context, []byte, [][]byte) error); ok {
+		r1 = rf(_a0, _a1, _a2)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -111,13 +156,13 @@ func (_m *ReadOnlyExecutionState) GetRegisters(_a0 []byte, _a1 [][]byte) ([][]by
 	return r0, r1
 }
 
-// GetRegistersWithProofs provides a mock function with given fields: _a0, _a1
-func (_m *ReadOnlyExecutionState) GetRegistersWithProofs(_a0 []byte, _a1 [][]byte) ([][]byte, [][]byte, error) {
-	ret := _m.Called(_a0, _a1)
+// GetRegistersWithProofs provides a mock function with given fields: _a0, _a1, _a2
+func (_m *ReadOnlyExecutionState) GetRegistersWithProofs(_a0 context.Context, _a1 []byte, _a2 [][]byte) ([][]byte, [][]byte, error) {
+	ret := _m.Called(_a0, _a1, _a2)
 
 	var r0 [][]byte
-	if rf, ok := ret.Get(0).(func([]byte, [][]byte) [][]byte); ok {
-		r0 = rf(_a0, _a1)
+	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte) [][]byte); ok {
+		r0 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([][]byte)
@@ -125,8 +170,8 @@ func (_m *ReadOnlyExecutionState) GetRegistersWithProofs(_a0 []byte, _a1 [][]byt
 	}
 
 	var r1 [][]byte
-	if rf, ok := ret.Get(1).(func([]byte, [][]byte) [][]byte); ok {
-		r1 = rf(_a0, _a1)
+	if rf, ok := ret.Get(1).(func(context.Context, []byte, [][]byte) [][]byte); ok {
+		r1 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(1) != nil {
 			r1 = ret.Get(1).([][]byte)
@@ -134,8 +179,8 @@ func (_m *ReadOnlyExecutionState) GetRegistersWithProofs(_a0 []byte, _a1 [][]byt
 	}
 
 	var r2 error
-	if rf, ok := ret.Get(2).(func([]byte, [][]byte) error); ok {
-		r2 = rf(_a0, _a1)
+	if rf, ok := ret.Get(2).(func(context.Context, []byte, [][]byte) error); ok {
+		r2 = rf(_a0, _a1, _a2)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -159,13 +204,13 @@ func (_m *ReadOnlyExecutionState) NewView(_a0 []byte) *delta.View {
 	return r0
 }
 
-// RetrieveStateDelta provides a mock function with given fields: blockID
-func (_m *ReadOnlyExecutionState) RetrieveStateDelta(blockID flow.Identifier) (*messages.ExecutionStateDelta, error) {
-	ret := _m.Called(blockID)
+// RetrieveStateDelta provides a mock function with given fields: _a0, _a1
+func (_m *ReadOnlyExecutionState) RetrieveStateDelta(_a0 context.Context, _a1 flow.Identifier) (*messages.ExecutionStateDelta, error) {
+	ret := _m.Called(_a0, _a1)
 
 	var r0 *messages.ExecutionStateDelta
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *messages.ExecutionStateDelta); ok {
-		r0 = rf(blockID)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) *messages.ExecutionStateDelta); ok {
+		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*messages.ExecutionStateDelta)
@@ -173,8 +218,8 @@ func (_m *ReadOnlyExecutionState) RetrieveStateDelta(blockID flow.Identifier) (*
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(blockID)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
+		r1 = rf(_a0, _a1)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -182,34 +227,13 @@ func (_m *ReadOnlyExecutionState) RetrieveStateDelta(blockID flow.Identifier) (*
 	return r0, r1
 }
 
-// Size provides a mock function with given fields:
-func (_m *ReadOnlyExecutionState) Size() (int64, error) {
-	ret := _m.Called()
-
-	var r0 int64
-	if rf, ok := ret.Get(0).(func() int64); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(int64)
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// StateCommitmentByBlockID provides a mock function with given fields: _a0
-func (_m *ReadOnlyExecutionState) StateCommitmentByBlockID(_a0 flow.Identifier) ([]byte, error) {
-	ret := _m.Called(_a0)
+// StateCommitmentByBlockID provides a mock function with given fields: _a0, _a1
+func (_m *ReadOnlyExecutionState) StateCommitmentByBlockID(_a0 context.Context, _a1 flow.Identifier) ([]byte, error) {
+	ret := _m.Called(_a0, _a1)
 
 	var r0 []byte
-	if rf, ok := ret.Get(0).(func(flow.Identifier) []byte); ok {
-		r0 = rf(_a0)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) []byte); ok {
+		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
@@ -217,8 +241,8 @@ func (_m *ReadOnlyExecutionState) StateCommitmentByBlockID(_a0 flow.Identifier) 
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(_a0)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
+		r1 = rf(_a0, _a1)
 	} else {
 		r1 = ret.Error(1)
 	}

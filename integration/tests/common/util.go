@@ -1,11 +1,11 @@
 package common
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 
-	encoding "github.com/onflow/cadence/encoding/xdr"
+	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go-sdk/examples"
@@ -18,10 +18,9 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-// deployCounter deploys a counter contract using the given client.
-func deployCounter(ctx context.Context, client *testnet.Client) error {
-
-	contract := dsl.Contract{
+var (
+	// CounterContract is a simple counter contract in Cadence
+	CounterContract = dsl.Contract{
 		Name: "Testing",
 		Members: []dsl.CadenceCode{
 			dsl.Resource{
@@ -44,14 +43,28 @@ func deployCounter(ctx context.Context, client *testnet.Client) error {
 		},
 	}
 
-	return client.DeployContract(ctx, contract)
-}
+	// CreateCounterTx is a transaction script for creating an instance of the counter in the account storage of the
+	// authorizing account NOTE: the counter contract must be deployed first
+	CreateCounterTx = dsl.Transaction{
+		Import: dsl.Import{Address: flow.ServiceAddress()},
+		Content: dsl.Prepare{
+			Content: dsl.Code(`
+				var maybeCounter <- signer.load<@Testing.Counter>(from: /storage/counter)
 
-// readCounter executes a script to read the value of a counter. The counter
-// must have been deployed and created.
-func readCounter(ctx context.Context, client *testnet.Client) (int, error) {
+				if maybeCounter == nil {
+					maybeCounter <-! Testing.createCounter()
+				}
 
-	script := dsl.Main{
+				maybeCounter?.add(2)
+				signer.save(<-maybeCounter!, to: /storage/counter)
+
+				signer.link<&Testing.Counter>(/public/counter, target: /storage/counter)
+				`),
+		},
+	}
+
+	// ReadCounterScript is a read-only script for reading the current value of the counter contract
+	ReadCounterScript = dsl.Main{
 		ReturnType: "Int",
 		Code: `
 			let account = getAccount(0x01)
@@ -61,44 +74,45 @@ func readCounter(ctx context.Context, client *testnet.Client) (int, error) {
 			return -3`,
 	}
 
-	res, err := client.ExecuteScript(ctx, script)
-	if err != nil {
-		return 0, err
-	}
-
-	decoder := encoding.NewDecoder(bytes.NewReader(res))
-	i, err := decoder.DecodeInt()
-	if err != nil {
-		return 0, err
-	}
-
-	return int(i.Value.Int64()), nil
-}
-
-// createCounter creates a counter instance in the root account. The counter
-// contract must first have been deployed.
-func createCounter(ctx context.Context, client *testnet.Client) error {
-
-	txDSL := dsl.Transaction{
-		Import: dsl.Import{Address: flow.RootAddress},
+	// CreateCounterPanicTx is a transaction script that creates a counter instance in the root account, but panics after
+	// manipulating state. It can be used to test whether execution state stays untouched/will revert. NOTE: the counter
+	// contract must be deployed first
+	CreateCounterPanicTx = dsl.Transaction{
+		Import: dsl.Import{Address: flow.ServiceAddress()},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
 				var maybeCounter <- signer.load<@Testing.Counter>(from: /storage/counter)
-				
+
 				if maybeCounter == nil {
 					maybeCounter <-! Testing.createCounter()
 				}
-				
+
 				maybeCounter?.add(2)
 				signer.save(<-maybeCounter!, to: /storage/counter)
-				
+
 				signer.link<&Testing.Counter>(/public/counter, target: /storage/counter)
+
+				panic("fail for testing purposes")
 				`),
 		},
 	}
+)
 
-	tx := unittest.TransactionBodyFixture(unittest.WithTransactionDSL(txDSL))
-	return client.SendTransaction(ctx, tx)
+// readCounter executes a script to read the value of a counter. The counter
+// must have been deployed and created.
+func readCounter(ctx context.Context, client *testnet.Client) (int, error) {
+
+	res, err := client.ExecuteScript(ctx, ReadCounterScript)
+	if err != nil {
+		return 0, err
+	}
+
+	v, err := jsoncdc.Decode(res)
+	if err != nil {
+		return 0, err
+	}
+
+	return v.(cadence.Int).Int(), nil
 }
 
 func GetGhostClient(ghostContainer *testnet.Container) (*client.GhostClient, error) {

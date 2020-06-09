@@ -3,27 +3,12 @@ package module
 import (
 	"time"
 
+	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/metrics"
 )
 
-type Metrics interface {
-	// Common Metrics
-	//
-
-	// BadgerLSMSize total size on-disk of the badger database.
-	BadgerLSMSize(sizeBytes int64)
-	BadgerVLogSize(sizeBytes int64)
-
-	// Badger built-in metrics (from badger/y/metrics.go)
-	BadgerNumReads(n int64)
-	BadgerNumWrites(n int64)
-	BadgerNumBytesRead(n int64)
-	BadgerNumBytesWritten(n int64)
-	BadgerNumGets(n int64)
-	BadgerNumPuts(n int64)
-	BadgerNumBlockedPuts(n int64)
-	BadgerNumMemtableGets(n int64)
-
+type NetworkMetrics interface {
 	// Network Metrics
 	// NetworkMessageSent size in bytes and count of the network message sent
 	NetworkMessageSent(sizeBytes int, topic string)
@@ -32,45 +17,39 @@ type Metrics interface {
 	// NetworkMessageReceived size in bytes and count of the network message received
 	NetworkMessageReceived(sizeBytes int, topic string)
 
-	// Collection Metrics
-	//
+	// NetworkDuplicateMessagesDropped counts number of messages dropped due to duplicate detection
+	NetworkDuplicateMessagesDropped(topic string)
+}
 
-	// TransactionReceived is called when a new transaction is ingested by the
-	// node. It increments the total count of ingested transactions and starts
-	// a tx->col span for the transaction.
-	TransactionReceived(txID flow.Identifier)
+type EngineMetrics interface {
+	MessageSent(engine string, message string)
+	MessageReceived(engine string, message string)
+	MessageHandled(engine string, messages string)
+}
 
-	// CollectionProposed is called when a new collection is proposed by us or
-	// any other node in the cluster.
-	CollectionProposed(collection flow.LightCollection)
+type ComplianceMetrics interface {
+	FinalizedHeight(height uint64)
+	SealedHeight(height uint64)
+	BlockFinalized(*flow.Block)
+	BlockSealed(*flow.Block)
+}
 
-	// CollectionGuaranteed is called when a collection is finalized.
-	CollectionGuaranteed(collection flow.LightCollection)
+type CleanerMetrics interface {
+	RanGC(took time.Duration)
+}
 
-	// Consensus Metrics
-	//
+type CacheMetrics interface {
+	CacheEntries(resource string, entries uint)
+	CacheHit(resource string)
+	CacheMiss(resource string)
+}
 
-	// StartCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized Block
-	StartCollectionToFinalized(collectionID flow.Identifier)
+type MempoolMetrics interface {
+	MempoolEntries(resource string, entries uint)
+	Register(resource string, entriesFunc metrics.EntriesFunc) error
+}
 
-	// FinishCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized Block
-	FinishCollectionToFinalized(collectionID flow.Identifier)
-
-	// CollectionsInFinalizedBlock reports Metric C2: Counter: Number of Collections included in finalized Blocks (per second)
-	CollectionsInFinalizedBlock(count int)
-
-	// CollectionsPerBlock reports Metric C3: Gauge type: number of Collections per incorporated Block
-	CollectionsPerBlock(count int)
-
-	// StartBlockToSeal reports Metrics C4: Block Received by CCL → Block Seal in finalized block
-	StartBlockToSeal(blockID flow.Identifier)
-
-	// FinishBlockToSeal reports Metrics C4: Block Received by CCL → Block Seal in finalized block
-	FinishBlockToSeal(blockID flow.Identifier)
-
-	// SealsInFinalizedBlock reports Metrics C5 Number of Blocks which are sealed by finalized blocks (per second)
-	SealsInFinalizedBlock(count int)
-
+type HotstuffMetrics interface {
 	// HotStuffBusyDuration reports Metrics C6 HotStuff Busy Duration
 	HotStuffBusyDuration(duration time.Duration, event string)
 
@@ -80,18 +59,69 @@ type Metrics interface {
 	// HotStuffWaitDuration reports Metrics C6 HotStuff Idle Duration
 	HotStuffWaitDuration(duration time.Duration, event string)
 
-	// FinalizedBlocks reports Metric C7: Number of Blocks Finalized (per second)
-	FinalizedBlocks(count int)
+	// SetCurView reports Metrics C8: Current View
+	SetCurView(view uint64)
 
-	// StartNewView reports Metrics C8: Current View
-	StartNewView(view uint64)
+	// SetQCView reports Metrics C9: View of Newest Known QC
+	SetQCView(view uint64)
 
-	// NewestKnownQC reports Metrics C9: View of Newest Known QC
-	NewestKnownQC(view uint64)
+	// CountSkipped reports the number of times we skipped ahead.
+	CountSkipped()
 
-	// Verification Metrics
-	//
+	// CountTimeout reports the number of times we timed out.
+	CountTimeout()
 
+	// SetTimeout sets the current timeout duration
+	SetTimeout(duration time.Duration)
+
+	// CommitteeProcessingDuration measures the time which the HotStuff's core logic
+	// spends in the hotstuff.Committee component, i.e. the time determining consensus
+	// committee relations.
+	CommitteeProcessingDuration(duration time.Duration)
+
+	// SignerProcessingDuration measures the time which the HotStuff's core logic
+	// spends in the hotstuff.Signer component, i.e. the with crypto-related operations.
+	SignerProcessingDuration(duration time.Duration)
+
+	// ValidatorProcessingDuration measures the time which the HotStuff's core logic
+	// spends in the hotstuff.Validator component, i.e. the with verifying
+	// consensus messages.
+	ValidatorProcessingDuration(duration time.Duration)
+
+	// PayloadProductionDuration measures the time which the HotStuff's core logic
+	// spends in the module.Builder component, i.e. the with generating block payloads.
+	PayloadProductionDuration(duration time.Duration)
+}
+
+type CollectionMetrics interface {
+	// TransactionIngested is called when a new transaction is ingested by the
+	// node. It increments the total count of ingested transactions and starts
+	// a tx->col span for the transaction.
+	TransactionIngested(txID flow.Identifier)
+
+	// ClusterBlockProposed is called when a new collection is proposed by us or
+	// any other node in the cluster.
+	ClusterBlockProposed(block *cluster.Block)
+
+	// ClusterBlockFinalized is called when a collection is finalized.
+	ClusterBlockFinalized(block *cluster.Block)
+}
+
+type ConsensusMetrics interface {
+	// StartCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized Block
+	StartCollectionToFinalized(collectionID flow.Identifier)
+
+	// FinishCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized Block
+	FinishCollectionToFinalized(collectionID flow.Identifier)
+
+	// StartBlockToSeal reports Metrics C4: Block Received by CCL → Block Seal in finalized block
+	StartBlockToSeal(blockID flow.Identifier)
+
+	// FinishBlockToSeal reports Metrics C4: Block Received by CCL → Block Seal in finalized block
+	FinishBlockToSeal(blockID flow.Identifier)
+}
+
+type VerificationMetrics interface {
 	// OnChunkVerificationStarted is called whenever the verification of a chunk is started
 	// it starts the timer to record the execution time
 	OnChunkVerificationStarted(chunkID flow.Identifier)
@@ -104,15 +134,58 @@ type Metrics interface {
 	// it increases the result approval counter for this chunk
 	OnResultApproval()
 
-	// OnChunkDataAdded is called whenever something is added to related to chunkID to the in-memory mempools
-	// of verification node. It records the size of stored object.
-	OnChunkDataAdded(chunkID flow.Identifier, size float64)
+	// OnVerifiableChunkSubmitted is called whenever a verifiable chunk is shaped for a specific
+	// chunk. It adds the size of the verifiable chunk to the histogram. A verifiable chunk is assumed
+	// to capture all the resources needed to verify a chunk.
+	// The purpose of this function is to track the overall chunk resources size on disk.
+	// Todo wire this up to do monitoring
+	// https://github.com/dapperlabs/flow-go/issues/3183
+	OnVerifiableChunkSubmitted(size float64)
+}
 
-	// OnChunkDataRemoved is called whenever something is removed that is related to chunkID from the in-memory mempools
-	// of verification node. It records the size of stored object.
-	OnChunkDataRemoved(chunkID flow.Identifier, size float64)
+// LedgerMetrics provides an interface to record Ledger Storage metrics.
+// Ledger storage is non-linear (fork-aware) so certain metrics are averaged
+// and computed before emitting for better visibility
+type LedgerMetrics interface {
+	// ForestApproxMemorySize records approximate memory usage of forest (all in-memory trees)
+	ForestApproxMemorySize(bytes uint64)
 
-	// Execution Metrics
+	// ForestNumberOfTrees current number of trees in a forest (in memory)
+	ForestNumberOfTrees(number uint64)
+
+	// UpdateCount increase a counter of performed updates
+	UpdateCount()
+
+	// ProofSize records a proof size
+	ProofSize(bytes uint32)
+
+	// UpdateValuesNumber accumulates number of updated values
+	UpdateValuesNumber(number uint64)
+
+	// UpdateValuesSize total size (in bytes) of updates values
+	UpdateValuesSize(byte uint64)
+
+	// UpdateDuration records absolute time for the update of a trie
+	UpdateDuration(duration time.Duration)
+
+	// UpdateDurationPerItem records update time for single value (total duration / number of updated values)
+	UpdateDurationPerItem(duration time.Duration)
+
+	// ReadValuesNumber accumulates number of read values
+	ReadValuesNumber(number uint64)
+
+	// ReadValuesSize total size (in bytes) of read values
+	ReadValuesSize(byte uint64)
+
+	// ReadDuration records absolute time for the read from a trie
+	ReadDuration(duration time.Duration)
+
+	// ReadDurationPerItem records read time for single value (total duration / number of read values)
+	ReadDurationPerItem(duration time.Duration)
+}
+
+type ExecutionMetrics interface {
+	LedgerMetrics
 
 	// StartBlockReceivedToExecuted starts a span to trace the duration of a block
 	// from being received for execution to execution being finished
@@ -133,4 +206,14 @@ type Metrics interface {
 
 	// ExecutionStorageStateCommitment reports the storage size of a state commitment in bytes
 	ExecutionStorageStateCommitment(bytes int64)
+
+	// ExecutionLastExecutedBlockView reports last executed block view
+	ExecutionLastExecutedBlockView(view uint64)
+
+	// ExecutionTotalExecutedTransactions adds num to the total number of executed transactions
+	ExecutionTotalExecutedTransactions(numExecuted int)
+
+	ExecutionCollectionRequestSent()
+
+	ExecutionCollectionRequestRetried()
 }

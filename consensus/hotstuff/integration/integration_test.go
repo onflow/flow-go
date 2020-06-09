@@ -15,16 +15,18 @@ import (
 
 // a pacemaker timeout to wait for proposals. Usually 10 ms is enough,
 // but for slow environment like CI, a longer one is needed.
-const safeTimeout = 10 * time.Second
+const safeTimeout = 2 * time.Second
+const safeDecrease = 200 * time.Millisecond
+const safeDecreaseFactor = 0.85
 
 func TestSingleInstance(t *testing.T) {
 
-	// set up a single instance to run4
+	// set up a single instance to run
 	// NOTE: currently, the HotStuff logic will infinitely call back on itself
 	// with a single instance, leading to a boundlessly growing call stack,
 	// which slows down the mocks significantly due to splitting the callstack
 	// to find the calling function name; we thus keep it low for now
-	finalView := uint64(100)
+	finalView := uint64(10)
 	in := NewInstance(t,
 		WithStopCondition(ViewFinalized(finalView)),
 	)
@@ -50,7 +52,7 @@ func TestThreeInstances(t *testing.T) {
 	// generate three hotstuff participants
 	participants := unittest.IdentityListFixture(num)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, 0.5, 1.5, 1*time.Second)
+	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, 0.5, 1.5, safeDecreaseFactor, 0)
 	require.NoError(t, err)
 
 	// set up three instances that are exactly the same
@@ -86,7 +88,7 @@ func TestThreeInstances(t *testing.T) {
 	in2 := instances[1]
 	in3 := instances[2]
 	// verify progress has been made
-	assert.Equal(t, finalView, in1.forks.FinalizedBlock().View, "the first instance 's finalized view should be four lower than current view")
+	assert.GreaterOrEqual(t, in1.forks.FinalizedBlock().View, finalView, "the first instance 's finalized view should be four lower than current view")
 	// verify same progresses have been made
 	assert.Equal(t, in1.forks.FinalizedBlock(), in2.forks.FinalizedBlock(), "second instance should have same finalized block as first instance")
 	assert.Equal(t, in1.forks.FinalizedBlock(), in3.forks.FinalizedBlock(), "third instance should have same finalized block as first instance")
@@ -109,7 +111,7 @@ func TestSevenInstances(t *testing.T) {
 	participants := unittest.IdentityListFixture(numPass + numFail)
 	instances := make([]*Instance, 0, numPass+numFail)
 	root := DefaultRoot()
-	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, 0.5, 1.5, 1*time.Second)
+	timeouts, err := timeout.NewConfig(safeTimeout, safeTimeout, 0.5, 1.5, safeDecreaseFactor, 0)
 	require.NoError(t, err)
 
 	// set up five instances that work fully

@@ -9,11 +9,3 @@ func SetClusters(clusters uint) func(*State) {
 		s.clusters = clusters
 	}
 }
-
-// SetValidationBlocks sets the number of blocks we look back to check
-// backwards for duplicate guarantees/seals.
-func SetValidationBlocks(validationBlocks uint64) func(*State) {
-	return func(s *State) {
-		s.validationBlocks = validationBlocks
-	}
-}

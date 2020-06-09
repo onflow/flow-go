@@ -3,11 +3,14 @@
 package operation
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -16,7 +19,7 @@ func TestSkipDuplicates(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
-		val := []byte(`{"ID":1337}`)
+		val, _ := msgpack.Marshal(e)
 
 		// persist first time
 		err := db.Update(insert(key, e))
@@ -39,5 +42,53 @@ func TestSkipDuplicates(t *testing.T) {
 		})
 
 		assert.Equal(t, val, act)
+	})
+}
+
+func TestRetryOnConflict(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		t.Run("good op", func(t *testing.T) {
+			goodOp := func(*badger.Txn) error {
+				return nil
+			}
+			err := RetryOnConflict(db.Update, goodOp)
+			require.NoError(t, err)
+		})
+
+		t.Run("conflict op should be retried", func(t *testing.T) {
+			n := 0
+			conflictOp := func(*badger.Txn) error {
+				n++
+				if n > 3 {
+					return nil
+				}
+				return badger.ErrConflict
+			}
+			err := RetryOnConflict(db.Update, conflictOp)
+			require.NoError(t, err)
+		})
+
+		t.Run("wrapped conflict op should be retried", func(t *testing.T) {
+			n := 0
+			conflictOp := func(*badger.Txn) error {
+				n++
+				if n > 3 {
+					return nil
+				}
+				return fmt.Errorf("wrap error: %w", badger.ErrConflict)
+			}
+			err := RetryOnConflict(db.Update, conflictOp)
+			require.NoError(t, err)
+		})
+
+		t.Run("other error should be returned", func(t *testing.T) {
+			otherError := errors.New("other error")
+			failOp := func(*badger.Txn) error {
+				return otherError
+			}
+
+			err := RetryOnConflict(db.Update, failOp)
+			require.Equal(t, otherError, err)
+		})
 	})
 }

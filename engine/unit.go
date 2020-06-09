@@ -51,24 +51,36 @@ func (u *Unit) Launch(f func()) {
 	}()
 }
 
+// LaunchAfter asynchronously executes the input function after a certain delay
+// unless the unit has shut down.
+func (u *Unit) LaunchAfter(delay time.Duration, f func()) {
+	u.Launch(func() {
+		select {
+		case <-u.quit:
+			return
+		case <-time.After(delay):
+			f()
+		}
+	})
+}
+
 // LaunchPeriodically asynchronously executes the input function on `interval` periods
 // unless the unit has shut down.
 // If f is executed, the unit will not shut down until after f returns.
-func (u *Unit) LaunchPeriodically(f func(), interval time.Duration) {
-	timer := time.NewTicker(interval)
-	u.wg.Add(1)
-	go func() {
+func (u *Unit) LaunchPeriodically(f func(), interval time.Duration, delay time.Duration) {
+	ticker := time.NewTicker(interval)
+	u.Launch(func() {
+		defer ticker.Stop()
+		<-time.After(delay)
 		for {
 			select {
 			case <-u.quit:
-				u.wg.Done()
-				timer.Stop()
 				return
-			case <-timer.C:
-				u.Launch(f)
+			case <-ticker.C:
+				f()
 			}
 		}
-	}()
+	})
 }
 
 // Ready returns a channel that is closed when the unit is ready. A unit is

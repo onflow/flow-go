@@ -1,58 +1,53 @@
 package badger
 
 import (
-	"fmt"
-
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 // Guarantees implements persistent storage for collection guarantees.
 type Guarantees struct {
-	db *badger.DB
+	db    *badger.DB
+	cache *Cache
 }
 
-func NewGuarantees(db *badger.DB) *Guarantees {
-	return &Guarantees{
-		db: db,
+func NewGuarantees(collector module.CacheMetrics, db *badger.DB) *Guarantees {
+
+	store := func(collID flow.Identifier, guarantee interface{}) error {
+		return operation.RetryOnConflict(db.Update, operation.SkipDuplicates(operation.InsertGuarantee(collID, guarantee.(*flow.CollectionGuarantee))))
 	}
+
+	retrieve := func(collID flow.Identifier) (interface{}, error) {
+		var guarantee flow.CollectionGuarantee
+		err := db.View(operation.RetrieveGuarantee(collID, &guarantee))
+		return &guarantee, err
+	}
+
+	g := &Guarantees{
+		db: db,
+		cache: newCache(collector,
+			withLimit(10*(flow.DefaultTransactionExpiry+100)),
+			withStore(store),
+			withRetrieve(retrieve),
+			withResource(metrics.ResourceGuarantee),
+		),
+	}
+
+	return g
 }
 
 func (g *Guarantees) Store(guarantee *flow.CollectionGuarantee) error {
-	return g.db.Update(func(tx *badger.Txn) error {
-		err := operation.InsertGuarantee(guarantee)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert collection guarantee: %w", err)
-		}
-		return nil
-	})
+	return g.cache.Put(guarantee.ID(), guarantee)
 }
 
-func (g *Guarantees) ByID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
-	var guarantee flow.CollectionGuarantee
-
-	err := g.db.View(func(tx *badger.Txn) error {
-		return operation.RetrieveGuarantee(collID, &guarantee)(tx)
-	})
+func (g *Guarantees) ByCollectionID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
+	guarantee, err := g.cache.Get(collID)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve collection guarantee: %w", err)
+		return nil, err
 	}
-
-	return &guarantee, nil
-}
-
-func (g *Guarantees) ByBlockID(blockID flow.Identifier) ([]*flow.CollectionGuarantee, error) {
-	var guarantees []*flow.CollectionGuarantee
-
-	err := g.db.View(func(tx *badger.Txn) error {
-		return procedure.RetrieveGuarantees(blockID, &guarantees)(tx)
-	})
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve guarantees: %w", err)
-	}
-
-	return guarantees, nil
+	return guarantee.(*flow.CollectionGuarantee), nil
 }

@@ -8,56 +8,58 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 type Seals struct {
-	db *badger.DB
+	db    *badger.DB
+	cache *Cache
 }
 
-func NewSeals(db *badger.DB) *Seals {
-	s := &Seals{db: db}
+func NewSeals(collector module.CacheMetrics, db *badger.DB) *Seals {
+
+	store := func(sealID flow.Identifier, seal interface{}) error {
+		return operation.RetryOnConflict(db.Update, operation.SkipDuplicates(operation.InsertSeal(sealID, seal.(*flow.Seal))))
+	}
+
+	retrieve := func(sealID flow.Identifier) (interface{}, error) {
+		var seal flow.Seal
+		err := db.View(operation.RetrieveSeal(sealID, &seal))
+		return &seal, err
+	}
+
+	s := &Seals{
+		db: db,
+		cache: newCache(collector,
+			withLimit(flow.DefaultTransactionExpiry+100),
+			withStore(store),
+			withRetrieve(retrieve),
+			withResource(metrics.ResourceSeal),
+		),
+	}
+
 	return s
 }
 
 func (s *Seals) Store(seal *flow.Seal) error {
-	return s.db.Update(func(tx *badger.Txn) error {
-		err := operation.InsertSeal(seal)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert seal: %w", err)
-		}
-		return nil
-	})
+	return s.cache.Put(seal.ID(), seal)
 }
 
 func (s *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {
-	var seal flow.Seal
-	err := s.db.View(func(tx *badger.Txn) error {
-		return operation.RetrieveSeal(sealID, &seal)(tx)
-	})
+	seal, err := s.cache.Get(sealID)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve seal: %w", err)
+		return nil, err
 	}
-	return &seal, nil
+	return seal.(*flow.Seal), nil
 }
 
-func (s *Seals) ByBlockID(blockID flow.Identifier) ([]*flow.Seal, error) {
-	var seals []*flow.Seal
-	err := s.db.View(func(tx *badger.Txn) error {
-		var header flow.Header
-		err := operation.RetrieveHeader(blockID, &header)(tx)
-		if err != nil {
-			return fmt.Errorf("could not get header: %w", err)
-		}
-		err = procedure.RetrieveSeals(header.PayloadHash, &seals)(tx)
-		if err != nil {
-			return fmt.Errorf("could not get seals: %w", err)
-		}
-		return nil
-	})
+func (s *Seals) ByBlockID(blockID flow.Identifier) (*flow.Seal, error) {
+	var sealID flow.Identifier
+	err := s.db.View(operation.LookupBlockSeal(blockID, &sealID))
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve seals for block: %w", err)
+		return nil, fmt.Errorf("could not look up seal for sealed: %w", err)
 	}
-	return seals, nil
+	return s.ByID(sealID)
 }

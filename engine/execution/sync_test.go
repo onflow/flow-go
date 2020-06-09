@@ -2,9 +2,12 @@ package execution_test
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine"
 	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
@@ -25,100 +28,111 @@ func TestSyncFlow(t *testing.T) {
 	exe2ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
-	identities := flow.IdentityList{colID, conID, exe1ID, exe2ID, verID}
+	identities := unittest.CompleteIdentitySet(colID, conID, exe1ID, exe2ID, verID)
 
 	// exe1 will sync from exe2 after exe2 executes transactions
 	exeNode1 := testutil.ExecutionNode(t, hub, exe1ID, identities, 1)
-	exeNode2 := testutil.ExecutionNode(t, hub, exe2ID, identities, 21)
 	defer exeNode1.Done()
+	exeNode2 := testutil.ExecutionNode(t, hub, exe2ID, identities, 21)
 	defer exeNode2.Done()
 
 	collectionNode := testutil.GenericNode(t, hub, colID, identities)
+	defer collectionNode.Done()
 	verificationNode := testutil.GenericNode(t, hub, verID, identities)
+	defer verificationNode.Done()
 	consensusNode := testutil.GenericNode(t, hub, conID, identities)
+	defer consensusNode.Done()
 
-	genesis := flow.Genesis(identities)
+	genesis, err := exeNode1.State.AtHeight(0).Head()
+	require.NoError(t, err)
 
-	tx1 := execTestutil.DeployCounterContractTransaction()
-	tx2 := execTestutil.CreateCounterTransaction()
-	tx4 := execTestutil.AddToCounterTransaction()
+	seq := uint64(0)
 
-	col1 := flow.Collection{Transactions: []*flow.TransactionBody{&tx1}}
-	col2 := flow.Collection{Transactions: []*flow.TransactionBody{&tx2}}
-	col4 := flow.Collection{Transactions: []*flow.TransactionBody{&tx4}}
+	tx1 := execTestutil.DeployCounterContractTransaction(flow.ServiceAddress())
+	err = execTestutil.SignTransactionByRoot(tx1, seq)
+	require.NoError(t, err)
+	seq++
 
-	//Create three blocks, with one tx each
-	block1 := &flow.Block{
-		Header: flow.Header{
-			ParentID: genesis.ID(),
-			View:     42,
-			Height:   1,
-		},
-		Payload: flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{
-				{
-					CollectionID: col1.ID(),
-					SignerIDs:    []flow.Identifier{colID.NodeID},
-				},
+	tx2 := execTestutil.CreateCounterTransaction(flow.ServiceAddress(), flow.ServiceAddress())
+	err = execTestutil.SignTransactionByRoot(tx2, seq)
+	require.NoError(t, err)
+	seq++
+
+	tx4 := execTestutil.AddToCounterTransaction(flow.ServiceAddress(), flow.ServiceAddress())
+	err = execTestutil.SignTransactionByRoot(tx4, seq)
+	require.NoError(t, err)
+	seq++
+
+	tx5 := execTestutil.AddToCounterTransaction(flow.ServiceAddress(), flow.ServiceAddress())
+	err = execTestutil.SignTransactionByRoot(tx5, seq)
+	require.NoError(t, err)
+
+	col1 := flow.Collection{Transactions: []*flow.TransactionBody{tx1}}
+	col2 := flow.Collection{Transactions: []*flow.TransactionBody{tx2}}
+	col4 := flow.Collection{Transactions: []*flow.TransactionBody{tx4}}
+	col5 := flow.Collection{Transactions: []*flow.TransactionBody{tx5}}
+
+	// Create three blocks, with one tx each
+	block1 := unittest.BlockWithParentFixture(genesis)
+	block1.Header.View = 42
+	block1.SetPayload(flow.Payload{
+		Guarantees: []*flow.CollectionGuarantee{
+			{
+				CollectionID: col1.ID(),
+				SignerIDs:    []flow.Identifier{colID.NodeID},
 			},
 		},
-	}
-	block1.PayloadHash = block1.Payload.Hash()
+	})
 
-	block2 := &flow.Block{
-		Header: flow.Header{
-			ParentID: block1.ID(),
-			View:     44,
-			Height:   2,
-		},
-		Payload: flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{
-				{
-					CollectionID: col2.ID(),
-					SignerIDs:    []flow.Identifier{colID.NodeID},
-				},
+	block2 := unittest.BlockWithParentFixture(block1.Header)
+	block2.Header.View = 44
+	block2.SetPayload(flow.Payload{
+		Guarantees: []*flow.CollectionGuarantee{
+			{
+				CollectionID: col2.ID(),
+				SignerIDs:    []flow.Identifier{colID.NodeID},
 			},
 		},
-	}
-	block2.PayloadHash = block2.Payload.Hash()
+	})
 
-	block3 := &flow.Block{
-		Header: flow.Header{
-			ParentID: block2.ID(),
-			View:     45,
-			Height:   3,
-		},
-		Payload: flow.Payload{},
-	}
-	block3.PayloadHash = block3.Payload.Hash()
+	block3 := unittest.BlockWithParentFixture(block2.Header)
+	block3.Header.View = 45
+	block3.SetPayload(flow.Payload{})
 
-	block4 := &flow.Block{
-		Header: flow.Header{
-			ParentID: block3.ID(),
-			View:     46,
-			Height:   4,
-		},
-		Payload: flow.Payload{
-			Guarantees: []*flow.CollectionGuarantee{
-				{
-					CollectionID: col4.ID(),
-					SignerIDs:    []flow.Identifier{colID.NodeID},
-				},
+	block4 := unittest.BlockWithParentFixture(block3.Header)
+	block4.Header.View = 46
+	block4.SetPayload(flow.Payload{
+		Guarantees: []*flow.CollectionGuarantee{
+			{
+				CollectionID: col4.ID(),
+				SignerIDs:    []flow.Identifier{colID.NodeID},
 			},
 		},
-	}
-	block4.PayloadHash = block4.Payload.Hash()
+	})
 
-	proposal1 := unittest.ProposalFromBlock(block1)
-	proposal2 := unittest.ProposalFromBlock(block2)
-	proposal3 := unittest.ProposalFromBlock(block3)
-	proposal4 := unittest.ProposalFromBlock(block4)
+	block5 := unittest.BlockWithParentFixture(block4.Header)
+	block5.Header.View = 47
+	block5.SetPayload(flow.Payload{
+		Guarantees: []*flow.CollectionGuarantee{
+			{
+				CollectionID: col5.ID(),
+				SignerIDs:    []flow.Identifier{colID.NodeID},
+			},
+		},
+	})
+
+	proposal1 := unittest.ProposalFromBlock(&block1)
+	proposal2 := unittest.ProposalFromBlock(&block2)
+	proposal3 := unittest.ProposalFromBlock(&block3)
+	proposal4 := unittest.ProposalFromBlock(&block4)
+	proposal5 := unittest.ProposalFromBlock(&block5)
 
 	fmt.Printf("block0 ID %x parent %x\n", genesis.ID(), genesis.ParentID)
-	fmt.Printf("block1 ID %x parent %x\n", block1.ID(), block1.ParentID)
-	fmt.Printf("block2 ID %x parent %x\n", block2.ID(), block2.ParentID)
-	fmt.Printf("block3 ID %x parent %x\n", block3.ID(), block3.ParentID)
-	fmt.Printf("block4 ID %x parent %x\n", block4.ID(), block4.ParentID)
+	fmt.Printf("block1 ID %x parent %x\n", block1.ID(), block1.Header.ParentID)
+	fmt.Printf("block2 ID %x parent %x\n", block2.ID(), block2.Header.ParentID)
+	fmt.Printf("block3 ID %x parent %x\n", block3.ID(), block3.Header.ParentID)
+	fmt.Printf("block4 ID %x parent %x\n", block4.ID(), block4.Header.ParentID)
+	fmt.Printf("block5 ID %x parent %x\n", block5.ID(), block5.Header.ParentID)
 
 	collectionEngine := new(network.Engine)
 	colConduit, _ := collectionNode.Net.Register(engine.CollectionProvider, collectionEngine)
@@ -132,15 +146,21 @@ func TestSyncFlow(t *testing.T) {
 	collectionEngine.On("Submit", exe1ID.NodeID, mock.MatchedBy(func(r *messages.CollectionRequest) bool { return r.ID == col4.ID() })).Run(func(args mock.Arguments) {
 		_ = colConduit.Submit(&messages.CollectionResponse{Collection: col4}, exe1ID.NodeID)
 	}).Return(nil)
+	collectionEngine.On("Submit", exe1ID.NodeID, mock.MatchedBy(func(r *messages.CollectionRequest) bool { return r.ID == col5.ID() })).Run(func(args mock.Arguments) {
+		_ = colConduit.Submit(&messages.CollectionResponse{Collection: col5}, exe1ID.NodeID)
+	}).Return(nil)
 
 	var receipt *flow.ExecutionReceipt
 
 	executedBlocks := map[flow.Identifier]*flow.Identifier{}
+	ebMutex := sync.RWMutex{}
 
 	verificationEngine := new(network.Engine)
 	_, _ = verificationNode.Net.Register(engine.ExecutionReceiptProvider, verificationEngine)
 	verificationEngine.On("Submit", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
+			ebMutex.Lock()
+			defer ebMutex.Unlock()
 			identifier, _ := args[0].(flow.Identifier)
 			receipt, _ = args[1].(*flow.ExecutionReceipt)
 			executedBlocks[receipt.ExecutionResult.BlockID] = &identifier
@@ -158,6 +178,9 @@ func TestSyncFlow(t *testing.T) {
 
 	// wait for block2 to be executed on execNode2
 	hub.Eventually(t, func() bool {
+		ebMutex.RLock()
+		defer ebMutex.RUnlock()
+
 		if nodeId, ok := executedBlocks[block2.ID()]; ok {
 			return *nodeId == exe2ID.NodeID
 		}
@@ -165,8 +188,8 @@ func TestSyncFlow(t *testing.T) {
 	})
 
 	// make sure exe1 didn't get any blocks
-	exeNode1.AssertHighestExecutedBlock(t, &genesis.Header)
-	exeNode2.AssertHighestExecutedBlock(t, &block2.Header)
+	exeNode1.AssertHighestExecutedBlock(t, genesis)
+	exeNode2.AssertHighestExecutedBlock(t, block2.Header)
 
 	// submit block3 and block4 to exe1 which should trigger sync
 	exeNode1.IngestionEngine.Submit(conID.NodeID, proposal3)
@@ -174,6 +197,9 @@ func TestSyncFlow(t *testing.T) {
 
 	// wait for block3/4 to be executed on execNode1
 	hub.Eventually(t, func() bool {
+		ebMutex.RLock()
+		defer ebMutex.RUnlock()
+
 		block3ok := false
 		block4ok := false
 		if nodeId, ok := executedBlocks[block3.ID()]; ok {
@@ -184,6 +210,47 @@ func TestSyncFlow(t *testing.T) {
 		}
 		return block3ok && block4ok
 	})
+
+	// make sure collections are saved and synced as well
+	rCol1, err := exeNode1.Collections.ByID(col1.ID())
+	require.NoError(t, err)
+	assert.Equal(t, col1, *rCol1)
+
+	rCol2, err := exeNode1.Collections.ByID(col2.ID())
+	require.NoError(t, err)
+	assert.Equal(t, col2, *rCol2)
+
+	rCol4, err := exeNode1.Collections.ByID(col4.ID())
+	require.NoError(t, err)
+	assert.Equal(t, col4, *rCol4)
+
+	rCol1, err = exeNode2.Collections.ByID(col1.ID())
+	require.NoError(t, err)
+	assert.Equal(t, col1, *rCol1)
+
+	rCol2, err = exeNode2.Collections.ByID(col2.ID())
+	require.NoError(t, err)
+	assert.Equal(t, col2, *rCol2)
+
+	// node two didn't get block4
+	_, err = exeNode2.Collections.ByID(col4.ID())
+	require.Error(t, err)
+
+	exeNode1.AssertHighestExecutedBlock(t, block4.Header)
+
+	// submit block5, to make sure we're still processing any incoming blocks after sync is complete
+	exeNode1.IngestionEngine.Submit(conID.NodeID, proposal5)
+	hub.Eventually(t, func() bool {
+		ebMutex.RLock()
+		defer ebMutex.RUnlock()
+
+		if nodeId, ok := executedBlocks[block5.ID()]; ok {
+			return *nodeId == exe1ID.NodeID
+		}
+		return false
+	})
+
+	exeNode1.AssertHighestExecutedBlock(t, block5.Header)
 
 	collectionEngine.AssertExpectations(t)
 	verificationEngine.AssertExpectations(t)

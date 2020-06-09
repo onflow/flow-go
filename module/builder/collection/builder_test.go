@@ -15,13 +15,18 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	builder "github.com/dapperlabs/flow-go/module/builder/collection"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/state/cluster"
 	clusterkv "github.com/dapperlabs/flow-go/state/cluster/badger"
+	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
+	putil "github.com/dapperlabs/flow-go/state/protocol/util"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
+	sutil "github.com/dapperlabs/flow-go/storage/util"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-var noopSetter = func(*flow.Header) {}
+var noopSetter = func(*flow.Header) error { return nil }
 
 type BuilderSuite struct {
 	suite.Suite
@@ -29,10 +34,17 @@ type BuilderSuite struct {
 	dbdir string
 
 	genesis *model.Block
-	chainID string
+	chainID flow.ChainID
+
+	headers  *storage.Headers
+	payloads *storage.ClusterPayloads
+	blocks   *storage.Blocks
 
 	state   cluster.State
 	mutator cluster.Mutator
+
+	// protocol state for reference blocks for transactions
+	protoState *protocol.State
 
 	pool    *stdmap.Transactions
 	builder *builder.Builder
@@ -46,20 +58,29 @@ func (suite *BuilderSuite) SetupTest() {
 	rand.Seed(time.Now().UnixNano())
 
 	suite.genesis = model.Genesis()
-	suite.chainID = suite.genesis.ChainID
+	suite.chainID = suite.genesis.Header.ChainID
 
 	suite.pool, err = stdmap.NewTransactions(1000)
-	suite.Assert().Nil(err)
+	suite.Require().Nil(err)
 
-	suite.db, suite.dbdir = unittest.TempBadgerDB(suite.T())
+	suite.dbdir = unittest.TempDir(suite.T())
+	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
 
-	suite.state, err = clusterkv.NewState(suite.db, suite.chainID)
-	suite.Assert().Nil(err)
+	metrics := metrics.NewNoopCollector()
+	headers, _, _, _, _, _, blocks := sutil.StorageLayer(suite.T(), suite.db)
+	suite.headers = headers
+	suite.blocks = blocks
+	suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
+
+	suite.state, err = clusterkv.NewState(suite.db, suite.chainID, suite.headers, suite.payloads)
+	suite.Require().Nil(err)
 	suite.mutator = suite.state.Mutate()
+
+	suite.protoState = putil.ProtocolState(suite.T(), suite.db)
 
 	suite.Bootstrap()
 
-	suite.builder = builder.NewBuilder(suite.db, suite.pool, suite.chainID)
+	suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.payloads, suite.pool)
 }
 
 // runs after each test finishes
@@ -71,14 +92,24 @@ func (suite *BuilderSuite) TearDownTest() {
 }
 
 func (suite *BuilderSuite) Bootstrap() {
-	err := suite.mutator.Bootstrap(suite.genesis)
+
+	// just bootstrap with a genesis block, we'll use this as reference
+	genesis := unittest.GenesisFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
+	err := suite.protoState.Mutate().Bootstrap(unittest.GenesisStateCommitment, genesis)
+	suite.Require().Nil(err)
+
+	// bootstrap cluster chain
+	err = suite.mutator.Bootstrap(suite.genesis)
 	suite.Assert().Nil(err)
 
 	// add some transactions to transaction pool
 	for i := 0; i < 3; i++ {
-		transaction := unittest.TransactionBodyFixture()
-		err = suite.pool.Add(&transaction)
-		suite.Assert().Nil(err)
+		transaction := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) {
+			tx.ReferenceBlockID = genesis.ID()
+			tx.ProposalKey.SequenceNumber = uint64(i)
+		})
+		added := suite.pool.Add(&transaction)
+		suite.Assert().True(added)
 	}
 }
 
@@ -90,6 +121,14 @@ func (suite *BuilderSuite) InsertBlock(block model.Block) {
 func (suite *BuilderSuite) FinalizeBlock(blockID flow.Identifier) {
 	err := suite.db.Update(procedure.FinalizeClusterBlock(blockID))
 	suite.Assert().Nil(err)
+}
+
+// Payload returns a payload containing the given transactions, with a valid
+// reference block ID.
+func (suite *BuilderSuite) Payload(transactions ...*flow.TransactionBody) model.Payload {
+	final, err := suite.protoState.Final().Head()
+	suite.Require().Nil(err)
+	return model.PayloadFromTransactions(final.ID(), transactions...)
 }
 
 func TestBuilder(t *testing.T) {
@@ -107,12 +146,13 @@ func (suite *BuilderSuite) TestBuildOn_NonExistentParent() {
 func (suite *BuilderSuite) TestBuildOn_Success() {
 
 	var expectedHeight uint64 = 42
-	setter := func(h *flow.Header) {
+	setter := func(h *flow.Header) error {
 		h.Height = expectedHeight
+		return nil
 	}
 
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), setter)
-	suite.Assert().Nil(err)
+	suite.Require().Nil(err)
 
 	// setter should have been run
 	suite.Assert().Equal(expectedHeight, header.Height)
@@ -121,12 +161,46 @@ func (suite *BuilderSuite) TestBuildOn_Success() {
 	var built model.Block
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
 	suite.Assert().Nil(err)
-	builtCollection := built.Collection
+	builtCollection := built.Payload.Collection
+
+	// should reference a valid reference block
+	// (since genesis is the only block, it's the only valid reference)
+	mainGenesis, err := suite.protoState.AtHeight(0).Head()
+	suite.Assert().Nil(err)
+	suite.Assert().Equal(mainGenesis.ID(), built.Payload.ReferenceBlockID)
 
 	// payload should include only items from mempool
 	mempoolTransactions := suite.pool.All()
 	suite.Assert().Len(builtCollection.Transactions, 3)
 	suite.Assert().True(collectionContains(builtCollection, flow.GetIDs(mempoolTransactions)...))
+}
+
+// when there are transactions with an unknown reference block in the pool,
+// we should not include them in collections
+func (suite *BuilderSuite) TestBuildOn_WithUnknownReferenceBlock() {
+
+	// before modifying the mempool, note the valid transactions already in the pool
+	validMempoolTransactions := suite.pool.All()
+
+	// add a transaction unknown reference block to the pool
+	unknownReferenceTx := unittest.TransactionBodyFixture()
+	unknownReferenceTx.ReferenceBlockID = unittest.IdentifierFixture()
+	suite.pool.Add(&unknownReferenceTx)
+
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
+	suite.Require().Nil(err)
+
+	// should be able to retrieve built block from storage
+	var built model.Block
+	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+	suite.Assert().Nil(err)
+	builtCollection := built.Payload.Collection
+
+	suite.Assert().Len(builtCollection.Transactions, 3)
+	// payload should include only the transactions with a valid reference block
+	suite.Assert().True(collectionContains(builtCollection, flow.GetIDs(validMempoolTransactions)...))
+	// should not contain the the unknown-reference transaction
+	suite.Assert().False(collectionContains(builtCollection, unknownReferenceTx.ID()))
 }
 
 func (suite *BuilderSuite) TestBuildOn_WithForks() {
@@ -138,7 +212,7 @@ func (suite *BuilderSuite) TestBuildOn_WithForks() {
 	tx3 := mempoolTransactions[2] // in no block
 
 	// build first fork on top of genesis
-	payload1 := model.PayloadFromTransactions(tx1)
+	payload1 := suite.Payload(tx1)
 	block1 := unittest.ClusterBlockWithParent(suite.genesis)
 	block1.SetPayload(payload1)
 
@@ -146,7 +220,7 @@ func (suite *BuilderSuite) TestBuildOn_WithForks() {
 	suite.InsertBlock(block1)
 
 	// build second fork on top of genesis
-	payload2 := model.PayloadFromTransactions(tx2)
+	payload2 := suite.Payload(tx2)
 	block2 := unittest.ClusterBlockWithParent(suite.genesis)
 	block2.SetPayload(payload2)
 
@@ -161,7 +235,7 @@ func (suite *BuilderSuite) TestBuildOn_WithForks() {
 	var built model.Block
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
 	assert.Nil(t, err)
-	builtCollection := built.Collection
+	builtCollection := built.Payload.Collection
 
 	// payload should include ONLY tx2 and tx3
 	assert.Len(t, builtCollection.Transactions, 2)
@@ -180,18 +254,18 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 	t.Logf("tx1: %s\ntx2: %s\ntx3: %s", tx1.ID(), tx2.ID(), tx3.ID())
 
 	// build a block containing tx1 on genesis
-	finalizedPayload := model.PayloadFromTransactions(tx1)
+	finalizedPayload := suite.Payload(tx1)
 	finalizedBlock := unittest.ClusterBlockWithParent(suite.genesis)
 	finalizedBlock.SetPayload(finalizedPayload)
 	suite.InsertBlock(finalizedBlock)
-	t.Logf("finalized: id=%s\tparent_id=%s\theight=%d\n", finalizedBlock.ID(), finalizedBlock.ParentID, finalizedBlock.Height)
+	t.Logf("finalized: id=%s\tparent_id=%s\theight=%d\n", finalizedBlock.ID(), finalizedBlock.Header.ParentID, finalizedBlock.Header.Height)
 
 	// build a block containing tx2 on the first block
-	unFinalizedPayload := model.PayloadFromTransactions(tx2)
+	unFinalizedPayload := suite.Payload(tx2)
 	unFinalizedBlock := unittest.ClusterBlockWithParent(&finalizedBlock)
 	unFinalizedBlock.SetPayload(unFinalizedPayload)
 	suite.InsertBlock(unFinalizedBlock)
-	t.Logf("unfinalized: id=%s\tparent_id=%s\theight=%d\n", unFinalizedBlock.ID(), unFinalizedBlock.ParentID, unFinalizedBlock.Height)
+	t.Logf("unfinalized: id=%s\tparent_id=%s\theight=%d\n", unFinalizedBlock.ID(), unFinalizedBlock.Header.ParentID, unFinalizedBlock.Header.Height)
 
 	// finalize first block
 	err := suite.db.Update(procedure.FinalizeClusterBlock(finalizedBlock.ID()))
@@ -205,7 +279,7 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 	var built model.Block
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
 	assert.Nil(t, err)
-	builtCollection := built.Collection
+	builtCollection := built.Payload.Collection
 
 	// payload should only contain tx3
 	assert.Len(t, builtCollection.Light().Transactions, 1)
@@ -214,6 +288,8 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 
 	// tx1 should be removed from mempool, as it is in a finalized block
 	assert.False(t, suite.pool.Has(tx1.ID()))
+	// tx2 should NOT be removed from mempool, as it is in an un-finalized block
+	assert.True(t, suite.pool.Has(tx2.ID()))
 }
 
 func (suite *BuilderSuite) TestBuildOn_ConflictingInvalidatedForks() {
@@ -227,19 +303,19 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingInvalidatedForks() {
 	t.Logf("tx1: %s\ntx2: %s\ntx3: %s", tx1.ID(), tx2.ID(), tx3.ID())
 
 	// build a block containing tx1 on genesis - will be finalized
-	finalizedPayload := model.PayloadFromTransactions(tx1)
+	finalizedPayload := suite.Payload(tx1)
 	finalizedBlock := unittest.ClusterBlockWithParent(suite.genesis)
 	finalizedBlock.SetPayload(finalizedPayload)
 
 	suite.InsertBlock(finalizedBlock)
-	t.Logf("finalized: id=%s\tparent_id=%s\theight=%d\n", finalizedBlock.ID(), finalizedBlock.ParentID, finalizedBlock.Height)
+	t.Logf("finalized: id=%s\tparent_id=%s\theight=%d\n", finalizedBlock.ID(), finalizedBlock.Header.ParentID, finalizedBlock.Header.Height)
 
 	// build a block containing tx2 ALSO on genesis - will be invalidated
-	invalidatedPayload := model.PayloadFromTransactions(tx2)
+	invalidatedPayload := suite.Payload(tx2)
 	invalidatedBlock := unittest.ClusterBlockWithParent(suite.genesis)
 	invalidatedBlock.SetPayload(invalidatedPayload)
 	suite.InsertBlock(invalidatedBlock)
-	t.Logf("invalidated: id=%s\tparent_id=%s\theight=%d\n", invalidatedBlock.ID(), invalidatedBlock.ParentID, invalidatedBlock.Height)
+	t.Logf("invalidated: id=%s\tparent_id=%s\theight=%d\n", invalidatedBlock.ID(), invalidatedBlock.Header.ParentID, invalidatedBlock.Header.Height)
 
 	// finalize first block - this indirectly invalidates the second block
 	err := suite.db.Update(procedure.FinalizeClusterBlock(finalizedBlock.ID()))
@@ -253,15 +329,12 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingInvalidatedForks() {
 	var built model.Block
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
 	assert.Nil(t, err)
-	builtCollection := built.Collection
+	builtCollection := built.Payload.Collection
 
 	// tx2 and tx3 should be in the built collection
 	assert.Len(t, builtCollection.Light().Transactions, 2)
 	assert.True(t, collectionContains(builtCollection, tx2.ID(), tx3.ID()))
 	assert.False(t, collectionContains(builtCollection, tx1.ID()))
-
-	// tx1 should be removed from mempool, as it is in a finalized block
-	assert.False(t, suite.pool.Has(tx1.ID()))
 }
 
 func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
@@ -272,7 +345,12 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 	// use a mempool with 2000 transactions, one per block
 	suite.pool, err = stdmap.NewTransactions(2000)
 	require.Nil(t, err)
-	suite.builder = builder.NewBuilder(suite.db, suite.pool, suite.chainID)
+	suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionSize(10000))
+
+	// get a valid reference block ID
+	final, err := suite.protoState.Final().Head()
+	require.Nil(t, err)
+	refID := final.ID()
 
 	// keep track of the head of the chain
 	head := *suite.genesis
@@ -281,12 +359,17 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 	var invalidatedTxIds []flow.Identifier
 
 	// create 1000 blocks containing 1000 transactions
-	for i := 0; i < 1000; i++ {
+	//TODO for now limit this test to no more blocks than we look back by
+	// when de-duplicating transactions.
+	for i := 0; i < flow.DefaultTransactionExpiry-1; i++ {
 
 		// create a transaction
-		tx := unittest.TransactionBodyFixture()
-		err = suite.pool.Add(&tx)
-		assert.Nil(t, err)
+		tx := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) {
+			tx.ReferenceBlockID = refID
+			tx.ProposalKey.SequenceNumber = uint64(i)
+		})
+		added := suite.pool.Add(&tx)
+		assert.True(t, added)
 
 		// 1/3 of the time create a conflicting fork that will be invalidated
 		// don't do this the first and last few times to ensure we don't
@@ -297,7 +380,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 		// conflicting fork, build on the parent of the head
 		parent := head
 		if conflicting {
-			err = suite.db.View(procedure.RetrieveClusterBlock(parent.ParentID, &parent))
+			err = suite.db.View(procedure.RetrieveClusterBlock(parent.Header.ParentID, &parent))
 			assert.Nil(t, err)
 			// add the transaction to the invalidated list
 			invalidatedTxIds = append(invalidatedTxIds, tx.ID())
@@ -305,7 +388,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 
 		// create a block containing the transaction
 		block := unittest.ClusterBlockWithParent(&head)
-		payload := model.PayloadFromTransactions(&tx)
+		payload := suite.Payload(&tx)
 		block.SetPayload(payload)
 		suite.InsertBlock(block)
 
@@ -327,16 +410,114 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 	var built model.Block
 	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
 	require.Nil(t, err)
-	builtCollection := built.Collection
+	builtCollection := built.Payload.Collection
 
 	// payload should only contain transactions from invalidated blocks
 	assert.Len(t, builtCollection.Transactions, len(invalidatedTxIds), "expected len=%d, got len=%d", len(invalidatedTxIds), len(builtCollection.Transactions))
 	assert.True(t, collectionContains(builtCollection, invalidatedTxIds...))
 }
 
-// TODO specify behaviour for empty mempools
+func (suite *BuilderSuite) TestBuildOn_MaxCollectionSize() {
+	// set the max collection size to 1
+	suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionSize(1))
+
+	// build a block
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
+	suite.Require().Nil(err)
+
+	// retrieve the built block from storage
+	var built model.Block
+	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+	suite.Require().Nil(err)
+	builtCollection := built.Payload.Collection
+
+	// should be only 1 transaction in the collection
+	suite.Assert().Equal(builtCollection.Len(), 1)
+}
+
+func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
+
+	// create enough main-chain blocks that an expired transaction is possible
+	genesis, err := suite.protoState.Final().Head()
+	suite.Require().Nil(err)
+
+	head := genesis
+	for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
+		block := unittest.BlockWithParentFixture(head)
+		block.Payload.Guarantees = nil
+		block.Payload.Seals = nil
+		block.Header.PayloadHash = block.Payload.Hash()
+		err = suite.protoState.Mutate().Extend(&block)
+		suite.Require().Nil(err)
+		err = suite.protoState.Mutate().Finalize(block.ID())
+		suite.Require().Nil(err)
+		head = block.Header
+	}
+
+	// reset the pool and builder
+	suite.pool, err = stdmap.NewTransactions(10)
+	suite.Require().Nil(err)
+	suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.payloads, suite.pool)
+
+	// insert a transaction referring genesis (now expired)
+	tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) {
+		tx.ReferenceBlockID = genesis.ID()
+		tx.ProposalKey.SequenceNumber = 0
+	})
+	added := suite.pool.Add(&tx1)
+	suite.Assert().True(added)
+
+	// insert a transaction referencing the head (valid)
+	tx2 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) {
+		tx.ReferenceBlockID = head.ID()
+		tx.ProposalKey.SequenceNumber = 1
+	})
+	added = suite.pool.Add(&tx2)
+	suite.Assert().True(added)
+
+	suite.T().Log("tx1: ", tx1.ID())
+	suite.T().Log("tx2: ", tx2.ID())
+
+	// build a block
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
+	suite.Require().Nil(err)
+
+	// retrieve the built block from storage
+	var built model.Block
+	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+	suite.Require().Nil(err)
+	builtCollection := built.Payload.Collection
+
+	// the block should only contain the un-expired transaction
+	suite.Assert().False(collectionContains(builtCollection, tx1.ID()))
+	suite.Assert().True(collectionContains(builtCollection, tx2.ID()))
+	// the expired transaction should have been removed from the mempool
+	suite.Assert().False(suite.pool.Has(tx1.ID()))
+}
+
 func (suite *BuilderSuite) TestBuildOn_EmptyMempool() {
-	suite.T().Skip()
+
+	// start with an empty mempool
+	var err error
+	suite.pool, err = stdmap.NewTransactions(1000)
+	suite.Require().Nil(err)
+	suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.payloads, suite.pool)
+
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
+	suite.Require().Nil(err)
+
+	var built model.Block
+	err = suite.db.View(procedure.RetrieveClusterBlock(header.ID(), &built))
+	suite.Require().Nil(err)
+
+	// should reference a valid reference block
+	// (since genesis is the only block, it's the only valid reference)
+	mainGenesis, err := suite.protoState.AtHeight(0).Head()
+	suite.Assert().Nil(err)
+	suite.Assert().Equal(mainGenesis.ID(), built.Payload.ReferenceBlockID)
+
+	// the payload should be empty
+	suite.Assert().Equal(0, built.Payload.Collection.Len())
 }
 
 // helper to check whether a collection contains each of the given transactions.
@@ -376,12 +557,13 @@ func benchmarkBuildOn(b *testing.B, size int) {
 	{
 		var err error
 		suite.genesis = model.Genesis()
-		suite.chainID = suite.genesis.ChainID
+		suite.chainID = suite.genesis.Header.ChainID
 
 		suite.pool, err = stdmap.NewTransactions(1000)
 		assert.Nil(b, err)
 
-		suite.db, suite.dbdir = unittest.TempBadgerDB(b)
+		suite.dbdir = unittest.TempDir(b)
+		suite.db = unittest.BadgerDB(b, suite.dbdir)
 		defer func() {
 			err = suite.db.Close()
 			assert.Nil(b, err)
@@ -389,7 +571,13 @@ func benchmarkBuildOn(b *testing.B, size int) {
 			assert.Nil(b, err)
 		}()
 
-		suite.state, err = clusterkv.NewState(suite.db, suite.chainID)
+		metrics := metrics.NewNoopCollector()
+		headers, _, _, _, _, _, blocks := sutil.StorageLayer(suite.T(), suite.db)
+		suite.headers = headers
+		suite.blocks = blocks
+		suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
+
+		suite.state, err = clusterkv.NewState(suite.db, suite.chainID, suite.headers, suite.payloads)
 		assert.Nil(b, err)
 		suite.mutator = suite.state.Mutate()
 
@@ -399,12 +587,12 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		// add some transactions to transaction pool
 		for i := 0; i < 3; i++ {
 			tx := unittest.TransactionBodyFixture()
-			err = suite.pool.Add(&tx)
-			assert.Nil(b, err)
+			added := suite.pool.Add(&tx)
+			assert.True(b, added)
 		}
 
 		// create the builder
-		suite.builder = builder.NewBuilder(suite.db, suite.pool, suite.chainID)
+		suite.builder = builder.NewBuilder(suite.db, suite.headers, suite.payloads, suite.pool)
 	}
 
 	// create a block history to test performance against

@@ -3,12 +3,14 @@ package flow
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/rand"
 	"regexp"
 	"sort"
 	"strconv"
 
 	"github.com/pkg/errors"
+	"github.com/vmihailenco/msgpack"
 
 	"github.com/dapperlabs/flow-go/crypto"
 )
@@ -71,7 +73,7 @@ func (iy Identity) Checksum() Identifier {
 	return MakeID(iy)
 }
 
-type jsonMarshalIdentity struct {
+type encodableIdentity struct {
 	NodeID        Identifier
 	Address       string
 	Role          Role
@@ -80,39 +82,84 @@ type jsonMarshalIdentity struct {
 	NetworkPubKey []byte
 }
 
-func (iy *Identity) UnmarshalJSON(b []byte) error {
-	var m jsonMarshalIdentity
-	if err := json.Unmarshal(b, &m); err != nil {
-		return err
+func toEncodable(iy Identity) (encodableIdentity, error) {
+	ie := encodableIdentity{iy.NodeID, iy.Address, iy.Role, iy.Stake, nil, nil}
+	if iy.StakingPubKey != nil {
+		ie.StakingPubKey = iy.StakingPubKey.Encode()
 	}
-	iy.NodeID = m.NodeID
-	iy.Address = m.Address
-	iy.Role = m.Role
-	iy.Stake = m.Stake
+	if iy.NetworkPubKey != nil {
+		ie.NetworkPubKey = iy.NetworkPubKey.Encode()
+	}
+	return ie, nil
+}
+
+func (iy Identity) MarshalJSON() ([]byte, error) {
+	encodable, err := toEncodable(iy)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert to encodable: %w", err)
+	}
+	data, err := json.Marshal(encodable)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode json: %w", err)
+	}
+	return data, nil
+}
+
+func (iy Identity) MarshalMsgpack() ([]byte, error) {
+	encodable, err := toEncodable(iy)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert to encodable: %w", err)
+	}
+	data, err := msgpack.Marshal(encodable)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode msgpack: %w", err)
+	}
+	return data, nil
+}
+
+func fromEncodable(ie encodableIdentity, identity *Identity) error {
+	identity.NodeID = ie.NodeID
+	identity.Address = ie.Address
+	identity.Role = ie.Role
+	identity.Stake = ie.Stake
 	var err error
-	if m.StakingPubKey != nil {
-		if iy.StakingPubKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, m.StakingPubKey); err != nil {
-			return err
+	if ie.StakingPubKey != nil {
+		if identity.StakingPubKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, ie.StakingPubKey); err != nil {
+			return fmt.Errorf("could not decode staking key: %w", err)
 		}
 	}
-	if m.NetworkPubKey != nil {
-		if iy.NetworkPubKey, err = crypto.DecodePublicKey(crypto.ECDSAP256, m.NetworkPubKey); err != nil {
-			return err
+	if ie.NetworkPubKey != nil {
+		if identity.NetworkPubKey, err = crypto.DecodePublicKey(crypto.ECDSAP256, ie.NetworkPubKey); err != nil {
+			return fmt.Errorf("could not decode network key: %w", err)
 		}
 	}
 	return nil
 }
 
-func (iy Identity) MarshalJSON() ([]byte, error) {
-	m := jsonMarshalIdentity{iy.NodeID, iy.Address, iy.Role, iy.Stake, nil, nil}
-	if iy.StakingPubKey != nil {
-		m.StakingPubKey = iy.StakingPubKey.Encode()
+func (iy *Identity) UnmarshalJSON(b []byte) error {
+	var encodable encodableIdentity
+	err := json.Unmarshal(b, &encodable)
+	if err != nil {
+		return fmt.Errorf("could not decode json: %w", err)
 	}
-	if iy.NetworkPubKey != nil {
-		m.NetworkPubKey = iy.NetworkPubKey.Encode()
+	err = fromEncodable(encodable, iy)
+	if err != nil {
+		return fmt.Errorf("could not convert from encodable: %w", err)
 	}
+	return nil
+}
 
-	return json.Marshal(m)
+func (iy *Identity) UnmarshalMsgpack(b []byte) error {
+	var encodable encodableIdentity
+	err := msgpack.Unmarshal(b, &encodable)
+	if err != nil {
+		return fmt.Errorf("could not decode json: %w", err)
+	}
+	err = fromEncodable(encodable, iy)
+	if err != nil {
+		return fmt.Errorf("could not convert from encodable: %w", err)
+	}
+	return nil
 }
 
 // IdentityFilter is a filter on identities.
@@ -205,6 +252,26 @@ func (il IdentityList) Sample(size uint) IdentityList {
 		dup[i], dup[j+i] = dup[j+i], dup[i]
 	}
 	return dup[:size]
+}
+
+// SamplePct returns a random sample from the receiver identity list. The
+// sample contains `pct` percentage of the list. The sample is rounded up
+// if `pct>0`, so this will always select at least one identity.
+//
+// NOTE: The input must be between 0-1.
+func (il IdentityList) SamplePct(pct float64) IdentityList {
+	if pct <= 0 {
+		return IdentityList{}
+	}
+
+	count := float64(il.Count()) * pct
+	size := uint(math.Round(count))
+	// ensure we always select at least 1, for non-zero input
+	if size == 0 {
+		size = 1
+	}
+
+	return il.Sample(size)
 }
 
 // StakingKeys returns a list of the staking public keys for the identities.

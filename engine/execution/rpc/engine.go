@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"errors"
 	"net"
 
 	"github.com/rs/zerolog"
@@ -16,11 +17,13 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
+	grpcutils "github.com/dapperlabs/flow-go/utils/grpc"
 )
 
 // Config defines the configurable options for the gRPC server.
 type Config struct {
 	ListenAddr string
+	MaxMsgSize int // In bytes
 }
 
 // Engine implements a gRPC server with a simplified version of the Observation API.
@@ -36,6 +39,10 @@ type Engine struct {
 func New(log zerolog.Logger, config Config, e *ingestion.Engine, blocks storage.Blocks, events storage.Events, txResults storage.TransactionResults) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
 
+	if config.MaxMsgSize == 0 {
+		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
+	}
+
 	eng := &Engine{
 		log:  log,
 		unit: engine.NewUnit(),
@@ -45,7 +52,10 @@ func New(log zerolog.Logger, config Config, e *ingestion.Engine, blocks storage.
 			events:             events,
 			transactionResults: txResults,
 		},
-		server: grpc.NewServer(),
+		server: grpc.NewServer(
+			grpc.MaxRecvMsgSize(config.MaxMsgSize),
+			grpc.MaxSendMsgSize(config.MaxMsgSize),
+		),
 		config: config,
 	}
 
@@ -107,7 +117,7 @@ func (h *handler) ExecuteScriptAtBlockID(
 ) (*execution.ExecuteScriptAtBlockIDResponse, error) {
 	blockID := flow.HashToID(req.GetBlockId())
 
-	value, err := h.engine.ExecuteScriptAtBlockID(req.Script, blockID)
+	value, err := h.engine.ExecuteScriptAtBlockID(ctx, req.Script, blockID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to execute script: %v", err)
 	}
@@ -159,8 +169,10 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 	}, nil
 }
 
-func (h *handler) GetTransactionResult(_ context.Context,
-	req *execution.GetTransactionResultRequest) (*execution.GetTransactionResultResponse, error) {
+func (h *handler) GetTransactionResult(
+	_ context.Context,
+	req *execution.GetTransactionResultRequest,
+) (*execution.GetTransactionResultResponse, error) {
 
 	reqBlockID := req.GetBlockId()
 	if reqBlockID == nil {
@@ -189,7 +201,11 @@ func (h *handler) GetTransactionResult(_ context.Context,
 	// lookup any transaction error that might have occurred
 	txResult, err := h.transactionResults.ByBlockIDTransactionID(blockID, txID)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get transaction error: %v", err)
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Error(codes.NotFound, "transaction result not found")
+		}
+
+		return nil, status.Errorf(codes.Internal, "failed to get transaction result: %v", err)
 	}
 	if txResult.ErrorMessage != "" {
 		statusCode = 1 // for now a statusCode of 1 indicates an error and 0 indicates no error
@@ -219,13 +235,15 @@ func (h *handler) eventResult(blockID flow.Identifier,
 
 	return &execution.GetEventsForBlockIDsResponse_Result{
 		BlockId:     blockID[:],
-		BlockHeight: block.Height,
+		BlockHeight: block.Header.Height,
 		Events:      events,
 	}, nil
 }
 
-func (h *handler) GetAccountAtBlockID(_ context.Context,
-	req *execution.GetAccountAtBlockIDRequest) (*execution.GetAccountAtBlockIDResponse, error) {
+func (h *handler) GetAccountAtBlockID(
+	ctx context.Context,
+	req *execution.GetAccountAtBlockIDRequest,
+) (*execution.GetAccountAtBlockIDResponse, error) {
 
 	blockID := req.GetBlockId()
 	if blockID == nil {
@@ -239,9 +257,13 @@ func (h *handler) GetAccountAtBlockID(_ context.Context,
 	}
 	flowAddress := flow.BytesToAddress(address)
 
-	value, err := h.engine.GetAccount(flowAddress, blockFlowID)
+	value, err := h.engine.GetAccount(ctx, flowAddress, blockFlowID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get account: %v", err)
+	}
+
+	if value == nil {
+		return nil, status.Errorf(codes.NotFound, "account with address %s does not exist", flowAddress)
 	}
 
 	account, err := convert.AccountToMessage(value)

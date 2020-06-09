@@ -3,8 +3,6 @@
 package stdmap
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -15,34 +13,37 @@ type Collections struct {
 
 // NewCollections creates a new memory pool for collection.
 func NewCollections(limit uint) (*Collections, error) {
-	g := &Collections{
+	c := &Collections{
 		Backend: NewBackend(WithLimit(limit)),
 	}
-
-	return g, nil
+	return c, nil
 }
 
 // Add adds a collection to the mempool.
-func (g *Collections) Add(coll *flow.Collection) error {
-	return g.Backend.Add(coll)
+func (c *Collections) Add(coll *flow.Collection) bool {
+	added := c.Backend.Add(coll)
+	return added
+}
+
+// Rem removes a collection by ID from memory
+func (c *Collections) Rem(collID flow.Identifier) bool {
+	ok := c.Backend.Rem(collID)
+	return ok
 }
 
 // ByID returns the collection with the given ID from the mempool.
-func (g *Collections) ByID(collID flow.Identifier) (*flow.Collection, error) {
-	entity, err := g.Backend.ByID(collID)
-	if err != nil {
-		return nil, err
+func (c *Collections) ByID(collID flow.Identifier) (*flow.Collection, bool) {
+	entity, exists := c.Backend.ByID(collID)
+	if !exists {
+		return nil, false
 	}
-	coll, ok := entity.(*flow.Collection)
-	if !ok {
-		panic(fmt.Sprintf("invalid entity in collection pool (%T)", entity))
-	}
-	return coll, nil
+	coll := entity.(*flow.Collection)
+	return coll, true
 }
 
 // All returns all collections from the mempool.
-func (g *Collections) All() []*flow.Collection {
-	entities := g.Backend.All()
+func (c *Collections) All() []*flow.Collection {
+	entities := c.Backend.All()
 	colls := make([]*flow.Collection, 0, len(entities))
 	for _, entity := range entities {
 		colls = append(colls, entity.(*flow.Collection))

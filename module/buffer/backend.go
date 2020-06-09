@@ -18,30 +18,30 @@ type item struct {
 type backend struct {
 	mu sync.RWMutex
 	// map of pending block IDs, keyed by parent ID for ByParentID lookups
-	byParent map[flow.Identifier][]flow.Identifier
+	blocksByParent map[flow.Identifier][]flow.Identifier
 	// set of pending blocks, keyed by ID to avoid duplication
-	byID map[flow.Identifier]*item
+	blocksByID map[flow.Identifier]*item
 }
 
 // newBackend returns a new pending block cache.
 func newBackend() *backend {
 	cache := &backend{
-		byParent: make(map[flow.Identifier][]flow.Identifier),
-		byID:     make(map[flow.Identifier]*item),
+		blocksByParent: make(map[flow.Identifier][]flow.Identifier),
+		blocksByID:     make(map[flow.Identifier]*item),
 	}
 	return cache
 }
 
 // add adds the item to the cache, returning false if it already exists and
 // true otherwise.
-func (c *backend) add(originID flow.Identifier, header *flow.Header, payload interface{}) bool {
+func (b *backend) add(originID flow.Identifier, header *flow.Header, payload interface{}) bool {
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	b.mu.Lock()
+	defer b.mu.Unlock()
 
 	blockID := header.ID()
 
-	_, exists := c.byID[blockID]
+	_, exists := b.blocksByID[blockID]
 	if exists {
 		return false
 	}
@@ -52,18 +52,18 @@ func (c *backend) add(originID flow.Identifier, header *flow.Header, payload int
 		payload:  payload,
 	}
 
-	c.byID[blockID] = item
-	c.byParent[header.ParentID] = append(c.byParent[header.ParentID], blockID)
+	b.blocksByID[blockID] = item
+	b.blocksByParent[header.ParentID] = append(b.blocksByParent[header.ParentID], blockID)
 
 	return true
 }
 
-func (c *backend) ByID(id flow.Identifier) (*item, bool) {
+func (b *backend) byID(id flow.Identifier) (*item, bool) {
 
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	b.mu.RLock()
+	defer b.mu.RUnlock()
 
-	item, exists := c.byID[id]
+	item, exists := b.blocksByID[id]
 	if !exists {
 		return nil, false
 	}
@@ -73,37 +73,52 @@ func (c *backend) ByID(id flow.Identifier) (*item, bool) {
 
 // byParentID returns a list of cached blocks with the given parent. If no such
 // blocks exist, returns false.
-func (c *backend) byParentID(parentID flow.Identifier) ([]*item, bool) {
+func (b *backend) byParentID(parentID flow.Identifier) ([]*item, bool) {
 
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	b.mu.RLock()
+	defer b.mu.RUnlock()
 
-	forParent, exists := c.byParent[parentID]
+	forParent, exists := b.blocksByParent[parentID]
 	if !exists {
 		return nil, false
 	}
 
 	items := make([]*item, 0, len(forParent))
 	for _, blockID := range forParent {
-		items = append(items, c.byID[blockID])
+		items = append(items, b.blocksByID[blockID])
 	}
 
 	return items, true
 }
 
 // dropForParent removes all cached blocks with the given parent (non-recursively).
-func (c *backend) dropForParent(parentID flow.Identifier) {
+func (b *backend) dropForParent(parentID flow.Identifier) {
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	b.mu.Lock()
+	defer b.mu.Unlock()
 
-	children, exists := c.byParent[parentID]
+	children, exists := b.blocksByParent[parentID]
 	if !exists {
 		return
 	}
 
 	for _, childID := range children {
-		delete(c.byID, childID)
+		delete(b.blocksByID, childID)
 	}
-	delete(c.byParent, parentID)
+	delete(b.blocksByParent, parentID)
+}
+
+// pruneByHeight prunes any items in the cache that have height less than or
+// equal to the given height. The pruning height should be the finalized height.
+func (b *backend) pruneByHeight(height uint64) {
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	for id, item := range b.blocksByID {
+		if item.header.Height <= height {
+			delete(b.blocksByID, id)
+			delete(b.blocksByParent, item.header.ParentID)
+		}
+	}
 }

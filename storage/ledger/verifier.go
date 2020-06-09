@@ -1,24 +1,20 @@
 package ledger
 
 import (
-	"errors"
-
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/ledger/trie"
+	proofs "github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
 )
 
 type TrieVerifier struct {
-	height        int
-	defaultHashes [257][]byte
+	trieHeight int
 }
 
 // NewTrieVerifier creates a new trie-backed ledger verifier.
 //
 // The verifier is configured with a height and a default hash value for each level.
-func NewTrieVerifier(height int, defaultHashes [257][]byte) *TrieVerifier {
+func NewTrieVerifier(trieHeight int) *TrieVerifier {
 	return &TrieVerifier{
-		height:        height,
-		defaultHashes: defaultHashes,
+		trieHeight: trieHeight,
 	}
 }
 
@@ -26,28 +22,13 @@ func NewTrieVerifier(height int, defaultHashes [257][]byte) *TrieVerifier {
 // and verifies if the proofs are correct
 func (v *TrieVerifier) VerifyRegistersProof(
 	registerIDs []flow.RegisterID,
-	stateCommitment flow.StateCommitment,
 	values []flow.RegisterValue,
 	proof []flow.StorageProof,
+	stateCommitment flow.StateCommitment,
 ) (verified bool, err error) {
-	proofHldr, err := trie.DecodeProof(proof)
+	bp, err := proofs.DecodeBatchProof(proof)
 	if err != nil {
 		return false, err
 	}
-	length := proofHldr.GetSize()
-	verified = true
-	var verify bool
-	for i := 0; i < length; i++ {
-		flag, singleProof, inclusion, size := proofHldr.ExportProof(i)
-		if inclusion {
-			verify = trie.VerifyInclusionProof(registerIDs[i], values[i], flag, singleProof, size, stateCommitment, v.height)
-		} else {
-			verify = trie.VerifyNonInclusionProof(registerIDs[i], values[i], flag, singleProof, size, stateCommitment, v.height)
-		}
-		if !verify {
-			return verify, errors.New("Incorrect Proof")
-		}
-	}
-
-	return verified, nil
+	return bp.Verify(registerIDs, values, stateCommitment, v.trieHeight), nil
 }

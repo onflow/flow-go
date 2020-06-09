@@ -11,40 +11,50 @@ import (
 
 const (
 
-	// special database markers
-	codeBoundary             = 1 // latest finalized block number
-	codeFinalizedBlockNumber = 2 // lookup for block by number
-	codeDelta                = 3 // history of stake changes
-	codeView                 = 4 // persisting the latest view for hotstuff
+	// codes for special database markers
+	codeMax = 1 // keeps track of the maximum key size
 
-	// block header and entities included in block contents
-	codeHeader    = 10
-	codeIdentity  = 11
-	codeGuarantee = 12
-	codeSeal      = 13
+	// codes for views with special meaning
+	codeStartedView = 10 // latest view hotstuff started
+	codeVotedView   = 11 // latest view hotstuff voted on
 
-	// entities that are related to block formation & validation
-	codeTransaction     = 21
-	codeCollection      = 22
-	codeCommit          = 23
-	codeExecutionResult = 24
-	// codeReceipt       = 25
-	// codeApproval      = 26
-	// codeChunkHeader                = 27
-	codeChunkDataPack              = 28
-	codeEvent                      = 29
-	codeExecutionStateInteractions = 30
-	codeTransactionResult          = 31
+	// code for heights with special meaning
+	codeFinalizedHeight = 20 // latest finalized block height
+	codeSealedHeight    = 21 // latest sealed block height
+	codeClusterHeight   = 22 // latest finalized height on cluster
+	codeExecutedBlock   = 23 // latest executed block with max height
 
-	codeIndexIdentity                = 100
-	codeIndexGuarantee               = 101
-	codeIndexSeal                    = 102
-	codeIndexCollection              = 104
-	codeIndexSealByBlock             = 105
-	codeIndexExecutionResultByBlock  = 106
-	codeIndexCollectionByTransaction = 107
-	codeIndexHeaderByCollection      = 108
-	codeHighestExecutedBlockNumber   = 109 //highest executed block number
+	// codes for single entity storage
+	codeHeader          = 30
+	codeIdentity        = 31
+	codeGuarantee       = 32
+	codeSeal            = 33
+	codeTransaction     = 34
+	codeCollection      = 35
+	codeExecutionResult = 36
+
+	// codes for indexing single identifier by identifier
+	codeHeightToBlock       = 40 // index mapping height to block ID
+	codeBlockToSeal         = 41 // index mapping a block its last payload seal
+	codeCollectionReference = 42 // index reference block ID for collection
+
+	// codes for indexing multiple identifiers by identifier
+	codeBlockChildren     = 50 // index mapping block ID to children blocks
+	codePayloadIdentities = 51 // index mapping block ID to payload identities
+	codePayloadGuarantees = 52 // index mapping block ID to payload guarantees
+	codePayloadSeals      = 53 // index mapping block ID to payload seals
+	codeCollectionBlock   = 54 // index mapping collection ID to block ID
+
+	// legacy codes (should be cleaned up)
+	codeChunkDataPack                = 100
+	codeCommit                       = 101
+	codeEvent                        = 102
+	codeExecutionStateInteractions   = 103
+	codeTransactionResult            = 104
+	codeFinalizedCluster             = 105
+	codeIndexCollection              = 200
+	codeIndexExecutionResultByBlock  = 202
+	codeIndexCollectionByTransaction = 203
 )
 
 func makePrefix(code byte, keys ...interface{}) []byte {
@@ -74,6 +84,8 @@ func b(v interface{}) []byte {
 		return []byte{byte(i)}
 	case flow.Identifier:
 		return i[:]
+	case flow.ChainID:
+		return []byte(i)
 	default:
 		panic(fmt.Sprintf("unsupported type to convert (%T)", v))
 	}

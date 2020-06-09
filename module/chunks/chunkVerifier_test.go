@@ -1,12 +1,11 @@
 package chunks_test
 
 import (
-	"errors"
 	"math/rand"
 	"testing"
 	"time"
 
-	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
@@ -15,7 +14,9 @@ import (
 	chModels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/chunks"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
+	mockStorage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -29,7 +30,7 @@ type ChunkVerifierTestSuite struct {
 func (s *ChunkVerifierTestSuite) SetupTest() {
 	// seed the RNG
 	rand.Seed(time.Now().UnixNano())
-	s.verifier = chunks.NewChunkVerifier(&virtualMachineMock{})
+	s.verifier = chunks.NewChunkVerifier(&virtualMachineMock{}, new(mockStorage.Blocks))
 }
 
 // TestChunkVerifier invokes all the tests in this test suite
@@ -128,8 +129,8 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 	header := unittest.BlockHeaderFixture()
 	header.PayloadHash = payload.Hash()
 	block := flow.Block{
-		Header:  header,
-		Payload: payload,
+		Header:  &header,
+		Payload: &payload,
 	}
 
 	// registerTouch and State setup
@@ -148,8 +149,10 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 
 	var verifiableChunk verification.VerifiableChunk
 
-	unittest.RunWithTempDBDir(t, func(dbDir string) {
-		f, _ := ledger.NewTrieStorage(dbDir)
+	metricsCollector := &metrics.NoopCollector{}
+
+	unittest.RunWithTempDir(t, func(dbDir string) {
+		f, _ := ledger.NewMTrieStorage(dbDir, 1000, metricsCollector, nil)
 		startState, _ := f.UpdateRegisters(ids, values, f.EmptyStateCommitment())
 		regTs, _ := f.GetRegisterTouches(ids, startState)
 
@@ -201,6 +204,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 type blockContextMock struct {
 	vm     *virtualMachineMock
 	header *flow.Header
+	blocks virtualmachine.Blocks
 }
 
 func (bc *blockContextMock) ExecuteTransaction(
@@ -217,7 +221,7 @@ func (bc *blockContextMock) ExecuteTransaction(
 		ledger.Set(id1, UpdatedValue1)
 		txRes = virtualmachine.TransactionResult{
 			TransactionID: unittest.IdentifierFixture(),
-			Events:        []runtime.Event{},
+			Events:        []cadence.Event{},
 			Logs:          []string{"log1", "log2"},
 			Error:         nil,
 			GasUsed:       0,
@@ -229,9 +233,9 @@ func (bc *blockContextMock) ExecuteTransaction(
 		ledger.Set(id1, UpdatedValue1)
 		txRes = virtualmachine.TransactionResult{
 			TransactionID: unittest.IdentifierFixture(),
-			Events:        []runtime.Event{},
+			Events:        []cadence.Event{},
 			Logs:          nil,
-			Error:         errors.New("runtime error"), // inside the runtime (e.g. div by zero, access account)
+			Error:         &virtualmachine.MissingPayerError{}, // inside the runtime (e.g. div by zero, access account)
 			GasUsed:       0,
 		}
 	default:
@@ -243,7 +247,7 @@ func (bc *blockContextMock) ExecuteTransaction(
 		ledger.Set(id2, UpdatedValue2)
 		txRes = virtualmachine.TransactionResult{
 			TransactionID: unittest.IdentifierFixture(),
-			Events:        []runtime.Event{},
+			Events:        []cadence.Event{},
 			Logs:          []string{"log1", "log2"},
 			Error:         nil,
 			GasUsed:       0,
@@ -259,17 +263,26 @@ func (bc *blockContextMock) ExecuteScript(
 	return nil, nil
 }
 
-func (bc *blockContextMock) GetAccount(ledger virtualmachine.Ledger, address flow.Address) *flow.Account {
-	return nil
+func (bc *blockContextMock) GetAccount(_ virtualmachine.Ledger, _ flow.Address) (*flow.Account, error) {
+	return nil, nil
 }
 
 // virtualMachineMock is a mocked virtualMachine
 type virtualMachineMock struct {
 }
 
-func (vm *virtualMachineMock) NewBlockContext(header *flow.Header) virtualmachine.BlockContext {
+func (vm *virtualMachineMock) NewBlockContext(header *flow.Header, blocks virtualmachine.Blocks) virtualmachine.BlockContext {
 	return &blockContextMock{
 		vm:     vm,
 		header: header,
+		blocks: blocks,
 	}
+}
+
+func (vm *virtualMachineMock) ASTCache() virtualmachine.ASTCache {
+	cache, err := virtualmachine.NewLRUASTCache(64)
+	if err != nil {
+		return nil
+	}
+	return cache
 }

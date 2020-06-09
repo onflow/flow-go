@@ -3,8 +3,10 @@
 package ingest
 
 import (
+	"errors"
 	"fmt"
 
+	"github.com/onflow/cadence/runtime/parser"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -12,8 +14,10 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -21,29 +25,43 @@ import (
 // transactions are delegated to the correct collection cluster, and prepared
 // to be included in a collection.
 type Engine struct {
-	unit    *engine.Unit
-	log     zerolog.Logger
-	metrics module.Metrics
-	con     network.Conduit
-	me      module.Local
-	state   protocol.State
-	pool    mempool.Transactions
+	unit       *engine.Unit
+	log        zerolog.Logger
+	engMetrics module.EngineMetrics
+	colMetrics module.CollectionMetrics
+	con        network.Conduit
+	me         module.Local
+	state      protocol.State
+	pool       mempool.Transactions
+
+	config Config
 }
 
 // New creates a new collection ingest engine.
-func New(log zerolog.Logger, net module.Network, state protocol.State, metrics module.Metrics, me module.Local, pool mempool.Transactions) (*Engine, error) {
+func New(
+	log zerolog.Logger,
+	net module.Network,
+	state protocol.State,
+	engMetrics module.EngineMetrics,
+	colMetrics module.CollectionMetrics,
+	me module.Local,
+	pool mempool.Transactions,
+	config Config,
+) (*Engine, error) {
 
 	logger := log.With().
 		Str("engine", "ingest").
 		Logger()
 
 	e := &Engine{
-		unit:    engine.NewUnit(),
-		log:     logger,
-		metrics: metrics,
-		me:      me,
-		state:   state,
-		pool:    pool,
+		unit:       engine.NewUnit(),
+		log:        logger,
+		engMetrics: engMetrics,
+		colMetrics: colMetrics,
+		me:         me,
+		state:      state,
+		pool:       pool,
+		config:     config,
 	}
 
 	con, err := net.Register(engine.CollectionIngest, e)
@@ -58,13 +76,11 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, metrics m
 
 // Ready returns a ready channel that is closed once the engine has fully
 // started.
-// TODO describe condition for ingest engine being ready
 func (e *Engine) Ready() <-chan struct{} {
 	return e.unit.Ready()
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
-// TODO describe conditions under which engine is done
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
 }
@@ -79,7 +95,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // a potential processing error internally when done.
 func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
-		err := e.Process(originID, event)
+		err := e.process(originID, event)
 		if err != nil {
 			e.log.Error().Err(err).Msg("could not process submitted event")
 		}
@@ -106,6 +122,8 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
 	case *flow.TransactionBody:
+		e.engMetrics.MessageReceived(metrics.EngineCollectionIngest, metrics.MessageTransaction)
+		defer e.engMetrics.MessageHandled(metrics.EngineCollectionIngest, metrics.MessageTransaction)
 		return e.onTransaction(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
@@ -123,8 +141,11 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 	log.Debug().Msg("transaction message received")
 
-	// report Metrics Transaction from received to being included in a collection guarantee
-	e.metrics.TransactionReceived(tx.ID())
+	// short-circuit if we have already stored the transaction
+	if e.pool.Has(tx.ID()) {
+		e.log.Debug().Msg("received dupe transaction")
+		return nil
+	}
 
 	// first, we check if the transaction is valid
 	err := e.ValidateTransaction(tx)
@@ -132,7 +153,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 		return fmt.Errorf("invalid transaction: %w", err)
 	}
 
-	// cluster the collection nodes into the configured amount of clusters
+	// retrieve the set of collector clusters
 	clusters, err := e.state.Final().Clusters()
 	if err != nil {
 		return fmt.Errorf("could not cluster collection nodes: %w", err)
@@ -154,21 +175,31 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 	// if our cluster is responsible for the transaction, store it
 	if localCluster.Fingerprint() == txCluster.Fingerprint() {
-		log.Debug().Msg("adding transaction to pool")
-		err := e.pool.Add(tx)
-		if err != nil {
-			return fmt.Errorf("could not add transaction to mempool: %w", err)
-		}
+		_ = e.pool.Add(tx)
+		e.colMetrics.TransactionIngested(tx.ID())
+		log.Debug().Msg("added transaction to pool")
 	}
 
-	// if the transaction is submitted locally, propagate it
+	// if the message was submitted internally (ie. via the Access API)
+	// propagate it to all members of the responsible cluster
 	if originID == localID {
-		log.Debug().Msg("propagating transaction to cluster")
-		targetIDs := txCluster.Filter(filter.Not(filter.HasNodeID(localID)))
+
+		// always send the transaction to one node in the responsible cluster,
+		// send to additional nodes based on configuration
+		targetIDs := txCluster.
+			Filter(filter.Not(filter.HasNodeID(localID))).
+			Sample(e.config.PropagationRedundancy + 1)
+
+		log.Debug().
+			Str("recipients", fmt.Sprintf("%v", targetIDs.NodeIDs())).
+			Msg("propagating transaction to cluster")
+
 		err = e.con.Submit(tx, targetIDs.NodeIDs()...)
 		if err != nil {
 			return fmt.Errorf("could not route transaction to cluster: %w", err)
 		}
+
+		e.engMetrics.MessageSent(metrics.EngineCollectionIngest, metrics.MessageTransaction)
 	}
 
 	log.Info().Msg("transaction processed")
@@ -180,14 +211,74 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 // the transaction should be included in a collection.
 func (e *Engine) ValidateTransaction(tx *flow.TransactionBody) error {
 
+	// ensure all required fields are set
 	missingFields := tx.MissingFields()
 	if len(missingFields) > 0 {
-		return ErrIncompleteTransaction{Missing: missingFields}
+		return IncompleteTransactionError{Missing: missingFields}
+	}
+
+	// ensure the gas limit is not over the maximum
+	if tx.GasLimit > e.config.MaxGasLimit {
+		return GasLimitExceededError{Actual: tx.GasLimit, Maximum: e.config.MaxGasLimit}
+	}
+
+	// ensure the reference block is valid
+	err := e.checkTransactionExpiry(tx)
+	if err != nil {
+		return err
+	}
+
+	if e.config.CheckScriptsParse {
+		// ensure the script is at least parse-able
+		_, _, err = parser.ParseProgram(string(tx.Script))
+		if err != nil {
+			return InvalidScriptError{ParserErr: err}
+		}
 	}
 
 	// TODO check account/payer signatures
 
-	// TODO parse Cadence script
+	return nil
+}
+
+// checkTransactionExpiry checks whether a transaction's reference block ID is
+// valid. Returns nil if the reference is valid, returns an error if the
+// reference is invalid or we failed to check it.
+func (e *Engine) checkTransactionExpiry(tx *flow.TransactionBody) error {
+
+	// look up the reference block
+	ref, err := e.state.AtBlockID(tx.ReferenceBlockID).Head()
+	if errors.Is(err, storage.ErrNotFound) {
+		// the transaction references an unknown block - at this point we decide
+		// whether to consider it expired based on configuration
+		if e.config.AllowUnknownReference {
+			return nil
+		}
+		return ErrUnknownReferenceBlock
+	}
+	if err != nil {
+		return fmt.Errorf("could not get reference block: %w", err)
+	}
+
+	// get the latest finalized block we know about
+	final, err := e.state.Final().Head()
+	if err != nil {
+		return fmt.Errorf("could not get finalized header: %w", err)
+	}
+
+	diff := final.Height - ref.Height
+	// check for overflow
+	if ref.Height > final.Height {
+		diff = 0
+	}
+	// discard transactions that are expired, or that will expire sooner than
+	// our configured buffer allows
+	if uint(diff) > flow.DefaultTransactionExpiry-e.config.ExpiryBuffer {
+		return ExpiredTransactionError{
+			RefHeight:   ref.Height,
+			FinalHeight: final.Height,
+		}
+	}
 
 	return nil
 }

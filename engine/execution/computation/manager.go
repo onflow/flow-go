@@ -1,12 +1,11 @@
 package computation
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
-
-	encoding "github.com/onflow/cadence/encoding/xdr"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
@@ -16,13 +15,18 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 type ComputationManager interface {
 	ExecuteScript([]byte, *flow.Header, *delta.View) ([]byte, error)
-	ComputeBlock(block *entity.ExecutableBlock, view *delta.View) (*execution.ComputationResult, error)
-	GetAccount(address flow.Address, blockHeader *flow.Header, view *delta.View) (*flow.Account, error)
+	ComputeBlock(
+		ctx context.Context,
+		block *entity.ExecutableBlock,
+		view *delta.View,
+	) (*execution.ComputationResult, error)
+	GetAccount(addr flow.Address, header *flow.Header, view *delta.View) (*flow.Account, error)
 }
 
 // Manager manages computation and execution
@@ -32,13 +36,16 @@ type Manager struct {
 	protoState    protocol.State
 	vm            virtualmachine.VirtualMachine
 	blockComputer computer.BlockComputer
+	blocks        storage.Blocks
 }
 
 func New(
 	logger zerolog.Logger,
+	tracer module.Tracer,
 	me module.Local,
 	protoState protocol.State,
 	vm virtualmachine.VirtualMachine,
+	blocks storage.Blocks,
 ) *Manager {
 	log := logger.With().Str("engine", "computation").Logger()
 
@@ -47,7 +54,8 @@ func New(
 		me:            me,
 		protoState:    protoState,
 		vm:            vm,
-		blockComputer: computer.NewBlockComputer(vm),
+		blockComputer: computer.NewBlockComputer(vm, tracer, blocks),
+		blocks:        blocks,
 	}
 
 	return &e
@@ -55,18 +63,16 @@ func New(
 
 func (e *Manager) ExecuteScript(script []byte, blockHeader *flow.Header, view *delta.View) ([]byte, error) {
 
-	result, err := e.vm.NewBlockContext(blockHeader).ExecuteScript(view, script)
+	result, err := e.vm.NewBlockContext(blockHeader, e.blocks).ExecuteScript(view, script)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
 	}
 
 	if !result.Succeeded() {
-		return nil, fmt.Errorf("failed to execute script at block (%s): %w", blockHeader.ID(), result.Error)
+		return nil, fmt.Errorf("failed to execute script at block (%s): %s", blockHeader.ID(), result.Error.ErrorMessage())
 	}
 
-	value := cadence.ConvertValue(result.Value)
-
-	encodedValue, err := encoding.Encode(value)
+	encodedValue, err := jsoncdc.Encode(result.Value)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode runtime value: %w", err)
 	}
@@ -74,12 +80,17 @@ func (e *Manager) ExecuteScript(script []byte, blockHeader *flow.Header, view *d
 	return encodedValue, nil
 }
 
-func (e *Manager) ComputeBlock(block *entity.ExecutableBlock, view *delta.View) (*execution.ComputationResult, error) {
+func (e *Manager) ComputeBlock(
+	ctx context.Context,
+	block *entity.ExecutableBlock,
+	view *delta.View,
+) (*execution.ComputationResult, error) {
+
 	e.log.Debug().
 		Hex("block_id", logging.Entity(block.Block)).
 		Msg("received complete block")
 
-	result, err := e.blockComputer.ExecuteBlock(block, view)
+	result, err := e.blockComputer.ExecuteBlock(ctx, block, view)
 	if err != nil {
 		e.log.Error().
 			Hex("block_id", logging.Entity(block.Block)).
@@ -95,8 +106,11 @@ func (e *Manager) ComputeBlock(block *entity.ExecutableBlock, view *delta.View) 
 	return result, nil
 }
 
-func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, view *delta.View) (*flow.Account, error) {
+func (e *Manager) GetAccount(addr flow.Address, blockHeader *flow.Header, view *delta.View) (*flow.Account, error) {
+	account, err := e.vm.NewBlockContext(blockHeader, e.blocks).GetAccount(view, addr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get accounot at block (%s): %w", blockHeader.ID(), err)
+	}
 
-	result := e.vm.NewBlockContext(blockHeader).GetAccount(view, address)
-	return result, nil
+	return account, nil
 }

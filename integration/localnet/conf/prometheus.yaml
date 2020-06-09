@@ -11,8 +11,7 @@ scrape_configs:
     static_configs:
       - targets: ["exporter:9100"]
   - job_name: flow
-    static_configs:
-      - targets:
-          - "consensus_1:8080"
-          - "consensus_2:8080"
-          - "consensus_3:8080"
+    scrape_interval: 5s
+    file_sd_configs:
+      - files:
+          - "/etc/prometheus/targets.nodes.json"

@@ -67,7 +67,7 @@ If seeds are not provided, the CLI will try to use the system's pseudo-random nu
 
 #### Example
 ```bash
-go run -tags relic ./cmd/bootstrap key --address "example.com" --role "consensus" -o ./bootstrap/partner-node-infos
+go run -tags relic ./cmd/bootstrap key --address "example.com:1234" --role "consensus" -o ./bootstrap/partner-node-infos
 ```
 
 #### Generated output files
@@ -95,7 +95,7 @@ Each input is a config file specified as a command line parameter:
 
 #### Example
 ```bash
-go run -tags relic ./cmd/bootstrap finalize --config ./cmd/bootstrap/example_files/node-config.json --partner-dir ./cmd/bootstrap/example_files/partner-node-infos --partner-stakes ./cmd/bootstrap/example_files/partner-stakes.json -o ./bootstrap/genesis-infos
+go run -tags relic ./cmd/bootstrap finalize --config ./cmd/bootstrap/example_files/node-config.json --partner-dir ./cmd/bootstrap/example_files/partner-node-infos --partner-stakes ./cmd/bootstrap/example_files/partner-stakes.json --genesis-token-supply 1000_000_000 -o ./bootstrap/genesis-infos
 ```
 
 #### Generated output files

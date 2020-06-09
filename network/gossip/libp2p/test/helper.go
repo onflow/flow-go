@@ -4,11 +4,11 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
-	mockery "github.com/stretchr/testify/mock"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
@@ -39,6 +39,7 @@ func CreateIDs(count int) []*flow.Identity {
 func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.IdentityList, csize int, dryrun bool, tops ...middleware.Topology) ([]*libp2p.Network, error) {
 	count := len(mws)
 	nets := make([]*libp2p.Network, 0)
+	metrics := metrics.NewNoopCollector()
 	// create an empty identity list of size len(ids) to make sure the network fanout is set appropriately even before the nodes are started
 	// identities are set to appropriate IP Port after the network and middleware are started
 	identities := make(flow.IdentityList, len(ids))
@@ -57,7 +58,7 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 		me := &mock.Local{}
 		me.On("NodeID").Return(ids[i].NodeID)
 		me.On("NotMeFilter").Return(flow.IdentityFilter(filter.Any))
-		net, err := libp2p.NewNetwork(log, json.NewCodec(), identities, me, mws[i], csize, tops[i])
+		net, err := libp2p.NewNetwork(log, json.NewCodec(), identities, me, mws[i], csize, tops[i], metrics)
 		if err != nil {
 			return nil, fmt.Errorf("could not create error %w", err)
 		}
@@ -105,7 +106,7 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 
 // CreateMiddleware receives an ids slice and creates and initializes a middleware instances for each id
 func CreateMiddleware(log zerolog.Logger, identities []*flow.Identity) ([]*libp2p.Middleware, error) {
-	metrics := SetupMetrics()
+	metrics := metrics.NewNoopCollector()
 	count := len(identities)
 	mws := make([]*libp2p.Middleware, 0)
 	for i := 0; i < count; i++ {
@@ -116,7 +117,7 @@ func CreateMiddleware(log zerolog.Logger, identities []*flow.Identity) ([]*libp2
 		}
 
 		// creating middleware of nodes
-		mw, err := libp2p.NewMiddleware(log, json.NewCodec(), "0.0.0.0:0", identities[i].NodeID, key, metrics)
+		mw, err := libp2p.NewMiddleware(log, json.NewCodec(), "0.0.0.0:0", identities[i].NodeID, key, metrics, libp2p.DefaultMaxPubSubMsgSize)
 		if err != nil {
 			return nil, err
 		}
@@ -155,11 +156,4 @@ func GenerateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
 	seed := make([]byte, crypto.KeyGenSeedMinLenECDSASecp256k1)
 	copy(seed, s[:])
 	return crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
-}
-
-func SetupMetrics() *mock.Metrics {
-	metrics := &mock.Metrics{}
-	metrics.On("NetworkMessageSent", mockery.Anything, mockery.Anything).Return()
-	metrics.On("NetworkMessageReceived", mockery.Anything, mockery.Anything).Return()
-	return metrics
 }

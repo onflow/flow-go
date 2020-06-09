@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/blockproducer"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/eventhandler"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/forks"
@@ -53,7 +54,7 @@ type Instance struct {
 	communicator *mocks.Communicator
 
 	// real dependencies
-	pacemaker  *pacemaker.FlowPaceMaker
+	pacemaker  hotstuff.PaceMaker
 	producer   *blockproducer.BlockProducer
 	forks      *forks.Forks
 	aggregator *voteaggregator.VoteAggregator
@@ -146,7 +147,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 
 	// program the builder module behaviour
 	in.builder.On("BuildOn", mock.Anything, mock.Anything).Return(
-		func(parentID flow.Identifier, setter func(*flow.Header)) *flow.Header {
+		func(parentID flow.Identifier, setter func(*flow.Header) error) *flow.Header {
 			parent, ok := in.headers.Load(parentID)
 			if !ok {
 				return nil
@@ -162,7 +163,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 			in.headers.Store(header.ID(), header)
 			return header
 		},
-		func(parentID flow.Identifier, setter func(*flow.Header)) error {
+		func(parentID flow.Identifier, setter func(*flow.Header) error) error {
 			_, ok := in.headers.Load(parentID)
 			if !ok {
 				return fmt.Errorf("parent block not found (parent: %x)", parentID)
@@ -172,8 +173,8 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	)
 
 	// check on stop condition, stop the tests as soon as entering a certain view
-	in.persist.On("StartedView", mock.Anything).Return(nil)
-	in.persist.On("VotedView", mock.Anything).Return(nil)
+	in.persist.On("PutStarted", mock.Anything).Return(nil)
+	in.persist.On("PutVoted", mock.Anything).Return(nil)
 
 	// program the hotstuff signer behaviour
 	in.signer.On("CreateProposal", mock.Anything).Return(
@@ -220,18 +221,27 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	// program the hotstuff communicator behaviour
-	in.communicator.On("BroadcastProposal", mock.Anything).Return(
-		func(header *flow.Header) error {
+	in.communicator.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Return(
+		func(header *flow.Header, delay time.Duration) error {
 
-			// check that we have the parent
-			parent, found := in.headers.Load(header.ParentID)
-			if !found {
-				return fmt.Errorf("can't broadcast with unknown parent")
+			// sender should always have the parent
+			parentBlob, exists := in.headers.Load(header.ParentID)
+			if !exists {
+				return fmt.Errorf("parent for proposal not found (sender: %x, parent: %x)", in.localID, header.ParentID)
 			}
+			parent := parentBlob.(*flow.Header)
 
 			// set the height and chain ID
-			header.ChainID = parent.(*flow.Header).ChainID
-			header.Height = parent.(*flow.Header).Height + 1
+			header.ChainID = parent.ChainID
+			header.Height = parent.Height + 1
+
+			// convert into proposal immediately
+			proposal := model.ProposalFromFlow(header, parent.View)
+
+			// store locally and loop back to engine for processing
+			in.headers.Store(header.ID(), header)
+			in.queue <- proposal
+
 			return nil
 		},
 	)
@@ -267,16 +277,13 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		},
 	)
 
+	in.finalizer.On("MakePending", mock.Anything).Return(nil)
+
 	// initialize error handling and logging
 	var err error
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
 	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Uint("index", index).Hex("local_id", in.localID[:]).Logger()
 	notifier := notifications.NewLogConsumer(log)
-
-	// initialize no-op metrics mock
-	metrics := &module.Metrics{}
-	metrics.On("HotStuffBusyDuration", mock.Anything)
-	metrics.On("HotStuffIdleDuration", mock.Anything)
 
 	// initialize the pacemaker
 	controller := timeout.NewController(cfg.Timeouts)

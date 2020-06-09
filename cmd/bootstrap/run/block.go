@@ -5,14 +5,14 @@ import (
 )
 
 // TODO consolidate this with model/flow/Block.Genesis
-func GenerateRootBlock(identityList flow.IdentityList, seal flow.Seal) flow.Block {
+func GenerateRootBlock(identityList flow.IdentityList) *flow.Block {
 	payload := flow.Payload{
 		Identities: identityList,
 		Guarantees: nil,
-		Seals:      []*flow.Seal{&seal},
+		Seals:      nil,
 	}
 	header := flow.Header{
-		ChainID:        flow.DefaultChainID,
+		ChainID:        flow.GetChainID(),
 		ParentID:       flow.ZeroID,
 		Height:         0,
 		PayloadHash:    payload.Hash(),
@@ -24,8 +24,8 @@ func GenerateRootBlock(identityList flow.IdentityList, seal flow.Seal) flow.Bloc
 		ProposerSig:    nil,
 	}
 
-	return flow.Block{
-		Header:  header,
-		Payload: payload,
+	return &flow.Block{
+		Header:  &header,
+		Payload: &payload,
 	}
 }

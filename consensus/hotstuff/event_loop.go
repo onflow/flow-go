@@ -16,7 +16,7 @@ import (
 type EventLoop struct {
 	log          zerolog.Logger
 	eventHandler EventHandler
-	metrics      module.Metrics
+	metrics      module.HotstuffMetrics
 	proposals    chan *model.Proposal
 	votes        chan *model.Vote
 
@@ -24,7 +24,7 @@ type EventLoop struct {
 }
 
 // NewEventLoop creates an instance of EventLoop.
-func NewEventLoop(log zerolog.Logger, metrics module.Metrics, eventHandler EventHandler) (*EventLoop, error) {
+func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler EventHandler) (*EventLoop, error) {
 	proposals := make(chan *model.Proposal)
 	votes := make(chan *model.Vote)
 
@@ -82,6 +82,12 @@ func (el *EventLoop) loop() {
 			if err != nil {
 				el.log.Fatal().Err(err).Msg("could not process timeout")
 			}
+
+			// At this point, we have received and processed an event from the timeout channel.
+			// A timeout also means, we have made progress. A new timeout will have
+			// been started and el.eventHandler.TimeoutChannel() will be a NEW channel (for the just-started timeout)
+			// Very important to start the for loop from the beginning, to continue the with the new timeout channel!
+			continue
 
 		default:
 			// fall through to non-priority events

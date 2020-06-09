@@ -1,0 +1,35 @@
+[Unit]
+Description=Flow Collection Node running with Docker
+Requires=docker.service
+After=network-online.target docker.service
+
+[Install]
+Alias=flow.service
+WantedBy=default.target
+
+[Service]
+Type=simple
+TimeoutStopSec=1m
+
+RestartSec=5s
+Restart=no
+
+StandardOutput=journal
+
+EnvironmentFile=/etc/flow/runtime-conf.env
+EnvironmentFile=-/etc/flow/conf.d/*.env
+
+ExecStartPre=docker pull gcr.io/flow-container-registry/collection:${FLOW_GO_NODE_VERSION}
+ExecStart=docker run --rm \
+	-v /var/flow/bootstrap:/bootstrap:ro \
+	-v /var/flow/data:/data:rw \
+	--name flow-go \
+	--network host \
+	gcr.io/flow-container-registry/collection:${FLOW_GO_NODE_VERSION} \
+	--nodeid=${FLOW_GO_NODE_ID} \
+	--bootstrapdir=/bootstrap \
+	--datadir=/data/protocol \
+	--ingress-addr=0.0.0.0:9000 \
+	--nclusters=${FLOW_NETWORK_COLLECTION_CLUSTER_COUNT} \
+	--bind 0.0.0.0:3569 \
+	--loglevel=ERROR

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -14,7 +15,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/dapperlabs/flow-go/engine/common/convert"
-	"github.com/dapperlabs/flow-go/engine/execution/ingestion/mock"
+	ingestion "github.com/dapperlabs/flow-go/engine/execution/ingestion/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -51,7 +52,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	// setup the events storage mock
 	for i := range blockIDs {
 		block := unittest.BlockFixture()
-		block.Height = uint64(i)
+		block.Header.Height = uint64(i)
 		id := block.ID()
 		blockIDs[i] = id[:]
 		eventsForBlock := make([]flow.Event, eventsPerBlock)
@@ -70,7 +71,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		// create the expected result for this block
 		expectedResult[i] = &execution.GetEventsForBlockIDsResponse_Result{
 			BlockId:     id[:],
-			BlockHeight: block.Height,
+			BlockHeight: block.Header.Height,
 			Events:      eventMessages,
 		}
 	}
@@ -166,13 +167,13 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 func (suite *Suite) TestGetAccountAtBlockID() {
 
 	id := unittest.IdentifierFixture()
-	rootAddress := flow.RootAddress
+	serviceAddress := flow.ServiceAddress()
 
-	rootAccount := flow.Account{
-		Address: rootAddress,
+	serviceAccount := flow.Account{
+		Address: serviceAddress,
 	}
 
-	mockEngine := new(mock.IngestRPC)
+	mockEngine := new(ingestion.IngestRPC)
 
 	// create the handler
 	handler := &handler{
@@ -189,15 +190,15 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 	suite.Run("happy path with valid request", func() {
 
 		// setup mock expectations
-		mockEngine.On("GetAccount", rootAddress, id).Return(&rootAccount, nil).Once()
+		mockEngine.On("GetAccount", mock.Anything, serviceAddress, id).Return(&serviceAccount, nil).Once()
 
-		req := createReq(id[:], rootAddress.Bytes())
+		req := createReq(id[:], serviceAddress.Bytes())
 
 		resp, err := handler.GetAccountAtBlockID(context.Background(), req)
 
 		suite.Require().NoError(err)
 		actualAccount := resp.GetAccount()
-		expectedAccount, err := convert.AccountToMessage(&rootAccount)
+		expectedAccount, err := convert.AccountToMessage(&serviceAccount)
 		suite.Require().NoError(err)
 		suite.Require().Equal(*expectedAccount, *actualAccount)
 		mockEngine.AssertExpectations(suite.T())
@@ -205,7 +206,7 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 
 	suite.Run("invalid request with nil block id", func() {
 
-		req := createReq(nil, rootAddress.Bytes())
+		req := createReq(nil, serviceAddress.Bytes())
 
 		_, err := handler.GetAccountAtBlockID(context.Background(), req)
 
@@ -244,7 +245,7 @@ func (suite *Suite) TestGetTransactionResult() {
 	suite.events.On("ByBlockIDTransactionID", bID, txID).Return(eventsForTx, nil)
 
 	// expect a call to lookup each block
-	suite.blocks.On("ByID", block.ID()).Return(&block, nil)
+	suite.blocks.On("ByID", block.ID()).Return(&block, true)
 
 	// create the handler
 	createHandler := func(txResults *storage.TransactionResults) *handler {

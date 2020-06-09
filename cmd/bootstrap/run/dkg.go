@@ -30,7 +30,6 @@ func RunDKG(n int, seeds [][]byte) (model.DKGData, error) {
 		processors = append(processors, localDKGProcessor{
 			current: i,
 			chans:   chans,
-			// msgType: dkgType,
 		})
 	}
 
@@ -53,7 +52,7 @@ func RunDKG(n int, seeds [][]byte) (model.DKGData, error) {
 		// start dkg could also run in parallel
 		// but they are run sequentially to avoid having non-deterministic
 		// output (the PRG used is common)
-		err := processors[i].dkg.StartDKG(seeds[i])
+		err := processors[i].dkg.Start(seeds[i])
 		if err != nil {
 			return model.DKGData{}, err
 		}
@@ -73,15 +72,16 @@ func RunDKG(n int, seeds [][]byte) (model.DKGData, error) {
 	// synchronize the main thread to end all DKGs
 	wg.Wait()
 
-	dkgData := model.DKGData{
-		Participants: make([]model.DKGParticipant, 0, n),
-	}
+	skShares := make([]crypto.PrivateKey, 0, n)
+
 	for _, processor := range processors {
-		dkgData.Participants = append(dkgData.Participants, model.DKGParticipant{
-			KeyShare:   processor.privkey,
-			GroupIndex: processor.current,
-		})
-		dkgData.PubGroupKey = processor.pubgroupkey
+		skShares = append(skShares, processor.privkey)
+	}
+
+	dkgData := model.DKGData{
+		PrivKeyShares: skShares,
+		PubGroupKey:   processors[0].pubgroupkey,
+		PubKeyShares:  processors[0].pubkeys,
 	}
 
 	return dkgData, nil
@@ -90,20 +90,20 @@ func RunDKG(n int, seeds [][]byte) (model.DKGData, error) {
 // localDKGProcessor implements DKGProcessor interface
 type localDKGProcessor struct {
 	current     int
-	dkg         crypto.DKGstate
+	dkg         crypto.DKGState
 	chans       []chan *message
 	privkey     crypto.PrivateKey
 	pubgroupkey crypto.PublicKey
+	pubkeys     []crypto.PublicKey
 }
 
 type message struct {
 	orig int
-	// msgType int
 	data []byte
 }
 
-// Send a message from one node to another
-func (proc *localDKGProcessor) Send(dest int, data []byte) {
+// PrivateSend sends a message from one node to another
+func (proc *localDKGProcessor) PrivateSend(dest int, data []byte) {
 	newMsg := &message{proc.current, data}
 	proc.chans[dest] <- newMsg
 }
@@ -150,7 +150,7 @@ func dkgRunChan(proc *localDKGProcessor, sync *sync.WaitGroup, phase int) {
 					log.Fatal().Err(err).Msg("failed to wait for next timeout")
 				}
 			case 2:
-				privkey, pubgroupkey, _, err := proc.dkg.EndDKG()
+				privkey, pubgroupkey, pubkeys, err := proc.dkg.End()
 				if err != nil {
 					log.Fatal().Err(err).Msg("end dkg error should be nit")
 				}
@@ -160,6 +160,7 @@ func dkgRunChan(proc *localDKGProcessor, sync *sync.WaitGroup, phase int) {
 
 				proc.privkey = privkey
 				proc.pubgroupkey = pubgroupkey
+				proc.pubkeys = pubkeys
 			}
 			sync.Done()
 			return

@@ -179,7 +179,6 @@ func (s *StubEngineTestSuite) TestDuplicateMessageParallel() {
 // on deduplicating the received messages against different engine ids. In specific, the
 // desire behavior is that the deduplication should happen based on both eventID and channelID
 func (s *StubEngineTestSuite) TestDuplicateMessageDifferentChan() {
-	s.T().Skip()
 	const (
 		sndNode = iota
 		rcvNode

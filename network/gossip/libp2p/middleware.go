@@ -34,30 +34,36 @@ const (
 	OneToK
 )
 
+const DefaultMaxPubSubMsgSize = 1 << 21 //2mb
+
+// the inbound message queue size for One to One and One to K messages (each)
+const InboundMessageQueueSize = 100
+
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
 	sync.Mutex
-	ctx        context.Context
-	cancel     context.CancelFunc
-	log        zerolog.Logger
-	codec      network.Codec
-	ov         middleware.Overlay
-	wg         *sync.WaitGroup
-	libP2PNode *P2PNode
-	stop       chan struct{}
-	me         flow.Identifier
-	host       string
-	port       string
-	key        crypto.PrivateKey
-	metrics    module.Metrics
-	validators []validators.MessageValidator
+	ctx              context.Context
+	cancel           context.CancelFunc
+	log              zerolog.Logger
+	codec            network.Codec
+	ov               middleware.Overlay
+	wg               *sync.WaitGroup
+	libP2PNode       *P2PNode
+	stop             chan struct{}
+	me               flow.Identifier
+	host             string
+	port             string
+	key              crypto.PrivateKey
+	metrics          module.NetworkMetrics
+	maxPubSubMsgSize int
+	validators       []validators.MessageValidator
 }
 
 // NewMiddleware creates a new middleware instance with the given config and using the
 // given codec to encode/decode messages to our peers.
 func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flowID flow.Identifier,
-	key crypto.PrivateKey, metrics module.Metrics, validators ...validators.MessageValidator) (*Middleware, error) {
+	key crypto.PrivateKey, metrics module.NetworkMetrics, maxPubSubMsgSize int, validators ...validators.MessageValidator) (*Middleware, error) {
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
@@ -71,21 +77,26 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		validators = defaultValidators(log, flowID)
 	}
 
+	if maxPubSubMsgSize <= 0 {
+		maxPubSubMsgSize = DefaultMaxPubSubMsgSize
+	}
+
 	// create the node entity and inject dependencies & config
 	m := &Middleware{
-		ctx:        ctx,
-		cancel:     cancel,
-		log:        log,
-		codec:      codec,
-		libP2PNode: p2p,
-		wg:         &sync.WaitGroup{},
-		stop:       make(chan struct{}),
-		me:         flowID,
-		host:       ip,
-		port:       port,
-		key:        key,
-		metrics:    metrics,
-		validators: validators,
+		ctx:              ctx,
+		cancel:           cancel,
+		log:              log,
+		codec:            codec,
+		libP2PNode:       p2p,
+		wg:               &sync.WaitGroup{},
+		stop:             make(chan struct{}),
+		me:               flowID,
+		host:             ip,
+		port:             port,
+		key:              key,
+		metrics:          metrics,
+		maxPubSubMsgSize: maxPubSubMsgSize,
+		validators:       validators,
 	}
 
 	return m, err
@@ -120,10 +131,16 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 	// create a discovery object to help libp2p discover peers
 	d := NewDiscovery(m.log, m.ov, m.me, m.stop)
 
-	// create PubSub options for libp2p to use the discovery object
-	psOptions := []pubsub.Option{pubsub.WithDiscovery(d),
+	// create PubSub options for libp2p to use
+	psOptions := []pubsub.Option{
+		// set the discovery object
+		pubsub.WithDiscovery(d),
+		// skip message signing
 		pubsub.WithMessageSigning(false),
+		// skip message signature
 		pubsub.WithStrictSignatureVerification(false),
+		// set max message size limit for 1-k PubSub messaging
+		pubsub.WithMaxMessageSize(m.maxPubSubMsgSize),
 	}
 
 	nodeAddress := NodeAddress{Name: m.me.String(), IP: m.host, Port: m.port}
@@ -135,7 +152,6 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 
 	// start the libp2p node
 	err = m.libP2PNode.Start(m.ctx, nodeAddress, m.log, libp2pKey, m.handleIncomingStream, psOptions...)
-
 	if err != nil {
 		return fmt.Errorf("failed to start libp2p node: %w", err)
 	}
@@ -150,9 +166,6 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 func (m *Middleware) Stop() {
 	close(m.stop)
 
-	// cancel the context (this also signals libp2p go routines to exit)
-	m.cancel()
-
 	// stop libp2p
 	done, err := m.libP2PNode.Stop()
 	if err != nil {
@@ -161,6 +174,9 @@ func (m *Middleware) Stop() {
 		<-done
 		m.log.Debug().Msg("node stopped successfully")
 	}
+
+	// cancel the context (this also signals any lingering libp2p go routines to exit)
+	m.cancel()
 
 	// wait for the go routines spawned by middleware to stop
 	m.wg.Wait()
@@ -261,7 +277,7 @@ func (m *Middleware) sendDirect(targetID flow.Identifier, msg *message.Message) 
 	go helpers.FullClose(stream)
 
 	// OneToOne communication metrics are reported with topic OneToOne
-	m.reportOutboundMsgSize(byteCount, metrics.TopicLabelOneToOne)
+	go m.reportOutboundMsgSize(byteCount, metrics.ChannelOneToOne)
 
 	return nil
 }
@@ -323,18 +339,14 @@ ProcessLoop:
 		case <-m.stop:
 			m.log.Info().Msg("exiting process loop: middleware stops")
 			break ProcessLoop
-		case <-conn.done:
-			m.log.Info().Msg("exiting process loop: connection stops")
-			break ProcessLoop
 		case msg, ok := <-conn.inbound:
 			if !ok {
-				m.log.Info().Msg("exiting process loop: connection stops")
+				m.log.Info().Msg("exiting process loop: read connection closed")
 				break ProcessLoop
 			}
 
 			msgSize := msg.Size()
-			m.reportInboundMsgSize(msgSize, metrics.TopicLabelOneToOne)
-
+			m.reportInboundMsgSize(msgSize, metrics.ChannelOneToOne)
 			m.processMessage(msg)
 			continue ProcessLoop
 		}
@@ -367,6 +379,7 @@ func (m *Middleware) Subscribe(channelID uint8) error {
 // handleInboundSubscription reads the messages from the channel written to by readsSubscription and processes them
 func (m *Middleware) handleInboundSubscription(rs *ReadSubscription) {
 	defer m.wg.Done()
+	defer rs.stop()
 	// process incoming messages for as long as the peer is running
 SubscriptionLoop:
 	for {
@@ -374,10 +387,6 @@ SubscriptionLoop:
 		case <-m.stop:
 			// middleware stops
 			m.log.Info().Msg("exiting subscription loop: middleware stops")
-			break SubscriptionLoop
-		case <-rs.done:
-			// subscription stops
-			m.log.Info().Msg("exiting subscription loop: connection stops")
 			break SubscriptionLoop
 		case msg, ok := <-rs.inbound:
 			if !ok {
@@ -422,6 +431,13 @@ func (m *Middleware) publish(channelID uint8, msg *message.Message) error {
 		return fmt.Errorf("failed to marshal the message: %w", err)
 	}
 
+	msgSize := len(data)
+	if msgSize > m.maxPubSubMsgSize {
+		// libp2p pubsub will silently drop the message if its size is greater than the configured pubsub max message size
+		// hence return an error as this message is undeliverable
+		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, m.maxPubSubMsgSize)
+	}
+
 	topic, err := topicFromChannelID(channelID)
 	if err != nil {
 		return fmt.Errorf("failed to lookup topic for channel %d: %w", channelID, err)
@@ -438,12 +454,12 @@ func (m *Middleware) publish(channelID uint8, msg *message.Message) error {
 	return nil
 }
 
-func (m *Middleware) reportOutboundMsgSize(size int, topic string) {
-	go m.metrics.NetworkMessageSent(size, topic)
+func (m *Middleware) reportOutboundMsgSize(size int, channel string) {
+	m.metrics.NetworkMessageSent(size, channel)
 }
 
-func (m *Middleware) reportInboundMsgSize(size int, topic string) {
-	go m.metrics.NetworkMessageReceived(size, topic)
+func (m *Middleware) reportInboundMsgSize(size int, channel string) {
+	m.metrics.NetworkMessageReceived(size, channel)
 }
 
 // topicFromChannelID converts a Flow channel ID to LibP2P pub-sub topic id e.g. 10 -> "CollectionProvider"

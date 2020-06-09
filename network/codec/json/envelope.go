@@ -30,7 +30,6 @@ const (
 	// cluster consensus
 	CodeClusterBlockProposal
 	CodeClusterBlockVote
-	CodeClusterBlockRequest
 	CodeClusterBlockResponse
 
 	CodeCollectionGuarantee
@@ -50,8 +49,9 @@ const (
 	CodeExecutionStateResponse
 	CodeExecutionStateSyncRequest
 	CodeExecutionStateDelta
-	CodeChunkDataPackRequest
-	CodeChunkDataPackResponse
+	CodeChunkDataRequest
+	CodeChunkDataResponse
+	CodeResultApproval
 )
 
 // Envelope is a wrapper to convey type information with JSON encoding without

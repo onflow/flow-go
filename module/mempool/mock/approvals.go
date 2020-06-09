@@ -12,26 +12,26 @@ type Approvals struct {
 }
 
 // Add provides a mock function with given fields: approval
-func (_m *Approvals) Add(approval *flow.ResultApproval) error {
+func (_m *Approvals) Add(approval *flow.ResultApproval) bool {
 	ret := _m.Called(approval)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.ResultApproval) error); ok {
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(*flow.ResultApproval) bool); ok {
 		r0 = rf(approval)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0
 }
 
-// ByResultID provides a mock function with given fields: resultID
-func (_m *Approvals) ByResultID(resultID flow.Identifier) []*flow.ResultApproval {
-	ret := _m.Called(resultID)
+// All provides a mock function with given fields:
+func (_m *Approvals) All() []*flow.ResultApproval {
+	ret := _m.Called()
 
 	var r0 []*flow.ResultApproval
-	if rf, ok := ret.Get(0).(func(flow.Identifier) []*flow.ResultApproval); ok {
-		r0 = rf(resultID)
+	if rf, ok := ret.Get(0).(func() []*flow.ResultApproval); ok {
+		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*flow.ResultApproval)
@@ -41,9 +41,27 @@ func (_m *Approvals) ByResultID(resultID flow.Identifier) []*flow.ResultApproval
 	return r0
 }
 
-// DropForBlock provides a mock function with given fields: blockID
-func (_m *Approvals) DropForBlock(blockID flow.Identifier) {
-	_m.Called(blockID)
+// ByID provides a mock function with given fields: approvalID
+func (_m *Approvals) ByID(approvalID flow.Identifier) (*flow.ResultApproval, bool) {
+	ret := _m.Called(approvalID)
+
+	var r0 *flow.ResultApproval
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.ResultApproval); ok {
+		r0 = rf(approvalID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.ResultApproval)
+		}
+	}
+
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
+		r1 = rf(approvalID)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	return r0, r1
 }
 
 // Has provides a mock function with given fields: approvalID
@@ -69,6 +87,20 @@ func (_m *Approvals) Rem(approvalID flow.Identifier) bool {
 		r0 = rf(approvalID)
 	} else {
 		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// Size provides a mock function with given fields:
+func (_m *Approvals) Size() uint {
+	ret := _m.Called()
+
+	var r0 uint
+	if rf, ok := ret.Get(0).(func() uint); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint)
 	}
 
 	return r0

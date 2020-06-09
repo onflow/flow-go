@@ -15,20 +15,20 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
+	validatorImpl "github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voter"
+	"github.com/dapperlabs/flow-go/consensus/recovery"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics module.Metrics, headers storage.Headers,
-	views storage.Views, committee hotstuff.Committee, protocolState protocol.State, builder module.Builder, updater module.Finalizer,
-	signer hotstuff.Signer, communicator hotstuff.Communicator, rootHeader *flow.Header,
-	rootQC *model.QuorumCertificate, options ...Option) (*hotstuff.EventLoop, error) {
+// NewParticipant initialize the EventLoop instance and recover the forks' state with all pending block
+func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics module.HotstuffMetrics, headers storage.Headers,
+	committee hotstuff.Committee, builder module.Builder, updater module.Finalizer, persist hotstuff.Persister,
+	signer hotstuff.Signer, communicator hotstuff.Communicator, rootHeader *flow.Header, rootQC *model.QuorumCertificate,
+	finalized *flow.Header, pending []*flow.Header, options ...Option) (*hotstuff.EventLoop, error) {
 
 	// initialize the default configuration
 	defTimeout := timeout.DefaultConfig
@@ -37,7 +37,8 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 		TimeoutMinimum:             time.Duration(defTimeout.MinReplicaTimeout) * time.Millisecond,
 		TimeoutAggregationFraction: defTimeout.VoteAggregationTimeoutFraction,
 		TimeoutIncreaseFactor:      defTimeout.TimeoutIncrease,
-		TimeoutDecreaseStep:        time.Duration(defTimeout.TimeoutDecrease) * time.Millisecond,
+		TimeoutDecreaseFactor:      defTimeout.TimeoutDecrease,
+		BlockRateDelay:             time.Duration(defTimeout.BlockRateDelayMS) * time.Millisecond,
 	}
 
 	// apply the configuration options
@@ -45,50 +46,36 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 		option(&cfg)
 	}
 
-	// initialize internal finalizer
-	rootBlock := &model.Block{
-		View:        rootHeader.View,
-		BlockID:     rootHeader.ID(),
-		ProposerID:  rootHeader.ProposerID,
-		QC:          nil,
-		PayloadHash: rootHeader.PayloadHash,
-		Timestamp:   rootHeader.Timestamp,
-	}
-	trustedRoot := &forks.BlockQC{
-		QC:    rootQC,
-		Block: rootBlock,
-	}
-	finalizer, err := finalizer.New(trustedRoot, updater, notifier)
+	// initialize forks with only finalized block.
+	// pending blocks was not recovered yet
+	forks, err := initForks(finalized, headers, updater, notifier, rootHeader, rootQC)
 	if err != nil {
-		return nil, fmt.Errorf("could not initialize finalizer: %w", err)
+		return nil, fmt.Errorf("could not recover forks: %w", err)
 	}
-
-	// initialize the fork choice
-	forkchoice, err := forkchoice.NewNewestForkChoice(finalizer, notifier)
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize fork choice: %w", err)
-	}
-
-	// initialize the forks manager
-	forks := forks.New(finalizer, forkchoice)
 
 	// initialize the validator
-	validator := validator.New(committee, forks, signer)
+	var validator hotstuff.Validator
+	validator = validatorImpl.New(committee, forks, signer)
+	validator = validatorImpl.NewMetricsWrapper(validator, metrics) // wrapper for measuring time spent in Validator component
 
 	// get the last view we started
-	lastStarted, err := views.Retrieve(persister.ActionStarted)
+	started, err := persist.GetStarted()
 	if err != nil {
 		return nil, fmt.Errorf("could not recover last started: %w", err)
 	}
 
 	// get the last view we voted
-	lastVoted, err := views.Retrieve(persister.ActionVoted)
+	voted, err := persist.GetVoted()
 	if err != nil {
 		return nil, fmt.Errorf("could not recover last voted: %w", err)
 	}
 
-	// recover the hotstuff state
-	err = Recover(log, forks, validator, headers, protocolState)
+	// initialize the vote aggregator
+	aggregator := voteaggregator.New(notifier, 0, committee, validator, signer)
+
+	// recover the hotstuff state, mainly to recover all pending blocks
+	// in forks
+	err = recovery.Participant(log, forks, aggregator, validator, finalized, pending)
 	if err != nil {
 		return nil, fmt.Errorf("could not recover hotstuff state: %w", err)
 	}
@@ -99,7 +86,8 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 		cfg.TimeoutMinimum,
 		cfg.TimeoutAggregationFraction,
 		cfg.TimeoutIncreaseFactor,
-		cfg.TimeoutDecreaseStep,
+		cfg.TimeoutDecreaseFactor,
+		cfg.BlockRateDelay,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize timeout config: %w", err)
@@ -107,8 +95,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 
 	// initialize the pacemaker
 	controller := timeout.NewController(timeoutConfig)
-	persist := persister.New(views)
-	pacemaker, err := pacemaker.New(lastStarted+1, controller, notifier)
+	pacemaker, err := pacemaker.New(started+1, controller, notifier)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize flow pacemaker: %w", err)
 	}
@@ -120,10 +107,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	}
 
 	// initialize the voter
-	voter := voter.New(signer, forks, persist, lastVoted)
-
-	// initialize the vote aggregator
-	aggregator := voteaggregator.New(notifier, 0, committee, validator, signer)
+	voter := voter.New(signer, forks, persist, voted)
 
 	// initialize the event handler
 	handler, err := eventhandler.New(log, pacemaker, producer, forks, persist, communicator, committee, aggregator, voter, validator, notifier)
@@ -138,4 +122,97 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	}
 
 	return loop, nil
+}
+
+func initForks(final *flow.Header, headers storage.Headers, updater module.Finalizer, notifier hotstuff.Consumer, rootHeader *flow.Header, rootQC *model.QuorumCertificate) (*forks.Forks, error) {
+	finalizer, err := initFinalizer(final, headers, updater, notifier, rootHeader, rootQC)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize finalizer: %w", err)
+	}
+
+	// initialize the fork choice
+	forkchoice, err := forkchoice.NewNewestForkChoice(finalizer, notifier)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize fork choice: %w", err)
+	}
+
+	// initialize the forks manager
+	forks := forks.New(finalizer, forkchoice)
+	return forks, nil
+}
+
+func initFinalizer(final *flow.Header, headers storage.Headers, updater module.Finalizer, notifier hotstuff.FinalizationConsumer, rootHeader *flow.Header, rootQC *model.QuorumCertificate) (*finalizer.Finalizer, error) {
+	// recover the trusted root
+	trustedRoot, err := recoverTrustedRoot(final, headers, rootHeader, rootQC)
+	if err != nil {
+		return nil, fmt.Errorf("could not recover trusted root: %w", err)
+	}
+
+	// initialize the finalizer
+	finalizer, err := finalizer.New(trustedRoot, updater, notifier)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize finalizer: %w", err)
+	}
+
+	return finalizer, nil
+}
+
+func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader *flow.Header, rootQC *model.QuorumCertificate) (*forks.BlockQC, error) {
+	if final.View < rootHeader.View {
+		return nil, fmt.Errorf("finalized Block has older view than trusted root")
+	}
+
+	// if finalized view is genesis block, then use genesis block as the trustedRoot
+	if final.View == rootHeader.View {
+		if final.ID() != rootHeader.ID() {
+			return nil, fmt.Errorf("finalized Block conflicts with trusted root")
+		}
+		return makeRootBlockQC(rootHeader, rootQC), nil
+	}
+
+	// get the parent for the latest finalized block
+	parent, err := headers.ByBlockID(final.ParentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get parent for finalized: %w", err)
+	}
+
+	// find a valid child of the finalized block in order to get its QC
+	children, err := headers.ByParentID(final.ID())
+	if err != nil {
+		// a finalized block must have a valid child, if err happens, we exit
+		return nil, fmt.Errorf("could not get children for finalized block: %w", err)
+	}
+	if len(children) == 0 {
+		return nil, fmt.Errorf("finalized block has no children")
+	}
+
+	child := model.BlockFromFlow(children[0], final.View)
+
+	// create the root block to use
+	trustedRoot := &forks.BlockQC{
+		Block: model.BlockFromFlow(final, parent.View),
+		QC:    child.QC,
+	}
+
+	return trustedRoot, nil
+}
+
+func makeRootBlockQC(header *flow.Header, qc *model.QuorumCertificate) *forks.BlockQC {
+	// By convention of Forks, the trusted root block does not need to have a qc
+	// (as is the case for the genesis block). For simplify of the implementation, we always omit
+	// the QC of the root block. Thereby, we have one algorithm which handles all cases,
+	// instead of having to distinguish between a genesis block without a qc
+	// and a later-finalized root block where we can retrieve the qc.
+	rootBlock := &model.Block{
+		View:        header.View,
+		BlockID:     header.ID(),
+		ProposerID:  header.ProposerID,
+		QC:          nil, // QC is omitted
+		PayloadHash: header.PayloadHash,
+		Timestamp:   header.Timestamp,
+	}
+	return &forks.BlockQC{
+		QC:    qc,
+		Block: rootBlock,
+	}
 }

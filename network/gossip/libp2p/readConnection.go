@@ -21,7 +21,7 @@ func NewReadConnection(log zerolog.Logger, stream libp2pnetwork.Stream) *ReadCon
 	connection := NewConnection(log, stream)
 	c := ReadConnection{
 		Connection: connection,
-		inbound:    make(chan *message.Message),
+		inbound:    make(chan *message.Message, InboundMessageQueueSize),
 	}
 	return &c
 }
@@ -59,7 +59,7 @@ RecvLoop:
 					rc.log.Error().Err(err)
 				}
 			}
-			rc.stop()
+
 			return
 		}
 

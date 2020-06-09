@@ -17,11 +17,13 @@ import (
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/network"
+	grpcutils "github.com/dapperlabs/flow-go/utils/grpc"
 )
 
 // Config defines the configurable options for the ingress server.
 type Config struct {
 	ListenAddr string
+	MaxMsgSize int // In bytes
 }
 
 // Ingress implements a gRPC server with a simplified version of the Observation
@@ -36,13 +38,19 @@ type Ingress struct {
 
 // New returns a new ingress server.
 func New(config Config, e *ingest.Engine) *Ingress {
+	if config.MaxMsgSize == 0 {
+		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
+	}
 	ingress := &Ingress{
 		unit: engine.NewUnit(),
 		handler: &handler{
 			UnimplementedAccessAPIServer: access.UnimplementedAccessAPIServer{},
 			engine:                       e,
 		},
-		server: grpc.NewServer(),
+		server: grpc.NewServer(
+			grpc.MaxRecvMsgSize(config.MaxMsgSize),
+			grpc.MaxSendMsgSize(config.MaxMsgSize),
+		),
 		config: config,
 	}
 

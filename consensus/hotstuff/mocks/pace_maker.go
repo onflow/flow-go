@@ -11,6 +11,20 @@ type PaceMaker struct {
 	mock.Mock
 }
 
+// BlockRateDelay provides a mock function with given fields:
+func (_m *PaceMaker) BlockRateDelay() time.Duration {
+	ret := _m.Called()
+
+	var r0 time.Duration
+	if rf, ok := ret.Get(0).(func() time.Duration); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(time.Duration)
+	}
+
+	return r0
+}
+
 // CurView provides a mock function with given fields:
 func (_m *PaceMaker) CurView() uint64 {
 	ret := _m.Called()

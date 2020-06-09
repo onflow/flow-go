@@ -17,17 +17,25 @@ type PendingBlockBuffer interface {
 
 	ByParentID(parentID flow.Identifier) ([]*flow.PendingBlock, bool)
 
-	DropForParent(header *flow.Header)
+	DropForParent(parentID flow.Identifier)
+
+	PruneByHeight(height uint64)
+
+	Size() uint
 }
 
 // PendingClusterBlockBuffer is the same thing as PendingBlockBuffer, but for
 // collection node cluster consensus.
 type PendingClusterBlockBuffer interface {
-	Add(block *cluster.PendingBlock) bool
+	Add(originID flow.Identifier, proposal *messages.ClusterBlockProposal) bool
 
 	ByID(blockID flow.Identifier) (*cluster.PendingBlock, bool)
 
 	ByParentID(parentID flow.Identifier) ([]*cluster.PendingBlock, bool)
 
 	DropForParent(parentID flow.Identifier)
+
+	PruneByHeight(height uint64)
+
+	Size() uint
 }

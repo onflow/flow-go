@@ -224,6 +224,12 @@ func (as *AggregatorSuite) TestReceiveInsufficientVotesBeforeBlock() {
 	require.False(as.T(), built)
 	require.Nil(as.T(), qc)
 	require.NoError(as.T(), err)
+
+	// and can be called again
+	qc, built, err = as.aggregator.BuildQCOnReceivedBlock(bp.Block)
+	require.False(as.T(), built)
+	require.Nil(as.T(), qc)
+	require.NoError(as.T(), err)
 }
 
 // PENDING PATH (votes are valid and the block arrives after votes)
@@ -239,6 +245,12 @@ func (as *AggregatorSuite) TestReceiveSufficientVotesBeforeBlock() {
 	}
 	_ = as.aggregator.StoreProposerVote(bp.ProposerVote())
 	qc, built, err := as.aggregator.BuildQCOnReceivedBlock(bp.Block)
+	require.NoError(as.T(), err)
+	require.NotNil(as.T(), qc)
+	require.True(as.T(), built)
+
+	// and can be called again
+	qc, built, err = as.aggregator.BuildQCOnReceivedBlock(bp.Block)
 	require.NoError(as.T(), err)
 	require.NotNil(as.T(), qc)
 	require.True(as.T(), built)
@@ -275,7 +287,7 @@ func (as *AggregatorSuite) TestStaleProposerVote() {
 	ok := as.aggregator.StoreProposerVote(bp.ProposerVote())
 	require.False(as.T(), ok)
 	qc, built, err := as.aggregator.BuildQCOnReceivedBlock(bp.Block)
-	require.Errorf(as.T(), err, fmt.Sprintf("could not get proposer vote for block: %x", bp.Block.BlockID))
+	require.NoError(as.T(), err)
 	require.False(as.T(), built)
 	require.Nil(as.T(), qc)
 }

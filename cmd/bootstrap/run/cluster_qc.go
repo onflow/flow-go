@@ -35,11 +35,11 @@ func GenerateClusterGenesisQC(participants []bootstrap.NodeInfo, block *flow.Blo
 
 	hotBlock := model.Block{
 		BlockID:     clusterBlock.ID(),
-		View:        clusterBlock.View,
-		ProposerID:  clusterBlock.ProposerID,
+		View:        clusterBlock.Header.View,
+		ProposerID:  clusterBlock.Header.ProposerID,
 		QC:          nil,
-		PayloadHash: clusterBlock.PayloadHash,
-		Timestamp:   clusterBlock.Timestamp,
+		PayloadHash: clusterBlock.Header.PayloadHash,
+		Timestamp:   clusterBlock.Header.Timestamp,
 	}
 
 	votes := make([]*model.Vote, 0, len(signers))
@@ -93,7 +93,13 @@ func createClusterValidators(ps *protoBadger.State, participants []bootstrap.Nod
 
 		// create cluster committee state
 		genesisBlockID := block.ID()
-		blockTranslator := func(clusterBlock flow.Identifier) (flow.Identifier, error) { return genesisBlockID, nil }
+		// just use the genesis block as the reference for bootstrapping
+		blockTranslator := committee.NewBlockTranslator(
+			func(clusterBlock flow.Identifier) (flow.Identifier, error) {
+				return genesisBlockID, nil
+			},
+		)
+
 		committee := committee.New(ps, blockTranslator, participant.NodeID, selector, nodeIDs)
 
 		// create signer for participant

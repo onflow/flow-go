@@ -16,12 +16,11 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	mocklocal "github.com/dapperlabs/flow-go/engine/testutil/mocklocal"
 	"github.com/dapperlabs/flow-go/engine/verification"
-	"github.com/dapperlabs/flow-go/engine/verification/test"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	chmodel "github.com/dapperlabs/flow-go/model/chunks"
-	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
@@ -36,8 +35,8 @@ type VerifierEngineTestSuite struct {
 	me      *mocklocal.MockLocal
 	sk      crypto.PrivateKey
 	hasher  hash.Hasher
-	conduit *network.Conduit    // mocks conduit for submitting result approvals
-	metrics *mockmodule.Metrics // mocks performance monitoring metrics
+	conduit *network.Conduit       // mocks conduit for submitting result approvals
+	metrics *metrics.NoopCollector // mocks performance monitoring metrics
 }
 
 func TestVerifierEngine(t *testing.T) {
@@ -50,21 +49,13 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	suite.net = &mockmodule.Network{}
 	suite.ss = &protocol.Snapshot{}
 	suite.conduit = &network.Conduit{}
-	suite.metrics = &mockmodule.Metrics{}
+	suite.metrics = metrics.NewNoopCollector()
 
 	suite.net.On("Register", uint8(engine.ApprovalProvider), testifymock.Anything).
 		Return(suite.conduit, nil).
 		Once()
 
 	suite.state.On("Final").Return(suite.ss)
-
-	// mocks metrics
-	suite.metrics.On("OnChunkVerificationStarted", testifymock.Anything).
-		Run(func(args testifymock.Arguments) {})
-	suite.metrics.On("OnChunkVerificationFinished", testifymock.Anything).
-		Run(func(args testifymock.Arguments) {})
-	suite.metrics.On("OnResultApproval").
-		Run(func(args testifymock.Arguments) {})
 
 	// Mocks the signature oracle of the engine
 	//
@@ -82,7 +73,7 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 }
 
 func (suite *VerifierEngineTestSuite) TestNewEngine() *verifier.Engine {
-	e, err := verifier.New(zerolog.Logger{}, suite.net, suite.state, suite.me, ChunkVerifierMock{}, suite.metrics)
+	e, err := verifier.New(zerolog.Logger{}, suite.metrics, suite.net, suite.state, suite.me, ChunkVerifierMock{})
 	require.Nil(suite.T(), err)
 
 	suite.net.AssertExpectations(suite.T())
@@ -99,7 +90,7 @@ func (suite *VerifierEngineTestSuite) TestInvalidSender() {
 	// mocks NodeID method of the local
 	suite.me.MockNodeID(myID)
 
-	completeRA := test.CompleteExecutionResultFixture(suite.T(), 1)
+	completeRA := utils.CompleteExecutionResultFixture(suite.T(), 1)
 
 	err := eng.Process(invalidID, &completeRA)
 	assert.Error(suite.T(), err)
@@ -135,12 +126,10 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 			suite.Assert().Equal(vChunk.Receipt.ExecutionResult.ID(), ra.Body.ExecutionResultID)
 
 			// verifies the signatures
-			batst, err := encoding.DefaultEncoder.Encode(ra.Body.Attestation)
-			suite.Assert().NoError(err)
-			suite.Assert().True(suite.sk.PublicKey().Verify(ra.Body.AttestationSignature, batst, suite.hasher))
-			bbody, err := encoding.DefaultEncoder.Encode(ra.Body)
-			suite.Assert().NoError(err)
-			suite.Assert().True(suite.sk.PublicKey().Verify(ra.VerifierSignature, bbody, suite.hasher))
+			atstID := ra.Body.Attestation.ID()
+			suite.Assert().True(suite.sk.PublicKey().Verify(ra.Body.AttestationSignature, atstID[:], suite.hasher))
+			bodyID := ra.Body.ID()
+			suite.Assert().True(suite.sk.PublicKey().Verify(ra.VerifierSignature, bodyID[:], suite.hasher))
 		}).
 		Once()
 

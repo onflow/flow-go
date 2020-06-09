@@ -15,14 +15,12 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
 	"github.com/libp2p/go-tcp-transport"
 	"github.com/multiformats/go-multiaddr"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 )
 
@@ -63,7 +61,7 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 
 	p.name = n.Name
 	p.logger = logger
-	addr := multiaddressStr(n)
+	addr := MultiaddressStr(n)
 	sourceMultiAddr, err := multiaddr.NewMultiaddr(addr)
 	if err != nil {
 		return err
@@ -93,7 +91,7 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 		transport,
 	)
 	if err != nil {
-		return errors.Wrapf(err, "could not construct libp2p host for %s", p.name)
+		return fmt.Errorf("could not create libp2p host: %w", err)
 	}
 
 	p.libP2PHost = host
@@ -103,7 +101,7 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 	// Creating a new PubSub instance of the type GossipSub with psOption
 	p.ps, err = pubsub.NewGossipSub(ctx, p.libP2PHost, psOption...)
 	if err != nil {
-		return errors.Wrapf(err, "unable to start pubsub %s", p.name)
+		return fmt.Errorf("could not create libp2p pubsub: %w", err)
 	}
 
 	p.topics = make(map[string]*pubsub.Topic)
@@ -129,15 +127,21 @@ func (p *P2PNode) Stop() (chan struct{}, error) {
 		}
 	}
 
-	if result != nil {
-		// TODO: Till #2485 - graceful shutdown is implemented, swallow all unsusbscribe errors and only log it
-		p.logger.Debug().Err(result)
-	}
-
 	p.logger.Debug().Str("name", p.name).Msg("stopping libp2p node")
 	if err := p.libP2PHost.Close(); err != nil {
+		result = multierror.Append(result, err)
+	}
+
+	p.logger.Debug().Str("name", p.name).Msg("closing peer store")
+	// to prevent peerstore routine leak (https://github.com/libp2p/go-libp2p/issues/718)
+	if err := p.libP2PHost.Peerstore().Close(); err != nil {
+		p.logger.Debug().Str("name", p.name).Err(err).Msg("closing peer store")
+		result = multierror.Append(result, err)
+	}
+
+	if result != nil {
 		close(done)
-		return done, multierror.Append(result, err)
+		return done, result
 	}
 
 	go func(done chan struct{}) {
@@ -172,10 +176,6 @@ func (p *P2PNode) AddPeers(ctx context.Context, peers ...NodeAddress) error {
 			return err
 		}
 
-		// Add the destination's peer multiaddress in the peerstore.
-		// This will be used during connection and stream creation by libp2p.
-		p.libP2PHost.Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.PermanentAddrTTL)
-
 		err = p.libP2PHost.Connect(ctx, pInfo)
 		if err != nil {
 			return err
@@ -196,7 +196,7 @@ func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stre
 	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath if it exists)
 	stream, err := p.tryCreateNewStream(ctx, n, peerID, maxConnectAttempt)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create stream for %s: %w", peerID.String(), err)
+		return nil, fmt.Errorf("could not create stream (name: %s, address: %s:%s): %w", n.Name, n.IP, n.Port, err)
 	}
 	return stream, nil
 }
@@ -258,7 +258,7 @@ func (p *P2PNode) tryCreateNewStream(ctx context.Context, n NodeAddress, targetI
 
 // GetPeerInfo generates the libp2p peer.AddrInfo for a Node/Peer given its node address
 func GetPeerInfo(p NodeAddress) (peer.AddrInfo, error) {
-	addr := multiaddressStr(p)
+	addr := MultiaddressStr(p)
 	maddr, err := multiaddr.NewMultiaddr(addr)
 	if err != nil {
 		return peer.AddrInfo{}, err
@@ -297,7 +297,7 @@ func (p *P2PNode) Subscribe(ctx context.Context, topic string) (*pubsub.Subscrip
 	if !found {
 		tp, err = p.ps.Join(topic)
 		if err != nil {
-			return nil, fmt.Errorf("failed to join topic %s: %w", topic, err)
+			return nil, fmt.Errorf("could not join topic (%s): %w", topic, err)
 		}
 		p.topics[topic] = tp
 	}
@@ -305,7 +305,7 @@ func (p *P2PNode) Subscribe(ctx context.Context, topic string) (*pubsub.Subscrip
 	// Create a new subscription
 	s, err := tp.Subscribe()
 	if err != nil {
-		return s, fmt.Errorf("failed to create subscription for topic %s: %w", topic, err)
+		return s, fmt.Errorf("could not subscribe to topic (%s): %w", topic, err)
 	}
 
 	// Add the subscription to the cache
@@ -328,14 +328,14 @@ func (p *P2PNode) UnSubscribe(topic string) error {
 
 	tp, found := p.topics[topic]
 	if !found {
-		err := fmt.Errorf("topic %s not subscribed to", topic)
+		err := fmt.Errorf("could not find topic (%s)", topic)
 		return err
 	}
 
 	// attempt to close the topic
 	err := tp.Close()
 	if err != nil {
-		err = errors.Wrapf(err, "unable to close topic %s", topic)
+		err = fmt.Errorf("could not close topic (%s): %w", topic, err)
 		return err
 	}
 	p.topics[topic] = nil
@@ -346,24 +346,24 @@ func (p *P2PNode) UnSubscribe(topic string) error {
 }
 
 // Publish publishes the given payload on the topic
-func (p *P2PNode) Publish(ctx context.Context, t string, data []byte) error {
-	ps, found := p.topics[t]
+func (p *P2PNode) Publish(ctx context.Context, topic string, data []byte) error {
+	ps, found := p.topics[topic]
 	if !found {
-		return fmt.Errorf("topic not found:%s", t)
+		return fmt.Errorf("could not find topic (%s)", topic)
 	}
 	err := ps.Publish(ctx, data)
 	if err != nil {
-		return fmt.Errorf("failed to publish to topic %s: %w", t, err)
+		return fmt.Errorf("could not publish top topic (%s): %w", topic, err)
 	}
 	return nil
 }
 
-// multiaddressStr receives a node address and returns
+// MultiaddressStr receives a node address and returns
 // its corresponding Libp2p Multiaddress in string format
 // in current implementation IP part of the node address is
 // either an IP or a dns4
 // https://docs.libp2p.io/concepts/addressing/
-func multiaddressStr(address NodeAddress) string {
+func MultiaddressStr(address NodeAddress) string {
 	parsedIP := net.ParseIP(address.IP)
 	if parsedIP != nil {
 		// returns parsed ip version of the multi-address

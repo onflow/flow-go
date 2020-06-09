@@ -2,13 +2,17 @@ package cmd
 
 import (
 	"fmt"
+	"net"
+	"strconv"
 
+	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 )
 
 var (
@@ -18,48 +22,52 @@ var (
 	flagStakingSeed []byte
 )
 
+// keyCmdRun generate the node staking key, networking key and node information
+func keyCmdRun(_ *cobra.Command, _ []string) {
+	// validate inputs
+	role := validateRole(flagRole)
+	validateAddressFormat(flagAddress)
+	networkSeed := validateSeed(flagNetworkSeed)
+	stakingSeed := validateSeed(flagStakingSeed)
+
+	log.Debug().Msg("will generate networking key")
+	networkKeys, err := run.GenerateNetworkingKeys(1, [][]byte{networkSeed})
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot generate networking key")
+	}
+	log.Info().Msg("generated networking key")
+
+	log.Debug().Msg("will generate staking key")
+	stakingKeys, err := run.GenerateStakingKeys(1, [][]byte{stakingSeed})
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot generate staking key")
+	}
+	log.Info().Msg("generated staking key")
+
+	log.Debug().Str("address", flagAddress).Msg("assembling node information")
+	conf := model.NodeConfig{
+		Role:    role,
+		Address: flagAddress,
+		Stake:   0,
+	}
+	nodeInfo := assembleNodeInfo(conf, networkKeys[0], stakingKeys[0])
+
+	// retrieve private representation of the node
+	private, err := nodeInfo.Private()
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not access private keys")
+	}
+
+	writeText(model.PathNodeId, []byte(nodeInfo.NodeID.String()))
+	writeJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID), private)
+	writeJSON(fmt.Sprintf(model.PathNodeInfoPub, nodeInfo.NodeID), nodeInfo.Public())
+}
+
 // keyCmd represents the key command
 var keyCmd = &cobra.Command{
 	Use:   "key",
 	Short: "Generate networking and staking keys for a partner node and write them to files",
-	Run: func(cmd *cobra.Command, args []string) {
-		// validate inputs
-		role := validateRole(flagRole)
-		networkSeed := validateSeed(flagNetworkSeed)
-		stakingSeed := validateSeed(flagStakingSeed)
-
-		log.Debug().Msg("will generate networking key")
-		networkKeys, err := run.GenerateNetworkingKeys(1, [][]byte{networkSeed})
-		if err != nil {
-			log.Fatal().Err(err).Msg("cannot generate networking key")
-		}
-		log.Info().Msg("generated networking key")
-
-		log.Debug().Msg("will generate staking key")
-		stakingKeys, err := run.GenerateStakingKeys(1, [][]byte{stakingSeed})
-		if err != nil {
-			log.Fatal().Err(err).Msg("cannot generate staking key")
-		}
-		log.Info().Msg("generated staking key")
-
-		log.Debug().Str("address", flagAddress).Msg("assembling node information")
-		conf := model.NodeConfig{
-			Role:    role,
-			Address: flagAddress,
-			Stake:   0,
-		}
-		nodeInfo := assembleNodeInfo(conf, networkKeys[0], stakingKeys[0])
-
-		// retrieve private representation of the node
-		private, err := nodeInfo.Private()
-		if err != nil {
-			log.Fatal().Err(err).Msg("could not access private keys")
-		}
-
-		writeText(model.FilenameNodeId, []byte(nodeInfo.NodeID.String()))
-		writeJSON(fmt.Sprintf(model.FilenameNodeInfoPriv, nodeInfo.NodeID), private)
-		writeJSON(fmt.Sprintf(model.FilenameNodeInfoPub, nodeInfo.NodeID), nodeInfo.Public())
-	},
+	Run:   keyCmdRun,
 }
 
 func init() {
@@ -90,4 +98,33 @@ func validateSeed(seed []byte) []byte {
 		log.Fatal().Int("len(seed)", len(seed)).Msgf("seed too short, needs to be at least %v bytes long", minSeedBytes)
 	}
 	return seed
+}
+
+// validateAddressFormat validates the address provided by pretty much doing what the network layer would do before
+// starting the node
+func validateAddressFormat(address string) {
+	checkErr := func(err error) {
+		if err != nil {
+			log.Fatal().Err(err).Str("address", address).Msg("invalid address format.\n" +
+				`Address needs to be in the format hostname:port or ip:port e.g. "flow.com:3569"`)
+		}
+	}
+
+	// split address into ip/hostname and port
+	ip, port, err := net.SplitHostPort(address)
+	checkErr(err)
+
+	// check that port number is indeed a number
+	_, err = strconv.Atoi(port)
+	checkErr(err)
+
+	nodeAddrs := libp2p.NodeAddress{
+		IP:   ip,
+		Port: port,
+	}
+
+	// create a libp2p address from the ip and port
+	lp2pAddr := libp2p.MultiaddressStr(nodeAddrs)
+	_, err = multiaddr.NewMultiaddr(lp2pAddr)
+	checkErr(err)
 }
