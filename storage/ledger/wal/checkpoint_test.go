@@ -179,7 +179,7 @@ func Test_Checkpointing(t *testing.T) {
 			require.NoError(t, err)
 
 			err = wal2.Replay(
-				func(nodes []*sequencer.StorableNode, tries []*sequencer.StorableTrie) error {
+				func(forestSequencing *sequencer.MForestSequencing) error {
 					return fmt.Errorf("I should fail as there should be no checkpoints")
 				},
 				func(commitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
@@ -214,8 +214,8 @@ func Test_Checkpointing(t *testing.T) {
 			require.NoError(t, err)
 
 			err = wal3.Replay(
-				func(nodes []*sequencer.StorableNode, tries []*sequencer.StorableTrie) error {
-					return loadIntoForest(f3, nodes, tries)
+				func(forestSequencing *sequencer.MForestSequencing) error {
+					return loadIntoForest(f3, forestSequencing)
 				},
 				func(commitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
 					return fmt.Errorf("I should fail as there should be no updates")
@@ -295,8 +295,8 @@ func Test_Checkpointing(t *testing.T) {
 			updatesLeft := 1 // there should be only one update
 
 			err = wal5.Replay(
-				func(nodes []*sequencer.StorableNode, tries []*sequencer.StorableTrie) error {
-					return loadIntoForest(f5, nodes, tries)
+				func(forestSequencing *sequencer.MForestSequencing) error {
+					return loadIntoForest(f5, forestSequencing)
 				},
 				func(commitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
 					if updatesLeft == 0 {
@@ -332,8 +332,7 @@ func Test_Checkpointing(t *testing.T) {
 	})
 }
 
-func loadIntoForest(forest *mtrie.MForest, storableNodes []*sequencer.StorableNode, storableTries []*sequencer.StorableTrie) error {
-	forestSequencing := &sequencer.MForestSequencing{Nodes: storableNodes, Tries: storableTries}
+func loadIntoForest(forest *mtrie.MForest, forestSequencing *sequencer.MForestSequencing) error {
 	tries, err := sequencer.RebuildTries(forestSequencing)
 	if err != nil {
 		return err

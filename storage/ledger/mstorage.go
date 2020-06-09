@@ -57,8 +57,7 @@ func NewMTrieStorage(dbDir string, cacheSize int, metrics module.LedgerMetrics, 
 	}
 
 	err = w.Replay(
-		func(storableNodes []*sequencer.StorableNode, storableTries []*sequencer.StorableTrie) error {
-			forestSequencing := &sequencer.MForestSequencing{Nodes: storableNodes, Tries: storableTries}
+		func(forestSequencing *sequencer.MForestSequencing) error {
 			rebuiltTries, err := sequencer.RebuildTries(forestSequencing)
 			if err != nil {
 				return fmt.Errorf("rebuilding forest from sequenced nodes failed: %w", err)
@@ -204,13 +203,13 @@ func (f *MTrieStorage) GetRegistersWithProof(
 
 	// values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Could not get register values: %w", err)
+		return nil, nil, fmt.Errorf("could not get register values: %w", err)
 	}
 
 	batchProof, err := f.mForest.Proofs(stateCommitment, registerIDs)
 	// batchProof, err := f.tree.GetBatchProof(registerIDs, stateCommitment)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Could not get proofs: %w", err)
+		return nil, nil, fmt.Errorf("could not get proofs: %w", err)
 	}
 
 	proofToGo, totalProofLength := proof.EncodeBatchProof(batchProof)

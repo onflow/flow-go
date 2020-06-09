@@ -126,8 +126,7 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 	}
 
 	err = c.wal.replay(0, to,
-		func(storableNodes []*sequencer.StorableNode, storableTries []*sequencer.StorableTrie) error {
-			forestSequencing := &sequencer.MForestSequencing{Nodes: storableNodes, Tries: storableTries}
+		func(forestSequencing *sequencer.MForestSequencing) error {
 			tries, err := sequencer.RebuildTries(forestSequencing)
 			if err != nil {
 				return err
@@ -164,7 +163,7 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 	}
 	defer writer.Close()
 
-	err = c.StoreCheckpoint(forestSequencing.Nodes, forestSequencing.Tries, writer)
+	err = c.StoreCheckpoint(forestSequencing, writer)
 
 	return err
 }
@@ -209,8 +208,9 @@ func (c *Checkpointer) CheckpointWriter(to int) (io.WriteCloser, error) {
 	}, nil
 }
 
-func (c *Checkpointer) StoreCheckpoint(storableNodes []*sequencer.StorableNode, storableTries []*sequencer.StorableTrie, writer io.WriteCloser) error {
-
+func (c *Checkpointer) StoreCheckpoint(forestSequencing *sequencer.MForestSequencing, writer io.WriteCloser) error {
+	storableNodes := forestSequencing.Nodes
+	storableTries := forestSequencing.Tries
 	header := make([]byte, 8+2)
 
 	pos := writeUint64(header, 0, uint64(len(storableNodes)-1)) // -1 to account for 0 node meaning nil
@@ -241,12 +241,12 @@ func (c *Checkpointer) StoreCheckpoint(storableNodes []*sequencer.StorableNode, 
 	return nil
 }
 
-func (c *Checkpointer) LoadCheckpoint(checkpoint int) ([]*sequencer.StorableNode, []*sequencer.StorableTrie, error) {
+func (c *Checkpointer) LoadCheckpoint(checkpoint int) (*sequencer.MForestSequencing, error) {
 
 	filepath := path.Join(c.dir, numberToFilename(checkpoint))
 	file, err := os.Open(filepath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("cannot open checkpoint file %s: %w", filepath, err)
+		return nil, fmt.Errorf("cannot open checkpoint file %s: %w", filepath, err)
 	}
 	defer func() {
 		_ = file.Close()
@@ -258,7 +258,7 @@ func (c *Checkpointer) LoadCheckpoint(checkpoint int) ([]*sequencer.StorableNode
 
 	_, err = io.ReadFull(reader, header)
 	if err != nil {
-		return nil, nil, fmt.Errorf("cannot read header bytes: %w", err)
+		return nil, fmt.Errorf("cannot read header bytes: %w", err)
 	}
 
 	nodesCount, pos := readUint64(header, 0)
@@ -270,7 +270,7 @@ func (c *Checkpointer) LoadCheckpoint(checkpoint int) ([]*sequencer.StorableNode
 	for i := uint64(1); i <= nodesCount; i++ {
 		storableNode, err := ReadStorableNode(reader)
 		if err != nil {
-			return nil, nil, fmt.Errorf("cannot read storable node %d: %w", i, err)
+			return nil, fmt.Errorf("cannot read storable node %d: %w", i, err)
 		}
 		nodes[i] = storableNode
 	}
@@ -278,10 +278,14 @@ func (c *Checkpointer) LoadCheckpoint(checkpoint int) ([]*sequencer.StorableNode
 	for i := uint16(0); i < triesCount; i++ {
 		storableTrie, err := ReadStorableTrie(reader)
 		if err != nil {
-			return nil, nil, fmt.Errorf("cannot read storable trie %d: %w", i, err)
+			return nil, fmt.Errorf("cannot read storable trie %d: %w", i, err)
 		}
 		tries[i] = storableTrie
 	}
 
-	return nodes, tries, nil
+	return &sequencer.MForestSequencing{
+		Nodes: nodes,
+		Tries: tries,
+	}, nil
+
 }

@@ -115,8 +115,8 @@ func Test_Compactor(t *testing.T) {
 			require.NoError(t, err)
 
 			err = wal2.Replay(
-				func(nodes []*sequencer.StorableNode, tries []*sequencer.StorableTrie) error {
-					return loadIntoForest(f2, nodes, tries)
+				func(forestSequencing *sequencer.MForestSequencing) error {
+					return loadIntoForest(f2, forestSequencing)
 				},
 				func(commitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
 					_, err := f2.Update(commitment, keys, values)
@@ -169,8 +169,7 @@ func Test_Compactor(t *testing.T) {
 	})
 }
 
-func loadIntoForest(forest *mtrie.MForest, storableNodes []*sequencer.StorableNode, storableTries []*sequencer.StorableTrie) error {
-	forestSequencing := &sequencer.MForestSequencing{Nodes: storableNodes, Tries: storableTries}
+func loadIntoForest(forest *mtrie.MForest, forestSequencing *sequencer.MForestSequencing) error {
 	tries, err := sequencer.RebuildTries(forestSequencing)
 	if err != nil {
 		return err
