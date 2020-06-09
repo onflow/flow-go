@@ -358,14 +358,9 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 	}
 
 	for height := sealed.Height; height < final.Height; height++ {
-		//TODO suggested fix for #3999
-		// get the execution result for the block at this height
-		// if no seal exists for this ER in the DB, nor in the mempool:
-		//   create a new seal and add it to mempool
 
-		// TODO hard-coded
 		// stop searching if we would overflow the seal mempool
-		if int(e.seals.Size())+len(results) >= 1000 {
+		if e.seals.Size()+uint(len(results)) >= e.seals.Limit() {
 			return results, nil
 		}
 
@@ -379,7 +374,12 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 		// get the execution result for the block at this height
 		result, err := e.resultsDB.ByBlockID(header.ID())
 		if err != nil {
-			break
+			e.log.Error().
+				Err(err).
+				Uint64("block_height", height).
+				Hex("block_id", logging.ID(header.ID())).
+				Msg("could not get execution result")
+			continue
 		}
 		results = append(results, result)
 	}
@@ -390,9 +390,8 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 	// go through all results and check which ones we have enough approvals for
 	for _, result := range e.results.All() {
 
-		// TODO hard-coded
 		// stop searching if we would overflow the seal mempool
-		if int(e.seals.Size())+len(results) >= 1000 {
+		if e.seals.Size()+uint(len(results)) >= e.seals.Limit() {
 			return results, nil
 		}
 
