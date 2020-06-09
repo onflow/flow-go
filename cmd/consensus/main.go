@@ -34,6 +34,7 @@ import (
 	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/mempool/ejectors"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
@@ -122,7 +123,10 @@ func main() {
 			return err
 		}).
 		Module("block seals mempool", func(node *cmd.FlowNodeBuilder) error {
-			seals, err = stdmap.NewSeals(sealLimit)
+			// use a custom ejector so we don't eject seals that would break
+			// the chain of seals
+			ejector := ejectors.NewLatestSeal(node.Storage.Headers)
+			seals, err = stdmap.NewSeals(sealLimit, stdmap.WithEject(ejector.Eject))
 			return err
 		}).
 		Module("consensus node metrics", func(node *cmd.FlowNodeBuilder) error {
