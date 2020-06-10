@@ -168,6 +168,11 @@ func (b *Backend) Size() uint {
 	return b.Backdata.Size()
 }
 
+// Limit returns the maximum number of items allowed in the backend.
+func (b *Backend) Limit() uint {
+	return b.limit
+}
+
 // All returns all entities from the pool.
 func (b *Backend) All() []flow.Entity {
 	b.RLock()

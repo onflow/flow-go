@@ -34,10 +34,12 @@ import (
 	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/mempool/ejectors"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
 func main() {
@@ -121,7 +123,10 @@ func main() {
 			return err
 		}).
 		Module("block seals mempool", func(node *cmd.FlowNodeBuilder) error {
-			seals, err = stdmap.NewSeals(sealLimit)
+			// use a custom ejector so we don't eject seals that would break
+			// the chain of seals
+			ejector := ejectors.NewLatestSeal(node.Storage.Headers)
+			seals, err = stdmap.NewSeals(sealLimit, stdmap.WithEject(ejector.Eject))
 			return err
 		}).
 		Module("consensus node metrics", func(node *cmd.FlowNodeBuilder) error {
@@ -132,8 +137,15 @@ func main() {
 			mainMetrics = metrics.NewHotstuffCollector(flow.GetChainID())
 			return nil
 		}).
+		Module("database migration", func(node *cmd.FlowNodeBuilder) error {
+			node.Logger.Info().Msg("starting execution result index migration...")
+			err := operation.IndexExecutionResultsByBlockID(node.DB)
+			node.Logger.Info().Msg("finished execution result index migration...")
+			return err
+		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			resultsDB := bstorage.NewExecutionResults(node.DB)
+			sealsDB := bstorage.NewSeals(node.Metrics.Cache, node.DB)
 			match, err := matching.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -142,6 +154,7 @@ func main() {
 				node.State,
 				node.Me,
 				resultsDB,
+				sealsDB,
 				node.Storage.Headers,
 				results,
 				receipts,
