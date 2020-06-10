@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
@@ -19,6 +21,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
+	realstorage "github.com/dapperlabs/flow-go/storage"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -187,30 +190,97 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	exeEventResp := execution.GetTransactionResultResponse{
 		Events: nil,
 	}
-	// execution node returns an empty list of events each time
-	suite.execClient.On("GetTransactionResult", ctx, &exeEventReq).Return(&exeEventResp, nil)
 
 	handler := NewHandler(suite.log, suite.state, suite.execClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions)
 	req := &access.GetTransactionRequest{
 		Id: txID[:],
 	}
 
-	// first call - when block under test is ahead of head
+	// Successfully return empty event list
+	suite.execClient.On("GetTransactionResult", ctx, &exeEventReq).Return(&exeEventResp, status.Errorf(codes.NotFound, "not found")).Once()
+	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
 	resp, err := handler.GetTransactionResult(ctx, req)
 	suite.checkResponse(resp, err)
 
 	// status should be finalized since the sealed blocks is smaller in height
 	suite.Assert().Equal(entities.TransactionStatus_FINALIZED, resp.GetStatus())
 
+	// Successfully return empty event list from here on
+	suite.execClient.On("GetTransactionResult", ctx, &exeEventReq).Return(&exeEventResp, nil)
+	// second call - when block under test's height is greater height than the sealed head
+	resp, err = handler.GetTransactionResult(ctx, req)
+	suite.checkResponse(resp, err)
+
+	// status should be executed since no `NotFound` error in the `GetTransactionResult` call
+	suite.Assert().Equal(entities.TransactionStatus_EXECUTED, resp.GetStatus())
+
 	// now let the head block be finalized
 	headBlock.Header.Height = block.Header.Height + 1
 
-	// second call - when block under test is behind head
+	// third call - when block under test's height is less than sealed head's height
 	resp, err = handler.GetTransactionResult(ctx, req)
 	suite.checkResponse(resp, err)
 
 	// status should be sealed since the sealed blocks is greater in height
 	suite.Assert().Equal(entities.TransactionStatus_SEALED, resp.GetStatus())
+
+	// now go far into the future
+	headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry + 1
+
+	// fourth call - when block under test's height so much less than the head's height that it's considered expired,
+	// but since there is a execution result, means it should retain it's sealed status
+	resp, err = handler.GetTransactionResult(ctx, req)
+	suite.checkResponse(resp, err)
+
+	// status should be expired since
+	suite.Assert().Equal(entities.TransactionStatus_SEALED, resp.GetStatus())
+
+	suite.assertAllExpectations()
+}
+
+// TestTransactionExpiredStatusTransition tests that the status of transaction changes from Unknown to Expired
+// when enough blocks pass
+func (suite *Suite) TestTransactionExpiredStatusTransition() {
+
+	ctx := context.Background()
+	collection := unittest.CollectionFixture(1)
+	transactionBody := collection.Transactions[0]
+	block := unittest.BlockFixture()
+	block.Header.Height = 2
+	transactionBody.SetReferenceBlockID(block.ID())
+	headBlock := unittest.BlockFixture()
+	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
+	suite.snapshot.On("Head").Return(headBlock.Header, nil)
+	snapshotAtBlock := new(protocol.Snapshot)
+	snapshotAtBlock.On("Head").Return(block.Header, nil)
+	suite.state.On("AtBlockID", block.ID()).Return(snapshotAtBlock, nil)
+
+	// transaction storage returns the corresponding transaction
+	suite.transactions.On("ByID", transactionBody.ID()).Return(transactionBody, nil)
+	// collection storage returns a not found error
+	suite.collections.On("LightByTransactionID", transactionBody.ID()).Return(nil, realstorage.ErrNotFound)
+
+	txID := transactionBody.ID()
+
+	handler := NewHandler(suite.log, suite.state, suite.execClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions)
+	req := &access.GetTransactionRequest{
+		Id: txID[:],
+	}
+
+	// first call - referenced block isn't known yet, so should return pending status
+	resp, err := handler.GetTransactionResult(ctx, req)
+	suite.checkResponse(resp, err)
+
+	suite.Assert().Equal(entities.TransactionStatus_PENDING, resp.GetStatus())
+
+	// now go far into the future
+	headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry + 1
+
+	// second call - reference block is now very far behind, and should be considered expired
+	resp, err = handler.GetTransactionResult(ctx, req)
+	suite.checkResponse(resp, err)
+
+	suite.Assert().Equal(entities.TransactionStatus_EXPIRED, resp.GetStatus())
 
 	suite.assertAllExpectations()
 }
