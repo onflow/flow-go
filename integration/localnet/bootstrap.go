@@ -217,6 +217,12 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 		panic(err)
 	}
 
+	profilerdir := "./" + path.Join(ProfilerDir, container.Role.String(), container.NodeID.String())
+	err = os.MkdirAll(profilerdir, 0755)
+	if err != nil && !os.IsExist(err) {
+		panic(err)
+	}
+
 	service := Service{
 		Image: fmt.Sprintf("localnet-%s", container.Role),
 		Command: []string{
@@ -231,7 +237,7 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 		},
 		Volumes: []string{
 			fmt.Sprintf("%s:/bootstrap", BootstrapDir),
-			fmt.Sprintf("%s:/profiler", ProfilerDir),
+			fmt.Sprintf("%s:/profiler", profilerdir),
 			fmt.Sprintf("%s:/flowdb", datadir),
 		},
 		Environment: []string{
