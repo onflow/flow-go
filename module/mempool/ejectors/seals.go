@@ -1,8 +1,6 @@
 package ejectors
 
 import (
-	"errors"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
 )
@@ -27,9 +25,6 @@ func (ls *LatestSeal) Eject(entities map[flow.Identifier]flow.Entity) (flow.Iden
 
 	for id := range entities {
 		block, err := ls.headers.ByBlockID(id)
-		if errors.Is(err, storage.ErrNotFound) {
-			return id, entities[id]
-		}
 		if err != nil {
 			continue
 		}
