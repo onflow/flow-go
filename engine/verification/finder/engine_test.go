@@ -158,14 +158,14 @@ func (suite *FinderEngineTestSuite) TestHandleReceipt_Duplicate() {
 	suite.processedResultIDs.On("Has", suite.receipt.ExecutionResult.ID()).Return(false).Once()
 
 	// mocks adding receipt to the receipts mempool returns a false result (i.e., a duplicate exists)
-	suite.receipts.On("Add", suite.receipt).Return(false).Once()
+	suite.receipts.On("Add", suite.pendingReceipt).Return(false).Once()
 
 	// sends receipt to finder engine
 	err := e.Process(suite.execIdentity.NodeID, suite.receipt)
 	require.NoError(suite.T(), err)
 
 	// should not be any attempt on sending result to match engine
-	suite.matchEng.AssertNotCalled(suite.T(), "ProcessLocal", suite.receipt.ExecutionResult)
+	suite.matchEng.AssertNotCalled(suite.T(), "Process", testifymock.Anything, testifymock.Anything)
 
 	suite.receipts.AssertExpectations(suite.T())
 	suite.processedResultIDs.AssertExpectations(suite.T())
