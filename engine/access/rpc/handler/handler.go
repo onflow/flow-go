@@ -161,6 +161,10 @@ func (h *Handler) GetNetworkParameters(_ context.Context, _ *access.GetNetworkPa
 	}, nil
 }
 
+func (h *Handler) NotifyFinalizedBlockHeight(height uint64) {
+	h.retry.Retry(height)
+}
+
 func convertStorageError(err error) error {
 	if errors.Is(err, storage.ErrNotFound) {
 		return status.Errorf(codes.NotFound, "not found: %v", err)

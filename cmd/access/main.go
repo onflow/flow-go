@@ -37,6 +37,7 @@ func main() {
 		receiptLimit    uint
 		ingestEng       *ingestion.Engine
 		rpcConf         rpc.Config
+		rpcEng          *rpc.Engine
 		collectionRPC   access.AccessAPIClient
 		executionRPC    execution.ExecutionAPIClient
 		err             error
@@ -82,8 +83,12 @@ func main() {
 			conCache = buffer.NewPendingBlocks()
 			return nil
 		}).
+		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			rpcEng = rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions)
+			return rpcEng, nil
+		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions)
+			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, rpcEng)
 			return ingestEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -141,10 +146,6 @@ func main() {
 			}
 
 			return follower.WithSynchronization(sync), nil
-		}).
-		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions)
-			return rpcEng, nil
 		}).
 		Run()
 }

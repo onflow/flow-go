@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"fmt"
 	"net"
 
 	"github.com/rs/zerolog"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/access/rpc/handler"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	grpcutils "github.com/dapperlabs/flow-go/utils/grpc"
@@ -78,6 +80,29 @@ func (e *Engine) Ready() <-chan struct{} {
 // It sends a signal to stop the gRPC server, then closes the channel.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(e.server.GracefulStop)
+}
+
+// SubmitLocal submits an event originating on the local node.
+func (e *Engine) SubmitLocal(event interface{}) {
+	e.unit.Launch(func() {
+		err := e.process(event)
+		if err != nil {
+			e.log.Error().Err(err).Msg("could not process submitted event")
+		}
+	})
+}
+
+// process processes the given ingestion engine event. Events that are given
+// to this function originate within the expulsion engine on the node with the
+// given origin ID.
+func (e *Engine) process(event interface{}) error {
+	switch entity := event.(type) {
+	case *flow.Block:
+		e.handler.NotifyFinalizedBlockHeight(entity.Header.Height)
+		return nil
+	default:
+		return fmt.Errorf("invalid event type (%T)", event)
+	}
 }
 
 // serve starts the gRPC server .

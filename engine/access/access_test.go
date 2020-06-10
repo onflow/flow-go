@@ -21,6 +21,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/access/ingestion"
 	accessmock "github.com/dapperlabs/flow-go/engine/access/mock"
+	"github.com/dapperlabs/flow-go/engine/access/rpc"
 	"github.com/dapperlabs/flow-go/engine/access/rpc/handler"
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -71,14 +72,17 @@ func (suite *Suite) SetupTest() {
 func (suite *Suite) TestSendAndGetTransaction() {
 
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+		referenceBlock := unittest.BlockHeaderFixture()
 		transaction := unittest.TransactionFixture()
+		transaction.SetReferenceBlockID(referenceBlock.ID())
 
 		// create storage
 		metrics := metrics.NewNoopCollector()
 		transactions := storage.NewTransactions(metrics, db)
 		collections := storage.NewCollections(db, transactions)
 		handler := handler.NewHandler(suite.log, suite.state, nil, suite.collClient, nil, nil, collections, transactions)
-
+		suite.state.On("AtBlockID", referenceBlock.ID()).Return(suite.snapshot, nil)
+		suite.snapshot.On("Head").Return(&referenceBlock, nil).Once()
 		expected := convert.TransactionToMessage(transaction.TransactionBody)
 		sendReq := &access.SendTransactionRequest{
 			Transaction: expected,
@@ -217,8 +221,10 @@ func (suite *Suite) TestGetSealedTransaction() {
 		transactions := storage.NewTransactions(metrics, db)
 		collections := storage.NewCollections(db, transactions)
 
+		rpcEng := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions)
+
 		// create the ingest engine
-		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, blocks, headers, collections, transactions)
+		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, blocks, headers, collections, transactions, rpcEng)
 		require.NoError(suite.T(), err)
 
 		// create the handler (called by the grpc engine)
