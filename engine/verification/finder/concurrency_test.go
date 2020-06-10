@@ -110,7 +110,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	requestInterval := uint(1000)
 	failureThreshold := uint(2)
 	matchEng, matchEngWG := SetupMockMatchEng(t, results)
-	assigner := utils.NewMockAssigner(verID.NodeID, utils.IsAssigned)
+	assigner := utils.NewMockAssigner(verID.NodeID, IsAssigned)
 
 	// creates a verification node with a real finder engine, and mock matching engine.
 	verNode := testutil.VerificationNode(t, hub, verID, identities,
@@ -255,4 +255,9 @@ func SetupMockMatchEng(t testing.TB, ers []flow.ExecutionResult) (*network.Engin
 		Return(nil)
 
 	return eng, &wg
+}
+
+// IsAssigned is a helper function that returns true for the even indices in [0, chunkNum-1]
+func IsAssigned(index uint64) bool {
+	return index%2 == 0
 }
