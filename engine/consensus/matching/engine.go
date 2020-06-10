@@ -455,6 +455,11 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 		return fmt.Errorf("could not store sealing result: %w", err)
 	}
+
+	//TODO to emulate the state of devnet, we insert but don't index results,
+	// and we discard the seal. So we exit here after inserting the result.
+	return nil
+
 	err = e.resultsDB.Index(result.BlockID, result.ID())
 	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 		return fmt.Errorf("could not index sealing result: %w", err)
