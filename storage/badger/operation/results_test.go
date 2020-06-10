@@ -3,6 +3,7 @@
 package operation
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -10,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -38,6 +40,11 @@ func TestResults_MassIndex(t *testing.T) {
 			unindexed[i] = unittest.ExecutionResultFixture()
 			err := db.Update(InsertExecutionResult(unindexed[i]))
 			require.Nil(t, err)
+
+			// confirm these entities aren't indexed
+			var resID flow.Identifier
+			err = db.View(LookupExecutionResult(unindexed[i].BlockID, &resID))
+			assert.True(t, errors.Is(err, storage.ErrNotFound))
 		}
 
 		// insert some results that are indexed
