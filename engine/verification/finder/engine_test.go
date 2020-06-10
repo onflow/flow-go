@@ -184,10 +184,10 @@ func (suite *FinderEngineTestSuite) TestHandleReceipt_Processed() {
 	require.NoError(suite.T(), err)
 
 	// should not be any attempt on sending result to match engine
-	suite.matchEng.AssertNotCalled(suite.T(), "ProcessLocal", suite.receipt.ExecutionResult)
+	suite.matchEng.AssertNotCalled(suite.T(), "Process", testifymock.Anything, testifymock.Anything)
 
 	// should not be any attempt on storing receipt in mempools
-	suite.receipts.AssertNotCalled(suite.T(), "Add", suite.pendingReceipt)
+	suite.receipts.AssertNotCalled(suite.T(), "Add", testifymock.Anything)
 
 	suite.processedResultIDs.AssertExpectations(suite.T())
 }
