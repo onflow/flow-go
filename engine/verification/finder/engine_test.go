@@ -210,10 +210,10 @@ func (suite *FinderEngineTestSuite) TestHandleReceipt_BlockMissing() {
 	suite.headerStorage.On("ByBlockID", suite.block.ID()).Return(nil, fmt.Errorf("block not available")).Once()
 
 	// should not be any attempt on sending result to match engine
-	suite.matchEng.AssertNotCalled(suite.T(), "Process", suite.execIdentity.NodeID, suite.receipt.ExecutionResult)
+	suite.matchEng.AssertNotCalled(suite.T(), "Process", testifymock.Anything, testifymock.Anything)
 
 	// should not be any attempt on marking receipt as processed
-	suite.processedResultIDs.AssertNotCalled(suite.T(), "Add", suite.receipt.ExecutionResult.ID())
+	suite.processedResultIDs.AssertNotCalled(suite.T(), "Add", testifymock.Anything)
 
 	// sends receipt to finder engine
 	err := e.Process(suite.execIdentity.NodeID, suite.receipt)
