@@ -134,8 +134,6 @@ func main() {
 			return providerEngine, err
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			// Only needed for ingestion engine
-			collections := badger.NewCollections(node.DB)
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
 			events = badger.NewEvents(node.DB)
@@ -147,7 +145,7 @@ func main() {
 				node.State,
 				node.Storage.Blocks,
 				node.Storage.Payloads,
-				collections,
+				node.Storage.Collections,
 				events,
 				txResults,
 				computationManager,

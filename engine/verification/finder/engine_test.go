@@ -1,6 +1,7 @@
 package finder_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -31,6 +32,8 @@ type FinderEngineTestSuite struct {
 	// mock mempool for receipts
 	receipts *mempool.Receipts
 
+	// mock mempool for processed result IDs
+	processedResults *mempool.Identifiers
 	// mock mempool for header storage of blocks
 	headerStorage *storage.Headers
 	// resources fixtures
@@ -62,6 +65,8 @@ func (suite *FinderEngineTestSuite) SetupTest() {
 	suite.me = &module.Local{}
 	suite.headerStorage = &storage.Headers{}
 	suite.receipts = &mempool.Receipts{}
+	suite.processedResults = &mempool.Identifiers{}
+	suite.matchEng = &network.Engine{}
 
 	// generates an execution result with a single collection, chunk, and transaction.
 	completeER := utils.LightExecutionResultFixture(1)
@@ -92,7 +97,8 @@ func (suite *FinderEngineTestSuite) TestNewFinderEngine() *finder.Engine {
 		suite.me,
 		suite.matchEng,
 		suite.receipts,
-		suite.headerStorage)
+		suite.headerStorage,
+		suite.processedResults)
 	require.Nil(suite.T(), err, "could not create finder engine")
 
 	suite.net.AssertExpectations(suite.T())
@@ -101,16 +107,144 @@ func (suite *FinderEngineTestSuite) TestNewFinderEngine() *finder.Engine {
 }
 
 // TestHandleReceipt_HappyPath evaluates that handling a receipt that is not duplicate,
-// and its result has not been processed yet ends by adding to receipt mempool.
+// and its result has not been processed yet ends by:
+// - sending its result to match engine.
+// - marking its result as processed.
+// - removing it from mempool.
 func (suite *FinderEngineTestSuite) TestHandleReceipt_HappyPath() {
 	e := suite.TestNewFinderEngine()
 
+	// mocks result has not yet processed
+	suite.processedResults.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
+
 	// mocks adding receipt to the receipts mempool
 	suite.receipts.On("Add", suite.receipt).Return(true).Once()
+
+	// mocks block associated with receipt
+	suite.headerStorage.On("ByBlockID", suite.block.ID()).Return(&flow.Header{}, nil).Once()
+
+	// mocks successful submission to match engine
+	suite.matchEng.On("ProcessLocal", &suite.receipt.ExecutionResult).Return(nil).Once()
+
+	// mocks marking receipt as processed
+	suite.processedResults.On("Add", suite.receipt.ExecutionResult.ID()).Return(true)
+
+	// mocks receipt clean up after result is processed
+	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt})
+	suite.receipts.On("Rem", suite.receipt.ID()).Return(true)
 
 	// sends receipt to finder engine
 	err := e.Process(suite.execIdentity.NodeID, suite.receipt)
 	require.NoError(suite.T(), err)
 
 	suite.receipts.AssertExpectations(suite.T())
+	suite.headerStorage.AssertExpectations(suite.T())
+	suite.matchEng.AssertExpectations(suite.T())
+}
+
+// TestHandleReceipt_Duplicate evaluates that handling a duplicate receipt is dropped
+// without attempting to process it.
+func (suite *FinderEngineTestSuite) TestHandleReceipt_Duplicate() {
+	e := suite.TestNewFinderEngine()
+
+	// mocks result has not yet processed
+	suite.processedResults.On("Has", suite.receipt.ExecutionResult.ID()).Return(false).Once()
+
+	// mocks adding receipt to the receipts mempool returns a false result (i.e., a duplicate exists)
+	suite.receipts.On("Add", suite.receipt).Return(false).Once()
+
+	// sends receipt to finder engine
+	err := e.Process(suite.execIdentity.NodeID, suite.receipt)
+	require.NoError(suite.T(), err)
+
+	// should not be any attempt on sending result to match engine
+	suite.matchEng.AssertNotCalled(suite.T(), "ProcessLocal", suite.receipt.ExecutionResult)
+
+	suite.receipts.AssertExpectations(suite.T())
+	suite.processedResults.AssertExpectations(suite.T())
+}
+
+// TestHandleReceipt_Processed evaluates that handling an already processed receipt is dropped
+// without attempting to add it to the mempools.
+func (suite *FinderEngineTestSuite) TestHandleReceipt_Processed() {
+	e := suite.TestNewFinderEngine()
+
+	// mocks result processed
+	suite.processedResults.On("Has", suite.receipt.ExecutionResult.ID()).Return(true).Once()
+
+	// sends receipt to finder engine
+	err := e.Process(suite.execIdentity.NodeID, suite.receipt)
+	require.NoError(suite.T(), err)
+
+	// should not be any attempt on sending result to match engine
+	suite.matchEng.AssertNotCalled(suite.T(), "ProcessLocal", suite.receipt.ExecutionResult)
+
+	// should not be any attempt on storing receipt in mempools
+	suite.receipts.AssertNotCalled(suite.T(), "Add", suite.receipt)
+
+	suite.processedResults.AssertExpectations(suite.T())
+}
+
+// TestHandleReceipt_BlockMissing evaluates that handling a receipt that its
+// corresponding block is not available yet results in:
+// - storing receipt in receipts mempool
+// - no invocation of match engine
+// - no attempt on marking its result as processed
+func (suite *FinderEngineTestSuite) TestHandleReceipt_BlockMissing() {
+	e := suite.TestNewFinderEngine()
+
+	// mocks result has not yet processed
+	suite.processedResults.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
+
+	// mocks adding receipt to the receipts mempool
+	suite.receipts.On("Add", suite.receipt).Return(true).Once()
+
+	// mocks block associated with receipt missing
+	suite.headerStorage.On("ByBlockID", suite.block.ID()).Return(nil, fmt.Errorf("block not available")).Once()
+
+	// should not be any attempt on sending result to match engine
+	suite.matchEng.AssertNotCalled(suite.T(), "ProcessLocal", suite.receipt.ExecutionResult)
+
+	// should not be any attempt on marking receipt as processed
+	suite.processedResults.AssertNotCalled(suite.T(), "Add", suite.receipt)
+
+	// sends receipt to finder engine
+	err := e.Process(suite.execIdentity.NodeID, suite.receipt)
+	require.NoError(suite.T(), err)
+
+	suite.receipts.AssertExpectations(suite.T())
+	suite.headerStorage.AssertExpectations(suite.T())
+	suite.processedResults.AssertExpectations(suite.T())
+}
+
+// TestHandleReceipt_BlockMissing evaluates that handling a receipt that its
+// corresponding block is not available yet results in:
+// - storing receipt in receipts mempool
+// - no invocation of match engine
+// - no attempt on marking its result as processed
+func (suite *FinderEngineTestSuite) TestHandleReceipt_ResultsCleanup() {
+	e := suite.TestNewFinderEngine()
+
+	// mocks result has not yet processed
+	suite.processedResults.On("Has", suite.receipt.ExecutionResult.ID()).Return(false)
+
+	// mocks adding receipt to the receipts mempool
+	suite.receipts.On("Add", suite.receipt).Return(true).Once()
+
+	// mocks block associated with receipt missing
+	suite.headerStorage.On("ByBlockID", suite.block.ID()).Return(nil, fmt.Errorf("block not available")).Once()
+
+	// should not be any attempt on sending result to match engine
+	suite.matchEng.AssertNotCalled(suite.T(), "ProcessLocal", suite.receipt.ExecutionResult)
+
+	// should not be any attempt on marking receipt as processed
+	suite.processedResults.AssertNotCalled(suite.T(), "Add", suite.receipt)
+
+	// sends receipt to finder engine
+	err := e.Process(suite.execIdentity.NodeID, suite.receipt)
+	require.NoError(suite.T(), err)
+
+	suite.receipts.AssertExpectations(suite.T())
+	suite.headerStorage.AssertExpectations(suite.T())
+	suite.processedResults.AssertExpectations(suite.T())
 }

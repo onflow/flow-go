@@ -3,19 +3,24 @@ package badger
 import (
 	"fmt"
 
+	"github.com/dgraph-io/badger/v2"
+
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
 type Payloads struct {
+	db         *badger.DB
 	index      *Index
 	identities *Identities
 	guarantees *Guarantees
 	seals      *Seals
 }
 
-func NewPayloads(index *Index, identities *Identities, guarantees *Guarantees, seals *Seals) *Payloads {
+func NewPayloads(db *badger.DB, index *Index, identities *Identities, guarantees *Guarantees, seals *Seals) *Payloads {
 
 	p := &Payloads{
+		db:         db,
 		index:      index,
 		identities: identities,
 		guarantees: guarantees,
@@ -26,38 +31,43 @@ func NewPayloads(index *Index, identities *Identities, guarantees *Guarantees, s
 }
 
 func (p *Payloads) Store(blockID flow.Identifier, payload *flow.Payload) error {
+	return operation.RetryOnConflict(p.db.Update, p.storeTx(blockID, payload))
+}
 
-	// make sure all payload entities are stored
-	for _, identity := range payload.Identities {
-		err := p.identities.Store(identity)
-		if err != nil {
-			return fmt.Errorf("could not store identity: %w", err)
+func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		// make sure all payload entities are stored
+		for _, identity := range payload.Identities {
+			err := p.identities.storeTx(identity)(tx)
+			if err != nil {
+				return fmt.Errorf("could not store identity: %w", err)
+			}
 		}
-	}
 
-	// make sure all payload guarantees are stored
-	for _, guarantee := range payload.Guarantees {
-		err := p.guarantees.Store(guarantee)
-		if err != nil {
-			return fmt.Errorf("could not store guarantee: %w", err)
+		// make sure all payload guarantees are stored
+		for _, guarantee := range payload.Guarantees {
+			err := p.guarantees.storeTx(guarantee)(tx)
+			if err != nil {
+				return fmt.Errorf("could not store guarantee: %w", err)
+			}
 		}
-	}
 
-	// make sure all payload seals are stored
-	for _, seal := range payload.Seals {
-		err := p.seals.Store(seal)
-		if err != nil {
-			return fmt.Errorf("could not store seal: %w", err)
+		// make sure all payload seals are stored
+		for _, seal := range payload.Seals {
+			err := p.seals.storeTx(seal)(tx)
+			if err != nil {
+				return fmt.Errorf("could not store seal: %w", err)
+			}
 		}
-	}
 
-	// store the index
-	err := p.index.Store(blockID, payload.Index())
-	if err != nil {
-		return fmt.Errorf("could not store index: %w", err)
-	}
+		// store the index
+		err := p.index.storeTx(blockID, payload.Index())(tx)
+		if err != nil {
+			return fmt.Errorf("could not store index: %w", err)
+		}
 
-	return nil
+		return nil
+	}
 }
 
 func (p *Payloads) ByBlockID(blockID flow.Identifier) (*flow.Payload, error) {

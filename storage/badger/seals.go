@@ -20,8 +20,10 @@ type Seals struct {
 
 func NewSeals(collector module.CacheMetrics, db *badger.DB) *Seals {
 
+	s := &Seals{db: db}
+
 	store := func(sealID flow.Identifier, seal interface{}) error {
-		return operation.RetryOnConflict(db.Update, operation.SkipDuplicates(operation.InsertSeal(sealID, seal.(*flow.Seal))))
+		return operation.RetryOnConflict(db.Update, s.storeTx(seal.(*flow.Seal)))
 	}
 
 	retrieve := func(sealID flow.Identifier) (interface{}, error) {
@@ -30,21 +32,23 @@ func NewSeals(collector module.CacheMetrics, db *badger.DB) *Seals {
 		return &seal, err
 	}
 
-	s := &Seals{
-		db: db,
-		cache: newCache(collector,
-			withLimit(flow.DefaultTransactionExpiry+100),
-			withStore(store),
-			withRetrieve(retrieve),
-			withResource(metrics.ResourceSeal),
-		),
-	}
+	s.cache = newCache(collector,
+		withLimit(flow.DefaultTransactionExpiry+100),
+		withStore(store),
+		withRetrieve(retrieve),
+		withResource(metrics.ResourceSeal))
 
 	return s
 }
 
 func (s *Seals) Store(seal *flow.Seal) error {
 	return s.cache.Put(seal.ID(), seal)
+}
+
+func (s *Seals) storeTx(seal *flow.Seal) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		return operation.SkipDuplicates(operation.InsertSeal(seal.ID(), seal))(tx)
+	}
 }
 
 func (s *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {

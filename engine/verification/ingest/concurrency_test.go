@@ -200,9 +200,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, lightIng
 	// to the verifier exactly once.
 	verifierEng, verifierEngWG := SetupMockVerifierEng(t, vChunks)
 	assigner := utils.NewMockAssigner(verID.NodeID, IsAssigned)
-	verNode := testutil.VerificationNode(t, hub, verID, identities, assigner, requestInterval, failureThreshold,
-		lightIngest,
-		testutil.WithVerifierEngine(verifierEng))
+	verNode := testutil.VerificationNode(t, hub, verID, identities, assigner, requestInterval, failureThreshold, lightIngest, false, testutil.WithVerifierEngine(verifierEng))
 
 	// starts the ingest engine
 	if lightIngest {
