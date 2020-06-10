@@ -26,6 +26,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/engine/verification/finder"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
+	"github.com/dapperlabs/flow-go/engine/verification/match"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
@@ -316,7 +317,7 @@ func WithVerifierEngine(eng network.Engine) VerificationOpt {
 
 func WithMatchEngine(eng network.Engine) VerificationOpt {
 	return func(node *mock.VerificationNode) {
-		node.MatchEngine = eng.(*matching.Engine)
+		node.MatchEngine = eng.(*match.Engine)
 	}
 }
 
@@ -408,7 +409,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.MatchEngine == nil {
-		node.MatchEngine, err = matching.New(node.Log,
+		node.MatchEngine, err = match.New(node.Log,
 			node.Metrics,
 			node.Metrics,
 			node.Net,
