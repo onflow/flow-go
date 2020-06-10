@@ -60,3 +60,7 @@ const DefaultMaxGasLimit = 9999
 func GenesisTime() time.Time {
 	return time.Date(2018, time.December, 19, 22, 32, 30, 42, time.UTC)
 }
+
+// DefaultValueLogGCFrequency is the default frequency in blocks that we call the
+// badger value log GC. Equivalent to 10 mins for a 1 second block time
+const DefaultValueLogGCFrequency = 10 * 60
