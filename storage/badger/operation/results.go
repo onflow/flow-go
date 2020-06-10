@@ -2,6 +2,7 @@ package operation
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -55,6 +56,9 @@ func IndexExecutionResultsByBlockID(db *badger.DB) error {
 				// skip already indexed entities
 				if errors.Is(err, storage.ErrAlreadyExists) {
 					return nil
+				}
+				if err != nil {
+					return fmt.Errorf("could not index execution result: %w", err)
 				}
 				return nil
 			}
