@@ -2,7 +2,6 @@ package finder
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/rs/zerolog"
 
@@ -18,14 +17,13 @@ import (
 )
 
 type Engine struct {
-	unit              *engine.Unit
-	log               zerolog.Logger
-	me                module.Local
-	match             network.Engine
-	receipts          mempool.PendingReceipts // used to keep the receipts as mempool
-	headerStorage     storage.Headers         // used to check block existence before verifying
-	processedResult   mempool.Identifiers     // used to keep track of the processed results
-	checkResourceLock sync.Mutex              // used to serialize checking receipts
+	unit            *engine.Unit
+	log             zerolog.Logger
+	me              module.Local
+	match           network.Engine
+	receipts        mempool.Receipts    // used to keep the receipts as mempool
+	headerStorage   storage.Headers     // used to check block existence before verifying
+	processedResult mempool.Identifiers // used to keep track of the processed results
 }
 
 func New(
@@ -160,6 +158,7 @@ func (e *Engine) OnBlockIncorporated(*model.Block) {
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 func (e *Engine) OnFinalizedBlock(block *model.Block) {
+	// TODO only receipts referencing block should be checked #4028
 	e.checkReceipts(e.receipts.All())
 }
 
@@ -219,9 +218,9 @@ func (e *Engine) onResultProcessed(resultID flow.Identifier) {
 
 // checkReceipts receives a set of receipts and evaluates each of them
 // against being processable. If a receipt is processable, it gets processed.
-func (e *Engine) checkReceipts(receipts []*verification.PendingReceipt) {
-	e.checkResourceLock.Lock()
-	defer e.checkResourceLock.Unlock()
+func (e *Engine) checkReceipts(receipts []*flow.ExecutionReceipt) {
+	e.unit.Lock()
+	defer e.unit.Unlock()
 
 	for _, pr := range receipts {
 		if e.isProcessable(&pr.Receipt.ExecutionResult) {

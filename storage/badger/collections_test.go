@@ -7,13 +7,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/module/metrics"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestCollections(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		store := bstorage.NewCollections(db)
+
+		metrics := metrics.NewNoopCollector()
+		transactions := bstorage.NewTransactions(metrics, db)
+		store := bstorage.NewCollections(db, transactions)
 
 		// create a light collection with three transactions
 		expected := unittest.CollectionFixture(3).Light()
