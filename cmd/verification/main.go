@@ -27,6 +27,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/utils"
 )
 
 const (
@@ -196,7 +197,8 @@ func main() {
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rt := runtime.NewInterpreterRuntime()
-			vm, err := virtualmachine.New(rt)
+			// vm, err := virtualmachine.New(rt)
+			vm, err := virtualmachine.NewWithCache(rt, utils.NoopCache{})
 			if err != nil {
 				return nil, err
 			}

@@ -25,6 +25,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/ledger"
+	"github.com/dapperlabs/flow-go/utils"
 )
 
 func main() {
@@ -55,7 +56,8 @@ func main() {
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
-			vm, err := virtualmachine.New(rt)
+			// vm, err := virtualmachine.New(rt)
+			vm, err := virtualmachine.NewWithCache(rt, utils.NoopCache{})
 			if err != nil {
 				return err
 			}

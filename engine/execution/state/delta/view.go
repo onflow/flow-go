@@ -1,6 +1,9 @@
 package delta
 
 import (
+	"encoding/hex"
+	"fmt"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -84,6 +87,7 @@ func (v *View) NewChild() *View {
 // This function will return an error if it fails to read from the underlying
 // data source for this view.
 func (v *View) Get(key flow.RegisterID) (flow.RegisterValue, error) {
+	fmt.Println("RAMTIN view get:" + hex.EncodeToString(key))
 	value, exists := v.delta.Get(key)
 	if exists {
 		// every time we read a value (order preserving)
@@ -111,6 +115,7 @@ func (v *View) Get(key flow.RegisterID) (flow.RegisterValue, error) {
 
 // Set sets a register value in this view.
 func (v *View) Set(key flow.RegisterID, value flow.RegisterValue) {
+	fmt.Println("RAMTIN view set:" + hex.EncodeToString(key))
 	// every time we write something to delta (order preserving)
 	// we append the value to the end of the SpocksSecret byte slice
 	v.spockSecret = append(v.spockSecret, value...)

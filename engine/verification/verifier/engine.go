@@ -162,6 +162,8 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 	if chFault != nil {
 		switch chFault.(type) {
 		case *chmodels.CFMissingRegisterTouch:
+			// TODO raise challenge
+			e.log.Warn().Msg(chFault.String())
 		case *chmodels.CFNonMatchingFinalState:
 			// TODO raise challenge
 			e.log.Warn().Msg(chFault.String())

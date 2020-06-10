@@ -31,12 +31,14 @@ func fromString(key string) flow.RegisterID {
 //
 // This function will return nil if the given key has been deleted in this delta.
 func (d Delta) Get(key flow.RegisterID) (value flow.RegisterValue, exists bool) {
+	fmt.Println("RAMTIN delta get:" + hex.EncodeToString(key))
 	value, exists = d[toString(key)]
 	return
 }
 
 // Set records an update in this delta.
 func (d Delta) Set(key flow.RegisterID, value flow.RegisterValue) {
+	fmt.Println("RAMTIN delta set:" + hex.EncodeToString(key))
 	d[toString(key)] = value
 }
 

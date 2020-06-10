@@ -22,7 +22,7 @@ services:
   exporter:
     image: prom/node-exporter:latest
     ports:
-      - "9100:9100"
+      - "9101:9100"
     environment:
       - LOGSPOUT=ignore
 
