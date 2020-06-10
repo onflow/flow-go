@@ -19,6 +19,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/engine/verification/finder"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
@@ -130,4 +131,6 @@ type VerificationNode struct {
 	IngestEngine          *ingest.Engine
 	LightIngestEngine     *ingest.LightEngine // a lighter version of ingest engine
 	VerifierEngine        network.Engine
+	FinderEngine          *finder.Engine
+	MatchEngine           network.Engine
 }

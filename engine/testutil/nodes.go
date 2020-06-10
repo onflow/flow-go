@@ -24,6 +24,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
+	"github.com/dapperlabs/flow-go/engine/verification/finder"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -315,6 +316,12 @@ func WithVerifierEngine(eng network.Engine) VerificationOpt {
 	}
 }
 
+func WithMatchEngine(eng network.Engine) VerificationOpt {
+	return func(node *mock.VerificationNode) {
+		node.MatchEngine = eng
+	}
+}
+
 func VerificationNode(t testing.TB,
 	hub *stub.Hub,
 	identity *flow.Identity,
@@ -323,6 +330,7 @@ func VerificationNode(t testing.TB,
 	requestIntervalMs uint,
 	failureThreshold uint,
 	lightIngestEngine bool,
+	newArchitecture bool, // a temporary parameter to distinguish between old and new architecture
 	opts ...VerificationOpt) mock.VerificationNode {
 
 	var err error
@@ -401,7 +409,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	// creates a light ingest engine for the node if lightIngestEngine is set
-	if node.LightIngestEngine == nil && lightIngestEngine {
+	if node.LightIngestEngine == nil && lightIngestEngine && !newArchitecture {
 		node.LightIngestEngine, err = ingest.NewLightEngine(node.Log,
 			node.Net,
 			node.State,
@@ -425,7 +433,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	// otherwise, creates an (original) ingest engine for the node
-	if node.IngestEngine == nil && !lightIngestEngine {
+	if node.IngestEngine == nil && !lightIngestEngine && !newArchitecture {
 		node.IngestEngine, err = ingest.New(node.Log,
 			node.Net,
 			node.State,
@@ -447,6 +455,11 @@ func VerificationNode(t testing.TB,
 			requestIntervalMs,
 			failureThreshold,
 		)
+		require.Nil(t, err)
+	}
+
+	if node.FinderEngine == nil && newArchitecture {
+		node.FinderEngine, err = finder.New(node.Log, node.Net, node.Me, node.MatchEngine, node.AuthReceipts, node.Headers, node.IngestedResultIDs)
 		require.Nil(t, err)
 	}
 
