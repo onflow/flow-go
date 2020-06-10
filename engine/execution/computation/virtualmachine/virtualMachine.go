@@ -1,7 +1,9 @@
 package virtualmachine
 
 import (
+	"encoding/binary"
 	"fmt"
+	"math/rand"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
@@ -48,6 +50,12 @@ type virtualMachine struct {
 }
 
 func (vm *virtualMachine) NewBlockContext(header *flow.Header, blocks Blocks) BlockContext {
+	// Seed the random number generator with entropy created from the block header ID. The random number generator will
+	// be used by the UnsafeRandom function.
+	// TODO: replace with better source of randomness.
+	id := header.ID()
+	rand.Seed(int64(binary.BigEndian.Uint64(id[:])))
+
 	return &blockContext{
 		vm:     vm,
 		header: header,

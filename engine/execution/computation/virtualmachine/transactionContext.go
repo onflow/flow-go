@@ -2,11 +2,11 @@ package virtualmachine
 
 import (
 	"bytes"
-	"crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/rand"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -650,7 +650,7 @@ func DeductAccountCreationFeeTransaction() []byte {
 func DeductAccountCreationFeeWithWhitelistTransaction() []byte {
 	return []byte(fmt.Sprintf(`
 		import FlowServiceAccount from 0x%s
-	
+
 		transaction {
 			prepare(acct: AuthAccount) {
 				if !FlowServiceAccount.isAccountCreator(acct.address) {
