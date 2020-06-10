@@ -35,9 +35,10 @@ type Blocks interface {
 }
 
 type blockContext struct {
-	vm     *virtualMachine
-	header *flow.Header
-	blocks Blocks
+	vm              *virtualMachine
+	header          *flow.Header
+	blocks          Blocks
+	simpleAddresses bool
 }
 
 func (bc *blockContext) newTransactionContext(
@@ -63,7 +64,10 @@ func (bc *blockContext) newTransactionContext(
 		signatureVerificationEnabled:     true,
 		restrictedAccountCreationEnabled: true,
 		restrictedDeploymentEnabled:      true,
+		simpleAddresses:                  bc.simpleAddresses,
 	}
+
+	ctx.ledger.simpleAddresses = bc.simpleAddresses
 
 	for _, option := range options {
 		option(ctx)

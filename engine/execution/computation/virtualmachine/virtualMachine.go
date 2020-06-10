@@ -24,34 +24,52 @@ type VirtualMachine interface {
 }
 
 // New creates a new virtual machine instance with the provided runtime.
-func New(rt runtime.Runtime) (VirtualMachine, error) {
-	cache, err := NewLRUASTCache(MaxProgramASTCacheSize)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create vm ast cache, %w", err)
+func New(rt runtime.Runtime, options ...VirtualMachineOption) (VirtualMachine, error) {
+	vm := &virtualMachine{
+		rt: rt,
 	}
-	return &virtualMachine{
-		rt:    rt,
-		cache: cache,
-	}, nil
+
+	for _, option := range options {
+		option(vm)
+	}
+
+	if vm.cache == nil {
+		cache, err := NewLRUASTCache(MaxProgramASTCacheSize)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create vm ast cache, %w", err)
+		}
+		vm.cache = cache
+	}
+
+	return vm, nil
 }
 
-func NewWithCache(rt runtime.Runtime, cache ASTCache) (VirtualMachine, error) {
-	return &virtualMachine{
-		rt:    rt,
-		cache: cache,
-	}, nil
+type VirtualMachineOption func(*virtualMachine)
+
+func WithCache(cache ASTCache) VirtualMachineOption {
+	return func(ctx *virtualMachine) {
+		ctx.cache = cache
+	}
+}
+
+func WithSimpleAddresses(enabled bool) VirtualMachineOption {
+	return func(ctx *virtualMachine) {
+		ctx.simpleAddresses = enabled
+	}
 }
 
 type virtualMachine struct {
-	rt    runtime.Runtime
-	cache ASTCache
+	rt              runtime.Runtime
+	cache           ASTCache
+	simpleAddresses bool
 }
 
 func (vm *virtualMachine) NewBlockContext(header *flow.Header, blocks Blocks) BlockContext {
 	return &blockContext{
-		vm:     vm,
-		header: header,
-		blocks: blocks,
+		vm:              vm,
+		header:          header,
+		blocks:          blocks,
+		simpleAddresses: vm.simpleAddresses,
 	}
 }
 

@@ -37,6 +37,7 @@ type TransactionContext struct {
 	signatureVerificationEnabled     bool
 	restrictedAccountCreationEnabled bool
 	restrictedDeploymentEnabled      bool
+	simpleAddresses                  bool
 }
 
 type TransactionContextOption func(*TransactionContext)
@@ -640,7 +641,7 @@ func DeductAccountCreationFeeTransaction() []byte {
 func DeductAccountCreationFeeWithWhitelistTransaction() []byte {
 	return []byte(fmt.Sprintf(`
 		import FlowServiceAccount from 0x%s
-	
+
 		transaction {
 			prepare(acct: AuthAccount) {
 				if !FlowServiceAccount.isAccountCreator(acct.address) {
