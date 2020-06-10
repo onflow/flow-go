@@ -64,7 +64,7 @@ func (suite *FinderEngineTestSuite) SetupTest() {
 	suite.net = &module.Network{}
 	suite.me = &module.Local{}
 	suite.headerStorage = &storage.Headers{}
-	suite.receipts = &mempool.Receipts{}
+	suite.receipts = &mempool.PendingReceipts{}
 	suite.processedResults = &mempool.Identifiers{}
 	suite.matchEng = &network.Engine{}
 
