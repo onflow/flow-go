@@ -310,13 +310,13 @@ type VerificationOpt func(*mock.VerificationNode)
 
 func WithVerifierEngine(eng network.Engine) VerificationOpt {
 	return func(node *mock.VerificationNode) {
-		node.VerifierEngine = eng
+		node.VerifierEngine = eng.(*verifier.Engine)
 	}
 }
 
 func WithMatchEngine(eng network.Engine) VerificationOpt {
 	return func(node *mock.VerificationNode) {
-		node.MatchEngine = eng
+		node.MatchEngine = eng.(*matching.Engine)
 	}
 }
 

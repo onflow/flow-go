@@ -50,31 +50,31 @@ func TestHappyPath(t *testing.T) {
 			chunkCount:   2,
 			lightIngest:  true,
 		},
-		{
-			verNodeCount: 1,
-			chunkCount:   10,
-			lightIngest:  true,
-		},
-		{
-			verNodeCount: 2,
-			chunkCount:   2,
-			lightIngest:  true,
-		},
-		{
-			verNodeCount: 1,
-			chunkCount:   2,
-			lightIngest:  false,
-		},
-		{
-			verNodeCount: 1,
-			chunkCount:   10,
-			lightIngest:  false,
-		},
-		{
-			verNodeCount: 2,
-			chunkCount:   2,
-			lightIngest:  false,
-		},
+		//{
+		//	verNodeCount: 1,
+		//	chunkCount:   10,
+		//	lightIngest:  true,
+		//},
+		//{
+		//	verNodeCount: 2,
+		//	chunkCount:   2,
+		//	lightIngest:  true,
+		//},
+		//{
+		//	verNodeCount: 1,
+		//	chunkCount:   2,
+		//	lightIngest:  false,
+		//},
+		//{
+		//	verNodeCount: 1,
+		//	chunkCount:   10,
+		//	lightIngest:  false,
+		//},
+		//{
+		//	verNodeCount: 2,
+		//	chunkCount:   2,
+		//	lightIngest:  false,
+		//},
 	}
 
 	for _, tc := range testcases {
@@ -156,14 +156,12 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 	// verification node
 	verNodes := make([]mock2.VerificationNode, 0)
 	for _, verIdentity := range verIdentities {
-		verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold, lightIngest, false)
+		verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold, lightIngest, true)
 
-		// starts the ingest engine
-		if lightIngest {
-			<-verNode.LightIngestEngine.Ready()
-		} else {
-			<-verNode.IngestEngine.Ready()
-		}
+		// starts all the engines
+		<-verNode.FinderEngine.Ready()
+		<-verNode.MatchEngine.Ready()
+		<-verNode.VerifierEngine.Ready()
 
 		// assumes the verification node has received the block
 		err := verNode.Blocks.Store(completeER.Block)
@@ -172,63 +170,24 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 		verNodes = append(verNodes, verNode)
 	}
 
-	// light ingest engine does not interact with collection node
-	// but the current version of original ingest engine does
-	// TODO removing collection request from ORIGINAL ingest engine
-	// https://github.com/dapperlabs/flow-go/issues/3008
-	var colNode mock2.CollectionNode
-	var colNet *stub.Network
-	if !lightIngest {
-		// collection node
-		colNode = testutil.CollectionNode(t, hub, colIdentity, identities)
-		// injects the assigned collections into the collection node mempool
-		for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
-			if IsAssigned(chunk.Index) {
-				err := colNode.Collections.Store(completeER.Collections[chunk.Index])
-				assert.Nil(t, err)
-			}
-		}
-		net, ok := hub.GetNetwork(colIdentity.NodeID)
-		assert.True(t, ok)
-		colNet = net
-		colNet.StartConDev(100, true)
-	}
-
 	// mock execution node
 	exeNode, exeEngine := setupMockExeNode(t, hub, exeIdentity, verIdentities, identities, completeER)
 
 	// mock consensus node
 	conNode, conEngine, conWG := setupMockConsensusNode(t, hub, conIdentity, verIdentities, identities, completeER)
 
-	// duplicates the ER (receipt1) into another ER (receipt2)
-	// that share their result part
-	receipt1 := completeER.Receipt
-	receipt2 := &flow.ExecutionReceipt{
-		ExecutorID:        exeIdentity.NodeID,
-		ExecutionResult:   completeER.Receipt.ExecutionResult,
-		ExecutorSignature: unittest.SignatureFixture(),
-	}
-
-	// invoking verification node with two receipts concurrently
+	// invokes finder engine of verification nodes with receipt
 	verWG := sync.WaitGroup{}
 	for _, verNode := range verNodes {
-		verWG.Add(2)
-		for _, er := range []*flow.ExecutionReceipt{receipt1, receipt2} {
-			go func(vn mock2.VerificationNode, receipt *flow.ExecutionReceipt) {
-				defer verWG.Done()
-				// routes the receipt to either light or original ingest engines based
-				// on the test type
-				if lightIngest {
-					err := vn.LightIngestEngine.Process(exeIdentity.NodeID, receipt)
-					assert.Nil(t, err)
-				} else {
-					err := vn.IngestEngine.Process(exeIdentity.NodeID, receipt)
-					assert.Nil(t, err)
-				}
-			}(verNode, er)
-		}
+		verWG.Add(1)
+		go func(vn mock2.VerificationNode, receipt *flow.ExecutionReceipt) {
+			defer verWG.Done()
+			err := vn.FinderEngine.Process(exeIdentity.NodeID, receipt)
+			require.NoError(t, err)
+		}(verNode, completeER.Receipt)
 	}
 
+	// requires all verification nodes process the receipt
 	unittest.RequireReturnsBefore(t, verWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second)
 
 	// creates a network instance for each verification node
@@ -246,6 +205,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 		verNets = append(verNets, verNet)
 	}
 
+	// requires all verification nodes send a result approval per assigned chunk
 	unittest.RequireReturnsBefore(t, conWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second)
 	// assert that the RA was received
 	conEngine.AssertExpectations(t)
@@ -257,11 +217,9 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 	// Note: this should be done prior to any evaluation to make sure that
 	// the process method of Ingest engines is done working.
 	for _, verNode := range verNodes {
-		if lightIngest {
-			<-verNode.LightIngestEngine.Done()
-		} else {
-			<-verNode.IngestEngine.Done()
-		}
+		<-verNode.FinderEngine.Done()
+		<-verNode.MatchEngine.Done()
+		<-verNode.VerifierEngine.Done()
 	}
 
 	// stops continuous delivery of verification nodes
@@ -269,54 +227,8 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 		verNet.StopConDev()
 	}
 
-	// light ingest engine does not interact with collection node
-	// but the current version of original ingest engine does
-	// TODO removing collection request from ORIGINAL ingest engine
-	// https://github.com/dapperlabs/flow-go/issues/3008
-	if !lightIngest {
-		colNet.StopConDev()
-	}
-
-	// resource cleanup
-	//
-	for _, verNode := range verNodes {
-		for i := 0; i < chunkNum; i++ {
-			// associated resources for each chunk should be removed from the mempool
-			assert.False(t, verNode.AuthCollections.Has(completeER.Collections[i].ID()))
-			assert.False(t, verNode.PendingCollections.Has(completeER.Collections[i].ID()))
-			assert.False(t, verNode.ChunkDataPacks.Has(completeER.ChunkDataPacks[i].ID()))
-			if IsAssigned(completeER.Receipt.ExecutionResult.Chunks[i].Index) {
-				// chunk ID of assigned chunks should be added to ingested chunks mempool
-				assert.True(t, verNode.IngestedChunkIDs.Has(completeER.Receipt.ExecutionResult.Chunks[i].ID()))
-			}
-		}
-
-		// LightIngestEngine does the cleaning of ingested receipts slower and passively
-		// hence it is discarded to check the receipts clean up in lightIngest mode.
-		if !lightIngest {
-			// since all chunks have been ingested, neither of execution receipts should reside on any mempool
-			assert.False(t, verNode.PendingReceipts.Has(receipt1.ID()))
-			assert.False(t, verNode.AuthReceipts.Has(receipt1.ID()))
-			assert.False(t, verNode.PendingReceipts.Has(receipt2.ID()))
-			assert.False(t, verNode.AuthReceipts.Has(receipt2.ID()))
-		}
-
-		// result ID should be added to the ingested results mempool
-		assert.True(t, verNode.IngestedResultIDs.Has(completeER.Receipt.ExecutionResult.ID()))
-
-		verNode.Done()
-	}
-
 	conNode.Done()
 	exeNode.Done()
-
-	// light ingest engine does not interact with collection node
-	// but the current version of original ingest engine does
-	// TODO removing collection request from ORIGINAL ingest engine
-	// https://github.com/dapperlabs/flow-go/issues/3008
-	if !lightIngest {
-		colNode.Done()
-	}
 
 	// to demarcate the debug logs
 	log.Debug().

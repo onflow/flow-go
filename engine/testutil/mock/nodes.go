@@ -21,11 +21,11 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/verification/finder"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
+	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/stub"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -135,7 +135,7 @@ type VerificationNode struct {
 	HeaderStorage         storage.Headers
 	IngestEngine          *ingest.Engine
 	LightIngestEngine     *ingest.LightEngine // a lighter version of ingest engine
-	VerifierEngine        network.Engine
+	VerifierEngine        *verifier.Engine
 	FinderEngine          *finder.Engine
-	MatchEngine           network.Engine
+	MatchEngine           *matching.Engine
 }
