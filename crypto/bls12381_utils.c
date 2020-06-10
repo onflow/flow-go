@@ -243,10 +243,13 @@ static int fp_get_bit_generic(const fp_t a, int bit) {
 }
 
 // uncompress a G1 point p into r taken into account the coordinate x
-// and the LS bit of the y coordinate.
-// the (y) bit is the LS of (y*R mod p) if Montgomery domain is used, otherwise
-// is the LS bit of y 
+// and the LS bit of the y coordinate. 
+//
 // (taken and modifed from Relic ep_upk function)
+// // Copyright 2019 D. F. Aranha and C. P. L. Gouvêa and T. Markmann and R. S. Wahby and K. Liao
+// https://github.com/relic-toolkit/relic
+// Change: the square root (y) is chosen regardless of the modular multiplication used.
+// If montgomery multiplication is used, the square root is reduced to check the LS bit.
 static int ep_upk_generic(ep_t r, const ep_t p) {
     fp_t t;
     int result = 0;
@@ -290,13 +293,14 @@ static int ep_upk_generic(ep_t r, const ep_t p) {
 
 // ep_write_bin_compact exports a point a in E(Fp) to a buffer bin in a compressed or uncompressed form.
 // len is the allocated size of the buffer bin for sanity check
-// The encoding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) with a small change to accomodate Relic lib
-// The code is a modified version of Relic ep_write_bin
+// The encoding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) with a small change to accomodate Relic lib 
+//
 // The most significant bit of the buffer, when set, indicates that the point is in compressed form. 
 // Otherwise, the point is in uncompressed form.
 // The second-most significant bit, when set, indicates that the point is at infinity. 
 // If this bit is set, the remaining bits of the group element's encoding should be set to zero.
-// The third-most significant bit is set if (and only if) this point is in compressed form and it is not the point at infinity and its y-coordinate is odd.
+// The third-most significant bit is set if (and only if) this point is in compressed form and it is not the point 
+// at infinity and its y-coordinate is odd.
 void ep_write_bin_compact(byte *bin, const ep_st *a, const int len) {
     ep_t t;
     ep_null(t);
@@ -337,7 +341,6 @@ void ep_write_bin_compact(byte *bin, const ep_st *a, const int len) {
 // len is the size of the input buffer
 // The encoding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) with a small change to accomodate Relic lib
 // look at the comments of ep_write_bin_compact for a detailed description
-// The code is a modified version of Relic ep_write_bin
 int ep_read_bin_compact(ep_st* a, const byte *bin, const int len) {
     const int G1size = (G1_BYTES/(SERIALIZATION+1));
     if (len!=G1size) {
@@ -394,9 +397,12 @@ int ep_read_bin_compact(ep_st* a, const byte *bin, const int len) {
 
 // uncompress a G2 point p into r taking into account the coordinate x
 // and the LS bit of the y lower coordinate.
-// the (y0) bit is the LS of (y0*R mod p) if Montgomery domain is used, otherwise
-// is the LS bit of y0 
-// (taken and modifed from Relic ep_upk function)
+//
+// (taken and modifed from Relic ep2_upk function)
+// // Copyright 2019 D. F. Aranha and C. P. L. Gouvêa and T. Markmann and R. S. Wahby and K. Liao
+// https://github.com/relic-toolkit/relic
+// Change: the square root (y) is chosen regardless of the modular multiplication used.
+// If montgomery multiplication is used, the square root is reduced to check the LS bit.
 static  int ep2_upk_generic(ep2_t r, ep2_t p) {
     fp2_t t;
     int result = 0;
@@ -439,7 +445,6 @@ static  int ep2_upk_generic(ep2_t r, ep2_t p) {
 }
 
 // ep2_write_bin_compact exports a point in E(Fp^2) to a buffer in a compressed or uncompressed form.
-// The code is a modified version of Relic ep2_write_bin
 // The most significant bit of the buffer, when set, indicates that the point is in compressed form. 
 // Otherwise, the point is in uncompressed form.
 // The second-most significant bit indicates that the point is at infinity. 
@@ -481,7 +486,6 @@ void ep2_write_bin_compact(byte *bin, const ep2_st *a, const int len) {
 }
 
 // ep2_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
-// The code is a modified version of Relic ep_write_bin
 int ep2_read_bin_compact(ep2_st* a, const byte *bin, const int len) {
     const int G2size = (G2_BYTES/(SERIALIZATION+1));
     if (len!=G2size) {

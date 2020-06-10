@@ -112,9 +112,10 @@ func BenchmarkHashToG1(b *testing.B) {
 	return
 }
 
-// test the optimized SwU algorithm core against a valid test vector
-// the test vector is taken from the original implementation used by the authors of
-// the paper https://eprint.iacr.org/2019/403.pdf
+// test the optimized SwU algorithm core against a valid test vector.
+// The test vector is taken from the original sage implementation
+// https://github.com/kwantam/bls12-381_hash from the author of
+// https://eprint.iacr.org/2019/403.pdf.
 func TestOpSwuHashToG1(t *testing.T) {
 	_ = newBLSBLS12381()
 	inputs := []string{

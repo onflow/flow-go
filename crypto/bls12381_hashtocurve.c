@@ -303,6 +303,10 @@ static inline void map_to_E1_swu(ep_st* p, const fp_t t) {
     free(fp_tmp);
 }
 
+
+// These constants are taken from https://github.com/kwantam/bls12-381_hash 
+// and converted to the Mongtomery domain. 
+// Copyright 2019 Riad S. Wahby
 const uint64_t iso_Nx_data[ELLP_Nx_LEN][6] = {
     {0xaeac1662734649b7, 0x5610c2d5f2e62d6e, 0xf2627b56cdb4e2c8, 
      0x6b303e88a2d7005f, 0xb809101dd9981585, 0x11a05f2b1e833340, },
@@ -421,6 +425,9 @@ const uint64_t iso_Dy_data[ELLP_Dy_LEN][6] = {
      0x71c40f65e273b853, 0x6b24255e0d7819c1, 0x0e0fa1d816ddc03e, },
 };
 
+// This code is taken from https://github.com/kwantam/bls12-381_hash 
+// and adapted to use Relic modular arithemtic.  
+// Copyright 2019 Riad S. Wahby
 static inline void hornerPolynomial(fp_t accumulator, const fp_t x, 
         const int start_val, const fp_t* fp_tmp) {
     for (int i = start_val; i >= 0; --i) {
@@ -429,6 +436,9 @@ static inline void hornerPolynomial(fp_t accumulator, const fp_t x,
     }
 }
 
+// This code is taken from https://github.com/kwantam/bls12-381_hash 
+// and adapted to use Relic modular arithemtic.  
+// Copyright 2019 Riad S. Wahby
 static inline void compute_map_zvals(const fp_t inv[], fp_t zv[], 
         const unsigned len, fp_t* fp_tmp) {
     for (unsigned i = 0; i < len; ++i) {
@@ -438,6 +448,11 @@ static inline void compute_map_zvals(const fp_t inv[], fp_t zv[],
 
 // 11-isogeny map
 // computes the mapping of p and stores the result in r
+//
+// This code is taken from https://github.com/kwantam/bls12-381_hash 
+// and adapted to use Relic modular arithemtic. The constant tables 
+// iso_D and iso_N were converted to the Montgomery domain. 
+// Copyright 2019 Riad S. Wahby
 static inline void eval_iso11(ep_st* r, const ep_st*  p) {
     const int tmp_len = 32;
     fp_t* fp_tmp = (fp_t*) malloc(tmp_len*sizeof(fp_t));
