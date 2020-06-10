@@ -34,6 +34,8 @@ type Handler struct {
 	headers      storage.Headers
 	collections  storage.Collections
 	transactions storage.Transactions
+
+	retry *Retry
 }
 
 var _ access.AccessAPIServer = &Handler{}
@@ -46,7 +48,8 @@ func NewHandler(log zerolog.Logger,
 	headers storage.Headers,
 	collections storage.Collections,
 	transactions storage.Transactions) *Handler {
-	return &Handler{
+	retry := newRetry()
+	h := &Handler{
 		executionRPC:  e,
 		collectionRPC: c,
 		blocks:        blocks,
@@ -55,7 +58,10 @@ func NewHandler(log zerolog.Logger,
 		transactions:  transactions,
 		state:         s,
 		log:           log,
+		retry:         retry,
 	}
+	retry.SetHandler(h)
+	return h
 }
 
 // Ping responds to requests when the server is up.

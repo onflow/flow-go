@@ -37,7 +37,22 @@ func (h *Handler) SendTransaction(ctx context.Context, req *access.SendTransacti
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to store transaction: %v", err))
 	}
 
+	err = h.registerTransactionForRetry(&tx)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to register transaction for retries: %v", err))
+	}
+
 	return resp, nil
+}
+
+// SendRawTransaction sends a raw transaction to the collection node
+func (h *Handler) SendRawTransaction(ctx context.Context, tx *entities.Transaction) (*access.SendTransactionResponse, error) {
+	req := &access.SendTransactionRequest{
+		Transaction: tx,
+	}
+
+	// send the transaction to the collection node
+	return h.collectionRPC.SendTransaction(ctx, req)
 }
 
 func (h *Handler) GetTransaction(_ context.Context, req *access.GetTransactionRequest) (*access.TransactionResponse, error) {
@@ -78,7 +93,7 @@ func (h *Handler) GetTransactionResult(ctx context.Context, req *access.GetTrans
 	}
 
 	// derive status of the transaction
-	status, err := h.deriveTransactionStatus(tx, executed)
+	status, err := h.DeriveTransactionStatus(tx, executed)
 	if err != nil {
 		return nil, convertStorageError(err)
 	}
@@ -96,8 +111,8 @@ func (h *Handler) GetTransactionResult(ctx context.Context, req *access.GetTrans
 	return resp, nil
 }
 
-// deriveTransactionStatus derives the transaction status based on current protocol state
-func (h *Handler) deriveTransactionStatus(tx *flow.TransactionBody, executed bool) (entities.TransactionStatus, error) {
+// DeriveTransactionStatus derives the transaction status based on current protocol state
+func (h *Handler) DeriveTransactionStatus(tx *flow.TransactionBody, executed bool) (entities.TransactionStatus, error) {
 
 	block, err := h.lookupBlock(tx.ID())
 	if errors.Is(err, storage.ErrNotFound) {
@@ -187,4 +202,14 @@ func (h *Handler) lookupTransactionResult(ctx context.Context, txID flow.Identif
 	}
 	// considered executed as long as some result is returned, even if it's an error
 	return true, events, txStatus, message, nil
+}
+
+func (h *Handler) registerTransactionForRetry(tx *flow.TransactionBody) error {
+	referenceBlock, err := h.state.AtBlockID(tx.ReferenceBlockID).Head()
+	if err != nil {
+		return err
+	}
+	h.retry.RegisterTransaction(referenceBlock.Height, tx)
+
+	return nil
 }
