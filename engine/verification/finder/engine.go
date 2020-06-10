@@ -176,11 +176,12 @@ func (e *Engine) isProcessable(result *flow.ExecutionResult) bool {
 }
 
 // processResult submits the result to the match engine.
-func (e *Engine) processResult(result *flow.ExecutionResult) error {
+// originID is the identifier of the node that initially sends a receipt containing this result.
+func (e *Engine) processResult(originID flow.Identifier, result *flow.ExecutionResult) error {
 	if e.processedResult.Has(result.ID()) {
 		return fmt.Errorf("result already processed")
 	}
-	err := e.match.ProcessLocal(result)
+	err := e.match.Process(originID, result)
 	if err != nil {
 		return fmt.Errorf("submission error to match engine: %w", err)
 	}
@@ -225,7 +226,7 @@ func (e *Engine) checkReceipts(receipts []*verification.PendingReceipt) {
 	for _, pr := range receipts {
 		if e.isProcessable(&pr.Receipt.ExecutionResult) {
 			// checks if result is ready to process
-			err := e.processResult(&pr.Receipt.ExecutionResult)
+			err := e.processResult(pr.OriginID, &pr.Receipt.ExecutionResult)
 			if err != nil {
 				e.log.Error().
 					Err(err).
