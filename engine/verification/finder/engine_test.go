@@ -30,7 +30,7 @@ type FinderEngineTestSuite struct {
 	receiptsConduit *network.Conduit
 
 	// mock mempool for receipts
-	receipts *mempool.Receipts
+	receipts *mempool.PendingReceipts
 
 	// mock mempool for processed result IDs
 	processedResults *mempool.Identifiers

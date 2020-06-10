@@ -123,16 +123,14 @@ type VerificationNode struct {
 	AuthCollections       mempool.Collections
 	PendingCollections    mempool.PendingCollections
 	CollectionTrackers    mempool.CollectionTrackers
-	Results               mempool.Results
+	PendingResults        mempool.PendingResults
 	ChunkDataPacks        mempool.ChunkDataPacks
 	ChunkDataPackTrackers mempool.ChunkDataPackTrackers
-	Seals                 mempool.Seals
-	Approvals             mempool.Approvals
 	IngestedChunkIDs      mempool.Identifiers
 	IngestedResultIDs     mempool.Identifiers
 	IngestedCollectionIDs mempool.Identifiers
 	AssignedChunkIDs      mempool.Identifiers
-	ResultStorage         storage.ExecutionResults
+	Chunks                *match.Chunks
 	HeaderStorage         storage.Headers
 	IngestEngine          *ingest.Engine
 	LightIngestEngine     *ingest.LightEngine // a lighter version of ingest engine

@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/verification"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
@@ -21,10 +22,10 @@ type Engine struct {
 	log               zerolog.Logger
 	me                module.Local
 	match             network.Engine
-	receipts          mempool.Receipts    // used to keep the receipts as mempool
-	headerStorage     storage.Headers     // used to check block existence before verifying
-	processedResult   mempool.Identifiers // used to keep track of the processed results
-	checkResourceLock sync.Mutex          // used to serialize checking receipts
+	receipts          mempool.PendingReceipts // used to keep the receipts as mempool
+	headerStorage     storage.Headers         // used to check block existence before verifying
+	processedResult   mempool.Identifiers     // used to keep track of the processed results
+	checkResourceLock sync.Mutex              // used to serialize checking receipts
 }
 
 func New(
@@ -32,7 +33,7 @@ func New(
 	net module.Network,
 	me module.Local,
 	match network.Engine,
-	receipts mempool.Receipts,
+	receipts mempool.PendingReceipts,
 	headerStorage storage.Headers,
 	processedResults mempool.Identifiers,
 ) (*Engine, error) {
@@ -128,7 +129,11 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	}
 
 	// adds the execution receipt in the mempool
-	added := e.receipts.Add(receipt)
+	pr := &verification.PendingReceipt{
+		Receipt:  receipt,
+		OriginID: originID,
+	}
+	added := e.receipts.Add(pr)
 	if !added {
 		log.Debug().Msg("drops adding duplicate receipt")
 		return nil
@@ -137,7 +142,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	log.Info().Msg("execution receipt successfully handled")
 
 	// checks receipt being processable
-	e.checkReceipts([]*flow.ExecutionReceipt{receipt})
+	e.checkReceipts([]*verification.PendingReceipt{pr})
 
 	return nil
 }
@@ -198,9 +203,9 @@ func (e *Engine) onResultProcessed(resultID flow.Identifier) {
 	}
 
 	// drops all receipts with the same result
-	for _, receipt := range e.receipts.All() {
-		if receipt.ExecutionResult.ID() == resultID {
-			receiptID := receipt.ID()
+	for _, pr := range e.receipts.All() {
+		if pr.Receipt.ExecutionResult.ID() == resultID {
+			receiptID := pr.Receipt.ID()
 			removed := e.receipts.Rem(receiptID)
 			if removed {
 				log.Debug().
@@ -213,25 +218,25 @@ func (e *Engine) onResultProcessed(resultID flow.Identifier) {
 
 // checkReceipts receives a set of receipts and evaluates each of them
 // against being processable. If a receipt is processable, it gets processed.
-func (e *Engine) checkReceipts(receipts []*flow.ExecutionReceipt) {
+func (e *Engine) checkReceipts(receipts []*verification.PendingReceipt) {
 	e.checkResourceLock.Lock()
 	defer e.checkResourceLock.Unlock()
 
-	for _, receipt := range receipts {
-		if e.isProcessable(&receipt.ExecutionResult) {
+	for _, pr := range receipts {
+		if e.isProcessable(&pr.Receipt.ExecutionResult) {
 			// checks if result is ready to process
-			err := e.processResult(&receipt.ExecutionResult)
+			err := e.processResult(&pr.Receipt.ExecutionResult)
 			if err != nil {
 				e.log.Error().
 					Err(err).
-					Hex("receipt_id", logging.Entity(receipt)).
-					Hex("result_id", logging.Entity(receipt.ExecutionResult)).
+					Hex("receipt_id", logging.Entity(pr)).
+					Hex("result_id", logging.Entity(pr.Receipt.ExecutionResult)).
 					Msg("could not process result")
 				continue
 			}
 
 			// performs clean up
-			e.onResultProcessed(receipt.ExecutionResult.ID())
+			e.onResultProcessed(pr.Receipt.ExecutionResult.ID())
 		}
 	}
 }

@@ -120,8 +120,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	exeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	verIdentities := unittest.IdentityListFixture(verNodeCount, unittest.WithRole(flow.RoleVerification))
-	conIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
-	conIdentity := conIdentities[0]
+	conIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 
 	identities := flow.IdentityList{colIdentity, conIdentity, exeIdentity}
 	identities = append(identities, verIdentities...)
@@ -172,6 +171,9 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 
 	// mock execution node
 	exeNode, exeEngine := setupMockExeNode(t, hub, exeIdentity, verIdentities, identities, completeER)
+	exeNet, ok := hub.GetNetwork(exeIdentity.NodeID)
+	assert.True(t, ok)
+	exeNet.StartConDev(requestInterval, true)
 
 	// mock consensus node
 	conNode, conEngine, conWG := setupMockConsensusNode(t, hub, conIdentity, verIdentities, identities, completeER)
@@ -187,8 +189,9 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 		}(verNode, completeER.Receipt)
 	}
 
+	verWG.Wait()
 	// requires all verification nodes process the receipt
-	unittest.RequireReturnsBefore(t, verWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second)
+	// unittest.RequireReturnsBefore(t, verWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second)
 
 	// creates a network instance for each verification node
 	// and sets it in continuous delivery mode
@@ -205,8 +208,9 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 		verNets = append(verNets, verNet)
 	}
 
+	conWG.Wait()
 	// requires all verification nodes send a result approval per assigned chunk
-	unittest.RequireReturnsBefore(t, conWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second)
+	// unittest.RequireReturnsBefore(t, conWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second)
 	// assert that the RA was received
 	conEngine.AssertExpectations(t)
 
@@ -222,10 +226,11 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 		<-verNode.VerifierEngine.Done()
 	}
 
-	// stops continuous delivery of verification nodes
+	// stops continuous delivery of nodes
 	for _, verNet := range verNets {
 		verNet.StopConDev()
 	}
+	exeNet.StopConDev()
 
 	conNode.Done()
 	exeNode.Done()

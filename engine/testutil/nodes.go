@@ -376,12 +376,8 @@ func VerificationNode(t testing.TB,
 		require.Nil(t, err)
 	}
 
-	if node.ResultStorage == nil {
-		node.ResultStorage = storage.NewExecutionResults(node.DB)
-	}
-
-	if node.Results == nil {
-		node.Results, err = stdmap.NewResults(1000)
+	if node.PendingResults == nil {
+		node.PendingResults = stdmap.NewPendingResults()
 		require.Nil(t, err)
 	}
 
@@ -389,12 +385,8 @@ func VerificationNode(t testing.TB,
 		node.HeaderStorage = storage.NewHeaders(node.Metrics, node.DB)
 	}
 
-	if node.Seals == nil {
-		node.Seals, err = stdmap.NewSeals(1000)
-	}
-
-	if node.Approvals == nil {
-		node.Approvals, err = stdmap.NewApprovals(1000)
+	if node.Chunks == nil {
+		node.Chunks = match.NewChunks(1000)
 	}
 
 	if node.VerifierEngine == nil {
@@ -408,19 +400,18 @@ func VerificationNode(t testing.TB,
 		require.Nil(t, err)
 	}
 
-	if node.MatchEngine == nil {
+	if node.MatchEngine == nil && newArchitecture {
 		node.MatchEngine, err = match.New(node.Log,
-			node.Metrics,
-			node.Metrics,
 			node.Net,
-			node.State,
 			node.Me,
-			node.ResultStorage,
+			node.PendingResults,
+			node.VerifierEngine,
+			assigner,
+			node.State,
+			node.Chunks,
 			node.HeaderStorage,
-			node.Results,
-			node.AuthReceipts,
-			node.Approvals,
-			node.Seals)
+			time.Duration(requestIntervalMs),
+			int(failureThreshold))
 	}
 
 	if node.IngestedChunkIDs == nil {
@@ -494,7 +485,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.FinderEngine == nil && newArchitecture {
-		node.FinderEngine, err = finder.New(node.Log, node.Net, node.Me, node.MatchEngine, node.AuthReceipts, node.Headers, node.IngestedResultIDs)
+		node.FinderEngine, err = finder.New(node.Log, node.Net, node.Me, node.MatchEngine, node.PendingReceipts, node.Headers, node.IngestedResultIDs)
 		require.Nil(t, err)
 	}
 
