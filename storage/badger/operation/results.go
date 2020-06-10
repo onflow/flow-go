@@ -38,34 +38,47 @@ func LookupExecutionResult(blockID flow.Identifier, resultID *flow.Identifier) f
 // we can better organize the storage layer code. Then this could live in ie. a
 // migrations package, but still import the relevant shared code from `common.go`.
 func IndexExecutionResultsByBlockID(db *badger.DB) error {
-	return db.Update(func(tx *badger.Txn) error {
 
-		iter := func() (checkFunc, createFunc, handleFunc) {
+	// we split the migration into 256 batches, one transaction each, to avoid
+	// hitting the max transaction size
+	batchNumber := uint8(0)
 
-			check := func(key []byte) bool {
-				return true
-			}
+	for {
+		err := db.Update(func(tx *badger.Txn) error {
+			iter := func() (checkFunc, createFunc, handleFunc) {
+				check := func(key []byte) bool {
+					return true
+				}
 
-			var result flow.ExecutionResult
-			create := func() interface{} {
-				return &result
-			}
+				var result flow.ExecutionResult
+				create := func() interface{} {
+					return &result
+				}
 
-			handle := func() error {
-				err := IndexExecutionResult(result.BlockID, result.ID())(tx)
-				// skip already indexed entities
-				if errors.Is(err, storage.ErrAlreadyExists) {
+				handle := func() error {
+					err := IndexExecutionResult(result.BlockID, result.ID())(tx)
+					// skip already indexed entities
+					if errors.Is(err, storage.ErrAlreadyExists) {
+						return nil
+					}
+					if err != nil {
+						return fmt.Errorf("could not index execution result: %w", err)
+					}
 					return nil
 				}
-				if err != nil {
-					return fmt.Errorf("could not index execution result: %w", err)
-				}
-				return nil
+
+				return check, create, handle
 			}
 
-			return check, create, handle
+			return traverse(makePrefix(codeExecutionResult, batchNumber), iter)(tx)
+		})
+		if err != nil {
+			return fmt.Errorf("ER index migration failed (batch=%d): %w", batchNumber, err)
 		}
 
-		return traverse(makePrefix(codeExecutionResult), iter)(tx)
-	})
+		if batchNumber == 255 {
+			return nil
+		}
+		batchNumber++
+	}
 }
