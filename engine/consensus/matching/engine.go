@@ -452,11 +452,11 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 
 	// store the result to make it persistent for later checks
 	err = e.resultsDB.Store(result)
-	if err != nil {
+	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 		return fmt.Errorf("could not store sealing result: %w", err)
 	}
 	err = e.resultsDB.Index(result.BlockID, result.ID())
-	if err != nil {
+	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 		return fmt.Errorf("could not index sealing result: %w", err)
 	}
 
@@ -471,8 +471,8 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 	// don't add the seal if it's already been included in a proposal
 	sealID := seal.ID()
 	_, err = e.sealsDB.ByID(sealID)
-	if err != nil {
-		return fmt.Errorf("seal (id=%x, block_id=%x) already stored: %w", sealID, seal.BlockID, err)
+	if err == nil {
+		return nil
 	}
 
 	// we don't care whether the seal is already in the mempool
