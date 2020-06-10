@@ -21,9 +21,9 @@ type Engine struct {
 	log             zerolog.Logger
 	me              module.Local
 	match           network.Engine
-	receipts        mempool.Receipts    // used to keep the receipts as mempool
-	headerStorage   storage.Headers     // used to check block existence before verifying
-	processedResult mempool.Identifiers // used to keep track of the processed results
+	receipts        mempool.PendingReceipts // used to keep the receipts as mempool
+	headerStorage   storage.Headers         // used to check block existence before verifying
+	processedResult mempool.Identifiers     // used to keep track of the processed results
 }
 
 func New(
@@ -218,7 +218,7 @@ func (e *Engine) onResultProcessed(resultID flow.Identifier) {
 
 // checkReceipts receives a set of receipts and evaluates each of them
 // against being processable. If a receipt is processable, it gets processed.
-func (e *Engine) checkReceipts(receipts []*flow.ExecutionReceipt) {
+func (e *Engine) checkReceipts(receipts []*verification.PendingReceipt) {
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
