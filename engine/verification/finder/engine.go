@@ -153,6 +153,7 @@ func (e *Engine) OnBlockIncorporated(*model.Block) {
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 func (e *Engine) OnFinalizedBlock(block *model.Block) {
+	// TODO only receipts referencing block should be checked #4028
 	e.checkReceipts(e.receipts.All())
 }
 
