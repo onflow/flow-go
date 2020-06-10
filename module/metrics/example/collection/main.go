@@ -29,14 +29,8 @@ func main() {
 			NetworkCollector:    metrics.NewNetworkCollector(),
 		}
 
-		topic1, err := engine.ChannelName(engine.CollectionProvider)
-		if err != nil {
-			panic(err)
-		}
-		topic2, err := engine.ChannelName(engine.CollectionIngest)
-		if err != nil {
-			panic(err)
-		}
+		topic1 := engine.ChannelName(engine.CollectionProvider)
+		topic2 := engine.ChannelName(engine.CollectionIngest)
 
 		for i := 0; i < 100; i++ {
 			collector.TransactionIngested(unittest.IdentifierFixture())

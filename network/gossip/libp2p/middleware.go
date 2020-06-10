@@ -358,10 +358,7 @@ ProcessLoop:
 // Subscribe will subscribe the middleware for a topic with the same name as the channelID
 func (m *Middleware) Subscribe(channelID uint8) error {
 
-	topic, err := engine.ChannelName(channelID)
-	if err != nil {
-		return fmt.Errorf("failed to lookup topic for channel %d: %w", channelID, err)
-	}
+	topic := engine.ChannelName(channelID)
 
 	s, err := m.libP2PNode.Subscribe(m.ctx, topic)
 	if err != nil {
@@ -438,10 +435,7 @@ func (m *Middleware) publish(channelID uint8, msg *message.Message) error {
 		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, m.maxPubSubMsgSize)
 	}
 
-	topic, err := engine.ChannelName(channelID)
-	if err != nil {
-		return fmt.Errorf("failed to lookup topic for channel %d: %w", channelID, err)
-	}
+	topic := engine.ChannelName(channelID)
 
 	// publish the bytes on the topic
 	err = m.libP2PNode.Publish(m.ctx, topic, data)

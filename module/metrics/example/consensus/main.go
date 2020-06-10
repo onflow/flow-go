@@ -62,14 +62,8 @@ func main() {
 				collector.FinishBlockToSeal(flow.HashToID(entityID))
 			}
 
-			collProvider, err := engine.ChannelName(engine.CollectionProvider)
-			if err != nil {
-				panic(err)
-			}
-			collIngest, err := engine.ChannelName(engine.CollectionIngest)
-			if err != nil {
-				panic(err)
-			}
+			collProvider := engine.ChannelName(engine.CollectionProvider)
+			collIngest := engine.ChannelName(engine.CollectionIngest)
 
 			collector.NetworkMessageSent(rand.Intn(1000), collProvider)
 			collector.NetworkMessageSent(rand.Intn(1000), collIngest)

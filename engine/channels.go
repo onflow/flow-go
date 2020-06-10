@@ -37,38 +37,38 @@ const (
 	SimulationColdstuff = 200
 )
 
-func ChannelName(channelID uint8) (string, error) {
+func ChannelName(channelID uint8) string {
 	switch channelID {
 	case CollectionProvider:
-		return "CollectionProvider", nil
+		return "CollectionProvider"
 	case CollectionIngest:
-		return "CollectionIngest", nil
+		return "CollectionIngest"
 	case ProtocolClusterConsensus:
-		return "ProtocolClusterConsensus", nil
+		return "ProtocolClusterConsensus"
 	case ProtocolClusterSynchronization:
-		return "ProtocolClusterSynchronization", nil
+		return "ProtocolClusterSynchronization"
 	case BlockProvider:
-		return "BlockProvider", nil
+		return "BlockProvider"
 	case BlockPropagation:
-		return "BlockPropagation", nil
+		return "BlockPropagation"
 	case ProtocolConsensus:
-		return "ProtocolConsensus", nil
+		return "ProtocolConsensus"
 	case ProtocolSynchronization:
-		return "ProtocolSynchronization", nil
+		return "ProtocolSynchronization"
 	case ExecutionReceiptProvider:
-		return "ExecutionReceiptProvider", nil
+		return "ExecutionReceiptProvider"
 	case ExecutionStateProvider:
-		return "ExecutionStateProvider", nil
+		return "ExecutionStateProvider"
 	case ExecutionComputer:
-		return "ExecutionComputer", nil
+		return "ExecutionComputer"
 	case ChunkDataPackProvider:
-		return "ChunkDataPackProvider", nil
+		return "ChunkDataPackProvider"
 	case ExecutionSync:
-		return "ExecutionSync", nil
+		return "ExecutionSync"
 	case ApprovalProvider:
-		return "ApprovalProvider", nil
+		return "ApprovalProvider"
 	case SimulationColdstuff:
-		return "SimulationColdstuff", nil
+		return "SimulationColdstuff"
 	}
-	return "", fmt.Errorf("invalid channel ID: %d", channelID)
+	return fmt.Sprintf("unknown-channel-%d", channelID)
 }

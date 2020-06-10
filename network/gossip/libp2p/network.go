@@ -165,11 +165,7 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 			Hex("event_id", message.EventID).
 			Logger()
 
-		channelName, err := engine.ChannelName(uint8(message.ChannelID))
-		if err != nil {
-			log.Error().Err(err).Msg("dropping message due to an invalid channel ID")
-			return fmt.Errorf("message received with an invalid channel ID: %w", err)
-		}
+		channelName := engine.ChannelName(uint8(message.ChannelID))
 
 		// drops duplicate message
 		log.Debug().
