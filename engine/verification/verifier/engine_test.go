@@ -160,12 +160,12 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 		})
 
 	var tests = []struct {
-		vc          *verification.VerifiableChunk
+		vc          *verification.VerifiableChunkData
 		expectedErr error
 	}{
-		{unittest.VerifiableChunkFixture(uint64(1)), nil},
-		{unittest.VerifiableChunkFixture(uint64(2)), nil},
-		{unittest.VerifiableChunkFixture(uint64(3)), nil},
+		{unittest.VerifiableChunkDataFixture(uint64(1)), nil},
+		{unittest.VerifiableChunkDataFixture(uint64(2)), nil},
+		{unittest.VerifiableChunkDataFixture(uint64(3)), nil},
 	}
 	for _, test := range tests {
 		err := eng.Process(myID, test.vc)
@@ -176,30 +176,30 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 type ChunkVerifierMock struct {
 }
 
-func (v ChunkVerifierMock) Verify(ch *verification.VerifiableChunk) (chmodel.ChunkFault, error) {
-	switch ch.ChunkIndex {
+func (v ChunkVerifierMock) Verify(vc *verification.VerifiableChunkData) (chmodel.ChunkFault, error) {
+	switch vc.Chunk.Index {
 	case 0:
 		return nil, nil
 	// return error
 	case 1:
 		return chmodel.NewCFMissingRegisterTouch(
 			[]string{"test missing register touch"},
-			ch.ChunkIndex,
-			ch.Receipt.ExecutionResult.ID()), nil
+			vc.Chunk.Index,
+			vc.Result.ID()), nil
 
 	case 2:
 		return chmodel.NewCFInvalidVerifiableChunk(
 			"test",
 			errors.New("test invalid verifiable chunk"),
-			ch.ChunkIndex,
-			ch.Receipt.ExecutionResult.ID()), nil
+			vc.Chunk.Index,
+			vc.Result.ID()), nil
 
 	case 3:
 		return chmodel.NewCFNonMatchingFinalState(
 			unittest.StateCommitmentFixture(),
 			unittest.StateCommitmentFixture(),
-			ch.ChunkIndex,
-			ch.Receipt.ExecutionResult.ID()), nil
+			vc.Chunk.Index,
+			vc.Result.ID()), nil
 
 	// TODO add cases for challenges
 	// return successful by default
