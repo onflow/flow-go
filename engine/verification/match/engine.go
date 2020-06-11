@@ -376,6 +376,16 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		return fmt.Errorf("could not find block header: %w for chunkID: %v", err, chunkID)
 	}
 
+	// computes the end state of the chunk
+	var endState flow.StateCommitment
+	if int(status.Chunk.Index) == len(result.ExecutionResult.Chunks)-1 {
+		// last chunk in receipt takes final state commitment
+		endState = result.ExecutionResult.FinalStateCommit
+	} else {
+		// any chunk except last takes the subsequent chunk's start state
+		endState = result.ExecutionResult.Chunks[status.Chunk.Index+1].StartState
+	}
+
 	// creates a verifiable chunk for assigned chunk
 	// TODO: replace with VerifiableChunk
 	vchunk := &verification.VerifiableChunkData{
@@ -384,6 +394,7 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		Result:        result.ExecutionResult,
 		Collection:    collection,
 		ChunkDataPack: chunkDataPack,
+		EndState:      endState,
 	}
 
 	e.unit.Launch(func() {
