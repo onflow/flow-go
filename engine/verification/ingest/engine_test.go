@@ -934,7 +934,7 @@ func (suite *IngestTestSuite) TestVerifyReady() {
 			suite.verifierEng.On("ProcessLocal", testifymock.AnythingOfType("*verification.VerifiableChunk")).
 				Run(func(args testifymock.Arguments) {
 					// the received entity should be a verifiable chunk
-					vc, ok := args[0].(*verification.VerifiableChunk)
+					vc, ok := args[0].(*verification.VerifiableChunkData)
 					assert.True(suite.T(), ok)
 
 					// checks verifiable chunk end state
