@@ -680,13 +680,13 @@ func (e *Engine) checkPendingChunks() {
 			}
 
 			// creates a verifiable chunk for assigned chunk
-			vchunk := &verification.VerifiableChunk{
-				ChunkIndex:    chunk.Index,
-				Receipt:       receipt,
-				EndState:      endState,
-				Block:         block,
+			vchunk := &verification.VerifiableChunkData{
+				Chunk:         chunk,
+				Header:        block.Header,
+				Result:        &receipt.ExecutionResult,
 				Collection:    collection,
 				ChunkDataPack: chunkDatapack,
+				EndState:      endState,
 			}
 
 			// verify the receipt
@@ -701,7 +701,7 @@ func (e *Engine) checkPendingChunks() {
 			}
 
 			// does resource cleanup
-			e.onChunkIngested(vchunk)
+			e.onChunkIngested(vchunk, receipt.ID())
 
 			e.log.Debug().
 				Hex("result_id", logging.Entity(receipt.ExecutionResult)).
@@ -714,7 +714,7 @@ func (e *Engine) checkPendingChunks() {
 // onChunkIngested is called whenever a verifiable chunk is formed for a
 // chunk and is sent to the verify engine successfully.
 // It cleans up all resources associated with this chunk
-func (e *Engine) onChunkIngested(vc *verification.VerifiableChunk) {
+func (e *Engine) onChunkIngested(vc *verification.VerifiableChunkData, receiptID flow.Identifier) {
 	// marks this chunk as ingested
 	ok := e.ingestedChunkIDs.Add(vc.ChunkDataPack.ChunkID)
 	if !ok {
@@ -736,12 +736,12 @@ func (e *Engine) onChunkIngested(vc *verification.VerifiableChunk) {
 	e.authCollections.Rem(vc.Collection.ID())
 	e.chunkDataPacks.Rem(vc.ChunkDataPack.ID())
 
-	mychunks, err := e.myUningestedChunks(&vc.Receipt.ExecutionResult)
+	mychunks, err := e.myUningestedChunks(vc.Result)
 	// extracts list of chunks assigned to this Verification node
 	if err != nil {
 		e.log.Error().
 			Err(err).
-			Hex("result_id", logging.Entity(vc.Receipt.ExecutionResult)).
+			Hex("result_id", logging.Entity(vc.Result)).
 			Msg("could not fetch assigned chunks")
 		return
 	}
@@ -749,15 +749,15 @@ func (e *Engine) onChunkIngested(vc *verification.VerifiableChunk) {
 	if len(mychunks) == 0 {
 		// no un-ingested chunk remains with this receipt
 		// marks execution result as ingested
-		added := e.ingestedResultIDs.Add(vc.Receipt.ExecutionResult.ID())
+		added := e.ingestedResultIDs.Add(vc.Result.ID())
 
 		if !added {
 			e.log.Error().
-				Hex("result_id", logging.Entity(vc.Receipt.ExecutionResult)).
+				Hex("result_id", logging.Entity(vc.Result)).
 				Msg("could add ingested result to mempool")
 		}
 		// removes receipt from mempool to avoid further iteration
-		e.authReceipts.Rem(vc.Receipt.ID())
+		e.authReceipts.Rem(receiptID)
 
 		// removes all pending and authenticated receipts with the same result
 		// pending receipts
