@@ -19,6 +19,14 @@ func (s *simpleAddressState) Bytes() []byte {
 	return b
 }
 
+func (s *simpleAddressState) CurrentAddress() flow.Address {
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, s.lastAddress)
+	var addr flow.Address
+	copy(addr[:], b)
+	return addr
+}
+
 func (s *simpleAddressState) NextAddress() (flow.Address, error) {
 	s.lastAddress += 1
 	b := make([]byte, 8)

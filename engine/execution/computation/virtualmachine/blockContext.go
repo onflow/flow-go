@@ -67,7 +67,7 @@ func (bc *blockContext) newTransactionContext(
 		simpleAddresses:                  bc.simpleAddresses,
 	}
 
-	ctx.ledger.simpleAddresses = bc.simpleAddresses
+	ctx.ledger.SimpleAddresses = bc.simpleAddresses
 
 	for _, option := range options {
 		option(ctx)
