@@ -259,6 +259,7 @@ func (bc *blockContextMock) ExecuteTransaction(
 func (bc *blockContextMock) ExecuteScript(
 	ledger virtualmachine.Ledger,
 	script []byte,
+	arguments [][]byte,
 ) (*virtualmachine.ScriptResult, error) {
 	return nil, nil
 }

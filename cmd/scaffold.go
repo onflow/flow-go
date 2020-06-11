@@ -303,7 +303,10 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	opts := badger.
 		DefaultOptions(fnb.BaseConfig.datadir).
 		WithKeepL0InMemory(true).
-		WithLogger(log)
+		WithLogger(log).
+		WithValueLogFileSize(128 << 20). // Default is 1 GB
+		WithValueLogMaxEntries(100000)   // Default is 1000000
+
 	db, err := badger.Open(opts)
 	fnb.MustNot(err).Msg("could not open key-value store")
 

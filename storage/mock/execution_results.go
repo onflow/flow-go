@@ -10,6 +10,29 @@ type ExecutionResults struct {
 	mock.Mock
 }
 
+// ByBlockID provides a mock function with given fields: blockID
+func (_m *ExecutionResults) ByBlockID(blockID flow.Identifier) (*flow.ExecutionResult, error) {
+	ret := _m.Called(blockID)
+
+	var r0 *flow.ExecutionResult
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.ExecutionResult); ok {
+		r0 = rf(blockID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.ExecutionResult)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(blockID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ByID provides a mock function with given fields: resultID
 func (_m *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult, error) {
 	ret := _m.Called(resultID)
@@ -45,29 +68,6 @@ func (_m *ExecutionResults) Index(blockID flow.Identifier, resultID flow.Identif
 	}
 
 	return r0
-}
-
-// Lookup provides a mock function with given fields: blockID
-func (_m *ExecutionResults) Lookup(blockID flow.Identifier) (flow.Identifier, error) {
-	ret := _m.Called(blockID)
-
-	var r0 flow.Identifier
-	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Identifier); ok {
-		r0 = rf(blockID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(flow.Identifier)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(blockID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
 }
 
 // Store provides a mock function with given fields: result

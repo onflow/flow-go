@@ -76,7 +76,7 @@ func TestScriptASTCache(t *testing.T) {
 
 		ledger := testutil.RootBootstrappedLedger()
 
-		result, err := bc.ExecuteScript(ledger, script)
+		result, err := bc.ExecuteScript(ledger, script, nil)
 		require.NoError(t, err)
 		require.True(t, result.Succeeded())
 
@@ -303,7 +303,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 					let v <- FlowToken.createEmptyVault()
 					destroy v
 				}
-			`, virtualmachine.FlowTokenAddress(), id)))
+			`, virtualmachine.FlowTokenAddress(), id)), nil)
 			if !assert.True(t, result.Succeeded()) {
 				t.Log(result.Error.ErrorMessage())
 			}

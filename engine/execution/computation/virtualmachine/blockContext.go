@@ -22,7 +22,7 @@ type BlockContext interface {
 	) (*TransactionResult, error)
 
 	// ExecuteScript computes the result of a read-only script.
-	ExecuteScript(ledger Ledger, script []byte) (*ScriptResult, error)
+	ExecuteScript(ledger Ledger, script []byte, arguments [][]byte) (*ScriptResult, error)
 
 	// GetAccount reads an account from this block context.
 	GetAccount(ledger Ledger, addr flow.Address) (*flow.Account, error)
@@ -163,13 +163,13 @@ func (bc *blockContext) ExecuteTransaction(
 	}, nil
 }
 
-func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte) (*ScriptResult, error) {
+func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte, arguments [][]byte) (*ScriptResult, error) {
 	scriptHash := hash.DefaultHasher.ComputeHash(script)
 
 	location := runtime.ScriptLocation(scriptHash)
 
 	ctx := bc.newScriptContext(ledger)
-	value, err := bc.vm.executeScript(script, ctx, location)
+	value, err := bc.vm.executeScript(script, arguments, ctx, location)
 	if err != nil {
 		possibleRuntimeError := runtime.Error{}
 		if errors.As(err, &possibleRuntimeError) {
@@ -201,7 +201,7 @@ func (bc *blockContext) GetAccount(ledger Ledger, addr flow.Address) (*flow.Acco
 		return nil, nil
 	}
 
-	result, err := bc.ExecuteScript(ledger, DefaultTokenBalanceScript(addr))
+	result, err := bc.ExecuteScript(ledger, DefaultTokenBalanceScript(addr), nil)
 	if err != nil {
 		return nil, err
 	}
