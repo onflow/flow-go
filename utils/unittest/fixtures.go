@@ -598,7 +598,7 @@ func TransactionDSLFixture() dsl.Transaction {
 
 // VerifiableChunk returns a complete verifiable chunk with an
 // execution receipt referencing the block/collections.
-func VerifiableChunkFixture(chunkIndex uint64) *verification.VerifiableChunk {
+func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunkData {
 
 	guarantees := make([]*flow.CollectionGuarantee, 0)
 
@@ -645,16 +645,13 @@ func VerifiableChunkFixture(chunkIndex uint64) *verification.VerifiableChunk {
 		},
 	}
 
-	receipt := flow.ExecutionReceipt{
-		ExecutionResult: result,
-	}
-
-	return &verification.VerifiableChunk{
-		ChunkIndex: chunkIndex,
-		EndState:   StateCommitmentFixture(),
-		Block:      &block,
-		Receipt:    &receipt,
-		Collection: &col,
+	return &verification.VerifiableChunkData{
+		Chunk:         &chunk,
+		Header:        block.Header,
+		Result:        &result,
+		Collection:    &col,
+		ChunkDataPack: nil,
+		EndState:      StateCommitmentFixture(),
 	}
 }
 
