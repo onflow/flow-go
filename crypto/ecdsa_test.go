@@ -182,21 +182,3 @@ func TestScalarMult(t *testing.T) {
 		assert.Equal(t, Ry.Cmp(Qy), 0)
 	}
 }
-
-func TestECDSAXX(t *testing.T) {
-	ecdsaCurves := []SigningAlgorithm{
-		ECDSAP256,
-		ECDSASecp256k1,
-	}
-
-	for _, curve := range ecdsaCurves {
-		seedMinLength := 48
-		// Key generation seed
-		seed := make([]byte, seedMinLength)
-		_, _ = rand.Read(seed)
-		sk, _ := GeneratePrivateKey(curve, seed)
-		pk1 := sk.PublicKey()
-		pk2 := sk.PublicKey()
-		assert.True(t, pk1.Equals(pk2), "ff")
-	}
-}
