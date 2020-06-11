@@ -73,7 +73,9 @@ func main() {
 		mainMetrics    module.HotstuffMetrics
 
 		// TODO remove this
-		migrateDB bool
+		migrateDB                  bool
+		resendOldBlocksStartHeight uint64
+		resendOldBlocksEndHeight   uint64
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -94,8 +96,10 @@ func main() {
 			// if block rate delay is 1 second, then 0.8 block will be finalized per second in average.
 			// if block rate delay is 1.5 second, then 0.5 block will be finalized per second in average
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
-			// TODO remove this
+			// TODO remove this -- this is for fixing specific devnet7 issues
 			flags.BoolVar(&migrateDB, "migrate-db", true, "whether or not to migrate the DB on startup")
+			flags.Uint64Var(&resendOldBlocksStartHeight, "resend-old-start", 945014, "where to start sending old blocks (inclusive)")
+			flags.Uint64Var(&resendOldBlocksEndHeight, "resend-old-end", 945368, "where to stop sending old blocks (inclusive)")
 		}).
 		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
 			privateDKGData, err = loadDKGPrivateData(node.BaseConfig.BootstrapDir, node.NodeID)
@@ -179,6 +183,9 @@ func main() {
 				node.Network,
 				node.State,
 				node.Me,
+				node.Storage.Blocks,
+				resendOldBlocksStartHeight,
+				resendOldBlocksEndHeight,
 			)
 			return prov, err
 		}).

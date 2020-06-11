@@ -3,6 +3,9 @@
 package provider
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
@@ -14,6 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -29,18 +33,26 @@ type Engine struct {
 	con     network.Conduit      // used to talk to other nodes on the network
 	state   protocol.State       // used to access the  protocol state
 	me      module.Local         // used to access local node information
+
+	// to send missing blocks to exe nodes
+	blocks      storage.Blocks
+	startHeight uint64 // inclusive
+	endHeight   uint64 // inclusive
 }
 
 // New creates a new block provider engine.
-func New(log zerolog.Logger, message module.EngineMetrics, net module.Network, state protocol.State, me module.Local) (*Engine, error) {
+func New(log zerolog.Logger, message module.EngineMetrics, net module.Network, state protocol.State, me module.Local, blocks storage.Blocks, startHeight, endHeight uint64) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:    engine.NewUnit(),
-		log:     log.With().Str("engine", "provider").Logger(),
-		message: message,
-		state:   state,
-		me:      me,
+		unit:        engine.NewUnit(),
+		log:         log.With().Str("engine", "provider").Logger(),
+		message:     message,
+		state:       state,
+		me:          me,
+		blocks:      blocks,
+		startHeight: startHeight,
+		endHeight:   endHeight,
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -58,6 +70,9 @@ func New(log zerolog.Logger, message module.EngineMetrics, net module.Network, s
 // started. For the provider engine, we consider the engine up and running
 // upon initialization.
 func (e *Engine) Ready() <-chan struct{} {
+	e.unit.Launch(func() {
+		e.sendOldBlocks(e.startHeight, e.endHeight)
+	})
 	return e.unit.Ready()
 }
 
@@ -151,4 +166,52 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	log.Info().Msg("block proposal propagated to non-consensus nodes")
 
 	return nil
+}
+
+// send a range of blocks that execution nodes are missing.
+
+func (e *Engine) sendOldBlocks(start, end uint64) {
+
+	// INCLUDE start in range
+	height := start
+
+	exeNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
+	if err != nil {
+		e.log.Error().Err(err).Msg("failed to get exe nodes ")
+		return
+	}
+
+	// INCLUDE end in range
+	for height <= end {
+
+		// wait 100ms between blocks
+		<-time.After(time.Millisecond * 100)
+
+		log := e.log.With().
+			Uint64("block_height", height).
+			Str("recipients", fmt.Sprintf("%v", exeNodes.NodeIDs())).
+			Logger()
+
+		block, err := e.blocks.ByHeight(height)
+		if err != nil {
+			log.Error().Err(err).Msg("could not get block")
+			continue
+		}
+
+		proposal := &messages.BlockProposal{
+			Header:  block.Header,
+			Payload: block.Payload,
+		}
+
+		log.Info().Msg("sending block proposal")
+		err = e.con.Submit(proposal, exeNodes.NodeIDs()...)
+		if err != nil {
+			log.Error().Err(err).Msg("could not send block")
+			continue
+		}
+
+		height++
+	}
+
+	e.log.Info().Msg("sent all proposals")
 }
