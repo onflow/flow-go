@@ -177,7 +177,12 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, r *flow.Executi
 	// add each chunk to a pending list to be processed by onTimer
 	for _, chunk := range chunks {
 		status := NewChunkStatus(chunk, result.ExecutionResult.ID(), result.ExecutorID)
-		_ = e.chunks.Add(status)
+		added = e.chunks.Add(status)
+		if !added {
+			log.Debug().
+				Int("chunks", len(chunks)).
+				Msg("could not add chunk status to chunks mempool")
+		}
 	}
 
 	log.Debug().
@@ -259,7 +264,7 @@ func (e *Engine) onTimer() {
 
 		// check if has reached max try
 		if !CanTry(e.maxAttempt, chunk) {
-			e.chunks.Rem(cid)
+			// e.chunks.Rem(cid)
 			log.Debug().
 				Int("max_attempt", e.maxAttempt).
 				Int("actual_attempts", chunk.Attempt).
@@ -324,7 +329,7 @@ func (e *Engine) requestChunkDataPack(c *ChunkStatus) error {
 // handleChunkDataPack receives a chunk data pack, verifies its origin ID, pull other data to make a
 // VerifiableChunk, and pass it to the verifier engine to verify
 func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) error {
-	chunkID := chunkDataPack.ID()
+	chunkID := chunkDataPack.ChunkID
 
 	log := e.log.With().
 		Hex("executor_id", logging.ID(originID)).
