@@ -143,7 +143,9 @@ func (e *Engine) SubmitLocal(event interface{}) {
 func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
-		if err != nil {
+		if engine.IsInvalidInputError(err) {
+			e.log.Warn().Err(err).Msg("compliance received invalid event")
+		} else if err != nil {
 			e.log.Error().Err(err).Msg("compliance could not process submitted event")
 		}
 	})
