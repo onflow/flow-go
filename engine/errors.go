@@ -33,11 +33,15 @@ func (e InvalidInput) Unwrap() error {
 
 func (e InvalidInput) Error() string {
 	if e.Err != nil {
+		if e.Msg == "" {
+			return fmt.Sprintf("%v", e.Err)
+		}
 		return fmt.Sprintf("%v, err: %v", e.Msg, e.Err)
 	}
 	return e.Msg
 }
 
+// IsInvalidInputError returns whether the given error is a InvalidInput error
 func IsInvalidInputError(err error) bool {
 	var errInvalidInput InvalidInput
 	return errors.As(err, &errInvalidInput)

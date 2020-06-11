@@ -169,20 +169,25 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	// source for a execution receipt (usually execution nodes)
 	identity, err := e.state.Final().Identity(originID)
 	if err != nil {
+		if protocol.IsIdentityNotFound(err) {
+			return engine.InvalidInput{Msg: "could not get executor identity", Err: err}
+		}
+
+		// unknown exception
 		return fmt.Errorf("could not get executor identity: %w", err)
 	}
 
 	// check that the origin is an execution node
 	if identity.Role != flow.RoleExecution {
-		return fmt.Errorf("invalid executor node role (%s)", identity.Role)
+		return engine.NewInvalidInputf("invalid executor node role (%s)", identity.Role)
 	}
 
 	// check if the identity has a stake
 	if identity.Stake == 0 {
-		return fmt.Errorf("executor has zero stake (%x)", identity.NodeID)
+		return engine.NewInvalidInputf("executor has zero stake (%x)", identity.NodeID)
 	}
 
-	// check if the result of this receipt is already in the dB
+	// check if the result of this receipt is already in the DB
 	result := &receipt.ExecutionResult
 	_, err = e.resultsDB.ByID(result.ID())
 	if err == nil {
@@ -233,24 +238,29 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 
 	// check approver matches the origin ID
 	if approval.Body.ApproverID != originID {
-		return fmt.Errorf("invalid origin for approval: %x", originID)
+		return engine.NewInvalidInputf("invalid origin for approval: %x", originID)
 	}
 
 	// get the identity of the origin node, so we can check if it's a valid
 	// source for a result approval (usually verification node)
 	identity, err := e.state.Final().Identity(originID)
 	if err != nil {
-		return fmt.Errorf("could not get approval identity: %w", err)
+		if protocol.IsIdentityNotFound(err) {
+			return engine.InvalidInput{Msg: "could not get approval identity", Err: err}
+		}
+
+		// unknown exception
+		return fmt.Errorf("could not get executor identity: %w", err)
 	}
 
 	// check that the origin is a verification node
 	if identity.Role != flow.RoleVerification {
-		return fmt.Errorf("invalid approver node role (%s)", identity.Role)
+		return engine.NewInvalidInputf("invalid approver node role (%s)", identity.Role)
 	}
 
 	// check if the identity has a stake
 	if identity.Stake == 0 {
-		return fmt.Errorf("verifier has zero stake (%x)", identity.NodeID)
+		return engine.NewInvalidInputf("verifier has zero stake (%x)", identity.NodeID)
 	}
 
 	// check if the result of this approval is already in the dB
