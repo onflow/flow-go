@@ -1,6 +1,9 @@
-package match
+package engine
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 // InvalidInput are the type for input errors. It's useful to distinguish
 // errors from exceptions.
@@ -20,6 +23,10 @@ func NewInvalidInput(msg string) error {
 	}
 }
 
+func NewInvalidInputf(msg string, args ...interface{}) error {
+	return NewInvalidInput(fmt.Sprintf(msg, args...))
+}
+
 func (e InvalidInput) Unwrap() error {
 	return e.Err
 }
@@ -29,4 +36,9 @@ func (e InvalidInput) Error() string {
 		return fmt.Sprintf("%v, err: %v", e.Msg, e.Err)
 	}
 	return e.Msg
+}
+
+func IsInvalidInputError(err error) bool {
+	var errInvalidInput InvalidInput
+	return errors.As(err, &errInvalidInput)
 }

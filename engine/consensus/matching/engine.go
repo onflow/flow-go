@@ -162,7 +162,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 	// check the execution receipt is sent by its executor
 	if receipt.ExecutorID != originID {
-		return fmt.Errorf("invalid origin for receipt (executor: %x, origin: %x)", receipt.ExecutorID, originID)
+		return engine.NewInvalidInputf("invalid origin for receipt (executor: %x, origin: %x)", receipt.ExecutorID, originID)
 	}
 
 	// get the identity of the origin node, so we can check if it's a valid
