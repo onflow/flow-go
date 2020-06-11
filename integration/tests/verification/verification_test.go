@@ -22,6 +22,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
@@ -159,8 +160,8 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 
 		// starts all the engines
 		<-verNode.FinderEngine.Ready()
-		<-verNode.MatchEngine.Ready()
-		<-verNode.VerifierEngine.Ready()
+		<-verNode.MatchEngine.(module.ReadyDoneAware).Ready()
+		<-verNode.VerifierEngine.(module.ReadyDoneAware).Ready()
 
 		// assumes the verification node has received the block
 		err := verNode.Blocks.Store(completeER.Block)
@@ -222,8 +223,8 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 	// the process method of Ingest engines is done working.
 	for _, verNode := range verNodes {
 		<-verNode.FinderEngine.Done()
-		<-verNode.MatchEngine.Done()
-		<-verNode.VerifierEngine.Done()
+		<-verNode.MatchEngine.(module.ReadyDoneAware).Done()
+		<-verNode.VerifierEngine.(module.ReadyDoneAware).Done()
 	}
 
 	// stops continuous delivery of nodes
