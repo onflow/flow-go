@@ -51,31 +51,31 @@ func TestHappyPath(t *testing.T) {
 			chunkCount:   2,
 			lightIngest:  true,
 		},
-		//{
-		//	verNodeCount: 1,
-		//	chunkCount:   10,
-		//	lightIngest:  true,
-		//},
-		//{
-		//	verNodeCount: 2,
-		//	chunkCount:   2,
-		//	lightIngest:  true,
-		//},
-		//{
-		//	verNodeCount: 1,
-		//	chunkCount:   2,
-		//	lightIngest:  false,
-		//},
-		//{
-		//	verNodeCount: 1,
-		//	chunkCount:   10,
-		//	lightIngest:  false,
-		//},
-		//{
-		//	verNodeCount: 2,
-		//	chunkCount:   2,
-		//	lightIngest:  false,
-		//},
+		{
+			verNodeCount: 1,
+			chunkCount:   10,
+			lightIngest:  true,
+		},
+		{
+			verNodeCount: 2,
+			chunkCount:   2,
+			lightIngest:  true,
+		},
+		{
+			verNodeCount: 1,
+			chunkCount:   2,
+			lightIngest:  false,
+		},
+		{
+			verNodeCount: 1,
+			chunkCount:   10,
+			lightIngest:  false,
+		},
+		{
+			verNodeCount: 2,
+			chunkCount:   2,
+			lightIngest:  false,
+		},
 	}
 
 	for _, tc := range testcases {
