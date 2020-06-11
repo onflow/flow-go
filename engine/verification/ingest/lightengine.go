@@ -584,13 +584,13 @@ func (l *LightEngine) ingestChunk(chunk *flow.Chunk,
 	}
 
 	// creates a verifiable chunk for assigned chunk
-	vchunk := &verification.VerifiableChunk{
-		ChunkIndex:    chunk.Index,
-		Receipt:       receipt,
-		EndState:      endState,
-		Block:         block,
+	vchunk := &verification.VerifiableChunkData{
+		Chunk:         chunk,
+		Header:        block.Header,
+		Result:        &receipt.ExecutionResult,
 		Collection:    collection,
 		ChunkDataPack: chunkDataPack,
+		EndState:      endState,
 	}
 
 	// verify the receipt
@@ -613,7 +613,7 @@ func (l *LightEngine) ingestChunk(chunk *flow.Chunk,
 // onChunkIngested is called whenever a verifiable chunk is formed for a
 // chunk and is sent to the verify engine successfully.
 // It cleans up all resources associated with this chunk.
-func (l *LightEngine) onChunkIngested(vc *verification.VerifiableChunk) {
+func (l *LightEngine) onChunkIngested(vc *verification.VerifiableChunkData) {
 	// marks this chunk as ingested
 	ok := l.ingestedChunkIDs.Add(vc.ChunkDataPack.ChunkID)
 	if !ok {
