@@ -361,7 +361,7 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 
 		// stop searching if we would overflow the seal mempool
 		if e.seals.Size()+uint(len(results)) >= e.seals.Limit() {
-			return results, nil
+			break
 		}
 
 		// get the block header at this height
@@ -389,11 +389,6 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 
 	// go through all results and check which ones we have enough approvals for
 	for _, result := range e.results.All() {
-
-		// stop searching if we would overflow the seal mempool
-		if e.seals.Size()+uint(len(results)) >= e.seals.Limit() {
-			return results, nil
-		}
 
 		// get the node IDs for all approvers of this result
 		// TODO: check for duplicate approver
