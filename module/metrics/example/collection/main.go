@@ -29,6 +29,9 @@ func main() {
 			NetworkCollector:    metrics.NewNetworkCollector(),
 		}
 
+		topic1 := engine.ChannelName(engine.CollectionProvider)
+		topic2 := engine.ChannelName(engine.CollectionIngest)
+
 		for i := 0; i < 100; i++ {
 			collector.TransactionIngested(unittest.IdentifierFixture())
 			collector.HotStuffBusyDuration(10, metrics.HotstuffEventTypeTimeout)
@@ -37,11 +40,11 @@ func main() {
 			collector.SetCurView(uint64(i))
 			collector.SetQCView(uint64(i))
 
-			collector.NetworkMessageSent(rand.Intn(1000), engine.ChannelName(engine.CollectionProvider))
-			collector.NetworkMessageSent(rand.Intn(1000), engine.ChannelName(engine.CollectionIngest))
+			collector.NetworkMessageSent(rand.Intn(1000), topic1)
+			collector.NetworkMessageSent(rand.Intn(1000), topic2)
 
-			collector.NetworkMessageReceived(rand.Intn(1000), engine.ChannelName(engine.CollectionProvider))
-			collector.NetworkMessageReceived(rand.Intn(1000), engine.ChannelName(engine.CollectionIngest))
+			collector.NetworkMessageReceived(rand.Intn(1000), topic1)
+			collector.NetworkMessageReceived(rand.Intn(1000), topic2)
 
 			time.Sleep(1 * time.Second)
 		}
