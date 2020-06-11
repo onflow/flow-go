@@ -550,6 +550,32 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 
 		assert.False(t, result.Succeeded())
 	})
+
+	t.Run("WithSimpleAddresses", func(t *testing.T) {
+		validTx := flow.NewTransactionBody().
+			SetScript(createAccountScript).
+			AddAuthorizer(flow.ServiceAddress())
+
+		err = execTestutil.SignTransactionAsServiceAccount(validTx, 3)
+		require.NoError(t, err)
+
+		vm, err := virtualmachine.New(rt, virtualmachine.WithSimpleAddresses(true))
+		assert.NoError(t, err)
+		bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
+
+		result, err := bc.ExecuteTransaction(ledger, validTx)
+		require.NoError(t, err)
+
+		if !assert.True(t, result.Succeeded()) {
+			t.Error(result.Error.ErrorMessage())
+		}
+
+		require.Len(t, result.Logs, 1)
+		// NOTE: 0x0000000000070002 comes from the fact that we bootstrap the ledger with
+		// `l.SetAddressState(flow.NewAddressGenerator())`. This does not make sense to be changed, since simple
+		// addresses are supposed to be used in flow-emulator, not in flow-go.
+		assert.Equal(t, "Created new account with address: 0x0000000000070002", result.Logs[0])
+	})
 }
 
 func TestBlockContext_ExecuteScript(t *testing.T) {
