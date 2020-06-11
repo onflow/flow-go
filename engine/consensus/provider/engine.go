@@ -3,7 +3,8 @@
 package provider
 
 import (
-	"github.com/pkg/errors"
+	"fmt"
+
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -46,7 +47,7 @@ func New(log zerolog.Logger, message module.EngineMetrics, net module.Network, s
 	// register the engine with the network layer and store the conduit
 	con, err := net.Register(engine.BlockProvider, e)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not register engine")
+		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 
 	e.con = con
@@ -101,17 +102,12 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // to this function originate within the provider engine on the node with the
 // given origin ID.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	var err error
 	switch ev := event.(type) {
 	case *messages.BlockProposal:
-		err = e.onBlockProposal(originID, ev)
+		return e.onBlockProposal(originID, ev)
 	default:
-		err = errors.Errorf("invalid event type (%T)", event)
+		return fmt.Errorf("invalid event type (%T)", event)
 	}
-	if err != nil {
-		return errors.Wrap(err, "could not process event")
-	}
-	return nil
 }
 
 // onBlockProposal is used when a block has been finalized locally and we want to
@@ -131,19 +127,19 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	// currently, only accept blocks that come from our local consensus
 	localID := e.me.NodeID()
 	if originID != localID {
-		return errors.Errorf("non-local block (nodeID: %x)", originID)
+		return engine.NewInvalidInput("non-local block (nodeID: %x)", originID)
 	}
 
 	// get all non-consensus nodes in the system
 	identities, err := e.state.Final().Identities(filter.Not(filter.HasRole(flow.RoleConsensus)))
 	if err != nil {
-		return errors.Wrap(err, "could not get identities")
+		return fmt.Errorf("could not get identities: %w", err)
 	}
 
 	// submit the blocks to the targets
 	err = e.con.Submit(proposal, identities.NodeIDs()...)
 	if err != nil {
-		return errors.Wrap(err, "could not broadcast block")
+		return fmt.Errorf("could not broadcast block: %w", err)
 	}
 
 	e.message.MessageSent(metrics.EngineConsensusProvider, metrics.MessageBlockProposal)
