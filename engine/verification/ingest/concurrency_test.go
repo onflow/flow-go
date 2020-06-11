@@ -473,11 +473,11 @@ func SetupMockVerifierEng(t testing.TB, vChunks []*verification.VerifiableChunkD
 			defer mu.Unlock()
 
 			// the received entity should be a verifiable chunk
-			vchunk, ok := args[0].(*verification.VerifiableChunk)
+			vchunk, ok := args[0].(*verification.VerifiableChunkData)
 			assert.True(t, ok)
 
 			// retrieves the content of received chunk
-			chunk, ok := vchunk.Receipt.ExecutionResult.Chunks.ByIndex(vchunk.ChunkIndex)
+			chunk, ok := vchunk.Result.Chunks.ByIndex(vchunk.Chunk.Index)
 			require.True(t, ok, "chunk out of range requested")
 			vID := chunk.ID()
 
