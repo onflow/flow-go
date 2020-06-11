@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
@@ -189,7 +190,7 @@ func CreateAccounts(
 
 func RootBootstrappedLedger() virtualmachine.Ledger {
 	ledger := make(virtualmachine.MapLedger)
-	bootstrap.BootstrapView(ledger, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply)
+	bootstrap.NewBootstrapper(zerolog.Nop()).BootstrapView(ledger, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply)
 	return ledger
 }
 

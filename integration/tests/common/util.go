@@ -65,13 +65,16 @@ var (
 
 	// ReadCounterScript is a read-only script for reading the current value of the counter contract
 	ReadCounterScript = dsl.Main{
+		Import: dsl.Import{
+			Names:   []string{"Testing"},
+			Address: flow.ServiceAddress()},
 		ReturnType: "Int",
-		Code: `
-			let account = getAccount(0x01)
+		Code: fmt.Sprintf(`
+			let account = getAccount(0x%s)
 			if let cap = account.getCapability(/public/counter) {
 				return cap.borrow<&Testing.Counter>()?.count ?? -3
 			}
-			return -3`,
+			return -3`, flow.ServiceAddress().Short()),
 	}
 
 	// CreateCounterPanicTx is a transaction script that creates a counter instance in the root account, but panics after

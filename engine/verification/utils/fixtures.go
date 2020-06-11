@@ -2,9 +2,11 @@ package utils
 
 import (
 	"context"
+	"io/ioutil"
 	"testing"
 
 	"github.com/onflow/cadence/runtime"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
@@ -75,12 +77,14 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) CompleteExecut
 
 	metricsCollector := &metrics.NoopCollector{}
 
+	log := zerolog.New(ioutil.Discard)
+
 	unittest.RunWithTempDir(t, func(dir string) {
 		led, err := ledger.NewMTrieStorage(dir, 100, metricsCollector, nil)
 		require.NoError(t, err)
 		defer led.Done()
 
-		startStateCommitment, err := bootstrap.BootstrapLedger(
+		startStateCommitment, err := bootstrap.NewBootstrapper(zerolog.Nop()).BootstrapLedger(
 			led,
 			unittest.ServiceAccountPublicKey,
 			unittest.GenesisTokenSupply,
@@ -95,7 +99,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) CompleteExecut
 		view := delta.NewView(state.LedgerGetRegister(led, startStateCommitment))
 
 		// create BlockComputer
-		bc := computer.NewBlockComputer(vm, nil, new(storage.Blocks))
+		bc := computer.NewBlockComputer(vm, nil, new(storage.Blocks), log)
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
 		completeColls[guarantee.ID()] = &entity.CompleteCollection{

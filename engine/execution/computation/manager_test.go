@@ -2,9 +2,11 @@ package computation
 
 import (
 	"context"
+	"io/ioutil"
 	"testing"
 
 	"github.com/onflow/cadence/runtime"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -83,7 +85,8 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	blockComputer := computer.NewBlockComputer(vm, nil, new(storage.Blocks))
+	log := zerolog.New(ioutil.Discard)
+	blockComputer := computer.NewBlockComputer(vm, nil, new(storage.Blocks), log)
 
 	engine := &Manager{
 		blockComputer: blockComputer,

@@ -50,6 +50,8 @@ func NewClient(addr string) (*Client, error) {
 // code to the root account.
 func (c *Client) DeployContract(ctx context.Context, refID flow.Identifier, contract dsl.CadenceCode) error {
 
+	fmt.Printf("contract to be deployed:\n %s\n", contract.ToCadence())
+
 	code := dsl.Transaction{
 		Import: dsl.Import{},
 		Content: dsl.Prepare{
@@ -62,7 +64,9 @@ func (c *Client) DeployContract(ctx context.Context, refID flow.Identifier, cont
 		unittest.WithReferenceBlock(refID),
 	)
 
-	return c.SendTransaction(ctx, tx)
+	fmt.Printf("deploying tx ID %x:\n %s\n", tx.ID(), tx)
+
+	return c.SignAndSendTransaction(ctx, tx)
 }
 
 // SignTransaction signs the transaction using the proposer's key
@@ -102,6 +106,8 @@ func (c *Client) SignAndSendTransaction(ctx context.Context, tx flow.Transaction
 func (c *Client) ExecuteScript(ctx context.Context, script dsl.Main) ([]byte, error) {
 
 	code := script.ToCadence()
+
+	fmt.Printf("executing %s\n", code)
 
 	res, err := c.client.ExecuteScript(ctx, []byte(code))
 	if err != nil {

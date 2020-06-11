@@ -54,17 +54,31 @@ func (e *MissingPayerError) StatusCode() uint32 {
 	return 3
 }
 
-// An InvalidSignatureAccountError indicates that a signature references a nonexistent account.
-type InvalidSignatureAccountError struct {
+// An SignatureAccountDoesNotExist indicates that a signature references a nonexistent account.
+type SignatureAccountDoesNotExist struct {
 	Address flow.Address
 }
 
-func (e *InvalidSignatureAccountError) ErrorMessage() string {
+func (e *SignatureAccountDoesNotExist) ErrorMessage() string {
 	return fmt.Sprintf("account with address %s does not exist", e.Address)
 }
 
-func (e *InvalidSignatureAccountError) StatusCode() uint32 {
-	return 4
+func (e *SignatureAccountDoesNotExist) StatusCode() uint32 {
+	return 10
+}
+
+// An SignatureAccountKeyDoesNotExist indicates that a signature references a nonexistent account.
+type SignatureAccountKeyDoesNotExist struct {
+	Address flow.Address
+	KeyID   uint64
+}
+
+func (e *SignatureAccountKeyDoesNotExist) ErrorMessage() string {
+	return fmt.Sprintf("key %d on account with address %s does not exist", e.KeyID, e.Address)
+}
+
+func (e *SignatureAccountKeyDoesNotExist) StatusCode() uint32 {
+	return 11
 }
 
 // An InvalidProposalKeyError indicates that proposal key references an invalid public key.
@@ -78,7 +92,7 @@ func (e *InvalidProposalKeyError) ErrorMessage() string {
 }
 
 func (e *InvalidProposalKeyError) StatusCode() uint32 {
-	return 4
+	return 10
 }
 
 // An InvalidHashingAlgorithmError indicates that given key has invalid key algorithm
