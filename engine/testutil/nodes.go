@@ -412,7 +412,7 @@ func VerificationNode(t testing.TB,
 			node.State,
 			node.Chunks,
 			node.HeaderStorage,
-			time.Duration(requestIntervalMs),
+			1000*time.Millisecond,
 			int(failureThreshold))
 	}
 
