@@ -36,7 +36,7 @@ func TestTransactionASTCache(t *testing.T) {
             `),
 		}
 
-		err := testutil.SignTransactionByRoot(tx, 0)
+		err := testutil.SignTransactionAsServiceAccount(tx, 0)
 		require.NoError(t, err)
 
 		ledger := testutil.RootBootstrappedLedger()

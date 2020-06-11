@@ -94,7 +94,7 @@ func SignTransaction(
 	return SignEnvelope(tx, address, privateKey)
 }
 
-func SignTransactionByRoot(tx *flow.TransactionBody, seqNum uint64) error {
+func SignTransactionAsServiceAccount(tx *flow.TransactionBody, seqNum uint64) error {
 	return SignTransaction(tx, flow.ServiceAddress(), unittest.ServiceAccountPrivateKey, seqNum)
 }
 
