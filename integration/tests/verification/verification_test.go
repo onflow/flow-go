@@ -409,13 +409,13 @@ func ingestHappyPath(tb testing.TB, receiptCount int, chunkCount int, lightInges
 	// mocks the assignment to assign the single chunk to this verifier node
 	assigner := utils.NewMockAssigner(verIdentity.NodeID, IsAssigned)
 
-	vChunks := make([]*verification.VerifiableChunk, 0)
+	vChunks := make([]*verification.VerifiableChunkData, 0)
 
 	// collects assigned chunks to verification node in vChunks
 	for _, er := range ers {
 		for _, chunk := range er.Receipt.ExecutionResult.Chunks {
 			if IsAssigned(chunk.Index) {
-				vChunks = append(vChunks, VerifiableChunk(chunk.Index, er))
+				vChunks = append(vChunks, VerifiableDataChunk(chunk.Index, er))
 			}
 		}
 	}
