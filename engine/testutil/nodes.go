@@ -414,6 +414,7 @@ func VerificationNode(t testing.TB,
 			node.HeaderStorage,
 			1000*time.Millisecond,
 			int(failureThreshold))
+		require.Nil(t, err)
 	}
 
 	if node.IngestedChunkIDs == nil {
