@@ -128,14 +128,14 @@ func (h *Handler) deriveTransactionStatus(tx *flow.TransactionBody, executed boo
 	}
 
 	// get the latest sealed block from the state
-	sealed, err := h.state.Sealed().Head()
+	sealed, err := h.sealedHeader()
 	if err != nil {
 		return entities.TransactionStatus_UNKNOWN, err
 	}
 
 	// if the finalized block precedes the latest sealed block, then it can be safely assumed that it would have been
 	// sealed as well and the transaction can be considered sealed
-	if block.Header.Height <= sealed.Height {
+	if block.Header.Height <= sealed.Height && executed {
 		return entities.TransactionStatus_SEALED, nil
 	}
 

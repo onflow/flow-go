@@ -14,7 +14,7 @@ func (h *Handler) ExecuteScriptAtLatestBlock(ctx context.Context,
 	req *access.ExecuteScriptAtLatestBlockRequest) (*access.ExecuteScriptResponse, error) {
 
 	// get the latest sealed header
-	latestHeader, err := h.state.Sealed().Head()
+	latestHeader, err := h.sealedHeader()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get latest sealed header: %v", err)
 	}

@@ -120,7 +120,7 @@ func (h *Handler) GetAccount(ctx context.Context, req *access.GetAccountRequest)
 	}
 
 	// get the latest sealed header
-	latestHeader, err := h.state.Sealed().Head()
+	latestHeader, err := h.sealedHeader()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get latest sealed header: %v", err)
 	}
@@ -153,6 +153,15 @@ func (h *Handler) GetNetworkParameters(_ context.Context, _ *access.GetNetworkPa
 	return &access.GetNetworkParametersResponse{
 		ChainId: string(flow.GetChainID()),
 	}, nil
+}
+
+func (h *Handler) sealedHeader() (*flow.Header, error) {
+	head, err := h.state.Final().Head()
+	if err != nil {
+		return nil, err
+	}
+
+	return h.headers.ByHeight(head.Height - 6)
 }
 
 func convertStorageError(err error) error {

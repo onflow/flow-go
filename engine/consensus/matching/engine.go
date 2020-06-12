@@ -357,8 +357,8 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 		return nil, fmt.Errorf("could not get finalized height: %w", err)
 	}
 
-	for height := sealed.Height; height < final.Height; height++ {
-
+	for height := sealed.Height + 1; height < final.Height; height++ {
+		break
 		// stop searching if we would overflow the seal mempool
 		if e.seals.Size()+uint(len(results)) >= e.seals.Limit() {
 			break

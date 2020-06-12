@@ -25,7 +25,7 @@ func (h *Handler) GetEventsForHeightRange(ctx context.Context, req *access.GetEv
 	}
 
 	// get the latest sealed block header
-	head, err := h.state.Sealed().Head()
+	head, err := h.sealedHeader()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, " failed to get events: %v", err)
 	}
