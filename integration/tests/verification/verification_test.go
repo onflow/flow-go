@@ -92,9 +92,10 @@ func TestHappyPath_TwoEngine(t *testing.T) {
 	}
 }
 
-// TestHappyPath evaluates the happy path scenario of
-// concurrently sending two execution receipts of the same result each
-// with `chunkCount`-many chunks to `verNodeCount`-many verification nodes
+// TestHappyPath_ThreeEngine considers the happy path of Finder-Match-Verify engines.
+// It evaluates the happy path scenario of
+// concurrently sending an execution receipt with
+// `chunkCount`-many chunks to `verNodeCount`-many verification nodes
 // the happy path should result in dissemination of a result approval for each
 // distinct chunk by each verification node. The result approvals should be
 // sent to the consensus nodes
@@ -195,9 +196,21 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest, th
 		verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold, lightIngest, threeEngine)
 
 		// starts all the engines
-		<-verNode.FinderEngine.Ready()
-		<-verNode.MatchEngine.(module.ReadyDoneAware).Ready()
-		<-verNode.VerifierEngine.(module.ReadyDoneAware).Ready()
+		if threeEngine {
+			// three engines architecture
+			<-verNode.FinderEngine.Ready()
+			<-verNode.MatchEngine.(module.ReadyDoneAware).Ready()
+			<-verNode.VerifierEngine.(module.ReadyDoneAware).Ready()
+		} else {
+			// two engines architecture
+			if lightIngest {
+				// light ingest
+				<-verNode.LightIngestEngine.Ready()
+			} else {
+				// original ingest engine
+				<-verNode.IngestEngine.Ready()
+			}
+		}
 
 		// assumes the verification node has received the block
 		err := verNode.Blocks.Store(completeER.Block)
@@ -215,14 +228,29 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest, th
 	// mock consensus node
 	conNode, conEngine, conWG := setupMockConsensusNode(t, hub, conIdentity, verIdentities, identities, completeER)
 
-	// invokes finder engine of verification nodes with receipt
+	// sends execution receipt to each of verification nodes
 	verWG := sync.WaitGroup{}
 	for _, verNode := range verNodes {
 		verWG.Add(1)
 		go func(vn mock2.VerificationNode, receipt *flow.ExecutionReceipt) {
 			defer verWG.Done()
-			err := vn.FinderEngine.Process(exeIdentity.NodeID, receipt)
+			var err error
+			if threeEngine {
+				// three engine architecture
+				err = vn.FinderEngine.Process(exeIdentity.NodeID, receipt)
+				require.NoError(t, err)
+			} else {
+				// two engine architecture
+				if lightIngest {
+					// light ingest engine
+					err = vn.LightIngestEngine.Process(exeIdentity.NodeID, receipt)
+				} else {
+					// ingest engine
+					err = vn.IngestEngine.Process(exeIdentity.NodeID, receipt)
+				}
+			}
 			require.NoError(t, err)
+
 		}(verNode, completeER.Receipt)
 	}
 
@@ -258,9 +286,22 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest, th
 	// Note: this should be done prior to any evaluation to make sure that
 	// the process method of Ingest engines is done working.
 	for _, verNode := range verNodes {
-		<-verNode.FinderEngine.Done()
-		<-verNode.MatchEngine.(module.ReadyDoneAware).Done()
-		<-verNode.VerifierEngine.(module.ReadyDoneAware).Done()
+		// starts all the engines
+		if threeEngine {
+			// three engines architecture
+			<-verNode.FinderEngine.Done()
+			<-verNode.MatchEngine.(module.ReadyDoneAware).Done()
+			<-verNode.VerifierEngine.(module.ReadyDoneAware).Done()
+		} else {
+			// two engines architecture
+			if lightIngest {
+				// light ingest
+				<-verNode.LightIngestEngine.Done()
+			} else {
+				// original ingest engine
+				<-verNode.IngestEngine.Done()
+			}
+		}
 	}
 
 	// stops continuous delivery of nodes
