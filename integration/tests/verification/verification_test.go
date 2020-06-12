@@ -137,7 +137,8 @@ func TestHappyPath_ThreeEngine(t *testing.T) {
 // - submitting a verifiable chunk locally to the verify engine by the ingest engine
 // - dropping the ingestion of the ERs that share the same result once the verifiable chunk is submitted to verify engine
 // - broadcast of a matching result approval to consensus nodes for each assigned chunk
-// threeEngine indicates whether to use the LightIngestEngine or the original ingest engine
+// lightIngest indicates whether to use the LightIngestEngine or the original ingest engine
+// threeEngine indicates whether to use the threeEngine version or the twoEngine version of architecture.
 func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest, threeEngine bool) {
 	// to demarcate the debug logs
 	log.Debug().
