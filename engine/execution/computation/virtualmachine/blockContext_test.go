@@ -375,6 +375,14 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 	}
 }
 
+var createAccountScript = []byte(`
+	transaction {
+		prepare(signer: AuthAccount) {
+			let acct = AuthAccount(payer: signer)
+		}
+	}
+`)
+
 func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 
@@ -390,14 +398,6 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 	ledger := execTestutil.RootBootstrappedLedger()
 	accounts, err := execTestutil.CreateAccounts(vm, ledger, privateKeys)
 	require.NoError(t, err)
-
-	createAccountScript := []byte(`
-		transaction {
-			prepare(signer: AuthAccount) {
-				let acct = AuthAccount(payer: signer)
-			}
-		}
-	`)
 
 	addAccountCreatorTemplate := `
 	import FlowServiceAccount from 0x%s
@@ -550,32 +550,34 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 
 		assert.False(t, result.Succeeded())
 	})
+}
 
-	t.Run("WithSimpleAddresses", func(t *testing.T) {
-		validTx := flow.NewTransactionBody().
-			SetScript(createAccountScript).
-			AddAuthorizer(flow.ServiceAddress())
+func TestBlockContext_ExecuteTransaction_CreateAccount_WithSimpleAddresses(t *testing.T) {
+	rt := runtime.NewInterpreterRuntime()
+	h := unittest.BlockHeaderFixture()
 
-		err = execTestutil.SignTransactionAsServiceAccount(validTx, 3)
-		require.NoError(t, err)
+	vm, err := virtualmachine.New(rt, virtualmachine.WithSimpleAddresses(true))
+	assert.NoError(t, err)
 
-		vm, err := virtualmachine.New(rt, virtualmachine.WithSimpleAddresses(true))
-		assert.NoError(t, err)
-		bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
+	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
+	ledger := execTestutil.RootBootstrappedLedgerWithSimpleAddresses(true)
 
-		result, err := bc.ExecuteTransaction(ledger, validTx)
-		require.NoError(t, err)
+	validTx := flow.NewTransactionBody().
+		SetScript(createAccountScript).
+		AddAuthorizer(virtualmachine.SimpleServiceAddress())
 
-		if !assert.True(t, result.Succeeded()) {
-			t.Error(result.Error.ErrorMessage())
-		}
+	err = execTestutil.SignTransactionAsSimpleServiceAccount(validTx, 0)
+	require.NoError(t, err)
 
-		require.Len(t, result.Logs, 1)
-		// NOTE: 0x0000000000070002 comes from the fact that we bootstrap the ledger with
-		// `l.SetAddressState(flow.NewAddressGenerator())`. This does not make sense to be changed, since simple
-		// addresses are supposed to be used in flow-emulator, not in flow-go.
-		assert.Equal(t, "Created new account with address: 0x0000000000070002", result.Logs[0])
-	})
+	result, err := bc.ExecuteTransaction(ledger, validTx)
+	require.NoError(t, err)
+
+	if !assert.True(t, result.Succeeded()) {
+		t.Fatal(result.Error.ErrorMessage())
+	}
+
+	require.Len(t, result.Logs, 1)
+	assert.Equal(t, "Created new account with address: 0x05", result.Logs[0])
 }
 
 func TestBlockContext_ExecuteScript(t *testing.T) {
@@ -866,7 +868,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	ledger := execTestutil.RootBootstrappedLedger()
 
-	ledgerAccess := virtualmachine.NewLedgerDAL(ledger)
+	ledgerAccess := virtualmachine.NewLedgerDAL(ledger, false)
 
 	createAccount := func() (flow.Address, crypto.PublicKey) {
 		privateKey, tx := execTestutil.CreateAccountCreationTransaction(t)

@@ -55,7 +55,7 @@ func (bc *blockContext) newTransactionContext(
 	ctx := &TransactionContext{
 		bc:                               bc,
 		astCache:                         bc.vm.cache,
-		ledger:                           NewLedgerDAL(ledger),
+		ledger:                           NewLedgerDAL(ledger, bc.simpleAddresses),
 		signingAccounts:                  signingAccounts,
 		tx:                               tx,
 		gasLimit:                         tx.GasLimit,
@@ -66,8 +66,6 @@ func (bc *blockContext) newTransactionContext(
 		restrictedDeploymentEnabled:      true,
 		simpleAddresses:                  bc.simpleAddresses,
 	}
-
-	ctx.ledger.SimpleAddresses = bc.simpleAddresses
 
 	for _, option := range options {
 		option(ctx)
@@ -80,7 +78,7 @@ func (bc *blockContext) newScriptContext(ledger Ledger) *TransactionContext {
 	return &TransactionContext{
 		bc:       bc,
 		astCache: bc.vm.cache,
-		ledger:   NewLedgerDAL(ledger),
+		ledger:   NewLedgerDAL(ledger, bc.simpleAddresses),
 		header:   bc.header,
 		blocks:   bc.blocks,
 		gasLimit: scriptGasLimit,
@@ -195,13 +193,18 @@ func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte, arguments []
 }
 
 func (bc *blockContext) GetAccount(ledger Ledger, addr flow.Address) (*flow.Account, error) {
-	ledgerAccess := NewLedgerDAL(ledger)
+	ledgerAccess := NewLedgerDAL(ledger, bc.simpleAddresses)
 	acct := ledgerAccess.GetAccount(addr)
 	if acct == nil {
 		return nil, nil
 	}
 
-	result, err := bc.ExecuteScript(ledger, DefaultTokenBalanceScript(addr), nil)
+	serviceAddress := flow.ServiceAddress()
+	if bc.simpleAddresses {
+		serviceAddress = SimpleServiceAddress()
+	}
+
+	result, err := bc.ExecuteScript(ledger, DefaultTokenBalanceScript(serviceAddress, addr), nil)
 	if err != nil {
 		return nil, err
 	}

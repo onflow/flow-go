@@ -60,8 +60,8 @@ type LedgerDAL struct {
 	SimpleAddresses bool
 }
 
-func NewLedgerDAL(ledger Ledger) LedgerDAL {
-	return LedgerDAL{Ledger: ledger}
+func NewLedgerDAL(ledger Ledger, simpleAddresses bool) LedgerDAL {
+	return LedgerDAL{Ledger: ledger, SimpleAddresses: simpleAddresses}
 }
 
 func (r *LedgerDAL) CheckAccountExists(accountAddress []byte) error {
@@ -157,7 +157,7 @@ func (r *LedgerDAL) GetAddressState() (AddressState, error) {
 		return nil, err
 	}
 	if r.SimpleAddresses {
-		state := bytesToSimpleAddressState(stateBytes)
+		state := BytesToSimpleAddressState(stateBytes)
 		return &state, nil
 	}
 	state := flow.BytesToAddressState(stateBytes)
