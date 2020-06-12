@@ -264,7 +264,8 @@ func (e *Engine) onTimer() {
 
 		// check if has reached max try
 		if !CanTry(e.maxAttempt, chunk) {
-			// e.chunks.Rem(cid)
+			// TODO not to drop max reach, but to ignore it
+			e.chunks.Rem(cid)
 			log.Debug().
 				Int("max_attempt", e.maxAttempt).
 				Int("actual_attempts", chunk.Attempt).
