@@ -282,7 +282,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest, th
 	// Note: this should be done prior to any evaluation to make sure that
 	// the process method of Ingest engines is done working.
 	for _, verNode := range verNodes {
-		// starts all the engines
+		// stops all the engines
 		if threeEngine {
 			// three engines architecture
 			<-verNode.FinderEngine.Done()
