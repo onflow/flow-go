@@ -107,18 +107,9 @@ func BytesToAddress(b []byte) Address {
 	return a
 }
 
-// Bytes returns the trimmed byte representation of the address.
+// Bytes returns the byte representation of the address.
 func (a Address) Bytes() []byte {
-	// Trim leading zeros
-	leadingZeros := 0
-	for _, b := range a {
-		if b != 0 {
-			break
-		}
-		leadingZeros += 1
-	}
-
-	return a[leadingZeros:]
+	return a[:]
 }
 
 // Hex returns the hex string representation of the address.

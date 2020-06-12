@@ -303,7 +303,7 @@ func (r *TransactionContext) ServiceAddress() flow.Address {
 // This function returns an error if the specified account does not exist or is
 // not a valid signing account.
 func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []byte) (err error) {
-	accountAddress := address.Bytes()
+	accountAddress := flow.BytesToAddress(address.Bytes()).Bytes()
 
 	key := fullKeyHash(string(accountAddress), string(accountAddress), keyCode)
 

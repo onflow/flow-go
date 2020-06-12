@@ -577,7 +577,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithSimpleAddresses(t *te
 	}
 
 	require.Len(t, result.Logs, 1)
-	assert.Equal(t, "Created new account with address: 0x05", result.Logs[0])
+	assert.Equal(t, "Created new account with address: 0x0000000000000005", result.Logs[0])
 }
 
 func TestBlockContext_ExecuteScript(t *testing.T) {
