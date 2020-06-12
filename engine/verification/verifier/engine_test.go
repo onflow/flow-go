@@ -110,7 +110,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 	myID := unittest.IdentifierFixture()
 	consensusNodes := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
 	// creates a verifiable chunk
-	vChunk := unittest.VerifiableChunkFixture(uint64(0))
+	vChunk := unittest.VerifiableChunkDataFixture(uint64(0))
 
 	// mocking node ID using the LocalMock
 	suite.me.MockNodeID(myID)
@@ -123,7 +123,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 			// check that the approval matches the input execution result
 			ra, ok := args[0].(*flow.ResultApproval)
 			suite.Assert().True(ok)
-			suite.Assert().Equal(vChunk.Receipt.ExecutionResult.ID(), ra.Body.ExecutionResultID)
+			suite.Assert().Equal(vChunk.Result.ID(), ra.Body.ExecutionResultID)
 
 			// verifies the signatures
 			atstID := ra.Body.Attestation.ID()
