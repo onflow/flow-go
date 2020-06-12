@@ -106,7 +106,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		execState.
 			On("ChunkDataPackByChunkID", mock.Anything, chunkID).
-			Return(&chunkDataPack, nil)
+			Return(chunkDataPack, nil)
 
 		execState.On("GetCollection", chunkDataPack.CollectionID).Return(&collection, nil)
 

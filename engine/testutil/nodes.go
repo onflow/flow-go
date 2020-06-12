@@ -26,6 +26,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/engine/verification/finder"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
+	"github.com/dapperlabs/flow-go/engine/verification/match"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
@@ -377,6 +378,19 @@ func VerificationNode(t testing.TB,
 		require.Nil(t, err)
 	}
 
+	if node.PendingResults == nil {
+		node.PendingResults = stdmap.NewPendingResults()
+		require.Nil(t, err)
+	}
+
+	if node.HeaderStorage == nil {
+		node.HeaderStorage = storage.NewHeaders(node.Metrics, node.DB)
+	}
+
+	if node.Chunks == nil {
+		node.Chunks = match.NewChunks(1000)
+	}
+
 	if node.VerifierEngine == nil {
 		rt := runtime.NewInterpreterRuntime()
 		vm, err := virtualmachine.New(rt)
@@ -385,6 +399,21 @@ func VerificationNode(t testing.TB,
 
 		require.NoError(t, err)
 		node.VerifierEngine, err = verifier.New(node.Log, node.Metrics, node.Net, node.State, node.Me, chunkVerifier)
+		require.Nil(t, err)
+	}
+
+	if node.MatchEngine == nil && newArchitecture {
+		node.MatchEngine, err = match.New(node.Log,
+			node.Net,
+			node.Me,
+			node.PendingResults,
+			node.VerifierEngine,
+			assigner,
+			node.State,
+			node.Chunks,
+			node.HeaderStorage,
+			1000*time.Millisecond,
+			int(failureThreshold))
 		require.Nil(t, err)
 	}
 
@@ -459,7 +488,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.FinderEngine == nil && newArchitecture {
-		node.FinderEngine, err = finder.New(node.Log, node.Net, node.Me, node.MatchEngine, node.AuthReceipts, node.Headers, node.IngestedResultIDs)
+		node.FinderEngine, err = finder.New(node.Log, node.Net, node.Me, node.MatchEngine, node.PendingReceipts, node.Headers, node.IngestedResultIDs)
 		require.Nil(t, err)
 	}
 
