@@ -34,20 +34,20 @@ import (
 
 // GenericNode implements a generic in-process node for tests.
 type GenericNode struct {
-	Log         zerolog.Logger
-	Metrics     *metrics.NoopCollector
-	Tracer      module.Tracer
-	DB          *badger.DB
-	Headers     storage.Headers
-	Identities  storage.Identities
-	Guarantees  storage.Guarantees
-	SealStorage storage.Seals
-	Payloads    storage.Payloads
-	Blocks      storage.Blocks
-	State       protocol.State
-	Me          module.Local
-	Net         *stub.Network
-	DBDir       string
+	Log        zerolog.Logger
+	Metrics    *metrics.NoopCollector
+	Tracer     module.Tracer
+	DB         *badger.DB
+	Headers    storage.Headers
+	Identities storage.Identities
+	Guarantees storage.Guarantees
+	Seals      storage.Seals
+	Payloads   storage.Payloads
+	Blocks     storage.Blocks
+	State      protocol.State
+	Me         module.Local
+	Net        *stub.Network
+	DBDir      string
 }
 
 func (g *GenericNode) Done() {

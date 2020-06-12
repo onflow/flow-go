@@ -98,20 +98,20 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	require.NoError(t, err)
 
 	return mock.GenericNode{
-		Log:         log,
-		Metrics:     metrics,
-		Tracer:      tracer,
-		DB:          db,
-		Headers:     headers,
-		Identities:  identities,
-		Guarantees:  guarantees,
-		SealStorage: seals,
-		Payloads:    payloads,
-		Blocks:      blocks,
-		State:       state,
-		Me:          me,
-		Net:         stubnet,
-		DBDir:       dbDir,
+		Log:        log,
+		Metrics:    metrics,
+		Tracer:     tracer,
+		DB:         db,
+		Headers:    headers,
+		Identities: identities,
+		Guarantees: guarantees,
+		Seals:      seals,
+		Payloads:   payloads,
+		Blocks:     blocks,
+		State:      state,
+		Me:         me,
+		Net:        stubnet,
+		DBDir:      dbDir,
 	}
 }
 
