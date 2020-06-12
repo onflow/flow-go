@@ -29,17 +29,17 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-// TestHappyPath evaluates the happy path scenario of
-// concurrently sending two execution receipts of the same result each
-// with `chunkCount`-many chunks to `verNodeCount`-many verification nodes
+// TestHappyPath_TwoEngine considers the happy path of Ingest/LightIngest and Verify engines.
+// It evaluates the happy path scenario of
+// concurrently sending an execution receipt with
+// `chunkCount`-many chunks to `verNodeCount`-many verification nodes
 // the happy path should result in dissemination of a result approval for each
 // distinct chunk by each verification node. The result approvals should be
 // sent to the consensus nodes
 //
 // NOTE: some test cases are meant to solely run locally when FLOWLOCAL environmental
 // variable is set to TRUE
-func TestHappyPath(t *testing.T) {
-
+func TestHappyPath_TwoEngine(t *testing.T) {
 	var mu sync.Mutex
 	testcases := []struct {
 		verNodeCount,
@@ -86,7 +86,43 @@ func TestHappyPath(t *testing.T) {
 		t.Run(fmt.Sprintf("%d-verification node %d-chunk number %t-light ingest", tc.verNodeCount, tc.chunkCount, tc.lightIngest), func(t *testing.T) {
 			mu.Lock()
 			defer mu.Unlock()
-			testHappyPath(t, tc.verNodeCount, tc.chunkCount, tc.lightIngest)
+			// sets last parameter to false to indicate using two engine configuration
+			testHappyPath(t, tc.verNodeCount, tc.chunkCount, tc.lightIngest, false)
+		})
+	}
+}
+
+// TestHappyPath evaluates the happy path scenario of
+// concurrently sending two execution receipts of the same result each
+// with `chunkCount`-many chunks to `verNodeCount`-many verification nodes
+// the happy path should result in dissemination of a result approval for each
+// distinct chunk by each verification node. The result approvals should be
+// sent to the consensus nodes
+func TestHappyPath_ThreeEngine(t *testing.T) {
+	var mu sync.Mutex
+	testcases := []struct {
+		verNodeCount,
+		chunkCount int
+	}{
+		{
+			verNodeCount: 1,
+			chunkCount:   2,
+		},
+		{
+			verNodeCount: 1,
+			chunkCount:   10,
+		},
+		{
+			verNodeCount: 2,
+			chunkCount:   2,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(fmt.Sprintf("%d-verification node %d-chunk number", tc.verNodeCount, tc.chunkCount), func(t *testing.T) {
+			mu.Lock()
+			defer mu.Unlock()
+			testHappyPath(t, tc.verNodeCount, tc.chunkCount, true, true)
 		})
 	}
 }
@@ -100,8 +136,8 @@ func TestHappyPath(t *testing.T) {
 // - submitting a verifiable chunk locally to the verify engine by the ingest engine
 // - dropping the ingestion of the ERs that share the same result once the verifiable chunk is submitted to verify engine
 // - broadcast of a matching result approval to consensus nodes for each assigned chunk
-// lightIngest indicates whether to use the LightIngestEngine or the original ingest engine
-func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest bool) {
+// threeEngine indicates whether to use the LightIngestEngine or the original ingest engine
+func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest, threeEngine bool) {
 	// to demarcate the debug logs
 	log.Debug().
 		Int("verification_nodes_count", verNodeCount).
@@ -156,7 +192,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 	// verification node
 	verNodes := make([]mock2.VerificationNode, 0)
 	for _, verIdentity := range verIdentities {
-		verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold, lightIngest, true)
+		verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold, lightIngest, threeEngine)
 
 		// starts all the engines
 		<-verNode.FinderEngine.Ready()
@@ -401,7 +437,7 @@ func BenchmarkIngestEngine(b *testing.B) {
 // resources for them, i.e., collections, blocks, and chunk data packs.
 // The benchmark finishes when a verifiable chunk is sent for each assigned chunk from the ingest engine
 // to the verify engine.
-// lightIngest indicates whether to use the LightIngestEngine or the original ingest engine
+// threeEngine indicates whether to use the LightIngestEngine or the original ingest engine
 func ingestHappyPath(tb testing.TB, receiptCount int, chunkCount int, lightIngest bool) {
 	// ingest engine parameters
 	// set based on following issue
