@@ -645,18 +645,29 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 		},
 	}
 
+	// computes chunk end state
+	index := chunk.Index
+	var endState flow.StateCommitment
+	if int(index) == len(result.Chunks)-1 {
+		// last chunk in receipt takes final state commitment
+		endState = result.FinalStateCommit
+	} else {
+		// any chunk except last takes the subsequent chunk's start state
+		endState = result.Chunks[index+1].StartState
+	}
+
 	return &verification.VerifiableChunkData{
 		Chunk:         &chunk,
 		Header:        block.Header,
 		Result:        &result,
 		Collection:    &col,
-		ChunkDataPack: nil,
-		EndState:      StateCommitmentFixture(),
+		ChunkDataPack: ChunkDataPackFixture(result.ID()),
+		EndState:      endState,
 	}
 }
 
-func ChunkDataPackFixture(identifier flow.Identifier) flow.ChunkDataPack {
-	return flow.ChunkDataPack{
+func ChunkDataPackFixture(identifier flow.Identifier) *flow.ChunkDataPack {
+	return &flow.ChunkDataPack{
 		ChunkID:         identifier,
 		StartState:      StateCommitmentFixture(),
 		RegisterTouches: []flow.RegisterTouch{{RegisterID: []byte{'1'}, Value: []byte{'a'}, Proof: []byte{'p'}}},

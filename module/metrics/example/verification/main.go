@@ -114,7 +114,7 @@ func main() {
 
 			// adds a chunk data pack as well as a chunk tracker
 			cdp := unittest.ChunkDataPackFixture(unittest.IdentifierFixture())
-			chunkDataPacks.Add(&cdp)
+			chunkDataPacks.Add(cdp)
 			chunkDataPackTrackers.Add(tracker.NewChunkDataPackTracker(unittest.IdentifierFixture(),
 				unittest.IdentifierFixture()))
 
