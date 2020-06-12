@@ -596,7 +596,7 @@ func TransactionDSLFixture() dsl.Transaction {
 	}
 }
 
-// VerifiableChunk returns a complete verifiable chunk with an
+// VerifiableChunkDataFixture returns a complete verifiable chunk with an
 // execution receipt referencing the block/collections.
 func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunkData {
 
