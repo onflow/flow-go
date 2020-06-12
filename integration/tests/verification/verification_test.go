@@ -243,10 +243,22 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest boo
 		Msg("TestHappyPath finishes")
 }
 
-// TestSingleCollectionProcessing checks the full happy
+// TestSingleCollectionProcessing_TwoEngines runs testSingleCollectionProcessing on the
+// two engine architecture of LightIngest-Verify
+func TestSingleCollectionProcessing_TwoEngines(t *testing.T) {
+	testSingleCollectionProcessing(t, false)
+}
+
+// TestSingleCollectionProcessing_ThreeEngines runs testSingleCollectionProcessing on the
+// three engine architecture of Finder-Match-Verify
+func TestSingleCollectionProcessing_ThreeEngines(t *testing.T) {
+	testSingleCollectionProcessing(t, true)
+}
+
+// testSingleCollectionProcessing checks the full happy
 // path assuming a single collection (including transactions on counter example)
 // are submited to the verification node.
-func TestSingleCollectionProcessing(t *testing.T) {
+func testSingleCollectionProcessing(t *testing.T, threeEngines bool) {
 	// ingest engine parameters
 	// set based on following issue
 	// https://github.com/dapperlabs/flow-go/issues/3443
@@ -280,26 +292,24 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	// setup nodes
 	//
 	// verification node
-	verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold, true, false)
+	verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold, true, threeEngines)
 	// inject block
 	err := verNode.Blocks.Store(completeER.Block)
 	assert.Nil(t, err)
-	// starts the ingest engine
-	<-verNode.LightIngestEngine.Ready()
+	if threeEngines {
+		// starts all the engines
+		<-verNode.FinderEngine.Ready()
+		<-verNode.MatchEngine.(module.ReadyDoneAware).Ready()
+		<-verNode.VerifierEngine.(module.ReadyDoneAware).Ready()
+	} else {
+		// starts the ingest engine
+		<-verNode.LightIngestEngine.Ready()
+	}
+
 	// starts verification node's network in continuous mode
 	verNet, ok := hub.GetNetwork(verIdentity.NodeID)
 	assert.True(t, ok)
 	verNet.StartConDev(100, true)
-
-	// collection node
-	colNode := testutil.CollectionNode(t, hub, colIdentity, identities)
-	// inject the collection
-	err = colNode.Collections.Store(completeER.Collections[0])
-	assert.Nil(t, err)
-	// starts collection node's network in continuous mode
-	colNet, ok := hub.GetNetwork(colIdentity.NodeID)
-	assert.True(t, ok)
-	colNet.StartConDev(100, true)
 
 	// execution node
 	exeNode := testutil.GenericNode(t, hub, exeIdentity, identities)
@@ -336,7 +346,11 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	assert.Nil(t, err)
 
 	// send the ER from execution to verification node
-	err = verNode.LightIngestEngine.Process(exeIdentity.NodeID, completeER.Receipt)
+	if threeEngines {
+		err = verNode.FinderEngine.Process(exeIdentity.NodeID, completeER.Receipt)
+	} else {
+		err = verNode.LightIngestEngine.Process(exeIdentity.NodeID, completeER.Receipt)
+	}
 	assert.Nil(t, err)
 
 	unittest.RequireReturnsBefore(t, approvalWG.Wait, 5*time.Second)
@@ -349,18 +363,22 @@ func TestSingleCollectionProcessing(t *testing.T) {
 
 	// stop continuous delivery mode of the network
 	verNet.StopConDev()
-	colNet.StopConDev()
 
 	// stops verification node
 	// Note: this should be done prior to any evaluation to make sure that
 	// the process method of Ingest engines is done working.
-	<-verNode.LightIngestEngine.Done()
+	if threeEngines {
+		<-verNode.FinderEngine.Done()
+		<-verNode.MatchEngine.(module.ReadyDoneAware).Done()
+		<-verNode.VerifierEngine.(module.ReadyDoneAware).Done()
+	} else {
+		<-verNode.LightIngestEngine.Done()
+	}
 
 	// receipt ID should be added to the ingested results mempool
 	assert.True(t, verNode.IngestedResultIDs.Has(completeER.Receipt.ExecutionResult.ID()))
 
 	verNode.Done()
-	colNode.Done()
 	conNode.Done()
 	exeNode.Done()
 
