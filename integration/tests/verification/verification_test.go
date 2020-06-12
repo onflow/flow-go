@@ -132,7 +132,7 @@ func TestHappyPath_ThreeEngine(t *testing.T) {
 // and checks that concurrently received execution receipts with the same result part that
 // by each verification node results in:
 // - the selection of the assigned chunks by the ingest engine
-// - request of the associated collections to the assigned chunks
+// - request of the associated chunk data pack to the assigned chunks
 // - formation of a complete verifiable chunk by the ingest engine for each assigned chunk
 // - submitting a verifiable chunk locally to the verify engine by the ingest engine
 // - dropping the ingestion of the ERs that share the same result once the verifiable chunk is submitted to verify engine
@@ -221,9 +221,6 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest, th
 
 	// mock execution node
 	exeNode, exeEngine := setupMockExeNode(t, hub, exeIdentity, verIdentities, identities, completeER)
-	exeNet, ok := hub.GetNetwork(exeIdentity.NodeID)
-	assert.True(t, ok)
-	exeNet.StartConDev(requestInterval, true)
 
 	// mock consensus node
 	conNode, conEngine, conWG := setupMockConsensusNode(t, hub, conIdentity, verIdentities, identities, completeER)
@@ -254,9 +251,8 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest, th
 		}(verNode, completeER.Receipt)
 	}
 
-	verWG.Wait()
 	// requires all verification nodes process the receipt
-	// unittest.RequireReturnsBefore(t, verWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second)
+	unittest.RequireReturnsBefore(t, verWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second)
 
 	// creates a network instance for each verification node
 	// and sets it in continuous delivery mode
@@ -273,9 +269,8 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest, th
 		verNets = append(verNets, verNet)
 	}
 
-	conWG.Wait()
 	// requires all verification nodes send a result approval per assigned chunk
-	// unittest.RequireReturnsBefore(t, conWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second)
+	unittest.RequireReturnsBefore(t, conWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second)
 	// assert that the RA was received
 	conEngine.AssertExpectations(t)
 
@@ -308,7 +303,6 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest, th
 	for _, verNet := range verNets {
 		verNet.StopConDev()
 	}
-	exeNet.StopConDev()
 
 	conNode.Done()
 	exeNode.Done()
