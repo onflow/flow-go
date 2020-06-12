@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
@@ -60,7 +61,7 @@ func (stt *SparseTopologyTestSuite) TestSparselyConnectedNetwork() {
 	// create engines
 	engs := make([]*MeshEngine, 0)
 	for _, n := range stt.nets {
-		eng := NewMeshEngine(stt.Suite.T(), n, count-1, 1)
+		eng := NewMeshEngine(stt.Suite.T(), n, count-1, engine.CollectionIngest)
 		engs = append(engs, eng)
 	}
 
@@ -107,7 +108,7 @@ func (stt *SparseTopologyTestSuite) TestDisjointedNetwork() {
 	// create engines
 	engs := make([]*MeshEngine, 0)
 	for _, n := range stt.nets {
-		eng := NewMeshEngine(stt.Suite.T(), n, count-1, 1)
+		eng := NewMeshEngine(stt.Suite.T(), n, count-1, engine.CollectionIngest)
 		engs = append(engs, eng)
 	}
 

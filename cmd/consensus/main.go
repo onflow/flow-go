@@ -71,6 +71,9 @@ func main() {
 		sync           *synchronization.Engine
 		conMetrics     module.ConsensusMetrics
 		mainMetrics    module.HotstuffMetrics
+
+		// TODO remove this
+		migrateDB bool
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -91,6 +94,8 @@ func main() {
 			// if block rate delay is 1 second, then 0.8 block will be finalized per second in average.
 			// if block rate delay is 1.5 second, then 0.5 block will be finalized per second in average
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
+			// TODO remove this
+			flags.BoolVar(&migrateDB, "migrate-db", true, "whether or not to migrate the DB on startup")
 		}).
 		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
 			privateDKGData, err = loadDKGPrivateData(node.BaseConfig.BootstrapDir, node.NodeID)
@@ -138,6 +143,10 @@ func main() {
 			return nil
 		}).
 		Module("database migration", func(node *cmd.FlowNodeBuilder) error {
+			if !migrateDB {
+				node.Logger.Info().Msg("skipping execution result index migration")
+				return nil
+			}
 			node.Logger.Info().Msg("starting execution result index migration...")
 			err := operation.IndexExecutionResultsByBlockID(node.DB)
 			node.Logger.Info().Msg("finished execution result index migration...")
