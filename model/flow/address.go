@@ -220,7 +220,9 @@ func (gen *AddressGenerator) NextAddress() (Address, error) {
 	return address, nil
 }
 
-// CurrentAddress returns the last generated address.
+// CurrentAddress returns the current account address.
+//
+// The returned address is the address of the latest created account.
 func (gen *AddressGenerator) CurrentAddress() Address {
 	address := gen.generateAddress()
 	return address
