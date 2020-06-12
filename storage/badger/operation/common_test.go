@@ -238,10 +238,10 @@ func TestRetrieveUnencodeable(t *testing.T) {
 
 func TestLookup(t *testing.T) {
 	expected := []flow.Identifier{
-		flow.Identifier{0x01},
-		flow.Identifier{0x02},
-		flow.Identifier{0x03},
-		flow.Identifier{0x04},
+		{0x01},
+		{0x02},
+		{0x03},
+		{0x04},
 	}
 	actual := []flow.Identifier{}
 
@@ -264,7 +264,7 @@ func TestLookup(t *testing.T) {
 
 func TestIterate(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		keys := [][]byte{[]byte{0x00}, []byte{0x12}, []byte{0xf0}, []byte{0xff}}
+		keys := [][]byte{{0x00}, {0x12}, {0xf0}, {0xff}}
 		vals := []bool{false, false, true, true}
 		expected := []bool{false, true}
 
@@ -303,7 +303,7 @@ func TestIterate(t *testing.T) {
 
 func TestTraverse(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		keys := [][]byte{[]byte{0x42, 0x00}, []byte{0xff}, []byte{0x42, 0x56}, []byte{0x00}, []byte{0x42, 0xff}}
+		keys := [][]byte{{0x42, 0x00}, {0xff}, {0x42, 0x56}, {0x00}, {0x42, 0xff}}
 		vals := []bool{false, false, true, false, true}
 		expected := []bool{false, true}
 
