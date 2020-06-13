@@ -31,8 +31,8 @@ func (s *sha3_256Algo) ComputeHash(data []byte) Hash {
 
 // SumHash returns the SHA3-256 output and resets the hash state
 func (s *sha3_256Algo) SumHash() Hash {
-	digest := make(Hash, HashLenSha3_256)
-	s.Sum(digest[:0])
+	digest := make(Hash, 0, HashLenSha3_256)
+	digest = s.Sum(digest[:0])
 	s.Reset()
 	return digest
 }
@@ -62,8 +62,8 @@ func (s *sha3_384Algo) ComputeHash(data []byte) Hash {
 
 // SumHash returns the SHA3-256 output and resets the hash state
 func (s *sha3_384Algo) SumHash() Hash {
-	digest := make(Hash, HashLenSha3_384)
-	s.Sum(digest[:0])
+	digest := make(Hash, 0, HashLenSha3_384)
+	digest = s.Sum(digest[:0])
 	s.Reset()
 	return digest
 }
