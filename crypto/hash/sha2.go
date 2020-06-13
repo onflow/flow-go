@@ -25,14 +25,12 @@ func NewSHA2_256() Hasher {
 func (s *sha2_256Algo) ComputeHash(data []byte) Hash {
 	s.Reset()
 	_, _ = s.Write(data)
-	digest := make(Hash, 0, HashLenSha2_256)
-	return s.Sum(digest)
+	return s.Sum(nil)
 }
 
 // SumHash returns the SHA2-256 output and resets the hash state
 func (s *sha2_256Algo) SumHash() Hash {
-	digest := make(Hash, 0, HashLenSha2_256)
-	digest = s.Sum(digest[:0])
+	digest := s.Sum(nil)
 	s.Reset()
 	return digest
 }
@@ -56,14 +54,12 @@ func NewSHA2_384() Hasher {
 func (s *sha2_384Algo) ComputeHash(data []byte) Hash {
 	s.Reset()
 	_, _ = s.Write(data)
-	digest := make(Hash, 0, HashLenSha2_384)
-	return s.Sum(digest)
+	return s.Sum(nil)
 }
 
 // SumHash returns the SHA2-384 output and resets the hash state
 func (s *sha2_384Algo) SumHash() Hash {
-	digest := make(Hash, 0, HashLenSha2_384)
-	digest = s.Sum(digest)
+	digest := s.Sum(nil)
 	s.Reset()
 	return digest
 }
