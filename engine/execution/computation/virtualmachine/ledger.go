@@ -102,7 +102,8 @@ func (r *LedgerDAL) GetAccountPublicKeys(accountAddress []byte) (publicKeys []fl
 
 	for i := uint64(0); i < count; i++ {
 		publicKey, err := r.Get(
-			fullKeyHash(string(accountAddress), string(accountAddress), keyPublicKey(i)),
+			fullKeyHash(string(flow.BytesToAddress(accountAddress).Bytes()),
+				string(flow.BytesToAddress(accountAddress).Bytes()), keyPublicKey(i)),
 		)
 		if err != nil {
 			return nil, err
@@ -238,7 +239,8 @@ func (r *LedgerDAL) SetAccountPublicKeys(accountAddress []byte, publicKeys []flo
 	newKeyCount := new(big.Int).SetUint64(newCount)
 
 	r.Set(
-		fullKeyHash(string(accountAddress), string(accountAddress), keyPublicKeyCount),
+		fullKeyHash(string(flow.BytesToAddress(accountAddress).Bytes()),
+			string(flow.BytesToAddress(accountAddress).Bytes()), keyPublicKeyCount),
 		newKeyCount.Bytes(),
 	)
 
@@ -260,7 +262,8 @@ func (r *LedgerDAL) SetAccountPublicKeys(accountAddress []byte, publicKeys []flo
 
 	// delete leftover keys
 	for i := newCount; i < existingCount; i++ {
-		r.Delete(fullKeyHash(string(accountAddress), string(accountAddress), keyPublicKey(i)))
+		r.Delete(fullKeyHash(string(flow.BytesToAddress(accountAddress).Bytes()),
+			string(flow.BytesToAddress(accountAddress).Bytes()), keyPublicKey(i)))
 	}
 
 	return nil
