@@ -455,7 +455,11 @@ CheckLoop:
 		case <-poll.C:
 			err := e.pollHeight()
 			if err != nil {
-				e.log.Error().Err(err).Msg("could not poll heights")
+				if network.IsPeerUnreachableError(err) {
+					e.log.Warn().Err(err).Msg("could not poll heights")
+				} else {
+					e.log.Error().Err(err).Msg("could not poll heights")
+				}
 				continue
 			}
 		case <-scan.C:
