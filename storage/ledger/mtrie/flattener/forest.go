@@ -1,4 +1,4 @@
-package sequencer
+package flattener
 
 import (
 	"encoding/hex"
@@ -9,13 +9,19 @@ import (
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 )
 
-// MForestSerialization is an sequence of serialized forest nodes.
-// Consists of:
-// a list of storable nodes, where references to nodes are replaced by index in the slice
-// and a list of storable tries, referencing root node by index.
+// FlattenedForest represents an MForest as a flattened data structure.
+// Specifically it consists of :
+//   * a list of storable nodes, where references to nodes are replaced by index in the slice
+//   * and a list of storable tries, each referencing their respective root node by index.
 // 0 is a special index, meaning nil, but is included in this list for ease of use
 // and removing would make it necessary to constantly add/subtract indexes
-type MForestSequencing struct {
+//
+// As an important property, the nodes are listed in an order which satisfies
+// Descendents-First-Relationship. The Descendents-First-Relationship has the
+// following important property:
+// When re-building the Trie from the sequence of nodes, one can build the trie on the fly,
+// as for each node, the children have been previously encountered.
+type FlattenedForest struct {
 	Nodes []*StorableNode
 	Tries []*StorableTrie
 }
@@ -23,8 +29,8 @@ type MForestSequencing struct {
 // node2indexMap maps a node pointer to the node index in the serialization
 type node2indexMap map[*node.Node]uint64
 
-// SequenceForest returns forest MForestSequencing, which contains all nodes and tries of the MForest.
-func SequenceForest(f *mtrie.MForest) (*MForestSequencing, error) {
+// FlattenForest returns forest FlattenedForest, which contains all nodes and tries of the MForest.
+func FlattenForest(f *mtrie.MForest) (*FlattenedForest, error) {
 	tries, err := f.GetTries()
 	if err != nil {
 		return nil, fmt.Errorf("cannot get cached tries root hashes: %w", err)
@@ -39,8 +45,8 @@ func SequenceForest(f *mtrie.MForest) (*MForestSequencing, error) {
 
 	counter := uint64(1) // start from 1, as 0 marks nil
 	for _, t := range tries {
-		itr := t.NewNodeIterator()
-		for n, hasNext := itr.Next(); hasNext; n, hasNext = itr.Next() {
+		for itr := NewNodeIterator(t); itr.Next(); {
+			n := itr.Value()
 			// if node not in map
 			if _, has := allNodes[n]; !has {
 				allNodes[n] = counter
@@ -52,7 +58,6 @@ func SequenceForest(f *mtrie.MForest) (*MForestSequencing, error) {
 				storableNodes = append(storableNodes, storableNode)
 			}
 		}
-
 		//fix root nodes indices
 		// since we indexed all nodes, root must be present
 		storableTrie, err := toStorableTrie(t, allNodes)
@@ -62,7 +67,7 @@ func SequenceForest(f *mtrie.MForest) (*MForestSequencing, error) {
 		storableTries = append(storableTries, storableTrie)
 	}
 
-	return &MForestSequencing{
+	return &FlattenedForest{
 		Nodes: storableNodes,
 		Tries: storableTries,
 	}, nil
@@ -104,15 +109,15 @@ func toStorableTrie(mtrie *trie.MTrie, indexForNode node2indexMap) (*StorableTri
 	return storableTrie, nil
 }
 
-func RebuildTries(forestSequencing *MForestSequencing) ([]*trie.MTrie, error) {
-	tries := make([]*trie.MTrie, 0, len(forestSequencing.Tries))
-	nodes, err := RebuildNodes(forestSequencing.Nodes)
+func RebuildTries(flatForest *FlattenedForest) ([]*trie.MTrie, error) {
+	tries := make([]*trie.MTrie, 0, len(flatForest.Tries))
+	nodes, err := RebuildNodes(flatForest.Nodes)
 	if err != nil {
 		return nil, fmt.Errorf("reconstructing nodes from storables failed: %w", err)
 	}
 
 	//restore tries
-	for _, storableTrie := range forestSequencing.Tries {
+	for _, storableTrie := range flatForest.Tries {
 		mtrie, err := trie.NewMTrie(
 			nodes[storableTrie.RootIndex],
 			storableTrie.Number,
@@ -126,7 +131,7 @@ func RebuildTries(forestSequencing *MForestSequencing) ([]*trie.MTrie, error) {
 	return tries, nil
 }
 
-// RebuildFromStorables generates a list of nodes from a sequence of StorableNodes.
+// RebuildFromStorables generates a list of Nodes from a sequence of StorableNodes.
 // The sequence must obey the DESCENDANTS-FIRST-RELATIONSHIP
 func RebuildNodes(storableNodes []*StorableNode) ([]*node.Node, error) {
 	nodes := make([]*node.Node, 0, len(storableNodes))

@@ -13,7 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/sequencer"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -56,8 +56,13 @@ func Test_Compactor(t *testing.T) {
 			// Generate the tree and create WAL
 			for i := 0; i < size; i++ {
 
-				keys := utils.GetRandomKeysFixedN(numInsPerStep, keyByteSize)
-				values := utils.GetRandomValues(len(keys), valueMaxByteSize, valueMaxByteSize)
+				keys0 := utils.GetRandomKeysFixedN(numInsPerStep, keyByteSize)
+				values0 := utils.GetRandomValues(len(keys0), valueMaxByteSize, valueMaxByteSize)
+				var keys, values [][]byte
+				keys = append(keys, keys0...)
+				keys = append(keys, keys0...)
+				values = append(values, values0...)
+				values = append(values, values0...)
 
 				err = wal.RecordUpdate(stateCommitment, keys, values)
 				require.NoError(t, err)
@@ -115,7 +120,7 @@ func Test_Compactor(t *testing.T) {
 			require.NoError(t, err)
 
 			err = wal2.Replay(
-				func(forestSequencing *sequencer.MForestSequencing) error {
+				func(forestSequencing *flattener.FlattenedForest) error {
 					return loadIntoForest(f2, forestSequencing)
 				},
 				func(commitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
@@ -169,8 +174,8 @@ func Test_Compactor(t *testing.T) {
 	})
 }
 
-func loadIntoForest(forest *mtrie.MForest, forestSequencing *sequencer.MForestSequencing) error {
-	tries, err := sequencer.RebuildTries(forestSequencing)
+func loadIntoForest(forest *mtrie.MForest, forestSequencing *flattener.FlattenedForest) error {
+	tries, err := flattener.RebuildTries(forestSequencing)
 	if err != nil {
 		return err
 	}

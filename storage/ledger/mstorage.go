@@ -6,7 +6,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/sequencer"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
@@ -57,8 +57,8 @@ func NewMTrieStorage(dbDir string, cacheSize int, metrics module.LedgerMetrics, 
 	}
 
 	err = w.Replay(
-		func(forestSequencing *sequencer.MForestSequencing) error {
-			rebuiltTries, err := sequencer.RebuildTries(forestSequencing)
+		func(forestSequencing *flattener.FlattenedForest) error {
+			rebuiltTries, err := flattener.RebuildTries(forestSequencing)
 			if err != nil {
 				return fmt.Errorf("rebuilding forest from sequenced nodes failed: %w", err)
 			}

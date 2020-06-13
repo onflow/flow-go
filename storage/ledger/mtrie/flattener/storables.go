@@ -1,4 +1,4 @@
-package sequencer
+package flattener
 
 type StorableNode struct {
 	LIndex    uint64

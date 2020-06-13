@@ -1,4 +1,4 @@
-package sequencer_test
+package flattener_test
 
 import (
 	"bytes"
@@ -13,7 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
 
 	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/sequencer"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
 )
 
 func TestForestStoreAndLoad(t *testing.T) {
@@ -59,7 +59,7 @@ func TestForestStoreAndLoad(t *testing.T) {
 	}
 	defer os.Remove(file.Name())
 
-	forestSequencing, err := sequencer.SequenceForest(mForest)
+	forestSequencing, err := flattener.FlattenForest(mForest)
 	require.NoError(t, err)
 
 	newMForest, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
@@ -68,7 +68,7 @@ func TestForestStoreAndLoad(t *testing.T) {
 	//forests are different
 	assert.NotEqual(t, mForest, newMForest)
 
-	rebuiltTries, err := sequencer.RebuildTries(forestSequencing)
+	rebuiltTries, err := flattener.RebuildTries(forestSequencing)
 	require.NoError(t, err)
 	err = newMForest.AddTries(rebuiltTries)
 	require.NoError(t, err)

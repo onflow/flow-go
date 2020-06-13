@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/sequencer"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -179,7 +179,7 @@ func Test_Checkpointing(t *testing.T) {
 			require.NoError(t, err)
 
 			err = wal2.Replay(
-				func(forestSequencing *sequencer.MForestSequencing) error {
+				func(forestSequencing *flattener.FlattenedForest) error {
 					return fmt.Errorf("I should fail as there should be no checkpoints")
 				},
 				func(commitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
@@ -214,7 +214,7 @@ func Test_Checkpointing(t *testing.T) {
 			require.NoError(t, err)
 
 			err = wal3.Replay(
-				func(forestSequencing *sequencer.MForestSequencing) error {
+				func(forestSequencing *flattener.FlattenedForest) error {
 					return loadIntoForest(f3, forestSequencing)
 				},
 				func(commitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
@@ -295,7 +295,7 @@ func Test_Checkpointing(t *testing.T) {
 			updatesLeft := 1 // there should be only one update
 
 			err = wal5.Replay(
-				func(forestSequencing *sequencer.MForestSequencing) error {
+				func(forestSequencing *flattener.FlattenedForest) error {
 					return loadIntoForest(f5, forestSequencing)
 				},
 				func(commitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
@@ -332,8 +332,8 @@ func Test_Checkpointing(t *testing.T) {
 	})
 }
 
-func loadIntoForest(forest *mtrie.MForest, forestSequencing *sequencer.MForestSequencing) error {
-	tries, err := sequencer.RebuildTries(forestSequencing)
+func loadIntoForest(forest *mtrie.MForest, forestSequencing *flattener.FlattenedForest) error {
+	tries, err := flattener.RebuildTries(forestSequencing)
 	if err != nil {
 		return err
 	}

@@ -14,7 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/sequencer"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 )
 
@@ -126,8 +126,8 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 	}
 
 	err = c.wal.replay(0, to,
-		func(forestSequencing *sequencer.MForestSequencing) error {
-			tries, err := sequencer.RebuildTries(forestSequencing)
+		func(forestSequencing *flattener.FlattenedForest) error {
+			tries, err := flattener.RebuildTries(forestSequencing)
 			if err != nil {
 				return err
 			}
@@ -152,7 +152,7 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 
 	fmt.Printf("Got the tries...\n")
 
-	forestSequencing, err := sequencer.SequenceForest(mForest)
+	forestSequencing, err := flattener.FlattenForest(mForest)
 	if err != nil {
 		return fmt.Errorf("cannot get storables: %w", err)
 	}
@@ -208,7 +208,7 @@ func (c *Checkpointer) CheckpointWriter(to int) (io.WriteCloser, error) {
 	}, nil
 }
 
-func (c *Checkpointer) StoreCheckpoint(forestSequencing *sequencer.MForestSequencing, writer io.WriteCloser) error {
+func (c *Checkpointer) StoreCheckpoint(forestSequencing *flattener.FlattenedForest, writer io.WriteCloser) error {
 	storableNodes := forestSequencing.Nodes
 	storableTries := forestSequencing.Tries
 	header := make([]byte, 8+2)
@@ -241,7 +241,7 @@ func (c *Checkpointer) StoreCheckpoint(forestSequencing *sequencer.MForestSequen
 	return nil
 }
 
-func (c *Checkpointer) LoadCheckpoint(checkpoint int) (*sequencer.MForestSequencing, error) {
+func (c *Checkpointer) LoadCheckpoint(checkpoint int) (*flattener.FlattenedForest, error) {
 
 	filepath := path.Join(c.dir, numberToFilename(checkpoint))
 	file, err := os.Open(filepath)
@@ -264,8 +264,8 @@ func (c *Checkpointer) LoadCheckpoint(checkpoint int) (*sequencer.MForestSequenc
 	nodesCount, pos := readUint64(header, 0)
 	triesCount, _ := readUint16(header, pos)
 
-	nodes := make([]*sequencer.StorableNode, nodesCount+1) //+1 for 0 index meaning nil
-	tries := make([]*sequencer.StorableTrie, triesCount)
+	nodes := make([]*flattener.StorableNode, nodesCount+1) //+1 for 0 index meaning nil
+	tries := make([]*flattener.StorableTrie, triesCount)
 
 	for i := uint64(1); i <= nodesCount; i++ {
 		storableNode, err := ReadStorableNode(reader)
@@ -283,7 +283,7 @@ func (c *Checkpointer) LoadCheckpoint(checkpoint int) (*sequencer.MForestSequenc
 		tries[i] = storableTrie
 	}
 
-	return &sequencer.MForestSequencing{
+	return &flattener.FlattenedForest{
 		Nodes: nodes,
 		Tries: tries,
 	}, nil
