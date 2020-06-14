@@ -25,6 +25,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
@@ -73,8 +74,9 @@ func (suite *Suite) TestSendAndGetTransaction() {
 		transaction := unittest.TransactionFixture()
 
 		// create storage
-		collections := storage.NewCollections(db)
-		transactions := storage.NewTransactions(db)
+		metrics := metrics.NewNoopCollector()
+		transactions := storage.NewTransactions(metrics, db)
+		collections := storage.NewCollections(db, transactions)
 		handler := handler.NewHandler(suite.log, suite.state, nil, suite.collClient, nil, nil, collections, transactions)
 
 		expected := convert.TransactionToMessage(transaction.TransactionBody)
@@ -211,8 +213,9 @@ func (suite *Suite) TestGetSealedTransaction() {
 		suite.execClient.On("GetTransactionResult", mock.Anything, mock.Anything).Return(&exeEventResp, nil)
 
 		// initialize storage
-		collections := storage.NewCollections(db)
-		transactions := storage.NewTransactions(db)
+		metrics := metrics.NewNoopCollector()
+		transactions := storage.NewTransactions(metrics, db)
+		collections := storage.NewCollections(db, transactions)
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, blocks, headers, collections, transactions)

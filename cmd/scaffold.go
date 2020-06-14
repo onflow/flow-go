@@ -70,14 +70,15 @@ type Metrics struct {
 }
 
 type Storage struct {
-	Headers     storage.Headers
-	Index       storage.Index
-	Identities  storage.Identities
-	Guarantees  storage.Guarantees
-	Seals       storage.Seals
-	Payloads    storage.Payloads
-	Blocks      storage.Blocks
-	Collections storage.Collections
+	Headers      storage.Headers
+	Index        storage.Index
+	Identities   storage.Identities
+	Guarantees   storage.Guarantees
+	Seals        storage.Seals
+	Payloads     storage.Payloads
+	Blocks       storage.Blocks
+	Transactions storage.Transactions
+	Collections  storage.Collections
 }
 
 type namedModuleFunc struct {
@@ -276,10 +277,9 @@ func (fnb *FlowNodeBuilder) initProfiler() {
 	if !fnb.BaseConfig.profilerEnabled {
 		return
 	}
-	dir := filepath.Join(fnb.BaseConfig.profilerDir, fnb.BaseConfig.nodeRole, fnb.BaseConfig.nodeIDHex)
 	profiler, err := debug.NewAutoProfiler(
 		fnb.Logger,
-		dir,
+		fnb.BaseConfig.profilerDir,
 		fnb.BaseConfig.profilerInterval,
 		fnb.BaseConfig.profilerDuration,
 	)
@@ -303,7 +303,10 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	opts := badger.
 		DefaultOptions(fnb.BaseConfig.datadir).
 		WithKeepL0InMemory(true).
-		WithLogger(log)
+		WithLogger(log).
+		WithValueLogFileSize(128 << 20). // Default is 1 GB
+		WithValueLogMaxEntries(100000)   // Default is 1000000
+
 	db, err := badger.Open(opts)
 	fnb.MustNot(err).Msg("could not open key-value store")
 
@@ -320,20 +323,22 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, db)
 	seals := bstorage.NewSeals(fnb.Metrics.Cache, db)
 	index := bstorage.NewIndex(fnb.Metrics.Cache, db)
-	payloads := bstorage.NewPayloads(index, identities, guarantees, seals)
+	payloads := bstorage.NewPayloads(db, index, identities, guarantees, seals)
 	blocks := bstorage.NewBlocks(db, headers, payloads)
-	collections := bstorage.NewCollections(db)
+	transactions := bstorage.NewTransactions(fnb.Metrics.Cache, db)
+	collections := bstorage.NewCollections(db, transactions)
 
 	fnb.DB = db
 	fnb.Storage = Storage{
-		Headers:     headers,
-		Identities:  identities,
-		Guarantees:  guarantees,
-		Seals:       seals,
-		Index:       index,
-		Payloads:    payloads,
-		Blocks:      blocks,
-		Collections: collections,
+		Headers:      headers,
+		Identities:   identities,
+		Guarantees:   guarantees,
+		Seals:        seals,
+		Index:        index,
+		Payloads:     payloads,
+		Blocks:       blocks,
+		Transactions: transactions,
+		Collections:  collections,
 	}
 }
 

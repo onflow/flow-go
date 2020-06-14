@@ -12,13 +12,13 @@ type IngestRPC struct {
 	mock.Mock
 }
 
-// ExecuteScriptAtBlockID provides a mock function with given fields: ctx, script, blockID
-func (_m *IngestRPC) ExecuteScriptAtBlockID(ctx context.Context, script []byte, blockID flow.Identifier) ([]byte, error) {
-	ret := _m.Called(ctx, script, blockID)
+// ExecuteScriptAtBlockID provides a mock function with given fields: ctx, script, arguments, blockID
+func (_m *IngestRPC) ExecuteScriptAtBlockID(ctx context.Context, script []byte, arguments [][]byte, blockID flow.Identifier) ([]byte, error) {
+	ret := _m.Called(ctx, script, arguments, blockID)
 
 	var r0 []byte
-	if rf, ok := ret.Get(0).(func(context.Context, []byte, flow.Identifier) []byte); ok {
-		r0 = rf(ctx, script, blockID)
+	if rf, ok := ret.Get(0).(func(context.Context, []byte, [][]byte, flow.Identifier) []byte); ok {
+		r0 = rf(ctx, script, arguments, blockID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
@@ -26,8 +26,8 @@ func (_m *IngestRPC) ExecuteScriptAtBlockID(ctx context.Context, script []byte, 
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, []byte, flow.Identifier) error); ok {
-		r1 = rf(ctx, script, blockID)
+	if rf, ok := ret.Get(1).(func(context.Context, []byte, [][]byte, flow.Identifier) error); ok {
+		r1 = rf(ctx, script, arguments, blockID)
 	} else {
 		r1 = ret.Error(1)
 	}

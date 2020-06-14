@@ -19,7 +19,9 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/engine/verification/finder"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
+	"github.com/dapperlabs/flow-go/engine/verification/match"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -121,13 +123,18 @@ type VerificationNode struct {
 	AuthCollections       mempool.Collections
 	PendingCollections    mempool.PendingCollections
 	CollectionTrackers    mempool.CollectionTrackers
+	PendingResults        mempool.PendingResults
 	ChunkDataPacks        mempool.ChunkDataPacks
 	ChunkDataPackTrackers mempool.ChunkDataPackTrackers
 	IngestedChunkIDs      mempool.Identifiers
 	IngestedResultIDs     mempool.Identifiers
 	IngestedCollectionIDs mempool.Identifiers
 	AssignedChunkIDs      mempool.Identifiers
+	Chunks                *match.Chunks
+	HeaderStorage         storage.Headers
 	IngestEngine          *ingest.Engine
 	LightIngestEngine     *ingest.LightEngine // a lighter version of ingest engine
 	VerifierEngine        network.Engine
+	FinderEngine          *finder.Engine
+	MatchEngine           network.Engine
 }

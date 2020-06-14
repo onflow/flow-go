@@ -68,12 +68,10 @@ func main() {
 		ingestConf  ingest.Config
 		ingressConf ingress.Config
 
-		pool            mempool.Transactions
-		transactions    *storagekv.Transactions
-		colHeaders      *storagekv.Headers
-		colPayloads     *storagekv.ClusterPayloads
-		colBlocks       *storagekv.ClusterBlocks
-		colCacheMetrics module.CacheMetrics
+		pool        mempool.Transactions
+		colHeaders  *storagekv.Headers
+		colPayloads *storagekv.ClusterPayloads
+		colBlocks   *storagekv.ClusterBlocks
 
 		colCache *buffer.PendingClusterBlocks // pending block cache for cluster consensus
 		conCache *buffer.PendingBlocks        // pending block cache for follower
@@ -123,10 +121,8 @@ func main() {
 			return nil
 		}).
 		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
-			colCacheMetrics = metrics.NewCacheCollector("cluster")
-			transactions = storagekv.NewTransactions(node.DB)
-			colHeaders = storagekv.NewHeaders(colCacheMetrics, node.DB)
-			colPayloads = storagekv.NewClusterPayloads(colCacheMetrics, node.DB)
+			colHeaders = storagekv.NewHeaders(node.Metrics.Cache, node.DB)
+			colPayloads = storagekv.NewClusterPayloads(node.Metrics.Cache, node.DB)
 			colBlocks = storagekv.NewClusterBlocks(node.DB, clusterID, colHeaders, colPayloads)
 			return nil
 		}).
@@ -199,7 +195,7 @@ func main() {
 
 			// initialize cleaner for DB
 			// TODO frequency of 0 turns off the cleaner, turn back on once we know the proper tuning
-			cleaner := storagekv.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), 0)
+			cleaner := storagekv.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
 
 			// create a finalizer that will handling updating the protocol
 			// state when the follower detects newly finalized blocks
@@ -298,7 +294,6 @@ func main() {
 			return server, nil
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			collections := storagekv.NewCollections(node.DB)
 			prov, err = provider.New(
 				node.Logger,
 				node.Network,
@@ -307,8 +302,8 @@ func main() {
 				colMetrics,
 				node.Me,
 				pool,
-				collections,
-				transactions,
+				node.Storage.Collections,
+				node.Storage.Transactions,
 			)
 			return prov, err
 		}).
@@ -330,7 +325,7 @@ func main() {
 				clusterState,
 				ing,
 				pool,
-				transactions,
+				node.Storage.Transactions,
 				colHeaders,
 				colPayloads,
 				colCache,

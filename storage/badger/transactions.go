@@ -6,34 +6,53 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
 type Transactions struct {
-	db *badger.DB
+	db    *badger.DB
+	cache *Cache
 }
 
-func NewTransactions(db *badger.DB) *Transactions {
-	t := Transactions{
-		db: db,
+func NewTransactions(cacheMetrics module.CacheMetrics, db *badger.DB) *Transactions {
+
+	t := Transactions{db: db}
+
+	store := func(txID flow.Identifier, tx interface{}) error {
+		return operation.RetryOnConflict(t.db.Update, t.storeTx(tx.(*flow.TransactionBody)))
 	}
+
+	retrieve := func(txID flow.Identifier) (interface{}, error) {
+		var tx flow.TransactionBody
+		err := db.View(operation.RetrieveTransaction(txID, &tx))
+		return &tx, err
+	}
+
+	t.cache = newCache(cacheMetrics,
+		withLimit(flow.DefaultTransactionExpiry+100),
+		withStore(store),
+		withRetrieve(retrieve),
+		withResource(metrics.ResourceTransaction))
+
 	return &t
 }
 
 func (t *Transactions) Store(tx *flow.TransactionBody) error {
-	err := operation.RetryOnConflict(t.db.Update, operation.SkipDuplicates(operation.InsertTransaction(tx)))
-	if err != nil {
-		return fmt.Errorf("could not insert transaction: %w", err)
+	return t.cache.Put(tx.ID(), tx)
+}
+
+func (t *Transactions) storeTx(tx *flow.TransactionBody) func(*badger.Txn) error {
+	return func(btx *badger.Txn) error {
+		return operation.SkipDuplicates(operation.InsertTransaction(tx))(btx)
 	}
-	return nil
 }
 
 func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error) {
-
-	var tx flow.TransactionBody
-	err := t.db.View(operation.RetrieveTransaction(txID, &tx))
+	tx, err := t.cache.Get(txID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve transaction: %w", err)
 	}
-	return &tx, nil
+	return tx.(*flow.TransactionBody), nil
 }

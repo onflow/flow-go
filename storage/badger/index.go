@@ -16,29 +16,18 @@ import (
 // Index implements a simple read-only payload storage around a badger DB.
 type Index struct {
 	db    *badger.DB
-	index *Cache
+	cache *Cache
 }
 
 func NewIndex(collector module.CacheMetrics, db *badger.DB) *Index {
 
-	storeIndex := func(blockID flow.Identifier, index interface{}) error {
-		idx := index.(flow.Index)
-		err := operation.RetryOnConflict(db.Update, operation.IndexPayloadIdentities(blockID, idx.NodeIDs))
-		if err != nil {
-			return fmt.Errorf("could not store identity index: %w", err)
-		}
-		err = operation.RetryOnConflict(db.Update, operation.IndexPayloadGuarantees(blockID, idx.CollectionIDs))
-		if err != nil {
-			return fmt.Errorf("could not store guarantee index: %w", err)
-		}
-		err = operation.RetryOnConflict(db.Update, operation.IndexPayloadSeals(blockID, idx.SealIDs))
-		if err != nil {
-			return fmt.Errorf("could not store seal index: %w", err)
-		}
-		return nil
+	p := &Index{db: db}
+
+	store := func(blockID flow.Identifier, index interface{}) error {
+		return operation.RetryOnConflict(db.Update, p.storeTx(blockID, index.(flow.Index)))
 	}
 
-	retrieveIndex := func(blockID flow.Identifier) (interface{}, error) {
+	retrieve := func(blockID flow.Identifier) (interface{}, error) {
 		var nodeIDs []flow.Identifier
 		err := db.View(operation.LookupPayloadIdentities(blockID, &nodeIDs))
 		if err != nil {
@@ -62,25 +51,39 @@ func NewIndex(collector module.CacheMetrics, db *badger.DB) *Index {
 		return idx, nil
 	}
 
-	p := &Index{
-		db: db,
-		index: newCache(collector,
-			withLimit(flow.DefaultTransactionExpiry+100),
-			withStore(storeIndex),
-			withRetrieve(retrieveIndex),
-			withResource(metrics.ResourceIndex),
-		),
-	}
+	p.cache = newCache(collector,
+		withLimit(flow.DefaultTransactionExpiry+100),
+		withStore(store),
+		withRetrieve(retrieve),
+		withResource(metrics.ResourceIndex))
 
 	return p
 }
 
 func (i *Index) Store(blockID flow.Identifier, index flow.Index) error {
-	return i.index.Put(blockID, index)
+	return i.cache.Put(blockID, index)
+}
+
+func (i *Index) storeTx(blockID flow.Identifier, index flow.Index) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		err := operation.IndexPayloadIdentities(blockID, index.NodeIDs)(tx)
+		if err != nil {
+			return fmt.Errorf("could not store identity index: %w", err)
+		}
+		err = operation.IndexPayloadGuarantees(blockID, index.CollectionIDs)(tx)
+		if err != nil {
+			return fmt.Errorf("could not store guarantee index: %w", err)
+		}
+		err = operation.IndexPayloadSeals(blockID, index.SealIDs)(tx)
+		if err != nil {
+			return fmt.Errorf("could not store seal index: %w", err)
+		}
+		return nil
+	}
 }
 
 func (i *Index) ByBlockID(blockID flow.Identifier) (flow.Index, error) {
-	index, err := i.index.Get(blockID)
+	index, err := i.cache.Get(blockID)
 	if err != nil {
 		return flow.Index{}, err
 	}

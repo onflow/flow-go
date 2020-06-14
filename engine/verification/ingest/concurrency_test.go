@@ -165,7 +165,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, lightIng
 	// create `erCount` ER fixtures that will be concurrently delivered
 	ers := make([]utils.CompleteExecutionResult, 0)
 	// list of assigned chunks to the verifier node
-	vChunks := make([]*verification.VerifiableChunk, 0)
+	vChunks := make([]*verification.VerifiableChunkData, 0)
 	// a counter to assign chunks every other one, so to check if
 	// ingest only sends the assigned chunks to verifier
 
@@ -184,13 +184,13 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, lightIng
 				endState = er.Receipt.ExecutionResult.Chunks[j+1].StartState
 			}
 
-			vc := &verification.VerifiableChunk{
-				ChunkIndex:    chunk.Index,
-				EndState:      endState,
-				Block:         er.Block,
-				Receipt:       er.Receipt,
+			vc := &verification.VerifiableChunkData{
+				Chunk:         chunk,
+				Header:        er.Block.Header,
+				Result:        &er.Receipt.ExecutionResult,
 				Collection:    er.Collections[chunk.Index],
 				ChunkDataPack: er.ChunkDataPacks[chunk.Index],
+				EndState:      endState,
 			}
 			vChunks = append(vChunks, vc)
 		}
@@ -200,9 +200,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, lightIng
 	// to the verifier exactly once.
 	verifierEng, verifierEngWG := SetupMockVerifierEng(t, vChunks)
 	assigner := utils.NewMockAssigner(verID.NodeID, IsAssigned)
-	verNode := testutil.VerificationNode(t, hub, verID, identities, assigner, requestInterval, failureThreshold,
-		lightIngest,
-		testutil.WithVerifierEngine(verifierEng))
+	verNode := testutil.VerificationNode(t, hub, verID, identities, assigner, requestInterval, failureThreshold, lightIngest, false, testutil.WithVerifierEngine(verifierEng))
 
 	// starts the ingest engine
 	if lightIngest {
@@ -329,9 +327,9 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, lightIng
 	verNet.StopConDev()
 
 	for _, c := range vChunks {
-		if IsAssigned(c.ChunkIndex) {
+		if IsAssigned(c.Chunk.Index) {
 			// assigned chunks should have their result to be added to ingested results mempool
-			assert.True(t, verNode.IngestedResultIDs.Has(c.Receipt.ExecutionResult.ID()))
+			assert.True(t, verNode.IngestedResultIDs.Has(c.Result.ID()))
 		}
 	}
 
@@ -448,7 +446,7 @@ func setupMockCollectionNode(t *testing.T, node mock.GenericNode, verID flow.Ide
 // - that a set of chunks are delivered to it.
 // - that each chunk is delivered exactly once
 // SetupMockVerifierEng returns the mock engine and a wait group that unblocks when all ERs are received.
-func SetupMockVerifierEng(t testing.TB, vChunks []*verification.VerifiableChunk) (*network.Engine, *sync.WaitGroup) {
+func SetupMockVerifierEng(t testing.TB, vChunks []*verification.VerifiableChunkData) (*network.Engine, *sync.WaitGroup) {
 	eng := new(network.Engine)
 
 	// keep track of which verifiable chunks we have received
@@ -463,7 +461,7 @@ func SetupMockVerifierEng(t testing.TB, vChunks []*verification.VerifiableChunk)
 	// computes expected number of assigned chunks
 	expected := 0
 	for _, c := range vChunks {
-		if IsAssigned(c.ChunkIndex) {
+		if IsAssigned(c.Chunk.Index) {
 			expected++
 		}
 	}
@@ -475,11 +473,11 @@ func SetupMockVerifierEng(t testing.TB, vChunks []*verification.VerifiableChunk)
 			defer mu.Unlock()
 
 			// the received entity should be a verifiable chunk
-			vchunk, ok := args[0].(*verification.VerifiableChunk)
+			vchunk, ok := args[0].(*verification.VerifiableChunkData)
 			assert.True(t, ok)
 
 			// retrieves the content of received chunk
-			chunk, ok := vchunk.Receipt.ExecutionResult.Chunks.ByIndex(vchunk.ChunkIndex)
+			chunk, ok := vchunk.Result.Chunks.ByIndex(vchunk.Chunk.Index)
 			require.True(t, ok, "chunk out of range requested")
 			vID := chunk.ID()
 

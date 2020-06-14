@@ -931,10 +931,10 @@ func (suite *IngestTestSuite) TestVerifyReady() {
 			// also checks the end state of verifiable chunks about edge cases
 			var receivedWG sync.WaitGroup
 			receivedWG.Add(1)
-			suite.verifierEng.On("ProcessLocal", testifymock.AnythingOfType("*verification.VerifiableChunk")).
+			suite.verifierEng.On("ProcessLocal", testifymock.AnythingOfType("*verification.VerifiableChunkData")).
 				Run(func(args testifymock.Arguments) {
 					// the received entity should be a verifiable chunk
-					vc, ok := args[0].(*verification.VerifiableChunk)
+					vc, ok := args[0].(*verification.VerifiableChunkData)
 					assert.True(suite.T(), ok)
 
 					// checks verifiable chunk end state

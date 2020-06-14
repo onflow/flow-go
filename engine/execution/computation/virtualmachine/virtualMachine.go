@@ -78,8 +78,9 @@ func (vm *virtualMachine) executeTransaction(
 
 func (vm *virtualMachine) executeScript(
 	script []byte,
+	arguments [][]byte,
 	runtimeInterface runtime.Interface,
 	location runtime.Location,
 ) (cadence.Value, error) {
-	return vm.rt.ExecuteScript(script, runtimeInterface, location)
+	return vm.rt.ExecuteScript(script, arguments, runtimeInterface, location)
 }
