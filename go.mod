@@ -25,7 +25,7 @@ require (
 	github.com/libp2p/go-libp2p-transport-upgrader v0.1.1
 	github.com/libp2p/go-tcp-transport v0.1.1
 	github.com/multiformats/go-multiaddr v0.2.0
-	github.com/onflow/cadence v0.4.1-0.20200604185918-21edaa9bfcdd
+	github.com/onflow/cadence v0.4.1-0.20200604200650-30a200f9c324
 	github.com/onflow/flow-go-sdk v0.4.0 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200609190303-17d262f35b48
 	github.com/onsi/ginkgo v1.10.1 // indirect
@@ -60,5 +60,3 @@ replace github.com/dapperlabs/flow-go/crypto => ./crypto
 replace github.com/dapperlabs/flow-go/protobuf => ./protobuf
 
 replace github.com/dapperlabs/flow-go/integration => ./integration
-
-replace github.com/onflow/cadence => ../cadence
