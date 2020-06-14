@@ -37,6 +37,7 @@ type TransactionContext struct {
 	signatureVerificationEnabled     bool
 	restrictedAccountCreationEnabled bool
 	restrictedDeploymentEnabled      bool
+	simpleAddresses                  bool
 }
 
 type TransactionContextOption func(*TransactionContext)
@@ -84,13 +85,15 @@ func (r *TransactionContext) Logs() []string {
 
 // GetValue gets a register value from the world state.
 func (r *TransactionContext) GetValue(owner, controller, key []byte) ([]byte, error) {
-	v, _ := r.ledger.Get(fullKeyHash(string(owner), string(controller), string(key)))
+	v, _ := r.ledger.Get(fullKeyHash(string(flow.BytesToAddress(owner).Bytes()), string(
+		flow.BytesToAddress(controller).Bytes()), string(key)))
 	return v, nil
 }
 
 // SetValue sets a register value in the world state.
 func (r *TransactionContext) SetValue(owner, controller, key, value []byte) error {
-	r.ledger.Set(fullKeyHash(string(owner), string(controller), string(key)), value)
+	r.ledger.Set(fullKeyHash(string(flow.BytesToAddress(owner).Bytes()), string(
+		flow.BytesToAddress(controller).Bytes()), string(key)), value)
 	return nil
 }
 
@@ -161,7 +164,7 @@ func (r *TransactionContext) CreateAccount(payer runtime.Address) (runtime.Addre
 
 func (r *TransactionContext) initDefaultToken(addr flow.Address) (FlowError, error) {
 	tx := flow.NewTransactionBody().
-		SetScript(InitDefaultTokenTransaction()).
+		SetScript(InitDefaultTokenTransaction(r.ServiceAddress())).
 		AddAuthorizer(addr)
 
 	// TODO: propagate computation limit
@@ -179,7 +182,7 @@ func (r *TransactionContext) initDefaultToken(addr flow.Address) (FlowError, err
 
 func (r *TransactionContext) deductTransactionFee(addr flow.Address) (FlowError, error) {
 	tx := flow.NewTransactionBody().
-		SetScript(DeductTransactionFeeTransaction()).
+		SetScript(DeductTransactionFeeTransaction(r.ServiceAddress())).
 		AddAuthorizer(addr)
 
 	// TODO: propagate computation limit
@@ -198,9 +201,9 @@ func (r *TransactionContext) deductTransactionFee(addr flow.Address) (FlowError,
 func (r *TransactionContext) deductAccountCreationFee(addr flow.Address) (FlowError, error) {
 	var script []byte
 	if r.restrictedAccountCreationEnabled {
-		script = DeductAccountCreationFeeWithWhitelistTransaction()
+		script = DeductAccountCreationFeeWithWhitelistTransaction(r.ServiceAddress())
 	} else {
-		script = DeductAccountCreationFeeTransaction()
+		script = DeductAccountCreationFeeTransaction(r.ServiceAddress())
 	}
 
 	tx := flow.NewTransactionBody().
@@ -289,12 +292,20 @@ func (r *TransactionContext) CheckCode(address runtime.Address, code []byte) (er
 	return r.checkProgram(code, address)
 }
 
+func (r *TransactionContext) ServiceAddress() flow.Address {
+	if r.simpleAddresses {
+		return SimpleServiceAddress()
+	}
+
+	return flow.ServiceAddress()
+}
+
 // UpdateAccountCode updates the deployed code on an existing account.
 //
 // This function returns an error if the specified account does not exist or is
 // not a valid signing account.
 func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []byte) (err error) {
-	accountAddress := address.Bytes()
+	accountAddress := flow.BytesToAddress(address.Bytes()).Bytes()
 
 	key := fullKeyHash(string(accountAddress), string(accountAddress), keyCode)
 
@@ -310,7 +321,7 @@ func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []b
 
 	// currently, every transaction that sets account code (deploys/updates contracts)
 	// must be signed by the service account
-	if r.restrictedDeploymentEnabled && !r.isValidSigningAccount(runtime.Address(flow.ServiceAddress())) {
+	if r.restrictedDeploymentEnabled && !r.isValidSigningAccount(runtime.Address(r.ServiceAddress())) {
 		return fmt.Errorf("code deployment requires authorization from the service account")
 	}
 
@@ -602,7 +613,7 @@ func (r *TransactionContext) isValidSigningAccount(address runtime.Address) bool
 	return false
 }
 
-func InitDefaultTokenTransaction() []byte {
+func InitDefaultTokenTransaction(serviceAddress flow.Address) []byte {
 	return []byte(fmt.Sprintf(`
 		import FlowServiceAccount from 0x%s
 
@@ -611,10 +622,10 @@ func InitDefaultTokenTransaction() []byte {
 				FlowServiceAccount.initDefaultToken(acct)
 			}
 		}
-	`, flow.ServiceAddress()))
+	`, serviceAddress))
 }
 
-func DefaultTokenBalanceScript(addr flow.Address) []byte {
+func DefaultTokenBalanceScript(serviceAddress, addr flow.Address) []byte {
 	return []byte(fmt.Sprintf(`
         import FlowServiceAccount from 0x%s
 
@@ -622,10 +633,10 @@ func DefaultTokenBalanceScript(addr flow.Address) []byte {
             let acct = getAccount(0x%s)
             return FlowServiceAccount.defaultTokenBalance(acct)
         }
-    `, flow.ServiceAddress(), addr))
+    `, serviceAddress, addr))
 }
 
-func DeductAccountCreationFeeTransaction() []byte {
+func DeductAccountCreationFeeTransaction(serviceAddress flow.Address) []byte {
 	return []byte(fmt.Sprintf(`
 		import FlowServiceAccount from 0x%s
 
@@ -634,13 +645,13 @@ func DeductAccountCreationFeeTransaction() []byte {
 				FlowServiceAccount.deductAccountCreationFee(acct)
 			}
 		}
-	`, flow.ServiceAddress()))
+	`, serviceAddress))
 }
 
-func DeductAccountCreationFeeWithWhitelistTransaction() []byte {
+func DeductAccountCreationFeeWithWhitelistTransaction(serviceAddress flow.Address) []byte {
 	return []byte(fmt.Sprintf(`
 		import FlowServiceAccount from 0x%s
-	
+
 		transaction {
 			prepare(acct: AuthAccount) {
 				if !FlowServiceAccount.isAccountCreator(acct.address) {
@@ -650,10 +661,10 @@ func DeductAccountCreationFeeWithWhitelistTransaction() []byte {
 				FlowServiceAccount.deductAccountCreationFee(acct)
 			}
 		}
-	`, flow.ServiceAddress()))
+	`, serviceAddress))
 }
 
-func DeductTransactionFeeTransaction() []byte {
+func DeductTransactionFeeTransaction(serviceAddress flow.Address) []byte {
 	return []byte(fmt.Sprintf(`
 		import FlowServiceAccount from 0x%s
 
@@ -662,7 +673,7 @@ func DeductTransactionFeeTransaction() []byte {
 				FlowServiceAccount.deductTransactionFee(acct)
 			}
 		}
-	`, flow.ServiceAddress()))
+	`, serviceAddress))
 }
 
 func DeployDefaultTokenTransaction(contract []byte) []byte {
@@ -687,7 +698,7 @@ func DeployFlowFeesTransaction(contract []byte) []byte {
     `, hex.EncodeToString(contract)))
 }
 
-func MintDefaultTokenTransaction() []byte {
+func MintDefaultTokenTransaction(fungibleTokenAddress, flowTokenAddress flow.Address) []byte {
 	return []byte(fmt.Sprintf(`
 		import FungibleToken from 0x%s
 		import FlowToken from 0x%s
@@ -717,7 +728,7 @@ func MintDefaultTokenTransaction() []byte {
 			destroy minter
 		  }
 		}
-	`, FungibleTokenAddress(), FlowTokenAddress()))
+	`, fungibleTokenAddress, flowTokenAddress))
 }
 
 func FungibleTokenAddress() flow.Address {

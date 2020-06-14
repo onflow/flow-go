@@ -108,7 +108,9 @@ func BytesToAddress(b []byte) Address {
 }
 
 // Bytes returns the byte representation of the address.
-func (a Address) Bytes() []byte { return a[:] }
+func (a Address) Bytes() []byte {
+	return a[:]
+}
 
 // Hex returns the hex string representation of the address.
 func (a Address) Hex() string {
