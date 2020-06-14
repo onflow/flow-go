@@ -163,7 +163,7 @@ func setupMockConsensusNode(t *testing.T,
 // - that a set of chunks are delivered to it.
 // - that each chunk is delivered exactly once
 // SetupMockVerifierEng returns the mock engine and a wait group that unblocks when all ERs are received.
-func SetupMockVerifierEng(t testing.TB, vChunks []*verification.VerifiableChunk) (*network.Engine, *sync.WaitGroup) {
+func SetupMockVerifierEng(t testing.TB, vChunks []*verification.VerifiableChunkData) (*network.Engine, *sync.WaitGroup) {
 	eng := new(network.Engine)
 
 	// keep track of which verifiable chunks we have received
@@ -178,7 +178,7 @@ func SetupMockVerifierEng(t testing.TB, vChunks []*verification.VerifiableChunk)
 	// computes expected number of assigned chunks
 	expected := 0
 	for _, c := range vChunks {
-		if IsAssigned(c.ChunkIndex) {
+		if IsAssigned(c.Chunk.Index) {
 			expected++
 		}
 	}
@@ -190,11 +190,11 @@ func SetupMockVerifierEng(t testing.TB, vChunks []*verification.VerifiableChunk)
 			defer mu.Unlock()
 
 			// the received entity should be a verifiable chunk
-			vchunk, ok := args[0].(*verification.VerifiableChunk)
+			vchunk, ok := args[0].(*verification.VerifiableChunkData)
 			assert.True(t, ok)
 
 			// retrieves the content of received chunk
-			chunk, ok := vchunk.Receipt.ExecutionResult.Chunks.ByIndex(vchunk.ChunkIndex)
+			chunk, ok := vchunk.Result.Chunks.ByIndex(vchunk.Chunk.Index)
 			require.True(t, ok, "chunk out of range requested")
 			vID := chunk.ID()
 
@@ -230,7 +230,7 @@ func SetupMockVerifierEng(t testing.TB, vChunks []*verification.VerifiableChunk)
 	return eng, &wg
 }
 
-func VerifiableChunk(chunkIndex uint64, er utils.CompleteExecutionResult) *verification.VerifiableChunk {
+func VerifiableDataChunk(chunkIndex uint64, er utils.CompleteExecutionResult) *verification.VerifiableChunkData {
 	var endState flow.StateCommitment
 	// last chunk
 	if int(chunkIndex) == len(er.Receipt.ExecutionResult.Chunks)-1 {
@@ -239,13 +239,13 @@ func VerifiableChunk(chunkIndex uint64, er utils.CompleteExecutionResult) *verif
 		endState = er.Receipt.ExecutionResult.Chunks[chunkIndex+1].StartState
 	}
 
-	return &verification.VerifiableChunk{
-		ChunkIndex:    chunkIndex,
-		EndState:      endState,
-		Block:         er.Block,
-		Receipt:       er.Receipt,
+	return &verification.VerifiableChunkData{
+		Chunk:         er.Receipt.ExecutionResult.Chunks[chunkIndex],
+		Header:        er.Block.Header,
+		Result:        &er.Receipt.ExecutionResult,
 		Collection:    er.Collections[chunkIndex],
 		ChunkDataPack: er.ChunkDataPacks[chunkIndex],
+		EndState:      endState,
 	}
 }
 
