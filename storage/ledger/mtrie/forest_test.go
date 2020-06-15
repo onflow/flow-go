@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -47,7 +46,7 @@ func TestTrieOperations(t *testing.T) {
 	require.NoError(t, err)
 
 	// Get trie
-	retnt, err := fStore.getTrie(updatedTrie.RootHash())
+	retnt, err := fStore.GetTrie(updatedTrie.RootHash())
 	require.NoError(t, err)
 	require.True(t, bytes.Equal(retnt.RootHash(), updatedTrie.RootHash()))
 	require.Equal(t, fStore.Size(), 2)
@@ -786,7 +785,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 	fStore, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
-	testTrie, err := fStore.getTrie(fStore.GetEmptyRootHash())
+	testTrie, err := fStore.GetTrie(fStore.GetEmptyRootHash())
 	require.NoError(t, err)
 	latestValueByKey := make(map[string][]byte) // map store
 
@@ -1013,72 +1012,4 @@ func TestTrieStoreAndLoad(t *testing.T) {
 	//for i := range keys {
 	//	require.True(t, bytes.Equal(values[i], retValues[i]))
 	//}
-}
-
-func TestForestStoreAndLoad(t *testing.T) {
-	trieHeight := 9
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
-
-	metricsCollector := &metrics.NoopCollector{}
-	mForest, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
-	require.NoError(t, err)
-	rootHash := mForest.GetEmptyRootHash()
-
-	k1 := []byte([]uint8{uint8(1)})
-	v1 := []byte{'A'}
-	k2 := []byte([]uint8{uint8(2)})
-	v2 := []byte{'B'}
-	k3 := []byte([]uint8{uint8(130)})
-	v3 := []byte{'C'}
-	k4 := []byte([]uint8{uint8(131)})
-	v4 := []byte{'D'}
-	k5 := []byte([]uint8{uint8(132)})
-	v5 := []byte{'E'}
-
-	keys := [][]byte{k1, k2, k3, k4, k5}
-	values := [][]byte{v1, v2, v3, v4, v5}
-	newTrie, err := mForest.Update(rootHash, keys, values)
-	require.NoError(t, err)
-	rootHash = newTrie.RootHash()
-
-	k6 := []byte([]uint8{uint8(133)})
-	v6 := []byte{'F'}
-
-	keys6 := [][]byte{k6}
-	values6 := [][]byte{v6}
-	newTrie, err = mForest.Update(rootHash, keys6, values6)
-	require.NoError(t, err)
-	rootHash = newTrie.RootHash()
-
-	file, err := ioutil.TempFile("", "flow-mtrie-load")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer os.Remove(file.Name())
-
-	storableNodes, storableTrees, err := mForest.ToStorables()
-	require.NoError(t, err)
-
-	newMForest, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
-	require.NoError(t, err)
-
-	//forests are different
-	assert.NotEqual(t, mForest, newMForest)
-
-	err = newMForest.LoadStorables(storableNodes, storableTrees)
-	require.NoError(t, err)
-
-	//forests are the same now
-	assert.Equal(t, *mForest, *newMForest)
-
-	retValues, err := mForest.Read(rootHash, keys)
-	require.NoError(t, err)
-	newRetValues, err := newMForest.Read(rootHash, keys)
-	require.NoError(t, err)
-	for i := range keys {
-		require.True(t, bytes.Equal(values[i], retValues[i]))
-		require.True(t, bytes.Equal(values[i], newRetValues[i]))
-	}
 }

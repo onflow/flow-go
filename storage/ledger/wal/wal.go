@@ -7,9 +7,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	prometheusWAL "github.com/prometheus/tsdb/wal"
 
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
+
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/node"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 )
 
 type LedgerWAL struct {
@@ -54,7 +54,7 @@ func (w *LedgerWAL) RecordDelete(stateCommitment flow.StateCommitment) error {
 }
 
 func (w *LedgerWAL) Replay(
-	checkpointFn func([]*node.StorableNode, []*trie.StorableTrie) error,
+	checkpointFn func(forestSequencing *flattener.FlattenedForest) error,
 	updateFn func(flow.StateCommitment, [][]byte, [][]byte) error,
 	deleteFn func(flow.StateCommitment) error,
 ) error {
@@ -67,7 +67,7 @@ func (w *LedgerWAL) Replay(
 
 func (w *LedgerWAL) replay(
 	from, to int,
-	checkpointFn func([]*node.StorableNode, []*trie.StorableTrie) error,
+	checkpointFn func(forestSequencing *flattener.FlattenedForest) error,
 	updateFn func(flow.StateCommitment, [][]byte, [][]byte) error,
 	deleteFn func(flow.StateCommitment) error,
 ) error {
@@ -89,11 +89,11 @@ func (w *LedgerWAL) replay(
 	loadedCheckpoint := false
 
 	if latestCheckpoint != -1 && latestCheckpoint+1 >= from { //+1 to account for connected checkpoint and segments
-		storedNodes, storedTris, err := checkpointer.LoadCheckpoint(latestCheckpoint)
+		forestSequencing, err := checkpointer.LoadCheckpoint(latestCheckpoint)
 		if err != nil {
 			return fmt.Errorf("cannot load checkpoint %d: %w", latestCheckpoint, err)
 		}
-		err = checkpointFn(storedNodes, storedTris)
+		err = checkpointFn(forestSequencing)
 		if err != nil {
 			return fmt.Errorf("error while handling checkpoint: %w", err)
 		}

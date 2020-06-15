@@ -6,10 +6,11 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/node"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/wal"
@@ -56,8 +57,16 @@ func NewMTrieStorage(dbDir string, cacheSize int, metrics module.LedgerMetrics, 
 	}
 
 	err = w.Replay(
-		func(storableNodes []*node.StorableNode, storableTries []*trie.StorableTrie) error {
-			return storage.mForest.LoadStorables(storableNodes, storableTries)
+		func(forestSequencing *flattener.FlattenedForest) error {
+			rebuiltTries, err := flattener.RebuildTries(forestSequencing)
+			if err != nil {
+				return fmt.Errorf("rebuilding forest from sequenced nodes failed: %w", err)
+			}
+			err = storage.mForest.AddTries(rebuiltTries)
+			if err != nil {
+				return fmt.Errorf("adding rebuilt tries to forest failed: %w", err)
+			}
+			return nil
 		},
 		func(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
 			_, err = storage.mForest.Update(stateCommitment, keys, values)
@@ -194,13 +203,13 @@ func (f *MTrieStorage) GetRegistersWithProof(
 
 	// values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Could not get register values: %w", err)
+		return nil, nil, fmt.Errorf("could not get register values: %w", err)
 	}
 
 	batchProof, err := f.mForest.Proofs(stateCommitment, registerIDs)
 	// batchProof, err := f.tree.GetBatchProof(registerIDs, stateCommitment)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Could not get proofs: %w", err)
+		return nil, nil, fmt.Errorf("could not get proofs: %w", err)
 	}
 
 	proofToGo, totalProofLength := proof.EncodeBatchProof(batchProof)

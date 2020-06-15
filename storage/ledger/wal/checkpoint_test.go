@@ -9,11 +9,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/node"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 	realWAL "github.com/dapperlabs/flow-go/storage/ledger/wal"
@@ -178,7 +179,7 @@ func Test_Checkpointing(t *testing.T) {
 			require.NoError(t, err)
 
 			err = wal2.Replay(
-				func(nodes []*node.StorableNode, tries []*trie.StorableTrie) error {
+				func(forestSequencing *flattener.FlattenedForest) error {
 					return fmt.Errorf("I should fail as there should be no checkpoints")
 				},
 				func(commitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
@@ -213,8 +214,8 @@ func Test_Checkpointing(t *testing.T) {
 			require.NoError(t, err)
 
 			err = wal3.Replay(
-				func(nodes []*node.StorableNode, tries []*trie.StorableTrie) error {
-					return f3.LoadStorables(nodes, tries)
+				func(forestSequencing *flattener.FlattenedForest) error {
+					return loadIntoForest(f3, forestSequencing)
 				},
 				func(commitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
 					return fmt.Errorf("I should fail as there should be no updates")
@@ -294,8 +295,8 @@ func Test_Checkpointing(t *testing.T) {
 			updatesLeft := 1 // there should be only one update
 
 			err = wal5.Replay(
-				func(nodes []*node.StorableNode, tries []*trie.StorableTrie) error {
-					return f5.LoadStorables(nodes, tries)
+				func(forestSequencing *flattener.FlattenedForest) error {
+					return loadIntoForest(f5, forestSequencing)
 				},
 				func(commitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
 					if updatesLeft == 0 {
@@ -329,4 +330,18 @@ func Test_Checkpointing(t *testing.T) {
 		})
 
 	})
+}
+
+func loadIntoForest(forest *mtrie.MForest, forestSequencing *flattener.FlattenedForest) error {
+	tries, err := flattener.RebuildTries(forestSequencing)
+	if err != nil {
+		return err
+	}
+	for _, t := range tries {
+		err := forest.AddTrie(t)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

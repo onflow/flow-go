@@ -45,15 +45,6 @@ type MTrie struct {
 	parentRootHash []byte
 }
 
-// StorableTrie is a data structure for storing trie
-type StorableTrie struct {
-	RootIndex      uint64
-	Number         uint64
-	MaxHeight      uint16
-	RootHash       []byte
-	ParentRootHash []byte
-}
-
 func NewEmptyMTrie(maxHeight int, number uint64, parentRootHash []byte) (*MTrie, error) {
 	if !checkHeight(maxHeight) {
 		return nil, errors.New("key length of trie must be integer-multiple of 8")
@@ -66,7 +57,8 @@ func NewEmptyMTrie(maxHeight int, number uint64, parentRootHash []byte) (*MTrie,
 	}, nil
 }
 
-func NewMTrie(root *node.Node, number uint64, maxHeight int, parentRootHash []byte) (*MTrie, error) {
+func NewMTrie(root *node.Node, number uint64, parentRootHash []byte) (*MTrie, error) {
+	maxHeight := root.Height() + 1
 	if !checkHeight(maxHeight) {
 		return nil, errors.New("key length of trie must be integer-multiple of 8")
 	}
@@ -95,9 +87,15 @@ func (mt *MTrie) Number() uint64 { return mt.number }
 // Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) ParentRootHash() []byte { return mt.parentRootHash }
 
-// Height return the trie height. The height is identical to the key length [in bit].
+// Height returns the trie height. The height is identical to the key length [in bit].
 // Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) Height() int { return mt.maxHeight - 1 }
+
+// RootNode returns the Trie's root Node
+// Concurrency safe (as Tries are immutable structures by convention)
+func (mt *MTrie) RootNode() *node.Node {
+	return mt.root
+}
 
 // StringRootHash returns the trie's string representation.
 // Concurrency safe (as Tries are immutable structures by convention)
@@ -586,20 +584,6 @@ func constructTrieFromKeyValuePairs(keys [][]byte, keyLength int, values [][]byt
 		maxHeight:      keyLength + 1, // TODO: fix me when replacing maxHeight definition
 		parentRootHash: parentRootHash,
 	}, nil
-}
-
-func (mt *MTrie) GetNodes() []*node.Node {
-	return mt.root.GetNodes()
-}
-
-func (mt *MTrie) ToStorableTrie(allNodes map[*node.Node]uint64) *StorableTrie {
-	return &StorableTrie{
-		RootIndex:      allNodes[mt.root],
-		Number:         mt.number,
-		MaxHeight:      uint16(mt.maxHeight),
-		RootHash:       mt.RootHash(),
-		ParentRootHash: mt.parentRootHash,
-	}
 }
 
 func checkHeight(height int) bool {

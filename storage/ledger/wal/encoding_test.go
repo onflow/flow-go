@@ -7,8 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/node"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
 )
 
 func TestUpdate(t *testing.T) {
@@ -69,7 +68,7 @@ func TestUpdate(t *testing.T) {
 }
 func TestStorableNode(t *testing.T) {
 
-	storableNode := &node.StorableNode{
+	storableNode := &flattener.StorableNode{
 		LIndex:    0,
 		RIndex:    1,
 		Height:    2137,
@@ -107,16 +106,14 @@ func TestStorableNode(t *testing.T) {
 
 func TestStorableTrie(t *testing.T) {
 
-	storableTrie := &trie.StorableTrie{
+	storableTrie := &flattener.StorableTrie{
 		RootIndex:      21,
 		Number:         37,
-		MaxHeight:      44,
 		RootHash:       []byte{2, 2, 2},
 		ParentRootHash: []byte{3, 3, 3},
 	}
 
 	expected := []byte{
-		0, 44, // MaxHeight
 		0, 0, 0, 0, 0, 0, 0, 37, // Number
 		0, 0, 0, 0, 0, 0, 0, 21, // RootIndex
 		0, 3, 2, 2, 2, // RootHash length + data
