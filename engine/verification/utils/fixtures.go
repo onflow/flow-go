@@ -39,13 +39,13 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) CompleteExecut
 
 	// setup collection
 	tx1 := testutil.DeployCounterContractTransaction(flow.ServiceAddress())
-	err := testutil.SignTransactionByRoot(tx1, 0)
+	err := testutil.SignTransactionAsServiceAccount(tx1, 0)
 	require.NoError(t, err)
 	tx2 := testutil.CreateCounterTransaction(flow.ServiceAddress(), flow.ServiceAddress())
-	err = testutil.SignTransactionByRoot(tx2, 1)
+	err = testutil.SignTransactionAsServiceAccount(tx2, 1)
 	require.NoError(t, err)
 	tx3 := testutil.CreateCounterPanicTransaction(flow.ServiceAddress(), flow.ServiceAddress())
-	err = testutil.SignTransactionByRoot(tx3, 2)
+	err = testutil.SignTransactionAsServiceAccount(tx3, 2)
 	require.NoError(t, err)
 	transactions := []*flow.TransactionBody{tx1, tx2, tx3}
 
@@ -159,7 +159,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) CompleteExecut
 		for i := 1; i < chunkCount; i++ {
 
 			tx3 = testutil.CreateCounterPanicTransaction(flow.ServiceAddress(), flow.ServiceAddress())
-			err = testutil.SignTransactionByRoot(tx3, 3+uint64(i))
+			err = testutil.SignTransactionAsServiceAccount(tx3, 3+uint64(i))
 			require.NoError(t, err)
 
 			transactions := []*flow.TransactionBody{tx3}

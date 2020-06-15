@@ -90,9 +90,6 @@ func main() {
 			flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor", timeout.DefaultConfig.TimeoutIncrease, "multiplicative increase of timeout value in case of time out event")
 			flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor", timeout.DefaultConfig.TimeoutDecrease, "multiplicative decrease of timeout value in case of progress")
 			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", 0.6, "additional fraction of replica timeout that the primary will wait for votes")
-			// From the experiment,
-			// if block rate delay is 1 second, then 0.8 block will be finalized per second in average.
-			// if block rate delay is 1.5 second, then 0.5 block will be finalized per second in average
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
 			// TODO remove this
 			flags.BoolVar(&migrateDB, "migrate-db", true, "whether or not to migrate the DB on startup")

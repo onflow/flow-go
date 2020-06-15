@@ -36,7 +36,7 @@ func TestTransactionASTCache(t *testing.T) {
             `),
 		}
 
-		err := testutil.SignTransactionByRoot(tx, 0)
+		err := testutil.SignTransactionAsServiceAccount(tx, 0)
 		require.NoError(t, err)
 
 		ledger := testutil.RootBootstrappedLedger()
@@ -227,7 +227,7 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.NewWithCache(rt, &nonFunctioningCache{})
+	vm, err := virtualmachine.New(rt, virtualmachine.WithCache(&nonFunctioningCache{}))
 	require.NoError(b, err)
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
