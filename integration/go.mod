@@ -14,7 +14,6 @@ require (
 	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200609190303-17d262f35b48
 	github.com/rs/zerolog v1.15.0
 	github.com/stretchr/testify v1.5.1
-	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	google.golang.org/grpc v1.28.0
 	gopkg.in/yaml.v2 v2.2.5
