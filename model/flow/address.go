@@ -108,7 +108,9 @@ func BytesToAddress(b []byte) Address {
 }
 
 // Bytes returns the byte representation of the address.
-func (a Address) Bytes() []byte { return a[:] }
+func (a Address) Bytes() []byte {
+	return a[:]
+}
 
 // Hex returns the hex string representation of the address.
 func (a Address) Hex() string {
@@ -220,7 +222,9 @@ func (gen *AddressGenerator) NextAddress() (Address, error) {
 	return address, nil
 }
 
-// CurrentAddress returns the last generated address.
+// CurrentAddress returns the current account address.
+//
+// The returned address is the address of the latest created account.
 func (gen *AddressGenerator) CurrentAddress() Address {
 	address := gen.generateAddress()
 	return address

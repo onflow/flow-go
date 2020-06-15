@@ -341,10 +341,6 @@ func TestRandomProofs(t *testing.T) {
 			rand.Seed(time.Now().UnixNano())
 
 			numberOfKeys := rand.Intn(256) + 1
-			if numberOfKeys == 0 {
-				numberOfKeys = 1
-			}
-
 			alreadySelectKeys := make(map[string]bool)
 			i := 0
 			for i < numberOfKeys {
@@ -400,8 +396,8 @@ func TestRandomProofs(t *testing.T) {
 			})
 
 			newTrie2, err := mForest.Update(root, updateKeys, updateValues)
-			root2 := newTrie2.RootHash()
 			require.NoError(t, err, "error updating trie")
+			root2 := newTrie2.RootHash()
 
 			proot2, _, err := psmt.Update(updateKeys, updateValues)
 			require.NoError(t, err, "error updating partial trie")

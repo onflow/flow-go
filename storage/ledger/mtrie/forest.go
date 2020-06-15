@@ -67,7 +67,7 @@ func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int, metrics
 		return nil, fmt.Errorf("constructing empty trie for forest failed: %w", err)
 	}
 
-	err = forest.addTrie(emptyTrie)
+	err = forest.AddTrie(emptyTrie)
 	if err != nil {
 		return nil, fmt.Errorf("adding empty trie to forest failed: %w", err)
 	}
@@ -76,7 +76,7 @@ func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int, metrics
 
 // getTrie returns trie at specific rootHash
 // warning, use this function for read-only operation
-func (f *MForest) getTrie(rootHash []byte) (*trie.MTrie, error) {
+func (f *MForest) GetTrie(rootHash []byte) (*trie.MTrie, error) {
 	encRootHash := hex.EncodeToString(rootHash)
 	// if in the cache
 
@@ -93,8 +93,34 @@ func (f *MForest) getTrie(rootHash []byte) (*trie.MTrie, error) {
 	return trie, nil
 }
 
+// GetCachedRootHashes returns list of currently cached tree root hashes
+func (f *MForest) GetTries() ([]*trie.MTrie, error) {
+	// ToDo needs concurrency safety
+	keys := f.tries.Keys()
+	tries := make([]*trie.MTrie, 0, len(keys))
+	for _, key := range keys {
+		t, ok := f.tries.Get(key)
+		if !ok {
+			return nil, errors.New("concurrent MForest modification")
+		}
+		tries = append(tries, t.(*trie.MTrie))
+	}
+	return tries, nil
+}
+
 // addTrie adds a trie to the forest
-func (f *MForest) addTrie(newTrie *trie.MTrie) error {
+func (f *MForest) AddTries(newTries []*trie.MTrie) error {
+	for _, t := range newTries {
+		err := f.AddTrie(t)
+		if err != nil {
+			return fmt.Errorf("adding tries to forrest failed: %w", err)
+		}
+	}
+	return nil
+}
+
+// addTrie adds a trie to the forest
+func (f *MForest) AddTrie(newTrie *trie.MTrie) error {
 	if newTrie == nil {
 		return nil
 	}
@@ -141,7 +167,7 @@ func (f *MForest) Read(rootHash []byte, keys [][]byte) ([][]byte, error) {
 	}
 
 	// lookup the trie by rootHash
-	trie, err := f.getTrie(rootHash)
+	trie, err := f.GetTrie(rootHash)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +218,7 @@ func (f *MForest) Read(rootHash []byte, keys [][]byte) ([][]byte, error) {
 
 // Update updates the Values for the registers and returns rootHash and error (if any)
 func (f *MForest) Update(rootHash []byte, keys [][]byte, values [][]byte) (*trie.MTrie, error) {
-	parentTrie, err := f.getTrie(rootHash)
+	parentTrie, err := f.GetTrie(rootHash)
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +264,7 @@ func (f *MForest) Update(rootHash []byte, keys [][]byte, values [][]byte) (*trie
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
 
-	err = f.addTrie(newTrie)
+	err = f.AddTrie(newTrie)
 	if err != nil {
 		return nil, fmt.Errorf("adding updated trie to forest failed: %w", err)
 	}
@@ -288,7 +314,7 @@ func (f *MForest) Proofs(rootHash []byte, keys [][]byte) (*proof.BatchProof, err
 
 	}
 
-	stateTrie, err := f.getTrie(rootHash)
+	stateTrie, err := f.GetTrie(rootHash)
 	if err != nil {
 		return nil, err
 	}
@@ -340,7 +366,7 @@ func (f *MForest) Proofs(rootHash []byte, keys [][]byte) (*proof.BatchProof, err
 
 // StoreTrie stores a trie on disk
 func (f *MForest) StoreTrie(rootHash []byte, path string) error {
-	trie, err := f.getTrie(rootHash)
+	trie, err := f.GetTrie(rootHash)
 	if err != nil {
 		return err
 	}
@@ -353,7 +379,7 @@ func (f *MForest) LoadTrie(path string) (*trie.MTrie, error) {
 	if err != nil {
 		return nil, fmt.Errorf("loading trie from '%s' failed: %w", path, err)
 	}
-	err = f.addTrie(newTrie)
+	err = f.AddTrie(newTrie)
 	if err != nil {
 		return nil, fmt.Errorf("adding loaded trie from '%s' to forest failed: %w", path, err)
 	}
@@ -366,7 +392,7 @@ func (f *MForest) Size() int {
 	return f.tries.Len()
 }
 
-// DiskSize returns the disk size of the directory used by the forest
+// DiskSize returns the disk size of the directory used by the forest (in bytes)
 func (f *MForest) DiskSize() (int64, error) {
 	return io.DirSize(f.dir)
 }

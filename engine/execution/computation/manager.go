@@ -20,7 +20,7 @@ import (
 )
 
 type ComputationManager interface {
-	ExecuteScript([]byte, *flow.Header, *delta.View) ([]byte, error)
+	ExecuteScript([]byte, [][]byte, *flow.Header, *delta.View) ([]byte, error)
 	ComputeBlock(
 		ctx context.Context,
 		block *entity.ExecutableBlock,
@@ -61,9 +61,9 @@ func New(
 	return &e
 }
 
-func (e *Manager) ExecuteScript(script []byte, blockHeader *flow.Header, view *delta.View) ([]byte, error) {
+func (e *Manager) ExecuteScript(script []byte, arguments [][]byte, blockHeader *flow.Header, view *delta.View) ([]byte, error) {
 
-	result, err := e.vm.NewBlockContext(blockHeader, e.blocks).ExecuteScript(view, script)
+	result, err := e.vm.NewBlockContext(blockHeader, e.blocks).ExecuteScript(view, script, arguments)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
 	}

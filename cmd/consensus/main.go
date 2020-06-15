@@ -34,10 +34,12 @@ import (
 	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/mempool/ejectors"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
 func main() {
@@ -69,6 +71,9 @@ func main() {
 		sync           *synchronization.Engine
 		conMetrics     module.ConsensusMetrics
 		mainMetrics    module.HotstuffMetrics
+
+		// TODO remove this
+		migrateDB bool
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -85,10 +90,9 @@ func main() {
 			flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor", timeout.DefaultConfig.TimeoutIncrease, "multiplicative increase of timeout value in case of time out event")
 			flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor", timeout.DefaultConfig.TimeoutDecrease, "multiplicative decrease of timeout value in case of progress")
 			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", 0.6, "additional fraction of replica timeout that the primary will wait for votes")
-			// From the experiment,
-			// if block rate delay is 1 second, then 0.8 block will be finalized per second in average.
-			// if block rate delay is 1.5 second, then 0.5 block will be finalized per second in average
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
+			// TODO remove this
+			flags.BoolVar(&migrateDB, "migrate-db", true, "whether or not to migrate the DB on startup")
 		}).
 		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
 			privateDKGData, err = loadDKGPrivateData(node.BaseConfig.BootstrapDir, node.NodeID)
@@ -121,7 +125,10 @@ func main() {
 			return err
 		}).
 		Module("block seals mempool", func(node *cmd.FlowNodeBuilder) error {
-			seals, err = stdmap.NewSeals(sealLimit)
+			// use a custom ejector so we don't eject seals that would break
+			// the chain of seals
+			ejector := ejectors.NewLatestSeal(node.Storage.Headers)
+			seals, err = stdmap.NewSeals(sealLimit, stdmap.WithEject(ejector.Eject))
 			return err
 		}).
 		Module("consensus node metrics", func(node *cmd.FlowNodeBuilder) error {
@@ -132,8 +139,19 @@ func main() {
 			mainMetrics = metrics.NewHotstuffCollector(flow.GetChainID())
 			return nil
 		}).
+		Module("database migration", func(node *cmd.FlowNodeBuilder) error {
+			if !migrateDB {
+				node.Logger.Info().Msg("skipping execution result index migration")
+				return nil
+			}
+			node.Logger.Info().Msg("starting execution result index migration...")
+			err := operation.IndexExecutionResultsByBlockID(node.DB)
+			node.Logger.Info().Msg("finished execution result index migration...")
+			return err
+		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			resultsDB := bstorage.NewExecutionResults(node.DB)
+			sealsDB := bstorage.NewSeals(node.Metrics.Cache, node.DB)
 			match, err := matching.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -142,6 +160,7 @@ func main() {
 				node.State,
 				node.Me,
 				resultsDB,
+				sealsDB,
 				node.Storage.Headers,
 				results,
 				receipts,
@@ -192,7 +211,7 @@ func main() {
 
 			// initialize the entity database accessors
 			// TODO frequency of 0 turns off the cleaner, turn back on once we know the proper tuning
-			cleaner := bstorage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), 0)
+			cleaner := bstorage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
 
 			// initialize the pending blocks cache
 			proposals := buffer.NewPendingBlocks()

@@ -37,13 +37,13 @@ func (_m *ComputationManager) ComputeBlock(ctx context.Context, block *entity.Ex
 	return r0, r1
 }
 
-// ExecuteScript provides a mock function with given fields: _a0, _a1, _a2
-func (_m *ComputationManager) ExecuteScript(_a0 []byte, _a1 *flow.Header, _a2 *delta.View) ([]byte, error) {
-	ret := _m.Called(_a0, _a1, _a2)
+// ExecuteScript provides a mock function with given fields: _a0, _a1, _a2, _a3
+func (_m *ComputationManager) ExecuteScript(_a0 []byte, _a1 [][]byte, _a2 *flow.Header, _a3 *delta.View) ([]byte, error) {
+	ret := _m.Called(_a0, _a1, _a2, _a3)
 
 	var r0 []byte
-	if rf, ok := ret.Get(0).(func([]byte, *flow.Header, *delta.View) []byte); ok {
-		r0 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func([]byte, [][]byte, *flow.Header, *delta.View) []byte); ok {
+		r0 = rf(_a0, _a1, _a2, _a3)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
@@ -51,8 +51,8 @@ func (_m *ComputationManager) ExecuteScript(_a0 []byte, _a1 *flow.Header, _a2 *d
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func([]byte, *flow.Header, *delta.View) error); ok {
-		r1 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(1).(func([]byte, [][]byte, *flow.Header, *delta.View) error); ok {
+		r1 = rf(_a0, _a1, _a2, _a3)
 	} else {
 		r1 = ret.Error(1)
 	}

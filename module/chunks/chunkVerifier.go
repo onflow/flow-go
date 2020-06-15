@@ -30,34 +30,27 @@ func NewChunkVerifier(vm virtualmachine.VirtualMachine, blocks storage.Blocks) *
 }
 
 // Verify verifies the given VerifiableChunk by executing it and checking the final statecommitment
-func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) (chmodels.ChunkFault, error) {
+func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) (chmodels.ChunkFault, error) {
 
 	// TODO check collection hash to match
 	// TODO check datapack hash to match
 	// TODO check the number of transactions and computation used
 
-	chIndex := ch.ChunkIndex
-
-	if ch.Receipt == nil {
-		return nil, fmt.Errorf("missing execution receipt")
-	}
-	execResID := ch.Receipt.ExecutionResult.ID()
+	chIndex := vc.Chunk.Index
+	execResID := vc.Result.ID()
 
 	// build a block context
-	if ch.Block == nil {
-		return nil, fmt.Errorf("missing block")
-	}
-	blockCtx := fcv.vm.NewBlockContext(ch.Block.Header, fcv.blocks)
+	blockCtx := fcv.vm.NewBlockContext(vc.Header, fcv.blocks)
 
 	// constructing a partial trie given chunk data package
-	if ch.ChunkDataPack == nil {
+	if vc.ChunkDataPack == nil {
 		return nil, fmt.Errorf("missing chunk data pack")
 	}
-	psmt, err := ptrie.NewPSMT(ch.ChunkDataPack.StartState,
+	psmt, err := ptrie.NewPSMT(vc.ChunkDataPack.StartState,
 		fcv.trieDepth,
-		ch.ChunkDataPack.Registers(),
-		ch.ChunkDataPack.Values(),
-		ch.ChunkDataPack.Proofs(),
+		vc.ChunkDataPack.Registers(),
+		vc.ChunkDataPack.Values(),
+		vc.ChunkDataPack.Proofs(),
 	)
 	if err != nil {
 		// TODO provide more details based on the error type
@@ -68,7 +61,7 @@ func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) (chmodels.Chu
 	// unknown register tracks access to parts of the partial trie which
 	// are not expanded and values are unknown.
 	unknownRegTouch := make(map[string]bool)
-	regMap := ch.ChunkDataPack.GetRegisterValues()
+	regMap := vc.ChunkDataPack.GetRegisterValues()
 	getRegister := func(key flow.RegisterID) (flow.RegisterValue, error) {
 		// check if register has been provided in the chunk data pack
 		val, ok := regMap[string(key)]
@@ -82,7 +75,7 @@ func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) (chmodels.Chu
 	chunkView := delta.NewView(getRegister)
 
 	// executes all transactions in this chunk
-	for i, tx := range ch.Collection.Transactions {
+	for i, tx := range vc.Collection.Transactions {
 		txView := chunkView.NewChild()
 
 		result, err := blockCtx.ExecuteTransaction(txView, tx)
@@ -116,11 +109,10 @@ func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) (chmodels.Chu
 	}
 
 	// TODO check if exec node provided register touches that was not used (no read and no update)
-
 	// check if the end state commitment mentioned in the chunk matches
 	// what the partial trie is providing.
-	if !bytes.Equal(expEndStateComm, ch.EndState) {
-		return chmodels.NewCFNonMatchingFinalState(expEndStateComm, ch.EndState, chIndex, execResID), nil
+	if !bytes.Equal(expEndStateComm, vc.EndState) {
+		return chmodels.NewCFNonMatchingFinalState(expEndStateComm, vc.EndState, chIndex, execResID), nil
 	}
 	return nil, nil
 }

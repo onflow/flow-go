@@ -13,11 +13,11 @@ type ChunkVerifier struct {
 }
 
 // Verify provides a mock function with given fields: ch
-func (_m *ChunkVerifier) Verify(ch *verification.VerifiableChunk) (chunks.ChunkFault, error) {
+func (_m *ChunkVerifier) Verify(ch *verification.VerifiableChunkData) (chunks.ChunkFault, error) {
 	ret := _m.Called(ch)
 
 	var r0 chunks.ChunkFault
-	if rf, ok := ret.Get(0).(func(*verification.VerifiableChunk) chunks.ChunkFault); ok {
+	if rf, ok := ret.Get(0).(func(*verification.VerifiableChunkData) chunks.ChunkFault); ok {
 		r0 = rf(ch)
 	} else {
 		if ret.Get(0) != nil {
@@ -26,7 +26,7 @@ func (_m *ChunkVerifier) Verify(ch *verification.VerifiableChunk) (chunks.ChunkF
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(*verification.VerifiableChunk) error); ok {
+	if rf, ok := ret.Get(1).(func(*verification.VerifiableChunkData) error); ok {
 		r1 = rf(ch)
 	} else {
 		r1 = ret.Error(1)

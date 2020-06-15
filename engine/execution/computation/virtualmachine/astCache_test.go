@@ -36,7 +36,7 @@ func TestTransactionASTCache(t *testing.T) {
             `),
 		}
 
-		err := testutil.SignTransactionByRoot(tx, 0)
+		err := testutil.SignTransactionAsServiceAccount(tx, 0)
 		require.NoError(t, err)
 
 		ledger := testutil.RootBootstrappedLedger()
@@ -76,7 +76,7 @@ func TestScriptASTCache(t *testing.T) {
 
 		ledger := testutil.RootBootstrappedLedger()
 
-		result, err := bc.ExecuteScript(ledger, script)
+		result, err := bc.ExecuteScript(ledger, script, nil)
 		require.NoError(t, err)
 		require.True(t, result.Succeeded())
 
@@ -227,7 +227,7 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := virtualmachine.NewWithCache(rt, &nonFunctioningCache{})
+	vm, err := virtualmachine.New(rt, virtualmachine.WithCache(&nonFunctioningCache{}))
 	require.NoError(b, err)
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
@@ -303,7 +303,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 					let v <- FlowToken.createEmptyVault()
 					destroy v
 				}
-			`, virtualmachine.FlowTokenAddress(), id)))
+			`, virtualmachine.FlowTokenAddress(), id)), nil)
 			if !assert.True(t, result.Succeeded()) {
 				t.Log(result.Error.ErrorMessage())
 			}

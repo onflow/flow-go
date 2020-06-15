@@ -105,6 +105,10 @@ func (h *Handler) getTransactionResultFromExecutionNode(ctx context.Context, blo
 	// call the execution node gRPC
 	resp, err := h.executionRPC.GetTransactionResult(ctx, &req)
 	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, 0, "", err
+		}
+
 		return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
 	}
 

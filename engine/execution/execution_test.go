@@ -237,7 +237,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	// transaction that will change state and succeed, used to test that state commitment changes
 	tx1 := execTestutil.DeployCounterContractTransaction(flow.ServiceAddress())
-	err = execTestutil.SignTransactionByRoot(tx1, seq)
+	err = execTestutil.SignTransactionAsServiceAccount(tx1, seq)
 	require.NoError(t, err)
 	seq++
 
@@ -255,7 +255,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	// transaction that will change state but then panic and revert, used to test that state commitment stays identical
 	tx2 := execTestutil.CreateCounterPanicTransaction(flow.ServiceAddress(), flow.ServiceAddress())
-	err = execTestutil.SignTransactionByRoot(tx2, seq)
+	err = execTestutil.SignTransactionAsServiceAccount(tx2, seq)
 	require.NoError(t, err)
 
 	col2 := flow.Collection{Transactions: []*flow.TransactionBody{tx2}}

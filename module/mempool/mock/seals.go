@@ -94,6 +94,20 @@ func (_m *Seals) Hash() flow.Identifier {
 	return r0
 }
 
+// Limit provides a mock function with given fields:
+func (_m *Seals) Limit() uint {
+	ret := _m.Called()
+
+	var r0 uint
+	if rf, ok := ret.Get(0).(func() uint); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint)
+	}
+
+	return r0
+}
+
 // Rem provides a mock function with given fields: sealID
 func (_m *Seals) Rem(sealID flow.Identifier) bool {
 	ret := _m.Called(sealID)

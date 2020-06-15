@@ -596,9 +596,9 @@ func TransactionDSLFixture() dsl.Transaction {
 	}
 }
 
-// VerifiableChunk returns a complete verifiable chunk with an
+// VerifiableChunkDataFixture returns a complete verifiable chunk with an
 // execution receipt referencing the block/collections.
-func VerifiableChunkFixture(chunkIndex uint64) *verification.VerifiableChunk {
+func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunkData {
 
 	guarantees := make([]*flow.CollectionGuarantee, 0)
 
@@ -645,21 +645,29 @@ func VerifiableChunkFixture(chunkIndex uint64) *verification.VerifiableChunk {
 		},
 	}
 
-	receipt := flow.ExecutionReceipt{
-		ExecutionResult: result,
+	// computes chunk end state
+	index := chunk.Index
+	var endState flow.StateCommitment
+	if int(index) == len(result.Chunks)-1 {
+		// last chunk in receipt takes final state commitment
+		endState = result.FinalStateCommit
+	} else {
+		// any chunk except last takes the subsequent chunk's start state
+		endState = result.Chunks[index+1].StartState
 	}
 
-	return &verification.VerifiableChunk{
-		ChunkIndex: chunkIndex,
-		EndState:   StateCommitmentFixture(),
-		Block:      &block,
-		Receipt:    &receipt,
-		Collection: &col,
+	return &verification.VerifiableChunkData{
+		Chunk:         &chunk,
+		Header:        block.Header,
+		Result:        &result,
+		Collection:    &col,
+		ChunkDataPack: ChunkDataPackFixture(result.ID()),
+		EndState:      endState,
 	}
 }
 
-func ChunkDataPackFixture(identifier flow.Identifier) flow.ChunkDataPack {
-	return flow.ChunkDataPack{
+func ChunkDataPackFixture(identifier flow.Identifier) *flow.ChunkDataPack {
+	return &flow.ChunkDataPack{
 		ChunkID:         identifier,
 		StartState:      StateCommitmentFixture(),
 		RegisterTouches: []flow.RegisterTouch{{RegisterID: []byte{'1'}, Value: []byte{'a'}, Proof: []byte{'p'}}},

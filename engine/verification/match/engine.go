@@ -177,7 +177,12 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, r *flow.Executi
 	// add each chunk to a pending list to be processed by onTimer
 	for _, chunk := range chunks {
 		status := NewChunkStatus(chunk, result.ExecutionResult.ID(), result.ExecutorID)
-		_ = e.chunks.Add(status)
+		added = e.chunks.Add(status)
+		if !added {
+			log.Debug().
+				Int("chunks", len(chunks)).
+				Msg("could not add chunk status to chunks mempool")
+		}
 	}
 
 	log.Debug().
@@ -259,6 +264,7 @@ func (e *Engine) onTimer() {
 
 		// check if has reached max try
 		if !CanTry(e.maxAttempt, chunk) {
+			// TODO not to drop max reach, but to ignore it
 			e.chunks.Rem(cid)
 			log.Debug().
 				Int("max_attempt", e.maxAttempt).
@@ -324,7 +330,7 @@ func (e *Engine) requestChunkDataPack(c *ChunkStatus) error {
 // handleChunkDataPack receives a chunk data pack, verifies its origin ID, pull other data to make a
 // VerifiableChunk, and pass it to the verifier engine to verify
 func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) error {
-	chunkID := chunkDataPack.ID()
+	chunkID := chunkDataPack.ChunkID
 
 	log := e.log.With().
 		Hex("executor_id", logging.ID(originID)).
@@ -371,6 +377,16 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		return fmt.Errorf("could not find block header: %w for chunkID: %v", err, chunkID)
 	}
 
+	// computes the end state of the chunk
+	var endState flow.StateCommitment
+	if int(status.Chunk.Index) == len(result.ExecutionResult.Chunks)-1 {
+		// last chunk in receipt takes final state commitment
+		endState = result.ExecutionResult.FinalStateCommit
+	} else {
+		// any chunk except last takes the subsequent chunk's start state
+		endState = result.ExecutionResult.Chunks[status.Chunk.Index+1].StartState
+	}
+
 	// creates a verifiable chunk for assigned chunk
 	// TODO: replace with VerifiableChunk
 	vchunk := &verification.VerifiableChunkData{
@@ -379,6 +395,7 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		Result:        result.ExecutionResult,
 		Collection:    collection,
 		ChunkDataPack: chunkDataPack,
+		EndState:      endState,
 	}
 
 	e.unit.Launch(func() {

@@ -43,7 +43,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
             `)).
 			AddAuthorizer(unittest.AddressFixture())
 
-		err := execTestutil.SignTransactionByRoot(tx, 0)
+		err := execTestutil.SignTransactionAsServiceAccount(tx, 0)
 		require.NoError(t, err)
 
 		ledger := execTestutil.RootBootstrappedLedger()
@@ -75,7 +75,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
                 }
             `))
 
-		err := execTestutil.SignTransactionByRoot(tx, 0)
+		err := execTestutil.SignTransactionAsServiceAccount(tx, 0)
 		require.NoError(t, err)
 
 		ledger := execTestutil.RootBootstrappedLedger()
@@ -98,7 +98,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
                 }
             `))
 
-		err := execTestutil.SignTransactionByRoot(tx, 0)
+		err := execTestutil.SignTransactionAsServiceAccount(tx, 0)
 		require.NoError(t, err)
 
 		ledger := execTestutil.RootBootstrappedLedger()
@@ -122,7 +122,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
             `)).
 			AddAuthorizer(flow.ServiceAddress())
 
-		err := execTestutil.SignTransactionByRoot(tx, 0)
+		err := execTestutil.SignTransactionAsServiceAccount(tx, 0)
 		require.NoError(t, err)
 
 		ledger := execTestutil.RootBootstrappedLedger()
@@ -288,7 +288,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 
 			ledger := execTestutil.RootBootstrappedLedger()
 
-			err = execTestutil.SignTransactionByRoot(tx, 0)
+			err = execTestutil.SignTransactionAsServiceAccount(tx, 0)
 			require.NoError(t, err)
 
 			result, err := bc.ExecuteTransaction(ledger, tx)
@@ -364,7 +364,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 
 			ledger := execTestutil.RootBootstrappedLedger()
 
-			err = execTestutil.SignTransactionByRoot(tx, 0)
+			err = execTestutil.SignTransactionAsServiceAccount(tx, 0)
 			require.NoError(t, err)
 
 			result, err := bc.ExecuteTransaction(ledger, tx)
@@ -374,6 +374,14 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 		})
 	}
 }
+
+var createAccountScript = []byte(`
+	transaction {
+		prepare(signer: AuthAccount) {
+			let acct = AuthAccount(payer: signer)
+		}
+	}
+`)
 
 func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
@@ -390,14 +398,6 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 	ledger := execTestutil.RootBootstrappedLedger()
 	accounts, err := execTestutil.CreateAccounts(vm, ledger, privateKeys)
 	require.NoError(t, err)
-
-	createAccountScript := []byte(`
-		transaction {
-			prepare(signer: AuthAccount) {
-				let acct = AuthAccount(payer: signer)
-			}
-		}
-	`)
 
 	addAccountCreatorTemplate := `
 	import FlowServiceAccount from 0x%s
@@ -431,7 +431,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 			SetScript(script).
 			AddAuthorizer(flow.ServiceAddress())
 
-		err = execTestutil.SignTransactionByRoot(validTx, seqNum)
+		err = execTestutil.SignTransactionAsServiceAccount(validTx, seqNum)
 		require.NoError(t, err)
 
 		result, err := bc.ExecuteTransaction(ledger, validTx)
@@ -475,7 +475,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 			SetScript(script).
 			AddAuthorizer(flow.ServiceAddress())
 
-		err = execTestutil.SignTransactionByRoot(validTx, seqNum)
+		err = execTestutil.SignTransactionAsServiceAccount(validTx, seqNum)
 		require.NoError(t, err)
 
 		result, err := bc.ExecuteTransaction(ledger, validTx)
@@ -492,7 +492,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 		err = execTestutil.SignPayload(invalidTx, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
-		err = execTestutil.SignTransactionByRoot(invalidTx, 0)
+		err = execTestutil.SignTransactionAsServiceAccount(invalidTx, 0)
 		require.NoError(t, err)
 
 		result, err := bc.ExecuteTransaction(ledger, invalidTx)
@@ -506,7 +506,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 			SetScript(createAccountScript).
 			AddAuthorizer(flow.ServiceAddress())
 
-		err = execTestutil.SignTransactionByRoot(validTx, 0)
+		err = execTestutil.SignTransactionAsServiceAccount(validTx, 0)
 		require.NoError(t, err)
 
 		result, err := bc.ExecuteTransaction(ledger, validTx)
@@ -552,6 +552,34 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 	})
 }
 
+func TestBlockContext_ExecuteTransaction_CreateAccount_WithSimpleAddresses(t *testing.T) {
+	rt := runtime.NewInterpreterRuntime()
+	h := unittest.BlockHeaderFixture()
+
+	vm, err := virtualmachine.New(rt, virtualmachine.WithSimpleAddresses(true))
+	assert.NoError(t, err)
+
+	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
+	ledger := execTestutil.RootBootstrappedLedgerWithSimpleAddresses(true)
+
+	validTx := flow.NewTransactionBody().
+		SetScript(createAccountScript).
+		AddAuthorizer(virtualmachine.SimpleServiceAddress())
+
+	err = execTestutil.SignTransactionAsSimpleServiceAccount(validTx, 0)
+	require.NoError(t, err)
+
+	result, err := bc.ExecuteTransaction(ledger, validTx)
+	require.NoError(t, err)
+
+	if !assert.True(t, result.Succeeded()) {
+		t.Fatal(result.Error.ErrorMessage())
+	}
+
+	require.Len(t, result.Logs, 1)
+	assert.Equal(t, "Created new account with address: 0x0000000000000005", result.Logs[0])
+}
+
 func TestBlockContext_ExecuteScript(t *testing.T) {
 	// seed the RNG
 	rand.Seed(time.Now().UnixNano())
@@ -563,55 +591,146 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 	require.NoError(t, err)
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
-	t.Run("script success", func(t *testing.T) {
-		script := []byte(`
-			pub fun main(): Int {
-				return 42
-			}
-		`)
+	var tests = []struct {
+		label  string
+		script string
+		args   [][]byte
+		check  func(t *testing.T, result *virtualmachine.ScriptResult)
+	}{
+		{
+			label: "script success",
+			script: `
+				pub fun main(): Int {
+					return 42
+				}
+			`,
+			check: func(t *testing.T, result *virtualmachine.ScriptResult) {
+				assert.True(t, result.Succeeded())
+			},
+		},
+		{
+			label: "script failure",
+			script: `
+				pub fun main(): Int {
+					assert 1 == 2
+					return 42
+				}
+			`,
+			check: func(t *testing.T, result *virtualmachine.ScriptResult) {
+				assert.False(t, result.Succeeded())
+				assert.NotNil(t, result.Error)
+			},
+		},
+		{
+			label: "script logs",
+			script: `
+				pub fun main(): Int {
+					log("foo")
+					log("bar")
+					return 42
+				}
+			`,
+			check: func(t *testing.T, result *virtualmachine.ScriptResult) {
+				require.Len(t, result.Logs, 2)
+				assert.Equal(t, "\"foo\"", result.Logs[0])
+				assert.Equal(t, "\"bar\"", result.Logs[1])
+			},
+		},
+	}
 
-		ledger := execTestutil.RootBootstrappedLedger()
+	for _, tt := range tests {
+		t.Run(tt.label, func(t *testing.T) {
+			ledger := execTestutil.RootBootstrappedLedger()
+			result, err := bc.ExecuteScript(ledger, []byte(tt.script), tt.args)
+			require.NoError(t, err)
+			tt.check(t, result)
+		})
+	}
+}
 
-		result, err := bc.ExecuteScript(ledger, script)
-		assert.NoError(t, err)
-		assert.True(t, result.Succeeded())
-	})
+func TestBlockContext_ExecuteScript_WithArguments(t *testing.T) {
+	// seed the RNG
+	rand.Seed(time.Now().UnixNano())
+	rt := runtime.NewInterpreterRuntime()
 
-	t.Run("script failure", func(t *testing.T) {
-		script := []byte(`
-			pub fun main(): Int {
-				assert 1 == 2
-				return 42
-			}
-		`)
+	h := unittest.BlockHeaderFixture()
 
-		ledger := execTestutil.RootBootstrappedLedger()
+	vm, err := virtualmachine.New(rt)
+	require.NoError(t, err)
+	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
-		result, err := bc.ExecuteScript(ledger, script)
+	arg1, _ := jsoncdc.Encode(cadence.NewInt(42))
+	arg2, _ := jsoncdc.Encode(cadence.NewInt(10))
+	arg3, _ := jsoncdc.Encode(cadence.NewInt(5))
 
-		assert.NoError(t, err)
-		assert.False(t, result.Succeeded())
-		assert.NotNil(t, result.Error)
-	})
+	var tests = []struct {
+		label  string
+		script string
+		args   [][]byte
+		check  func(t *testing.T, result *virtualmachine.ScriptResult)
+	}{
+		{
+			label: "script success, no arguments",
+			script: `
+				pub fun main(): Int {
+					return 42
+				}
+			`,
+			check: func(t *testing.T, result *virtualmachine.ScriptResult) {
+				assert.True(t, result.Succeeded())
+			},
+		},
+		{
+			label: "script with arguments success",
+			args:  [][]byte{arg1},
+			script: `
+				pub fun main(val: Int): Int {
+					return val
+				}
+			`,
+			check: func(t *testing.T, result *virtualmachine.ScriptResult) {
+				assert.True(t, result.Succeeded())
+			},
+		},
+		{
+			label: "script with multiple arguments success",
+			args:  [][]byte{arg2, arg3},
+			script: `
+				pub fun main(a: Int, b: Int): Int {
+					log(a + b)
+					return a + b
+				}
+			`,
+			check: func(t *testing.T, result *virtualmachine.ScriptResult) {
+				assert.True(t, result.Succeeded())
+				assert.Contains(t, result.Logs, "15")
+				assert.Equal(t, cadence.NewInt(15), result.Value)
+			},
+		},
+		{
+			label: "script failure",
+			script: `
+				pub fun main(): Int {
+					assert 1 == 2
+					return 42
+				}
+			`,
+			args: nil,
+			check: func(t *testing.T, result *virtualmachine.ScriptResult) {
+				assert.False(t, result.Succeeded())
+				assert.NotNil(t, result.Error)
+			},
+		},
+	}
 
-	t.Run("script logs", func(t *testing.T) {
-		script := []byte(`
-			pub fun main(): Int {
-				log("foo")
-				log("bar")
-				return 42
-			}
-		`)
-
-		ledger := execTestutil.RootBootstrappedLedger()
-
-		result, err := bc.ExecuteScript(ledger, script)
-		assert.NoError(t, err)
-
-		require.Len(t, result.Logs, 2)
-		assert.Equal(t, "\"foo\"", result.Logs[0])
-		assert.Equal(t, "\"bar\"", result.Logs[1])
-	})
+	for _, tt := range tests {
+		t.Run(tt.label, func(t *testing.T) {
+			ledger := execTestutil.RootBootstrappedLedger()
+			result, err := bc.ExecuteScript(ledger, []byte(tt.script), tt.args)
+			require.NoError(t, err)
+			tt.check(t, result)
+		})
+	}
 }
 
 func TestBlockContext_GetBlockInfo(t *testing.T) {
@@ -646,7 +765,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 				}
 			`))
 
-		err := execTestutil.SignTransactionByRoot(tx, 0)
+		err := execTestutil.SignTransactionAsServiceAccount(tx, 0)
 		require.NoError(t, err)
 
 		ledger := execTestutil.RootBootstrappedLedger()
@@ -678,7 +797,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		ledger := execTestutil.RootBootstrappedLedger()
 		require.NoError(t, err)
 
-		result, err := bc.ExecuteScript(ledger, script)
+		result, err := bc.ExecuteScript(ledger, script, nil)
 		assert.NoError(t, err)
 
 		assert.True(t, result.Succeeded())
@@ -701,7 +820,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 				}
 			`))
 
-		err := execTestutil.SignTransactionByRoot(tx, 0)
+		err := execTestutil.SignTransactionAsServiceAccount(tx, 0)
 		require.NoError(t, err)
 
 		ledger := execTestutil.RootBootstrappedLedger()
@@ -728,7 +847,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		assert.PanicsWithValue(t, interpreter.ExternalError{
 			Recovered: logPanic{},
 		}, func() {
-			_, _ = bc.ExecuteScript(ledger, script)
+			_, _ = bc.ExecuteScript(ledger, script, nil)
 		})
 	})
 }
@@ -749,12 +868,12 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	ledger := execTestutil.RootBootstrappedLedger()
 
-	ledgerAccess := virtualmachine.NewLedgerDAL(ledger)
+	ledgerAccess := virtualmachine.NewLedgerDAL(ledger, false)
 
 	createAccount := func() (flow.Address, crypto.PublicKey) {
 		privateKey, tx := execTestutil.CreateAccountCreationTransaction(t)
 
-		err := execTestutil.SignTransactionByRoot(tx, sequenceNumber)
+		err := execTestutil.SignTransactionAsServiceAccount(tx, sequenceNumber)
 		require.NoError(t, err)
 
 		sequenceNumber++
