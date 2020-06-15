@@ -854,15 +854,14 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 }
 
 func TestBlockContext_UnsafeRandom(t *testing.T) {
-	// seed the RNG
-	rand.Seed(time.Now().Unix())
 	rt := runtime.NewInterpreterRuntime()
 
 	vm, err := virtualmachine.New(rt)
 	require.NoError(t, err)
-	block := unittest.BlockFixture()
+	header := flow.Header{Height: 42}
 	blocks := new(vmMock.Blocks)
-	bc := vm.NewBlockContext(block.Header, blocks)
+
+	bc := vm.NewBlockContext(&header, blocks)
 
 	t.Run("works as transaction", func(t *testing.T) {
 		tx := flow.NewTransactionBody().
@@ -875,7 +874,7 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 				}
 			`))
 
-		err := execTestutil.SignTransactionByRoot(tx, 0)
+		err := execTestutil.SignTransactionAsServiceAccount(tx, 0)
 		require.NoError(t, err)
 
 		ledger := execTestutil.RootBootstrappedLedger()
@@ -887,8 +886,9 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 		assert.True(t, result.Succeeded())
 
 		require.Len(t, result.Logs, 1)
-		_, err = strconv.ParseUint(result.Logs[0], 10, 64)
+		num, err := strconv.ParseUint(result.Logs[0], 10, 64)
 		require.NoError(t, err)
+		require.Equal(t, uint64(0xb9c618010e32a0fb), num)
 	})
 }
 

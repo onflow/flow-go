@@ -67,20 +67,22 @@ type virtualMachine struct {
 }
 
 func (vm *virtualMachine) NewBlockContext(header *flow.Header, blocks Blocks) BlockContext {
-	// Seed the random number generator with entropy created from the block header ID. The random number generator will
-	// be used by the UnsafeRandom function.
-	// TODO: replace with better source of randomness.
-	if header != nil {
-		id := header.ID()
-		rand.Seed(int64(binary.BigEndian.Uint64(id[:])))
-	}
-
-	return &blockContext{
+	bc := &blockContext{
 		vm:              vm,
 		header:          header,
 		blocks:          blocks,
 		simpleAddresses: vm.simpleAddresses,
 	}
+
+	// Seed the random number generator with entropy created from the block header ID. The random number generator will
+	// be used by the UnsafeRandom function.
+	// TODO: replace with better source of randomness.
+	if header != nil {
+		id := header.ID()
+		bc.rng = rand.New(rand.NewSource(int64(binary.BigEndian.Uint64(id[:]))))
+	}
+
+	return bc
 }
 
 func (vm *virtualMachine) ASTCache() ASTCache {

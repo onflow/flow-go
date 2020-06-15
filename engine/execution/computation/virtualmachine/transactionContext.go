@@ -40,6 +40,7 @@ type TransactionContext struct {
 	restrictedAccountCreationEnabled bool
 	restrictedDeploymentEnabled      bool
 	simpleAddresses                  bool
+	rng                              *rand.Rand
 }
 
 type TransactionContextOption func(*TransactionContext)
@@ -418,7 +419,7 @@ func (r *TransactionContext) GetBlockAtHeight(height uint64) (hash runtime.Block
 // secure.
 func (r *TransactionContext) UnsafeRandom() uint64 {
 	buf := make([]byte, 8)
-	_, _ = rand.Read(buf) // Always succeeds, no need to check error
+	_, _ = r.rng.Read(buf) // Always succeeds, no need to check error
 	return binary.LittleEndian.Uint64(buf)
 }
 
