@@ -60,16 +60,6 @@ func main() {
 			panic(err)
 		}
 
-		// creates a pending collection mempool and registers a metric on its size
-		pendingCollections, err := stdmap.NewPendingCollections(100)
-		if err != nil {
-			panic(err)
-		}
-		err = mempoolCollector.Register(metrics.ResourcePendingCollection, pendingCollections.Size)
-		if err != nil {
-			panic(err)
-		}
-
 		// creates a chunk data pack mempool and registers a metric on its size
 		chunkDataPacks, err := stdmap.NewChunkDataPacks(100)
 		if err != nil {
@@ -87,10 +77,6 @@ func main() {
 
 			// adds a collection to pending and authenticated collections mempool
 			coll := unittest.CollectionFixture(1)
-			pendingCollections.Add(&verification.PendingCollection{
-				Collection: &coll,
-				OriginID:   unittest.IdentifierFixture(),
-			})
 			authCollections.Add(&coll)
 
 			// adds a receipt to the pending receipts
