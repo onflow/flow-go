@@ -8,7 +8,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/model/verification"
-	"github.com/dapperlabs/flow-go/model/verification/tracker"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/metrics/example"
@@ -81,16 +80,6 @@ func main() {
 			panic(err)
 		}
 
-		// creates a chunk data pack tracker mempool and registers a metric on its size
-		chunkDataPackTrackers, err := stdmap.NewChunkDataPackTrackers(100)
-		if err != nil {
-			panic(err)
-		}
-		err = mempoolCollector.Register(metrics.ResourceChunkDataPackTracker, chunkDataPackTrackers.Size)
-		if err != nil {
-			panic(err)
-		}
-
 		for i := 0; i < 100; i++ {
 			chunkID := unittest.ChunkFixture().ID()
 			verificationCollector.OnResultApproval()
@@ -115,8 +104,6 @@ func main() {
 			// adds a chunk data pack as well as a chunk tracker
 			cdp := unittest.ChunkDataPackFixture(unittest.IdentifierFixture())
 			chunkDataPacks.Add(cdp)
-			chunkDataPackTrackers.Add(tracker.NewChunkDataPackTracker(unittest.IdentifierFixture(),
-				unittest.IdentifierFixture()))
 
 			// adds a synthetic 1 s delay for verification duration
 			time.Sleep(1 * time.Second)
