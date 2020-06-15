@@ -106,7 +106,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 		err := e.Process(originID, event)
 
 		if engine.IsInvalidInputError(err) {
-			e.log.Warn().Err(err).Msg("match received invalid input")
+			e.log.Error().Str("error_type", "invalid_input").Err(err).Msg("match received invalid input")
 		} else if err != nil {
 			e.log.Error().Err(err).Msg("match could not process submitted event with exception")
 		}

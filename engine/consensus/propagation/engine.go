@@ -86,7 +86,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
 		if engine.IsInvalidInputError(err) {
-			e.log.Warn().Err(err).Msg("propagation received invalid event")
+			e.log.Error().Str("error_type", "invalid_input").Err(err).Msg("propagation received invalid event")
 		} else if err != nil {
 			e.log.Error().Err(err).Msg("propagation could not process submitted event")
 		}
