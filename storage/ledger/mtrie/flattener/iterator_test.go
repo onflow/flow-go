@@ -26,6 +26,7 @@ func TestEmptyTrie(t *testing.T) {
 
 func TestPopulatedTrie(t *testing.T) {
 	emptyTrie, err := trie.NewEmptyMTrie(9, 21, nil)
+	require.NoError(t, err)
 
 	k1 := []byte([]uint8{uint8(1)}) // key: 0000...
 	v1 := []byte{'A'}
