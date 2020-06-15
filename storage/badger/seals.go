@@ -52,6 +52,9 @@ func (s *Seals) storeTx(seal *flow.Seal) func(*badger.Txn) error {
 func (s *Seals) retrieveTx(sealID flow.Identifier) func(*badger.Txn) (*flow.Seal, error) {
 	return func(tx *badger.Txn) (*flow.Seal, error) {
 		v, err := s.cache.Get(sealID)(tx)
+		if err != nil {
+			return nil, err
+		}
 		return v.(*flow.Seal), err
 	}
 }

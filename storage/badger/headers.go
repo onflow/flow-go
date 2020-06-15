@@ -54,7 +54,10 @@ func (h *Headers) storeTx(header *flow.Header) func(*badger.Txn) error {
 func (h *Headers) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Header, error) {
 	return func(tx *badger.Txn) (*flow.Header, error) {
 		v, err := h.cache.Get(blockID)(tx)
-		return v.(*flow.Header), err
+		if err != nil {
+			return nil, err
+		}
+		return v.(*flow.Header), nil
 	}
 }
 

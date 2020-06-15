@@ -48,6 +48,9 @@ func (t *Transactions) storeTx(flowTx *flow.TransactionBody) func(*badger.Txn) e
 func (t *Transactions) retrieveTx(txID flow.Identifier) func(*badger.Txn) (*flow.TransactionBody, error) {
 	return func(tx *badger.Txn) (*flow.TransactionBody, error) {
 		v, err := t.cache.Get(txID)(tx)
+		if err != nil {
+			return nil, err
+		}
 		return v.(*flow.TransactionBody), err
 	}
 }

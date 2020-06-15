@@ -50,7 +50,10 @@ func (i *Identities) storeTx(identity *flow.Identity) func(*badger.Txn) error {
 func (i *Identities) retrieveTx(nodeID flow.Identifier) func(*badger.Txn) (*flow.Identity, error) {
 	return func(tx *badger.Txn) (*flow.Identity, error) {
 		v, err := i.cache.Get(nodeID)(tx)
-		return v.(*flow.Identity), err
+		if err != nil {
+			return nil, err
+		}
+		return v.(*flow.Identity), nil
 	}
 }
 

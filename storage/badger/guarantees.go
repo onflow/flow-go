@@ -49,7 +49,10 @@ func (g *Guarantees) storeTx(guarantee *flow.CollectionGuarantee) func(*badger.T
 func (g *Guarantees) retrieveTx(collID flow.Identifier) func(*badger.Txn) (*flow.CollectionGuarantee, error) {
 	return func(tx *badger.Txn) (*flow.CollectionGuarantee, error) {
 		v, err := g.cache.Get(collID)(tx)
-		return v.(*flow.CollectionGuarantee), err
+		if err != nil {
+			return nil, err
+		}
+		return v.(*flow.CollectionGuarantee), nil
 	}
 }
 

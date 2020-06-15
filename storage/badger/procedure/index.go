@@ -9,7 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
-func InsertIndex(blockID flow.Identifier, index flow.Index) func(tx *badger.Txn) error {
+func InsertIndex(blockID flow.Identifier, index *flow.Index) func(tx *badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		err := operation.IndexPayloadIdentities(blockID, index.NodeIDs)(tx)
 		if err != nil {

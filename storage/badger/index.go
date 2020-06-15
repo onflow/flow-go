@@ -21,7 +21,7 @@ type Index struct {
 func NewIndex(collector module.CacheMetrics, db *badger.DB) *Index {
 
 	store := func(blockID flow.Identifier, v interface{}) func(tx *badger.Txn) error {
-		index := v.(flow.Index)
+		index := v.(*flow.Index)
 		return procedure.InsertIndex(blockID, index)
 	}
 
@@ -29,7 +29,7 @@ func NewIndex(collector module.CacheMetrics, db *badger.DB) *Index {
 		var index flow.Index
 		return func(tx *badger.Txn) (interface{}, error) {
 			err := procedure.RetrieveIndex(blockID, &index)(tx)
-			return index, err
+			return &index, err
 		}
 	}
 
@@ -45,21 +45,24 @@ func NewIndex(collector module.CacheMetrics, db *badger.DB) *Index {
 	return p
 }
 
-func (i *Index) storeTx(blockID flow.Identifier, index flow.Index) func(*badger.Txn) error {
+func (i *Index) storeTx(blockID flow.Identifier, index *flow.Index) func(*badger.Txn) error {
 	return i.cache.Put(blockID, index)
 }
 
-func (i *Index) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (flow.Index, error) {
-	return func(tx *badger.Txn) (flow.Index, error) {
+func (i *Index) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Index, error) {
+	return func(tx *badger.Txn) (*flow.Index, error) {
 		v, err := i.cache.Get(blockID)(tx)
-		return v.(flow.Index), err
+		if err != nil {
+			return nil, err
+		}
+		return v.(*flow.Index), nil
 	}
 }
 
-func (i *Index) Store(blockID flow.Identifier, index flow.Index) error {
+func (i *Index) Store(blockID flow.Identifier, index *flow.Index) error {
 	return operation.RetryOnConflict(i.db.Update, i.storeTx(blockID, index))
 }
 
-func (i *Index) ByBlockID(blockID flow.Identifier) (flow.Index, error) {
+func (i *Index) ByBlockID(blockID flow.Identifier) (*flow.Index, error) {
 	return i.retrieveTx(blockID)(i.db.NewTransaction(false))
 }
