@@ -43,8 +43,8 @@ The following table lists all work streams and links to their home directory and
 | Access Node | [/cmd/access](/cmd/access) |
 | Collection Node | [/cmd/collection](/engine/collection) |
 | Consensus Node | [/cmd/consensus](/engine/consensus) |
-| Execution Node | [/cmd/execution](/cmd/execution) |
-| Verification Node | [/engine/verification](/cmd/verification) |
+| Execution Node | [/engine/execution](/engine/execution) |
+| Verification Node | [/cmd/verification](/cmd/verification) |
 | HotStuff | [/consensus/hotstuff](/consensus/hotstuff) |
 | Storage | [/storage](/storage) |
 | Networking | [/network](/network/) |
