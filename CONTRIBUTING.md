@@ -129,7 +129,7 @@ The majority of this project is written in Go.
 
 We try to follow the coding guidelines from the Go community.
 
-- Code should be formatted using `gofmt`
+- Code should be formatted using `go fmt`
 - Code should pass the linter: `make lint`
 - Code should follow the guidelines covered in
   [Effective Go](http://golang.org/doc/effective_go.html)
