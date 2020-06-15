@@ -3,7 +3,6 @@ package verification
 import (
 	"fmt"
 	"math/rand"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -27,77 +26,14 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-// TestHappyPath_TwoEngine considers the happy path of Ingest/LightIngest and Verify engines.
+// TestHappyPath considers the happy path of Finder-Match-Verify engines.
 // It evaluates the happy path scenario of
 // concurrently sending an execution receipt with
 // `chunkCount`-many chunks to `verNodeCount`-many verification nodes
 // the happy path should result in dissemination of a result approval for each
 // distinct chunk by each verification node. The result approvals should be
 // sent to the consensus nodes
-//
-// NOTE: some test cases are meant to solely run locally when FLOWLOCAL environmental
-// variable is set to TRUE
-func TestHappyPath_TwoEngine(t *testing.T) {
-	var mu sync.Mutex
-	testcases := []struct {
-		verNodeCount,
-		chunkCount int
-		lightIngest bool // indicates if light ingest engine should replace the original one
-	}{
-		{
-			verNodeCount: 1,
-			chunkCount:   2,
-			lightIngest:  true,
-		},
-		{
-			verNodeCount: 1,
-			chunkCount:   10,
-			lightIngest:  true,
-		},
-		{
-			verNodeCount: 2,
-			chunkCount:   2,
-			lightIngest:  true,
-		},
-		{
-			verNodeCount: 1,
-			chunkCount:   2,
-			lightIngest:  false,
-		},
-		{
-			verNodeCount: 1,
-			chunkCount:   10,
-			lightIngest:  false,
-		},
-		{
-			verNodeCount: 2,
-			chunkCount:   2,
-			lightIngest:  false,
-		},
-	}
-
-	for _, tc := range testcases {
-		// skips tests of original ingest over CI
-		if !tc.lightIngest && os.Getenv("FLOWLOCAL") != "TRUE" {
-			continue
-		}
-		t.Run(fmt.Sprintf("%d-verification node %d-chunk number %t-light ingest", tc.verNodeCount, tc.chunkCount, tc.lightIngest), func(t *testing.T) {
-			mu.Lock()
-			defer mu.Unlock()
-			// sets last parameter to false to indicate using two engine configuration
-			testHappyPath(t, tc.verNodeCount, tc.chunkCount, tc.lightIngest, false)
-		})
-	}
-}
-
-// TestHappyPath_ThreeEngine considers the happy path of Finder-Match-Verify engines.
-// It evaluates the happy path scenario of
-// concurrently sending an execution receipt with
-// `chunkCount`-many chunks to `verNodeCount`-many verification nodes
-// the happy path should result in dissemination of a result approval for each
-// distinct chunk by each verification node. The result approvals should be
-// sent to the consensus nodes
-func TestHappyPath_ThreeEngine(t *testing.T) {
+func TestHappyPath(t *testing.T) {
 	var mu sync.Mutex
 	testcases := []struct {
 		verNodeCount,
@@ -121,7 +57,7 @@ func TestHappyPath_ThreeEngine(t *testing.T) {
 		t.Run(fmt.Sprintf("%d-verification node %d-chunk number", tc.verNodeCount, tc.chunkCount), func(t *testing.T) {
 			mu.Lock()
 			defer mu.Unlock()
-			testHappyPath(t, tc.verNodeCount, tc.chunkCount, true, true)
+			testHappyPath(t, tc.verNodeCount, tc.chunkCount)
 		})
 	}
 }
@@ -135,9 +71,7 @@ func TestHappyPath_ThreeEngine(t *testing.T) {
 // - submitting a verifiable chunk locally to the verify engine by the ingest engine
 // - dropping the ingestion of the ERs that share the same result once the verifiable chunk is submitted to verify engine
 // - broadcast of a matching result approval to consensus nodes for each assigned chunk
-// lightIngest indicates whether to use the LightIngestEngine or the original ingest engine
-// threeEngine indicates whether to use the threeEngine version or the twoEngine version of architecture.
-func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest, threeEngine bool) {
+func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 	// to demarcate the debug logs
 	log.Debug().
 		Int("verification_nodes_count", verNodeCount).
