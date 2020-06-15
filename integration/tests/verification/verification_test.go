@@ -192,24 +192,12 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest, th
 	// verification node
 	verNodes := make([]mock2.VerificationNode, 0)
 	for _, verIdentity := range verIdentities {
-		verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold, lightIngest, threeEngine)
+		verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold)
 
 		// starts all the engines
-		if threeEngine {
-			// three engines architecture
-			<-verNode.FinderEngine.Ready()
-			<-verNode.MatchEngine.(module.ReadyDoneAware).Ready()
-			<-verNode.VerifierEngine.(module.ReadyDoneAware).Ready()
-		} else {
-			// two engines architecture
-			if lightIngest {
-				// light ingest
-				<-verNode.LightIngestEngine.Ready()
-			} else {
-				// original ingest engine
-				<-verNode.IngestEngine.Ready()
-			}
-		}
+		<-verNode.FinderEngine.Ready()
+		<-verNode.MatchEngine.(module.ReadyDoneAware).Ready()
+		<-verNode.VerifierEngine.(module.ReadyDoneAware).Ready()
 
 		// assumes the verification node has received the block
 		err := verNode.Blocks.Store(completeER.Block)
@@ -230,23 +218,8 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest, th
 		verWG.Add(1)
 		go func(vn mock2.VerificationNode, receipt *flow.ExecutionReceipt) {
 			defer verWG.Done()
-			var err error
-			if threeEngine {
-				// three engine architecture
-				err = vn.FinderEngine.Process(exeIdentity.NodeID, receipt)
-				require.NoError(t, err)
-			} else {
-				// two engine architecture
-				if lightIngest {
-					// light ingest engine
-					err = vn.LightIngestEngine.Process(exeIdentity.NodeID, receipt)
-				} else {
-					// ingest engine
-					err = vn.IngestEngine.Process(exeIdentity.NodeID, receipt)
-				}
-			}
+			err := vn.FinderEngine.Process(exeIdentity.NodeID, receipt)
 			require.NoError(t, err)
-
 		}(verNode, completeER.Receipt)
 	}
 
@@ -281,21 +254,9 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest, th
 	// the process method of Ingest engines is done working.
 	for _, verNode := range verNodes {
 		// stops all the engines
-		if threeEngine {
-			// three engines architecture
-			<-verNode.FinderEngine.Done()
-			<-verNode.MatchEngine.(module.ReadyDoneAware).Done()
-			<-verNode.VerifierEngine.(module.ReadyDoneAware).Done()
-		} else {
-			// two engines architecture
-			if lightIngest {
-				// light ingest
-				<-verNode.LightIngestEngine.Done()
-			} else {
-				// original ingest engine
-				<-verNode.IngestEngine.Done()
-			}
-		}
+		<-verNode.FinderEngine.Done()
+		<-verNode.MatchEngine.(module.ReadyDoneAware).Done()
+		<-verNode.VerifierEngine.(module.ReadyDoneAware).Done()
 	}
 
 	// stops continuous delivery of nodes
@@ -313,16 +274,10 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int, lightIngest, th
 		Msg("TestHappyPath finishes")
 }
 
-// TestSingleCollectionProcessing runs testSingleCollectionProcessing on the
-// three engine architecture of Finder-Match-Verify
-func TestSingleCollectionProcessing(t *testing.T) {
-	testSingleCollectionProcessing(t)
-}
-
-// testSingleCollectionProcessing checks the full happy
+// TestSingleCollectionProcessing checks the full happy
 // path assuming a single collection (including transactions on counter example)
 // are submited to the verification node.
-func testSingleCollectionProcessing(t *testing.T) {
+func TestSingleCollectionProcessing(t *testing.T) {
 	// ingest engine parameters
 	// set based on following issue
 	// https://github.com/dapperlabs/flow-go/issues/3443
