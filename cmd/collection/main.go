@@ -64,6 +64,7 @@ func main() {
 		hotstuffTimeoutIncreaseFactor          float64
 		hotstuffTimeoutDecreaseFactor          float64
 		hotstuffTimeoutVoteAggregationFraction float64
+		blockRateDelay                         time.Duration
 
 		ingestConf  ingest.Config
 		ingressConf ingress.Config
@@ -107,6 +108,7 @@ func main() {
 			flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor", timeout.DefaultConfig.TimeoutIncrease, "multiplicative increase of timeout value in case of time out event")
 			flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor", timeout.DefaultConfig.TimeoutDecrease, "multiplicative decrease of timeout value in case of progress")
 			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", timeout.DefaultConfig.VoteAggregationTimeoutFraction, "additional fraction of replica timeout that the primary will wait for votes")
+			flags.DurationVar(&blockRateDelay, "block-rate-delay", 1000*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
 		}).
 		Module("transactions mempool", func(node *cmd.FlowNodeBuilder) error {
 			pool, err = stdmap.NewTransactions(txLimit)
@@ -369,6 +371,7 @@ func main() {
 				clusterQC,
 				finalized,
 				pending,
+				consensus.WithBlockRateDelay(blockRateDelay),
 				consensus.WithInitialTimeout(hotstuffTimeout),
 				consensus.WithMinTimeout(hotstuffMinTimeout),
 				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
