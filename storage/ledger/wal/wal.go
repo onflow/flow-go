@@ -18,7 +18,7 @@ type LedgerWAL struct {
 	maxHeight int
 }
 
-// TODO use real loger and metrics, but that would require passing them to Trie storage
+// TODO use real logger and metrics, but that would require passing them to Trie storage
 func NewWAL(logger log.Logger, reg prometheus.Registerer, dir string, cacheSize int, maxHeight int) (*LedgerWAL, error) {
 	w, err := prometheusWAL.NewSize(logger, reg, dir, 32*1024)
 	if err != nil {
@@ -76,7 +76,7 @@ func (w *LedgerWAL) replay(
 		return fmt.Errorf("end of range cannot be smaller than beginning")
 	}
 
-	checkpointer, err := w.Checkpointer()
+	checkpointer, err := w.NewCheckpointer()
 	if err != nil {
 		return fmt.Errorf("cannot create checkpointer: %w", err)
 	}
@@ -150,7 +150,8 @@ func (w *LedgerWAL) replay(
 	return nil
 }
 
-func (w *LedgerWAL) Checkpointer() (*Checkpointer, error) {
+// NewCheckpointer returns a Checkpointer for this WAL
+func (w *LedgerWAL) NewCheckpointer() (*Checkpointer, error) {
 	return NewCheckpointer(w, w.maxHeight, w.cacheSize), nil
 }
 

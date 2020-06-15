@@ -37,7 +37,7 @@ func RunWithWALCheckpointerWithFiles(t *testing.T, names ...interface{}) {
 		wal, err := realWAL.NewWAL(nil, nil, dir, 10, 9)
 		require.NoError(t, err)
 
-		checkpointer, err := wal.Checkpointer()
+		checkpointer, err := wal.NewCheckpointer()
 		require.NoError(t, err)
 
 		f(t, wal, checkpointer)
@@ -192,7 +192,7 @@ func Test_Checkpointing(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			checkpointer, err := wal2.Checkpointer()
+			checkpointer, err := wal2.NewCheckpointer()
 			require.NoError(t, err)
 
 			err = checkpointer.Checkpoint(10, func() (io.WriteCloser, error) {

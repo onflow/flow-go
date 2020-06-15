@@ -70,6 +70,9 @@ func GetRandomKeysFixedN(n int, byteSize int) [][]byte {
 }
 
 func GetRandomValues(n int, minByteSize, maxByteSize int) [][]byte {
+	if minByteSize > maxByteSize {
+		panic("minByteSize cannot be smaller then maxByteSize")
+	}
 	values := make([][]byte, 0)
 	for i := 0; i < n; i++ {
 		var byteSize = maxByteSize

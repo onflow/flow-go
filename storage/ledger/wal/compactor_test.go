@@ -45,7 +45,7 @@ func Test_Compactor(t *testing.T) {
 			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
 			// so we should get at least `size` segments
 
-			checkpointer, err := wal.Checkpointer()
+			checkpointer, err := wal.NewCheckpointer()
 			require.NoError(t, err)
 
 			compactor := NewCompactor(checkpointer, 5*time.Millisecond)
