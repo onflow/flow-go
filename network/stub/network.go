@@ -42,7 +42,7 @@ func NewNetwork(state protocol.State, me module.Local, hub *Hub) *Network {
 	return o
 }
 
-// GetID returns the identity of the Node.
+// GetID returns the identity of the node.
 func (mn *Network) GetID() flow.Identifier {
 	return mn.me.NodeID()
 }

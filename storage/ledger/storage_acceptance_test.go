@@ -56,7 +56,7 @@ func TestLedgerFunctionality(t *testing.T) {
 				// add new keys
 				// TODO update some of the existing keys and shuffle them
 				keys := utils.GetRandomKeysRandN(maxNumInsPerStep, keyByteSize)
-				values := utils.GetRandomValues(len(keys), valueMaxByteSize)
+				values := utils.GetRandomValues(len(keys), 0, valueMaxByteSize)
 				newState, err := led.UpdateRegisters(keys, values, stateCommitment)
 				assert.NoError(t, err)
 
