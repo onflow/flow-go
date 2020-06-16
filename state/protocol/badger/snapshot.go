@@ -68,7 +68,9 @@ func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 
 	// check if node ID is part of identities
 	if len(identities) == 0 {
-		return nil, fmt.Errorf("identity not found (%x)", nodeID)
+		return nil, protocol.IdentityNotFoundErr{
+			NodeID: nodeID,
+		}
 	}
 
 	return identities[0], nil
