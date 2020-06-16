@@ -91,7 +91,9 @@ func (r *TransactionContext) ValueExists(owner, controller, key []byte) (exists 
 //
 // This function returns an error if the input is invalid.
 func (r *TransactionContext) CreateAccount(payer runtime.Address) (runtime.Address, error) {
-	flowErr, fatalErr := r.deductAccountCreationFee(flow.Address(payer))
+	accountAddress := runtimeToFlowAddress(payer)
+
+	flowErr, fatalErr := r.deductAccountCreationFee(accountAddress)
 	if fatalErr != nil {
 		return runtime.Address{}, fatalErr
 	}
@@ -202,7 +204,7 @@ func (r *TransactionContext) deductAccountCreationFee(addr flow.Address) (FlowEr
 // This function returns an error if the specified account does not exist or
 // if the key insertion fails.
 func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []byte) error {
-	accountAddress := address.Bytes()
+	accountAddress := runtimeToFlowAddress(address)
 
 	err := r.ledger.CheckAccountExists(accountAddress)
 	if err != nil {
@@ -229,7 +231,7 @@ func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []
 // This function returns an error if the specified account does not exist, the
 // provided key is invalid, or if key deletion fails.
 func (r *TransactionContext) RemoveAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
-	accountAddress := address.Bytes()
+	accountAddress := runtimeToFlowAddress(address)
 
 	err = r.ledger.CheckAccountExists(accountAddress)
 	if err != nil {
@@ -271,9 +273,9 @@ func (r *TransactionContext) CheckCode(address runtime.Address, code []byte) (er
 // This function returns an error if the specified account does not exist or is
 // not a valid signing account.
 func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []byte, checkPermission bool) (err error) {
-	accountAddress := address.Bytes()
+	accountAddress := runtimeToFlowAddress(address)
 
-	key := fullKeyHash(string(accountAddress), string(accountAddress), keyCode)
+	key := fullKeyHash(string(accountAddress.Bytes()), string(accountAddress.Bytes()), keyCode)
 
 	prevCode, err := r.ledger.Get(key)
 	if err != nil {
@@ -313,15 +315,13 @@ func (r *TransactionContext) ResolveImport(location runtime.Location) ([]byte, e
 
 	address := flow.BytesToAddress(addressLocation)
 
-	accountAddress := address.Bytes()
-
-	code, err := r.ledger.Get(fullKeyHash(string(accountAddress), string(accountAddress), keyCode))
+	code, err := r.ledger.Get(fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyCode))
 	if err != nil {
 		return nil, err
 	}
 
 	if code == nil {
-		return nil, fmt.Errorf("no code deployed at address %x", accountAddress)
+		return nil, fmt.Errorf("no code deployed at address %s", address.Bytes())
 	}
 
 	return code, nil
@@ -476,7 +476,7 @@ func (r *TransactionContext) checkAndIncrementSequenceNumber() (FlowError, error
 	if err != nil {
 		return nil, err
 	}
-	r.ledger.setAccountPublicKey(account.Address.Bytes(), proposalKey.KeyID, updatedAccountBytes)
+	r.ledger.setAccountPublicKey(account.Address, proposalKey.KeyID, updatedAccountBytes)
 
 	return nil, nil
 }
@@ -674,3 +674,7 @@ var MintDefaultTokenTransaction = []byte(fmt.Sprintf(`
 // TODO: assign these values after bootstrapping
 var FungibleTokenAddress, _, _ = flow.AccountAddress(flow.AddressState(1))
 var FlowTokenAddress, _, _ = flow.AccountAddress(flow.AddressState(2))
+
+func runtimeToFlowAddress(address runtime.Address) flow.Address {
+	return flow.Address(address)
+}
