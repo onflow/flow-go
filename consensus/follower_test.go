@@ -1,7 +1,6 @@
 package consensus_test
 
 import (
-	"fmt"
 	"os"
 	"sync"
 	"testing"
@@ -73,6 +72,15 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 
 	// mock finalization updater
 	s.updater = &mockmodule.Finalizer{}
+	s.updater.On("MakePending", mock.Anything).Return(nil).Run(
+		func(args mock.Arguments) {
+			require.True(s.T(), s.expectedUpdaterRecord.HasNextExpectedRecord(), "no expected record for this call")
+			expectedMethodName, expectedBlockID := s.expectedUpdaterRecord.NextExpectedRecord()
+			require.Equal(s.T(), expectedMethodName, "MakePending", "unexpected method call")
+			blockID := args.Get(0).(flow.Identifier)
+			require.Equal(s.T(), expectedBlockID, blockID, "unexpected block ID")
+		},
+	)
 
 	// mock finalization updater
 	s.verifier = &mockhotstuff.Verifier{}
@@ -107,17 +115,17 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 		BlockID:   s.rootHeader.ID(),
 		SignerIDs: identities.NodeIDs()[:3],
 	}
-	s.expectedNotifierRecord.AppendRecord("OnBlockIncorporated", s.rootHeader)
-	//s.notifier.On(
-	//	"OnBlockIncorporated",
-	//	mock.MatchedBy(func(block *model.Block) bool { return block.BlockID == s.rootHeader.ID() }),
-	//).Return().Once()
 
 	// we start with the latest finalized block being the root block
 	s.finalized = s.rootHeader
 	// and no pending (unfinalized) block
 	s.pending = []*flow.Header{}
+}
 
+func (s *HotStuffFollowerSuite) BeforeTest(suiteName, testName string) {
+	s.expectedNotifierRecord.AppendRecord("OnBlockIncorporated", s.rootHeader)
+
+	var err error
 	s.follower, err = consensus.NewFollower(
 		zerolog.New(os.Stderr),
 		s.committee,
@@ -131,24 +139,68 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 		s.pending,
 	)
 	require.NoError(s.T(), err)
-	s.follower.Ready()
-	//s.notifier.AssertExpectations(s.T())
+
+	select {
+	case <-s.follower.Ready():
+	case <-time.After(time.Second):
+		s.T().Error("timeout on waiting for follower start")
+	}
 }
 
+func (s *HotStuffFollowerSuite) AfterTest(suiteName, testName string) {
+	select {
+	case <-s.follower.Done():
+	case <-time.After(time.Second):
+		s.T().Error("timeout on waiting for expected Follower shutdown")
+	}
+}
+
+// TestFollowerInitialization verifies that the basic test setup with initialization of the Follower works as expected
 func (s *HotStuffFollowerSuite) TestFollowerInitialization() {
-	fmt.Println("foo")
-	parentView := s.rootHeader.View
-	nextBlock := s.mockConsensus.extendBlock(parentView, s.rootHeader)
+	// we expect no additional calls to s.updater or s.notifier
+	s.requireForExpectedRecords()
+}
+
+// TestFollowerProcessBlock verifies that when submitting a single valid block (child root block),
+// the Follower reacts with callbacks to s.updater.MakePending or s.notifier.OnBlockIncorporated with this new block
+func (s *HotStuffFollowerSuite) TestFollowerProcessBlock() {
+	rootBlockView := s.rootHeader.View
+	nextBlock := s.mockConsensus.extendBlock(rootBlockView+1, s.rootHeader)
 
 	s.expectedNotifierRecord.AppendRecord("OnBlockIncorporated", nextBlock)
-	s.follower.SubmitProposal(nextBlock, parentView)
+	s.expectedUpdaterRecord.AppendRecord("MakePending", nextBlock)
+	s.follower.SubmitProposal(nextBlock, rootBlockView)
+	s.requireForExpectedRecords()
+}
 
+func (s *HotStuffFollowerSuite) requireForExpectedRecords() {
 	select {
 	case <-s.expectedNotifierRecord.AllRecordsRecalled():
 	case <-time.After(time.Second):
 		s.T().Error("timeout on waiting for expected Notifier calls")
 	}
+	select {
+	case <-s.expectedUpdaterRecord.AllRecordsRecalled():
+	case <-time.After(time.Second):
+		s.T().Error("timeout on waiting for expected Notifier calls")
+	}
 }
+
+//func (s *HotStuffFollowerSuite) TestFollowerProcessBlock() {
+//	fmt.Println("foo")
+//	rootBlockView := s.rootHeader.View
+//	nextBlock := s.mockConsensus.extendBlock(rootBlockView+1, s.rootHeader)
+//
+//	s.expectedNotifierRecord.AppendRecord("OnBlockIncorporated", nextBlock)
+//	s.expectedUpdaterRecord.AppendRecord("MakePending", nextBlock)
+//	s.follower.SubmitProposal(nextBlock, rootBlockView)
+//
+//	select {
+//	case <-s.expectedNotifierRecord.AllRecordsRecalled():
+//	case <-time.After(time.Second):
+//		s.T().Error("timeout on waiting for expected Notifier calls")
+//	}
+//}
 
 //func (s *HotStuffFollowerSuite) TestFollowerInitialization() {
 //	fmt.Println("foo")
