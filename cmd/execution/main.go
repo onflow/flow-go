@@ -32,8 +32,7 @@ import (
 func main() {
 
 	var (
-		ledgerStorage      storage.Ledger
-		mTrieStorage       *ledger.MTrieStorage
+		ledgerStorage      *ledger.MTrieStorage
 		events             storage.Events
 		txResults          storage.TransactionResults
 		providerEngine     *provider.Engine
@@ -108,7 +107,7 @@ func main() {
 		}).
 		Component("execution state ledger WAL compactor", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
-			checkpointer, err := mTrieStorage.Checkpointer()
+			checkpointer, err := ledgerStorage.Checkpointer()
 			if err != nil {
 				return nil, fmt.Errorf("cannot create checkpointer: %w", err)
 			}
