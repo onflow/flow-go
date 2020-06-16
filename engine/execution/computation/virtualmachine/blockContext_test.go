@@ -895,7 +895,7 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 func TestBlockContext_GetAccount(t *testing.T) {
 	// seed the RNG
 	rand.Seed(time.Now().UnixNano())
-	count := 10
+	count := 100
 	rt := runtime.NewInterpreterRuntime()
 
 	h := unittest.BlockHeaderFixture()
@@ -984,5 +984,4 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		account := ledgerAccess.GetAccount(address)
 		assert.Nil(t, account)
 	})
-
 }
