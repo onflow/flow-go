@@ -1,16 +1,18 @@
 package stdmap
 
 import (
+	"fmt"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/model"
 )
 
-// Identifiers represents a concurrency-safe memory pool for IDs.
+// IdentifierMap represents a concurrency-safe memory pool for IdMapEntity.
 type IdentifierMap struct {
 	*Backend
 }
 
-// NewIdentifiers creates a new memory pool for identifiers.
+// NewIdentifierMap creates a new memory pool for IdMapEntity.
 func NewIdentifierMap(limit uint) (*IdentifierMap, error) {
 	i := &IdentifierMap{
 		Backend: NewBackend(WithLimit(limit)),
@@ -18,23 +20,55 @@ func NewIdentifierMap(limit uint) (*IdentifierMap, error) {
 	return i, nil
 }
 
-// Add will add the given identifier to the memory pool or it will error if
-// the identifier is already in the memory pool.
-func (i *IdentifierMap) Add(key, id flow.Identifier) bool {
-	// wraps ID around an ID entity to be stored in the mempool
-	idEntity := &model.IdEntity{
-		Id: id,
+// Add will append the id to the list of identifier associated with key.
+func (i *IdentifierMap) Append(key, id flow.Identifier) error {
+	ids, ok := i.Get(key)
+	if !ok {
+		// no record with key is available in the mempool,
+		// initializes ids.
+		ids = make([]flow.Identifier, 0)
+	} else {
+		// removes map entry associated with key for update
+		ok = i.Backend.Rem(key)
+		if !ok {
+			return fmt.Errorf("could not remove key from backend: %x", key)
+		}
 	}
-	return i.Backend.Add(idEntity)
+
+	// appends id to the ids list
+	ids = append(ids, id)
+
+	// adds the new ids list associated with key to mempool
+	mapEntity := model.IdMapEntity{
+		Key: key,
+		IDs: ids,
+	}
+
+	ok = i.Backend.Add(mapEntity)
+	if !ok {
+		return fmt.Errorf("could not add updated entity to backend, key: %x", key)
+	}
+
+	return nil
 }
 
-// Has checks whether the mempool has the identifier
-func (i *IdentifierMap) Get(id flow.Identifier) ([]flow.Identifier, bool) {
-	return i.Backend.Has(id)
+// Get returns list of all identifiers associated with key and True, if the key exists in the mempool.
+// Otherwise it returns nil and false.
+func (i *IdentifierMap) Get(key flow.Identifier) ([]flow.Identifier, bool) {
+	entity, ok := i.Backend.ByID(key)
+	if !ok {
+		return nil, false
+	}
+
+	mapEntity, ok := entity.(model.IdMapEntity)
+	if !ok {
+		return nil, false
+	}
+
+	return mapEntity.IDs, true
 }
 
-// Rem removes the given identifier from the memory pool; it will
-// return true if the identifier was known and removed.
+// Rem removes the given key with all associated identifiers.
 func (i *IdentifierMap) Rem(id flow.Identifier) bool {
 	return i.Backend.Rem(id)
 }
