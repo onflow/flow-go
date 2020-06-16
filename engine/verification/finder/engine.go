@@ -270,7 +270,14 @@ func (e *Engine) checkReceipts(receipts []*verification.PendingReceipt) {
 		} else {
 			// receipt is not processable
 			// keeps track of it in id map
-			e.receiptsByBlock.Append(pr.Receipt.ExecutionResult.BlockID, receiptID)
+			err := e.receiptsByBlock.Append(pr.Receipt.ExecutionResult.BlockID, receiptID)
+			if err != nil {
+				e.log.Error().
+					Err(err).
+					Hex("block_id", logging.ID(pr.Receipt.ExecutionResult.BlockID)).
+					Hex("receipt_id", logging.ID(receiptID)).
+					Msg("could not append receipt to identifier map")
+			}
 		}
 	}
 }
