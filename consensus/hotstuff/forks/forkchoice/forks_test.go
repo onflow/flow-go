@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
@@ -87,7 +86,6 @@ func TestForks_3ChainFinalization(t *testing.T) {
 	notifier.On("OnQcIncorporated", block5.QC).Return().Once()
 	notifier.On("OnFinalizedBlock", block2).Return().Once()
 	finCallback.On("MakeFinal", block2.BlockID).Return(nil).Once()
-	finCallback.On("MakePending", mock.Anything).Return(nil)
 	addBlock2Forks(t, block5, forks)
 	notifier.AssertExpectations(t)
 	finCallback.AssertExpectations(t)
@@ -98,7 +96,6 @@ func TestForks_3ChainFinalization(t *testing.T) {
 	notifier.On("OnQcIncorporated", block6.QC).Return().Once()
 	notifier.On("OnFinalizedBlock", block3).Return().Once()
 	finCallback.On("MakeFinal", block3.BlockID).Return(nil).Once()
-	finCallback.On("MakePending", mock.Anything).Return(nil)
 	addBlock2Forks(t, block6, forks)
 	notifier.AssertExpectations(t)
 	finCallback.AssertExpectations(t)
@@ -136,7 +133,6 @@ func verifyStored(t *testing.T, block *model.Block, forks hotstuff.Forks) {
 func initForks(t *testing.T, view uint64) (*forks.Forks, *mockfinalizer.Finalizer, *mocks.Consumer, *forks.BlockQC) {
 	notifier := &mocks.Consumer{}
 	finalizationCallback := &mockfinalizer.Finalizer{}
-	finalizationCallback.On("MakePending", mock.Anything).Return(nil)
 
 	// construct Finalizer
 	root := makeRootBlock(t, view)
