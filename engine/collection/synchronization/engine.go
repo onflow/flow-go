@@ -456,7 +456,7 @@ CheckLoop:
 			err := e.pollHeight()
 			if err != nil {
 				if network.IsPeerUnreachableError(err) {
-					e.log.Warn().Err(err).Msg("could not poll heights")
+					e.log.Warn().Err(err).Msg("could not poll heights due to peer unreachable")
 				} else {
 					e.log.Error().Err(err).Msg("could not poll heights")
 				}
