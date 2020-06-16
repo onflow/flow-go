@@ -168,10 +168,12 @@ func (cg *LoadGenerator) Next() error {
 		accountCreationTxRes := waitForFinalized(context.Background(), cg.flowClient, addKeysTx.ID())
 		examples.Handle(accountCreationTxRes.Error)
 
+		fmt.Println("load generator step 0 done")
 		return nil
 	}
 	// setup accounts
 	if cg.step == 1 {
+		fmt.Println("load generator step 1 started")
 		for i := 0; i < cg.numberOfAccounts; i++ {
 			privKey := examples.RandomPrivateKey()
 			accountKey := flowsdk.NewAccountKey().
@@ -229,6 +231,8 @@ func (cg *LoadGenerator) Next() error {
 		}
 		cg.step++
 	}
+
+	fmt.Println("load generator step 2 done")
 	// TODO else do the transfers
 	return nil
 }
