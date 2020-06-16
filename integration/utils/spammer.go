@@ -110,6 +110,7 @@ func loadServiceAccount(flowClient *client.Client,
 	servAccPrivKeyHex string) (*flowAccount, error) {
 
 	address := flowsdk.ServiceAddress(flowsdk.ChainID(chainID))
+	fmt.Println(">>>>>>>>>>>>", address)
 	acc, err := flowClient.GetAccount(context.Background(), address)
 	if err != nil {
 		return nil, fmt.Errorf("error while calling get account for service account %w", err)
