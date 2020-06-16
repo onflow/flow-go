@@ -176,7 +176,7 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 	}
 
 	ers := make([]*verification.PendingReceipt, len(erIDs))
-	for _, erId := range erIDs {
+	for index, erId := range erIDs {
 		er, ok := e.receipts.Get(erId)
 		if !ok {
 			e.log.Debug().
@@ -184,7 +184,7 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 				Msg("could not retrieve pending receipt")
 			continue
 		}
-		ers = append(ers, er)
+		ers[index] = er
 	}
 	e.checkReceipts(ers)
 }
