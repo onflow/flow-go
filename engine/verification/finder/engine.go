@@ -24,6 +24,7 @@ type Engine struct {
 	receipts        mempool.PendingReceipts // used to keep the receipts as mempool
 	headerStorage   storage.Headers         // used to check block existence before verifying
 	processedResult mempool.Identifiers     // used to keep track of the processed results
+	receiptsByBlock mempool.IdentifierMap   // used as a mapping to keep track of receipt associated with a block
 }
 
 func New(
@@ -34,6 +35,7 @@ func New(
 	receipts mempool.PendingReceipts,
 	headerStorage storage.Headers,
 	processedResults mempool.Identifiers,
+	receiptsByBlock mempool.IdentifierMap,
 ) (*Engine, error) {
 	e := &Engine{
 		unit:            engine.NewUnit(),
@@ -43,6 +45,7 @@ func New(
 		headerStorage:   headerStorage,
 		receipts:        receipts,
 		processedResult: processedResults,
+		receiptsByBlock: receiptsByBlock,
 	}
 
 	_, err := net.Register(engine.ExecutionReceiptProvider, e)
@@ -158,8 +161,32 @@ func (e *Engine) OnBlockIncorporated(*model.Block) {
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 func (e *Engine) OnFinalizedBlock(block *model.Block) {
-	// TODO only receipts referencing block should be checked #4028
-	e.checkReceipts(e.receipts.All())
+	// retrieves all receipts that are pending for this block
+	erIDs, ok := e.receiptsByBlock.Get(block.BlockID)
+	if !ok {
+		// no pending receipt for this block
+		return
+	}
+	// removes list of receipts for this block
+	ok = e.receiptsByBlock.Rem(block.BlockID)
+	if !ok {
+		e.log.Debug().
+			Hex("block_id", logging.ID(block.BlockID)).
+			Msg("could not remove pending receipts from mempool")
+	}
+
+	ers := make([]*verification.PendingReceipt, len(erIDs))
+	for _, erId := range erIDs {
+		er, ok := e.receipts.Get(erId)
+		if !ok {
+			e.log.Debug().
+				Hex("receipt_id", logging.ID(erId)).
+				Msg("could not retrieve pending receipt")
+			continue
+		}
+		ers = append(ers, er)
+	}
+	e.checkReceipts(ers)
 }
 
 // To implement FinalizationConsumer
@@ -223,20 +250,26 @@ func (e *Engine) checkReceipts(receipts []*verification.PendingReceipt) {
 	defer e.unit.Unlock()
 
 	for _, pr := range receipts {
+		receiptID := pr.Receipt.ID()
+		resultID := pr.Receipt.ExecutionResult.ID()
 		if e.isProcessable(&pr.Receipt.ExecutionResult) {
 			// checks if result is ready to process
 			err := e.processResult(pr.OriginID, &pr.Receipt.ExecutionResult)
 			if err != nil {
 				e.log.Error().
 					Err(err).
-					Hex("receipt_id", logging.Entity(pr)).
-					Hex("result_id", logging.Entity(pr.Receipt.ExecutionResult)).
+					Hex("receipt_id", logging.ID(receiptID)).
+					Hex("result_id", logging.ID(resultID)).
 					Msg("could not process result")
 				continue
 			}
 
 			// performs clean up
-			e.onResultProcessed(pr.Receipt.ExecutionResult.ID())
+			e.onResultProcessed(resultID)
+		} else {
+			// receipt is not processable
+			// keeps track of it in id map
+			e.receiptsByBlock.Append(pr.Receipt.ExecutionResult.BlockID, receiptID)
 		}
 	}
 }
