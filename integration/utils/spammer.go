@@ -192,15 +192,11 @@ func (cg *LoadGenerator) Next() error {
 				SetPayer(cg.serviceAccount.address)
 
 			cg.serviceAccount.signerLock.Lock()
-			defer cg.serviceAccount.signerLock.Unlock()
-
 			err = createAccountTx.SignEnvelope(cg.serviceAccount.address, i+1, cg.serviceAccount.signer)
 			if err != nil {
 				return err
 			}
-
-			cg.serviceAccount.accountKey.SequenceNumber++
-			cg.step++
+			cg.serviceAccount.signerLock.Unlock()
 
 			err = cg.flowClient.SendTransaction(context.Background(), *createAccountTx)
 			examples.Handle(err)
