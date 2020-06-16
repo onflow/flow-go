@@ -163,7 +163,10 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, r *flow.Executi
 	// if a execution result has been added before, then don't process
 	// this result.
 	if !added {
-		return engine.NewInvalidInputf("execution result has been added: %v", r.ID())
+		log.Debug().
+			Hex("result_id", logging.ID(r.ID())).
+			Msg("execution result has been added")
+		return nil
 	}
 
 	// different execution results can be chunked in parallel
