@@ -22,14 +22,14 @@ func TestChunkDataPack(t *testing.T) {
 		})
 
 		t.Run("Save", func(t *testing.T) {
-			err := db.Update(InsertChunkDataPack(&expected))
+			err := db.Update(InsertChunkDataPack(expected))
 			require.NoError(t, err)
 
 			var actual flow.ChunkDataPack
 			err = db.View(RetrieveChunkDataPack(expected.ChunkID, &actual))
 			assert.NoError(t, err)
 
-			assert.Equal(t, expected, actual)
+			assert.Equal(t, *expected, actual)
 		})
 
 		t.Run("Remove", func(t *testing.T) {

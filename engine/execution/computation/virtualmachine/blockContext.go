@@ -3,6 +3,7 @@ package virtualmachine
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
@@ -35,9 +36,11 @@ type Blocks interface {
 }
 
 type blockContext struct {
-	vm     *virtualMachine
-	header *flow.Header
-	blocks Blocks
+	vm              *virtualMachine
+	header          *flow.Header
+	blocks          Blocks
+	simpleAddresses bool
+	rng             *rand.Rand
 }
 
 func (bc *blockContext) newTransactionContext(
@@ -54,7 +57,7 @@ func (bc *blockContext) newTransactionContext(
 	ctx := &TransactionContext{
 		bc:                               bc,
 		astCache:                         bc.vm.cache,
-		ledger:                           NewLedgerDAL(ledger),
+		ledger:                           NewLedgerDAL(ledger, bc.simpleAddresses),
 		signingAccounts:                  signingAccounts,
 		tx:                               tx,
 		gasLimit:                         tx.GasLimit,
@@ -63,6 +66,8 @@ func (bc *blockContext) newTransactionContext(
 		signatureVerificationEnabled:     true,
 		restrictedAccountCreationEnabled: true,
 		restrictedDeploymentEnabled:      true,
+		simpleAddresses:                  bc.simpleAddresses,
+		rng:                              bc.rng,
 	}
 
 	for _, option := range options {
@@ -76,7 +81,7 @@ func (bc *blockContext) newScriptContext(ledger Ledger) *TransactionContext {
 	return &TransactionContext{
 		bc:       bc,
 		astCache: bc.vm.cache,
-		ledger:   NewLedgerDAL(ledger),
+		ledger:   NewLedgerDAL(ledger, bc.simpleAddresses),
 		header:   bc.header,
 		blocks:   bc.blocks,
 		gasLimit: scriptGasLimit,
@@ -191,13 +196,18 @@ func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte, arguments []
 }
 
 func (bc *blockContext) GetAccount(ledger Ledger, addr flow.Address) (*flow.Account, error) {
-	ledgerAccess := NewLedgerDAL(ledger)
+	ledgerAccess := NewLedgerDAL(ledger, bc.simpleAddresses)
 	acct := ledgerAccess.GetAccount(addr)
 	if acct == nil {
 		return nil, nil
 	}
 
-	result, err := bc.ExecuteScript(ledger, DefaultTokenBalanceScript(addr), nil)
+	serviceAddress := flow.ServiceAddress()
+	if bc.simpleAddresses {
+		serviceAddress = SimpleServiceAddress()
+	}
+
+	result, err := bc.ExecuteScript(ledger, DefaultTokenBalanceScript(serviceAddress, addr), nil)
 	if err != nil {
 		return nil, err
 	}

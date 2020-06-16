@@ -18,5 +18,5 @@ type ChunkAssigner interface {
 type ChunkVerifier interface {
 	// Verify verifies the given VerifiableChunk by executing it and checking the final statecommitment
 	// TODO return challenges plus errors
-	Verify(ch *verification.VerifiableChunk) (chmodels.ChunkFault, error)
+	Verify(ch *verification.VerifiableChunkData) (chmodels.ChunkFault, error)
 }

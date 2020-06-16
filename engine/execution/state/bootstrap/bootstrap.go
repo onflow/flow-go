@@ -37,7 +37,7 @@ func (b *Bootstrapper) BootstrapLedger(
 ) (flow.StateCommitment, error) {
 	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.EmptyStateCommitment()))
 
-	b.BootstrapView(view, rootPublicKey, initialTokenSupply)
+	b.BootstrapView(view, rootPublicKey, initialTokenSupply, false)
 
 	newStateCommitment, err := state.CommitDelta(ledger, view.Delta(), ledger.EmptyStateCommitment())
 	if err != nil {
@@ -81,41 +81,55 @@ func (b *Bootstrapper) BootstrapExecutionDatabase(db *badger.DB, commit flow.Sta
 	return nil
 }
 
+type AddressState interface {
+	Bytes() []byte
+	NextAddress() (flow.Address, error)
+	CurrentAddress() flow.Address
+}
+
 func (b *Bootstrapper) BootstrapView(
 	ledger virtualmachine.Ledger,
 	serviceAccountPublicKey flow.AccountPublicKey,
 	initialTokenSupply uint64,
+	simpleAddresses bool,
 ) {
-	l := virtualmachine.NewLedgerDAL(ledger)
+	l := virtualmachine.NewLedgerDAL(ledger, simpleAddresses)
+
+	var addressState AddressState
+	if simpleAddresses {
+		addressState = &virtualmachine.SimpleAddressState{}
+	} else {
+		addressState = flow.NewAddressGenerator()
+	}
 
 	// initialize the account addressing state
-	l.SetAddressState(flow.NewAddressGenerator())
+	l.SetAddressState(addressState)
 
-	service := createServiceAccount(ledger, serviceAccountPublicKey)
+	service := createServiceAccount(ledger, serviceAccountPublicKey, simpleAddresses)
 
 	b.logger.Debug().Str("account_address", service.Short()).Msg("created service account")
 
 	rt := runtime.NewInterpreterRuntime()
-	vm, err := virtualmachine.New(rt)
+	vm, err := virtualmachine.New(rt, virtualmachine.WithSimpleAddresses(simpleAddresses))
 	if err != nil {
 		panic(err)
 	}
 
 	ctx := vm.NewBlockContext(nil, nil)
 
-	fungibleToken := deployFungibleToken(ctx, ledger)
-	flowToken := deployFlowToken(ctx, ledger, service, fungibleToken)
-	feeContract := deployFlowFees(ctx, ledger, service, fungibleToken, flowToken)
+	fungibleToken := deployFungibleToken(ctx, ledger, simpleAddresses)
+	flowToken := deployFlowToken(ctx, ledger, simpleAddresses, service, fungibleToken)
+	feeContract := deployFlowFees(ctx, ledger, simpleAddresses, service, fungibleToken, flowToken)
 
 	if initialTokenSupply > 0 {
-		mintInitialTokens(ctx, ledger, service, initialTokenSupply)
+		mintInitialTokens(ctx, ledger, simpleAddresses, service, initialTokenSupply)
 	}
 
 	initServiceAccount(ctx, ledger, service, fungibleToken, flowToken, feeContract)
 }
 
-func createAccount(ledger virtualmachine.Ledger) flow.Address {
-	l := virtualmachine.NewLedgerDAL(ledger)
+func createAccount(ledger virtualmachine.Ledger, simpleAddresses bool) flow.Address {
+	l := virtualmachine.NewLedgerDAL(ledger, simpleAddresses)
 
 	addr, err := l.CreateAccount(nil)
 	if err != nil {
@@ -125,8 +139,9 @@ func createAccount(ledger virtualmachine.Ledger) flow.Address {
 	return addr
 }
 
-func createServiceAccount(ledger virtualmachine.Ledger, accountKey flow.AccountPublicKey) flow.Address {
-	l := virtualmachine.NewLedgerDAL(ledger)
+func createServiceAccount(ledger virtualmachine.Ledger, accountKey flow.AccountPublicKey, simpleAddresses bool,
+) flow.Address {
+	l := virtualmachine.NewLedgerDAL(ledger, simpleAddresses)
 
 	addr, err := l.CreateAccount([]flow.AccountPublicKey{accountKey})
 	if err != nil {
@@ -136,16 +151,18 @@ func createServiceAccount(ledger virtualmachine.Ledger, accountKey flow.AccountP
 	return addr
 }
 
-func deployFungibleToken(ctx virtualmachine.BlockContext, ledger virtualmachine.Ledger) flow.Address {
-	return deployContract(ctx, ledger, contracts.FungibleToken())
+func deployFungibleToken(ctx virtualmachine.BlockContext, ledger virtualmachine.Ledger, simpleAddresses bool,
+) flow.Address {
+	return deployContract(ctx, ledger, simpleAddresses, contracts.FungibleToken())
 }
 
 func deployFlowToken(
 	ctx virtualmachine.BlockContext,
 	ledger virtualmachine.Ledger,
+	simpleAddresses bool,
 	service, fungibleToken flow.Address,
 ) flow.Address {
-	flowToken := createAccount(ledger)
+	flowToken := createAccount(ledger, simpleAddresses)
 
 	contract := contracts.FlowToken(fungibleToken.Hex())
 
@@ -165,9 +182,10 @@ func deployFlowToken(
 func deployFlowFees(
 	ctx virtualmachine.BlockContext,
 	ledger virtualmachine.Ledger,
+	simpleAddresses bool,
 	service, fungibleToken, flowToken flow.Address,
 ) flow.Address {
-	flowFees := createAccount(ledger)
+	flowFees := createAccount(ledger, simpleAddresses)
 
 	contract := contracts.FlowFees(fungibleToken.Hex(), flowToken.Hex())
 
@@ -187,6 +205,7 @@ func deployFlowFees(
 func mintInitialTokens(
 	ctx virtualmachine.BlockContext,
 	ledger virtualmachine.Ledger,
+	simpleAddresses bool,
 	service flow.Address,
 	initialSupply uint64,
 ) {
@@ -195,8 +214,15 @@ func mintInitialTokens(
 		panic(fmt.Sprintf("failed to encode initial token supply: %s", err.Error()))
 	}
 
+	fungibleTokenAddress := virtualmachine.FungibleTokenAddress()
+	flowTokenAddress := virtualmachine.FlowTokenAddress()
+	if simpleAddresses {
+		fungibleTokenAddress = virtualmachine.SimpleFungibleTokenAddress()
+		flowTokenAddress = virtualmachine.SimpleFlowTokenAddress()
+	}
+
 	tx := flow.NewTransactionBody().
-		SetScript(virtualmachine.MintDefaultTokenTransaction()).
+		SetScript(virtualmachine.MintDefaultTokenTransaction(fungibleTokenAddress, flowTokenAddress)).
 		AddArgument(initialSupplyArg).
 		AddAuthorizer(service)
 
@@ -212,11 +238,12 @@ func initServiceAccount(
 	service, fungibleToken, flowToken, feeContract flow.Address,
 ) {
 	serviceAccountContract := contracts.FlowServiceAccount(fungibleToken.Hex(), flowToken.Hex(), feeContract.Hex())
-	deployContractToServiceAccount(ctx, ledger, serviceAccountContract)
+	deployContractToServiceAccount(ctx, ledger, service, serviceAccountContract)
 }
 
-func deployContract(ctx virtualmachine.BlockContext, ledger virtualmachine.Ledger, contract []byte) flow.Address {
-	addr := createAccount(ledger)
+func deployContract(ctx virtualmachine.BlockContext, ledger virtualmachine.Ledger, simpleAddresses bool,
+	contract []byte) flow.Address {
+	addr := createAccount(ledger, simpleAddresses)
 
 	script := []byte(
 		fmt.Sprintf(`
@@ -228,10 +255,15 @@ func deployContract(ctx virtualmachine.BlockContext, ledger virtualmachine.Ledge
 		`, hex.EncodeToString(contract)),
 	)
 
+	serviceAddress := flow.ServiceAddress()
+	if simpleAddresses {
+		serviceAddress = virtualmachine.SimpleServiceAddress()
+	}
+
 	tx := flow.NewTransactionBody().
 		SetScript(script).
 		AddAuthorizer(addr).
-		AddAuthorizer(flow.ServiceAddress())
+		AddAuthorizer(serviceAddress)
 
 	result := executeTransaction(ctx, ledger, tx)
 	if result.Error != nil {
@@ -244,6 +276,7 @@ func deployContract(ctx virtualmachine.BlockContext, ledger virtualmachine.Ledge
 func deployContractToServiceAccount(
 	ctx virtualmachine.BlockContext,
 	ledger virtualmachine.Ledger,
+	serviceAddress flow.Address,
 	contract []byte,
 ) {
 	script := []byte(
@@ -258,7 +291,7 @@ func deployContractToServiceAccount(
 
 	tx := flow.NewTransactionBody().
 		SetScript(script).
-		AddAuthorizer(flow.ServiceAddress())
+		AddAuthorizer(serviceAddress)
 
 	result := executeTransaction(ctx, ledger, tx)
 	if result.Error != nil {

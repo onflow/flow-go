@@ -95,8 +95,12 @@ func SignTransaction(
 	return SignEnvelope(tx, address, privateKey)
 }
 
-func SignTransactionByRoot(tx *flow.TransactionBody, seqNum uint64) error {
+func SignTransactionAsServiceAccount(tx *flow.TransactionBody, seqNum uint64) error {
 	return SignTransaction(tx, flow.ServiceAddress(), unittest.ServiceAccountPrivateKey, seqNum)
+}
+
+func SignTransactionAsSimpleServiceAccount(tx *flow.TransactionBody, seqNum uint64) error {
+	return SignTransaction(tx, virtualmachine.SimpleServiceAddress(), unittest.ServiceAccountPrivateKey, seqNum)
 }
 
 // GenerateAccountPrivateKeys generates a number of private keys.
@@ -138,6 +142,15 @@ func CreateAccounts(
 	ledger virtualmachine.Ledger,
 	privateKeys []flow.AccountPrivateKey,
 ) ([]flow.Address, error) {
+	return CreateAccountsWithSimpleAddresses(vm, ledger, privateKeys, false)
+}
+
+func CreateAccountsWithSimpleAddresses(
+	vm virtualmachine.VirtualMachine,
+	ledger virtualmachine.Ledger,
+	privateKeys []flow.AccountPrivateKey,
+	simpleAddresses bool,
+) ([]flow.Address, error) {
 	ctx := vm.NewBlockContext(nil, new(storage.Blocks))
 
 	var accounts []flow.Address
@@ -151,6 +164,11 @@ func CreateAccounts(
 	  }
 	`)
 
+	serviceAddress := flow.ServiceAddress()
+	if simpleAddresses {
+		serviceAddress = virtualmachine.SimpleServiceAddress()
+	}
+
 	for _, privateKey := range privateKeys {
 		accountKey := privateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold)
 		encAccountKey, _ := flow.EncodeRuntimeAccountPublicKey(accountKey)
@@ -160,7 +178,7 @@ func CreateAccounts(
 		tx := flow.NewTransactionBody().
 			SetScript(script).
 			AddArgument(encCadAccountKey).
-			AddAuthorizer(flow.ServiceAddress())
+			AddAuthorizer(serviceAddress)
 
 		result, err := ctx.ExecuteTransaction(ledger, tx, virtualmachine.WithSignatureVerification(false))
 		if err != nil {
@@ -189,8 +207,12 @@ func CreateAccounts(
 }
 
 func RootBootstrappedLedger() virtualmachine.Ledger {
+	return RootBootstrappedLedgerWithSimpleAddresses(false)
+}
+
+func RootBootstrappedLedgerWithSimpleAddresses(simpleAddresses bool) virtualmachine.Ledger {
 	ledger := make(virtualmachine.MapLedger)
-	bootstrap.NewBootstrapper(zerolog.Nop()).BootstrapView(ledger, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply)
+	bootstrap.NewBootstrapper(zerolog.Nop()).BootstrapView(ledger, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply, simpleAddresses)
 	return ledger
 }
 

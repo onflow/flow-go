@@ -57,14 +57,15 @@ func keyPublicKey(index uint64) string {
 // A LedgerDAL is an abstraction layer used to read and manipulate ledger state in a consistent way.
 type LedgerDAL struct {
 	Ledger
+	SimpleAddresses bool
 }
 
-func NewLedgerDAL(ledger Ledger) LedgerDAL {
-	return LedgerDAL{Ledger: ledger}
+func NewLedgerDAL(ledger Ledger, simpleAddresses bool) LedgerDAL {
+	return LedgerDAL{Ledger: ledger, SimpleAddresses: simpleAddresses}
 }
 
 func (r *LedgerDAL) CheckAccountExists(accountAddress []byte) error {
-	exists, err := r.Get(fullKeyHash(string(accountAddress), "", keyExists))
+	exists, err := r.Get(fullKeyHash(string(flow.BytesToAddress(accountAddress).Bytes()), "", keyExists))
 	if err != nil {
 		return err
 	}
@@ -78,7 +79,7 @@ func (r *LedgerDAL) CheckAccountExists(accountAddress []byte) error {
 
 func (r *LedgerDAL) GetAccountPublicKeys(accountAddress []byte) (publicKeys []flow.AccountPublicKey, err error) {
 	countBytes, err := r.Get(
-		fullKeyHash(string(accountAddress), string(accountAddress), keyPublicKeyCount),
+		fullKeyHash(string(flow.BytesToAddress(accountAddress).Bytes()), string(flow.BytesToAddress(accountAddress).Bytes()), keyPublicKeyCount),
 	)
 	if err != nil {
 		return nil, err
@@ -101,7 +102,8 @@ func (r *LedgerDAL) GetAccountPublicKeys(accountAddress []byte) (publicKeys []fl
 
 	for i := uint64(0); i < count; i++ {
 		publicKey, err := r.Get(
-			fullKeyHash(string(accountAddress), string(accountAddress), keyPublicKey(i)),
+			fullKeyHash(string(flow.BytesToAddress(accountAddress).Bytes()),
+				string(flow.BytesToAddress(accountAddress).Bytes()), keyPublicKey(i)),
 		)
 		if err != nil {
 			return nil, err
@@ -144,16 +146,26 @@ func (r *LedgerDAL) GetAccount(address flow.Address) *flow.Account {
 	}
 }
 
-func (r *LedgerDAL) GetAddressState() (*flow.AddressGenerator, error) {
+type AddressState interface {
+	Bytes() []byte
+	NextAddress() (flow.Address, error)
+	CurrentAddress() flow.Address
+}
+
+func (r *LedgerDAL) GetAddressState() (AddressState, error) {
 	stateBytes, err := r.Get(fullKeyHash("", "", keyAddressState))
 	if err != nil {
 		return nil, err
+	}
+	if r.SimpleAddresses {
+		state := BytesToSimpleAddressState(stateBytes)
+		return &state, nil
 	}
 	state := flow.BytesToAddressState(stateBytes)
 	return state, nil
 }
 
-func (r *LedgerDAL) SetAddressState(state *flow.AddressGenerator) {
+func (r *LedgerDAL) SetAddressState(state AddressState) {
 	stateBytes := state.Bytes()
 	r.Set(fullKeyHash("", "", keyAddressState), stateBytes)
 }
@@ -204,7 +216,7 @@ func (r *LedgerDAL) SetAccountPublicKeys(accountAddress []byte, publicKeys []flo
 	var existingCount uint64
 
 	countBytes, err := r.Get(
-		fullKeyHash(string(accountAddress), string(accountAddress), keyPublicKeyCount),
+		fullKeyHash(string(flow.BytesToAddress(accountAddress).Bytes()), string(flow.BytesToAddress(accountAddress).Bytes()), keyPublicKeyCount),
 	)
 	if err != nil {
 		return err
@@ -227,7 +239,8 @@ func (r *LedgerDAL) SetAccountPublicKeys(accountAddress []byte, publicKeys []flo
 	newKeyCount := new(big.Int).SetUint64(newCount)
 
 	r.Set(
-		fullKeyHash(string(accountAddress), string(accountAddress), keyPublicKeyCount),
+		fullKeyHash(string(flow.BytesToAddress(accountAddress).Bytes()),
+			string(flow.BytesToAddress(accountAddress).Bytes()), keyPublicKeyCount),
 		newKeyCount.Bytes(),
 	)
 
@@ -249,7 +262,8 @@ func (r *LedgerDAL) SetAccountPublicKeys(accountAddress []byte, publicKeys []flo
 
 	// delete leftover keys
 	for i := newCount; i < existingCount; i++ {
-		r.Delete(fullKeyHash(string(accountAddress), string(accountAddress), keyPublicKey(i)))
+		r.Delete(fullKeyHash(string(flow.BytesToAddress(accountAddress).Bytes()),
+			string(flow.BytesToAddress(accountAddress).Bytes()), keyPublicKey(i)))
 	}
 
 	return nil
@@ -257,7 +271,7 @@ func (r *LedgerDAL) SetAccountPublicKeys(accountAddress []byte, publicKeys []flo
 
 func (r *LedgerDAL) setAccountPublicKey(accountAddress []byte, keyID uint64, publicKey []byte) {
 	r.Set(
-		fullKeyHash(string(accountAddress), string(accountAddress), keyPublicKey(keyID)),
+		fullKeyHash(string(flow.BytesToAddress(accountAddress).Bytes()), string(flow.BytesToAddress(accountAddress).Bytes()), keyPublicKey(keyID)),
 		publicKey,
 	)
 }

@@ -109,7 +109,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	// set up mock matching engine that asserts each receipt is submitted exactly once.
 	requestInterval := uint(1000)
 	failureThreshold := uint(2)
-	matchEng, matchEngWG := SetupMockMatchEng(t, results)
+	matchEng, matchEngWG := SetupMockMatchEng(t, exeID, results)
 	assigner := utils.NewMockAssigner(verID.NodeID, IsAssigned)
 
 	// creates a verification node with a real finder engine, and mock matching engine.
@@ -204,7 +204,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 // - that a set of execution results are delivered to it.
 // - that each execution result is delivered only once.
 // SetupMockMatchEng returns the mock engine and a wait group that unblocks when all results are received.
-func SetupMockMatchEng(t testing.TB, ers []flow.ExecutionResult) (*network.Engine, *sync.WaitGroup) {
+func SetupMockMatchEng(t testing.TB, exeID *flow.Identity, ers []flow.ExecutionResult) (*network.Engine, *sync.WaitGroup) {
 	eng := new(network.Engine)
 
 	// keeps track of which execution results it has received
@@ -219,13 +219,18 @@ func SetupMockMatchEng(t testing.TB, ers []flow.ExecutionResult) (*network.Engin
 	// expects `len(er)` many distinct execution results
 	wg.Add(len(ers))
 
-	eng.On("ProcessLocal", testifymock.Anything).
+	eng.On("Process", testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
 			mu.Lock()
 			defer mu.Unlock()
 
+			// origin ID of event should be exection node
+			originID, ok := args[0].(flow.Identifier)
+			assert.True(t, ok)
+			assert.Equal(t, originID, exeID.NodeID)
+
 			// the received entity should be an execution result
-			result, ok := args[0].(*flow.ExecutionResult)
+			result, ok := args[1].(*flow.ExecutionResult)
 			assert.True(t, ok)
 
 			resultID := result.ID()
