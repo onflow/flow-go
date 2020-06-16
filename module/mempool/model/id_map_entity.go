@@ -12,13 +12,13 @@ type IdMapEntity struct {
 }
 
 // ID implements flow.Entity.ID for IdMapEntity to make it capable of being stored directly
-// in mempools and storage.
+// in mempools and storage. It returns key field of the id.
 func (id IdMapEntity) ID() flow.Identifier {
-	return flow.MakeID(id)
+	return id.Key
 }
 
 // CheckSum implements flow.Entity.CheckSum for IdMapEntity to make it capable of being stored directly
-// in mempools and storage. It acts the same as ID method.
+// in mempools and storage. It makes the id of the entire IdMapEntity.
 func (id IdMapEntity) Checksum() flow.Identifier {
 	return flow.MakeID(id)
 }
