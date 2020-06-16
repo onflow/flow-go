@@ -198,6 +198,7 @@ func (suite *FinderEngineTestSuite) TestHandleReceipt_Processed() {
 // - storing receipt in receipts mempool
 // - no invocation of match engine
 // - no attempt on marking its result as processed
+// - receipt ID is added to the list of receipts pending for the associated block
 func (suite *FinderEngineTestSuite) TestHandleReceipt_BlockMissing() {
 	e := suite.TestNewFinderEngine()
 
@@ -209,6 +210,9 @@ func (suite *FinderEngineTestSuite) TestHandleReceipt_BlockMissing() {
 
 	// mocks block associated with receipt missing
 	suite.headerStorage.On("ByBlockID", suite.block.ID()).Return(nil, fmt.Errorf("block not available")).Once()
+
+	// mocks receipt ID added to pending receipts for block ID.
+	suite.receiptsByID.On("Append", suite.block.ID(), suite.receipt.ID()).Return(nil)
 
 	// should not be any attempt on sending result to match engine
 	suite.matchEng.AssertNotCalled(suite.T(), "Process", testifymock.Anything, testifymock.Anything)
