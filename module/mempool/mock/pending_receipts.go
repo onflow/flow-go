@@ -42,6 +42,29 @@ func (_m *PendingReceipts) All() []*verification.PendingReceipt {
 	return r0
 }
 
+// Get provides a mock function with given fields: preceiptID
+func (_m *PendingReceipts) Get(preceiptID flow.Identifier) (*verification.PendingReceipt, bool) {
+	ret := _m.Called(preceiptID)
+
+	var r0 *verification.PendingReceipt
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *verification.PendingReceipt); ok {
+		r0 = rf(preceiptID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*verification.PendingReceipt)
+		}
+	}
+
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
+		r1 = rf(preceiptID)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	return r0, r1
+}
+
 // Has provides a mock function with given fields: preceiptID
 func (_m *PendingReceipts) Has(preceiptID flow.Identifier) bool {
 	ret := _m.Called(preceiptID)
