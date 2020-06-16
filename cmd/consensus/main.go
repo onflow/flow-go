@@ -39,7 +39,6 @@ import (
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
 func main() {
@@ -71,9 +70,6 @@ func main() {
 		sync           *synchronization.Engine
 		conMetrics     module.ConsensusMetrics
 		mainMetrics    module.HotstuffMetrics
-
-		// TODO remove this
-		migrateDB bool
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -91,8 +87,6 @@ func main() {
 			flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor", timeout.DefaultConfig.TimeoutDecrease, "multiplicative decrease of timeout value in case of progress")
 			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", 0.6, "additional fraction of replica timeout that the primary will wait for votes")
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
-			// TODO remove this
-			flags.BoolVar(&migrateDB, "migrate-db", true, "whether or not to migrate the DB on startup")
 		}).
 		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
 			privateDKGData, err = loadDKGPrivateData(node.BaseConfig.BootstrapDir, node.NodeID)
@@ -138,16 +132,6 @@ func main() {
 		Module("hotstuff main metrics", func(node *cmd.FlowNodeBuilder) error {
 			mainMetrics = metrics.NewHotstuffCollector(flow.GetChainID())
 			return nil
-		}).
-		Module("database migration", func(node *cmd.FlowNodeBuilder) error {
-			if !migrateDB {
-				node.Logger.Info().Msg("skipping execution result index migration")
-				return nil
-			}
-			node.Logger.Info().Msg("starting execution result index migration...")
-			err := operation.IndexExecutionResultsByBlockID(node.DB)
-			node.Logger.Info().Msg("finished execution result index migration...")
-			return err
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			resultsDB := bstorage.NewExecutionResults(node.DB)

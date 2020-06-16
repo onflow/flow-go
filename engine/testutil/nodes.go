@@ -25,7 +25,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/engine/verification/finder"
-	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/engine/verification/match"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -330,8 +329,6 @@ func VerificationNode(t testing.TB,
 	assigner module.ChunkAssigner,
 	requestIntervalMs uint,
 	failureThreshold uint,
-	lightIngestEngine bool,
-	newArchitecture bool, // a temporary parameter to distinguish between old and new architecture
 	opts ...VerificationOpt) mock.VerificationNode {
 
 	var err error
@@ -343,38 +340,13 @@ func VerificationNode(t testing.TB,
 		apply(&node)
 	}
 
-	if node.AuthReceipts == nil {
-		node.AuthReceipts, err = stdmap.NewReceipts(1000)
+	if node.Receipts == nil {
+		node.Receipts, err = stdmap.NewReceipts(1000)
 		require.Nil(t, err)
 	}
 
 	if node.PendingReceipts == nil {
 		node.PendingReceipts, err = stdmap.NewPendingReceipts(1000)
-		require.Nil(t, err)
-	}
-
-	if node.AuthCollections == nil {
-		node.AuthCollections, err = stdmap.NewCollections(1000)
-		require.Nil(t, err)
-	}
-
-	if node.PendingCollections == nil {
-		node.PendingCollections, err = stdmap.NewPendingCollections(1000)
-		require.Nil(t, err)
-	}
-
-	if node.CollectionTrackers == nil {
-		node.CollectionTrackers, err = stdmap.NewCollectionTrackers(1000)
-		require.Nil(t, err)
-	}
-
-	if node.ChunkDataPacks == nil {
-		node.ChunkDataPacks, err = stdmap.NewChunkDataPacks(1000)
-		require.Nil(t, err)
-	}
-
-	if node.ChunkDataPackTrackers == nil {
-		node.ChunkDataPackTrackers, err = stdmap.NewChunkDataPackTrackers(1000)
 		require.Nil(t, err)
 	}
 
@@ -391,6 +363,11 @@ func VerificationNode(t testing.TB,
 		node.Chunks = match.NewChunks(1000)
 	}
 
+	if node.IngestedResultIDs == nil {
+		node.IngestedResultIDs, err = stdmap.NewIdentifiers(1000)
+		require.Nil(t, err)
+	}
+
 	if node.VerifierEngine == nil {
 		rt := runtime.NewInterpreterRuntime()
 		vm, err := virtualmachine.New(rt)
@@ -402,7 +379,7 @@ func VerificationNode(t testing.TB,
 		require.Nil(t, err)
 	}
 
-	if node.MatchEngine == nil && newArchitecture {
+	if node.MatchEngine == nil {
 		node.MatchEngine, err = match.New(node.Log,
 			node.Net,
 			node.Me,
@@ -412,83 +389,19 @@ func VerificationNode(t testing.TB,
 			node.State,
 			node.Chunks,
 			node.HeaderStorage,
-			1000*time.Millisecond,
+			time.Duration(requestIntervalMs)*time.Millisecond,
 			int(failureThreshold))
 		require.Nil(t, err)
 	}
 
-	if node.IngestedChunkIDs == nil {
-		node.IngestedChunkIDs, err = stdmap.NewIdentifiers(1000)
-		require.Nil(t, err)
-	}
-
-	if node.IngestedResultIDs == nil {
-		node.IngestedResultIDs, err = stdmap.NewIdentifiers(1000)
-		require.Nil(t, err)
-	}
-
-	if node.IngestedCollectionIDs == nil {
-		node.IngestedCollectionIDs, err = stdmap.NewIdentifiers(1000)
-		require.Nil(t, err)
-	}
-
-	if node.AssignedChunkIDs == nil {
-		node.AssignedChunkIDs, err = stdmap.NewIdentifiers(1000)
-		require.Nil(t, err)
-	}
-
-	// creates a light ingest engine for the node if lightIngestEngine is set
-	if node.LightIngestEngine == nil && lightIngestEngine && !newArchitecture {
-		node.LightIngestEngine, err = ingest.NewLightEngine(node.Log,
+	if node.FinderEngine == nil {
+		node.FinderEngine, err = finder.New(node.Log,
 			node.Net,
-			node.State,
 			node.Me,
-			node.VerifierEngine,
-			node.AuthReceipts,
-			node.AuthCollections,
-			node.ChunkDataPacks,
-			node.ChunkDataPackTrackers,
-			node.IngestedChunkIDs,
-			node.IngestedResultIDs,
-			node.AssignedChunkIDs,
-			node.IngestedCollectionIDs,
-			node.Headers,
-			node.Blocks,
-			assigner,
-			requestIntervalMs,
-			failureThreshold,
-		)
-		require.Nil(t, err)
-	}
-
-	// otherwise, creates an (original) ingest engine for the node
-	if node.IngestEngine == nil && !lightIngestEngine && !newArchitecture {
-		node.IngestEngine, err = ingest.New(node.Log,
-			node.Net,
-			node.State,
-			node.Me,
-			node.VerifierEngine,
-			node.AuthReceipts,
+			node.MatchEngine,
 			node.PendingReceipts,
-			node.AuthCollections,
-			node.PendingCollections,
-			node.CollectionTrackers,
-			node.ChunkDataPacks,
-			node.ChunkDataPackTrackers,
-			node.IngestedChunkIDs,
-			node.IngestedResultIDs,
-			node.IngestedCollectionIDs,
 			node.Headers,
-			node.Blocks,
-			assigner,
-			requestIntervalMs,
-			failureThreshold,
-		)
-		require.Nil(t, err)
-	}
-
-	if node.FinderEngine == nil && newArchitecture {
-		node.FinderEngine, err = finder.New(node.Log, node.Net, node.Me, node.MatchEngine, node.PendingReceipts, node.Headers, node.IngestedResultIDs)
+			node.IngestedResultIDs)
 		require.Nil(t, err)
 	}
 

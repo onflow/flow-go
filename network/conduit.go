@@ -3,6 +3,9 @@
 package network
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -19,4 +22,29 @@ type Conduit interface {
 	// nodes on its path across the network. The network codec needs to be aware
 	// of how to encode the given event type, otherwise the send will fail.
 	Submit(event interface{}, targetIDs ...flow.Identifier) error
+}
+
+// PeerUnreachableError is the error when submitting events to target fails due to the
+// target peer is unreachable
+type PeerUnreachableError struct {
+	Err error
+}
+
+func NewPeerUnreachableError(err error) error {
+	return PeerUnreachableError{
+		Err: err,
+	}
+}
+
+func (e PeerUnreachableError) Unwrap() error {
+	return e.Err
+}
+
+func (e PeerUnreachableError) Error() string {
+	return fmt.Sprintf("%v", e.Err)
+}
+
+func IsPeerUnreachableError(e error) bool {
+	var err PeerUnreachableError
+	return errors.As(e, &err)
 }
