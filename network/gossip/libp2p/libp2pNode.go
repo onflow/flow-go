@@ -238,16 +238,12 @@ func (p *P2PNode) tryCreateNewStream(ctx context.Context, n NodeAddress, targetI
 		// Add node address as a peer
 		err = p.AddPeers(ctx, n)
 		if err != nil {
-			p.logger.Warn().Str("target", targetID.String()).Err(err).
-				Int("retry_attempt", retries).Msg("could not create connection")
 			errs = multierror.Append(errs, err)
 			continue
 		}
 
 		s, err = p.libP2PHost.NewStream(ctx, targetID, flowLibP2PProtocolID)
 		if err != nil {
-			p.logger.Warn().Str("target", targetID.String()).Err(err).
-				Int("retry_attempt", retries).Msg("failed to create stream")
 			errs = multierror.Append(errs, err)
 			continue
 		}
