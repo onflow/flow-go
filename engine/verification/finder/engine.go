@@ -167,7 +167,7 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 		// no pending receipt for this block
 		return
 	}
-	// removes list of receipts for this block
+	// removes list of receipt ids for this block
 	ok = e.receiptsByBlock.Rem(block.BlockID)
 	if !ok {
 		e.log.Debug().
@@ -175,6 +175,7 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 			Msg("could not remove pending receipts from mempool")
 	}
 
+	// constructs list of receipts pending for this block
 	ers := make([]*verification.PendingReceipt, len(erIDs))
 	for index, erId := range erIDs {
 		er, ok := e.receipts.Get(erId)
