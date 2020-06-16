@@ -114,8 +114,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 
 	// creates a verification node with a real finder engine, and mock matching engine.
 	verNode := testutil.VerificationNode(t, hub, verID, identities,
-		assigner, requestInterval, failureThreshold, true,
-		true, testutil.WithMatchEngine(matchEng))
+		assigner, requestInterval, failureThreshold, testutil.WithMatchEngine(matchEng))
 
 	// the wait group tracks goroutines for each Execution Receipt sent to finder engine
 	var senderWG sync.WaitGroup
