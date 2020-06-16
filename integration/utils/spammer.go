@@ -224,6 +224,7 @@ func (cg *LoadGenerator) Next() error {
 					cg.accounts = append(cg.accounts, newAcc)
 				}
 			}
+
 		}
 		cg.step++
 	}
@@ -245,10 +246,9 @@ func languageEncodeBytes(b []byte) string {
 func waitForFinalized(ctx context.Context, c *client.Client, id flowsdk.Identifier) *flowsdk.TransactionResult {
 	result, err := c.GetTransactionResult(ctx, id)
 	// Handle(err)
-
 	fmt.Printf("Waiting for transaction %s to be finalized...\n", id)
 	errCount := 0
-	for result == nil || (result.Status != flowsdk.TransactionStatusFinalized && result.Status != flowsdk.TransactionStatusSealed) {
+	for result == nil || (result.Status != flowsdk.TransactionStatusFinalized && result.Status != flowsdk.TransactionStatusSealed) || len(result.Events) == 0 {
 		time.Sleep(time.Second)
 		result, err = c.GetTransactionResult(ctx, id)
 		if err != nil {
@@ -264,7 +264,6 @@ func waitForFinalized(ctx context.Context, c *client.Client, id flowsdk.Identifi
 		}
 		// Handle(err)
 	}
-
 	fmt.Println()
 	fmt.Printf("Transaction %s finalized\n", id)
 
