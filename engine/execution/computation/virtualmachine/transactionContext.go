@@ -2,9 +2,11 @@ package virtualmachine
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/rand"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -38,6 +40,7 @@ type TransactionContext struct {
 	restrictedAccountCreationEnabled bool
 	restrictedDeploymentEnabled      bool
 	simpleAddresses                  bool
+	rng                              *rand.Rand
 }
 
 type TransactionContextOption func(*TransactionContext)
@@ -410,6 +413,14 @@ func (r *TransactionContext) GetBlockAtHeight(height uint64) (hash runtime.Block
 			"unexpected failure of GetBlockAtHeight, tx ID %s, height %v: %w", r.tx.ID().String(), height, err)
 	}
 	return runtime.BlockHash(block.ID()), block.Header.Timestamp.UnixNano(), true, nil
+}
+
+// UnsafeRandom returns a random uint64, where the process of random number derivation is not cryptographically
+// secure.
+func (r *TransactionContext) UnsafeRandom() uint64 {
+	buf := make([]byte, 8)
+	_, _ = r.rng.Read(buf) // Always succeeds, no need to check error
+	return binary.LittleEndian.Uint64(buf)
 }
 
 // checkProgram checks the given code for syntactic and semantic correctness.

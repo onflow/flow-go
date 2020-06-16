@@ -48,7 +48,7 @@ func Test_Compactor(t *testing.T) {
 			checkpointer, err := wal.NewCheckpointer()
 			require.NoError(t, err)
 
-			compactor := NewCompactor(checkpointer, 5*time.Millisecond)
+			compactor := NewCompactor(checkpointer, 100*time.Millisecond)
 
 			// Run Compactor in background.
 			<-compactor.Ready()
@@ -86,7 +86,8 @@ func Test_Compactor(t *testing.T) {
 				require.NoError(t, err)
 
 				return to == from && from == 10 //make sure there is only one segment ahead of checkpoint
-			}, 2000*time.Millisecond, 100*time.Millisecond)
+				// this is disk-based operation after all, so give it big timeout
+			}, 15*time.Second, 100*time.Millisecond)
 
 			require.FileExists(t, path.Join(dir, "checkpoint.00000009"))
 

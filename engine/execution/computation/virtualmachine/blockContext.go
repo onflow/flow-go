@@ -3,6 +3,7 @@ package virtualmachine
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
@@ -39,6 +40,7 @@ type blockContext struct {
 	header          *flow.Header
 	blocks          Blocks
 	simpleAddresses bool
+	rng             *rand.Rand
 }
 
 func (bc *blockContext) newTransactionContext(
@@ -65,6 +67,7 @@ func (bc *blockContext) newTransactionContext(
 		restrictedAccountCreationEnabled: true,
 		restrictedDeploymentEnabled:      true,
 		simpleAddresses:                  bc.simpleAddresses,
+		rng:                              bc.rng,
 	}
 
 	for _, option := range options {
