@@ -107,7 +107,12 @@ func (b *Bootstrapper) BootstrapView(
 
 	service := createServiceAccount(ledger, serviceAccountPublicKey, simpleAddresses)
 
-	b.logger.Debug().Str("account_address", service.Short()).Msg("created service account")
+	publicKeyJSON, err := serviceAccountPublicKey.MarshalJSON()
+	if err != nil {
+		panic(fmt.Sprintf("cannot marshal public key: %s", err))
+	}
+
+	b.logger.Debug().Str("account_address", service.Short()).RawJSON("public_key", publicKeyJSON).Msg("created service account")
 
 	rt := runtime.NewInterpreterRuntime()
 	vm, err := virtualmachine.New(rt, virtualmachine.WithSimpleAddresses(simpleAddresses))

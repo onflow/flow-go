@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	sdk "github.com/onflow/flow-go-sdk"
@@ -74,7 +75,7 @@ var (
 			if let cap = account.getCapability(/public/counter) {
 				return cap.borrow<&Testing.Counter>()?.count ?? -3
 			}
-			return -3`, flow.ServiceAddress().Short()),
+			return -3`, flow.ServiceAddress().String()),
 	}
 
 	// CreateCounterPanicTx is a transaction script that creates a counter instance in the root account, but panics after
@@ -104,6 +105,8 @@ var (
 // readCounter executes a script to read the value of a counter. The counter
 // must have been deployed and created.
 func readCounter(ctx context.Context, client *testnet.Client) (int, error) {
+
+	spew.Dump(ReadCounterScript)
 
 	res, err := client.ExecuteScript(ctx, ReadCounterScript)
 	if err != nil {

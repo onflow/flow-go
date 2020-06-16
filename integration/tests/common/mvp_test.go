@@ -6,9 +6,11 @@ import (
 	"testing"
 	"time"
 
+	//sdk "github.com/onflow/flow-go-sdk"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	//"github.com/dapperlabs/flow-go/integration/convert"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -74,15 +76,22 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	cancel()
 	require.Error(t, err)
 
+	fmt.Printf("service address1: %s\n", flow.ServiceAddress().Short())
+
 	// deploy the contract
 	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
 	err = client.DeployContract(childCtx, genesis.ID(), CounterContract)
 	cancel()
 	require.NoError(t, err)
 
+	fmt.Printf("service address: %s\n", flow.ServiceAddress().Short())
+
 	// script executes eventually, but no counter instance is created
 	require.Eventually(t, func() bool {
 		childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
+
+		fmt.Printf("service address script: %s\n", flow.ServiceAddress().Short())
+
 		counter, err = readCounter(ctx, client)
 		cancel()
 		if err != nil {
@@ -91,12 +100,22 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 		return err == nil && counter == -3
 	}, 30*time.Second, time.Second)
 
-	tx := unittest.TransactionBodyFixture(
-		unittest.WithTransactionDSL(CreateCounterTx),
-		unittest.WithReferenceBlock(genesis.ID()),
-	)
+	//tx := unittest.TransactionBodyFixture(
+	//	unittest.WithTransactionDSL(CreateCounterTx),
+	//	unittest.WithReferenceBlock(genesis.ID()),
+	//)
+
+	//sdk.ServiceAddress(sdk.Mainnet)
+
+	tx := flow.NewTransactionBody().
+		SetScript(unittest.NoopTxScript()).
+		SetReferenceBlockID(genesis.ID()).
+		SetProposalKey(flow.ServiceAddress(), 0, 0).
+		SetPayer(flow.ServiceAddress()).
+		AddAuthorizer(flow.ServiceAddress())
+
 	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
-	err = client.SendTransaction(ctx, tx)
+	err = client.SendTransaction(ctx, *tx)
 	cancel()
 
 	require.NoError(t, err)

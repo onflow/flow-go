@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	//sdk "github.com/onflow/flow-go-sdk"
+
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/integration/client"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -17,6 +19,7 @@ import (
 type Client struct {
 	client *client.AccessClient
 	key    *flow.AccountPrivateKey
+	seqNo  uint64
 }
 
 // NewClientWithKey returns a new client to an Access API listening at the given
@@ -38,12 +41,28 @@ func NewClientWithKey(addr string, key *flow.AccountPrivateKey) (*Client, error)
 // NewClient returns a new client to an Access API listening at the given
 // address, with a generated account key for signing transactions.
 func NewClient(addr string) (*Client, error) {
-	key, err := unittest.AccountKeyFixture()
+	key := unittest.ServiceAccountPrivateKey
+
+	json, err := key.MarshalJSON()
 	if err != nil {
-		return nil, fmt.Errorf("could not generate key for client")
+		return nil, fmt.Errorf("cannot marshal key json: %w", err)
+	}
+	public := key.PublicKey(1000)
+	publicJson, err := public.MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("cannot marshal key json: %w", err)
 	}
 
-	return NewClientWithKey(addr, key)
+	fmt.Printf("New client with private key: \n%s\n", json)
+	fmt.Printf("and public key: \n%s\n", publicJson)
+
+	return NewClientWithKey(addr, &key)
+}
+
+func (c *Client) GetSeqNumber() uint64 {
+	n := c.seqNo
+	c.seqNo++
+	return n
 }
 
 // DeployContract submits a transaction to deploy a contract with the given
@@ -59,21 +78,27 @@ func (c *Client) DeployContract(ctx context.Context, refID flow.Identifier, cont
 		},
 	}
 
-	tx := unittest.TransactionBodyFixture(
-		unittest.WithTransactionDSL(code),
-		unittest.WithReferenceBlock(refID),
-	)
+	tx := flow.NewTransactionBody().
+		SetScript([]byte(code.ToCadence())).
+		SetReferenceBlockID(refID).
+		SetProposalKey(flow.ServiceAddress(), 0, c.GetSeqNumber()).
+		SetPayer(flow.ServiceAddress()).
+		AddAuthorizer(flow.ServiceAddress())
 
 	fmt.Printf("deploying tx ID %x:\n %s\n", tx.ID(), tx)
 
-	return c.SignAndSendTransaction(ctx, tx)
+	return c.SignAndSendTransaction(ctx, *tx)
 }
 
 // SignTransaction signs the transaction using the proposer's key
 func (c *Client) SignTransaction(tx flow.TransactionBody) (flow.TransactionBody, error) {
 
-	hasher := hash.NewSHA3_256()
-	err := tx.SignPayload(tx.Payer, tx.ProposalKey.KeyID, c.key.PrivateKey, hasher)
+	hasher, err := hash.NewHasher(c.key.HashAlgo)
+	if err != nil {
+		return flow.TransactionBody{}, err
+	}
+
+	err = tx.SignPayload(tx.Payer, tx.ProposalKey.KeyID, c.key.PrivateKey, hasher)
 	if err != nil {
 		return flow.TransactionBody{}, err
 	}
@@ -104,6 +129,8 @@ func (c *Client) SignAndSendTransaction(ctx context.Context, tx flow.Transaction
 }
 
 func (c *Client) ExecuteScript(ctx context.Context, script dsl.Main) ([]byte, error) {
+
+	fmt.Printf("address inside import: %s\n", script.Import.Address.Short())
 
 	code := script.ToCadence()
 
