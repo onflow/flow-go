@@ -1,8 +1,9 @@
-package utils
+package main
 
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"sync"
@@ -11,6 +12,7 @@ import (
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"google.golang.org/grpc"
 
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
@@ -270,8 +272,22 @@ func waitForFinalized(ctx context.Context, c *client.Client, id flowsdk.Identifi
 }
 
 func main() {
-	flowClient, err := client.New("localhost:9000", grpc.WithInsecure())
-	lg, err := NewLoadGenerator(flowClient, unittest.ServiceAccountPrivateKeyHex, string(flowsdk.Testnet), 10)
+	serviceAccountPrivateKeyBytes, err := hex.DecodeString(unittest.ServiceAccountPrivateKeyHex)
+	if err != nil {
+		panic("error while hex decoding hardcoded root key")
+	}
+
+	// RLP decode the key
+	ServiceAccountPrivateKey, err := flow.DecodeAccountPrivateKey(serviceAccountPrivateKeyBytes)
+	if err != nil {
+		panic("error while decoding hardcoded root key bytes")
+	}
+
+	// get the private key string
+	priv := hex.EncodeToString(ServiceAccountPrivateKey.PrivateKey.Encode())
+
+	flowClient, err := client.New("localhost:3569", grpc.WithInsecure())
+	lg, err := NewLoadGenerator(flowClient, priv, string(flowsdk.Testnet), 10)
 	if err != nil {
 		panic(err)
 	}
