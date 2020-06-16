@@ -14,7 +14,8 @@ type Address [AddressLength]byte
 
 // AddressGenerator represents the internal state of the address generation mechanism
 type AddressGenerator struct {
-	state uint64
+	state   uint64
+	chainID ChainID
 }
 
 // NewAddressGenerator returns a new AddressGenerator with an
@@ -85,6 +86,7 @@ func zeroAddress() Address {
 func ServiceAddress() Address {
 	// returned error is guaranteed to be nil
 	address, _ := AddressAtIndex(1)
+	fmt.Printf("getting service address: %s\n", address)
 	return address
 }
 
