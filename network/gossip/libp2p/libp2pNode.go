@@ -22,6 +22,8 @@ import (
 	"github.com/libp2p/go-tcp-transport"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
+
+	netwk "github.com/dapperlabs/flow-go/network"
 )
 
 // A unique Libp2p protocol ID for Flow (https://docs.libp2p.io/concepts/protocols/)
@@ -198,7 +200,7 @@ func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stre
 	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath if it exists)
 	stream, err := p.tryCreateNewStream(ctx, n, peerID, maxConnectAttempt)
 	if err != nil {
-		return nil, fmt.Errorf("could not create stream (name: %s, address: %s:%s): %w", n.Name, n.IP, n.Port, err)
+		return nil, netwk.NewPeerUnreachableError(fmt.Errorf("could not create stream (name: %s, address: %s:%s): %w", n.Name, n.IP, n.Port, err))
 	}
 	return stream, nil
 }
