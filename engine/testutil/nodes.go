@@ -368,6 +368,11 @@ func VerificationNode(t testing.TB,
 		require.Nil(t, err)
 	}
 
+	if node.ReceiptIDsByBlock == nil {
+		node.ReceiptIDsByBlock, err = stdmap.NewIdentifierMap(1000)
+		require.Nil(t, err)
+	}
+
 	if node.VerifierEngine == nil {
 		rt := runtime.NewInterpreterRuntime()
 		vm, err := virtualmachine.New(rt)
@@ -401,7 +406,8 @@ func VerificationNode(t testing.TB,
 			node.MatchEngine,
 			node.PendingReceipts,
 			node.Headers,
-			node.IngestedResultIDs)
+			node.IngestedResultIDs,
+			node.ReceiptIDsByBlock)
 		require.Nil(t, err)
 	}
 
