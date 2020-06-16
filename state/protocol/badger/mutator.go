@@ -11,6 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 type Mutator struct {
@@ -389,6 +390,10 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		err = operation.InsertBlockChildren(blockID, nil)(tx)
 		if err != nil {
 			return fmt.Errorf("could not initialize children index: %w", err)
+		}
+		err = procedure.IndexBlockChild(candidate.Header.ParentID, blockID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not add to parent index: %w", err)
 		}
 		return nil
 	})
