@@ -22,6 +22,20 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
+// TestHotStuffFollower is a test suite for the HotStuff Follower.
+// The main focus of this test suite is to test that the follower generates the expected callbacks to
+// module.Finalizer and hotstuff.FinalizationConsumer in the _specified order_. In this context, note that
+// the Follower internally has its own processing thread. Therefore, the test must be concurrency safe and
+// potentially wait a little bit until the Follower has asynchronously processed the submitted block
+// (functionality not natively supported by testify).
+// Furthermore, we want to ensure that calls are happening with a specified order. Therefore, we set up
+// our own concurrency safe `ExpectedRecord` and make testify compare the received values to the expected
+// record on each call to module.Finalizer and hotstuff.FinalizationConsumer.
+//
+// For this test, most of the Follower's injected components are mocked out.
+// As we test the mocked components separately, we assume here that they work according to specification.
+// Furthermore, we also assume that Forks works according to specification, i.e. that the determination of
+// finalized blocks is correct (which is also tested separately)
 func TestHotStuffFollower(t *testing.T) {
 	suite.Run(t, new(HotStuffFollowerSuite))
 }
@@ -45,6 +59,8 @@ type HotStuffFollowerSuite struct {
 	expectedUpdaterRecord  *ExpectedRecord
 }
 
+// SetupTest initializes all the components needed for the Follower.
+// The follower itself is instantiated in method BeforeTest
 func (s *HotStuffFollowerSuite) SetupTest() {
 	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
 	s.mockConsensus = &MockConsensus{identities: identities}
@@ -84,8 +100,6 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 
 	// mock finalization updater
 	s.verifier = &mockhotstuff.Verifier{}
-	//s.verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-	//s.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 	s.verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 	s.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
@@ -122,6 +136,7 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 	s.pending = []*flow.Header{}
 }
 
+// BeforeTest instantiates and starts Follower
 func (s *HotStuffFollowerSuite) BeforeTest(suiteName, testName string) {
 	s.expectedNotifierRecord.AppendRecord("OnBlockIncorporated", s.rootHeader)
 
@@ -147,6 +162,7 @@ func (s *HotStuffFollowerSuite) BeforeTest(suiteName, testName string) {
 	}
 }
 
+// AfterTest stops follower
 func (s *HotStuffFollowerSuite) AfterTest(suiteName, testName string) {
 	select {
 	case <-s.follower.Done():
@@ -158,7 +174,7 @@ func (s *HotStuffFollowerSuite) AfterTest(suiteName, testName string) {
 // TestFollowerInitialization verifies that the basic test setup with initialization of the Follower works as expected
 func (s *HotStuffFollowerSuite) TestFollowerInitialization() {
 	// we expect no additional calls to s.updater or s.notifier
-	s.requireForExpectedRecords()
+	s.requireExpectedRecords()
 }
 
 // TestFollowerProcessBlock verifies that when submitting a single valid block (child root block),
@@ -170,10 +186,12 @@ func (s *HotStuffFollowerSuite) TestFollowerProcessBlock() {
 	s.expectedNotifierRecord.AppendRecord("OnBlockIncorporated", nextBlock)
 	s.expectedUpdaterRecord.AppendRecord("MakePending", nextBlock)
 	s.follower.SubmitProposal(nextBlock, rootBlockView)
-	s.requireForExpectedRecords()
+	s.requireExpectedRecords()
 }
 
-func (s *HotStuffFollowerSuite) requireForExpectedRecords() {
+// requireExpectedRecords verifies that _exactly_ the required records for
+// s.updater.MakePending and s.notifier.OnBlockIncorporated were produced
+func (s *HotStuffFollowerSuite) requireExpectedRecords() {
 	select {
 	case <-s.expectedNotifierRecord.AllRecordsRecalled():
 	case <-time.After(time.Second):
@@ -185,40 +203,6 @@ func (s *HotStuffFollowerSuite) requireForExpectedRecords() {
 		s.T().Error("timeout on waiting for expected Notifier calls")
 	}
 }
-
-//func (s *HotStuffFollowerSuite) TestFollowerProcessBlock() {
-//	fmt.Println("foo")
-//	rootBlockView := s.rootHeader.View
-//	nextBlock := s.mockConsensus.extendBlock(rootBlockView+1, s.rootHeader)
-//
-//	s.expectedNotifierRecord.AppendRecord("OnBlockIncorporated", nextBlock)
-//	s.expectedUpdaterRecord.AppendRecord("MakePending", nextBlock)
-//	s.follower.SubmitProposal(nextBlock, rootBlockView)
-//
-//	select {
-//	case <-s.expectedNotifierRecord.AllRecordsRecalled():
-//	case <-time.After(time.Second):
-//		s.T().Error("timeout on waiting for expected Notifier calls")
-//	}
-//}
-
-//func (s *HotStuffFollowerSuite) TestFollowerInitialization() {
-//	fmt.Println("foo")
-//	parentView := s.rootHeader.View
-//	nextBlock := unittest.BlockHeaderWithParentFixture(s.rootHeader)
-//	s.follower.SubmitProposal(&nextBlock, parentView)
-//
-//	//s.T().
-//	print("done")
-//	require.Equal(s.T(), 100, s.a)
-//	//// construct ForkChoice
-//	//s.notifier.On("OnQcIncorporated", root.QC).Return().Once()
-//	//fc, err := NewNewestForkChoice(fnlzr, notifier)
-//	//require.NoError(t, err)
-//	//
-//	//s.notifier.AssertExpectations(s.T())
-//
-//}
 
 //func qc(view uint64, id flow.Identifier) *model.QuorumCertificate {
 //	return &model.QuorumCertificate{View: view, BlockID: id}
