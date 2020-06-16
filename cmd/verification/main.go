@@ -62,6 +62,7 @@ func main() {
 		pendingReceipts     *stdmap.PendingReceipts
 		pendingResults      *stdmap.PendingResults
 		conCache            *buffer.PendingBlocks
+		receiptIDsByBlock   *stdmap.IdentifierMap
 		matchChunks         *match.Chunks
 		headerStorage       *storage.Headers
 		processedResultsIDs *stdmap.Identifiers
@@ -92,6 +93,14 @@ func main() {
 			if err != nil {
 				return fmt.Errorf("could not register backend metric: %w", err)
 			}
+			return nil
+		}).
+		Module("pending receipt ids by block mempool", func(node *cmd.FlowNodeBuilder) error {
+			receiptIDsByBlock, err = stdmap.NewIdentifierMap(receiptLimit)
+			if err != nil {
+				return err
+			}
+			// TODO needs a metric registration
 			return nil
 		}).
 		Module("pending results mempool", func(node *cmd.FlowNodeBuilder) error {
@@ -152,7 +161,8 @@ func main() {
 				matchEng,
 				pendingReceipts,
 				headerStorage,
-				processedResultsIDs)
+				processedResultsIDs,
+				receiptIDsByBlock)
 			return finderEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
