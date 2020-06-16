@@ -61,4 +61,22 @@ func TestIdentiferMap(t *testing.T) {
 		assert.NotContains(t, ids, id2)
 	})
 
+	// tests against removing a key
+	t.Run("removing key", func(t *testing.T) {
+		ok := idMap.Rem(key1)
+		require.True(t, ok)
+
+		// getting removed key should return false
+		ids, ok := idMap.Get(key1)
+		require.False(t, ok)
+		require.Nil(t, ids)
+
+		// checks the existence of  id1 for key2
+		// removing key1 should not alter key2
+		ids, ok = idMap.Get(key2)
+		require.True(t, ok)
+		assert.Contains(t, ids, id1)
+		assert.NotContains(t, ids, id2)
+	})
+
 }
