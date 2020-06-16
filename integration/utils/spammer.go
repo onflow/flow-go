@@ -78,6 +78,7 @@ func NewLoadGenerator(fclient *client.Client,
 	// generate addresses
 	addressGen := flowsdk.NewAddressGenerator(flowsdk.ChainID(chainID))
 	servAccAddress := addressGen.NextAddress()
+	fmt.Println("service account: ", servAccAddress)
 	fungibleTokenAddress := addressGen.NextAddress()
 	flowTokenAddress := addressGen.NextAddress()
 
