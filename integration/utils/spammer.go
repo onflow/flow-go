@@ -56,6 +56,7 @@ type LoadGenerator struct {
 	accounts             []*flowAccount
 	step                 int
 	addressGen           *flowsdk.AddressGenerator
+	txTracker            *txTracker
 }
 
 // In case we have to creat the client
@@ -84,6 +85,11 @@ func NewLoadGenerator(fclient *client.Client,
 		return nil, fmt.Errorf("service account addresses doesn't match %v != %v", servAccAddress, servAcc.address)
 	}
 
+	txTracker, err := newTxTracker(1000)
+	if err != nil {
+		return nil, err
+	}
+
 	lGen := &LoadGenerator{
 		numberOfAccounts:     numberOfAccounts,
 		flowClient:           fclient,
@@ -93,6 +99,7 @@ func NewLoadGenerator(fclient *client.Client,
 		accounts:             make([]*flowAccount, 0),
 		step:                 0,
 		addressGen:           addressGen,
+		txTracker:            txTracker,
 	}
 	return lGen, nil
 }
@@ -180,7 +187,7 @@ func (cg *LoadGenerator) Next() error {
 				FromPrivateKey(privKey).
 				SetHashAlgo(crypto.SHA3_256).
 				SetWeight(flowsdk.AccountKeyWeightThreshold)
-			signer := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
+			// signer := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
 			createAccountScript, err := templates.CreateAccount([]*flowsdk.AccountKey{accountKey}, nil)
 			// Generate an account creation script
 			examples.Handle(err)
@@ -203,27 +210,31 @@ func (cg *LoadGenerator) Next() error {
 
 			createAccountTxID := createAccountTx.ID()
 
-			accountCreationTxRes := waitForFinalized(context.Background(), cg.flowClient, createAccountTxID)
-			examples.Handle(accountCreationTxRes.Error)
+			cg.txTracker.addTx(createAccountTxID, cg.serviceAccount.address, nil, nil, nil)
+			// accountCreationTxRes := waitForFinalized(context.Background(), cg.flowClient, createAccountTxID)
+			// examples.Handle(accountCreationTxRes.Error)
 
 			fmt.Println("<<<", i)
-			// Successful Tx, increment sequence number
-			accountAddress := flowsdk.Address{}
-			for _, event := range accountCreationTxRes.Events {
-				fmt.Println(event)
+			// // Successful Tx, increment sequence number
+			// accountAddress := flowsdk.Address{}
 
-				if event.Type == flowsdk.EventAccountCreated {
-					accountCreatedEvent := flowsdk.AccountCreatedEvent(event)
-					accountAddress = accountCreatedEvent.Address()
-					newAcc := newFlowAccount(accountAddress, accountKey, signer)
-					cg.accounts = append(cg.accounts, newAcc)
-				}
-			}
+			// for _, event := range accountCreationTxRes.Events {
+			// 	fmt.Println(event)
+
+			// 	if event.Type == flowsdk.EventAccountCreated {
+			// 		accountCreatedEvent := flowsdk.AccountCreatedEvent(event)
+			// 		accountAddress = accountCreatedEvent.Address()
+			// 		newAcc := newFlowAccount(accountAddress, accountKey, signer)
+			// 		cg.accounts = append(cg.accounts, newAcc)
+			// 	}
+			// }
 			fmt.Println(">>", i)
 		}
 		cg.step++
 	}
 
+	// wait for all
+	time.Sleep(time.Second * 150)
 	fmt.Println("load generator step 2 done")
 	// TODO else do the transfers
 	return nil
@@ -237,6 +248,105 @@ func languageEncodeBytes(b []byte) string {
 
 	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
 }
+
+type txInFlight struct {
+	txID                flowsdk.Identifier
+	lastStatus          flowsdk.TransactionStatus
+	proposer            flowsdk.Address
+	onErrorCallback     func(flowsdk.Identifier, error)
+	onSealCallback      func(flowsdk.Identifier, *flowsdk.TransactionResult)
+	onFinalizedCallback func(flowsdk.Identifier, *flowsdk.TransactionResult)
+}
+
+type txTracker struct {
+	client *client.Client
+	txs    chan *txInFlight
+}
+
+// TODO pass port
+func newTxTracker(maxCap int) (*txTracker, error) {
+	fclient, err := client.New("localhost:3569", grpc.WithInsecure())
+	if err != nil {
+		return nil, err
+	}
+	txt := &txTracker{client: fclient,
+		txs: make(chan *txInFlight, maxCap),
+	}
+	go txt.run()
+	return txt, nil
+}
+
+func (txt *txTracker) addTx(txID flowsdk.Identifier,
+	proposer flowsdk.Address,
+	onErrorCallback func(flowsdk.Identifier, error),
+	onSealCallback func(flowsdk.Identifier, *flowsdk.TransactionResult),
+	onFinalizedCallback func(flowsdk.Identifier, *flowsdk.TransactionResult),
+) {
+	result, _ := txt.client.GetTransactionResult(context.Background(), txID)
+	// TODO deal with error
+	newTx := &txInFlight{txID: txID,
+		lastStatus:          result.Status,
+		proposer:            proposer,
+		onErrorCallback:     onErrorCallback,
+		onSealCallback:      onSealCallback,
+		onFinalizedCallback: onFinalizedCallback,
+	}
+	fmt.Println("tx added ", txID)
+	txt.txs <- newTx
+}
+
+// TODO proper ready/done
+func (txt *txTracker) stop() {
+	close(txt.txs)
+}
+
+func (txt *txTracker) run() {
+	for tx := range txt.txs {
+		fmt.Println("req sent for tx ", tx.txID)
+		result, err := txt.client.GetTransactionResult(context.Background(), tx.txID)
+		// TODO deal with error properly
+		if err != nil {
+			fmt.Println(err)
+		}
+		if result != nil {
+			// if change in status
+			if tx.lastStatus != result.Status {
+				switch result.Status {
+				case flowsdk.TransactionStatusFinalized:
+					if tx.onFinalizedCallback != nil {
+						go tx.onFinalizedCallback(tx.txID, result)
+					}
+				case flowsdk.TransactionStatusSealed:
+					if tx.onSealCallback != nil {
+						go tx.onSealCallback(tx.txID, result)
+					}
+					continue
+				}
+			}
+
+		}
+		// put it back
+		txt.txs <- tx
+		// TODO get rid of this
+		time.Sleep(time.Second / 10)
+	}
+	fmt.Println("finished!")
+}
+
+// TODO use context deadlines
+
+// // TransactionStatusUnknown indicates that the transaction status is not known.
+// TransactionStatusUnknown TransactionStatus = iota
+// // TransactionStatusPending is the status of a pending transaction.
+// TransactionStatusPending
+// // TransactionStatusFinalized is the status of a finalized transaction.
+// TransactionStatusFinalized
+// // TransactionStatusExecuted is the status of an executed transaction.
+// TransactionStatusExecuted
+// // TransactionStatusSealed is the status of a sealed transaction.
+// TransactionStatusSealed
+// // TransactionStatusExpired is the status of an expired transaction.
+// TransactionStatusExpired
 
 func waitForFinalized(ctx context.Context, c *client.Client, id flowsdk.Identifier) *flowsdk.TransactionResult {
 	result, err := c.GetTransactionResult(ctx, id)
