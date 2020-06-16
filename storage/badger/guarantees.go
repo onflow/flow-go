@@ -61,5 +61,7 @@ func (g *Guarantees) Store(guarantee *flow.CollectionGuarantee) error {
 }
 
 func (g *Guarantees) ByCollectionID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
-	return g.retrieveTx(collID)(g.db.NewTransaction(false))
+	tx := g.db.NewTransaction(false)
+	defer tx.Discard()
+	return g.retrieveTx(collID)(tx)
 }

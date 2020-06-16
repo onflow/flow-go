@@ -60,5 +60,7 @@ func (t *Transactions) Store(flowTx *flow.TransactionBody) error {
 }
 
 func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error) {
-	return t.retrieveTx(txID)(t.db.NewTransaction(false))
+	tx := t.db.NewTransaction(false)
+	defer tx.Discard()
+	return t.retrieveTx(txID)(tx)
 }

@@ -64,7 +64,9 @@ func (s *Seals) Store(seal *flow.Seal) error {
 }
 
 func (s *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {
-	return s.retrieveTx(sealID)(s.db.NewTransaction(false))
+	tx := s.db.NewTransaction(false)
+	defer tx.Discard()
+	return s.retrieveTx(sealID)(tx)
 }
 
 func (s *Seals) ByBlockID(blockID flow.Identifier) (*flow.Seal, error) {

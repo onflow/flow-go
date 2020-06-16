@@ -121,5 +121,7 @@ func (p *Payloads) Store(blockID flow.Identifier, payload *flow.Payload) error {
 }
 
 func (p *Payloads) ByBlockID(blockID flow.Identifier) (*flow.Payload, error) {
-	return p.retrieveTx(blockID)(p.db.NewTransaction(false))
+	tx := p.db.NewTransaction(false)
+	defer tx.Discard()
+	return p.retrieveTx(blockID)(tx)
 }

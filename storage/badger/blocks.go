@@ -64,7 +64,9 @@ func (b *Blocks) Store(block *flow.Block) error {
 }
 
 func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
-	return b.retrieveTx(blockID)(b.db.NewTransaction(false))
+	tx := b.db.NewTransaction(false)
+	defer tx.Discard()
+	return b.retrieveTx(blockID)(tx)
 }
 
 func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {

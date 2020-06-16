@@ -60,5 +60,7 @@ func (cp *ClusterPayloads) Store(blockID flow.Identifier, payload *cluster.Paylo
 }
 
 func (cp *ClusterPayloads) ByBlockID(blockID flow.Identifier) (*cluster.Payload, error) {
-	return cp.retrieveTx(blockID)(cp.db.NewTransaction(false))
+	tx := cp.db.NewTransaction(false)
+	defer tx.Discard()
+	return cp.retrieveTx(blockID)(tx)
 }

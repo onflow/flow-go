@@ -64,5 +64,7 @@ func (i *Index) Store(blockID flow.Identifier, index *flow.Index) error {
 }
 
 func (i *Index) ByBlockID(blockID flow.Identifier) (*flow.Index, error) {
-	return i.retrieveTx(blockID)(i.db.NewTransaction(false))
+	tx := i.db.NewTransaction(false)
+	defer tx.Discard()
+	return i.retrieveTx(blockID)(tx)
 }

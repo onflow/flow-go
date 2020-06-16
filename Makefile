@@ -41,7 +41,7 @@ install-tools: crypto/relic/build check-go-version
 	cd ${GOPATH}; \
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@v1.9.0; \
-	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@v0.0.0-20181123154057-e78b021dcbb5; \
+	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@v1.1.2; \
 	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1; \
 	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master;
 
@@ -315,10 +315,10 @@ docker-run-access:
 docker-run-ghost:
 	docker run -p 9000:9000 -p 3569:3569 gcr.io/dl-flow/ghost:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries ghost-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
 
-# Check if the go version is 1.13. flow-go only supports go 1.13
+# Check if the go version is 1.13 or higher. flow-go only supports go 1.13 and up.
 .PHONY: check-go-version
 check-go-version:
-	go version | grep 1.13
+	go version | grep 1.13 || go version | grep 1.14
 
 #----------------------------------------------------------------------
 # CD COMMANDS

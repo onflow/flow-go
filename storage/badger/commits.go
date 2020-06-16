@@ -61,5 +61,7 @@ func (c *Commits) Store(blockID flow.Identifier, commit flow.StateCommitment) er
 }
 
 func (c *Commits) ByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {
-	return c.retrieveTx(blockID)(c.db.NewTransaction(false))
+	tx := c.db.NewTransaction(false)
+	defer tx.Discard()
+	return c.retrieveTx(blockID)(tx)
 }

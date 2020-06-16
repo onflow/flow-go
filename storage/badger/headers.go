@@ -66,7 +66,9 @@ func (h *Headers) Store(header *flow.Header) error {
 }
 
 func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
-	return h.retrieveTx(blockID)(h.db.NewTransaction(false))
+	tx := h.db.NewTransaction(false)
+	defer tx.Discard()
+	return h.retrieveTx(blockID)(tx)
 }
 
 func (h *Headers) ByHeight(height uint64) (*flow.Header, error) {

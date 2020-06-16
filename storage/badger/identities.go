@@ -62,5 +62,7 @@ func (i *Identities) Store(identity *flow.Identity) error {
 }
 
 func (i *Identities) ByNodeID(nodeID flow.Identifier) (*flow.Identity, error) {
-	return i.retrieveTx(nodeID)(i.db.NewTransaction(false))
+	tx := i.db.NewTransaction(false)
+	defer tx.Discard()
+	return i.retrieveTx(nodeID)(tx)
 }
