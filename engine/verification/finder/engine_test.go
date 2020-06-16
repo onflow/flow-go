@@ -30,13 +30,12 @@ type FinderEngineTestSuite struct {
 	// mock conduit for receiving receipts
 	receiptsConduit *network.Conduit
 
-	// mock mempool for receipts
-	receipts *mempool.PendingReceipts
-
-	// mock mempool for processed result IDs
+	// mock mempools
+	receipts           *mempool.PendingReceipts
 	processedResultIDs *mempool.Identifiers
-	// mock mempool for header storage of blocks
-	headerStorage *storage.Headers
+	receiptsByID       *mempool.IdentifierMap
+	headerStorage      *storage.Headers
+
 	// resources fixtures
 	collection     *flow.Collection
 	block          *flow.Block
@@ -68,6 +67,7 @@ func (suite *FinderEngineTestSuite) SetupTest() {
 	suite.headerStorage = &storage.Headers{}
 	suite.receipts = &mempool.PendingReceipts{}
 	suite.processedResultIDs = &mempool.Identifiers{}
+	suite.receiptsByID = &mempool.IdentifierMap{}
 	suite.matchEng = &network.Engine{}
 
 	// generates an execution result with a single collection, chunk, and transaction.
@@ -105,7 +105,8 @@ func (suite *FinderEngineTestSuite) TestNewFinderEngine() *finder.Engine {
 		suite.matchEng,
 		suite.receipts,
 		suite.headerStorage,
-		suite.processedResultIDs)
+		suite.processedResultIDs,
+		suite.receiptsByID)
 	require.Nil(suite.T(), err, "could not create finder engine")
 
 	suite.net.AssertExpectations(suite.T())
