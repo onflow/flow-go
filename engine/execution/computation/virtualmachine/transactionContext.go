@@ -321,7 +321,7 @@ func (r *TransactionContext) ResolveImport(location runtime.Location) ([]byte, e
 	}
 
 	if code == nil {
-		return nil, fmt.Errorf("no code deployed at address %s", address.Bytes())
+		return nil, fmt.Errorf("no code deployed at address %s", address)
 	}
 
 	return code, nil
