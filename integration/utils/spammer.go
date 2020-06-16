@@ -214,10 +214,6 @@ func (cg *LoadGenerator) Next() error {
 
 			// Successful Tx, increment sequence number
 			accountAddress := flowsdk.Address{}
-			for len(accountCreationTxRes.Events) == 0 {
-				accountCreationTxRes = waitForFinalized(ctx, cg.flowClient, createAccountTxID)
-			}
-
 			for _, event := range accountCreationTxRes.Events {
 				fmt.Println(event)
 
