@@ -129,7 +129,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	// currently, only accept blocks that come from our local consensus
 	localID := e.me.NodeID()
 	if originID != localID {
-		return engine.NewInvalidInputf("non-local block (nodeID: %x)", originID)
+		return engine.NewInvalidInputErrorf("non-local block (nodeID: %x)", originID)
 	}
 
 	// get all non-consensus nodes in the system

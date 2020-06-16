@@ -342,18 +342,18 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	// TODO check the origin is a node that we requested before
 	sender, err := e.state.Final().Identity(originID)
 	if err == storage.ErrNotFound {
-		return engine.NewInvalidInputf("origin is unstaked: %v", originID)
+		return engine.NewInvalidInputErrorf("origin is unstaked: %v", originID)
 	} else if err != nil {
 		return fmt.Errorf("could not find identity for chunkID %v: %w", chunkID, err)
 	}
 
 	if sender.Role != flow.RoleExecution {
-		return engine.NewInvalidInput("receives chunk data pack from a non-execution node")
+		return engine.NewInvalidInputError("receives chunk data pack from a non-execution node")
 	}
 
 	status, exists := e.chunks.ByID(chunkID)
 	if !exists {
-		return engine.NewInvalidInputf("chunk does not exist, chunkID: %v", chunkID)
+		return engine.NewInvalidInputErrorf("chunk does not exist, chunkID: %v", chunkID)
 	}
 
 	// TODO: verify the collection ID matches with the collection guarantee in the block payload
@@ -361,14 +361,14 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	// remove first to ensure concurrency issue
 	removed := e.chunks.Rem(chunkDataPack.ChunkID)
 	if !removed {
-		return engine.NewInvalidInputf("chunk has been removed, chunkID: %v", chunkID)
+		return engine.NewInvalidInputErrorf("chunk has been removed, chunkID: %v", chunkID)
 	}
 
 	resultID := status.ExecutionResultID
 	result, exists := e.results.ByID(resultID)
 	if !exists {
 		// result no longer exists
-		return engine.NewInvalidInputf("execution result ID no longer exist: %v, for chunkID :%v", status.ExecutionResultID, chunkID)
+		return engine.NewInvalidInputErrorf("execution result ID no longer exist: %v, for chunkID :%v", status.ExecutionResultID, chunkID)
 	}
 
 	blockID := result.ExecutionResult.ExecutionResultBody.BlockID

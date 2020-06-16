@@ -5,44 +5,38 @@ import (
 	"fmt"
 )
 
-// InvalidInput are the type for input errors. It's useful to distinguish
+// InvalidInputError are the type for input errors. It's useful to distinguish
 // errors from exceptions.
 // By distinguishing errors from exception using different type, we can log them
-// differently. For instance, log InvalidInput error as a warning log, and log
+// differently.
+// For instance, log InvalidInputError error as a warning log, and log
 // other error as an error log.
 // You can use this struct as an customized error type directly or
 // create a function to reuse a certain error type, just like ErrorExecutionResultExist
-type InvalidInput struct {
-	Msg string
-	Err error
+type InvalidInputError struct {
+	err error
 }
 
-func NewInvalidInput(msg string) error {
-	return InvalidInput{
-		Msg: msg,
+func NewInvalidInputError(msg string) error {
+	return NewInvalidInputErrorf(msg)
+}
+
+func NewInvalidInputErrorf(msg string, args ...interface{}) error {
+	return InvalidInputError{
+		err: fmt.Errorf(msg, args...),
 	}
 }
 
-func NewInvalidInputf(msg string, args ...interface{}) error {
-	return NewInvalidInput(fmt.Sprintf(msg, args...))
+func (e InvalidInputError) Unwrap() error {
+	return e.err
 }
 
-func (e InvalidInput) Unwrap() error {
-	return e.Err
+func (e InvalidInputError) Error() string {
+	return e.err.Error()
 }
 
-func (e InvalidInput) Error() string {
-	if e.Err != nil {
-		if e.Msg == "" {
-			return fmt.Sprintf("%v", e.Err)
-		}
-		return fmt.Sprintf("%v, err: %v", e.Msg, e.Err)
-	}
-	return e.Msg
-}
-
-// IsInvalidInputError returns whether the given error is a InvalidInput error
+// IsInvalidInputError returns whether the given error is an InvalidInputError error
 func IsInvalidInputError(err error) bool {
-	var errInvalidInput InvalidInput
-	return errors.As(err, &errInvalidInput)
+	var errInvalidInputError InvalidInputError
+	return errors.As(err, &errInvalidInputError)
 }

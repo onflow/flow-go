@@ -130,7 +130,7 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	// ensure there is at least one guarantor
 	guarantors := guarantee.SignerIDs
 	if len(guarantors) == 0 {
-		return engine.NewInvalidInput("invalid collection guarantee with no guarantors")
+		return engine.NewInvalidInputError("invalid collection guarantee with no guarantors")
 	}
 
 	// get the identity of the origin node, so we can check if it's a valid
@@ -146,7 +146,7 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	// between consensus nodes anyway; we do no processing or validation in this
 	// engine beyond validating the origin
 	if identity.Role != flow.RoleCollection {
-		return engine.NewInvalidInputf("invalid origin node role (%s)", identity.Role)
+		return engine.NewInvalidInputErrorf("invalid origin node role (%s)", identity.Role)
 	}
 
 	// ensure that collection has not expired
@@ -162,7 +162,7 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	}
 	cluster, ok := clusters.ByNodeID(guarantors[0])
 	if !ok {
-		return engine.NewInvalidInputf("guarantor (id=%s) does not exist in any cluster", guarantors[0])
+		return engine.NewInvalidInputErrorf("guarantor (id=%s) does not exist in any cluster", guarantors[0])
 	}
 
 	// NOTE: Eventually we should check the signatures, ensure a quorum of the
@@ -175,7 +175,7 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	for _, guarantorID := range guarantors {
 		_, exists := cluster.ByNodeID(guarantorID)
 		if !exists {
-			return engine.NewInvalidInput("inconsistent guarantors from different clusters")
+			return engine.NewInvalidInputError("inconsistent guarantors from different clusters")
 		}
 	}
 
@@ -198,7 +198,7 @@ func (e *Engine) validateExpiry(guarantee *flow.CollectionGuarantee) error {
 	}
 	ref, err := e.headers.ByBlockID(guarantee.ReferenceBlockID)
 	if errors.Is(err, storage.ErrNotFound) {
-		return engine.NewInvalidInputf("collection guarantee refers to an unknown block: %x", guarantee.ReferenceBlockID)
+		return engine.NewInvalidInputErrorf("collection guarantee refers to an unknown block: %x", guarantee.ReferenceBlockID)
 	}
 
 	// if head has advanced beyond the block referenced by the collection guarantee by more than 'expiry' number of blocks,
@@ -209,7 +209,7 @@ func (e *Engine) validateExpiry(guarantee *flow.CollectionGuarantee) error {
 		diff = 0
 	}
 	if diff > flow.DefaultTransactionExpiry {
-		return engine.NewInvalidInputf("collection guarantee expired ref_height=%d final_height=%d", ref.Height, final.Height)
+		return engine.NewInvalidInputErrorf("collection guarantee expired ref_height=%d final_height=%d", ref.Height, final.Height)
 	}
 
 	return nil

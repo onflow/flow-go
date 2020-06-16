@@ -24,27 +24,27 @@ type Conduit interface {
 	Submit(event interface{}, targetIDs ...flow.Identifier) error
 }
 
-// PeerUnreachable is the error when submitting events to target fails due to the
+// PeerUnreachableError is the error when submitting events to target fails due to the
 // target peer is unreachable
-type PeerUnreachable struct {
+type PeerUnreachableError struct {
 	Err error
 }
 
-func NewPeerUnreachable(err error) error {
-	return PeerUnreachable{
+func NewPeerUnreachableError(err error) error {
+	return PeerUnreachableError{
 		Err: err,
 	}
 }
 
-func (e PeerUnreachable) Unwrap() error {
+func (e PeerUnreachableError) Unwrap() error {
 	return e.Err
 }
 
-func (e PeerUnreachable) Error() string {
+func (e PeerUnreachableError) Error() string {
 	return fmt.Sprintf("%v", e.Err)
 }
 
 func IsPeerUnreachableError(e error) bool {
-	var err PeerUnreachable
+	var err PeerUnreachableError
 	return errors.As(e, &err)
 }
