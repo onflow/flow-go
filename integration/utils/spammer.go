@@ -202,16 +202,15 @@ func (cg *LoadGenerator) Next() error {
 			cg.serviceAccount.accountKey.SequenceNumber++
 			cg.step++
 
-			ctx := context.Background()
-
-			err = cg.flowClient.SendTransaction(ctx, *createAccountTx)
+			err = cg.flowClient.SendTransaction(context.Background(), *createAccountTx)
 			examples.Handle(err)
 
 			createAccountTxID := createAccountTx.ID()
 
-			accountCreationTxRes := waitForFinalized(ctx, cg.flowClient, createAccountTxID)
+			accountCreationTxRes := waitForFinalized(context.Background(), cg.flowClient, createAccountTxID)
 			examples.Handle(accountCreationTxRes.Error)
 
+			fmt.Println("<<<", i)
 			// Successful Tx, increment sequence number
 			accountAddress := flowsdk.Address{}
 			for _, event := range accountCreationTxRes.Events {
@@ -224,7 +223,7 @@ func (cg *LoadGenerator) Next() error {
 					cg.accounts = append(cg.accounts, newAcc)
 				}
 			}
-
+			fmt.Println(">>", i)
 		}
 		cg.step++
 	}
