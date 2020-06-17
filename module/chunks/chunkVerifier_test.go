@@ -219,7 +219,7 @@ func (bc *blockContextMock) Parse(i fvm.Invokable, ledger fvm.Ledger) (fvm.Invok
 
 func (bc *blockContextMock) Invoke(i fvm.Invokable, ledger fvm.Ledger) (*fvm.InvocationResult, error) {
 
-	invokableTx, ok := i.(*fvm.InvokableTransaction)
+	invokableTx, ok := i.(fvm.InvokableTransaction)
 	if !ok {
 		return nil, fmt.Errorf("invokable is not a transaction")
 	}
