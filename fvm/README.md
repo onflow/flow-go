@@ -141,6 +141,7 @@ is reused for multiple invocations, each of which is supplied with a unique `Hos
   - [ ] Address generation
   - [ ] Account management
   - [ ] Bootstrapping
+  - [ ] Ledger usage
 
 ## Open Questions
 
