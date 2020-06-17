@@ -288,7 +288,7 @@ func (e *transactionEnv) GetComputationLimit() uint64 {
 }
 
 func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
-	var result *Result
+	var result *InvocationResult
 
 	result, err = e.txCtx.Invoke(
 		deductAccountCreationFee(flow.Address(payer), e.restrictAccountCreation),
