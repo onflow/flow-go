@@ -30,7 +30,7 @@ func (i InvokableScript) Parse(ctx Context, ledger Ledger) (Invokable, error) {
 }
 
 func (i InvokableScript) Invoke(ctx Context, ledger Ledger) (*InvocationResult, error) {
-	env := ctx.Environment(ledger)
+	env := ctx.NewEnvironment(ledger)
 
 	scriptHash := hash.DefaultHasher.ComputeHash(i.script)
 	location := runtime.ScriptLocation(scriptHash)
