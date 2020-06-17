@@ -7,8 +7,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/hash"
 )
 
-func Script(script []byte) *InvokableScript {
-	return &InvokableScript{
+func Script(script []byte) InvokableScript {
+	return InvokableScript{
 		script: script,
 	}
 }
@@ -18,16 +18,18 @@ type InvokableScript struct {
 	args   [][]byte
 }
 
-func (i *InvokableScript) WithArguments(args [][]byte) *InvokableScript {
-	i.args = args
-	return i
+func (i InvokableScript) WithArguments(args [][]byte) InvokableScript {
+	return InvokableScript{
+		script: i.script,
+		args:   args,
+	}
 }
 
-func (i *InvokableScript) Parse(ctx Context, ledger Ledger) (Invokable, error) {
+func (i InvokableScript) Parse(ctx Context, ledger Ledger) (Invokable, error) {
 	panic("implement me")
 }
 
-func (i *InvokableScript) Invoke(ctx Context, ledger Ledger) (*InvocationResult, error) {
+func (i InvokableScript) Invoke(ctx Context, ledger Ledger) (*InvocationResult, error) {
 	env := ctx.Environment(ledger)
 
 	scriptHash := hash.DefaultHasher.ComputeHash(i.script)
