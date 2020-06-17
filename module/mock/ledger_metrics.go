@@ -16,6 +16,16 @@ func (_m *LedgerMetrics) ForestApproxMemorySize(bytes uint64) {
 	_m.Called(bytes)
 }
 
+// ForestMaxDepth provides a mock function with given fields: number
+func (_m *LedgerMetrics) ForestMaxDepth(number uint64) {
+	_m.Called(number)
+}
+
+// ForestNumberOfAllocatedRegisters provides a mock function with given fields: number
+func (_m *LedgerMetrics) ForestNumberOfAllocatedRegisters(number uint64) {
+	_m.Called(number)
+}
+
 // ForestNumberOfTrees provides a mock function with given fields: number
 func (_m *LedgerMetrics) ForestNumberOfTrees(number uint64) {
 	_m.Called(number)

@@ -189,7 +189,7 @@ func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedRegisterKeys [][]byte
 
 //func constructSubtrie(height int, keys [][]byte, keyLength int, values [][]byte) (*node.Node, error) {
 
-// update returns the head of updated sub-trie for the specified key-value pairs
+// update returns the head of updated sub-trie for the specified key-value pairs.
 // UNSAFE: update requires the following conditions to be satisfied,
 // but does not explicitly check them for performance reasons
 //   * all keys AND the parent node share the same common prefix [0 : mt.maxHeight-1 - headHeight)
@@ -255,7 +255,7 @@ func update(parentNode *node.Node, height int, keys [][]byte, keyLength int, val
 	return node.NewInterimNode(height, lChild, rChild), nil
 }
 
-// constructSubtrie returns the head of a newly-constructed sub-trie for the specified key-value pairs
+// constructSubtrie returns the head of a newly-constructed sub-trie for the specified key-value pairs.
 // UNSAFE: constructSubtrie requires the following conditions to be satisfied,
 // but does not explicitly check them for performance reasons
 //   * keys all share the same common prefix [0 : mt.maxHeight-1 - headHeight)

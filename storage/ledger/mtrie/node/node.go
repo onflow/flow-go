@@ -93,14 +93,25 @@ func NewLeaf(key, value []byte, height int) *Node {
 // newNode creates a new Node with the provided value and no children.
 // UNCHECKED requirement: lchild.height and rchild.height must be smaller than height
 func NewInterimNode(height int, lchild, rchild *Node) *Node {
+	var lMaxDepth, rMaxDepth uint16
+	var lRegCount, rRegCount uint64
+	if lchild != nil {
+		lMaxDepth = lchild.maxDepth
+		lRegCount = lchild.regCount
+	}
+	if rchild != nil {
+		rMaxDepth = rchild.maxDepth
+		rRegCount = rchild.regCount
+	}
+
 	n := &Node{
 		lChild:   lchild,
 		rChild:   rchild,
 		height:   height,
 		key:      nil,
 		value:    nil,
-		maxDepth: common.MaxUint16(lchild.maxDepth, rchild.maxDepth) + uint16(1),
-		regCount: lchild.regCount + rchild.regCount,
+		maxDepth: common.MaxUint16(lMaxDepth, rMaxDepth) + uint16(1),
+		regCount: lRegCount + rRegCount,
 	}
 	n.hashValue = n.computeNodeHash()
 	return n
