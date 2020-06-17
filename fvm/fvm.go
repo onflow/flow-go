@@ -16,7 +16,7 @@ type VirtualMachine interface {
 
 type Invokable interface {
 	Parse(ctx Context, ledger Ledger) (Invokable, error)
-	Invoke(ctx Context, ledger Ledger) (*Result, error)
+	Invoke(ctx Context, ledger Ledger) (*InvocationResult, error)
 }
 
 // New creates a new virtual machine instance with the provided runtime.

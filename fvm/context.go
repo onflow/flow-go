@@ -10,7 +10,7 @@ type Context interface {
 	NewChild(opts ...Option) Context
 
 	Parse(i Invokable, ledger Ledger) (Invokable, error)
-	Invoke(i Invokable, ledger Ledger) (*Result, error)
+	Invoke(i Invokable, ledger Ledger) (*InvocationResult, error)
 	GetAccount(address flow.Address, ledger Ledger) (*flow.Account, error)
 
 	Environment(ledger Ledger) HostEnvironment
@@ -42,7 +42,7 @@ func (ctx *context) Parse(i Invokable, ledger Ledger) (Invokable, error) {
 	return i.Parse(ctx, ledger)
 }
 
-func (ctx *context) Invoke(i Invokable, ledger Ledger) (*Result, error) {
+func (ctx *context) Invoke(i Invokable, ledger Ledger) (*InvocationResult, error) {
 	return i.Invoke(ctx, ledger)
 }
 
