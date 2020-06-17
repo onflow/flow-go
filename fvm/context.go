@@ -13,7 +13,7 @@ type Context interface {
 	Invoke(i Invokable, ledger Ledger) (*InvocationResult, error)
 	GetAccount(address flow.Address, ledger Ledger) (*flow.Account, error)
 
-	Environment(ledger Ledger) HostEnvironment
+	NewEnvironment(ledger Ledger) HostEnvironment
 	Options() Options
 	Runtime() runtime.Runtime
 }
@@ -56,7 +56,7 @@ func (ctx *context) GetAccount(address flow.Address, ledger Ledger) (*flow.Accou
 	return account, nil
 }
 
-func (ctx *context) Environment(ledger Ledger) HostEnvironment {
+func (ctx *context) NewEnvironment(ledger Ledger) HostEnvironment {
 	env := newEnvironment(
 		ledger,
 		ctx.opts.astCache,
