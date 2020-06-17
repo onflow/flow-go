@@ -7,8 +7,8 @@ import (
 type Index interface {
 
 	// Store stores the index for a block payload.
-	Store(blockID flow.Identifier, index flow.Index) error
+	Store(blockID flow.Identifier, index *flow.Index) error
 
 	// ByBlockID retrieves the index for a block payload.
-	ByBlockID(blockID flow.Identifier) (flow.Index, error)
+	ByBlockID(blockID flow.Identifier) (*flow.Index, error)
 }

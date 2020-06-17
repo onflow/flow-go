@@ -27,10 +27,6 @@ func NewBlocks(db *badger.DB, headers *Headers, payloads *Payloads) *Blocks {
 	return b
 }
 
-func (b *Blocks) Store(block *flow.Block) error {
-	return operation.RetryOnConflict(b.db.Update, b.storeTx(block))
-}
-
 func (b *Blocks) storeTx(block *flow.Block) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		err := b.headers.storeTx(block.Header)(tx)
@@ -45,20 +41,32 @@ func (b *Blocks) storeTx(block *flow.Block) func(*badger.Txn) error {
 	}
 }
 
+func (b *Blocks) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Block, error) {
+	return func(tx *badger.Txn) (*flow.Block, error) {
+		header, err := b.headers.retrieveTx(blockID)(tx)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve header: %w", err)
+		}
+		payload, err := b.payloads.retrieveTx(blockID)(tx)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve payload: %w", err)
+		}
+		block := &flow.Block{
+			Header:  header,
+			Payload: payload,
+		}
+		return block, nil
+	}
+}
+
+func (b *Blocks) Store(block *flow.Block) error {
+	return operation.RetryOnConflict(b.db.Update, b.storeTx(block))
+}
+
 func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
-	header, err := b.headers.ByBlockID(blockID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get header: %w", err)
-	}
-	payload, err := b.payloads.ByBlockID(blockID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve payload: %w", err)
-	}
-	block := flow.Block{
-		Header:  header,
-		Payload: payload,
-	}
-	return &block, nil
+	tx := b.db.NewTransaction(false)
+	defer tx.Discard()
+	return b.retrieveTx(blockID)(tx)
 }
 
 func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {

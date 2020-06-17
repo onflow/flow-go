@@ -3,6 +3,7 @@ package badger
 import (
 	"fmt"
 
+	"github.com/dgraph-io/badger/v2"
 	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -16,7 +17,7 @@ func withLimit(limit uint) func(*Cache) {
 	}
 }
 
-type storeFunc func(flow.Identifier, interface{}) error
+type storeFunc func(flow.Identifier, interface{}) func(*badger.Txn) error
 
 func withStore(store storeFunc) func(*Cache) {
 	return func(c *Cache) {
@@ -24,11 +25,13 @@ func withStore(store storeFunc) func(*Cache) {
 	}
 }
 
-func noStore(flow.Identifier, interface{}) error {
-	return fmt.Errorf("no store function for cache put available")
+func noStore(flow.Identifier, interface{}) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		return fmt.Errorf("no store function for cache put available")
+	}
 }
 
-type retrieveFunc func(flow.Identifier) (interface{}, error)
+type retrieveFunc func(flow.Identifier) func(*badger.Txn) (interface{}, error)
 
 func withRetrieve(retrieve retrieveFunc) func(*Cache) {
 	return func(c *Cache) {
@@ -36,8 +39,10 @@ func withRetrieve(retrieve retrieveFunc) func(*Cache) {
 	}
 }
 
-func noRetrieve(flow.Identifier) (interface{}, error) {
-	return nil, fmt.Errorf("no retrieve function for cache get available")
+func noRetrieve(flow.Identifier) func(*badger.Txn) (interface{}, error) {
+	return func(tx *badger.Txn) (interface{}, error) {
+		return nil, fmt.Errorf("no retrieve function for cache get available")
+	}
 }
 
 func withResource(resource string) func(*Cache) {
@@ -73,45 +78,49 @@ func newCache(collector module.CacheMetrics, options ...func(*Cache)) *Cache {
 
 // Get will try to retrieve the resource from cache first, and then from the
 // injected
-func (c *Cache) Get(entityID flow.Identifier) (interface{}, error) {
+func (c *Cache) Get(entityID flow.Identifier) func(*badger.Txn) (interface{}, error) {
+	return func(tx *badger.Txn) (interface{}, error) {
 
-	// check if we have it in the cache
-	resource, cached := c.cache.Get(entityID)
-	if cached {
-		c.metrics.CacheHit(c.resource)
+		// check if we have it in the cache
+		resource, cached := c.cache.Get(entityID)
+		if cached {
+			c.metrics.CacheHit(c.resource)
+			return resource, nil
+		}
+
+		// get it from the database
+		c.metrics.CacheMiss(c.resource)
+		resource, err := c.retrieve(entityID)(tx)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve resource: %w", err)
+		}
+
+		// cache the resource and eject least recently used one if we reached limit
+		evicted := c.cache.Add(entityID, resource)
+		if !evicted {
+			c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
+		}
+
 		return resource, nil
 	}
-
-	// get it from the database
-	c.metrics.CacheMiss(c.resource)
-	resource, err := c.retrieve(entityID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve resource: %w", err)
-	}
-
-	// cache the resource and eject least recently used one if we reached limit
-	evicted := c.cache.Add(entityID, resource)
-	if !evicted {
-		c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
-	}
-
-	return resource, nil
 }
 
 // Put will add an resource to the cache with the given ID.
-func (c *Cache) Put(entityID flow.Identifier, resource interface{}) error {
+func (c *Cache) Put(entityID flow.Identifier, resource interface{}) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
 
-	// try to store the resource
-	err := c.store(entityID, resource)
-	if err != nil {
-		return fmt.Errorf("could not store resource: %w", err)
+		// try to store the resource
+		err := c.store(entityID, resource)(tx)
+		if err != nil {
+			return fmt.Errorf("could not store resource: %w", err)
+		}
+
+		// cache the resource and eject least recently used one if we reached limit
+		evicted := c.cache.Add(entityID, resource)
+		if !evicted {
+			c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
+		}
+
+		return nil
 	}
-
-	// cache the resource and eject least recently used one if we reached limit
-	evicted := c.cache.Add(entityID, resource)
-	if !evicted {
-		c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
-	}
-
-	return nil
 }
