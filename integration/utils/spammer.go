@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
@@ -29,14 +28,14 @@ const (
 
 // This should only used for testing reasons
 type flowAccount struct {
-	address    flowsdk.Address
+	address    *flowsdk.Address
 	accountKey *flowsdk.AccountKey
 	signer     crypto.InMemorySigner
 	seqNumber  uint64
 	signerLock sync.Mutex
 }
 
-func newFlowAccount(address flowsdk.Address,
+func newFlowAccount(address *flowsdk.Address,
 	accountKey *flowsdk.AccountKey,
 	signer crypto.InMemorySigner) *flowAccount {
 	return &flowAccount{address: address,
@@ -50,12 +49,11 @@ func newFlowAccount(address flowsdk.Address,
 type LoadGenerator struct {
 	numberOfAccounts     int
 	flowClient           *client.Client
-	flowTokenAddress     flowsdk.Address
-	fungibleTokenAddress flowsdk.Address
 	serviceAccount       *flowAccount
+	flowTokenAddress     *flowsdk.Address
+	fungibleTokenAddress *flowsdk.Address
 	accounts             []*flowAccount
 	step                 int
-	addressGen           *flowsdk.AddressGenerator
 	txTracker            *txTracker
 }
 
@@ -63,27 +61,43 @@ type LoadGenerator struct {
 // flowClient, err := client.New(gs.accessAddr, grpc.WithInsecure())
 // require.NoError(gs.T(), err, "could not get client")
 
+func decodeAddressFromHex(hexinput string) (*flowsdk.Address, error) {
+	var output flowsdk.Address
+	inputBytes, err := hex.DecodeString(hexinput)
+	if err != nil {
+		return nil, err
+	}
+	copy(output[:], inputBytes)
+	return &output, nil
+}
+
 // TODO flowsdk.Testnet as chainID
 // TODO remove the need for servAccPrivKeyHex when we open it up to everyone
 func NewLoadGenerator(fclient *client.Client,
 	servAccPrivKeyHex string,
-	chainID string,
+	serviceAccountAddressHex string,
+	fungibleTokenAddressHex string,
+	flowTokenAddressHex string,
 	numberOfAccounts int) (*LoadGenerator, error) {
 
-	servAcc, err := loadServiceAccount(fclient, chainID, servAccPrivKeyHex)
+	serviceAccountAddress, err := decodeAddressFromHex(serviceAccountAddressHex)
 	if err != nil {
-		return nil, fmt.Errorf("error loading service account %w", err)
+		return nil, err
 	}
 
-	// generate addresses
-	addressGen := flowsdk.NewAddressGenerator(flowsdk.ChainID(chainID))
-	servAccAddress := addressGen.NextAddress()
-	fmt.Println("service account: ", servAccAddress)
-	fungibleTokenAddress := addressGen.NextAddress()
-	flowTokenAddress := addressGen.NextAddress()
+	fungibleTokenAddress, err := decodeAddressFromHex(fungibleTokenAddressHex)
+	if err != nil {
+		return nil, err
+	}
 
-	if !bytes.Equal(servAccAddress[:], servAcc.address[:]) {
-		return nil, fmt.Errorf("service account addresses doesn't match %v != %v", servAccAddress, servAcc.address)
+	flowTokenAddress, err := decodeAddressFromHex(flowTokenAddressHex)
+	if err != nil {
+		return nil, err
+	}
+
+	servAcc, err := loadServiceAccount(fclient, serviceAccountAddress, servAccPrivKeyHex)
+	if err != nil {
+		return nil, fmt.Errorf("error loading service account %w", err)
 	}
 
 	txTracker, err := newTxTracker(1000)
@@ -94,24 +108,23 @@ func NewLoadGenerator(fclient *client.Client,
 	lGen := &LoadGenerator{
 		numberOfAccounts:     numberOfAccounts,
 		flowClient:           fclient,
+		serviceAccount:       servAcc,
 		fungibleTokenAddress: fungibleTokenAddress,
 		flowTokenAddress:     flowTokenAddress,
-		serviceAccount:       servAcc,
 		accounts:             make([]*flowAccount, 0),
 		step:                 0,
-		addressGen:           addressGen,
 		txTracker:            txTracker,
 	}
 	return lGen, nil
 }
 
 func loadServiceAccount(flowClient *client.Client,
-	chainID string,
+	servAccAddress *flowsdk.Address,
 	servAccPrivKeyHex string) (*flowAccount, error) {
 
-	address := flowsdk.ServiceAddress(flowsdk.ChainID(chainID))
-	fmt.Println(">>>>>>>>>>>>", address)
-	acc, err := flowClient.GetAccount(context.Background(), address)
+	// address := flowsdk.ServiceAddress(flowsdk.ChainID(chainID))
+	// fmt.Println(">>>>>>>>>>>>", address)
+	acc, err := flowClient.GetAccount(context.Background(), *servAccAddress)
 	if err != nil {
 		return nil, fmt.Errorf("error while calling get account for service account %w", err)
 	}
@@ -125,7 +138,7 @@ func loadServiceAccount(flowClient *client.Client,
 	signer := crypto.NewInMemorySigner(privateKey, accountKey.HashAlgo)
 
 	return &flowAccount{
-		address:    address,
+		address:    servAccAddress,
 		accountKey: accountKey,
 		seqNumber:  accountKey.SequenceNumber,
 		signer:     signer,
@@ -157,14 +170,14 @@ func (cg *LoadGenerator) Next() error {
 		addKeysTx := flowsdk.NewTransaction().
 			SetReferenceBlockID(ref.ID).
 			SetScript([]byte(script)).
-			SetProposalKey(cg.serviceAccount.address, cg.serviceAccount.accountKey.ID, cg.serviceAccount.accountKey.SequenceNumber).
-			SetPayer(cg.serviceAccount.address).
-			AddAuthorizer(cg.serviceAccount.address)
+			SetProposalKey(*cg.serviceAccount.address, cg.serviceAccount.accountKey.ID, cg.serviceAccount.accountKey.SequenceNumber).
+			SetPayer(*cg.serviceAccount.address).
+			AddAuthorizer(*cg.serviceAccount.address)
 
 		cg.serviceAccount.signerLock.Lock()
 		defer cg.serviceAccount.signerLock.Unlock()
 
-		err := addKeysTx.SignEnvelope(cg.serviceAccount.address, cg.serviceAccount.accountKey.ID, cg.serviceAccount.signer)
+		err := addKeysTx.SignEnvelope(*cg.serviceAccount.address, cg.serviceAccount.accountKey.ID, cg.serviceAccount.signer)
 		if err != nil {
 			return err
 		}
@@ -196,12 +209,12 @@ func (cg *LoadGenerator) Next() error {
 			createAccountTx := flowsdk.NewTransaction().
 				SetReferenceBlockID(ref.ID).
 				SetScript(createAccountScript).
-				AddAuthorizer(cg.serviceAccount.address).
-				SetProposalKey(cg.serviceAccount.address, i+1, 0).
-				SetPayer(cg.serviceAccount.address)
+				AddAuthorizer(*cg.serviceAccount.address).
+				SetProposalKey(*cg.serviceAccount.address, i+1, 0).
+				SetPayer(*cg.serviceAccount.address)
 
 			cg.serviceAccount.signerLock.Lock()
-			err = createAccountTx.SignEnvelope(cg.serviceAccount.address, i+1, cg.serviceAccount.signer)
+			err = createAccountTx.SignEnvelope(*cg.serviceAccount.address, i+1, cg.serviceAccount.signer)
 			if err != nil {
 				return err
 			}
@@ -212,7 +225,7 @@ func (cg *LoadGenerator) Next() error {
 
 			createAccountTxID := createAccountTx.ID()
 
-			cg.txTracker.addTx(createAccountTxID, cg.serviceAccount.address, nil, nil, nil)
+			cg.txTracker.addTx(createAccountTxID, *cg.serviceAccount.address, nil, nil, nil)
 			// accountCreationTxRes := waitForFinalized(context.Background(), cg.flowClient, createAccountTxID)
 			// examples.Handle(accountCreationTxRes.Error)
 
@@ -378,6 +391,11 @@ func waitForFinalized(ctx context.Context, c *client.Client, id flowsdk.Identifi
 }
 
 func main() {
+
+	serviceAccountAddressHex := "9a0766d93b6608b7"
+	fungibleTokenAddressHex := "7e60df042a9c0868"
+	flowTokenAddressHex := "912d5440f7e3769e"
+
 	serviceAccountPrivateKeyBytes, err := hex.DecodeString(unittest.ServiceAccountPrivateKeyHex)
 	if err != nil {
 		panic("error while hex decoding hardcoded root key")
@@ -393,7 +411,7 @@ func main() {
 	priv := hex.EncodeToString(ServiceAccountPrivateKey.PrivateKey.Encode())
 
 	flowClient, err := client.New("localhost:3569", grpc.WithInsecure())
-	lg, err := NewLoadGenerator(flowClient, priv, string(flowsdk.Testnet), 10)
+	lg, err := NewLoadGenerator(flowClient, priv, serviceAccountAddressHex, fungibleTokenAddressHex, flowTokenAddressHex, 10)
 	if err != nil {
 		panic(err)
 	}
