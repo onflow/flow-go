@@ -101,22 +101,24 @@ TODO: document context options
 ## Design
 
 The structure of the FVM package is intended to promote the following:
-- **Determinism**: behaviour of the VM should be consistent and predictable, producing the identical results with the 
+- **Determinism**: the VM should be consistent and predictable, producing identical results given the 
 same inputs.
-- **Performance**: the VM should expose functionality that allows the caller to manage parallel computation.
-- **Flexibility**: the VM should support a variety of use cases including execution, verification and network emulation.
+- **Performance**: the VM should expose functionality that allows the caller to exploit parallelism and pre-computation.
+- **Flexibility**: the VM should support a variety of use cases including not only execution and verification, but also
+developer tooling and network emulation.
 
 ### `Context`
 
 A `Context` is a reusable component that simply defines the parameters of an execution environment. 
-For example, all transactions within the same block would share a common `Context`.
+For example, all transactions within the same block would share a common `Context` configured with the relevant
+block data.
 
-Contexts can be arbitrarily nested. Each child context inherits the parameters of its parent, but is free to override
+Contexts can be arbitrarily nested. A child context inherits the parameters of its parent, but is free to override
 any parameters that it chooses.
 
 ### `HostEnvironment`
 
-A `HostEnvironment` is short-lived component that is consumed by an invocation. A `HostEnvironment` is the 
+A `HostEnvironment` is a short-lived component that is consumed by an invocation. A `HostEnvironment` is the 
 interface through which the VM communicates with the Cadence runtime. The `HostEnvironment` provides information about
 the current `Context` and also collects logs, events and metrics emitted from the runtime.
 
