@@ -122,8 +122,6 @@ func loadServiceAccount(flowClient *client.Client,
 	servAccAddress *flowsdk.Address,
 	servAccPrivKeyHex string) (*flowAccount, error) {
 
-	// address := flowsdk.ServiceAddress(flowsdk.ChainID(chainID))
-	// fmt.Println(">>>>>>>>>>>>", address)
 	acc, err := flowClient.GetAccount(context.Background(), *servAccAddress)
 	if err != nil {
 		return nil, fmt.Errorf("error while calling get account for service account %w", err)
@@ -225,9 +223,12 @@ func (cg *LoadGenerator) Next() error {
 
 			createAccountTxID := createAccountTx.ID()
 
-			cg.txTracker.addTx(createAccountTxID, *cg.serviceAccount.address, nil, nil, nil)
+			cg.txTracker.addTx(createAccountTxID, *cg.serviceAccount.address, nil, nil, nil, nil, 30)
 			// accountCreationTxRes := waitForFinalized(context.Background(), cg.flowClient, createAccountTxID)
 			// examples.Handle(accountCreationTxRes.Error)
+
+			// wait group
+			// unlock on finalized
 
 			fmt.Println("<<<", i)
 			// // Successful Tx, increment sequence number
@@ -264,109 +265,7 @@ func languageEncodeBytes(b []byte) string {
 	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
 }
 
-type txInFlight struct {
-	txID                flowsdk.Identifier
-	lastStatus          flowsdk.TransactionStatus
-	proposer            flowsdk.Address
-	onErrorCallback     func(flowsdk.Identifier, error)
-	onSealCallback      func(flowsdk.Identifier, *flowsdk.TransactionResult)
-	onFinalizedCallback func(flowsdk.Identifier, *flowsdk.TransactionResult)
-	createdAt           time.Time
-}
-
-type txTracker struct {
-	client *client.Client
-	txs    chan *txInFlight
-}
-
-// TODO pass port
-func newTxTracker(maxCap int) (*txTracker, error) {
-	fclient, err := client.New("localhost:3569", grpc.WithInsecure())
-	if err != nil {
-		return nil, err
-	}
-	txt := &txTracker{client: fclient,
-		txs: make(chan *txInFlight, maxCap),
-	}
-	go txt.run()
-	return txt, nil
-}
-
-func (txt *txTracker) addTx(txID flowsdk.Identifier,
-	proposer flowsdk.Address,
-	onErrorCallback func(flowsdk.Identifier, error),
-	onSealCallback func(flowsdk.Identifier, *flowsdk.TransactionResult),
-	onFinalizedCallback func(flowsdk.Identifier, *flowsdk.TransactionResult),
-) {
-	result, _ := txt.client.GetTransactionResult(context.Background(), txID)
-	// TODO deal with error
-	newTx := &txInFlight{txID: txID,
-		lastStatus:          result.Status,
-		proposer:            proposer,
-		onErrorCallback:     onErrorCallback,
-		onSealCallback:      onSealCallback,
-		onFinalizedCallback: onFinalizedCallback,
-		createdAt:           time.Now(),
-	}
-	fmt.Println("tx added ", txID)
-	txt.txs <- newTx
-}
-
-// TODO proper ready/done
-func (txt *txTracker) stop() {
-	close(txt.txs)
-}
-
-func (txt *txTracker) run() {
-	for tx := range txt.txs {
-		fmt.Println("req sent for tx ", tx.txID)
-		result, err := txt.client.GetTransactionResult(context.Background(), tx.txID)
-		// TODO deal with error properly
-		if err != nil {
-			fmt.Println(err)
-		}
-		if result != nil {
-			// if change in status
-			if tx.lastStatus != result.Status {
-				switch result.Status {
-				case flowsdk.TransactionStatusFinalized:
-					if tx.onFinalizedCallback != nil {
-						go tx.onFinalizedCallback(tx.txID, result)
-					}
-					tx.lastStatus = flowsdk.TransactionStatusFinalized
-					fmt.Println("tx ", tx.txID, "finalized in seconds: ", time.Since(tx.createdAt).Seconds)
-				case flowsdk.TransactionStatusSealed:
-					if tx.onSealCallback != nil {
-						go tx.onSealCallback(tx.txID, result)
-					}
-					fmt.Println("tx ", tx.txID, "sealed in seconds: ", time.Since(tx.createdAt).Seconds)
-					continue
-				}
-			}
-
-		}
-		// put it back
-		txt.txs <- tx
-		// TODO get rid of this
-		time.Sleep(time.Second / 10)
-	}
-	fmt.Println("finished!")
-}
-
 // TODO use context deadlines
-
-// // TransactionStatusUnknown indicates that the transaction status is not known.
-// TransactionStatusUnknown TransactionStatus = iota
-// // TransactionStatusPending is the status of a pending transaction.
-// TransactionStatusPending
-// // TransactionStatusFinalized is the status of a finalized transaction.
-// TransactionStatusFinalized
-// // TransactionStatusExecuted is the status of an executed transaction.
-// TransactionStatusExecuted
-// // TransactionStatusSealed is the status of a sealed transaction.
-// TransactionStatusSealed
-// // TransactionStatusExpired is the status of an expired transaction.
-// TransactionStatusExpired
 
 func waitForFinalized(ctx context.Context, c *client.Client, id flowsdk.Identifier) *flowsdk.TransactionResult {
 	result, err := c.GetTransactionResult(ctx, id)
