@@ -373,7 +373,7 @@ func VerificationNode(t testing.TB,
 		require.Nil(t, err)
 	}
 
-	if node.ReceiptIDsByResult== nil {
+	if node.ReceiptIDsByResult == nil {
 		node.ReceiptIDsByResult, err = stdmap.NewIdentifierMap(1000)
 		require.Nil(t, err)
 	}
@@ -412,7 +412,7 @@ func VerificationNode(t testing.TB,
 			node.PendingReceipts,
 			node.Headers,
 			node.IngestedResultIDs,
-			node.ReceiptIDsByBlock
+			node.ReceiptIDsByBlock,
 			node.ReceiptIDsByResult)
 		require.Nil(t, err)
 	}
