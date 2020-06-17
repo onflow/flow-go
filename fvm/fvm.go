@@ -1,12 +1,9 @@
 package fvm
 
 import (
-	"encoding/binary"
-	"fmt"
-	"math/rand"
-
-	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
+
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // VirtualMachine augments the Cadence runtime with Flow host functionality.
@@ -20,7 +17,7 @@ type Invokable interface {
 }
 
 // New creates a new virtual machine instance with the provided runtime.
-func New(rt runtime.Runtime) VirtualMachine {
+func New(rt runtime.Runtime, chain flow.Chain) VirtualMachine {
 	return &virtualMachine{rt: rt}
 }
 

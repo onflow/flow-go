@@ -248,12 +248,12 @@ func mintDefaultTokenTransaction(fungibleToken, flowToken, service flow.Address,
 	)
 }
 
-func FungibleTokenAddress() flow.Address {
+func FungibleTokenAddress(chain flow.Chain) flow.Address {
 	addressess, _ := flow.AddressAtIndex(2)
 	return addressess
 }
 
-func FlowTokenAddress() flow.Address {
+func FlowTokenAddress(chain flow.Chain) flow.Address {
 	addressess, _ := flow.AddressAtIndex(3)
 	return addressess
 }
