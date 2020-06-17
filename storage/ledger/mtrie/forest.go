@@ -264,6 +264,9 @@ func (f *MForest) Update(rootHash []byte, keys [][]byte, values [][]byte) (*trie
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
 
+	f.metrics.ForestNumberOfAllocatedRegisters(newTrie.AllocatedRegCount())
+	f.metrics.ForestMaxDepth(uint64(newTrie.MaxDepth()))
+
 	err = f.AddTrie(newTrie)
 	if err != nil {
 		return nil, fmt.Errorf("adding updated trie to forest failed: %w", err)
