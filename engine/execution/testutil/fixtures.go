@@ -10,16 +10,14 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/rs/zerolog"
+	"github.com/onflow/cadence/runtime"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/engine/execution/utils"
 	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/model/flow"
-	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -148,7 +146,7 @@ func CreateAccountsWithSimpleAddresses(
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) ([]flow.Address, error) {
-	ctx := vm.NewBlockContext(nil, new(storage.Blocks))
+	ctx := vm.NewContext(fvm.WithSignatureVerification(false))
 
 	var accounts []flow.Address
 
@@ -174,7 +172,7 @@ func CreateAccountsWithSimpleAddresses(
 			AddArgument(encCadAccountKey).
 			AddAuthorizer(serviceAddress)
 
-		result, err := ctx.ExecuteTransaction(ledger, tx, fvm.WithSignatureVerification(false))
+		result, err := ctx.Invoke(fvm.Transaction(tx), ledger)
 		if err != nil {
 			return nil, err
 		}
@@ -202,7 +200,14 @@ func CreateAccountsWithSimpleAddresses(
 
 func RootBootstrappedLedger(chain flow.Chain) fvm.Ledger {
 	ledger := make(fvm.MapLedger)
-	bootstrap.NewBootstrapper(zerolog.Nop()).BootstrapView(ledger, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply, chain)
+
+	vm := fvm.New(runtime.NewInterpreterRuntime(), chain)
+
+	_, _ = vm.NewContext().Invoke(
+		fvm.Bootstrap(unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply),
+		ledger,
+	)
+
 	return ledger
 }
 

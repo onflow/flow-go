@@ -15,7 +15,6 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -34,9 +33,8 @@ type Manager struct {
 	log           zerolog.Logger
 	me            module.Local
 	protoState    protocol.State
-	vm            fvm.VirtualMachine
+	execCtx       fvm.Context
 	blockComputer computer.BlockComputer
-	blocks        storage.Blocks
 }
 
 func New(
@@ -45,18 +43,21 @@ func New(
 	tracer module.Tracer,
 	me module.Local,
 	protoState protocol.State,
-	vm fvm.VirtualMachine,
-	blocks storage.Blocks,
+	execCtx fvm.Context,
 ) *Manager {
 	log := logger.With().Str("engine", "computation").Logger()
 
 	e := Manager{
-		log:           log,
-		me:            me,
-		protoState:    protoState,
-		vm:            vm,
-		blockComputer: computer.NewBlockComputer(vm, blocks, metrics, tracer, log.With().Str("component", "block_computer").Logger()),
-		blocks:        blocks,
+		log:        log,
+		me:         me,
+		protoState: protoState,
+		execCtx:    execCtx,
+		blockComputer: computer.NewBlockComputer(
+			execCtx,
+			metrics,
+			tracer,
+			log.With().Str("component", "block_computer").Logger(),
+		),
 	}
 
 	return &e
@@ -64,7 +65,9 @@ func New(
 
 func (e *Manager) ExecuteScript(script []byte, arguments [][]byte, blockHeader *flow.Header, view *delta.View) ([]byte, error) {
 
-	result, err := e.vm.NewBlockContext(blockHeader, e.blocks).ExecuteScript(view, script, arguments)
+	scriptCtx := e.execCtx.NewChild(fvm.WithBlockHeader(blockHeader))
+
+	result, err := scriptCtx.Invoke(fvm.Script(script).WithArguments(arguments), view)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
 	}
@@ -107,10 +110,10 @@ func (e *Manager) ComputeBlock(
 	return result, nil
 }
 
-func (e *Manager) GetAccount(addr flow.Address, blockHeader *flow.Header, view *delta.View) (*flow.Account, error) {
-	account, err := e.vm.NewBlockContext(blockHeader, e.blocks).GetAccount(view, addr)
+func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, view *delta.View) (*flow.Account, error) {
+	account, err := e.execCtx.NewChild(fvm.WithBlockHeader(blockHeader)).GetAccount(address, view)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get accounot at block (%s): %w", blockHeader.ID(), err)
+		return nil, fmt.Errorf("failed to get account at block (%s): %w", blockHeader.ID(), err)
 	}
 
 	return account, nil

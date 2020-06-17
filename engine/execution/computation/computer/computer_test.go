@@ -17,25 +17,25 @@ import (
 	vmmock "github.com/dapperlabs/flow-go/fvm/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
-	storage "github.com/dapperlabs/flow-go/storage/mock"
 )
 
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("single collection", func(t *testing.T) {
-		vm := new(vmmock.VirtualMachine)
-		bc := new(vmmock.BlockContext)
-		blocks := new(storage.Blocks)
+		globalCtx := new(vmmock.Context)
+		blockCtx := new(vmmock.Context)
+		txCtx := new(vmmock.Context)
 
-		exe := computer.NewBlockComputer(vm, blocks, nil, nil, zerolog.Nop())
+		exe := computer.NewBlockComputer(globalCtx, nil, nil, zerolog.Nop())
 
 		// create a block with 1 collection with 2 transactions
 		block := generateBlock(1, 2)
 
-		vm.On("NewBlockContext", block.Block.Header, mock.Anything).Return(bc)
+		globalCtx.On("NewChild", mock.Anything, mock.Anything).Return(blockCtx)
+		blockCtx.On("NewChild", mock.Anything).Return(txCtx)
 
-		bc.On("ExecuteTransaction", mock.Anything, mock.Anything, mock.Anything).
-			Return(&fvm.TransactionResult{}, nil).
+		txCtx.On("Invoke", mock.Anything, mock.Anything).
+			Return(&fvm.InvocationResult{}, nil).
 			Twice()
 
 		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
@@ -46,16 +46,16 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
 
-		vm.AssertExpectations(t)
-		bc.AssertExpectations(t)
+		globalCtx.AssertExpectations(t)
+		blockCtx.AssertExpectations(t)
 	})
 
 	t.Run("multiple collections", func(t *testing.T) {
-		vm := new(vmmock.VirtualMachine)
-		bc := new(vmmock.BlockContext)
-		blocks := new(storage.Blocks)
+		globalCtx := new(vmmock.Context)
+		blockCtx := new(vmmock.Context)
+		txCtx := new(vmmock.Context)
 
-		exe := computer.NewBlockComputer(vm, blocks, nil, nil, zerolog.Nop())
+		exe := computer.NewBlockComputer(globalCtx, nil, nil, zerolog.Nop())
 
 		collectionCount := 2
 		transactionsPerCollection := 2
@@ -69,10 +69,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		// create dummy events
 		events := generateEvents(eventsPerTransaction)
 
-		vm.On("NewBlockContext", block.Block.Header, mock.Anything).Return(bc)
+		globalCtx.On("NewChild", mock.Anything, mock.Anything).Return(blockCtx)
+		blockCtx.On("NewChild", mock.Anything).Return(txCtx)
 
-		bc.On("ExecuteTransaction", mock.Anything, mock.Anything, mock.Anything).
-			Return(&fvm.TransactionResult{Events: events, Error: &fvm.MissingPayerError{}}, nil).
+		txCtx.On("Invoke", mock.Anything, mock.Anything).
+			Return(&fvm.InvocationResult{Events: events, Error: &fvm.MissingPayerError{}}, nil).
 			Times(totalTransactionCount)
 
 		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
@@ -111,8 +112,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		}
 		assert.ElementsMatch(t, expectedResults, result.TransactionResult)
 
-		vm.AssertExpectations(t)
-		bc.AssertExpectations(t)
+		globalCtx.AssertExpectations(t)
+		blockCtx.AssertExpectations(t)
 	})
 }
 
