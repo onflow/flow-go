@@ -116,3 +116,13 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
 	return nil
 }
+
+// MakeValid marks a block as having passed HotStuff validation.
+func (f *Finalizer) MakeValid(blockID flow.Identifier) error {
+	return operation.RetryOnConflict(
+		f.db.Update,
+		operation.SkipDuplicates(
+			operation.InsertBlockValidity(blockID, true),
+		),
+	)
+}
