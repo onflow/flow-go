@@ -15,17 +15,16 @@ import (
 
 // ChunkVerifier is a verifier based on the current definitions of the flow network
 type ChunkVerifier struct {
-	vm        fvm.VirtualMachine
+	execCtx   fvm.Context
 	trieDepth int
 	blocks    storage.Blocks
 }
 
 // NewChunkVerifier creates a chunk verifier containing a flow virtual machine
-func NewChunkVerifier(vm fvm.VirtualMachine, blocks storage.Blocks) *ChunkVerifier {
+func NewChunkVerifier(execCtx fvm.Context) *ChunkVerifier {
 	return &ChunkVerifier{
-		vm:        vm,
+		execCtx:   execCtx,
 		trieDepth: 257,
-		blocks:    blocks,
 	}
 }
 
@@ -47,7 +46,7 @@ func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) (chmodels.Chu
 	if ch.Block == nil {
 		return nil, fmt.Errorf("missing block")
 	}
-	blockCtx := fcv.vm.NewBlockContext(ch.Block.Header, fcv.blocks)
+	blockCtx := fcv.execCtx.NewChild(fvm.WithBlockHeader(ch.Block.Header))
 
 	// constructing a partial trie given chunk data package
 	if ch.ChunkDataPack == nil {
@@ -85,7 +84,7 @@ func (fcv *ChunkVerifier) Verify(ch *verification.VerifiableChunk) (chmodels.Chu
 	for i, tx := range ch.Collection.Transactions {
 		txView := chunkView.NewChild()
 
-		result, err := blockCtx.ExecuteTransaction(txView, tx)
+		result, err := blockCtx.Invoke(fvm.Transaction(tx), txView)
 		if err != nil {
 			// this covers unexpected and very rare cases (e.g. system memory issues...),
 			// so we shouldn't be here even if transaction naturally fails (e.g. permission, runtime ... )

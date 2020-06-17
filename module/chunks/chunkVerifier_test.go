@@ -1,22 +1,25 @@
 package chunks_test
 
 import (
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/runtime"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/fvm"
+	fvmMock "github.com/dapperlabs/flow-go/fvm/mock"
 	chModels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
-	mockStorage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -30,7 +33,11 @@ type ChunkVerifierTestSuite struct {
 func (s *ChunkVerifierTestSuite) SetupTest() {
 	// seed the RNG
 	rand.Seed(time.Now().UnixNano())
-	s.verifier = chunks.NewChunkVerifier(&virtualMachineMock{}, new(mockStorage.Blocks))
+
+	execCtx := new(fvmMock.Context)
+	execCtx.On("NewChild", mock.Anything).Return(&blockContextMock{})
+
+	s.verifier = chunks.NewChunkVerifier(execCtx)
 }
 
 // TestChunkVerifier invokes all the tests in this test suite
@@ -202,41 +209,50 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 }
 
 type blockContextMock struct {
-	vm     *virtualMachineMock
 	header *flow.Header
 	blocks fvm.Blocks
 }
 
-func (bc *blockContextMock) ExecuteTransaction(
-	ledger fvm.Ledger,
-	tx *flow.TransactionBody,
-	options ...fvm.TransactionContextOption,
-) (*fvm.TransactionResult, error) {
-	var txRes fvm.TransactionResult
-	switch string(tx.Script) {
+func (bc *blockContextMock) NewChild(opts ...fvm.Option) fvm.Context {
+	return nil
+}
+
+func (bc *blockContextMock) Parse(i fvm.Invokable, ledger fvm.Ledger) (fvm.Invokable, error) {
+	return nil, nil
+}
+
+func (bc *blockContextMock) Invoke(i fvm.Invokable, ledger fvm.Ledger) (*fvm.InvocationResult, error) {
+
+	invokableTx, ok := i.(*fvm.InvokableTransaction)
+	if !ok {
+		return nil, fmt.Errorf("invokable is not a transaction")
+	}
+
+	var txRes fvm.InvocationResult
+	switch string(invokableTx.Transaction().Script) {
 	case "wrongEndState":
 		id1 := make([]byte, 32)
 		UpdatedValue1 := []byte{'F'}
 		// add updates to the ledger
 		ledger.Set(id1, UpdatedValue1)
-		txRes = fvm.TransactionResult{
-			TransactionID: unittest.IdentifierFixture(),
-			Events:        []cadence.Event{},
-			Logs:          []string{"log1", "log2"},
-			Error:         nil,
-			GasUsed:       0,
+		txRes = fvm.InvocationResult{
+			ID:      unittest.IdentifierFixture(),
+			Events:  []cadence.Event{},
+			Logs:    []string{"log1", "log2"},
+			Error:   nil,
+			GasUsed: 0,
 		}
 	case "failedTx":
 		id1 := make([]byte, 32)
 		UpdatedValue1 := []byte{'F'}
 		// add updates to the ledger
 		ledger.Set(id1, UpdatedValue1)
-		txRes = fvm.TransactionResult{
-			TransactionID: unittest.IdentifierFixture(),
-			Events:        []cadence.Event{},
-			Logs:          nil,
-			Error:         &fvm.MissingPayerError{}, // inside the runtime (e.g. div by zero, access account)
-			GasUsed:       0,
+		txRes = fvm.InvocationResult{
+			ID:      unittest.IdentifierFixture(),
+			Events:  []cadence.Event{},
+			Logs:    nil,
+			Error:   &fvm.MissingPayerError{}, // inside the runtime (e.g. div by zero, access account)
+			GasUsed: 0,
 		}
 	default:
 		id1 := make([]byte, 32)
@@ -245,44 +261,29 @@ func (bc *blockContextMock) ExecuteTransaction(
 		UpdatedValue2 := []byte{'B'}
 		_, _ = ledger.Get(id1)
 		ledger.Set(id2, UpdatedValue2)
-		txRes = fvm.TransactionResult{
-			TransactionID: unittest.IdentifierFixture(),
-			Events:        []cadence.Event{},
-			Logs:          []string{"log1", "log2"},
-			Error:         nil,
-			GasUsed:       0,
+		txRes = fvm.InvocationResult{
+			ID:      unittest.IdentifierFixture(),
+			Events:  []cadence.Event{},
+			Logs:    []string{"log1", "log2"},
+			Error:   nil,
+			GasUsed: 0,
 		}
 	}
 	return &txRes, nil
 }
 
-func (bc *blockContextMock) ExecuteScript(
-	ledger fvm.Ledger,
-	script []byte,
-) (*fvm.ScriptResult, error) {
+func (bc *blockContextMock) GetAccount(address flow.Address, ledger fvm.Ledger) (*flow.Account, error) {
 	return nil, nil
 }
 
-func (bc *blockContextMock) GetAccount(_ fvm.Ledger, _ flow.Address) (*flow.Account, error) {
-	return nil, nil
+func (bc *blockContextMock) Environment(ledger fvm.Ledger) fvm.Environment {
+	return nil
 }
 
-// virtualMachineMock is a mocked virtualMachine
-type virtualMachineMock struct {
+func (bc *blockContextMock) Options() fvm.Options {
+	return fvm.Options{}
 }
 
-func (vm *virtualMachineMock) NewBlockContext(header *flow.Header, blocks fvm.Blocks) fvm.BlockContext {
-	return &blockContextMock{
-		vm:     vm,
-		header: header,
-		blocks: blocks,
-	}
-}
-
-func (vm *virtualMachineMock) ASTCache() fvm.ASTCache {
-	cache, err := fvm.NewLRUASTCache(64)
-	if err != nil {
-		return nil
-	}
-	return cache
+func (bc *blockContextMock) Runtime() runtime.Runtime {
+	return nil
 }
