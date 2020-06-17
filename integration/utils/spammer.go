@@ -271,6 +271,7 @@ type txInFlight struct {
 	onErrorCallback     func(flowsdk.Identifier, error)
 	onSealCallback      func(flowsdk.Identifier, *flowsdk.TransactionResult)
 	onFinalizedCallback func(flowsdk.Identifier, *flowsdk.TransactionResult)
+	createdAt           time.Time
 }
 
 type txTracker struct {
@@ -305,6 +306,7 @@ func (txt *txTracker) addTx(txID flowsdk.Identifier,
 		onErrorCallback:     onErrorCallback,
 		onSealCallback:      onSealCallback,
 		onFinalizedCallback: onFinalizedCallback,
+		createdAt:           time.Now(),
 	}
 	fmt.Println("tx added ", txID)
 	txt.txs <- newTx
@@ -331,12 +333,13 @@ func (txt *txTracker) run() {
 					if tx.onFinalizedCallback != nil {
 						go tx.onFinalizedCallback(tx.txID, result)
 					}
-					fmt.Println("tx ", tx.txID, "finalized")
+					tx.lastStatus = flowsdk.TransactionStatusFinalized
+					fmt.Println("tx ", tx.txID, "finalized in seconds: ", time.Since(tx.createdAt).Seconds)
 				case flowsdk.TransactionStatusSealed:
 					if tx.onSealCallback != nil {
 						go tx.onSealCallback(tx.txID, result)
 					}
-					fmt.Println("tx ", tx.txID, "sealed")
+					fmt.Println("tx ", tx.txID, "sealed in seconds: ", time.Since(tx.createdAt).Seconds)
 					continue
 				}
 			}
