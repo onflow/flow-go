@@ -12,9 +12,8 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestGenerateGenesisState(t *testing.T) {
+func TestBootstrapLedger(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dbDir string) {
-
 		metricsCollector := &metrics.NoopCollector{}
 		ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 		require.NoError(t, err)
@@ -32,11 +31,11 @@ func TestGenerateGenesisState(t *testing.T) {
 	})
 }
 
-func TestGenerateGenesisState_ZeroTokenSupply(t *testing.T) {
-	var expectedStateCommitment, _ = hex.DecodeString("9e9cb57df31949260de41afa7fe534396f04bfeb54279ad8aef5922a3974cbf0")
+func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
+	var expectedStateCommitment, err = hex.DecodeString("9e9cb57df31949260de41afa7fe534396f04bfeb54279ad8aef5922a3974cbf0")
+	require.NoError(t, err)
 
 	unittest.RunWithTempDir(t, func(dbDir string) {
-
 		metricsCollector := &metrics.NoopCollector{}
 		ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 		require.NoError(t, err)
