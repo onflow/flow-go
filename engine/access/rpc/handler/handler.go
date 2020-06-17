@@ -18,24 +18,26 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-// Handler implements the Access API. It spans multiple files
-// Transaction related calls are handled in handler handler_transaction
-// Block Header related calls are handled in handler handler_block_header
-// Block details related calls are handled in handler handler_block_details
-// All remaining calls are handled in this file
+// Handler implements the Access API. It is composed of several sub-handlers that implement part of the Access API.
+// Script related calls are handled by handlerScript
+// Transaction related calls are handled by handlerTransactions
+// Block Header related calls are handled by handlerBlockHeader
+// Block details related calls are handled by handlerBlockDetails
+// Event related calls are handled by handlerEvents
+// All remaining calls are handled in this file by Handler
 type Handler struct {
+	handlerScript
+	handlerTransaction
+	handlerEvents
+	handlerBlockHeader
+	handlerBlockDetails
+
 	executionRPC  execution.ExecutionAPIClient
-	collectionRPC access.AccessAPIClient
-	log           zerolog.Logger
 	state         protocol.State
 
-	// storage
-	blocks       storage.Blocks
-	headers      storage.Headers
-	collections  storage.Collections
-	transactions storage.Transactions
 }
 
+// static compile time check to make sure the aggregated handler implements the Access API
 var _ access.AccessAPIServer = &Handler{}
 
 func NewHandler(log zerolog.Logger,
@@ -46,15 +48,37 @@ func NewHandler(log zerolog.Logger,
 	headers storage.Headers,
 	collections storage.Collections,
 	transactions storage.Transactions) *Handler {
+
 	return &Handler{
 		executionRPC:  e,
-		collectionRPC: c,
-		blocks:        blocks,
-		headers:       headers,
-		collections:   collections,
-		transactions:  transactions,
 		state:         s,
-		log:           log,
+		// create the sub-handlers
+		handlerScript: handlerScript{
+			headers: headers,
+			executionRPC: e,
+			state: s,
+		},
+		handlerTransaction: handlerTransaction{
+			collectionRPC: c,
+			executionRPC: e,
+			state: s,
+			collections: collections,
+			blocks: blocks,
+			transactions: transactions,
+		},
+		handlerEvents: handlerEvents{
+			executionRPC: e,
+			state: s,
+			blocks: blocks,
+		},
+		handlerBlockHeader: handlerBlockHeader {
+			headers: headers,
+			state: s,
+		},
+		handlerBlockDetails: handlerBlockDetails{
+			blocks: blocks,
+			state: s,
+		},
 	}
 }
 

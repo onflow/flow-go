@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -13,11 +14,21 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 )
 
+type handlerTransaction struct {
+	collectionRPC access.AccessAPIClient
+	executionRPC  execution.ExecutionAPIClient
+	transactions storage.Transactions
+	collections  storage.Collections
+	blocks       storage.Blocks
+	state         protocol.State
+}
+
 // SendTransaction forwards the transaction to the collection node
-func (h *Handler) SendTransaction(ctx context.Context, req *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {
+func (h *handlerTransaction) SendTransaction(ctx context.Context, req *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {
 
 	// send the transaction to the collection node
 	resp, err := h.collectionRPC.SendTransaction(ctx, req)
@@ -40,7 +51,7 @@ func (h *Handler) SendTransaction(ctx context.Context, req *access.SendTransacti
 	return resp, nil
 }
 
-func (h *Handler) GetTransaction(_ context.Context, req *access.GetTransactionRequest) (*access.TransactionResponse, error) {
+func (h *handlerTransaction) GetTransaction(_ context.Context, req *access.GetTransactionRequest) (*access.TransactionResponse, error) {
 
 	id := flow.HashToID(req.Id)
 	// look up transaction from storage
@@ -59,7 +70,7 @@ func (h *Handler) GetTransaction(_ context.Context, req *access.GetTransactionRe
 	return resp, nil
 }
 
-func (h *Handler) GetTransactionResult(ctx context.Context, req *access.GetTransactionRequest) (*access.TransactionResultResponse, error) {
+func (h *handlerTransaction) GetTransactionResult(ctx context.Context, req *access.GetTransactionRequest) (*access.TransactionResultResponse, error) {
 
 	id := flow.HashToID(req.GetId())
 
@@ -97,7 +108,7 @@ func (h *Handler) GetTransactionResult(ctx context.Context, req *access.GetTrans
 }
 
 // deriveTransactionStatus derives the transaction status based on current protocol state
-func (h *Handler) deriveTransactionStatus(tx *flow.TransactionBody, executed bool) (entities.TransactionStatus, error) {
+func (h *handlerTransaction) deriveTransactionStatus(tx *flow.TransactionBody, executed bool) (entities.TransactionStatus, error) {
 
 	block, err := h.lookupBlock(tx.ID())
 	if errors.Is(err, storage.ErrNotFound) {
@@ -149,7 +160,7 @@ func (h *Handler) deriveTransactionStatus(tx *flow.TransactionBody, executed boo
 	return entities.TransactionStatus_FINALIZED, nil
 }
 
-func (h *Handler) lookupBlock(txID flow.Identifier) (*flow.Block, error) {
+func (h *handlerTransaction) lookupBlock(txID flow.Identifier) (*flow.Block, error) {
 
 	collection, err := h.collections.LightByTransactionID(txID)
 	if err != nil {
@@ -164,7 +175,7 @@ func (h *Handler) lookupBlock(txID flow.Identifier) (*flow.Block, error) {
 	return block, nil
 }
 
-func (h *Handler) lookupTransactionResult(ctx context.Context, txID flow.Identifier) (bool, []*entities.Event, uint32, string, error) {
+func (h *handlerTransaction) lookupTransactionResult(ctx context.Context, txID flow.Identifier) (bool, []*entities.Event, uint32, string, error) {
 
 	// find the block ID for the transaction
 	block, err := h.lookupBlock(txID)
@@ -187,4 +198,29 @@ func (h *Handler) lookupTransactionResult(ctx context.Context, txID flow.Identif
 	}
 	// considered executed as long as some result is returned, even if it's an error
 	return true, events, txStatus, message, nil
+}
+
+func (h *handlerTransaction) getTransactionResultFromExecutionNode(ctx context.Context,
+	blockID []byte,
+	transactionID []byte) ([]*entities.Event, uint32, string, error) {
+
+	// create an execution API request for events at blockID and transactionID
+	req := execution.GetTransactionResultRequest{
+		BlockId:       blockID,
+		TransactionId: transactionID,
+	}
+
+	// call the execution node gRPC
+	resp, err := h.executionRPC.GetTransactionResult(ctx, &req)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, 0, "", err
+		}
+
+		return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
+	}
+
+	exeResults := resp.GetEvents()
+
+	return exeResults, resp.GetStatusCode(), resp.GetErrorMessage(), nil
 }

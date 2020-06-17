@@ -7,9 +7,16 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
-func (h *Handler) GetLatestBlock(_ context.Context, req *access.GetLatestBlockRequest) (*access.BlockResponse, error) {
+type handlerBlockDetails struct {
+	blocks storage.Blocks
+	state protocol.State
+}
+
+func (h *handlerBlockDetails) GetLatestBlock(_ context.Context, req *access.GetLatestBlockRequest) (*access.BlockResponse, error) {
 	var header *flow.Header
 	var err error
 	if req.IsSealed {
@@ -34,7 +41,7 @@ func (h *Handler) GetLatestBlock(_ context.Context, req *access.GetLatestBlockRe
 	return createBlockResponse(block)
 }
 
-func (h *Handler) GetBlockByID(_ context.Context, req *access.GetBlockByIDRequest) (*access.BlockResponse, error) {
+func (h *handlerBlockDetails) GetBlockByID(_ context.Context, req *access.GetBlockByIDRequest) (*access.BlockResponse, error) {
 
 	id := flow.HashToID(req.Id)
 	block, err := h.blocks.ByID(id)
@@ -46,7 +53,7 @@ func (h *Handler) GetBlockByID(_ context.Context, req *access.GetBlockByIDReques
 	return createBlockResponse(block)
 }
 
-func (h *Handler) GetBlockByHeight(_ context.Context, req *access.GetBlockByHeightRequest) (*access.BlockResponse, error) {
+func (h *handlerBlockDetails) GetBlockByHeight(_ context.Context, req *access.GetBlockByHeightRequest) (*access.BlockResponse, error) {
 
 	block, err := h.blocks.ByHeight(req.Height)
 	if err != nil {

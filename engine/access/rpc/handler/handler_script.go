@@ -8,9 +8,18 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
+
+	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
-func (h *Handler) ExecuteScriptAtLatestBlock(ctx context.Context,
+type handlerScript struct {
+	headers      storage.Headers
+	state         protocol.State
+	executionRPC  execution.ExecutionAPIClient
+}
+
+func (h *handlerScript) ExecuteScriptAtLatestBlock(ctx context.Context,
 	req *access.ExecuteScriptAtLatestBlockRequest) (*access.ExecuteScriptResponse, error) {
 
 	// get the latest sealed header
@@ -26,7 +35,7 @@ func (h *Handler) ExecuteScriptAtLatestBlock(ctx context.Context,
 	return h.executeScriptOnExecutionNode(ctx, latestBlockID[:], req.Script)
 }
 
-func (h *Handler) ExecuteScriptAtBlockID(ctx context.Context,
+func (h *handlerScript) ExecuteScriptAtBlockID(ctx context.Context,
 	req *access.ExecuteScriptAtBlockIDRequest) (*access.ExecuteScriptResponse, error) {
 
 	blockID := req.GetBlockId()
@@ -40,7 +49,7 @@ func (h *Handler) ExecuteScriptAtBlockID(ctx context.Context,
 	return h.executeScriptOnExecutionNode(ctx, blockID, req.Script)
 }
 
-func (h *Handler) ExecuteScriptAtBlockHeight(ctx context.Context,
+func (h *handlerScript) ExecuteScriptAtBlockHeight(ctx context.Context,
 	req *access.ExecuteScriptAtBlockHeightRequest) (*access.ExecuteScriptResponse, error) {
 
 	height := req.GetBlockHeight()
@@ -60,7 +69,7 @@ func (h *Handler) ExecuteScriptAtBlockHeight(ctx context.Context,
 
 // executeScriptOnExecutionNode forwards the request to the execution node using the execution node
 // grpc client and converts the response back to the access node api response format
-func (h *Handler) executeScriptOnExecutionNode(ctx context.Context,
+func (h *handlerScript) executeScriptOnExecutionNode(ctx context.Context,
 	blockID []byte,
 	script []byte) (*access.ExecuteScriptResponse, error) {
 
