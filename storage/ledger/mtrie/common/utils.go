@@ -102,3 +102,11 @@ func GetRandomValues(n int, maxByteSize int) [][]byte {
 	}
 	return values
 }
+
+// MaxUint16 returns the max value of two uint16
+func MaxUint16(a, b uint16) uint16 {
+	if a > b {
+		return a
+	}
+	return b
+}

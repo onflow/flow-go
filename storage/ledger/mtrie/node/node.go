@@ -33,12 +33,14 @@ type Node struct {
 	key       []byte
 	value     []byte
 	hashValue []byte
+	maxDepth  uint16 // captures the longest path from this node to compacted leafs in the subtree
+	regCount  uint64 // number of registers allocated in the subtree
 }
 
 // NewNode creates a new Node.
 // UNCHECKED requirement: combination of values must conform to
 // a valid node type (see documentation of `Node` for details)
-func NewNode(height int, lchild, rchild *Node, key, value, hashValue []byte) *Node {
+func NewNode(height int, lchild, rchild *Node, key, value, hashValue []byte, maxDepth uint16, regCount uint64) *Node {
 	n := &Node{
 		lChild:    lchild,
 		rChild:    rchild,
@@ -46,6 +48,8 @@ func NewNode(height int, lchild, rchild *Node, key, value, hashValue []byte) *No
 		key:       key,
 		value:     value,
 		hashValue: hashValue,
+		maxDepth:  maxDepth,
+		regCount:  regCount,
 	}
 	return n
 }
@@ -54,11 +58,13 @@ func NewNode(height int, lchild, rchild *Node, key, value, hashValue []byte) *No
 // UNCHECKED requirement: height must be non-negative
 func NewEmptyTreeRoot(height int) *Node {
 	n := &Node{
-		lChild: nil,
-		rChild: nil,
-		height: height,
-		key:    nil,
-		value:  nil,
+		lChild:   nil,
+		rChild:   nil,
+		height:   height,
+		key:      nil,
+		value:    nil,
+		maxDepth: 0,
+		regCount: 0,
 	}
 	n.hashValue = n.computeNodeHash()
 	return n
@@ -67,12 +73,18 @@ func NewEmptyTreeRoot(height int) *Node {
 // NewLeaf creates a compact leaf Node
 // UNCHECKED requirement: height must be non-negative
 func NewLeaf(key, value []byte, height int) *Node {
+	regCount := uint64(0)
+	if key != nil {
+		regCount = uint64(1)
+	}
 	n := &Node{
-		lChild: nil,
-		rChild: nil,
-		height: height,
-		key:    key,
-		value:  value,
+		lChild:   nil,
+		rChild:   nil,
+		height:   height,
+		key:      key,
+		value:    value,
+		maxDepth: 0,
+		regCount: regCount,
 	}
 	n.hashValue = n.computeNodeHash()
 	return n
@@ -82,11 +94,13 @@ func NewLeaf(key, value []byte, height int) *Node {
 // UNCHECKED requirement: lchild.height and rchild.height must be smaller than height
 func NewInterimNode(height int, lchild, rchild *Node) *Node {
 	n := &Node{
-		lChild: lchild,
-		rChild: rchild,
-		height: height,
-		key:    nil,
-		value:  nil,
+		lChild:   lchild,
+		rChild:   rchild,
+		height:   height,
+		key:      nil,
+		value:    nil,
+		maxDepth: common.MaxUint16(lchild.maxDepth, rchild.maxDepth) + uint16(1),
+		regCount: lchild.regCount + rchild.regCount,
 	}
 	n.hashValue = n.computeNodeHash()
 	return n
@@ -126,6 +140,13 @@ func (n *Node) Hash() []byte { return n.hashValue }
 // Per definition, the height of a node v in a tree is the number
 // of edges on the longest downward path between v and a tree leaf.
 func (n *Node) Height() int { return n.height }
+
+// MaxDepth returns the longest path from this node to compacted leafs in the subtree.
+// in contrast to the Height, this value captures compactness of the subtrie.
+func (n *Node) MaxDepth() uint16 { return n.maxDepth }
+
+// RegCount returns number of registers allocated in the subtrie of this node.
+func (n *Node) RegCount() uint64 { return n.regCount }
 
 // Key returns the the Node's register key.
 // The present node is a LEAF node, if and only if the returned key is NOT NULL.
