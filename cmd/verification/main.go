@@ -63,6 +63,7 @@ func main() {
 		pendingResults      *stdmap.PendingResults
 		conCache            *buffer.PendingBlocks
 		receiptIDsByBlock   *stdmap.IdentifierMap
+		receiptIDsByResult  *stdmap.IdentifierMap
 		matchChunks         *match.Chunks
 		headerStorage       *storage.Headers
 		processedResultsIDs *stdmap.Identifiers
@@ -97,6 +98,14 @@ func main() {
 		}).
 		Module("pending receipt ids by block mempool", func(node *cmd.FlowNodeBuilder) error {
 			receiptIDsByBlock, err = stdmap.NewIdentifierMap(receiptLimit)
+			if err != nil {
+				return err
+			}
+			// TODO needs a metric registration
+			return nil
+		}).
+		Module("pending receipt ids by result mempool", func(node *cmd.FlowNodeBuilder) error {
+			receiptIDsByResult, err = stdmap.NewIdentifierMap(receiptLimit)
 			if err != nil {
 				return err
 			}
@@ -162,7 +171,8 @@ func main() {
 				pendingReceipts,
 				headerStorage,
 				processedResultsIDs,
-				receiptIDsByBlock)
+				receiptIDsByBlock,
+				receiptIDsByResult)
 			return finderEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {

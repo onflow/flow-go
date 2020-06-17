@@ -17,14 +17,15 @@ import (
 )
 
 type Engine struct {
-	unit            *engine.Unit
-	log             zerolog.Logger
-	me              module.Local
-	match           network.Engine
-	receipts        mempool.PendingReceipts // used to keep the receipts as mempool
-	headerStorage   storage.Headers         // used to check block existence before verifying
-	processedResult mempool.Identifiers     // used to keep track of the processed results
-	receiptsByBlock mempool.IdentifierMap   // used as a mapping to keep track of receipt associated with a block
+	unit             *engine.Unit
+	log              zerolog.Logger
+	me               module.Local
+	match            network.Engine
+	receipts         mempool.PendingReceipts // used to keep the receipts as mempool
+	headerStorage    storage.Headers         // used to check block existence before verifying
+	processedResult  mempool.Identifiers     // used to keep track of the processed results
+	receiptsByBlock  mempool.IdentifierMap   // used as a mapping to keep track of receipts associated with a block
+	receiptsByResult mempool.IdentifierMap   // used as a mapping to keep track of receipts with the same result
 }
 
 func New(
@@ -36,16 +37,18 @@ func New(
 	headerStorage storage.Headers,
 	processedResults mempool.Identifiers,
 	receiptsByBlock mempool.IdentifierMap,
+	receiptsByResult mempool.IdentifierMap,
 ) (*Engine, error) {
 	e := &Engine{
-		unit:            engine.NewUnit(),
-		log:             log.With().Str("engine", "finder").Logger(),
-		me:              me,
-		match:           match,
-		headerStorage:   headerStorage,
-		receipts:        receipts,
-		processedResult: processedResults,
-		receiptsByBlock: receiptsByBlock,
+		unit:             engine.NewUnit(),
+		log:              log.With().Str("engine", "finder").Logger(),
+		me:               me,
+		match:            match,
+		headerStorage:    headerStorage,
+		receipts:         receipts,
+		processedResult:  processedResults,
+		receiptsByBlock:  receiptsByBlock,
+		receiptsByResult: receiptsByResult,
 	}
 
 	_, err := net.Register(engine.ExecutionReceiptProvider, e)
