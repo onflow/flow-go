@@ -1,7 +1,37 @@
-# Cryptography
+# Flow Cryptography
 
-This package contains all the cryptography tools needed in Flow across all the protocol streams.  
-Some tools offer cryptographic services that can be used in other contexts and projects while others are specific to Flow. 
+The Go package provides all the cryptography tools needed by Flow blockchain.  
+Most of the primitives and protocols can be used in other projects and are not specific to Flow.
+
+Flow is an ongoing project, new features will still be added and modifications will still be made to improve security and performance.
+
+The cryptography primitives do not provide any security against side channel or tampering attacks.
+
+## Package import
+
+Flow Cryptography is written in Go and C. Some primitives are using [Relic library](https://github.com/relic-toolkit). 
+
+Cloning the entire Flow repository and following the [installation steps](https://github.com/dapperlabs/flow-go) does the necessary build to use Flow cryptography. 
+
+<!--- If you only wish to import the Flow cryptography package to your Go project, please follow the following steps:
+
+- Get Flow cryptography package
+```
+go get "github.com/dapperlabs/flow-go/crypto"
+```
+- Install [CMake](https://cmake.org/install/), which is used for building the package.
+- Build the package dependencies
+```
+cd $GOPATH/pkg/mod/github.com/flow-go/crypto
+go generate
+``` -->
+
+
+
+
+
+
+
 
 ## Hashing
 
