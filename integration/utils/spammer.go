@@ -331,10 +331,12 @@ func (txt *txTracker) run() {
 					if tx.onFinalizedCallback != nil {
 						go tx.onFinalizedCallback(tx.txID, result)
 					}
+					fmt.Println("tx ", tx.txID, "finalized")
 				case flowsdk.TransactionStatusSealed:
 					if tx.onSealCallback != nil {
 						go tx.onSealCallback(tx.txID, result)
 					}
+					fmt.Println("tx ", tx.txID, "sealed")
 					continue
 				}
 			}
@@ -392,9 +394,9 @@ func waitForFinalized(ctx context.Context, c *client.Client, id flowsdk.Identifi
 
 func main() {
 
-	serviceAccountAddressHex := "9a0766d93b6608b7"
-	fungibleTokenAddressHex := "7e60df042a9c0868"
-	flowTokenAddressHex := "912d5440f7e3769e"
+	serviceAccountAddressHex := "8c5303eaa26202d6"
+	fungibleTokenAddressHex := "9a0766d93b6608b7"
+	flowTokenAddressHex := "7e60df042a9c0868"
 
 	serviceAccountPrivateKeyBytes, err := hex.DecodeString(unittest.ServiceAccountPrivateKeyHex)
 	if err != nil {
