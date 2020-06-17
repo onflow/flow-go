@@ -177,10 +177,8 @@ func main() {
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rt := runtime.NewInterpreterRuntime()
-			vm, err := fvm.New(rt, node.RootChainID.Chain())
-			if err != nil {
-				return nil, err
-			}
+			vm := fvm.New(rt, node.RootChainID.Chain())
+
 			chunkVerifier := chunks.NewChunkVerifier(vm, node.Storage.Blocks)
 			verifierEng, err = verifier.New(node.Logger, collector, node.Tracer, node.Network, node.State, node.Me,
 				chunkVerifier)
