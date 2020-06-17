@@ -7,23 +7,23 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func Transaction(tx *flow.TransactionBody) *InvokableTransaction {
-	return &InvokableTransaction{tx: tx}
+func Transaction(tx *flow.TransactionBody) InvokableTransaction {
+	return InvokableTransaction{tx: tx}
 }
 
 type InvokableTransaction struct {
 	tx *flow.TransactionBody
 }
 
-func (i *InvokableTransaction) Transaction() *flow.TransactionBody {
+func (i InvokableTransaction) Transaction() *flow.TransactionBody {
 	return i.tx
 }
 
-func (i *InvokableTransaction) Parse(ctx Context, ledger Ledger) (Invokable, error) {
+func (i InvokableTransaction) Parse(ctx Context, ledger Ledger) (Invokable, error) {
 	panic("implement me")
 }
 
-func (i *InvokableTransaction) Invoke(ctx Context, ledger Ledger) (*InvocationResult, error) {
+func (i InvokableTransaction) Invoke(ctx Context, ledger Ledger) (*InvocationResult, error) {
 	metaCtx := ctx.NewChild(
 		WithSignatureVerification(false),
 		WithFeePayments(false),
