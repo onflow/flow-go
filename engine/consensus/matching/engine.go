@@ -109,8 +109,10 @@ func (e *Engine) SubmitLocal(event interface{}) {
 func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
-		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+		if engine.IsInvalidInputError(err) {
+			e.log.Error().Str("error_type", "invalid_input").Err(err).Msg("matching received invalid event")
+		} else if err != nil {
+			e.log.Error().Err(err).Msg("matching could not process submitted event")
 		}
 	})
 }
@@ -162,27 +164,32 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 	// check the execution receipt is sent by its executor
 	if receipt.ExecutorID != originID {
-		return fmt.Errorf("invalid origin for receipt (executor: %x, origin: %x)", receipt.ExecutorID, originID)
+		return engine.NewInvalidInputErrorf("invalid origin for receipt (executor: %x, origin: %x)", receipt.ExecutorID, originID)
 	}
 
 	// get the identity of the origin node, so we can check if it's a valid
 	// source for a execution receipt (usually execution nodes)
 	identity, err := e.state.Final().Identity(originID)
 	if err != nil {
+		if protocol.IsIdentityNotFound(err) {
+			return engine.NewInvalidInputErrorf("could not get executor identity: %w", err)
+		}
+
+		// unknown exception
 		return fmt.Errorf("could not get executor identity: %w", err)
 	}
 
 	// check that the origin is an execution node
 	if identity.Role != flow.RoleExecution {
-		return fmt.Errorf("invalid executor node role (%s)", identity.Role)
+		return engine.NewInvalidInputErrorf("invalid executor node role (%s)", identity.Role)
 	}
 
 	// check if the identity has a stake
 	if identity.Stake == 0 {
-		return fmt.Errorf("executor has zero stake (%x)", identity.NodeID)
+		return engine.NewInvalidInputErrorf("executor has zero stake (%x)", identity.NodeID)
 	}
 
-	// check if the result of this receipt is already in the dB
+	// check if the result of this receipt is already in the DB
 	result := &receipt.ExecutionResult
 	_, err = e.resultsDB.ByID(result.ID())
 	if err == nil {
@@ -233,24 +240,29 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 
 	// check approver matches the origin ID
 	if approval.Body.ApproverID != originID {
-		return fmt.Errorf("invalid origin for approval: %x", originID)
+		return engine.NewInvalidInputErrorf("invalid origin for approval: %x", originID)
 	}
 
 	// get the identity of the origin node, so we can check if it's a valid
 	// source for a result approval (usually verification node)
 	identity, err := e.state.Final().Identity(originID)
 	if err != nil {
-		return fmt.Errorf("could not get approval identity: %w", err)
+		if protocol.IsIdentityNotFound(err) {
+			return engine.NewInvalidInputErrorf("could not get approval identity: %w", err)
+		}
+
+		// unknown exception
+		return fmt.Errorf("could not get executor identity: %w", err)
 	}
 
 	// check that the origin is a verification node
 	if identity.Role != flow.RoleVerification {
-		return fmt.Errorf("invalid approver node role (%s)", identity.Role)
+		return engine.NewInvalidInputErrorf("invalid approver node role (%s)", identity.Role)
 	}
 
 	// check if the identity has a stake
 	if identity.Stake == 0 {
-		return fmt.Errorf("verifier has zero stake (%x)", identity.NodeID)
+		return engine.NewInvalidInputErrorf("verifier has zero stake (%x)", identity.NodeID)
 	}
 
 	// check if the result of this approval is already in the dB
