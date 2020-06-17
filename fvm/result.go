@@ -11,7 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-type Result struct {
+type InvocationResult struct {
 	ID      flow.Identifier
 	Value   cadence.Value
 	Events  []cadence.Event
@@ -20,11 +20,11 @@ type Result struct {
 	GasUsed uint64
 }
 
-func (r Result) Succeeded() bool {
+func (r InvocationResult) Succeeded() bool {
 	return r.Error == nil
 }
 
-func (r Result) TransactionEvents(txIndex uint32) ([]flow.Event, error) {
+func (r InvocationResult) TransactionEvents(txIndex uint32) ([]flow.Event, error) {
 	flowEvents := make([]flow.Event, len(r.Events))
 
 	for i, event := range r.Events {
@@ -45,18 +45,18 @@ func (r Result) TransactionEvents(txIndex uint32) ([]flow.Event, error) {
 	return flowEvents, nil
 }
 
-func createResult(
+func createInvocationResult(
 	id flow.Identifier,
 	value cadence.Value,
 	events []cadence.Event,
 	logs []string,
 	err error,
-) (*Result, error) {
+) (*InvocationResult, error) {
 	if err != nil {
 		possibleRuntimeError := runtime.Error{}
 		if errors.As(err, &possibleRuntimeError) {
 			// runtime errors occur when the execution reverts
-			return &Result{
+			return &InvocationResult{
 				ID: id,
 				Error: &CodeExecutionError{
 					RuntimeError: possibleRuntimeError,
@@ -69,7 +69,7 @@ func createResult(
 		return nil, err
 	}
 
-	return &Result{
+	return &InvocationResult{
 		ID:      id,
 		Value:   value,
 		Events:  events,
