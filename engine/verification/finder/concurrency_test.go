@@ -185,8 +185,11 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	unittest.RequireReturnsBefore(t, matchEngWG.Wait, time.Duration(senderCount*chunksNum*erCount*5)*time.Second)
 
 	for _, er := range ers {
-		// all distinct execution results should be processed
+		// all distinct execution results should be marked as processed by finder engine
 		assert.True(t, verNode.IngestedResultIDs.Has(er.Receipt.ExecutionResult.ID()))
+
+		// no execution receipt should reside in mempool of finder engine
+		assert.False(t, verNode.PendingReceipts.Has(er.Receipt.ID()))
 	}
 
 	verNode.Done()
