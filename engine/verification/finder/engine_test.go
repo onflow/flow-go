@@ -33,7 +33,8 @@ type FinderEngineTestSuite struct {
 	// mock mempools
 	receipts           *mempool.PendingReceipts
 	processedResultIDs *mempool.Identifiers
-	receiptsByID       *mempool.IdentifierMap
+	receiptIDsByBlock  *mempool.IdentifierMap
+	receiptIDsByResult *mempool.IdentifierMap
 	headerStorage      *storage.Headers
 
 	// resources fixtures
@@ -67,7 +68,8 @@ func (suite *FinderEngineTestSuite) SetupTest() {
 	suite.headerStorage = &storage.Headers{}
 	suite.receipts = &mempool.PendingReceipts{}
 	suite.processedResultIDs = &mempool.Identifiers{}
-	suite.receiptsByID = &mempool.IdentifierMap{}
+	suite.receiptIDsByBlock = &mempool.IdentifierMap{}
+	suite.receiptIDsByResult = &mempool.IdentifierMap{}
 	suite.matchEng = &network.Engine{}
 
 	// generates an execution result with a single collection, chunk, and transaction.
@@ -106,7 +108,8 @@ func (suite *FinderEngineTestSuite) TestNewFinderEngine() *finder.Engine {
 		suite.receipts,
 		suite.headerStorage,
 		suite.processedResultIDs,
-		suite.receiptsByID)
+		suite.receiptIDsByBlock,
+		suite.receiptIDsByResult)
 	require.Nil(suite.T(), err, "could not create finder engine")
 
 	suite.net.AssertExpectations(suite.T())
@@ -212,7 +215,7 @@ func (suite *FinderEngineTestSuite) TestHandleReceipt_BlockMissing() {
 	suite.headerStorage.On("ByBlockID", suite.block.ID()).Return(nil, fmt.Errorf("block not available")).Once()
 
 	// mocks receipt ID added to pending receipts for block ID.
-	suite.receiptsByID.On("Append", suite.block.ID(), suite.receipt.ID()).Return(nil)
+	suite.receiptIDsByBlock.On("Append", suite.block.ID(), suite.receipt.ID()).Return(nil)
 
 	// should not be any attempt on sending result to match engine
 	suite.matchEng.AssertNotCalled(suite.T(), "Process", testifymock.Anything, testifymock.Anything)
