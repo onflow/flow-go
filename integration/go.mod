@@ -16,7 +16,7 @@ require (
 	github.com/stretchr/testify v1.5.1
 	github.com/zenazn/goji v0.9.0 // indirect
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
-	google.golang.org/grpc v1.28.0
+	google.golang.org/grpc v1.29.1
 	gopkg.in/yaml.v2 v2.2.5
 )
 
