@@ -37,7 +37,7 @@ type Handler struct {
 
 }
 
-// static compile time check to make sure the aggregated handler implements the Access API
+// compile time check to make sure the aggregated handler implements the Access API
 var _ access.AccessAPIServer = &Handler{}
 
 func NewHandler(log zerolog.Logger,
