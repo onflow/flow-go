@@ -211,6 +211,9 @@ func (suite *FinderEngineTestSuite) TestHandleReceipt_BlockMissing() {
 	// mocks adding receipt to the receipts mempool
 	suite.receipts.On("Add", suite.pendingReceipt).Return(true).Once()
 
+	// mocks adding receipt id to mapping mempool based on its result
+	suite.receiptIDsByResult.On("Append", suite.receipt.ExecutionResult.ID(), suite.receipt.ID()).Return(nil)
+
 	// mocks block associated with receipt missing
 	suite.headerStorage.On("ByBlockID", suite.block.ID()).Return(nil, fmt.Errorf("block not available")).Once()
 
