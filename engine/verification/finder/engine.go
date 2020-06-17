@@ -143,6 +143,12 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		return nil
 	}
 
+	// records the execution receipt id based on its result id
+	err := e.receiptsByResult.Append(resultID, receiptID)
+	if err != nil {
+		log.Debug().Err(err).Msg("could not add receipt id to receipts by result mempool")
+	}
+
 	log.Info().Msg("execution receipt successfully handled")
 
 	// checks receipt being processable
@@ -233,16 +239,20 @@ func (e *Engine) onResultProcessed(resultID flow.Identifier) {
 		log.Debug().Msg("result marked as processed")
 	}
 
+	// extracts all receipt ids with this result
+	prIDs, ok := e.receiptsByResult.Get(resultID)
+	if !ok {
+		log.Debug().Msg("could not retrieve receipt ids associated with this result")
+	}
+
 	// drops all receipts with the same result
-	for _, pr := range e.receipts.All() {
-		if pr.Receipt.ExecutionResult.ID() == resultID {
-			receiptID := pr.Receipt.ID()
-			removed := e.receipts.Rem(receiptID)
-			if removed {
-				log.Debug().
-					Hex("receipt_id", logging.ID(receiptID)).
-					Msg("processed result cleaned up")
-			}
+	for _, prID := range prIDs {
+		// removes receipt from mempool
+		removed := e.receipts.Rem(prID)
+		if removed {
+			log.Debug().
+				Hex("receipt_id", logging.ID(prID)).
+				Msg("receipt with processed result cleaned up")
 		}
 	}
 }
