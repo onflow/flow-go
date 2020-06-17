@@ -13,7 +13,6 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/module/trace"
-	"github.com/dapperlabs/flow-go/storage"
 )
 
 // A BlockComputer executes the transactions in a block.
@@ -22,17 +21,15 @@ type BlockComputer interface {
 }
 
 type blockComputer struct {
-	tracer module.Tracer
-	vm     fvm.VirtualMachine
-	blocks storage.Blocks
+	tracer  module.Tracer
+	execCtx fvm.Context
 }
 
 // NewBlockComputer creates a new block executor.
-func NewBlockComputer(vm fvm.VirtualMachine, tracer module.Tracer, blocks storage.Blocks) BlockComputer {
+func NewBlockComputer(execCtx fvm.Context, tracer module.Tracer) BlockComputer {
 	return &blockComputer{
-		tracer: tracer,
-		vm:     vm,
-		blocks: blocks,
+		tracer:  tracer,
+		execCtx: execCtx,
 	}
 }
 
@@ -64,7 +61,7 @@ func (e *blockComputer) executeBlock(
 	stateView *delta.View,
 ) (*execution.ComputationResult, error) {
 
-	blockCtx := e.vm.NewBlockContext(block.Block.Header, e.blocks)
+	blockCtx := e.execCtx.NewChild(fvm.WithBlockHeader(block.Block.Header))
 
 	collections := block.Collections()
 
@@ -112,7 +109,7 @@ func (e *blockComputer) executeBlock(
 func (e *blockComputer) executeCollection(
 	ctx context.Context,
 	txIndex uint32,
-	blockCtx fvm.BlockContext,
+	blockCtx fvm.Context,
 	collectionView *delta.View,
 	collection *entity.CompleteCollection,
 ) ([]flow.Event, []flow.TransactionResult, uint32, uint64, error) {
@@ -138,13 +135,13 @@ func (e *blockComputer) executeCollection(
 
 			txView := collectionView.NewChild()
 
-			result, err := blockCtx.ExecuteTransaction(txView, tx)
+			result, err := blockCtx.Invoke(fvm.Transaction(tx), txView)
 			if err != nil {
 				txIndex++
 				return fmt.Errorf("failed to execute transaction: %w", err)
 			}
 
-			txEvents, err := fvm.ConvertEvents(txIndex, result)
+			txEvents, err := result.TransactionEvents(txIndex)
 			txIndex++
 			gasUsed += result.GasUsed
 

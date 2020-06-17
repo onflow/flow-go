@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/onflow/cadence/runtime"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
@@ -15,10 +16,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/model/flow"
-	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -137,7 +136,7 @@ func CreateAccounts(
 	ledger fvm.Ledger,
 	privateKeys []flow.AccountPrivateKey,
 ) ([]flow.Address, error) {
-	ctx := vm.NewBlockContext(nil, new(storage.Blocks))
+	ctx := vm.NewContext(fvm.WithSignatureVerification(false))
 
 	var accounts []flow.Address
 
@@ -161,7 +160,7 @@ func CreateAccounts(
 			AddArgument(encCadAccountKey).
 			AddAuthorizer(flow.ServiceAddress())
 
-		result, err := ctx.ExecuteTransaction(ledger, tx, fvm.WithSignatureVerification(false))
+		result, err := ctx.Invoke(fvm.Transaction(tx), ledger)
 		if err != nil {
 			return nil, err
 		}
@@ -189,7 +188,14 @@ func CreateAccounts(
 
 func RootBootstrappedLedger() fvm.Ledger {
 	ledger := make(fvm.MapLedger)
-	bootstrap.BootstrapView(ledger, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply)
+
+	vm := fvm.New(runtime.NewInterpreterRuntime())
+
+	_, _ = vm.NewContext().Invoke(
+		fvm.Bootstrap(unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply),
+		ledger,
+	)
+
 	return ledger
 }
 

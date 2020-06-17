@@ -1,30 +1,30 @@
 package main
 
 import (
-    "bytes"
-    "fmt"
-    "os"
-    "path/filepath"
-    "time"
+	"bytes"
+	"fmt"
+	"os"
+	"path/filepath"
+	"time"
 
-    "github.com/onflow/cadence/runtime"
-    "github.com/spf13/pflag"
+	"github.com/onflow/cadence/runtime"
+	"github.com/spf13/pflag"
 
-    "github.com/dapperlabs/flow-go/cmd"
-    "github.com/dapperlabs/flow-go/engine/execution/computation"
-    "github.com/dapperlabs/flow-go/engine/execution/ingestion"
-    "github.com/dapperlabs/flow-go/engine/execution/provider"
-    "github.com/dapperlabs/flow-go/engine/execution/rpc"
-    "github.com/dapperlabs/flow-go/engine/execution/state"
-    "github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
-    "github.com/dapperlabs/flow-go/engine/execution/sync"
+	"github.com/dapperlabs/flow-go/cmd"
+	"github.com/dapperlabs/flow-go/engine/execution/computation"
+	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
+	"github.com/dapperlabs/flow-go/engine/execution/provider"
+	"github.com/dapperlabs/flow-go/engine/execution/rpc"
+	"github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
+	"github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/model/flow"
-    "github.com/dapperlabs/flow-go/module"
-    "github.com/dapperlabs/flow-go/module/metrics"
-    "github.com/dapperlabs/flow-go/storage"
-    "github.com/dapperlabs/flow-go/storage/badger"
-    "github.com/dapperlabs/flow-go/storage/ledger"
+	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/metrics"
+	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/storage/ledger"
 )
 
 func main() {
@@ -55,18 +55,16 @@ func main() {
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
-			vm, err := fvm.New(rt)
-			if err != nil {
-				return err
-			}
+			vm := fvm.New(rt)
+
+			execCtx := vm.NewContext(fvm.WithBlocks(node.Storage.Blocks))
 
 			computationManager = computation.New(
 				node.Logger,
 				node.Tracer,
 				node.Me,
 				node.State,
-				vm,
-				node.Storage.Blocks,
+				execCtx,
 			)
 
 			return nil
