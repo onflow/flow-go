@@ -277,7 +277,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		},
 	)
 
-	in.finalizer.On("MakePending", mock.Anything).Return(nil)
+	in.finalizer.On("MakeValid", mock.Anything).Return(nil)
 
 	// initialize error handling and logging
 	var err error
