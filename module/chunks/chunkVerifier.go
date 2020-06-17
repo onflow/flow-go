@@ -9,22 +9,19 @@ import (
 	"github.com/dapperlabs/flow-go/fvm"
 	chmodels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/ptrie"
 )
 
 // ChunkVerifier is a verifier based on the current definitions of the flow network
 type ChunkVerifier struct {
-	vm     fvm.VirtualMachine
-	blocks storage.Blocks
+	execCtx fvm.Context
 }
 
 // NewChunkVerifier creates a chunk verifier containing a flow virtual machine
-func NewChunkVerifier(vm fvm.VirtualMachine, blocks storage.Blocks) *ChunkVerifier {
+func NewChunkVerifier(execCtx fvm.Context) *ChunkVerifier {
 	return &ChunkVerifier{
-		vm:     vm,
-		blocks: blocks,
+		execCtx: execCtx,
 	}
 }
 
@@ -39,7 +36,7 @@ func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) (chmodels
 	execResID := vc.Result.ID()
 
 	// build a block context
-	blockCtx := fcv.vm.NewBlockContext(vc.Header, fcv.blocks)
+	blockCtx := fcv.execCtx.NewChild(fvm.WithBlockHeader(vc.Header))
 
 	// constructing a partial trie given chunk data package
 	if vc.ChunkDataPack == nil {
@@ -77,7 +74,7 @@ func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) (chmodels
 	for i, tx := range vc.Collection.Transactions {
 		txView := chunkView.NewChild()
 
-		result, err := blockCtx.ExecuteTransaction(txView, tx)
+		result, err := blockCtx.Invoke(fvm.Transaction(tx), txView)
 		if err != nil {
 			// this covers unexpected and very rare cases (e.g. system memory issues...),
 			// so we shouldn't be here even if transaction naturally fails (e.g. permission, runtime ... )
