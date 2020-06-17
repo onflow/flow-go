@@ -131,6 +131,9 @@ func (suite *FinderEngineTestSuite) TestHandleReceipt_HappyPath() {
 	// mocks adding receipt to the receipts mempool
 	suite.receipts.On("Add", suite.pendingReceipt).Return(true).Once()
 
+	// mocks adding receipt id to mapping mempool based on its result
+	suite.receiptIDsByResult.On("Append", suite.receipt.ExecutionResult.ID(), suite.receipt.ID()).Return(nil)
+
 	// mocks block associated with receipt
 	suite.headerStorage.On("ByBlockID", suite.block.ID()).Return(&flow.Header{}, nil).Once()
 
@@ -141,7 +144,7 @@ func (suite *FinderEngineTestSuite) TestHandleReceipt_HappyPath() {
 	suite.processedResultIDs.On("Add", suite.receipt.ExecutionResult.ID()).Return(true)
 
 	// mocks receipt clean up after result is processed
-	suite.receipts.On("All").Return([]*verification.PendingReceipt{suite.pendingReceipt})
+	suite.receiptIDsByResult.On("Get", suite.receipt.ExecutionResult.ID()).Return([]flow.Identifier{suite.receipt.ID()}, true)
 	suite.receipts.On("Rem", suite.receipt.ID()).Return(true)
 
 	// sends receipt to finder engine
