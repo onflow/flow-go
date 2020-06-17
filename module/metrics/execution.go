@@ -297,7 +297,7 @@ func (ec *ExecutionCollector) ForestNumberOfAllocatedRegisters(number uint64) {
 	ec.forestNumberOfAllocatedRegisters.Set(float64(number))
 }
 
-// ForestMaxDepth records maximum depth of the last updated trie
+// ForestMaxDepth records the maximum depth of the last updated trie
 func (ec *ExecutionCollector) ForestMaxDepth(number uint64) {
 	ec.forestMaxDepth.Set(float64(number))
 }

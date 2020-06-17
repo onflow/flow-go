@@ -156,7 +156,7 @@ type LedgerMetrics interface {
 	// ForestNumberOfAllocatedRegisters records number of unique register allocated (of the last updated trie)
 	ForestNumberOfAllocatedRegisters(number uint64)
 
-	// ForestMaxDepth records maximum depth of the last updated trie
+	// ForestMaxDepth records the maximum depth of the last updated trie
 	ForestMaxDepth(number uint64)
 
 	// UpdateCount increase a counter of performed updates
