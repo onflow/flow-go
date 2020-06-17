@@ -1,33 +1,79 @@
 package fvm
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// A TransactionResult is the result of executing a transaction.
-type TransactionResult struct {
-	TransactionID flow.Identifier
-	Events        []cadence.Event
-	Logs          []string
-	Error         FlowError
-	GasUsed       uint64
+type Result struct {
+	ID      flow.Identifier
+	Value   cadence.Value
+	Events  []cadence.Event
+	Logs    []string
+	Error   FlowError
+	GasUsed uint64
 }
 
-func (r TransactionResult) Succeeded() bool {
+func (r Result) Succeeded() bool {
 	return r.Error == nil
 }
 
-// A ScriptResult is the result of executing a script.
-type ScriptResult struct {
-	ScriptID flow.Identifier
-	Value    cadence.Value
-	Logs     []string
-	Error    FlowError
-	Events   []cadence.Event
+func (r Result) TransactionEvents(txIndex uint32) ([]flow.Event, error) {
+	flowEvents := make([]flow.Event, len(r.Events))
+
+	for i, event := range r.Events {
+		payload, err := jsoncdc.Encode(event)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode event: %w", err)
+		}
+
+		flowEvents[i] = flow.Event{
+			Type:             flow.EventType(event.EventType.ID()),
+			TransactionID:    r.ID,
+			TransactionIndex: txIndex,
+			EventIndex:       uint32(i),
+			Payload:          payload,
+		}
+	}
+
+	return flowEvents, nil
 }
 
-func (r ScriptResult) Succeeded() bool {
-	return r.Error == nil
+func createResult(
+	id flow.Identifier,
+	value cadence.Value,
+	events []cadence.Event,
+	logs []string,
+	err error,
+) (*Result, error) {
+	if err != nil {
+		possibleRuntimeError := runtime.Error{}
+		if errors.As(err, &possibleRuntimeError) {
+			// runtime errors occur when the execution reverts
+			return &Result{
+				ID: id,
+				Error: &CodeExecutionError{
+					RuntimeError: possibleRuntimeError,
+				},
+				Logs: logs,
+			}, nil
+		}
+
+		// other errors are unexpected and should be treated as fatal
+		return nil, err
+	}
+
+	return &Result{
+		ID:      id,
+		Value:   value,
+		Events:  events,
+		Logs:    logs,
+		GasUsed: 0,
+	}, nil
 }
