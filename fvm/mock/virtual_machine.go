@@ -2,7 +2,6 @@
 
 package mock
 
-import flow "github.com/dapperlabs/flow-go/model/flow"
 import fvm "github.com/dapperlabs/flow-go/fvm"
 import mock "github.com/stretchr/testify/mock"
 
@@ -11,32 +10,22 @@ type VirtualMachine struct {
 	mock.Mock
 }
 
-// ASTCache provides a mock function with given fields:
-func (_m *VirtualMachine) ASTCache() fvm.ASTCache {
-	ret := _m.Called()
-
-	var r0 fvm.ASTCache
-	if rf, ok := ret.Get(0).(func() fvm.ASTCache); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(fvm.ASTCache)
-		}
+// NewContext provides a mock function with given fields: opts
+func (_m *VirtualMachine) NewContext(opts ...fvm.Option) fvm.Context {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
 	}
+	var _ca []interface{}
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
-	return r0
-}
-
-// NewBlockContext provides a mock function with given fields: b, blocks
-func (_m *VirtualMachine) NewBlockContext(b *flow.Header, blocks fvm.Blocks) fvm.BlockContext {
-	ret := _m.Called(b, blocks)
-
-	var r0 fvm.BlockContext
-	if rf, ok := ret.Get(0).(func(*flow.Header, fvm.Blocks) fvm.BlockContext); ok {
-		r0 = rf(b, blocks)
+	var r0 fvm.Context
+	if rf, ok := ret.Get(0).(func(...fvm.Option) fvm.Context); ok {
+		r0 = rf(opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(fvm.BlockContext)
+			r0 = ret.Get(0).(fvm.Context)
 		}
 	}
 

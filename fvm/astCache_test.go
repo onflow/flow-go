@@ -13,18 +13,23 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/fvm"
-	vmMock "github.com/dapperlabs/flow-go/fvm/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/hash"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
+const CacheSize = 256
+
 func TestTransactionASTCache(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
-	vm, err := fvm.New(rt)
+
+	vm := fvm.New(rt)
+
+	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
-	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
+
+	bc := vm.NewContext(fvm.WithBlockHeader(&h), fvm.WithCache(cache))
 
 	t.Run("transaction execution results in cached program", func(t *testing.T) {
 		tx := &flow.TransactionBody{
@@ -41,7 +46,7 @@ func TestTransactionASTCache(t *testing.T) {
 
 		ledger := testutil.RootBootstrappedLedger()
 
-		result, err := bc.ExecuteTransaction(ledger, tx)
+		result, err := bc.Invoke(fvm.Transaction(tx), ledger)
 		require.NoError(t, err)
 
 		require.True(t, result.Succeeded())
@@ -52,7 +57,7 @@ func TestTransactionASTCache(t *testing.T) {
 		location := runtime.TransactionLocation(txID[:])
 
 		// Get cached program
-		program, err := vm.ASTCache().GetProgram(location)
+		program, err := cache.GetProgram(location)
 		require.NotNil(t, program)
 		require.NoError(t, err)
 	})
@@ -62,10 +67,13 @@ func TestTransactionASTCache(t *testing.T) {
 func TestScriptASTCache(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
-	vm, err := fvm.New(rt)
 
+	vm := fvm.New(rt)
+
+	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
-	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
+
+	bc := vm.NewContext(fvm.WithBlockHeader(&h), fvm.WithCache(cache))
 
 	t.Run("script execution results in cached program", func(t *testing.T) {
 		script := []byte(`
@@ -76,7 +84,7 @@ func TestScriptASTCache(t *testing.T) {
 
 		ledger := testutil.RootBootstrappedLedger()
 
-		result, err := bc.ExecuteScript(ledger, script)
+		result, err := bc.Invoke(fvm.Script(script), ledger)
 		require.NoError(t, err)
 		require.True(t, result.Succeeded())
 
@@ -85,7 +93,7 @@ func TestScriptASTCache(t *testing.T) {
 		location := runtime.ScriptLocation(scriptHash)
 
 		// Get cached program
-		program, err := vm.ASTCache().GetProgram(location)
+		program, err := cache.GetProgram(location)
 		require.NotNil(t, program)
 		require.NoError(t, err)
 
@@ -96,9 +104,12 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := fvm.New(rt)
+	vm := fvm.New(rt)
+
+	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
-	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
+
+	bc := vm.NewContext(fvm.WithBlockHeader(&h), fvm.WithCache(cache))
 
 	// Create a number of account private keys.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -133,7 +144,7 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 	require.NoError(t, err)
 
 	// Run the Use import (FT Vault resource) transaction
-	result, err := bc.ExecuteTransaction(ledger, useImportTx)
+	result, err := bc.Invoke(fvm.Transaction(useImportTx), ledger)
 	require.NoError(t, err)
 
 	if !assert.Nil(t, result.Error) {
@@ -145,7 +156,7 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 	location := runtime.TransactionLocation(txID[:])
 
 	// Get cached program
-	program, err := vm.ASTCache().GetProgram(location)
+	program, err := cache.GetProgram(location)
 	require.NotNil(t, program)
 	require.NoError(t, err)
 }
@@ -154,9 +165,8 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := fvm.New(rt)
-	require.NoError(b, err)
-	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
+	vm := fvm.New(rt)
+	bc := vm.NewContext(fvm.WithBlockHeader(&h))
 
 	// Create a number of account private keys.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -202,7 +212,7 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		for _, tx := range txs {
 			// Run the Use import (FT Vault resource) transaction.
-			result, err := bc.ExecuteTransaction(ledger, tx)
+			result, err := bc.Invoke(fvm.Transaction(tx), ledger)
 			require.NoError(b, err)
 
 			if !assert.Nil(b, result.Error) {
@@ -227,9 +237,8 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := fvm.NewWithCache(rt, &nonFunctioningCache{})
-	require.NoError(b, err)
-	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
+	vm := fvm.New(rt)
+	bc := vm.NewContext(fvm.WithBlockHeader(&h), fvm.WithCache(&nonFunctioningCache{}))
 
 	// Create a number of account private keys.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -272,7 +281,7 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		for _, tx := range txs {
 			// Run the Use import (FT Vault resource) transaction.
-			result, err := bc.ExecuteTransaction(ledger, tx)
+			result, err := bc.Invoke(fvm.Transaction(tx), ledger)
 			require.True(b, result.Succeeded())
 			require.NoError(b, err)
 		}
@@ -283,9 +292,12 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 	h := unittest.BlockHeaderFixture()
 
-	vm, err := fvm.New(rt)
+	vm := fvm.New(rt)
+
+	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
-	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
+
+	bc := vm.NewContext(fvm.WithBlockHeader(&h), fvm.WithCache(cache))
 
 	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
 	ledger := testutil.RootBootstrappedLedger()
@@ -296,14 +308,17 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 		go func(id int, wg *sync.WaitGroup) {
 			defer wg.Done()
 			view := delta.NewView(ledger.Get)
-			result, err := bc.ExecuteScript(view, []byte(fmt.Sprintf(`
+
+			script := []byte(fmt.Sprintf(`
 				import FlowToken from 0x%s
 				pub fun main() {
 					log("Script %d")
 					let v <- FlowToken.createEmptyVault()
 					destroy v
 				}
-			`, fvm.FlowTokenAddress(), id)))
+			`, fvm.FlowTokenAddress(), id))
+
+			result, err := bc.Invoke(fvm.Script(script), view)
 			if !assert.True(t, result.Succeeded()) {
 				t.Log(result.Error.ErrorMessage())
 			}
@@ -316,7 +331,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 	location := runtime.AddressLocation(fvm.FlowTokenAddress().Bytes())
 
 	// Get cached program
-	program, err := vm.ASTCache().GetProgram(location)
+	program, err := cache.GetProgram(location)
 	require.NotNil(t, program)
 	require.NoError(t, err)
 }
