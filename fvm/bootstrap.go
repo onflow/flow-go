@@ -33,7 +33,7 @@ func (b *bootstrap) Parse(ctx Context, ledger Ledger) (Invokable, error) {
 	return b, nil
 }
 
-func (b *bootstrap) Invoke(ctx Context, ledger Ledger) (*Result, error) {
+func (b *bootstrap) Invoke(ctx Context, ledger Ledger) (*InvocationResult, error) {
 	b.metaCtx = ctx.NewChild(
 		WithSignatureVerification(false),
 		WithFeePayments(false),
@@ -81,7 +81,7 @@ func (b *bootstrap) createServiceAccount(accountKey flow.AccountPublicKey) flow.
 func (b *bootstrap) deployFungibleToken() flow.Address {
 	fungibleToken := b.createAccount()
 
-	result := b.invoke(deployContractTransaction(fungibleToken, contracts.FungibleToken()))
+	result := b.mustInvoke(deployContractTransaction(fungibleToken, contracts.FungibleToken()))
 	if result.Error != nil {
 		panic(fmt.Sprintf("failed to deploy fungible token contract: %s", result.Error.ErrorMessage()))
 	}
@@ -94,9 +94,9 @@ func (b *bootstrap) deployFlowToken(service, fungibleToken flow.Address) flow.Ad
 
 	contract := contracts.FlowToken(fungibleToken.Hex())
 
-	result := b.invoke(deployFlowTokenTransaction(flowToken, service, contract))
+	result := b.mustInvoke(deployFlowTokenTransaction(flowToken, service, contract))
 	if result.Error != nil {
-		panic(fmt.Sprintf("failed to deploy default token contract: %s", result.Error.ErrorMessage()))
+		panic(fmt.Sprintf("failed to deploy Flow token contract: %s", result.Error.ErrorMessage()))
 	}
 
 	return flowToken
@@ -107,7 +107,7 @@ func (b *bootstrap) deployFlowFees(service, fungibleToken, flowToken flow.Addres
 
 	contract := contracts.FlowFees(fungibleToken.Hex(), flowToken.Hex())
 
-	result := b.invoke(deployFlowFeesTransaction(flowFees, service, contract))
+	result := b.mustInvoke(deployFlowFeesTransaction(flowFees, service, contract))
 	if result.Error != nil {
 		panic(fmt.Sprintf("failed to deploy fees contract: %s", result.Error.ErrorMessage()))
 	}
@@ -118,27 +118,27 @@ func (b *bootstrap) deployFlowFees(service, fungibleToken, flowToken flow.Addres
 func (b *bootstrap) deployServiceAccount(service, fungibleToken, flowToken, feeContract flow.Address) {
 	contract := contracts.FlowServiceAccount(fungibleToken.Hex(), flowToken.Hex(), feeContract.Hex())
 
-	result := b.invoke(deployContractTransaction(service, contract))
+	result := b.mustInvoke(deployContractTransaction(service, contract))
 	if result.Error != nil {
 		panic(fmt.Sprintf("failed to deploy service account contract: %s", result.Error.ErrorMessage()))
 	}
 }
 
 func (b *bootstrap) mintInitialTokens(service, fungibleToken, flowToken flow.Address, initialSupply uint64) {
-	result := b.invoke(mintDefaultTokenTransaction(fungibleToken, flowToken, service, initialSupply))
+	result := b.mustInvoke(mintFlowTokenTransaction(fungibleToken, flowToken, service, initialSupply))
 	if result.Error != nil {
 		panic(fmt.Sprintf("failed to mint initial token supply: %s", result.Error.ErrorMessage()))
 	}
 }
 
 func (b *bootstrap) deployContractToServiceAccount(service flow.Address, contract []byte) {
-	result := b.invoke(deployContractTransaction(service, contract))
+	result := b.mustInvoke(deployContractTransaction(service, contract))
 	if result.Error != nil {
 		panic(fmt.Sprintf("failed to deploy service account contract: %s", result.Error.ErrorMessage()))
 	}
 }
 
-func (b *bootstrap) invoke(i Invokable) *Result {
+func (b *bootstrap) mustInvoke(i Invokable) *InvocationResult {
 	result, err := b.metaCtx.Invoke(i, b.ledger)
 	if err != nil {
 		panic(err)
@@ -177,7 +177,7 @@ transaction {
 }
 `
 
-const mintDefaultTokenTransactionTemplate = `
+const mintFlowTokenTransactionTemplate = `
 import FungibleToken from 0x%s
 import FlowToken from 0x%s
 
@@ -234,7 +234,7 @@ func deployFlowFeesTransaction(flowFees, service flow.Address, contract []byte) 
 	)
 }
 
-func mintDefaultTokenTransaction(fungibleToken, flowToken, service flow.Address, initialSupply uint64) Invokable {
+func mintFlowTokenTransaction(fungibleToken, flowToken, service flow.Address, initialSupply uint64) Invokable {
 	initialSupplyArg, err := jsoncdc.Encode(cadence.NewUFix64(initialSupply))
 	if err != nil {
 		panic(fmt.Sprintf("failed to encode initial token supply: %s", err.Error()))
@@ -242,7 +242,7 @@ func mintDefaultTokenTransaction(fungibleToken, flowToken, service flow.Address,
 
 	return Transaction(
 		flow.NewTransactionBody().
-			SetScript([]byte(fmt.Sprintf(mintDefaultTokenTransactionTemplate, fungibleToken, flowToken))).
+			SetScript([]byte(fmt.Sprintf(mintFlowTokenTransactionTemplate, fungibleToken, flowToken))).
 			AddArgument(initialSupplyArg).
 			AddAuthorizer(service),
 	)
