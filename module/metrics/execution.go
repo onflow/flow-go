@@ -27,6 +27,8 @@ type ExecutionCollector struct {
 	storageStateCommitment           prometheus.Gauge
 	forestApproxMemorySize           prometheus.Gauge
 	forestNumberOfTrees              prometheus.Gauge
+	forestMaxDepth                   prometheus.Gauge
+	forestNumberOfAllocatedRegisters prometheus.Gauge
 	updated                          prometheus.Counter
 	proofSize                        prometheus.Gauge
 	updatedValuesNumber              prometheus.Counter
@@ -56,6 +58,21 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 		Name:      "forest_number_of_trees",
 		Help:      "number of trees in memory",
 	})
+
+	forestMaxDepth := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemMTrie,
+		Name:      "forest_max_depth",
+		Help:      "maximum depth of the last updated trie",
+	})
+
+	forestNumberOfAllocatedRegisters := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemMTrie,
+		Name:      "forest_number_of_allocated_registers",
+		Help:      "number of allocated registers of the last updated trie",
+	})
+
 	updatedCount := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
@@ -140,6 +157,8 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 
 	registerer.MustRegister(forestApproxMemorySize)
 	registerer.MustRegister(forestNumberOfTrees)
+	registerer.MustRegister(forestNumberOfAllocatedRegisters)
+	registerer.MustRegister(forestMaxDepth)
 	registerer.MustRegister(updatedCount)
 	registerer.MustRegister(proofSize)
 	registerer.MustRegister(updatedValuesNumber)
@@ -156,20 +175,22 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 	ec := &ExecutionCollector{
 		tracer: tracer,
 
-		forestApproxMemorySize:   forestApproxMemorySize,
-		forestNumberOfTrees:      forestNumberOfTrees,
-		updated:                  updatedCount,
-		proofSize:                proofSize,
-		updatedValuesNumber:      updatedValuesNumber,
-		updatedValuesSize:        updatedValuesSize,
-		updatedDuration:          updatedDuration,
-		updatedDurationPerValue:  updatedDurationPerValue,
-		readValuesNumber:         readValuesNumber,
-		readValuesSize:           readValuesSize,
-		readDuration:             readDuration,
-		readDurationPerValue:     readDurationPerValue,
-		collectionRequestSent:    collectionRequestsSent,
-		collectionRequestRetried: collectionRequestsRetries,
+		forestApproxMemorySize:           forestApproxMemorySize,
+		forestNumberOfTrees:              forestNumberOfTrees,
+		forestMaxDepth:                   forestMaxDepth,
+		forestNumberOfAllocatedRegisters: forestNumberOfAllocatedRegisters,
+		updated:                          updatedCount,
+		proofSize:                        proofSize,
+		updatedValuesNumber:              updatedValuesNumber,
+		updatedValuesSize:                updatedValuesSize,
+		updatedDuration:                  updatedDuration,
+		updatedDurationPerValue:          updatedDurationPerValue,
+		readValuesNumber:                 readValuesNumber,
+		readValuesSize:                   readValuesSize,
+		readDuration:                     readDuration,
+		readDurationPerValue:             readDurationPerValue,
+		collectionRequestSent:            collectionRequestsSent,
+		collectionRequestRetried:         collectionRequestsRetries,
 
 		gasUsedPerBlock: promauto.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespaceExecution,
@@ -269,6 +290,16 @@ func (ec *ExecutionCollector) ForestApproxMemorySize(bytes uint64) {
 // ForestNumberOfTrees current number of trees in a forest (in memory)
 func (ec *ExecutionCollector) ForestNumberOfTrees(number uint64) {
 	ec.forestNumberOfTrees.Set(float64(number))
+}
+
+// ForestNumberOfAllocatedRegisters records number of unique register allocated (of the last updated trie)
+func (ec *ExecutionCollector) ForestNumberOfAllocatedRegisters(number uint64) {
+	ec.forestNumberOfAllocatedRegisters.Set(float64(number))
+}
+
+// ForestMaxDepth records maximum depth of the last updated trie
+func (ec *ExecutionCollector) ForestMaxDepth(number uint64) {
+	ec.forestMaxDepth.Set(float64(number))
 }
 
 // UpdateCount increase a counter of performed updates
