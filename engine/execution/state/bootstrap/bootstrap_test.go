@@ -14,7 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestGenerateGenesisState(t *testing.T) {
+func TestBootstrapLedger(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dbDir string) {
 
 		chain := flow.Mainnet.Chain()
