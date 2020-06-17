@@ -16,7 +16,7 @@ import (
 
 type handlerBlockHeader struct {
 	headers storage.Headers
-	state         protocol.State
+	state   protocol.State
 }
 
 func (h *handlerBlockHeader) GetLatestBlockHeader(ctx context.Context, req *access.GetLatestBlockHeaderRequest) (*access.BlockHeaderResponse, error) {

@@ -15,8 +15,8 @@ import (
 
 type handlerScript struct {
 	headers      storage.Headers
-	state         protocol.State
-	executionRPC  execution.ExecutionAPIClient
+	state        protocol.State
+	executionRPC execution.ExecutionAPIClient
 }
 
 func (h *handlerScript) ExecuteScriptAtLatestBlock(ctx context.Context,

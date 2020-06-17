@@ -14,9 +14,9 @@ import (
 )
 
 type handlerEvents struct {
-	executionRPC  execution.ExecutionAPIClient
+	executionRPC execution.ExecutionAPIClient
 	blocks       storage.Blocks
-	state         protocol.State
+	state        protocol.State
 }
 
 // GetEventsForHeightRange retrieves events for all sealed blocks between the start block height and the end block height (inclusive) that have the given type

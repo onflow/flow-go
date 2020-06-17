@@ -13,7 +13,7 @@ import (
 
 type handlerBlockDetails struct {
 	blocks storage.Blocks
-	state protocol.State
+	state  protocol.State
 }
 
 func (h *handlerBlockDetails) GetLatestBlock(_ context.Context, req *access.GetLatestBlockRequest) (*access.BlockResponse, error) {

@@ -21,9 +21,9 @@ import (
 type handlerTransaction struct {
 	collectionRPC access.AccessAPIClient
 	executionRPC  execution.ExecutionAPIClient
-	transactions storage.Transactions
-	collections  storage.Collections
-	blocks       storage.Blocks
+	transactions  storage.Transactions
+	collections   storage.Collections
+	blocks        storage.Blocks
 	state         protocol.State
 }
 

@@ -32,9 +32,8 @@ type Handler struct {
 	handlerBlockHeader
 	handlerBlockDetails
 
-	executionRPC  execution.ExecutionAPIClient
-	state         protocol.State
-
+	executionRPC execution.ExecutionAPIClient
+	state        protocol.State
 }
 
 // compile time check to make sure the aggregated handler implements the Access API
@@ -50,34 +49,34 @@ func NewHandler(log zerolog.Logger,
 	transactions storage.Transactions) *Handler {
 
 	return &Handler{
-		executionRPC:  e,
-		state:         s,
+		executionRPC: e,
+		state:        s,
 		// create the sub-handlers
 		handlerScript: handlerScript{
-			headers: headers,
+			headers:      headers,
 			executionRPC: e,
-			state: s,
+			state:        s,
 		},
 		handlerTransaction: handlerTransaction{
 			collectionRPC: c,
-			executionRPC: e,
-			state: s,
-			collections: collections,
-			blocks: blocks,
-			transactions: transactions,
+			executionRPC:  e,
+			state:         s,
+			collections:   collections,
+			blocks:        blocks,
+			transactions:  transactions,
 		},
 		handlerEvents: handlerEvents{
 			executionRPC: e,
-			state: s,
-			blocks: blocks,
+			state:        s,
+			blocks:       blocks,
 		},
-		handlerBlockHeader: handlerBlockHeader {
+		handlerBlockHeader: handlerBlockHeader{
 			headers: headers,
-			state: s,
+			state:   s,
 		},
 		handlerBlockDetails: handlerBlockDetails{
 			blocks: blocks,
-			state: s,
+			state:  s,
 		},
 	}
 }
