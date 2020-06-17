@@ -13,7 +13,7 @@ require (
 	github.com/onflow/flow-go-sdk v0.4.0
 	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200609190303-17d262f35b48
 	github.com/rs/zerolog v1.19.0
-	github.com/stretchr/testify v1.5.1
+	github.com/stretchr/testify v1.6.1
 	github.com/zenazn/goji v0.9.0 // indirect
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	google.golang.org/grpc v1.29.1
