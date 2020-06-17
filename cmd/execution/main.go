@@ -60,10 +60,10 @@ func main() {
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
-			vm, err := fvm.New(rt, node.RootChainID.Chain())
-			if err != nil {
-				return err
-			}
+
+			vm := fvm.New(rt, node.RootChainID.Chain())
+
+			execCtx := vm.NewContext(fvm.WithBlocks(node.Storage.Blocks))
 
 			computationManager = computation.New(
 				node.Logger,
@@ -71,8 +71,7 @@ func main() {
 				node.Tracer,
 				node.Me,
 				node.State,
-				vm,
-				node.Storage.Blocks,
+				execCtx,
 			)
 
 			return nil

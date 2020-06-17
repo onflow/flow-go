@@ -25,8 +25,7 @@ type BlockComputer interface {
 }
 
 type blockComputer struct {
-	vm      fvm.VirtualMachine
-	blocks  storage.Blocks
+	execCtx fvm.Context
 	metrics module.ExecutionMetrics
 	tracer  module.Tracer
 	log     zerolog.Logger
@@ -34,15 +33,13 @@ type blockComputer struct {
 
 // NewBlockComputer creates a new block executor.
 func NewBlockComputer(
-	vm fvm.VirtualMachine,
-	blocks storage.Blocks,
+	execCtx fvm.Context,
 	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
 	logger zerolog.Logger,
 ) BlockComputer {
 	return &blockComputer{
-		vm:      vm,
-		blocks:  blocks,
+		execCtx: execCtx,
 		metrics: metrics,
 		tracer:  tracer,
 		log:     logger,
@@ -77,7 +74,7 @@ func (e *blockComputer) executeBlock(
 	stateView *delta.View,
 ) (*execution.ComputationResult, error) {
 
-	blockCtx := e.vm.NewBlockContext(block.Block.Header, e.blocks)
+	blockCtx := e.execCtx.NewChild(fvm.WithBlockHeader(block.Block.Header))
 
 	collections := block.Collections()
 
@@ -127,7 +124,7 @@ func (e *blockComputer) executeBlock(
 func (e *blockComputer) executeCollection(
 	ctx context.Context,
 	txIndex uint32,
-	blockCtx fvm.BlockContext,
+	blockCtx fvm.Context,
 	collectionView *delta.View,
 	collection *entity.CompleteCollection,
 ) ([]flow.Event, []flow.TransactionResult, uint32, uint64, error) {
@@ -169,7 +166,9 @@ func (e *blockComputer) executeCollection(
 
 			txView := collectionView.NewChild()
 
-			result, err := blockCtx.ExecuteTransaction(txView, tx, fvm.WithMetricsCollector(txMetrics))
+			txCtx := blockCtx.NewChild(fvm.WithMetricsCollector(txMetrics))
+
+			result, err := txCtx.Invoke(fvm.Transaction(tx), txView)
 
 			if e.metrics != nil {
 				e.metrics.TransactionParsed(txMetrics.Parsed())
@@ -182,7 +181,7 @@ func (e *blockComputer) executeCollection(
 				return fmt.Errorf("failed to execute transaction: %w", err)
 			}
 
-			txEvents, err := fvm.ConvertEvents(txIndex, result)
+			txEvents, err := result.TransactionEvents(txIndex)
 			txIndex++
 			gasUsed += result.GasUsed
 
