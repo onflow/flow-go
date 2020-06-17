@@ -7,7 +7,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func Transaction(tx *flow.TransactionBody) Invokable {
+func Transaction(tx *flow.TransactionBody) *InvokableTransaction {
 	return &InvokableTransaction{tx: tx}
 }
 
