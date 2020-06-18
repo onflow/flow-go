@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go-sdk/client"
 )
 
-// TODO add workers
+// TODO add workers (status worker should have its own client at least injected)
 
 type txInFlight struct {
 	txID        flowsdk.Identifier
@@ -61,7 +61,7 @@ func (txt *TxTracker) addTx(txID flowsdk.Identifier,
 		onFinalized: onFinalizedCallback,
 		onTimeout:   onTimeoutCallback,
 		createdAt:   time.Now(),
-		expiresAt:   time.Now().Add(time.Duration(timeoutInSec)),
+		expiresAt:   time.Now().Add(time.Duration(timeoutInSec * 1000)),
 	}
 	fmt.Println("tx added ", txID)
 	txt.txs <- newTx
@@ -78,6 +78,7 @@ func (txt *TxTracker) run() {
 			if tx.onTimeout != nil {
 				go tx.onTimeout(tx.txID)
 			}
+			fmt.Println("tx timed out", tx.txID)
 			continue
 		}
 		fmt.Println("req sent for tx ", tx.txID)
@@ -95,12 +96,12 @@ func (txt *TxTracker) run() {
 						go tx.onFinalized(tx.txID, result)
 					}
 					tx.lastStatus = flowsdk.TransactionStatusFinalized
-					fmt.Println("tx ", tx.txID, "finalized in seconds: ", time.Since(tx.createdAt).Seconds)
+					fmt.Println("tx ", tx.txID, "finalized in seconds: ", time.Since(tx.createdAt).Seconds())
 				case flowsdk.TransactionStatusSealed:
 					if tx.onSeal != nil {
 						go tx.onSeal(tx.txID, result)
 					}
-					fmt.Println("tx ", tx.txID, "sealed in seconds: ", time.Since(tx.createdAt).Seconds)
+					fmt.Println("tx ", tx.txID, "sealed in seconds: ", time.Since(tx.createdAt).Seconds())
 					continue
 				}
 			}
@@ -126,3 +127,13 @@ func (txt *TxTracker) run() {
 // TransactionStatusSealed
 // // TransactionStatusExpired is the status of an expired transaction.
 // TransactionStatusExpired
+
+// Status worker
+// func statusWorker(id int, jobs <-chan int) {
+//     for j := range jobs {
+//         fmt.Println("worker", id, "started  job", j)
+//         time.Sleep(time.Second)
+//         fmt.Println("worker", id, "finished job", j)
+//         results <- j * 2
+//     }
+// }
