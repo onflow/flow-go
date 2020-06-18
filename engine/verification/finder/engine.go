@@ -146,7 +146,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	// records the execution receipt id based on its result id
 	err := e.receiptIDsByResult.Append(resultID, receiptID)
 	if err != nil {
-		log.Debug().Err(err).Msg("could not add receipt id to receipts by result mempool")
+		log.Debug().Err(err).Msg("could not add receipt id to receipt-ids-by-result mempool")
 	}
 
 	log.Info().Msg("execution receipt successfully handled")
@@ -289,7 +289,7 @@ func (e *Engine) checkReceipts(receipts []*verification.PendingReceipt) {
 					Err(err).
 					Hex("block_id", logging.ID(pr.Receipt.ExecutionResult.BlockID)).
 					Hex("receipt_id", logging.ID(receiptID)).
-					Msg("could not append receipt to identifier map")
+					Msg("could not append receipt to receipt-ids-by-block mempool")
 			}
 		}
 	}
