@@ -15,7 +15,6 @@ import (
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/dsl"
-	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 var (
@@ -42,11 +41,13 @@ var (
 			),
 		},
 	}
+)
 
-	// CreateCounterTx is a transaction script for creating an instance of the counter in the account storage of the
-	// authorizing account NOTE: the counter contract must be deployed first
-	CreateCounterTx = dsl.Transaction{
-		Import: dsl.Import{Address: flow.ServiceAddress()},
+// CreateCounterTx is a transaction script for creating an instance of the counter in the account storage of the
+// authorizing account NOTE: the counter contract must be deployed first
+func CreateCounterTx(chain flow.Chain) dsl.Transaction {
+	return dsl.Transaction{
+		Import: dsl.Import{Address: chain.ServiceAddress()},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
 				var maybeCounter <- signer.load<@Testing.Counter>(from: /storage/counter)
@@ -62,23 +63,30 @@ var (
 				`),
 		},
 	}
+}
 
-	// ReadCounterScript is a read-only script for reading the current value of the counter contract
-	ReadCounterScript = dsl.Main{
+// ReadCounterScript is a read-only script for reading the current value of the counter contract
+func ReadCounterScript(chain flow.Chain) dsl.Main {
+	return dsl.Main{
+		Import: dsl.Import{
+			Names:   []string{"Testing"},
+			Address: chain.ServiceAddress()},
 		ReturnType: "Int",
-		Code: `
-			let account = getAccount(0x01)
+		Code: fmt.Sprintf(`
+			let account = getAccount(0x%s)
 			if let cap = account.getCapability(/public/counter) {
 				return cap.borrow<&Testing.Counter>()?.count ?? -3
 			}
-			return -3`,
+			return -3`, chain.ServiceAddress().String()),
 	}
+}
 
-	// CreateCounterPanicTx is a transaction script that creates a counter instance in the root account, but panics after
-	// manipulating state. It can be used to test whether execution state stays untouched/will revert. NOTE: the counter
-	// contract must be deployed first
-	CreateCounterPanicTx = dsl.Transaction{
-		Import: dsl.Import{Address: flow.ServiceAddress()},
+// CreateCounterPanicTx is a transaction script that creates a counter instance in the root account, but panics after
+// manipulating state. It can be used to test whether execution state stays untouched/will revert. NOTE: the counter
+// contract must be deployed first
+func CreateCounterPanicTx(chain flow.Chain) dsl.Transaction {
+	return dsl.Transaction{
+		Import: dsl.Import{Address: chain.ServiceAddress()},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
 				var maybeCounter <- signer.load<@Testing.Counter>(from: /storage/counter)
@@ -96,13 +104,37 @@ var (
 				`),
 		},
 	}
-)
+}
+
+func createAccount(ctx context.Context, client *testnet.Client, genesis flow.Block) error {
+	var createAccountScript = []byte(`
+	transaction {
+		prepare(signer: AuthAccount) {
+			let acct = AuthAccount(payer: signer)
+		}
+	}
+	`)
+
+	tx := flow.NewTransactionBody().
+		SetScript([]byte(createAccountScript)).
+		SetReferenceBlockID(genesis.ID()).
+		SetProposalKey(client.Chain.ServiceAddress(), 0, client.GetSeqNumber()).
+		SetPayer(client.Chain.ServiceAddress()).
+		AddAuthorizer(client.Chain.ServiceAddress())
+
+	err := client.SignAndSendTransaction(ctx, *tx)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
 
 // readCounter executes a script to read the value of a counter. The counter
 // must have been deployed and created.
 func readCounter(ctx context.Context, client *testnet.Client) (int, error) {
 
-	res, err := client.ExecuteScript(ctx, ReadCounterScript)
+	res, err := client.ExecuteScript(ctx, ReadCounterScript(client.Chain))
 	if err != nil {
 		return 0, err
 	}

@@ -480,7 +480,8 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Block, []ContainerConfig, error) {
 	// Setup as Testnet
-	flow.SetChainID(flow.Testnet)
+	chainID := flow.Testnet
+	chain := chainID.Chain()
 
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
@@ -505,13 +506,13 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 
 	// generate the initial execution state
 	dbDir := filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState)
-	commit, err := run.GenerateExecutionState(dbDir, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply)
+	commit, err := run.GenerateExecutionState(dbDir, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply, chain)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// generate genesis block
-	genesis := bootstraprun.GenerateRootBlock(toIdentityList(confs))
+	genesis := bootstraprun.GenerateRootBlock(toIdentityList(confs), chainID)
 
 	// generate QC
 	nodeInfos := bootstrap.FilterByRole(toNodeInfoList(confs), flow.RoleConsensus)
