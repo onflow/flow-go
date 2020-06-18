@@ -145,6 +145,7 @@ func (e *hostEnv) EmitEvent(event cadence.Event) {
 }
 
 func (e *hostEnv) GenerateUUID() uint64 {
+	// TODO: https://github.com/dapperlabs/flow-go/issues/4141
 	defer func() { e.uuid++ }()
 	return e.uuid
 }

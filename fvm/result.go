@@ -70,10 +70,11 @@ func createInvocationResult(
 	}
 
 	return &InvocationResult{
-		ID:      id,
-		Value:   value,
-		Events:  events,
-		Logs:    logs,
+		ID:     id,
+		Value:  value,
+		Events: events,
+		Logs:   logs,
+		// TODO: https://github.com/dapperlabs/flow-go/issues/4139
 		GasUsed: 0,
 	}, nil
 }
