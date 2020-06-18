@@ -3,6 +3,8 @@ package main
 import (
 	"sync"
 	"time"
+
+	"github.com/jedib0t/go-pretty/table"
 )
 
 type StatsConfig struct {
@@ -83,8 +85,11 @@ func (st *StatsTracker) AvgTTF() float64 {
 // MedTTS int     // Median transaction time to seal (in seconds)
 // VarTTS float32 // Variance of transaction time to seal (in seconds)
 
-func (st *StatsTracker) String() {
-
+func (st *StatsTracker) String() string {
+	t := table.NewWriter()
+	t.AppendHeader(table.Row{"total TX", "failure rate", "avg TTF"})
+	t.AppendRow(table.Row{st.TotalTxSubmited(), st.TxFailureRate(), st.AvgTTF()})
+	return t.Render()
 }
 
 func (st *StatsTracker) ToFile(filePath string) {

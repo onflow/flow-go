@@ -447,7 +447,7 @@ func main() {
 		lg.Next()
 	}
 
-	fmt.Println(lg.Stats().AvgTTF())
+	fmt.Println(lg.Stats())
 	// cg.txTracker.close()
 	// wait for all
 	time.Sleep(time.Second * 30)
