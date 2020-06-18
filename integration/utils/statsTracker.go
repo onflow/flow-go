@@ -69,7 +69,7 @@ func (st *StatsTracker) AvgTTF() float64 {
 	count := 0
 	for _, t := range st.txStats {
 		if !t.isExpired && t.TTF > 0 {
-			sum += t.TTE.Seconds()
+			sum += t.TTF.Seconds()
 			count++
 		}
 	}
@@ -208,14 +208,6 @@ func (st *StatsTracker) MedTTS() float64 {
 	return observations[len(observations)/2]
 }
 
-// TODO
-// MedTTF int     // Median transaction time to finality (in seconds)
-// VarTTF float32 // Variance of transaction time to finality (in seconds)
-// MedTTE int     // Median transaction time to execution (in seconds)
-// VarTTE float32 // Variance of transaction time to execution (in seconds)
-// MedTTS int     // Median transaction time to seal (in seconds)
-// VarTTS float32 // Variance of transaction time to seal (in seconds)
-
 func (st *StatsTracker) String() string {
 	t := table.NewWriter()
 	t.AppendHeader(table.Row{"total TX",
@@ -235,11 +227,11 @@ func (st *StatsTracker) String() string {
 		st.MedTTF(),
 		st.MaxTTF(),
 		st.AvgTTE(),
-		st.MaxTTE(),
 		st.MedTTE(),
+		st.MaxTTE(),
 		st.AvgTTS(),
-		st.MaxTTS(),
-		st.MedTTS()})
+		st.MedTTS(),
+		st.MaxTTS()})
 	return t.Render()
 }
 
