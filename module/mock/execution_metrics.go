@@ -99,6 +99,21 @@ func (_m *ExecutionMetrics) StartBlockReceivedToExecuted(blockID flow.Identifier
 	_m.Called(blockID)
 }
 
+// TransactionChecked provides a mock function with given fields: dur
+func (_m *ExecutionMetrics) TransactionChecked(dur time.Duration) {
+	_m.Called(dur)
+}
+
+// TransactionInterpreted provides a mock function with given fields: dur
+func (_m *ExecutionMetrics) TransactionInterpreted(dur time.Duration) {
+	_m.Called(dur)
+}
+
+// TransactionParsed provides a mock function with given fields: dur
+func (_m *ExecutionMetrics) TransactionParsed(dur time.Duration) {
+	_m.Called(dur)
+}
+
 // UpdateCount provides a mock function with given fields:
 func (_m *ExecutionMetrics) UpdateCount() {
 	_m.Called()
