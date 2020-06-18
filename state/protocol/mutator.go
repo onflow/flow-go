@@ -12,11 +12,13 @@ import (
 // and valid.
 type Mutator interface {
 
-	// Bootstrap initializes the persistent protocol state with the given
-	// genesis block. A genesis block requires a number of zero, a hash of 32
-	// zero bytes and an empty collection guarantees slice. The provided new
-	// identities will be the initial staked nodes on the network.
-	Bootstrap(state flow.StateCommitment, genesis *flow.Block) error
+	// Bootstrap initializes the persistent protocol state with the given block,
+	// execution state and block seal. In order to successfully bootstrap, the
+	// execution result needs to refer to the provided block and the block seal
+	// needs to refer to the provided block and eecution result. The identities
+	// in the block payload will be used as the initial set of staked node
+	// identities.
+	Bootstrap(block *flow.Block, result *flow.ExecutionResult, seal *flow.Seal) error
 
 	// Extend introduces the block with the given ID into the persistent
 	// protocol state without modifying the current finalized state. It allows

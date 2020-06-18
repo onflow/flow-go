@@ -17,29 +17,29 @@ type Mutator struct {
 	state *State
 }
 
-func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) error {
+func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal) error {
 	return operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
 
-		// FIRST: execute all the validity checks on the genesis block
+		// FIRST: validate the root block structure and contents
 
-		// the parent must be zero hash
-		if genesis.Header.ParentID != flow.ZeroID {
-			return errors.New("genesis parent must have zero ID")
+		// the root block can not have a parent
+		if root.Header.ParentID != flow.ZeroID {
+			return errors.New("root block must not have parent")
 		}
 
-		// we should have no guarantees
-		if len(genesis.Payload.Guarantees) > 0 {
-			return fmt.Errorf("genesis block must have zero guarantees")
+		// the root block should have an empty guarantee payload
+		if len(root.Payload.Guarantees) > 0 {
+			return fmt.Errorf("root block must not have guarantees")
 		}
 
-		// we should have no seals
-		if len(genesis.Payload.Seals) > 0 {
-			return fmt.Errorf("genesis block must have zero seals")
+		// the root block should have an empty seal payload
+		if len(root.Payload.Seals) > 0 {
+			return fmt.Errorf("root block must not have seals")
 		}
 
-		// we should have one role of each type at least
+		// the root block needs at least one identity for each role
 		roles := make(map[flow.Role]uint)
-		for _, identity := range genesis.Payload.Identities {
+		for _, identity := range root.Payload.Identities {
 			roles[identity.Role]++
 		}
 		if roles[flow.RoleConsensus] < 1 {
@@ -55,9 +55,9 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 			return fmt.Errorf("need at least one verification node")
 		}
 
-		// check that we don't have duplicate identity entries
+		// the root block should not contain duplicate identities
 		identLookup := make(map[flow.Identifier]struct{})
-		for _, identity := range genesis.Payload.Identities {
+		for _, identity := range root.Payload.Identities {
 			_, ok := identLookup[identity.NodeID]
 			if ok {
 				return fmt.Errorf("duplicate node identifier (%x)", identity.NodeID)
@@ -65,9 +65,9 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 			identLookup[identity.NodeID] = struct{}{}
 		}
 
-		// check identities do not have duplicate addresses
+		// the root block identities should not contain duplicate addresses
 		addrLookup := make(map[string]struct{})
-		for _, identity := range genesis.Payload.Identities {
+		for _, identity := range root.Payload.Identities {
 			_, ok := addrLookup[identity.Address]
 			if ok {
 				return fmt.Errorf("duplicate node address (%x)", identity.Address)
@@ -75,89 +75,76 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 			addrLookup[identity.Address] = struct{}{}
 		}
 
-		// for each identity, check it has a non-zero stake
-		for _, identity := range genesis.Payload.Identities {
+		// the root block identities should all have a non-zero stake
+		for _, identity := range root.Payload.Identities {
 			if identity.Stake == 0 {
 				return fmt.Errorf("zero stake identity (%x)", identity.NodeID)
 			}
 		}
 
-		// SECOND: update the underyling database with the genesis data
+		// SECOND: insert the initial protocol state data into the database
 
-		// 1) insert the block, the genesis identities and index it by beight
-		err := m.state.blocks.Store(genesis)
+		// 1) insert the root block with its payload into the state and index it
+		err := m.state.blocks.Store(root)
 		if err != nil {
-			return fmt.Errorf("could not insert header: %w", err)
+			return fmt.Errorf("could not insert root block: %w", err)
 		}
-		err = operation.IndexBlockHeight(genesis.Header.Height, genesis.ID())(tx)
+		err = operation.IndexBlockHeight(root.Header.Height, root.ID())(tx)
 		if err != nil {
-			return fmt.Errorf("could not initialize boundary: %w", err)
+			return fmt.Errorf("could not index root block: %w", err)
 		}
-		err = operation.InsertBlockChildren(genesis.ID(), nil)(tx)
+		err = operation.InsertBlockChildren(root.ID(), nil)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert empty block children: %w", err)
-		}
-
-		// TODO: put seal into payload to have it signed
-
-		// 2) generate genesis execution result, insert and index by block
-		result := flow.ExecutionResult{ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: flow.ZeroID,
-			BlockID:          genesis.ID(),
-			FinalStateCommit: commit,
-		}}
-		err = operation.InsertExecutionResult(&result)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert genesis result: %w", err)
-		}
-		err = operation.IndexExecutionResult(genesis.ID(), result.ID())(tx)
-		if err != nil {
-			return fmt.Errorf("could not index genesis result: %w", err)
+			return fmt.Errorf("could not initialize root child index: %w", err)
 		}
 
-		// 3) generate genesis block seal, insert and index by block
-		seal := flow.Seal{
-			BlockID:      genesis.ID(),
-			ResultID:     result.ID(),
-			InitialState: commit,
-			FinalState:   result.FinalStateCommit,
-		}
-		err = operation.InsertSeal(seal.ID(), &seal)(tx)
+		// 2) insert the root execution result into the database and index it
+		err = operation.InsertExecutionResult(result)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert genesis seal: %w", err)
+			return fmt.Errorf("could not insert root result: %w", err)
 		}
-		err = operation.IndexBlockSeal(genesis.ID(), seal.ID())(tx)
+		err = operation.IndexExecutionResult(root.ID(), result.ID())(tx)
 		if err != nil {
-			return fmt.Errorf("could not index genesis block seal: %w", err)
+			return fmt.Errorf("could not index root result: %w", err)
 		}
 
-		// 4) initialize all of the special views and heights
-		err = operation.InsertStartedView(genesis.Header.View)(tx)
+		// 3) insert the root block seal into the database and index it
+		err = operation.InsertSeal(seal.ID(), seal)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert root seal: %w", err)
+		}
+		err = operation.IndexBlockSeal(root.ID(), seal.ID())(tx)
+		if err != nil {
+			return fmt.Errorf("could not index root block seal: %w", err)
+		}
+
+		// 4) initialize the current protocol state values
+		err = operation.InsertStartedView(root.Header.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert started view: %w", err)
 		}
-		err = operation.InsertVotedView(genesis.Header.View)(tx)
+		err = operation.InsertVotedView(root.Header.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert started view: %w", err)
 		}
-		err = operation.InsertRootHeight(genesis.Header.Height)(tx)
+		err = operation.InsertRootHeight(root.Header.Height)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert genesis height: %w", err)
+			return fmt.Errorf("could not insert root height: %w", err)
 		}
-		err = operation.InsertFinalizedHeight(genesis.Header.Height)(tx)
+		err = operation.InsertFinalizedHeight(root.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert finalized height: %w", err)
 		}
-		err = operation.InsertSealedHeight(genesis.Header.Height)(tx)
+		err = operation.InsertSealedHeight(root.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert sealed height: %w", err)
 		}
 
-		m.state.metrics.FinalizedHeight(genesis.Header.Height)
-		m.state.metrics.BlockFinalized(genesis)
+		m.state.metrics.FinalizedHeight(root.Header.Height)
+		m.state.metrics.BlockFinalized(root)
 
-		m.state.metrics.SealedHeight(genesis.Header.Height)
-		m.state.metrics.BlockSealed(genesis)
+		m.state.metrics.SealedHeight(root.Header.Height)
+		m.state.metrics.BlockSealed(root)
 
 		return nil
 	})
