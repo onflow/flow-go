@@ -12,7 +12,7 @@ type IdentifierMap interface {
 	// Rem removes the given key with all associated identifiers.
 	Rem(key flow.Identifier) bool
 
-	// Get returns list of all identifiers associated with key and True, if the key exists in the mempool.
+	// Get returns list of all identifiers associated with key and true, if the key exists in the mempool.
 	// Otherwise it returns nil and false.
 	Get(key flow.Identifier) ([]flow.Identifier, bool)
 }

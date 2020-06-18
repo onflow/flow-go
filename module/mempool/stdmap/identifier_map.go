@@ -52,7 +52,7 @@ func (i *IdentifierMap) Append(key, id flow.Identifier) error {
 	return nil
 }
 
-// Get returns list of all identifiers associated with key and True, if the key exists in the mempool.
+// Get returns list of all identifiers associated with key and true, if the key exists in the mempool.
 // Otherwise it returns nil and false.
 func (i *IdentifierMap) Get(key flow.Identifier) ([]flow.Identifier, bool) {
 	entity, ok := i.Backend.ByID(key)
