@@ -83,7 +83,7 @@ func (h *Handler) GetTransactionResult(ctx context.Context, req *access.GetTrans
 		return nil, convertStorageError(err)
 	}
 
-	//TODO: Set correct values for StatusCode and ErrorMessage
+	// TODO: Set correct values for StatusCode and ErrorMessage
 
 	// return result
 	resp := &access.TransactionResultResponse{
