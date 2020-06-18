@@ -6,7 +6,7 @@ import (
 
 // IdentifierMap represents a concurrency-safe memory pool for mapping an identifier to a list of identifiers
 type IdentifierMap interface {
-	// Append will append the id to the list of identifier associated with key.
+	// Append will append the id to the list of identifiers associated with key.
 	Append(key, id flow.Identifier) error
 
 	// Rem removes the given key with all associated identifiers.
