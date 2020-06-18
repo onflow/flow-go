@@ -223,7 +223,6 @@ func TestAddressesIntersection(t *testing.T) {
 
 		// sanity check: mainnet addresses must fail the test check
 		r = uint64(rand.Intn(maxState - loop))
-		state = chain.newAddressGeneratorAtState(r)
 		for i := 0; i < loop; i++ {
 			invalidAddress, err := Mainnet.Chain().newAddressGeneratorAtState(r).NextAddress()
 			require.NoError(t, err)
