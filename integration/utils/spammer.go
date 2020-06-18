@@ -299,7 +299,47 @@ func (cg *LoadGenerator) Next() error {
 		cg.step++
 		fmt.Println("load generator step 2 done")
 	}
+	if cg.step > 2 {
+		allTxWG := sync.WaitGroup{}
+		fmt.Println("load generator step 3 started")
 
+		for i := 0; i < cg.numberOfAccounts; i++ {
+			j := (i + 1) % cg.numberOfAccounts
+			transferScript := GenerateTransferScript(cg.fungibleTokenAddress, cg.accounts[i].address, cg.accounts[j].address, 10)
+			transferTx := flowsdk.NewTransaction().
+				SetReferenceBlockID(ref.ID).
+				SetScript(transferScript).
+				SetProposalKey(*cg.accounts[i].address, 0, cg.accounts[i].seqNumber).
+				SetPayer(*cg.accounts[i].address).
+				AddAuthorizer(*cg.accounts[i].address)
+
+			// TODO signer be thread safe
+			cg.accounts[i].signerLock.Lock()
+			err = transferTx.SignEnvelope(*cg.accounts[i].address, 0, cg.accounts[i].signer)
+			cg.accounts[i].seqNumber++
+			cg.accounts[i].signerLock.Unlock()
+
+			err = cg.flowClient.SendTransaction(context.Background(), *transferTx)
+			examples.Handle(err)
+			allTxWG.Add(1)
+
+			cg.txTracker.addTx(transferTx.ID(),
+				nil,
+				func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
+					allTxWG.Done()
+				},
+				nil, // on sealed
+				nil, // on expired
+				nil, // on timout
+				nil, // on error
+				30)
+
+		}
+		allTxWG.Wait()
+		cg.step++
+		fmt.Println("load generator step 3 done")
+	}
+	// cg.txTracker.close()
 	// wait for all
 	time.Sleep(time.Second * 30)
 	// TODO else do the transfers
@@ -372,7 +412,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	lg.Next()
-	lg.Next()
-	lg.Next()
+
+	rounds := 30
+
+	// extra 3 is for setup
+	for i := 0; i < rounds+3; i++ {
+		lg.Next()
+	}
 }
