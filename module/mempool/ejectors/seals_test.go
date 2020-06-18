@@ -19,9 +19,7 @@ func TestLatestSealEjector(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		const N = 10
 
-		mm := metrics.NewNoopCollector()
-		headers := storage.NewHeaders(mm, db)
-
+		headers := storage.NewHeaders(metrics.NewNoopCollector(), db)
 		ejector := ejectors.NewLatestSeal(headers)
 
 		pool, err := stdmap.NewSeals(N, stdmap.WithEject(ejector.Eject))
@@ -35,13 +33,13 @@ func TestLatestSealEjector(t *testing.T) {
 		// add some seals to the pool to fill it up
 		for i := 0; i < N+1; i++ {
 			header := unittest.BlockHeaderFixture()
+			err := headers.Store(&header)
+			require.Nil(t, err)
+
 			seal := unittest.BlockSealFixture()
 			seal.BlockID = header.ID()
 			ok := pool.Add(seal)
 			assert.True(t, ok)
-
-			err := headers.Store(&header)
-			require.Nil(t, err)
 
 			if header.Height >= maxHeader.Height {
 				maxHeader = header
