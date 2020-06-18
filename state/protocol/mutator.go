@@ -15,10 +15,10 @@ type Mutator interface {
 	// Bootstrap initializes the persistent protocol state with the given block,
 	// execution state and block seal. In order to successfully bootstrap, the
 	// execution result needs to refer to the provided block and the block seal
-	// needs to refer to the provided block and eecution result. The identities
+	// needs to refer to the provided block and execution result. The identities
 	// in the block payload will be used as the initial set of staked node
 	// identities.
-	Bootstrap(block *flow.Block, result *flow.ExecutionResult, seal *flow.Seal) error
+	Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal) error
 
 	// Extend introduces the block with the given ID into the persistent
 	// protocol state without modifying the current finalized state. It allows

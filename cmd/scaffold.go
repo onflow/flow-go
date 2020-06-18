@@ -130,7 +130,7 @@ type FlowNodeBuilder struct {
 	MsgValidators     []validators.MessageValidator
 
 	// genesis information
-	GenesisCommit           flow.StateCommitment
+	GenesisCommit           flow.StateCommitment // should be removed
 	GenesisBlock            *flow.Block
 	GenesisQC               *model.QuorumCertificate
 	GenesisResult           *flow.ExecutionResult
@@ -384,7 +384,7 @@ func (fnb *FlowNodeBuilder) initState() {
 		flow.SetChainID(fnb.GenesisBlock.Header.ChainID)
 
 		// load genesis QC and DKG data from bootstrap files
-		fnb.GenesisQC, err = loadRootBlockQC(fnb.BaseConfig.BootstrapDir)
+		fnb.GenesisQC, err = loadGenesisQC(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
 		}
@@ -436,7 +436,7 @@ func (fnb *FlowNodeBuilder) initState() {
 		flow.SetChainID(fnb.GenesisBlock.Header.ChainID)
 
 		// load genesis QC and DKG data from bootstrap files for recovery
-		fnb.GenesisQC, err = loadRootBlockQC(fnb.BaseConfig.BootstrapDir)
+		fnb.GenesisQC, err = loadGenesisQC(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
 		}
@@ -702,7 +702,7 @@ func loadGenesisBlock(dir string) (*flow.Block, error) {
 
 }
 
-func loadRootBlockQC(dir string) (*model.QuorumCertificate, error) {
+func loadGenesisQC(dir string) (*model.QuorumCertificate, error) {
 	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisQC))
 	if err != nil {
 		return nil, err

@@ -20,7 +20,22 @@ type Mutator struct {
 func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal) error {
 	return operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
 
-		// FIRST: validate the root block structure and contents
+		// NEW: bootstrapping from an arbitrary states requires an execution result and block seal
+		// as input; we need to verify them against each other and against the root block
+
+		if result.BlockID != root.ID() {
+			return fmt.Errorf("root execution result for wrong block (%x != %x)", result.BlockID, root.ID())
+		}
+
+		if seal.BlockID != root.ID() {
+			return fmt.Errorf("root block seal for wrong block (%x != %x)", seal.BlockID, root.ID())
+		}
+
+		if seal.ResultID != result.ID() {
+			return fmt.Errorf("root block seal for wrong execution result (%x != %x)", seal.ResultID, result.ID())
+		}
+
+		// FIRST: validate the root block and its payload
 
 		// the root block can not have a parent
 		if root.Header.ParentID != flow.ZeroID {
@@ -153,7 +168,7 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 func (m *Mutator) Extend(candidate *flow.Block) error {
 
 	// FIRST: We do some initial cheap sanity checks. Currently, only the
-	// genesis block can contain identities. We also want to make sure that the
+	// root block can contain identities. We also want to make sure that the
 	// payload hash has been set correctly.
 
 	header := candidate.Header
