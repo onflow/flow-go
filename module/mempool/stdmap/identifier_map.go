@@ -20,7 +20,7 @@ func NewIdentifierMap(limit uint) (*IdentifierMap, error) {
 	return i, nil
 }
 
-// Add will append the id to the list of identifier associated with key.
+// Append will append the id to the list of identifier associated with key.
 func (i *IdentifierMap) Append(key, id flow.Identifier) error {
 	ids, ok := i.Get(key)
 	if !ok {
