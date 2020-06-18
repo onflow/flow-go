@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/dapperlabs/flow-go/engine/execution/utils"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
 )
@@ -581,7 +581,7 @@ func (r *TransactionContext) verifyAccountSignature(
 
 	accountKey := &account.Keys[txSig.KeyID]
 
-	hasher, err := hash.NewHasher(accountKey.HashAlgo)
+	hasher, err := utils.NewHasher(accountKey.HashAlgo)
 	if err != nil {
 		return accountKey, &InvalidHashingAlgorithmError{
 			Address:          txSig.Address,
