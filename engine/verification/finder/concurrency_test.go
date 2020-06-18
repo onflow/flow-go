@@ -82,7 +82,7 @@ func TestConcurrency(t *testing.T) {
 }
 
 // testConcurrency sends `erCount` many execution receipts each with `chunkNum` many chunks, concurrently by
-// `senderCount` sender to the verification node.
+// `senderCount` senders to the verification node.
 // If blockFirst is true, the block arrives at verification node earlier than the receipt.
 // Otherwise, the block arrives after the receipt.
 // This test successfully is passed if each unique execution result is passed to Match engine by the Finder engine
