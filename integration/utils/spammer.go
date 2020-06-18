@@ -54,7 +54,7 @@ type LoadGenerator struct {
 	fungibleTokenAddress *flowsdk.Address
 	accounts             []*flowAccount
 	step                 int
-	txTracker            *txTracker
+	txTracker            *TxTracker
 }
 
 // In case we have to creat the client
@@ -100,7 +100,7 @@ func NewLoadGenerator(fclient *client.Client,
 		return nil, fmt.Errorf("error loading service account %w", err)
 	}
 
-	txTracker, err := newTxTracker(1000)
+	txTracker, err := NewTxTracker(1000)
 	if err != nil {
 		return nil, err
 	}

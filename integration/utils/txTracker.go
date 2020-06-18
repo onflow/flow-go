@@ -25,25 +25,25 @@ type txInFlight struct {
 	expiresAt   time.Time
 }
 
-type txTracker struct {
+type TxTracker struct {
 	client *client.Client
 	txs    chan *txInFlight
 }
 
 // TODO pass port
-func newTxTracker(maxCap int) (*txTracker, error) {
+func NewTxTracker(maxCap int) (*TxTracker, error) {
 	fclient, err := client.New("localhost:3569", grpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}
-	txt := &txTracker{client: fclient,
+	txt := &TxTracker{client: fclient,
 		txs: make(chan *txInFlight, maxCap),
 	}
 	go txt.run()
 	return txt, nil
 }
 
-func (txt *txTracker) addTx(txID flowsdk.Identifier,
+func (txt *TxTracker) addTx(txID flowsdk.Identifier,
 	proposer flowsdk.Address,
 	onErrorCallback func(flowsdk.Identifier, error),
 	onSealCallback func(flowsdk.Identifier, *flowsdk.TransactionResult),
@@ -68,11 +68,11 @@ func (txt *txTracker) addTx(txID flowsdk.Identifier,
 }
 
 // TODO proper ready/done
-func (txt *txTracker) stop() {
+func (txt *TxTracker) stop() {
 	close(txt.txs)
 }
 
-func (txt *txTracker) run() {
+func (txt *TxTracker) run() {
 	for tx := range txt.txs {
 		if tx.expiresAt.Before(time.Now()) {
 			if tx.onTimeout != nil {
