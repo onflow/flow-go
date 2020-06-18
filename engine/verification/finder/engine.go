@@ -17,15 +17,15 @@ import (
 )
 
 type Engine struct {
-	unit             *engine.Unit
-	log              zerolog.Logger
-	me               module.Local
-	match            network.Engine
-	receipts         mempool.PendingReceipts // used to keep the receipts as mempool
-	headerStorage    storage.Headers         // used to check block existence before verifying
-	processedResult  mempool.Identifiers     // used to keep track of the processed results
-	receiptsByBlock  mempool.IdentifierMap   // used as a mapping to keep track of receipts associated with a block
-	receiptsByResult mempool.IdentifierMap   // used as a mapping to keep track of receipts with the same result
+	unit               *engine.Unit
+	log                zerolog.Logger
+	me                 module.Local
+	match              network.Engine
+	receipts           mempool.PendingReceipts // used to keep the receipts as mempool
+	headerStorage      storage.Headers         // used to check block existence before verifying
+	processedResult    mempool.Identifiers     // used to keep track of the processed results
+	receiptIDsByBlock  mempool.IdentifierMap   // used as a mapping to keep track of receipts associated with a block
+	receiptIDsByResult mempool.IdentifierMap   // used as a mapping to keep track of receipts with the same result
 }
 
 func New(
@@ -40,15 +40,15 @@ func New(
 	receiptsByResult mempool.IdentifierMap,
 ) (*Engine, error) {
 	e := &Engine{
-		unit:             engine.NewUnit(),
-		log:              log.With().Str("engine", "finder").Logger(),
-		me:               me,
-		match:            match,
-		headerStorage:    headerStorage,
-		receipts:         receipts,
-		processedResult:  processedResults,
-		receiptsByBlock:  receiptsByBlock,
-		receiptsByResult: receiptsByResult,
+		unit:               engine.NewUnit(),
+		log:                log.With().Str("engine", "finder").Logger(),
+		me:                 me,
+		match:              match,
+		headerStorage:      headerStorage,
+		receipts:           receipts,
+		processedResult:    processedResults,
+		receiptIDsByBlock:  receiptsByBlock,
+		receiptIDsByResult: receiptsByResult,
 	}
 
 	_, err := net.Register(engine.ExecutionReceiptProvider, e)
@@ -144,7 +144,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	}
 
 	// records the execution receipt id based on its result id
-	err := e.receiptsByResult.Append(resultID, receiptID)
+	err := e.receiptIDsByResult.Append(resultID, receiptID)
 	if err != nil {
 		log.Debug().Err(err).Msg("could not add receipt id to receipts by result mempool")
 	}
@@ -171,13 +171,13 @@ func (e *Engine) OnBlockIncorporated(*model.Block) {
 // and must handle repetition of the same events (with some processing overhead).
 func (e *Engine) OnFinalizedBlock(block *model.Block) {
 	// retrieves all receipts that are pending for this block
-	erIDs, ok := e.receiptsByBlock.Get(block.BlockID)
+	erIDs, ok := e.receiptIDsByBlock.Get(block.BlockID)
 	if !ok {
 		// no pending receipt for this block
 		return
 	}
 	// removes list of receipt ids for this block
-	ok = e.receiptsByBlock.Rem(block.BlockID)
+	ok = e.receiptIDsByBlock.Rem(block.BlockID)
 	if !ok {
 		e.log.Debug().
 			Hex("block_id", logging.ID(block.BlockID)).
@@ -240,7 +240,7 @@ func (e *Engine) onResultProcessed(resultID flow.Identifier) {
 	}
 
 	// extracts all receipt ids with this result
-	prIDs, ok := e.receiptsByResult.Get(resultID)
+	prIDs, ok := e.receiptIDsByResult.Get(resultID)
 	if !ok {
 		log.Debug().Msg("could not retrieve receipt ids associated with this result")
 	}
@@ -283,7 +283,7 @@ func (e *Engine) checkReceipts(receipts []*verification.PendingReceipt) {
 		} else {
 			// receipt is not processable
 			// keeps track of it in id map
-			err := e.receiptsByBlock.Append(pr.Receipt.ExecutionResult.BlockID, receiptID)
+			err := e.receiptIDsByBlock.Append(pr.Receipt.ExecutionResult.BlockID, receiptID)
 			if err != nil {
 				e.log.Error().
 					Err(err).
