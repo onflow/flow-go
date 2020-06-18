@@ -194,6 +194,7 @@ func (cg *LoadGenerator) Next() error {
 	// setup accounts
 	if cg.step == 1 {
 		fmt.Println("load generator step 1 started")
+		allTxWG := sync.WaitGroup{}
 		for i := 0; i < cg.numberOfAccounts; i++ {
 			privKey := examples.RandomPrivateKey()
 			accountKey := flowsdk.NewAccountKey().
@@ -220,10 +221,15 @@ func (cg *LoadGenerator) Next() error {
 
 			err = cg.flowClient.SendTransaction(context.Background(), *createAccountTx)
 			examples.Handle(err)
+			allTxWG.Add(1)
 
-			createAccountTxID := createAccountTx.ID()
+			cg.txTracker.addTx(createAccountTx.ID(),
+				*cg.serviceAccount.address,
+				nil, nil, nil,
+				func(_ flowsdk.Identifier) {
+					allTxWG.Done()
+				}, 30)
 
-			cg.txTracker.addTx(createAccountTxID, *cg.serviceAccount.address, nil, nil, nil, nil, 30)
 			// accountCreationTxRes := waitForFinalized(context.Background(), cg.flowClient, createAccountTxID)
 			// examples.Handle(accountCreationTxRes.Error)
 
@@ -246,12 +252,12 @@ func (cg *LoadGenerator) Next() error {
 			// }
 			fmt.Println(">>", i)
 		}
+		allTxWG.Wait()
 		cg.step++
+		fmt.Println("load generator step 2 done")
 	}
-
 	// wait for all
 	time.Sleep(time.Second * 150)
-	fmt.Println("load generator step 2 done")
 	// TODO else do the transfers
 	return nil
 }
