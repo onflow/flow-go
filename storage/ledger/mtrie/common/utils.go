@@ -5,7 +5,7 @@ import (
 	"math/rand"
 )
 
-// IsBitSet returns if the bit at index `idx` in the byte array `b` is set to 1
+// IsBitSet returns if the bit at index `idx` in the byte array `b` is set to 1 (big endian)
 // TODO: remove error return
 func IsBitSet(b []byte, idx int) (bool, error) {
 	if idx >= len(b)*8 {

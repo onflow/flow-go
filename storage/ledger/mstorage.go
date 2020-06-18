@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	// ExecutionStateRegisterKeySize is the size of a Execution register's key [bytes]
+	// RegisterKeySize is the size of a Execution register's key [bytes]
 	RegisterKeySize = 32
 )
 
