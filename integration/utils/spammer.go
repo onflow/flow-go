@@ -102,7 +102,7 @@ func NewLoadGenerator(fclient *client.Client,
 		return nil, fmt.Errorf("error loading service account %w", err)
 	}
 
-	txTracker, err := NewTxTracker(1000, 2, "localhost:3569", true, time.Second/10)
+	txTracker, err := NewTxTracker(5000, 2, "localhost:3569", true, time.Second/10)
 	if err != nil {
 		return nil, err
 	}
