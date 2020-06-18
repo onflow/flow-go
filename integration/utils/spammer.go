@@ -233,8 +233,8 @@ func (cg *LoadGenerator) Next() error {
 							accountAddress := accountCreatedEvent.Address()
 							newAcc := newFlowAccount(&accountAddress, accountKey, signer)
 							cg.accounts = append(cg.accounts, newAcc)
+							fmt.Println("account added")
 						}
-						fmt.Println("account added")
 					}
 					allTxWG.Done()
 				}, nil, nil, 30)

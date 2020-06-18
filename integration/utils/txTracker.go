@@ -61,7 +61,7 @@ func (txt *TxTracker) addTx(txID flowsdk.Identifier,
 		onFinalized: onFinalizedCallback,
 		onTimeout:   onTimeoutCallback,
 		createdAt:   time.Now(),
-		expiresAt:   time.Now().Add(time.Duration(timeoutInSec * 1000)),
+		expiresAt:   time.Now().Add(time.Duration(timeoutInSec) * time.Second),
 	}
 	fmt.Println("tx added ", txID)
 	txt.txs <- newTx
