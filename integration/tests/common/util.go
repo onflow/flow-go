@@ -138,9 +138,9 @@ func GetGhostClient(ghostContainer *testnet.Container) (*client.GhostClient, err
 }
 
 // GetAccount returns a new account address, key, and signer.
-func GetAccount() (sdk.Address, *sdk.AccountKey, sdkcrypto.Signer) {
+func GetAccount(chain flow.Chain) (sdk.Address, *sdk.AccountKey, sdkcrypto.Signer) {
 
-	addr := convert.ToSDKAddress(unittest.AddressFixture())
+	addr := convert.ToSDKAddress(chain.ServiceAddress())
 
 	key := examples.RandomPrivateKey()
 	signer := sdkcrypto.NewInMemorySigner(key, sdkcrypto.SHA3_256)

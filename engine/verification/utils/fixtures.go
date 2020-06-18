@@ -37,17 +37,17 @@ type CompleteExecutionResult struct {
 // CompleteExecutionResultFixture returns complete execution result with an
 // execution receipt referencing the block/collections.
 // chunkCount determines the number of chunks inside each receipt
-func CompleteExecutionResultFixture(t *testing.T, chunkCount int) CompleteExecutionResult {
+func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain) CompleteExecutionResult {
 
 	// setup collection
-	tx1 := testutil.DeployCounterContractTransaction(flow.ServiceAddress())
-	err := testutil.SignTransactionAsServiceAccount(tx1, 0)
+	tx1 := testutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
+	err := testutil.SignTransactionAsServiceAccount(tx1, 0, chain)
 	require.NoError(t, err)
-	tx2 := testutil.CreateCounterTransaction(flow.ServiceAddress(), flow.ServiceAddress())
-	err = testutil.SignTransactionAsServiceAccount(tx2, 1)
+	tx2 := testutil.CreateCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+	err = testutil.SignTransactionAsServiceAccount(tx2, 1, chain)
 	require.NoError(t, err)
-	tx3 := testutil.CreateCounterPanicTransaction(flow.ServiceAddress(), flow.ServiceAddress())
-	err = testutil.SignTransactionAsServiceAccount(tx3, 2)
+	tx3 := testutil.CreateCounterPanicTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+	err = testutil.SignTransactionAsServiceAccount(tx3, 2, chain)
 	require.NoError(t, err)
 	transactions := []*flow.TransactionBody{tx1, tx2, tx3}
 
@@ -88,11 +88,12 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) CompleteExecut
 			led,
 			unittest.ServiceAccountPublicKey,
 			unittest.GenesisTokenSupply,
+			chain,
 		)
 		require.NoError(t, err)
 
 		rt := runtime.NewInterpreterRuntime()
-		vm, err := virtualmachine.New(rt)
+		vm, err := virtualmachine.New(rt, chain)
 		require.NoError(t, err)
 
 		// create state.View
@@ -162,8 +163,8 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) CompleteExecut
 
 		for i := 1; i < chunkCount; i++ {
 
-			tx3 = testutil.CreateCounterPanicTransaction(flow.ServiceAddress(), flow.ServiceAddress())
-			err = testutil.SignTransactionAsServiceAccount(tx3, 3+uint64(i))
+			tx3 = testutil.CreateCounterPanicTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+			err = testutil.SignTransactionAsServiceAccount(tx3, 3+uint64(i), chain)
 			require.NoError(t, err)
 
 			transactions := []*flow.TransactionBody{tx3}

@@ -31,8 +31,7 @@ import (
 func main() {
 
 	var (
-		ledgerStorage      storage.Ledger
-		mTrieStorage       *ledger.MTrieStorage
+		ledgerStorage      *ledger.MTrieStorage
 		events             storage.Events
 		txResults          storage.TransactionResults
 		providerEngine     *provider.Engine
@@ -57,7 +56,7 @@ func main() {
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
-			vm, err := virtualmachine.New(rt)
+			vm, err := virtualmachine.New(rt, node.GenesisChainID.Chain())
 			if err != nil {
 				return err
 			}
@@ -90,7 +89,7 @@ func main() {
 
 			bootstrapper := bootstrap.NewBootstrapper(node.Logger)
 
-			bootstrappedStateCommitment, err := bootstrapper.BootstrapLedger(ledgerStorage, *node.GenesisAccountPublicKey, node.GenesisTokenSupply)
+			bootstrappedStateCommitment, err := bootstrapper.BootstrapLedger(ledgerStorage, *node.GenesisAccountPublicKey, node.GenesisTokenSupply, node.GenesisChainID.Chain())
 			if err != nil {
 				panic(fmt.Sprintf("error while bootstrapping execution state: %s", err))
 			}
@@ -109,7 +108,7 @@ func main() {
 		}).
 		Component("execution state ledger WAL compactor", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
-			checkpointer, err := mTrieStorage.Checkpointer()
+			checkpointer, err := ledgerStorage.Checkpointer()
 			if err != nil {
 				return nil, fmt.Errorf("cannot create checkpointer: %w", err)
 			}

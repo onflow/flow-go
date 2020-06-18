@@ -37,6 +37,7 @@ type VerifierEngineTestSuite struct {
 	hasher  hash.Hasher
 	conduit *network.Conduit       // mocks conduit for submitting result approvals
 	metrics *metrics.NoopCollector // mocks performance monitoring metrics
+	chain   flow.Chain
 }
 
 func TestVerifierEngine(t *testing.T) {
@@ -50,6 +51,7 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	suite.ss = &protocol.Snapshot{}
 	suite.conduit = &network.Conduit{}
 	suite.metrics = metrics.NewNoopCollector()
+	suite.chain = flow.Testnet.Chain()
 
 	suite.net.On("Register", uint8(engine.ApprovalProvider), testifymock.Anything).
 		Return(suite.conduit, nil).
@@ -90,7 +92,7 @@ func (suite *VerifierEngineTestSuite) TestInvalidSender() {
 	// mocks NodeID method of the local
 	suite.me.MockNodeID(myID)
 
-	completeRA := utils.CompleteExecutionResultFixture(suite.T(), 1)
+	completeRA := utils.CompleteExecutionResultFixture(suite.T(), 1, suite.chain)
 
 	err := eng.Process(invalidID, &completeRA)
 	assert.Error(suite.T(), err)

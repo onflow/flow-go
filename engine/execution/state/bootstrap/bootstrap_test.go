@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -15,6 +16,8 @@ import (
 
 func TestGenerateGenesisState(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dbDir string) {
+
+		chain := flow.Mainnet.Chain()
 
 		metricsCollector := &metrics.NoopCollector{}
 		ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
@@ -24,6 +27,7 @@ func TestGenerateGenesisState(t *testing.T) {
 			ls,
 			unittest.ServiceAccountPublicKey,
 			unittest.GenesisTokenSupply,
+			chain,
 		)
 		require.NoError(t, err)
 
@@ -38,11 +42,13 @@ func TestGenerateGenesisState_ZeroTokenSupply(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dbDir string) {
 
+		chain := flow.Mainnet.Chain()
+
 		metricsCollector := &metrics.NoopCollector{}
 		ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 		require.NoError(t, err)
 
-		stateCommitment, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(ls, unittest.ServiceAccountPublicKey, 0)
+		stateCommitment, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(ls, unittest.ServiceAccountPublicKey, 0, chain)
 		require.NoError(t, err)
 
 		if !assert.Equal(t, expectedStateCommitment, stateCommitment) {

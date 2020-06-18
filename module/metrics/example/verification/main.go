@@ -8,7 +8,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/model/verification"
-	"github.com/dapperlabs/flow-go/model/verification/tracker"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/metrics/example"
@@ -61,32 +60,12 @@ func main() {
 			panic(err)
 		}
 
-		// creates a pending collection mempool and registers a metric on its size
-		pendingCollections, err := stdmap.NewPendingCollections(100)
-		if err != nil {
-			panic(err)
-		}
-		err = mempoolCollector.Register(metrics.ResourcePendingCollection, pendingCollections.Size)
-		if err != nil {
-			panic(err)
-		}
-
 		// creates a chunk data pack mempool and registers a metric on its size
 		chunkDataPacks, err := stdmap.NewChunkDataPacks(100)
 		if err != nil {
 			panic(err)
 		}
 		err = mempoolCollector.Register(metrics.ResourceChunkDataPack, chunkDataPacks.Size)
-		if err != nil {
-			panic(err)
-		}
-
-		// creates a chunk data pack tracker mempool and registers a metric on its size
-		chunkDataPackTrackers, err := stdmap.NewChunkDataPackTrackers(100)
-		if err != nil {
-			panic(err)
-		}
-		err = mempoolCollector.Register(metrics.ResourceChunkDataPackTracker, chunkDataPackTrackers.Size)
 		if err != nil {
 			panic(err)
 		}
@@ -98,10 +77,6 @@ func main() {
 
 			// adds a collection to pending and authenticated collections mempool
 			coll := unittest.CollectionFixture(1)
-			pendingCollections.Add(&verification.PendingCollection{
-				Collection: &coll,
-				OriginID:   unittest.IdentifierFixture(),
-			})
 			authCollections.Add(&coll)
 
 			// adds a receipt to the pending receipts
@@ -115,8 +90,6 @@ func main() {
 			// adds a chunk data pack as well as a chunk tracker
 			cdp := unittest.ChunkDataPackFixture(unittest.IdentifierFixture())
 			chunkDataPacks.Add(cdp)
-			chunkDataPackTrackers.Add(tracker.NewChunkDataPackTracker(unittest.IdentifierFixture(),
-				unittest.IdentifierFixture()))
 
 			// adds a synthetic 1 s delay for verification duration
 			time.Sleep(1 * time.Second)
