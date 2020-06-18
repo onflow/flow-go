@@ -1,6 +1,9 @@
 package main
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
 type StatsConfig struct {
 	numCollNodes    int // number of collection nodes
@@ -21,6 +24,7 @@ type TxStats struct {
 type StatsTracker struct {
 	config  *StatsConfig
 	txStats []*TxStats
+	mux     sync.Mutex
 }
 
 func NewStatsTracker(config *StatsConfig) *StatsTracker {
@@ -31,6 +35,8 @@ func NewStatsTracker(config *StatsConfig) *StatsTracker {
 }
 
 func (st *StatsTracker) AddTxStats(tt *TxStats) {
+	st.mux.Lock()
+	defer st.mux.Unlock()
 	st.txStats = append(st.txStats, tt)
 }
 
@@ -41,6 +47,8 @@ func (st *StatsTracker) TotalTxSubmited() int {
 
 // TxFailureRate returns the number of expired transactions divided by total number of transactions
 func (st *StatsTracker) TxFailureRate() float64 {
+	st.mux.Lock()
+	defer st.mux.Unlock()
 	counter := 0
 	for _, t := range st.txStats {
 		if t.isExpired {
@@ -52,10 +60,12 @@ func (st *StatsTracker) TxFailureRate() float64 {
 
 // AvgTTF returns average transaction time to finality (in seconds)
 func (st *StatsTracker) AvgTTF() float64 {
+	st.mux.Lock()
+	defer st.mux.Unlock()
 	sum := float64(0)
 	count := 0
 	for _, t := range st.txStats {
-		if !t.isExpired {
+		if !t.isExpired && t.TTF > 0 {
 			sum += t.TTE.Seconds()
 			count++
 		}

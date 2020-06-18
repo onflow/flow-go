@@ -22,6 +22,7 @@ type txInFlight struct {
 	onTimeout   func(flowsdk.Identifier)
 	createdAt   time.Time
 	expiresAt   time.Time
+	stat        *TxStats
 }
 
 type TxTracker struct {
@@ -43,7 +44,7 @@ func NewTxTracker(maxCap int,
 			return nil, err
 		}
 		time.Sleep(sleepAfterOp) // creating parity
-		go statusWorker(i, txt.txs, fclient, verbose, sleepAfterOp)
+		go statusWorker(i, txt.txs, fclient, stats, verbose, sleepAfterOp)
 	}
 	return txt, nil
 }
@@ -67,6 +68,7 @@ func (txt *TxTracker) AddTx(txID flowsdk.Identifier,
 		onTimeout:   onTimeoutCallback,
 		createdAt:   time.Now(),
 		expiresAt:   time.Now().Add(time.Duration(timeoutInSec) * time.Second),
+		stat:        &TxStats{isExpired: false},
 	}
 	fmt.Println("tx added ", txID)
 	txt.txs <- newTx
@@ -80,7 +82,7 @@ func (txt *TxTracker) stop() {
 
 // TODO enable verbose and do proper log formatting
 
-func statusWorker(workerID int, txs chan *txInFlight, fclient *client.Client, verbose bool, sleepAfterOp time.Duration) {
+func statusWorker(workerID int, txs chan *txInFlight, fclient *client.Client, stats *StatsTracker, verbose bool, sleepAfterOp time.Duration) {
 	clientContErrorCounter := 0
 	for tx := range txs {
 		if clientContErrorCounter > 10 {
@@ -94,6 +96,8 @@ func statusWorker(workerID int, txs chan *txInFlight, fclient *client.Client, ve
 			if verbose {
 				fmt.Printf("worker %d: status process for tx %v is timed out.\n", workerID, tx.txID)
 			}
+			tx.stat.isExpired = true
+			stats.AddTxStats(tx.stat)
 			continue
 		}
 		if verbose {
@@ -115,6 +119,7 @@ func statusWorker(workerID int, txs chan *txInFlight, fclient *client.Client, ve
 						go tx.onFinalized(tx.txID)
 					}
 					tx.lastStatus = flowsdk.TransactionStatusFinalized
+					tx.stat.TTF = time.Since(tx.createdAt)
 					if verbose {
 						fmt.Printf("worker %d tx %v has been finalized in %v seconds\n", workerID, tx.txID, time.Since(tx.createdAt).Seconds())
 					}
@@ -122,25 +127,29 @@ func statusWorker(workerID int, txs chan *txInFlight, fclient *client.Client, ve
 					if tx.onExecuted != nil {
 						go tx.onExecuted(tx.txID, result)
 					}
+					tx.lastStatus = flowsdk.TransactionStatusExecuted
+					tx.stat.TTE = time.Since(tx.createdAt)
 					if verbose {
 						fmt.Printf("worker %d tx %v has been executed in %v seconds\n", workerID, tx.txID, time.Since(tx.createdAt).Seconds())
 					}
-					tx.lastStatus = flowsdk.TransactionStatusExecuted
-
 				case flowsdk.TransactionStatusSealed:
 					if tx.onSealed != nil {
 						go tx.onSealed(tx.txID, result)
 					}
+
+					tx.stat.TTS = time.Since(tx.createdAt)
+					stats.AddTxStats(tx.stat)
 					if verbose {
 						fmt.Printf("worker %d tx %v has been sealed in %v seconds\n", workerID, tx.txID, time.Since(tx.createdAt).Seconds())
 					}
 					continue
-
 				case flowsdk.TransactionStatusUnknown:
 					err := fmt.Errorf("worker %d tx %v got into an unknown status after %v seconds", workerID, tx.txID, time.Since(tx.createdAt).Seconds())
 					if tx.onError != nil {
 						go tx.onError(tx.txID, err)
 					}
+					tx.stat.isExpired = true
+					stats.AddTxStats(tx.stat)
 					if verbose {
 						fmt.Println(err)
 					}
