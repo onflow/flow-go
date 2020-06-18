@@ -1,5 +1,6 @@
 package trace
 
+// Span names
 const (
 	EXEExecuteBlock           = "ingestion.executeBlock"
 	EXESaveExecutionResults   = "ingestion.saveExecutionResults"
@@ -22,7 +23,10 @@ const (
 	EXERetrieveStateDelta                 = "state.retrieveStateDelta"
 	EXEUpdateHighestExecutedBlockIfHigher = "state.updateHighestExecutedBlockIfHigher"
 	EXEGetHighestExecutedBlockID          = "state.getHighestExecutedBlockID"
+)
 
+// Tag names
+const (
 	EXEParseDurationTag     = "runtime.parseTransactionDuration"
 	EXECheckDurationTag     = "runtime.checkTransactionDuration"
 	EXEInterpretDurationTag = "runtime.interpretTransactionDuration"
