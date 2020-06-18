@@ -24,7 +24,7 @@ import (
 
 // TestHotStuffFollower is a test suite for the HotStuff Follower.
 // The main focus of this test suite is to test that the follower generates the expected callbacks to
-// module.Finalizer and hotstuff.FinalizationConsumer in the _specified order_. In this context, note that
+// module.Finalizer and hotstuff.FinalizationConsumer in the _expected order_. In this context, note that
 // the Follower internally has its own processing thread. Therefore, the test must be concurrency safe and
 // potentially wait a little bit until the Follower has asynchronously processed the submitted block
 // (functionality not natively supported by testify).
