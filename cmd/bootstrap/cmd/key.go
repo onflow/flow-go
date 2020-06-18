@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/multiformats/go-multiaddr"
-	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"

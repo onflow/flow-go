@@ -4,6 +4,10 @@ import "path/filepath"
 
 // Canonical filenames/paths for bootstrapping files.
 var (
+	// The Node ID file is used as a helper by the transit scripts
+	FilenameNodeId = "node-id"
+	PathNodeId     = filepath.Join(DirnamePublicGenesis, FilenameNodeId) // %v will be replaced by NodeID
+
 	// execution state
 	DirnameExecutionState = "execution-state"
 
@@ -22,13 +26,9 @@ var (
 	PathNodeInfosPub            = filepath.Join(DirnamePublicGenesis, "node-infos.pub.json")
 	PathNodeInfoPub             = filepath.Join(DirnamePublicGenesis, "node-info.pub.%v.json") // %v will be replaced by NodeID
 	PathPartnerNodeInfoPrefix   = filepath.Join(DirnamePublicGenesis, "node-info.pub.")
-	// The Node ID file is used as a helper by the transit scripts
-	FilenameNodeId = "node-id"
-	PathNodeId     = filepath.Join(DirnamePublicGenesis, FilenameNodeId) // %v will be replaced by NodeID
 
 	// private genesis information
 	DirPrivateGenesis        = "private-genesis-information"
-	PathServiceAccountPriv   = filepath.Join(DirPrivateGenesis, "service-account.priv.json")
 	PathNodeInfoPriv         = filepath.Join(DirPrivateGenesis, "private-node-info_%v", "node-info.priv.json") // %v will be replaced by NodeID
 	FilenameRandomBeaconPriv = "random-beacon.priv.json"
 	PathRandomBeaconPriv     = filepath.Join(DirPrivateGenesis, "private-node-info_%v", FilenameRandomBeaconPriv) // %v will be replaced by NodeID

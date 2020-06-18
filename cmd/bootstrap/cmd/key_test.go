@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -35,7 +34,6 @@ func TestHappyPath(t *testing.T) {
 	hook := zeroLoggerHook{
 		logs: &strings.Builder{},
 	}
-	log.Logger = log.Logger.Hook(hook)
 	keyCmdRun(nil, nil)
 	require.Regexp(t, regex, hook.logs.String())
 	require.DirExists(t, flagOutdir+"/public-genesis-information")

@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"github.com/rs/zerolog/log"
-
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/dkg"

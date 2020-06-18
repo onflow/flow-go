@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -76,8 +75,7 @@ func main() {
 			collector = metrics.NewExecutionCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
 		}).
-		// Trie storage is required to bootstrap, but also should be handled while shutting down
-		Module("ledger storage", func(node *cmd.FlowNodeBuilder) error {
+		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), collector, node.MetricsRegisterer)
 			return err
 		}).
@@ -88,20 +86,9 @@ func main() {
 
 			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage, *node.GenesisAccountPublicKey, node.GenesisTokenSupply, node.GenesisChainID.Chain())
 			if err != nil {
-				panic(fmt.Sprintf("error while bootstrapping execution state: %s", err))
+				return nil, fmt.Errorf("could not open trie storage: %w", err)
 			}
-
-			if !bytes.Equal(bootstrappedStateCommitment, node.GenesisCommit) {
-				panic(fmt.Sprintf("genesis seal state commitment (%x) different from precalculated (%x)", bootstrappedStateCommitment, node.GenesisCommit))
-			}
-
-			err = bootstrap.BootstrapExecutionDatabase(node.DB, bootstrappedStateCommitment, block.Header)
-			if err != nil {
-				panic(fmt.Sprintf("error while bootstrapping execution state - cannot bootstrap database: %s", err))
-			}
-		}).
-		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			return ledgerStorage, nil
+			return ledgerStorage, err
 		}).
 		Component("execution state ledger WAL compactor", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 

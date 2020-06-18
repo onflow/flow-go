@@ -20,6 +20,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
+	exebs "github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/dkg"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -122,8 +123,6 @@ type FlowNodeBuilder struct {
 	components        []namedComponentFunc
 	doneObject        []namedDoneObject
 	sig               chan os.Signal
-	genesisHandler    func(node *FlowNodeBuilder, block *flow.Block)
-	genesisBootstrap  bool
 	postInitFns       []func(*FlowNodeBuilder)
 	stakingKey        crypto.PrivateKey
 	networkKey        crypto.PrivateKey
@@ -368,16 +367,7 @@ func (fnb *FlowNodeBuilder) initState() {
 	if errors.Is(err, storerr.ErrNotFound) {
 		// Bootstrap!
 
-		// Mark that we need to run the genesis handler
-		fnb.genesisBootstrap = true
-
 		fnb.Logger.Info().Msg("bootstrapping empty protocol state")
-
-		// Load the genesis account public key
-		fnb.GenesisAccountPublicKey, err = loadGenesisAccountPublicKey(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis account public key")
-		}
 
 		// Load the rest of the genesis info, eventually needed for the consensus follower
 		fnb.GenesisBlock, err = loadGenesisBlock(fnb.BaseConfig.BootstrapDir)
@@ -405,16 +395,14 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis block seal")
 		}
 
-		// load token supply from bootstrap config
-		fnb.GenesisTokenSupply, err = loadGenesisTokenSupply(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis token supply")
-		}
-
+		// load the dkg public data from bootstrap files
 		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
 		}
+
+		// set the chain ID based on the bootstrap block
+		flow.SetChainID(fnb.GenesisBlock.Header.ChainID)
 
 		// TODO: this always needs to be available, so we need to persist it
 		fnb.DKGState = wrapper.NewState(dkgPubData)
@@ -423,6 +411,14 @@ func (fnb *FlowNodeBuilder) initState() {
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap protocol state")
 		}
+
+		if fnb.BaseConfig.nodeRole == flow.RoleExecution.String() {
+			err := exebs.BootstrapExecutionDatabase(fnb.DB, fnb.GenesisSeal.FinalState, fnb.GenesisBlock.Header)
+			if err != nil {
+				fnb.Logger.Fatal().Err(err).Msg("could not bootstrap execution database")
+			}
+		}
+
 	} else if err != nil {
 		fnb.Logger.Fatal().Err(err).Msg("could not check existing database")
 	} else {
@@ -563,12 +559,6 @@ func (fnb *FlowNodeBuilder) Component(name string, f func(*FlowNodeBuilder) (mod
 	return fnb
 }
 
-// GenesisHandler sets up handler which will be executed when a genesis block is generated
-func (fnb *FlowNodeBuilder) GenesisHandler(handler func(node *FlowNodeBuilder, block *flow.Block)) *FlowNodeBuilder {
-	fnb.genesisHandler = handler
-	return fnb
-}
-
 func (fnb *FlowNodeBuilder) PostInit(f func(node *FlowNodeBuilder)) *FlowNodeBuilder {
 	fnb.postInitFns = append(fnb.postInitFns, f)
 	return fnb
@@ -634,10 +624,6 @@ func (fnb *FlowNodeBuilder) Run() {
 	// set up all modules
 	for _, f := range fnb.modules {
 		fnb.handleModule(f)
-	}
-
-	if fnb.genesisBootstrap && fnb.GenesisBlock != nil && fnb.genesisHandler != nil {
-		fnb.genesisHandler(fnb, fnb.GenesisBlock)
 	}
 
 	// initialize all components
@@ -747,14 +733,4 @@ func loadPrivateNodeInfo(dir string, myID flow.Identifier) (*bootstrap.NodeInfoP
 	var info bootstrap.NodeInfoPriv
 	err = json.Unmarshal(data, &info)
 	return &info, err
-}
-
-func loadGenesisTokenSupply(dir string) (uint64, error) {
-	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisTokenSupply))
-	if err != nil {
-		return 0, err
-	}
-	var supply uint64
-	err = json.Unmarshal(data, &supply)
-	return supply, err
 }
