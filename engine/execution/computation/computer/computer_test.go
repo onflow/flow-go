@@ -26,7 +26,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		bc := new(vmmock.BlockContext)
 		blocks := new(storage.Blocks)
 
-		exe := computer.NewBlockComputer(vm, nil, nil, blocks)
+		exe := computer.NewBlockComputer(nil, nil, vm, blocks)
 
 		// create a block with 1 collection with 2 transactions
 		block := generateBlock(1, 2)
@@ -54,7 +54,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		bc := new(vmmock.BlockContext)
 		blocks := new(storage.Blocks)
 
-		exe := computer.NewBlockComputer(vm, nil, nil, blocks)
+		exe := computer.NewBlockComputer(nil, nil, vm, blocks)
 
 		collectionCount := 2
 		transactionsPerCollection := 2

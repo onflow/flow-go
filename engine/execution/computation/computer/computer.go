@@ -23,19 +23,24 @@ type BlockComputer interface {
 }
 
 type blockComputer struct {
-	metrics module.Metrics
+	metrics module.ExecutionMetrics
 	tracer  module.Tracer
 	vm      virtualmachine.VirtualMachine
-		blocks storage.Blocks
+	blocks  storage.Blocks
 }
 
 // NewBlockComputer creates a new block executor.
-func NewBlockComputer(vm virtualmachine.VirtualMachine, metrics module.Metrics, tracer module.Tracer, blocks storage.Blocks) BlockComputer {
+func NewBlockComputer(
+	metrics module.ExecutionMetrics,
+	tracer module.Tracer,
+	vm virtualmachine.VirtualMachine,
+	blocks storage.Blocks,
+) BlockComputer {
 	return &blockComputer{
 		metrics: metrics,
 		tracer:  tracer,
 		vm:      vm,
-		blocks: blocks,
+		blocks:  blocks,
 	}
 }
 
@@ -160,9 +165,9 @@ func (e *blockComputer) executeCollection(
 			result, err := blockCtx.ExecuteTransaction(txView, tx, virtualmachine.WithMetrics(metrics))
 
 			if e.metrics != nil {
-				e.metrics.ExecutionTransactionParsed(metrics.Parsed())
-				e.metrics.ExecutionTransactionChecked(metrics.Checked())
-				e.metrics.ExecutionTransactionInterpreted(metrics.Interpreted())
+				e.metrics.TransactionParsed(metrics.Parsed())
+				e.metrics.TransactionChecked(metrics.Checked())
+				e.metrics.TransactionInterpreted(metrics.Interpreted())
 			}
 
 			if err != nil {

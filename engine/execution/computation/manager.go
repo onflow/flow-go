@@ -41,7 +41,7 @@ type Manager struct {
 
 func New(
 	logger zerolog.Logger,
-	mc module.Metrics,
+	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
 	me module.Local,
 	protoState protocol.State,
@@ -55,7 +55,7 @@ func New(
 		me:            me,
 		protoState:    protoState,
 		vm:            vm,
-		blockComputer: computer.NewBlockComputer(vm, mc, tracer, blocks),
+		blockComputer: computer.NewBlockComputer(metrics, tracer, vm, blocks),
 		blocks:        blocks,
 	}
 
