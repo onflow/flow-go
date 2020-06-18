@@ -63,7 +63,7 @@ func main() {
 
 			computationManager = computation.New(
 				node.Logger,
-				node.Metrics,
+				collector,
 				node.Tracer,
 				node.Me,
 				node.State,
