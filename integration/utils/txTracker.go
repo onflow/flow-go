@@ -25,11 +25,18 @@ type txInFlight struct {
 }
 
 type TxTracker struct {
-	txs chan *txInFlight
+	txs   chan *txInFlight
+	stats *StatsTracker
 }
 
-func NewTxTracker(maxCap int, numberOfWorkers int, accessNodeAddress string, verbose bool, sleepAfterOp time.Duration) (*TxTracker, error) {
-	txt := &TxTracker{txs: make(chan *txInFlight, maxCap)}
+func NewTxTracker(maxCap int,
+	numberOfWorkers int,
+	accessNodeAddress string,
+	verbose bool,
+	sleepAfterOp time.Duration,
+	stats *StatsTracker) (*TxTracker, error) {
+
+	txt := &TxTracker{txs: make(chan *txInFlight, maxCap), stats: stats}
 	for i := 0; i < numberOfWorkers; i++ {
 		fclient, err := client.New(accessNodeAddress, grpc.WithInsecure())
 		if err != nil {
@@ -41,7 +48,7 @@ func NewTxTracker(maxCap int, numberOfWorkers int, accessNodeAddress string, ver
 	return txt, nil
 }
 
-func (txt *TxTracker) addTx(txID flowsdk.Identifier,
+func (txt *TxTracker) AddTx(txID flowsdk.Identifier,
 	onFinalizedCallback func(flowsdk.Identifier),
 	onExecutedCallback func(flowsdk.Identifier, *flowsdk.TransactionResult),
 	onSealedCallback func(flowsdk.Identifier, *flowsdk.TransactionResult),

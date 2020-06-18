@@ -57,6 +57,7 @@ type LoadGenerator struct {
 	accounts             []*flowAccount
 	step                 int
 	txTracker            *TxTracker
+	statsTracker         *StatsTracker
 }
 
 // In case we have to creat the client
@@ -102,7 +103,9 @@ func NewLoadGenerator(fclient *client.Client,
 		return nil, fmt.Errorf("error loading service account %w", err)
 	}
 
-	txTracker, err := NewTxTracker(5000, 2, "localhost:3569", true, time.Second/10)
+	// TODO get these params from the command line
+	stTracker := NewStatsTracker(&StatsConfig{1, 1, 1, 1, 1, numberOfAccounts})
+	txTracker, err := NewTxTracker(5000, 2, "localhost:3569", true, time.Second/10, stTracker)
 	if err != nil {
 		return nil, err
 	}
@@ -116,6 +119,7 @@ func NewLoadGenerator(fclient *client.Client,
 		accounts:             make([]*flowAccount, 0),
 		step:                 0,
 		txTracker:            txTracker,
+		statsTracker:         stTracker,
 	}
 	return lGen, nil
 }
@@ -146,203 +150,226 @@ func loadServiceAccount(flowClient *client.Client,
 	}, nil
 }
 
-func (cg *LoadGenerator) Next() error {
-
+func (cg *LoadGenerator) getBlockIDRef() flowsdk.Identifier {
 	ref, err := cg.flowClient.GetLatestBlockHeader(context.Background(), false)
 	examples.Handle(err)
+	return ref.ID
+}
 
-	// add keys to service account
-	if cg.step == 0 {
-		publicKeysStr := strings.Builder{}
+func (cg *LoadGenerator) Stats() *StatsTracker {
+	return cg.statsTracker
+}
 
-		for i := 0; i < cg.numberOfAccounts; i++ {
-			publicKeysStr.WriteString("signer.addPublicKey(")
-			publicKeysStr.WriteString(languageEncodeBytes(cg.serviceAccount.accountKey.Encode()))
-			publicKeysStr.WriteString(")\n")
-		}
-		script := fmt.Sprintf(`
+func (cg *LoadGenerator) SetupServiceAccountKeys() error {
+
+	blockRef := cg.getBlockIDRef()
+	publicKeysStr := strings.Builder{}
+	for i := 0; i < cg.numberOfAccounts; i++ {
+		publicKeysStr.WriteString("signer.addPublicKey(")
+		publicKeysStr.WriteString(languageEncodeBytes(cg.serviceAccount.accountKey.Encode()))
+		publicKeysStr.WriteString(")\n")
+	}
+	script := fmt.Sprintf(`
 		transaction {
 		prepare(signer: AuthAccount) {
 				%s
 			}
 		}`, publicKeysStr.String())
 
-		addKeysTx := flowsdk.NewTransaction().
-			SetReferenceBlockID(ref.ID).
-			SetScript([]byte(script)).
-			SetProposalKey(*cg.serviceAccount.address, cg.serviceAccount.accountKey.ID, cg.serviceAccount.accountKey.SequenceNumber).
-			SetPayer(*cg.serviceAccount.address).
-			AddAuthorizer(*cg.serviceAccount.address)
+	addKeysTx := flowsdk.NewTransaction().
+		SetReferenceBlockID(blockRef).
+		SetScript([]byte(script)).
+		SetProposalKey(*cg.serviceAccount.address, cg.serviceAccount.accountKey.ID, cg.serviceAccount.accountKey.SequenceNumber).
+		SetPayer(*cg.serviceAccount.address).
+		AddAuthorizer(*cg.serviceAccount.address)
+
+	cg.serviceAccount.signerLock.Lock()
+	defer cg.serviceAccount.signerLock.Unlock()
+
+	err := addKeysTx.SignEnvelope(*cg.serviceAccount.address, cg.serviceAccount.accountKey.ID, cg.serviceAccount.signer)
+	if err != nil {
+		return err
+	}
+	cg.serviceAccount.accountKey.SequenceNumber++
+	cg.step++
+
+	err = cg.flowClient.SendTransaction(context.Background(), *addKeysTx)
+	examples.Handle(err)
+
+	txWG := sync.WaitGroup{}
+	txWG.Add(1)
+	cg.txTracker.AddTx(addKeysTx.ID(), nil,
+		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
+			txWG.Done()
+		},
+		nil, nil, nil, nil, 60)
+
+	txWG.Wait()
+	// TODO pass methods for handling errors
+	// examples.Handle(accountCreationTxRes.Error)
+
+	fmt.Println("load generator step 0 done")
+	return nil
+
+}
+
+func (cg *LoadGenerator) CreateAccounts() error {
+	fmt.Printf("creating %d accounts...", cg.numberOfAccounts)
+	blockRef := cg.getBlockIDRef()
+	allTxWG := sync.WaitGroup{}
+	for i := 0; i < cg.numberOfAccounts; i++ {
+		privKey := examples.RandomPrivateKey()
+		accountKey := flowsdk.NewAccountKey().
+			FromPrivateKey(privKey).
+			SetHashAlgo(crypto.SHA3_256).
+			SetWeight(flowsdk.AccountKeyWeightThreshold)
+		signer := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
+		createAccountScript, err := templates.CreateAccount([]*flowsdk.AccountKey{accountKey}, nil)
+		// Generate an account creation script
+		examples.Handle(err)
+		createAccountTx := flowsdk.NewTransaction().
+			SetReferenceBlockID(blockRef).
+			SetScript(createAccountScript).
+			AddAuthorizer(*cg.serviceAccount.address).
+			SetProposalKey(*cg.serviceAccount.address, i+1, 0).
+			SetPayer(*cg.serviceAccount.address)
 
 		cg.serviceAccount.signerLock.Lock()
-		defer cg.serviceAccount.signerLock.Unlock()
-
-		err := addKeysTx.SignEnvelope(*cg.serviceAccount.address, cg.serviceAccount.accountKey.ID, cg.serviceAccount.signer)
+		err = createAccountTx.SignEnvelope(*cg.serviceAccount.address, i+1, cg.serviceAccount.signer)
 		if err != nil {
 			return err
 		}
-		cg.serviceAccount.accountKey.SequenceNumber++
-		cg.step++
+		cg.serviceAccount.signerLock.Unlock()
 
-		err = cg.flowClient.SendTransaction(context.Background(), *addKeysTx)
+		err = cg.flowClient.SendTransaction(context.Background(), *createAccountTx)
 		examples.Handle(err)
+		allTxWG.Add(1)
 
-		txWG := sync.WaitGroup{}
-		txWG.Add(1)
-		cg.txTracker.addTx(addKeysTx.ID(), nil,
+		cg.txTracker.AddTx(createAccountTx.ID(),
+			nil,
 			func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
-				txWG.Done()
-			},
-			nil, nil, nil, nil, 60)
-
-		txWG.Wait()
-		// TODO pass methods for handling errors
-		// examples.Handle(accountCreationTxRes.Error)
-
-		fmt.Println("load generator step 0 done")
-		return nil
-	}
-	// setup accounts
-	if cg.step == 1 {
-		fmt.Println("load generator step 1 started")
-		allTxWG := sync.WaitGroup{}
-		for i := 0; i < cg.numberOfAccounts; i++ {
-			privKey := examples.RandomPrivateKey()
-			accountKey := flowsdk.NewAccountKey().
-				FromPrivateKey(privKey).
-				SetHashAlgo(crypto.SHA3_256).
-				SetWeight(flowsdk.AccountKeyWeightThreshold)
-			signer := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
-			createAccountScript, err := templates.CreateAccount([]*flowsdk.AccountKey{accountKey}, nil)
-			// Generate an account creation script
-			examples.Handle(err)
-			createAccountTx := flowsdk.NewTransaction().
-				SetReferenceBlockID(ref.ID).
-				SetScript(createAccountScript).
-				AddAuthorizer(*cg.serviceAccount.address).
-				SetProposalKey(*cg.serviceAccount.address, i+1, 0).
-				SetPayer(*cg.serviceAccount.address)
-
-			cg.serviceAccount.signerLock.Lock()
-			err = createAccountTx.SignEnvelope(*cg.serviceAccount.address, i+1, cg.serviceAccount.signer)
-			if err != nil {
-				return err
-			}
-			cg.serviceAccount.signerLock.Unlock()
-
-			err = cg.flowClient.SendTransaction(context.Background(), *createAccountTx)
-			examples.Handle(err)
-			allTxWG.Add(1)
-
-			cg.txTracker.addTx(createAccountTx.ID(),
-				nil,
-				func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
-					for _, event := range res.Events {
-						if event.Type == flowsdk.EventAccountCreated {
-							accountCreatedEvent := flowsdk.AccountCreatedEvent(event)
-							accountAddress := accountCreatedEvent.Address()
-							newAcc := newFlowAccount(&accountAddress, accountKey, signer)
-							cg.accounts = append(cg.accounts, newAcc)
-							fmt.Println("account added")
-						}
+				for _, event := range res.Events {
+					if event.Type == flowsdk.EventAccountCreated {
+						accountCreatedEvent := flowsdk.AccountCreatedEvent(event)
+						accountAddress := accountCreatedEvent.Address()
+						newAcc := newFlowAccount(&accountAddress, accountKey, signer)
+						cg.accounts = append(cg.accounts, newAcc)
+						fmt.Println("account added")
 					}
-					allTxWG.Done()
-				},
-				nil, // on sealed
-				nil, // on expired
-				nil, // on timout
-				nil, // on error
-				30)
+				}
+				allTxWG.Done()
+			},
+			nil, // on sealed
+			nil, // on expired
+			nil, // on timout
+			nil, // on error
+			30)
 
-			fmt.Println("<<<", i)
-		}
-		allTxWG.Wait()
-		cg.step++
-		fmt.Println("load generator step 1 done")
+		fmt.Println("<<<", i)
 	}
-	if cg.step == 2 {
-		allTxWG := sync.WaitGroup{}
-		fmt.Println("load generator step 2 started")
-		for i := 0; i < cg.numberOfAccounts; i++ {
+	allTxWG.Wait()
+	cg.step++
+	fmt.Printf("done\n")
+	return nil
+}
 
-			// Transfer 10000 tokens
-			transferScript := GenerateTransferScript(cg.fungibleTokenAddress, cg.flowTokenAddress, cg.accounts[i].address, 10000)
-			transferTx := flowsdk.NewTransaction().
-				SetReferenceBlockID(ref.ID).
-				SetScript(transferScript).
-				SetProposalKey(*cg.serviceAccount.address, i+1, 1).
-				SetPayer(*cg.serviceAccount.address).
-				AddAuthorizer(*cg.serviceAccount.address)
+func (cg *LoadGenerator) DistributeInitialTokens() error {
 
-			// TODO signer be thread safe
-			cg.serviceAccount.signerLock.Lock()
-			err = transferTx.SignEnvelope(*cg.serviceAccount.address, 0, cg.serviceAccount.signer)
-			cg.serviceAccount.signerLock.Unlock()
+	blockRef := cg.getBlockIDRef()
+	allTxWG := sync.WaitGroup{}
+	fmt.Println("load generator step 2 started")
+	for i := 0; i < cg.numberOfAccounts; i++ {
 
-			err = cg.flowClient.SendTransaction(context.Background(), *transferTx)
-			examples.Handle(err)
-			allTxWG.Add(1)
+		// Transfer 10000 tokens
+		transferScript := GenerateTransferScript(cg.fungibleTokenAddress, cg.flowTokenAddress, cg.accounts[i].address, 10000)
+		transferTx := flowsdk.NewTransaction().
+			SetReferenceBlockID(blockRef).
+			SetScript(transferScript).
+			SetProposalKey(*cg.serviceAccount.address, i+1, 1).
+			SetPayer(*cg.serviceAccount.address).
+			AddAuthorizer(*cg.serviceAccount.address)
 
-			cg.txTracker.addTx(transferTx.ID(),
-				nil,
-				func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
-					allTxWG.Done()
-				},
-				nil, // on sealed
-				nil, // on expired
-				nil, // on timout
-				nil, // on error
-				30)
+		// TODO signer be thread safe
+		cg.serviceAccount.signerLock.Lock()
+		err := transferTx.SignEnvelope(*cg.serviceAccount.address, 0, cg.serviceAccount.signer)
+		cg.serviceAccount.signerLock.Unlock()
 
-		}
-		allTxWG.Wait()
-		cg.step++
-		fmt.Println("load generator step 2 done")
+		err = cg.flowClient.SendTransaction(context.Background(), *transferTx)
+		examples.Handle(err)
+		allTxWG.Add(1)
+
+		cg.txTracker.AddTx(transferTx.ID(),
+			nil,
+			func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
+				allTxWG.Done()
+			},
+			nil, // on sealed
+			nil, // on expired
+			nil, // on timout
+			nil, // on error
+			30)
+
 	}
-	if cg.step > 2 {
-		allTxWG := sync.WaitGroup{}
-		fmt.Println("load generator step 3 started")
+	allTxWG.Wait()
+	cg.step++
+	fmt.Println("load generator step 2 done")
+	return nil
+}
 
-		for i := 0; i < cg.numberOfAccounts; i++ {
-			j := (i + 1) % cg.numberOfAccounts
-			transferScript := GenerateTransferScript(cg.fungibleTokenAddress, cg.accounts[i].address, cg.accounts[j].address, 10)
-			transferTx := flowsdk.NewTransaction().
-				SetReferenceBlockID(ref.ID).
-				SetScript(transferScript).
-				SetProposalKey(*cg.accounts[i].address, 0, cg.accounts[i].seqNumber).
-				SetPayer(*cg.accounts[i].address).
-				AddAuthorizer(*cg.accounts[i].address)
+func (cg *LoadGenerator) RotateTokens() error {
+	blockRef := cg.getBlockIDRef()
+	allTxWG := sync.WaitGroup{}
+	fmt.Println("load generator step 3 started")
 
-			// TODO signer be thread safe
-			cg.accounts[i].signerLock.Lock()
-			err = transferTx.SignEnvelope(*cg.accounts[i].address, 0, cg.accounts[i].signer)
-			cg.accounts[i].seqNumber++
-			cg.accounts[i].signerLock.Unlock()
+	for i := 0; i < cg.numberOfAccounts; i++ {
+		j := (i + 1) % cg.numberOfAccounts
+		transferScript := GenerateTransferScript(cg.fungibleTokenAddress, cg.accounts[i].address, cg.accounts[j].address, 10)
+		transferTx := flowsdk.NewTransaction().
+			SetReferenceBlockID(blockRef).
+			SetScript(transferScript).
+			SetProposalKey(*cg.accounts[i].address, 0, cg.accounts[i].seqNumber).
+			SetPayer(*cg.accounts[i].address).
+			AddAuthorizer(*cg.accounts[i].address)
 
-			err = cg.flowClient.SendTransaction(context.Background(), *transferTx)
-			examples.Handle(err)
-			allTxWG.Add(1)
+		// TODO signer be thread safe
+		cg.accounts[i].signerLock.Lock()
+		err := transferTx.SignEnvelope(*cg.accounts[i].address, 0, cg.accounts[i].signer)
+		cg.accounts[i].seqNumber++
+		cg.accounts[i].signerLock.Unlock()
 
-			cg.txTracker.addTx(transferTx.ID(),
-				nil,
-				func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
-					allTxWG.Done()
-				},
-				nil, // on sealed
-				nil, // on expired
-				nil, // on timout
-				nil, // on error
-				30)
+		err = cg.flowClient.SendTransaction(context.Background(), *transferTx)
+		examples.Handle(err)
+		allTxWG.Add(1)
 
-		}
-		allTxWG.Wait()
-		cg.step++
-		fmt.Println("load generator step 3 done")
+		cg.txTracker.AddTx(transferTx.ID(),
+			nil,
+			func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
+				allTxWG.Done()
+			},
+			nil, // on sealed
+			nil, // on expired
+			nil, // on timout
+			nil, // on error
+			30)
+
 	}
-	// cg.txTracker.close()
-	// wait for all
-	time.Sleep(time.Second * 30)
-	// TODO else do the transfers
+	allTxWG.Wait()
+	cg.step++
+	fmt.Println("load generator step 3 done")
+	return nil
+}
+
+func (cg *LoadGenerator) Next() error {
+	switch cg.step {
+	case 0:
+		return cg.SetupServiceAccountKeys()
+	case 1:
+		return cg.CreateAccounts()
+	case 2:
+		return cg.DistributeInitialTokens()
+	default:
+		return cg.RotateTokens()
+	}
 	return nil
 }
 
@@ -413,10 +440,16 @@ func main() {
 		panic(err)
 	}
 
-	rounds := 30
+	rounds := 5
 
 	// extra 3 is for setup
 	for i := 0; i < rounds+3; i++ {
 		lg.Next()
 	}
+
+	fmt.Println(lg.Stats().AvgTTF())
+	// cg.txTracker.close()
+	// wait for all
+	time.Sleep(time.Second * 30)
+	// TODO else do the transfers
 }
