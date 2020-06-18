@@ -28,7 +28,7 @@ go generate
 
 ### Hashing and Message Authentication Code:
 
-`crypto/hash` provides the hashing and MAC algorithms required for Flow. All algorithm implement the generic interface `Hasher`. All digest are of the generic type `Hash`.
+`crypto/hash` provides the hashing and MAC algorithms required for Flow. All algorithm implement the generic interface `Hasher`. All digests are of the generic type `Hash`.
 
 *Hashing* :
  * Sha3: 256 and 384 output size
@@ -84,7 +84,7 @@ All signature schemes use the generic interfaces of `PrivateKey` and `PublicKey`
     * support a partial signature reconstruction in the stateful api to avoid a long final reconstruction. 
 
 
-### Discrete Log based distributed key generation
+### Discrete-Log based distributed key generation
 
  All supported Distributed Key Generation protocols are [discrete log based](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.50.2737&rep=rep1&type=pdf) and are implemented for the same BLS setup on the BLS 12-381 curve. The protocols generate key sets for the BLS-based threshold signature. 
 
