@@ -246,10 +246,23 @@ static int fp_get_bit_generic(const fp_t a, int bit) {
 // and the LS bit of the y coordinate. 
 //
 // (taken and modifed from Relic ep_upk function)
-// // Copyright 2019 D. F. Aranha and C. P. L. Gouvêa and T. Markmann and R. S. Wahby and K. Liao
-// https://github.com/relic-toolkit/relic
 // Change: the square root (y) is chosen regardless of the modular multiplication used.
 // If montgomery multiplication is used, the square root is reduced to check the LS bit.
+//
+// Copyright 2019 D. F. Aranha and C. P. L. Gouvêa and T. Markmann and R. S. Wahby and K. Liao
+// https://github.com/relic-toolkit/relic
+//
+//    Licensed under the Apache License, Version 2.0 (the "License");
+//    you may not use this file except in compliance with the License.
+//    You may obtain a copy of the License at
+
+//        http://www.apache.org/licenses/LICENSE-2.0
+
+//    Unless required by applicable law or agreed to in writing, software
+//    distributed under the License is distributed on an "AS IS" BASIS,
+//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//    See the License for the specific language governing permissions and
+//    limitations under the License.
 static int ep_upk_generic(ep_t r, const ep_t p) {
     fp_t t;
     int result = 0;
@@ -399,10 +412,11 @@ int ep_read_bin_compact(ep_st* a, const byte *bin, const int len) {
 // and the LS bit of the y lower coordinate.
 //
 // (taken and modifed from Relic ep2_upk function)
-// // Copyright 2019 D. F. Aranha and C. P. L. Gouvêa and T. Markmann and R. S. Wahby and K. Liao
-// https://github.com/relic-toolkit/relic
 // Change: the square root (y) is chosen regardless of the modular multiplication used.
 // If montgomery multiplication is used, the square root is reduced to check the LS bit.
+//
+// Copyright 2019 D. F. Aranha and C. P. L. Gouvêa and T. Markmann and R. S. Wahby and K. Liao
+// https://github.com/relic-toolkit/relic
 static  int ep2_upk_generic(ep2_t r, ep2_t p) {
     fp2_t t;
     int result = 0;
