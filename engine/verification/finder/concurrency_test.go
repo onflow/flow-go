@@ -198,7 +198,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 
 	for _, er := range ers {
 		// all distinct execution results should be marked as processed by finder engine
-		assert.True(t, verNode.IngestedResultIDs.Has(er.Receipt.ExecutionResult.ID()))
+		assert.True(t, verNode.ProcessedResultIDs.Has(er.Receipt.ExecutionResult.ID()))
 
 		// no execution receipt should reside in mempool of finder engine
 		assert.False(t, verNode.PendingReceipts.Has(er.Receipt.ID()))

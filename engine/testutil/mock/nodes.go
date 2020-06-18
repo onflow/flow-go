@@ -120,7 +120,7 @@ type VerificationNode struct {
 	Receipts           mempool.Receipts
 	PendingReceipts    mempool.PendingReceipts
 	PendingResults     mempool.PendingResults
-	IngestedResultIDs  mempool.Identifiers
+	ProcessedResultIDs mempool.Identifiers
 	ReceiptIDsByBlock  mempool.IdentifierMap
 	ReceiptIDsByResult mempool.IdentifierMap
 	Chunks             *match.Chunks
