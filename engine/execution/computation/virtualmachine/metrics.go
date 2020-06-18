@@ -6,47 +6,51 @@ import (
 	"github.com/onflow/cadence/runtime/ast"
 )
 
-type RuntimeMetrics struct {
+// A MetricsCollector accumulates performance metrics reported by the Cadence runtime.
+//
+// A single collector instance will sum all reported values. For example, the "parsed" field will be
+// incremented each time a program is parsed.
+type MetricsCollector struct {
 	parsed      time.Duration
 	checked     time.Duration
 	interpreted time.Duration
 }
 
-func NewRuntimeMetrics() *RuntimeMetrics {
-	return &RuntimeMetrics{}
+func NewMetricsCollector() *MetricsCollector {
+	return &MetricsCollector{}
 }
 
-func (m *RuntimeMetrics) Parsed() time.Duration      { return m.parsed }
-func (m *RuntimeMetrics) Checked() time.Duration     { return m.checked }
-func (m *RuntimeMetrics) Interpreted() time.Duration { return m.interpreted }
+func (m *MetricsCollector) Parsed() time.Duration      { return m.parsed }
+func (m *MetricsCollector) Checked() time.Duration     { return m.checked }
+func (m *MetricsCollector) Interpreted() time.Duration { return m.interpreted }
 
-type runtimeMetricsCollector struct {
-	*RuntimeMetrics
+type metricsCollector struct {
+	*MetricsCollector
 }
 
-func (m runtimeMetricsCollector) ProgramParsed(location ast.Location, duration time.Duration) {
-	if m.RuntimeMetrics == nil {
+func (m metricsCollector) ProgramParsed(location ast.Location, duration time.Duration) {
+	if m.MetricsCollector == nil {
 		return
 	}
 	m.parsed += duration
 }
 
-func (m runtimeMetricsCollector) ProgramChecked(location ast.Location, duration time.Duration) {
-	if m.RuntimeMetrics == nil {
+func (m metricsCollector) ProgramChecked(location ast.Location, duration time.Duration) {
+	if m.MetricsCollector == nil {
 		return
 	}
 	m.checked += duration
 }
 
-func (m runtimeMetricsCollector) ProgramInterpreted(location ast.Location, duration time.Duration) {
-	if m.RuntimeMetrics == nil {
+func (m metricsCollector) ProgramInterpreted(location ast.Location, duration time.Duration) {
+	if m.MetricsCollector == nil {
 		return
 	}
 	m.interpreted += duration
 }
 
-func (m runtimeMetricsCollector) ValueEncoded(duration time.Duration) {}
-func (m runtimeMetricsCollector) ValueDecoded(duration time.Duration) {}
+func (m metricsCollector) ValueEncoded(duration time.Duration) {}
+func (m metricsCollector) ValueDecoded(duration time.Duration) {}
 
 type emptyMetricsCollector struct{}
 

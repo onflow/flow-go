@@ -64,9 +64,9 @@ func WithRestrictedAccountCreation(enabled bool) TransactionContextOption {
 	}
 }
 
-func WithMetrics(metrics *RuntimeMetrics) TransactionContextOption {
+func WithMetricsCollector(mc *MetricsCollector) TransactionContextOption {
 	return func(ctx *TransactionContext) {
-		ctx.Metrics = runtimeMetricsCollector{metrics}
+		ctx.Metrics = metricsCollector{mc}
 	}
 }
 

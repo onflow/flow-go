@@ -137,7 +137,7 @@ func (e *blockComputer) executeCollection(
 		gasUsed   uint64
 	)
 
-	metrics := virtualmachine.NewRuntimeMetrics()
+	txMetrics := virtualmachine.NewMetricsCollector()
 
 	for _, tx := range collection.Transactions {
 		err := func(tx *flow.TransactionBody) error {
@@ -152,9 +152,9 @@ func (e *blockComputer) executeCollection(
 					// For example, metrics.Parsed() returns the total time spent parsing the transaction itself,
 					// as well as any imported programs.
 					txSpan.LogFields(
-						log.Int64(trace.EXEParseDurationTag, int64(metrics.Parsed())),
-						log.Int64(trace.EXECheckDurationTag, int64(metrics.Checked())),
-						log.Int64(trace.EXEInterpretDurationTag, int64(metrics.Interpreted())),
+						log.Int64(trace.EXEParseDurationTag, int64(txMetrics.Parsed())),
+						log.Int64(trace.EXECheckDurationTag, int64(txMetrics.Checked())),
+						log.Int64(trace.EXEInterpretDurationTag, int64(txMetrics.Interpreted())),
 					)
 					txSpan.Finish()
 				}()
@@ -162,12 +162,12 @@ func (e *blockComputer) executeCollection(
 
 			txView := collectionView.NewChild()
 
-			result, err := blockCtx.ExecuteTransaction(txView, tx, virtualmachine.WithMetrics(metrics))
+			result, err := blockCtx.ExecuteTransaction(txView, tx, virtualmachine.WithMetricsCollector(txMetrics))
 
 			if e.metrics != nil {
-				e.metrics.TransactionParsed(metrics.Parsed())
-				e.metrics.TransactionChecked(metrics.Checked())
-				e.metrics.TransactionInterpreted(metrics.Interpreted())
+				e.metrics.TransactionParsed(txMetrics.Parsed())
+				e.metrics.TransactionChecked(txMetrics.Checked())
+				e.metrics.TransactionInterpreted(txMetrics.Interpreted())
 			}
 
 			if err != nil {
