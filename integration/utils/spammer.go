@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -30,8 +32,8 @@ const (
 type flowAccount struct {
 	address    *flowsdk.Address
 	accountKey *flowsdk.AccountKey
-	signer     crypto.InMemorySigner
 	seqNumber  uint64
+	signer     crypto.InMemorySigner
 	signerLock sync.Mutex
 }
 
@@ -185,8 +187,17 @@ func (cg *LoadGenerator) Next() error {
 		err = cg.flowClient.SendTransaction(context.Background(), *addKeysTx)
 		examples.Handle(err)
 
-		accountCreationTxRes := waitForFinalized(context.Background(), cg.flowClient, addKeysTx.ID())
-		examples.Handle(accountCreationTxRes.Error)
+		txWG := sync.WaitGroup{}
+		txWG.Add(1)
+		cg.txTracker.addTx(addKeysTx.ID(), nil,
+			func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
+				txWG.Done()
+			},
+			nil, nil, nil, nil, 60)
+
+		txWG.Wait()
+		// TODO pass methods for handling errors
+		// examples.Handle(accountCreationTxRes.Error)
 
 		fmt.Println("load generator step 0 done")
 		return nil
@@ -224,7 +235,6 @@ func (cg *LoadGenerator) Next() error {
 			allTxWG.Add(1)
 
 			cg.txTracker.addTx(createAccountTx.ID(),
-				*cg.serviceAccount.address,
 				nil,
 				func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
 					for _, event := range res.Events {
@@ -244,23 +254,54 @@ func (cg *LoadGenerator) Next() error {
 				nil, // on error
 				30)
 
-			// accountCreationTxRes := waitForFinalized(context.Background(), cg.flowClient, createAccountTxID)
-			// examples.Handle(accountCreationTxRes.Error)
-
-			// wait group
-			// unlock on finalized
-
 			fmt.Println("<<<", i)
-			// // Successful Tx, increment sequence number
+		}
+		allTxWG.Wait()
+		cg.step++
+		fmt.Println("load generator step 1 done")
+	}
+	if cg.step == 2 {
+		allTxWG := sync.WaitGroup{}
+		fmt.Println("load generator step 2 started")
+		for i := 0; i < cg.numberOfAccounts; i++ {
 
-			fmt.Println(">>", i)
+			// Transfer 10000 tokens
+			transferScript := GenerateTransferScript(cg.fungibleTokenAddress, cg.flowTokenAddress, cg.accounts[i].address, 10000)
+			transferTx := flowsdk.NewTransaction().
+				SetReferenceBlockID(ref.ID).
+				SetScript(transferScript).
+				SetProposalKey(*cg.serviceAccount.address, i+1, 1).
+				SetPayer(*cg.serviceAccount.address).
+				AddAuthorizer(*cg.serviceAccount.address)
+
+			// TODO signer be thread safe
+			cg.serviceAccount.signerLock.Lock()
+			err = transferTx.SignEnvelope(*cg.serviceAccount.address, 0, cg.serviceAccount.signer)
+			cg.serviceAccount.signerLock.Unlock()
+
+			err = cg.flowClient.SendTransaction(context.Background(), *transferTx)
+			examples.Handle(err)
+			allTxWG.Add(1)
+
+			cg.txTracker.addTx(transferTx.ID(),
+				nil,
+				func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
+					allTxWG.Done()
+				},
+				nil, // on sealed
+				nil, // on expired
+				nil, // on timout
+				nil, // on error
+				30)
+
 		}
 		allTxWG.Wait()
 		cg.step++
 		fmt.Println("load generator step 2 done")
 	}
+
 	// wait for all
-	time.Sleep(time.Second * 150)
+	time.Sleep(time.Second * 30)
 	// TODO else do the transfers
 	return nil
 }
@@ -274,33 +315,36 @@ func languageEncodeBytes(b []byte) string {
 	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
 }
 
+// TODO remove the need to download many times
+// GenerateTransferScript Creates a script that transfer some amount of FTs
+func GenerateTransferScript(ftAddr, flowToken, toAddr *flowsdk.Address, amount int) []byte {
+	mintCode, err := DownloadFile(FungibleTokenTransactionsBaseURL + TransferTokens)
+	examples.Handle(err)
+
+	withFTAddr := strings.ReplaceAll(string(mintCode), "0x02", "0x"+ftAddr.Hex())
+	withFlowTokenAddr := strings.Replace(string(withFTAddr), "0x03", "0x"+flowToken.Hex(), 1)
+	withToAddr := strings.Replace(string(withFlowTokenAddr), "0x04", "0x"+toAddr.Hex(), 1)
+
+	withAmount := strings.Replace(string(withToAddr), fmt.Sprintf("%d.0", amount), "0.01", 1)
+
+	return []byte(withAmount)
+}
+
 // TODO use context deadlines
 
-func waitForFinalized(ctx context.Context, c *client.Client, id flowsdk.Identifier) *flowsdk.TransactionResult {
-	result, err := c.GetTransactionResult(ctx, id)
-	// Handle(err)
-	fmt.Printf("Waiting for transaction %s to be finalized...\n", id)
-	errCount := 0
-	for result == nil || (result.Status != flowsdk.TransactionStatusFinalized && result.Status != flowsdk.TransactionStatusSealed) || len(result.Events) == 0 {
-		time.Sleep(time.Second)
-		result, err = c.GetTransactionResult(ctx, id)
-		if err != nil {
-			fmt.Print("x")
-			errCount++
-			if errCount >= 10 {
-				return &flowsdk.TransactionResult{
-					Error: err,
-				}
-			}
-		} else {
-			fmt.Print(".")
-		}
-		// Handle(err)
-	}
-	fmt.Println()
-	fmt.Printf("Transaction %s finalized\n", id)
+// TODO: Consider moving some of the following helpers to a common package, or just use any that are in the SDK once they're added there
 
-	return result
+// DownloadFile will download a url a byte slice
+func DownloadFile(url string) ([]byte, error) {
+
+	// Get the data
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	return ioutil.ReadAll(resp.Body)
 }
 
 func main() {
@@ -328,6 +372,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	lg.Next()
 	lg.Next()
 	lg.Next()
 }

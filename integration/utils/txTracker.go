@@ -14,7 +14,6 @@ import (
 type txInFlight struct {
 	txID        flowsdk.Identifier
 	lastStatus  flowsdk.TransactionStatus
-	proposer    flowsdk.Address
 	onError     func(flowsdk.Identifier, error)
 	onFinalized func(flowsdk.Identifier)
 	onExecuted  func(flowsdk.Identifier, *flowsdk.TransactionResult)
@@ -43,7 +42,6 @@ func NewTxTracker(maxCap int, numberOfWorkers int, accessNodeAddress string, ver
 }
 
 func (txt *TxTracker) addTx(txID flowsdk.Identifier,
-	proposer flowsdk.Address,
 	onFinalizedCallback func(flowsdk.Identifier),
 	onExecutedCallback func(flowsdk.Identifier, *flowsdk.TransactionResult),
 	onSealedCallback func(flowsdk.Identifier, *flowsdk.TransactionResult),
@@ -54,7 +52,6 @@ func (txt *TxTracker) addTx(txID flowsdk.Identifier,
 ) {
 	newTx := &txInFlight{txID: txID,
 		lastStatus:  flowsdk.TransactionStatusUnknown,
-		proposer:    proposer,
 		onError:     onErrorCallback,
 		onFinalized: onFinalizedCallback,
 		onExecuted:  onExecutedCallback,
