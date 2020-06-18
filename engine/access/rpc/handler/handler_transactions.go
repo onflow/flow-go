@@ -18,7 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-type handlerTransaction struct {
+type handlerTransactions struct {
 	collectionRPC access.AccessAPIClient
 	executionRPC  execution.ExecutionAPIClient
 	transactions  storage.Transactions
@@ -28,7 +28,7 @@ type handlerTransaction struct {
 }
 
 // SendTransaction forwards the transaction to the collection node
-func (h *handlerTransaction) SendTransaction(ctx context.Context, req *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {
+func (h *handlerTransactions) SendTransaction(ctx context.Context, req *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {
 
 	// send the transaction to the collection node
 	resp, err := h.collectionRPC.SendTransaction(ctx, req)
@@ -51,7 +51,7 @@ func (h *handlerTransaction) SendTransaction(ctx context.Context, req *access.Se
 	return resp, nil
 }
 
-func (h *handlerTransaction) GetTransaction(_ context.Context, req *access.GetTransactionRequest) (*access.TransactionResponse, error) {
+func (h *handlerTransactions) GetTransaction(_ context.Context, req *access.GetTransactionRequest) (*access.TransactionResponse, error) {
 
 	id := flow.HashToID(req.Id)
 	// look up transaction from storage
@@ -70,7 +70,7 @@ func (h *handlerTransaction) GetTransaction(_ context.Context, req *access.GetTr
 	return resp, nil
 }
 
-func (h *handlerTransaction) GetTransactionResult(ctx context.Context, req *access.GetTransactionRequest) (*access.TransactionResultResponse, error) {
+func (h *handlerTransactions) GetTransactionResult(ctx context.Context, req *access.GetTransactionRequest) (*access.TransactionResultResponse, error) {
 
 	id := flow.HashToID(req.GetId())
 
@@ -108,7 +108,7 @@ func (h *handlerTransaction) GetTransactionResult(ctx context.Context, req *acce
 }
 
 // deriveTransactionStatus derives the transaction status based on current protocol state
-func (h *handlerTransaction) deriveTransactionStatus(tx *flow.TransactionBody, executed bool) (entities.TransactionStatus, error) {
+func (h *handlerTransactions) deriveTransactionStatus(tx *flow.TransactionBody, executed bool) (entities.TransactionStatus, error) {
 
 	block, err := h.lookupBlock(tx.ID())
 	if errors.Is(err, storage.ErrNotFound) {
@@ -160,7 +160,7 @@ func (h *handlerTransaction) deriveTransactionStatus(tx *flow.TransactionBody, e
 	return entities.TransactionStatus_FINALIZED, nil
 }
 
-func (h *handlerTransaction) lookupBlock(txID flow.Identifier) (*flow.Block, error) {
+func (h *handlerTransactions) lookupBlock(txID flow.Identifier) (*flow.Block, error) {
 
 	collection, err := h.collections.LightByTransactionID(txID)
 	if err != nil {
@@ -175,7 +175,7 @@ func (h *handlerTransaction) lookupBlock(txID flow.Identifier) (*flow.Block, err
 	return block, nil
 }
 
-func (h *handlerTransaction) lookupTransactionResult(ctx context.Context, txID flow.Identifier) (bool, []*entities.Event, uint32, string, error) {
+func (h *handlerTransactions) lookupTransactionResult(ctx context.Context, txID flow.Identifier) (bool, []*entities.Event, uint32, string, error) {
 
 	// find the block ID for the transaction
 	block, err := h.lookupBlock(txID)
@@ -200,7 +200,7 @@ func (h *handlerTransaction) lookupTransactionResult(ctx context.Context, txID f
 	return true, events, txStatus, message, nil
 }
 
-func (h *handlerTransaction) getTransactionResultFromExecutionNode(ctx context.Context,
+func (h *handlerTransactions) getTransactionResultFromExecutionNode(ctx context.Context,
 	blockID []byte,
 	transactionID []byte) ([]*entities.Event, uint32, string, error) {
 

@@ -14,12 +14,12 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-type handlerBlockHeader struct {
+type handlerBlockHeaders struct {
 	headers storage.Headers
 	state   protocol.State
 }
 
-func (h *handlerBlockHeader) GetLatestBlockHeader(ctx context.Context, req *access.GetLatestBlockHeaderRequest) (*access.BlockHeaderResponse, error) {
+func (h *handlerBlockHeaders) GetLatestBlockHeader(ctx context.Context, req *access.GetLatestBlockHeaderRequest) (*access.BlockHeaderResponse, error) {
 
 	var header *flow.Header
 	var err error
@@ -39,7 +39,7 @@ func (h *handlerBlockHeader) GetLatestBlockHeader(ctx context.Context, req *acce
 	return createBlockHeaderResponse(header)
 }
 
-func (h *handlerBlockHeader) GetBlockHeaderByID(_ context.Context, req *access.GetBlockHeaderByIDRequest) (*access.BlockHeaderResponse, error) {
+func (h *handlerBlockHeaders) GetBlockHeaderByID(_ context.Context, req *access.GetBlockHeaderByIDRequest) (*access.BlockHeaderResponse, error) {
 
 	id := flow.HashToID(req.Id)
 	header, err := h.headers.ByBlockID(id)
@@ -51,7 +51,7 @@ func (h *handlerBlockHeader) GetBlockHeaderByID(_ context.Context, req *access.G
 	return createBlockHeaderResponse(header)
 }
 
-func (h *handlerBlockHeader) GetBlockHeaderByHeight(_ context.Context, req *access.GetBlockHeaderByHeightRequest) (*access.BlockHeaderResponse, error) {
+func (h *handlerBlockHeaders) GetBlockHeaderByHeight(_ context.Context, req *access.GetBlockHeaderByHeightRequest) (*access.BlockHeaderResponse, error) {
 
 	header, err := h.headers.ByHeight(req.Height)
 	if err != nil {

@@ -19,17 +19,17 @@ import (
 )
 
 // Handler implements the Access API. It is composed of several sub-handlers that implement part of the Access API.
-// Script related calls are handled by handlerScript
+// Script related calls are handled by handlerScripts
 // Transaction related calls are handled by handlerTransactions
-// Block Header related calls are handled by handlerBlockHeader
+// Block Header related calls are handled by handlerBlockHeaders
 // Block details related calls are handled by handlerBlockDetails
 // Event related calls are handled by handlerEvents
 // All remaining calls are handled in this file by Handler
 type Handler struct {
-	handlerScript
-	handlerTransaction
+	handlerScripts
+	handlerTransactions
 	handlerEvents
-	handlerBlockHeader
+	handlerBlockHeaders
 	handlerBlockDetails
 
 	executionRPC execution.ExecutionAPIClient
@@ -52,12 +52,12 @@ func NewHandler(log zerolog.Logger,
 		executionRPC: e,
 		state:        s,
 		// create the sub-handlers
-		handlerScript: handlerScript{
+		handlerScripts: handlerScripts{
 			headers:      headers,
 			executionRPC: e,
 			state:        s,
 		},
-		handlerTransaction: handlerTransaction{
+		handlerTransactions: handlerTransactions{
 			collectionRPC: c,
 			executionRPC:  e,
 			state:         s,
@@ -70,7 +70,7 @@ func NewHandler(log zerolog.Logger,
 			state:        s,
 			blocks:       blocks,
 		},
-		handlerBlockHeader: handlerBlockHeader{
+		handlerBlockHeaders: handlerBlockHeaders{
 			headers: headers,
 			state:   s,
 		},
