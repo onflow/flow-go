@@ -20,8 +20,7 @@ go get "github.com/dapperlabs/flow-go/crypto"
 - Install [CMake](https://cmake.org/install/), which is used for building the package.
 - Build the package dependencies
 ```
-cd $GOPATH/pkg/mod/github.com/flow-go/crypto
-go generate
+go generate github.com/dapperlabs/flow-go/crypto
 ``` -->
 
 ## Algorithms
