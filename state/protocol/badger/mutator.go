@@ -387,10 +387,12 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		if err != nil {
 			return fmt.Errorf("could not index candidate seal: %w", err)
 		}
+		// add an empty child index for the added block
 		err = operation.InsertBlockChildren(blockID, nil)(tx)
 		if err != nil {
 			return fmt.Errorf("could not initialize children index: %w", err)
 		}
+		// index the added block as a child of its parent
 		err = procedure.IndexBlockChild(candidate.Header.ParentID, blockID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not add to parent index: %w", err)
