@@ -21,7 +21,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	gologging "github.com/whyrusleeping/go-logging"
 )
 
 // Workaround for https://github.com/stretchr/testify/pull/808
@@ -41,7 +40,7 @@ func TestLibP2PNodesTestSuite(t *testing.T) {
 // SetupTests initiates the test setups prior to each test
 func (l *LibP2PNodeTestSuite) SetupTest() {
 	l.ctx, l.cancel = context.WithCancel(context.Background())
-	golog.SetAllLoggers(gologging.INFO)
+	golog.SetAllLoggers(golog.LevelInfo)
 }
 
 // TestMultiAddress evaluates correct translations from

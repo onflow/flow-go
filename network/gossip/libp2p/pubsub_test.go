@@ -18,7 +18,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	gologging "github.com/whyrusleeping/go-logging"
 )
 
 type PubSubTestSuite struct {
@@ -64,7 +63,7 @@ func (p *PubSubTestSuite) TestPubSub() {
 	defer p.cancel()
 	topic := "testtopic"
 	count := 4
-	golog.SetAllLoggers(gologging.CRITICAL)
+	golog.SetAllLoggers(golog.LevelError)
 
 	// Step 1: Creates nodes
 	d := &mockDiscovery{}
