@@ -153,9 +153,6 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 			return fmt.Errorf("could not insert sealed height: %w", err)
 		}
 
-		// set the genesis ID of the state for caching
-		m.state.genesisID = genesis.ID()
-
 		m.state.metrics.FinalizedHeight(genesis.Header.Height)
 		m.state.metrics.BlockFinalized(genesis)
 

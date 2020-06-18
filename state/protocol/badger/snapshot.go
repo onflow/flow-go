@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/order"
 	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
@@ -30,8 +31,22 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		return nil, s.err
 	}
 
+	// retrieve the genesis height
+	var height uint64
+	err := s.state.db.View(operation.RetrieveGenesisHeight(&height))
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve genesis height: %w", err)
+	}
+
+	// retrieve genesis block ID
+	var genesisID flow.Identifier
+	err = s.state.db.View(operation.LookupBlockHeight(height, &genesisID))
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve genesis height: %w", err)
+	}
+
 	// retrieve identities from storage
-	payload, err := s.state.payloads.ByBlockID(s.state.genesisID)
+	payload, err := s.state.payloads.ByBlockID(genesisID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get identities for block: %w", err)
 	}
