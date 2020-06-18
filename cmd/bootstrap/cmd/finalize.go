@@ -51,19 +51,23 @@ running the DKG for generating the random beacon keys, generating genesis execut
 		dkgData := runDKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
 		log.Info().Msg("")
 
+		// Flag?
+		chainID := flow.Mainnet
+		chain := chainID.Chain()
+
 		if len(flagServiceAccountPublicKeyFile) > 0 {
 			publicKey := readServiceAccountPublicKey(flagServiceAccountPublicKeyFile)
 			log.Info().Msg("✨ using provided public key file for service account and generating genesis execution state")
-			genGenesisExecutionState(publicKey, flagGenesisTokenSupply)
+			genGenesisExecutionState(publicKey, flagGenesisTokenSupply, chain)
 			log.Info().Msg("")
 		} else {
 			log.Info().Msg("✨ generating private key for service account and generating genesis execution state")
-			genGenesisExecutionState(nil, flagGenesisTokenSupply)
+			genGenesisExecutionState(nil, flagGenesisTokenSupply, chain)
 			log.Info().Msg("")
 		}
 
 		log.Info().Msg("✨ constructing genesis seal and genesis block")
-		block := constructGenesisBlock(stakingNodes)
+		block := constructGenesisBlock(stakingNodes, chainID)
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ constructing genesis QC")

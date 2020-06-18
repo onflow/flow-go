@@ -23,10 +23,11 @@ func BootstrapLedger(
 	ledger storage.Ledger,
 	rootPublicKey flow.AccountPublicKey,
 	initialTokenSupply uint64,
+	chain flow.Chain,
 ) (flow.StateCommitment, error) {
 	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.EmptyStateCommitment()))
 
-	BootstrapView(view, rootPublicKey, initialTokenSupply, false)
+	BootstrapView(view, rootPublicKey, initialTokenSupply, chain)
 
 	newStateCommitment, err := state.CommitDelta(ledger, view.Delta(), ledger.EmptyStateCommitment())
 	if err != nil {
@@ -80,43 +81,38 @@ func BootstrapView(
 	ledger virtualmachine.Ledger,
 	serviceAccountPublicKey flow.AccountPublicKey,
 	initialTokenSupply uint64,
-	simpleAddresses bool,
+	chain flow.Chain,
 ) {
-	l := virtualmachine.NewLedgerDAL(ledger, simpleAddresses)
+	l := virtualmachine.NewLedgerDAL(ledger, chain)
 
-	var addressState AddressState
-	if simpleAddresses {
-		addressState = &virtualmachine.SimpleAddressState{}
-	} else {
-		addressState = flow.NewAddressGenerator()
-	}
+	addressGenerator := chain.NewAddressGenerator()
 
 	// initialize the account addressing state
-	l.SetAddressState(addressState)
+	l.SetAddressState(addressGenerator)
 
-	service := createServiceAccount(ledger, serviceAccountPublicKey, simpleAddresses)
+	service := createServiceAccount(ledger, serviceAccountPublicKey, chain)
 
 	rt := runtime.NewInterpreterRuntime()
-	vm, err := virtualmachine.New(rt, virtualmachine.WithSimpleAddresses(simpleAddresses))
+	vm, err := virtualmachine.New(rt, chain)
 	if err != nil {
 		panic(err)
 	}
 
 	ctx := vm.NewBlockContext(nil, nil)
 
-	fungibleToken := deployFungibleToken(ctx, ledger, simpleAddresses)
-	flowToken := deployFlowToken(ctx, ledger, simpleAddresses, service, fungibleToken)
-	feeContract := deployFlowFees(ctx, ledger, simpleAddresses, service, fungibleToken, flowToken)
+	fungibleToken := deployFungibleToken(ctx, ledger, chain)
+	flowToken := deployFlowToken(ctx, ledger, service, fungibleToken, chain)
+	feeContract := deployFlowFees(ctx, ledger, service, fungibleToken, flowToken, chain)
 
 	if initialTokenSupply > 0 {
-		mintInitialTokens(ctx, ledger, simpleAddresses, service, initialTokenSupply)
+		mintInitialTokens(ctx, ledger, service, initialTokenSupply, chain)
 	}
 
 	initServiceAccount(ctx, ledger, service, fungibleToken, flowToken, feeContract)
 }
 
-func createAccount(ledger virtualmachine.Ledger, simpleAddresses bool) flow.Address {
-	l := virtualmachine.NewLedgerDAL(ledger, simpleAddresses)
+func createAccount(ledger virtualmachine.Ledger, chain flow.Chain) flow.Address {
+	l := virtualmachine.NewLedgerDAL(ledger, chain)
 
 	addr, err := l.CreateAccount(nil)
 	if err != nil {
@@ -126,9 +122,9 @@ func createAccount(ledger virtualmachine.Ledger, simpleAddresses bool) flow.Addr
 	return addr
 }
 
-func createServiceAccount(ledger virtualmachine.Ledger, accountKey flow.AccountPublicKey, simpleAddresses bool,
+func createServiceAccount(ledger virtualmachine.Ledger, accountKey flow.AccountPublicKey, chain flow.Chain,
 ) flow.Address {
-	l := virtualmachine.NewLedgerDAL(ledger, simpleAddresses)
+	l := virtualmachine.NewLedgerDAL(ledger, chain)
 
 	addr, err := l.CreateAccount([]flow.AccountPublicKey{accountKey})
 	if err != nil {
@@ -138,18 +134,18 @@ func createServiceAccount(ledger virtualmachine.Ledger, accountKey flow.AccountP
 	return addr
 }
 
-func deployFungibleToken(ctx virtualmachine.BlockContext, ledger virtualmachine.Ledger, simpleAddresses bool,
+func deployFungibleToken(ctx virtualmachine.BlockContext, ledger virtualmachine.Ledger, chain flow.Chain,
 ) flow.Address {
-	return deployContract(ctx, ledger, simpleAddresses, contracts.FungibleToken())
+	return deployContract(ctx, ledger, chain, contracts.FungibleToken())
 }
 
 func deployFlowToken(
 	ctx virtualmachine.BlockContext,
 	ledger virtualmachine.Ledger,
-	simpleAddresses bool,
 	service, fungibleToken flow.Address,
+	chain flow.Chain,
 ) flow.Address {
-	flowToken := createAccount(ledger, simpleAddresses)
+	flowToken := createAccount(ledger, chain)
 
 	contract := contracts.FlowToken(fungibleToken.Hex())
 
@@ -169,10 +165,10 @@ func deployFlowToken(
 func deployFlowFees(
 	ctx virtualmachine.BlockContext,
 	ledger virtualmachine.Ledger,
-	simpleAddresses bool,
 	service, fungibleToken, flowToken flow.Address,
+	chain flow.Chain,
 ) flow.Address {
-	flowFees := createAccount(ledger, simpleAddresses)
+	flowFees := createAccount(ledger, chain)
 
 	contract := contracts.FlowFees(fungibleToken.Hex(), flowToken.Hex())
 
@@ -192,21 +188,17 @@ func deployFlowFees(
 func mintInitialTokens(
 	ctx virtualmachine.BlockContext,
 	ledger virtualmachine.Ledger,
-	simpleAddresses bool,
 	service flow.Address,
 	initialSupply uint64,
+	chain flow.Chain,
 ) {
 	initialSupplyArg, err := jsoncdc.Encode(cadence.NewUFix64(initialSupply))
 	if err != nil {
 		panic(fmt.Sprintf("failed to encode initial token supply: %s", err.Error()))
 	}
 
-	fungibleTokenAddress := virtualmachine.FungibleTokenAddress()
-	flowTokenAddress := virtualmachine.FlowTokenAddress()
-	if simpleAddresses {
-		fungibleTokenAddress = virtualmachine.SimpleFungibleTokenAddress()
-		flowTokenAddress = virtualmachine.SimpleFlowTokenAddress()
-	}
+	fungibleTokenAddress := virtualmachine.FungibleTokenAddress(chain)
+	flowTokenAddress := virtualmachine.FlowTokenAddress(chain)
 
 	tx := flow.NewTransactionBody().
 		SetScript(virtualmachine.MintDefaultTokenTransaction(fungibleTokenAddress, flowTokenAddress)).
@@ -228,9 +220,9 @@ func initServiceAccount(
 	deployContractToServiceAccount(ctx, ledger, service, serviceAccountContract)
 }
 
-func deployContract(ctx virtualmachine.BlockContext, ledger virtualmachine.Ledger, simpleAddresses bool,
+func deployContract(ctx virtualmachine.BlockContext, ledger virtualmachine.Ledger, chain flow.Chain,
 	contract []byte) flow.Address {
-	addr := createAccount(ledger, simpleAddresses)
+	addr := createAccount(ledger, chain)
 
 	script := []byte(
 		fmt.Sprintf(`
@@ -242,10 +234,7 @@ func deployContract(ctx virtualmachine.BlockContext, ledger virtualmachine.Ledge
 		`, hex.EncodeToString(contract)),
 	)
 
-	serviceAddress := flow.ServiceAddress()
-	if simpleAddresses {
-		serviceAddress = virtualmachine.SimpleServiceAddress()
-	}
+	serviceAddress := chain.ServiceAddress()
 
 	tx := flow.NewTransactionBody().
 		SetScript(script).

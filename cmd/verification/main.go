@@ -119,7 +119,7 @@ func main() {
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rt := runtime.NewInterpreterRuntime()
-			vm, err := virtualmachine.New(rt)
+			vm, err := virtualmachine.New(rt, node.GenesisChainID.Chain())
 			if err != nil {
 				return nil, err
 			}

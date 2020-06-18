@@ -135,6 +135,7 @@ type FlowNodeBuilder struct {
 	GenesisQC               *model.QuorumCertificate
 	GenesisAccountPublicKey *flow.AccountPublicKey
 	GenesisTokenSupply      uint64
+	GenesisChainID          flow.ChainID
 }
 
 func (fnb *FlowNodeBuilder) baseFlags() {
@@ -263,7 +264,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		Network:    metrics.NewNetworkCollector(),
 		Engine:     metrics.NewEngineCollector(),
 		Compliance: metrics.NewComplianceCollector(),
-		Cache:      metrics.NewCacheCollector(flow.GetChainID()),
+		Cache:      metrics.NewCacheCollector(fnb.GenesisChainID),
 		Mempool:    mempools,
 	}
 
@@ -385,7 +386,7 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
 		}
 
-		flow.SetChainID(fnb.GenesisBlock.Header.ChainID)
+		fnb.GenesisChainID = fnb.GenesisBlock.Header.ChainID
 
 		// load genesis QC and DKG data from bootstrap files
 		fnb.GenesisQC, err = loadRootBlockQC(fnb.BaseConfig.BootstrapDir)
@@ -425,7 +426,7 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
 		}
 
-		flow.SetChainID(fnb.GenesisBlock.Header.ChainID)
+		fnb.GenesisChainID = fnb.GenesisBlock.Header.ChainID
 
 		// load genesis QC and DKG data from bootstrap files for recovery
 		fnb.GenesisQC, err = loadRootBlockQC(fnb.BaseConfig.BootstrapDir)
@@ -605,13 +606,13 @@ func (fnb *FlowNodeBuilder) Run() {
 
 	fnb.initLogger()
 
-	fnb.initMetrics()
-
 	fnb.initProfiler()
 
 	fnb.initStorage()
 
 	fnb.initState()
+
+	fnb.initMetrics()
 
 	for _, f := range fnb.postInitFns {
 		fnb.handlePostInit(f)

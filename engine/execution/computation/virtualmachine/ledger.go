@@ -57,11 +57,11 @@ func keyPublicKey(index uint64) string {
 // A LedgerDAL is an abstraction layer used to read and manipulate ledger state in a consistent way.
 type LedgerDAL struct {
 	Ledger
-	SimpleAddresses bool
+	chain flow.Chain
 }
 
-func NewLedgerDAL(ledger Ledger, simpleAddresses bool) LedgerDAL {
-	return LedgerDAL{Ledger: ledger, SimpleAddresses: simpleAddresses}
+func NewLedgerDAL(ledger Ledger, chain flow.Chain) LedgerDAL {
+	return LedgerDAL{Ledger: ledger, chain: chain}
 }
 
 func (r *LedgerDAL) CheckAccountExists(accountAddress []byte) error {
@@ -152,20 +152,16 @@ type AddressState interface {
 	CurrentAddress() flow.Address
 }
 
-func (r *LedgerDAL) GetAddressState() (AddressState, error) {
+func (r *LedgerDAL) GetAddressState() (flow.AddressGenerator, error) {
 	stateBytes, err := r.Get(fullKeyHash("", "", keyAddressState))
 	if err != nil {
 		return nil, err
 	}
-	if r.SimpleAddresses {
-		state := BytesToSimpleAddressState(stateBytes)
-		return &state, nil
-	}
-	state := flow.BytesToAddressState(stateBytes)
-	return state, nil
+
+	return r.chain.BytesToAddressState(stateBytes), nil
 }
 
-func (r *LedgerDAL) SetAddressState(state AddressState) {
+func (r *LedgerDAL) SetAddressState(state flow.AddressGenerator) {
 	stateBytes := state.Bytes()
 	r.Set(fullKeyHash("", "", keyAddressState), stateBytes)
 }

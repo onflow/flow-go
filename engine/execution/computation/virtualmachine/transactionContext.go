@@ -296,11 +296,7 @@ func (r *TransactionContext) CheckCode(address runtime.Address, code []byte) (er
 }
 
 func (r *TransactionContext) ServiceAddress() flow.Address {
-	if r.simpleAddresses {
-		return SimpleServiceAddress()
-	}
-
-	return flow.ServiceAddress()
+	return r.chain.ServiceAddress()
 }
 
 // UpdateAccountCode updates the deployed code on an existing account.
@@ -742,12 +738,12 @@ func MintDefaultTokenTransaction(fungibleTokenAddress, flowTokenAddress flow.Add
 	`, fungibleTokenAddress, flowTokenAddress))
 }
 
-func FungibleTokenAddress() flow.Address {
-	address, _ := flow.AddressAtIndex(2)
+func FungibleTokenAddress(chain flow.Chain) flow.Address {
+	address, _ := chain.AddressAtIndex(2)
 	return address
 }
 
-func FlowTokenAddress() flow.Address {
-	address, _ := flow.AddressAtIndex(3)
+func FlowTokenAddress(chain flow.Chain) flow.Address {
+	address, _ := chain.AddressAtIndex(3)
 	return address
 }

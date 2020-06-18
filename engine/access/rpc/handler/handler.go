@@ -34,6 +34,7 @@ type Handler struct {
 	headers      storage.Headers
 	collections  storage.Collections
 	transactions storage.Transactions
+	chainID      flow.ChainID
 }
 
 var _ access.AccessAPIServer = &Handler{}
@@ -45,7 +46,8 @@ func NewHandler(log zerolog.Logger,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
-	transactions storage.Transactions) *Handler {
+	transactions storage.Transactions,
+	chainID flow.ChainID) *Handler {
 	return &Handler{
 		executionRPC:  e,
 		collectionRPC: c,
@@ -55,6 +57,7 @@ func NewHandler(log zerolog.Logger,
 		transactions:  transactions,
 		state:         s,
 		log:           log,
+		chainID:       chainID,
 	}
 }
 
@@ -151,7 +154,7 @@ func (h *Handler) GetAccount(ctx context.Context, req *access.GetAccountRequest)
 
 func (h *Handler) GetNetworkParameters(_ context.Context, _ *access.GetNetworkParametersRequest) (*access.GetNetworkParametersResponse, error) {
 	return &access.GetNetworkParametersResponse{
-		ChainId: string(flow.GetChainID()),
+		ChainId: string(h.chainID),
 	}, nil
 }
 

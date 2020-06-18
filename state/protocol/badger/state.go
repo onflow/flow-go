@@ -25,6 +25,7 @@ type State struct {
 	payloads   storage.Payloads
 	blocks     storage.Blocks
 	expiry     uint
+	chainID    flow.ChainID
 }
 
 // NewState initializes a new state backed by a badger database, applying the

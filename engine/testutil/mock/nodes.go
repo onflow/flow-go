@@ -47,6 +47,7 @@ type GenericNode struct {
 	Me         module.Local
 	Net        *stub.Network
 	DBDir      string
+	ChainID    flow.ChainID
 }
 
 func (g *GenericNode) Done() {
