@@ -18,6 +18,7 @@ type State struct {
 	metrics    module.ComplianceMetrics
 	db         *badger.DB
 	clusters   uint
+	genesisID  flow.Identifier
 	headers    storage.Headers
 	identities storage.Identities
 	seals      storage.Seals

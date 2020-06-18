@@ -22,11 +22,6 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 
 		// FIRST: execute all the validity checks on the genesis block
 
-		// the initial height needs to be height zero
-		if genesis.Header.Height != 0 {
-			return fmt.Errorf("genesis height must be zero")
-		}
-
 		// the parent must be zero hash
 		if genesis.Header.ParentID != flow.ZeroID {
 			return errors.New("genesis parent must have zero ID")
@@ -145,6 +140,10 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 		if err != nil {
 			return fmt.Errorf("could not insert started view: %w", err)
 		}
+		err = operation.InsertGenesisHeight(genesis.Header.Height)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert genesis height: %w", err)
+		}
 		err = operation.InsertFinalizedHeight(genesis.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert finalized height: %w", err)
@@ -154,10 +153,13 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 			return fmt.Errorf("could not insert sealed height: %w", err)
 		}
 
-		m.state.metrics.FinalizedHeight(0)
+		// set the genesis ID of the state for caching
+		m.state.genesisID = genesis.ID()
+
+		m.state.metrics.FinalizedHeight(genesis.Header.Height)
 		m.state.metrics.BlockFinalized(genesis)
 
-		m.state.metrics.SealedHeight(0)
+		m.state.metrics.SealedHeight(genesis.Header.Height)
 		m.state.metrics.BlockSealed(genesis)
 
 		return nil
