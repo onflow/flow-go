@@ -45,10 +45,10 @@ func NewTxTracker(maxCap int) (*TxTracker, error) {
 
 func (txt *TxTracker) addTx(txID flowsdk.Identifier,
 	proposer flowsdk.Address,
-	onErrorCallback func(flowsdk.Identifier, error),
-	onSealCallback func(flowsdk.Identifier, *flowsdk.TransactionResult),
 	onFinalizedCallback func(flowsdk.Identifier, *flowsdk.TransactionResult),
+	onSealCallback func(flowsdk.Identifier, *flowsdk.TransactionResult),
 	onTimeoutCallback func(flowsdk.Identifier),
+	onErrorCallback func(flowsdk.Identifier, error),
 	timeoutInSec int,
 ) {
 	result, _ := txt.client.GetTransactionResult(context.Background(), txID)

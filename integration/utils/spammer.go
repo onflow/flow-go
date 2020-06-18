@@ -201,7 +201,7 @@ func (cg *LoadGenerator) Next() error {
 				FromPrivateKey(privKey).
 				SetHashAlgo(crypto.SHA3_256).
 				SetWeight(flowsdk.AccountKeyWeightThreshold)
-			// signer := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
+			signer := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
 			createAccountScript, err := templates.CreateAccount([]*flowsdk.AccountKey{accountKey}, nil)
 			// Generate an account creation script
 			examples.Handle(err)
@@ -225,10 +225,19 @@ func (cg *LoadGenerator) Next() error {
 
 			cg.txTracker.addTx(createAccountTx.ID(),
 				*cg.serviceAccount.address,
-				nil, nil, nil,
-				func(_ flowsdk.Identifier) {
+				nil,
+				func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
+					for _, event := range res.Events {
+						if event.Type == flowsdk.EventAccountCreated {
+							accountCreatedEvent := flowsdk.AccountCreatedEvent(event)
+							accountAddress := accountCreatedEvent.Address()
+							newAcc := newFlowAccount(&accountAddress, accountKey, signer)
+							cg.accounts = append(cg.accounts, newAcc)
+						}
+						fmt.Println("account added")
+					}
 					allTxWG.Done()
-				}, 30)
+				}, nil, nil, 30)
 
 			// accountCreationTxRes := waitForFinalized(context.Background(), cg.flowClient, createAccountTxID)
 			// examples.Handle(accountCreationTxRes.Error)
@@ -238,18 +247,7 @@ func (cg *LoadGenerator) Next() error {
 
 			fmt.Println("<<<", i)
 			// // Successful Tx, increment sequence number
-			// accountAddress := flowsdk.Address{}
 
-			// for _, event := range accountCreationTxRes.Events {
-			// 	fmt.Println(event)
-
-			// 	if event.Type == flowsdk.EventAccountCreated {
-			// 		accountCreatedEvent := flowsdk.AccountCreatedEvent(event)
-			// 		accountAddress = accountCreatedEvent.Address()
-			// 		newAcc := newFlowAccount(accountAddress, accountKey, signer)
-			// 		cg.accounts = append(cg.accounts, newAcc)
-			// 	}
-			// }
 			fmt.Println(">>", i)
 		}
 		allTxWG.Wait()
