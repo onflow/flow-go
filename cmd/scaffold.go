@@ -290,7 +290,7 @@ func (fnb *FlowNodeBuilder) initProfiler() {
 	})
 }
 
-func (fnb *FlowNodeBuilder) initStorage() {
+func (fnb *FlowNodeBuilder) initDB() {
 	// Pre-create DB path (Badger creates only one-level dirs)
 	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
 	fnb.MustNot(err).Str("dir", fnb.BaseConfig.datadir).Msg("could not create datadir")
@@ -310,26 +310,29 @@ func (fnb *FlowNodeBuilder) initStorage() {
 
 	db, err := badger.Open(opts)
 	fnb.MustNot(err).Msg("could not open key-value store")
+	fnb.DB = db
+}
+
+func (fnb *FlowNodeBuilder) initStorage() {
 
 	// in order to void long iterations with big keys when initializing with an
 	// already populated database, we bootstrap the initial maximum key size
 	// upon starting
-	err = operation.RetryOnConflict(db.Update, func(tx *badger.Txn) error {
+	err := operation.RetryOnConflict(fnb.DB.Update, func(tx *badger.Txn) error {
 		return operation.InitMax(tx)
 	})
 	fnb.MustNot(err).Msg("could not initialize max tracker")
 
-	headers := bstorage.NewHeaders(fnb.Metrics.Cache, db)
-	identities := bstorage.NewIdentities(fnb.Metrics.Cache, db)
-	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, db)
-	seals := bstorage.NewSeals(fnb.Metrics.Cache, db)
-	index := bstorage.NewIndex(fnb.Metrics.Cache, db)
-	payloads := bstorage.NewPayloads(db, index, identities, guarantees, seals)
-	blocks := bstorage.NewBlocks(db, headers, payloads)
-	transactions := bstorage.NewTransactions(fnb.Metrics.Cache, db)
-	collections := bstorage.NewCollections(db, transactions)
+	headers := bstorage.NewHeaders(fnb.Metrics.Cache, fnb.DB)
+	identities := bstorage.NewIdentities(fnb.Metrics.Cache, fnb.DB)
+	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB)
+	seals := bstorage.NewSeals(fnb.Metrics.Cache, fnb.DB)
+	index := bstorage.NewIndex(fnb.Metrics.Cache, fnb.DB)
+	payloads := bstorage.NewPayloads(fnb.DB, index, identities, guarantees, seals)
+	blocks := bstorage.NewBlocks(fnb.DB, headers, payloads)
+	transactions := bstorage.NewTransactions(fnb.Metrics.Cache, fnb.DB)
+	collections := bstorage.NewCollections(fnb.DB, transactions)
 
-	fnb.DB = db
 	fnb.Storage = Storage{
 		Headers:      headers,
 		Identities:   identities,
@@ -608,11 +611,13 @@ func (fnb *FlowNodeBuilder) Run() {
 
 	fnb.initProfiler()
 
+	fnb.initDB()
+
+	fnb.initMetrics()
+
 	fnb.initStorage()
 
 	fnb.initState()
-
-	fnb.initMetrics()
 
 	for _, f := range fnb.postInitFns {
 		fnb.handlePostInit(f)

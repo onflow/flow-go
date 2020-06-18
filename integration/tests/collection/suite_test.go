@@ -87,7 +87,7 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 	suite.net.Start(suite.ctx)
 
 	// create an account to use for sending transactions
-	suite.acct.addr, suite.acct.key, suite.acct.signer = common.GetAccount()
+	suite.acct.addr, suite.acct.key, suite.acct.signer = common.GetAccount(suite.net.Genesis().Header.ChainID.Chain())
 
 	// subscribe to the ghost
 	for attempts := 0; ; attempts++ {

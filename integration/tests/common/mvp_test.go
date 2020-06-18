@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/cadence/encoding/json"
 	//sdk "github.com/onflow/flow-go-sdk"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -54,7 +55,7 @@ func TestMVP_Emulator(t *testing.T) {
 	key, err := unittest.EmulatorRootKey()
 	require.NoError(t, err)
 
-	c, err := testnet.NewClientWithKey(":3569", key)
+	c, err := testnet.NewClientWithKey(":3569", key, flow.Emulator.Chain())
 	require.NoError(t, err)
 
 	//TODO commented out because main test requires genesis for sending tx
@@ -65,34 +66,77 @@ func TestMVP_Emulator(t *testing.T) {
 
 func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 
-	client, err := testnet.NewClient(fmt.Sprintf(":%s", net.AccessPorts[testnet.AccessNodeAPIPort]))
-	require.NoError(t, err)
-
 	genesis := net.Genesis()
 
-	// contract is not deployed, so script fails
+	chain := genesis.Header.ChainID.Chain()
+
+	serviceAccountClient, err := testnet.NewClient(fmt.Sprintf(":%s", net.AccessPorts[testnet.AccessNodeAPIPort]), chain)
+	require.NoError(t, err)
+
+	//create new account to deploy Counter to
+	//account, key, signer := GetAccount(chain)
+
 	childCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
-	counter, err := readCounter(childCtx, client)
+	err = createAccount(childCtx, serviceAccountClient, genesis)
+	cancel()
+
+	var newAccountAddress flow.Address = flow.EmptyAddress
+
+	require.Eventually(t, func() bool {
+		childCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
+		responses, err := serviceAccountClient.Events(childCtx, "flow.AccountCreated")
+		cancel()
+
+		if err != nil {
+			return false
+		}
+
+		found := false
+
+		for _, response := range responses {
+			for _, e := range response.Events {
+				if e.Type == string(flow.EventAccountCreated) { //just to be sure
+
+					event, err := json.Decode(e.Payload)
+					if err != nil {
+						fmt.Printf("decoding payload err = %s\n", err)
+					}
+
+					newAccountAddress = event.ToGoValue().([]interface{})[0].(flow.Address)
+
+					found = true
+				}
+			}
+		}
+
+		return found
+	}, 30*time.Second, time.Second)
+
+	require.NoError(t, err)
+
+	// contract is not deployed, so script fails
+	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
+	counter, err := readCounter(childCtx, serviceAccountClient)
 	cancel()
 	require.Error(t, err)
 
-	fmt.Printf("service address1: %s\n", flow.ServiceAddress().Short())
+	fmt.Printf("service address1: %s\n", chain.ServiceAddress().Short())
 
 	// deploy the contract
 	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
-	err = client.DeployContract(childCtx, genesis.ID(), CounterContract)
+	err = serviceAccountClient.DeployContract(childCtx, genesis.ID(), CounterContract)
 	cancel()
 	require.NoError(t, err)
 
-	fmt.Printf("service address: %s\n", flow.ServiceAddress().Short())
+	fmt.Printf("service address: %s\n", chain.ServiceAddress().Short())
 
 	// script executes eventually, but no counter instance is created
 	require.Eventually(t, func() bool {
 		childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
 
-		fmt.Printf("service address script: %s\n", flow.ServiceAddress().Short())
+		fmt.Printf("service address script: %s\n", chain.ServiceAddress().Short())
 
-		counter, err = readCounter(ctx, client)
+		counter, err = readCounter(ctx, serviceAccountClient)
 		cancel()
 		if err != nil {
 			t.Log("EXECUTE SCRIPT ERR", err)
@@ -110,12 +154,12 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	tx := flow.NewTransactionBody().
 		SetScript(unittest.NoopTxScript()).
 		SetReferenceBlockID(genesis.ID()).
-		SetProposalKey(flow.ServiceAddress(), 0, 0).
-		SetPayer(flow.ServiceAddress()).
-		AddAuthorizer(flow.ServiceAddress())
+		SetProposalKey(chain.ServiceAddress(), 0, 0).
+		SetPayer(chain.ServiceAddress()).
+		AddAuthorizer(chain.ServiceAddress())
 
 	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
-	err = client.SendTransaction(ctx, *tx)
+	err = serviceAccountClient.SendTransaction(ctx, *tx)
 	cancel()
 
 	require.NoError(t, err)
@@ -123,7 +167,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	// counter is created and incremented eventually
 	require.Eventually(t, func() bool {
 		childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
-		counter, err = readCounter(ctx, client)
+		counter, err = readCounter(ctx, serviceAccountClient)
 		cancel()
 
 		t.Logf("read counter: counter=%d, err=%s", counter, err)

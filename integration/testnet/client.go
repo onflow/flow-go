@@ -6,6 +6,8 @@ import (
 
 	//sdk "github.com/onflow/flow-go-sdk"
 
+	"github.com/onflow/flow/protobuf/go/flow/access"
+
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/integration/client"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -20,11 +22,12 @@ type Client struct {
 	client *client.AccessClient
 	key    *flow.AccountPrivateKey
 	seqNo  uint64
+	Chain  flow.Chain
 }
 
 // NewClientWithKey returns a new client to an Access API listening at the given
 // address, using the given account key for signing transactions.
-func NewClientWithKey(addr string, key *flow.AccountPrivateKey) (*Client, error) {
+func NewClientWithKey(addr string, key *flow.AccountPrivateKey, chain flow.Chain) (*Client, error) {
 
 	client, err := client.NewAccessClient(addr)
 	if err != nil {
@@ -34,13 +37,14 @@ func NewClientWithKey(addr string, key *flow.AccountPrivateKey) (*Client, error)
 	tc := &Client{
 		client: client,
 		key:    key,
+		Chain:  chain,
 	}
 	return tc, nil
 }
 
 // NewClient returns a new client to an Access API listening at the given
 // address, with a generated account key for signing transactions.
-func NewClient(addr string) (*Client, error) {
+func NewClient(addr string, chain flow.Chain) (*Client, error) {
 	key := unittest.ServiceAccountPrivateKey
 
 	json, err := key.MarshalJSON()
@@ -56,13 +60,17 @@ func NewClient(addr string) (*Client, error) {
 	fmt.Printf("New client with private key: \n%s\n", json)
 	fmt.Printf("and public key: \n%s\n", publicJson)
 
-	return NewClientWithKey(addr, &key)
+	return NewClientWithKey(addr, &key, chain)
 }
 
 func (c *Client) GetSeqNumber() uint64 {
 	n := c.seqNo
 	c.seqNo++
 	return n
+}
+
+func (c *Client) Events(ctx context.Context, typ string) ([]*access.EventsResponse_Result, error) {
+	return c.client.GetEvents(ctx, typ)
 }
 
 // DeployContract submits a transaction to deploy a contract with the given
@@ -81,9 +89,9 @@ func (c *Client) DeployContract(ctx context.Context, refID flow.Identifier, cont
 	tx := flow.NewTransactionBody().
 		SetScript([]byte(code.ToCadence())).
 		SetReferenceBlockID(refID).
-		SetProposalKey(flow.ServiceAddress(), 0, c.GetSeqNumber()).
-		SetPayer(flow.ServiceAddress()).
-		AddAuthorizer(flow.ServiceAddress())
+		SetProposalKey(c.Chain.ServiceAddress(), 0, c.GetSeqNumber()).
+		SetPayer(c.Chain.ServiceAddress()).
+		AddAuthorizer(c.Chain.ServiceAddress())
 
 	fmt.Printf("deploying tx ID %x:\n %s\n", tx.ID(), tx)
 
