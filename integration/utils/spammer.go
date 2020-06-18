@@ -100,7 +100,7 @@ func NewLoadGenerator(fclient *client.Client,
 		return nil, fmt.Errorf("error loading service account %w", err)
 	}
 
-	txTracker, err := NewTxTracker(1000)
+	txTracker, err := NewTxTracker(1000, 2, "localhost:3569", true, time.Second/10)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +237,12 @@ func (cg *LoadGenerator) Next() error {
 						}
 					}
 					allTxWG.Done()
-				}, nil, nil, 30)
+				},
+				nil, // on sealed
+				nil, // on expired
+				nil, // on timout
+				nil, // on error
+				30)
 
 			// accountCreationTxRes := waitForFinalized(context.Background(), cg.flowClient, createAccountTxID)
 			// examples.Handle(accountCreationTxRes.Error)

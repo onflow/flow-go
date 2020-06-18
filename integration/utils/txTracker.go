@@ -11,54 +11,55 @@ import (
 	"github.com/onflow/flow-go-sdk/client"
 )
 
-// TODO add workers (status worker should have its own client at least injected)
-
 type txInFlight struct {
 	txID        flowsdk.Identifier
 	lastStatus  flowsdk.TransactionStatus
 	proposer    flowsdk.Address
 	onError     func(flowsdk.Identifier, error)
-	onSeal      func(flowsdk.Identifier, *flowsdk.TransactionResult)
-	onFinalized func(flowsdk.Identifier, *flowsdk.TransactionResult)
+	onFinalized func(flowsdk.Identifier)
+	onExecuted  func(flowsdk.Identifier, *flowsdk.TransactionResult)
+	onSealed    func(flowsdk.Identifier, *flowsdk.TransactionResult)
+	onExpired   func(flowsdk.Identifier)
 	onTimeout   func(flowsdk.Identifier)
 	createdAt   time.Time
 	expiresAt   time.Time
 }
 
 type TxTracker struct {
-	client *client.Client
-	txs    chan *txInFlight
+	txs chan *txInFlight
 }
 
-// TODO pass port
-func NewTxTracker(maxCap int) (*TxTracker, error) {
-	fclient, err := client.New("localhost:3569", grpc.WithInsecure())
-	if err != nil {
-		return nil, err
+func NewTxTracker(maxCap int, numberOfWorkers int, accessNodeAddress string, verbose bool, sleepAfterOp time.Duration) (*TxTracker, error) {
+	txt := &TxTracker{txs: make(chan *txInFlight, maxCap)}
+	for i := 0; i < numberOfWorkers; i++ {
+		fclient, err := client.New(accessNodeAddress, grpc.WithInsecure())
+		if err != nil {
+			return nil, err
+		}
+		time.Sleep(sleepAfterOp) // creating parity
+		go statusWorker(i, txt.txs, fclient, verbose, sleepAfterOp)
 	}
-	txt := &TxTracker{client: fclient,
-		txs: make(chan *txInFlight, maxCap),
-	}
-	go txt.run()
 	return txt, nil
 }
 
 func (txt *TxTracker) addTx(txID flowsdk.Identifier,
 	proposer flowsdk.Address,
-	onFinalizedCallback func(flowsdk.Identifier, *flowsdk.TransactionResult),
-	onSealCallback func(flowsdk.Identifier, *flowsdk.TransactionResult),
+	onFinalizedCallback func(flowsdk.Identifier),
+	onExecutedCallback func(flowsdk.Identifier, *flowsdk.TransactionResult),
+	onSealedCallback func(flowsdk.Identifier, *flowsdk.TransactionResult),
+	onExpiredCallback func(flowsdk.Identifier),
 	onTimeoutCallback func(flowsdk.Identifier),
 	onErrorCallback func(flowsdk.Identifier, error),
 	timeoutInSec int,
 ) {
-	result, _ := txt.client.GetTransactionResult(context.Background(), txID)
-	// TODO deal with error
 	newTx := &txInFlight{txID: txID,
-		lastStatus:  result.Status,
+		lastStatus:  flowsdk.TransactionStatusUnknown,
 		proposer:    proposer,
 		onError:     onErrorCallback,
-		onSeal:      onSealCallback,
 		onFinalized: onFinalizedCallback,
+		onExecuted:  onExecutedCallback,
+		onSealed:    onSealedCallback,
+		onExpired:   onExpiredCallback,
 		onTimeout:   onTimeoutCallback,
 		createdAt:   time.Now(),
 		expiresAt:   time.Now().Add(time.Duration(timeoutInSec) * time.Second),
@@ -67,73 +68,89 @@ func (txt *TxTracker) addTx(txID flowsdk.Identifier,
 	txt.txs <- newTx
 }
 
-// TODO proper ready/done
 func (txt *TxTracker) stop() {
+	// TODO use signals to shut down the workers or ready/done style
 	close(txt.txs)
+	time.Sleep(time.Second * 5)
 }
 
-func (txt *TxTracker) run() {
-	for tx := range txt.txs {
+// TODO enable verbose and do proper log formatting
+
+func statusWorker(workerID int, txs chan *txInFlight, fclient *client.Client, verbose bool, sleepAfterOp time.Duration) {
+	clientContErrorCounter := 0
+	for tx := range txs {
+		if clientContErrorCounter > 10 {
+			fmt.Errorf("worker %d: calling client has failed for the last 10 times", workerID)
+			break
+		}
 		if tx.expiresAt.Before(time.Now()) {
 			if tx.onTimeout != nil {
 				go tx.onTimeout(tx.txID)
 			}
-			fmt.Println("tx timed out", tx.txID)
+			if verbose {
+				fmt.Printf("worker %d: status process for tx %v is timed out.\n", workerID, tx.txID)
+			}
 			continue
 		}
-		fmt.Println("req sent for tx ", tx.txID)
-		result, err := txt.client.GetTransactionResult(context.Background(), tx.txID)
-		// TODO deal with error properly
-		if err != nil {
-			fmt.Println(err)
+		if verbose {
+			fmt.Printf("worker %d: status update request sent for tx %v \n", workerID, tx.txID)
 		}
+		result, err := fclient.GetTransactionResult(context.Background(), tx.txID)
+		if err != nil {
+			clientContErrorCounter++
+			txs <- tx
+			continue
+		}
+		clientContErrorCounter = 0
 		if result != nil {
-			// if change in status
+			// if any change in status
 			if tx.lastStatus != result.Status {
 				switch result.Status {
 				case flowsdk.TransactionStatusFinalized:
 					if tx.onFinalized != nil {
-						go tx.onFinalized(tx.txID, result)
+						go tx.onFinalized(tx.txID)
 					}
 					tx.lastStatus = flowsdk.TransactionStatusFinalized
-					fmt.Println("tx ", tx.txID, "finalized in seconds: ", time.Since(tx.createdAt).Seconds())
-				case flowsdk.TransactionStatusSealed:
-					if tx.onSeal != nil {
-						go tx.onSeal(tx.txID, result)
+					if verbose {
+						fmt.Printf("worker %d tx %v has been finalized in %v seconds\n", workerID, tx.txID, time.Since(tx.createdAt).Seconds())
 					}
-					fmt.Println("tx ", tx.txID, "sealed in seconds: ", time.Since(tx.createdAt).Seconds())
+				case flowsdk.TransactionStatusExecuted:
+					if tx.onExecuted != nil {
+						go tx.onExecuted(tx.txID, result)
+					}
+					if verbose {
+						fmt.Printf("worker %d tx %v has been executed in %v seconds\n", workerID, tx.txID, time.Since(tx.createdAt).Seconds())
+					}
+					tx.lastStatus = flowsdk.TransactionStatusExecuted
+
+				case flowsdk.TransactionStatusSealed:
+					if tx.onSealed != nil {
+						go tx.onSealed(tx.txID, result)
+					}
+					if verbose {
+						fmt.Printf("worker %d tx %v has been sealed in %v seconds\n", workerID, tx.txID, time.Since(tx.createdAt).Seconds())
+					}
+					continue
+
+				case flowsdk.TransactionStatusUnknown:
+					err := fmt.Errorf("worker %d tx %v got into an unknown status after %v seconds", workerID, tx.txID, time.Since(tx.createdAt).Seconds())
+					if tx.onError != nil {
+						go tx.onError(tx.txID, err)
+					}
+					if verbose {
+						fmt.Println(err)
+					}
 					continue
 				}
 			}
-
 		}
 		// put it back
-		txt.txs <- tx
-		// TODO get rid of this
-		time.Sleep(time.Second / 10)
+		txs <- tx
+		// don't put too much pressure on access node
+		time.Sleep(sleepAfterOp)
 	}
-	fmt.Println("finished!")
+	if verbose {
+		fmt.Printf("worker %d stoped!\n", workerID)
+	}
+
 }
-
-// // TransactionStatusUnknown indicates that the transaction status is not known.
-// TransactionStatusUnknown TransactionStatus = iota
-// // TransactionStatusPending is the status of a pending transaction.
-// TransactionStatusPending
-// // TransactionStatusFinalized is the status of a finalized transaction.
-// TransactionStatusFinalized
-// // TransactionStatusExecuted is the status of an executed transaction.
-// TransactionStatusExecuted
-// // TransactionStatusSealed is the status of a sealed transaction.
-// TransactionStatusSealed
-// // TransactionStatusExpired is the status of an expired transaction.
-// TransactionStatusExpired
-
-// Status worker
-// func statusWorker(id int, jobs <-chan int) {
-//     for j := range jobs {
-//         fmt.Println("worker", id, "started  job", j)
-//         time.Sleep(time.Second)
-//         fmt.Println("worker", id, "finished job", j)
-//         results <- j * 2
-//     }
-// }
