@@ -201,21 +201,16 @@ func main() {
 			// initialize the verifier for the protocol consensus
 			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, node.DKGState, staking, beacon, merger)
 
-			finalized, pending, err := protocolRecovery.FindLatest(node.State, node.Storage.Headers, node.GenesisBlock.Header)
+			finalized, pending, err := protocolRecovery.FindLatest(node.State, node.Storage.Headers, node.RootBlock.Header)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, node.Storage.Headers, final, verifier, finderEng, node.GenesisBlock.Header, node.GenesisQC, finalized, pending)
+			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, node.Storage.Headers, final, verifier, finderEng, node.RootBlock.Header, node.RootQC, finalized, pending)
 			if err != nil {
-				// return nil, fmt.Errorf("could not create follower core logic: %w", err)
-				// TODO for now we ignore failures in follower
-				// this is necessary for integration tests to run, until they are
-				// updated to generate/use valid genesis QC and DKG files.
-				// ref https://github.com/dapperlabs/flow-go/issues/3057
-				node.Logger.Debug().Err(err).Msg("ignoring failures in follower core")
+				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
 
 			followerEng, err := followereng.New(node.Logger,

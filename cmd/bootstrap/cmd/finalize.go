@@ -31,7 +31,8 @@ var finalizeCmd = &cobra.Command{
 	Use:   "finalize",
 	Short: "Finalize the bootstrapping process",
 	Long: `Finalize the bootstrapping process, which includes generating of internal networking and staking keys,
-running the DKG for generating the random beacon keys, generating genesis execution state, seal, block and QC.`,
+running the DKG for the generation of the random beacon keys and generating the root block, QC, execution result
+and block seal.`,
 	Run: func(cmd *cobra.Command, args []string) {
 
 		chainID := parseChainID(flagChainID)
@@ -53,16 +54,12 @@ running the DKG for generating the random beacon keys, generating genesis execut
 		dkgData := runDKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
 		log.Info().Msg("")
 
-		log.Info().Msg("✨ constructing genesis block")
-		block := constructGenesisBlock(stakingNodes, chainID)
+		log.Info().Msg("✨ constructing root block")
+		block := constructRootBlock(stakingNodes, chainID)
 		log.Info().Msg("")
 
-		log.Info().Msg("✨ constructing genesis execution result and block seal")
-		constructGenesisBlockSeal(flagStateCommitment, block)
-		log.Info().Msg("")
-
-		log.Info().Msg("✨ constructing genesis QC")
-		constructGenesisQC(
+		log.Info().Msg("✨ constructing root QC")
+		constructRootQC(
 			block,
 			model.FilterByRole(stakingNodes, flow.RoleConsensus),
 			model.FilterByRole(internalNodes, flow.RoleConsensus),
@@ -70,16 +67,20 @@ running the DKG for generating the random beacon keys, generating genesis execut
 		)
 		log.Info().Msg("")
 
-		log.Info().Msg("✨ computing collector clusters")
+		log.Info().Msg("✨ constructing root execution result and block seal")
+		constructRootResultAndSeal(flagStateCommitment, block)
+		log.Info().Msg("")
+
+		log.Info().Msg("✨ computing collection node clusters")
 		clusters := protocol.Clusters(uint(flagCollectionClusters), model.ToIdentityList(stakingNodes))
 		log.Info().Msg("")
 
-		log.Info().Msg("✨ constructing genesis blocks for collector clusters")
-		clusterBlocks := constructGenesisBlocksForCollectorClusters(clusters)
+		log.Info().Msg("✨ constructing root blocks for collection node clusters")
+		clusterBlocks := constructRootBlocksForClusters(clusters)
 		log.Info().Msg("")
 
-		log.Info().Msg("✨ constructing genesis QCs for collector clusters")
-		constructGenesisQCsForCollectorClusters(clusters, internalNodes, block, clusterBlocks)
+		log.Info().Msg("✨ constructing root QCs for collection node clusters")
+		constructRootQCsForClusters(clusters, internalNodes, block, clusterBlocks)
 		log.Info().Msg("")
 
 		log.Info().Msg("🌊 🏄 🤙 Done – ready to flow!")

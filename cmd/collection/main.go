@@ -82,8 +82,8 @@ func main() {
 		clusterState *clusterkv.State  // chain state for the cluster
 
 		// from bootstrap files
-		clusterGenesis *clustermodel.Block              // genesis block for the cluster
-		clusterQC      *hotstuffmodel.QuorumCertificate // QC for the cluster
+		clusterBlock *clustermodel.Block              // root block for the cluster
+		clusterQC    *hotstuffmodel.QuorumCertificate // root QC for the cluster
 
 		prov           *provider.Engine
 		ing            *ingest.Engine
@@ -142,11 +142,11 @@ func main() {
 			return nil
 		}).
 		// regardless of whether we are starting from scratch or from an
-		// existing state, we load the genesis files
+		// existing state, we load the root files
 		Module("cluster consensus bootstrapping", func(node *cmd.FlowNodeBuilder) error {
 
 			// read cluster bootstrapping files from standard bootstrap directory
-			clusterGenesis, err = loadClusterBlock(node.BaseConfig.BootstrapDir, clusterID)
+			clusterBlock, err = loadClusterBlock(node.BaseConfig.BootstrapDir, clusterID)
 			if err != nil {
 				return fmt.Errorf("could not load cluster block: %w", err)
 			}
@@ -158,7 +158,7 @@ func main() {
 
 			return nil
 		}).
-		// if a genesis cluster block already exists in the database, discard
+		// if a root cluster block already exists in the database, discard
 		// the loaded bootstrap files and use the existing cluster state
 		Module("cluster state", func(node *cmd.FlowNodeBuilder) error {
 
@@ -177,13 +177,13 @@ func main() {
 			// no existing cluster state, bootstrap with block specified in
 			// bootstrapping files
 			if errors.Is(err, storage.ErrNotFound) {
-				err = clusterState.Mutate().Bootstrap(clusterGenesis)
+				err = clusterState.Mutate().Bootstrap(clusterBlock)
 				if err != nil {
 					return fmt.Errorf("could not bootstrap cluster state: %w", err)
 				}
 
 				node.Logger.Info().
-					Hex("genesis_id", logging.ID(clusterGenesis.ID())).
+					Hex("root_id", logging.ID(clusterBlock.ID())).
 					Str("cluster_id", clusterID.String()).
 					Str("cluster_members", fmt.Sprintf("%v", myCluster.NodeIDs())).
 					Msg("bootstrapped cluster state")
@@ -196,7 +196,7 @@ func main() {
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
-			// TODO frequency of 0 turns off the cleaner, turn back on once we know the proper tuning
+			// TODO: frequency of 0 turns off the cleaner, turn back on once we know the proper tuning
 			cleaner := storagekv.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
 
 			// create a finalizer that will handling updating the protocol
@@ -222,7 +222,7 @@ func main() {
 			// use proper engine for notifier to follower
 			notifier := notifications.NewNoopConsumer()
 
-			finalized, pending, err := protocolRecovery.FindLatest(node.State, node.Storage.Headers, node.GenesisBlock.Header)
+			finalized, pending, err := protocolRecovery.FindLatest(node.State, node.Storage.Headers, node.RootBlock.Header)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
@@ -235,8 +235,8 @@ func main() {
 				finalizer,
 				verifier,
 				notifier,
-				node.GenesisBlock.Header,
-				node.GenesisQC,
+				node.RootBlock.Header,
+				node.RootQC,
 				finalized,
 				pending,
 			)
@@ -367,7 +367,7 @@ func main() {
 				persist,
 				signer,
 				prop,
-				clusterGenesis.Header,
+				clusterBlock.Header,
 				clusterQC,
 				finalized,
 				pending,
@@ -418,7 +418,7 @@ func initClusterCommittee(node *cmd.FlowNodeBuilder, colPayloads *storagekv.Clus
 }
 
 func loadClusterBlock(path string, clusterID flow.ChainID) (*clustermodel.Block, error) {
-	filename := fmt.Sprintf(bootstrap.PathGenesisClusterBlock, clusterID)
+	filename := fmt.Sprintf(bootstrap.PathRootClusterBlock, clusterID)
 	data, err := ioutil.ReadFile(filepath.Join(path, filename))
 	if err != nil {
 		return nil, err
@@ -433,7 +433,7 @@ func loadClusterBlock(path string, clusterID flow.ChainID) (*clustermodel.Block,
 }
 
 func loadClusterQC(path string, clusterID flow.ChainID) (*hotstuffmodel.QuorumCertificate, error) {
-	filename := fmt.Sprintf(bootstrap.PathGenesisClusterQC, clusterID)
+	filename := fmt.Sprintf(bootstrap.PathRootClusterQC, clusterID)
 	data, err := ioutil.ReadFile(filepath.Join(path, filename))
 	if err != nil {
 		return nil, err

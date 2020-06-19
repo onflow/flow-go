@@ -31,7 +31,7 @@ var (
 
 const fileMode = os.FileMode(0644)
 
-const flowBucket = "flow-genesis-bootstrap"
+const flowBucket = "flow-root-bootstrap"
 
 var (
 
@@ -44,7 +44,7 @@ var (
 	filesToUploadConsensus = FilenameTransitKeyPub
 
 	// default folder to download for all role type
-	folderToDownload = bootstrap.DirnamePublicGenesis
+	folderToDownload = bootstrap.DirnamePublicBootstrap
 
 	// consensus node additionally gets the random beacon file
 	filesToDownloadConsensus = FilenameRandomBeaconCipher
@@ -121,7 +121,7 @@ func main() {
 
 // Read the NodeID file to build other paths from
 func fetchNodeId(bootdir string) (string, error) {
-	path := filepath.Join(bootdir, bootstrap.PathNodeId)
+	path := filepath.Join(bootdir, bootstrap.PathNodeID)
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("Error reading file %s: %w", path, err)
@@ -162,7 +162,7 @@ func runPull(ctx context.Context, bootdir, token, nodeId string, role flow.Role)
 	var err error
 
 	// download the public folder from the bucket and any additional files
-	err = bucketDownload(ctx, bootdir, folderToDownload, bootstrap.DirnamePublicGenesis, token, extraFiles...)
+	err = bucketDownload(ctx, bootdir, folderToDownload, bootstrap.DirnamePublicBootstrap, token, extraFiles...)
 	if err != nil {
 		log.Fatalf("Failed to pull: %s", err)
 	}
@@ -174,12 +174,12 @@ func runPull(ctx context.Context, bootdir, token, nodeId string, role flow.Role)
 		}
 	}
 
-	genesisFile := filepath.Join(bootdir, bootstrap.PathGenesisBlock)
-	genesisMd5, err := getFileMd5(genesisFile)
+	rootFile := filepath.Join(bootdir, bootstrap.PathRootBlock)
+	rootMd5, err := getFileMd5(rootFile)
 	if err != nil {
-		log.Fatalf("Failed to calculate md5 of %s: %v", genesisFile, err)
+		log.Fatalf("Failed to calculate md5 of %s: %v", rootFile, err)
 	}
-	log.Printf("MD5 of the genesis block is: %s\n", genesisMd5)
+	log.Printf("MD5 of the root block is: %s\n", rootMd5)
 }
 
 // generateKeys creates the transit keypair and writes them to disk for later

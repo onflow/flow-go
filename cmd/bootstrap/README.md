@@ -1,6 +1,6 @@
 # Bootstrapping
 
-This package contains script for generating genesis information to bootstrap the Flow network.
+This package contains script for generating bootstrap information to initialize the Flow network.
 The high-level bootstrapping process is described in [Notion](https://www.notion.so/dapperlabs/Flow-Bootstrapping-ce9d227f18a8410dbce74ed7d4ddee27).
 
 WARNING: These scripts use Go's crypto/rand package to generate seeds for private keys. Make sure you are running the bootstrap scripts on a machine that does provide proper lower level implementations. See https://golang.org/pkg/crypto/rand/ for details.
@@ -24,7 +24,7 @@ The bootstrapping will generate the following information:
 
 #### Execution state
 * Key for Account-Zero, i.e. the first account on Flow (ECDSA key)
-* Genesis Execution state: LevelDB dump of execution state including pre-generated Account-Zero
+* Root Execution state: LevelDB dump of execution state including pre-generated Account-Zero
 
 #### Node Identities
 * List of all authorized Flow nodes
@@ -36,14 +36,14 @@ The bootstrapping will generate the following information:
   - stake
 
 #### Root Block for main consensus
-* Genesis Block
-* Genesis QC: votes from consensus nodes for the genesis block (required to start consensus)
+* Root Block
+* Root QC: votes from consensus nodes for the root block (required to start consensus)
 
 
 #### Root Blocks for Collector clusters
-_Each cluster_ of collector nodes needs to have its own genesis Block and genesis QC
-* Genesis `ClusterBlockProposal`
-* Genesis QC from cluster for their respective `ClusterBlockProposal`
+_Each cluster_ of collector nodes needs to have its own root Block and root QC
+* Root `ClusterBlockProposal`
+* Root QC from cluster for their respective `ClusterBlockProposal`
 
 
 # Usage
@@ -78,13 +78,13 @@ go run -tags relic ./cmd/bootstrap key --address "example.com:1234" --role "cons
      file needs to be available to respective partner node at boot up (or recovery after crash)
 * file `<NodeID>.node-info.pub.json`
    - public information
-   - file needs to be delivered to Dapper Labs for Phase 2 of generating genesis information,
+   - file needs to be delivered to Dapper Labs for Phase 2 of generating root information,
      but is not required at node start
 
 
-### Phase 2: Generating final genesis information
+### Phase 2: Generating final root information
 
-This step will generate the entire genesis information for all nodes (incl. keys for all Dapper-controlled nodes).
+This step will generate the entire root information for all nodes (incl. keys for all Dapper-controlled nodes).
 
 #### Required Inputs
 Each input is a config file specified as a command line parameter:
@@ -95,7 +95,7 @@ Each input is a config file specified as a command line parameter:
 
 #### Example
 ```bash
-go run -tags relic ./cmd/bootstrap finalize --config ./cmd/bootstrap/example_files/node-config.json --partner-dir ./cmd/bootstrap/example_files/partner-node-infos --partner-stakes ./cmd/bootstrap/example_files/partner-stakes.json --genesis-token-supply 1000_000_000 -o ./bootstrap/genesis-infos
+go run -tags relic ./cmd/bootstrap finalize --config ./cmd/bootstrap/example_files/node-config.json --partner-dir ./cmd/bootstrap/example_files/partner-node-infos --partner-stakes ./cmd/bootstrap/example_files/partner-stakes.json --root-token-supply 1000_000_000 -o ./bootstrap/root-infos
 ```
 
 #### Generated output files
@@ -126,18 +126,18 @@ go run -tags relic ./cmd/bootstrap finalize --config ./cmd/bootstrap/example_fil
    - contains public LevelDB dump of execution state including pre-generated Account-Zero
    - REQUIRED at NODE START by all execution nodes
    - file can be made accessible to all nodes at boot up (or recovery after crash)
-* file `genesis-block.json`
+* file `root-block.json`
    - REQUIRED at NODE START by all nodes
-* file `genesis-qc.json`
+* file `root-qc.json`
    - REQUIRED at NODE START by all nodes
 * file `dkg-data.pub.json`
    - REQUIRED at NODE START by all nodes
 
-* file `<ClusterID>.genesis-cluster-block.json`
-   - genesis `ClusterBlockProposal` for collector cluster with ID `<ClusterID>`
+* file `<ClusterID>.root-cluster-block.json`
+   - root `ClusterBlockProposal` for collector cluster with ID `<ClusterID>`
    - REQUIRED at NODE START by all collectors of the respective cluster
    - file can be made accessible to all nodes at boot up (or recovery after crash)
-* file `<ClusterID>.genesis-cluster-qc.json`
-   - genesis Quorum Certificate for `ClusterBlockProposal` for collector cluster with ID `<ClusterID>`
+* file `<ClusterID>.root-cluster-qc.json`
+   - root Quorum Certificate for `ClusterBlockProposal` for collector cluster with ID `<ClusterID>`
    - REQUIRED at NODE START by all collectors of the respective cluster
    - file can be made accessible to all nodes at boot up (or recovery after crash)

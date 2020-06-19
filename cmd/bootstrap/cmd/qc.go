@@ -8,15 +8,15 @@ import (
 	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
 )
 
-func constructGenesisQC(block *flow.Block, allNodes, internalNodes []model.NodeInfo, dkgData model.DKGData) {
+func constructRootQC(block *flow.Block, allNodes, internalNodes []model.NodeInfo, dkgData model.DKGData) {
 	participantData := GenerateQCParticipantData(allNodes, internalNodes, dkgData)
 
-	qc, err := run.GenerateGenesisQC(participantData, block)
+	qc, err := run.GenerateRootQC(participantData, block)
 	if err != nil {
-		log.Fatal().Err(err).Msg("generating genesis QC failed")
+		log.Fatal().Err(err).Msg("generating root QC failed")
 	}
 
-	writeJSON(model.PathGenesisQC, qc)
+	writeJSON(model.PathRootQC, qc)
 }
 
 func GenerateQCParticipantData(allNodes, internalNodes []model.NodeInfo, dkgData model.DKGData) run.ParticipantData {

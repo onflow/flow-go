@@ -7,7 +7,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func constructGenesisBlockSeal(commitString string, block *flow.Block) {
+func constructRootResultAndSeal(commitString string, block *flow.Block) {
 
 	commit, err := hex.DecodeString(commitString)
 	if err != nil {
@@ -33,6 +33,6 @@ func constructGenesisBlockSeal(commitString string, block *flow.Block) {
 		FinalState:   commit,
 	}
 
-	writeJSON(model.PathGenesisExecutionResult, result)
-	writeJSON(model.PathGenesisBlockSeal, seal)
+	writeJSON(model.PathRootResult, result)
+	writeJSON(model.PathRootSeal, seal)
 }

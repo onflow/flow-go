@@ -101,7 +101,7 @@ type namedDoneObject struct {
 // It runs a node process with following structure, in sequential order
 // Base inits (network, storage, state, logger)
 //   PostInit handlers, if any
-//   GenesisHandler, if any and if genesis was generated
+//   Bootstrap handlers, if protocol state was bootstrapped
 // Components handlers, if any, wait sequentially
 // Run() <- main loop
 // Components destructors, if any
@@ -128,15 +128,15 @@ type FlowNodeBuilder struct {
 	networkKey        crypto.PrivateKey
 	MsgValidators     []validators.MessageValidator
 
-	// genesis information
-	GenesisCommit           flow.StateCommitment // should be removed
-	GenesisBlock            *flow.Block
-	GenesisQC               *model.QuorumCertificate
-	GenesisResult           *flow.ExecutionResult
-	GenesisSeal             *flow.Seal
-	GenesisAccountPublicKey *flow.AccountPublicKey
-	GenesisTokenSupply      uint64
-	GenesisChainID          flow.ChainID
+	// root state information
+	RootCommit           flow.StateCommitment // should be removed
+	RootBlock            *flow.Block
+	RootQC               *model.QuorumCertificate
+	RootResult           *flow.ExecutionResult
+	RootSeal             *flow.Seal
+	RootAccountPublicKey *flow.AccountPublicKey
+	RootTokenSupply      uint64
+	RootChainID          flow.ChainID
 }
 
 func (fnb *FlowNodeBuilder) baseFlags() {
@@ -369,30 +369,31 @@ func (fnb *FlowNodeBuilder) initState() {
 
 		fnb.Logger.Info().Msg("bootstrapping empty protocol state")
 
-		// Load the rest of the genesis info, eventually needed for the consensus follower
-		fnb.GenesisBlock, err = loadGenesisBlock(fnb.BaseConfig.BootstrapDir)
+		// Load the rest of the root info, eventually needed for the consensus follower
+		fnb.RootBlock, err = loadRootBlock(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root header")
 		}
 
-		fnb.GenesisChainID = fnb.GenesisBlock.Header.ChainID
+		// set the root chain ID based on the root block
+		fnb.RootChainID = fnb.RootBlock.Header.ChainID
 
-		// load genesis QC and DKG data from bootstrap files
-		fnb.GenesisQC, err = loadGenesisQC(fnb.BaseConfig.BootstrapDir)
+		// load root QC data from bootstrap files
+		fnb.RootQC, err = loadRootQC(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
 		}
 
-		// load genesis execution result from bootstrap files
-		fnb.GenesisResult, err = loadGenesisResult(fnb.BaseConfig.BootstrapDir)
+		// load root execution result from bootstrap files
+		fnb.RootResult, err = loadRootResult(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis execution result")
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root execution result")
 		}
 
-		// load genesis block seal from bootstrap files
-		fnb.GenesisSeal, err = loadGenesisSeal(fnb.BaseConfig.BootstrapDir)
+		// load root block seal from bootstrap files
+		fnb.RootSeal, err = loadRootSeal(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis block seal")
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block seal")
 		}
 
 		// load the dkg public data from bootstrap files
@@ -402,18 +403,19 @@ func (fnb *FlowNodeBuilder) initState() {
 		}
 
 		// set the chain ID based on the bootstrap block
-		flow.SetChainID(fnb.GenesisBlock.Header.ChainID)
+		flow.SetChainID(fnb.RootBlock.Header.ChainID)
 
 		// TODO: this always needs to be available, so we need to persist it
 		fnb.DKGState = wrapper.NewState(dkgPubData)
 
-		err = state.Mutate().Bootstrap(fnb.GenesisBlock, fnb.GenesisResult, fnb.GenesisSeal)
+		err = state.Mutate().Bootstrap(fnb.RootBlock, fnb.RootResult, fnb.RootSeal)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap protocol state")
 		}
 
+		// TODO: replace with clean way to execute bootstrap operations on state for each node
 		if fnb.BaseConfig.nodeRole == flow.RoleExecution.String() {
-			err := exebs.BootstrapExecutionDatabase(fnb.DB, fnb.GenesisSeal.FinalState, fnb.GenesisBlock.Header)
+			err := exebs.BootstrapExecutionDatabase(fnb.DB, fnb.RootSeal.FinalState, fnb.RootBlock.Header)
 			if err != nil {
 				fnb.Logger.Fatal().Err(err).Msg("could not bootstrap execution database")
 			}
@@ -427,16 +429,16 @@ func (fnb *FlowNodeBuilder) initState() {
 			Uint64("final_height", head.Height).
 			Msg("using existing database")
 
-		// Load the genesis info for recovery
-		fnb.GenesisBlock, err = loadGenesisBlock(fnb.BaseConfig.BootstrapDir)
+		// Load the root info for recovery
+		fnb.RootBlock, err = loadRootBlock(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root header")
 		}
 
-		fnb.GenesisChainID = fnb.GenesisBlock.Header.ChainID
+		fnb.RootChainID = fnb.RootBlock.Header.ChainID
 
-		// load genesis QC and DKG data from bootstrap files for recovery
-		fnb.GenesisQC, err = loadGenesisQC(fnb.BaseConfig.BootstrapDir)
+		// load root QC data from bootstrap files for recovery
+		fnb.RootQC, err = loadRootQC(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
 		}
@@ -673,18 +675,8 @@ func loadDKGPublicData(dir string) (*dkg.PublicData, error) {
 	return dkgPubData.ForHotStuff(), err
 }
 
-func loadGenesisAccountPublicKey(dir string) (*flow.AccountPublicKey, error) {
-	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathServiceAccountPublicKey))
-	if err != nil {
-		return nil, err
-	}
-	publicKey := new(flow.AccountPublicKey)
-	err = json.Unmarshal(data, publicKey)
-	return publicKey, err
-}
-
-func loadGenesisBlock(dir string) (*flow.Block, error) {
-	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisBlock))
+func loadRootBlock(dir string) (*flow.Block, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathRootBlock))
 	if err != nil {
 		return nil, err
 	}
@@ -694,8 +686,8 @@ func loadGenesisBlock(dir string) (*flow.Block, error) {
 
 }
 
-func loadGenesisQC(dir string) (*model.QuorumCertificate, error) {
-	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisQC))
+func loadRootQC(dir string) (*model.QuorumCertificate, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathRootQC))
 	if err != nil {
 		return nil, err
 	}
@@ -704,8 +696,8 @@ func loadGenesisQC(dir string) (*model.QuorumCertificate, error) {
 	return &qc, err
 }
 
-func loadGenesisResult(dir string) (*flow.ExecutionResult, error) {
-	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisResult))
+func loadRootResult(dir string) (*flow.ExecutionResult, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathRootResult))
 	if err != nil {
 		return nil, err
 	}
@@ -714,8 +706,8 @@ func loadGenesisResult(dir string) (*flow.ExecutionResult, error) {
 	return &result, err
 }
 
-func loadGenesisSeal(dir string) (*flow.Seal, error) {
-	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisSeal))
+func loadRootSeal(dir string) (*flow.Seal, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathRootSeal))
 	if err != nil {
 		return nil, err
 	}
