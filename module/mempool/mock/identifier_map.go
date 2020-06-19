@@ -14,17 +14,24 @@ type IdentifierMap struct {
 }
 
 // Append provides a mock function with given fields: key, id
-func (_m *IdentifierMap) Append(key flow.Identifier, id flow.Identifier) error {
+func (_m *IdentifierMap) Append(key flow.Identifier, id flow.Identifier) (bool, error) {
 	ret := _m.Called(key, id)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.Identifier) error); ok {
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.Identifier) bool); ok {
 		r0 = rf(key, id)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(bool)
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier, flow.Identifier) error); ok {
+		r1 = rf(key, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // Get provides a mock function with given fields: key
