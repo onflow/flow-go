@@ -16,36 +16,33 @@ require (
 	github.com/golang/protobuf v1.4.0
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/ipfs/go-log v0.0.1
+	github.com/ipfs/go-log v1.0.4
 	github.com/jrick/bitset v1.0.0
-	github.com/libp2p/go-libp2p v0.5.1
-	github.com/libp2p/go-libp2p-core v0.3.0
-	github.com/libp2p/go-libp2p-pubsub v0.2.7-0.20200226020716-1f147c24576a
-	github.com/libp2p/go-libp2p-swarm v0.2.2
-	github.com/libp2p/go-libp2p-transport-upgrader v0.1.1
-	github.com/libp2p/go-tcp-transport v0.1.1
-	github.com/multiformats/go-multiaddr v0.2.0
+	github.com/libp2p/go-libp2p v0.10.0
+	github.com/libp2p/go-libp2p-core v0.6.0
+	github.com/libp2p/go-libp2p-pubsub v0.3.2
+	github.com/libp2p/go-libp2p-swarm v0.2.7
+	github.com/libp2p/go-libp2p-transport-upgrader v0.3.0
+	github.com/libp2p/go-tcp-transport v0.2.0
+	github.com/multiformats/go-multiaddr v0.2.2
 	github.com/onflow/cadence v0.4.1-0.20200604200650-30a200f9c324
 	github.com/onflow/flow-go-sdk v0.4.0 // indirect
-	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200609190303-17d262f35b48
-	github.com/onsi/ginkgo v1.10.1 // indirect
-	github.com/onsi/gomega v1.7.0 // indirect
+	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200619174948-a3a856d16a27
 	github.com/opentracing/opentracing-go v1.1.0
-	github.com/pkg/errors v0.8.1
+	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.3.0
 	github.com/prometheus/tsdb v0.7.1
 	github.com/rs/zerolog v1.15.0
 	github.com/spf13/cobra v0.0.6
 	github.com/spf13/pflag v1.0.3
 	github.com/spf13/viper v1.4.0
-	github.com/stretchr/testify v1.5.1
+	github.com/stretchr/testify v1.6.1
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
 	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/vmihailenco/msgpack/v4 v4.3.11
-	github.com/whyrusleeping/go-logging v0.0.1
-	go.uber.org/atomic v1.5.1
-	golang.org/x/crypto v0.0.0-20200423211502-4bdfaf469ed5
+	go.uber.org/atomic v1.6.0
+	golang.org/x/crypto v0.0.0-20200510223506-06a226fb4e37
 	google.golang.org/api v0.18.0
 	google.golang.org/grpc v1.28.0
 )

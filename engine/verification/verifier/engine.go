@@ -84,7 +84,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+			engine.LogError(e.log, err)
 		}
 	})
 }
@@ -146,7 +146,7 @@ func (e *Engine) verify(originID flow.Identifier, vc *verification.VerifiableChu
 	// extracts chunk ID
 	ch, ok := vc.Result.Chunks.ByIndex(vc.Chunk.Index)
 	if !ok {
-		return fmt.Errorf("chunk out of range requested: %v", vc.Chunk.Index)
+		return engine.NewInvalidInputErrorf("chunk out of range requested: %v", vc.Chunk.Index)
 	}
 	log.With().Hex("chunk_id", logging.Entity(ch)).Logger()
 
@@ -169,7 +169,7 @@ func (e *Engine) verify(originID flow.Identifier, vc *verification.VerifiableChu
 			// TODO raise challenge
 			e.log.Error().Msg(chFault.String())
 		default:
-			return fmt.Errorf("unknown type of chunk fault is recieved (type: %T) : %v", chFault, chFault.String())
+			return engine.NewInvalidInputErrorf("unknown type of chunk fault is recieved (type: %T) : %v", chFault, chFault.String())
 		}
 		// don't do anything else, but skip generating result approvals
 		return nil

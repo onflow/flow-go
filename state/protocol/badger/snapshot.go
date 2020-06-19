@@ -4,6 +4,7 @@ package badger
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/order"
 	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
@@ -138,8 +140,30 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 		return nil, fmt.Errorf("block doesn't have children yet")
 	}
 
+	// find the first child that has been validated
+	var validChildID flow.Identifier
+	for _, childID := range childrenIDs {
+		var valid bool
+		err = s.state.db.View(operation.RetrieveBlockValidity(childID, &valid))
+		// skip blocks whose validity hasn't been checked yet
+		if errors.Is(err, storage.ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("could not get child validity: %w", err)
+		}
+		if valid {
+			validChildID = childID
+			break
+		}
+	}
+
+	if validChildID == flow.ZeroID {
+		return nil, fmt.Errorf("block has no valid children")
+	}
+
 	// get the header of the first child (they all have the same threshold sig)
-	head, err := s.state.headers.ByBlockID(childrenIDs[0])
+	head, err := s.state.headers.ByBlockID(validChildID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get head: %w", err)
 	}

@@ -225,7 +225,7 @@ func TestOnQcIncorporated(t *testing.T) {
 
 	finalizationCallback := &mockfinalizer.Finalizer{}
 	finalizationCallback.On("MakeFinal", mock.Anything).Return(nil)
-	finalizationCallback.On("MakePending", mock.Anything).Return(nil)
+	finalizationCallback.On("MakeValid", mock.Anything).Return(nil)
 
 	// construct Finalizer
 	root := makeRootBlock(t, 1)
@@ -296,7 +296,7 @@ func initNewestForkChoice(t *testing.T, view uint64) (hs.Forks, *mocks.Consumer,
 
 	finalizationCallback := &mockfinalizer.Finalizer{}
 	finalizationCallback.On("MakeFinal", mock.Anything).Return(nil)
-	finalizationCallback.On("MakePending", mock.Anything).Return(nil)
+	finalizationCallback.On("MakeValid", mock.Anything).Return(nil)
 
 	// construct Finalizer
 	root := makeRootBlock(t, view)
