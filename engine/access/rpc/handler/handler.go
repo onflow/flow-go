@@ -24,6 +24,7 @@ import (
 // Block Header related calls are handled by handlerBlockHeaders
 // Block details related calls are handled by handlerBlockDetails
 // Event related calls are handled by handlerEvents
+// Account related calls are handled by handlerAccounts
 // All remaining calls are handled in this file by Handler
 type Handler struct {
 	handlerScripts
@@ -31,6 +32,7 @@ type Handler struct {
 	handlerEvents
 	handlerBlockHeaders
 	handlerBlockDetails
+	handlerAccounts
 
 	executionRPC execution.ExecutionAPIClient
 	state        protocol.State
@@ -77,6 +79,11 @@ func NewHandler(log zerolog.Logger,
 		handlerBlockDetails: handlerBlockDetails{
 			blocks: blocks,
 			state:  s,
+		},
+		handlerAccounts: handlerAccounts{
+			executionRPC: e,
+			state:        s,
+			headers:      headers,
 		},
 	}
 }
@@ -132,44 +139,6 @@ func (h *Handler) GetCollectionByID(_ context.Context, req *access.GetCollection
 		Collection: ce,
 	}
 	return resp, nil
-}
-
-func (h *Handler) GetAccount(ctx context.Context, req *access.GetAccountRequest) (*access.GetAccountResponse, error) {
-
-	address := req.GetAddress()
-
-	if address == nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid address")
-	}
-
-	// get the latest sealed header
-	latestHeader, err := h.state.Sealed().Head()
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get latest sealed header: %v", err)
-	}
-
-	// get the block id of the latest sealed header
-	latestBlockID := latestHeader.ID()
-
-	exeReq := execution.GetAccountAtBlockIDRequest{
-		Address: address,
-		BlockId: latestBlockID[:],
-	}
-
-	exeResp, err := h.executionRPC.GetAccountAtBlockID(ctx, &exeReq)
-	if err != nil {
-		errStatus, _ := status.FromError(err)
-		if errStatus.Code() == codes.NotFound {
-			return nil, err
-		}
-
-		return nil, status.Errorf(codes.Internal, "failed to get account from the execution node: %v", err)
-	}
-
-	return &access.GetAccountResponse{
-		Account: exeResp.GetAccount(),
-	}, nil
-
 }
 
 func (h *Handler) GetNetworkParameters(_ context.Context, _ *access.GetNetworkParametersRequest) (*access.GetNetworkParametersResponse, error) {
