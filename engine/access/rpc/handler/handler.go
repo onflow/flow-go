@@ -86,7 +86,7 @@ func NewHandler(log zerolog.Logger,
 			state:        s,
 			headers:      headers,
 		},
-		chainID:       chainID,
+		chainID: chainID,
 	}
 }
 
