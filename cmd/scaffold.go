@@ -95,6 +95,11 @@ type namedDoneObject struct {
 	name string
 }
 
+type namedBootstrapFunc struct {
+	fn   func(*protocol.State) error
+	name string
+}
+
 // FlowNodeBuilder is the builder struct used for all flow nodes
 // It runs a node process with following structure, in sequential order
 // Base inits (network, storage, state, logger)
@@ -120,6 +125,7 @@ type FlowNodeBuilder struct {
 	modules           []namedModuleFunc
 	components        []namedComponentFunc
 	doneObject        []namedDoneObject
+	bootstraps        []namedBootstrapFunc
 	sig               chan os.Signal
 	postInitFns       []func(*FlowNodeBuilder)
 	stakingKey        crypto.PrivateKey
@@ -370,66 +376,72 @@ func (fnb *FlowNodeBuilder) initState() {
 
 		// load the root block from bootstrap files and set the chain ID based on it
 		fnb.RootBlock, err = loadRootBlock(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root header")
-		}
+		fnb.MustNot(err).Msg("could not load root block")
 
 		// set the root chain ID based on the root block
 		fnb.RootChainID = fnb.RootBlock.Header.ChainID
 
 		// load the root QC data from bootstrap files
-		// TODO: persist the QC in some way, so we don't need to keep loading it
 		fnb.RootQC, err = loadRootQC(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root QC")
-		}
+		fnb.MustNot(err).Msg("could not load root QC")
 
 		// load the root execution result from bootstrap files
 		rootResult, err := loadRootResult(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root execution result")
-		}
+		fnb.MustNot(err).Msg("could not load root execution result")
 
 		// load the root block seal from bootstrap files
 		rootSeal, err := loadRootSeal(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block seal")
-		}
+		fnb.MustNot(err).Msg("could not load root seal")
 
 		// bootstrap the protocol state with the loaded data
 		err = state.Mutate().Bootstrap(fnb.RootBlock, rootResult, rootSeal)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap protocol state")
+		fnb.MustNot(err).Msg("could not bootstrap protocol state")
+
+		// apply the bootstrap functions to the protocol state
+		for _, b := range fnb.bootstraps {
+			err := b.fn(state)
+			fnb.MustNot(err).Str("name", b.name).Msg("could not apply bootstrap function")
 		}
 
 		// load the DKG public data from bootstrap files
 		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap protocol state")
-		}
+		fnb.MustNot(err).Msg("could not load public DKG data")
 
 		// bootstrap the DKG state with the loaded data
-		// TODO: this always needs to be available, so we need to persist it
 		fnb.DKGState = wrapper.NewState(dkgPubData)
 
 	} else if err != nil {
 		fnb.Logger.Fatal().Err(err).Msg("could not check existing database")
 	} else {
 
-		// Load the genesis info for recovery
+		// TODO: we shouldn't have to load any files again after bootstrapping; in
+		// order to make it unnecessary, we need to changes:
+		// 1) persist the root QC along the root block so it can be loaded from DB
+		// => https://github.com/dapperlabs/flow-go/issues/4166
+		// 2) bootstrap and persist DKG state in a similar fashion to protocol state
+		// => https://github.com/dapperlabs/flow-go/issues/4165
+
+		// load the root block from bootstrap files and set the chain ID based on it
 		fnb.RootBlock, err = loadRootBlock(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
-		}
+		fnb.MustNot(err).Msg("could not load root block")
 
-		flow.SetChainID(fnb.RootBlock.Header.ChainID)
+		// set the chain ID based on the root header
+		// TODO: as the root header can now be loaded from protocol state, we should
+		// not use a global variable for chain ID anymore, but rely on the protocol
+		// state as final authority on what the chain ID is
+		// => https://github.com/dapperlabs/flow-go/issues/4167
+		fnb.RootChainID = fnb.RootBlock.Header.ChainID
 
-		// load genesis QC and DKG data from bootstrap files for recovery
+		// load the root QC data from bootstrap files
 		fnb.RootQC, err = loadRootQC(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
-		}
+		fnb.MustNot(err).Msg("could not load root QC")
+
+		// load the DKG public data from bootstrap files
+		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
+		fnb.MustNot(err).Msg("could not load public DKG data")
+
+		// bootstrap the DKG state with the loaded data
+		fnb.DKGState = wrapper.NewState(dkgPubData)
 	}
 
 	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
