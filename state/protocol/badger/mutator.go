@@ -225,6 +225,14 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	// guarantee that was expired at the block height, nor should it have been
 	// included in any previous payload.
 
+	// we only look as far back for duplicates as the transaction expiry limit;
+	// if a guarantee was included before that, we will disqualify it on the
+	// basis of the reference block anyway
+	limit := header.Height - uint64(m.state.expiry)
+	if limit > header.Height { // overflow check
+		limit = 0
+	}
+
 	// look up the root height so we don't look too far back
 	// initially this is the genesis block height (aka 0).
 	var rootHeight uint64
@@ -232,12 +240,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve root block height: %w", err)
 	}
-
-	// we only look as far back for duplicates as the transaction expiry limit;
-	// if a guarantee was included before that, we will disqualify it on the
-	// basis of the reference block anyway
-	limit := header.Height - uint64(m.state.expiry)
-	if limit > header.Height || limit < rootHeight { // overflow check
+	if limit < rootHeight {
 		limit = rootHeight
 	}
 
