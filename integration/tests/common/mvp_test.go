@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/onflow/cadence/encoding/json"
-	//sdk "github.com/onflow/flow-go-sdk"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 

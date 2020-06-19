@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	//sdk "github.com/onflow/flow-go-sdk"
-
 	"github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
@@ -77,8 +75,6 @@ func (c *Client) Events(ctx context.Context, typ string) ([]*access.EventsRespon
 // code to the root account.
 func (c *Client) DeployContract(ctx context.Context, refID flow.Identifier, contract dsl.CadenceCode) error {
 
-	fmt.Printf("contract to be deployed:\n %s\n", contract.ToCadence())
-
 	code := dsl.Transaction{
 		Import: dsl.Import{},
 		Content: dsl.Prepare{
@@ -92,8 +88,6 @@ func (c *Client) DeployContract(ctx context.Context, refID flow.Identifier, cont
 		SetProposalKey(c.Chain.ServiceAddress(), 0, c.GetSeqNumber()).
 		SetPayer(c.Chain.ServiceAddress()).
 		AddAuthorizer(c.Chain.ServiceAddress())
-
-	fmt.Printf("deploying tx ID %x:\n %s\n", tx.ID(), tx)
 
 	return c.SignAndSendTransaction(ctx, *tx)
 }
