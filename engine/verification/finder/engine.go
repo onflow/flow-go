@@ -144,7 +144,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	}
 
 	// records the execution receipt id based on its result id
-	err := e.receiptIDsByResult.Append(resultID, receiptID)
+	_, err := e.receiptIDsByResult.Append(resultID, receiptID)
 	if err != nil {
 		log.Debug().Err(err).Msg("could not add receipt id to receipt-ids-by-result mempool")
 	}
@@ -287,7 +287,7 @@ func (e *Engine) checkReceipts(receipts []*verification.PendingReceipt) {
 		} else {
 			// receipt is not processable
 			// keeps track of it in id map
-			err := e.receiptIDsByBlock.Append(pr.Receipt.ExecutionResult.BlockID, receiptID)
+			_, err := e.receiptIDsByBlock.Append(pr.Receipt.ExecutionResult.BlockID, receiptID)
 			if err != nil {
 				e.log.Error().
 					Err(err).

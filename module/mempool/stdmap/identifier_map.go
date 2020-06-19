@@ -21,8 +21,11 @@ func NewIdentifierMap(limit uint) (*IdentifierMap, error) {
 }
 
 // Append will append the id to the list of identifiers associated with key.
-func (i *IdentifierMap) Append(key, id flow.Identifier) error {
-	return i.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+// If the returned error is nil, the boolean value indicates whether the append was
+// successful, or dropped since the id is already associated with the key.
+func (i *IdentifierMap) Append(key, id flow.Identifier) (bool, error) {
+	appended := false
+	err := i.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
 		var ids map[flow.Identifier]struct{}
 		entity, ok := backdata[key]
 		if !ok {
@@ -34,10 +37,16 @@ func (i *IdentifierMap) Append(key, id flow.Identifier) error {
 			if !ok {
 				return fmt.Errorf("could not assert entity to IdMapEntity")
 			}
-			// removes map entry associated with key for update
-			delete(backdata, key)
 
 			ids = idMapEntity.IDs
+			if _, ok := ids[id]; ok {
+				// id is already associated with the key
+				// no need to append
+				return nil
+			}
+
+			// removes map entry associated with key for update
+			delete(backdata, key)
 		}
 
 		// appends id to the ids list
@@ -50,9 +59,11 @@ func (i *IdentifierMap) Append(key, id flow.Identifier) error {
 		}
 
 		backdata[key] = idMapEntity
-
+		appended = true
 		return nil
 	})
+
+	return appended, err
 }
 
 // Get returns list of all identifiers associated with key and true, if the key exists in the mempool.

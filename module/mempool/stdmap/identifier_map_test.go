@@ -19,7 +19,8 @@ func TestIdentiferMap(t *testing.T) {
 	key1 := unittest.IdentifierFixture()
 	id1 := unittest.IdentifierFixture()
 	t.Run("appending id to new key", func(t *testing.T) {
-		err = idMap.Append(key1, id1)
+		ok, err := idMap.Append(key1, id1)
+		require.True(t, ok)
 		require.NoError(t, err)
 
 		// checks the existence of id1 for key
@@ -30,7 +31,8 @@ func TestIdentiferMap(t *testing.T) {
 
 	id2 := unittest.IdentifierFixture()
 	t.Run("appending the second id", func(t *testing.T) {
-		err = idMap.Append(key1, id2)
+		ok, err := idMap.Append(key1, id2)
+		require.True(t, ok)
 		require.NoError(t, err)
 
 		// checks the existence of both id1 and id2 for key1
@@ -44,7 +46,8 @@ func TestIdentiferMap(t *testing.T) {
 	// tests against existence of another key, with a shared id (id1)
 	key2 := unittest.IdentifierFixture()
 	t.Run("appending shared id to another key", func(t *testing.T) {
-		err = idMap.Append(key2, id1)
+		ok, err := idMap.Append(key2, id1)
+		require.True(t, ok)
 		require.NoError(t, err)
 
 		// checks the existence of both id1 and id2 for key1
@@ -79,4 +82,16 @@ func TestIdentiferMap(t *testing.T) {
 		assert.NotContains(t, ids, id2)
 	})
 
+	// tests against appending an existing id for a key
+	t.Run("duplicate id for a key", func(t *testing.T) {
+		ids, ok := idMap.Get(key2)
+		require.True(t, ok)
+		assert.Contains(t, ids, id1)
+
+		ok, err := idMap.Append(key2, id1)
+		require.NoError(t, err)
+		// id1 is already associated with key2, so it should return false
+		// on double append
+		require.False(t, ok)
+	})
 }
