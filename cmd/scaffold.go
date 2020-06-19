@@ -130,9 +130,11 @@ type FlowNodeBuilder struct {
 	MsgValidators     []validators.MessageValidator
 
 	// genesis information
-	GenesisCommit           flow.StateCommitment
+	GenesisCommit           flow.StateCommitment // should be removed
 	GenesisBlock            *flow.Block
 	GenesisQC               *model.QuorumCertificate
+	GenesisResult           *flow.ExecutionResult
+	GenesisSeal             *flow.Seal
 	GenesisAccountPublicKey *flow.AccountPublicKey
 	GenesisTokenSupply      uint64
 	GenesisChainID          flow.ChainID
@@ -377,12 +379,6 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis account public key")
 		}
 
-		// Load the genesis state commitment
-		fnb.GenesisCommit, err = loadGenesisCommit(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis commit")
-		}
-
 		// Load the rest of the genesis info, eventually needed for the consensus follower
 		fnb.GenesisBlock, err = loadGenesisBlock(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
@@ -392,9 +388,21 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.GenesisChainID = fnb.GenesisBlock.Header.ChainID
 
 		// load genesis QC and DKG data from bootstrap files
-		fnb.GenesisQC, err = loadRootBlockQC(fnb.BaseConfig.BootstrapDir)
+		fnb.GenesisQC, err = loadGenesisQC(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
+		}
+
+		// load genesis execution result from bootstrap files
+		fnb.GenesisResult, err = loadGenesisResult(fnb.BaseConfig.BootstrapDir)
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis execution result")
+		}
+
+		// load genesis block seal from bootstrap files
+		fnb.GenesisSeal, err = loadGenesisSeal(fnb.BaseConfig.BootstrapDir)
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis block seal")
 		}
 
 		// load token supply from bootstrap config
@@ -411,7 +419,7 @@ func (fnb *FlowNodeBuilder) initState() {
 		// TODO: this always needs to be available, so we need to persist it
 		fnb.DKGState = wrapper.NewState(dkgPubData)
 
-		err = state.Mutate().Bootstrap(fnb.GenesisCommit, fnb.GenesisBlock)
+		err = state.Mutate().Bootstrap(fnb.GenesisBlock, fnb.GenesisResult, fnb.GenesisSeal)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap protocol state")
 		}
@@ -432,7 +440,7 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.GenesisChainID = fnb.GenesisBlock.Header.ChainID
 
 		// load genesis QC and DKG data from bootstrap files for recovery
-		fnb.GenesisQC, err = loadRootBlockQC(fnb.BaseConfig.BootstrapDir)
+		fnb.GenesisQC, err = loadGenesisQC(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
 		}
@@ -689,35 +697,45 @@ func loadGenesisAccountPublicKey(dir string) (*flow.AccountPublicKey, error) {
 	return publicKey, err
 }
 
-func loadGenesisCommit(dir string) (flow.StateCommitment, error) {
-	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisCommit))
-	if err != nil {
-		return nil, err
-	}
-	var commit flow.StateCommitment
-	err = json.Unmarshal(data, &commit)
-	return commit, err
-}
-
 func loadGenesisBlock(dir string) (*flow.Block, error) {
 	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisBlock))
 	if err != nil {
 		return nil, err
 	}
-	var genesisBlock flow.Block
-	err = json.Unmarshal(data, &genesisBlock)
-	return &genesisBlock, err
+	var block flow.Block
+	err = json.Unmarshal(data, &block)
+	return &block, err
 
 }
 
-func loadRootBlockQC(dir string) (*model.QuorumCertificate, error) {
+func loadGenesisQC(dir string) (*model.QuorumCertificate, error) {
 	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisQC))
 	if err != nil {
 		return nil, err
 	}
-	qc := &model.QuorumCertificate{}
-	err = json.Unmarshal(data, qc)
-	return qc, err
+	var qc model.QuorumCertificate
+	err = json.Unmarshal(data, &qc)
+	return &qc, err
+}
+
+func loadGenesisResult(dir string) (*flow.ExecutionResult, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisResult))
+	if err != nil {
+		return nil, err
+	}
+	var result flow.ExecutionResult
+	err = json.Unmarshal(data, &result)
+	return &result, err
+}
+
+func loadGenesisSeal(dir string) (*flow.Seal, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisSeal))
+	if err != nil {
+		return nil, err
+	}
+	var seal flow.Seal
+	err = json.Unmarshal(data, &seal)
+	return &seal, err
 }
 
 // Loads the private info for this node from disk (eg. private staking/network keys).
