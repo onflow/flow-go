@@ -55,7 +55,7 @@ func New(
 		me:            me,
 		protoState:    protoState,
 		vm:            vm,
-		blockComputer: computer.NewBlockComputer(metrics, tracer, vm, blocks),
+		blockComputer: computer.NewBlockComputer(vm, blocks, metrics, tracer),
 		blocks:        blocks,
 	}
 

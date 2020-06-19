@@ -83,7 +83,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	blockComputer := computer.NewBlockComputer(nil, nil, vm, new(storage.Blocks))
+	blockComputer := computer.NewBlockComputer(vm, new(storage.Blocks), nil, nil)
 
 	engine := &Manager{
 		blockComputer: blockComputer,

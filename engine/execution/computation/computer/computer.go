@@ -23,24 +23,24 @@ type BlockComputer interface {
 }
 
 type blockComputer struct {
-	metrics module.ExecutionMetrics
-	tracer  module.Tracer
 	vm      virtualmachine.VirtualMachine
 	blocks  storage.Blocks
+	metrics module.ExecutionMetrics
+	tracer  module.Tracer
 }
 
 // NewBlockComputer creates a new block executor.
 func NewBlockComputer(
-	metrics module.ExecutionMetrics,
-	tracer module.Tracer,
 	vm virtualmachine.VirtualMachine,
 	blocks storage.Blocks,
+	metrics module.ExecutionMetrics,
+	tracer module.Tracer,
 ) BlockComputer {
 	return &blockComputer{
-		metrics: metrics,
-		tracer:  tracer,
 		vm:      vm,
 		blocks:  blocks,
+		metrics: metrics,
+		tracer:  tracer,
 	}
 }
 
