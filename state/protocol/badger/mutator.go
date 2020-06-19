@@ -89,7 +89,7 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 		if err != nil {
 			return fmt.Errorf("could not insert header: %w", err)
 		}
-		err = operation.IndexBlockHeight(0, genesis.ID())(tx)
+		err = operation.IndexBlockHeight(genesis.Header.Height, genesis.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not initialize boundary: %w", err)
 		}
@@ -225,12 +225,20 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	// guarantee that was expired at the block height, nor should it have been
 	// included in any previous payload.
 
+	// look up the root height so we don't look too far back
+	// initially this is the genesis block height (aka 0).
+	var rootHeight uint64
+	err = m.state.db.View(operation.RetrieveGenesisHeight(&rootHeight))
+	if err != nil {
+		return fmt.Errorf("could not retrieve root block height: %w", err)
+	}
+
 	// we only look as far back for duplicates as the transaction expiry limit;
 	// if a guarantee was included before that, we will disqualify it on the
 	// basis of the reference block anyway
 	limit := header.Height - uint64(m.state.expiry)
-	if limit > header.Height { // overflow check
-		limit = 0
+	if limit > header.Height || limit < rootHeight { // overflow check
+		limit = rootHeight
 	}
 
 	// build a list of all previously used guarantees on this part of the chain

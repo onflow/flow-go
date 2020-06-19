@@ -100,6 +100,14 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		ancestorID = ancestor.ParentID
 	}
 
+	// look up the root height so we don't look too far back
+	// initially this is the genesis block height (aka 0).
+	var rootHeight uint64
+	err = b.db.View(operation.RetrieveGenesisHeight(&rootHeight))
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve root block height: %w", err)
+	}
+
 	// we look back only as far as the expiry limit for the current height we
 	// are building for; any guarantee with a reference block before that can
 	// not be included anymore anyway
@@ -109,8 +117,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 	height := parent.Height + 1
 	limit := height - uint64(b.cfg.expiry)
-	if limit > height { // overflow check
-		limit = 0
+	if limit > height || limit < rootHeight { // overflow check
+		limit = rootHeight
 	}
 
 	ancestorID = finalID
