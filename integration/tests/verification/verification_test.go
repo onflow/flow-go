@@ -317,7 +317,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	<-verNode.VerifierEngine.(module.ReadyDoneAware).Done()
 
 	// receipt ID should be added to the ingested results mempool
-	assert.True(t, verNode.IngestedResultIDs.Has(completeER.Receipt.ExecutionResult.ID()))
+	assert.True(t, verNode.ProcessedResultIDs.Has(completeER.Receipt.ExecutionResult.ID()))
 
 	verNode.Done()
 	conNode.Done()
