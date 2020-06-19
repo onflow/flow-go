@@ -175,11 +175,11 @@ func runPull(ctx context.Context, bootdir, token, nodeId string, role flow.Role)
 	}
 
 	rootFile := filepath.Join(bootdir, bootstrap.PathRootBlock)
-	rootMd5, err := getFileMd5(rootFile)
+	rootMD5, err := getFileMd5(rootFile)
 	if err != nil {
 		log.Fatalf("Failed to calculate md5 of %s: %v", rootFile, err)
 	}
-	log.Printf("MD5 of the root block is: %s\n", rootMd5)
+	log.Printf("MD5 of the root block is: %s\n", rootMD5)
 }
 
 // generateKeys creates the transit keypair and writes them to disk for later

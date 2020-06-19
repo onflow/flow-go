@@ -12,7 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
-	protocolRecovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
+	recovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
@@ -201,7 +201,7 @@ func main() {
 			// initialize the verifier for the protocol consensus
 			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, node.DKGState, staking, beacon, merger)
 
-			finalized, pending, err := protocolRecovery.FindLatest(node.State, node.Storage.Headers, node.RootBlock.Header)
+			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}

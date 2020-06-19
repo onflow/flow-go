@@ -20,7 +20,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/consensus/recovery/cluster"
-	protocolRecovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
+	recovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/proposal"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
@@ -222,7 +222,7 @@ func main() {
 			// use proper engine for notifier to follower
 			notifier := notifications.NewNoopConsumer()
 
-			finalized, pending, err := protocolRecovery.FindLatest(node.State, node.Storage.Headers, node.RootBlock.Header)
+			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}

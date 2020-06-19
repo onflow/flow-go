@@ -19,7 +19,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
-	protocolRecovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
+	recovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
 	"github.com/dapperlabs/flow-go/engine/consensus/ingestion"
@@ -300,7 +300,7 @@ func main() {
 			persist := persister.New(node.DB)
 
 			// query the last finalized block and pending blocks for recovery
-			finalized, pending, err := protocolRecovery.FindLatest(node.State, node.Storage.Headers, node.RootBlock.Header)
+			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks: %w", err)
 			}

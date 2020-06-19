@@ -20,7 +20,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
-	exebs "github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/dkg"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -40,7 +39,6 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	sutil "github.com/dapperlabs/flow-go/storage/util"
 	"github.com/dapperlabs/flow-go/utils/debug"
-	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 const notSet = "not set"
@@ -360,16 +358,17 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.Storage.Blocks,
 		protocol.SetClusters(fnb.BaseConfig.nClusters),
 	)
+
 	fnb.MustNot(err).Msg("could not initialize flow state")
 
 	// check if database is initialized
-	head, err := state.Final().Head()
+	_, err = state.Final().Head()
 	if errors.Is(err, storerr.ErrNotFound) {
 		// Bootstrap!
 
 		fnb.Logger.Info().Msg("bootstrapping empty protocol state")
 
-		// Load the rest of the root info, eventually needed for the consensus follower
+		// load the root block from bootstrap files and set the chain ID based on it
 		fnb.RootBlock, err = loadRootBlock(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root header")
@@ -378,77 +377,44 @@ func (fnb *FlowNodeBuilder) initState() {
 		// set the root chain ID based on the root block
 		fnb.RootChainID = fnb.RootBlock.Header.ChainID
 
-		// load root QC data from bootstrap files
+		// load the root QC data from bootstrap files
+		// TODO: persist the QC in some way, so we don't need to keep loading it
 		fnb.RootQC, err = loadRootQC(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root QC")
 		}
 
-		// load root execution result from bootstrap files
-		fnb.RootResult, err = loadRootResult(fnb.BaseConfig.BootstrapDir)
+		// load the root execution result from bootstrap files
+		rootResult, err := loadRootResult(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root execution result")
 		}
 
-		// load root block seal from bootstrap files
-		fnb.RootSeal, err = loadRootSeal(fnb.BaseConfig.BootstrapDir)
+		// load the root block seal from bootstrap files
+		rootSeal, err := loadRootSeal(fnb.BaseConfig.BootstrapDir)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block seal")
 		}
 
-		// load the dkg public data from bootstrap files
-		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
-		}
-
-		// set the chain ID based on the bootstrap block
-		flow.SetChainID(fnb.RootBlock.Header.ChainID)
-
-		// TODO: this always needs to be available, so we need to persist it
-		fnb.DKGState = wrapper.NewState(dkgPubData)
-
-		err = state.Mutate().Bootstrap(fnb.RootBlock, fnb.RootResult, fnb.RootSeal)
+		// bootstrap the protocol state with the loaded data
+		err = state.Mutate().Bootstrap(fnb.RootBlock, rootResult, rootSeal)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap protocol state")
 		}
 
-		// TODO: replace with clean way to execute bootstrap operations on state for each node
-		if fnb.BaseConfig.nodeRole == flow.RoleExecution.String() {
-			err := exebs.BootstrapExecutionDatabase(fnb.DB, fnb.RootSeal.FinalState, fnb.RootBlock.Header)
-			if err != nil {
-				fnb.Logger.Fatal().Err(err).Msg("could not bootstrap execution database")
-			}
-		}
+		// bootstrap the DKG state with the loaded data
 
 	} else if err != nil {
 		fnb.Logger.Fatal().Err(err).Msg("could not check existing database")
-	} else {
-		fnb.Logger.Info().
-			Hex("final_id", logging.ID(head.ID())).
-			Uint64("final_height", head.Height).
-			Msg("using existing database")
-
-		// Load the root info for recovery
-		fnb.RootBlock, err = loadRootBlock(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root header")
-		}
-
-		fnb.RootChainID = fnb.RootBlock.Header.ChainID
-
-		// load root QC data from bootstrap files for recovery
-		fnb.RootQC, err = loadRootQC(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
-		}
-
-		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
-		}
-		fnb.DKGState = wrapper.NewState(dkgPubData)
 	}
+
+	// TODO: persist & bootstrap DKG state similarly to protocol state
+	_, err = loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
+	if err != nil {
+		fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
+	}
+
+	// TODO: load root block directly on recovery
 
 	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
 	fnb.MustNot(err).Msg("could not parse node identifier")
@@ -665,16 +631,6 @@ func (fnb *FlowNodeBuilder) closeDatabase() {
 	}
 }
 
-func loadDKGPublicData(dir string) (*dkg.PublicData, error) {
-	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathDKGDataPub))
-	if err != nil {
-		return nil, err
-	}
-	dkgPubData := &bootstrap.EncodableDKGDataPub{}
-	err = json.Unmarshal(data, dkgPubData)
-	return dkgPubData.ForHotStuff(), err
-}
-
 func loadRootBlock(dir string) (*flow.Block, error) {
 	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathRootBlock))
 	if err != nil {
@@ -714,6 +670,16 @@ func loadRootSeal(dir string) (*flow.Seal, error) {
 	var seal flow.Seal
 	err = json.Unmarshal(data, &seal)
 	return &seal, err
+}
+
+func loadDKGPublicData(dir string) (*dkg.PublicData, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathDKGDataPub))
+	if err != nil {
+		return nil, err
+	}
+	dkgPubData := &bootstrap.EncodableDKGDataPub{}
+	err = json.Unmarshal(data, dkgPubData)
+	return dkgPubData.ForHotStuff(), err
 }
 
 // Loads the private info for this node from disk (eg. private staking/network keys).
