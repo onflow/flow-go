@@ -47,6 +47,13 @@ type TransactionBody struct {
 	EnvelopeSignatures []TransactionSignature
 }
 
+var (
+	// TransactionDomainTag is the prefix of all signed transaction payloads
+	TransactionDomainTag = []byte("FLOW-V0.0-tran")
+	// UserDomainTag is the prefix of all signed user space payloads
+	UserDomainTag = []byte("FLOW-V0.0-user")
+)
+
 // NewTransactionBody initializes and returns an empty transaction body
 func NewTransactionBody() *TransactionBody {
 	return &TransactionBody{}
