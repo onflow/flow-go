@@ -68,7 +68,12 @@ func (i *IdentifierMap) Get(key flow.Identifier) ([]flow.Identifier, bool) {
 		return nil, false
 	}
 
-	return mapEntity.IDs, true
+	ids := make([]flow.Identifier, len(mapEntity.IDs))
+	for id := range mapEntity.IDs {
+		ids = append(ids, id)
+	}
+
+	return ids, true
 }
 
 // Rem removes the given key with all associated identifiers.
