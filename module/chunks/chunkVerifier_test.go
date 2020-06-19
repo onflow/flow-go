@@ -113,7 +113,7 @@ func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
 // GetBaselineVerifiableChunk returns a verifiable chunk and sets the script
 // of a transaction in the middle of the collection to some value to signal the
 // mocked vm on what to return as tx exec outcome.
-func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.VerifiableChunk {
+func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.VerifiableChunkData {
 	// Collection setup
 
 	coll := unittest.CollectionFixture(5)
@@ -147,7 +147,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 	ids = append(ids, id1, id2)
 	values = append(values, value1, value2)
 
-	var verifiableChunk verification.VerifiableChunk
+	var verifiableChunkData verification.VerifiableChunkData
 
 	metricsCollector := &metrics.NoopCollector{}
 
@@ -183,21 +183,17 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 			},
 		}
 
-		receipt := flow.ExecutionReceipt{
-			ExecutionResult: result,
-		}
-
-		verifiableChunk = verification.VerifiableChunk{
-			ChunkIndex:    chunk.Index,
-			EndState:      endState,
-			Block:         &block,
-			Receipt:       &receipt,
+		verifiableChunkData = verification.VerifiableChunkData{
+			Chunk:         &chunk,
+			Header:        &header,
+			Result:        &result,
 			Collection:    &coll,
 			ChunkDataPack: &chunkDataPack,
+			EndState:      endState,
 		}
 	})
 
-	return &verifiableChunk
+	return &verifiableChunkData
 
 }
 
@@ -259,6 +255,7 @@ func (bc *blockContextMock) ExecuteTransaction(
 func (bc *blockContextMock) ExecuteScript(
 	ledger virtualmachine.Ledger,
 	script []byte,
+	arguments [][]byte,
 ) (*virtualmachine.ScriptResult, error) {
 	return nil, nil
 }

@@ -122,7 +122,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("synchronization could not process submitted event")
+			engine.LogError(e.log, err)
 		}
 	})
 }
@@ -455,7 +455,11 @@ CheckLoop:
 		case <-poll.C:
 			err := e.pollHeight()
 			if err != nil {
-				e.log.Error().Err(err).Msg("could not poll heights")
+				if network.IsPeerUnreachableError(err) {
+					e.log.Warn().Err(err).Msg("could not poll heights due to peer unreachable")
+				} else {
+					e.log.Error().Err(err).Msg("could not poll heights")
+				}
 				continue
 			}
 		case <-scan.C:

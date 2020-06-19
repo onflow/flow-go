@@ -9,15 +9,14 @@ require (
 	github.com/dgraph-io/badger/v2 v2.0.2
 	github.com/docker/docker v1.4.2-0.20190513124817-8c8457b0f2f8
 	github.com/docker/go-connections v0.4.0
-	github.com/ethereum/go-ethereum v1.9.9
-	github.com/onflow/cadence v0.4.0
+	github.com/onflow/cadence v0.4.1-0.20200604200650-30a200f9c324
 	github.com/onflow/flow-go-sdk v0.4.0
 	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200609190303-17d262f35b48
 	github.com/rs/zerolog v1.15.0
 	github.com/stretchr/testify v1.5.1
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	google.golang.org/grpc v1.28.0
-	gopkg.in/yaml.v2 v2.2.4
+	gopkg.in/yaml.v2 v2.2.5
 )
 
 replace github.com/dapperlabs/flow-go => ../

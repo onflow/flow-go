@@ -11,9 +11,9 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// Follower recovers the hotstuff state for consensus follower nodes.
-// It reads the pending blocks from storage and pass them to the input Finalizer instance
-// to recover its state form the restart.
+// Follower recovers the HotStuff state for a follower instance.
+// It reads the pending blocks from storage and pass them to the input Finalizer
+// instance to recover its state from before the restart.
 func Follower(
 	log zerolog.Logger,
 	finalizer forks.Finalizer,

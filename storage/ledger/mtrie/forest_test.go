@@ -42,11 +42,11 @@ func TestTrieOperations(t *testing.T) {
 	require.NoError(t, err)
 
 	// Add trie
-	err = fStore.addTrie(updatedTrie)
+	err = fStore.AddTrie(updatedTrie)
 	require.NoError(t, err)
 
 	// Get trie
-	retnt, err := fStore.getTrie(updatedTrie.RootHash())
+	retnt, err := fStore.GetTrie(updatedTrie.RootHash())
 	require.NoError(t, err)
 	require.True(t, bytes.Equal(retnt.RootHash(), updatedTrie.RootHash()))
 	require.Equal(t, fStore.Size(), 2)
@@ -785,7 +785,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 	fStore, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
-	testTrie, err := fStore.getTrie(fStore.GetEmptyRootHash())
+	testTrie, err := fStore.GetTrie(fStore.GetEmptyRootHash())
 	require.NoError(t, err)
 	latestValueByKey := make(map[string][]byte) // map store
 

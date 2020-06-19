@@ -20,6 +20,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
+	"github.com/dapperlabs/flow-go/state"
 	clusterkv "github.com/dapperlabs/flow-go/state/cluster"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -156,7 +157,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+			engine.LogError(e.log, err)
 		}
 	})
 }
@@ -397,7 +398,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 		}
 	}
 	if err := merr.ErrorOrNil(); err != nil {
-		return fmt.Errorf("cannot validate block proposal (id=%x) with invalid transactions: %w", header.ID(), err)
+		return engine.NewInvalidInputErrorf("cannot validate block proposal (id=%x) with invalid transactions: %w", header.ID(), err)
 	}
 
 	// there are two possibilities if the proposal is neither already pending
@@ -492,7 +493,20 @@ func (e *Engine) processBlockProposal(proposal *messages.ClusterBlockProposal) e
 		Header:  proposal.Header,
 		Payload: proposal.Payload,
 	}
+
 	err := e.clusterState.Mutate().Extend(block)
+	// if the error is a known invalid extension of the cluster state, then
+	// the input is invalid
+	if state.IsInvalidExtensionError(err) {
+		return engine.NewInvalidInputErrorf("invalid extension of cluster state: %w", err)
+	}
+
+	// if the error is an known outdated extension of the cluster state, then
+	// the input is outdated
+	if state.IsOutdatedExtensionError(err) {
+		return engine.NewOutdatedInputErrorf("outdated extension of cluster state: %w", err)
+	}
+
 	if err != nil {
 		return fmt.Errorf("could not extend cluster state: %w", err)
 	}

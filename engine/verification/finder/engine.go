@@ -5,8 +5,10 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/verification"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
@@ -15,12 +17,13 @@ import (
 )
 
 type Engine struct {
-	unit          *engine.Unit
-	log           zerolog.Logger
-	me            module.Local
-	match         network.Engine
-	receipts      mempool.Receipts // used to keep the receipts as mempool
-	headerStorage storage.Headers  // used to check block existence before verifying
+	unit            *engine.Unit
+	log             zerolog.Logger
+	me              module.Local
+	match           network.Engine
+	receipts        mempool.PendingReceipts // used to keep the receipts as mempool
+	headerStorage   storage.Headers         // used to check block existence before verifying
+	processedResult mempool.Identifiers     // used to keep track of the processed results
 }
 
 func New(
@@ -28,16 +31,18 @@ func New(
 	net module.Network,
 	me module.Local,
 	match network.Engine,
-	receipts mempool.Receipts,
+	receipts mempool.PendingReceipts,
 	headerStorage storage.Headers,
+	processedResults mempool.Identifiers,
 ) (*Engine, error) {
 	e := &Engine{
-		unit:          engine.NewUnit(),
-		log:           log.With().Str("engine", "finder").Logger(),
-		me:            me,
-		match:         match,
-		headerStorage: headerStorage,
-		receipts:      receipts,
+		unit:            engine.NewUnit(),
+		log:             log.With().Str("engine", "finder").Logger(),
+		me:              me,
+		match:           match,
+		headerStorage:   headerStorage,
+		receipts:        receipts,
+		processedResult: processedResults,
 	}
 
 	_, err := net.Register(engine.ExecutionReceiptProvider, e)
@@ -69,7 +74,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+			engine.LogError(e.log, err)
 		}
 	})
 }
@@ -87,8 +92,8 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-// process receives and submits an event to the verifier engine for processing.
-// It returns an error so the verifier engine will not propagate an event unless
+// process receives and submits an event to the finder engine for processing.
+// It returns an error so the finder engine will not propagate an event unless
 // it is successfully processed by the engine.
 // The origin ID indicates the node which originally submitted the event to
 // the peer-to-peer network.
@@ -115,8 +120,18 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		Hex("result_id", logging.ID(resultID)).Logger()
 	log.Info().Msg("execution receipt arrived")
 
+	// checks if the result has already been handled
+	if e.processedResult.Has(resultID) {
+		log.Debug().Msg("drops handling already processed result")
+		return nil
+	}
+
 	// adds the execution receipt in the mempool
-	added := e.receipts.Add(receipt)
+	pr := &verification.PendingReceipt{
+		Receipt:  receipt,
+		OriginID: originID,
+	}
+	added := e.receipts.Add(pr)
 	if !added {
 		log.Debug().Msg("drops adding duplicate receipt")
 		return nil
@@ -124,5 +139,108 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 
 	log.Info().Msg("execution receipt successfully handled")
 
+	// checks receipt being processable
+	e.checkReceipts([]*verification.PendingReceipt{pr})
+
 	return nil
+}
+
+// To implement FinalizationConsumer
+func (e *Engine) OnBlockIncorporated(*model.Block) {
+
+}
+
+// OnFinalizedBlock is part of implementing FinalizationConsumer interface
+//
+// OnFinalizedBlock notifications are produced by the Finalization Logic whenever
+// a block has been finalized. They are emitted in the order the blocks are finalized.
+// Prerequisites:
+// Implementation must be concurrency safe; Non-blocking;
+// and must handle repetition of the same events (with some processing overhead).
+func (e *Engine) OnFinalizedBlock(block *model.Block) {
+	// TODO only receipts referencing block should be checked #4028
+	e.checkReceipts(e.receipts.All())
+}
+
+// To implement FinalizationConsumer
+func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {}
+
+// isProcessable returns true if the block for execution result is available in the storage
+// otherwise it returns false. In the current version, it checks solely against the block that
+// contains the collection guarantee.
+func (e *Engine) isProcessable(result *flow.ExecutionResult) bool {
+	// checks existence of block that result points to
+	_, err := e.headerStorage.ByBlockID(result.BlockID)
+	return err == nil
+}
+
+// processResult submits the result to the match engine.
+// originID is the identifier of the node that initially sends a receipt containing this result.
+func (e *Engine) processResult(originID flow.Identifier, result *flow.ExecutionResult) error {
+	resultID := result.ID()
+	if e.processedResult.Has(resultID) {
+		e.log.Debug().
+			Hex("result_id", logging.ID(resultID)).
+			Msg("result already processed")
+		return nil
+	}
+	err := e.match.Process(originID, result)
+	if err != nil {
+		return fmt.Errorf("submission error to match engine: %w", err)
+	}
+
+	return nil
+}
+
+// onResultProcessed is called whenever a result is processed completely and
+// is passed to the match engine. It marks the result as processed, and removes
+// all receipts with the same result from mempool.
+func (e *Engine) onResultProcessed(resultID flow.Identifier) {
+	log := e.log.With().
+		Hex("result_id", logging.ID(resultID)).
+		Logger()
+
+	// marks result as processed
+	added := e.processedResult.Add(resultID)
+	if added {
+		log.Debug().Msg("result marked as processed")
+	}
+
+	// drops all receipts with the same result
+	for _, pr := range e.receipts.All() {
+		if pr.Receipt.ExecutionResult.ID() == resultID {
+			receiptID := pr.Receipt.ID()
+			removed := e.receipts.Rem(receiptID)
+			if removed {
+				log.Debug().
+					Hex("receipt_id", logging.ID(receiptID)).
+					Msg("processed result cleaned up")
+			}
+		}
+	}
+}
+
+// checkReceipts receives a set of receipts and evaluates each of them
+// against being processable. If a receipt is processable, it gets processed.
+func (e *Engine) checkReceipts(receipts []*verification.PendingReceipt) {
+	e.unit.Lock()
+	defer e.unit.Unlock()
+
+	for _, pr := range receipts {
+		if e.isProcessable(&pr.Receipt.ExecutionResult) {
+			// checks if result is ready to process
+			err := e.processResult(pr.OriginID, &pr.Receipt.ExecutionResult)
+			if err != nil {
+				e.log.Error().
+					Err(err).
+					Hex("receipt_id", logging.Entity(pr)).
+					Hex("result_id", logging.Entity(pr.Receipt.ExecutionResult)).
+					Msg("could not process result")
+				continue
+			}
+
+			// performs clean up
+			e.onResultProcessed(pr.Receipt.ExecutionResult.ID())
+		}
+	}
 }

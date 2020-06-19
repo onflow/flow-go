@@ -49,7 +49,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 	stateCommitment := led.EmptyStateCommitment()
 	for i := 0; i < steps; i++ {
 		keys := utils.GetRandomKeysFixedN(numInsPerStep, keyByteSize)
-		values := utils.GetRandomValues(len(keys), valueMaxByteSize)
+		values := utils.GetRandomValues(len(keys), 0, valueMaxByteSize)
 		totalRegOperation += len(keys)
 
 		start := time.Now()

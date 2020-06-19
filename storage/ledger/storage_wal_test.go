@@ -34,7 +34,7 @@ func Test_WAL(t *testing.T) {
 
 		for i := 0; i < size; i++ {
 			keys := utils.GetRandomKeysFixedN(numInsPerStep, keyByteSize)
-			values := utils.GetRandomValues(len(keys), valueMaxByteSize)
+			values := utils.GetRandomValues(len(keys), 0, valueMaxByteSize)
 
 			stateCommitment, err = f.UpdateRegisters(keys, values, stateCommitment)
 			require.NoError(t, err)

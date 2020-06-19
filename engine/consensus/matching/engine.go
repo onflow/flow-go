@@ -24,8 +24,8 @@ var (
 	errUnknownPrevious = errors.New("previous result unknown")
 )
 
-// Engine is the propagation engine, which makes sure that new collections are
-// propagated to the other consensus nodes on the network.
+// Engine is the matching engine, which matches execution receipts with result
+// approvals to create block seals.
 type Engine struct {
 	unit      *engine.Unit             // used to control startup/shutdown
 	log       zerolog.Logger           // used to log relevant actions with context
@@ -34,6 +34,7 @@ type Engine struct {
 	state     protocol.State           // used to access the  protocol state
 	me        module.Local             // used to access local node information
 	resultsDB storage.ExecutionResults // used to permanently store results
+	sealsDB   storage.Seals            // used to check existing seals
 	headersDB storage.Headers          // used to check sealed headers
 	results   mempool.Results          // holds execution results in memory
 	receipts  mempool.Receipts         // holds execution receipts in memory
@@ -43,7 +44,7 @@ type Engine struct {
 }
 
 // New creates a new collection propagation engine.
-func New(log zerolog.Logger, collector module.EngineMetrics, mempool module.MempoolMetrics, net module.Network, state protocol.State, me module.Local, resultsDB storage.ExecutionResults, headersDB storage.Headers, results mempool.Results, receipts mempool.Receipts, approvals mempool.Approvals, seals mempool.Seals) (*Engine, error) {
+func New(log zerolog.Logger, collector module.EngineMetrics, mempool module.MempoolMetrics, net module.Network, state protocol.State, me module.Local, resultsDB storage.ExecutionResults, sealsDB storage.Seals, headersDB storage.Headers, results mempool.Results, receipts mempool.Receipts, approvals mempool.Approvals, seals mempool.Seals) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
@@ -54,6 +55,7 @@ func New(log zerolog.Logger, collector module.EngineMetrics, mempool module.Memp
 		state:     state,
 		me:        me,
 		resultsDB: resultsDB,
+		sealsDB:   sealsDB,
 		headersDB: headersDB,
 		results:   results,
 		receipts:  receipts,
@@ -108,7 +110,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+			engine.LogError(e.log, err)
 		}
 	})
 }
@@ -160,27 +162,32 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 	// check the execution receipt is sent by its executor
 	if receipt.ExecutorID != originID {
-		return fmt.Errorf("invalid origin for receipt (executor: %x, origin: %x)", receipt.ExecutorID, originID)
+		return engine.NewInvalidInputErrorf("invalid origin for receipt (executor: %x, origin: %x)", receipt.ExecutorID, originID)
 	}
 
 	// get the identity of the origin node, so we can check if it's a valid
 	// source for a execution receipt (usually execution nodes)
 	identity, err := e.state.Final().Identity(originID)
 	if err != nil {
+		if protocol.IsIdentityNotFound(err) {
+			return engine.NewInvalidInputErrorf("could not get executor identity: %w", err)
+		}
+
+		// unknown exception
 		return fmt.Errorf("could not get executor identity: %w", err)
 	}
 
 	// check that the origin is an execution node
 	if identity.Role != flow.RoleExecution {
-		return fmt.Errorf("invalid executor node role (%s)", identity.Role)
+		return engine.NewInvalidInputErrorf("invalid executor node role (%s)", identity.Role)
 	}
 
 	// check if the identity has a stake
 	if identity.Stake == 0 {
-		return fmt.Errorf("executor has zero stake (%x)", identity.NodeID)
+		return engine.NewInvalidInputErrorf("executor has zero stake (%x)", identity.NodeID)
 	}
 
-	// check if the result of this receipt is already in the dB
+	// check if the result of this receipt is already in the DB
 	result := &receipt.ExecutionResult
 	_, err = e.resultsDB.ByID(result.ID())
 	if err == nil {
@@ -231,24 +238,29 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 
 	// check approver matches the origin ID
 	if approval.Body.ApproverID != originID {
-		return fmt.Errorf("invalid origin for approval: %x", originID)
+		return engine.NewInvalidInputErrorf("invalid origin for approval: %x", originID)
 	}
 
 	// get the identity of the origin node, so we can check if it's a valid
 	// source for a result approval (usually verification node)
 	identity, err := e.state.Final().Identity(originID)
 	if err != nil {
-		return fmt.Errorf("could not get approval identity: %w", err)
+		if protocol.IsIdentityNotFound(err) {
+			return engine.NewInvalidInputErrorf("could not get approval identity: %w", err)
+		}
+
+		// unknown exception
+		return fmt.Errorf("could not get executor identity: %w", err)
 	}
 
 	// check that the origin is a verification node
 	if identity.Role != flow.RoleVerification {
-		return fmt.Errorf("invalid approver node role (%s)", identity.Role)
+		return engine.NewInvalidInputErrorf("invalid approver node role (%s)", identity.Role)
 	}
 
 	// check if the identity has a stake
 	if identity.Stake == 0 {
-		return fmt.Errorf("verifier has zero stake (%x)", identity.NodeID)
+		return engine.NewInvalidInputErrorf("verifier has zero stake (%x)", identity.NodeID)
 	}
 
 	// check if the result of this approval is already in the dB
@@ -345,6 +357,43 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 	}
 	threshold := verifiers.TotalStake() / 3 * 2
 
+	// check for stored execution results that don't have a corresponding seal
+	sealed, err := e.state.Sealed().Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get sealed height: %w", err)
+	}
+	final, err := e.state.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get finalized height: %w", err)
+	}
+
+	for height := sealed.Height; height < final.Height; height++ {
+
+		// stop searching if we would overflow the seal mempool
+		if e.seals.Size()+uint(len(results)) >= e.seals.Limit() {
+			break
+		}
+
+		// get the block header at this height
+		header, err := e.headersDB.ByHeight(height)
+		if err != nil {
+			// should never happen
+			return nil, fmt.Errorf("could not get header (height=%d): %w", height, err)
+		}
+
+		// get the execution result for the block at this height
+		result, err := e.resultsDB.ByBlockID(header.ID())
+		if err != nil {
+			e.log.Error().
+				Err(err).
+				Uint64("block_height", height).
+				Hex("block_id", logging.ID(header.ID())).
+				Msg("could not get execution result")
+			continue
+		}
+		results = append(results, result)
+	}
+
 	// get all available approvals once
 	approvals := e.approvals.All()
 
@@ -408,8 +457,12 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 
 	// store the result to make it persistent for later checks
 	err = e.resultsDB.Store(result)
-	if err != nil {
+	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 		return fmt.Errorf("could not store sealing result: %w", err)
+	}
+	err = e.resultsDB.Index(result.BlockID, result.ID())
+	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+		return fmt.Errorf("could not index sealing result: %w", err)
 	}
 
 	// generate & store seal
@@ -419,10 +472,16 @@ func (e *Engine) sealResult(result *flow.ExecutionResult) error {
 		InitialState: previous.FinalStateCommit,
 		FinalState:   result.FinalStateCommit,
 	}
-	added := e.seals.Add(seal)
-	if !added {
-		return fmt.Errorf("could not add seal to mempool")
+
+	// don't add the seal if it's already been included in a proposal
+	sealID := seal.ID()
+	_, err = e.sealsDB.ByID(sealID)
+	if err == nil {
+		return nil
 	}
+
+	// we don't care whether the seal is already in the mempool
+	_ = e.seals.Add(seal)
 
 	return nil
 }

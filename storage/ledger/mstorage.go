@@ -6,6 +6,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
@@ -27,51 +29,64 @@ import (
 // for archival use but make it possible for other software components to reconstruct very old tries using write-ahead logs.
 type MTrieStorage struct {
 	mForest *mtrie.MForest
-	wal     *wal.WAL
+	wal     *wal.LedgerWAL
 	metrics module.LedgerMetrics
 }
 
-// NewMTrieStorage creates a new in-memory trie-backed ledger storage with persistence.
-func NewMTrieStorage(dbDir string, cacheSize int, metrics module.LedgerMetrics, reg prometheus.Registerer) (*MTrieStorage, error) {
+var maxHeight = 257
 
-	w, err := wal.NewWAL(nil, reg, dbDir)
+// NewMTrieStorage creates a new in-memory trie-backed ledger storage with persistence.
+func NewMTrieStorage(dbDir string, capacity int, metrics module.LedgerMetrics, reg prometheus.Registerer) (*MTrieStorage, error) {
+
+	w, err := wal.NewWAL(nil, reg, dbDir, capacity, maxHeight)
 
 	if err != nil {
-		return nil, fmt.Errorf("cannot create WAL: %w", err)
+		return nil, fmt.Errorf("cannot create LedgerWAL: %w", err)
 	}
 
-	mForest, err := mtrie.NewMForest(257, dbDir, cacheSize, metrics, func(evictedTrie *trie.MTrie) error {
+	mForest, err := mtrie.NewMForest(maxHeight, dbDir, capacity, metrics, func(evictedTrie *trie.MTrie) error {
 		return w.RecordDelete(evictedTrie.RootHash())
 	})
 	if err != nil {
 		return nil, fmt.Errorf("cannot create MForest: %w", err)
 	}
-	trie := &MTrieStorage{
+	storage := &MTrieStorage{
 		mForest: mForest,
 		wal:     w,
 		metrics: metrics,
 	}
 
 	err = w.Replay(
+		func(forestSequencing *flattener.FlattenedForest) error {
+			rebuiltTries, err := flattener.RebuildTries(forestSequencing)
+			if err != nil {
+				return fmt.Errorf("rebuilding forest from sequenced nodes failed: %w", err)
+			}
+			err = storage.mForest.AddTries(rebuiltTries)
+			if err != nil {
+				return fmt.Errorf("adding rebuilt tries to forest failed: %w", err)
+			}
+			return nil
+		},
 		func(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
-			_, err = trie.mForest.Update(stateCommitment, keys, values)
+			_, err = storage.mForest.Update(stateCommitment, keys, values)
 			// _, err := trie.UpdateRegisters(keys, values, stateCommitment)
 			return err
 		},
 		func(stateCommitment flow.StateCommitment) error {
-			trie.mForest.RemoveTrie(stateCommitment)
+			storage.mForest.RemoveTrie(stateCommitment)
 			return nil
 		},
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("cannot restore WAL: %w", err)
+		return nil, fmt.Errorf("cannot restore LedgerWAL: %w", err)
 	}
 
 	// TODO update to proper value once https://github.com/dapperlabs/flow-go/pull/3720 is merged
 	metrics.ForestApproxMemorySize(0)
 
-	return trie, nil
+	return storage, nil
 }
 
 // Ready implements interface module.ReadyDoneAware
@@ -150,7 +165,7 @@ func (f *MTrieStorage) UpdateRegisters(
 
 	err = f.wal.RecordUpdate(stateCommitment, ids, values)
 	if err != nil {
-		return nil, fmt.Errorf("cannot update state, error while writing WAL: %w", err)
+		return nil, fmt.Errorf("cannot update state, error while writing LedgerWAL: %w", err)
 	}
 
 	newTrie, err := f.mForest.Update(stateCommitment, ids, values)
@@ -188,13 +203,13 @@ func (f *MTrieStorage) GetRegistersWithProof(
 
 	// values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Could not get register values: %w", err)
+		return nil, nil, fmt.Errorf("could not get register values: %w", err)
 	}
 
 	batchProof, err := f.mForest.Proofs(stateCommitment, registerIDs)
 	// batchProof, err := f.tree.GetBatchProof(registerIDs, stateCommitment)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Could not get proofs: %w", err)
+		return nil, nil, fmt.Errorf("could not get proofs: %w", err)
 	}
 
 	proofToGo, totalProofLength := proof.EncodeBatchProof(batchProof)
@@ -264,4 +279,12 @@ func (f *MTrieStorage) DiskSize() (int64, error) {
 // ForestSize returns the number of tries stored in the forest
 func (f *MTrieStorage) ForestSize() int {
 	return f.mForest.Size()
+}
+
+func (f *MTrieStorage) Checkpointer() (*wal.Checkpointer, error) {
+	checkpointer, err := f.wal.NewCheckpointer()
+	if err != nil {
+		return nil, fmt.Errorf("cannot create checkpointer for compactor: %w", err)
+	}
+	return checkpointer, nil
 }

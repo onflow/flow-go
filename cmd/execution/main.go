@@ -25,12 +25,13 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/ledger"
+	"github.com/dapperlabs/flow-go/storage/ledger/wal"
 )
 
 func main() {
 
 	var (
-		ledgerStorage      storage.Ledger
+		ledgerStorage      *ledger.MTrieStorage
 		events             storage.Events
 		txResults          storage.TransactionResults
 		providerEngine     *provider.Engine
@@ -78,7 +79,6 @@ func main() {
 		// Trie storage is required to bootstrap, but also should be handled while shutting down
 		Module("ledger storage", func(node *cmd.FlowNodeBuilder) error {
 			ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), collector, node.MetricsRegisterer)
-
 			return err
 		}).
 		GenesisHandler(func(node *cmd.FlowNodeBuilder, block *flow.Block) {
@@ -102,6 +102,16 @@ func main() {
 		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			return ledgerStorage, nil
+		}).
+		Component("execution state ledger WAL compactor", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+
+			checkpointer, err := ledgerStorage.Checkpointer()
+			if err != nil {
+				return nil, fmt.Errorf("cannot create checkpointer: %w", err)
+			}
+			compactor := wal.NewCompactor(checkpointer, 10*time.Second)
+
+			return compactor, nil
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			chunkDataPacks := badger.NewChunkDataPacks(node.DB)

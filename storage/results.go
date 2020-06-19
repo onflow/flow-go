@@ -8,15 +8,15 @@ import (
 
 type ExecutionResults interface {
 
-	// Store will store an execution result.
+	// Store stores an execution result.
 	Store(result *flow.ExecutionResult) error
 
-	// ByID will retrieve an execution result by its ID.
+	// ByID retrieves an execution result by its ID.
 	ByID(resultID flow.Identifier) (*flow.ExecutionResult, error)
 
-	// Index result ID by a blockID
+	// Index indexes an execution result by block ID.
 	Index(blockID flow.Identifier, resultID flow.Identifier) error
 
-	// Lookup execution result by block ID
-	Lookup(blockID flow.Identifier) (flow.Identifier, error)
+	// ByBlockID retrieves an execution result by block ID.
+	ByBlockID(blockID flow.Identifier) (*flow.ExecutionResult, error)
 }

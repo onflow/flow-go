@@ -117,7 +117,7 @@ func (h *handler) ExecuteScriptAtBlockID(
 ) (*execution.ExecuteScriptAtBlockIDResponse, error) {
 	blockID := flow.HashToID(req.GetBlockId())
 
-	value, err := h.engine.ExecuteScriptAtBlockID(ctx, req.Script, blockID)
+	value, err := h.engine.ExecuteScriptAtBlockID(ctx, req.GetScript(), req.GetArguments(), blockID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to execute script: %v", err)
 	}

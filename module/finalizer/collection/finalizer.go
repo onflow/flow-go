@@ -1,7 +1,6 @@
 package collection
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
@@ -12,7 +11,6 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
@@ -166,25 +164,12 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	})
 }
 
-// MakePending indexes a block by its parent. The index is useful for looking up the child block
-// of a finalized block.
-func (f *Finalizer) MakePending(blockID flow.Identifier) error {
-
-	// retrieve the header to get the parent
-	var header flow.Header
-	err := f.db.View(operation.RetrieveHeader(blockID, &header))
-	if err != nil {
-		return fmt.Errorf("could not retrieve header: %w", err)
-	}
-
-	// insert the child index into the DB
-	err = operation.RetryOnConflict(f.db.Update, operation.SkipDuplicates(procedure.IndexBlockChild(header.ParentID, blockID)))
-	if errors.Is(err, storage.ErrAlreadyExists) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("could not index block child: %w", err)
-	}
-
-	return nil
+// MakeValid marks a block as having passed HotStuff validation.
+func (f *Finalizer) MakeValid(blockID flow.Identifier) error {
+	return operation.RetryOnConflict(
+		f.db.Update,
+		operation.SkipDuplicates(
+			operation.InsertBlockValidity(blockID, true),
+		),
+	)
 }
