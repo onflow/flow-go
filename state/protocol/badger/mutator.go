@@ -140,7 +140,7 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 		if err != nil {
 			return fmt.Errorf("could not insert started view: %w", err)
 		}
-		err = operation.InsertGenesisHeight(genesis.Header.Height)(tx)
+		err = operation.InsertRootHeight(genesis.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis height: %w", err)
 		}
@@ -236,7 +236,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	// look up the root height so we don't look too far back
 	// initially this is the genesis block height (aka 0).
 	var rootHeight uint64
-	err = m.state.db.View(operation.RetrieveGenesisHeight(&rootHeight))
+	err = m.state.db.View(operation.RetrieveRootHeight(&rootHeight))
 	if err != nil {
 		return fmt.Errorf("could not retrieve root block height: %w", err)
 	}

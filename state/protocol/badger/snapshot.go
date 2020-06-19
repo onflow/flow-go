@@ -33,20 +33,20 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 
 	// retrieve the genesis height
 	var height uint64
-	err := s.state.db.View(operation.RetrieveGenesisHeight(&height))
+	err := s.state.db.View(operation.RetrieveRootHeight(&height))
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve genesis height: %w", err)
 	}
 
 	// retrieve genesis block ID
-	var genesisID flow.Identifier
-	err = s.state.db.View(operation.LookupBlockHeight(height, &genesisID))
+	var rootID flow.Identifier
+	err = s.state.db.View(operation.LookupBlockHeight(height, &rootID))
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve genesis height: %w", err)
 	}
 
 	// retrieve identities from storage
-	payload, err := s.state.payloads.ByBlockID(genesisID)
+	payload, err := s.state.payloads.ByBlockID(rootID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get identities for block: %w", err)
 	}

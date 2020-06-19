@@ -116,7 +116,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// look up the root height so we don't look too far back
 	// initially this is the genesis block height (aka 0).
 	var rootHeight uint64
-	err = b.db.View(operation.RetrieveGenesisHeight(&rootHeight))
+	err = b.db.View(operation.RetrieveRootHeight(&rootHeight))
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve root block height: %w", err)
 	}
