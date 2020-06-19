@@ -4,19 +4,19 @@ about: A template for standard issues.
 
 ---
 
-# Problem Definition
+## Problem Definition
 
 What problem is this solving?
 
-# Proposed Solution
+## Proposed Solution
 
 What are the proposed solutions to solve?
 
-# Definition of done
+## Definition of done
 
 What tests must pass for this issue to be addressed?
 
-# Actions Needed Before Submitting
+## Actions Needed Before Submitting
 
 Update ticket status using the following (remove this section once ticket created)
 
