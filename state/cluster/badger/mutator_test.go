@@ -228,11 +228,18 @@ func (suite *MutatorSuite) TestExtend_Success() {
 	err := suite.mutator.Extend(&block)
 	suite.Assert().Nil(err)
 
+	// should be able to retrieve the block
 	var extended model.Block
 	err = suite.db.View(procedure.RetrieveClusterBlock(block.ID(), &extended))
 	suite.Assert().Nil(err)
-
 	suite.Assert().Equal(*block.Payload, *extended.Payload)
+
+	// the block should be indexed by its parent
+	var childIDs []flow.Identifier
+	err = suite.db.View(procedure.LookupBlockChildren(suite.genesis.ID(), &childIDs))
+	suite.Assert().Nil(err)
+	suite.Require().Len(childIDs, 1)
+	suite.Assert().Equal(block.ID(), childIDs[0])
 }
 
 func (suite *MutatorSuite) TestExtend_WithEmptyCollection() {

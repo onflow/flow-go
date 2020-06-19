@@ -26,8 +26,8 @@ func (_m *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	return r0
 }
 
-// MakePending provides a mock function with given fields: blockID
-func (_m *Finalizer) MakePending(blockID flow.Identifier) error {
+// MakeValid provides a mock function with given fields: blockID
+func (_m *Finalizer) MakeValid(blockID flow.Identifier) error {
 	ret := _m.Called(blockID)
 
 	var r0 error

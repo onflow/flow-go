@@ -80,7 +80,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+			engine.LogError(e.log, err)
 		}
 	})
 }
@@ -214,8 +214,12 @@ func (e *Engine) isProcessable(result *flow.ExecutionResult) bool {
 // processResult submits the result to the match engine.
 // originID is the identifier of the node that initially sends a receipt containing this result.
 func (e *Engine) processResult(originID flow.Identifier, result *flow.ExecutionResult) error {
-	if e.processedResult.Has(result.ID()) {
-		return fmt.Errorf("result already processed")
+	resultID := result.ID()
+	if e.processedResult.Has(resultID) {
+		e.log.Debug().
+			Hex("result_id", logging.ID(resultID)).
+			Msg("result already processed")
+		return nil
 	}
 	err := e.match.Process(originID, result)
 	if err != nil {

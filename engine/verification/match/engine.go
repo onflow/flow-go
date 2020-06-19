@@ -1,6 +1,7 @@
 package match
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"time"
@@ -104,11 +105,8 @@ func (e *Engine) SubmitLocal(event interface{}) {
 func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
-
-		if engine.IsInvalidInputError(err) {
-			e.log.Error().Str("error_type", "invalid_input").Err(err).Msg("match received invalid input")
-		} else if err != nil {
-			e.log.Error().Err(err).Msg("match could not process submitted event with exception")
+		if err != nil {
+			engine.LogError(e.log, err)
 		}
 	})
 }
@@ -341,9 +339,11 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	// check origin is from a execution node
 	// TODO check the origin is a node that we requested before
 	sender, err := e.state.Final().Identity(originID)
-	if err == storage.ErrNotFound {
+	if errors.Is(err, storage.ErrNotFound) {
 		return engine.NewInvalidInputErrorf("origin is unstaked: %v", originID)
-	} else if err != nil {
+	}
+
+	if err != nil {
 		return fmt.Errorf("could not find identity for chunkID %v: %w", chunkID, err)
 	}
 
