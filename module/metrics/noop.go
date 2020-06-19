@@ -74,8 +74,10 @@ func (nc *NoopCollector) ExecutionLastExecutedBlockView(view uint64)            
 func (ec *NoopCollector) ExecutionTotalExecutedTransactions(numberOfTx int)         {}
 func (nc *NoopCollector) ForestApproxMemorySize(bytes uint64)                       {}
 func (nc *NoopCollector) ForestNumberOfTrees(number uint64)                         {}
-func (nc *NoopCollector) ForestNumberOfAllocatedRegisters(number uint64)            {}
-func (nc *NoopCollector) ForestMaxDepth(number uint64)                              {}
+func (nc *NoopCollector) LatestTrieRegCount(number uint64)                          {}
+func (nc *NoopCollector) LatestTrieRegCountDiff(number uint64)                      {}
+func (nc *NoopCollector) LatestTrieMaxDepth(number uint64)                          {}
+func (nc *NoopCollector) LatestTrieMaxDepthDiff(number uint64)                      {}
 func (nc *NoopCollector) UpdateCount()                                              {}
 func (nc *NoopCollector) ProofSize(bytes uint32)                                    {}
 func (nc *NoopCollector) UpdateValuesNumber(number uint64)                          {}
