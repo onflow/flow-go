@@ -29,24 +29,21 @@ type metricsCollector struct {
 }
 
 func (m metricsCollector) ProgramParsed(location ast.Location, duration time.Duration) {
-	if m.MetricsCollector == nil {
-		return
+	if m.MetricsCollector != nil {
+		m.parsed += duration
 	}
-	m.parsed += duration
 }
 
 func (m metricsCollector) ProgramChecked(location ast.Location, duration time.Duration) {
-	if m.MetricsCollector == nil {
-		return
+	if m.MetricsCollector != nil {
+		m.checked += duration
 	}
-	m.checked += duration
 }
 
 func (m metricsCollector) ProgramInterpreted(location ast.Location, duration time.Duration) {
-	if m.MetricsCollector == nil {
-		return
+	if m.MetricsCollector != nil {
+		m.interpreted += duration
 	}
-	m.interpreted += duration
 }
 
 func (m metricsCollector) ValueEncoded(duration time.Duration) {}
