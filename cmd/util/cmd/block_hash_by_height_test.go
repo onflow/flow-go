@@ -19,87 +19,87 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestAllowUnfinalizedUnsealed(t *testing.T) {
-	datadir, err := tempDBDir()
-	require.NoError(t, err)
-
-	db := initStorage(datadir)
+func TestBlockHashByHeight(t *testing.T) {
 	metr := metrics.NewCacheCollector(flow.GetChainID())
-	headers := bstorage.NewHeaders(metr, db)
 
-	h := unittest.BlockHeaderFixture()
-	storeAndIndexHeader(t, db, headers, &h)
+	t.Run("AllowUnfinalizedUnsealed", func(t *testing.T) {
+		datadir, err := tempDBDir()
+		require.NoError(t, err)
+		db := initStorage(datadir)
+		headers := bstorage.NewHeaders(metr, db)
 
-	err = db.Close()
-	require.NoError(t, err)
+		h := unittest.BlockHeaderFixture()
+		storeAndIndexHeader(t, db, headers, &h)
 
-	// execute command
-	cmd := exec.Command("go", "run", "-tags", "relic", utilPath(t), "block-hash-by-height", "--height", fmt.Sprint(h.Height), "--datadir", datadir, "--allow-unfinalized", "--allow-unsealed")
+		err = db.Close()
+		require.NoError(t, err)
 
-	// capture the subprocess stdout and stderr
-	out, err := cmd.CombinedOutput()
+		// execute command
+		cmd := exec.Command("go", "run", "-tags", "relic", utilPath(t), "block-hash-by-height", "--height", fmt.Sprint(h.Height), "--datadir", datadir, "--allow-unfinalized", "--allow-unsealed")
 
-	// check that the process did not fail
-	assert.NoError(t, err)
-	assert.Equal(t, fmt.Sprintf("%v\n", h.ID()), string(out))
-}
+		// capture the subprocess stdout and stderr
+		out, err := cmd.CombinedOutput()
 
-func TestRequireFinalizedAllowUnsealed(t *testing.T) {
-	datadir, err := tempDBDir()
-	require.NoError(t, err)
+		// check that the process did not fail
+		assert.NoError(t, err)
+		assert.Equal(t, fmt.Sprintf("%v\n", h.ID()), string(out))
+	})
 
-	db := initStorage(datadir)
-	metr := metrics.NewCacheCollector(flow.GetChainID())
-	headers := bstorage.NewHeaders(metr, db)
+	t.Run("RequireFinalizedAllowUnsealed", func(t *testing.T) {
+		datadir, err := tempDBDir()
+		require.NoError(t, err)
 
-	h1 := unittest.BlockHeaderFixture()
-	storeAndIndexHeader(t, db, headers, &h1)
-	h2 := unittest.BlockHeaderWithParentFixture(&h1)
-	storeAndIndexHeader(t, db, headers, &h2)
-	h3 := unittest.BlockHeaderWithParentFixture(&h2)
-	storeAndIndexHeader(t, db, headers, &h3)
-	h4 := unittest.BlockHeaderWithParentFixture(&h3)
-	storeAndIndexHeader(t, db, headers, &h4)
+		db := initStorage(datadir)
+		headers := bstorage.NewHeaders(metr, db)
 
-	err = db.Close()
-	require.NoError(t, err)
+		h1 := unittest.BlockHeaderFixture()
+		storeAndIndexHeader(t, db, headers, &h1)
+		h2 := unittest.BlockHeaderWithParentFixture(&h1)
+		storeAndIndexHeader(t, db, headers, &h2)
+		h3 := unittest.BlockHeaderWithParentFixture(&h2)
+		storeAndIndexHeader(t, db, headers, &h3)
+		h4 := unittest.BlockHeaderWithParentFixture(&h3)
+		storeAndIndexHeader(t, db, headers, &h4)
 
-	// execute command
-	cmd := exec.Command("go", "run", "-tags", "relic", utilPath(t), "block-hash-by-height", "--height", fmt.Sprint(h1.Height), "--datadir", datadir, "--allow-unsealed")
+		err = db.Close()
+		require.NoError(t, err)
 
-	// capture the subprocess stdout and stderr
-	out, err := cmd.CombinedOutput()
+		// execute command
+		cmd := exec.Command("go", "run", "-tags", "relic", utilPath(t), "block-hash-by-height", "--height", fmt.Sprint(h1.Height), "--datadir", datadir, "--allow-unsealed")
 
-	// check that the process did not fail
-	assert.NoError(t, err)
-	assert.Equal(t, fmt.Sprintf("%v\n", h1.ID()), string(out))
-}
+		// capture the subprocess stdout and stderr
+		out, err := cmd.CombinedOutput()
 
-func TestAllowUnfinalizedRequireSealed(t *testing.T) {
-	datadir, err := tempDBDir()
-	require.NoError(t, err)
+		// check that the process did not fail
+		assert.NoError(t, err)
+		assert.Equal(t, fmt.Sprintf("%v\n", h1.ID()), string(out))
+	})
 
-	db := initStorage(datadir)
-	metr := metrics.NewCacheCollector(flow.GetChainID())
-	headers := bstorage.NewHeaders(metr, db)
-	seals := bstorage.NewSeals(metr, db)
+	t.Run("AllowUnfinalizedRequireSealed", func(t *testing.T) {
+		datadir, err := tempDBDir()
+		require.NoError(t, err)
 
-	h := unittest.BlockHeaderFixture()
-	storeAndIndexHeader(t, db, headers, &h)
-	storeAndIndexSealFor(t, db, seals, &h)
+		db := initStorage(datadir)
+		headers := bstorage.NewHeaders(metr, db)
+		seals := bstorage.NewSeals(metr, db)
 
-	err = db.Close()
-	require.NoError(t, err)
+		h := unittest.BlockHeaderFixture()
+		storeAndIndexHeader(t, db, headers, &h)
+		storeAndIndexSealFor(t, db, seals, &h)
 
-	// execute command
-	cmd := exec.Command("go", "run", "-tags", "relic", utilPath(t), "block-hash-by-height", "--height", fmt.Sprint(h.Height), "--datadir", datadir, "--allow-unfinalized")
+		err = db.Close()
+		require.NoError(t, err)
 
-	// capture the subprocess stdout and stderr
-	out, err := cmd.CombinedOutput()
+		// execute command
+		cmd := exec.Command("go", "run", "-tags", "relic", utilPath(t), "block-hash-by-height", "--height", fmt.Sprint(h.Height), "--datadir", datadir, "--allow-unfinalized")
 
-	// check that the process did not fail
-	assert.NoError(t, err)
-	assert.Equal(t, fmt.Sprintf("%v\n", h.ID()), string(out))
+		// capture the subprocess stdout and stderr
+		out, err := cmd.CombinedOutput()
+
+		// check that the process did not fail
+		assert.NoError(t, err)
+		assert.Equal(t, fmt.Sprintf("%v\n", h.ID()), string(out))
+	})
 }
 
 func tempDBDir() (string, error) {
