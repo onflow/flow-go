@@ -131,7 +131,6 @@ func TestLeftEmptyInsert(t *testing.T) {
 	require.Equal(t, updatedTrie.MaxDepth(), uint16(2))
 	require.Equal(t, updatedTrie.AllocatedRegCount(), uint64(3))
 	// expected updated Trie:
-	// TODO: update Trie representation
 	// 16: ([],)[]
 	// 		15: ([1 1],43)[0]
 	// 		15: ([],)[1]
@@ -139,7 +138,6 @@ func TestLeftEmptyInsert(t *testing.T) {
 	// 			14: ([193 1],42)[11]
 	fmt.Println("UPDATED TRIE:")
 	fmt.Println(updatedTrie.String())
-
 	keys = [][]byte{k1, k2, k3}
 	values = [][]byte{v1, v2, v3}
 	retValues, err := fStore.Read(updatedTrie.RootHash(), keys)
@@ -182,7 +180,6 @@ func TestRightEmptyInsert(t *testing.T) {
 	require.Equal(t, baseTrie.MaxDepth(), uint16(2))
 	require.Equal(t, baseTrie.AllocatedRegCount(), uint64(2))
 	// resulting base trie:
-	// TODO: update Trie representation
 	// 16: ([],)[]
 	// 		15: ([],)[0]
 	// 			14: ([ 1 1],41)[00]
@@ -246,10 +243,11 @@ func TestExpansionInsert(t *testing.T) {
 	values := [][]byte{v1}
 	baseTrie, err := fStore.Update(fStore.GetEmptyRootHash(), keys, values)
 	require.NoError(t, err)
-	require.Equal(t, baseTrie.MaxDepth(), uint16(0))
+	require.Equal(t, baseTrie.MaxDepth(), uint16(1))
 	require.Equal(t, baseTrie.AllocatedRegCount(), uint64(1))
 	// resulting base trie:
-	// 16: ([129 1],41)[]
+	// 16: ([] )[]
+	//	  15: ([129 1], 41)[1]
 	fmt.Println("BASE TRIE:")
 	fmt.Println(baseTrie.String())
 
@@ -320,10 +318,10 @@ func TestFullHouseInsert(t *testing.T) {
 	baseTrie, err := fStore.Update(fStore.GetEmptyRootHash(), keys, values)
 	require.NoError(t, err)
 	require.Equal(t, baseTrie.MaxDepth(), uint16(2))
-	require.Equal(t, baseTrie.AllocatedRegCount(), uint64(2))
+	require.Equal(t, baseTrie.AllocatedRegCount(), uint64(3))
 	// expected trie:
-	// TODO: update Trie representation
 	// 16: ([],)[]
+	//      15: ([64 1],30)[0]
 	// 		15: ([],)[1]
 	// 			14: ([129 1],41)[10]
 	// 			14: ([193 1],42)[11]
@@ -339,17 +337,18 @@ func TestFullHouseInsert(t *testing.T) {
 	updatedTrie, err := fStore.Update(baseTrie.RootHash(), keys, values)
 	require.NoError(t, err)
 	require.Equal(t, updatedTrie.MaxDepth(), uint16(3))
-	require.Equal(t, updatedTrie.AllocatedRegCount(), uint64(3))
+	require.Equal(t, updatedTrie.AllocatedRegCount(), uint64(4))
 	// expected trie:
 	// TODO: update Trie representation
 	// 16: ([],)[]
+	//      15: ([64 1],30)[0]
 	// 		15: ([],)[1]
 	// 			14: ([],)[10]
 	// 				13: ([129 1],41)[100]
 	// 				13: ([160 1],43)[101]
 	// 			14: ([193 1],42)[11]
 	fmt.Println("UPDATED TRIE:")
-	fmt.Println(baseTrie.String())
+	fmt.Println(updatedTrie.String())
 
 	keys = [][]byte{k1, k2, k3}
 	values = [][]byte{v1, v2, v3}
