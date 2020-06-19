@@ -8,6 +8,7 @@ import (
 	"github.com/jedib0t/go-pretty/table"
 )
 
+// StatsConfig captures configuration details of an experiment
 type StatsConfig struct {
 	numCollNodes    int // number of collection nodes
 	numConsNodes    int // number of consensus nodes
@@ -17,6 +18,8 @@ type StatsConfig struct {
 	txBatchSize     int // transaction batch size (tx sent at the same time)
 
 }
+
+// TxStats holds stats about execution of a transaction
 type TxStats struct {
 	TTF       time.Duration
 	TTE       time.Duration
@@ -24,6 +27,7 @@ type TxStats struct {
 	isExpired bool
 }
 
+// StatsTracker keep track of TxStats
 type StatsTracker struct {
 	config  *StatsConfig
 	txStats []*TxStats
@@ -233,8 +237,4 @@ func (st *StatsTracker) String() string {
 		st.MedTTS(),
 		st.MaxTTS()})
 	return t.Render()
-}
-
-func (st *StatsTracker) ToFile(filePath string) {
-
 }

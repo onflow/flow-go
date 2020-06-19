@@ -6,9 +6,8 @@ import (
 	"time"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
-	"google.golang.org/grpc"
-
 	"github.com/onflow/flow-go-sdk/client"
+	"google.golang.org/grpc"
 )
 
 type txInFlight struct {
@@ -70,11 +69,11 @@ func (txt *TxTracker) AddTx(txID flowsdk.Identifier,
 		expiresAt:   time.Now().Add(time.Duration(timeoutInSec) * time.Second),
 		stat:        &TxStats{isExpired: false},
 	}
-	fmt.Println("tx added ", txID)
+	fmt.Printf("%v tx added to tx tracker\n", txID)
 	txt.txs <- newTx
 }
 
-func (txt *TxTracker) stop() {
+func (txt *TxTracker) Stop() {
 	// TODO use signals to shut down the workers or ready/done style
 	close(txt.txs)
 	time.Sleep(time.Second * 5)
