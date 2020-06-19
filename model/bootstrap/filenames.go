@@ -13,8 +13,10 @@ var (
 	PathGenesisBlock            = filepath.Join(DirnamePublicGenesis, "genesis-block.json")
 	PathGenesisClusterBlock     = filepath.Join(DirnamePublicGenesis, "genesis-cluster-block.%v.json") // %v will be replaced by cluster ID
 	PathGenesisClusterQC        = filepath.Join(DirnamePublicGenesis, "genesis-cluster-qc.%v.json")    // %v will be replaced by cluster ID
-	PathGenesisCommit           = filepath.Join(DirnamePublicGenesis, "genesis-commit.json")
+	PathGenesisCommit           = filepath.Join(DirnamePublicGenesis, "genesis-state-commitment.json") // TODO: remove this
 	PathGenesisQC               = filepath.Join(DirnamePublicGenesis, "genesis-qc.json")
+	PathGenesisResult           = filepath.Join(DirnamePublicGenesis, "genesis-execution-result.json")
+	PathGenesisSeal             = filepath.Join(DirnamePublicGenesis, "genesis-block-seal.json")
 	PathGenesisTokenSupply      = filepath.Join(DirnamePublicGenesis, "genesis-token-supply.json")
 	PathServiceAccountPublicKey = filepath.Join(DirnamePublicGenesis, "service-account.pub.json")
 	PathNodeInfosPub            = filepath.Join(DirnamePublicGenesis, "node-infos.pub.json")
