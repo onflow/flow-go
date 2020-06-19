@@ -11,7 +11,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	//"github.com/dapperlabs/flow-go/integration/convert"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
+	"github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -67,21 +68,22 @@ func TestMVP_Emulator(t *testing.T) {
 func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 
 	genesis := net.Genesis()
-
 	chain := genesis.Header.ChainID.Chain()
 
 	serviceAccountClient, err := testnet.NewClient(fmt.Sprintf(":%s", net.AccessPorts[testnet.AccessNodeAPIPort]), chain)
 	require.NoError(t, err)
 
 	//create new account to deploy Counter to
-	//account, key, signer := GetAccount(chain)
+	accountPrivateKey, err := testutil.GenerateAccountPrivateKey()
+	require.NoError(t, err)
 
 	childCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
-	err = createAccount(childCtx, serviceAccountClient, genesis)
+	err = createAccount(childCtx, serviceAccountClient, genesis, []byte(CounterContract.ToCadence()), accountPrivateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold))
 	cancel()
 
-	var newAccountAddress flow.Address = flow.EmptyAddress
+	var newAccountAddress = flow.EmptyAddress
 
+	// wait for account to be created
 	require.Eventually(t, func() bool {
 		childCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
 		responses, err := serviceAccountClient.Events(childCtx, "flow.AccountCreated")
@@ -102,7 +104,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 						fmt.Printf("decoding payload err = %s\n", err)
 					}
 
-					newAccountAddress = event.ToGoValue().([]interface{})[0].(flow.Address)
+					newAccountAddress = event.ToGoValue().([]interface{})[0].([flow.AddressLength]byte)
 
 					found = true
 				}
@@ -112,54 +114,30 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 		return found
 	}, 30*time.Second, time.Second)
 
+	accountClient, err := testnet.NewClientWithKey(
+		fmt.Sprintf(":%s", net.AccessPorts[testnet.AccessNodeAPIPort]),
+		&accountPrivateKey,
+		chain,
+	)
 	require.NoError(t, err)
 
-	// contract is not deployed, so script fails
+	// contract is deployed, but no instance is created yet
 	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
-	counter, err := readCounter(childCtx, serviceAccountClient)
-	cancel()
-	require.Error(t, err)
-
-	fmt.Printf("service address1: %s\n", chain.ServiceAddress().Short())
-
-	// deploy the contract
-	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
-	err = serviceAccountClient.DeployContract(childCtx, genesis.ID(), CounterContract)
+	counter, err := readCounter(childCtx, accountClient, newAccountAddress)
 	cancel()
 	require.NoError(t, err)
+	require.Equal(t, -3, counter)
 
-	fmt.Printf("service address: %s\n", chain.ServiceAddress().Short())
-
-	// script executes eventually, but no counter instance is created
-	require.Eventually(t, func() bool {
-		childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
-
-		fmt.Printf("service address script: %s\n", chain.ServiceAddress().Short())
-
-		counter, err = readCounter(ctx, serviceAccountClient)
-		cancel()
-		if err != nil {
-			t.Log("EXECUTE SCRIPT ERR", err)
-		}
-		return err == nil && counter == -3
-	}, 30*time.Second, time.Second)
-
-	//tx := unittest.TransactionBodyFixture(
-	//	unittest.WithTransactionDSL(CreateCounterTx),
-	//	unittest.WithReferenceBlock(genesis.ID()),
-	//)
-
-	//sdk.ServiceAddress(sdk.Mainnet)
-
+	// create counter instance
 	tx := flow.NewTransactionBody().
-		SetScript(unittest.NoopTxScript()).
+		SetScript([]byte(CreateCounterTx(newAccountAddress).ToCadence())).
 		SetReferenceBlockID(genesis.ID()).
-		SetProposalKey(chain.ServiceAddress(), 0, 0).
-		SetPayer(chain.ServiceAddress()).
-		AddAuthorizer(chain.ServiceAddress())
+		SetProposalKey(newAccountAddress, 0, 0).
+		SetPayer(newAccountAddress).
+		AddAuthorizer(newAccountAddress)
 
 	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
-	err = serviceAccountClient.SendTransaction(ctx, *tx)
+	err = accountClient.SignAndSendTransaction(ctx, *tx)
 	cancel()
 
 	require.NoError(t, err)
@@ -167,7 +145,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	// counter is created and incremented eventually
 	require.Eventually(t, func() bool {
 		childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
-		counter, err = readCounter(ctx, serviceAccountClient)
+		counter, err = readCounter(ctx, serviceAccountClient, newAccountAddress)
 		cancel()
 
 		t.Logf("read counter: counter=%d, err=%s", counter, err)

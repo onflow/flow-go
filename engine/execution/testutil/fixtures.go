@@ -166,7 +166,7 @@ func CreateAccountsWithSimpleAddresses(
 	for _, privateKey := range privateKeys {
 		accountKey := privateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold)
 		encAccountKey, _ := flow.EncodeRuntimeAccountPublicKey(accountKey)
-		cadAccountKey := bytesToCadenceArray(encAccountKey)
+		cadAccountKey := BytesToCadenceArray(encAccountKey)
 		encCadAccountKey, _ := jsoncdc.Encode(cadAccountKey)
 
 		tx := flow.NewTransactionBody().
@@ -206,7 +206,7 @@ func RootBootstrappedLedger(chain flow.Chain) virtualmachine.Ledger {
 	return ledger
 }
 
-func bytesToCadenceArray(l []byte) cadence.Array {
+func BytesToCadenceArray(l []byte) cadence.Array {
 	values := make([]cadence.Value, len(l))
 	for i, b := range l {
 		values[i] = cadence.NewInt(int(b))

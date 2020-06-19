@@ -43,7 +43,7 @@ func NewClientWithKey(addr string, key *flow.AccountPrivateKey, chain flow.Chain
 }
 
 // NewClient returns a new client to an Access API listening at the given
-// address, with a generated account key for signing transactions.
+// address, with a test service account key for signing transactions.
 func NewClient(addr string, chain flow.Chain) (*Client, error) {
 	key := unittest.ServiceAccountPrivateKey
 
@@ -71,10 +71,6 @@ func (c *Client) GetSeqNumber() uint64 {
 
 func (c *Client) Events(ctx context.Context, typ string) ([]*access.EventsResponse_Result, error) {
 	return c.client.GetEvents(ctx, typ)
-func (c *Client) GetSeqNumber() uint64 {
-	n := c.seqNo
-	c.seqNo++
-	return n
 }
 
 // DeployContract submits a transaction to deploy a contract with the given
@@ -142,11 +138,7 @@ func (c *Client) SignAndSendTransaction(ctx context.Context, tx flow.Transaction
 
 func (c *Client) ExecuteScript(ctx context.Context, script dsl.Main) ([]byte, error) {
 
-	fmt.Printf("address inside import: %s\n", script.Import.Address.Short())
-
 	code := script.ToCadence()
-
-	fmt.Printf("executing %s\n", code)
 
 	res, err := c.client.ExecuteScript(ctx, []byte(code))
 	if err != nil {
