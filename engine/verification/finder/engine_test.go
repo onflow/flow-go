@@ -132,7 +132,7 @@ func (suite *FinderEngineTestSuite) TestHandleReceipt_HappyPath() {
 	suite.receipts.On("Add", suite.pendingReceipt).Return(true).Once()
 
 	// mocks adding receipt id to mapping mempool based on its result
-	suite.receiptIDsByResult.On("Append", suite.receipt.ExecutionResult.ID(), suite.receipt.ID()).Return(nil)
+	suite.receiptIDsByResult.On("Append", suite.receipt.ExecutionResult.ID(), suite.receipt.ID()).Return(true, nil)
 
 	// mocks block associated with receipt
 	suite.headerStorage.On("ByBlockID", suite.block.ID()).Return(&flow.Header{}, nil).Once()
@@ -215,13 +215,13 @@ func (suite *FinderEngineTestSuite) TestHandleReceipt_BlockMissing() {
 	suite.receipts.On("Add", suite.pendingReceipt).Return(true).Once()
 
 	// mocks adding receipt id to mapping mempool based on its result
-	suite.receiptIDsByResult.On("Append", suite.receipt.ExecutionResult.ID(), suite.receipt.ID()).Return(nil)
+	suite.receiptIDsByResult.On("Append", suite.receipt.ExecutionResult.ID(), suite.receipt.ID()).Return(true, nil)
 
 	// mocks block associated with receipt missing
 	suite.headerStorage.On("ByBlockID", suite.block.ID()).Return(nil, fmt.Errorf("block not available")).Once()
 
 	// mocks receipt ID added to pending receipts for block ID.
-	suite.receiptIDsByBlock.On("Append", suite.block.ID(), suite.receipt.ID()).Return(nil)
+	suite.receiptIDsByBlock.On("Append", suite.block.ID(), suite.receipt.ID()).Return(true, nil)
 
 	// should not be any attempt on sending result to match engine
 	suite.matchEng.AssertNotCalled(suite.T(), "Process", testifymock.Anything, testifymock.Anything)
