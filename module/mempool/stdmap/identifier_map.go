@@ -22,34 +22,37 @@ func NewIdentifierMap(limit uint) (*IdentifierMap, error) {
 
 // Append will append the id to the list of identifiers associated with key.
 func (i *IdentifierMap) Append(key, id flow.Identifier) error {
-	ids, ok := i.Get(key)
-	if !ok {
-		// no record with key is available in the mempool,
-		// initializes ids.
-		ids = make([]flow.Identifier, 0)
-	} else {
-		// removes map entry associated with key for update
-		ok = i.Backend.Rem(key)
+	return i.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+		var ids []flow.Identifier
+		entity, ok := backdata[key]
 		if !ok {
-			return fmt.Errorf("could not remove key from backend: %x", key)
+			// no record with key is available in the mempool,
+			// initializes ids.
+			ids = make([]flow.Identifier, 0)
+		} else {
+			idMapEntity, ok := entity.(model.IdMapEntity)
+			if !ok {
+				return fmt.Errorf("could not assert entity to IdMapEntity")
+			}
+			// removes map entry associated with key for update
+			delete(backdata, key)
+
+			ids = idMapEntity.IDs
 		}
-	}
 
-	// appends id to the ids list
-	ids = append(ids, id)
+		// appends id to the ids list
+		ids = append(ids, id)
 
-	// adds the new ids list associated with key to mempool
-	mapEntity := model.IdMapEntity{
-		Key: key,
-		IDs: ids,
-	}
+		// adds the new ids list associated with key to mempool
+		idMapEntity := model.IdMapEntity{
+			Key: key,
+			IDs: ids,
+		}
 
-	ok = i.Backend.Add(mapEntity)
-	if !ok {
-		return fmt.Errorf("could not add updated entity to backend, key: %x", key)
-	}
+		backdata[key] = idMapEntity
 
-	return nil
+		return nil
+	})
 }
 
 // Get returns list of all identifiers associated with key and true, if the key exists in the mempool.
