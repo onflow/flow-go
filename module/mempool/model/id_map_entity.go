@@ -8,7 +8,7 @@ import (
 // It implements a key-value entry where an identifier is mapped to a list of other identifiers.
 type IdMapEntity struct {
 	Key flow.Identifier
-	IDs []flow.Identifier
+	IDs map[flow.Identifier]struct{}
 }
 
 // ID implements flow.Entity.ID for IdMapEntity to make it capable of being stored directly

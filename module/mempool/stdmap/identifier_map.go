@@ -23,12 +23,12 @@ func NewIdentifierMap(limit uint) (*IdentifierMap, error) {
 // Append will append the id to the list of identifiers associated with key.
 func (i *IdentifierMap) Append(key, id flow.Identifier) error {
 	return i.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
-		var ids []flow.Identifier
+		var ids map[flow.Identifier]struct{}
 		entity, ok := backdata[key]
 		if !ok {
 			// no record with key is available in the mempool,
 			// initializes ids.
-			ids = make([]flow.Identifier, 0)
+			ids = make(map[flow.Identifier]struct{})
 		} else {
 			idMapEntity, ok := entity.(model.IdMapEntity)
 			if !ok {
@@ -41,7 +41,7 @@ func (i *IdentifierMap) Append(key, id flow.Identifier) error {
 		}
 
 		// appends id to the ids list
-		ids = append(ids, id)
+		ids[id] = struct{}{}
 
 		// adds the new ids list associated with key to mempool
 		idMapEntity := model.IdMapEntity{
