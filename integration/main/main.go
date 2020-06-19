@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
 	"google.golang.org/grpc"
 
@@ -14,19 +15,14 @@ import (
 
 func main() {
 
-	// TODO flowsdk.Testnet as chainID
-
-	// addressGen := flowsdk.NewAddressGenerator(flowsdk.Testnet)
-	// serviceAccountAddressHex = addressGen.NextAddress()
-	// fmt.Println("Root Service Address:", serviceAccountAddressHex)
-	// fungibleTokenAddress = addressGen.NextAddress()
-	// fmt.Println("Fungible Address:", fungibleTokenAddress)
-	// flowTokenAddress = addressGen.NextAddress()
-	// fmt.Println("Flow Address:", flowTokenAddress)
-
-	serviceAccountAddressHex := "8c5303eaa26202d6"
-	fungibleTokenAddressHex := "9a0766d93b6608b7"
-	flowTokenAddressHex := "7e60df042a9c0868"
+	chainID := flowsdk.Testnet
+	addressGen := flowsdk.NewAddressGenerator(chainID)
+	serviceAccountAddress := addressGen.NextAddress()
+	fmt.Println("Root Service Address:", serviceAccountAddress)
+	fungibleTokenAddress := addressGen.NextAddress()
+	fmt.Println("Fungible Address:", fungibleTokenAddress)
+	flowTokenAddress := addressGen.NextAddress()
+	fmt.Println("Flow Address:", flowTokenAddress)
 
 	serviceAccountPrivateKeyBytes, err := hex.DecodeString(unittest.ServiceAccountPrivateKeyHex)
 	if err != nil {
@@ -43,13 +39,12 @@ func main() {
 	priv := hex.EncodeToString(ServiceAccountPrivateKey.PrivateKey.Encode())
 
 	flowClient, err := client.New("localhost:3569", grpc.WithInsecure())
-	lg, err := utils.NewLoadGenerator(flowClient, priv, serviceAccountAddressHex, fungibleTokenAddressHex, flowTokenAddressHex, 100)
+	lg, err := utils.NewLoadGenerator(flowClient, priv, &serviceAccountAddress, &fungibleTokenAddress, &flowTokenAddress, 100, false)
 	if err != nil {
 		panic(err)
 	}
 
 	rounds := 5
-
 	// extra 3 is for setup
 	for i := 0; i < rounds+3; i++ {
 		lg.Next()

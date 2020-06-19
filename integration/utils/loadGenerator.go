@@ -2,7 +2,6 @@ package utils
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"sync"
 	"time"
@@ -14,7 +13,6 @@ import (
 	"github.com/onflow/flow-go-sdk/examples"
 )
 
-// This should only used for testing reasons
 type flowAccount struct {
 	address    *flowsdk.Address
 	accountKey *flowsdk.AccountKey
@@ -34,6 +32,8 @@ func newFlowAccount(address *flowsdk.Address,
 	}
 }
 
+// LoadGenerator submits a batch of transactions to the network
+// by creating many accounts and transfer flow tokens between them
 type LoadGenerator struct {
 	numberOfAccounts     int
 	flowClient           *client.Client
@@ -47,28 +47,15 @@ type LoadGenerator struct {
 	statsTracker         *StatsTracker
 }
 
-// TODO remove the need for servAccPrivKeyHex when we open it up to everyone
+// NewLoadGenerator returns a new LoadGenerator
+// TODO remove servAccPrivKeyHex when we open up account creation to everyone
 func NewLoadGenerator(fclient *client.Client,
 	servAccPrivKeyHex string,
-	serviceAccountAddressHex string,
-	fungibleTokenAddressHex string,
-	flowTokenAddressHex string,
-	numberOfAccounts int) (*LoadGenerator, error) {
-
-	serviceAccountAddress, err := decodeAddressFromHex(serviceAccountAddressHex)
-	if err != nil {
-		return nil, err
-	}
-
-	fungibleTokenAddress, err := decodeAddressFromHex(fungibleTokenAddressHex)
-	if err != nil {
-		return nil, err
-	}
-
-	flowTokenAddress, err := decodeAddressFromHex(flowTokenAddressHex)
-	if err != nil {
-		return nil, err
-	}
+	serviceAccountAddress *flowsdk.Address,
+	fungibleTokenAddress *flowsdk.Address,
+	flowTokenAddress *flowsdk.Address,
+	numberOfAccounts int,
+	verbose bool) (*LoadGenerator, error) {
 
 	servAcc, err := loadServiceAccount(fclient, serviceAccountAddress, servAccPrivKeyHex)
 	if err != nil {
@@ -77,7 +64,7 @@ func NewLoadGenerator(fclient *client.Client,
 
 	// TODO get these params hooked to the top level
 	stTracker := NewStatsTracker(&StatsConfig{1, 1, 1, 1, 1, numberOfAccounts})
-	txTracker, err := NewTxTracker(5000, 2, "localhost:3569", true, time.Second/10, stTracker)
+	txTracker, err := NewTxTracker(5000, 2, "localhost:3569", verbose, time.Second/10, stTracker)
 	if err != nil {
 		return nil, err
 	}
@@ -134,15 +121,17 @@ func (lg *LoadGenerator) getBlockIDRef() flowsdk.Identifier {
 	return ref.ID
 }
 
+// Stats returns the statsTracker that captures stats for transactions submitted
 func (lg *LoadGenerator) Stats() *StatsTracker {
 	return lg.statsTracker
 }
 
+// Close closes the transaction tracker gracefully.
 func (lg *LoadGenerator) Close() {
 	lg.txTracker.Stop()
 }
 
-func (lg *LoadGenerator) SetupServiceAccountKeys() error {
+func (lg *LoadGenerator) setupServiceAccountKeys() error {
 
 	blockRef := lg.getBlockIDRef()
 	keys := make([]*flowsdk.AccountKey, 0)
@@ -180,7 +169,11 @@ func (lg *LoadGenerator) SetupServiceAccountKeys() error {
 		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
 			txWG.Done()
 		},
-		nil, nil, nil, nil, 60)
+		nil, // on sealed
+		nil, // on expired
+		nil, // on timout
+		nil, // on error,
+		60)
 
 	txWG.Wait()
 
@@ -189,7 +182,7 @@ func (lg *LoadGenerator) SetupServiceAccountKeys() error {
 
 }
 
-func (lg *LoadGenerator) CreateAccounts() error {
+func (lg *LoadGenerator) createAccounts() error {
 	fmt.Printf("creating %d accounts...", lg.numberOfAccounts)
 	blockRef := lg.getBlockIDRef()
 	allTxWG := sync.WaitGroup{}
@@ -234,7 +227,7 @@ func (lg *LoadGenerator) CreateAccounts() error {
 						accountAddress := accountCreatedEvent.Address()
 						newAcc := newFlowAccount(&accountAddress, accountKey, signer)
 						lg.accounts = append(lg.accounts, newAcc)
-						fmt.Println("account added")
+						fmt.Printf("new account %v added\n", accountAddress)
 					}
 				}
 				allTxWG.Done()
@@ -253,7 +246,7 @@ func (lg *LoadGenerator) CreateAccounts() error {
 	return nil
 }
 
-func (lg *LoadGenerator) DistributeInitialTokens() error {
+func (lg *LoadGenerator) distributeInitialTokens() error {
 	blockRef := lg.getBlockIDRef()
 	allTxWG := sync.WaitGroup{}
 	fmt.Println("load generator step 2 started")
@@ -297,7 +290,7 @@ func (lg *LoadGenerator) DistributeInitialTokens() error {
 	return nil
 }
 
-func (lg *LoadGenerator) RotateTokens() error {
+func (lg *LoadGenerator) rotateTokens() error {
 	blockRef := lg.getBlockIDRef()
 	allTxWG := sync.WaitGroup{}
 	fmt.Println("load generator step 3 started")
@@ -346,26 +339,18 @@ func (lg *LoadGenerator) RotateTokens() error {
 	return nil
 }
 
+// Next submits the next batch of transactions to the network and waits
+// until transactions are finalized, the first 3 calls setup accounts
+// needed, and the rest of the calls rotates tokens between accounts
 func (lg *LoadGenerator) Next() error {
 	switch lg.step {
 	case 0:
-		return lg.SetupServiceAccountKeys()
+		return lg.setupServiceAccountKeys()
 	case 1:
-		return lg.CreateAccounts()
+		return lg.createAccounts()
 	case 2:
-		return lg.DistributeInitialTokens()
+		return lg.distributeInitialTokens()
 	default:
-		return lg.RotateTokens()
+		return lg.rotateTokens()
 	}
-	return nil
-}
-
-func decodeAddressFromHex(hexinput string) (*flowsdk.Address, error) {
-	var output flowsdk.Address
-	inputBytes, err := hex.DecodeString(hexinput)
-	if err != nil {
-		return nil, err
-	}
-	copy(output[:], inputBytes)
-	return &output, nil
 }

@@ -34,6 +34,7 @@ type StatsTracker struct {
 	mux     sync.Mutex
 }
 
+// NewStatsTracker returns a new instance of StatsTracker
 func NewStatsTracker(config *StatsConfig) *StatsTracker {
 	return &StatsTracker{
 		config:  config,
@@ -41,6 +42,7 @@ func NewStatsTracker(config *StatsConfig) *StatsTracker {
 	}
 }
 
+// AddTxStats adds a new TxStats to the tracker
 func (st *StatsTracker) AddTxStats(tt *TxStats) {
 	st.mux.Lock()
 	defer st.mux.Unlock()

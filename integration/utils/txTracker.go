@@ -24,6 +24,9 @@ type txInFlight struct {
 	stat        *TxStats
 }
 
+// TxTracker activly calls access nodes and keep track of
+// transactions by txID, in case of transaction state change
+// it calls the provided callbacks
 type TxTracker struct {
 	numbOfWorkers int
 	txs           chan *txInFlight
@@ -31,6 +34,7 @@ type TxTracker struct {
 	stats         *StatsTracker
 }
 
+// NewTxTracker returns a new instance of TxTracker
 func NewTxTracker(maxCap int,
 	numberOfWorkers int,
 	accessNodeAddress string,
@@ -54,6 +58,8 @@ func NewTxTracker(maxCap int,
 	return txt, nil
 }
 
+// AddTx adds a transaction to the tracker and register
+// callbacks for transaction status changes
 func (txt *TxTracker) AddTx(txID flowsdk.Identifier,
 	onFinalizedCallback func(flowsdk.Identifier),
 	onExecutedCallback func(flowsdk.Identifier, *flowsdk.TransactionResult),
@@ -79,6 +85,7 @@ func (txt *TxTracker) AddTx(txID flowsdk.Identifier,
 	txt.txs <- newTx
 }
 
+// Stop stops the tracker workers
 func (txt *TxTracker) Stop() {
 	for i := 0; i < txt.numbOfWorkers; i++ {
 		txt.done <- true
@@ -86,8 +93,6 @@ func (txt *TxTracker) Stop() {
 	time.Sleep(time.Second * 5)
 	close(txt.txs)
 }
-
-// TODO enable verbose and do proper log formatting
 
 func statusWorker(workerID int, txs chan *txInFlight, done <-chan bool, fclient *client.Client, stats *StatsTracker, verbose bool, sleepAfterOp time.Duration) {
 	clientContErrorCounter := 0
@@ -100,7 +105,7 @@ func statusWorker(workerID int, txs chan *txInFlight, done <-chan bool, fclient 
 		case tx := <-txs:
 
 			if clientContErrorCounter > 10 {
-				fmt.Errorf("worker %d: calling client has failed for the last 10 times", workerID)
+				fmt.Printf("worker %d: calling client has failed for the last 10 times\n", workerID)
 				break
 			}
 			if tx.expiresAt.Before(time.Now()) {

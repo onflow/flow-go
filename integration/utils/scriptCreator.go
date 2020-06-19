@@ -11,14 +11,16 @@ import (
 )
 
 const (
-	FungibleTokenTransactionsBaseURL = "https://raw.githubusercontent.com/onflow/flow-ft/0e8024a483ce85c06eb165c2d4c9a5795ba167a1/src/transactions/"
-	TransferTokens                   = "transfer_tokens.cdc"
+	fungibleTokenTransactionsBaseURL = "https://raw.githubusercontent.com/onflow/flow-ft/0e8024a483ce85c06eb165c2d4c9a5795ba167a1/src/transactions/"
+	transferTokens                   = "transfer_tokens.cdc"
 )
 
+// ScriptCreator creates transaction scripts
 type ScriptCreator struct {
 	tokenTransferTemplate []byte
 }
 
+// NewScriptCreator returns a new instance of ScriptCreator
 func NewScriptCreator() (*ScriptCreator, error) {
 	ttt, err := getTokenTransferTemplate()
 	if err != nil {
@@ -27,6 +29,7 @@ func NewScriptCreator() (*ScriptCreator, error) {
 	return &ScriptCreator{tokenTransferTemplate: ttt}, nil
 }
 
+// TokenTransferScript returns a transaction script for transfering `amount` flow tokens to `toAddr` address
 func (sc *ScriptCreator) TokenTransferScript(ftAddr, flowToken, toAddr *flowsdk.Address, amount int) ([]byte, error) {
 	withFTAddr := strings.ReplaceAll(string(sc.tokenTransferTemplate), "0x02", "0x"+ftAddr.Hex())
 	withFlowTokenAddr := strings.Replace(string(withFTAddr), "0x03", "0x"+flowToken.Hex(), 1)
@@ -35,10 +38,12 @@ func (sc *ScriptCreator) TokenTransferScript(ftAddr, flowToken, toAddr *flowsdk.
 	return []byte(withAmount), nil
 }
 
+// CreateAccountScript returns a transaction script for creating a new account
 func (sc *ScriptCreator) CreateAccountScript(accountKey *flowsdk.AccountKey) ([]byte, error) {
 	return templates.CreateAccount([]*flowsdk.AccountKey{accountKey}, nil)
 }
 
+// AddKeyToAccountScript returns a transaction script for adding keys to an already existing account
 func (sc *ScriptCreator) AddKeyToAccountScript(keys []*flowsdk.AccountKey) ([]byte, error) {
 	publicKeysStr := strings.Builder{}
 	for i := 0; i < len(keys); i++ {
@@ -57,7 +62,7 @@ func (sc *ScriptCreator) AddKeyToAccountScript(keys []*flowsdk.AccountKey) ([]by
 }
 
 func getTokenTransferTemplate() ([]byte, error) {
-	resp, err := http.Get(FungibleTokenTransactionsBaseURL + TransferTokens)
+	resp, err := http.Get(fungibleTokenTransactionsBaseURL + transferTokens)
 	if err != nil {
 		return nil, err
 	}
