@@ -71,6 +71,10 @@ func (c *Client) GetSeqNumber() uint64 {
 
 func (c *Client) Events(ctx context.Context, typ string) ([]*access.EventsResponse_Result, error) {
 	return c.client.GetEvents(ctx, typ)
+func (c *Client) GetSeqNumber() uint64 {
+	n := c.seqNo
+	c.seqNo++
+	return n
 }
 
 // DeployContract submits a transaction to deploy a contract with the given
