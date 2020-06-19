@@ -34,6 +34,7 @@ func TestHappyPath(t *testing.T) {
 	hook := zeroLoggerHook{
 		logs: &strings.Builder{},
 	}
+	log.Hook(hook)
 	keyCmdRun(nil, nil)
 	require.Regexp(t, regex, hook.logs.String())
 	require.DirExists(t, flagOutdir+"/public-root-information")

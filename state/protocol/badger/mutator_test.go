@@ -254,25 +254,6 @@ func TestBootstrapExistingAddress(t *testing.T) {
 	})
 }
 
-func TestBootstrapNonZeroHeight(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		block := unittest.GenesisFixture(participants)
-		block.Header.Height = 42
-
-		result := unittest.ExecutionResultFixture()
-		result.BlockID = block.ID()
-
-		seal := unittest.BlockSealFixture()
-		seal.BlockID = block.ID()
-		seal.ResultID = result.ID()
-		seal.FinalState = result.FinalStateCommit
-
-		err := state.Mutate().Bootstrap(block, result, seal)
-		require.Error(t, err)
-	})
-}
-
 func TestBootstrapNonZeroParent(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 

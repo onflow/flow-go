@@ -69,7 +69,10 @@ func TestIdentity(t *testing.T) {
 		identity := unittest.IdentityFixture()
 		blockID := unittest.IdentifierFixture()
 
-		err := db.Update(operation.InsertFinalizedHeight(0))
+		err := db.Update(operation.InsertRootHeight(0))
+		require.NoError(t, err)
+
+		err = db.Update(operation.InsertFinalizedHeight(0))
 		require.NoError(t, err)
 
 		err = db.Update(operation.IndexBlockHeight(0, blockID))
@@ -102,7 +105,10 @@ func TestIdentities(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		identities := unittest.IdentityListFixture(8)
 
-		err := db.Update(operation.InsertFinalizedHeight(0))
+		err := db.Update(operation.InsertRootHeight(0))
+		require.NoError(t, err)
+
+		err = db.Update(operation.InsertFinalizedHeight(0))
 		require.NoError(t, err)
 
 		err = db.Update(operation.IndexBlockHeight(0, blockID))
@@ -134,7 +140,10 @@ func TestClusters(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		identities := unittest.IdentityListFixture(7, unittest.WithRole(flow.RoleCollection))
 
-		err := db.Update(operation.InsertFinalizedHeight(0))
+		err := db.Update(operation.InsertRootHeight(0))
+		require.NoError(t, err)
+
+		err = db.Update(operation.InsertFinalizedHeight(0))
 		require.NoError(t, err)
 
 		err = db.Update(operation.IndexBlockHeight(0, blockID))
