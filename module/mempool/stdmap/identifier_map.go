@@ -69,8 +69,9 @@ func (i *IdentifierMap) Get(key flow.Identifier) ([]flow.Identifier, bool) {
 	}
 
 	ids := make([]flow.Identifier, len(mapEntity.IDs))
+	index := 0
 	for id := range mapEntity.IDs {
-		ids = append(ids, id)
+		ids[index] = id
 	}
 
 	return ids, true
