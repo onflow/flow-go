@@ -402,19 +402,35 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap protocol state")
 		}
 
+		// load the DKG public data from bootstrap files
+		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap protocol state")
+		}
+
 		// bootstrap the DKG state with the loaded data
+		// TODO: this always needs to be available, so we need to persist it
+		fnb.DKGState = wrapper.NewState(dkgPubData)
 
 	} else if err != nil {
 		fnb.Logger.Fatal().Err(err).Msg("could not check existing database")
-	}
+	} else {
 
-	// TODO: persist & bootstrap DKG state similarly to protocol state
-	_, err = loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
-	if err != nil {
-		fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
-	}
+		// Load the genesis info for recovery
+		fnb.RootBlock, err = loadRootBlock(fnb.BaseConfig.BootstrapDir)
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
+		}
 
-	// TODO: load root block directly on recovery
+		flow.SetChainID(fnb.RootBlock.Header.ChainID)
+
+		// load genesis QC and DKG data from bootstrap files for recovery
+		fnb.RootQC, err = loadRootQC(fnb.BaseConfig.BootstrapDir)
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
+		}
+	}
 
 	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
 	fnb.MustNot(err).Msg("could not parse node identifier")
