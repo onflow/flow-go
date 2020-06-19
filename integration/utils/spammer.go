@@ -340,7 +340,6 @@ func (cg *LoadGenerator) RotateTokens() error {
 		err = cg.flowClient.SendTransaction(context.Background(), *transferTx)
 		examples.Handle(err)
 		allTxWG.Add(1)
-
 		cg.txTracker.AddTx(transferTx.ID(),
 			nil,
 			func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
@@ -435,7 +434,7 @@ func main() {
 	priv := hex.EncodeToString(ServiceAccountPrivateKey.PrivateKey.Encode())
 
 	flowClient, err := client.New("localhost:3569", grpc.WithInsecure())
-	lg, err := NewLoadGenerator(flowClient, priv, serviceAccountAddressHex, fungibleTokenAddressHex, flowTokenAddressHex, 10)
+	lg, err := NewLoadGenerator(flowClient, priv, serviceAccountAddressHex, fungibleTokenAddressHex, flowTokenAddressHex, 100)
 	if err != nil {
 		panic(err)
 	}
