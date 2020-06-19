@@ -24,11 +24,6 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 
 		// FIRST: execute all the validity checks on the genesis block
 
-		// the initial height needs to be height zero
-		if genesis.Header.Height != 0 {
-			return fmt.Errorf("genesis height must be zero")
-		}
-
 		// the parent must be zero hash
 		if genesis.Header.ParentID != flow.ZeroID {
 			return errors.New("genesis parent must have zero ID")
@@ -96,7 +91,7 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 		if err != nil {
 			return fmt.Errorf("could not insert header: %w", err)
 		}
-		err = operation.IndexBlockHeight(0, genesis.ID())(tx)
+		err = operation.IndexBlockHeight(genesis.Header.Height, genesis.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not initialize boundary: %w", err)
 		}
@@ -147,6 +142,10 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 		if err != nil {
 			return fmt.Errorf("could not insert started view: %w", err)
 		}
+		err = operation.InsertRootHeight(genesis.Header.Height)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert genesis height: %w", err)
+		}
 		err = operation.InsertFinalizedHeight(genesis.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert finalized height: %w", err)
@@ -156,10 +155,10 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 			return fmt.Errorf("could not insert sealed height: %w", err)
 		}
 
-		m.state.metrics.FinalizedHeight(0)
+		m.state.metrics.FinalizedHeight(genesis.Header.Height)
 		m.state.metrics.BlockFinalized(genesis)
 
-		m.state.metrics.SealedHeight(0)
+		m.state.metrics.SealedHeight(genesis.Header.Height)
 		m.state.metrics.BlockSealed(genesis)
 
 		return nil
@@ -237,6 +236,17 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	limit := header.Height - uint64(m.state.expiry)
 	if limit > header.Height { // overflow check
 		limit = 0
+	}
+
+	// look up the root height so we don't look too far back
+	// initially this is the genesis block height (aka 0).
+	var rootHeight uint64
+	err = m.state.db.View(operation.RetrieveRootHeight(&rootHeight))
+	if err != nil {
+		return fmt.Errorf("could not retrieve root block height: %w", err)
+	}
+	if limit < rootHeight {
+		limit = rootHeight
 	}
 
 	// build a list of all previously used guarantees on this part of the chain
