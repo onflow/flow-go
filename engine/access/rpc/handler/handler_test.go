@@ -553,7 +553,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 	suite.execClient.On("GetAccountAtBlockID", ctx, exeReq).Return(exeResp, nil).Once()
 
 	// create the handler with the mock
-	handler := NewHandler(suite.log, suite.state, suite.execClient, nil, nil, suite.headers, nil, nil)
+	handler := NewHandler(suite.log, suite.state, suite.execClient, nil, nil, suite.headers, nil, nil, flow.Testnet)
 
 	suite.Run("happy path - valid request and valid response", func() {
 		expectedResp := &access.AccountResponse{
