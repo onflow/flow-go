@@ -219,6 +219,8 @@ func TestAddressesIntersection(t *testing.T) {
 			require.NoError(t, err)
 			check := Mainnet.Chain().IsValid(address)
 			assert.False(t, check, "test account address format should be invalid in Flow")
+			sameChainCheck := chain.IsValid(address)
+			require.True(t, sameChainCheck)
 		}
 
 		// sanity check: mainnet addresses must fail the test check

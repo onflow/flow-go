@@ -172,7 +172,9 @@ func (s *feldmanVSSstate) generateShares(seed []byte) error {
 	s.a = make([]scalar, s.threshold+1)
 	s.vA = make([]pointG2, s.threshold+1)
 	s.y = make([]pointG2, s.size)
-	for i := 0; i < s.threshold+1; i++ {
+	randZrStar(&s.a[0]) // non zero a[0]
+	genScalarMultG2(&s.vA[0], &s.a[0])
+	for i := 1; i < s.threshold+1; i++ {
 		randZr(&s.a[i])
 		genScalarMultG2(&s.vA[i], &s.a[i])
 	}

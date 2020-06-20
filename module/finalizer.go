@@ -10,12 +10,12 @@ import (
 // other components in the node about a block being finalized.
 type Finalizer interface {
 
+	// MakeValid will mark a block as having passed the consensus algorithm's
+	// internal validation.
+	MakeValid(blockID flow.Identifier) error
+
 	// MakeFinal will declare a block and all of its ancestors as finalized, which
 	// makes it an immutable part of the blockchain. Returning an error indicates
 	// some fatal condition and will cause the finalization logic to terminate.
 	MakeFinal(blockID flow.Identifier) error
-
-	// MakePending will declare a block has passed all the validation, and is
-	// incorporated to a certain branch that is waiting to be finalized.
-	MakePending(blockID flow.Identifier) error
 }

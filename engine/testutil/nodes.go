@@ -367,8 +367,18 @@ func VerificationNode(t testing.TB,
 		node.Chunks = match.NewChunks(1000)
 	}
 
-	if node.IngestedResultIDs == nil {
-		node.IngestedResultIDs, err = stdmap.NewIdentifiers(1000)
+	if node.ProcessedResultIDs == nil {
+		node.ProcessedResultIDs, err = stdmap.NewIdentifiers(1000)
+		require.Nil(t, err)
+	}
+
+	if node.ReceiptIDsByBlock == nil {
+		node.ReceiptIDsByBlock, err = stdmap.NewIdentifierMap(1000)
+		require.Nil(t, err)
+	}
+
+	if node.ReceiptIDsByResult == nil {
+		node.ReceiptIDsByResult, err = stdmap.NewIdentifierMap(1000)
 		require.Nil(t, err)
 	}
 
@@ -405,7 +415,9 @@ func VerificationNode(t testing.TB,
 			node.MatchEngine,
 			node.PendingReceipts,
 			node.Headers,
-			node.IngestedResultIDs)
+			node.ProcessedResultIDs,
+			node.ReceiptIDsByBlock,
+			node.ReceiptIDsByResult)
 		require.Nil(t, err)
 	}
 

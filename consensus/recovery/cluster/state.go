@@ -9,9 +9,9 @@ import (
 )
 
 // FindLatest retrieves the latest finalized header and all of its pending
-// children. These are child blocks that have been verified by both the
-// compliance layer and HotStuff and thus are safe to inject directly into
-// HotStuff with no further validation.
+// children. These pending children have been verified by the compliance layer
+// but are NOT guaranteed to have been verified by HotStuff. They MUST be
+// validated by HotStuff during the recovery process.
 func FindLatest(state cluster.State, headers storage.Headers) (*flow.Header, []*flow.Header, error) {
 
 	finalized, err := state.Final().Head()

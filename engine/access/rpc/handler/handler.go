@@ -18,25 +18,28 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-// Handler implements the Access API. It spans multiple files
-// Transaction related calls are handled in handler handler_transaction
-// Block Header related calls are handled in handler handler_block_header
-// Block details related calls are handled in handler handler_block_details
-// All remaining calls are handled in this file
+// Handler implements the Access API. It is composed of several sub-handlers that implement part of the Access API.
+// Script related calls are handled by handlerScripts
+// Transaction related calls are handled by handlerTransactions
+// Block Header related calls are handled by handlerBlockHeaders
+// Block details related calls are handled by handlerBlockDetails
+// Event related calls are handled by handlerEvents
+// Account related calls are handled by handlerAccounts
+// All remaining calls are handled in this file by Handler
 type Handler struct {
-	executionRPC  execution.ExecutionAPIClient
-	collectionRPC access.AccessAPIClient
-	log           zerolog.Logger
-	state         protocol.State
+	handlerScripts
+	handlerTransactions
+	handlerEvents
+	handlerBlockHeaders
+	handlerBlockDetails
+	handlerAccounts
 
-	// storage
-	blocks       storage.Blocks
-	headers      storage.Headers
-	collections  storage.Collections
-	transactions storage.Transactions
+	executionRPC execution.ExecutionAPIClient
+	state        protocol.State
 	chainID      flow.ChainID
 }
 
+// compile time check to make sure the aggregated handler implements the Access API
 var _ access.AccessAPIServer = &Handler{}
 
 func NewHandler(log zerolog.Logger,
@@ -49,15 +52,41 @@ func NewHandler(log zerolog.Logger,
 	transactions storage.Transactions,
 	chainID flow.ChainID) *Handler {
 	return &Handler{
-		executionRPC:  e,
-		collectionRPC: c,
-		blocks:        blocks,
-		headers:       headers,
-		collections:   collections,
-		transactions:  transactions,
-		state:         s,
-		log:           log,
-		chainID:       chainID,
+		executionRPC: e,
+		state:        s,
+		// create the sub-handlers
+		handlerScripts: handlerScripts{
+			headers:      headers,
+			executionRPC: e,
+			state:        s,
+		},
+		handlerTransactions: handlerTransactions{
+			collectionRPC: c,
+			executionRPC:  e,
+			state:         s,
+			collections:   collections,
+			blocks:        blocks,
+			transactions:  transactions,
+		},
+		handlerEvents: handlerEvents{
+			executionRPC: e,
+			state:        s,
+			blocks:       blocks,
+		},
+		handlerBlockHeaders: handlerBlockHeaders{
+			headers: headers,
+			state:   s,
+		},
+		handlerBlockDetails: handlerBlockDetails{
+			blocks: blocks,
+			state:  s,
+		},
+		handlerAccounts: handlerAccounts{
+			executionRPC: e,
+			state:        s,
+			headers:      headers,
+		},
+		chainID: chainID,
 	}
 }
 
@@ -112,44 +141,6 @@ func (h *Handler) GetCollectionByID(_ context.Context, req *access.GetCollection
 		Collection: ce,
 	}
 	return resp, nil
-}
-
-func (h *Handler) GetAccount(ctx context.Context, req *access.GetAccountRequest) (*access.GetAccountResponse, error) {
-
-	address := req.GetAddress()
-
-	if address == nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid address")
-	}
-
-	// get the latest sealed header
-	latestHeader, err := h.state.Sealed().Head()
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get latest sealed header: %v", err)
-	}
-
-	// get the block id of the latest sealed header
-	latestBlockID := latestHeader.ID()
-
-	exeReq := execution.GetAccountAtBlockIDRequest{
-		Address: address,
-		BlockId: latestBlockID[:],
-	}
-
-	exeResp, err := h.executionRPC.GetAccountAtBlockID(ctx, &exeReq)
-	if err != nil {
-		errStatus, _ := status.FromError(err)
-		if errStatus.Code() == codes.NotFound {
-			return nil, err
-		}
-
-		return nil, status.Errorf(codes.Internal, "failed to get account from the execution node: %v", err)
-	}
-
-	return &access.GetAccountResponse{
-		Account: exeResp.GetAccount(),
-	}, nil
-
 }
 
 func (h *Handler) GetNetworkParameters(_ context.Context, _ *access.GetNetworkParametersRequest) (*access.GetNetworkParametersResponse, error) {

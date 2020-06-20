@@ -2,10 +2,10 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -64,12 +65,12 @@ func New(
 
 	eng.receiptCon, err = net.Register(engine.ExecutionReceiptProvider, &eng)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not register receipt provider engine")
+		return nil, fmt.Errorf("could not register receipt provider engine: %w", err)
 	}
 
 	chunksConduit, err := net.Register(engine.ChunkDataPackProvider, &eng)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not register chunk data pack provider engine")
+		return nil, fmt.Errorf("could not register chunk data pack provider engine: %w", err)
 	}
 	eng.chunksConduit = chunksConduit
 
@@ -84,7 +85,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+			engine.LogError(e.log, err)
 		}
 	})
 }
@@ -107,19 +108,18 @@ func (e *Engine) Done() <-chan struct{} {
 
 func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
-		ctx := context.Background()
-		var err error
-		switch v := event.(type) {
-		case *messages.ChunkDataRequest:
-			err = e.onChunkDataRequest(ctx, originID, v)
-		default:
-			err = errors.Errorf("invalid event type (%T)", event)
-		}
-		if err != nil {
-			return errors.Wrap(err, "could not process event")
-		}
-		return nil
+		return e.process(originID, event)
 	})
+}
+
+func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+	ctx := context.Background()
+	switch v := event.(type) {
+	case *messages.ChunkDataRequest:
+		return e.onChunkDataRequest(ctx, originID, v)
+	default:
+		return fmt.Errorf("invalid event type (%T)", event)
+	}
 }
 
 // onChunkDataRequest receives a request for the chunk data pack associated with chunkID from the
@@ -143,15 +143,22 @@ func (e *Engine) onChunkDataRequest(
 
 	origin, err := e.state.Final().Identity(originID)
 	if err != nil {
-		return fmt.Errorf("invalid origin id (%s): %w", origin, err)
+		return engine.NewInvalidInputErrorf("invalid origin id (%s): %w", origin, err)
 	}
 
 	// only verifier nodes are allowed to request chunk data packs
 	if origin.Role != flow.RoleVerification {
-		return fmt.Errorf("invalid role for receiving collection: %s", origin.Role)
+		return engine.NewInvalidInputErrorf("invalid role for receiving collection: %s", origin.Role)
 	}
 
 	cdp, err := e.execState.ChunkDataPackByChunkID(ctx, chunkID)
+	// we might be behind when we don't have the requested chunk.
+	// if this happen, log it and return nil
+	if errors.Is(err, storage.ErrNotFound) {
+		log.Warn().Msg("chunk not found")
+		return nil
+	}
+
 	if err != nil {
 		return fmt.Errorf("could not retrieve chunk ID (%s): %w", origin, err)
 	}
