@@ -26,9 +26,10 @@ type VirtualMachine interface {
 }
 
 // New creates a new virtual machine instance with the provided runtime.
-func New(rt runtime.Runtime, options ...VirtualMachineOption) (VirtualMachine, error) {
+func New(rt runtime.Runtime, chain flow.Chain, options ...VirtualMachineOption) (VirtualMachine, error) {
 	vm := &virtualMachine{
-		rt: rt,
+		rt:    rt,
+		chain: chain,
 	}
 
 	for _, option := range options {
@@ -54,24 +55,18 @@ func WithCache(cache ASTCache) VirtualMachineOption {
 	}
 }
 
-func WithSimpleAddresses(enabled bool) VirtualMachineOption {
-	return func(ctx *virtualMachine) {
-		ctx.simpleAddresses = enabled
-	}
-}
-
 type virtualMachine struct {
-	rt              runtime.Runtime
-	cache           ASTCache
-	simpleAddresses bool
+	rt    runtime.Runtime
+	cache ASTCache
+	chain flow.Chain
 }
 
 func (vm *virtualMachine) NewBlockContext(header *flow.Header, blocks Blocks) BlockContext {
 	bc := &blockContext{
-		vm:              vm,
-		header:          header,
-		blocks:          blocks,
-		simpleAddresses: vm.simpleAddresses,
+		vm:     vm,
+		header: header,
+		blocks: blocks,
+		chain:  vm.chain,
 	}
 
 	// Seed the random number generator with entropy created from the block header ID. The random number generator will

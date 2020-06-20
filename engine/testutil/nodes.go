@@ -66,11 +66,12 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	index := storage.NewIndex(metrics, db)
 	payloads := storage.NewPayloads(db, index, identities, guarantees, seals)
 	blocks := storage.NewBlocks(db, headers, payloads)
+	chainID := flow.Testnet
 
 	state, err := protocol.NewState(metrics, db, headers, identities, seals, index, payloads, blocks)
 	require.NoError(t, err)
 
-	genesis := flow.Genesis(participants)
+	genesis := flow.Genesis(participants, chainID)
 	err = state.Mutate().Bootstrap(unittest.GenesisStateCommitment, genesis)
 	require.NoError(t, err)
 
@@ -111,6 +112,7 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 		Me:         me,
 		Net:        stubnet,
 		DBDir:      dbDir,
+		ChainID:    chainID,
 	}
 }
 
@@ -240,7 +242,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	genesisHead, err := node.State.Final().Head()
 	require.NoError(t, err)
 
-	commit, err := bootstrap.BootstrapLedger(ls, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply)
+	commit, err := bootstrap.BootstrapLedger(ls, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply, node.ChainID.Chain())
 	require.NoError(t, err)
 
 	err = bootstrap.BootstrapExecutionDatabase(node.DB, commit, genesisHead)
@@ -258,7 +260,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	rt := runtime.NewInterpreterRuntime()
-	vm, err := virtualmachine.New(rt)
+	vm, err := virtualmachine.New(rt, node.ChainID.Chain())
 
 	require.NoError(t, err)
 
@@ -380,7 +382,7 @@ func VerificationNode(t testing.TB,
 
 	if node.VerifierEngine == nil {
 		rt := runtime.NewInterpreterRuntime()
-		vm, err := virtualmachine.New(rt)
+		vm, err := virtualmachine.New(rt, node.ChainID.Chain())
 		require.NoError(t, err)
 		chunkVerifier := chunks.NewChunkVerifier(vm, node.Blocks)
 

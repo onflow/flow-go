@@ -36,6 +36,7 @@ type Handler struct {
 
 	executionRPC execution.ExecutionAPIClient
 	state        protocol.State
+	chainID      flow.ChainID
 }
 
 // compile time check to make sure the aggregated handler implements the Access API
@@ -48,8 +49,8 @@ func NewHandler(log zerolog.Logger,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
-	transactions storage.Transactions) *Handler {
-
+	transactions storage.Transactions,
+	chainID flow.ChainID) *Handler {
 	return &Handler{
 		executionRPC: e,
 		state:        s,
@@ -85,6 +86,7 @@ func NewHandler(log zerolog.Logger,
 			state:        s,
 			headers:      headers,
 		},
+		chainID: chainID,
 	}
 }
 
@@ -143,7 +145,7 @@ func (h *Handler) GetCollectionByID(_ context.Context, req *access.GetCollection
 
 func (h *Handler) GetNetworkParameters(_ context.Context, _ *access.GetNetworkParametersRequest) (*access.GetNetworkParametersResponse, error) {
 	return &access.GetNetworkParametersResponse{
-		ChainId: string(flow.GetChainID()),
+		ChainId: string(h.chainID),
 	}, nil
 }
 

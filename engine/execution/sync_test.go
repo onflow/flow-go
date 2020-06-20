@@ -48,23 +48,25 @@ func TestSyncFlow(t *testing.T) {
 
 	seq := uint64(0)
 
-	tx1 := execTestutil.DeployCounterContractTransaction(flow.ServiceAddress())
-	err = execTestutil.SignTransactionAsServiceAccount(tx1, seq)
+	chain := exeNode1.ChainID.Chain()
+
+	tx1 := execTestutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
+	err = execTestutil.SignTransactionAsServiceAccount(tx1, seq, chain)
 	require.NoError(t, err)
 	seq++
 
-	tx2 := execTestutil.CreateCounterTransaction(flow.ServiceAddress(), flow.ServiceAddress())
-	err = execTestutil.SignTransactionAsServiceAccount(tx2, seq)
+	tx2 := execTestutil.CreateCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+	err = execTestutil.SignTransactionAsServiceAccount(tx2, seq, chain)
 	require.NoError(t, err)
 	seq++
 
-	tx4 := execTestutil.AddToCounterTransaction(flow.ServiceAddress(), flow.ServiceAddress())
-	err = execTestutil.SignTransactionAsServiceAccount(tx4, seq)
+	tx4 := execTestutil.AddToCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+	err = execTestutil.SignTransactionAsServiceAccount(tx4, seq, chain)
 	require.NoError(t, err)
 	seq++
 
-	tx5 := execTestutil.AddToCounterTransaction(flow.ServiceAddress(), flow.ServiceAddress())
-	err = execTestutil.SignTransactionAsServiceAccount(tx5, seq)
+	tx5 := execTestutil.AddToCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+	err = execTestutil.SignTransactionAsServiceAccount(tx5, seq, chain)
 	require.NoError(t, err)
 
 	col1 := flow.Collection{Transactions: []*flow.TransactionBody{tx1}}
