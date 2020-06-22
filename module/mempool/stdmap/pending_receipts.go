@@ -24,6 +24,7 @@ func NewPendingReceipts(limit uint) (*PendingReceipts, error) {
 		qe:      qe,
 		Backend: NewBackend(WithLimit(limit), WithEject(qe.Eject)),
 	}
+
 	return r, nil
 }
 
@@ -33,13 +34,29 @@ func (p *PendingReceipts) Add(preceipt *verification.PendingReceipt) bool {
 	if ok {
 		p.qe.Push(preceipt.ID())
 	}
-
 	return ok
+}
+
+// Get returns the pending receipt and true, if the pending receipt is in the
+// mempool. Otherwise, it returns nil and false.
+func (p *PendingReceipts) Get(preceiptID flow.Identifier) (*verification.PendingReceipt, bool) {
+	entity, ok := p.Backend.ByID(preceiptID)
+	if !ok {
+		return nil, false
+	}
+
+	pr, ok := entity.(*verification.PendingReceipt)
+	if !ok {
+		return nil, false
+	}
+
+	return pr, true
 }
 
 // Rem will remove a pending receipt by ID.
 func (p *PendingReceipts) Rem(preceiptID flow.Identifier) bool {
-	return p.Backend.Rem(preceiptID)
+	ok := p.Backend.Rem(preceiptID)
+	return ok
 }
 
 // All will return all pending execution receipts in the memory pool.

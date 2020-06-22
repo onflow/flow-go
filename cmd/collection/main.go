@@ -16,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
 	hotstuffmodel "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/consensus/recovery/cluster"
@@ -23,8 +24,9 @@ import (
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/proposal"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
+	colsync "github.com/dapperlabs/flow-go/engine/collection/synchronization"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
-	"github.com/dapperlabs/flow-go/engine/common/synchronization"
+	consync "github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	clustermodel "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/encoding"
@@ -54,24 +56,29 @@ const (
 func main() {
 
 	var (
-		txLimit             uint
-		maxCollectionSize   uint
-		ingressExpiryBuffer uint
-		builderExpiryBuffer uint
-		hotstuffTimeout     time.Duration
+		txLimit                                uint
+		maxCollectionSize                      uint
+		builderExpiryBuffer                    uint
+		hotstuffTimeout                        time.Duration
+		hotstuffMinTimeout                     time.Duration
+		hotstuffTimeoutIncreaseFactor          float64
+		hotstuffTimeoutDecreaseFactor          float64
+		hotstuffTimeoutVoteAggregationFraction float64
+		blockRateDelay                         time.Duration
 
-		ingressConf     ingress.Config
-		pool            mempool.Transactions
-		transactions    *storagekv.Transactions
-		colHeaders      *storagekv.Headers
-		colPayloads     *storagekv.ClusterPayloads
-		colCacheMetrics module.CacheMetrics
+		ingestConf  ingest.Config
+		ingressConf ingress.Config
+
+		pool        mempool.Transactions
+		colHeaders  *storagekv.Headers
+		colPayloads *storagekv.ClusterPayloads
+		colBlocks   *storagekv.ClusterBlocks
 
 		colCache *buffer.PendingClusterBlocks // pending block cache for cluster consensus
 		conCache *buffer.PendingBlocks        // pending block cache for follower
 
 		myCluster    flow.IdentityList // cluster identity list
-		clusterID    string            // chain ID for the cluster
+		clusterID    flow.ChainID      // chain ID for the cluster
 		clusterState *clusterkv.State  // chain state for the cluster
 
 		// from bootstrap files
@@ -88,27 +95,24 @@ func main() {
 	cmd.FlowNode(flow.RoleCollection.String()).
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&txLimit, "tx-limit", 50000, "maximum number of transactions in the memory pool")
-			flags.UintVar(&ingressExpiryBuffer, "ingress-expiry-buffer", 30, "expiry buffer for inbound transactions")
-			flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", 15, "expiry buffer for transactions in proposed collections")
-			flags.UintVar(&maxCollectionSize, "max-collection-size", 100, "maximum number of transactions in proposed collections")
 			flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000", "the address the ingress server listens on")
-			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", proposalTimeout, "the initial timeout for the hotstuff pacemaker")
+			flags.Uint64Var(&ingestConf.MaxGasLimit, "ingest-max-gas-limit", flow.DefaultMaxGasLimit, "maximum per-transaction gas limit")
+			flags.BoolVar(&ingestConf.CheckScriptsParse, "ingest-check-scripts-parse", true, "whether we check that inbound transactions are parse-able")
+			flags.BoolVar(&ingestConf.AllowUnknownReference, "ingest-allow-unknown-reference", true, "whether we ingest transactions referencing an unknown block")
+			flags.UintVar(&ingestConf.ExpiryBuffer, "ingest-expiry-buffer", 30, "expiry buffer for inbound transactions")
+			flags.UintVar(&ingestConf.PropagationRedundancy, "ingest-tx-propagation-redundancy", 2, "how many additional cluster members we propagate transactions to")
+			flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", 15, "expiry buffer for transactions in proposed collections")
+			flags.UintVar(&maxCollectionSize, "builder-max-collection-size", 100, "maximum number of transactions in proposed collections")
+			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second, "the initial timeout for the hotstuff pacemaker")
+			flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", proposalTimeout, "the lower timeout bound for the hotstuff pacemaker")
+			flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor", timeout.DefaultConfig.TimeoutIncrease, "multiplicative increase of timeout value in case of time out event")
+			flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor", timeout.DefaultConfig.TimeoutDecrease, "multiplicative decrease of timeout value in case of progress")
+			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", timeout.DefaultConfig.VoteAggregationTimeoutFraction, "additional fraction of replica timeout that the primary will wait for votes")
+			flags.DurationVar(&blockRateDelay, "block-rate-delay", 1000*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
 		}).
 		Module("transactions mempool", func(node *cmd.FlowNodeBuilder) error {
 			pool, err = stdmap.NewTransactions(txLimit)
 			return err
-		}).
-		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
-			colCacheMetrics = metrics.NewCacheCollector("cluster")
-			transactions = storagekv.NewTransactions(node.DB)
-			colHeaders = storagekv.NewHeaders(colCacheMetrics, node.DB)
-			colPayloads = storagekv.NewClusterPayloads(colCacheMetrics, node.DB)
-			return nil
-		}).
-		Module("block mempool", func(node *cmd.FlowNodeBuilder) error {
-			colCache = buffer.NewPendingClusterBlocks()
-			conCache = buffer.NewPendingBlocks()
-			return nil
 		}).
 		Module("collection cluster ID", func(node *cmd.FlowNodeBuilder) error {
 			myCluster, err = protocol.ClusterFor(node.State.Final(), node.Me.NodeID())
@@ -116,6 +120,17 @@ func main() {
 				return fmt.Errorf("could not get my cluster: %w", err)
 			}
 			clusterID = protocol.ChainIDForCluster(myCluster)
+			return nil
+		}).
+		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
+			colHeaders = storagekv.NewHeaders(node.Metrics.Cache, node.DB)
+			colPayloads = storagekv.NewClusterPayloads(node.Metrics.Cache, node.DB)
+			colBlocks = storagekv.NewClusterBlocks(node.DB, clusterID, colHeaders, colPayloads)
+			return nil
+		}).
+		Module("block mempool", func(node *cmd.FlowNodeBuilder) error {
+			colCache = buffer.NewPendingClusterBlocks()
+			conCache = buffer.NewPendingBlocks()
 			return nil
 		}).
 		Module("collection node metrics", func(node *cmd.FlowNodeBuilder) error {
@@ -169,7 +184,7 @@ func main() {
 
 				node.Logger.Info().
 					Hex("genesis_id", logging.ID(clusterGenesis.ID())).
-					Str("cluster_id", clusterID).
+					Str("cluster_id", clusterID.String()).
 					Str("cluster_members", fmt.Sprintf("%v", myCluster.NodeIDs())).
 					Msg("bootstrapped cluster state")
 			}
@@ -181,7 +196,8 @@ func main() {
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
-			cleaner := storagekv.NewCleaner(node.Logger, node.DB)
+			// TODO frequency of 0 turns off the cleaner, turn back on once we know the proper tuning
+			cleaner := storagekv.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
 
 			// create a finalizer that will handling updating the protocol
 			// state when the follower detects newly finalized blocks
@@ -247,7 +263,7 @@ func main() {
 
 			// create a block synchronization engine to handle follower getting
 			// out of sync
-			sync, err := synchronization.New(
+			sync, err := consync.New(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Network,
@@ -271,7 +287,7 @@ func main() {
 				colMetrics,
 				node.Me,
 				pool,
-				ingressExpiryBuffer,
+				ingestConf,
 			)
 			return ing, err
 		}).
@@ -280,7 +296,6 @@ func main() {
 			return server, nil
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			collections := storagekv.NewCollections(node.DB)
 			prov, err = provider.New(
 				node.Logger,
 				node.Network,
@@ -289,8 +304,8 @@ func main() {
 				colMetrics,
 				node.Me,
 				pool,
-				collections,
-				transactions,
+				node.Storage.Collections,
+				node.Storage.Transactions,
 			)
 			return prov, err
 		}).
@@ -312,7 +327,7 @@ func main() {
 				clusterState,
 				ing,
 				pool,
-				transactions,
+				node.Storage.Transactions,
 				colHeaders,
 				colPayloads,
 				colCache,
@@ -356,13 +371,32 @@ func main() {
 				clusterQC,
 				finalized,
 				pending,
-				consensus.WithTimeout(hotstuffTimeout),
+				consensus.WithBlockRateDelay(blockRateDelay),
+				consensus.WithInitialTimeout(hotstuffTimeout),
+				consensus.WithMinTimeout(hotstuffMinTimeout),
+				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
+				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
+				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
 			)
 			if err != nil {
-				return nil, fmt.Errorf("creating HotStuff participant failed: %w", err)
+				return nil, fmt.Errorf("could not initialize hotstuff participant: %w", err)
 			}
 
-			prop = prop.WithConsensus(hot)
+			sync, err := colsync.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				myCluster,
+				clusterState,
+				colBlocks,
+				prop,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create cluster sync engine: %w", err)
+			}
+
+			prop = prop.WithConsensus(hot).WithSynchronization(sync)
 			return prop, nil
 		}).
 		Run()
@@ -383,7 +417,7 @@ func initClusterCommittee(node *cmd.FlowNodeBuilder, colPayloads *storagekv.Clus
 	return committee.New(node.State, translator, node.Me.NodeID(), selector, cluster.NodeIDs()), nil
 }
 
-func loadClusterBlock(path string, clusterID string) (*clustermodel.Block, error) {
+func loadClusterBlock(path string, clusterID flow.ChainID) (*clustermodel.Block, error) {
 	filename := fmt.Sprintf(bootstrap.PathGenesisClusterBlock, clusterID)
 	data, err := ioutil.ReadFile(filepath.Join(path, filename))
 	if err != nil {
@@ -398,7 +432,7 @@ func loadClusterBlock(path string, clusterID string) (*clustermodel.Block, error
 	return &block, nil
 }
 
-func loadClusterQC(path string, clusterID string) (*hotstuffmodel.QuorumCertificate, error) {
+func loadClusterQC(path string, clusterID flow.ChainID) (*hotstuffmodel.QuorumCertificate, error) {
 	filename := fmt.Sprintf(bootstrap.PathGenesisClusterQC, clusterID)
 	data, err := ioutil.ReadFile(filepath.Join(path, filename))
 	if err != nil {

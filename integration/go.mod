@@ -6,16 +6,17 @@ require (
 	github.com/dapperlabs/flow-go v0.3.2-0.20200312195452-df4550a863b7
 	github.com/dapperlabs/flow-go/crypto v0.3.2-0.20200312195452-df4550a863b7
 	github.com/dapperlabs/testingdock v0.4.3-0.20200424073047-26b38aa03602
-	github.com/dgraph-io/badger/v2 v2.0.2
+	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/docker/docker v1.4.2-0.20190513124817-8c8457b0f2f8
 	github.com/docker/go-connections v0.4.0
-	github.com/onflow/cadence v0.2.0
-	github.com/onflow/flow-go-sdk v0.1.2-0.20200507214414-a33d38d32156
-	github.com/onflow/flow/protobuf/go/flow v0.1.4
+	github.com/onflow/cadence v0.4.1-0.20200604200650-30a200f9c324
+	github.com/onflow/flow-go-sdk v0.4.0
+	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200619174948-a3a856d16a27
 	github.com/rs/zerolog v1.15.0
-	github.com/stretchr/testify v1.5.1
-	google.golang.org/grpc v1.28.0
-	gopkg.in/yaml.v2 v2.2.4
+	github.com/stretchr/testify v1.6.1
+	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
+	google.golang.org/grpc v1.29.1
+	gopkg.in/yaml.v2 v2.2.5
 )
 
 replace github.com/dapperlabs/flow-go => ../

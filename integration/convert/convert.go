@@ -9,7 +9,11 @@ import (
 )
 
 func TxFromSDK(sdkTx sdk.Transaction) flow.TransactionBody {
-	proto := sdkconvert.TransactionToMessage(sdkTx)
+	proto, err := sdkconvert.TransactionToMessage(sdkTx)
+	if err != nil {
+		panic(err)
+	}
+
 	tx, err := convert.MessageToTransaction(proto)
 	if err != nil {
 		panic(err)
@@ -39,5 +43,5 @@ func AddressFromSDK(sdkAddr sdk.Address) flow.Address {
 }
 
 func ToSDKAddress(addr flow.Address) sdk.Address {
-	return sdk.BytesToAddress(addr[:])
+	return sdk.BytesToAddress(addr.Bytes())
 }

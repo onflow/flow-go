@@ -75,7 +75,7 @@ func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*b
 
 // RetrieveLatestFinalizedClusterHeader retrieves the latest finalized for the
 // given cluster chain ID.
-func RetrieveLatestFinalizedClusterHeader(chainID string, final *flow.Header) func(tx *badger.Txn) error {
+func RetrieveLatestFinalizedClusterHeader(chainID flow.ChainID, final *flow.Header) func(tx *badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		var boundary uint64
 		err := operation.RetrieveClusterFinalizedHeight(chainID, &boundary)(tx)
@@ -167,7 +167,7 @@ func InsertClusterPayload(blockID flow.Identifier, payload *cluster.Payload) fun
 
 		// insert constituent transactions
 		for _, colTx := range payload.Collection.Transactions {
-			err = operation.SkipDuplicates(operation.InsertTransaction(colTx))(tx)
+			err = operation.SkipDuplicates(operation.InsertTransaction(colTx.ID(), colTx))(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert payload transaction: %w", err)
 			}

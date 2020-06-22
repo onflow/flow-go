@@ -15,7 +15,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	swarm "github.com/libp2p/go-libp2p-swarm"
@@ -23,13 +22,17 @@ import (
 	"github.com/libp2p/go-tcp-transport"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
+
+	netwk "github.com/dapperlabs/flow-go/network"
 )
 
 // A unique Libp2p protocol ID for Flow (https://docs.libp2p.io/concepts/protocols/)
 // All nodes communicate with each other using this protocol
 const (
-	FlowLibP2PProtocolID protocol.ID = "/flow/push/0.0.1"
+	FlowLibP2PProtocolIDVersion1 protocol.ID = "/flow/push/0.0.1"
 )
+
+var flowLibP2PProtocolID = FlowLibP2PProtocolIDVersion1
 
 // maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
 const maxConnectAttempt = 3
@@ -62,7 +65,7 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 
 	p.name = n.Name
 	p.logger = logger
-	addr := multiaddressStr(n)
+	addr := MultiaddressStr(n)
 	sourceMultiAddr, err := multiaddr.NewMultiaddr(addr)
 	if err != nil {
 		return err
@@ -97,7 +100,7 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 
 	p.libP2PHost = host
 
-	host.SetStreamHandler(FlowLibP2PProtocolID, handler)
+	host.SetStreamHandler(flowLibP2PProtocolID, handler)
 
 	// Creating a new PubSub instance of the type GossipSub with psOption
 	p.ps, err = pubsub.NewGossipSub(ctx, p.libP2PHost, psOption...)
@@ -128,15 +131,21 @@ func (p *P2PNode) Stop() (chan struct{}, error) {
 		}
 	}
 
-	if result != nil {
-		// TODO: Till #2485 - graceful shutdown is implemented, swallow all unsusbscribe errors and only log it
-		p.logger.Debug().Err(result)
-	}
-
 	p.logger.Debug().Str("name", p.name).Msg("stopping libp2p node")
 	if err := p.libP2PHost.Close(); err != nil {
+		result = multierror.Append(result, err)
+	}
+
+	p.logger.Debug().Str("name", p.name).Msg("closing peer store")
+	// to prevent peerstore routine leak (https://github.com/libp2p/go-libp2p/issues/718)
+	if err := p.libP2PHost.Peerstore().Close(); err != nil {
+		p.logger.Debug().Str("name", p.name).Err(err).Msg("closing peer store")
+		result = multierror.Append(result, err)
+	}
+
+	if result != nil {
 		close(done)
-		return done, multierror.Append(result, err)
+		return done, result
 	}
 
 	go func(done chan struct{}) {
@@ -171,10 +180,6 @@ func (p *P2PNode) AddPeers(ctx context.Context, peers ...NodeAddress) error {
 			return err
 		}
 
-		// Add the destination's peer multiaddress in the peerstore.
-		// This will be used during connection and stream creation by libp2p.
-		p.libP2PHost.Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.PermanentAddrTTL)
-
 		err = p.libP2PHost.Connect(ctx, pInfo)
 		if err != nil {
 			return err
@@ -195,7 +200,7 @@ func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stre
 	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath if it exists)
 	stream, err := p.tryCreateNewStream(ctx, n, peerID, maxConnectAttempt)
 	if err != nil {
-		return nil, fmt.Errorf("could not create stream (name: %s, address: %s:%s): %w", n.Name, n.IP, n.Port, err)
+		return nil, netwk.NewPeerUnreachableError(fmt.Errorf("could not create stream (name: %s, address: %s:%s): %w", n.Name, n.IP, n.Port, err))
 	}
 	return stream, nil
 }
@@ -233,16 +238,12 @@ func (p *P2PNode) tryCreateNewStream(ctx context.Context, n NodeAddress, targetI
 		// Add node address as a peer
 		err = p.AddPeers(ctx, n)
 		if err != nil {
-			p.logger.Error().Str("target", targetID.String()).Err(err).
-				Int("retry_attempt", retries).Msg("could not create connection")
 			errs = multierror.Append(errs, err)
 			continue
 		}
 
-		s, err = p.libP2PHost.NewStream(ctx, targetID, FlowLibP2PProtocolID)
+		s, err = p.libP2PHost.NewStream(ctx, targetID, flowLibP2PProtocolID)
 		if err != nil {
-			p.logger.Error().Str("target", targetID.String()).Err(err).
-				Int("retry_attempt", retries).Msg("failed to create stream")
 			errs = multierror.Append(errs, err)
 			continue
 		}
@@ -257,7 +258,7 @@ func (p *P2PNode) tryCreateNewStream(ctx context.Context, n NodeAddress, targetI
 
 // GetPeerInfo generates the libp2p peer.AddrInfo for a Node/Peer given its node address
 func GetPeerInfo(p NodeAddress) (peer.AddrInfo, error) {
-	addr := multiaddressStr(p)
+	addr := MultiaddressStr(p)
 	maddr, err := multiaddr.NewMultiaddr(addr)
 	if err != nil {
 		return peer.AddrInfo{}, err
@@ -357,12 +358,12 @@ func (p *P2PNode) Publish(ctx context.Context, topic string, data []byte) error 
 	return nil
 }
 
-// multiaddressStr receives a node address and returns
+// MultiaddressStr receives a node address and returns
 // its corresponding Libp2p Multiaddress in string format
 // in current implementation IP part of the node address is
 // either an IP or a dns4
 // https://docs.libp2p.io/concepts/addressing/
-func multiaddressStr(address NodeAddress) string {
+func MultiaddressStr(address NodeAddress) string {
 	parsedIP := net.ParseIP(address.IP)
 	if parsedIP != nil {
 		// returns parsed ip version of the multi-address

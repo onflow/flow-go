@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
+	"github.com/dapperlabs/flow-go/state"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -144,7 +145,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("compliance could not process submitted event")
+			engine.LogError(e.log, err)
 		}
 	})
 }
@@ -209,13 +210,11 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 	}
 
 	// fill in the fields that can't be populated by HotStuff
-	//TODO clean this up - currently we set these fields in builder, then lose
-	// them in HotStuff, then need to set them again here
 	header.ChainID = parent.ChainID
 	header.Height = parent.Height + 1
 
 	log := e.log.With().
-		Str("chain_id", header.ChainID).
+		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
 		Hex("block_id", logging.Entity(header)).
@@ -245,6 +244,9 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 	}
 
 	e.unit.LaunchAfter(delay, func() {
+
+		go e.hotstuff.SubmitProposal(header, parent.View)
+
 		// NOTE: some fields are not needed for the message
 		// - proposer ID is conveyed over the network message
 		// - the payload hash is deduced from the payload
@@ -326,7 +328,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	header := proposal.Header
 
 	log := e.log.With().
-		Str("chain_id", header.ChainID).
+		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
 		Hex("block_id", logging.Entity(header)).
@@ -381,15 +383,20 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 		// go to the first missing ancestor
 		ancestorID := ancestor.Header.ParentID
+		ancestorHeight := ancestor.Header.Height - 1
 		for {
 			ancestor, found := e.pending.ByID(ancestorID)
 			if !found {
 				break
 			}
 			ancestorID = ancestor.Header.ParentID
+			ancestorHeight = ancestor.Header.Height - 1
 		}
 
-		log.Debug().Msg("requesting missing ancestor for proposal")
+		log.Debug().
+			Uint64("ancestor_height", ancestorHeight).
+			Hex("ancestor_id", ancestorID[:]).
+			Msg("requesting missing ancestor for proposal")
 
 		e.sync.RequestBlock(ancestorID)
 
@@ -441,7 +448,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	header := proposal.Header
 
 	log := e.log.With().
-		Str("chain_id", header.ChainID).
+		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
 		Hex("block_id", logging.Entity(header)).
@@ -459,7 +466,21 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 		Header:  proposal.Header,
 		Payload: proposal.Payload,
 	}
+
 	err := e.state.Mutate().Extend(block)
+	// if the error is a known invalid extension of the protocol state, then
+	// the input is invalid
+	if state.IsInvalidExtensionError(err) {
+		return engine.NewInvalidInputErrorf("invalid extension of protocol state (block: %x, height: %d): %w",
+			header.ID(), header.Height, err)
+	}
+
+	// if the error is an known outdated extension of the protocol state, then
+	// the input is outdated
+	if state.IsOutdatedExtensionError(err) {
+		return engine.NewOutdatedInputErrorf("outdated extension of protocol state: %w", err)
+	}
+
 	if err != nil {
 		return fmt.Errorf("could not extend protocol state (block: %x, height: %d): %w", header.ID(), header.Height, err)
 	}
@@ -507,12 +528,17 @@ func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.BlockVote)
 // parent block that was just processed; if this is the case, they should now
 // all be validly connected to the finalized state and we should process them.
 func (e *Engine) processPendingChildren(header *flow.Header) error {
+	blockID := header.ID()
 
 	// check if there are any children for this parent in the cache
-	children, has := e.pending.ByParentID(header.ID())
+	children, has := e.pending.ByParentID(blockID)
 	if !has {
 		return nil
 	}
+
+	e.log.Debug().
+		Int("children", len(children)).
+		Msg("processing pending children")
 
 	// then try to process children only this once
 	var result *multierror.Error
@@ -528,7 +554,7 @@ func (e *Engine) processPendingChildren(header *flow.Header) error {
 	}
 
 	// drop all of the children that should have been processed now
-	e.pending.DropForParent(header)
+	e.pending.DropForParent(blockID)
 
 	e.mempool.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
 

@@ -2,7 +2,6 @@ package testnet
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -12,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
@@ -54,6 +54,9 @@ const (
 	AccessNodeAPIPort = "access-api-port"
 	// GhostNodeAPIPort is the name used for the access node API port.
 	GhostNodeAPIPort = "ghost-api-port"
+
+	// ExeNodeMetricsPort
+	ExeNodeMetricsPort = "exe-metrics-port"
 )
 
 func init() {
@@ -392,6 +395,10 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			nodeContainer.bindPort(hostPort, containerPort)
 
+			// set a low timeout so that all nodes agree on the current view more quickly
+			nodeContainer.addFlag("hotstuff-timeout", time.Second.String())
+			nodeContainer.addFlag("hotstuff-min-timeout", time.Second.String())
+
 			nodeContainer.addFlag("ingress-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 			nodeContainer.Ports[ColNodeAPIPort] = hostPort
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
@@ -404,12 +411,20 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			nodeContainer.bindPort(hostPort, containerPort)
 
+			hostMetricsPort := testingdock.RandomPort(t)
+			containerMetricsPort := "8080/tcp"
+
+			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
+
 			nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 			if !nodeContainer.Config.Ghost {
 			}
 			nodeContainer.Ports[ExeNodeAPIPort] = hostPort
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckExecutionGRPC(hostPort))
 			net.AccessPorts[ExeNodeAPIPort] = hostPort
+
+			nodeContainer.Ports[ExeNodeMetricsPort] = hostMetricsPort
+			net.AccessPorts[ExeNodeMetricsPort] = hostMetricsPort
 
 			// create directories for execution state trie and values in the tmp
 			// host directory.
@@ -464,6 +479,10 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 }
 
 func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Block, []ContainerConfig, error) {
+	// Setup as Testnet
+	chainID := flow.Testnet
+	chain := chainID.Chain()
+
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
 	if nNodes == 0 {
@@ -485,25 +504,15 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, fmt.Errorf("failed to run DKG: %w", err)
 	}
 
-	// generate the root account
-	hardcoded, err := hex.DecodeString(flow.RootAccountPrivateKeyHex)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	account, err := flow.DecodeAccountPrivateKey(hardcoded)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	// generate the initial execution state
-	commit, err := run.GenerateExecutionState(filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState), account)
+	dbDir := filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState)
+	commit, err := run.GenerateExecutionState(dbDir, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply, chain)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// generate genesis block
-	genesis := bootstraprun.GenerateRootBlock(toIdentityList(confs))
+	genesis := bootstraprun.GenerateRootBlock(toIdentityList(confs), chainID)
 
 	// generate QC
 	nodeInfos := bootstrap.FilterByRole(toNodeInfoList(confs), flow.RoleConsensus)
@@ -515,7 +524,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 
 	// write common genesis bootstrap files
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathAccount0Priv), account)
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathServiceAccountPublicKey), unittest.ServiceAccountPublicKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -535,15 +544,29 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, err
 	}
 
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathDKGDataPub), dkg.Public())
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathGenesisTokenSupply), unittest.GenesisTokenSupply)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// write public DKG data
+	consensusNodes := bootstrap.FilterByRole(toNodeInfoList(confs), flow.RoleConsensus)
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathDKGDataPub), dkg.Public(consensusNodes))
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// write private key files for each DKG participant
-	for _, part := range dkg.Participants {
-		path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, part.NodeID)
-		err = writeJSON(filepath.Join(bootstrapDir, path), part.Private())
+	for i, sk := range dkg.PrivKeyShares {
+		nodeID := consensusNodes[i].NodeID
+		encodableSk := bootstrap.EncodableRandomBeaconPrivKey{PrivateKey: sk}
+		privParticpant := bootstrap.DKGParticipantPriv{
+			NodeID:              nodeID,
+			RandomBeaconPrivKey: encodableSk,
+			GroupIndex:          i,
+		}
+		path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID)
+		err = writeJSON(filepath.Join(bootstrapDir, path), privParticpant)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -661,29 +684,23 @@ func runDKG(confs []ContainerConfig) (bootstrap.DKGData, error) {
 	nConsensusNodes := len(consensusNodes)
 
 	// run the core dkg algorithm
-	dkgSeeds, err := getSeeds(nConsensusNodes)
+	dkgSeed, err := getSeed()
 	if err != nil {
 		return bootstrap.DKGData{}, err
 	}
 
-	dkg, err := bootstraprun.RunDKG(nConsensusNodes, dkgSeeds)
+	dkg, err := bootstraprun.RunFastKG(nConsensusNodes, dkgSeed)
 	if err != nil {
 		return bootstrap.DKGData{}, err
 	}
 
 	// sanity check
-	if nConsensusNodes != len(dkg.Participants) {
+	if nConsensusNodes != len(dkg.PrivKeyShares) {
 		return bootstrap.DKGData{}, fmt.Errorf(
 			"consensus node count does not match DKG participant count: nodes=%d, participants=%d",
 			nConsensusNodes,
-			len(dkg.Participants),
+			len(dkg.PrivKeyShares),
 		)
-	}
-
-	// set the node IDs in the dkg data
-	for i := range dkg.Participants {
-		nodeID := consensusNodes[i].NodeID
-		dkg.Participants[i].NodeID = nodeID
 	}
 
 	return dkg, nil

@@ -6,7 +6,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/model/encoding/rlp"
+	"github.com/dapperlabs/flow-go/model/fingerprint"
 )
 
 // TransactionBody includes the main contents of a transaction
@@ -50,6 +50,18 @@ type TransactionBody struct {
 // NewTransactionBody initializes and returns an empty transaction body
 func NewTransactionBody() *TransactionBody {
 	return &TransactionBody{}
+}
+
+func (tb TransactionBody) Fingerprint() []byte {
+	return fingerprint.Fingerprint(struct {
+		Payload            interface{}
+		PayloadSignatures  interface{}
+		EnvelopeSignatures interface{}
+	}{
+		Payload:            tb.payloadCanonicalForm(),
+		PayloadSignatures:  signaturesList(tb.PayloadSignatures).canonicalForm(),
+		EnvelopeSignatures: signaturesList(tb.EnvelopeSignatures).canonicalForm(),
+	})
 }
 
 func (tb TransactionBody) ID() Identifier {
@@ -139,7 +151,7 @@ func (tb *TransactionBody) MissingFields() []string {
 		missingFields = append(missingFields, TransactionFieldRefBlockID.String())
 	}
 
-	if tb.Payer == ZeroAddress {
+	if tb.Payer == EmptyAddress {
 		missingFields = append(missingFields, TransactionFieldPayer.String())
 	}
 
@@ -169,11 +181,11 @@ func (tb *TransactionBody) signerList() []Address {
 		seen[address] = struct{}{}
 	}
 
-	if tb.ProposalKey.Address != ZeroAddress {
+	if tb.ProposalKey.Address != EmptyAddress {
 		addSigner(tb.ProposalKey.Address)
 	}
 
-	if tb.Payer != ZeroAddress {
+	if tb.Payer != EmptyAddress {
 		addSigner(tb.Payer)
 	}
 
@@ -195,12 +207,12 @@ func (tb *TransactionBody) signerMap() map[Address]int {
 	return signers
 }
 
-//SignPayload signs the transaction payload with the specified account key.
+// SignPayload signs the transaction payload with the specified account key.
 //
-//The resulting signature is combined with the account address and key ID before
-//being added to the transaction.
+// The resulting signature is combined with the account address and key ID before
+// being added to the transaction.
 //
-//This function returns an error if the signature cannot be generated.
+// This function returns an error if the signature cannot be generated.
 func (tb *TransactionBody) SignPayload(address Address, keyID uint64, privateKey crypto.PrivateKey, hasher hash.Hasher) error {
 
 	sig, err := privateKey.Sign(tb.PayloadMessage(), hasher)
@@ -213,12 +225,12 @@ func (tb *TransactionBody) SignPayload(address Address, keyID uint64, privateKey
 	return nil
 }
 
-//SignEnvelope signs the full transaction (payload + payload signatures) with the specified account key.
+// SignEnvelope signs the full transaction (payload + payload signatures) with the specified account key.
 //
-//The resulting signature is combined with the account address and key ID before
-//being added to the transaction.
+// The resulting signature is combined with the account address and key ID before
+// being added to the transaction.
 //
-//This function returns an error if the signature cannot be generated.
+// This function returns an error if the signature cannot be generated.
 func (tb *TransactionBody) SignEnvelope(address Address, keyID uint64, privateKey crypto.PrivateKey, hasher hash.Hasher) error {
 
 	sig, err := privateKey.Sign(tb.EnvelopeMessage(), hasher)
@@ -266,9 +278,7 @@ func (tb *TransactionBody) createSignature(address Address, keyID uint64, sig []
 }
 
 func (tb *TransactionBody) PayloadMessage() []byte {
-	temp := tb.payloadCanonicalForm()
-	encoder := rlp.NewEncoder()
-	return encoder.MustEncode(temp)
+	return fingerprint.Fingerprint(tb.payloadCanonicalForm())
 }
 
 func (tb *TransactionBody) payloadCanonicalForm() interface{} {
@@ -279,6 +289,7 @@ func (tb *TransactionBody) payloadCanonicalForm() interface{} {
 
 	return struct {
 		Script                    []byte
+		Arguments                 [][]byte
 		ReferenceBlockID          []byte
 		GasLimit                  uint64
 		ProposalKeyAddress        []byte
@@ -287,14 +298,15 @@ func (tb *TransactionBody) payloadCanonicalForm() interface{} {
 		Payer                     []byte
 		Authorizers               [][]byte
 	}{
-		tb.Script,
-		tb.ReferenceBlockID[:],
-		tb.GasLimit,
-		tb.ProposalKey.Address.Bytes(),
-		uint64(tb.ProposalKey.KeyID),
-		tb.ProposalKey.SequenceNumber,
-		tb.Payer.Bytes(),
-		authorizers,
+		Script:                    tb.Script,
+		Arguments:                 tb.Arguments,
+		ReferenceBlockID:          tb.ReferenceBlockID[:],
+		GasLimit:                  tb.GasLimit,
+		ProposalKeyAddress:        tb.ProposalKey.Address.Bytes(),
+		ProposalKeyID:             tb.ProposalKey.KeyID,
+		ProposalKeySequenceNumber: tb.ProposalKey.SequenceNumber,
+		Payer:                     tb.Payer.Bytes(),
+		Authorizers:               authorizers,
 	}
 }
 
@@ -302,8 +314,7 @@ func (tb *TransactionBody) payloadCanonicalForm() interface{} {
 //
 // This message is only signed by the payer account.
 func (tb *TransactionBody) EnvelopeMessage() []byte {
-	temp := tb.envelopeCanonicalForm()
-	return rlp.NewEncoder().MustEncode(temp)
+	return fingerprint.Fingerprint(tb.envelopeCanonicalForm())
 }
 
 func (tb *TransactionBody) envelopeCanonicalForm() interface{} {
@@ -316,27 +327,8 @@ func (tb *TransactionBody) envelopeCanonicalForm() interface{} {
 	}
 }
 
-// Encode serializes the full transaction data including the payload and all signatures.
-func (tb TransactionBody) Encode() []byte {
-	temp := struct {
-		Payload            interface{}
-		PayloadSignatures  interface{}
-		EnvelopeSignatures interface{}
-	}{
-		tb.payloadCanonicalForm(),
-		signaturesList(tb.PayloadSignatures).canonicalForm(),
-		signaturesList(tb.EnvelopeSignatures).canonicalForm(),
-	}
-
-	encoder := rlp.NewEncoder()
-	return encoder.MustEncode(temp)
-}
-
 func (tx *Transaction) PayloadMessage() []byte {
-	body := tx.TransactionBody
-	temp := body.payloadCanonicalForm()
-	encoder := rlp.NewEncoder()
-	return encoder.MustEncode(temp)
+	return fingerprint.Fingerprint(tx.TransactionBody.payloadCanonicalForm())
 }
 
 // Checksum provides a cryptographic commitment for a chunk content
@@ -398,6 +390,10 @@ type TransactionSignature struct {
 	SignerIndex int
 	KeyID       uint64
 	Signature   []byte
+}
+
+func (s TransactionSignature) Fingerprint() []byte {
+	return fingerprint.Fingerprint(s.canonicalForm())
 }
 
 func (s TransactionSignature) canonicalForm() interface{} {

@@ -16,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
+	mockStorage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -29,7 +30,7 @@ type ChunkVerifierTestSuite struct {
 func (s *ChunkVerifierTestSuite) SetupTest() {
 	// seed the RNG
 	rand.Seed(time.Now().UnixNano())
-	s.verifier = chunks.NewChunkVerifier(&virtualMachineMock{})
+	s.verifier = chunks.NewChunkVerifier(&virtualMachineMock{}, new(mockStorage.Blocks))
 }
 
 // TestChunkVerifier invokes all the tests in this test suite
@@ -112,7 +113,7 @@ func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
 // GetBaselineVerifiableChunk returns a verifiable chunk and sets the script
 // of a transaction in the middle of the collection to some value to signal the
 // mocked vm on what to return as tx exec outcome.
-func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.VerifiableChunk {
+func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.VerifiableChunkData {
 	// Collection setup
 
 	coll := unittest.CollectionFixture(5)
@@ -146,12 +147,12 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 	ids = append(ids, id1, id2)
 	values = append(values, value1, value2)
 
-	var verifiableChunk verification.VerifiableChunk
+	var verifiableChunkData verification.VerifiableChunkData
 
 	metricsCollector := &metrics.NoopCollector{}
 
 	unittest.RunWithTempDir(t, func(dbDir string) {
-		f, _ := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
+		f, _ := ledger.NewMTrieStorage(dbDir, 1000, metricsCollector, nil)
 		startState, _ := f.UpdateRegisters(ids, values, f.EmptyStateCommitment())
 		regTs, _ := f.GetRegisterTouches(ids, startState)
 
@@ -182,27 +183,24 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 			},
 		}
 
-		receipt := flow.ExecutionReceipt{
-			ExecutionResult: result,
-		}
-
-		verifiableChunk = verification.VerifiableChunk{
-			ChunkIndex:    chunk.Index,
-			EndState:      endState,
-			Block:         &block,
-			Receipt:       &receipt,
+		verifiableChunkData = verification.VerifiableChunkData{
+			Chunk:         &chunk,
+			Header:        &header,
+			Result:        &result,
 			Collection:    &coll,
 			ChunkDataPack: &chunkDataPack,
+			EndState:      endState,
 		}
 	})
 
-	return &verifiableChunk
+	return &verifiableChunkData
 
 }
 
 type blockContextMock struct {
 	vm     *virtualMachineMock
 	header *flow.Header
+	blocks virtualmachine.Blocks
 }
 
 func (bc *blockContextMock) ExecuteTransaction(
@@ -257,22 +255,24 @@ func (bc *blockContextMock) ExecuteTransaction(
 func (bc *blockContextMock) ExecuteScript(
 	ledger virtualmachine.Ledger,
 	script []byte,
+	arguments [][]byte,
 ) (*virtualmachine.ScriptResult, error) {
 	return nil, nil
 }
 
-func (bc *blockContextMock) GetAccount(ledger virtualmachine.Ledger, address flow.Address) *flow.Account {
-	return nil
+func (bc *blockContextMock) GetAccount(_ virtualmachine.Ledger, _ flow.Address) (*flow.Account, error) {
+	return nil, nil
 }
 
 // virtualMachineMock is a mocked virtualMachine
 type virtualMachineMock struct {
 }
 
-func (vm *virtualMachineMock) NewBlockContext(header *flow.Header) virtualmachine.BlockContext {
+func (vm *virtualMachineMock) NewBlockContext(header *flow.Header, blocks virtualmachine.Blocks) virtualmachine.BlockContext {
 	return &blockContextMock{
 		vm:     vm,
 		header: header,
+		blocks: blocks,
 	}
 }
 

@@ -2,7 +2,6 @@ package flow_test
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,11 +14,10 @@ import (
 
 func TestGenesisEncodingJSON(t *testing.T) {
 	identities := unittest.IdentityListFixture(8)
-	genesis := flow.Genesis(identities)
+	genesis := flow.Genesis(identities, flow.Mainnet)
 	genesisID := genesis.ID()
 	data, err := json.Marshal(genesis)
 	require.NoError(t, err)
-	fmt.Println(string(data))
 	var decoded flow.Block
 	err = json.Unmarshal(data, &decoded)
 	require.NoError(t, err)
@@ -30,7 +28,7 @@ func TestGenesisEncodingJSON(t *testing.T) {
 
 func TestGenesisDecodingMsgpack(t *testing.T) {
 	identities := unittest.IdentityListFixture(8)
-	genesis := flow.Genesis(identities)
+	genesis := flow.Genesis(identities, flow.Mainnet)
 	genesisID := genesis.ID()
 	data, err := msgpack.Marshal(genesis)
 	require.NoError(t, err)

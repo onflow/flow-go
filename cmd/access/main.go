@@ -23,8 +23,10 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
+	grpcutils "github.com/dapperlabs/flow-go/utils/grpc"
 )
 
 func main() {
@@ -38,8 +40,6 @@ func main() {
 		collectionRPC   access.AccessAPIClient
 		executionRPC    execution.ExecutionAPIClient
 		err             error
-		collections     *storage.Collections
-		transactions    *storage.Transactions
 		conCache        *buffer.PendingBlocks // pending block cache for follower
 	)
 
@@ -55,7 +55,10 @@ func main() {
 		Module("collection node client", func(node *cmd.FlowNodeBuilder) error {
 			node.Logger.Info().Err(err).Msgf("Collection node Addr: %s", rpcConf.CollectionAddr)
 
-			collectionRPCConn, err := grpc.Dial(rpcConf.CollectionAddr, grpc.WithInsecure())
+			collectionRPCConn, err := grpc.Dial(
+				rpcConf.CollectionAddr,
+				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+				grpc.WithInsecure())
 			if err != nil {
 				return err
 			}
@@ -65,16 +68,14 @@ func main() {
 		Module("execution node client", func(node *cmd.FlowNodeBuilder) error {
 			node.Logger.Info().Err(err).Msgf("Execution node Addr: %s", rpcConf.ExecutionAddr)
 
-			executionRPCConn, err := grpc.Dial(rpcConf.ExecutionAddr, grpc.WithInsecure())
+			executionRPCConn, err := grpc.Dial(
+				rpcConf.ExecutionAddr,
+				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+				grpc.WithInsecure())
 			if err != nil {
 				return err
 			}
 			executionRPC = execution.NewExecutionAPIClient(executionRPCConn)
-			return nil
-		}).
-		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
-			collections = storage.NewCollections(node.DB)
-			transactions = storage.NewTransactions(node.DB)
 			return nil
 		}).
 		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
@@ -82,13 +83,14 @@ func main() {
 			return nil
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, node.Storage.Blocks, node.Storage.Headers, collections, transactions)
+			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions)
 			return ingestEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
-			cleaner := storage.NewCleaner(node.Logger, node.DB)
+			// TODO frequency of 0 turns off the cleaner, turn back on once we know the proper tuning
+			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
 
 			// create a finalizer that will handle updating the protocol
 			// state when the follower detects newly finalized blocks
@@ -141,7 +143,7 @@ func main() {
 			return follower.WithSynchronization(sync), nil
 		}).
 		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, node.Storage.Blocks, node.Storage.Headers, collections, transactions)
+			rpcEng := rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.GenesisChainID)
 			return rpcEng, nil
 		}).
 		Run()

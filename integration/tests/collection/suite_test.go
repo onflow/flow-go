@@ -87,7 +87,7 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 	suite.net.Start(suite.ctx)
 
 	// create an account to use for sending transactions
-	suite.acct.addr, suite.acct.key, suite.acct.signer = common.GetAccount()
+	suite.acct.addr, suite.acct.key, suite.acct.signer = common.GetAccount(suite.net.Genesis().Header.ChainID.Chain())
 
 	// subscribe to the ghost
 	for attempts := 0; ; attempts++ {
@@ -158,7 +158,7 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transac
 	// hash-grind the script until the transaction will be routed to target cluster
 	for {
 		tx.SetScript(append(tx.Script, '/', '/'))
-		err := tx.SignEnvelope(sdk.RootAddress, acct.key.ID, acct.signer)
+		err := tx.SignEnvelope(sdk.ServiceAddress(sdk.Mainnet), acct.key.ID, acct.signer)
 		require.Nil(suite.T(), err)
 		routed := clusters.ByTxID(convert.IDFromSDK(tx.ID()))
 		if routed.Fingerprint() == target.Fingerprint() {
@@ -224,7 +224,7 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 	deadline := time.Now().Add(waitFor)
 	for time.Now().Before(deadline) {
 
-		originID, msg, err := suite.reader.Next()
+		_, msg, err := suite.reader.Next()
 		require.Nil(suite.T(), err, "could not read next message")
 
 		switch val := msg.(type) {
@@ -249,12 +249,6 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 
 		case *flow.TransactionBody:
 			suite.T().Log("got tx: ", val.ID())
-
-		case *messages.ClusterBlockRequest:
-			suite.T().Logf("got block req: %x from=%x", val.BlockID, originID)
-
-		case *messages.ClusterBlockResponse:
-			suite.T().Logf("got block req: %x %d", val.Proposal.Header.ID(), val.Proposal.Header.Height)
 		}
 	}
 

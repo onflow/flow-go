@@ -1,10 +1,8 @@
 package ledger
 
 import (
-	"errors"
-
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/ledger/trie"
+	proofs "github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
 )
 
 type TrieVerifier struct {
@@ -28,24 +26,9 @@ func (v *TrieVerifier) VerifyRegistersProof(
 	proof []flow.StorageProof,
 	stateCommitment flow.StateCommitment,
 ) (verified bool, err error) {
-	proofHldr, err := trie.DecodeProof(proof)
+	bp, err := proofs.DecodeBatchProof(proof)
 	if err != nil {
 		return false, err
 	}
-	length := proofHldr.GetSize()
-	verified = true
-	var verify bool
-	for i := 0; i < length; i++ {
-		flag, singleProof, inclusion, size := proofHldr.ExportProof(i)
-		if inclusion {
-			verify = trie.VerifyInclusionProof(registerIDs[i], values[i], flag, singleProof, size, stateCommitment, v.trieHeight)
-		} else {
-			verify = trie.VerifyNonInclusionProof(registerIDs[i], values[i], flag, singleProof, size, stateCommitment, v.trieHeight)
-		}
-		if !verify {
-			return verify, errors.New("Incorrect Proof")
-		}
-	}
-
-	return verified, nil
+	return bp.Verify(registerIDs, values, stateCommitment, v.trieHeight), nil
 }

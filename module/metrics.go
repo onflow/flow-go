@@ -3,7 +3,9 @@ package module
 import (
 	"time"
 
+	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/metrics"
 )
 
 type NetworkMetrics interface {
@@ -14,6 +16,9 @@ type NetworkMetrics interface {
 	// Network Metrics
 	// NetworkMessageReceived size in bytes and count of the network message received
 	NetworkMessageReceived(sizeBytes int, topic string)
+
+	// NetworkDuplicateMessagesDropped counts number of messages dropped due to duplicate detection
+	NetworkDuplicateMessagesDropped(topic string)
 }
 
 type EngineMetrics interface {
@@ -29,6 +34,10 @@ type ComplianceMetrics interface {
 	BlockSealed(*flow.Block)
 }
 
+type CleanerMetrics interface {
+	RanGC(took time.Duration)
+}
+
 type CacheMetrics interface {
 	CacheEntries(resource string, entries uint)
 	CacheHit(resource string)
@@ -37,6 +46,7 @@ type CacheMetrics interface {
 
 type MempoolMetrics interface {
 	MempoolEntries(resource string, entries uint)
+	Register(resource string, entriesFunc metrics.EntriesFunc) error
 }
 
 type HotstuffMetrics interface {
@@ -63,20 +73,38 @@ type HotstuffMetrics interface {
 
 	// SetTimeout sets the current timeout duration
 	SetTimeout(duration time.Duration)
+
+	// CommitteeProcessingDuration measures the time which the HotStuff's core logic
+	// spends in the hotstuff.Committee component, i.e. the time determining consensus
+	// committee relations.
+	CommitteeProcessingDuration(duration time.Duration)
+
+	// SignerProcessingDuration measures the time which the HotStuff's core logic
+	// spends in the hotstuff.Signer component, i.e. the with crypto-related operations.
+	SignerProcessingDuration(duration time.Duration)
+
+	// ValidatorProcessingDuration measures the time which the HotStuff's core logic
+	// spends in the hotstuff.Validator component, i.e. the with verifying
+	// consensus messages.
+	ValidatorProcessingDuration(duration time.Duration)
+
+	// PayloadProductionDuration measures the time which the HotStuff's core logic
+	// spends in the module.Builder component, i.e. the with generating block payloads.
+	PayloadProductionDuration(duration time.Duration)
 }
 
 type CollectionMetrics interface {
-	// TransactionReceived is called when a new transaction is ingested by the
+	// TransactionIngested is called when a new transaction is ingested by the
 	// node. It increments the total count of ingested transactions and starts
 	// a tx->col span for the transaction.
-	TransactionReceived(txID flow.Identifier)
+	TransactionIngested(txID flow.Identifier)
 
-	// CollectionProposed is called when a new collection is proposed by us or
+	// ClusterBlockProposed is called when a new collection is proposed by us or
 	// any other node in the cluster.
-	CollectionProposed(collection flow.LightCollection)
+	ClusterBlockProposed(block *cluster.Block)
 
-	// CollectionGuaranteed is called when a collection is finalized.
-	CollectionGuaranteed(collection flow.LightCollection)
+	// ClusterBlockFinalized is called when a collection is finalized.
+	ClusterBlockFinalized(block *cluster.Block)
 }
 
 type ConsensusMetrics interface {
@@ -106,13 +134,13 @@ type VerificationMetrics interface {
 	// it increases the result approval counter for this chunk
 	OnResultApproval()
 
-	// OnChunkDataAdded is called whenever something is added to related to chunkID to the in-memory mempools
-	// of verification node. It records the size of stored object.
-	OnChunkDataAdded(chunkID flow.Identifier, size float64)
-
-	// OnChunkDataRemoved is called whenever something is removed that is related to chunkID from the in-memory mempools
-	// of verification node. It records the size of stored object.
-	OnChunkDataRemoved(chunkID flow.Identifier, size float64)
+	// OnVerifiableChunkSubmitted is called whenever a verifiable chunk is shaped for a specific
+	// chunk. It adds the size of the verifiable chunk to the histogram. A verifiable chunk is assumed
+	// to capture all the resources needed to verify a chunk.
+	// The purpose of this function is to track the overall chunk resources size on disk.
+	// Todo wire this up to do monitoring
+	// https://github.com/dapperlabs/flow-go/issues/3183
+	OnVerifiableChunkSubmitted(size float64)
 }
 
 // LedgerMetrics provides an interface to record Ledger Storage metrics.
@@ -184,4 +212,8 @@ type ExecutionMetrics interface {
 
 	// ExecutionTotalExecutedTransactions adds num to the total number of executed transactions
 	ExecutionTotalExecutedTransactions(numExecuted int)
+
+	ExecutionCollectionRequestSent()
+
+	ExecutionCollectionRequestRetried()
 }

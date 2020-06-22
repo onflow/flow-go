@@ -41,10 +41,9 @@ install-tools: crypto/relic/build check-go-version
 	cd ${GOPATH}; \
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@v1.9.0; \
-	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@v0.0.0-20181123154057-e78b021dcbb5; \
+	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@v1.1.2; \
 	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1; \
-	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master; \
-	GO111MODULE=on go get github.com/kevinburke/go-bindata/...@v3.11.0;
+	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master;
 
 .PHONY: unittest
 unittest:
@@ -59,6 +58,10 @@ test: generate-mocks unittest
 .PHONY: integration-test
 integration-test: docker-build-flow
 	$(MAKE) -C integration integration-test
+
+.PHONY: benchmark
+benchmark: docker-build-flow
+	$(MAKE) -C integration benchmark
 
 .PHONY: coverage
 coverage:
@@ -104,11 +107,17 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir="./consensus/hotstuff" -case=underscore -output="./consensus/hotstuff/mocks" -outpkg="mocks"
 	GO111MODULE=on mockery -name '.*' -dir="./engine/access/wrapper" -case=underscore -output="./engine/access/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'IngestRPC' -dir="./engine/execution/ingestion" -case=underscore -output="./engine/execution/ingestion/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name '.*' -dir=model/fingerprint -case=underscore -output="./model/fingerprint/mock" -outpkg="mock"
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
 tidy:
-	go mod tidy; git diff --exit-code
+	go mod tidy
+	cd integration; go mod tidy
+	cd crypto; go mod tidy
+	cd cmd/testclient; go mod tidy
+	cd protobuf; go mod tidy
+	git diff --exit-code
 
 .PHONY: lint
 lint:
@@ -177,72 +186,72 @@ docker-ci-integration-team-city:
 
 .PHONY: docker-build-collection
 docker-build-collection:
-	docker build -f cmd/Dockerfile --build-arg TARGET=collection --target production \
+	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=collection --target production \
 		-t gcr.io/dl-flow/collection:latest -t "gcr.io/dl-flow/collection:$(SHORT_COMMIT)" -t gcr.io/dl-flow/collection:$(IMAGE_TAG) .
 
 .PHONY: docker-build-collection-debug
 docker-build-collection-debug:
-	docker build -f cmd/Dockerfile --build-arg TARGET=collection --target debug \
+	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=collection --target debug \
 		-t gcr.io/dl-flow/collection-debug:latest -t "gcr.io/dl-flow/collection-debug:$(SHORT_COMMIT)" -t gcr.io/dl-flow/collection-debug:$(IMAGE_TAG) .
 
 .PHONY: docker-build-consensus
 docker-build-consensus:
-	docker build -f cmd/Dockerfile --build-arg TARGET=consensus --target production \
+	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=consensus --target production \
 		-t gcr.io/dl-flow/consensus:latest -t "gcr.io/dl-flow/consensus:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/consensus:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-consensus-debug
 docker-build-consensus-debug:
-	docker build -f cmd/Dockerfile --build-arg TARGET=consensus --target debug \
+	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=consensus --target debug \
 		-t gcr.io/dl-flow/consensus-debug:latest -t "gcr.io/dl-flow/consensus-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/consensus-debug:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-execution
 docker-build-execution:
-	docker build -f cmd/Dockerfile --build-arg TARGET=execution --target production \
+	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=execution --target production \
 		-t gcr.io/dl-flow/execution:latest -t "gcr.io/dl-flow/execution:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/execution:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-execution-debug
 docker-build-execution-debug:
-	docker build -f cmd/Dockerfile --build-arg TARGET=execution --target debug \
+	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=execution --target debug \
 		-t gcr.io/dl-flow/execution-debug:latest -t "gcr.io/dl-flow/execution-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/execution-debug:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-verification
 docker-build-verification:
-	docker build -f cmd/Dockerfile --build-arg TARGET=verification --target production \
+	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=verification --target production \
 		-t gcr.io/dl-flow/verification:latest -t "gcr.io/dl-flow/verification:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/verification:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-verification-debug
 docker-build-verification-debug:
-	docker build -f cmd/Dockerfile --build-arg TARGET=verification --target debug \
+	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=verification --target debug \
 		-t gcr.io/dl-flow/verification-debug:latest -t "gcr.io/dl-flow/verification-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/verification-debug:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-access
 docker-build-access:
-	docker build -f cmd/Dockerfile --build-arg TARGET=access --target production \
+	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=access --target production \
 		-t gcr.io/dl-flow/access:latest -t "gcr.io/dl-flow/access:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/access:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-access-debug
 docker-build-access-debug:
-	docker build -f cmd/Dockerfile --build-arg TARGET=access --target debug \
+	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=access --target debug \
 		-t gcr.io/dl-flow/access-debug:latest -t "gcr.io/dl-flow/access-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/access-debug:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-ghost
 docker-build-ghost:
-	docker build -f cmd/Dockerfile --build-arg TARGET=ghost --target production \
+	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=ghost --target production \
 		-t gcr.io/dl-flow/ghost:latest -t "gcr.io/dl-flow/ghost:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/ghost:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-ghost-debug
 docker-build-ghost-debug:
-	docker build -f cmd/Dockerfile --build-arg TARGET=ghost --target debug \
+	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=ghost --target debug \
 		-t gcr.io/dl-flow/ghost-debug:latest -t "gcr.io/dl-flow/ghost-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/ghost-debug:$(IMAGE_TAG)" .
 
 PHONY: docker-build-bootstrap
 docker-build-bootstrap:
-	docker build -f cmd/Dockerfile --build-arg TARGET=bootstrap --target production \
+	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=bootstrap --target production \
 		-t gcr.io/dl-flow/bootstrap:latest -t "gcr.io/dl-flow/bootstrap:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/bootstrap:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-bootstrap-transit
 docker-build-bootstrap-transit:
-	docker build -f cmd/Dockerfile --build-arg TARGET=bootstrap/transit --target production-nocgo \
+	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=bootstrap/transit --target production-nocgo \
 		-t gcr.io/dl-flow/bootstrap-transit:latest -t "gcr.io/dl-flow/bootstrap-transit:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/bootstrap-transit:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-flow
@@ -311,10 +320,10 @@ docker-run-access:
 docker-run-ghost:
 	docker run -p 9000:9000 -p 3569:3569 gcr.io/dl-flow/ghost:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries ghost-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
 
-# Check if the go version is 1.13. flow-go only supports go 1.13
+# Check if the go version is 1.13 or higher. flow-go only supports go 1.13 and up.
 .PHONY: check-go-version
 check-go-version:
-	go version | grep 1.13
+	go version | grep 1.13 || go version | grep 1.14
 
 #----------------------------------------------------------------------
 # CD COMMANDS

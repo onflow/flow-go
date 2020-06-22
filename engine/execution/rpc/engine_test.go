@@ -167,10 +167,10 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 func (suite *Suite) TestGetAccountAtBlockID() {
 
 	id := unittest.IdentifierFixture()
-	rootAddress := flow.RootAddress
+	serviceAddress := flow.Mainnet.Chain().ServiceAddress()
 
-	rootAccount := flow.Account{
-		Address: rootAddress,
+	serviceAccount := flow.Account{
+		Address: serviceAddress,
 	}
 
 	mockEngine := new(ingestion.IngestRPC)
@@ -190,15 +190,15 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 	suite.Run("happy path with valid request", func() {
 
 		// setup mock expectations
-		mockEngine.On("GetAccount", mock.Anything, rootAddress, id).Return(&rootAccount, nil).Once()
+		mockEngine.On("GetAccount", mock.Anything, serviceAddress, id).Return(&serviceAccount, nil).Once()
 
-		req := createReq(id[:], rootAddress.Bytes())
+		req := createReq(id[:], serviceAddress.Bytes())
 
 		resp, err := handler.GetAccountAtBlockID(context.Background(), req)
 
 		suite.Require().NoError(err)
 		actualAccount := resp.GetAccount()
-		expectedAccount, err := convert.AccountToMessage(&rootAccount)
+		expectedAccount, err := convert.AccountToMessage(&serviceAccount)
 		suite.Require().NoError(err)
 		suite.Require().Equal(*expectedAccount, *actualAccount)
 		mockEngine.AssertExpectations(suite.T())
@@ -206,7 +206,7 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 
 	suite.Run("invalid request with nil block id", func() {
 
-		req := createReq(nil, rootAddress.Bytes())
+		req := createReq(nil, serviceAddress.Bytes())
 
 		_, err := handler.GetAccountAtBlockID(context.Background(), req)
 

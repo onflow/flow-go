@@ -15,22 +15,34 @@ func runDKG(nodes []model.NodeInfo) model.DKGData {
 	log.Info().Msgf("read %v node infos for DKG", n)
 
 	log.Debug().Msgf("will run DKG")
-	dkgData, err := run.RunDKG(n, generateRandomSeeds(n))
+	var dkgData model.DKGData
+	var err error
+	if flagFastKG {
+		dkgData, err = run.RunFastKG(n, generateRandomSeed())
+	} else {
+		dkgData, err = run.RunDKG(n, generateRandomSeeds(n))
+	}
 	if err != nil {
 		log.Fatal().Err(err).Msg("error running DKG")
 	}
 	log.Info().Msgf("finished running DKG")
 
-	for i, participant := range dkgData.Participants {
+	for i, privKey := range dkgData.PrivKeyShares {
 		nodeID := nodes[i].NodeID
-		dkgData.Participants[i].NodeID = nodeID
 
 		log.Debug().Int("i", i).Str("nodeId", nodeID.String()).Msg("assembling dkg data")
 
-		writeJSON(fmt.Sprintf(model.PathRandomBeaconPriv, nodeID), participant.Private())
+		encKey := model.EncodableRandomBeaconPrivKey{PrivateKey: privKey}
+		privParticpant := model.DKGParticipantPriv{
+			NodeID:              nodeID,
+			RandomBeaconPrivKey: encKey,
+			GroupIndex:          i,
+		}
+
+		writeJSON(fmt.Sprintf(model.PathRandomBeaconPriv, nodeID), privParticpant)
 	}
 
-	writeJSON(model.PathDKGDataPub, dkgData.Public())
+	writeJSON(model.PathDKGDataPub, dkgData.Public(nodes))
 
 	return dkgData
 }

@@ -22,7 +22,7 @@ type Network struct {
 	me           module.Local
 	hub          *Hub
 	engines      map[uint8]network.Engine
-	seenEventIDs map[string]bool
+	seenEventIDs sync.Map
 	qCD          chan struct{} // used to stop continous delivery mode of the network
 }
 
@@ -31,19 +31,18 @@ type Network struct {
 // in order for a mock hub to find each other.
 func NewNetwork(state protocol.State, me module.Local, hub *Hub) *Network {
 	o := &Network{
-		state:        state,
-		me:           me,
-		hub:          hub,
-		engines:      make(map[uint8]network.Engine),
-		seenEventIDs: make(map[string]bool),
-		qCD:          make(chan struct{}),
+		state:   state,
+		me:      me,
+		hub:     hub,
+		engines: make(map[uint8]network.Engine),
+		qCD:     make(chan struct{}),
 	}
 	// Plug the network to a hub so that networks can find each other.
 	hub.Plug(o)
 	return o
 }
 
-// GetID returns the identity of the Node.
+// GetID returns the identity of the node.
 func (mn *Network) GetID() flow.Identifier {
 	return mn.me.NodeID()
 }
@@ -78,16 +77,16 @@ func (mn *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.
 
 // return a certain node has seen a certain key
 func (mn *Network) haveSeen(key string) bool {
-	seen, ok := mn.seenEventIDs[key]
+	seen, ok := mn.seenEventIDs.Load(key)
 	if !ok {
 		return false
 	}
-	return seen
+	return seen.(bool)
 }
 
 // mark a certain node has seen a certain event for a certain engine
 func (mn *Network) seen(key string) {
-	mn.seenEventIDs[key] = true
+	mn.seenEventIDs.Store(key, true)
 }
 
 // buffer saves the request into pending buffer

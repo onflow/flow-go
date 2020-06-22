@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	gologging "github.com/whyrusleeping/go-logging"
 
+	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
@@ -38,7 +38,7 @@ func TestStubEngineTestSuite(t *testing.T) {
 
 func (s *StubEngineTestSuite) SetupTest() {
 	const count = 2
-	golog.SetAllLoggers(gologging.INFO)
+	golog.SetAllLoggers(golog.LevelInfo)
 	s.ids = CreateIDs(count)
 
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
@@ -80,7 +80,6 @@ func (s *StubEngineTestSuite) TestSingleEcho() {
 // TestMultiMsgSync tests sending multiple messages from sender to receiver
 // sender and receiver are synced over reception
 func (s *StubEngineTestSuite) TestMultiMsgSync() {
-	s.T().Skip()
 	// set to false for no echo expectation
 	s.multiMessageSync(false, 10)
 }
@@ -89,7 +88,6 @@ func (s *StubEngineTestSuite) TestMultiMsgSync() {
 // it also evaluates the correct reception of an echo message back for each send
 // sender and receiver are synced over reception
 func (s *StubEngineTestSuite) TestEchoMultiMsgSync() {
-	s.T().Skip()
 	// set to true for an echo expectation
 	s.multiMessageSync(true, 10)
 }
@@ -97,7 +95,6 @@ func (s *StubEngineTestSuite) TestEchoMultiMsgSync() {
 // TestMultiMsgAsync tests sending multiple messages from sender to receiver
 // sender and receiver are not synchronized
 func (s *StubEngineTestSuite) TestMultiMsgAsync() {
-	s.T().Skip()
 	// set to false for no echo expectation
 	s.multiMessageAsync(false, 10)
 }
@@ -106,7 +103,6 @@ func (s *StubEngineTestSuite) TestMultiMsgAsync() {
 // it also evaluates the correct reception of an echo message back for each send
 // sender and receiver are not synchronized
 func (s *StubEngineTestSuite) TestEchoMultiMsgAsync() {
-	s.T().Skip()
 	// set to true for an echo expectation
 	s.multiMessageAsync(true, 10)
 }
@@ -119,10 +115,10 @@ func (s *StubEngineTestSuite) TestDuplicateMessageSequential() {
 	rcvID := 1
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, 1, false)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, engine.ExecutionComputer, false)
 
 	// receiver's engine
-	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1, false)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.ExecutionComputer, false)
 
 	// Sends a message from sender to receiver
 	event := &message.Echo{
@@ -150,10 +146,10 @@ func (s *StubEngineTestSuite) TestDuplicateMessageParallel() {
 	rcvID := 1
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, 1, false)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, engine.ExecutionComputer, false)
 
 	// receiver's engine
-	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1, false)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.ExecutionComputer, false)
 
 	// Sends a message from sender to receiver
 	event := &message.Echo{
@@ -182,14 +178,13 @@ func (s *StubEngineTestSuite) TestDuplicateMessageParallel() {
 // on deduplicating the received messages against different engine ids. In specific, the
 // desire behavior is that the deduplication should happen based on both eventID and channelID
 func (s *StubEngineTestSuite) TestDuplicateMessageDifferentChan() {
-	s.T().Skip()
 	const (
 		sndNode = iota
 		rcvNode
 	)
 	const (
-		channel1 = iota
-		channel2
+		channel1 = engine.ExecutionReceiptProvider
+		channel2 = engine.ExecutionComputer
 	)
 	// registers engines in the network
 	// first type
@@ -246,10 +241,10 @@ func (s *StubEngineTestSuite) singleMessage(echo bool) {
 
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, 1, echo)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, engine.ExecutionComputer, echo)
 
 	// receiver's engine
-	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1, echo)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.ExecutionComputer, echo)
 
 	// Sends a message from sender to receiver
 	event := &message.Echo{
@@ -316,10 +311,10 @@ func (s *StubEngineTestSuite) multiMessageSync(echo bool, count int) {
 	rcvID := 1
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, 1, echo)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, engine.ExecutionComputer, echo)
 
 	// receiver's engine
-	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1, echo)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.ExecutionComputer, echo)
 
 	for i := 0; i < count; i++ {
 		// Send the message to receiver
@@ -389,10 +384,10 @@ func (s *StubEngineTestSuite) multiMessageAsync(echo bool, count int) {
 
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, 1, echo)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, engine.ExecutionComputer, echo)
 
 	// receiver's engine
-	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1, echo)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.ExecutionComputer, echo)
 
 	// keeps track of async received messages at receiver side
 	received := make(map[string]struct{})

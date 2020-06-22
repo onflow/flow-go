@@ -3,6 +3,7 @@ package buffer
 import (
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/messages"
 )
 
 type PendingClusterBlocks struct {
@@ -14,12 +15,12 @@ func NewPendingClusterBlocks() *PendingClusterBlocks {
 	return b
 }
 
-func (b *PendingClusterBlocks) Add(block *cluster.PendingBlock) bool {
-	return b.backend.add(block.OriginID, block.Header, block.Payload)
+func (b *PendingClusterBlocks) Add(originID flow.Identifier, proposal *messages.ClusterBlockProposal) bool {
+	return b.backend.add(originID, proposal.Header, proposal.Payload)
 }
 
 func (b *PendingClusterBlocks) ByID(blockID flow.Identifier) (*cluster.PendingBlock, bool) {
-	item, ok := b.backend.ByID(blockID)
+	item, ok := b.backend.byID(blockID)
 	if !ok {
 		return nil, false
 	}
@@ -61,5 +62,5 @@ func (b *PendingClusterBlocks) PruneByHeight(height uint64) {
 }
 
 func (b *PendingClusterBlocks) Size() uint {
-	return uint(len(b.backend.byID))
+	return uint(len(b.backend.blocksByID))
 }

@@ -25,12 +25,13 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/ledger"
+	"github.com/dapperlabs/flow-go/storage/ledger/wal"
 )
 
 func main() {
 
 	var (
-		ledgerStorage      storage.Ledger
+		ledgerStorage      *ledger.MTrieStorage
 		events             storage.Events
 		txResults          storage.TransactionResults
 		providerEngine     *provider.Engine
@@ -55,7 +56,7 @@ func main() {
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
-			vm, err := virtualmachine.New(rt)
+			vm, err := virtualmachine.New(rt, node.GenesisChainID.Chain())
 			if err != nil {
 				return err
 			}
@@ -66,6 +67,7 @@ func main() {
 				node.Me,
 				node.State,
 				vm,
+				node.Storage.Blocks,
 			)
 
 			return nil
@@ -77,28 +79,39 @@ func main() {
 		// Trie storage is required to bootstrap, but also should be handled while shutting down
 		Module("ledger storage", func(node *cmd.FlowNodeBuilder) error {
 			ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), collector, node.MetricsRegisterer)
-
 			return err
 		}).
 		GenesisHandler(func(node *cmd.FlowNodeBuilder, block *flow.Block) {
-			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage)
+			if node.GenesisAccountPublicKey == nil {
+				panic(fmt.Sprintf("error while bootstrapping execution state: no service account public key"))
+			}
+
+			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage, *node.GenesisAccountPublicKey, node.GenesisTokenSupply, node.GenesisChainID.Chain())
 			if err != nil {
 				panic(fmt.Sprintf("error while bootstrapping execution state: %s", err))
 			}
-			if !bytes.Equal(bootstrappedStateCommitment, flow.GenesisStateCommitment) {
-				panic("error while bootstrapping execution state - resulting state is different than precalculated!")
-			}
-			if !bytes.Equal(flow.GenesisStateCommitment, node.GenesisCommit) {
-				panic(fmt.Sprintf("genesis seal state commitment (%x) different from precalculated (%x)", node.GenesisCommit, flow.GenesisStateCommitment))
+
+			if !bytes.Equal(bootstrappedStateCommitment, node.GenesisCommit) {
+				panic(fmt.Sprintf("genesis seal state commitment (%x) different from precalculated (%x)", bootstrappedStateCommitment, node.GenesisCommit))
 			}
 
 			err = bootstrap.BootstrapExecutionDatabase(node.DB, bootstrappedStateCommitment, block.Header)
 			if err != nil {
-				panic(fmt.Sprintf("error while boostrapping execution state - cannot bootstrap database: %s", err))
+				panic(fmt.Sprintf("error while bootstrapping execution state - cannot bootstrap database: %s", err))
 			}
 		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			return ledgerStorage, nil
+		}).
+		Component("execution state ledger WAL compactor", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+
+			checkpointer, err := ledgerStorage.Checkpointer()
+			if err != nil {
+				return nil, fmt.Errorf("cannot create checkpointer: %w", err)
+			}
+			compactor := wal.NewCompactor(checkpointer, 10*time.Second)
+
+			return compactor, nil
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			chunkDataPacks := badger.NewChunkDataPacks(node.DB)
@@ -109,6 +122,7 @@ func main() {
 				ledgerStorage,
 				stateCommitments,
 				node.Storage.Blocks,
+				node.Storage.Collections,
 				chunkDataPacks,
 				executionResults,
 				node.DB,
@@ -130,8 +144,6 @@ func main() {
 			return providerEngine, err
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			// Only needed for ingestion engine
-			collections := badger.NewCollections(node.DB)
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
 			events = badger.NewEvents(node.DB)
@@ -143,7 +155,7 @@ func main() {
 				node.State,
 				node.Storage.Blocks,
 				node.Storage.Payloads,
-				collections,
+				node.Storage.Collections,
 				events,
 				txResults,
 				computationManager,

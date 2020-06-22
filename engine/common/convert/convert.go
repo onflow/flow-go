@@ -101,10 +101,17 @@ func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 
 func BlockHeaderToMessage(h *flow.Header) (entities.BlockHeader, error) {
 	id := h.ID()
+
+	t, err := ptypes.TimestampProto(h.Timestamp)
+	if err != nil {
+		return entities.BlockHeader{}, err
+	}
+
 	bh := entities.BlockHeader{
-		Id:       id[:],
-		ParentId: h.ParentID[:],
-		Height:   h.Height,
+		Id:        id[:],
+		ParentId:  h.ParentID[:],
+		Height:    h.Height,
+		Timestamp: t,
 	}
 	return bh, nil
 }

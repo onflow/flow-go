@@ -37,6 +37,7 @@ const (
 	codeHeightToBlock       = 40 // index mapping height to block ID
 	codeBlockToSeal         = 41 // index mapping a block its last payload seal
 	codeCollectionReference = 42 // index reference block ID for collection
+	codeBlockValidity       = 43 // validity of block per HotStuff
 
 	// codes for indexing multiple identifiers by identifier
 	codeBlockChildren     = 50 // index mapping block ID to children blocks
@@ -84,6 +85,8 @@ func b(v interface{}) []byte {
 		return []byte{byte(i)}
 	case flow.Identifier:
 		return i[:]
+	case flow.ChainID:
+		return []byte(i)
 	default:
 		panic(fmt.Sprintf("unsupported type to convert (%T)", v))
 	}

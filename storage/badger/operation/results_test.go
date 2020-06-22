@@ -13,7 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestResultsInsertRetrieve(t *testing.T) {
+func TestResults_InsertRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := unittest.ExecutionResultFixture()
 

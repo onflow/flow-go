@@ -129,7 +129,7 @@ func goecdsaGenerateKey(c elliptic.Curve, seed []byte) *goecdsa.PrivateKey {
 	priv := new(goecdsa.PrivateKey)
 	priv.PublicKey.Curve = c
 	priv.D = k
-	priv.PublicKey.X, priv.PublicKey.Y = c.ScalarBaseMult(k.Bytes())
+	// public key is not computed
 	return priv
 }
 
@@ -143,7 +143,11 @@ func (a *ecdsaAlgo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 		return nil, fmt.Errorf("seed should be at least %d bytes", minSeedLen)
 	}
 	sk := goecdsaGenerateKey(a.curve, seed)
-	return &PrKeyECDSA{a, sk}, nil
+	return &PrKeyECDSA{
+		alg:     a,
+		goPrKey: sk,
+		pubKey:  nil, // public key is not computed
+	}, nil
 }
 
 func (a *ecdsaAlgo) rawDecodePrivateKey(der []byte) (PrivateKey, error) {
@@ -163,8 +167,12 @@ func (a *ecdsaAlgo) rawDecodePrivateKey(der []byte) (PrivateKey, error) {
 		D: &d,
 	}
 	priv.PublicKey.Curve = a.curve
-	priv.PublicKey.X, priv.PublicKey.Y = a.curve.ScalarBaseMult(der)
-	return &PrKeyECDSA{a, &priv}, nil
+
+	return &PrKeyECDSA{
+		alg:     a,
+		goPrKey: &priv,
+		pubKey:  nil, // public key is not computed
+	}, nil
 }
 
 func (a *ecdsaAlgo) decodePrivateKey(der []byte) (PrivateKey, error) {
@@ -181,6 +189,8 @@ func (a *ecdsaAlgo) rawDecodePublicKey(der []byte) (PublicKey, error) {
 	x.SetBytes(der[:plen])
 	y.SetBytes(der[plen:])
 
+	// all the curves supported for now have a cofactor equal to 1,
+	// so that IsOnCurve guarantees the point is on the right subgroup.
 	if x.Cmp(p) >= 0 || y.Cmp(p) >= 0 || !a.curve.IsOnCurve(&x, &y) {
 		return nil, errors.New("raw public key value is not valid")
 	}
@@ -201,8 +211,10 @@ func (a *ecdsaAlgo) decodePublicKey(der []byte) (PublicKey, error) {
 type PrKeyECDSA struct {
 	// the signature algo
 	alg *ecdsaAlgo
-	// private key (including the public key)
+	// goecdsa private key
 	goPrKey *goecdsa.PrivateKey
+	// public key
+	pubKey *PubKeyECDSA
 }
 
 // Algorithm returns the algo related to the private key
@@ -217,10 +229,16 @@ func (sk *PrKeyECDSA) Size() int {
 
 // PublicKey returns the public key associated to the private key
 func (sk *PrKeyECDSA) PublicKey() PublicKey {
-	return &PubKeyECDSA{
+	// compute the public key once
+	if sk.pubKey == nil {
+		priv := sk.goPrKey
+		priv.PublicKey.X, priv.PublicKey.Y = priv.Curve.ScalarBaseMult(priv.D.Bytes())
+	}
+	sk.pubKey = &PubKeyECDSA{
 		alg:      sk.alg,
 		goPubKey: &sk.goPrKey.PublicKey,
 	}
+	return sk.pubKey
 }
 
 // given a private key (d), returns a raw encoding bytes(d) in big endian

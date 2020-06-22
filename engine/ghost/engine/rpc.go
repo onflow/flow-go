@@ -13,14 +13,16 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
+	grpcutils "github.com/dapperlabs/flow-go/utils/grpc"
 )
 
 // Config defines the configurable options for the gRPC server.
 type Config struct {
 	ListenAddr string
+	MaxMsgSize int // In bytes
 }
 
-// RPC implements a gRPC server for the Ghost Node
+// RPC implements a gRPC server for the Ghost node
 type RPC struct {
 	unit    *engine.Unit
 	log     zerolog.Logger
@@ -46,11 +48,18 @@ func New(net module.Network, log zerolog.Logger, me module.Local, config Config)
 
 	codec := jsoncodec.NewCodec()
 
+	if config.MaxMsgSize == 0 {
+		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
+	}
+
 	eng := &RPC{
-		log:      log,
-		unit:     engine.NewUnit(),
-		me:       me,
-		server:   grpc.NewServer(),
+		log:  log,
+		unit: engine.NewUnit(),
+		me:   me,
+		server: grpc.NewServer(
+			grpc.MaxRecvMsgSize(config.MaxMsgSize),
+			grpc.MaxSendMsgSize(config.MaxMsgSize),
+		),
 		config:   config,
 		messages: messages,
 		codec:    codec,

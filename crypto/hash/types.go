@@ -20,22 +20,6 @@ func (f HashingAlgorithm) String() string {
 	return [...]string{"UNKNOWN", "SHA2_256", "SHA2_384", "SHA3_256", "SHA3_384", "KMAC128"}[f]
 }
 
-// StringToHashAlgorithm converts a string to a HashAlgorithm.
-func StringToHashAlgorithm(s string) HashingAlgorithm {
-	switch s {
-	case SHA2_256.String():
-		return SHA2_256
-	case SHA2_384.String():
-		return SHA2_384
-	case SHA3_256.String():
-		return SHA3_256
-	case SHA3_384.String():
-		return SHA3_384
-	default:
-		return UnknownHashingAlgorithm
-	}
-}
-
 const (
 
 	// Lengths of hash outputs in bytes

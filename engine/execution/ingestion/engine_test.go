@@ -21,7 +21,6 @@ import (
 	state "github.com/dapperlabs/flow-go/engine/execution/state/mock"
 	executionUnittest "github.com/dapperlabs/flow-go/engine/execution/state/unittest"
 	mocklocal "github.com/dapperlabs/flow-go/engine/testutil/mocklocal"
-	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -242,10 +241,8 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 			assert.NoError(ctx.t, err, "could not find executor in protocol state")
 
 			// verify the signature
-			b, err := encoding.DefaultEncoder.Encode(receipt.Body())
-			assert.NoError(ctx.t, err)
-
-			validSig, err := executor.StakingPubKey.Verify(receipt.ExecutorSignature, b, ctx.engine.receiptHasher)
+			id := receipt.ID()
+			validSig, err := executor.StakingPubKey.Verify(receipt.ExecutorSignature, id[:], ctx.engine.receiptHasher)
 			assert.NoError(ctx.t, err)
 
 			assert.True(ctx.t, validSig, "execution receipt signature invalid")
@@ -388,11 +385,11 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 
 		// Successful call to computation manager
 		ctx.computationManager.
-			On("ExecuteScript", script, executableBlock.Block.Header, view).
+			On("ExecuteScript", script, [][]byte(nil), executableBlock.Block.Header, view).
 			Return(scriptResult, nil)
 
 		// Execute our script and expect no error
-		res, err := ctx.engine.ExecuteScriptAtBlockID(context.Background(), script, executableBlock.Block.ID())
+		res, err := ctx.engine.ExecuteScriptAtBlockID(context.Background(), script, nil, executableBlock.Block.ID())
 		assert.NoError(t, err)
 		assert.Equal(t, scriptResult, res)
 

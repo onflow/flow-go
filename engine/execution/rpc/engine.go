@@ -17,11 +17,13 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
+	grpcutils "github.com/dapperlabs/flow-go/utils/grpc"
 )
 
 // Config defines the configurable options for the gRPC server.
 type Config struct {
 	ListenAddr string
+	MaxMsgSize int // In bytes
 }
 
 // Engine implements a gRPC server with a simplified version of the Observation API.
@@ -37,6 +39,10 @@ type Engine struct {
 func New(log zerolog.Logger, config Config, e *ingestion.Engine, blocks storage.Blocks, events storage.Events, txResults storage.TransactionResults) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
 
+	if config.MaxMsgSize == 0 {
+		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
+	}
+
 	eng := &Engine{
 		log:  log,
 		unit: engine.NewUnit(),
@@ -46,7 +52,10 @@ func New(log zerolog.Logger, config Config, e *ingestion.Engine, blocks storage.
 			events:             events,
 			transactionResults: txResults,
 		},
-		server: grpc.NewServer(),
+		server: grpc.NewServer(
+			grpc.MaxRecvMsgSize(config.MaxMsgSize),
+			grpc.MaxSendMsgSize(config.MaxMsgSize),
+		),
 		config: config,
 	}
 
@@ -108,7 +117,7 @@ func (h *handler) ExecuteScriptAtBlockID(
 ) (*execution.ExecuteScriptAtBlockIDResponse, error) {
 	blockID := flow.HashToID(req.GetBlockId())
 
-	value, err := h.engine.ExecuteScriptAtBlockID(ctx, req.Script, blockID)
+	value, err := h.engine.ExecuteScriptAtBlockID(ctx, req.GetScript(), req.GetArguments(), blockID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to execute script: %v", err)
 	}

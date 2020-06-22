@@ -1,33 +1,67 @@
 package virtualmachine
 
 import (
+	"bytes"
+	"encoding/binary"
+	"encoding/hex"
+	"errors"
 	"fmt"
+	"math/rand"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/dapperlabs/flow-go/engine/execution/utils"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 )
+
+const scriptGasLimit = 100000
 
 type CheckerFunc func([]byte, runtime.Location) error
 
 type TransactionContext struct {
 	LedgerDAL
-	astCache          ASTCache
-	signingAccounts   []runtime.Address
-	checker           CheckerFunc
-	logs              []string
-	events            []cadence.Event
-	OnSetValueHandler func(owner, controller, key, value []byte)
-	gasUsed           uint64 // TODO fill with actual gas
-	tx                *flow.TransactionBody
-	uuid              uint64
+	bc                               BlockContext
+	ledger                           LedgerDAL
+	astCache                         ASTCache
+	signingAccounts                  []runtime.Address
+	checker                          CheckerFunc
+	logs                             []string
+	events                           []cadence.Event
+	tx                               *flow.TransactionBody
+	gasLimit                         uint64
+	uuid                             uint64 // TODO: implement proper UUID
+	header                           *flow.Header
+	blocks                           Blocks
+	signatureVerificationEnabled     bool
+	restrictedAccountCreationEnabled bool
+	restrictedDeploymentEnabled      bool
+	simpleAddresses                  bool
+	rng                              *rand.Rand
 }
 
 type TransactionContextOption func(*TransactionContext)
+
+func WithSignatureVerification(enabled bool) TransactionContextOption {
+	return func(ctx *TransactionContext) {
+		ctx.signatureVerificationEnabled = enabled
+	}
+}
+
+func WithRestrictedDeployment(enabled bool) TransactionContextOption {
+	return func(ctx *TransactionContext) {
+		ctx.restrictedAccountCreationEnabled = enabled
+	}
+}
+
+func WithRestrictedAccountCreation(enabled bool) TransactionContextOption {
+	return func(ctx *TransactionContext) {
+		ctx.restrictedDeploymentEnabled = enabled
+	}
+}
 
 // GetSigningAccounts gets the signing accounts for this context.
 //
@@ -54,16 +88,15 @@ func (r *TransactionContext) Logs() []string {
 
 // GetValue gets a register value from the world state.
 func (r *TransactionContext) GetValue(owner, controller, key []byte) ([]byte, error) {
-	v, _ := r.Ledger.Get(fullKeyHash(string(owner), string(controller), string(key)))
+	v, _ := r.ledger.Get(fullKeyHash(string(flow.BytesToAddress(owner).Bytes()), string(
+		flow.BytesToAddress(controller).Bytes()), string(key)))
 	return v, nil
 }
 
 // SetValue sets a register value in the world state.
 func (r *TransactionContext) SetValue(owner, controller, key, value []byte) error {
-	r.Ledger.Set(fullKeyHash(string(owner), string(controller), string(key)), value)
-	if r.OnSetValueHandler != nil {
-		r.OnSetValueHandler(owner, controller, key, value)
-	}
+	r.ledger.Set(fullKeyHash(string(flow.BytesToAddress(owner).Bytes()), string(
+		flow.BytesToAddress(controller).Bytes()), string(key)), value)
 	return nil
 }
 
@@ -79,24 +112,120 @@ func (r *TransactionContext) ValueExists(owner, controller, key []byte) (exists 
 // CreateAccount creates a new account and inserts it into the world state.
 //
 // This function returns an error if the input is invalid.
-//
-// After creating the account, this function calls the onAccountCreated callback registered
-// with this context.
-func (r *TransactionContext) CreateAccount(publicKeysBytes [][]byte) (runtime.Address, error) {
+func (r *TransactionContext) CreateAccount(payer runtime.Address) (runtime.Address, error) {
+	accountAddress := runtimeToFlowAddress(payer)
 
-	publicKeys := make([]flow.AccountPublicKey, len(publicKeysBytes))
-	var err error
-	for i, keyBytes := range publicKeysBytes {
-		publicKeys[i], err = flow.DecodeRuntimeAccountPublicKey(keyBytes, 0)
-		if err != nil {
-			return runtime.Address{}, fmt.Errorf("cannot decode public key %d: %w", i, err)
+	flowErr, fatalErr := r.deductAccountCreationFee(accountAddress)
+	if fatalErr != nil {
+		return runtime.Address{}, fatalErr
+	}
+
+	if flowErr != nil {
+		// TODO: properly propagate this error
+
+		switch err := flowErr.(type) {
+		case *CodeExecutionError:
+			return runtime.Address{}, err.RuntimeError.Unwrap()
+		default:
+			// Account creation should fail due to insufficient balance, which is reported in `flowErr`.
+			// Should we tree other FlowErrors as fatal?
+			return runtime.Address{}, fmt.Errorf(
+				"failed to deduct account creation fee: %s",
+				err.ErrorMessage(),
+			)
 		}
 	}
 
-	accountAddress, err := r.CreateAccountInLedger(publicKeys)
-	r.Log(fmt.Sprintf("Created new account with address: %x", accountAddress))
+	var err error
 
-	return runtime.Address(accountAddress), err
+	addr, err := r.ledger.CreateAccount(nil)
+	if err != nil {
+		return runtime.Address{}, err
+	}
+
+	flowErr, fatalErr = r.initDefaultToken(addr)
+	if fatalErr != nil {
+		return runtime.Address{}, fatalErr
+	}
+
+	if flowErr != nil {
+		// TODO: properly propagate this error
+
+		switch err := flowErr.(type) {
+		case *CodeExecutionError:
+			return runtime.Address{}, err.RuntimeError.Unwrap()
+		default:
+			return runtime.Address{}, fmt.Errorf(
+				"failed to initialize default token: %s",
+				err.ErrorMessage(),
+			)
+		}
+	}
+
+	r.Log(fmt.Sprintf("Created new account with address: 0x%s", addr))
+
+	return runtime.Address(addr), nil
+}
+
+func (r *TransactionContext) initDefaultToken(addr flow.Address) (FlowError, error) {
+	tx := flow.NewTransactionBody().
+		SetScript(InitDefaultTokenTransaction(r.ServiceAddress())).
+		AddAuthorizer(addr)
+
+	// TODO: propagate computation limit
+	result, err := r.bc.ExecuteTransaction(r.ledger, tx, WithSignatureVerification(false))
+	if err != nil {
+		return nil, err
+	}
+
+	if result.Error != nil {
+		return result.Error, nil
+	}
+
+	return nil, nil
+}
+
+func (r *TransactionContext) deductTransactionFee(addr flow.Address) (FlowError, error) {
+	tx := flow.NewTransactionBody().
+		SetScript(DeductTransactionFeeTransaction(r.ServiceAddress())).
+		AddAuthorizer(addr)
+
+	// TODO: propagate computation limit
+	result, err := r.bc.ExecuteTransaction(r.ledger, tx, WithSignatureVerification(false))
+	if err != nil {
+		return nil, err
+	}
+
+	if result.Error != nil {
+		return result.Error, nil
+	}
+
+	return nil, nil
+}
+
+func (r *TransactionContext) deductAccountCreationFee(addr flow.Address) (FlowError, error) {
+	var script []byte
+	if r.restrictedAccountCreationEnabled {
+		script = DeductAccountCreationFeeWithWhitelistTransaction(r.ServiceAddress())
+	} else {
+		script = DeductAccountCreationFeeTransaction(r.ServiceAddress())
+	}
+
+	tx := flow.NewTransactionBody().
+		SetScript(script).
+		AddAuthorizer(addr)
+
+	// TODO: propagate computation limit
+	result, err := r.bc.ExecuteTransaction(r.ledger, tx, WithSignatureVerification(false))
+	if err != nil {
+		return nil, err
+	}
+
+	if result.Error != nil {
+		return result.Error, nil
+	}
+
+	return nil, nil
 }
 
 // AddAccountKey adds a public key to an existing account.
@@ -104,9 +233,9 @@ func (r *TransactionContext) CreateAccount(publicKeysBytes [][]byte) (runtime.Ad
 // This function returns an error if the specified account does not exist or
 // if the key insertion fails.
 func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []byte) error {
-	accountID := address[:]
+	accountAddress := runtimeToFlowAddress(address)
 
-	err := r.CheckAccountExists(accountID)
+	err := r.ledger.CheckAccountExists(accountAddress)
 	if err != nil {
 		return err
 	}
@@ -116,14 +245,14 @@ func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []
 		return fmt.Errorf("cannot decode runtime public account key: %w", err)
 	}
 
-	publicKeys, err := r.GetAccountPublicKeys(accountID)
+	publicKeys, err := r.ledger.GetAccountPublicKeys(accountAddress)
 	if err != nil {
 		return err
 	}
 
 	publicKeys = append(publicKeys, runtimePublicKey)
 
-	return r.SetAccountPublicKeys(accountID, publicKeys)
+	return r.ledger.SetAccountPublicKeys(accountAddress, publicKeys)
 }
 
 // RemoveAccountKey removes a public key by index from an existing account.
@@ -131,14 +260,14 @@ func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []
 // This function returns an error if the specified account does not exist, the
 // provided key is invalid, or if key deletion fails.
 func (r *TransactionContext) RemoveAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
-	accountID := address[:]
+	accountAddress := runtimeToFlowAddress(address)
 
-	err = r.CheckAccountExists(accountID)
+	err = r.ledger.CheckAccountExists(accountAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	publicKeys, err := r.GetAccountPublicKeys(accountID)
+	publicKeys, err := r.ledger.GetAccountPublicKeys(accountAddress)
 	if err != nil {
 		return publicKey, err
 	}
@@ -151,7 +280,7 @@ func (r *TransactionContext) RemoveAccountKey(address runtime.Address, index int
 
 	publicKeys = append(publicKeys[:index], publicKeys[index+1:]...)
 
-	err = r.SetAccountPublicKeys(accountID, publicKeys)
+	err = r.ledger.SetAccountPublicKeys(accountAddress, publicKeys)
 	if err != nil {
 		return publicKey, err
 	}
@@ -168,23 +297,41 @@ func (r *TransactionContext) CheckCode(address runtime.Address, code []byte) (er
 	return r.checkProgram(code, address)
 }
 
+func (r *TransactionContext) ServiceAddress() flow.Address {
+	return r.chain.ServiceAddress()
+}
+
 // UpdateAccountCode updates the deployed code on an existing account.
 //
 // This function returns an error if the specified account does not exist or is
 // not a valid signing account.
-func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []byte, checkPermission bool) (err error) {
-	accountID := address[:]
+func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []byte) (err error) {
+	accountAddress := runtimeToFlowAddress(address)
 
-	if checkPermission && !r.isValidSigningAccount(address) {
-		return fmt.Errorf("not permitted to update account with ID %s", address)
+	key := fullKeyHash(string(accountAddress.Bytes()), string(accountAddress.Bytes()), keyCode)
+
+	prevCode, err := r.ledger.Get(key)
+	if err != nil {
+		return fmt.Errorf("cannot retreive previous code: %w", err)
 	}
 
-	err = r.CheckAccountExists(accountID)
+	// skip checks and updating if the new code equals the old
+	if bytes.Equal(prevCode, code) {
+		return nil
+	}
+
+	// currently, every transaction that sets account code (deploys/updates contracts)
+	// must be signed by the service account
+	if r.restrictedDeploymentEnabled && !r.isValidSigningAccount(runtime.Address(r.ServiceAddress())) {
+		return fmt.Errorf("code deployment requires authorization from the service account")
+	}
+
+	err = r.ledger.CheckAccountExists(accountAddress)
 	if err != nil {
 		return err
 	}
 
-	r.Ledger.Set(fullKeyHash(string(accountID), string(accountID), keyCode), code)
+	r.ledger.Set(key, code)
 
 	return nil
 }
@@ -201,15 +348,13 @@ func (r *TransactionContext) ResolveImport(location runtime.Location) ([]byte, e
 
 	address := flow.BytesToAddress(addressLocation)
 
-	accountID := address.Bytes()
-
-	code, err := r.Ledger.Get(fullKeyHash(string(accountID), string(accountID), keyCode))
+	code, err := r.ledger.Get(fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyCode))
 	if err != nil {
 		return nil, err
 	}
 
 	if code == nil {
-		return nil, fmt.Errorf("no code deployed at address %x", accountID)
+		return nil, fmt.Errorf("no code deployed at address %s", address)
 	}
 
 	return code, nil
@@ -241,24 +386,37 @@ func (r *TransactionContext) GenerateUUID() uint64 {
 }
 
 func (r *TransactionContext) GetComputationLimit() uint64 {
-	// TODO: implement me
-	return 100
+	return r.gasLimit
 }
 
 func (r *TransactionContext) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {
 	return jsoncdc.Decode(b)
 }
 
-// GetAccount gets an account by address.
+// GetCurrentBlockHeight returns the current block height.
+func (r *TransactionContext) GetCurrentBlockHeight() uint64 {
+	return r.header.Height
+}
 
-func (r *TransactionContext) isValidSigningAccount(address runtime.Address) bool {
-	for _, accountAddress := range r.GetSigningAccounts() {
-		if accountAddress == address {
-			return true
-		}
+// GetBlockAtHeight returns the block at the given height.
+func (r *TransactionContext) GetBlockAtHeight(height uint64) (hash runtime.BlockHash, timestamp int64, exists bool, err error) {
+	block, err := r.blocks.ByHeight(height)
+	// TODO remove dependency on storage
+	if errors.Is(err, storage.ErrNotFound) {
+		return runtime.BlockHash{}, 0, false, nil
+	} else if err != nil {
+		return runtime.BlockHash{}, 0, false, fmt.Errorf(
+			"unexpected failure of GetBlockAtHeight, tx ID %s, height %v: %w", r.tx.ID().String(), height, err)
 	}
+	return runtime.BlockHash(block.ID()), block.Header.Timestamp.UnixNano(), true, nil
+}
 
-	return false
+// UnsafeRandom returns a random uint64, where the process of random number derivation is not cryptographically
+// secure.
+func (r *TransactionContext) UnsafeRandom() uint64 {
+	buf := make([]byte, 8)
+	_, _ = r.rng.Read(buf) // Always succeeds, no need to check error
+	return binary.LittleEndian.Uint64(buf)
 }
 
 // checkProgram checks the given code for syntactic and semantic correctness.
@@ -276,8 +434,7 @@ func (r *TransactionContext) checkProgram(code []byte, address runtime.Address) 
 //
 // An error is returned if any of the expected signatures are invalid or missing.
 func (r *TransactionContext) verifySignatures() FlowError {
-
-	if r.tx.Payer == flow.ZeroAddress {
+	if r.tx.Payer == flow.EmptyAddress {
 		return &MissingPayerError{}
 	}
 
@@ -328,7 +485,7 @@ func (r *TransactionContext) verifySignatures() FlowError {
 	return nil
 }
 
-// CheckAndIncrementSequenceNumber validates and increments a sequence number for an account key.
+// checkAndIncrementSequenceNumber validates and increments a sequence number for an account key.
 //
 // This function first checks that the provided sequence number matches the version stored on-chain.
 // If they are equal, the on-chain sequence number is incremented.
@@ -336,10 +493,9 @@ func (r *TransactionContext) verifySignatures() FlowError {
 //
 // This function returns an error if any problem occurred during checking or the check failed
 func (r *TransactionContext) checkAndIncrementSequenceNumber() (FlowError, error) {
-
 	proposalKey := r.tx.ProposalKey
 
-	account := r.GetAccount(proposalKey.Address)
+	account := r.ledger.GetAccount(proposalKey.Address)
 
 	if int(proposalKey.KeyID) >= len(account.Keys) {
 		return &InvalidProposalKeyError{
@@ -367,7 +523,7 @@ func (r *TransactionContext) checkAndIncrementSequenceNumber() (FlowError, error
 	if err != nil {
 		return nil, err
 	}
-	r.setAccountPublicKey(account.Address.Bytes(), proposalKey.KeyID, updatedAccountBytes)
+	r.ledger.setAccountPublicKey(account.Address, proposalKey.KeyID, updatedAccountBytes)
 
 	return nil, nil
 }
@@ -410,7 +566,7 @@ func (r *TransactionContext) verifyAccountSignature(
 	txSig flow.TransactionSignature,
 	message []byte,
 ) (*flow.AccountPublicKey, FlowError) {
-	account := r.GetAccount(txSig.Address)
+	account := r.ledger.GetAccount(txSig.Address)
 	if account == nil {
 		return nil, &InvalidSignatureAccountError{Address: txSig.Address}
 	}
@@ -421,7 +577,7 @@ func (r *TransactionContext) verifyAccountSignature(
 
 	accountKey := &account.Keys[txSig.KeyID]
 
-	hasher, err := hash.NewHasher(accountKey.HashAlgo)
+	hasher, err := utils.NewHasher(accountKey.HashAlgo)
 	if err != nil {
 		return accountKey, &InvalidHashingAlgorithmError{
 			Address:          txSig.Address,
@@ -452,4 +608,146 @@ func sigIsForProposalKey(txSig flow.TransactionSignature, proposalKey flow.Propo
 
 func hasSufficientKeyWeight(weights map[flow.Address]int, address flow.Address) bool {
 	return weights[address] >= AccountKeyWeightThreshold
+}
+
+func (r *TransactionContext) isValidSigningAccount(address runtime.Address) bool {
+	for _, accountAddress := range r.GetSigningAccounts() {
+		if accountAddress == address {
+			return true
+		}
+	}
+
+	return false
+}
+
+func InitDefaultTokenTransaction(serviceAddress flow.Address) []byte {
+	return []byte(fmt.Sprintf(`
+		import FlowServiceAccount from 0x%s
+
+		transaction {
+			prepare(acct: AuthAccount) {
+				FlowServiceAccount.initDefaultToken(acct)
+			}
+		}
+	`, serviceAddress))
+}
+
+func DefaultTokenBalanceScript(serviceAddress, addr flow.Address) []byte {
+	return []byte(fmt.Sprintf(`
+        import FlowServiceAccount from 0x%s
+
+        pub fun main(): UFix64 {
+            let acct = getAccount(0x%s)
+            return FlowServiceAccount.defaultTokenBalance(acct)
+        }
+    `, serviceAddress, addr))
+}
+
+func DeductAccountCreationFeeTransaction(serviceAddress flow.Address) []byte {
+	return []byte(fmt.Sprintf(`
+		import FlowServiceAccount from 0x%s
+
+		transaction {
+			prepare(acct: AuthAccount) {
+				FlowServiceAccount.deductAccountCreationFee(acct)
+			}
+		}
+	`, serviceAddress))
+}
+
+func DeductAccountCreationFeeWithWhitelistTransaction(serviceAddress flow.Address) []byte {
+	return []byte(fmt.Sprintf(`
+		import FlowServiceAccount from 0x%s
+
+		transaction {
+			prepare(acct: AuthAccount) {
+				if !FlowServiceAccount.isAccountCreator(acct.address) {
+					panic("Account not authorized to create accounts")
+				}
+
+				FlowServiceAccount.deductAccountCreationFee(acct)
+			}
+		}
+	`, serviceAddress))
+}
+
+func DeductTransactionFeeTransaction(serviceAddress flow.Address) []byte {
+	return []byte(fmt.Sprintf(`
+		import FlowServiceAccount from 0x%s
+
+		transaction {
+			prepare(acct: AuthAccount) {
+				FlowServiceAccount.deductTransactionFee(acct)
+			}
+		}
+	`, serviceAddress))
+}
+
+func DeployDefaultTokenTransaction(contract []byte) []byte {
+	return []byte(fmt.Sprintf(`
+        transaction {
+          prepare(flowTokenAcct: AuthAccount, serviceAcct: AuthAccount) {
+            let adminAcct = serviceAcct
+            flowTokenAcct.setCode("%s".decodeHex(), adminAcct)
+          }
+        }
+    `, hex.EncodeToString(contract)))
+}
+
+func DeployFlowFeesTransaction(contract []byte) []byte {
+	return []byte(fmt.Sprintf(`
+        transaction {
+          prepare(flowFees: AuthAccount, serviceAcct: AuthAccount) {
+            let adminAcct = serviceAcct
+            flowFees.setCode("%s".decodeHex(), adminAcct)
+          }
+        }
+    `, hex.EncodeToString(contract)))
+}
+
+func MintDefaultTokenTransaction(fungibleTokenAddress, flowTokenAddress flow.Address) []byte {
+	return []byte(fmt.Sprintf(`
+		import FungibleToken from 0x%s
+		import FlowToken from 0x%s
+
+		transaction(amount: UFix64) {
+
+		  let tokenAdmin: &FlowToken.Administrator
+		  let tokenReceiver: &FlowToken.Vault{FungibleToken.Receiver}
+
+		  prepare(signer: AuthAccount) {
+			self.tokenAdmin = signer
+			  .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)
+			  ?? panic("Signer is not the token admin")
+
+			self.tokenReceiver = signer
+			  .getCapability(/public/flowTokenReceiver)!
+			  .borrow<&FlowToken.Vault{FungibleToken.Receiver}>()
+			  ?? panic("Unable to borrow receiver reference for recipient")
+		  }
+
+		  execute {
+			let minter <- self.tokenAdmin.createNewMinter(allowedAmount: amount)
+			let mintedVault <- minter.mintTokens(amount: amount)
+
+			self.tokenReceiver.deposit(from: <-mintedVault)
+
+			destroy minter
+		  }
+		}
+	`, fungibleTokenAddress, flowTokenAddress))
+}
+
+func FungibleTokenAddress(chain flow.Chain) flow.Address {
+	address, _ := chain.AddressAtIndex(2)
+	return address
+}
+
+func FlowTokenAddress(chain flow.Chain) flow.Address {
+	address, _ := chain.AddressAtIndex(3)
+	return address
+}
+
+func runtimeToFlowAddress(address runtime.Address) flow.Address {
+	return flow.Address(address)
 }

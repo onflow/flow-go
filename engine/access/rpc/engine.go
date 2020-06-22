@@ -11,8 +11,10 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/access/rpc/handler"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
+	grpcutils "github.com/dapperlabs/flow-go/utils/grpc"
 )
 
 // Config defines the configurable options for the gRPC server.
@@ -20,6 +22,7 @@ type Config struct {
 	ListenAddr     string
 	ExecutionAddr  string
 	CollectionAddr string
+	MaxMsgSize     int // In bytes
 }
 
 // Engine implements a gRPC server with a simplified version of the Observation API.
@@ -40,16 +43,24 @@ func New(log zerolog.Logger,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
-	transactions storage.Transactions) *Engine {
+	transactions storage.Transactions,
+	chainID flow.ChainID) *Engine {
 
 	log = log.With().Str("engine", "rpc").Logger()
+
+	if config.MaxMsgSize == 0 {
+		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
+	}
 
 	eng := &Engine{
 		log:     log,
 		unit:    engine.NewUnit(),
-		handler: handler.NewHandler(log, state, executionRPC, collectionRPC, blocks, headers, collections, transactions),
-		server:  grpc.NewServer(),
-		config:  config,
+		handler: handler.NewHandler(log, state, executionRPC, collectionRPC, blocks, headers, collections, transactions, chainID),
+		server: grpc.NewServer(
+			grpc.MaxRecvMsgSize(config.MaxMsgSize),
+			grpc.MaxSendMsgSize(config.MaxMsgSize),
+		),
+		config: config,
 	}
 
 	access.RegisterAccessAPIServer(eng.server, eng.handler)
