@@ -254,12 +254,17 @@ func mintFlowTokenTransaction(fungibleToken, flowToken, service flow.Address, in
 	)
 }
 
+const (
+	fungibleTokenAccountIndex = 2
+	flowTokenAccountIndex     = 3
+)
+
 func FungibleTokenAddress() flow.Address {
-	addressess, _ := flow.AddressAtIndex(2)
-	return addressess
+	address, _ := flow.AddressAtIndex(fungibleTokenAccountIndex)
+	return address
 }
 
 func FlowTokenAddress() flow.Address {
-	addressess, _ := flow.AddressAtIndex(3)
-	return addressess
+	address, _ := flow.AddressAtIndex(flowTokenAccountIndex)
+	return address
 }
