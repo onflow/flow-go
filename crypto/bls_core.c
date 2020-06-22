@@ -33,7 +33,7 @@ int check_membership_Zr(const bn_t a){
 // and is in the subgroup G1
 // membership check in G1 is using a naive scalar multiplication by the group order
 // TODO: switch to the faster Bowe check 
-static int check_membership_G1(const ep_t p){
+int check_membership_G1(const ep_t p){
 #if MEMBERSHIP_CHECK
     // check p is on curve
     if (!ep_is_valid(p))

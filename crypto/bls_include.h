@@ -39,6 +39,7 @@ void     bls_sign(byte*, const bn_t, const byte*, const int);
 int      bls_verify(const ep2_t, const byte*, const byte*, const int);
 
 int      check_membership_Zr(const bn_t);
+int      check_membership_G1(const ep_t p);
 int      check_membership_G2(const ep2_t);
 
 void     map_to_G1(ep_t, const byte*, const int);

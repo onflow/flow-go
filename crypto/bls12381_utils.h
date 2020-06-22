@@ -87,4 +87,7 @@ void     bn_print_(char*, bn_st*);
 void     ep_print_(char*, ep_st*);
 void     ep2_print_(char*, ep2_st*);
 
+// BLS based SPoCK
+int bls_spock_verify(const ep2_t, const byte*, const ep2_t, const byte*);
+
 #endif
