@@ -112,7 +112,12 @@ generate-mocks:
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
 tidy:
-	go mod tidy; git diff --exit-code
+	go mod tidy
+	cd integration; go mod tidy
+	cd crypto; go mod tidy
+	cd cmd/testclient; go mod tidy
+	cd protobuf; go mod tidy
+	git diff --exit-code
 
 .PHONY: lint
 lint:
