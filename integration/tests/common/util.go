@@ -3,12 +3,12 @@ package common
 import (
 	"context"
 	"fmt"
+	"math/rand"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go-sdk/examples"
 
 	"github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/engine/ghost/client"
@@ -192,7 +192,7 @@ func GetAccount(chain flow.Chain) (sdk.Address, *sdk.AccountKey, sdkcrypto.Signe
 
 	addr := convert.ToSDKAddress(chain.ServiceAddress())
 
-	key := examples.RandomPrivateKey()
+	key := RandomPrivateKey()
 	signer := sdkcrypto.NewInMemorySigner(key, sdkcrypto.SHA3_256)
 
 	acct := sdk.NewAccountKey().
@@ -201,4 +201,21 @@ func GetAccount(chain flow.Chain) (sdk.Address, *sdk.AccountKey, sdkcrypto.Signe
 		SetWeight(sdk.AccountKeyWeightThreshold)
 
 	return addr, acct, signer
+}
+
+// RandomPrivateKey returns a randomly generated ECDSA P-256 private key.
+func RandomPrivateKey() sdkcrypto.PrivateKey {
+	seed := make([]byte, sdkcrypto.MinSeedLength)
+
+	_, err := rand.Read(seed)
+	if err != nil {
+		panic(err)
+	}
+
+	privateKey, err := sdkcrypto.GeneratePrivateKey(sdkcrypto.ECDSA_P256, seed)
+	if err != nil {
+		panic(err)
+	}
+
+	return privateKey
 }

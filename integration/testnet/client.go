@@ -6,7 +6,7 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/dapperlabs/flow-go/engine/execution/utils"
 	"github.com/dapperlabs/flow-go/integration/client"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/dsl"
@@ -95,7 +95,7 @@ func (c *Client) DeployContract(ctx context.Context, refID flow.Identifier, cont
 // SignTransaction signs the transaction using the proposer's key
 func (c *Client) SignTransaction(tx flow.TransactionBody) (flow.TransactionBody, error) {
 
-	hasher, err := hash.NewHasher(c.key.HashAlgo)
+	hasher, err := utils.NewHasher(c.key.HashAlgo)
 	if err != nil {
 		return flow.TransactionBody{}, err
 	}
