@@ -25,7 +25,8 @@ import (
 )
 
 func TestECDSADomainTags(t *testing.T) {
-	assert.Equal(len(TransactionDomainTag), len(UserDomainTag))
+	assert.Equal(t, len(flow.TransactionDomainTag), len(flow.UserDomainTag),
+		"tag lengths must be equal")
 }
 
 func TestBlockContext_ExecuteTransaction(t *testing.T) {

@@ -49,9 +49,13 @@ type TransactionBody struct {
 
 var (
 	// TransactionDomainTag is the prefix of all signed transaction payloads
-	TransactionDomainTag = []byte("FLOW-V0.0-tran")
+	//
+	// The string decoding into bytes is using utf8
+	TransactionDomainTag = []byte("FLOW-V0.0-transaction")
 	// UserDomainTag is the prefix of all signed user space payloads
-	UserDomainTag = []byte("FLOW-V0.0-user")
+	//
+	// The string decoding into bytes is using utf8
+	UserDomainTag = []byte("FLOW-V0.0-user-domain")
 )
 
 // NewTransactionBody initializes and returns an empty transaction body
