@@ -24,7 +24,6 @@ const (
 	codeClusterHeight   = 22 // latest finalized height on cluster
 	codeExecutedBlock   = 23 // latest executed block with max height
 	codeRootHeight      = 24 // the height of the first loaded block
-	codeChainID         = 25 // holds the chain ID for the protocol state
 
 	// codes for single entity storage
 	codeHeader          = 30
