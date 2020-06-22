@@ -4,6 +4,7 @@ package badger_test
 
 import (
 	"errors"
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -357,14 +358,17 @@ func TestExtendSealedBoundary(t *testing.T) {
 		seal := unittest.BlockSealFixture()
 		seal.BlockID = block.ID()
 		seal.ResultID = result.ID()
+		seal.InitialState = nil
 		seal.FinalState = result.FinalStateCommit
+
+		fmt.Printf("root: %x\n", block.ID())
 
 		err := state.Mutate().Bootstrap(block, result, seal)
 		require.NoError(t, err)
 
 		finalCommit, err := state.Final().Commit()
 		require.NoError(t, err)
-		assert.Equal(t, seal.FinalState, finalCommit, "original commit should be genisis commit")
+		assert.Equal(t, seal.FinalState, finalCommit, "original commit should be root commit")
 
 		first := unittest.BlockFixture()
 		first.Payload.Identities = nil
@@ -384,9 +388,9 @@ func TestExtendSealedBoundary(t *testing.T) {
 		second := unittest.BlockFixture()
 		second.Payload.Identities = nil
 		second.Payload.Guarantees = nil
-		second.Payload.Seals = []*flow.Seal{seal}
+		second.Payload.Seals = []*flow.Seal{extend}
 		second.Header.Height = 2
-		second.Header.ParentID = block.ID()
+		second.Header.ParentID = first.ID()
 		second.Header.PayloadHash = second.Payload.Hash()
 
 		err = state.Mutate().Extend(&first)
@@ -488,20 +492,21 @@ func TestExtendHeightTooSmall(t *testing.T) {
 
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupBlockSeal(block.ID(), &sealID))
-		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
+		err = db.View(operation.LookupBlockSeal(extend.ID(), &sealID))
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, stoerr.ErrNotFound))
 	})
 }
 
 func TestExtendHeightTooLarge(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
-		genesis := unittest.GenesisFixture(participants)
+		root := unittest.GenesisFixture(participants)
 
-		block := unittest.BlockWithParentFixture(genesis.Header)
+		block := unittest.BlockWithParentFixture(root.Header)
 		block.SetPayload(flow.Payload{})
 		// set an invalid height
-		block.Header.Height = genesis.Header.Height + 2
+		block.Header.Height = root.Header.Height + 2
 
 		err := state.Mutate().Extend(&block)
 		require.Error(t, err)
@@ -539,7 +544,7 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		err = state.Mutate().Finalize(extend.ID())
 		require.NoError(t, err)
 
-		// create a fork at view/height 1 and try to connect it to genesis
+		// create a fork at view/height 1 and try to connect it to root
 		extend.Header.Timestamp = extend.Header.Timestamp.Add(time.Second)
 		extend.Header.ParentID = block.Header.ID()
 
@@ -550,6 +555,7 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		var sealID flow.Identifier
 		err = db.View(operation.LookupBlockSeal(extend.ID(), &sealID))
 		require.Error(t, err)
+		assert.True(t, errors.Is(err, stoerr.ErrNotFound))
 	})
 }
 
@@ -584,7 +590,7 @@ func TestExtendSealNotConnected(t *testing.T) {
 		// create seal for the block
 		second := &flow.Seal{
 			BlockID:      extend.ID(),
-			InitialState: unittest.StateCommitmentFixture(), // not genesis state
+			InitialState: unittest.StateCommitmentFixture(), // not root state
 			FinalState:   unittest.StateCommitmentFixture(),
 		}
 
@@ -603,6 +609,7 @@ func TestExtendSealNotConnected(t *testing.T) {
 		// verify seal not indexed
 		var sealID flow.Identifier
 		err = db.View(operation.LookupBlockSeal(sealing.ID(), &sealID))
+		require.Error(t, err)
 		assert.True(t, errors.Is(err, stoerr.ErrNotFound))
 	})
 }
@@ -632,22 +639,17 @@ func TestExtendWrongIdentity(t *testing.T) {
 
 		err = state.Mutate().Extend(&extend)
 		require.Error(t, err)
-
-		// verify seal not indexed
-		var sealID flow.Identifier
-		err = db.View(operation.LookupBlockSeal(block.ID(), &sealID))
-		require.Error(t, err)
 	})
 }
 
 func TestExtendInvalidChainID(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
-		genesis := unittest.GenesisFixture(participants)
-		block := unittest.BlockWithParentFixture(genesis.Header)
+		root := unittest.GenesisFixture(participants)
+		block := unittest.BlockWithParentFixture(root.Header)
 		block.SetPayload(flow.Payload{})
 		// use an invalid chain ID
-		block.Header.ChainID = genesis.Header.ChainID + "-invalid"
+		block.Header.ChainID = root.Header.ChainID + "-invalid"
 
 		err := state.Mutate().Extend(&block)
 		require.Error(t, err)
