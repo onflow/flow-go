@@ -292,7 +292,7 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	var result *InvocationResult
 
 	result, err = e.txCtx.Invoke(
-		deductAccountCreationFee(flow.Address(payer), e.restrictAccountCreation),
+		deductAccountCreationFeeTransaction(flow.Address(payer), e.restrictAccountCreation),
 		e.ledger,
 	)
 	if err != nil {
