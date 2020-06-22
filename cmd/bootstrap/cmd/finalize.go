@@ -117,15 +117,6 @@ func init() {
 	finalizeCmd.Flags().StringVar(&flagChainID, "chain-id", "", "chain ID for the root block (can be \"main\", \"test\" or \"emulator\"")
 }
 
-// Mainnet is the chain ID for the mainnet node chain.
-const Mainnet ChainID = "flow-mainnet"
-
-// Testnet is the chain ID for the testnet node chain.
-const Testnet ChainID = "flow-testnet"
-
-// Emulator is the chain ID for the emulated node chain.
-const Emulator ChainID = "flow-emulator"
-
 func assemblePartnerNodes() []model.NodeInfo {
 
 	partners := readPartnerNodes()
@@ -229,7 +220,7 @@ func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) []model.NodeIn
 }
 
 func parseChainID(chainID string) flow.ChainID {
-	switch chain {
+	switch chainID {
 	case "main":
 		return flow.Mainnet
 	case "test":
@@ -238,5 +229,6 @@ func parseChainID(chainID string) flow.ChainID {
 		return flow.Emulator
 	default:
 		log.Fatal().Str("chain_id", chainID).Msg("invalid chain ID")
+		return ""
 	}
 }

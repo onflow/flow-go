@@ -31,5 +31,5 @@ func GenerateExecutionState(dbDir string, accountKey flow.AccountPublicKey, toke
 	if err != nil {
 		return nil, err
 	}
-	return bootstrap.BootstrapLedger(ledgerStorage, accountKey, genesisTokenSupply, chain)
+	return bootstrap.BootstrapLedger(ledgerStorage, accountKey, tokenSupply, chain)
 }

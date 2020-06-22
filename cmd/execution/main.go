@@ -54,7 +54,7 @@ func main() {
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
-			vm, err := virtualmachine.New(rt, node.GenesisChainID.Chain())
+			vm, err := virtualmachine.New(rt, node.RootChainID.Chain())
 			if err != nil {
 				return err
 			}

@@ -18,10 +18,6 @@ import (
 	"github.com/dapperlabs/flow-go/state/protocol/util"
 	stoerr "github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
-<<<<<<< HEAD
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
-=======
->>>>>>> switched bootstrapping to input state & output seal
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 

@@ -20,7 +20,7 @@ import (
 )
 
 func TestBlockHashByHeight(t *testing.T) {
-	metr := metrics.NewCacheCollector(flow.GetChainID())
+	metr := metrics.NewCacheCollector(flow.Testnet)
 
 	t.Run("AllowUnfinalizedUnsealed", func(t *testing.T) {
 		datadir, err := tempDBDir()
