@@ -699,7 +699,6 @@ github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn
 github.com/olekukonko/tablewriter v0.0.1/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
 github.com/olekukonko/tablewriter v0.0.2-0.20190409134802-7e037d187b0c/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
 github.com/onflow/cadence v0.3.0-beta1/go.mod h1:GaLQ7IsJi5bqpH66GprNs8uoQtperK/xbXXIOq11nZw=
-github.com/onflow/cadence v0.4.0-beta1/go.mod h1:gaPtSctdMzT5NAoJgzsRuwUkdgRswVHsRXFNNmCTn3I=
 github.com/onflow/cadence v0.4.1-0.20200604185918-21edaa9bfcdd/go.mod h1:dgj1JPlSDeY6ZSqD/yCW06reFSt+19d/IFgQ1eE8Bfg=
 github.com/onflow/cadence v0.4.1-0.20200604200650-30a200f9c324 h1:MVknTPVGjL7cVFQhs9Yv9idJAEAnJXFU8hy/+mtIrp0=
 github.com/onflow/cadence v0.4.1-0.20200604200650-30a200f9c324/go.mod h1:dgj1JPlSDeY6ZSqD/yCW06reFSt+19d/IFgQ1eE8Bfg=
@@ -707,13 +706,10 @@ github.com/onflow/flow-ft/contracts v0.0.0-20200525235630-0e8024a483ce h1:I8SaLO
 github.com/onflow/flow-ft/contracts v0.0.0-20200525235630-0e8024a483ce/go.mod h1:KwzrK5thiLObKHTHaHf9lrvOS3HLr9jntNEZUQ4yJgw=
 github.com/onflow/flow-go-sdk v0.3.0-beta1 h1:HmAqosPHLoNmYfhUECsSFpvSD4kWIkJ+Xs8LAJijKDc=
 github.com/onflow/flow-go-sdk v0.3.0-beta1/go.mod h1:8v6vcYGh5/PtYcM3IXflLcCb00I91WDbnNF8SjirnlI=
-github.com/onflow/flow-go-sdk v0.4.0 h1:ZNEE8HQ6xTyr4+RmlxZ2+U/BjKtQDsAB54I+D8AJpZA=
-github.com/onflow/flow-go-sdk v0.4.0/go.mod h1:MHn8oQCkBNcl2rXdYSm9VYYK4ogwEpyrdM/XK/czdlM=
 github.com/onflow/flow-go-sdk v0.5.1-0.20200620041402-7cc94298795c h1:ZCQ67fFGLiTq1Jx+8DZdZ9zjM7/fuiMHUv2FDtXtnyQ=
 github.com/onflow/flow-go-sdk v0.5.1-0.20200620041402-7cc94298795c/go.mod h1:RvfeJU2ST71IcX/1OsdrMG0JjBqtmuJErlV8r0Xw+eU=
 github.com/onflow/flow/protobuf/go/flow v0.1.4 h1:xRdLYCxR/V6lq03ElK3g0T/F8pCIpLrKs2IHQTYr9rM=
 github.com/onflow/flow/protobuf/go/flow v0.1.4/go.mod h1:kRugbzZjwQqvevJhrnnCFMJZNmoSJmxlKt6hTGXZojM=
-github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200601215056-34a11def1d6b/go.mod h1:kRugbzZjwQqvevJhrnnCFMJZNmoSJmxlKt6hTGXZojM=
 github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200619174948-a3a856d16a27 h1:ZZ8njaFTOz7JyBpQwXGfFUUOc9l2urVAxQ7FpMUpfnc=
 github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200619174948-a3a856d16a27/go.mod h1:kRugbzZjwQqvevJhrnnCFMJZNmoSJmxlKt6hTGXZojM=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
@@ -1127,6 +1123,7 @@ golang.org/x/tools v0.0.0-20200207183749-b753a1ba74fa/go.mod h1:TB2adYChydJhpapK
 golang.org/x/tools v0.0.0-20200212150539-ea181f53ac56/go.mod h1:TB2adYChydJhpapKDTa4BR/hXlZSLoq2Wpct/0txZ28=
 golang.org/x/tools v0.0.0-20200224181240-023911ca70b2 h1:L/G4KZvrQn7FWLN/LlulBtBzrLUhqjiGfTWWDmrh+IQ=
 golang.org/x/tools v0.0.0-20200224181240-023911ca70b2/go.mod h1:TB2adYChydJhpapKDTa4BR/hXlZSLoq2Wpct/0txZ28=
+golang.org/x/tools v0.0.0-20200323144430-8dcfad9e016e h1:ssd5ulOvVWlh4kDSUF2SqzmMeWfjmwDXM+uGw/aQjRE=
 golang.org/x/tools v0.0.0-20200323144430-8dcfad9e016e/go.mod h1:Sl4aGygMT6LrqrWclx+PTx3U+LnKx/seiNR+3G19Ar8=
 golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
