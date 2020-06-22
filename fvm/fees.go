@@ -40,7 +40,7 @@ transaction {
 }
 `
 
-func deductAccountCreationFee(address flow.Address, restrictedAccountCreationEnabled bool) Invokable {
+func deductAccountCreationFeeTransaction(address flow.Address, restrictedAccountCreationEnabled bool) InvokableTransaction {
 	var script string
 
 	if restrictedAccountCreationEnabled {
@@ -56,7 +56,7 @@ func deductAccountCreationFee(address flow.Address, restrictedAccountCreationEna
 	return Transaction(tx)
 }
 
-func deductTransactionFeeTransaction(address flow.Address) Invokable {
+func deductTransactionFeeTransaction(address flow.Address) InvokableTransaction {
 	return Transaction(
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(deductTransactionFeeTransactionTemplate, flow.ServiceAddress()))).

@@ -294,7 +294,7 @@ pub fun main(): UFix64 {
 }
 `
 
-func initFlowTokenTransaction(address flow.Address) Invokable {
+func initFlowTokenTransaction(address flow.Address) InvokableTransaction {
 	return Transaction(
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(initFlowTokenTransactionTemplate, flow.ServiceAddress()))).
@@ -302,6 +302,6 @@ func initFlowTokenTransaction(address flow.Address) Invokable {
 	)
 }
 
-func getFlowTokenBalanceScript(address flow.Address) Invokable {
+func getFlowTokenBalanceScript(address flow.Address) InvokableScript {
 	return Script([]byte(fmt.Sprintf(getFlowTokenBalanceScriptTemplate, flow.ServiceAddress(), address)))
 }
