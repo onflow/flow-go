@@ -25,8 +25,10 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 	vm := fvm.New(rt)
 
-	h := unittest.BlockHeaderFixture()
-	bc := vm.NewContext(fvm.WithBlockHeader(&h))
+	cache, err := fvm.NewLRUASTCache(CacheSize)
+	require.NoError(t, err)
+
+	ctx := vm.NewContext(fvm.WithASTCache(cache))
 
 	t.Run("Success", func(t *testing.T) {
 		tx := flow.NewTransactionBody().
@@ -42,7 +44,8 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		ledger := execTestutil.RootBootstrappedLedger()
 
-		result, err := bc.Invoke(fvm.Transaction(tx), ledger)
+		var result *fvm.InvocationResult
+		result, err = ctx.Invoke(fvm.Transaction(tx), ledger)
 		require.NoError(t, err)
 
 		assert.True(t, result.Succeeded())
@@ -74,7 +77,8 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		ledger := execTestutil.RootBootstrappedLedger()
 
-		result, err := bc.Invoke(fvm.Transaction(tx), ledger)
+		var result *fvm.InvocationResult
+		result, err = ctx.Invoke(fvm.Transaction(tx), ledger)
 		require.NoError(t, err)
 
 		assert.False(t, result.Succeeded())
@@ -97,7 +101,8 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		ledger := execTestutil.RootBootstrappedLedger()
 
-		result, err := bc.Invoke(fvm.Transaction(tx), ledger)
+		var result *fvm.InvocationResult
+		result, err = ctx.Invoke(fvm.Transaction(tx), ledger)
 		require.NoError(t, err)
 
 		require.Len(t, result.Logs, 2)
@@ -121,7 +126,8 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		ledger := execTestutil.RootBootstrappedLedger()
 
-		result, err := bc.Invoke(fvm.Transaction(tx), ledger)
+		var result *fvm.InvocationResult
+		result, err = ctx.Invoke(fvm.Transaction(tx), ledger)
 		require.NoError(t, err)
 
 		assert.True(t, result.Succeeded())
@@ -136,11 +142,12 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 func TestBlockContext_DeployContract(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
-
-	h := unittest.BlockHeaderFixture()
-
 	vm := fvm.New(rt)
-	bc := vm.NewContext(fvm.WithBlockHeader(&h))
+
+	cache, err := fvm.NewLRUASTCache(CacheSize)
+	require.NoError(t, err)
+
+	ctx := vm.NewContext(fvm.WithASTCache(cache))
 
 	t.Run("account update with set code succeeds as service account", func(t *testing.T) {
 		ledger := execTestutil.RootBootstrappedLedger()
@@ -164,7 +171,8 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = execTestutil.SignEnvelope(tx, flow.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
-		result, err := bc.Invoke(fvm.Transaction(tx), ledger)
+		var result *fvm.InvocationResult
+		result, err = ctx.Invoke(fvm.Transaction(tx), ledger)
 		require.NoError(t, err)
 
 		assert.True(t, result.Succeeded())
@@ -190,7 +198,8 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		err = execTestutil.SignTransaction(tx, accounts[0], privateKeys[0], 0)
 		require.NoError(t, err)
 
-		result, err := bc.Invoke(fvm.Transaction(tx), ledger)
+		var result *fvm.InvocationResult
+		result, err = ctx.Invoke(fvm.Transaction(tx), ledger)
 		require.NoError(t, err)
 
 		assert.False(t, result.Succeeded())
@@ -205,11 +214,12 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
-
-	h := unittest.BlockHeaderFixture()
-
 	vm := fvm.New(rt)
-	bc := vm.NewContext(fvm.WithBlockHeader(&h))
+
+	cache, err := fvm.NewLRUASTCache(CacheSize)
+	require.NoError(t, err)
+
+	ctx := vm.NewContext(fvm.WithASTCache(cache))
 
 	arg1, _ := jsoncdc.Encode(cadence.NewInt(42))
 	arg2, _ := jsoncdc.Encode(cadence.NewString("foo"))
@@ -281,7 +291,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 			err := execTestutil.SignTransactionByRoot(tx, 0)
 			require.NoError(t, err)
 
-			result, err := bc.Invoke(fvm.Transaction(tx), ledger)
+			result, err := ctx.Invoke(fvm.Transaction(tx), ledger)
 			require.NoError(t, err)
 
 			tt.check(t, result)
@@ -305,11 +315,12 @@ func gasLimitScript(depth int) string {
 
 func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
-
-	h := unittest.BlockHeaderFixture()
-
 	vm := fvm.New(rt)
-	bc := vm.NewContext(fvm.WithBlockHeader(&h))
+
+	cache, err := fvm.NewLRUASTCache(CacheSize)
+	require.NoError(t, err)
+
+	ctx := vm.NewContext(fvm.WithASTCache(cache))
 
 	var tests = []struct {
 		label    string
@@ -356,7 +367,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 			err := execTestutil.SignTransactionByRoot(tx, 0)
 			require.NoError(t, err)
 
-			result, err := bc.Invoke(fvm.Transaction(tx), ledger)
+			result, err := ctx.Invoke(fvm.Transaction(tx), ledger)
 			require.NoError(t, err)
 
 			tt.check(t, result)
@@ -366,11 +377,12 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 
 func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
-
-	h := unittest.BlockHeaderFixture()
-
 	vm := fvm.New(rt)
-	bc := vm.NewContext(fvm.WithBlockHeader(&h))
+
+	cache, err := fvm.NewLRUASTCache(CacheSize)
+	require.NoError(t, err)
+
+	ctx := vm.NewContext(fvm.WithASTCache(cache))
 
 	privateKeys, err := execTestutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
@@ -422,7 +434,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 		err = execTestutil.SignTransactionByRoot(validTx, seqNum)
 		require.NoError(t, err)
 
-		result, err := bc.Invoke(fvm.Transaction(validTx), ledger)
+		result, err := ctx.Invoke(fvm.Transaction(validTx), ledger)
 		require.NoError(t, err)
 
 		if !assert.True(t, result.Succeeded()) {
@@ -466,7 +478,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 		err = execTestutil.SignTransactionByRoot(validTx, seqNum)
 		require.NoError(t, err)
 
-		result, err := bc.Invoke(fvm.Transaction(validTx), ledger)
+		result, err := ctx.Invoke(fvm.Transaction(validTx), ledger)
 		require.NoError(t, err)
 
 		assert.True(t, result.Succeeded())
@@ -483,7 +495,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 		err = execTestutil.SignTransactionByRoot(invalidTx, 0)
 		require.NoError(t, err)
 
-		result, err := bc.Invoke(fvm.Transaction(invalidTx), ledger)
+		result, err := ctx.Invoke(fvm.Transaction(invalidTx), ledger)
 		require.NoError(t, err)
 
 		assert.False(t, result.Succeeded())
@@ -497,7 +509,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 		err = execTestutil.SignTransactionByRoot(validTx, 0)
 		require.NoError(t, err)
 
-		result, err := bc.Invoke(fvm.Transaction(validTx), ledger)
+		result, err := ctx.Invoke(fvm.Transaction(validTx), ledger)
 		require.NoError(t, err)
 
 		assert.True(t, result.Succeeded())
@@ -515,7 +527,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 		err = execTestutil.SignEnvelope(validTx, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
-		result, err := bc.Invoke(fvm.Transaction(validTx), ledger)
+		result, err := ctx.Invoke(fvm.Transaction(validTx), ledger)
 		require.NoError(t, err)
 
 		assert.True(t, result.Succeeded())
@@ -533,7 +545,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 		err = execTestutil.SignEnvelope(invalidTx, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
-		result, err := bc.Invoke(fvm.Transaction(invalidTx), ledger)
+		result, err := ctx.Invoke(fvm.Transaction(invalidTx), ledger)
 		require.NoError(t, err)
 
 		assert.False(t, result.Succeeded())
@@ -542,11 +554,12 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 
 func TestBlockContext_ExecuteScript(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
-
-	h := unittest.BlockHeaderFixture()
-
 	vm := fvm.New(rt)
-	bc := vm.NewContext(fvm.WithBlockHeader(&h))
+
+	cache, err := fvm.NewLRUASTCache(CacheSize)
+	require.NoError(t, err)
+
+	ctx := vm.NewContext(fvm.WithASTCache(cache))
 
 	t.Run("script success", func(t *testing.T) {
 		script := []byte(`
@@ -557,7 +570,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		ledger := execTestutil.RootBootstrappedLedger()
 
-		result, err := bc.Invoke(fvm.Script(script), ledger)
+		result, err := ctx.Invoke(fvm.Script(script), ledger)
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 	})
@@ -572,7 +585,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		ledger := execTestutil.RootBootstrappedLedger()
 
-		result, err := bc.Invoke(fvm.Script(script), ledger)
+		result, err := ctx.Invoke(fvm.Script(script), ledger)
 
 		assert.NoError(t, err)
 		assert.False(t, result.Succeeded())
@@ -590,7 +603,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		ledger := execTestutil.RootBootstrappedLedger()
 
-		result, err := bc.Invoke(fvm.Script(script), ledger)
+		result, err := ctx.Invoke(fvm.Script(script), ledger)
 		assert.NoError(t, err)
 
 		require.Len(t, result.Logs, 2)
@@ -608,9 +621,14 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 	vm := fvm.New(rt)
 
+	cache, err := fvm.NewLRUASTCache(CacheSize)
+	require.NoError(t, err)
+
+	ctx := vm.NewContext(fvm.WithASTCache(cache))
+
 	blocks := new(vmMock.Blocks)
 
-	bc := vm.NewContext(fvm.WithBlocks(blocks), fvm.WithBlockHeader(block1.Header))
+	blockCtx := ctx.NewChild(fvm.WithBlocks(blocks), fvm.WithBlockHeader(block1.Header))
 	blocks.On("ByHeight", block1.Header.Height).Return(&block1, nil)
 	blocks.On("ByHeight", block2.Header.Height).Return(&block2, nil)
 
@@ -637,7 +655,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		ledger := execTestutil.RootBootstrappedLedger()
 		require.NoError(t, err)
 
-		result, err := bc.Invoke(fvm.Transaction(tx), ledger)
+		result, err := blockCtx.Invoke(fvm.Transaction(tx), ledger)
 		assert.NoError(t, err)
 
 		assert.True(t, result.Succeeded())
@@ -662,7 +680,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 		ledger := execTestutil.RootBootstrappedLedger()
 
-		result, err := bc.Invoke(fvm.Script(script), ledger)
+		result, err := blockCtx.Invoke(fvm.Script(script), ledger)
 		assert.NoError(t, err)
 
 		assert.True(t, result.Succeeded())
@@ -694,7 +712,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		assert.PanicsWithValue(t, interpreter.ExternalError{
 			Recovered: logPanic{},
 		}, func() {
-			_, _ = bc.Invoke(fvm.Transaction(tx), ledger)
+			_, _ = blockCtx.Invoke(fvm.Transaction(tx), ledger)
 		})
 	})
 
@@ -711,7 +729,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		assert.PanicsWithValue(t, interpreter.ExternalError{
 			Recovered: logPanic{},
 		}, func() {
-			_, _ = bc.Invoke(fvm.Script(script), ledger)
+			_, _ = blockCtx.Invoke(fvm.Script(script), ledger)
 		})
 	})
 }
@@ -720,14 +738,12 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	count := 100
 	rt := runtime.NewInterpreterRuntime()
 
-	h := unittest.BlockHeaderFixture()
-
 	vm := fvm.New(rt)
 
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	bc := vm.NewContext(fvm.WithBlockHeader(&h), fvm.WithASTCache(cache))
+	ctx := vm.NewContext(fvm.WithASTCache(cache))
 
 	sequenceNumber := uint64(0)
 
@@ -753,7 +769,8 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		require.NoError(t, err)
 
 		// execute the transaction
-		result, err := bc.Invoke(fvm.Transaction(tx), ledger)
+		var result *fvm.InvocationResult
+		result, err = ctx.Invoke(fvm.Transaction(tx), ledger)
 		require.NoError(t, err)
 
 		assert.True(t, result.Succeeded())
@@ -792,7 +809,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 	t.Run("get accounts", func(t *testing.T) {
 		for address, expectedKey := range accounts {
 
-			account, err := bc.GetAccount(address, ledger)
+			account, err := ctx.GetAccount(address, ledger)
 			require.NoError(t, err)
 
 			assert.Len(t, account.Keys, 1)
@@ -806,7 +823,8 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		address, err := addressGen.NextAddress()
 		require.NoError(t, err)
 
-		account, err := bc.GetAccount(address, ledger)
+		var account *flow.Account
+		account, err = ctx.GetAccount(address, ledger)
 		require.NoError(t, err)
 
 		assert.Nil(t, account)
