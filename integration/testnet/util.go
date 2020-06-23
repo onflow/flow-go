@@ -68,20 +68,6 @@ func toNodeInfoList(confs []ContainerConfig) []bootstrap.NodeInfo {
 	return infos
 }
 
-// getSeeds returns a list of n random seeds of 48 bytes each. This is used in
-// conjunction with bootstrap key generation functions.
-func getSeeds(n int) ([][]byte, error) {
-	seeds := make([][]byte, n)
-	for i := 0; i < n; i++ {
-		seed, err := getSeed()
-		if err != nil {
-			return nil, err
-		}
-		seeds[i] = seed
-	}
-	return seeds, nil
-}
-
 func getSeed() ([]byte, error) {
 	seed := make([]byte, crypto.SeedMinLenDKG)
 	n, err := rand.Read(seed)
