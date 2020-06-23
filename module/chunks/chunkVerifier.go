@@ -9,7 +9,6 @@ import (
 	"github.com/dapperlabs/flow-go/fvm"
 	chmodels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/ledger/ptrie"
 )
 
@@ -17,7 +16,6 @@ import (
 type ChunkVerifier struct {
 	execCtx   fvm.Context
 	trieDepth int
-	blocks    storage.Blocks
 }
 
 // NewChunkVerifier creates a chunk verifier containing a flow virtual machine
