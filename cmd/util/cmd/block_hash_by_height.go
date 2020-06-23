@@ -5,14 +5,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	"github.com/dapperlabs/flow-go/cmd/util/cmd/common"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
 var (
@@ -24,8 +23,8 @@ var (
 
 // blockHashByHeight retreives the block hash by height
 func blockHashByHeight(_ *cobra.Command, _ []string) {
-	db := initStorage(flagDatadir)
-	cache := metrics.NewCacheCollector(flow.GetChainID())
+	db := common.InitStorage(flagDatadir)
+	cache := metrics.NewCacheCollector(flow.Mainnet)
 	headers := bstorage.NewHeaders(cache, db)
 	seals := bstorage.NewSeals(cache, db)
 
@@ -70,7 +69,7 @@ func blockHashByHeight(_ *cobra.Command, _ []string) {
 
 var blockHashByHeightCmd = &cobra.Command{
 	Use:   "block-hash-by-height",
-	Short: "Retreive the block hash for the finalized block at the given height",
+	Short: "Retrieve the block hash for the finalized block at the given height",
 	Run:   blockHashByHeight,
 }
 
@@ -78,7 +77,7 @@ func init() {
 	rootCmd.AddCommand(blockHashByHeightCmd)
 
 	blockHashByHeightCmd.Flags().Uint64Var(&flagHeight, "height", 0,
-		"height for which the block hash should be retreived")
+		"height for which the block hash should be retrieved")
 	_ = blockHashByHeightCmd.MarkFlagRequired("height")
 
 	blockHashByHeightCmd.Flags().BoolVar(&flagAllowUnfinalized, "allow-unfinalized", false,
@@ -91,28 +90,4 @@ func init() {
 	datadir := filepath.Join(homedir, ".flow", "database")
 	blockHashByHeightCmd.Flags().StringVar(&flagDatadir, "datadir", datadir,
 		"directory that stores the protocol state")
-}
-
-func initStorage(datadir string) *badger.DB {
-	opts := badger.
-		DefaultOptions(datadir).
-		WithKeepL0InMemory(true).
-		WithLogger(nil)
-
-	db, err := badger.Open(opts)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not open key-value store")
-	}
-
-	// in order to void long iterations with big keys when initializing with an
-	// already populated database, we bootstrap the initial maximum key size
-	// upon starting
-	err = operation.RetryOnConflict(db.Update, func(tx *badger.Txn) error {
-		return operation.InitMax(tx)
-	})
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not initialize max tracker")
-	}
-
-	return db
 }
