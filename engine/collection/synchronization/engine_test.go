@@ -289,3 +289,42 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 	err = ss.e.onRangeRequest(originID, req)
 	require.NoError(ss.T(), err, "valid range request should pass")
 }
+
+func (ss *SyncSuite) TestOnBatchRequest() {
+
+	// generate origin ID and batch request
+	originID := unittest.IdentifierFixture()
+	req := &messages.BatchRequest{
+		Nonce:    rand.Uint64(),
+		BlockIDs: nil,
+	}
+
+	// an empty request should not lead to response
+	req.BlockIDs = []flow.Identifier{}
+	err := ss.e.onBatchRequest(originID, req)
+	require.NoError(ss.T(), err, "should pass empty request")
+	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 0)
+
+	// a non-empty request for missing block ID should be a no-op
+	req.BlockIDs = unittest.IdentifierListFixture(1)
+	err = ss.e.onBatchRequest(originID, req)
+	require.NoError(ss.T(), err, "should pass request for missing block")
+	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 0)
+
+	// a non-empty request for existing block IDs should send right response
+	block := unittest.ClusterBlockFixture()
+	block.Header.Height = ss.head.Height - 1
+	req.BlockIDs = []flow.Identifier{block.ID()}
+	ss.blockIDs[block.ID()] = &block
+	ss.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Run(
+		func(args mock.Arguments) {
+			res := args.Get(0).(*messages.ClusterBlockResponse)
+			assert.ElementsMatch(ss.T(), []*model.Block{&block}, res.Blocks, "response should contain right block")
+			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
+			recipientID := args.Get(1).(flow.Identifier)
+			assert.Equal(ss.T(), originID, recipientID, "response should be send to original requester")
+		},
+	)
+	err = ss.e.onBatchRequest(originID, req)
+	require.NoError(ss.T(), err, "should pass request with valid block")
+}
