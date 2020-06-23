@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/cmd"
+	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
@@ -36,6 +37,7 @@ func main() {
 		txResults          storage.TransactionResults
 		providerEngine     *provider.Engine
 		computationManager *computation.Manager
+		syncEngine         *synchronization.Engine
 		ingestionEng       *ingestion.Engine
 		rpcConf            rpc.Config
 		err                error
@@ -160,6 +162,7 @@ func main() {
 				txResults,
 				computationManager,
 				providerEngine,
+				nil,
 				executionState,
 				6, // TODO - config param maybe?
 				collector,
@@ -169,6 +172,25 @@ func main() {
 				10,          // TODO - config param
 			)
 			return ingestionEng, err
+		}).
+		Module("sychronization engine", func(node *cmd.FlowNodeBuilder) error {
+			// initialize the synchronization engine
+			syncEngine, err = synchronization.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				node.Storage.Blocks,
+				ingestionEng,
+			)
+			if err != nil {
+				return fmt.Errorf("could not initialize synchronization engine: %w", err)
+			}
+
+			ingestionEng = ingestionEng.WithSynchronization(syncEngine)
+
+			return nil
 		}).
 		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, events, txResults)

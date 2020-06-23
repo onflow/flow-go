@@ -22,6 +22,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	executionSync "github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/engine/execution/utils"
+	"github.com/dapperlabs/flow-go/model/events"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -53,6 +54,7 @@ type Engine struct {
 	transactionResults                  storage.TransactionResults
 	computationManager                  computation.ComputationManager
 	providerEngine                      provider.ProviderEngine
+	syncEngine                          module.Synchronization
 	mempool                             *Mempool
 	execState                           state.ExecutionState
 	wg                                  sync.WaitGroup
@@ -80,6 +82,7 @@ func New(
 	transactionResults storage.TransactionResults,
 	executionEngine computation.ComputationManager,
 	providerEngine provider.ProviderEngine,
+	syncEngine module.Synchronization,
 	execState state.ExecutionState,
 	syncThreshold uint64,
 	metrics module.ExecutionMetrics,
@@ -105,6 +108,7 @@ func New(
 		transactionResults:                  transactionResults,
 		computationManager:                  executionEngine,
 		providerEngine:                      providerEngine,
+		syncEngine:                          syncEngine,
 		mempool:                             mempool,
 		execState:                           execState,
 		syncModeThreshold:                   syncThreshold,
@@ -139,6 +143,13 @@ func New(
 	return &eng, nil
 }
 
+// WithSynchronization adds the synchronization engine responsible for bringing the node
+// up to speed to the ingestion engine.
+func (e *Engine) WithSynchronization(sync module.Synchronization) *Engine {
+	e.syncEngine = sync
+	return e
+}
+
 // Engine boilerplate
 func (e *Engine) SubmitLocal(event interface{}) {
 	e.Submit(e.me.NodeID(), event)
@@ -160,7 +171,12 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 // Ready returns a channel that will close when the engine has
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
-	return e.unit.Ready()
+	if e.syncEngine == nil {
+		panic("must initialize ingestion engine with synchronization module")
+	}
+	return e.unit.Ready(func() {
+		<-e.syncEngine.Ready()
+	})
 }
 
 // Done returns a channel that will close when the engine has
@@ -183,6 +199,9 @@ func (e *Engine) Done() <-chan struct{} {
 		})
 
 		e.Wait()
+
+		e.log.Debug().Msg("shutting down synchronization engine")
+		<-e.syncEngine.Done()
 	})
 }
 
@@ -198,6 +217,14 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 		var err error
 		switch v := event.(type) {
+		case *events.SyncedBlock:
+			log.Debug().Hex("block_id", logging.Entity(v.Block.Header)).
+				Uint64("block_view", v.Block.Header.View).
+				Uint64("block_height", v.Block.Header.Height).
+				Msg("received synced block")
+			p := &messages.BlockProposal{
+				Header: v.Block.Header, Payload: v.Block.Payload}
+			err = e.handleBlockProposal(ctx, p)
 		case *messages.BlockProposal:
 			log.Debug().Hex("block_id", logging.Entity(v.Header)).
 				Uint64("block_view", v.Header.View).
@@ -990,12 +1017,16 @@ func (e *Engine) StartSync(ctx context.Context, firstKnown *entity.ExecutableBlo
 	}
 
 	if len(otherNodes) < 1 {
-		e.log.Fatal().Err(err).Msg("no other execution nodes to sync from")
+		e.log.Debug().
+			Msgf("no other execution nodes found, request last block instead at height %d", targetHeight)
+		e.syncEngine.RequestBlock(targetBlockID)
+		return
 	}
 
 	// select other node at random
 	// TODO - protocol which surveys other nodes for state
 	// TODO - ability to sync from multiple servers
+	// TODO - handle byzantine other node that does not send response
 	otherNodeIdentity := otherNodes[rand.Intn(len(otherNodes))]
 
 	exeStateReq := messages.ExecutionStateSyncRequest{

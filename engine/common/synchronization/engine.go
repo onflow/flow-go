@@ -96,6 +96,9 @@ func New(
 // started. For consensus engine, this is true once the underlying consensus
 // algorithm has started.
 func (e *Engine) Ready() <-chan struct{} {
+	if e.comp == nil {
+		panic("must initialize synchronization engine with comp engine")
+	}
 	e.unit.Launch(e.checkLoop)
 	return e.unit.Ready()
 }

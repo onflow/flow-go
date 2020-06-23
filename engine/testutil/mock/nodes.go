@@ -11,6 +11,7 @@ import (
 
 	collectioningest "github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
+	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
@@ -90,12 +91,20 @@ type ExecutionNode struct {
 	IngestionEngine *ingestion.Engine
 	ExecutionEngine *computation.Manager
 	ReceiptsEngine  *executionprovider.Engine
+	SyncEngine      *synchronization.Engine
 	BadgerDB        *badger.DB
 	VM              virtualmachine.VirtualMachine
 	ExecutionState  state.ExecutionState
 	Ledger          storage.Ledger
 	LevelDbDir      string
 	Collections     storage.Collections
+}
+
+func (en ExecutionNode) Ready() {
+	<-en.Ledger.Ready()
+	<-en.ReceiptsEngine.Ready()
+	<-en.IngestionEngine.Ready()
+	<-en.SyncEngine.Ready()
 }
 
 func (en ExecutionNode) Done() {
