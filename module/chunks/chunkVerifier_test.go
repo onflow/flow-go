@@ -204,10 +204,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 
 }
 
-type blockContextMock struct {
-	header *flow.Header
-	blocks fvm.Blocks
-}
+type blockContextMock struct{}
 
 func (bc *blockContextMock) NewChild(opts ...fvm.Option) fvm.Context {
 	return nil
@@ -272,10 +269,5 @@ func (bc *blockContextMock) GetAccount(address flow.Address, ledger fvm.Ledger) 
 	return nil, nil
 }
 
-func (bc *blockContextMock) Options() fvm.Options {
-	return fvm.Options{}
-}
-
-func (bc *blockContextMock) Runtime() runtime.Runtime {
-	return nil
-}
+func (bc *blockContextMock) Options() fvm.Options     { return fvm.Options{} }
+func (bc *blockContextMock) Runtime() runtime.Runtime { return nil }
