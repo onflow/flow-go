@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"

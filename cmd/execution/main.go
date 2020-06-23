@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,7 +16,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/rpc"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -81,38 +79,9 @@ func main() {
 			collector = metrics.NewExecutionCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
 		}).
-		// Trie storage is required to bootstrap, but also should be handled while shutting down
-		Module("ledger storage", func(node *cmd.FlowNodeBuilder) error {
-			ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), collector, node.MetricsRegisterer)
-			return err
-		}).
-		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
-			syncCore, err = chainsync.New(node.Logger, chainsync.DefaultConfig())
-			return err
-		}).
-		GenesisHandler(func(node *cmd.FlowNodeBuilder, block *flow.Block) {
-			if node.GenesisAccountPublicKey == nil {
-				panic("error while bootstrapping execution state: no service account public key")
-			}
-
-			bootstrapper := bootstrap.NewBootstrapper(node.Logger)
-
-			bootstrappedStateCommitment, err := bootstrapper.BootstrapLedger(ledgerStorage, *node.GenesisAccountPublicKey, node.GenesisTokenSupply, node.RootChainID.Chain())
-			if err != nil {
-				panic(fmt.Sprintf("error while bootstrapping execution state: %s", err))
-			}
-
-			if !bytes.Equal(bootstrappedStateCommitment, node.GenesisCommit) {
-				panic(fmt.Sprintf("genesis seal state commitment (%x) different from precalculated (%x)", bootstrappedStateCommitment, node.GenesisCommit))
-			}
-
-			err = bootstrapper.BootstrapExecutionDatabase(node.DB, bootstrappedStateCommitment, block.Header)
-			if err != nil {
-				panic(fmt.Sprintf("error while bootstrapping execution state - cannot bootstrap database: %s", err))
-			}
-		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			return ledgerStorage, nil
+			ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), collector, node.MetricsRegisterer)
+			return ledgerStorage, err
 		}).
 		Component("execution state ledger WAL compactor", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
