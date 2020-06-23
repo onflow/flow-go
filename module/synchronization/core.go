@@ -1,8 +1,8 @@
 package synchronization
 
 import (
+	"fmt"
 	"sort"
-	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -20,24 +20,89 @@ type Config struct {
 	MaxRequests   uint          // the maximum number of requests we send during each scanning period
 }
 
-type Core struct {
-	mu       sync.Mutex
-	log      zerolog.Logger
-	config   Config
-	heights  map[uint64]*Status
-	blockIDs map[flow.Identifier]*Status
-	head     func() (*flow.Header, error)
+func DefaultConfig() Config {
+	return Config{
+		PollInterval:  8 * time.Second,
+		ScanInterval:  2 * time.Second,
+		RetryInterval: 4 * time.Second,
+		Tolerance:     10,
+		MaxAttempts:   5,
+		MaxSize:       64,
+		MaxRequests:   3,
+	}
 }
 
-func New(log zerolog.Logger, head func() (*flow.Header, error), config Config) (*Core, error) {
+type Core struct {
+	log      zerolog.Logger
+	Config   Config
+	heights  map[uint64]*Status
+	blockIDs map[flow.Identifier]*Status
+}
+
+func New(log zerolog.Logger, config Config) (*Core, error) {
 	core := &Core{
 		log:      log,
-		config:   config,
-		head:     head,
+		Config:   config,
 		heights:  make(map[uint64]*Status),
 		blockIDs: make(map[flow.Identifier]*Status),
 	}
 	return core, nil
+}
+
+// HandleHeight handles receiving a new highest finalized height from another.
+// We queue any new heights and return
+func (c *Core) HandleHeight(final *flow.Header, height uint64) {
+
+	// don't bother queueing anything if we're within tolerance
+	if c.WithinTolerance(final, height) {
+		return
+	}
+
+	// if we are sufficiently behind, we want to sync the missing blocks
+	if height > final.Height {
+		for h := final.Height + 1; h <= height; h++ {
+			c.QueueByHeight(h)
+		}
+	}
+}
+
+// HandleBlock handles receiving a new block from another node. It returns
+// true if the block should be processed by the compliance layer and false
+// if it should be ignored.
+func (c *Core) HandleBlock(header *flow.Header) bool {
+
+	status := c.GetRequestStatus(header.Height, header.ID())
+	// if we never asked for this block, discard it
+	if !status.WasQueued() {
+		return false
+	}
+	// if we have already received this block, exit
+	if status.WasReceived() {
+		return false
+	}
+
+	// this is a new block, remember that we've seen it
+	status.Header = header
+	status.Received = time.Now()
+
+	// track it by ID and by height so we don't accidentally request it again
+	c.blockIDs[header.ID()] = status
+	c.heights[header.Height] = status
+
+	return true
+}
+
+// WithinTolerance returns whether or not the given height is within configured
+// height tolerance, wrt the given local finalized header.
+func (c *Core) WithinTolerance(final *flow.Header, height uint64) bool {
+
+	lower := final.Height - uint64(c.Config.Tolerance)
+	if lower > final.Height { // underflow check
+		lower = 0
+	}
+	upper := final.Height + uint64(c.Config.Tolerance)
+
+	return height >= lower && height <= upper
 }
 
 // QueueByHeight queues a request for the finalized block at the given height,
@@ -66,6 +131,18 @@ func (c *Core) QueueByBlockID(blockID flow.Identifier) {
 	c.blockIDs[blockID] = NewQueuedStatus()
 }
 
+func (c *Core) RequestBlock(blockID flow.Identifier) {
+
+	// if we already received this block, reset the status so we can re-queue
+	status := c.blockIDs[blockID]
+	if status.WasReceived() {
+		delete(c.blockIDs, status.Header.ID())
+		delete(c.heights, status.Header.Height)
+	}
+
+	c.QueueByBlockID(blockID)
+}
+
 // GetRequestStatus retrieves a request status for a block, regardless of
 // whether it was queued by height or by block ID.
 func (c *Core) GetRequestStatus(height uint64, blockID flow.Identifier) *Status {
@@ -83,15 +160,11 @@ func (c *Core) GetRequestStatus(height uint64, blockID flow.Identifier) *Status 
 
 // prune removes any pending requests which we have received and which is below
 // the finalized height, or which we received sufficiently long ago.
-//
-// NOTE: the caller must acquire the engine lock!
-func (c *Core) prune() {
+func (c *Core) prune(final *flow.Header) {
 
-	final, err := c.head()
-	if err != nil {
-		c.log.Error().Err(err).Msg("failed to prune")
-		return
-	}
+	// track how many statuses we are pruning
+	initialHeights := len(c.heights)
+	initialBlockIDs := len(c.blockIDs)
 
 	for height := range c.heights {
 		if height <= final.Height {
@@ -110,12 +183,30 @@ func (c *Core) prune() {
 			}
 		}
 	}
+
+	prunedHeights := len(c.heights) - initialHeights
+	prunedBlockIDs := len(c.blockIDs) - initialBlockIDs
+	c.log.Debug().
+		Uint64("final_height", final.Height).
+		Msgf("pruned %d heights, %d block IDs", prunedHeights, prunedBlockIDs)
 }
 
-// scanPending will check which items shall be requested.
-func (c *Core) scanPending() ([]uint64, []flow.Identifier, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+// ScanPending scans all pending block statuses for blocks that should be
+// requested. It apportions requestable items into range and batch requests
+// according to configured maximums, giving precedence to range requests.
+func (c *Core) ScanPending(final *flow.Header) ([]Range, []Batch, error) {
+
+	heights, blockIDs, err := c.getRequestableItems(final)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not scan for requestable items: %w", err)
+	}
+
+	ranges, batches := c.getRequests(heights, blockIDs)
+	return ranges, batches, nil
+}
+
+// getRequestableItems will check which items shall be requested.
+func (c *Core) getRequestableItems(final *flow.Header) ([]uint64, []flow.Identifier, error) {
 
 	// TODO: we will probably want to limit the maximum amount of in-flight
 	// requests and maximum amount of blocks requested at the same time here;
@@ -124,12 +215,15 @@ func (c *Core) scanPending() ([]uint64, []flow.Identifier, error) {
 
 	now := time.Now()
 
+	// prune before doing any work
+	c.prune(final)
+
 	// create a list of all height requests that should be sent
 	var heights []uint64
 	for height, status := range c.heights {
 
 		// if the last request is young enough, skip
-		retryAfter := status.Requested.Add(c.config.RetryInterval << status.Attempts)
+		retryAfter := status.Requested.Add(c.Config.RetryInterval << status.Attempts)
 		if now.Before(retryAfter) {
 			continue
 		}
@@ -140,7 +234,7 @@ func (c *Core) scanPending() ([]uint64, []flow.Identifier, error) {
 		}
 
 		// if we reached maximum number of attempts, delete
-		if status.Attempts >= c.config.MaxAttempts {
+		if status.Attempts >= c.Config.MaxAttempts {
 			delete(c.heights, height)
 			continue
 		}
@@ -154,7 +248,7 @@ func (c *Core) scanPending() ([]uint64, []flow.Identifier, error) {
 	for blockID, status := range c.blockIDs {
 
 		// if the last request is young enough, skip
-		retryAfter := status.Requested.Add(c.config.RetryInterval << status.Attempts)
+		retryAfter := status.Requested.Add(c.Config.RetryInterval << status.Attempts)
 		if now.Before(retryAfter) {
 			continue
 		}
@@ -165,7 +259,7 @@ func (c *Core) scanPending() ([]uint64, []flow.Identifier, error) {
 		}
 
 		// if we reached the maximum number of attempts for a queue item, drop
-		if status.Attempts >= c.config.MaxAttempts {
+		if status.Attempts >= c.Config.MaxAttempts {
 			delete(c.blockIDs, blockID)
 			continue
 		}
@@ -192,7 +286,7 @@ func (c *Core) getRequests(heights []uint64, blockIDs []flow.Identifier) ([]Rang
 
 	for _, ran := range ranges {
 		// check if the number of ranges exceeds the maximum requests
-		if uint(len(rangesToRequest)) >= c.config.MaxRequests {
+		if uint(len(rangesToRequest)) >= c.Config.MaxRequests {
 			break
 		}
 
@@ -213,7 +307,7 @@ func (c *Core) getRequests(heights []uint64, blockIDs []flow.Identifier) ([]Rang
 
 	for _, batch := range batches {
 		// check if the number of batches exceeds the maximum requests
-		if uint(len(rangesToRequest)+len(batchesToRequest)) >= c.config.MaxRequests {
+		if uint(len(rangesToRequest)+len(batchesToRequest)) >= c.Config.MaxRequests {
 			break
 		}
 
@@ -237,7 +331,6 @@ func (c *Core) getRequests(heights []uint64, blockIDs []flow.Identifier) ([]Rang
 
 // getRanges returns a set of ranges of heights that can be used as range
 // requests.
-// NOTE: the caller must acquire the lock
 func (c *Core) getRanges(heights []uint64) []Range {
 
 	// sort the heights so we can build contiguous ranges more easily
@@ -273,7 +366,7 @@ func (c *Core) getRanges(heights []uint64) []Range {
 		// if we have reached the maximum size for a range, we create the range
 		// and forward the start pointer to the next height
 		rangeSize := end - start + 1
-		if rangeSize >= uint64(c.config.MaxSize) {
+		if rangeSize >= uint64(c.Config.MaxSize) {
 			r := Range{From: start, To: end}
 			ranges = append(ranges, r)
 			start = nextHeight
@@ -294,17 +387,16 @@ func (c *Core) getRanges(heights []uint64) []Range {
 }
 
 // getBatches returns a set of batches that can be used in batch requests.
-// NOTE: the caller must acquire the lock
 func (c *Core) getBatches(blockIDs []flow.Identifier) []Batch {
 
 	now := time.Now()
 
 	var batches []Batch
 	// split the block IDs into maximum sized requests
-	for from := 0; from < len(blockIDs); from += int(c.config.MaxSize) {
+	for from := 0; from < len(blockIDs); from += int(c.Config.MaxSize) {
 
 		// make sure last range is not out of bounds
-		to := from + int(c.config.MaxSize)
+		to := from + int(c.Config.MaxSize)
 		if to > len(blockIDs) {
 			to = len(blockIDs)
 		}
