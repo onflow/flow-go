@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/dapperlabs/flow-go/engine/common/rpc/validate"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -24,8 +25,8 @@ func (h *handlerAccounts) GetAccountAtLatestBlock(ctx context.Context, req *acce
 
 	address := req.GetAddress()
 
-	if address == nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid address")
+	if err := validate.Address(address); err != nil {
+		return nil, err
 	}
 
 	// get the latest sealed header
@@ -54,8 +55,8 @@ func (h *handlerAccounts) GetAccountAtBlockHeight(ctx context.Context,
 
 	address := req.GetAddress()
 
-	if len(address) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "account address is required")
+	if err := validate.Address(address); err != nil {
+		return nil, err
 	}
 
 	height := req.GetBlockHeight()

@@ -14,6 +14,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/common/convert"
+	"github.com/dapperlabs/flow-go/engine/common/rpc/validate"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
@@ -252,9 +253,10 @@ func (h *handler) GetAccountAtBlockID(
 	blockFlowID := flow.HashToID(blockID)
 
 	address := req.GetAddress()
-	if address == nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid address")
+	if err := validate.Address(address); err != nil {
+		return nil, err
 	}
+
 	flowAddress := flow.BytesToAddress(address)
 
 	value, err := h.engine.GetAccount(ctx, flowAddress, blockFlowID)

@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
+	"github.com/dapperlabs/flow-go/engine/common/rpc/validate"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 )
@@ -27,9 +28,10 @@ func (h *handlerEvents) GetEventsForHeightRange(ctx context.Context, req *access
 		return nil, status.Error(codes.InvalidArgument, "invalid start or end height")
 	}
 
+	// validate the event type
 	reqEvent := req.GetType()
-	if reqEvent == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid event type")
+	if err := validate.EventType(reqEvent); err != nil {
+		return nil, err
 	}
 
 	// get the latest sealed block header
@@ -61,22 +63,30 @@ func (h *handlerEvents) GetEventsForHeightRange(ctx context.Context, req *access
 		blockIDs = append(blockIDs, id[:])
 	}
 
+	if err := validate.BlockIDs(blockIDs); err != nil {
+		return nil, err
+	}
+
 	return h.getBlockEventsFromExecutionNode(ctx, blockIDs, reqEvent)
 }
 
 // GetEventsForBlockIDs retrieves events for all the specified block IDs that have the given type
 func (h *handlerEvents) GetEventsForBlockIDs(ctx context.Context, req *access.GetEventsForBlockIDsRequest) (*access.EventsResponse, error) {
 
-	if len(req.GetBlockIds()) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "block IDs not specified")
+	// validate the block ids
+	blockIDs := req.GetBlockIds()
+	if err := validate.BlockIDs(blockIDs); err != nil {
+		return nil, err
 	}
 
-	if req.GetType() == "" {
-		return nil, status.Error(codes.InvalidArgument, "invalid event type")
+	// validate the event type
+	reqEvent := req.GetType()
+	if err := validate.EventType(reqEvent); err != nil {
+		return nil, err
 	}
 
 	// forward the request to the execution node
-	return h.getBlockEventsFromExecutionNode(ctx, req.GetBlockIds(), req.GetType())
+	return h.getBlockEventsFromExecutionNode(ctx, req.GetBlockIds(), reqEvent)
 }
 
 func (h *handlerEvents) getBlockEventsFromExecutionNode(ctx context.Context, blockIDs [][]byte, etype string) (*access.EventsResponse, error) {
