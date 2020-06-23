@@ -724,7 +724,10 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	vm := fvm.New(rt)
 
-	bc := vm.NewContext(fvm.WithBlockHeader(&h))
+	cache, err := fvm.NewLRUASTCache(CacheSize)
+	require.NoError(t, err)
+
+	bc := vm.NewContext(fvm.WithBlockHeader(&h), fvm.WithCache(cache))
 
 	sequenceNumber := uint64(0)
 
