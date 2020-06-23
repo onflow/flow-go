@@ -29,7 +29,7 @@ func TestTransactionASTCache(t *testing.T) {
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	bc := vm.NewContext(fvm.WithBlockHeader(&h), fvm.WithCache(cache))
+	bc := vm.NewContext(fvm.WithBlockHeader(&h), fvm.WithASTCache(cache))
 
 	t.Run("transaction execution results in cached program", func(t *testing.T) {
 		tx := &flow.TransactionBody{
@@ -73,7 +73,7 @@ func TestScriptASTCache(t *testing.T) {
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	bc := vm.NewContext(fvm.WithBlockHeader(&h), fvm.WithCache(cache))
+	bc := vm.NewContext(fvm.WithBlockHeader(&h), fvm.WithASTCache(cache))
 
 	t.Run("script execution results in cached program", func(t *testing.T) {
 		script := []byte(`
@@ -109,7 +109,7 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	bc := vm.NewContext(fvm.WithBlockHeader(&h), fvm.WithCache(cache))
+	bc := vm.NewContext(fvm.WithBlockHeader(&h), fvm.WithASTCache(cache))
 
 	// Create a number of account private keys.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -238,7 +238,7 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 	h := unittest.BlockHeaderFixture()
 
 	vm := fvm.New(rt)
-	bc := vm.NewContext(fvm.WithBlockHeader(&h), fvm.WithCache(&nonFunctioningCache{}))
+	bc := vm.NewContext(fvm.WithBlockHeader(&h), fvm.WithASTCache(&nonFunctioningCache{}))
 
 	// Create a number of account private keys.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -297,7 +297,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	bc := vm.NewContext(fvm.WithBlockHeader(&h), fvm.WithCache(cache))
+	bc := vm.NewContext(fvm.WithBlockHeader(&h), fvm.WithASTCache(cache))
 
 	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
 	ledger := testutil.RootBootstrappedLedger()

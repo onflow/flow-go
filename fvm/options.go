@@ -31,7 +31,7 @@ func defaultOptions() Options {
 
 type Option func(config Options) Options
 
-func WithCache(cache ASTCache) Option {
+func WithASTCache(cache ASTCache) Option {
 	return func(opts Options) Options {
 		opts.astCache = cache
 		return opts
