@@ -416,7 +416,7 @@ func (e *Engine) pollHeight() error {
 }
 
 // sendRequests sends a request for each range and batch.
-func (e *Engine) sendRequests(ranges []synchronization.Range, batches []synchronization.Batch) error {
+func (e *Engine) sendRequests(ranges []flow.Range, batches []flow.Batch) error {
 
 	var errs error
 	for _, ran := range ranges {

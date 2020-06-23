@@ -1,7 +1,6 @@
 package synchronization
 
 import (
-	"fmt"
 	"sort"
 	"time"
 
@@ -108,15 +107,19 @@ func (c *Core) RequestBlock(blockID flow.Identifier) {
 // ScanPending scans all pending block statuses for blocks that should be
 // requested. It apportions requestable items into range and batch requests
 // according to configured maximums, giving precedence to range requests.
-func (c *Core) ScanPending(final *flow.Header) ([]Range, []Batch, error) {
+func (c *Core) ScanPending(final *flow.Header) ([]flow.Range, []flow.Batch) {
 
-	heights, blockIDs, err := c.getRequestableItems(final)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not scan for requestable items: %w", err)
-	}
+	// prune before doing any work
+	c.prune(final)
 
-	ranges, batches := c.getRequests(heights, blockIDs)
-	return ranges, batches, nil
+	// get all items that are eligible for initial or re-requesting
+	heights, blockIDs := c.getRequestableItems()
+
+	// convert to valid range and batch requests
+	ranges := c.getRanges(heights)
+	batches := c.getBatches(blockIDs)
+
+	return c.selectRequests(ranges, batches)
 }
 
 // WithinTolerance returns whether or not the given height is within configured
@@ -206,8 +209,9 @@ func (c *Core) prune(final *flow.Header) {
 		Msgf("pruned %d heights, %d block IDs", prunedHeights, prunedBlockIDs)
 }
 
-// getRequestableItems will check which items shall be requested.
-func (c *Core) getRequestableItems(final *flow.Header) ([]uint64, []flow.Identifier, error) {
+// getRequestableItems will find all block IDs and heights that are eligible
+// to be requested.
+func (c *Core) getRequestableItems() ([]uint64, []flow.Identifier) {
 
 	// TODO: we will probably want to limit the maximum amount of in-flight
 	// requests and maximum amount of blocks requested at the same time here;
@@ -215,9 +219,6 @@ func (c *Core) getRequestableItems(final *flow.Header) ([]uint64, []flow.Identif
 	// prioritize range requests over batch requests
 
 	now := time.Now()
-
-	// prune before doing any work
-	c.prune(final)
 
 	// create a list of all height requests that should be sent
 	var heights []uint64
@@ -269,70 +270,38 @@ func (c *Core) getRequestableItems(final *flow.Header) ([]uint64, []flow.Identif
 		blockIDs = append(blockIDs, blockID)
 	}
 
-	return heights, blockIDs, nil
+	return heights, blockIDs
 }
 
-// getRequests will divide the given heights and block IDs appropriately and
-// request the desired blocks.
-func (c *Core) getRequests(heights []uint64, blockIDs []flow.Identifier) ([]Range, []Batch) {
-
-	// get all valid ranges and batches
-	ranges := c.getRanges(heights)
-	batches := c.getBatches(blockIDs)
-
-	// pick some ranges/batches to request, up to the maximum of `totalRequests`
-	// and giving precedence to range requests
-	var rangesToRequest []Range
-	var batchesToRequest []Batch
-
-	for _, ran := range ranges {
-		// check if the number of ranges exceeds the maximum requests
-		if uint(len(rangesToRequest)) >= c.Config.MaxRequests {
-			break
+// RangeRequested updates status state for a range of block heights that has
+// been successfully requested. Must be called when a range request is submitted.
+func (c *Core) RangeRequested(ran flow.Range) {
+	for height := ran.From; height <= ran.To; height++ {
+		status, exists := c.heights[height]
+		if !exists {
+			return
 		}
-
-		// mark all of the heights as requested
-		for height := ran.From; height <= ran.To; height++ {
-			// NOTE: during the short window between scan and send, we could
-			// have evicted a status
-			status, exists := c.heights[height]
-			if !exists {
-				continue
-			}
-			status.Requested = time.Now()
-			status.Attempts++
-		}
-
-		rangesToRequest = append(rangesToRequest, ran)
+		status.Requested = time.Now()
+		status.Attempts++
 	}
+}
 
-	for _, batch := range batches {
-		// check if the number of batches exceeds the maximum requests
-		if uint(len(rangesToRequest)+len(batchesToRequest)) >= c.Config.MaxRequests {
-			break
+// BatchRequested updates status state for a batch of block IDs that has been
+// successfully requested. Must be called when a batch request is submitted.
+func (c *Core) BatchRequested(batch flow.Batch) {
+	for _, blockID := range batch.BlockIDs {
+		status, exists := c.blockIDs[blockID]
+		if !exists {
+			return
 		}
-
-		// mark all the IDs as requested
-		for _, id := range batch.BlockIDs {
-			// NOTE: during the short window between scan and send, we could
-			// have evicted a status
-			status, exists := c.blockIDs[id]
-			if !exists {
-				continue
-			}
-			status.Requested = time.Now()
-			status.Attempts++
-		}
-
-		batchesToRequest = append(batchesToRequest, batch)
+		status.Requested = time.Now()
+		status.Attempts++
 	}
-
-	return rangesToRequest, batchesToRequest
 }
 
 // getRanges returns a set of ranges of heights that can be used as range
 // requests.
-func (c *Core) getRanges(heights []uint64) []Range {
+func (c *Core) getRanges(heights []uint64) []flow.Range {
 
 	// sort the heights so we can build contiguous ranges more easily
 	sort.Slice(heights, func(i int, j int) bool {
@@ -342,7 +311,7 @@ func (c *Core) getRanges(heights []uint64) []Range {
 	// build contiguous height ranges with maximum batch size
 	start := uint64(0)
 	end := uint64(0)
-	var ranges []Range
+	var ranges []flow.Range
 	for index, height := range heights {
 
 		// on the first iteration, we set the start pointer, so we don't need to
@@ -356,7 +325,7 @@ func (c *Core) getRanges(heights []uint64) []Range {
 
 		// if we have the end of the loop, we always create one final range
 		if index >= len(heights)-1 {
-			r := Range{From: start, To: end}
+			r := flow.Range{From: start, To: end}
 			ranges = append(ranges, r)
 			break
 		}
@@ -368,7 +337,7 @@ func (c *Core) getRanges(heights []uint64) []Range {
 		// and forward the start pointer to the next height
 		rangeSize := end - start + 1
 		if rangeSize >= uint64(c.Config.MaxSize) {
-			r := Range{From: start, To: end}
+			r := flow.Range{From: start, To: end}
 			ranges = append(ranges, r)
 			start = nextHeight
 			continue
@@ -377,7 +346,7 @@ func (c *Core) getRanges(heights []uint64) []Range {
 		// if end is more than one smaller than the next height, we have a gap
 		// next, so we create a range and forward the start pointer
 		if nextHeight > end+1 {
-			r := Range{From: start, To: end}
+			r := flow.Range{From: start, To: end}
 			ranges = append(ranges, r)
 			start = nextHeight
 			continue
@@ -388,11 +357,9 @@ func (c *Core) getRanges(heights []uint64) []Range {
 }
 
 // getBatches returns a set of batches that can be used in batch requests.
-func (c *Core) getBatches(blockIDs []flow.Identifier) []Batch {
+func (c *Core) getBatches(blockIDs []flow.Identifier) []flow.Batch {
 
-	now := time.Now()
-
-	var batches []Batch
+	var batches []flow.Batch
 	// split the block IDs into maximum sized requests
 	for from := 0; from < len(blockIDs); from += int(c.Config.MaxSize) {
 
@@ -404,23 +371,26 @@ func (c *Core) getBatches(blockIDs []flow.Identifier) []Batch {
 
 		// create the block IDs slice
 		requestIDs := blockIDs[from:to]
-		batch := Batch{
+		batch := flow.Batch{
 			BlockIDs: requestIDs,
 		}
 		batches = append(batches, batch)
-
-		// mark all of the blocks as requested
-		for _, blockID := range requestIDs {
-			// NOTE: during the short window between scan and send, we could
-			// have received a block and removed a key
-			status := c.blockIDs[blockID]
-			if status.WasReceived() {
-				continue
-			}
-			status.Requested = now
-			status.Attempts++
-		}
 	}
 
 	return batches
+}
+
+// selectRequests selects which requests should be submitted, given a set of
+// candidate range and batch requests. Range requests are given precedence and
+// the total number of requests does not exceed the configured request maximum.
+func (c *Core) selectRequests(ranges []flow.Range, batches []flow.Batch) ([]flow.Range, []flow.Batch) {
+	max := int(c.Config.MaxRequests)
+
+	if len(ranges) >= max {
+		return ranges[:max], nil
+	}
+	if len(ranges)+len(batches) >= max {
+		return ranges, batches[:max-len(ranges)]
+	}
+	return ranges, batches
 }

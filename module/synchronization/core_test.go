@@ -1,6 +1,7 @@
 package synchronization
 
 import (
+	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"testing"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -196,6 +198,189 @@ func (ss *SyncSuite) TestHandleHeight() {
 	ss.Assert().Len(ss.core.heights, int(aboveOutsideTolerance-final.Height))
 	for height := final.Height + 1; height <= aboveOutsideTolerance; height++ {
 		ss.Assert().Contains(ss.core.heights, height)
+	}
+}
+
+func (ss *SyncSuite) TestGetRequestableItems() {
+
+	// get current timestamp and zero timestamp
+	now := time.Now().UTC()
+	zero := time.Time{}
+
+	// fill in a height status that should be skipped
+	skipHeight := uint64(rand.Uint64())
+	ss.core.heights[skipHeight] = &Status{
+		Queued:    now,
+		Requested: now,
+		Attempts:  0,
+	}
+
+	// fill in a height status that should be deleted
+	dropHeight := uint64(rand.Uint64())
+	ss.core.heights[dropHeight] = &Status{
+		Queued:    now,
+		Requested: zero,
+		Attempts:  ss.core.Config.MaxAttempts,
+	}
+
+	// fill in a height status that should be requested
+	reqHeight := uint64(rand.Uint64())
+	ss.core.heights[reqHeight] = &Status{
+		Queued:    now,
+		Requested: zero,
+		Attempts:  0,
+	}
+
+	// fill in a block ID that should be skipped
+	skipBlockID := unittest.IdentifierFixture()
+	ss.core.blockIDs[skipBlockID] = &Status{
+		Queued:    now,
+		Requested: now,
+		Attempts:  0,
+	}
+
+	// fill in a block ID that should be deleted
+	dropBlockID := unittest.IdentifierFixture()
+	ss.core.blockIDs[dropBlockID] = &Status{
+		Queued:    now,
+		Requested: zero,
+		Attempts:  ss.core.Config.MaxAttempts,
+	}
+
+	// fill in a block ID that should be requested
+	reqBlockID := unittest.IdentifierFixture()
+	ss.core.blockIDs[reqBlockID] = &Status{
+		Queued:    now,
+		Requested: zero,
+		Attempts:  0,
+	}
+
+	// execute the pending scan
+	heights, blockIDs := ss.core.getRequestableItems()
+
+	// check only the request height is in heights
+	require.NotContains(ss.T(), heights, skipHeight, "output should not contain skip height")
+	require.NotContains(ss.T(), heights, dropHeight, "output should not contain drop height")
+	require.Contains(ss.T(), heights, reqHeight, "output should contain request height")
+
+	// check only the request block ID is in block IDs
+	require.NotContains(ss.T(), blockIDs, skipBlockID, "output should not contain skip blockID")
+	require.NotContains(ss.T(), blockIDs, dropBlockID, "output should not contain drop blockID")
+	require.Contains(ss.T(), blockIDs, reqBlockID, "output should contain request blockID")
+
+	// check only delete height was deleted
+	require.Contains(ss.T(), ss.core.heights, skipHeight, "status should not contain skip height")
+	require.NotContains(ss.T(), ss.core.heights, dropHeight, "status should not contain drop height")
+	require.Contains(ss.T(), ss.core.heights, reqHeight, "status should contain request height")
+
+	// check only the delete block ID was deleted
+	require.Contains(ss.T(), ss.core.blockIDs, skipBlockID, "status should not contain skip blockID")
+	require.NotContains(ss.T(), ss.core.blockIDs, dropBlockID, "status should not contain drop blockID")
+	require.Contains(ss.T(), ss.core.blockIDs, reqBlockID, "status should contain request blockID")
+}
+
+func (ss *SyncSuite) TestGetRanges() {
+
+	// use a small max request size for simpler test cases
+	ss.core.Config.MaxSize = 4
+
+	ss.Run("contiguous", func() {
+		input := []uint64{1, 2, 3, 4, 5, 6, 7, 8}
+		expected := []flow.Range{{From: 1, To: 4}, {From: 5, To: 8}}
+		ranges := ss.core.getRanges(input)
+		ss.Assert().Equal(expected, ranges)
+	})
+
+	ss.Run("non-contiguous", func() {
+		input := []uint64{1, 3}
+		expected := []flow.Range{{From: 1, To: 1}, {From: 3, To: 3}}
+		ranges := ss.core.getRanges(input)
+		ss.Assert().Equal(expected, ranges)
+	})
+
+	ss.Run("with dupes", func() {
+		input := []uint64{1, 2, 2, 3, 3, 4}
+		expected := []flow.Range{{From: 1, To: 4}}
+		ranges := ss.core.getRanges(input)
+		ss.Assert().Equal(expected, ranges)
+	})
+}
+
+func (ss *SyncSuite) TestGetBatches() {
+
+	// use a small max request size for simpler test cases
+	ss.core.Config.MaxSize = 4
+
+	ss.Run("less than max size", func() {
+		input := unittest.IdentifierListFixture(2)
+		expected := []flow.Batch{{BlockIDs: input}}
+		batches := ss.core.getBatches(input)
+		ss.Assert().Equal(expected, batches)
+	})
+
+	ss.Run("greater than max size", func() {
+		input := unittest.IdentifierListFixture(6)
+		expected := []flow.Batch{{BlockIDs: input[:4]}, {BlockIDs: input[4:]}}
+		batches := ss.core.getBatches(input)
+		ss.Assert().Equal(expected, batches)
+	})
+}
+
+func (ss *SyncSuite) TestSelectRequests() {
+
+	ss.core.Config.MaxRequests = 4
+
+	type testcase struct {
+		// number of candidate ranges and batches
+		nRanges, nBatches int
+		// number of each request that should be selected
+		expectedNRanges, expectedNBatches int
+	}
+
+	cases := []testcase{
+		{
+			nRanges:          4,
+			nBatches:         1,
+			expectedNRanges:  4,
+			expectedNBatches: 0,
+		}, {
+			nRanges:          5,
+			nBatches:         1,
+			expectedNRanges:  4,
+			expectedNBatches: 0,
+		}, {
+			nRanges:          3,
+			nBatches:         1,
+			expectedNRanges:  3,
+			expectedNBatches: 1,
+		}, {
+			nRanges:          0,
+			nBatches:         1,
+			expectedNRanges:  0,
+			expectedNBatches: 1,
+		}, {
+			nRanges:          0,
+			nBatches:         5,
+			expectedNRanges:  0,
+			expectedNBatches: 4,
+		},
+	}
+
+	for _, tcase := range cases {
+		ss.Run(fmt.Sprintf("%d ranges / %d batches", tcase.nRanges, tcase.nBatches), func() {
+			inputRanges := unittest.RangeListFixture(tcase.nRanges)
+			inputBatches := unittest.BatchListFixture(tcase.nBatches)
+
+			ranges, batches := ss.core.selectRequests(inputRanges, inputBatches)
+			ss.Assert().Len(ranges, tcase.expectedNRanges)
+			if tcase.expectedNRanges > 0 {
+				ss.Assert().Equal(ranges, inputRanges[:tcase.expectedNRanges])
+			}
+			ss.Assert().Len(batches, tcase.expectedNBatches)
+			if tcase.expectedNBatches > 0 {
+				ss.Assert().Equal(batches, inputBatches[:tcase.expectedNBatches])
+			}
+		})
 	}
 }
 
