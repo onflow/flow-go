@@ -137,13 +137,6 @@ func (b *BootstrapProcedure) mintInitialTokens(service, fungibleToken, flowToken
 	}
 }
 
-func (b *BootstrapProcedure) deployContractToServiceAccount(service flow.Address, contract []byte) {
-	result := b.mustInvoke(deployContractTransaction(service, contract))
-	if result.Error != nil {
-		panic(fmt.Sprintf("failed to deploy service account contract: %s", result.Error.ErrorMessage()))
-	}
-}
-
 func (b *BootstrapProcedure) mustInvoke(i Invokable) *InvocationResult {
 	result, err := b.metaCtx.Invoke(i, b.ledger)
 	if err != nil {

@@ -132,7 +132,7 @@ func GenerateAccountPrivateKey() (flow.AccountPrivateKey, error) {
 
 // CreateAccounts inserts accounts into the ledger using the provided private keys.
 func CreateAccounts(
-	vm fvm.VirtualMachine,
+	vm *fvm.VirtualMachine,
 	ledger fvm.Ledger,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
