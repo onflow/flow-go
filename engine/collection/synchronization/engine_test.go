@@ -208,3 +208,84 @@ func (ss *SyncSuite) TestOnSyncResponse() {
 	ss.Assert().Nil(err)
 	ss.core.AssertExpectations(ss.T())
 }
+
+func (ss *SyncSuite) TestOnRangeRequest() {
+
+	// generate originID and range request
+	originID := unittest.IdentifierFixture()
+	req := &messages.RangeRequest{
+		Nonce:      rand.Uint64(),
+		FromHeight: 0,
+		ToHeight:   0,
+	}
+
+	// fill in blocks at heights -1 to -4 from head
+	ref := ss.head.Height
+	for height := ref; height >= ref-4; height-- {
+		block := unittest.ClusterBlockFixture()
+		block.Header.Height = height
+		ss.heights[height] = &block
+	}
+
+	// empty range should be a no-op
+	req.FromHeight = ref
+	req.ToHeight = ref - 1
+	err := ss.e.onRangeRequest(originID, req)
+	require.NoError(ss.T(), err, "empty range request should pass")
+	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 0)
+
+	// range with only unknown block should be a no-op
+	req.FromHeight = ref + 1
+	req.ToHeight = ref + 3
+	err = ss.e.onRangeRequest(originID, req)
+	require.NoError(ss.T(), err, "unknown range request should pass")
+	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 0)
+
+	// a request for same from and to should send single block
+	req.FromHeight = ref - 1
+	req.ToHeight = ref - 1
+	ss.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Once().Run(
+		func(args mock.Arguments) {
+			res := args.Get(0).(*messages.ClusterBlockResponse)
+			expected := []*model.Block{ss.heights[ref-1]}
+			assert.ElementsMatch(ss.T(), expected, res.Blocks, "response should contain right blocks")
+			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
+			recipientID := args.Get(1).(flow.Identifier)
+			assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
+		},
+	)
+	err = ss.e.onRangeRequest(originID, req)
+	require.NoError(ss.T(), err, "range request with higher to height should pass")
+
+	// a request for a range that we partially have should send partial response
+	req.FromHeight = ref - 2
+	req.ToHeight = ref + 2
+	ss.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Once().Run(
+		func(args mock.Arguments) {
+			res := args.Get(0).(*messages.ClusterBlockResponse)
+			expected := []*model.Block{ss.heights[ref-2], ss.heights[ref-1], ss.heights[ref]}
+			assert.ElementsMatch(ss.T(), expected, res.Blocks, "response should contain right blocks")
+			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
+			recipientID := args.Get(1).(flow.Identifier)
+			assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
+		},
+	)
+	err = ss.e.onRangeRequest(originID, req)
+	require.NoError(ss.T(), err, "valid range with missing blocks should fail")
+
+	// a request for a range we entirely have should send all blocks
+	req.FromHeight = ref - 2
+	req.ToHeight = ref
+	ss.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Once().Run(
+		func(args mock.Arguments) {
+			res := args.Get(0).(*messages.ClusterBlockResponse)
+			expected := []*model.Block{ss.heights[ref-2], ss.heights[ref-1], ss.heights[ref]}
+			assert.ElementsMatch(ss.T(), expected, res.Blocks, "response should contain right blocks")
+			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
+			recipientID := args.Get(1).(flow.Identifier)
+			assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
+		},
+	)
+	err = ss.e.onRangeRequest(originID, req)
+	require.NoError(ss.T(), err, "valid range request should pass")
+}
