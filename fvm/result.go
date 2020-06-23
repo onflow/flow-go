@@ -1,12 +1,12 @@
 package fvm
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -16,7 +16,7 @@ type InvocationResult struct {
 	Value   cadence.Value
 	Events  []cadence.Event
 	Logs    []string
-	Error   FlowError
+	Error   Error
 	GasUsed uint64
 }
 
@@ -52,21 +52,20 @@ func createInvocationResult(
 	logs []string,
 	err error,
 ) (*InvocationResult, error) {
-	if err != nil {
-		possibleRuntimeError := runtime.Error{}
-		if errors.As(err, &possibleRuntimeError) {
-			// runtime errors occur when the execution reverts
-			return &InvocationResult{
-				ID: id,
-				Error: &CodeExecutionError{
-					RuntimeError: possibleRuntimeError,
-				},
-				Logs: logs,
-			}, nil
-		}
+	vmErr, fatalErr := handleError(err)
+	if fatalErr != nil {
+		return nil, fatalErr
+	}
 
-		// other errors are unexpected and should be treated as fatal
-		return nil, err
+	if vmErr != nil {
+		return &InvocationResult{
+			ID:    id,
+			Error: vmErr,
+			Logs:  logs,
+			// TODO: https://github.com/dapperlabs/flow-go/issues/4139
+			// Should gas be reported for failed transactions?
+			GasUsed: 0,
+		}, nil
 	}
 
 	return &InvocationResult{
@@ -77,4 +76,40 @@ func createInvocationResult(
 		// TODO: https://github.com/dapperlabs/flow-go/issues/4139
 		GasUsed: 0,
 	}, nil
+}
+
+func handleError(err error) (vmErr Error, fatalErr error) {
+	switch typedErr := err.(type) {
+	case runtime.Error:
+		// If the error originated from the runtime, handle separately
+		return handleRuntimeError(typedErr)
+	case Error:
+		// If the error is an fvm.Error, return as is
+		return typedErr, nil
+	default:
+		// All other errors are considered fatal
+		return nil, err
+	}
+}
+
+func handleRuntimeError(err runtime.Error) (vmErr Error, fatalErr error) {
+	innerErr := err.Err
+
+	// External errors are reported by the runtime but originate from the VM.
+	//
+	// External errors may be fatal or non-fatal, so additional handling
+	// is required.
+	if externalErr, ok := innerErr.(interpreter.ExternalError); ok {
+		if recoveredErr, ok := externalErr.Recovered.(error); ok {
+			// If the recovered value is an error, pass it to the original
+			// error handler to distinguish between fatal and non-fatal errors.
+			return handleError(recoveredErr)
+		}
+
+		// If the recovered value is not an error, bubble up the panic.
+		panic(externalErr.Recovered)
+	}
+
+	// All other errors are non-fatal Cadence errors.
+	return &ExecutionError{Err: err}, nil
 }

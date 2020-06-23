@@ -166,7 +166,7 @@ func CreateAccounts(
 		}
 
 		if result.Error != nil {
-			return nil, fmt.Errorf("failed to create account: %s", result.Error.ErrorMessage())
+			return nil, fmt.Errorf("failed to create account: %w", result.Error)
 		}
 
 		var addr flow.Address

@@ -142,7 +142,7 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 	require.NoError(t, err)
 
 	if !assert.Nil(t, result.Error) {
-		t.Fatal(result.Error.ErrorMessage())
+		t.Fatal(result.Error)
 	}
 
 	// Determine location of transaction
@@ -212,7 +212,7 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 			require.NoError(b, err)
 
 			if !assert.Nil(b, result.Error) {
-				b.Fatal(result.Error.ErrorMessage())
+				b.Fatal(result.Error)
 			}
 		}
 	}
@@ -313,7 +313,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 
 			result, err := ctx.Invoke(fvm.Script(script), view)
 			if !assert.True(t, result.Succeeded()) {
-				t.Log(result.Error.ErrorMessage())
+				t.Log(result.Error)
 			}
 			require.NoError(t, err)
 			require.True(t, result.Succeeded())

@@ -132,7 +132,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		assert.True(t, result.Succeeded())
 		if !assert.Nil(t, result.Error) {
-			t.Log(result.Error.ErrorMessage())
+			t.Log(result.Error)
 		}
 
 		require.Len(t, result.Events, 1)
@@ -178,7 +178,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		assert.True(t, result.Succeeded())
 
 		if !assert.Nil(t, result.Error) {
-			t.Log(result.Error.ErrorMessage())
+			t.Log(result.Error)
 		}
 	})
 
@@ -205,10 +205,10 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		assert.False(t, result.Succeeded())
 		assert.NotNil(t, result.Error)
 
-		expectedErr := "code execution failed: Execution failed:\ncode deployment requires authorization from the service account\n"
+		expectedErr := "Execution failed:\ncode deployment requires authorization from the service account\n"
 
-		assert.Equal(t, expectedErr, result.Error.ErrorMessage())
-		assert.Equal(t, uint32(9), result.Error.StatusCode())
+		assert.Equal(t, expectedErr, result.Error.Error())
+		assert.Equal(t, (&fvm.ExecutionError{}).Code(), result.Error.Code())
 	})
 }
 
@@ -438,7 +438,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 		require.NoError(t, err)
 
 		if !assert.True(t, result.Succeeded()) {
-			t.Log(result.Error.ErrorMessage())
+			t.Log(result.Error)
 		}
 	}
 
@@ -775,7 +775,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 		assert.True(t, result.Succeeded())
 		if !assert.Nil(t, result.Error) {
-			t.Log(result.Error.ErrorMessage())
+			t.Log(result.Error)
 		}
 
 		assert.Len(t, result.Events, 2)

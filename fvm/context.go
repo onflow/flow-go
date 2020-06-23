@@ -62,3 +62,20 @@ func (ctx *context) Options() Options {
 func (ctx *context) Runtime() runtime.Runtime {
 	return ctx.rt
 }
+
+// invokeMetaTransaction invokes a meta transaction inside the context of an outer transaction.
+//
+// Errors that occur in a meta transaction are propagated as a single error that can be
+// captured by the Cadence runtime and eventually disambiguated by the parent context.
+func invokeMetaTransaction(ctx Context, tx InvokableTransaction, ledger Ledger) error {
+	result, err := ctx.Invoke(tx, ledger)
+	if err != nil {
+		return err
+	}
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	return nil
+}
