@@ -40,7 +40,7 @@ type Engine struct {
 	con      network.Conduit
 	prov     network.Engine
 	pending  module.PendingBlockBuffer // pending block cache
-	sync     module.Synchronization
+	sync     module.BlockRequester
 	hotstuff module.HotStuff
 }
 
@@ -93,7 +93,7 @@ func New(
 
 // WithSynchronization adds the synchronization engine responsible for bringing the node
 // up to speed to the compliance engine.
-func (e *Engine) WithSynchronization(sync module.Synchronization) *Engine {
+func (e *Engine) WithSynchronization(sync module.BlockRequester) *Engine {
 	e.sync = sync
 	return e
 }

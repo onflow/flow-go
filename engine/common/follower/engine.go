@@ -33,7 +33,7 @@ type Engine struct {
 	pending        module.PendingBlockBuffer
 	follower       module.HotStuffFollower
 	con            network.Conduit
-	sync           module.Synchronization
+	sync           module.BlockRequester
 }
 
 func New(
@@ -76,7 +76,7 @@ func New(
 // WithSynchronization injects the given synchronization protocol into the
 // hotstuff follower, providing it with blocks proactively, while also allowing
 // it to explicitly request blocks by ID.
-func (e *Engine) WithSynchronization(sync module.Synchronization) *Engine {
+func (e *Engine) WithSynchronization(sync module.BlockRequester) *Engine {
 	e.sync = sync
 	return e
 }
