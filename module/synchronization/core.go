@@ -49,29 +49,12 @@ func New(log zerolog.Logger, config Config) (*Core, error) {
 	return core, nil
 }
 
-// HandleHeight handles receiving a new highest finalized height from another.
-// We queue any new heights and return
-func (c *Core) HandleHeight(final *flow.Header, height uint64) {
-
-	// don't bother queueing anything if we're within tolerance
-	if c.WithinTolerance(final, height) {
-		return
-	}
-
-	// if we are sufficiently behind, we want to sync the missing blocks
-	if height > final.Height {
-		for h := final.Height + 1; h <= height; h++ {
-			c.QueueByHeight(h)
-		}
-	}
-}
-
 // HandleBlock handles receiving a new block from another node. It returns
 // true if the block should be processed by the compliance layer and false
 // if it should be ignored.
 func (c *Core) HandleBlock(header *flow.Header) bool {
 
-	status := c.GetRequestStatus(header.Height, header.ID())
+	status := c.getRequestStatus(header.Height, header.ID())
 	// if we never asked for this block, discard it
 	if !status.WasQueued() {
 		return false
@@ -92,6 +75,50 @@ func (c *Core) HandleBlock(header *flow.Header) bool {
 	return true
 }
 
+// HandleHeight handles receiving a new highest finalized height from another node.
+// If the height difference between local and the reported height, we do nothing.
+// Otherwise, we queue each missing height.
+func (c *Core) HandleHeight(final *flow.Header, height uint64) {
+
+	// don't bother queueing anything if we're within tolerance
+	if c.WithinTolerance(final, height) {
+		return
+	}
+
+	// if we are sufficiently behind, we want to sync the missing blocks
+	if height > final.Height {
+		for h := final.Height + 1; h <= height; h++ {
+			c.queueByHeight(h)
+		}
+	}
+}
+
+func (c *Core) RequestBlock(blockID flow.Identifier) {
+
+	// if we already received this block, reset the status so we can re-queue
+	status := c.blockIDs[blockID]
+	if status.WasReceived() {
+		delete(c.blockIDs, status.Header.ID())
+		delete(c.heights, status.Header.Height)
+	}
+
+	c.queueByBlockID(blockID)
+}
+
+// ScanPending scans all pending block statuses for blocks that should be
+// requested. It apportions requestable items into range and batch requests
+// according to configured maximums, giving precedence to range requests.
+func (c *Core) ScanPending(final *flow.Header) ([]Range, []Batch, error) {
+
+	heights, blockIDs, err := c.getRequestableItems(final)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not scan for requestable items: %w", err)
+	}
+
+	ranges, batches := c.getRequests(heights, blockIDs)
+	return ranges, batches, nil
+}
+
 // WithinTolerance returns whether or not the given height is within configured
 // height tolerance, wrt the given local finalized header.
 func (c *Core) WithinTolerance(final *flow.Header, height uint64) bool {
@@ -105,9 +132,9 @@ func (c *Core) WithinTolerance(final *flow.Header, height uint64) bool {
 	return height >= lower && height <= upper
 }
 
-// QueueByHeight queues a request for the finalized block at the given height,
+// queueByHeight queues a request for the finalized block at the given height,
 // only if no equivalent request has been queued before.
-func (c *Core) QueueByHeight(height uint64) {
+func (c *Core) queueByHeight(height uint64) {
 
 	// only queue the request if have never queued it before
 	if c.heights[height].WasQueued() {
@@ -118,9 +145,9 @@ func (c *Core) QueueByHeight(height uint64) {
 	c.heights[height] = NewQueuedStatus()
 }
 
-// QueueByBlockID queues a request for a block by block ID, only if no
+// queueByBlockID queues a request for a block by block ID, only if no
 // equivalent request has been queued before.
-func (c *Core) QueueByBlockID(blockID flow.Identifier) {
+func (c *Core) queueByBlockID(blockID flow.Identifier) {
 
 	// only queue the request if have never queued it before
 	if c.blockIDs[blockID].WasQueued() {
@@ -131,21 +158,9 @@ func (c *Core) QueueByBlockID(blockID flow.Identifier) {
 	c.blockIDs[blockID] = NewQueuedStatus()
 }
 
-func (c *Core) RequestBlock(blockID flow.Identifier) {
-
-	// if we already received this block, reset the status so we can re-queue
-	status := c.blockIDs[blockID]
-	if status.WasReceived() {
-		delete(c.blockIDs, status.Header.ID())
-		delete(c.heights, status.Header.Height)
-	}
-
-	c.QueueByBlockID(blockID)
-}
-
-// GetRequestStatus retrieves a request status for a block, regardless of
+// getRequestStatus retrieves a request status for a block, regardless of
 // whether it was queued by height or by block ID.
-func (c *Core) GetRequestStatus(height uint64, blockID flow.Identifier) *Status {
+func (c *Core) getRequestStatus(height uint64, blockID flow.Identifier) *Status {
 	heightStatus := c.heights[height]
 	idStatus := c.blockIDs[blockID]
 
@@ -189,20 +204,6 @@ func (c *Core) prune(final *flow.Header) {
 	c.log.Debug().
 		Uint64("final_height", final.Height).
 		Msgf("pruned %d heights, %d block IDs", prunedHeights, prunedBlockIDs)
-}
-
-// ScanPending scans all pending block statuses for blocks that should be
-// requested. It apportions requestable items into range and batch requests
-// according to configured maximums, giving precedence to range requests.
-func (c *Core) ScanPending(final *flow.Header) ([]Range, []Batch, error) {
-
-	heights, blockIDs, err := c.getRequestableItems(final)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not scan for requestable items: %w", err)
-	}
-
-	ranges, batches := c.getRequests(heights, blockIDs)
-	return ranges, batches, nil
 }
 
 // getRequestableItems will check which items shall be requested.

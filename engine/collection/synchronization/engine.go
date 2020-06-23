@@ -356,18 +356,18 @@ CheckLoop:
 			break CheckLoop
 		case <-poll.C:
 			err := e.pollHeight()
-			if err != nil {
-				if network.IsPeerUnreachableError(err) {
-					e.log.Warn().Err(err).Msg("could not poll heights due to peer unreachable")
-				} else {
-					e.log.Error().Err(err).Msg("could not poll heights")
-				}
+			if network.IsPeerUnreachableError(err) {
+				e.log.Warn().Err(err).Msg("could not poll heights due to peer unreachable")
 				continue
+			}
+			if err != nil {
+				e.log.Error().Err(err).Msg("could not poll heights")
 			}
 		case <-scan.C:
 			final, err := e.state.Final().Head()
 			if err != nil {
 				e.log.Error().Err(err).Msg("could not get final height")
+				continue
 			}
 
 			heights, blockIDs, err := e.core.ScanPending(final)
@@ -375,7 +375,10 @@ CheckLoop:
 				e.log.Error().Err(err).Msg("could not scan pending")
 				continue
 			}
-			e.sendRequests(heights, blockIDs)
+			err = e.sendRequests(heights, blockIDs)
+			if err != nil {
+				e.log.Error().Err(err).Msg("could not send requests")
+			}
 		}
 	}
 
@@ -413,8 +416,9 @@ func (e *Engine) pollHeight() error {
 }
 
 // sendRequests sends a request for each range and batch.
-func (e *Engine) sendRequests(ranges []synchronization.Range, batches []synchronization.Batch) {
+func (e *Engine) sendRequests(ranges []synchronization.Range, batches []synchronization.Batch) error {
 
+	var errs error
 	for _, ran := range ranges {
 		req := &messages.RangeRequest{
 			Nonce:      rand.Uint64(),
@@ -423,7 +427,7 @@ func (e *Engine) sendRequests(ranges []synchronization.Range, batches []synchron
 		}
 		err := e.con.Submit(req, e.participants.Sample(3).NodeIDs()...)
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not submit range request")
+			errs = multierror.Append(errs, fmt.Errorf("could not submit range request: %w", err))
 			continue
 		}
 		e.metrics.MessageSent(metrics.EngineClusterSynchronization, metrics.MessageRangeRequest)
@@ -436,9 +440,11 @@ func (e *Engine) sendRequests(ranges []synchronization.Range, batches []synchron
 		}
 		err := e.con.Submit(req, e.participants.Sample(3).NodeIDs()...)
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not submit batch request")
+			errs = multierror.Append(errs, fmt.Errorf("could not submit batch request: %w", err))
 			continue
 		}
 		e.metrics.MessageSent(metrics.EngineClusterSynchronization, metrics.MessageBatchRequest)
 	}
+
+	return errs
 }
