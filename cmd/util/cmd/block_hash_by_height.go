@@ -24,7 +24,7 @@ var (
 // blockHashByHeight retreives the block hash by height
 func blockHashByHeight(_ *cobra.Command, _ []string) {
 	db := common.InitStorage(flagDatadir)
-	cache := metrics.NewCacheCollector(flow.Mainnet)
+	cache := &metrics.NoopCollector{}
 	headers := bstorage.NewHeaders(cache, db)
 	seals := bstorage.NewSeals(cache, db)
 
