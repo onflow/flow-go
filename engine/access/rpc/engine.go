@@ -17,21 +17,23 @@ import (
 	grpcutils "github.com/dapperlabs/flow-go/utils/grpc"
 )
 
-// Config defines the configurable options for the gRPC server.
+// Config defines the configurable options for the gRPC grpcServer.
 type Config struct {
-	ListenAddr     string
+	GRPCListenAddr string
+	HTTPListenAddr string
 	ExecutionAddr  string
 	CollectionAddr string
 	MaxMsgSize     int // In bytes
 }
 
-// Engine implements a gRPC server with a simplified version of the Observation API.
+// Engine implements a gRPC grpcServer with a simplified version of the Observation API.
 type Engine struct {
-	unit    *engine.Unit
-	log     zerolog.Logger
-	handler *handler.Handler // the gRPC service implementation
-	server  *grpc.Server     // the gRPC server
-	config  Config
+	unit       *engine.Unit
+	log        zerolog.Logger
+	handler    *handler.Handler // the gRPC service implementation
+	grpcServer *grpc.Server     // the gRPC grpcServer
+	httpServer *HTTPServer
+	config     Config
 }
 
 // New returns a new RPC engine.
@@ -52,24 +54,29 @@ func New(log zerolog.Logger,
 		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
 	}
 
+	grpcServer := grpc.NewServer(
+		grpc.MaxRecvMsgSize(config.MaxMsgSize),
+		grpc.MaxSendMsgSize(config.MaxMsgSize),
+	)
+
+	httpServer := NewHTTPServer(grpcServer, 8080)
+
 	eng := &Engine{
-		log:     log,
-		unit:    engine.NewUnit(),
-		handler: handler.NewHandler(log, state, executionRPC, collectionRPC, blocks, headers, collections, transactions, chainID),
-		server: grpc.NewServer(
-			grpc.MaxRecvMsgSize(config.MaxMsgSize),
-			grpc.MaxSendMsgSize(config.MaxMsgSize),
-		),
-		config: config,
+		log:        log,
+		unit:       engine.NewUnit(),
+		handler:    handler.NewHandler(log, state, executionRPC, collectionRPC, blocks, headers, collections, transactions, chainID),
+		grpcServer: grpcServer,
+		httpServer: httpServer,
+		config:     config,
 	}
 
-	access.RegisterAccessAPIServer(eng.server, eng.handler)
+	access.RegisterAccessAPIServer(eng.grpcServer, eng.handler)
 
 	return eng
 }
 
 // Ready returns a ready channel that is closed once the engine has fully
-// started. The RPC engine is ready when the gRPC server has successfully
+// started. The RPC engine is ready when the gRPC grpcServer has successfully
 // started.
 func (e *Engine) Ready() <-chan struct{} {
 	e.unit.Launch(e.serve)
@@ -77,25 +84,27 @@ func (e *Engine) Ready() <-chan struct{} {
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
-// It sends a signal to stop the gRPC server, then closes the channel.
+// It sends a signal to stop the gRPC grpcServer, then closes the channel.
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done(e.server.GracefulStop)
+	return e.unit.Done(e.grpcServer.GracefulStop)
 }
 
-// serve starts the gRPC server .
-//
-// When this function returns, the server is considered ready.
+// serve starts the gRPC grpcServer and the http proxy server
+// When this function returns, the grpcServer is considered ready.
 func (e *Engine) serve() {
-	e.log.Info().Msgf("starting server on address %s", e.config.ListenAddr)
+	e.log.Info().Msgf("starting grpc server on address %s", e.config.GRPCListenAddr)
 
-	l, err := net.Listen("tcp", e.config.ListenAddr)
+	l, err := net.Listen("tcp", e.config.GRPCListenAddr)
 	if err != nil {
-		e.log.Err(err).Msg("failed to start server")
+		e.log.Err(err).Msg("failed to start grpcServer")
 		return
 	}
 
-	err = e.server.Serve(l)
+	err = e.grpcServer.Serve(l)
 	if err != nil {
-		e.log.Err(err).Msg("fatal error in server")
+		e.log.Err(err).Msg("fatal error in grpcServer")
 	}
+
+	e.log.Info().Msgf("starting http server on address %s", e.config.HTTPListenAddr)
+	e.httpServer.Start()
 }
