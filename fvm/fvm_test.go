@@ -825,8 +825,8 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 		var account *flow.Account
 		account, err = ctx.GetAccount(address, ledger)
-		require.NoError(t, err)
-
+		assert.Error(t, err)
+		assert.Equal(t, fvm.ErrAccountNotFound, err)
 		assert.Nil(t, account)
 	})
 

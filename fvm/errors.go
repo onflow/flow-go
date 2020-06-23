@@ -1,6 +1,7 @@
 package fvm
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/cadence/runtime"
@@ -24,6 +25,8 @@ const (
 
 	errCodeExecution = 100
 )
+
+var ErrAccountNotFound = errors.New("account not found")
 
 // An Error represents a non-fatal error that is expected during normal operation of the virtual machine.
 //
