@@ -69,7 +69,7 @@ func (i InvokableTransaction) Invoke(ctx Context, ledger Ledger) (*InvocationRes
 		}
 	}
 
-	env := ctx.NewEnvironment(ledger).SetTransaction(i.tx, metaCtx)
+	env := newEnvironment(ledger, ctx.Options()).setTransaction(i.tx, metaCtx)
 
 	location := runtime.TransactionLocation(txID[:])
 

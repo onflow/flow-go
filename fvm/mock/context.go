@@ -12,22 +12,6 @@ type Context struct {
 	mock.Mock
 }
 
-// Environment provides a mock function with given fields: ledger
-func (_m *Context) Environment(ledger fvm.Ledger) fvm.Environment {
-	ret := _m.Called(ledger)
-
-	var r0 fvm.Environment
-	if rf, ok := ret.Get(0).(func(fvm.Ledger) fvm.Environment); ok {
-		r0 = rf(ledger)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(fvm.Environment)
-		}
-	}
-
-	return r0
-}
-
 // GetAccount provides a mock function with given fields: address, ledger
 func (_m *Context) GetAccount(address flow.Address, ledger fvm.Ledger) (*flow.Account, error) {
 	ret := _m.Called(address, ledger)
