@@ -118,7 +118,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 		}
 
 		// *execution.ComputationResult, error
-		_, err = bc.ExecuteBlock(context.Background(), executableBlock, view)
+		_, err = ctx.ExecuteBlock(context.Background(), executableBlock, view)
 		require.NoError(t, err, "error executing block")
 
 		ids, values := view.Delta().RegisterUpdates()
@@ -189,7 +189,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 			}
 
 			// *execution.ComputationResult, error
-			_, err = bc.ExecuteBlock(context.Background(), executableBlock, view)
+			_, err = ctx.ExecuteBlock(context.Background(), executableBlock, view)
 			require.NoError(t, err, "error executing block")
 
 			ids, values := view.Delta().RegisterUpdates()
