@@ -13,17 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-type HostEnvironment interface {
-	runtime.Interface
-
-	SetBlockHeader(header *flow.Header) HostEnvironment
-	SetTransaction(tx *flow.TransactionBody, txCtx Context) HostEnvironment
-
-	getEvents() []cadence.Event
-	getLogs() []string
-}
-
-var _ HostEnvironment = &hostEnv{}
+var _ runtime.Interface = &hostEnv{}
 
 type hostEnv struct {
 	ledger   Ledger
@@ -42,33 +32,32 @@ type hostEnv struct {
 	restrictAccountCreation    bool
 }
 
-func newEnvironment(
-	ledger Ledger,
-	astCache ASTCache,
-	blocks Blocks,
-	gasLimit uint64,
-	restrictContractDeployment bool,
-	restrictAccountCreation bool,
-) *hostEnv {
-	return &hostEnv{
+func newEnvironment(ledger Ledger, opts Options) *hostEnv {
+	env := &hostEnv{
 		ledger:                     ledger,
-		astCache:                   astCache,
-		blocks:                     blocks,
-		gasLimit:                   gasLimit,
-		restrictContractDeployment: restrictContractDeployment,
-		restrictAccountCreation:    restrictAccountCreation,
+		astCache:                   opts.astCache,
+		blocks:                     opts.blocks,
+		gasLimit:                   opts.gasLimit,
+		restrictContractDeployment: opts.restrictedDeploymentEnabled,
+		restrictAccountCreation:    opts.restrictedAccountCreationEnabled,
 	}
+
+	if opts.blockHeader != nil {
+		return env.setBlockHeader(opts.blockHeader)
+	}
+
+	return env
 }
 
-func (e *hostEnv) SetBlockHeader(header *flow.Header) HostEnvironment {
+func (e *hostEnv) setBlockHeader(header *flow.Header) *hostEnv {
 	e.blockHeader = header
 	return e
 }
 
-func (e *hostEnv) SetTransaction(
+func (e *hostEnv) setTransaction(
 	tx *flow.TransactionBody,
 	txCtx Context,
-) HostEnvironment {
+) *hostEnv {
 	e.transactionEnv = newTransactionEnv(e.ledger, tx, txCtx, e.restrictContractDeployment, e.restrictAccountCreation)
 	return e
 }
