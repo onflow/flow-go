@@ -39,7 +39,6 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	sutil "github.com/dapperlabs/flow-go/storage/util"
 	"github.com/dapperlabs/flow-go/utils/debug"
-	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 const notSet = "not set"
@@ -96,11 +95,16 @@ type namedDoneObject struct {
 	name string
 }
 
+type namedBootstrapFunc struct {
+	fn   func(*protocol.State) error
+	name string
+}
+
 // FlowNodeBuilder is the builder struct used for all flow nodes
 // It runs a node process with following structure, in sequential order
 // Base inits (network, storage, state, logger)
 //   PostInit handlers, if any
-//   GenesisHandler, if any and if genesis was generated
+//   Bootstrap handlers, if protocol state was bootstrapped
 // Components handlers, if any, wait sequentially
 // Run() <- main loop
 // Components destructors, if any
@@ -121,23 +125,22 @@ type FlowNodeBuilder struct {
 	modules           []namedModuleFunc
 	components        []namedComponentFunc
 	doneObject        []namedDoneObject
+	bootstraps        []namedBootstrapFunc
 	sig               chan os.Signal
-	genesisHandler    func(node *FlowNodeBuilder, block *flow.Block)
-	genesisBootstrap  bool
 	postInitFns       []func(*FlowNodeBuilder)
 	stakingKey        crypto.PrivateKey
 	networkKey        crypto.PrivateKey
 	MsgValidators     []validators.MessageValidator
 
-	// genesis information
-	GenesisCommit           flow.StateCommitment // should be removed
-	GenesisBlock            *flow.Block
-	GenesisQC               *model.QuorumCertificate
-	GenesisResult           *flow.ExecutionResult
-	GenesisSeal             *flow.Seal
-	GenesisAccountPublicKey *flow.AccountPublicKey
-	GenesisTokenSupply      uint64
-	GenesisChainID          flow.ChainID
+	// root state information
+	RootCommit           flow.StateCommitment // should be removed
+	RootBlock            *flow.Block
+	RootQC               *model.QuorumCertificate
+	RootResult           *flow.ExecutionResult
+	RootSeal             *flow.Seal
+	RootAccountPublicKey *flow.AccountPublicKey
+	RootTokenSupply      uint64
+	RootChainID          flow.ChainID
 }
 
 func (fnb *FlowNodeBuilder) baseFlags() {
@@ -266,7 +269,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		Network:    metrics.NewNetworkCollector(),
 		Engine:     metrics.NewEngineCollector(),
 		Compliance: metrics.NewComplianceCollector(),
-		Cache:      metrics.NewCacheCollector(fnb.GenesisChainID),
+		Cache:      metrics.NewCacheCollector(fnb.RootChainID),
 		Mempool:    mempools,
 	}
 
@@ -361,94 +364,83 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.Storage.Blocks,
 		protocol.SetClusters(fnb.BaseConfig.nClusters),
 	)
+
 	fnb.MustNot(err).Msg("could not initialize flow state")
 
 	// check if database is initialized
-	head, err := state.Final().Head()
+	_, err = state.Final().Head()
 	if errors.Is(err, storerr.ErrNotFound) {
 		// Bootstrap!
 
-		// Mark that we need to run the genesis handler
-		fnb.genesisBootstrap = true
-
 		fnb.Logger.Info().Msg("bootstrapping empty protocol state")
 
-		// Load the genesis account public key
-		fnb.GenesisAccountPublicKey, err = loadGenesisAccountPublicKey(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis account public key")
+		// load the root block from bootstrap files and set the chain ID based on it
+		fnb.RootBlock, err = loadRootBlock(fnb.BaseConfig.BootstrapDir)
+		fnb.MustNot(err).Msg("could not load root block")
+
+		// set the root chain ID based on the root block
+		fnb.RootChainID = fnb.RootBlock.Header.ChainID
+
+		// load the root QC data from bootstrap files
+		fnb.RootQC, err = loadRootQC(fnb.BaseConfig.BootstrapDir)
+		fnb.MustNot(err).Msg("could not load root QC")
+
+		// load the root execution result from bootstrap files
+		rootResult, err := loadRootResult(fnb.BaseConfig.BootstrapDir)
+		fnb.MustNot(err).Msg("could not load root execution result")
+
+		// load the root block seal from bootstrap files
+		rootSeal, err := loadRootSeal(fnb.BaseConfig.BootstrapDir)
+		fnb.MustNot(err).Msg("could not load root seal")
+
+		// bootstrap the protocol state with the loaded data
+		err = state.Mutate().Bootstrap(fnb.RootBlock, rootResult, rootSeal)
+		fnb.MustNot(err).Msg("could not bootstrap protocol state")
+
+		// apply the bootstrap functions to the protocol state
+		for _, b := range fnb.bootstraps {
+			err := b.fn(state)
+			fnb.MustNot(err).Str("name", b.name).Msg("could not apply bootstrap function")
 		}
 
-		// Load the rest of the genesis info, eventually needed for the consensus follower
-		fnb.GenesisBlock, err = loadGenesisBlock(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
-		}
-
-		fnb.GenesisChainID = fnb.GenesisBlock.Header.ChainID
-
-		// load genesis QC and DKG data from bootstrap files
-		fnb.GenesisQC, err = loadGenesisQC(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
-		}
-
-		// load genesis execution result from bootstrap files
-		fnb.GenesisResult, err = loadGenesisResult(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis execution result")
-		}
-
-		// load genesis block seal from bootstrap files
-		fnb.GenesisSeal, err = loadGenesisSeal(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis block seal")
-		}
-
-		// load token supply from bootstrap config
-		fnb.GenesisTokenSupply, err = loadGenesisTokenSupply(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis token supply")
-		}
-
+		// load the DKG public data from bootstrap files
 		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
-		}
+		fnb.MustNot(err).Msg("could not load public DKG data")
 
-		// TODO: this always needs to be available, so we need to persist it
+		// bootstrap the DKG state with the loaded data
 		fnb.DKGState = wrapper.NewState(dkgPubData)
 
-		err = state.Mutate().Bootstrap(fnb.GenesisBlock, fnb.GenesisResult, fnb.GenesisSeal)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap protocol state")
-		}
 	} else if err != nil {
 		fnb.Logger.Fatal().Err(err).Msg("could not check existing database")
 	} else {
-		fnb.Logger.Info().
-			Hex("final_id", logging.ID(head.ID())).
-			Uint64("final_height", head.Height).
-			Msg("using existing database")
 
-		// Load the genesis info for recovery
-		fnb.GenesisBlock, err = loadGenesisBlock(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
-		}
+		// TODO: we shouldn't have to load any files again after bootstrapping; in
+		// order to make it unnecessary, we need to changes:
+		// 1) persist the root QC along the root block so it can be loaded from DB
+		// => https://github.com/dapperlabs/flow-go/issues/4166
+		// 2) bootstrap and persist DKG state in a similar fashion to protocol state
+		// => https://github.com/dapperlabs/flow-go/issues/4165
 
-		fnb.GenesisChainID = fnb.GenesisBlock.Header.ChainID
+		// load the root block from bootstrap files and set the chain ID based on it
+		fnb.RootBlock, err = loadRootBlock(fnb.BaseConfig.BootstrapDir)
+		fnb.MustNot(err).Msg("could not load root block")
 
-		// load genesis QC and DKG data from bootstrap files for recovery
-		fnb.GenesisQC, err = loadGenesisQC(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading root block sigs")
-		}
+		// set the chain ID based on the root header
+		// TODO: as the root header can now be loaded from protocol state, we should
+		// not use a global variable for chain ID anymore, but rely on the protocol
+		// state as final authority on what the chain ID is
+		// => https://github.com/dapperlabs/flow-go/issues/4167
+		fnb.RootChainID = fnb.RootBlock.Header.ChainID
 
+		// load the root QC data from bootstrap files
+		fnb.RootQC, err = loadRootQC(fnb.BaseConfig.BootstrapDir)
+		fnb.MustNot(err).Msg("could not load root QC")
+
+		// load the DKG public data from bootstrap files
 		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
-		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading dkg public data")
-		}
+		fnb.MustNot(err).Msg("could not load public DKG data")
+
+		// bootstrap the DKG state with the loaded data
 		fnb.DKGState = wrapper.NewState(dkgPubData)
 	}
 
@@ -563,12 +555,6 @@ func (fnb *FlowNodeBuilder) Component(name string, f func(*FlowNodeBuilder) (mod
 	return fnb
 }
 
-// GenesisHandler sets up handler which will be executed when a genesis block is generated
-func (fnb *FlowNodeBuilder) GenesisHandler(handler func(node *FlowNodeBuilder, block *flow.Block)) *FlowNodeBuilder {
-	fnb.genesisHandler = handler
-	return fnb
-}
-
 func (fnb *FlowNodeBuilder) PostInit(f func(node *FlowNodeBuilder)) *FlowNodeBuilder {
 	fnb.postInitFns = append(fnb.postInitFns, f)
 	return fnb
@@ -636,10 +622,6 @@ func (fnb *FlowNodeBuilder) Run() {
 		fnb.handleModule(f)
 	}
 
-	if fnb.genesisBootstrap && fnb.GenesisBlock != nil && fnb.genesisHandler != nil {
-		fnb.genesisHandler(fnb, fnb.GenesisBlock)
-	}
-
 	// initialize all components
 	for _, f := range fnb.components {
 		fnb.handleComponent(f)
@@ -677,28 +659,8 @@ func (fnb *FlowNodeBuilder) closeDatabase() {
 	}
 }
 
-func loadDKGPublicData(dir string) (*dkg.PublicData, error) {
-	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathDKGDataPub))
-	if err != nil {
-		return nil, err
-	}
-	dkgPubData := &bootstrap.EncodableDKGDataPub{}
-	err = json.Unmarshal(data, dkgPubData)
-	return dkgPubData.ForHotStuff(), err
-}
-
-func loadGenesisAccountPublicKey(dir string) (*flow.AccountPublicKey, error) {
-	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathServiceAccountPublicKey))
-	if err != nil {
-		return nil, err
-	}
-	publicKey := new(flow.AccountPublicKey)
-	err = json.Unmarshal(data, publicKey)
-	return publicKey, err
-}
-
-func loadGenesisBlock(dir string) (*flow.Block, error) {
-	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisBlock))
+func loadRootBlock(dir string) (*flow.Block, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathRootBlock))
 	if err != nil {
 		return nil, err
 	}
@@ -708,8 +670,8 @@ func loadGenesisBlock(dir string) (*flow.Block, error) {
 
 }
 
-func loadGenesisQC(dir string) (*model.QuorumCertificate, error) {
-	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisQC))
+func loadRootQC(dir string) (*model.QuorumCertificate, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathRootQC))
 	if err != nil {
 		return nil, err
 	}
@@ -718,8 +680,8 @@ func loadGenesisQC(dir string) (*model.QuorumCertificate, error) {
 	return &qc, err
 }
 
-func loadGenesisResult(dir string) (*flow.ExecutionResult, error) {
-	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisResult))
+func loadRootResult(dir string) (*flow.ExecutionResult, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathRootResult))
 	if err != nil {
 		return nil, err
 	}
@@ -728,14 +690,24 @@ func loadGenesisResult(dir string) (*flow.ExecutionResult, error) {
 	return &result, err
 }
 
-func loadGenesisSeal(dir string) (*flow.Seal, error) {
-	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisSeal))
+func loadRootSeal(dir string) (*flow.Seal, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathRootSeal))
 	if err != nil {
 		return nil, err
 	}
 	var seal flow.Seal
 	err = json.Unmarshal(data, &seal)
 	return &seal, err
+}
+
+func loadDKGPublicData(dir string) (*dkg.PublicData, error) {
+	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathDKGDataPub))
+	if err != nil {
+		return nil, err
+	}
+	dkgPubData := &bootstrap.EncodableDKGDataPub{}
+	err = json.Unmarshal(data, dkgPubData)
+	return dkgPubData.ForHotStuff(), err
 }
 
 // Loads the private info for this node from disk (eg. private staking/network keys).
@@ -747,14 +719,4 @@ func loadPrivateNodeInfo(dir string, myID flow.Identifier) (*bootstrap.NodeInfoP
 	var info bootstrap.NodeInfoPriv
 	err = json.Unmarshal(data, &info)
 	return &info, err
-}
-
-func loadGenesisTokenSupply(dir string) (uint64, error) {
-	data, err := ioutil.ReadFile(filepath.Join(dir, bootstrap.PathGenesisTokenSupply))
-	if err != nil {
-		return 0, err
-	}
-	var supply uint64
-	err = json.Unmarshal(data, &supply)
-	return supply, err
 }

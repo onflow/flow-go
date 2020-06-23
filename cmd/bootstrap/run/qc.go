@@ -36,7 +36,7 @@ type ParticipantData struct {
 	Participants []Participant
 }
 
-func GenerateGenesisQC(participantData ParticipantData, block *flow.Block) (*model.QuorumCertificate, error) {
+func GenerateRootQC(participantData ParticipantData, block *flow.Block) (*model.QuorumCertificate, error) {
 	state, db, err := NewProtocolState(block)
 	if err != nil {
 		return nil, err
