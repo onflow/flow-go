@@ -19,7 +19,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/module/synchronization"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/cluster"
 	"github.com/dapperlabs/flow-go/storage"
@@ -37,8 +36,9 @@ type Engine struct {
 	blocks       storage.ClusterBlocks
 	comp         network.Engine // compliance layer engine
 
-	config *synchronization.Config
-	core   *synchronization.Core
+	pollInterval time.Duration
+	scanInterval time.Duration
+	core         module.SyncCore
 }
 
 // New creates a new cluster synchronization engine.
@@ -51,19 +51,13 @@ func New(
 	state cluster.State,
 	blocks storage.ClusterBlocks,
 	comp network.Engine,
+	core module.SyncCore,
 ) (*Engine, error) {
-
-	log = log.With().Str("engine", "cluster_synchronization").Logger()
-
-	core, err := synchronization.New(log, synchronization.DefaultConfig())
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize sync core: %w", err)
-	}
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		unit:         engine.NewUnit(),
-		log:          log,
+		log:          log.With().Str("engine", "cluster_synchronization").Logger(),
 		metrics:      metrics,
 		me:           me,
 		participants: participants.Filter(filter.Not(filter.HasNodeID(me.NodeID()))),
@@ -71,6 +65,8 @@ func New(
 		blocks:       blocks,
 		comp:         comp,
 		core:         core,
+		pollInterval: 8 * time.Second,
+		scanInterval: 2 * time.Second,
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -125,12 +121,6 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
-}
-
-// RequestBlock is an external provider allowing users to request block downloads
-// by block ID.
-func (e *Engine) RequestBlock(blockID flow.Identifier) {
-	e.core.RequestBlock(blockID)
 }
 
 // process processes events for the propagation engine on the consensus node.
@@ -346,8 +336,8 @@ func (e *Engine) processIncomingBlock(originID flow.Identifier, block *clustermo
 
 // checkLoop will regularly scan for items that need requesting.
 func (e *Engine) checkLoop() {
-	poll := time.NewTicker(e.core.Config.PollInterval)
-	scan := time.NewTicker(e.core.Config.ScanInterval)
+	poll := time.NewTicker(e.pollInterval)
+	scan := time.NewTicker(e.scanInterval)
 
 CheckLoop:
 	for {
@@ -370,12 +360,8 @@ CheckLoop:
 				continue
 			}
 
-			heights, blockIDs, err := e.core.ScanPending(final)
-			if err != nil {
-				e.log.Error().Err(err).Msg("could not scan pending")
-				continue
-			}
-			err = e.sendRequests(heights, blockIDs)
+			ranges, batches := e.core.ScanPending(final)
+			err = e.sendRequests(ranges, batches)
 			if err != nil {
 				e.log.Error().Err(err).Msg("could not send requests")
 			}
@@ -430,6 +416,7 @@ func (e *Engine) sendRequests(ranges []flow.Range, batches []flow.Batch) error {
 			errs = multierror.Append(errs, fmt.Errorf("could not submit range request: %w", err))
 			continue
 		}
+		e.core.RangeRequested(ran)
 		e.metrics.MessageSent(metrics.EngineClusterSynchronization, metrics.MessageRangeRequest)
 	}
 
@@ -443,6 +430,7 @@ func (e *Engine) sendRequests(ranges []flow.Range, batches []flow.Batch) error {
 			errs = multierror.Append(errs, fmt.Errorf("could not submit batch request: %w", err))
 			continue
 		}
+		e.core.BatchRequested(batch)
 		e.metrics.MessageSent(metrics.EngineClusterSynchronization, metrics.MessageBatchRequest)
 	}
 

@@ -10,8 +10,6 @@ import (
 )
 
 type Config struct {
-	PollInterval  time.Duration // how often we poll other nodes for their finalized height
-	ScanInterval  time.Duration // how often we scan our pending statuses and request blocks
 	RetryInterval time.Duration // the initial interval before we retry a request, uses exponential backoff
 	Tolerance     uint          // determines how big of a difference in block heights we tolerated before actively syncing with range requests
 	MaxAttempts   uint          // the maximum number of attempts we make for each requested block/height before discarding
@@ -21,8 +19,6 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
-		PollInterval:  8 * time.Second,
-		ScanInterval:  2 * time.Second,
 		RetryInterval: 4 * time.Second,
 		Tolerance:     10,
 		MaxAttempts:   5,
@@ -31,6 +27,15 @@ func DefaultConfig() Config {
 	}
 }
 
+// Core contains core logic, configuration, and state for chain state
+// synchronization. It is generic to chain type, so it works for both consensus
+// and collection nodes.
+//
+// Core should be wrapped by a type-aware engine that manages the specifics of
+// each chain. Example: https://github.com/dapperlabs/flow-go/blob/master/engine/common/synchronization/engine.go
+//
+// Core is NOT safe for concurrent use by multiple goroutines. Wrapping engines
+// are responsible for avoid concurrent access.
 type Core struct {
 	log      zerolog.Logger
 	Config   Config

@@ -151,30 +151,6 @@ func (ss *SyncSuite) SetupTest() {
 	ss.e = e
 }
 
-func (ss *SyncSuite) QueuedStatus() *Status {
-	return &Status{
-		Queued: time.Now(),
-	}
-}
-
-func (ss *SyncSuite) RequestedStatus() *Status {
-	return &Status{
-		Queued:    time.Now().Add(-time.Second),
-		Requested: time.Now(),
-		Attempts:  1,
-	}
-}
-
-func (ss *SyncSuite) ReceivedStatus(header *flow.Header) *Status {
-	return &Status{
-		Queued:    time.Now().Add(-time.Second * 2),
-		Requested: time.Now().Add(-time.Second),
-		Attempts:  1,
-		Header:    header,
-		Received:  time.Now(),
-	}
-}
-
 func (ss *SyncSuite) TestOnSyncRequest() {
 
 	// generate origin and request message
@@ -403,89 +379,6 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 
 }
 
-func (ss *SyncSuite) TestQueueByHeight() {
-
-	// generate a number of heights
-	var heights []uint64
-	for n := 0; n < 100; n++ {
-		heights = append(heights, rand.Uint64())
-	}
-
-	// add all of them to engine
-	for _, height := range heights {
-		ss.e.queueByHeight(height)
-	}
-
-	// check they are all in the map now
-	for _, height := range heights {
-		assert.Contains(ss.T(), ss.e.heights, height, "status map should contain the height")
-	}
-
-	// get current count and add all again
-	count := len(ss.e.heights)
-	for _, height := range heights {
-		ss.e.queueByHeight(height)
-	}
-
-	// check that operation was idempotent (size still the same)
-	assert.Len(ss.T(), ss.e.heights, count, "height map should be the same")
-
-}
-
-func (ss *SyncSuite) TestQueueByBlockID() {
-
-	// generate a number of block IDs
-	var blockIDs []flow.Identifier
-	for n := 0; n < 100; n++ {
-		blockIDs = append(blockIDs, unittest.IdentifierFixture())
-	}
-
-	// add all of them to engine
-	for _, blockID := range blockIDs {
-		ss.e.queueByBlockID(blockID)
-	}
-
-	// check they are all in the map now
-	for _, blockID := range blockIDs {
-		assert.Contains(ss.T(), ss.e.blockIDs, blockID, "status map should contain the block ID")
-	}
-
-	// get current count and add all again
-	count := len(ss.e.blockIDs)
-	for _, blockID := range blockIDs {
-		ss.e.queueByBlockID(blockID)
-	}
-
-	// check that operation was idempotent (size still the same)
-	assert.Len(ss.T(), ss.e.blockIDs, count, "block ID map should be the same")
-}
-
-func (ss *SyncSuite) TestRequestBlock() {
-
-	queuedID := unittest.IdentifierFixture()
-	requestedID := unittest.IdentifierFixture()
-	received := unittest.BlockFixture()
-
-	ss.e.blockIDs[queuedID] = ss.QueuedStatus()
-	ss.e.blockIDs[requestedID] = ss.RequestedStatus()
-	ss.e.blockIDs[received.ID()] = ss.RequestedStatus()
-	ss.e.processIncomingBlock(unittest.IdentifierFixture(), &received)
-
-	// queued status should stay the same
-	ss.e.RequestBlock(queuedID)
-	assert.True(ss.T(), ss.e.blockIDs[queuedID].WasQueued())
-
-	// requested status should stay the same
-	ss.e.RequestBlock(requestedID)
-	assert.True(ss.T(), ss.e.blockIDs[requestedID].WasRequested())
-
-	// received status should be re-queued by ID
-	ss.e.RequestBlock(received.ID())
-	assert.True(ss.T(), ss.e.blockIDs[received.ID()].WasQueued())
-	assert.False(ss.T(), ss.e.blockIDs[received.ID()].WasReceived())
-	assert.False(ss.T(), ss.e.heights[received.Header.Height].WasQueued())
-}
-
 func (ss *SyncSuite) TestProcessIncomingBlock() {
 
 	var blocks []*flow.Block
@@ -539,73 +432,6 @@ func (ss *SyncSuite) TestProcessIncomingBlock() {
 		for _, block := range blocks[0:6] {
 			ss.comp.AssertCalled(ss.T(), "SubmitLocal", &events.SyncedBlock{OriginID: originID, Block: block})
 		}
-	}
-}
-
-func (ss *SyncSuite) TestPrune() {
-
-	// our latest finalized height is 100
-	finalHeight := uint64(100)
-	ss.head.Height = finalHeight
-
-	var (
-		prunableHeights  []flow.Block
-		prunableBlockIDs []flow.Block
-		unprunable       []flow.Block
-	)
-
-	// add some finalized blocks by height
-	for i := 0; i < 3; i++ {
-		block := unittest.BlockFixture()
-		block.Header.Height = uint64(i + 1)
-		ss.e.heights[block.Header.Height] = ss.QueuedStatus()
-		prunableHeights = append(prunableHeights, block)
-	}
-	// add some un-finalized blocks by height
-	for i := 0; i < 3; i++ {
-		block := unittest.BlockFixture()
-		block.Header.Height = finalHeight + uint64(i+1)
-		ss.e.heights[block.Header.Height] = ss.QueuedStatus()
-		unprunable = append(unprunable, block)
-	}
-
-	// add some finalized blocks by block ID
-	for i := 0; i < 3; i++ {
-		block := unittest.BlockFixture()
-		block.Header.Height = uint64(i + 1)
-		ss.e.blockIDs[block.ID()] = ss.ReceivedStatus(block.Header)
-		prunableBlockIDs = append(prunableBlockIDs, block)
-	}
-	// add some un-finalized, received blocks by block ID
-	for i := 0; i < 3; i++ {
-		block := unittest.BlockFixture()
-		block.Header.Height = 100 + uint64(i+1)
-		ss.e.blockIDs[block.ID()] = ss.ReceivedStatus(block.Header)
-		unprunable = append(unprunable, block)
-	}
-
-	heightsBefore := len(ss.e.heights)
-	blockIDsBefore := len(ss.e.blockIDs)
-
-	// prune the pending requests
-	ss.e.prune()
-
-	assert.Equal(ss.T(), heightsBefore-len(prunableHeights), len(ss.e.heights))
-	assert.Equal(ss.T(), blockIDsBefore-len(prunableBlockIDs), len(ss.e.blockIDs))
-
-	// ensure the right things were pruned
-	for _, block := range prunableBlockIDs {
-		_, exists := ss.e.blockIDs[block.ID()]
-		assert.False(ss.T(), exists)
-	}
-	for _, block := range prunableHeights {
-		_, exists := ss.e.heights[block.Header.Height]
-		assert.False(ss.T(), exists)
-	}
-	for _, block := range unprunable {
-		_, heightExists := ss.e.heights[block.Header.Height]
-		_, blockIDExists := ss.e.blockIDs[block.ID()]
-		assert.True(ss.T(), heightExists || blockIDExists)
 	}
 }
 
