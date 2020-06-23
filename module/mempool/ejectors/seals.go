@@ -23,14 +23,15 @@ func (ls *LatestSeal) Eject(entities map[flow.Identifier]flow.Entity) (flow.Iden
 	maxHeight := uint64(0)
 	maxID := flow.ZeroID
 
-	for id := range entities {
-		block, err := ls.headers.ByBlockID(id)
+	for sealID, sealEntity := range entities {
+		seal := sealEntity.(*flow.Seal)
+		block, err := ls.headers.ByBlockID(seal.BlockID)
 		if err != nil {
 			continue
 		}
 		if block.Height > maxHeight {
 			maxHeight = block.Height
-			maxID = id
+			maxID = sealID
 		}
 	}
 

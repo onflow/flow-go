@@ -45,6 +45,7 @@ type Suite struct {
 	execClient         *accessmock.ExecutionAPIClient
 	collectionsConduit *networkmock.Conduit
 	me                 *mockmodule.Local
+	chainID            flow.ChainID
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -77,7 +78,7 @@ func (suite *Suite) TestSendAndGetTransaction() {
 		metrics := metrics.NewNoopCollector()
 		transactions := storage.NewTransactions(metrics, db)
 		collections := storage.NewCollections(db, transactions)
-		handler := handler.NewHandler(suite.log, suite.state, nil, suite.collClient, nil, nil, collections, transactions)
+		handler := handler.NewHandler(suite.log, suite.state, nil, suite.collClient, nil, nil, collections, transactions, suite.chainID)
 
 		expected := convert.TransactionToMessage(transaction.TransactionBody)
 		sendReq := &access.SendTransactionRequest{
@@ -122,7 +123,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		err := db.Update(operation.IndexBlockHeight(block2.Header.Height, block2.ID()))
 		require.NoError(suite.T(), err)
 
-		handler := handler.NewHandler(suite.log, suite.state, nil, suite.collClient, blocks, headers, nil, nil)
+		handler := handler.NewHandler(suite.log, suite.state, nil, suite.collClient, blocks, headers, nil, nil, suite.chainID)
 
 		assertHeaderResp := func(resp *access.BlockHeaderResponse, err error, header *flow.Header) {
 			require.NoError(suite.T(), err)
@@ -222,7 +223,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 
 		// create the handler (called by the grpc engine)
-		handler := handler.NewHandler(suite.log, suite.state, suite.execClient, suite.collClient, blocks, headers, collections, transactions)
+		handler := handler.NewHandler(suite.log, suite.state, suite.execClient, suite.collClient, blocks, headers, collections, transactions, suite.chainID)
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
 		err = blocks.Store(&block)
@@ -282,7 +283,7 @@ func (suite *Suite) TestExecuteScript() {
 
 		ctx := context.Background()
 
-		handler := handler.NewHandler(suite.log, suite.state, suite.execClient, suite.collClient, blocks, headers, nil, nil)
+		handler := handler.NewHandler(suite.log, suite.state, suite.execClient, suite.collClient, blocks, headers, nil, nil, suite.chainID)
 
 		script := []byte("dummy script")
 

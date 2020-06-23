@@ -1,7 +1,6 @@
 package provider_test
 
 import (
-	"errors"
 	"math/rand"
 	"testing"
 	"time"
@@ -19,7 +18,6 @@ import (
 	"github.com/dapperlabs/flow-go/network"
 	mocknetwork "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
-	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -136,6 +134,8 @@ func (suite *Suite) TestCollectionRequest() {
 
 		// provider should return error
 		err := suite.colNode.ProviderEngine.ProcessLocal(req)
-		assert.True(t, errors.Is(err, storage.ErrNotFound))
+		// we can't distinguish from invalid fingerprint or not found (because we are behind),
+		// so there won't be an error
+		assert.Nil(t, err)
 	})
 }

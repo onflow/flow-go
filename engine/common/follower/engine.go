@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
+	"github.com/dapperlabs/flow-go/state"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -114,7 +115,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+			engine.LogError(e.log, err)
 		}
 	})
 }
@@ -308,7 +309,20 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 		Header:  proposal.Header,
 		Payload: proposal.Payload,
 	}
+
 	err := e.state.Mutate().Extend(block)
+	// if the error is a known invalid extension of the protocol state, then
+	// the input is invalid
+	if state.IsInvalidExtensionError(err) {
+		return engine.NewInvalidInputErrorf("invalid extension of protocol state: %w", err)
+	}
+
+	// if the error is a known outdated extension of the protocol state, then
+	// the input is outdated
+	if state.IsOutdatedExtensionError(err) {
+		return engine.NewOutdatedInputErrorf("outdated extension of protocol state: %w", err)
+	}
+
 	if err != nil {
 		return fmt.Errorf("could not extend protocol state: %w", err)
 	}

@@ -317,11 +317,9 @@ func ThresholdSignKeyGen(size int, seed []byte) ([]PrivateKey,
 	}
 	// Generate a polynomial P in Zr[X] of degree t
 	a := make([]scalar, threshold+1)
-	for i := 0; i < threshold+1; i++ {
-		err := randZr(&a[i])
-		if err != nil {
-			return nil, nil, nil, err
-		}
+	randZrStar(&a[0])
+	for i := 1; i < threshold+1; i++ {
+		randZr(&a[i])
 	}
 	// compute the shares
 	for i := index(1); int(i) <= size; i++ {

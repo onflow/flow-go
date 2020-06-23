@@ -8,6 +8,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/verification"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
@@ -16,13 +17,15 @@ import (
 )
 
 type Engine struct {
-	unit            *engine.Unit
-	log             zerolog.Logger
-	me              module.Local
-	match           network.Engine
-	receipts        mempool.Receipts    // used to keep the receipts as mempool
-	headerStorage   storage.Headers     // used to check block existence before verifying
-	processedResult mempool.Identifiers // used to keep track of the processed results
+	unit               *engine.Unit
+	log                zerolog.Logger
+	me                 module.Local
+	match              network.Engine
+	receipts           mempool.PendingReceipts // used to keep the receipts as mempool
+	headerStorage      storage.Headers         // used to check block existence before verifying
+	processedResult    mempool.Identifiers     // used to keep track of the processed results
+	receiptIDsByBlock  mempool.IdentifierMap   // used as a mapping to keep track of receipts associated with a block
+	receiptIDsByResult mempool.IdentifierMap   // used as a mapping to keep track of receipts with the same result
 }
 
 func New(
@@ -30,18 +33,22 @@ func New(
 	net module.Network,
 	me module.Local,
 	match network.Engine,
-	receipts mempool.Receipts,
+	receipts mempool.PendingReceipts,
 	headerStorage storage.Headers,
 	processedResults mempool.Identifiers,
+	receiptsByBlock mempool.IdentifierMap,
+	receiptsByResult mempool.IdentifierMap,
 ) (*Engine, error) {
 	e := &Engine{
-		unit:            engine.NewUnit(),
-		log:             log.With().Str("engine", "finder").Logger(),
-		me:              me,
-		match:           match,
-		headerStorage:   headerStorage,
-		receipts:        receipts,
-		processedResult: processedResults,
+		unit:               engine.NewUnit(),
+		log:                log.With().Str("engine", "finder").Logger(),
+		me:                 me,
+		match:              match,
+		headerStorage:      headerStorage,
+		receipts:           receipts,
+		processedResult:    processedResults,
+		receiptIDsByBlock:  receiptsByBlock,
+		receiptIDsByResult: receiptsByResult,
 	}
 
 	_, err := net.Register(engine.ExecutionReceiptProvider, e)
@@ -73,7 +80,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+			engine.LogError(e.log, err)
 		}
 	})
 }
@@ -126,16 +133,26 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	}
 
 	// adds the execution receipt in the mempool
-	added := e.receipts.Add(receipt)
+	pr := &verification.PendingReceipt{
+		Receipt:  receipt,
+		OriginID: originID,
+	}
+	added := e.receipts.Add(pr)
 	if !added {
 		log.Debug().Msg("drops adding duplicate receipt")
 		return nil
 	}
 
+	// records the execution receipt id based on its result id
+	_, err := e.receiptIDsByResult.Append(resultID, receiptID)
+	if err != nil {
+		log.Debug().Err(err).Msg("could not add receipt id to receipt-ids-by-result mempool")
+	}
+
 	log.Info().Msg("execution receipt successfully handled")
 
 	// checks receipt being processable
-	e.checkReceipts([]*flow.ExecutionReceipt{receipt})
+	e.checkReceipts([]*verification.PendingReceipt{pr})
 
 	return nil
 }
@@ -153,8 +170,33 @@ func (e *Engine) OnBlockIncorporated(*model.Block) {
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 func (e *Engine) OnFinalizedBlock(block *model.Block) {
-	// TODO only receipts referencing block should be checked #4028
-	e.checkReceipts(e.receipts.All())
+	// retrieves all receipts that are pending for this block
+	erIDs, ok := e.receiptIDsByBlock.Get(block.BlockID)
+	if !ok {
+		// no pending receipt for this block
+		return
+	}
+	// removes list of receipt ids for this block
+	ok = e.receiptIDsByBlock.Rem(block.BlockID)
+	if !ok {
+		e.log.Debug().
+			Hex("block_id", logging.ID(block.BlockID)).
+			Msg("could not remove pending receipts from mempool")
+	}
+
+	// constructs list of receipts pending for this block
+	ers := make([]*verification.PendingReceipt, len(erIDs))
+	for index, erId := range erIDs {
+		er, ok := e.receipts.Get(erId)
+		if !ok {
+			e.log.Debug().
+				Hex("receipt_id", logging.ID(erId)).
+				Msg("could not retrieve pending receipt")
+			continue
+		}
+		ers[index] = er
+	}
+	e.checkReceipts(ers)
 }
 
 // To implement FinalizationConsumer
@@ -170,11 +212,16 @@ func (e *Engine) isProcessable(result *flow.ExecutionResult) bool {
 }
 
 // processResult submits the result to the match engine.
-func (e *Engine) processResult(result *flow.ExecutionResult) error {
-	if e.processedResult.Has(result.ID()) {
-		return fmt.Errorf("result already processed")
+// originID is the identifier of the node that initially sends a receipt containing this result.
+func (e *Engine) processResult(originID flow.Identifier, result *flow.ExecutionResult) error {
+	resultID := result.ID()
+	if e.processedResult.Has(resultID) {
+		e.log.Debug().
+			Hex("result_id", logging.ID(resultID)).
+			Msg("result already processed")
+		return nil
 	}
-	err := e.match.ProcessLocal(result)
+	err := e.match.Process(originID, result)
 	if err != nil {
 		return fmt.Errorf("submission error to match engine: %w", err)
 	}
@@ -196,41 +243,58 @@ func (e *Engine) onResultProcessed(resultID flow.Identifier) {
 		log.Debug().Msg("result marked as processed")
 	}
 
+	// extracts all receipt ids with this result
+	prIDs, ok := e.receiptIDsByResult.Get(resultID)
+	if !ok {
+		log.Debug().Msg("could not retrieve receipt ids associated with this result")
+	}
+
 	// drops all receipts with the same result
-	for _, receipt := range e.receipts.All() {
-		if receipt.ExecutionResult.ID() == resultID {
-			receiptID := receipt.ID()
-			removed := e.receipts.Rem(receiptID)
-			if removed {
-				log.Debug().
-					Hex("receipt_id", logging.ID(receiptID)).
-					Msg("processed result cleaned up")
-			}
+	for _, prID := range prIDs {
+		// removes receipt from mempool
+		removed := e.receipts.Rem(prID)
+		if removed {
+			log.Debug().
+				Hex("receipt_id", logging.ID(prID)).
+				Msg("receipt with processed result cleaned up")
 		}
 	}
 }
 
 // checkReceipts receives a set of receipts and evaluates each of them
 // against being processable. If a receipt is processable, it gets processed.
-func (e *Engine) checkReceipts(receipts []*flow.ExecutionReceipt) {
+func (e *Engine) checkReceipts(receipts []*verification.PendingReceipt) {
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
-	for _, receipt := range receipts {
-		if e.isProcessable(&receipt.ExecutionResult) {
+	for _, pr := range receipts {
+		receiptID := pr.Receipt.ID()
+		resultID := pr.Receipt.ExecutionResult.ID()
+		if e.isProcessable(&pr.Receipt.ExecutionResult) {
 			// checks if result is ready to process
-			err := e.processResult(&receipt.ExecutionResult)
+			err := e.processResult(pr.OriginID, &pr.Receipt.ExecutionResult)
 			if err != nil {
 				e.log.Error().
 					Err(err).
-					Hex("receipt_id", logging.Entity(receipt)).
-					Hex("result_id", logging.Entity(receipt.ExecutionResult)).
+					Hex("receipt_id", logging.ID(receiptID)).
+					Hex("result_id", logging.ID(resultID)).
 					Msg("could not process result")
 				continue
 			}
 
 			// performs clean up
-			e.onResultProcessed(receipt.ExecutionResult.ID())
+			e.onResultProcessed(resultID)
+		} else {
+			// receipt is not processable
+			// keeps track of it in id map
+			_, err := e.receiptIDsByBlock.Append(pr.Receipt.ExecutionResult.BlockID, receiptID)
+			if err != nil {
+				e.log.Error().
+					Err(err).
+					Hex("block_id", logging.ID(pr.Receipt.ExecutionResult.BlockID)).
+					Hex("receipt_id", logging.ID(receiptID)).
+					Msg("could not append receipt to receipt-ids-by-block mempool")
+			}
 		}
 	}
 }

@@ -39,7 +39,6 @@ import (
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
 func main() {
@@ -87,9 +86,6 @@ func main() {
 			flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor", timeout.DefaultConfig.TimeoutIncrease, "multiplicative increase of timeout value in case of time out event")
 			flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor", timeout.DefaultConfig.TimeoutDecrease, "multiplicative decrease of timeout value in case of progress")
 			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", 0.6, "additional fraction of replica timeout that the primary will wait for votes")
-			// From the experiment,
-			// if block rate delay is 1 second, then 0.8 block will be finalized per second in average.
-			// if block rate delay is 1.5 second, then 0.5 block will be finalized per second in average
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
 		}).
 		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
@@ -134,14 +130,8 @@ func main() {
 			return nil
 		}).
 		Module("hotstuff main metrics", func(node *cmd.FlowNodeBuilder) error {
-			mainMetrics = metrics.NewHotstuffCollector(flow.GetChainID())
+			mainMetrics = metrics.NewHotstuffCollector(node.RootChainID)
 			return nil
-		}).
-		Module("database migration", func(node *cmd.FlowNodeBuilder) error {
-			node.Logger.Info().Msg("starting execution result index migration...")
-			err := operation.IndexExecutionResultsByBlockID(node.DB)
-			node.Logger.Info().Msg("finished execution result index migration...")
-			return err
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			resultsDB := bstorage.NewExecutionResults(node.DB)

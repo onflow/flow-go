@@ -105,12 +105,8 @@ func (e *Engine) SubmitLocal(event interface{}) {
 func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
-
-		var errInvalidInput InvalidInput
-		if errors.As(err, &errInvalidInput) {
-			e.log.Warn().Err(err).Msg("match engine could not process invalid input")
-		} else if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event with exception")
+		if err != nil {
+			engine.LogError(e.log, err)
 		}
 	})
 }
@@ -165,7 +161,10 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, r *flow.Executi
 	// if a execution result has been added before, then don't process
 	// this result.
 	if !added {
-		return NewInvalidInput(fmt.Sprintf("execution result has been added: %v", r.ID()))
+		log.Debug().
+			Hex("result_id", logging.ID(r.ID())).
+			Msg("execution result has been added")
+		return nil
 	}
 
 	// different execution results can be chunked in parallel
@@ -177,7 +176,12 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, r *flow.Executi
 	// add each chunk to a pending list to be processed by onTimer
 	for _, chunk := range chunks {
 		status := NewChunkStatus(chunk, result.ExecutionResult.ID(), result.ExecutorID)
-		_ = e.chunks.Add(status)
+		added = e.chunks.Add(status)
+		if !added {
+			log.Debug().
+				Int("chunks", len(chunks)).
+				Msg("could not add chunk status to chunks mempool")
+		}
 	}
 
 	log.Debug().
@@ -259,6 +263,7 @@ func (e *Engine) onTimer() {
 
 		// check if has reached max try
 		if !CanTry(e.maxAttempt, chunk) {
+			// TODO not to drop max reach, but to ignore it
 			e.chunks.Rem(cid)
 			log.Debug().
 				Int("max_attempt", e.maxAttempt).
@@ -324,7 +329,7 @@ func (e *Engine) requestChunkDataPack(c *ChunkStatus) error {
 // handleChunkDataPack receives a chunk data pack, verifies its origin ID, pull other data to make a
 // VerifiableChunk, and pass it to the verifier engine to verify
 func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) error {
-	chunkID := chunkDataPack.ID()
+	chunkID := chunkDataPack.ChunkID
 
 	log := e.log.With().
 		Hex("executor_id", logging.ID(originID)).
@@ -334,19 +339,21 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	// check origin is from a execution node
 	// TODO check the origin is a node that we requested before
 	sender, err := e.state.Final().Identity(originID)
-	if err == storage.ErrNotFound {
-		return NewInvalidInput(fmt.Sprintf("origin is unstaked: %v", originID))
-	} else if err != nil {
+	if errors.Is(err, storage.ErrNotFound) {
+		return engine.NewInvalidInputErrorf("origin is unstaked: %v", originID)
+	}
+
+	if err != nil {
 		return fmt.Errorf("could not find identity for chunkID %v: %w", chunkID, err)
 	}
 
 	if sender.Role != flow.RoleExecution {
-		return NewInvalidInput(fmt.Sprintf("receives chunk data pack from a non-execution node"))
+		return engine.NewInvalidInputError("receives chunk data pack from a non-execution node")
 	}
 
 	status, exists := e.chunks.ByID(chunkID)
 	if !exists {
-		return NewInvalidInput(fmt.Sprintf("chunk does not exist, chunkID: %v", chunkID))
+		return engine.NewInvalidInputErrorf("chunk does not exist, chunkID: %v", chunkID)
 	}
 
 	// TODO: verify the collection ID matches with the collection guarantee in the block payload
@@ -354,14 +361,14 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	// remove first to ensure concurrency issue
 	removed := e.chunks.Rem(chunkDataPack.ChunkID)
 	if !removed {
-		return NewInvalidInput(fmt.Sprintf("chunk has been removed, chunkID: %v", chunkID))
+		return engine.NewInvalidInputErrorf("chunk has been removed, chunkID: %v", chunkID)
 	}
 
 	resultID := status.ExecutionResultID
 	result, exists := e.results.ByID(resultID)
 	if !exists {
 		// result no longer exists
-		return NewInvalidInput(fmt.Sprintf("execution result ID no longer exist: %v, for chunkID :%v", status.ExecutionResultID, chunkID))
+		return engine.NewInvalidInputErrorf("execution result ID no longer exist: %v, for chunkID :%v", status.ExecutionResultID, chunkID)
 	}
 
 	blockID := result.ExecutionResult.ExecutionResultBody.BlockID
@@ -369,6 +376,16 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	header, err := e.headers.ByBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not find block header: %w for chunkID: %v", err, chunkID)
+	}
+
+	// computes the end state of the chunk
+	var endState flow.StateCommitment
+	if int(status.Chunk.Index) == len(result.ExecutionResult.Chunks)-1 {
+		// last chunk in receipt takes final state commitment
+		endState = result.ExecutionResult.FinalStateCommit
+	} else {
+		// any chunk except last takes the subsequent chunk's start state
+		endState = result.ExecutionResult.Chunks[status.Chunk.Index+1].StartState
 	}
 
 	// creates a verifiable chunk for assigned chunk
@@ -379,6 +396,7 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		Result:        result.ExecutionResult,
 		Collection:    collection,
 		ChunkDataPack: chunkDataPack,
+		EndState:      endState,
 	}
 
 	e.unit.Launch(func() {

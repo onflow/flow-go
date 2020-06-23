@@ -20,7 +20,7 @@ import (
 	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/verification/finder"
-	"github.com/dapperlabs/flow-go/engine/verification/ingest"
+	"github.com/dapperlabs/flow-go/engine/verification/match"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -47,6 +47,7 @@ type GenericNode struct {
 	Me         module.Local
 	Net        *stub.Network
 	DBDir      string
+	ChainID    flow.ChainID
 }
 
 func (g *GenericNode) Done() {
@@ -117,20 +118,15 @@ func (en ExecutionNode) AssertHighestExecutedBlock(t *testing.T, header *flow.He
 // VerificationNode implements an in-process verification node for tests.
 type VerificationNode struct {
 	GenericNode
-	AuthReceipts          mempool.Receipts
-	PendingReceipts       mempool.PendingReceipts
-	AuthCollections       mempool.Collections
-	PendingCollections    mempool.PendingCollections
-	CollectionTrackers    mempool.CollectionTrackers
-	ChunkDataPacks        mempool.ChunkDataPacks
-	ChunkDataPackTrackers mempool.ChunkDataPackTrackers
-	IngestedChunkIDs      mempool.Identifiers
-	IngestedResultIDs     mempool.Identifiers
-	IngestedCollectionIDs mempool.Identifiers
-	AssignedChunkIDs      mempool.Identifiers
-	IngestEngine          *ingest.Engine
-	LightIngestEngine     *ingest.LightEngine // a lighter version of ingest engine
-	VerifierEngine        network.Engine
-	FinderEngine          *finder.Engine
-	MatchEngine           network.Engine
+	Receipts           mempool.Receipts
+	PendingReceipts    mempool.PendingReceipts
+	PendingResults     mempool.PendingResults
+	ProcessedResultIDs mempool.Identifiers
+	ReceiptIDsByBlock  mempool.IdentifierMap
+	ReceiptIDsByResult mempool.IdentifierMap
+	Chunks             *match.Chunks
+	HeaderStorage      storage.Headers
+	VerifierEngine     network.Engine
+	FinderEngine       *finder.Engine
+	MatchEngine        network.Engine
 }

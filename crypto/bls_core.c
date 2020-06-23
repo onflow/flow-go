@@ -20,7 +20,7 @@ int get_sk_len() {
 }
 
 // checks an input scalar is less than the groups order (r)
-int check_membership_Zr(const bn_st* a){
+int check_membership_Zr(const bn_t a){
     bn_t r;
     bn_new(r); 
     g2_get_ord(r);
@@ -39,17 +39,17 @@ static int check_membership_G1(const ep_t p){
     if (!ep_is_valid(p))
         return INVALID;
     // check p is in G1
-    ep_st inf;
-    ep_new(&inf);
+    ep_t inf;
+    ep_new(inf);
     // check p^order == infinity
     // use basic double & add as lwnaf reduces the expo modulo r
     // TODO : write a simple lwnaf without reduction
-    ep_mul_basic(&inf, p, &core_get()->ep_r);
-    if (!ep_is_infty(&inf)){
-        ep_free(&inf);
+    ep_mul_basic(inf, p, &core_get()->ep_r);
+    if (!ep_is_infty(inf)){
+        ep_free(inf);
         return INVALID;
     }
-    ep_free(&inf);
+    ep_free(inf);
 #endif
     return VALID;
 }
@@ -58,44 +58,44 @@ static int check_membership_G1(const ep_t p){
 // and is in the subgroup G2
 // membership check in G2 is using a naive scalar multiplication by the group order
 // TODO: switch to the faster Bowe check 
-int check_membership_G2(const ep2_st* p){
+int check_membership_G2(const ep2_t p){
 #if MEMBERSHIP_CHECK
     // check p is on curve
     if (!ep2_is_valid((ep2_st*)p))
         return INVALID;
     // check p is in G2
-    ep2_st inf;
-    ep2_new(&inf);
+    ep2_t inf;
+    ep2_new(inf);
     // check p^order == infinity
     // use basic double & add as lwnaf reduces the expo modulo r
     // TODO : write a simple lwnaf without reduction
-    ep2_mul_basic(&inf, (ep2_st*)p, &core_get()->ep_r);
-    if (!ep2_is_infty(&inf)){
-        ep2_free(&inf);
+    ep2_mul_basic(inf, (ep2_st*)p, &core_get()->ep_r);
+    if (!ep2_is_infty(inf)){
+        ep2_free(inf);
         return INVALID;
     }
-    ep2_free(&inf);
+    ep2_free(inf);
 #endif
     return VALID;
 }
 
 // Computes a BLS signature
-void bls_sign(byte* s, const bn_st *sk, const byte* data, const int len) {
-    ep_st h;
-    ep_new(&h);
+void bls_sign(byte* s, const bn_t sk, const byte* data, const int len) {
+    ep_t h;
+    ep_new(h);
     // hash to G1
-    map_to_G1(&h, data, len);
-    // s = p^sk
-	ep_mult(&h, &h, sk);  
-    ep_write_bin_compact(s, &h, SIGNATURE_LEN);
-    ep_free(&p);
+    map_to_G1(h, data, len);
+    // s = h^sk
+	ep_mult(h, h, sk);  
+    ep_write_bin_compact(s, h, SIGNATURE_LEN);
+    ep_free(h);
 }
 
 // Verifies the validity of a BLS signature
 // membership check of the signature in G1 is verified in this function
 // membership check of pk in G2 is not verified in this function
 // the membership check is separated to allow optimizing multiple verifications using the same pk
-int bls_verify(const ep2_st *pk, const byte* sig, const byte* data, const int len) {  
+int bls_verify(const ep2_t pk, const byte* sig, const byte* data, const int len) {  
     ep_t elemsG1[2];
     ep2_t elemsG2[2];
 

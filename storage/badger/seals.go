@@ -20,43 +20,53 @@ type Seals struct {
 
 func NewSeals(collector module.CacheMetrics, db *badger.DB) *Seals {
 
-	s := &Seals{db: db}
-
-	store := func(sealID flow.Identifier, seal interface{}) error {
-		return operation.RetryOnConflict(db.Update, s.storeTx(seal.(*flow.Seal)))
+	store := func(sealID flow.Identifier, v interface{}) func(*badger.Txn) error {
+		seal := v.(*flow.Seal)
+		return operation.SkipDuplicates(operation.InsertSeal(sealID, seal))
 	}
 
-	retrieve := func(sealID flow.Identifier) (interface{}, error) {
+	retrieve := func(sealID flow.Identifier) func(*badger.Txn) (interface{}, error) {
 		var seal flow.Seal
-		err := db.View(operation.RetrieveSeal(sealID, &seal))
-		return &seal, err
+		return func(tx *badger.Txn) (interface{}, error) {
+			err := operation.RetrieveSeal(sealID, &seal)(tx)
+			return &seal, err
+		}
 	}
 
-	s.cache = newCache(collector,
-		withLimit(flow.DefaultTransactionExpiry+100),
-		withStore(store),
-		withRetrieve(retrieve),
-		withResource(metrics.ResourceSeal))
+	s := &Seals{
+		db: db,
+		cache: newCache(collector,
+			withLimit(flow.DefaultTransactionExpiry+100),
+			withStore(store),
+			withRetrieve(retrieve),
+			withResource(metrics.ResourceSeal)),
+	}
 
 	return s
 }
 
-func (s *Seals) Store(seal *flow.Seal) error {
+func (s *Seals) storeTx(seal *flow.Seal) func(*badger.Txn) error {
 	return s.cache.Put(seal.ID(), seal)
 }
 
-func (s *Seals) storeTx(seal *flow.Seal) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-		return operation.SkipDuplicates(operation.InsertSeal(seal.ID(), seal))(tx)
+func (s *Seals) retrieveTx(sealID flow.Identifier) func(*badger.Txn) (*flow.Seal, error) {
+	return func(tx *badger.Txn) (*flow.Seal, error) {
+		v, err := s.cache.Get(sealID)(tx)
+		if err != nil {
+			return nil, err
+		}
+		return v.(*flow.Seal), err
 	}
 }
 
+func (s *Seals) Store(seal *flow.Seal) error {
+	return operation.RetryOnConflict(s.db.Update, s.storeTx(seal))
+}
+
 func (s *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {
-	seal, err := s.cache.Get(sealID)
-	if err != nil {
-		return nil, err
-	}
-	return seal.(*flow.Seal), nil
+	tx := s.db.NewTransaction(false)
+	defer tx.Discard()
+	return s.retrieveTx(sealID)(tx)
 }
 
 func (s *Seals) ByBlockID(blockID flow.Identifier) (*flow.Seal, error) {

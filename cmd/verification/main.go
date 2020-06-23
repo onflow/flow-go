@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/spf13/pflag"
 
@@ -15,7 +16,8 @@ import (
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
-	"github.com/dapperlabs/flow-go/engine/verification/ingest"
+	"github.com/dapperlabs/flow-go/engine/verification/finder"
+	"github.com/dapperlabs/flow-go/engine/verification/match"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -40,7 +42,7 @@ const (
 	// ingest engine retries sending resource requests to the network
 	// this value is set following this issue:
 	// https://github.com/dapperlabs/flow-go/issues/3443
-	requestIntervalMs = 1000
+	requestIntervalMs = 1000 * time.Millisecond
 
 	// failureThreshold represents the number of retries ingest engine sends
 	// at `requestIntervalMs` milliseconds for each of the missing resources.
@@ -53,35 +55,27 @@ const (
 func main() {
 
 	var (
-		alpha           uint
-		receiptLimit    uint
-		collectionLimit uint
-		blockLimit      uint
-		chunkLimit      uint
-		err             error
-		authReceipts    *stdmap.Receipts
-		// pendingReceipts       *stdmap.PendingReceipts
-		conCache        *buffer.PendingBlocks
-		authCollections *stdmap.Collections
-		// pendingCollections    *stdmap.PendingCollections
-		// collectionTrackers    *stdmap.CollectionTrackers
-		chunkDataPacks        *stdmap.ChunkDataPacks
-		chunkDataPackTracker  *stdmap.ChunkDataPackTrackers
-		ingestedChunkIDs      *stdmap.Identifiers
-		ingestedCollectionIDs *stdmap.Identifiers
-		assignedChunkIDs      *stdmap.Identifiers
-		ingestedResultIDs     *stdmap.Identifiers
-		verifierEng           *verifier.Engine
-		// ingestEng             *ingest.Engine
-		lightIngestEng *ingest.LightEngine
-		collector      module.VerificationMetrics
+		alpha               uint
+		receiptLimit        uint
+		chunkLimit          uint
+		err                 error
+		pendingReceipts     *stdmap.PendingReceipts
+		pendingResults      *stdmap.PendingResults
+		conCache            *buffer.PendingBlocks
+		receiptIDsByBlock   *stdmap.IdentifierMap
+		receiptIDsByResult  *stdmap.IdentifierMap
+		matchChunks         *match.Chunks
+		headerStorage       *storage.Headers
+		processedResultsIDs *stdmap.Identifiers
+		finderEng           *finder.Engine
+		verifierEng         *verifier.Engine
+		matchEng            *match.Engine
+		collector           module.VerificationMetrics
 	)
 
 	cmd.FlowNode(flow.RoleVerification.String()).
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
-			flags.UintVar(&collectionLimit, "collection-limit", 1000, "maximum number of authCollections in the memory pool")
-			flags.UintVar(&blockLimit, "block-limit", 1000, "maximum number of result blocks in the memory pool")
 			flags.UintVar(&chunkLimit, "chunk-limit", 10000, "maximum number of chunk states in the memory pool")
 			flags.UintVar(&alpha, "alpha", 10, "maximum number of chunk states in the memory pool")
 		}).
@@ -89,104 +83,47 @@ func main() {
 			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegisterer, node.Logger)
 			return nil
 		}).
-		Module("execution authenticated receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-			authReceipts, err = stdmap.NewReceipts(receiptLimit)
-			if err != nil {
-				return err
-			}
-			// registers size method of backend for metrics
-			err := node.Metrics.Mempool.Register(metrics.ResourceReceipt, authReceipts.Size)
-			if err != nil {
-				return fmt.Errorf("could not register backend metric: %w", err)
-			}
-			return nil
-		}).
-		//Module("execution pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-		//	pendingReceipts, err = stdmap.NewPendingReceipts(receiptLimit)
-		//	if err != nil{
-		//		return err
-		//	}
-		//
-		//	// registers size method of backend for metrics
-		//	err = node.Metrics.Mempool.Register(metrics.ResourcePendingReceipt, pendingReceipts.Size)
-		//	if err != nil {
-		//		return fmt.Errorf("could not register backend metric: %w", err)
-		//	}
-		//	return nil
-		//}).
-		Module("authenticated collections mempool", func(node *cmd.FlowNodeBuilder) error {
-			authCollections, err = stdmap.NewCollections(collectionLimit)
+		Module("execution pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
+			pendingReceipts, err = stdmap.NewPendingReceipts(receiptLimit)
 			if err != nil {
 				return err
 			}
 
 			// registers size method of backend for metrics
-			err := node.Metrics.Mempool.Register(metrics.ResourceCollection, authCollections.Size)
-
+			err = node.Metrics.Mempool.Register(metrics.ResourcePendingReceipt, pendingReceipts.Size)
 			if err != nil {
 				return fmt.Errorf("could not register backend metric: %w", err)
 			}
 			return nil
 		}).
-		//Module("pending collections mempool", func(node *cmd.FlowNodeBuilder) error {
-		//	pendingCollections, err = stdmap.NewPendingCollections(collectionLimit)
-		//	if err != nil{
-		//		return err
-		//	}
-		//
-		//	// registers size method of backend for metrics
-		//	err = node.Metrics.Mempool.Register(metrics.ResourcePendingCollection, pendingCollections.Size)
-		//	if err != nil {
-		//		return fmt.Errorf("could not register backend metric: %w", err)
-		//	}
-		//	return nil
-		//}).
-		//Module("collection trackers mempool", func(node *cmd.FlowNodeBuilder) error {
-		//	collectionTrackers, err = stdmap.NewCollectionTrackers(collectionLimit)
-		//	return err
-		//}).
-		Module("chunk data pack mempool", func(node *cmd.FlowNodeBuilder) error {
-			chunkDataPacks, err = stdmap.NewChunkDataPacks(chunkLimit)
+		Module("pending receipt ids by block mempool", func(node *cmd.FlowNodeBuilder) error {
+			receiptIDsByBlock, err = stdmap.NewIdentifierMap(receiptLimit)
 			if err != nil {
 				return err
 			}
-
-			// registers size method of backend for metrics
-			err := node.Metrics.Mempool.Register(metrics.ResourceChunkDataPack, chunkDataPacks.Size)
-			if err != nil {
-				return fmt.Errorf("could not register backend metric: %w", err)
-			}
-
+			// TODO needs a metric registration
 			return nil
 		}).
-		Module("chunk data pack tracker mempool", func(node *cmd.FlowNodeBuilder) error {
-			chunkDataPackTracker, err = stdmap.NewChunkDataPackTrackers(chunkLimit)
+		Module("pending receipt ids by result mempool", func(node *cmd.FlowNodeBuilder) error {
+			receiptIDsByResult, err = stdmap.NewIdentifierMap(receiptLimit)
 			if err != nil {
 				return err
 			}
-
-			// registers size method of backend for metrics
-			err = node.Metrics.Mempool.Register(metrics.ResourceChunkDataPackTracker, chunkDataPackTracker.Size)
-			if err != nil {
-				return fmt.Errorf("could not register backend metric: %w", err)
-			}
-
+			// TODO needs a metric registration
 			return nil
 		}).
-		Module("ingested chunk ids mempool", func(node *cmd.FlowNodeBuilder) error {
-			ingestedChunkIDs, err = stdmap.NewIdentifiers(chunkLimit)
-			return err
+		Module("pending results mempool", func(node *cmd.FlowNodeBuilder) error {
+			pendingResults = stdmap.NewPendingResults()
+			// TODO needs a metric registration
+			return nil
 		}).
-		Module("assigned chunk ids mempool", func(node *cmd.FlowNodeBuilder) error {
-			assignedChunkIDs, err = stdmap.NewIdentifiers(chunkLimit)
-			return err
+		Module("match chunks mempool", func(node *cmd.FlowNodeBuilder) error {
+			matchChunks = match.NewChunks(chunkLimit)
+			// TODO register a size tracker
+			return nil
 		}).
-		Module("ingested result ids mempool", func(node *cmd.FlowNodeBuilder) error {
-			ingestedResultIDs, err = stdmap.NewIdentifiers(receiptLimit)
-			return err
-		}).
-		Module("ingested collection ids mempool", func(node *cmd.FlowNodeBuilder) error {
-			ingestedCollectionIDs, err = stdmap.NewIdentifiers(receiptLimit)
+		Module("processed results ids mempool", func(node *cmd.FlowNodeBuilder) error {
+			processedResultsIDs, err = stdmap.NewIdentifiers(receiptLimit)
 			return err
 		}).
 		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
@@ -194,9 +131,13 @@ func main() {
 			conCache = buffer.NewPendingBlocks()
 			return nil
 		}).
+		Module("header storage", func(node *cmd.FlowNodeBuilder) error {
+			headerStorage = storage.NewHeaders(node.Metrics.Cache, node.DB)
+			return nil
+		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rt := runtime.NewInterpreterRuntime()
-			vm, err := virtualmachine.New(rt)
+			vm, err := virtualmachine.New(rt, node.RootChainID.Chain())
 			if err != nil {
 				return nil, err
 			}
@@ -204,57 +145,35 @@ func main() {
 			verifierEng, err = verifier.New(node.Logger, collector, node.Network, node.State, node.Me, chunkVerifier)
 			return verifierEng, err
 		}).
-		//Component("ingest engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-		//	assigner, err := chunks.NewPublicAssignment(chunkAssignmentAlpha)
-		//	if err != nil {
-		//		return nil, err
-		//	}
-		//	ingestEng, err = ingest.New(node.Logger,
-		//		node.Network,
-		//		node.State,
-		//		node.Me,
-		//		verifierEng,
-		//		authReceipts,
-		//		pendingReceipts,
-		//		authCollections,
-		//		pendingCollections,
-		//		collectionTrackers,
-		//		chunkDataPacks,
-		//		chunkDataPackTracker,
-		//		ingestedChunkIDs,
-		//		ingestedCollectionIDs,
-		//		ingestedResultIDs,
-		//		node.Storage.Headers,
-		//		node.Storage.Blocks,
-		//		assigner,
-		//		requestIntervalMs,
-		//		failureThreshold)
-		//	return ingestEng, err
-		//}).
-		Component("light ingest engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("match engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			assigner, err := chunks.NewPublicAssignment(chunkAssignmentAlpha)
 			if err != nil {
 				return nil, err
 			}
-			lightIngestEng, err = ingest.NewLightEngine(node.Logger,
+			matchEng, err = match.New(node.Logger,
 				node.Network,
-				node.State,
 				node.Me,
+				pendingResults,
 				verifierEng,
-				authReceipts,
-				authCollections,
-				chunkDataPacks,
-				chunkDataPackTracker,
-				ingestedChunkIDs,
-				ingestedCollectionIDs,
-				ingestedResultIDs,
-				assignedChunkIDs,
-				node.Storage.Headers,
-				node.Storage.Blocks,
 				assigner,
+				node.State,
+				matchChunks,
+				headerStorage,
 				requestIntervalMs,
 				failureThreshold)
-			return lightIngestEng, err
+			return matchEng, err
+		}).
+		Component("finder engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			finderEng, err = finder.New(node.Logger,
+				node.Network,
+				node.Me,
+				matchEng,
+				pendingReceipts,
+				headerStorage,
+				processedResultsIDs,
+				receiptIDsByBlock,
+				receiptIDsByResult)
+			return finderEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
@@ -289,7 +208,7 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, node.Storage.Headers, final, verifier, lightIngestEng, node.GenesisBlock.Header, node.GenesisQC, finalized, pending)
+			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, node.Storage.Headers, final, verifier, finderEng, node.GenesisBlock.Header, node.GenesisQC, finalized, pending)
 			if err != nil {
 				// return nil, fmt.Errorf("could not create follower core logic: %w", err)
 				// TODO for now we ignore failures in follower

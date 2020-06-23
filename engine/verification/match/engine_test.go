@@ -355,7 +355,7 @@ func TestDuplication(t *testing.T) {
 
 	// engine processes the execution result again
 	err = e.Process(en.ID(), result)
-	require.Contains(t, err.Error(), "execution result has been added")
+	require.NoError(t, err)
 
 	// wait until verifier has been called
 	<-vchunksC

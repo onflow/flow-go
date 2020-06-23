@@ -5,6 +5,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+// Finalizer is responsible for block finalization.
 type Finalizer interface {
 	VerifyBlock(*model.Block) error
 	IsSafeBlock(*model.Block) bool

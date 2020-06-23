@@ -119,12 +119,12 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 
 		// validate the block. exit if the proposal is invalid
 		err := e.validator.ValidateProposal(proposal)
-		if errors.Is(err, model.ErrorInvalidBlock{}) {
-			log.Warn().AnErr("ErrorInvalidBlock", err).Msg("invalid block proposal")
+		if model.IsInvalidBlockError(err) {
+			log.Warn().Err(err).Msg("invalid block proposal")
 			return nil
 		}
 		if errors.Is(err, model.ErrUnverifiableBlock) {
-			log.Warn().AnErr("ErrUnverifiableBlock", err).Msg("unverifiable block proposal")
+			log.Warn().Err(err).Msg("unverifiable block proposal")
 
 			// even if the block is unverifiable because the QC has been
 			// pruned, it still needs to be added to the forks, otherwise,
@@ -364,7 +364,7 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNextLeader(block *model.Blo
 	shouldVote := true
 	ownVote, err := e.voter.ProduceVoteIfVotable(block, curView)
 	if err != nil {
-		if errors.Is(err, model.NoVoteError{}) {
+		if model.IsNoVoteError(err) {
 			// if this block should not be voted, then change shouldVote to false
 			log.Debug().Err(err).Msg("should not vote for this block")
 			shouldVote = false
@@ -415,9 +415,8 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *model.
 
 	ownVote, err := e.voter.ProduceVoteIfVotable(block, curView)
 	shouldVote := true
-	var noVote *model.NoVoteError
 	if err != nil {
-		if !errors.As(err, &noVote) {
+		if !model.IsNoVoteError(err) {
 			// unknown error, exit the event loop
 			return fmt.Errorf("could not produce vote: %w", err)
 		}

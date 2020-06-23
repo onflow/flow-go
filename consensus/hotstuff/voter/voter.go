@@ -34,15 +34,15 @@ func New(signer hotstuff.Signer, forks hotstuff.ForksReader, persist hotstuff.Pe
 // (including repeated calls with the initial block we voted for also return `nil, error`).
 func (v *Voter) ProduceVoteIfVotable(block *model.Block, curView uint64) (*model.Vote, error) {
 	if !v.forks.IsSafeBlock(block) {
-		return nil, &model.NoVoteError{Msg: "not safe block"}
+		return nil, model.NoVoteError{Msg: "not safe block"}
 	}
 
 	if curView != block.View {
-		return nil, &model.NoVoteError{Msg: "not for current view"}
+		return nil, model.NoVoteError{Msg: "not for current view"}
 	}
 
 	if curView <= v.lastVotedView {
-		return nil, &model.NoVoteError{Msg: "not above the last voted view"}
+		return nil, model.NoVoteError{Msg: "not above the last voted view"}
 	}
 
 	vote, err := v.signer.CreateVote(block)

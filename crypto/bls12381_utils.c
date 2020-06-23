@@ -123,7 +123,7 @@ void seed_relic(byte* seed, int len) {
 }
 
 // Exponentiation of a generic point p in G1
-void ep_mult(ep_st* res, const ep_st* p, const bn_st *expo) {
+void ep_mult(ep_t res, const ep_t p, const bn_t expo) {
     // Using window NAF of size 2
     #if (EP_MUL	== LWNAF)
         g1_mul(res, p, expo);
@@ -134,7 +134,7 @@ void ep_mult(ep_st* res, const ep_st* p, const bn_st *expo) {
 
 // Exponentiation of generator g1 in G1
 // This function is not called by BLS but is here for DEBUG/TESTs purposes
-void ep_mult_gen(ep_st* res, const bn_st *expo) {
+void ep_mult_gen(ep_t res, const bn_t expo) {
 #define GENERIC_POINT 0
 #define FIXED_MULT    (GENERIC_POINT^1)
 
@@ -147,7 +147,7 @@ void ep_mult_gen(ep_st* res, const bn_st *expo) {
 }
 
 // Exponentiation of a generic point p in G2
-void ep2_mult(ep2_st* res, ep2_st* p, bn_st *expo) {
+void ep2_mult(ep2_t res, ep2_t p, bn_t expo) {
     // Using window NAF of size 2
     #if (EP_MUL	== LWNAF)
         g2_mul(res, p, expo);
@@ -157,7 +157,7 @@ void ep2_mult(ep2_st* res, ep2_st* p, bn_st *expo) {
 }
 
 // Exponentiation of fixed g2 in G2
-void ep2_mult_gen(ep2_st* res, const bn_st *expo) {
+void ep2_mult_gen(ep2_t res, const bn_t expo) {
     // Using precomputed table of size 4
     g2_mul_gen(res, (bn_st*)expo);
 }
@@ -194,36 +194,44 @@ void ep_print_(char* s, ep_st* p) {
 void ep2_print_(char* s, ep2_st* p) {
     printf("[%s]:\n", s);
     g2_print(p);
-} 
+}
+
+// generates a random number less than the order r
+void bn_randZr_star(bn_t x) {
+    int seed_len = BITS_TO_BYTES(Fr_BITS + SEC_BITS);
+    byte* seed = (byte*) malloc(seed_len);
+    rand_bytes(seed, seed_len);
+    bn_map_to_Zr_star(x, seed, seed_len);
+}
 
 // generates a random number less than the order r
 void bn_randZr(bn_t x) {
-    bn_st r;
-    bn_new(&r); 
-    g2_get_ord(&r);
+    bn_t r;
+    bn_new(r); 
+    g2_get_ord(r);
 
-    bn_new_size(x, bn_size_raw(&r));
-    if (x)
-        bn_rand_mod(x,&r);
-    bn_free(&r);
+    bn_new_size(x, BITS_TO_DIGITS(Fr_BITS + SEC_BITS));
+    bn_rand(x, RLC_POS, Fr_BITS + SEC_BITS);
+    bn_mod(x, x, r);
+    bn_free(r);
 }
 
 // reads a scalar from an array and maps it to Zr
 // the resulting scalar is in the range 0 < a < r
 // len must be less than BITS_TO_BYTES(RLC_BN_BITS)
-void bn_map_to_Zr(bn_st* a, const uint8_t* bin, int len) {
-    bn_st tmp;
-    bn_new(&tmp);
-    bn_new_size(&tmp, BYTES_TO_DIGITS(len));
-    bn_read_bin(&tmp, bin, len);
+void bn_map_to_Zr_star(bn_t a, const uint8_t* bin, int len) {
+    bn_t tmp;
+    bn_new(tmp);
+    bn_new_size(tmp, BYTES_TO_DIGITS(len));
+    bn_read_bin(tmp, bin, len);
     bn_t r;
     bn_new(r); 
     g2_get_ord(r);
     bn_sub_dig(r,r,1);
-    bn_mod_basic(a,&tmp,r);
+    bn_mod_basic(a,tmp,r);
     bn_add_dig(a,a,1);
     bn_free(r);
-    bn_free(&tmp);
+    bn_free(tmp);
 }
 
 
@@ -231,11 +239,11 @@ void bn_map_to_Zr(bn_st* a, const uint8_t* bin, int len) {
 // whether the field element is in Montgomery domain or not
 static int fp_get_bit_generic(const fp_t a, int bit) {
 #if (FP_RDC == MONTY)
-    bn_st tmp;
-    bn_new(&tmp);
-    fp_prime_back(&tmp, a);
-    int res = bn_get_bit(&tmp, bit);
-    bn_free(&tmp);
+    bn_t tmp;
+    bn_new(tmp);
+    fp_prime_back(tmp, a);
+    int res = bn_get_bit(tmp, bit);
+    bn_free(tmp);
     return res;
 #else
     return fp_get_bit(a, bit);
@@ -243,10 +251,26 @@ static int fp_get_bit_generic(const fp_t a, int bit) {
 }
 
 // uncompress a G1 point p into r taken into account the coordinate x
-// and the LS bit of the y coordinate.
-// the (y) bit is the LS of (y*R mod p) if Montgomery domain is used, otherwise
-// is the LS bit of y 
+// and the LS bit of the y coordinate. 
+//
 // (taken and modifed from Relic ep_upk function)
+// Change: the square root (y) is chosen regardless of the modular multiplication used.
+// If montgomery multiplication is used, the square root is reduced to check the LS bit.
+//
+// Copyright 2019 D. F. Aranha and C. P. L. Gouvêa and T. Markmann and R. S. Wahby and K. Liao
+// https://github.com/relic-toolkit/relic
+//
+//    Licensed under the Apache License, Version 2.0 (the "License");
+//    you may not use this file except in compliance with the License.
+//    You may obtain a copy of the License at
+
+//        http://www.apache.org/licenses/LICENSE-2.0
+
+//    Unless required by applicable law or agreed to in writing, software
+//    distributed under the License is distributed on an "AS IS" BASIS,
+//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//    See the License for the specific language governing permissions and
+//    limitations under the License.
 static int ep_upk_generic(ep_t r, const ep_t p) {
     fp_t t;
     int result = 0;
@@ -260,13 +284,13 @@ static int ep_upk_generic(ep_t r, const ep_t p) {
             /* Verify if least significant bit of the result matches the
             * compressed y-coordinate. */
             #if (FP_RDC == MONTY)
-            bn_st tmp;
-            bn_new(&tmp);
-            fp_prime_back(&tmp, t);
-            if (bn_get_bit(&tmp, 0) != fp_get_bit(p->y, 0)) {
+            bn_t tmp;
+            bn_new(tmp);
+            fp_prime_back(tmp, t);
+            if (bn_get_bit(tmp, 0) != fp_get_bit(p->y, 0)) {
                 fp_neg(t, t);
             }
-            bn_free(&tmp);
+            bn_free(tmp);
             #else
             if (fp_get_bit(t, 0) != fp_get_bit(p->y, 0)) {
                 fp_neg(t, t);
@@ -290,14 +314,14 @@ static int ep_upk_generic(ep_t r, const ep_t p) {
 
 // ep_write_bin_compact exports a point a in E(Fp) to a buffer bin in a compressed or uncompressed form.
 // len is the allocated size of the buffer bin for sanity check
-// The encoding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) with a small change to accomodate Relic lib
-// The code is a modified version of Relic ep_write_bin
+// The encoding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) with a small change to accomodate Relic lib 
+//
 // The most significant bit of the buffer, when set, indicates that the point is in compressed form. 
 // Otherwise, the point is in uncompressed form.
 // The second-most significant bit, when set, indicates that the point is at infinity. 
 // If this bit is set, the remaining bits of the group element's encoding should be set to zero.
 // The third-most significant bit is set if (and only if) this point is in compressed form and it is not the point at infinity and its y-coordinate is odd.
-void ep_write_bin_compact(byte *bin, const ep_st *a, const int len) {
+void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
     ep_t t;
     ep_null(t);
     const int G1size = (G1_BYTES/(SERIALIZATION+1));
@@ -338,7 +362,7 @@ void ep_write_bin_compact(byte *bin, const ep_st *a, const int len) {
 // The encoding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) with a small change to accomodate Relic lib
 // look at the comments of ep_write_bin_compact for a detailed description
 // The code is a modified version of Relic ep_write_bin
-int ep_read_bin_compact(ep_st* a, const byte *bin, const int len) {
+int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
     const int G1size = (G1_BYTES/(SERIALIZATION+1));
     if (len!=G1size) {
         THROW(ERR_NO_BUFFER);
@@ -394,9 +418,13 @@ int ep_read_bin_compact(ep_st* a, const byte *bin, const int len) {
 
 // uncompress a G2 point p into r taking into account the coordinate x
 // and the LS bit of the y lower coordinate.
-// the (y0) bit is the LS of (y0*R mod p) if Montgomery domain is used, otherwise
-// is the LS bit of y0 
-// (taken and modifed from Relic ep_upk function)
+//
+// (taken and modifed from Relic ep2_upk function)
+// Change: the square root (y) is chosen regardless of the modular multiplication used.
+// If montgomery multiplication is used, the square root is reduced to check the LS bit.
+//
+// Copyright 2019 D. F. Aranha and C. P. L. Gouvêa and T. Markmann and R. S. Wahby and K. Liao
+// https://github.com/relic-toolkit/relic
 static  int ep2_upk_generic(ep2_t r, ep2_t p) {
     fp2_t t;
     int result = 0;
@@ -410,13 +438,13 @@ static  int ep2_upk_generic(ep2_t r, ep2_t p) {
             /* Verify if least significant bit of the result matches the
              * compressed y-coordinate. */
             #if (FP_RDC == MONTY)
-            bn_st tmp;
-            bn_new(&tmp);
-            fp_prime_back(&tmp, t[0]);
-            if (bn_get_bit(&tmp, 0) != fp_get_bit(p->y[0], 0)) {
+            bn_t tmp;
+            bn_new(tmp);
+            fp_prime_back(tmp, t[0]);
+            if (bn_get_bit(tmp, 0) != fp_get_bit(p->y[0], 0)) {
                 fp2_neg(t, t);
             }
-            bn_free(&tmp);
+            bn_free(tmp);
             #else
             if (fp_get_bit(t[0], 0) != fp_get_bit(p->y[0], 0)) {
                 fp2_neg(t, t);
@@ -439,13 +467,12 @@ static  int ep2_upk_generic(ep2_t r, ep2_t p) {
 }
 
 // ep2_write_bin_compact exports a point in E(Fp^2) to a buffer in a compressed or uncompressed form.
-// The code is a modified version of Relic ep2_write_bin
 // The most significant bit of the buffer, when set, indicates that the point is in compressed form. 
 // Otherwise, the point is in uncompressed form.
 // The second-most significant bit indicates that the point is at infinity. 
 // If this bit is set, the remaining bits of the group element's encoding should be set to zero.
 // The third-most significant bit is set if (and only if) this point is in compressed form and it is not the point at infinity and its y-coordinate is odd.
-void ep2_write_bin_compact(byte *bin, const ep2_st *a, const int len) {
+void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
     ep2_t t;
     ep2_null(t);
     const int G2size = (G2_BYTES/(SERIALIZATION+1));
@@ -482,7 +509,7 @@ void ep2_write_bin_compact(byte *bin, const ep2_st *a, const int len) {
 
 // ep2_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
 // The code is a modified version of Relic ep_write_bin
-int ep2_read_bin_compact(ep2_st* a, const byte *bin, const int len) {
+int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     const int G2size = (G2_BYTES/(SERIALIZATION+1));
     if (len!=G2size) {
         THROW(ERR_NO_VALID);
