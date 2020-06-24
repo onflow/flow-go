@@ -86,3 +86,6 @@ func (nc *NoopCollector) ReadDuration(duration time.Duration)                   
 func (nc *NoopCollector) ReadDurationPerItem(duration time.Duration)                {}
 func (nc *NoopCollector) ExecutionCollectionRequestSent()                           {}
 func (nc *NoopCollector) ExecutionCollectionRequestRetried()                        {}
+func (nc *NoopCollector) TransactionParsed(dur time.Duration)                       {}
+func (nc *NoopCollector) TransactionChecked(dur time.Duration)                      {}
+func (nc *NoopCollector) TransactionInterpreted(dur time.Duration)                  {}

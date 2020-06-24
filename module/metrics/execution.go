@@ -39,6 +39,9 @@ type ExecutionCollector struct {
 	readDurationPerValue             prometheus.Histogram
 	collectionRequestSent            prometheus.Counter
 	collectionRequestRetried         prometheus.Counter
+	transactionParseTime             prometheus.Histogram
+	transactionCheckTime             prometheus.Histogram
+	transactionInterpretTime         prometheus.Histogram
 }
 
 func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer) *ExecutionCollector {
@@ -83,6 +86,7 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 		Name:      "update_values_size",
 		Help:      "total size of values for single update in bytes",
 	})
+
 	updatedDuration := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
@@ -90,6 +94,7 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 		Help:      "duration of update operation",
 		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
 	})
+
 	updatedDurationPerValue := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
@@ -97,18 +102,21 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 		Help:      "duration of update operation per value",
 		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
 	})
+
 	readValuesNumber := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "read_values_number",
 		Help:      "total number of values read",
 	})
+
 	readValuesSize := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "read_values_size",
 		Help:      "total size of values for single read in bytes",
 	})
+
 	readDuration := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
@@ -116,6 +124,7 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 		Help:      "duration of read operation",
 		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
 	})
+
 	readDurationPerValue := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
@@ -138,6 +147,27 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 		Help:      "number of collection requests retried",
 	})
 
+	transactionParseTime := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "transaction_parse_time_nanoseconds",
+		Help:      "the parse time for a transaction in nanoseconds",
+	})
+
+	transactionCheckTime := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "transaction_check_time_nanoseconds",
+		Help:      "the checking time for a transaction in nanoseconds",
+	})
+
+	transactionInterpretTime := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "transaction_interpret_time_nanoseconds",
+		Help:      "the interpretation time for a transaction in nanoseconds",
+	})
+
 	registerer.MustRegister(forestApproxMemorySize)
 	registerer.MustRegister(forestNumberOfTrees)
 	registerer.MustRegister(updatedCount)
@@ -152,6 +182,9 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 	registerer.MustRegister(readDurationPerValue)
 	registerer.MustRegister(collectionRequestsSent)
 	registerer.MustRegister(collectionRequestsRetries)
+	registerer.MustRegister(transactionParseTime)
+	registerer.MustRegister(transactionCheckTime)
+	registerer.MustRegister(transactionInterpretTime)
 
 	ec := &ExecutionCollector{
 		tracer: tracer,
@@ -170,6 +203,9 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 		readDurationPerValue:     readDurationPerValue,
 		collectionRequestSent:    collectionRequestsSent,
 		collectionRequestRetried: collectionRequestsRetries,
+		transactionParseTime:     transactionParseTime,
+		transactionCheckTime:     transactionCheckTime,
+		transactionInterpretTime: transactionInterpretTime,
 
 		gasUsedPerBlock: promauto.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespaceExecution,
@@ -327,4 +363,19 @@ func (ec *ExecutionCollector) ExecutionCollectionRequestSent() {
 
 func (ec *ExecutionCollector) ExecutionCollectionRequestRetried() {
 	ec.collectionRequestRetried.Inc()
+}
+
+// TransactionParsed reports the time spent parsing a single transaction
+func (ec *ExecutionCollector) TransactionParsed(dur time.Duration) {
+	ec.transactionParseTime.Observe(float64(dur))
+}
+
+// TransactionChecked reports the time spent checking a single transaction
+func (ec *ExecutionCollector) TransactionChecked(dur time.Duration) {
+	ec.transactionCheckTime.Observe(float64(dur))
+}
+
+// TransactionInterpreted reports the time spent interpreting a single transaction
+func (ec *ExecutionCollector) TransactionInterpreted(dur time.Duration) {
+	ec.transactionInterpretTime.Observe(float64(dur))
 }

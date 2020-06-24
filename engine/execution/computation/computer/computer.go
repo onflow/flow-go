@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/opentracing/opentracing-go"
-	"github.com/rs/zerolog"
+	zerolog "github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
@@ -24,19 +24,27 @@ type BlockComputer interface {
 }
 
 type blockComputer struct {
-	tracer module.Tracer
-	log    zerolog.Logger
-	vm     virtualmachine.VirtualMachine
-	blocks storage.Blocks
+	vm      virtualmachine.VirtualMachine
+	blocks  storage.Blocks
+	metrics module.ExecutionMetrics
+	tracer  module.Tracer
+	log     zerolog.Logger
 }
 
 // NewBlockComputer creates a new block executor.
-func NewBlockComputer(vm virtualmachine.VirtualMachine, tracer module.Tracer, blocks storage.Blocks, logger zerolog.Logger) BlockComputer {
+func NewBlockComputer(
+	vm virtualmachine.VirtualMachine,
+	blocks storage.Blocks,
+	metrics module.ExecutionMetrics,
+	tracer module.Tracer,
+	logger zerolog.Logger,
+) BlockComputer {
 	return &blockComputer{
-		tracer: tracer,
-		vm:     vm,
-		blocks: blocks,
-		log:    logger,
+		vm:      vm,
+		blocks:  blocks,
+		metrics: metrics,
+		tracer:  tracer,
+		log:     logger,
 	}
 }
 
@@ -135,16 +143,39 @@ func (e *blockComputer) executeCollection(
 		gasUsed   uint64
 	)
 
+	txMetrics := virtualmachine.NewMetricsCollector()
+
 	for _, tx := range collection.Transactions {
 		err := func(tx *flow.TransactionBody) error {
 			if e.tracer != nil {
 				txSpan := e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
-				defer txSpan.Finish()
+
+				defer func() {
+					// Attach runtime metrics to the transaction span.
+					//
+					// Each duration is the sum of all sub-programs in the transaction.
+					//
+					// For example, metrics.Parsed() returns the total time spent parsing the transaction itself,
+					// as well as any imported programs.
+					txSpan.LogFields(
+						log.Int64(trace.EXEParseDurationTag, int64(txMetrics.Parsed())),
+						log.Int64(trace.EXECheckDurationTag, int64(txMetrics.Checked())),
+						log.Int64(trace.EXEInterpretDurationTag, int64(txMetrics.Interpreted())),
+					)
+					txSpan.Finish()
+				}()
 			}
 
 			txView := collectionView.NewChild()
 
-			result, err := blockCtx.ExecuteTransaction(txView, tx)
+			result, err := blockCtx.ExecuteTransaction(txView, tx, virtualmachine.WithMetricsCollector(txMetrics))
+
+			if e.metrics != nil {
+				e.metrics.TransactionParsed(txMetrics.Parsed())
+				e.metrics.TransactionChecked(txMetrics.Checked())
+				e.metrics.TransactionInterpreted(txMetrics.Interpreted())
+			}
+
 			if err != nil {
 				txIndex++
 				return fmt.Errorf("failed to execute transaction: %w", err)

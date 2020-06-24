@@ -621,8 +621,8 @@ func (ss *SyncSuite) TestPollHeight() {
 			require.Contains(ss.T(), consensus.NodeIDs(), targetID, "target should be in participants")
 		},
 	)
-	err := ss.e.pollHeight()
-	require.NoError(ss.T(), err, "should pass poll height")
+	errs := ss.e.pollHeight()
+	require.NoError(ss.T(), errs.ErrorOrNil(), "should pass poll height")
 	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 3)
 }
 

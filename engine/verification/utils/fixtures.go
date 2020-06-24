@@ -77,14 +77,14 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 
 	metricsCollector := &metrics.NoopCollector{}
 
-	log := zerolog.New(ioutil.Discard)
+	log := zerolog.Nop()
 
 	unittest.RunWithTempDir(t, func(dir string) {
 		led, err := ledger.NewMTrieStorage(dir, 100, metricsCollector, nil)
 		require.NoError(t, err)
 		defer led.Done()
 
-		startStateCommitment, err := bootstrap.NewBootstrapper(zerolog.Nop()).BootstrapLedger(
+		startStateCommitment, err := bootstrap.NewBootstrapper(log).BootstrapLedger(
 			led,
 			unittest.ServiceAccountPublicKey,
 			unittest.GenesisTokenSupply,
@@ -100,7 +100,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 		view := delta.NewView(state.LedgerGetRegister(led, startStateCommitment))
 
 		// create BlockComputer
-		bc := computer.NewBlockComputer(vm, nil, new(storage.Blocks), log)
+		bc := computer.NewBlockComputer(vm, new(storage.Blocks), nil, nil, log)
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
 		completeColls[guarantee.ID()] = &entity.CompleteCollection{

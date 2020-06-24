@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -28,16 +29,14 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		bc := new(vmmock.BlockContext)
 		blocks := new(storage.Blocks)
 
-		log := zerolog.New(ioutil.Discard)
-
-		exe := computer.NewBlockComputer(vm, nil, blocks, log)
+		exe := computer.NewBlockComputer(vm, blocks, nil, nil, zerolog.Nop())
 
 		// create a block with 1 collection with 2 transactions
 		block := generateBlock(1, 2)
 
 		vm.On("NewBlockContext", block.Block.Header, mock.Anything).Return(bc)
 
-		bc.On("ExecuteTransaction", mock.Anything, mock.Anything).
+		bc.On("ExecuteTransaction", mock.Anything, mock.Anything, mock.Anything).
 			Return(&virtualmachine.TransactionResult{}, nil).
 			Twice()
 
@@ -58,9 +57,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		bc := new(vmmock.BlockContext)
 		blocks := new(storage.Blocks)
 
-		log := zerolog.New(ioutil.Discard)
-
-		exe := computer.NewBlockComputer(vm, nil, blocks, log)
+		exe := computer.NewBlockComputer(vm, blocks, nil, nil, zerolog.Nop())
 
 		collectionCount := 2
 		transactionsPerCollection := 2
@@ -76,7 +73,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm.On("NewBlockContext", block.Block.Header, mock.Anything).Return(bc)
 
-		bc.On("ExecuteTransaction", mock.Anything, mock.Anything).
+		bc.On("ExecuteTransaction", mock.Anything, mock.Anything, mock.Anything).
 			Return(&virtualmachine.TransactionResult{Events: events, Error: &virtualmachine.MissingPayerError{}}, nil).
 			Times(totalTransactionCount)
 

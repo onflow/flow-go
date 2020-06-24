@@ -56,13 +56,14 @@ func main() {
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
-			vm, err := virtualmachine.New(rt, node.GenesisChainID.Chain())
+			vm, err := virtualmachine.New(rt, node.RootChainID.Chain())
 			if err != nil {
 				return err
 			}
 
 			computationManager = computation.New(
 				node.Logger,
+				collector,
 				node.Tracer,
 				node.Me,
 				node.State,
@@ -88,7 +89,7 @@ func main() {
 
 			bootstrapper := bootstrap.NewBootstrapper(node.Logger)
 
-			bootstrappedStateCommitment, err := bootstrapper.BootstrapLedger(ledgerStorage, *node.GenesisAccountPublicKey, node.GenesisTokenSupply, node.GenesisChainID.Chain())
+			bootstrappedStateCommitment, err := bootstrapper.BootstrapLedger(ledgerStorage, *node.GenesisAccountPublicKey, node.GenesisTokenSupply, node.RootChainID.Chain())
 			if err != nil {
 				panic(fmt.Sprintf("error while bootstrapping execution state: %s", err))
 			}
