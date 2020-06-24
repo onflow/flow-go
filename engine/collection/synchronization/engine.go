@@ -360,11 +360,13 @@ CheckLoop:
 				continue
 			}
 
+			e.unit.Lock()
 			ranges, batches := e.core.ScanPending(final)
 			err = e.sendRequests(ranges, batches)
 			if err != nil {
 				e.log.Error().Err(err).Msg("could not send requests")
 			}
+			e.unit.Unlock()
 		}
 	}
 
