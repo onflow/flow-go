@@ -3,12 +3,10 @@ package computer_test
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"testing"
 
 	"github.com/onflow/cadence"
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"

@@ -2,7 +2,6 @@ package utils
 
 import (
 	"context"
-	"io/ioutil"
 	"testing"
 
 	"github.com/onflow/cadence/runtime"

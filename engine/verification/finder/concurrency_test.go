@@ -99,6 +99,8 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 		Msg("TestConcurrency started")
 	hub := stub.NewNetworkHub()
 
+	chainID := flow.Testnet
+
 	// creates test id for each role
 	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
@@ -124,7 +126,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 
 	// creates a verification node with a real finder engine, and mock matching engine.
 	verNode := testutil.VerificationNode(t, hub, verID, identities,
-		assigner, requestInterval, failureThreshold, testutil.WithMatchEngine(matchEng))
+		assigner, requestInterval, failureThreshold, chainID, testutil.WithMatchEngine(matchEng))
 
 	// the wait group tracks goroutines for each Execution Receipt sent to finder engine
 	var senderWG sync.WaitGroup

@@ -5,7 +5,8 @@ import (
 	"fmt"
 
 	"github.com/opentracing/opentracing-go"
-	zerolog "github.com/rs/zerolog"
+	"github.com/opentracing/opentracing-go/log"
+	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
