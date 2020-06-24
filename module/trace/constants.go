@@ -2,27 +2,27 @@ package trace
 
 // Span names
 const (
-	EXEExecuteBlock           = "ingestion.executeBlock"
-	EXESaveExecutionResults   = "ingestion.saveExecutionResults"
-	EXESaveTransactionResults = "ingestion.saveTransactionResults"
+	EXEExecuteBlock           SpanName = "ingestion.executeBlock"
+	EXESaveExecutionResults   SpanName = "ingestion.saveExecutionResults"
+	EXESaveTransactionResults SpanName = "ingestion.saveTransactionResults"
 
-	EXEBroadcastExecutionReceipt = "provider.broadcastExecutionReceipt"
+	EXEBroadcastExecutionReceipt SpanName = "provider.broadcastExecutionReceipt"
 
-	EXEComputeBlock       = "computer.computeBlock"
-	EXEComputeCollection  = "computer.computeCollection"
-	EXEComputeTransaction = "computer.computeTransaction"
+	EXEComputeBlock       SpanName = "computer.computeBlock"
+	EXEComputeCollection  SpanName = "computer.computeCollection"
+	EXEComputeTransaction SpanName = "computer.computeTransaction"
 
-	EXECommitDelta                        = "state.commitDelta"
-	EXEGetRegisters                       = "state.getRegisters"
-	EXEGetRegistersWithProofs             = "state.getRegistersWithProofs"
-	EXEPersistStateCommitment             = "state.persistStateCommitment"
-	EXEPersistChunkDataPack               = "state.persistChunkDataPack"
-	EXEGetExecutionResultID               = "state.getExecutionResultID"
-	EXEPersistExecutionResult             = "state.persistExecutionResult"
-	EXEPersistStateInteractions           = "state.persistStateInteractions"
-	EXERetrieveStateDelta                 = "state.retrieveStateDelta"
-	EXEUpdateHighestExecutedBlockIfHigher = "state.updateHighestExecutedBlockIfHigher"
-	EXEGetHighestExecutedBlockID          = "state.getHighestExecutedBlockID"
+	EXECommitDelta                        SpanName = "state.commitDelta"
+	EXEGetRegisters                       SpanName = "state.getRegisters"
+	EXEGetRegistersWithProofs             SpanName = "state.getRegistersWithProofs"
+	EXEPersistStateCommitment             SpanName = "state.persistStateCommitment"
+	EXEPersistChunkDataPack               SpanName = "state.persistChunkDataPack"
+	EXEGetExecutionResultID               SpanName = "state.getExecutionResultID"
+	EXEPersistExecutionResult             SpanName = "state.persistExecutionResult"
+	EXEPersistStateInteractions           SpanName = "state.persistStateInteractions"
+	EXERetrieveStateDelta                 SpanName = "state.retrieveStateDelta"
+	EXEUpdateHighestExecutedBlockIfHigher SpanName = "state.updateHighestExecutedBlockIfHigher"
+	EXEGetHighestExecutedBlockID          SpanName = "state.getHighestExecutedBlockID"
 )
 
 // Tag names
