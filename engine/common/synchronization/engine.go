@@ -25,15 +25,14 @@ import (
 
 // Engine is the synchronization engine, responsible for synchronizing chain state.
 type Engine struct {
-	unit         *engine.Unit
-	log          zerolog.Logger
-	metrics      module.EngineMetrics
-	me           module.Local
-	participants flow.IdentityList
-	state        protocol.State
-	con          network.Conduit
-	blocks       storage.Blocks
-	comp         network.Engine // compliance layer engine
+	unit    *engine.Unit
+	log     zerolog.Logger
+	metrics module.EngineMetrics
+	me      module.Local
+	state   protocol.State
+	con     network.Conduit
+	blocks  storage.Blocks
+	comp    network.Engine // compliance layer engine
 
 	pollInterval time.Duration
 	scanInterval time.Duration
@@ -46,7 +45,6 @@ func New(
 	metrics module.EngineMetrics,
 	net module.Network,
 	me module.Local,
-	participants flow.IdentityList,
 	state protocol.State,
 	blocks storage.Blocks,
 	comp network.Engine,
@@ -59,7 +57,6 @@ func New(
 		log:          log.With().Str("engine", "synchronization").Logger(),
 		metrics:      metrics,
 		me:           me,
-		participants: participants.Filter(filter.Not(filter.HasNodeID(me.NodeID()))),
 		state:        state,
 		blocks:       blocks,
 		comp:         comp,
@@ -383,9 +380,14 @@ func (e *Engine) pollHeight() error {
 		return fmt.Errorf("could not get last finalized header: %w", err)
 	}
 
+	participants, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus))
+	if err != nil {
+		return fmt.Errorf("could not get participants: %w", err)
+	}
+
 	var errs error
 	// send the request for synchronization
-	for _, targetID := range e.participants.Sample(3).NodeIDs() {
+	for _, targetID := range participants.Sample(3).NodeIDs() {
 
 		req := &messages.SyncRequest{
 			Nonce:  rand.Uint64(),
@@ -405,6 +407,11 @@ func (e *Engine) pollHeight() error {
 // sendRequests sends a request for each range and batch.
 func (e *Engine) sendRequests(ranges []flow.Range, batches []flow.Batch) error {
 
+	participants, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus))
+	if err != nil {
+		return fmt.Errorf("could not get participants: %w", err)
+	}
+
 	var errs error
 	for _, ran := range ranges {
 		req := &messages.RangeRequest{
@@ -412,7 +419,7 @@ func (e *Engine) sendRequests(ranges []flow.Range, batches []flow.Batch) error {
 			FromHeight: ran.From,
 			ToHeight:   ran.To,
 		}
-		err := e.con.Submit(req, e.participants.Sample(3).NodeIDs()...)
+		err := e.con.Submit(req, participants.Sample(3).NodeIDs()...)
 		if err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("could not submit range request: %w", err))
 			continue
@@ -426,7 +433,7 @@ func (e *Engine) sendRequests(ranges []flow.Range, batches []flow.Batch) error {
 			Nonce:    rand.Uint64(),
 			BlockIDs: batch.BlockIDs,
 		}
-		err := e.con.Submit(req, e.participants.Sample(3).NodeIDs()...)
+		err := e.con.Submit(req, participants.Sample(3).NodeIDs()...)
 		if err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("could not submit batch request: %w", err))
 			continue

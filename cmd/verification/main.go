@@ -14,7 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	protocolRecovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
-	"github.com/dapperlabs/flow-go/engine/common/synchronization"
+	synceng "github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/verification/finder"
 	"github.com/dapperlabs/flow-go/engine/verification/match"
@@ -28,6 +28,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
+	"github.com/dapperlabs/flow-go/module/synchronization"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
@@ -70,6 +71,8 @@ func main() {
 		finderEng           *finder.Engine
 		verifierEng         *verifier.Engine
 		matchEng            *match.Engine
+		followerEng         *followereng.Engine
+		syncCore            *synchronization.Core
 		collector           module.VerificationMetrics
 	)
 
@@ -134,6 +137,10 @@ func main() {
 		Module("header storage", func(node *cmd.FlowNodeBuilder) error {
 			headerStorage = storage.NewHeaders(node.Metrics.Cache, node.DB)
 			return nil
+		}).
+		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
+			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
+			return err
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rt := runtime.NewInterpreterRuntime()
@@ -218,7 +225,7 @@ func main() {
 				node.Logger.Debug().Err(err).Msg("ignoring failures in follower core")
 			}
 
-			followerEng, err := followereng.New(node.Logger,
+			followerEng, err = followereng.New(node.Logger,
 				node.Network,
 				node.Me,
 				node.Metrics.Engine,
@@ -233,20 +240,23 @@ func main() {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
 
-			// create a block synchronization engine to handle follower getting
-			// out of sync
-			sync, err := synchronization.New(node.Logger,
+			return followerEng.WithSynchronization(syncCore), nil
+		}).
+		Component("sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			sync, err := synceng.New(
+				node.Logger,
 				node.Metrics.Engine,
 				node.Network,
 				node.Me,
 				node.State,
 				node.Storage.Blocks,
-				followerEng)
+				followerEng,
+				syncCore,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
-
-			return followerEng.WithSynchronization(sync), nil
+			return sync, nil
 		}).
 		Run()
 }

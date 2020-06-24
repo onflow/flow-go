@@ -20,7 +20,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	protocolRecovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
-	"github.com/dapperlabs/flow-go/engine/common/synchronization"
+	synceng "github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
 	"github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
@@ -38,6 +38,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
+	"github.com/dapperlabs/flow-go/module/synchronization"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
@@ -67,7 +68,8 @@ func main() {
 		seals          mempool.Seals
 		prop           *propagation.Engine
 		prov           *provider.Engine
-		sync           *synchronization.Engine
+		syncCore       *synchronization.Core
+		comp           *compliance.Engine
 		conMetrics     module.ConsensusMetrics
 		mainMetrics    module.HotstuffMetrics
 	)
@@ -132,6 +134,10 @@ func main() {
 		Module("hotstuff main metrics", func(node *cmd.FlowNodeBuilder) error {
 			mainMetrics = metrics.NewHotstuffCollector(node.GenesisChainID)
 			return nil
+		}).
+		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
+			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
+			return err
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			resultsDB := bstorage.NewExecutionResults(node.DB)
@@ -218,20 +224,6 @@ func main() {
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
-			}
-
-			// initialize the synchronization engine
-			sync, err = synchronization.New(
-				node.Logger,
-				node.Metrics.Engine,
-				node.Network,
-				node.Me,
-				node.State,
-				node.Storage.Blocks,
-				comp,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 			}
 
 			// initialize the block builder
@@ -332,8 +324,25 @@ func main() {
 				return nil, fmt.Errorf("could not initialize hotstuff engine: %w", err)
 			}
 
-			comp = comp.WithSynchronization(sync).WithConsensus(hot)
+			comp = comp.WithSynchronization(syncCore).WithConsensus(hot)
 			return comp, nil
+		}).
+		Component("sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			sync, err := synceng.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				node.Storage.Blocks,
+				comp,
+				syncCore,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
+			}
+
+			return sync, nil
 		}).
 		Run()
 }

@@ -17,7 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/access/ingestion"
 	"github.com/dapperlabs/flow-go/engine/access/rpc"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
-	"github.com/dapperlabs/flow-go/engine/common/synchronization"
+	synceng "github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
@@ -25,6 +25,7 @@ import (
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
+	"github.com/dapperlabs/flow-go/module/synchronization"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 	grpcutils "github.com/dapperlabs/flow-go/utils/grpc"
 )
@@ -36,6 +37,8 @@ func main() {
 		collectionLimit uint
 		receiptLimit    uint
 		ingestEng       *ingestion.Engine
+		followerEng     *followereng.Engine
+		syncCore        *synchronization.Core
 		rpcConf         rpc.Config
 		collectionRPC   access.AccessAPIClient
 		executionRPC    execution.ExecutionAPIClient
@@ -81,6 +84,10 @@ func main() {
 		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
 			conCache = buffer.NewPendingBlocks()
 			return nil
+		}).
+		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
+			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
+			return err
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions)
@@ -133,14 +140,23 @@ func main() {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
 
-			// create a block synchronization engine to handle follower getting
-			// out of sync
-			sync, err := synchronization.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State, node.Storage.Blocks, follower)
+			return follower.WithSynchronization(syncCore), nil
+		}).
+		Component("sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			sync, err := synceng.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				node.Storage.Blocks,
+				followerEng,
+				syncCore,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
-
-			return follower.WithSynchronization(sync), nil
+			return sync, nil
 		}).
 		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rpcEng := rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.GenesisChainID)
