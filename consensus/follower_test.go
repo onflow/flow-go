@@ -35,9 +35,10 @@ import (
 //     Hence, waiting for the Follower's `Done()` channel guarantees that it complete processing any
 //     blocks that are in the event loop.
 // For this test, most of the Follower's injected components are mocked out.
-// As we test the mocked components separately, we assume here that they work according to specification.
-// Furthermore, we also assume that Forks works according to specification, i.e. that the determination of
-// finalized blocks is correct (which is also tested separately)
+// As we test the mocked components separately, we assume:
+//   * The mocked components work according to specification.
+//   * Especially, we assume that Forks works according to specification, i.e. that the determination of
+//     finalized blocks is correct and events are emitted in the desired order (both are tested separately).
 func TestHotStuffFollower(t *testing.T) {
 	suite.Run(t, new(HotStuffFollowerSuite))
 }
@@ -86,24 +87,6 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 
 	// mock finalization updater
 	s.updater = &mockmodule.Finalizer{}
-	//s.updater.On("MakePending", mock.Anything).Return(nil).Run(
-	//	func(args mock.Arguments) {
-	//		require.True(s.T(), s.expectedUpdaterRecord.HasNextExpectedRecord(), "no expected record for this call")
-	//		expectedMethodName, expectedBlockID := s.expectedUpdaterRecord.NextExpectedRecord()
-	//		require.Equal(s.T(), expectedMethodName, "MakePending", "unexpected method call")
-	//		blockID := args.Get(0).(flow.Identifier)
-	//		require.Equal(s.T(), expectedBlockID, blockID, "unexpected block ID")
-	//	},
-	//)
-	//s.updater.On("MakeFinal", mock.Anything).Return(nil).Run(
-	//	func(args mock.Arguments) {
-	//		require.True(s.T(), s.expectedUpdaterRecord.HasNextExpectedRecord(), "no expected record for this call")
-	//		expectedMethodName, expectedBlockID := s.expectedUpdaterRecord.NextExpectedRecord()
-	//		require.Equal(s.T(), expectedMethodName, "MakeFinal", "unexpected method call")
-	//		blockID := args.Get(0).(flow.Identifier)
-	//		require.Equal(s.T(), expectedBlockID, blockID, "unexpected block ID")
-	//	},
-	//)
 
 	// mock finalization updater
 	s.verifier = &mockhotstuff.Verifier{}
@@ -112,24 +95,6 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 
 	// mock consumer for finalization notifications
 	s.notifier = &mockhotstuff.FinalizationConsumer{}
-	//s.notifier.On("OnBlockIncorporated", mock.Anything).Return().Run(
-	//	func(args mock.Arguments) {
-	//		require.True(s.T(), s.expectedNotifierRecord.HasNextExpectedRecord(), "no expected record for this call")
-	//		expectedMethodName, expectedBlockID := s.expectedNotifierRecord.NextExpectedRecord()
-	//		require.Equal(s.T(), expectedMethodName, "OnBlockIncorporated", "unexpected method call")
-	//		block := args.Get(0).(*model.Block)
-	//		require.Equal(s.T(), expectedBlockID, block.BlockID, "unexpected block ID")
-	//	},
-	//)
-	//s.notifier.On("OnFinalizedBlock", mock.Anything).Return().Run(
-	//	func(args mock.Arguments) {
-	//		require.True(s.T(), s.expectedNotifierRecord.HasNextExpectedRecord(), "no expected record for this call")
-	//		expectedMethodName, expectedBlockID := s.expectedNotifierRecord.NextExpectedRecord()
-	//		require.Equal(s.T(), expectedMethodName, "OnFinalizedBlock", "unexpected method call")
-	//		block := args.Get(0).(*model.Block)
-	//		require.Equal(s.T(), expectedBlockID, block.BlockID, "unexpected block ID")
-	//	},
-	//)
 
 	// root block and QC
 	parentID, err := flow.HexStringToIdentifier("aa7693d498e9a087b1cadf5bfe9a1ff07829badc1915c210e482f369f9a00a70")
@@ -185,6 +150,7 @@ func (s *HotStuffFollowerSuite) AfterTest(suiteName, testName string) {
 	case <-s.follower.Done():
 	case <-time.After(time.Second):
 		s.T().Error("timeout on waiting for expected Follower shutdown")
+		s.T().FailNow() // stops the test
 	}
 	s.notifier.AssertExpectations(s.T())
 	s.updater.AssertExpectations(s.T())
