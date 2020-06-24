@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
+	"github.com/dapperlabs/flow-go/state"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -143,10 +144,8 @@ func (e *Engine) SubmitLocal(event interface{}) {
 func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
-		if engine.IsInvalidInputError(err) {
-			e.log.Error().Str("error_type", "invalid_input").Err(err).Msg("compliance received invalid event")
-		} else if err != nil {
-			e.log.Error().Err(err).Msg("compliance could not process submitted event")
+		if err != nil {
+			engine.LogError(e.log, err)
 		}
 	})
 }
@@ -467,7 +466,21 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 		Header:  proposal.Header,
 		Payload: proposal.Payload,
 	}
+
 	err := e.state.Mutate().Extend(block)
+	// if the error is a known invalid extension of the protocol state, then
+	// the input is invalid
+	if state.IsInvalidExtensionError(err) {
+		return engine.NewInvalidInputErrorf("invalid extension of protocol state (block: %x, height: %d): %w",
+			header.ID(), header.Height, err)
+	}
+
+	// if the error is an known outdated extension of the protocol state, then
+	// the input is outdated
+	if state.IsOutdatedExtensionError(err) {
+		return engine.NewOutdatedInputErrorf("outdated extension of protocol state: %w", err)
+	}
+
 	if err != nil {
 		return fmt.Errorf("could not extend protocol state (block: %x, height: %d): %w", header.ID(), header.Height, err)
 	}

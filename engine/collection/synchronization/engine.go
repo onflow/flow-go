@@ -122,7 +122,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("synchronization could not process submitted event")
+			engine.LogError(e.log, err)
 		}
 	})
 }
@@ -453,14 +453,18 @@ CheckLoop:
 		case <-e.unit.Quit():
 			break CheckLoop
 		case <-poll.C:
-			err := e.pollHeight()
-			if err != nil {
-				if network.IsPeerUnreachableError(err) {
-					e.log.Warn().Err(err).Msg("could not poll heights due to peer unreachable")
-				} else {
-					e.log.Error().Err(err).Msg("could not poll heights")
-				}
+			errs := e.pollHeight()
+
+			if errs.ErrorOrNil() == nil {
 				continue
+			}
+
+			// if there are errors, and errors are all PeerUnreachableError, then log as warn
+			// otherwise log as error
+			if network.AllPeerUnreachableError(errs) {
+				e.log.Warn().Err(errs).Msg("could not poll heights due to peer unreachable")
+			} else {
+				e.log.Error().Err(errs).Msg("could not poll heights")
 			}
 		case <-scan.C:
 			heights, blockIDs, err := e.scanPending()
@@ -482,17 +486,18 @@ CheckLoop:
 }
 
 // pollHeight will send a synchronization request to three random nodes.
-func (e *Engine) pollHeight() error {
+func (e *Engine) pollHeight() *multierror.Error {
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
+	var errs *multierror.Error
 	// get the last finalized header
 	final, err := e.state.Final().Head()
 	if err != nil {
-		return fmt.Errorf("could not get last finalized header: %w", err)
+		errs = multierror.Append(errs, fmt.Errorf("could not get last finalized header: %w", err))
+		return errs
 	}
 
-	var errs error
 	// send the request for synchronization
 	for _, targetID := range e.participants.Sample(3).NodeIDs() {
 

@@ -109,10 +109,8 @@ func (e *Engine) SubmitLocal(event interface{}) {
 func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
-		if engine.IsInvalidInputError(err) {
-			e.log.Error().Str("error_type", "invalid_input").Err(err).Msg("matching received invalid event")
-		} else if err != nil {
-			e.log.Error().Err(err).Msg("matching could not process submitted event")
+		if err != nil {
+			engine.LogError(e.log, err)
 		}
 	})
 }

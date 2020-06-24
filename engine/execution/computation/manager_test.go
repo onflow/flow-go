@@ -22,34 +22,36 @@ import (
 func TestComputeBlockWithStorage(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 
-	vm, err := virtualmachine.New(rt)
+	chain := flow.Mainnet.Chain()
+
+	vm, err := virtualmachine.New(rt, chain)
 	require.NoError(t, err)
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(2)
 	require.NoError(t, err)
 
-	ledger := testutil.RootBootstrappedLedger()
-	accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys)
+	ledger := testutil.RootBootstrappedLedger(chain)
+	accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
 	require.NoError(t, err)
 
-	tx1 := testutil.DeployCounterContractTransaction(accounts[0])
-	tx1.SetProposalKey(flow.ServiceAddress(), 0, 0).
-		SetPayer(flow.ServiceAddress())
+	tx1 := testutil.DeployCounterContractTransaction(accounts[0], chain)
+	tx1.SetProposalKey(chain.ServiceAddress(), 0, 0).
+		SetPayer(chain.ServiceAddress())
 
 	err = testutil.SignPayload(tx1, accounts[0], privateKeys[0])
 	require.NoError(t, err)
 
-	err = testutil.SignEnvelope(tx1, flow.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+	err = testutil.SignEnvelope(tx1, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 	require.NoError(t, err)
 
 	tx2 := testutil.CreateCounterTransaction(accounts[0], accounts[1])
-	tx2.SetProposalKey(flow.ServiceAddress(), 0, 0).
-		SetPayer(flow.ServiceAddress())
+	tx2.SetProposalKey(chain.ServiceAddress(), 0, 0).
+		SetPayer(chain.ServiceAddress())
 
 	err = testutil.SignPayload(tx2, accounts[1], privateKeys[1])
 	require.NoError(t, err)
 
-	err = testutil.SignEnvelope(tx2, flow.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+	err = testutil.SignEnvelope(tx2, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 	require.NoError(t, err)
 
 	transactions := []*flow.TransactionBody{tx1, tx2}

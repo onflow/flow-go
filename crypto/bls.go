@@ -87,7 +87,7 @@ const blsKMACFunction = "H2C"
 // tag is the domain separation tag, it is recommended to use a different tag for each signature domain
 func NewBLSKMAC(tag string) hash.Hasher {
 	// the error is ignored as the parameter lengths are in the correct range for kmac
-	kmac, _ := hash.NewKMAC_128([]byte(tag), []byte("BLS_KMACFunction"), opSwUInputLenBLSBLS12381)
+	kmac, _ := hash.NewKMAC_128([]byte(tag), []byte(blsKMACFunction), opSwUInputLenBLSBLS12381)
 	return kmac
 }
 

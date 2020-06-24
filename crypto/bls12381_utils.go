@@ -16,6 +16,7 @@ import (
 )
 
 // Go wrappers to Relic C types
+// Relic is compiled with ALLOC=AUTO
 type pointG1 C.ep_st
 type pointG2 C.ep2_st
 type scalar C.bn_st
@@ -91,12 +92,13 @@ func (p *pointG2) equals(other *pointG2) bool {
 }
 
 // returns a random number in Zr
-func randZr(x *scalar) error {
+func randZr(x *scalar) {
 	C.bn_randZr((*C.bn_st)(x))
-	if x == nil {
-		return errors.New("the memory allocation of the random number has failed")
-	}
-	return nil
+}
+
+// returns a random non-zero number in Zr
+func randZrStar(x *scalar) {
+	C.bn_randZr_star((*C.bn_st)(x))
 }
 
 // mapToZr reads a scalar from a slice of bytes and maps it to Zr
@@ -105,7 +107,7 @@ func mapToZr(x *scalar, src []byte) error {
 	if len(src) > maxScalarSize {
 		return fmt.Errorf("input slice length must be less than %d", maxScalarSize)
 	}
-	C.bn_map_to_Zr((*C.bn_st)(x),
+	C.bn_map_to_Zr_star((*C.bn_st)(x),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)))
 	return nil

@@ -211,15 +211,15 @@ func (va *VoteAggregator) convertPendingVotes(pendingVotes []*model.Vote, block 
 func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *model.Vote, block *model.Block) (bool, error) {
 	// validate the vote
 	voter, err := va.voteValidator.ValidateVote(vote, block)
-	if err != nil {
-		switch err.(type) {
+
+	if model.IsInvalidVoteError(err) {
 		// does not report invalid vote as an error, notify consumers instead
-		case *model.ErrorInvalidVote:
-			va.notifier.OnInvalidVoteDetected(vote)
-			return false, nil
-		default:
-			return false, fmt.Errorf("could not validate incorporated vote: %w", err)
-		}
+		va.notifier.OnInvalidVoteDetected(vote)
+		return false, nil
+	}
+
+	if err != nil {
+		return false, fmt.Errorf("could not validate incorporated vote: %w", err)
 	}
 
 	// does not report double vote as an error, notify consumers instead

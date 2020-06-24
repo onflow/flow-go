@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/dapperlabs/flow-go/engine/execution/utils"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
 )
@@ -305,11 +305,7 @@ func (r *TransactionContext) CheckCode(address runtime.Address, code []byte) (er
 }
 
 func (r *TransactionContext) ServiceAddress() flow.Address {
-	if r.simpleAddresses {
-		return SimpleServiceAddress()
-	}
-
-	return flow.ServiceAddress()
+	return r.chain.ServiceAddress()
 }
 
 // UpdateAccountCode updates the deployed code on an existing account.
@@ -588,7 +584,7 @@ func (r *TransactionContext) verifyAccountSignature(
 
 	accountKey := &account.Keys[txSig.KeyID]
 
-	hasher, err := hash.NewHasher(accountKey.HashAlgo)
+	hasher, err := utils.NewHasher(accountKey.HashAlgo)
 	if err != nil {
 		return accountKey, &InvalidHashingAlgorithmError{
 			Address:          txSig.Address,
@@ -749,13 +745,13 @@ func MintDefaultTokenTransaction(fungibleTokenAddress, flowTokenAddress flow.Add
 	`, fungibleTokenAddress, flowTokenAddress))
 }
 
-func FungibleTokenAddress() flow.Address {
-	address, _ := flow.AddressAtIndex(2)
+func FungibleTokenAddress(chain flow.Chain) flow.Address {
+	address, _ := chain.AddressAtIndex(2)
 	return address
 }
 
-func FlowTokenAddress() flow.Address {
-	address, _ := flow.AddressAtIndex(3)
+func FlowTokenAddress(chain flow.Chain) flow.Address {
+	address, _ := chain.AddressAtIndex(3)
 	return address
 }
 

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/hashicorp/go-multierror"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -30,12 +32,14 @@ type PeerUnreachableError struct {
 	Err error
 }
 
+// NewPeerUnreachableError creates a PeerUnreachableError instance with an error
 func NewPeerUnreachableError(err error) error {
 	return PeerUnreachableError{
 		Err: err,
 	}
 }
 
+// Unwrap returns the wrapped error value
 func (e PeerUnreachableError) Unwrap() error {
 	return e.Err
 }
@@ -44,7 +48,18 @@ func (e PeerUnreachableError) Error() string {
 	return fmt.Sprintf("%v", e.Err)
 }
 
+// IsPeerUnreachableError returns whether the given error is PeerUnreachableError
 func IsPeerUnreachableError(e error) bool {
 	var err PeerUnreachableError
 	return errors.As(e, &err)
+}
+
+// AllPeerUnreachableError returns whether all errors are PeerUnreachableError
+func AllPeerUnreachableError(errs *multierror.Error) bool {
+	for _, err := range errs.WrappedErrors() {
+		if !IsPeerUnreachableError(err) {
+			return false
+		}
+	}
+	return true
 }

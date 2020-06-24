@@ -36,11 +36,11 @@ type Blocks interface {
 }
 
 type blockContext struct {
-	vm              *virtualMachine
-	header          *flow.Header
-	blocks          Blocks
-	simpleAddresses bool
-	rng             *rand.Rand
+	vm     *virtualMachine
+	header *flow.Header
+	blocks Blocks
+	chain  flow.Chain
+	rng    *rand.Rand
 }
 
 func (bc *blockContext) newTransactionContext(
@@ -54,20 +54,26 @@ func (bc *blockContext) newTransactionContext(
 		signingAccounts[i] = runtime.Address(addr)
 	}
 
+	ledgerDAL := NewLedgerDAL(ledger, bc.chain)
 	ctx := &TransactionContext{
+		LedgerDAL:                        ledgerDAL,
 		bc:                               bc,
+		ledger:                           ledgerDAL,
 		astCache:                         bc.vm.cache,
 		Metrics:                          emptyMetricsCollector{},
-		ledger:                           NewLedgerDAL(ledger, bc.simpleAddresses),
 		signingAccounts:                  signingAccounts,
+		checker:                          nil,
+		logs:                             nil,
+		events:                           nil,
 		tx:                               tx,
 		gasLimit:                         tx.GasLimit,
+		uuid:                             0,
 		header:                           bc.header,
 		blocks:                           bc.blocks,
 		signatureVerificationEnabled:     true,
 		restrictedAccountCreationEnabled: true,
 		restrictedDeploymentEnabled:      true,
-		simpleAddresses:                  bc.simpleAddresses,
+		simpleAddresses:                  false,
 		rng:                              bc.rng,
 	}
 
@@ -83,7 +89,7 @@ func (bc *blockContext) newScriptContext(ledger Ledger) *TransactionContext {
 		bc:       bc,
 		astCache: bc.vm.cache,
 		Metrics:  emptyMetricsCollector{},
-		ledger:   NewLedgerDAL(ledger, bc.simpleAddresses),
+		ledger:   NewLedgerDAL(ledger, bc.chain),
 		header:   bc.header,
 		blocks:   bc.blocks,
 		gasLimit: scriptGasLimit,
@@ -199,16 +205,13 @@ func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte, arguments []
 }
 
 func (bc *blockContext) GetAccount(ledger Ledger, addr flow.Address) (*flow.Account, error) {
-	ledgerAccess := NewLedgerDAL(ledger, bc.simpleAddresses)
+	ledgerAccess := NewLedgerDAL(ledger, bc.chain)
 	acct := ledgerAccess.GetAccount(addr)
 	if acct == nil {
 		return nil, nil
 	}
 
-	serviceAddress := flow.ServiceAddress()
-	if bc.simpleAddresses {
-		serviceAddress = SimpleServiceAddress()
-	}
+	serviceAddress := bc.chain.ServiceAddress()
 
 	result, err := bc.ExecuteScript(ledger, DefaultTokenBalanceScript(serviceAddress, addr), nil)
 	if err != nil {

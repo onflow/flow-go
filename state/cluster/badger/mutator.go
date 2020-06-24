@@ -7,6 +7,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/state"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
@@ -66,7 +67,7 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 
 		// check chain ID
 		if block.Header.ChainID != m.state.chainID {
-			return fmt.Errorf("new block chain ID (%s) does not match configured (%s)", block.Header.ChainID, m.state.chainID)
+			return state.NewInvalidExtensionErrorf("new block chain ID (%s) does not match configured (%s)", block.Header.ChainID, m.state.chainID)
 		}
 
 		// get the chain ID, which determines which cluster state to query
@@ -87,7 +88,8 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 
 		// the extending block must increase height by 1 from parent
 		if block.Header.Height != parent.Height+1 {
-			return fmt.Errorf("extending block height (%d) must be parent height + 1 (%d)", block.Header.Height, parent.Height)
+			return state.NewOutdatedExtensionErrorf("extending block height (%d) must be parent height + 1 (%d)",
+				block.Header.Height, parent.Height)
 		}
 
 		// ensure that the extending block connects to the finalized state, we
@@ -107,7 +109,8 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 			// if its number is below current boundary, the block does not connect
 			// to the finalized protocol state and would break database consistency
 			if ancestor.Height < final.Height {
-				return fmt.Errorf("block doesn't connect to finalized state")
+				return state.NewInvalidExtensionErrorf("block doesn't connect to finalized state. ancestor.Height (%v), final.Height (%v)",
+					ancestor.Height, final.Height)
 			}
 
 			parentID = ancestor.ParentID
@@ -156,7 +159,8 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 
 		// if we have duplicate transactions, fail
 		if len(duplicateTxIDs) > 0 {
-			return fmt.Errorf("payload includes duplicate transactions (duplicates: %s)", duplicateTxIDs)
+			return state.NewInvalidExtensionErrorf("payload includes duplicate transactions (duplicates: %s)",
+				duplicateTxIDs)
 		}
 
 		return nil

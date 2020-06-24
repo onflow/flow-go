@@ -5,6 +5,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+// Validator provides functions to validate QC, proposals and votes.
 type Validator interface {
 
 	// ValidateQC checks the validity of a QC for a given block.
