@@ -4,12 +4,11 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/dapperlabs/flow-core-contracts/contracts"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
-
-	"github.com/dapperlabs/flow-core-contracts/contracts"
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state"

@@ -30,8 +30,7 @@ require (
 	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200619174948-a3a856d16a27
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/pkg/errors v0.9.1
-	github.com/plus3it/gorecurcopy v0.0.1 // indirect
-	github.com/prometheus/client_golang v1.3.0
+	github.com/prometheus/client_golang v0.9.3
 	github.com/prometheus/tsdb v0.7.1
 	github.com/rs/zerolog v1.15.0
 	github.com/spf13/cobra v0.0.6

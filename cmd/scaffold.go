@@ -133,7 +133,6 @@ type FlowNodeBuilder struct {
 	MsgValidators     []validators.MessageValidator
 
 	// root state information
-	RootCommit           flow.StateCommitment // should be removed
 	RootBlock            *flow.Block
 	RootQC               *model.QuorumCertificate
 	RootResult           *flow.ExecutionResult
@@ -396,8 +395,6 @@ func (fnb *FlowNodeBuilder) initState() {
 		// bootstrap the protocol state with the loaded data
 		err = state.Mutate().Bootstrap(fnb.RootBlock, rootResult, rootSeal)
 		fnb.MustNot(err).Msg("could not bootstrap protocol state")
-
-		fnb.RootCommit = rootSeal.FinalState
 
 		// apply the bootstrap functions to the protocol state
 		for _, b := range fnb.bootstraps {

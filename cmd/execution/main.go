@@ -106,7 +106,7 @@ func main() {
 				node.Tracer,
 			)
 
-			err = bootstrap.BootstrapExecutionDatabase(node.DB, node.RootCommit, node.RootBlock.Header)
+			err = bootstrap.BootstrapExecutionDatabase(node.DB, node.RootSeal.FinalState, node.RootBlock.Header)
 			// Root block already loaded, can simply continue
 			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 				return nil, fmt.Errorf("could not bootstrap execution DB: %w", err)
