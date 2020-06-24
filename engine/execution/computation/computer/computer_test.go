@@ -26,14 +26,14 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		bc := new(vmmock.BlockContext)
 		blocks := new(storage.Blocks)
 
-		exe := computer.NewBlockComputer(vm, nil, blocks)
+		exe := computer.NewBlockComputer(vm, blocks, nil, nil)
 
 		// create a block with 1 collection with 2 transactions
 		block := generateBlock(1, 2)
 
 		vm.On("NewBlockContext", block.Block.Header, mock.Anything).Return(bc)
 
-		bc.On("ExecuteTransaction", mock.Anything, mock.Anything).
+		bc.On("ExecuteTransaction", mock.Anything, mock.Anything, mock.Anything).
 			Return(&virtualmachine.TransactionResult{}, nil).
 			Twice()
 
@@ -54,7 +54,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		bc := new(vmmock.BlockContext)
 		blocks := new(storage.Blocks)
 
-		exe := computer.NewBlockComputer(vm, nil, blocks)
+		exe := computer.NewBlockComputer(vm, blocks, nil, nil)
 
 		collectionCount := 2
 		transactionsPerCollection := 2
@@ -70,7 +70,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm.On("NewBlockContext", block.Block.Header, mock.Anything).Return(bc)
 
-		bc.On("ExecuteTransaction", mock.Anything, mock.Anything).
+		bc.On("ExecuteTransaction", mock.Anything, mock.Anything, mock.Anything).
 			Return(&virtualmachine.TransactionResult{Events: events, Error: &virtualmachine.MissingPayerError{}}, nil).
 			Times(totalTransactionCount)
 

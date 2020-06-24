@@ -60,10 +60,16 @@ func (nc *NoopCollector) StartCollectionToFinalized(collectionID flow.Identifier
 func (nc *NoopCollector) FinishCollectionToFinalized(collectionID flow.Identifier)  {}
 func (nc *NoopCollector) StartBlockToSeal(blockID flow.Identifier)                  {}
 func (nc *NoopCollector) FinishBlockToSeal(blockID flow.Identifier)                 {}
+func (nc *NoopCollector) OnExecutionReceiptReceived()                               {}
+func (nc *NoopCollector) OnExecutionResultSent()                                    {}
+func (nc *NoopCollector) OnExecutionResultReceived()                                {}
+func (nc *NoopCollector) OnVerifiableChunkSent()                                    {}
+func (nc *NoopCollector) OnVerifiableChunkReceived()                                {}
+func (nc *NoopCollector) OnChunkDataPackReceived()                                  {}
+func (nc *NoopCollector) OnResultApproval()                                         {}
 func (nc *NoopCollector) OnChunkVerificationStarted(chunkID flow.Identifier)        {}
 func (nc *NoopCollector) OnChunkVerificationFinished(chunkID flow.Identifier)       {}
-func (nc *NoopCollector) OnVerifiableChunkSubmitted(size float64)                   {}
-func (nc *NoopCollector) OnResultApproval()                                         {}
+func (nc *NoopCollector) LogVerifiableChunkSize(size float64)                       {}
 func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)      {}
 func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)     {}
 func (nc *NoopCollector) ExecutionGasUsedPerBlock(gas uint64)                       {}
@@ -74,6 +80,10 @@ func (nc *NoopCollector) ExecutionLastExecutedBlockView(view uint64)            
 func (ec *NoopCollector) ExecutionTotalExecutedTransactions(numberOfTx int)         {}
 func (nc *NoopCollector) ForestApproxMemorySize(bytes uint64)                       {}
 func (nc *NoopCollector) ForestNumberOfTrees(number uint64)                         {}
+func (nc *NoopCollector) LatestTrieRegCount(number uint64)                          {}
+func (nc *NoopCollector) LatestTrieRegCountDiff(number uint64)                      {}
+func (nc *NoopCollector) LatestTrieMaxDepth(number uint64)                          {}
+func (nc *NoopCollector) LatestTrieMaxDepthDiff(number uint64)                      {}
 func (nc *NoopCollector) UpdateCount()                                              {}
 func (nc *NoopCollector) ProofSize(bytes uint32)                                    {}
 func (nc *NoopCollector) UpdateValuesNumber(number uint64)                          {}
@@ -86,3 +96,6 @@ func (nc *NoopCollector) ReadDuration(duration time.Duration)                   
 func (nc *NoopCollector) ReadDurationPerItem(duration time.Duration)                {}
 func (nc *NoopCollector) ExecutionCollectionRequestSent()                           {}
 func (nc *NoopCollector) ExecutionCollectionRequestRetried()                        {}
+func (nc *NoopCollector) TransactionParsed(dur time.Duration)                       {}
+func (nc *NoopCollector) TransactionChecked(dur time.Duration)                      {}
+func (nc *NoopCollector) TransactionInterpreted(dur time.Duration)                  {}

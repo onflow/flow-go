@@ -74,7 +74,7 @@ func NewMForest(maxHeight int, trieStorageDir string, trieCacheSize int, metrics
 	return forest, nil
 }
 
-// getTrie returns trie at specific rootHash
+// GetTrie returns trie at specific rootHash
 // warning, use this function for read-only operation
 func (f *MForest) GetTrie(rootHash []byte) (*trie.MTrie, error) {
 	encRootHash := hex.EncodeToString(rootHash)
@@ -93,7 +93,7 @@ func (f *MForest) GetTrie(rootHash []byte) (*trie.MTrie, error) {
 	return trie, nil
 }
 
-// GetCachedRootHashes returns list of currently cached tree root hashes
+// GetTries returns list of currently cached tree root hashes
 func (f *MForest) GetTries() ([]*trie.MTrie, error) {
 	// ToDo needs concurrency safety
 	keys := f.tries.Keys()
@@ -108,7 +108,7 @@ func (f *MForest) GetTries() ([]*trie.MTrie, error) {
 	return tries, nil
 }
 
-// addTrie adds a trie to the forest
+// AddTries adds a trie to the forest
 func (f *MForest) AddTries(newTries []*trie.MTrie) error {
 	for _, t := range newTries {
 		err := f.AddTrie(t)
@@ -119,7 +119,7 @@ func (f *MForest) AddTries(newTries []*trie.MTrie) error {
 	return nil
 }
 
-// addTrie adds a trie to the forest
+// AddTrie adds a trie to the forest
 func (f *MForest) AddTrie(newTrie *trie.MTrie) error {
 	if newTrie == nil {
 		return nil
@@ -263,6 +263,11 @@ func (f *MForest) Update(rootHash []byte, keys [][]byte, values [][]byte) (*trie
 	if err != nil {
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
+
+	f.metrics.LatestTrieRegCount(newTrie.AllocatedRegCount())
+	f.metrics.LatestTrieRegCountDiff(newTrie.AllocatedRegCount() - parentTrie.AllocatedRegCount())
+	f.metrics.LatestTrieMaxDepth(uint64(newTrie.MaxDepth()))
+	f.metrics.LatestTrieMaxDepthDiff(uint64(newTrie.MaxDepth() - parentTrie.MaxDepth()))
 
 	err = f.AddTrie(newTrie)
 	if err != nil {
