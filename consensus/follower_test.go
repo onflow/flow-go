@@ -2,7 +2,6 @@ package consensus_test
 
 import (
 	"os"
-	"sync"
 	"testing"
 	"time"
 
@@ -12,7 +11,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/consensus"
-
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	mockhotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
@@ -24,14 +22,18 @@ import (
 
 // TestHotStuffFollower is a test suite for the HotStuff Follower.
 // The main focus of this test suite is to test that the follower generates the expected callbacks to
-// module.Finalizer and hotstuff.FinalizationConsumer in the _expected order_. In this context, note that
-// the Follower internally has its own processing thread. Therefore, the test must be concurrency safe and
-// potentially wait a little bit until the Follower has asynchronously processed the submitted block
-// (functionality not natively supported by testify).
-// Furthermore, we want to ensure that calls are happening with a specified order. Therefore, we set up
-// our own concurrency safe `ExpectedRecord` and make testify compare the received values to the expected
-// record on each call to module.Finalizer and hotstuff.FinalizationConsumer.
-//
+// module.Finalizer and hotstuff.FinalizationConsumer. In this context, note that the Follower internally
+// has its own processing thread. Therefore, the test must be concurrency safe and ensure that the Follower
+// has asynchronously processed the submitted blocks _before_ we assert whether all callbacks were run.
+// We use the following knowledge about the Follower's _internal_ processing:
+//   * The Follower is running in a single go-routine, pulling one event at a time from an
+//     _unbuffered_ channel. The test will send blocks to the Follower's input channel and block there
+//     until the Follower receives the block from the channel. Hence, when all sends have completed, the
+//     Follower has processed all blocks but the last one. Furthermore, the last block has already been
+//     received.
+//   * Therefore, the Follower will only pick up a shutdown signal _after_ it processed the last block.
+//     Hence, waiting for the Follower's `Done()` channel guarantees that it complete processing any
+//     blocks that are in the event loop.
 // For this test, most of the Follower's injected components are mocked out.
 // As we test the mocked components separately, we assume here that they work according to specification.
 // Furthermore, we also assume that Forks works according to specification, i.e. that the determination of
@@ -54,9 +56,7 @@ type HotStuffFollowerSuite struct {
 	pending    []*flow.Header
 	follower   *hotstuff.FollowerLoop
 
-	mockConsensus          *MockConsensus
-	expectedNotifierRecord *ExpectedRecord
-	expectedUpdaterRecord  *ExpectedRecord
+	mockConsensus *MockConsensus
 }
 
 // SetupTest initializes all the components needed for the Follower.
@@ -64,8 +64,6 @@ type HotStuffFollowerSuite struct {
 func (s *HotStuffFollowerSuite) SetupTest() {
 	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
 	s.mockConsensus = &MockConsensus{identities: identities}
-	s.expectedNotifierRecord = NewExpectedRecord()
-	s.expectedUpdaterRecord = NewExpectedRecord()
 
 	// mock consensus committee
 	s.committee = &mockhotstuff.Committee{}
@@ -88,24 +86,24 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 
 	// mock finalization updater
 	s.updater = &mockmodule.Finalizer{}
-	s.updater.On("MakePending", mock.Anything).Return(nil).Run(
-		func(args mock.Arguments) {
-			require.True(s.T(), s.expectedUpdaterRecord.HasNextExpectedRecord(), "no expected record for this call")
-			expectedMethodName, expectedBlockID := s.expectedUpdaterRecord.NextExpectedRecord()
-			require.Equal(s.T(), expectedMethodName, "MakePending", "unexpected method call")
-			blockID := args.Get(0).(flow.Identifier)
-			require.Equal(s.T(), expectedBlockID, blockID, "unexpected block ID")
-		},
-	)
-	s.updater.On("MakeFinal", mock.Anything).Return(nil).Run(
-		func(args mock.Arguments) {
-			require.True(s.T(), s.expectedUpdaterRecord.HasNextExpectedRecord(), "no expected record for this call")
-			expectedMethodName, expectedBlockID := s.expectedUpdaterRecord.NextExpectedRecord()
-			require.Equal(s.T(), expectedMethodName, "MakeFinal", "unexpected method call")
-			blockID := args.Get(0).(flow.Identifier)
-			require.Equal(s.T(), expectedBlockID, blockID, "unexpected block ID")
-		},
-	)
+	//s.updater.On("MakePending", mock.Anything).Return(nil).Run(
+	//	func(args mock.Arguments) {
+	//		require.True(s.T(), s.expectedUpdaterRecord.HasNextExpectedRecord(), "no expected record for this call")
+	//		expectedMethodName, expectedBlockID := s.expectedUpdaterRecord.NextExpectedRecord()
+	//		require.Equal(s.T(), expectedMethodName, "MakePending", "unexpected method call")
+	//		blockID := args.Get(0).(flow.Identifier)
+	//		require.Equal(s.T(), expectedBlockID, blockID, "unexpected block ID")
+	//	},
+	//)
+	//s.updater.On("MakeFinal", mock.Anything).Return(nil).Run(
+	//	func(args mock.Arguments) {
+	//		require.True(s.T(), s.expectedUpdaterRecord.HasNextExpectedRecord(), "no expected record for this call")
+	//		expectedMethodName, expectedBlockID := s.expectedUpdaterRecord.NextExpectedRecord()
+	//		require.Equal(s.T(), expectedMethodName, "MakeFinal", "unexpected method call")
+	//		blockID := args.Get(0).(flow.Identifier)
+	//		require.Equal(s.T(), expectedBlockID, blockID, "unexpected block ID")
+	//	},
+	//)
 
 	// mock finalization updater
 	s.verifier = &mockhotstuff.Verifier{}
@@ -114,24 +112,24 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 
 	// mock consumer for finalization notifications
 	s.notifier = &mockhotstuff.FinalizationConsumer{}
-	s.notifier.On("OnBlockIncorporated", mock.Anything).Return().Run(
-		func(args mock.Arguments) {
-			require.True(s.T(), s.expectedNotifierRecord.HasNextExpectedRecord(), "no expected record for this call")
-			expectedMethodName, expectedBlockID := s.expectedNotifierRecord.NextExpectedRecord()
-			require.Equal(s.T(), expectedMethodName, "OnBlockIncorporated", "unexpected method call")
-			block := args.Get(0).(*model.Block)
-			require.Equal(s.T(), expectedBlockID, block.BlockID, "unexpected block ID")
-		},
-	)
-	s.notifier.On("OnFinalizedBlock", mock.Anything).Return().Run(
-		func(args mock.Arguments) {
-			require.True(s.T(), s.expectedNotifierRecord.HasNextExpectedRecord(), "no expected record for this call")
-			expectedMethodName, expectedBlockID := s.expectedNotifierRecord.NextExpectedRecord()
-			require.Equal(s.T(), expectedMethodName, "OnFinalizedBlock", "unexpected method call")
-			block := args.Get(0).(*model.Block)
-			require.Equal(s.T(), expectedBlockID, block.BlockID, "unexpected block ID")
-		},
-	)
+	//s.notifier.On("OnBlockIncorporated", mock.Anything).Return().Run(
+	//	func(args mock.Arguments) {
+	//		require.True(s.T(), s.expectedNotifierRecord.HasNextExpectedRecord(), "no expected record for this call")
+	//		expectedMethodName, expectedBlockID := s.expectedNotifierRecord.NextExpectedRecord()
+	//		require.Equal(s.T(), expectedMethodName, "OnBlockIncorporated", "unexpected method call")
+	//		block := args.Get(0).(*model.Block)
+	//		require.Equal(s.T(), expectedBlockID, block.BlockID, "unexpected block ID")
+	//	},
+	//)
+	//s.notifier.On("OnFinalizedBlock", mock.Anything).Return().Run(
+	//	func(args mock.Arguments) {
+	//		require.True(s.T(), s.expectedNotifierRecord.HasNextExpectedRecord(), "no expected record for this call")
+	//		expectedMethodName, expectedBlockID := s.expectedNotifierRecord.NextExpectedRecord()
+	//		require.Equal(s.T(), expectedMethodName, "OnFinalizedBlock", "unexpected method call")
+	//		block := args.Get(0).(*model.Block)
+	//		require.Equal(s.T(), expectedBlockID, block.BlockID, "unexpected block ID")
+	//	},
+	//)
 
 	// root block and QC
 	parentID, err := flow.HexStringToIdentifier("aa7693d498e9a087b1cadf5bfe9a1ff07829badc1915c210e482f369f9a00a70")
@@ -156,7 +154,7 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 
 // BeforeTest instantiates and starts Follower
 func (s *HotStuffFollowerSuite) BeforeTest(suiteName, testName string) {
-	s.expectedNotifierRecord.AppendRecord("OnBlockIncorporated", s.rootHeader)
+	s.notifier.On("OnBlockIncorporated", blockWithID(s.rootHeader.ID())).Return().Once()
 
 	var err error
 	s.follower, err = consensus.NewFollower(
@@ -180,79 +178,63 @@ func (s *HotStuffFollowerSuite) BeforeTest(suiteName, testName string) {
 	}
 }
 
-// AfterTest stops follower
+// AfterTest stops follower and asserts that the Follower executed the expected callbacks
+// to s.updater.MakeValid or s.notifier.OnBlockIncorporated
 func (s *HotStuffFollowerSuite) AfterTest(suiteName, testName string) {
 	select {
 	case <-s.follower.Done():
 	case <-time.After(time.Second):
 		s.T().Error("timeout on waiting for expected Follower shutdown")
 	}
+	s.notifier.AssertExpectations(s.T())
+	s.updater.AssertExpectations(s.T())
 }
 
 // TestFollowerInitialization verifies that the basic test setup with initialization of the Follower works as expected
-func (s *HotStuffFollowerSuite) TestFollowerInitialization() {
+func (s *HotStuffFollowerSuite) TestInitialization() {
 	// we expect no additional calls to s.updater or s.notifier
-	s.requireExpectedRecords()
 }
 
 // TestFollowerProcessBlock verifies that when submitting a single valid block (child root block),
-// the Follower reacts with callbacks to s.updater.MakePending or s.notifier.OnBlockIncorporated with this new block
-func (s *HotStuffFollowerSuite) TestFollowerProcessBlock() {
+// the Follower reacts with callbacks to s.updater.MakeValid or s.notifier.OnBlockIncorporated with this new block
+func (s *HotStuffFollowerSuite) TestSubmitProposal() {
 	rootBlockView := s.rootHeader.View
 	nextBlock := s.mockConsensus.extendBlock(rootBlockView+1, s.rootHeader)
 
-	s.expectedNotifierRecord.AppendRecord("OnBlockIncorporated", nextBlock)
-	s.expectedUpdaterRecord.AppendRecord("MakePending", nextBlock)
+	s.notifier.On("OnBlockIncorporated", blockWithID(nextBlock.ID())).Return().Once()
+	s.updater.On("MakeValid", blockID(nextBlock.ID())).Return(nil).Once()
 	s.follower.SubmitProposal(nextBlock, rootBlockView)
-	s.requireExpectedRecords()
 }
 
 // TestFollowerProcessBlock verifies that when submitting a single valid block (child root block),
-// the Follower reacts with callbacks to s.updater.MakePending or s.notifier.OnBlockIncorporated with this new block
+// the Follower reacts with callbacks to s.updater.MakeValid or s.notifier.OnBlockIncorporated with this new block
 func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
 	expectedFinalized := s.mockConsensus.extendBlock(s.rootHeader.View+1, s.rootHeader)
-	s.expectedNotifierRecord.AppendRecord("OnBlockIncorporated", expectedFinalized)
-	s.expectedUpdaterRecord.AppendRecord("MakePending", expectedFinalized)
+	s.notifier.On("OnBlockIncorporated", blockWithID(expectedFinalized.ID())).Return().Once()
+	s.updater.On("MakeValid", blockID(expectedFinalized.ID())).Return(nil).Once()
 	s.follower.SubmitProposal(expectedFinalized, s.rootHeader.View)
 
 	// direct 1-chain on top of expectedFinalized
 	nextBlock := s.mockConsensus.extendBlock(expectedFinalized.View+1, expectedFinalized)
-	s.expectedNotifierRecord.AppendRecord("OnBlockIncorporated", nextBlock)
-	s.expectedUpdaterRecord.AppendRecord("MakePending", nextBlock)
+	s.notifier.On("OnBlockIncorporated", blockWithID(nextBlock.ID())).Return().Once()
+	s.updater.On("MakeValid", blockID(nextBlock.ID())).Return(nil).Once()
 	s.follower.SubmitProposal(nextBlock, expectedFinalized.View)
 
 	// direct 2-chain on top of expectedFinalized
 	lastBlock := nextBlock
 	nextBlock = s.mockConsensus.extendBlock(lastBlock.View+1, lastBlock)
-	s.expectedNotifierRecord.AppendRecord("OnBlockIncorporated", nextBlock)
-	s.expectedUpdaterRecord.AppendRecord("MakePending", nextBlock)
+	s.notifier.On("OnBlockIncorporated", blockWithID(nextBlock.ID())).Return().Once()
+	s.updater.On("MakeValid", blockID(nextBlock.ID())).Return(nil).Once()
 	s.follower.SubmitProposal(nextBlock, lastBlock.View)
 
 	// indirect 3-chain on top of expectedFinalized => finalization
 	lastBlock = nextBlock
 	nextBlock = s.mockConsensus.extendBlock(lastBlock.View+5, lastBlock)
-	s.expectedNotifierRecord.AppendRecord("OnFinalizedBlock", expectedFinalized)
-	s.expectedNotifierRecord.AppendRecord("OnBlockIncorporated", nextBlock)
-	s.expectedUpdaterRecord.AppendRecord("MakeFinal", expectedFinalized)
-	s.expectedUpdaterRecord.AppendRecord("MakePending", nextBlock)
+	s.notifier.On("OnFinalizedBlock", blockWithID(expectedFinalized.ID())).Return().Once()
+	s.notifier.On("OnBlockIncorporated", blockWithID(nextBlock.ID())).Return().Once()
+	s.updater.On("MakeFinal", blockID(expectedFinalized.ID())).Return(nil).Once()
+	s.updater.On("MakeValid", blockID(nextBlock.ID())).Return(nil).Once()
 	s.follower.SubmitProposal(nextBlock, lastBlock.View)
-
-	s.requireExpectedRecords()
-}
-
-// requireExpectedRecords verifies that _exactly_ the required records for
-// s.updater.MakePending and s.notifier.OnBlockIncorporated were produced
-func (s *HotStuffFollowerSuite) requireExpectedRecords() {
-	select {
-	case <-s.expectedNotifierRecord.AllRecordsRecalled():
-	case <-time.After(time.Second):
-		s.T().Error("timeout on waiting for expected Notifier calls")
-	}
-	select {
-	case <-s.expectedUpdaterRecord.AllRecordsRecalled():
-	case <-time.After(time.Second):
-		s.T().Error("timeout on waiting for expected Notifier calls")
-	}
 }
 
 // MockConsensus is used to generate Blocks for a mocked consensus committee
@@ -268,57 +250,10 @@ func (mc *MockConsensus) extendBlock(blockView uint64, parent *flow.Header) *flo
 	return &nextBlock
 }
 
-// ExpectedRecord is a concurrency-safe record which allows constructing
-// an expected record for callbacks into module.Finalizer and hotstuff.FinalizationConsumer
-// It allows to iterate over the expected calls
-type ExpectedRecord struct {
-	sync.Mutex
-	recalledElements   int
-	method             []string
-	blockID            []flow.Identifier
-	allRecordsRecalled chan struct{} // channel is closed when all records where recalled
+func blockWithID(expectedBlockID flow.Identifier) interface{} {
+	return mock.MatchedBy(func(block *model.Block) bool { return expectedBlockID == block.BlockID })
 }
 
-func NewExpectedRecord() *ExpectedRecord {
-	return &ExpectedRecord{
-		Mutex:              sync.Mutex{},
-		allRecordsRecalled: nil,
-	}
-}
-
-// AppendRecord appends the expected Method call to the end of the record
-func (r *ExpectedRecord) AppendRecord(methodName string, block *flow.Header) {
-	r.Lock()
-	defer r.Unlock()
-	r.method = append(r.method, methodName)
-	r.blockID = append(r.blockID, block.ID())
-}
-
-func (r *ExpectedRecord) HasNextExpectedRecord() bool {
-	r.Lock()
-	defer r.Unlock()
-	return r.recalledElements < len(r.method)
-}
-
-func (r *ExpectedRecord) NextExpectedRecord() (string, flow.Identifier) {
-	r.Lock()
-	defer r.Unlock()
-	recalledElements := r.recalledElements
-	r.recalledElements++
-	if r.allRecordsRecalled != nil {
-		if r.recalledElements == len(r.method) {
-			close(r.allRecordsRecalled)
-		}
-	}
-	return r.method[recalledElements], r.blockID[recalledElements]
-}
-
-func (r *ExpectedRecord) AllRecordsRecalled() <-chan struct{} {
-	r.Lock()
-	defer r.Unlock()
-	r.allRecordsRecalled = make(chan struct{})
-	if r.recalledElements == len(r.method) {
-		close(r.allRecordsRecalled)
-	}
-	return r.allRecordsRecalled
+func blockID(expectedBlockID flow.Identifier) interface{} {
+	return mock.MatchedBy(func(blockID flow.Identifier) bool { return expectedBlockID == blockID })
 }
