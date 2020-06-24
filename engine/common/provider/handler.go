@@ -1,4 +1,4 @@
-package engine
+package provider
 
 import (
 	"github.com/dapperlabs/flow-go/model/flow"

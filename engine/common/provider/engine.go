@@ -1,4 +1,4 @@
-package engine
+package provider
 
 import (
 	"fmt"
@@ -123,6 +123,12 @@ func (e *Engine) after(msg string) {
 }
 
 func (e *Engine) onResourceRequest(originID flow.Identifier, req *messages.ResourceRequest) error {
+
+	// TODO: track previous requests to protect against spam / repeated requests
+
+	// TODO: add support for batch requests (multiple IDs in requests, multiple resources in response)
+
+	// TODO: add delay to allow compounding of requests
 
 	// first, we check if we know how to handle the requested resource
 	handler, exists := e.handlers[req.Resource]
