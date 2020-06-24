@@ -11,22 +11,26 @@ import (
 )
 
 const (
-	errCodeInvalidSignaturePublicKey = 1
-	errCodeMissingSignature          = 2
-	errCodeMissingPayer              = 3
-	errCodeInvalidSignatureAccount   = 4
+	errCodeMissingSignature                      = 1
+	errCodeMissingPayer                          = 2
+	errCodeInvalidSignaturePublicKeyDoesNotExist = 3
+	errCodeInvalidSignaturePublicKeyRevoked      = 4
+	errCodeInvalidSignatureVerification          = 5
 
-	errCodeProposalKeyDoesNotExist          = 5
-	errCodeProposalKeyInvalidSequenceNumber = 6
-	errCodeProposalKeyMissingSignature      = 7
+	errCodeInvalidProposalKeyPublicKeyDoesNotExist = 6
+	errCodeInvalidProposalKeyPublicKeyRevoked      = 7
+	errCodeInvalidProposalKeySequenceNumber        = 8
+	errCodeInvalidProposalKeyMissingSignature      = 9
 
-	errCodeInvalidHashAlgorithm  = 8
-	errCodePublicKeyVerification = 9
+	errCodeInvalidHashAlgorithm = 10
 
 	errCodeExecution = 100
 )
 
-var ErrAccountNotFound = errors.New("account not found")
+var (
+	ErrAccountNotFound          = errors.New("account not found")
+	ErrAccountPublicKeyNotFound = errors.New("account public key not found")
+)
 
 // An Error represents a non-fatal error that is expected during normal operation of the virtual machine.
 //
@@ -37,20 +41,6 @@ var ErrAccountNotFound = errors.New("account not found")
 type Error interface {
 	Code() uint32
 	Error() string
-}
-
-// An InvalidSignaturePublicKeyError indicates that signature uses an invalid public key.
-type InvalidSignaturePublicKeyError struct {
-	Address flow.Address
-	KeyID   uint64
-}
-
-func (e *InvalidSignaturePublicKeyError) Error() string {
-	return fmt.Sprintf("invalid signature for key %d on account %s", e.KeyID, e.Address)
-}
-
-func (e *InvalidSignaturePublicKeyError) Code() uint32 {
-	return errCodeInvalidSignaturePublicKey
 }
 
 // A MissingSignatureError indicates that a transaction is missing a required signature.
@@ -67,8 +57,7 @@ func (e *MissingSignatureError) Code() uint32 {
 }
 
 // A MissingPayerError indicates that a transaction is missing a payer.
-type MissingPayerError struct {
-}
+type MissingPayerError struct{}
 
 func (e *MissingPayerError) Error() string {
 	return "no payer address provided"
@@ -78,31 +67,136 @@ func (e *MissingPayerError) Code() uint32 {
 	return errCodeMissingPayer
 }
 
-// An InvalidSignatureAccountError indicates that a signature references a nonexistent account.
-type InvalidSignatureAccountError struct {
-	Address flow.Address
+// An InvalidSignaturePublicKeyDoesNotExistError indicates that a signature specifies a public key that
+// does not exist.
+type InvalidSignaturePublicKeyDoesNotExistError struct {
+	Address  flow.Address
+	KeyIndex uint64
 }
 
-func (e *InvalidSignatureAccountError) Error() string {
-	return fmt.Sprintf("account with address %s does not exist", e.Address)
+func (e *InvalidSignaturePublicKeyDoesNotExistError) Error() string {
+	return fmt.Sprintf(
+		"invalid signature: public key with index %d does not exist on account %s",
+		e.KeyIndex,
+		e.Address,
+	)
 }
 
-func (e *InvalidSignatureAccountError) Code() uint32 {
-	return errCodeInvalidSignatureAccount
+func (e *InvalidSignaturePublicKeyDoesNotExistError) Code() uint32 {
+	return errCodeInvalidSignaturePublicKeyDoesNotExist
 }
 
-// A ProposalKeyDoesNotExistError indicates that proposal key references a non-existent public key.
-type ProposalKeyDoesNotExistError struct {
-	Address flow.Address
-	KeyID   uint64
+// An InvalidSignaturePublicKeyRevokedError indicates that a signature specifies a public key that has been revoked.
+type InvalidSignaturePublicKeyRevokedError struct {
+	Address  flow.Address
+	KeyIndex uint64
 }
 
-func (e *ProposalKeyDoesNotExistError) Error() string {
-	return fmt.Sprintf("invalid proposal key %d on account %s", e.KeyID, e.Address)
+func (e *InvalidSignaturePublicKeyRevokedError) Error() string {
+	return fmt.Sprintf(
+		"invalid signature: public key with index %d on account %s has been revoked",
+		e.KeyIndex,
+		e.Address,
+	)
 }
 
-func (e *ProposalKeyDoesNotExistError) Code() uint32 {
-	return errCodeProposalKeyDoesNotExist
+func (e *InvalidSignaturePublicKeyRevokedError) Code() uint32 {
+	return errCodeInvalidSignaturePublicKeyRevoked
+}
+
+// An InvalidSignatureVerificationError indicates that a signature could not be verified using its specified
+// public key.
+type InvalidSignatureVerificationError struct {
+	Address  flow.Address
+	KeyIndex uint64
+}
+
+func (e *InvalidSignatureVerificationError) Error() string {
+	return fmt.Sprintf(
+		"invalid signature: signature could not be verified using public key with index %d on account %s",
+		e.KeyIndex,
+		e.Address,
+	)
+}
+
+func (e *InvalidSignatureVerificationError) Code() uint32 {
+	return errCodeInvalidSignatureVerification
+}
+
+// A InvalidProposalKeyPublicKeyDoesNotExistError indicates that proposal key specifies a nonexistent public key.
+type InvalidProposalKeyPublicKeyDoesNotExistError struct {
+	Address  flow.Address
+	KeyIndex uint64
+}
+
+func (e *InvalidProposalKeyPublicKeyDoesNotExistError) Error() string {
+	return fmt.Sprintf(
+		"invalid proposal key: public key with index %d does not exist on account %s",
+		e.KeyIndex,
+		e.Address,
+	)
+}
+
+func (e *InvalidProposalKeyPublicKeyDoesNotExistError) Code() uint32 {
+	return errCodeInvalidProposalKeyPublicKeyDoesNotExist
+}
+
+// An InvalidProposalKeyPublicKeyRevokedError indicates that proposal key sequence number does not match the on-chain value.
+type InvalidProposalKeyPublicKeyRevokedError struct {
+	Address  flow.Address
+	KeyIndex uint64
+}
+
+func (e *InvalidProposalKeyPublicKeyRevokedError) Error() string {
+	return fmt.Sprintf(
+		"invalid proposal key: public key with index %d on account %s has been revoked",
+		e.KeyIndex,
+		e.Address,
+	)
+}
+
+func (e *InvalidProposalKeyPublicKeyRevokedError) Code() uint32 {
+	return errCodeInvalidProposalKeyPublicKeyRevoked
+}
+
+// An InvalidProposalKeySequenceNumberError indicates that proposal key sequence number does not match the on-chain value.
+type InvalidProposalKeySequenceNumberError struct {
+	Address           flow.Address
+	KeyIndex          uint64
+	CurrentSeqNumber  uint64
+	ProvidedSeqNumber uint64
+}
+
+func (e *InvalidProposalKeySequenceNumberError) Error() string {
+	return fmt.Sprintf(
+		"invalid proposal key: public key %d on account %s has sequence number %d, but given %d",
+		e.KeyIndex,
+		e.Address,
+		e.CurrentSeqNumber,
+		e.ProvidedSeqNumber,
+	)
+}
+
+func (e *InvalidProposalKeySequenceNumberError) Code() uint32 {
+	return errCodeInvalidProposalKeySequenceNumber
+}
+
+// A InvalidProposalKeyMissingSignatureError indicates that a proposal key does not have a valid signature.
+type InvalidProposalKeyMissingSignatureError struct {
+	Address  flow.Address
+	KeyIndex uint64
+}
+
+func (e *InvalidProposalKeyMissingSignatureError) Error() string {
+	return fmt.Sprintf(
+		"invalid proposal key: public key %d on account %s does not have a valid signature",
+		e.KeyIndex,
+		e.Address,
+	)
+}
+
+func (e *InvalidProposalKeyMissingSignatureError) Code() uint32 {
+	return errCodeInvalidProposalKeyMissingSignature
 }
 
 // An InvalidHashAlgorithmError indicates that a given key has an invalid hash algorithm.
@@ -118,51 +212,6 @@ func (e *InvalidHashAlgorithmError) Error() string {
 
 func (e *InvalidHashAlgorithmError) Code() uint32 {
 	return errCodeInvalidHashAlgorithm
-}
-
-// An PublicKeyVerificationError indicates unexpected error while verifying signature using given key
-type PublicKeyVerificationError struct {
-	Address flow.Address
-	KeyID   uint64
-	Err     error
-}
-
-func (e *PublicKeyVerificationError) Error() string {
-	return fmt.Sprintf("unexpected error while veryfing signature using key %d on account %s: %s", e.KeyID, e.Address, e.Err)
-}
-
-func (e *PublicKeyVerificationError) Code() uint32 {
-	return errCodePublicKeyVerification
-}
-
-// An InvalidProposalKeySequenceNumberError indicates that proposal key sequence number does not match the on-chain value.
-type InvalidProposalKeySequenceNumberError struct {
-	Address           flow.Address
-	KeyID             uint64
-	CurrentSeqNumber  uint64
-	ProvidedSeqNumber uint64
-}
-
-func (e *InvalidProposalKeySequenceNumberError) Error() string {
-	return fmt.Sprintf("invalid proposal key sequence number: key %d on account %s has sequence number %d, but given %d", e.KeyID, e.Address, e.CurrentSeqNumber, e.ProvidedSeqNumber)
-}
-
-func (e *InvalidProposalKeySequenceNumberError) Code() uint32 {
-	return errCodeProposalKeyInvalidSequenceNumber
-}
-
-// A MissingSignatureForProposalKeyError indicates that a transaction is missing a required signature for proposal key.
-type MissingSignatureForProposalKeyError struct {
-	Address flow.Address
-	KeyID   uint64
-}
-
-func (e *MissingSignatureForProposalKeyError) Error() string {
-	return fmt.Sprintf("key %d on account %s does not have sufficient signatures for proposal key", e.KeyID, e.Address)
-}
-
-func (e *MissingSignatureForProposalKeyError) Code() uint32 {
-	return errCodeProposalKeyMissingSignature
 }
 
 type ExecutionError struct {

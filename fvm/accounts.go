@@ -178,7 +178,7 @@ func getAccountPublicKey(ledger Ledger, address flow.Address, keyIndex uint64) (
 	}
 
 	if publicKey == nil {
-		return flow.AccountPublicKey{}, fmt.Errorf("failed to retrieve public key from account %s", address)
+		return flow.AccountPublicKey{}, ErrAccountPublicKeyNotFound
 	}
 
 	decodedPublicKey, err := flow.DecodeAccountPublicKey(publicKey)

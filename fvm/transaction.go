@@ -1,6 +1,8 @@
 package fvm
 
 import (
+	"errors"
+
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
@@ -60,34 +62,39 @@ func (i InvokableTransaction) Invoke(ctx Context, ledger Ledger) (*InvocationRes
 }
 
 func checkAndIncrementSequenceNumber(ledger Ledger, proposalKey flow.ProposalKey) error {
-	accountKeys, err := getAccountPublicKeys(ledger, proposalKey.Address)
+	accountKey, err := getAccountPublicKey(ledger, proposalKey.Address, proposalKey.KeyID)
 	if err != nil {
+		if errors.Is(err, ErrAccountPublicKeyNotFound) {
+			return &InvalidProposalKeyPublicKeyDoesNotExistError{
+				Address:  proposalKey.Address,
+				KeyIndex: proposalKey.KeyID,
+			}
+		}
+
 		return err
 	}
 
-	if int(proposalKey.KeyID) >= len(accountKeys) {
-		return &ProposalKeyDoesNotExistError{
-			Address: proposalKey.Address,
-			KeyID:   proposalKey.KeyID,
+	if accountKey.Revoked {
+		return &InvalidProposalKeyPublicKeyRevokedError{
+			Address:  proposalKey.Address,
+			KeyIndex: proposalKey.KeyID,
 		}
 	}
 
-	publicKey := accountKeys[proposalKey.KeyID]
-
-	valid := publicKey.SeqNumber == proposalKey.SequenceNumber
+	valid := accountKey.SeqNumber == proposalKey.SequenceNumber
 
 	if !valid {
 		return &InvalidProposalKeySequenceNumberError{
 			Address:           proposalKey.Address,
-			KeyID:             proposalKey.KeyID,
-			CurrentSeqNumber:  publicKey.SeqNumber,
+			KeyIndex:          proposalKey.KeyID,
+			CurrentSeqNumber:  accountKey.SeqNumber,
 			ProvidedSeqNumber: proposalKey.SequenceNumber,
 		}
 	}
 
-	publicKey.SeqNumber++
+	accountKey.SeqNumber++
 
-	_, err = setAccountPublicKey(ledger, proposalKey.Address, proposalKey.KeyID, publicKey)
+	_, err = setAccountPublicKey(ledger, proposalKey.Address, proposalKey.KeyID, accountKey)
 	if err != nil {
 		return err
 	}
@@ -132,9 +139,9 @@ func verifySignatures(ledger Ledger, tx *flow.TransactionBody) (err error) {
 	proposalKeyVerified := proposalKeyVerifiedInPayload || proposalKeyVerifiedInEnvelope
 
 	if !proposalKeyVerified {
-		return &MissingSignatureForProposalKeyError{
-			Address: tx.ProposalKey.Address,
-			KeyID:   tx.ProposalKey.KeyID,
+		return &InvalidProposalKeyMissingSignatureError{
+			Address:  tx.ProposalKey.Address,
+			KeyIndex: tx.ProposalKey.KeyID,
 		}
 	}
 
@@ -198,34 +205,28 @@ func verifyAccountSignature(
 	txSig flow.TransactionSignature,
 	message []byte,
 ) (*flow.AccountPublicKey, error) {
-	var ok bool
-	var err error
-
-	ok, err = accountExists(ledger, txSig.Address)
+	accountKey, err := getAccountPublicKey(ledger, txSig.Address, txSig.KeyID)
 	if err != nil {
+		if errors.Is(err, ErrAccountPublicKeyNotFound) {
+			return nil, &InvalidSignaturePublicKeyDoesNotExistError{
+				Address:  txSig.Address,
+				KeyIndex: txSig.KeyID,
+			}
+		}
+
 		return nil, err
 	}
 
-	if !ok {
-		return nil, &InvalidSignatureAccountError{Address: txSig.Address}
+	if accountKey.Revoked {
+		return nil, &InvalidSignaturePublicKeyRevokedError{
+			Address:  txSig.Address,
+			KeyIndex: txSig.KeyID,
+		}
 	}
-
-	var accountKeys []flow.AccountPublicKey
-
-	accountKeys, err = getAccountPublicKeys(ledger, txSig.Address)
-	if err != nil {
-		return nil, err
-	}
-
-	if int(txSig.KeyID) >= len(accountKeys) {
-		return nil, &InvalidSignatureAccountError{Address: txSig.Address}
-	}
-
-	accountKey := &accountKeys[txSig.KeyID]
 
 	hasher, err := hash.NewHasher(accountKey.HashAlgo)
 	if err != nil {
-		return accountKey, &InvalidHashAlgorithmError{
+		return nil, &InvalidHashAlgorithmError{
 			Address:  txSig.Address,
 			KeyID:    txSig.KeyID,
 			HashAlgo: accountKey.HashAlgo,
@@ -234,18 +235,14 @@ func verifyAccountSignature(
 
 	valid, err := accountKey.PublicKey.Verify(txSig.Signature, message, hasher)
 	if err != nil {
-		return accountKey, &PublicKeyVerificationError{
-			Address: txSig.Address,
-			KeyID:   txSig.KeyID,
-			Err:     err,
-		}
+		return nil, err
 	}
 
 	if !valid {
-		return accountKey, &InvalidSignaturePublicKeyError{Address: txSig.Address, KeyID: txSig.KeyID}
+		return nil, &InvalidSignatureVerificationError{Address: txSig.Address, KeyIndex: txSig.KeyID}
 	}
 
-	return accountKey, nil
+	return &accountKey, nil
 }
 
 func sigIsForProposalKey(txSig flow.TransactionSignature, proposalKey flow.ProposalKey) bool {
