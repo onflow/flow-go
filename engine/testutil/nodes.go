@@ -42,7 +42,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participants []*flow.Identity, options ...func(*protocol.State)) mock.GenericNode {
+func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participants []*flow.Identity, chainID flow.ChainID, options ...func(*protocol.State)) mock.GenericNode {
 
 	var i int
 	var participant *flow.Identity
@@ -66,7 +66,6 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	index := storage.NewIndex(metrics, db)
 	payloads := storage.NewPayloads(db, index, identities, guarantees, seals)
 	blocks := storage.NewBlocks(db, headers, payloads)
-	chainID := flow.Testnet
 
 	state, err := protocol.NewState(metrics, db, headers, identities, seals, index, payloads, blocks)
 	require.NoError(t, err)
@@ -117,9 +116,9 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 }
 
 // CollectionNode returns a mock collection node.
-func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, options ...func(*protocol.State)) mock.CollectionNode {
+func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, chainID flow.ChainID, options ...func(*protocol.State)) mock.CollectionNode {
 
-	node := GenericNode(t, hub, identity, identities, options...)
+	node := GenericNode(t, hub, identity, identities, chainID, options...)
 
 	pool, err := stdmap.NewTransactions(1000)
 	require.NoError(t, err)
@@ -144,7 +143,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 }
 
 // CollectionNodes returns n collection nodes connected to the given hub.
-func CollectionNodes(t *testing.T, hub *stub.Hub, nNodes int, options ...func(*protocol.State)) []mock.CollectionNode {
+func CollectionNodes(t *testing.T, hub *stub.Hub, nNodes int, chainID flow.ChainID, options ...func(*protocol.State)) []mock.CollectionNode {
 	colIdentities := unittest.IdentityListFixture(nNodes, unittest.WithRole(flow.RoleCollection))
 
 	// add some extra dummy identities so we have one of each role
@@ -154,15 +153,15 @@ func CollectionNodes(t *testing.T, hub *stub.Hub, nNodes int, options ...func(*p
 
 	nodes := make([]mock.CollectionNode, 0, len(colIdentities))
 	for _, identity := range colIdentities {
-		nodes = append(nodes, CollectionNode(t, hub, identity, identities, options...))
+		nodes = append(nodes, CollectionNode(t, hub, identity, identities, chainID, options...))
 	}
 
 	return nodes
 }
 
-func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity) mock.ConsensusNode {
+func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, chainID flow.ChainID) mock.ConsensusNode {
 
-	node := GenericNode(t, hub, identity, identities)
+	node := GenericNode(t, hub, identity, identities, chainID)
 
 	resultsDB := storage.NewExecutionResults(node.DB)
 	sealsDB := storage.NewSeals(node.Metrics, node.DB)
@@ -203,7 +202,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	}
 }
 
-func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int) []mock.ConsensusNode {
+func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int, chainID flow.ChainID) []mock.ConsensusNode {
 	conIdentities := unittest.IdentityListFixture(nNodes, unittest.WithRole(flow.RoleConsensus))
 	for _, id := range conIdentities {
 		t.Log(id.String())
@@ -216,14 +215,14 @@ func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int) []mock.ConsensusNod
 
 	nodes := make([]mock.ConsensusNode, 0, len(conIdentities))
 	for _, identity := range conIdentities {
-		nodes = append(nodes, ConsensusNode(t, hub, identity, identities))
+		nodes = append(nodes, ConsensusNode(t, hub, identity, identities, chainID))
 	}
 
 	return nodes
 }
 
-func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, syncThreshold uint64) mock.ExecutionNode {
-	node := GenericNode(t, hub, identity, identities)
+func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, syncThreshold uint64, chainID flow.ChainID) mock.ExecutionNode {
+	node := GenericNode(t, hub, identity, identities, chainID)
 
 	transactionsStorage := storage.NewTransactions(node.Metrics, node.DB)
 	collectionsStorage := storage.NewCollections(node.DB, transactionsStorage)
@@ -333,11 +332,12 @@ func VerificationNode(t testing.TB,
 	assigner module.ChunkAssigner,
 	requestIntervalMs uint,
 	failureThreshold uint,
+	chainID flow.ChainID,
 	opts ...VerificationOpt) mock.VerificationNode {
 
 	var err error
 	node := mock.VerificationNode{
-		GenericNode: GenericNode(t, hub, identity, identities),
+		GenericNode: GenericNode(t, hub, identity, identities, chainID),
 	}
 
 	for _, apply := range opts {

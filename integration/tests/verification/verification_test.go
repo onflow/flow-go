@@ -84,6 +84,8 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 	requestInterval := uint(1000)
 	failureThreshold := uint(2)
 
+	chainID := flow.Mainnet
+
 	// generates network hub
 	hub := stub.NewNetworkHub()
 
@@ -100,7 +102,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 	//
 	// creates an execution receipt and its associated data
 	// with `chunkNum` chunks
-	completeER := utils.CompleteExecutionResultFixture(t, chunkNum)
+	completeER := utils.CompleteExecutionResultFixture(t, chunkNum, chainID.Chain())
 
 	// mocks the assignment to only assign "some" chunks to the verIdentity
 	// the assignment is done based on `isAssgined` function
@@ -126,7 +128,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 	// verification node
 	verNodes := make([]mock2.VerificationNode, 0)
 	for _, verIdentity := range verIdentities {
-		verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold)
+		verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold, chainID)
 
 		// starts all the engines
 		<-verNode.FinderEngine.Ready()
@@ -141,10 +143,10 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 	}
 
 	// mock execution node
-	exeNode, exeEngine := setupMockExeNode(t, hub, exeIdentity, verIdentities, identities, completeER)
+	exeNode, exeEngine := setupMockExeNode(t, hub, exeIdentity, verIdentities, identities, chainID, completeER)
 
 	// mock consensus node
-	conNode, conEngine, conWG := setupMockConsensusNode(t, hub, conIdentity, verIdentities, identities, completeER)
+	conNode, conEngine, conWG := setupMockConsensusNode(t, hub, conIdentity, verIdentities, identities, completeER, chainID)
 
 	// sends execution receipt to each of verification nodes
 	verWG := sync.WaitGroup{}
@@ -218,6 +220,8 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	requestInterval := uint(1000)
 	failureThreshold := uint(2)
 
+	chainID := flow.Mainnet
+
 	// network identity setup
 	hub := stub.NewNetworkHub()
 	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
@@ -228,7 +232,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	identities := flow.IdentityList{colIdentity, conIdentity, exeIdentity, verIdentity}
 
 	// complete ER counter example
-	completeER := utils.CompleteExecutionResultFixture(t, 1)
+	completeER := utils.CompleteExecutionResultFixture(t, 1, chainID.Chain())
 	chunk, ok := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(0))
 	assert.True(t, ok)
 
@@ -245,7 +249,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	// setup nodes
 	//
 	// verification node
-	verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold)
+	verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold, chainID)
 	// inject block
 	err := verNode.Blocks.Store(completeER.Block)
 	assert.Nil(t, err)
@@ -261,7 +265,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	verNet.StartConDev(100, true)
 
 	// execution node
-	exeNode := testutil.GenericNode(t, hub, exeIdentity, identities)
+	exeNode := testutil.GenericNode(t, hub, exeIdentity, identities, chainID)
 	exeEngine := new(network.Engine)
 	exeChunkDataConduit, err := exeNode.Net.Register(engine.ChunkDataPackProvider, exeEngine)
 	assert.Nil(t, err)
@@ -280,7 +284,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 		}).Return(nil).Once()
 
 	// consensus node
-	conNode := testutil.GenericNode(t, hub, conIdentity, identities)
+	conNode := testutil.GenericNode(t, hub, conIdentity, identities, chainID)
 	conEngine := new(network.Engine)
 	approvalWG := sync.WaitGroup{}
 	approvalWG.Add(1)
