@@ -87,7 +87,7 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 	suite.net.Start(suite.ctx)
 
 	// create an account to use for sending transactions
-	suite.acct.addr, suite.acct.key, suite.acct.signer = common.GetAccount(suite.net.Genesis().Header.ChainID.Chain())
+	suite.acct.addr, suite.acct.key, suite.acct.signer = common.GetAccount(suite.net.Root().Header.ChainID.Chain())
 
 	// subscribe to the ghost
 	for attempts := 0; ; attempts++ {
@@ -131,7 +131,7 @@ func (suite *CollectorSuite) NextTransaction(opts ...func(*sdk.Transaction)) *sd
 
 	tx := sdk.NewTransaction().
 		SetScript(unittest.NoopTxScript()).
-		SetReferenceBlockID(convert.ToSDKID(suite.net.Genesis().ID())).
+		SetReferenceBlockID(convert.ToSDKID(suite.net.Root().ID())).
 		SetProposalKey(acct.addr, acct.key.ID, acct.key.SequenceNumber).
 		SetPayer(acct.addr).
 		AddAuthorizer(acct.addr)

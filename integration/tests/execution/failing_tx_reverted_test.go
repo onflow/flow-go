@@ -25,12 +25,14 @@ type FailingTxRevertedSuite struct {
 
 func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 
+	chain := s.net.Root().Header.ChainID.Chain()
+
 	// wait for first finalized block, called blockA
 	blockA := s.BlockState.WaitForFirstFinalized(s.T())
 	s.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
 
 	// send transaction
-	err := s.AccessClient().DeployContract(context.Background(), s.net.Genesis().ID(), common.CounterContract)
+	err := s.AccessClient().DeployContract(context.Background(), s.net.Root().ID(), common.CounterContract)
 	require.NoError(s.T(), err, "could not deploy counter")
 
 	// wait until we see a different state commitment for a finalized block, call that block blockB
@@ -39,16 +41,16 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 
 	// send transaction that panics and should revert
 	tx := unittest.TransactionBodyFixture(
-		unittest.WithTransactionDSL(common.CreateCounterPanicTx(s.chainID.Chain())),
-		unittest.WithReferenceBlock(s.net.Genesis().ID()),
+		unittest.WithTransactionDSL(common.CreateCounterPanicTx(chain)),
+		unittest.WithReferenceBlock(s.net.Root().ID()),
 	)
 	err = s.AccessClient().SendTransaction(context.Background(), tx)
 	require.NoError(s.T(), err, "could not send tx to create counter that should panic")
 
 	// send transaction that has no sigs and should not execute
 	tx = unittest.TransactionBodyFixture(
-		unittest.WithTransactionDSL(common.CreateCounterTx(s.chainID.Chain().ServiceAddress())),
-		unittest.WithReferenceBlock(s.net.Genesis().ID()),
+		unittest.WithTransactionDSL(common.CreateCounterTx(chain)),
+		unittest.WithReferenceBlock(s.net.Root().ID()),
 	)
 	tx.PayloadSignatures = nil
 	tx.EnvelopeSignatures = nil
