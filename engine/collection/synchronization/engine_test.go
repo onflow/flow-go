@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	model "github.com/dapperlabs/flow-go/model/cluster"
+	"github.com/dapperlabs/flow-go/model/events"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -327,4 +328,36 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 	)
 	err = ss.e.onBatchRequest(originID, req)
 	require.NoError(ss.T(), err, "should pass request with valid block")
+}
+
+func (ss *SyncSuite) TestOnBlockResponse() {
+
+	// generate origin and block response
+	originID := unittest.IdentifierFixture()
+	res := &messages.ClusterBlockResponse{
+		Nonce:  rand.Uint64(),
+		Blocks: []*model.Block{},
+	}
+
+	// add one block that should be processed
+	processable := unittest.ClusterBlockFixture()
+	ss.core.On("HandleBlock", processable.Header).Return(true)
+	res.Blocks = append(res.Blocks, &processable)
+
+	// add one block that should not be processed
+	unprocessable := unittest.ClusterBlockFixture()
+	ss.core.On("HandleBlock", unprocessable.Header).Return(false)
+	res.Blocks = append(res.Blocks, &unprocessable)
+
+	ss.comp.On("SubmitLocal", mock.Anything).Run(func(args mock.Arguments) {
+		res := args.Get(0).(*events.SyncedClusterBlock)
+		ss.Assert().Equal(&processable, res.Block)
+		ss.Assert().Equal(originID, res.OriginID)
+	},
+	)
+
+	err := ss.e.onBlockResponse(originID, res)
+	ss.Assert().Nil(err)
+	ss.comp.AssertExpectations(ss.T())
+	ss.core.AssertExpectations(ss.T())
 }
