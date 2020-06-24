@@ -95,11 +95,6 @@ type namedDoneObject struct {
 	name string
 }
 
-type namedBootstrapFunc struct {
-	fn   func(*protocol.State) error
-	name string
-}
-
 // FlowNodeBuilder is the builder struct used for all flow nodes
 // It runs a node process with following structure, in sequential order
 // Base inits (network, storage, state, logger)
@@ -125,7 +120,6 @@ type FlowNodeBuilder struct {
 	modules           []namedModuleFunc
 	components        []namedComponentFunc
 	doneObject        []namedDoneObject
-	bootstraps        []namedBootstrapFunc
 	sig               chan os.Signal
 	postInitFns       []func(*FlowNodeBuilder)
 	stakingKey        crypto.PrivateKey
@@ -393,12 +387,6 @@ func (fnb *FlowNodeBuilder) initState() {
 		// bootstrap the protocol state with the loaded data
 		err = state.Mutate().Bootstrap(fnb.RootBlock, fnb.RootResult, fnb.RootSeal)
 		fnb.MustNot(err).Msg("could not bootstrap protocol state")
-
-		// apply the bootstrap functions to the protocol state
-		for _, b := range fnb.bootstraps {
-			err := b.fn(state)
-			fnb.MustNot(err).Str("name", b.name).Msg("could not apply bootstrap function")
-		}
 
 		// load the DKG public data from bootstrap files
 		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
