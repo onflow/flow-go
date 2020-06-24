@@ -26,12 +26,12 @@ type Config struct {
 	MaxMsgSize     int // In bytes
 }
 
-// Engine implements a gRPC grpcServer with a simplified version of the Observation API.
+// Engine implements a gRPC server with a simplified version of the Observation API.
 type Engine struct {
 	unit       *engine.Unit
 	log        zerolog.Logger
 	handler    *handler.Handler // the gRPC service implementation
-	grpcServer *grpc.Server     // the gRPC grpcServer
+	grpcServer *grpc.Server     // the gRPC server
 	httpServer *HTTPServer
 	config     Config
 }
@@ -78,7 +78,7 @@ func New(log zerolog.Logger,
 }
 
 // Ready returns a ready channel that is closed once the engine has fully
-// started. The RPC engine is ready when the gRPC grpcServer has successfully
+// started. The RPC engine is ready when the gRPC server has successfully
 // started.
 func (e *Engine) Ready() <-chan struct{} {
 	e.unit.Launch(e.serve)
@@ -86,30 +86,30 @@ func (e *Engine) Ready() <-chan struct{} {
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
-// It sends a signal to stop the gRPC grpcServer, then closes the channel.
+// It sends a signal to stop the gRPC server, then closes the channel.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(e.grpcServer.GracefulStop, e.httpServer.Stop)
 }
 
-// serve starts the gRPC grpcServer and the http proxy server
-// When this function returns, the grpcServer is considered ready.
+// serve starts the gRPC server and the http proxy server
+// When this function returns, the server is considered ready.
 func (e *Engine) serve() {
 	e.log.Info().Msgf("starting grpc server on address %s", e.config.GRPCListenAddr)
 
 	l, err := net.Listen("tcp", e.config.GRPCListenAddr)
 	if err != nil {
-		e.log.Err(err).Msg("failed to start grpcServer")
+		e.log.Err(err).Msg("failed to start the grpc server")
 		return
 	}
 
 	err = e.grpcServer.Serve(l)
 	if err != nil {
-		e.log.Err(err).Msg("fatal error in grpcServer")
+		e.log.Err(err).Msg("fatal error in grpc server")
 	}
 
 	e.log.Info().Msgf("starting http server on address %s", e.config.HTTPListenAddr)
 	err = e.httpServer.Start()
 	if err != nil {
-		e.log.Err(err).Msg("failed to start http proxy server")
+		e.log.Err(err).Msg("failed to start the http proxy server")
 	}
 }
