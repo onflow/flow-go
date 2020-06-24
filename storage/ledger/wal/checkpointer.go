@@ -144,7 +144,7 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 			return err
 		}, func(commitment flow.StateCommitment) error {
 			return nil
-		})
+		}, true)
 
 	if err != nil {
 		return fmt.Errorf("cannot replay WAL: %w", err)
@@ -163,7 +163,7 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 	}
 	defer writer.Close()
 
-	err = c.StoreCheckpoint(forestSequencing, writer)
+	err = StoreCheckpoint(forestSequencing, writer)
 
 	return err
 }
@@ -196,9 +196,13 @@ func (s *SyncOnCloseFile) Close() error {
 }
 
 func (c *Checkpointer) CheckpointWriter(to int) (io.WriteCloser, error) {
-	file, err := os.Create(path.Join(c.dir, numberToFilename(to)))
+	return CreateCheckpointWriter(c.dir, to)
+}
+
+func CreateCheckpointWriter(dir string, fileNo int) (io.WriteCloser, error) {
+	file, err := os.Create(path.Join(dir, numberToFilename(fileNo)))
 	if err != nil {
-		return nil, fmt.Errorf("cannot create file for checkpoint %d: %w", to, err)
+		return nil, fmt.Errorf("cannot create file for checkpoint %d: %w", fileNo, err)
 	}
 
 	writer := bufio.NewWriter(file)
@@ -208,7 +212,7 @@ func (c *Checkpointer) CheckpointWriter(to int) (io.WriteCloser, error) {
 	}, nil
 }
 
-func (c *Checkpointer) StoreCheckpoint(forestSequencing *flattener.FlattenedForest, writer io.WriteCloser) error {
+func StoreCheckpoint(forestSequencing *flattener.FlattenedForest, writer io.WriteCloser) error {
 	storableNodes := forestSequencing.Nodes
 	storableTries := forestSequencing.Tries
 	header := make([]byte, 8+2)

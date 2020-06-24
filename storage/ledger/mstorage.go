@@ -33,18 +33,18 @@ type MTrieStorage struct {
 	metrics module.LedgerMetrics
 }
 
-var maxHeight = 257
+const MaxHeight = 257
 
 // NewMTrieStorage creates a new in-memory trie-backed ledger storage with persistence.
 func NewMTrieStorage(dbDir string, capacity int, metrics module.LedgerMetrics, reg prometheus.Registerer) (*MTrieStorage, error) {
 
-	w, err := wal.NewWAL(nil, reg, dbDir, capacity, maxHeight)
+	w, err := wal.NewWAL(nil, reg, dbDir, capacity, MaxHeight)
 
 	if err != nil {
 		return nil, fmt.Errorf("cannot create LedgerWAL: %w", err)
 	}
 
-	mForest, err := mtrie.NewMForest(maxHeight, dbDir, capacity, metrics, func(evictedTrie *trie.MTrie) error {
+	mForest, err := mtrie.NewMForest(MaxHeight, dbDir, capacity, metrics, func(evictedTrie *trie.MTrie) error {
 		return w.RecordDelete(evictedTrie.RootHash())
 	})
 	if err != nil {
