@@ -8,14 +8,16 @@ package encoding
 // a domain tag that specifies the type of the signed object.
 
 const (
+	// Flow protocol version and prefix
+	versionPrefix = "FLOW-V0.0-"
 	// RandomBeaconTag is used for threshold signatures in the random beacon
-	RandomBeaconTag = "FLOW-V0.0-RandomBeacon"
+	RandomBeaconTag = versionPrefix + "RandomBeacon"
 	// ConsensusVoteTag is used for Consensus Hotstuff votes
-	ConsensusVoteTag = "FLOW-V0.0-ConsensusVote"
+	ConsensusVoteTag = versionPrefix + "ConsensusVote"
 	// CollectorVoteTag is used for Collection Hotstuff votes
-	CollectorVoteTag = "FLOW-V0.0-CollectorVote"
+	CollectorVoteTag = versionPrefix + "CollectorVote"
 	// ExecutionReceiptTag is used for execution receipts
-	ExecutionReceiptTag = "FLOW-V0.0-ExecutionReceipt"
+	ExecutionReceiptTag = versionPrefix + "ExecutionReceipt"
 	// ResultApprovalTag is used for result approvals
-	ResultApprovalTag = "FLOW-V0.0-ResultApproval"
+	ResultApprovalTag = versionPrefix + "ResultApproval"
 )
