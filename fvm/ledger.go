@@ -11,24 +11,34 @@ import (
 type Ledger interface {
 	Set(key flow.RegisterID, value flow.RegisterValue)
 	Get(key flow.RegisterID) (flow.RegisterValue, error)
+	Touch(key flow.RegisterID)
 	Delete(key flow.RegisterID)
 }
 
 // A MapLedger is a naive ledger storage implementation backed by a simple map.
 //
 // This implementation is designed for testing purposes.
-type MapLedger map[string]flow.RegisterValue
+type MapLedger struct {
+	RegTouchSet map[string]bool
+	Registers   map[string]flow.RegisterValue
+}
 
 func (m MapLedger) Set(key flow.RegisterID, value flow.RegisterValue) {
-	m[string(key)] = value
+	m.RegTouchSet[string(key)] = true
+	m.Registers[string(key)] = value
 }
 
 func (m MapLedger) Get(key flow.RegisterID) (flow.RegisterValue, error) {
-	return m[string(key)], nil
+	m.RegTouchSet[string(key)] = true
+	return m.Registers[string(key)], nil
+}
+
+func (m MapLedger) Touch(key flow.RegisterID) {
+	m.RegTouchSet[string(key)] = true
 }
 
 func (m MapLedger) Delete(key flow.RegisterID) {
-	delete(m, string(key))
+	delete(m.Registers, string(key))
 }
 
 func fullKey(owner, controller, key string) string {
