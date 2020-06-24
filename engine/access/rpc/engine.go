@@ -17,7 +17,7 @@ import (
 	grpcutils "github.com/dapperlabs/flow-go/utils/grpc"
 )
 
-// Config defines the configurable options for the gRPC grpcServer.
+// Config defines the configurable options for the access node server
 type Config struct {
 	GRPCListenAddr string
 	HTTPListenAddr string
@@ -54,11 +54,13 @@ func New(log zerolog.Logger,
 		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
 	}
 
+	// create a GRPC server to serve GRPC clients
 	grpcServer := grpc.NewServer(
 		grpc.MaxRecvMsgSize(config.MaxMsgSize),
 		grpc.MaxSendMsgSize(config.MaxMsgSize),
 	)
 
+	// wrap the GRPC server with an HTTP proxy server to serve HTTP clients
 	httpServer := NewHTTPServer(grpcServer, 8080)
 
 	eng := &Engine{
@@ -86,7 +88,7 @@ func (e *Engine) Ready() <-chan struct{} {
 // Done returns a done channel that is closed once the engine has fully stopped.
 // It sends a signal to stop the gRPC grpcServer, then closes the channel.
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done(e.grpcServer.GracefulStop)
+	return e.unit.Done(e.grpcServer.GracefulStop, e.httpServer.Stop)
 }
 
 // serve starts the gRPC grpcServer and the http proxy server
@@ -106,5 +108,8 @@ func (e *Engine) serve() {
 	}
 
 	e.log.Info().Msgf("starting http server on address %s", e.config.HTTPListenAddr)
-	e.httpServer.Start()
+	err = e.httpServer.Start()
+	if err != nil {
+		e.log.Err(err).Msg("failed to start http proxy server")
+	}
 }

@@ -15,6 +15,7 @@ type HTTPHeader struct {
 	Value string
 }
 
+// HTTPServer is the HTTP GRPC proxy server
 type HTTPServer struct {
 	httpServer *http.Server
 }
