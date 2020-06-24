@@ -307,7 +307,7 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 //
 // This function returns an error if the specified account does not exist or
 // if the key insertion fails.
-func (e *transactionEnv) AddAccountKey(address runtime.Address, encPublicKey []byte) (err error) {
+func (e *transactionEnv) AddAccountKey(address runtime.Address, encodedPublicKey []byte) (err error) {
 	accountAddress := flow.Address(address)
 
 	var ok bool
@@ -323,7 +323,7 @@ func (e *transactionEnv) AddAccountKey(address runtime.Address, encPublicKey []b
 
 	var publicKey flow.AccountPublicKey
 
-	publicKey, err = flow.DecodeRuntimeAccountPublicKey(encPublicKey, 0)
+	publicKey, err = flow.DecodeRuntimeAccountPublicKey(encodedPublicKey, 0)
 	if err != nil {
 		return fmt.Errorf("cannot decode runtime public account key: %w", err)
 	}
@@ -340,11 +340,11 @@ func (e *transactionEnv) AddAccountKey(address runtime.Address, encPublicKey []b
 	return setAccountPublicKeys(e.ledger, accountAddress, publicKeys)
 }
 
-// RemoveAccountKey removes a public key by index from an existing account.
+// RemoveAccountKey revokes a public key by index from an existing account.
 //
 // This function returns an error if the specified account does not exist, the
-// provided key is invalid, or if key deletion fails.
-func (e *transactionEnv) RemoveAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
+// provided key is invalid, or if key revoking fails.
+func (e *transactionEnv) RemoveAccountKey(address runtime.Address, keyIndex int) (encodedPublicKey []byte, err error) {
 	accountAddress := flow.Address(address)
 
 	var ok bool
@@ -358,34 +358,25 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, index int) (p
 		return nil, fmt.Errorf("account with address %s does not exist", address)
 	}
 
-	var publicKeys []flow.AccountPublicKey
+	if keyIndex < 0 {
+		return nil, fmt.Errorf("key index must be positve, received %d", keyIndex)
+	}
 
-	publicKeys, err = getAccountPublicKeys(e.ledger, accountAddress)
+	var publicKey flow.AccountPublicKey
+	publicKey, err = getAccountPublicKey(e.ledger, accountAddress, uint64(keyIndex))
 	if err != nil {
-		return publicKey, err
+		return nil, err
 	}
 
-	if index < 0 || index > len(publicKeys)-1 {
-		return publicKey, fmt.Errorf("invalid key index %d, account has %d keys", index, len(publicKeys))
-	}
+	// mark this key as revoked
+	publicKey.Revoked = true
 
-	removedKey := publicKeys[index]
-
-	publicKeys = append(publicKeys[:index], publicKeys[index+1:]...)
-
-	err = setAccountPublicKeys(e.ledger, accountAddress, publicKeys)
+	encodedPublicKey, err = setAccountPublicKey(e.ledger, accountAddress, uint64(keyIndex), publicKey)
 	if err != nil {
-		return publicKey, err
+		return nil, err
 	}
 
-	var removedKeyBytes []byte
-
-	removedKeyBytes, err = flow.EncodeRuntimeAccountPublicKey(removedKey)
-	if err != nil {
-		return nil, fmt.Errorf("cannot encode removed runtime account key: %w", err)
-	}
-
-	return removedKeyBytes, nil
+	return encodedPublicKey, nil
 }
 
 // UpdateAccountCode updates the deployed code on an existing account.

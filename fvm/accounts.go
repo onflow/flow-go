@@ -158,26 +158,35 @@ func getAccountPublicKeys(ledger Ledger, address flow.Address) (publicKeys []flo
 	publicKeys = make([]flow.AccountPublicKey, count)
 
 	for i := uint64(0); i < count; i++ {
-		publicKey, err := ledger.Get(
-			fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyPublicKey(i)),
-		)
+		publicKey, err := getAccountPublicKey(ledger, address, i)
 		if err != nil {
-			return nil, newLedgerGetError(keyPublicKey(i), address, err)
+			return nil, err
 		}
 
-		if publicKey == nil {
-			return nil, fmt.Errorf("failed to retrieve public key from account %s", address)
-		}
-
-		decodedPublicKey, err := flow.DecodeAccountPublicKey(publicKey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode public key: %w", err)
-		}
-
-		publicKeys[i] = decodedPublicKey
+		publicKeys[i] = publicKey
 	}
 
 	return publicKeys, nil
+}
+
+func getAccountPublicKey(ledger Ledger, address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error) {
+	publicKey, err := ledger.Get(
+		fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyPublicKey(keyIndex)),
+	)
+	if err != nil {
+		return flow.AccountPublicKey{}, newLedgerGetError(keyPublicKey(keyIndex), address, err)
+	}
+
+	if publicKey == nil {
+		return flow.AccountPublicKey{}, fmt.Errorf("failed to retrieve public key from account %s", address)
+	}
+
+	decodedPublicKey, err := flow.DecodeAccountPublicKey(publicKey)
+	if err != nil {
+		return flow.AccountPublicKey{}, fmt.Errorf("failed to decode public key: %w", err)
+	}
+
+	return decodedPublicKey, nil
 }
 
 func setAccountPublicKeys(ledger Ledger, address flow.Address, publicKeys []flow.AccountPublicKey) error {
@@ -213,19 +222,16 @@ func setAccountPublicKeys(ledger Ledger, address flow.Address, publicKeys []flow
 	)
 
 	for i, publicKey := range publicKeys {
-
 		err = publicKey.Validate()
 		if err != nil {
 			return fmt.Errorf("invalid public key: %w", err)
 		}
 
-		publicKeyBytes, err := flow.EncodeAccountPublicKey(publicKey)
+		// asserted length of publicKeys so index should always fit into uint64
+		_, err = setAccountPublicKey(ledger, address, uint64(i), publicKey)
 		if err != nil {
-			return fmt.Errorf("failed to encode public key: %w", err)
+			return err
 		}
-
-		// asserted length of publicKeys so i should always fit into uint64
-		setAccountPublicKey(ledger, address, uint64(i), publicKeyBytes)
 	}
 
 	// delete leftover keys
@@ -236,11 +242,23 @@ func setAccountPublicKeys(ledger Ledger, address flow.Address, publicKeys []flow
 	return nil
 }
 
-func setAccountPublicKey(ledger Ledger, address flow.Address, keyID uint64, publicKey []byte) {
+func setAccountPublicKey(
+	ledger Ledger,
+	address flow.Address,
+	keyIndex uint64,
+	publicKey flow.AccountPublicKey,
+) (encodedPublicKey []byte, err error) {
+	encodedPublicKey, err = flow.EncodeAccountPublicKey(publicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode public key: %w", err)
+	}
+
 	ledger.Set(
-		fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyPublicKey(keyID)),
-		publicKey,
+		fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyPublicKey(keyIndex)),
+		encodedPublicKey,
 	)
+
+	return encodedPublicKey, nil
 }
 
 func setAccountCode(ledger Ledger, address flow.Address, code []byte) error {

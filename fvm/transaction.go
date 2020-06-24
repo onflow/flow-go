@@ -72,28 +72,25 @@ func checkAndIncrementSequenceNumber(ledger Ledger, proposalKey flow.ProposalKey
 		}
 	}
 
-	accountKey := accountKeys[proposalKey.KeyID]
+	publicKey := accountKeys[proposalKey.KeyID]
 
-	valid := accountKey.SeqNumber == proposalKey.SequenceNumber
+	valid := publicKey.SeqNumber == proposalKey.SequenceNumber
 
 	if !valid {
 		return &InvalidProposalKeySequenceNumberError{
 			Address:           proposalKey.Address,
 			KeyID:             proposalKey.KeyID,
-			CurrentSeqNumber:  accountKey.SeqNumber,
+			CurrentSeqNumber:  publicKey.SeqNumber,
 			ProvidedSeqNumber: proposalKey.SequenceNumber,
 		}
 	}
 
-	accountKey.SeqNumber++
+	publicKey.SeqNumber++
 
-	var updatedAccountKeyBytes []byte
-	updatedAccountKeyBytes, err = flow.EncodeAccountPublicKey(accountKey)
+	_, err = setAccountPublicKey(ledger, proposalKey.Address, proposalKey.KeyID, publicKey)
 	if err != nil {
 		return err
 	}
-
-	setAccountPublicKey(ledger, proposalKey.Address, proposalKey.KeyID, updatedAccountKeyBytes)
 
 	return nil
 }
