@@ -152,7 +152,7 @@ func CreateAccounts(
 	for _, privateKey := range privateKeys {
 		accountKey := privateKey.PublicKey(fvm.AccountKeyWeightThreshold)
 		encAccountKey, _ := flow.EncodeRuntimeAccountPublicKey(accountKey)
-		cadAccountKey := bytesToCadenceArray(encAccountKey)
+		cadAccountKey := BytesToCadenceArray(encAccountKey)
 		encCadAccountKey, _ := jsoncdc.Encode(cadAccountKey)
 
 		tx := flow.NewTransactionBody().
@@ -199,7 +199,7 @@ func RootBootstrappedLedger() fvm.Ledger {
 	return ledger
 }
 
-func bytesToCadenceArray(l []byte) cadence.Array {
+func BytesToCadenceArray(l []byte) cadence.Array {
 	values := make([]cadence.Value, len(l))
 	for i, b := range l {
 		values[i] = cadence.NewInt(int(b))

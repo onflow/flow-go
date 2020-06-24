@@ -21,6 +21,28 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
+func vmTest(f func(t *testing.T, ctx fvm.Context, ledger fvm.Ledger), opts ...fvm.Option) func(t *testing.T) {
+	return func(t *testing.T) {
+		rt := runtime.NewInterpreterRuntime()
+		vm := fvm.New(rt)
+
+		cache, err := fvm.NewLRUASTCache(CacheSize)
+		require.NoError(t, err)
+
+		baseOpts := []fvm.Option{fvm.WithASTCache(cache)}
+		opts = append(baseOpts, opts...)
+
+		ctx := vm.NewContext(opts...)
+
+		ledger := make(fvm.MapLedger)
+
+		_, err = ctx.Invoke(fvm.Bootstrap(unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply), ledger)
+		require.NoError(t, err)
+
+		f(t, ctx, ledger)
+	}
+}
+
 func TestBlockContext_ExecuteTransaction(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 	vm := fvm.New(rt)
@@ -373,183 +395,6 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 			tt.check(t, result)
 		})
 	}
-}
-
-func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
-	rt := runtime.NewInterpreterRuntime()
-	vm := fvm.New(rt)
-
-	cache, err := fvm.NewLRUASTCache(CacheSize)
-	require.NoError(t, err)
-
-	ctx := vm.NewContext(fvm.WithASTCache(cache))
-
-	privateKeys, err := execTestutil.GenerateAccountPrivateKeys(1)
-	require.NoError(t, err)
-
-	ledger := execTestutil.RootBootstrappedLedger()
-	accounts, err := execTestutil.CreateAccounts(vm, ledger, privateKeys)
-	require.NoError(t, err)
-
-	createAccountScript := []byte(`
-		transaction {
-			prepare(signer: AuthAccount) {
-				let acct = AuthAccount(payer: signer)
-			}
-		}
-	`)
-
-	addAccountCreatorTemplate := `
-	import FlowServiceAccount from 0x%s
-	transaction {
-		let serviceAccountAdmin: &FlowServiceAccount.Administrator
-		prepare(signer: AuthAccount) {
-			// Borrow reference to FlowServiceAccount Administrator resource.
-			//
-			self.serviceAccountAdmin = signer.borrow<&FlowServiceAccount.Administrator>(from: /storage/flowServiceAdmin)
-				?? panic("Unable to borrow reference to administrator resource")
-		}
-		execute {
-			// Add account to account creator whitelist.
-			//
-			// Will emit AccountCreatorAdded(accountCreator: accountCreator).
-			//
-			self.serviceAccountAdmin.addAccountCreator(0x%s)
-		}
-	}
-	`
-
-	addAccountCreator := func(account flow.Address, seqNum uint64) {
-		script := []byte(
-			fmt.Sprintf(addAccountCreatorTemplate,
-				flow.ServiceAddress().String(),
-				account.String(),
-			),
-		)
-
-		validTx := flow.NewTransactionBody().
-			SetScript(script).
-			AddAuthorizer(flow.ServiceAddress())
-
-		err = execTestutil.SignTransactionByRoot(validTx, seqNum)
-		require.NoError(t, err)
-
-		result, err := ctx.Invoke(fvm.Transaction(validTx), ledger)
-		require.NoError(t, err)
-
-		if !assert.True(t, result.Succeeded()) {
-			t.Log(result.Error)
-		}
-	}
-
-	removeAccountCreatorTemplate := `
-	import FlowServiceAccount from 0x%s
-	transaction {
-		let serviceAccountAdmin: &FlowServiceAccount.Administrator
-		prepare(signer: AuthAccount) {
-			// Borrow reference to FlowServiceAccount Administrator resource.
-			//
-			self.serviceAccountAdmin = signer.borrow<&FlowServiceAccount.Administrator>(from: /storage/flowServiceAdmin)
-				?? panic("Unable to borrow reference to administrator resource")
-		}
-		execute {
-			// Remove account from account creator whitelist.
-			//
-			// Will emit AccountCreatorRemoved(accountCreator: accountCreator).
-			//
-			self.serviceAccountAdmin.removeAccountCreator(0x%s)
-		}
-	}
-	`
-
-	removeAccountCreator := func(account flow.Address, seqNum uint64) {
-		script := []byte(
-			fmt.Sprintf(
-				removeAccountCreatorTemplate,
-				flow.ServiceAddress(),
-				account.String(),
-			),
-		)
-
-		validTx := flow.NewTransactionBody().
-			SetScript(script).
-			AddAuthorizer(flow.ServiceAddress())
-
-		err = execTestutil.SignTransactionByRoot(validTx, seqNum)
-		require.NoError(t, err)
-
-		result, err := ctx.Invoke(fvm.Transaction(validTx), ledger)
-		require.NoError(t, err)
-
-		assert.True(t, result.Succeeded())
-	}
-
-	t.Run("Invalid account creator", func(t *testing.T) {
-		invalidTx := flow.NewTransactionBody().
-			SetScript(createAccountScript).
-			AddAuthorizer(accounts[0])
-
-		err = execTestutil.SignPayload(invalidTx, accounts[0], privateKeys[0])
-		require.NoError(t, err)
-
-		err = execTestutil.SignTransactionByRoot(invalidTx, 0)
-		require.NoError(t, err)
-
-		result, err := ctx.Invoke(fvm.Transaction(invalidTx), ledger)
-		require.NoError(t, err)
-
-		assert.False(t, result.Succeeded())
-	})
-
-	t.Run("Valid account creator", func(t *testing.T) {
-		validTx := flow.NewTransactionBody().
-			SetScript(createAccountScript).
-			AddAuthorizer(flow.ServiceAddress())
-
-		err = execTestutil.SignTransactionByRoot(validTx, 0)
-		require.NoError(t, err)
-
-		result, err := ctx.Invoke(fvm.Transaction(validTx), ledger)
-		require.NoError(t, err)
-
-		assert.True(t, result.Succeeded())
-	})
-
-	t.Run("Account creation succeeds when added to authorized accountCreators", func(t *testing.T) {
-		addAccountCreator(accounts[0], 1)
-
-		validTx := flow.NewTransactionBody().
-			SetScript(createAccountScript).
-			SetPayer(accounts[0]).
-			SetProposalKey(accounts[0], 0, 0).
-			AddAuthorizer(accounts[0])
-
-		err = execTestutil.SignEnvelope(validTx, accounts[0], privateKeys[0])
-		require.NoError(t, err)
-
-		result, err := ctx.Invoke(fvm.Transaction(validTx), ledger)
-		require.NoError(t, err)
-
-		assert.True(t, result.Succeeded())
-	})
-
-	t.Run("Account creation fails when removed from authorized accountCreators", func(t *testing.T) {
-		removeAccountCreator(accounts[0], 2)
-
-		invalidTx := flow.NewTransactionBody().
-			SetScript(createAccountScript).
-			SetPayer(accounts[0]).
-			SetProposalKey(accounts[0], 0, 0).
-			AddAuthorizer(accounts[0])
-
-		err = execTestutil.SignEnvelope(invalidTx, accounts[0], privateKeys[0])
-		require.NoError(t, err)
-
-		result, err := ctx.Invoke(fvm.Transaction(invalidTx), ledger)
-		require.NoError(t, err)
-
-		assert.False(t, result.Succeeded())
-	})
 }
 
 func TestBlockContext_ExecuteScript(t *testing.T) {
