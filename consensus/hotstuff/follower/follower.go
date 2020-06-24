@@ -22,7 +22,6 @@ type FollowerLogic struct {
 	log               zerolog.Logger
 	validator         hotstuff.Validator
 	finalizationLogic forks.Finalizer
-	notifier          hotstuff.FinalizationConsumer
 }
 
 // New creates a new FollowerLogic instance
@@ -30,13 +29,11 @@ func New(
 	log zerolog.Logger,
 	validator hotstuff.Validator,
 	finalizationLogic forks.Finalizer,
-	notifier hotstuff.FinalizationConsumer,
 ) (*FollowerLogic, error) {
 	return &FollowerLogic{
 		log:               log.With().Str("hotstuff", "follower").Logger(),
 		validator:         validator,
 		finalizationLogic: finalizationLogic,
-		notifier:          notifier,
 	}, nil
 }
 
