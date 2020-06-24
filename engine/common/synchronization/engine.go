@@ -445,6 +445,13 @@ func (e *Engine) checkLoop() {
 
 CheckLoop:
 	for {
+		// give the quit channel a priority to be selected
+		select {
+		case <-e.unit.Quit():
+			break CheckLoop
+		default:
+		}
+
 		select {
 		case <-e.unit.Quit():
 			break CheckLoop
