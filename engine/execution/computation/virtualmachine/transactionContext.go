@@ -24,6 +24,7 @@ type CheckerFunc func([]byte, runtime.Location) error
 
 type TransactionContext struct {
 	LedgerDAL
+	runtime.Metrics
 	bc                               BlockContext
 	ledger                           LedgerDAL
 	astCache                         ASTCache
@@ -60,6 +61,12 @@ func WithRestrictedDeployment(enabled bool) TransactionContextOption {
 func WithRestrictedAccountCreation(enabled bool) TransactionContextOption {
 	return func(ctx *TransactionContext) {
 		ctx.restrictedDeploymentEnabled = enabled
+	}
+}
+
+func WithMetricsCollector(mc *MetricsCollector) TransactionContextOption {
+	return func(ctx *TransactionContext) {
+		ctx.Metrics = metricsCollector{mc}
 	}
 }
 
