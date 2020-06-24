@@ -7,10 +7,12 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
+	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
 type Engine struct {
@@ -18,14 +20,13 @@ type Engine struct {
 	log      zerolog.Logger
 	metrics  module.EngineMetrics
 	me       module.Local
+	state    protocol.State
 	con      network.Conduit
-	handlers map[messages.Resource]HandlerFunc
+	handlers map[messages.Resource]Handler
 }
 
 // New creates a new consensus propagation engine.
-func New(
-	log zerolog.Logger, metrics module.EngineMetrics, net module.Network, me module.Local,
-) (*Engine, error) {
+func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, me module.Local, state protocol.State, handlers ...Handler) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
@@ -33,7 +34,8 @@ func New(
 		log:      log.With().Str("engine", "synchronization").Logger(),
 		metrics:  metrics,
 		me:       me,
-		handlers: make(map[messages.Resource]HandlerFunc),
+		state:    state,
+		handlers: make(map[messages.Resource]Handler),
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -42,6 +44,15 @@ func New(
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 	e.con = con
+
+	// process all the handlers
+	for _, handler := range handlers {
+		_, duplicate := e.handlers[handler.Resource]
+		if duplicate {
+			return nil, fmt.Errorf("duplicate handler (%s)", handler.Resource)
+		}
+		e.handlers[handler.Resource] = handler
+	}
 
 	return e, nil
 }
@@ -89,18 +100,6 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-// Register will register a resource provider handler function with the engine.
-func (e *Engine) Register(resource messages.Resource, handler HandlerFunc) error {
-
-	_, exists := e.handlers[resource]
-	if exists {
-		return fmt.Errorf("resource handler already registered (%s)", resource)
-	}
-
-	e.handlers[resource] = handler
-	return nil
-}
-
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
@@ -125,16 +124,32 @@ func (e *Engine) after(msg string) {
 
 func (e *Engine) onResourceRequest(originID flow.Identifier, req *messages.ResourceRequest) error {
 
+	// first, we check if we know how to handle the requested resource
 	handler, exists := e.handlers[req.Resource]
 	if !exists {
-		return fmt.Errorf("received request for unhandled resource type (%s)", req.Resource)
+		return fmt.Errorf("handler for requested resource does not exist (%s)", req.Resource)
 	}
 
-	resource, err := handler(req.ResourceID)
+	// then, we try to get the current identity of the requester and check it against the filter
+	// for the handler to make sure the requester is authorized for this resource
+	selector := filter.And(
+		handler.Filter, // checks provided by the handler
+		filter.Not(filter.HasNodeID(e.me.NodeID())), // disallow requests from self
+		filter.HasStake(true),                       // disallow requests from nodes without stake
+	)
+	identities, err := e.state.Final().Identities(selector)
+	if err != nil {
+		return fmt.Errorf("could not retrieve identity for origin: %w", err)
+	}
+	if len(identities) == 0 {
+		return fmt.Errorf("origin is not allowed to request resource")
+	}
+
+	// finally, execute the retrieve function to get the resource and send the response
+	resource, err := handler.Retrieve(req.ResourceID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve resource: %w", err)
 	}
-
 	rep := &messages.ResourceReply{
 		Resource: req.Resource,
 		Value:    resource,
