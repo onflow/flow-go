@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/rpc"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
@@ -104,6 +106,12 @@ func main() {
 				node.DB,
 				node.Tracer,
 			)
+
+			err = bootstrap.BootstrapExecutionDatabase(node.DB, node.RootSeal.FinalState, node.RootBlock.Header)
+			// Root block already loaded, can simply continue
+			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+				return nil, fmt.Errorf("could not bootstrap execution DB: %w", err)
+			}
 
 			stateSync := sync.NewStateSynchronizer(executionState)
 
