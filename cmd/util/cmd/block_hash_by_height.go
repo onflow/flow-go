@@ -19,6 +19,7 @@ var (
 	flagAllowUnfinalized bool
 	flagAllowUnsealed    bool
 	flagDatadir          string
+	flagChainID          string
 )
 
 // blockHashByHeight retreives the block hash by height
@@ -85,6 +86,9 @@ func init() {
 
 	blockHashByHeightCmd.Flags().BoolVar(&flagAllowUnsealed, "allow-unsealed", false,
 		"allows retrieval of hashes of unsealed blocks. Defaults to false.")
+
+	blockHashByHeightCmd.Flags().StringVar(&flagChainID, "chain-id", "mainnet",
+		"allows setting the chain ID to retrieve block for")
 
 	homedir, _ := os.UserHomeDir()
 	datadir := filepath.Join(homedir, ".flow", "database")
