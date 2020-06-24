@@ -15,6 +15,7 @@ import (
 	model "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/events"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	module "github.com/dapperlabs/flow-go/module/mock"
@@ -360,4 +361,58 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	ss.Assert().Nil(err)
 	ss.comp.AssertExpectations(ss.T())
 	ss.core.AssertExpectations(ss.T())
+}
+
+func (ss *SyncSuite) TestPollHeight() {
+
+	// check that we send to three nodes from our total list
+	consensus := ss.participants.Filter(filter.HasNodeID(ss.participants[1:].NodeIDs()...))
+	ss.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Run(
+		func(args mock.Arguments) {
+			req := args.Get(0).(*messages.SyncRequest)
+			require.Equal(ss.T(), ss.head.Height, req.Height, "request should contain finalized height")
+			targetID := args.Get(1).(flow.Identifier)
+			require.Contains(ss.T(), consensus.NodeIDs(), targetID, "target should be in participants")
+		},
+	)
+	err := ss.e.pollHeight()
+	require.NoError(ss.T(), err, "should pass poll height")
+	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 3)
+}
+
+func (ss *SyncSuite) TestSendRequests() {
+
+	ranges := unittest.RangeListFixture(1)
+	batches := unittest.BatchListFixture(1)
+
+	// should submit and mark requested all ranges
+	ss.con.On("Submit", mock.AnythingOfType("*messages.RangeRequest"), mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
+		func(args mock.Arguments) {
+			req := args.Get(0).(*messages.RangeRequest)
+			ss.Assert().Equal(ranges[0].From, req.FromHeight)
+			ss.Assert().Equal(ranges[0].To, req.ToHeight)
+		},
+	)
+	ss.core.On("RangeRequested", ranges[0])
+
+	// should submit and mark requested all batches
+	ss.con.On("Submit", mock.AnythingOfType("*messages.BatchRequest"), mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
+		func(args mock.Arguments) {
+			req := args.Get(0).(*messages.BatchRequest)
+			ss.Assert().Equal(batches[0].BlockIDs, req.BlockIDs)
+		},
+	)
+	ss.core.On("BatchRequested", batches[0])
+
+	err := ss.e.sendRequests(ranges, batches)
+	ss.Assert().Nil(err)
+	ss.con.AssertExpectations(ss.T())
+}
+
+// test a synchronization engine can be started and stopped
+func (ss *SyncSuite) TestStartStop() {
+	unittest.AssertReturnsBefore(ss.T(), func() {
+		<-ss.e.Ready()
+		<-ss.e.Done()
+	}, time.Second)
 }
