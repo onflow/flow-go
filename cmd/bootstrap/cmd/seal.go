@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/hex"
 
+	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -14,24 +15,8 @@ func constructRootResultAndSeal(commitString string, block *flow.Block) {
 		log.Fatal().Err(err).Msg("could not decode state commitment")
 	}
 
-	blockID := block.ID()
-
-	result := &flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: flow.ZeroID,
-			BlockID:          blockID,
-			FinalStateCommit: commit,
-			Chunks:           nil,
-		},
-		Signatures: nil,
-	}
-
-	seal := &flow.Seal{
-		BlockID:      block.ID(),
-		ResultID:     result.ID(),
-		InitialState: nil,
-		FinalState:   commit,
-	}
+	result := run.GenerateRootResult(block, commit)
+	seal := run.GenerateRootSeal(result)
 
 	writeJSON(model.PathRootResult, result)
 	writeJSON(model.PathRootSeal, seal)

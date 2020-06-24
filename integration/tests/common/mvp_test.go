@@ -62,9 +62,9 @@ func TestMVP_Emulator(t *testing.T) {
 
 func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 
-	genesis := net.Genesis()
+	root := net.Root()
 
-	chain := genesis.Header.ChainID.Chain()
+	chain := root.Header.ChainID.Chain()
 
 	client, err := testnet.NewClient(fmt.Sprintf(":%s", net.AccessPorts[testnet.AccessNodeAPIPort]), chain)
 	require.NoError(t, err)
@@ -77,7 +77,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 
 	// deploy the contract
 	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
-	err = client.DeployContract(childCtx, genesis.ID(), CounterContract)
+	err = client.DeployContract(childCtx, root.ID(), CounterContract)
 	cancel()
 	require.NoError(t, err)
 
@@ -93,8 +93,8 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	}, 30*time.Second, time.Second)
 
 	tx := unittest.TransactionBodyFixture(
-		unittest.WithTransactionDSL(CreateCounterTx),
-		unittest.WithReferenceBlock(genesis.ID()),
+		unittest.WithTransactionDSL(CreateCounterTx(chain)),
+		unittest.WithReferenceBlock(root.ID()),
 	)
 	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
 	err = client.SendTransaction(ctx, tx)
