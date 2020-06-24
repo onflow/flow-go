@@ -133,13 +133,11 @@ type FlowNodeBuilder struct {
 	MsgValidators     []validators.MessageValidator
 
 	// root state information
-	RootBlock            *flow.Block
-	RootQC               *model.QuorumCertificate
-	RootResult           *flow.ExecutionResult
-	RootSeal             *flow.Seal
-	RootAccountPublicKey *flow.AccountPublicKey
-	RootTokenSupply      uint64
-	RootChainID          flow.ChainID
+	RootBlock   *flow.Block
+	RootQC      *model.QuorumCertificate
+	RootResult  *flow.ExecutionResult
+	RootSeal    *flow.Seal
+	RootChainID flow.ChainID
 }
 
 func (fnb *FlowNodeBuilder) baseFlags() {
@@ -385,15 +383,15 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.MustNot(err).Msg("could not load root QC")
 
 		// load the root execution result from bootstrap files
-		rootResult, err := loadRootResult(fnb.BaseConfig.BootstrapDir)
+		fnb.RootResult, err = loadRootResult(fnb.BaseConfig.BootstrapDir)
 		fnb.MustNot(err).Msg("could not load root execution result")
 
 		// load the root block seal from bootstrap files
-		rootSeal, err := loadRootSeal(fnb.BaseConfig.BootstrapDir)
+		fnb.RootSeal, err = loadRootSeal(fnb.BaseConfig.BootstrapDir)
 		fnb.MustNot(err).Msg("could not load root seal")
 
 		// bootstrap the protocol state with the loaded data
-		err = state.Mutate().Bootstrap(fnb.RootBlock, rootResult, rootSeal)
+		err = state.Mutate().Bootstrap(fnb.RootBlock, fnb.RootResult, fnb.RootSeal)
 		fnb.MustNot(err).Msg("could not bootstrap protocol state")
 
 		// apply the bootstrap functions to the protocol state
