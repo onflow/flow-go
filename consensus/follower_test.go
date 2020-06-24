@@ -156,12 +156,12 @@ func (s *HotStuffFollowerSuite) AfterTest(suiteName, testName string) {
 	s.updater.AssertExpectations(s.T())
 }
 
-// TestFollowerInitialization verifies that the basic test setup with initialization of the Follower works as expected
+// TestInitialization verifies that the basic test setup with initialization of the Follower works as expected
 func (s *HotStuffFollowerSuite) TestInitialization() {
 	// we expect no additional calls to s.updater or s.notifier
 }
 
-// TestFollowerProcessBlock verifies that when submitting a single valid block (child root block),
+// TestSubmitProposal verifies that when submitting a single valid block (child root block),
 // the Follower reacts with callbacks to s.updater.MakeValid or s.notifier.OnBlockIncorporated with this new block
 func (s *HotStuffFollowerSuite) TestSubmitProposal() {
 	rootBlockView := s.rootHeader.View
@@ -172,7 +172,7 @@ func (s *HotStuffFollowerSuite) TestSubmitProposal() {
 	s.follower.SubmitProposal(nextBlock, rootBlockView)
 }
 
-// TestFollowerProcessBlock verifies that when submitting a single valid block (child root block),
+// TestFollowerFinalizedBlock verifies that when submitting a single valid block (child root block),
 // the Follower reacts with callbacks to s.updater.MakeValid or s.notifier.OnBlockIncorporated with this new block
 func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
 	expectedFinalized := s.mockConsensus.extendBlock(s.rootHeader.View+1, s.rootHeader)
