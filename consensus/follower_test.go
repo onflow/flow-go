@@ -161,8 +161,8 @@ func (s *HotStuffFollowerSuite) TestInitialization() {
 	// we expect no additional calls to s.updater or s.notifier
 }
 
-// TestSubmitProposal verifies that when submitting a single valid block (child root block),
-// the Follower reacts with callbacks to s.updater.MakeValid or s.notifier.OnBlockIncorporated with this new block
+// TestSubmitProposal verifies that when submitting a single valid block (child's root block),
+// the Follower reacts with callbacks to s.updater.MakeValid and s.notifier.OnBlockIncorporated with this new block
 func (s *HotStuffFollowerSuite) TestSubmitProposal() {
 	rootBlockView := s.rootHeader.View
 	nextBlock := s.mockConsensus.extendBlock(rootBlockView+1, s.rootHeader)
@@ -172,8 +172,10 @@ func (s *HotStuffFollowerSuite) TestSubmitProposal() {
 	s.follower.SubmitProposal(nextBlock, rootBlockView)
 }
 
-// TestFollowerFinalizedBlock verifies that when submitting a single valid block (child root block),
-// the Follower reacts with callbacks to s.updater.MakeValid or s.notifier.OnBlockIncorporated with this new block
+// TestFollowerFinalizedBlock verifies that when submitting 4 extra blocks
+// the Follower reacts with callbacks to s.updater.MakeValid or s.notifier.OnBlockIncorporated
+// for all the added blocks. Furthermore, the follower should finalize the first submitted block,
+// i.e. call s.updater.MakeFinal and s.notifier.OnFinalizedBlock
 func (s *HotStuffFollowerSuite) TestFollowerFinalizedBlock() {
 	expectedFinalized := s.mockConsensus.extendBlock(s.rootHeader.View+1, s.rootHeader)
 	s.notifier.On("OnBlockIncorporated", blockWithID(expectedFinalized.ID())).Return().Once()
