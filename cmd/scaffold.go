@@ -397,6 +397,8 @@ func (fnb *FlowNodeBuilder) initState() {
 		err = state.Mutate().Bootstrap(fnb.RootBlock, rootResult, rootSeal)
 		fnb.MustNot(err).Msg("could not bootstrap protocol state")
 
+		fnb.RootCommit = rootSeal.FinalState
+
 		// apply the bootstrap functions to the protocol state
 		for _, b := range fnb.bootstraps {
 			err := b.fn(state)
