@@ -64,7 +64,7 @@ func main() {
 		conCache            *buffer.PendingBlocks
 		receiptIDsByBlock   *stdmap.IdentifierMap
 		receiptIDsByResult  *stdmap.IdentifierMap
-		matchChunks         *match.Chunks
+		pendingChunks       *match.Chunks
 		headerStorage       *storage.Headers
 		processedResultsIDs *stdmap.Identifiers
 		finderEng           *finder.Engine
@@ -101,7 +101,7 @@ func main() {
 			if err != nil {
 				return err
 			}
-			// TODO needs a metric registration
+
 			return nil
 		}).
 		Module("pending receipt ids by result mempool", func(node *cmd.FlowNodeBuilder) error {
@@ -109,22 +109,39 @@ func main() {
 			if err != nil {
 				return err
 			}
-			// TODO needs a metric registration
+
 			return nil
 		}).
 		Module("pending results mempool", func(node *cmd.FlowNodeBuilder) error {
 			pendingResults = stdmap.NewPendingResults()
-			// TODO needs a metric registration
+
+			// registers size method of backend for metrics
+			err = node.Metrics.Mempool.Register(metrics.ResourcePendingResult, pendingResults.Size)
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
+			}
 			return nil
 		}).
 		Module("match chunks mempool", func(node *cmd.FlowNodeBuilder) error {
-			matchChunks = match.NewChunks(chunkLimit)
-			// TODO register a size tracker
+			pendingChunks = match.NewChunks(chunkLimit)
+
+			err = node.Metrics.Mempool.Register(metrics.ResourcePendingChunks, pendingChunks.Size)
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
+			}
 			return nil
 		}).
 		Module("processed results ids mempool", func(node *cmd.FlowNodeBuilder) error {
 			processedResultsIDs, err = stdmap.NewIdentifiers(receiptLimit)
-			return err
+			if err != nil {
+				return err
+			}
+			// registers size method of backend for metrics
+			err = node.Metrics.Mempool.Register(metrics.ResourceProcessedResultIDs, processedResultsIDs.Size)
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
+			}
+			return nil
 		}).
 		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
 			// consensus cache for follower engine
@@ -151,13 +168,14 @@ func main() {
 				return nil, err
 			}
 			matchEng, err = match.New(node.Logger,
+				collector,
 				node.Network,
 				node.Me,
 				pendingResults,
 				verifierEng,
 				assigner,
 				node.State,
-				matchChunks,
+				pendingChunks,
 				headerStorage,
 				requestIntervalMs,
 				failureThreshold)
@@ -165,6 +183,7 @@ func main() {
 		}).
 		Component("finder engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			finderEng, err = finder.New(node.Logger,
+				collector,
 				node.Network,
 				node.Me,
 				matchEng,

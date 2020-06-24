@@ -327,6 +327,8 @@ func WithMatchEngine(eng network.Engine) VerificationOpt {
 
 func VerificationNode(t testing.TB,
 	hub *stub.Hub,
+	verificationCollector module.VerificationMetrics,
+	mempoolCollector module.MempoolMetrics,
 	identity *flow.Identity,
 	identities []*flow.Identity,
 	assigner module.ChunkAssigner,
@@ -346,15 +348,24 @@ func VerificationNode(t testing.TB,
 	if node.Receipts == nil {
 		node.Receipts, err = stdmap.NewReceipts(1000)
 		require.Nil(t, err)
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourceReceipt, node.Receipts.Size)
+		require.Nil(t, err)
 	}
 
 	if node.PendingReceipts == nil {
 		node.PendingReceipts, err = stdmap.NewPendingReceipts(1000)
 		require.Nil(t, err)
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourcePendingReceipt, node.PendingReceipts.Size)
+		require.Nil(t, err)
 	}
 
 	if node.PendingResults == nil {
 		node.PendingResults = stdmap.NewPendingResults()
+		require.Nil(t, err)
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourcePendingResult, node.PendingResults.Size)
 		require.Nil(t, err)
 	}
 
@@ -364,10 +375,16 @@ func VerificationNode(t testing.TB,
 
 	if node.Chunks == nil {
 		node.Chunks = match.NewChunks(1000)
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourcePendingChunks, node.Chunks.Size)
+		require.Nil(t, err)
 	}
 
 	if node.ProcessedResultIDs == nil {
 		node.ProcessedResultIDs, err = stdmap.NewIdentifiers(1000)
+		require.Nil(t, err)
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourceProcessedResultIDs, node.ProcessedResultIDs.Size)
 		require.Nil(t, err)
 	}
 
@@ -388,12 +405,18 @@ func VerificationNode(t testing.TB,
 		chunkVerifier := chunks.NewChunkVerifier(vm, node.Blocks)
 
 		require.NoError(t, err)
-		node.VerifierEngine, err = verifier.New(node.Log, node.Metrics, node.Net, node.State, node.Me, chunkVerifier)
+		node.VerifierEngine, err = verifier.New(node.Log,
+			verificationCollector,
+			node.Net,
+			node.State,
+			node.Me,
+			chunkVerifier)
 		require.Nil(t, err)
 	}
 
 	if node.MatchEngine == nil {
 		node.MatchEngine, err = match.New(node.Log,
+			verificationCollector,
 			node.Net,
 			node.Me,
 			node.PendingResults,
@@ -409,6 +432,7 @@ func VerificationNode(t testing.TB,
 
 	if node.FinderEngine == nil {
 		node.FinderEngine, err = finder.New(node.Log,
+			verificationCollector,
 			node.Net,
 			node.Me,
 			node.MatchEngine,

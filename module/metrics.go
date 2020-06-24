@@ -122,25 +122,51 @@ type ConsensusMetrics interface {
 }
 
 type VerificationMetrics interface {
+	// Finder Engine
+	//
+	// OnExecutionReceiptReceived is called whenever a new execution receipt arrives
+	// at Finder engine. It increments total number of received receipts.
+	OnExecutionReceiptReceived()
+	// OnExecutionResultSent is called whenever a new execution result is sent by
+	// Finder engine to the match engine. It increments total number of sent execution results.
+	OnExecutionResultSent()
+
+	// Match Engine
+	//
+	// OnExecutionResultReceived is called whenever a new execution result is successfully received
+	// by Match engine from Finder engine.
+	// It increments the total number of received execution results.
+	OnExecutionResultReceived()
+	// OnVerifiableChunkSent is called on a successful submission of matched chunk
+	// by Match engine to Verifier engine.
+	// It increments the total number of chunks matched by match engine.
+	OnVerifiableChunkSent()
+	// OnChunkDataPackReceived is called on a receiving a chunk data pack by Match engine
+	// It increments the total number of chunk data packs received.
+	OnChunkDataPackReceived()
+
+	// Verifier Engine
+	//
+	// OnVerifiableChunkReceived is called whenever a verifiable chunk is received by Verifier engine
+	// from Match engine.It increments the total number of sent verifiable chunks.
+	OnVerifiableChunkReceived()
+	// OnResultApproval is called whenever a result approval for is emitted to consensus nodes.
+	// It increases the total number of result approvals.
+	OnResultApproval()
 	// OnChunkVerificationStarted is called whenever the verification of a chunk is started
 	// it starts the timer to record the execution time
 	OnChunkVerificationStarted(chunkID flow.Identifier)
-
 	// OnChunkVerificationFinished is called whenever chunkID verification gets finished
-	// it records the duration of execution and increases number of checked chunks
+	// it records the duration of execution.
 	OnChunkVerificationFinished(chunkID flow.Identifier)
 
-	// OnResultApproval is called whenever a result approval for is emitted
-	// it increases the result approval counter for this chunk
-	OnResultApproval()
-
-	// OnVerifiableChunkSubmitted is called whenever a verifiable chunk is shaped for a specific
+	// LogVerifiableChunkSize is called whenever a verifiable chunk is shaped for a specific
 	// chunk. It adds the size of the verifiable chunk to the histogram. A verifiable chunk is assumed
 	// to capture all the resources needed to verify a chunk.
 	// The purpose of this function is to track the overall chunk resources size on disk.
 	// Todo wire this up to do monitoring
 	// https://github.com/dapperlabs/flow-go/issues/3183
-	OnVerifiableChunkSubmitted(size float64)
+	LogVerifiableChunkSize(size float64)
 }
 
 // LedgerMetrics provides an interface to record Ledger Storage metrics.
