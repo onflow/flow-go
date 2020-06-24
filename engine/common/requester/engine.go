@@ -41,7 +41,7 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.ProtocolProvider, e)
+	con, err := net.Register(engine.ProtocolExchange, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
