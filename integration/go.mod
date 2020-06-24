@@ -11,7 +11,7 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/onflow/cadence v0.4.1-0.20200604200650-30a200f9c324
 	github.com/onflow/flow-go-sdk v0.4.0
-	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200619174948-a3a856d16a27
+	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200611205353-548107cc9aca
 	github.com/rs/zerolog v1.15.0
 	github.com/stretchr/testify v1.6.1
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
