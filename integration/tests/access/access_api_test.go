@@ -3,7 +3,9 @@ package access
 import (
 	"context"
 	"fmt"
+	"net"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -70,11 +72,9 @@ func (suite *AccessSuite) SetupTest() {
 	suite.net.Start(suite.ctx)
 }
 
-func (suite *AccessSuite) TestHTTPProxy() {
-	genesis := suite.net.Genesis()
-
-	chain := genesis.Header.ChainID.Chain()
-
-	_, err := testnet.NewClient(fmt.Sprintf(":%s", suite.net.AccessPorts[testnet.AccessNodeAPIPort]), chain)
-	require.NoError(suite.T(), err)
+func (suite *AccessSuite) TestHTTPProxyPortOpen() {
+	httpProxyAddress := fmt.Sprintf(":%s", suite.net.AccessPorts[testnet.AccessNodeAPIProxyPort])
+	conn, err := net.DialTimeout("tcp", httpProxyAddress, 1*time.Second)
+	require.NoError(suite.T(), err, "http proxy port not open on the access node")
+	conn.Close()
 }
