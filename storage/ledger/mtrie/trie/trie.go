@@ -18,6 +18,10 @@ import (
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
 )
 
+const (
+	storageFormatVersion uint16 = 1
+)
+
 // MTrie is a fully in memory trie with option to persist to disk.
 // Formally, an MTrie represents a perfect, full binary Merkle tree with uniform height.
 // For a detailed description of the storage model, please consult `mtrie/README.md`
@@ -39,37 +43,32 @@ import (
 //     between v and a tree leaf. The height of a tree is the heights of its root.
 //     The height of a Trie is always the height of the fully-expanded tree.
 type MTrie struct {
-	root           *node.Node
-	number         uint64
-	height         int
-	keyByteSize    int
-	parentRootHash []byte
+	root        *node.Node
+	height      int
+	keyByteSize int
 }
 
-func NewEmptyMTrie(keyByteSize int, number uint64, parentRootHash []byte) (*MTrie, error) {
+func NewEmptyMTrie(keyByteSize int) (*MTrie, error) {
 	if keyByteSize < 1 {
 		return nil, errors.New("trie's key size [in bytes] must be positive")
 	}
 	height := keyByteSize * 8
 	return &MTrie{
-		root:           node.NewEmptyTreeRoot(height),
-		number:         number,
-		keyByteSize:    keyByteSize,
-		height:         height,
-		parentRootHash: parentRootHash,
+		root:        node.NewEmptyTreeRoot(height),
+		keyByteSize: keyByteSize,
+		height:      height,
 	}, nil
 }
 
-func NewMTrie(root *node.Node, number uint64, parentRootHash []byte) (*MTrie, error) {
-	maxHeight := root.Height() + 1
-	if !checkHeight(maxHeight) {
-		return nil, errors.New("key length of trie must be integer-multiple of 8")
+func NewMTrie(root *node.Node) (*MTrie, error) {
+	if root.Height()%8 != 0 {
+		return nil, errors.New("height of root node must be integer-multiple of 8")
 	}
+	keyByteSize := root.Height() / 8
 	return &MTrie{
-		root:           root,
-		number:         number,
-		maxHeight:      maxHeight,
-		parentRootHash: parentRootHash,
+		root:        root,
+		keyByteSize: keyByteSize,
+		height:      root.Height(),
 	}, nil
 }
 
@@ -80,15 +79,6 @@ func (mt *MTrie) StringRootHash() string { return hex.EncodeToString(mt.root.Has
 // RootHash returns the trie's root hash (i.e. the hash of the trie's root node).
 // Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) RootHash() []byte { return mt.root.Hash() }
-
-// Number returns the trie's number. By convention, the number of a Trie is
-// the parent Trie's number incremented by one.
-// Concurrency safe (as Tries are immutable structures by convention)
-func (mt *MTrie) Number() uint64 { return mt.number }
-
-// ParentRootHash returns the root hash of the trie's parent.
-// Concurrency safe (as Tries are immutable structures by convention)
-func (mt *MTrie) ParentRootHash() []byte { return mt.parentRootHash }
 
 // KeyLength return the length [in bytes] the trie operates with.
 // Concurrency safe (as Tries are immutable structures by convention)
@@ -111,7 +101,7 @@ func (mt *MTrie) RootNode() *node.Node {
 // StringRootHash returns the trie's string representation.
 // Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) String() string {
-	trieStr := fmt.Sprintf("Trie number:%v hash:%v parent: %v\n", mt.number, mt.StringRootHash(), hex.EncodeToString(mt.parentRootHash))
+	trieStr := fmt.Sprintf("Trie root hash: %v\n", mt.StringRootHash())
 	return trieStr + mt.root.FmtStr("", "")
 }
 
@@ -181,12 +171,9 @@ func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedRegisterKeys [][]byte
 	if err != nil {
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
-	updatedTrie := &MTrie{
-		root:           updatedRoot,
-		number:         parentTrie.number + 1,
-		height:         parentTrie.height,
-		keyByteSize:    parentTrie.keyByteSize,
-		parentRootHash: parentTrie.RootHash(),
+	updatedTrie, err := NewMTrie(updatedRoot)
+	if err != nil {
+		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
 	return updatedTrie, nil
 }
@@ -393,7 +380,7 @@ func (mt *MTrie) Equals(o *MTrie) bool {
 	if o == nil {
 		return false
 	}
-	return o.Height() == mt.Height() && bytes.Equal(o.RootHash(), mt.RootHash())
+	return o.KeyLength() == mt.KeyLength() && bytes.Equal(o.RootHash(), mt.RootHash())
 }
 
 // Store stores the trie key Values to a file
@@ -406,15 +393,9 @@ func (mt *MTrie) Store(path string) error {
 	writer := bufio.NewWriter(fi)
 	defer writer.Flush()
 
-	// first byte is the store format version
-	_, err = writer.Write([]byte{byte(1)})
-	if err != nil {
-		return err
-	}
-
-	// then 8 bytes captures trie number
-	b1 := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b1, mt.number)
+	// first two byte are the storage format version
+	b1 := make([]byte, 2)
+	binary.LittleEndian.PutUint16(b1, storageFormatVersion)
 	_, err = writer.Write(b1)
 	if err != nil {
 		return err
@@ -424,12 +405,6 @@ func (mt *MTrie) Store(path string) error {
 	b2 := make([]byte, 2)
 	binary.LittleEndian.PutUint16(b2, uint16(mt.keyByteSize))
 	_, err = writer.Write(b2)
-	if err != nil {
-		return err
-	}
-
-	// next 32 bytes are parent rootHash
-	_, err = writer.Write(mt.parentRootHash)
 	if err != nil {
 		return err
 	}
@@ -493,23 +468,15 @@ func Load(path string) (*MTrie, error) {
 	}
 	defer fi.Close()
 
-	// first byte is the store format version
-	version := make([]byte, 1)
+	// first two byte are the storage format version
+	version := make([]byte, 2)
 	_, err = fi.Read(version)
 	if err != nil {
 		return nil, err
 	}
-	if uint8(version[0]) != uint8(1) { // assert encoding version
-		return nil, errors.New("trie store/load version doesn't match")
+	if binary.LittleEndian.Uint16(version) != storageFormatVersion { // assert encoding version
+		return nil, errors.New("trie storage version doesn't match")
 	}
-
-	// next 8 bytes capture trie number
-	trieNumberB := make([]byte, 8)
-	_, err = fi.Read(trieNumberB)
-	if err != nil {
-		return nil, err
-	}
-	trieNumber := binary.LittleEndian.Uint64(trieNumberB)
 
 	// next 2 bytes capture the trie's key size
 	keyByteSizeB := make([]byte, 2)
@@ -518,13 +485,6 @@ func Load(path string) (*MTrie, error) {
 		return nil, err
 	}
 	keyByteSize := int(binary.LittleEndian.Uint16(keyByteSizeB))
-
-	// next 32 bytes are parent rootHash
-	parentRootHash := make([]byte, 32)
-	_, err = fi.Read(parentRootHash)
-	if err != nil {
-		return nil, err
-	}
 
 	// next 32 bytes are rootHash
 	expectedRootHash := make([]byte, 32)
@@ -564,7 +524,7 @@ func Load(path string) (*MTrie, error) {
 	}
 
 	// reconstruct trie
-	trie, err := constructTrieFromKeyValuePairs(keyByteSize, trieNumber, parentRootHash, keys, values)
+	trie, err := constructTrieFromKeyValuePairs(keyByteSize, keys, values)
 	if err != nil {
 		return nil, err
 	}
@@ -578,20 +538,18 @@ func Load(path string) (*MTrie, error) {
 // constructTrieFromKeyValuePairs constructs a trie from the given key-value pairs.
 // UNSAFE: function requires the following conditions to be satisfied, but does not explicitly check them:
 //   * keys must have the same keyLength
-func constructTrieFromKeyValuePairs(keyByteSize int, number uint64, parentRootHash []byte, keys [][]byte, values [][]byte) (*MTrie, error) {
+func constructTrieFromKeyValuePairs(keyByteSize int, keys [][]byte, values [][]byte) (*MTrie, error) {
 	treeHeight := 8 * keyByteSize
 	root, err := constructSubtrie(treeHeight, treeHeight, keys, values)
 	if err != nil {
 		return nil, fmt.Errorf("constructing trie from key-value pairs failed: %w", err)
 	}
 
-	return &MTrie{
-		root:           root,
-		number:         number,
-		height:         treeHeight,
-		keyByteSize:    keyByteSize,
-		parentRootHash: parentRootHash,
-	}, nil
+	updatedTrie, err := NewMTrie(root)
+	if err != nil {
+		return nil, fmt.Errorf("constructing trie from key-value pairs failed: %w", err)
+	}
+	return updatedTrie, nil
 }
 
 // EmptyTrieRootHash returns the rootHash of an empty Trie for the specified key size [bytes]

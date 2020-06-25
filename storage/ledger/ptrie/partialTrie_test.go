@@ -63,8 +63,8 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 			t.Fatal("rootNode hash doesn't match [before set]")
 		}
 		newTrie, err := mForest.Update(rootHash, keys, values)
-		rootHash = newTrie.RootHash()
 		require.NoError(t, err, "error updating trie")
+		rootHash = newTrie.RootHash()
 
 		_, _, err = psmt.Update(keys, values)
 		require.NoError(t, err, "error updating psmt")
@@ -79,8 +79,8 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 		values = append(values, updatedValue1)
 
 		newTrie, err = mForest.Update(rootHash, keys, values)
-		rootHash = newTrie.RootHash()
 		require.NoError(t, err, "error updating trie")
+		rootHash = newTrie.RootHash()
 
 		_, _, err = psmt.Update(keys, values)
 		require.NoError(t, err, "error updating psmt")
@@ -113,8 +113,8 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 		values = append(values, value1, value2)
 
 		newTrie, err := mForest.Update(mForest.GetEmptyRootHash(), keys, values)
-		newRoot := newTrie.RootHash()
 		require.NoError(t, err, "error updating trie")
+		newRoot := newTrie.RootHash()
 
 		retvalues, err := mForest.Read(newRoot, keys)
 		require.NoError(t, err, "error reading values")
@@ -133,8 +133,8 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 		values = make([][]byte, 0)
 		values = append(values, updatedValue1, updatedValue2)
 		newTrie2, err := mForest.Update(newRoot, keys, values)
-		newRoot2 := newTrie2.RootHash()
 		require.NoError(t, err, "error updating trie")
+		newRoot2 := newTrie2.RootHash()
 
 		_, _, err = psmt.Update(keys, values)
 		require.NoError(t, err, "error updating psmt")
@@ -243,8 +243,8 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 
 		// first update
 		newTrie, err := mForest.Update(mForest.GetEmptyRootHash(), keys, values)
-		newRoot := newTrie.RootHash()
 		require.NoError(t, err, "error updating trie")
+		newRoot := newTrie.RootHash()
 
 		_, _, err = psmt.Update(keys, values)
 		require.NoError(t, err, "error updating psmt")
@@ -256,8 +256,8 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 		values = make([][]byte, 0)
 		values = append(values, updatedValue1, updatedValue2)
 		newTrie2, err := mForest.Update(newRoot, keys, values)
-		newRoot2 := newTrie2.RootHash()
 		require.NoError(t, err, "error updating trie")
+		newRoot2 := newTrie2.RootHash()
 
 		_, _, err = psmt.Update(keys, values)
 		require.NoError(t, err, "error updating psmt")
@@ -288,8 +288,8 @@ func TestMixProof(t *testing.T) {
 		values = append(values, value1, value3)
 
 		newTrie, err := mForest.Update(mForest.GetEmptyRootHash(), keys, values)
-		newRoot := newTrie.RootHash()
 		require.NoError(t, err, "error updating trie")
+		newRoot := newTrie.RootHash()
 
 		keys = make([][]byte, 0)
 		keys = append(keys, key1, key2, key3)
@@ -315,8 +315,8 @@ func TestMixProof(t *testing.T) {
 		values = append(values, []byte{'X'}, []byte{'Y'})
 
 		trie2, err := mForest.Update(newRoot, keys, values)
-		root2 := trie2.RootHash()
 		require.NoError(t, err, "error updating trie")
+		root2 := trie2.RootHash()
 
 		proot2, _, err := psmt.Update(keys, values)
 		require.NoError(t, err, "error updating partial trie")
@@ -363,8 +363,8 @@ func TestRandomProofs(t *testing.T) {
 			insertValues := values[:split]
 
 			nTrie, err := mForest.Update(mForest.GetEmptyRootHash(), insertKeys, insertValues)
-			root := nTrie.RootHash()
 			require.NoError(t, err, "error updating trie")
+			root := nTrie.RootHash()
 
 			// shuffle keys for read
 			rand.Shuffle(len(keys), func(i, j int) {

@@ -41,8 +41,7 @@ type MTrieStorage struct {
 // NewMTrieStorage creates a new in-memory trie-backed ledger storage with persistence.
 func NewMTrieStorage(dbDir string, capacity int, metrics module.LedgerMetrics, reg prometheus.Registerer) (*MTrieStorage, error) {
 
-	w, err := wal.NewWAL(nil, reg, dbDir, capacity, maxHeight)
-
+	w, err := wal.NewWAL(nil, reg, dbDir, capacity, RegisterKeySize)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create LedgerWAL: %w", err)
 	}
@@ -81,7 +80,6 @@ func NewMTrieStorage(dbDir string, capacity int, metrics module.LedgerMetrics, r
 			return nil
 		},
 	)
-
 	if err != nil {
 		return nil, fmt.Errorf("cannot restore LedgerWAL: %w", err)
 	}
@@ -172,10 +170,10 @@ func (f *MTrieStorage) UpdateRegisters(
 	}
 
 	newTrie, err := f.mForest.Update(stateCommitment, ids, values)
-	newStateCommitment = newTrie.RootHash()
 	if err != nil {
 		return nil, fmt.Errorf("cannot update state: %w", err)
 	}
+	newStateCommitment = newTrie.RootHash()
 
 	// TODO update to proper value once https://github.com/dapperlabs/flow-go/pull/3720 is merged
 	f.metrics.ForestApproxMemorySize(0)

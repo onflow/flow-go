@@ -11,7 +11,7 @@ import (
 )
 
 func TestEmptyTrie(t *testing.T) {
-	emptyTrie, err := trie.NewEmptyMTrie(9, 21, nil)
+	emptyTrie, err := trie.NewEmptyMTrie(9)
 	require.NoError(t, err)
 
 	itr := flattener.NewNodeIterator(emptyTrie)
@@ -25,7 +25,7 @@ func TestEmptyTrie(t *testing.T) {
 }
 
 func TestPopulatedTrie(t *testing.T) {
-	emptyTrie, err := trie.NewEmptyMTrie(9, 21, nil)
+	emptyTrie, err := trie.NewEmptyMTrie(9)
 	require.NoError(t, err)
 
 	k1 := []byte([]uint8{uint8(1)}) // key: 0000...

@@ -1,7 +1,6 @@
 package benchmark
 
 import (
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"testing"
@@ -78,20 +77,6 @@ func Test_BenchmarkHashingWithConstantHasher(t *testing.T) {
 	}
 	fmt.Printf(hex.EncodeToString(res) + "\n")
 	fmt.Printf("Average time per run [ns]: %f\n\n", float64(totalElapsed)/float64(pairs))
-}
-
-func Test_DefaultHash(t *testing.T) {
-	res := GetDefaultHashForHeight(0)
-	fmt.Printf(hex.EncodeToString(res) + "\n")
-
-	res = GetDefaultHashForHeight(1)
-	fmt.Printf(hex.EncodeToString(res) + "\n")
-
-	var v uint32 = 1030549473
-
-	b := make([]byte, 4)
-	binary.LittleEndian.PutUint32(b, v)
-	fmt.Printf(hex.EncodeToString(b) + "\n")
 }
 
 // Benchmark_Hash benchmarks how many heap allocations result from
