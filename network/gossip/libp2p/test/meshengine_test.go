@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	golog "github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
@@ -43,7 +44,7 @@ func (m *MeshNetTestSuite) SetupTest() {
 	// defines total number of nodes in our network (minimum 3 needed to use 1-k messaging)
 	const count = 10
 	const cacheSize = 100
-	//golog.SetAllLoggers(gologging.INFO)
+	golog.SetAllLoggers(golog.LevelInfo)
 
 	m.ids = CreateIDs(count)
 

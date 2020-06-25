@@ -13,7 +13,10 @@ import (
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
+
+var genesisHash = unittest.BlockFixture().ID().String()
 
 // helper offers a set of functions that are shared among different tests
 // CreateIDs creates and initializes count-many flow identifiers instances
@@ -117,7 +120,8 @@ func CreateMiddleware(log zerolog.Logger, identities []*flow.Identity) ([]*libp2
 		}
 
 		// creating middleware of nodes
-		mw, err := libp2p.NewMiddleware(log, json.NewCodec(), "0.0.0.0:0", identities[i].NodeID, key, metrics, libp2p.DefaultMaxPubSubMsgSize)
+		mw, err := libp2p.NewMiddleware(log, json.NewCodec(), "0.0.0.0:0", identities[i].NodeID, key, metrics,
+			libp2p.DefaultMaxPubSubMsgSize, genesisHash)
 		if err != nil {
 			return nil, err
 		}
