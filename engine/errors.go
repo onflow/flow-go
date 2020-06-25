@@ -7,14 +7,12 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// InvalidInputError are the type for input errors. It's useful to distinguish
-// errors from exceptions.
-// By distinguishing errors from exception using different type, we can log them
+// InvalidInputError are errors for caused by invalid inputs.
+// It's useful to distinguish these known errors from exceptions.
+// By distinguishing errors from exceptions, we can log them
 // differently.
-// For instance, log InvalidInputError error as a warning log, and log
+// For instance, log InvalidInputError error as a warn log, and log
 // other error as an error log.
-// You can use this struct as an customized error type directly or
-// create a function to reuse a certain error type, just like ErrorExecutionResultExist
 type InvalidInputError struct {
 	err error
 }
@@ -75,7 +73,8 @@ func LogError(log zerolog.Logger, err error) {
 	if IsInvalidInputError(err) {
 		// invalid input could be logged as warning.
 		// but in non-BFT phase, there should not be any invalid input error.
-		// if there is, must be an exception error, which for now log as error level
+		// if there is, it must be an exception error, which makes sense
+		// to log as error level
 		log.Error().
 			Str("error_type", "invalid_input").
 			Err(err).

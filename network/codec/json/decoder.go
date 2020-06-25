@@ -4,8 +4,7 @@ package json
 
 import (
 	"encoding/json"
-
-	"github.com/pkg/errors"
+	"fmt"
 )
 
 // Decoder implements a stream decoder for JSON.
@@ -20,13 +19,13 @@ func (d *Decoder) Decode() (interface{}, error) {
 	var env Envelope
 	err := d.dec.Decode(&env)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not decode envelope")
+		return nil, fmt.Errorf("could not decode envelope: %w", err)
 	}
 
 	// decode the embedded value
 	v, err := decode(env)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not decode value")
+		return nil, fmt.Errorf("could not decode value: %w", err)
 	}
 
 	return v, nil

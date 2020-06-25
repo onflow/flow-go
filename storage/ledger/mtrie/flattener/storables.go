@@ -7,6 +7,8 @@ type StorableNode struct {
 	Key       []byte
 	Value     []byte
 	HashValue []byte
+	MaxDepth  uint16
+	RegCount  uint64
 }
 
 // StorableTrie is a data structure for storing trie

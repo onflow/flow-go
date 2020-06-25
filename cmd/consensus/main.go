@@ -132,7 +132,7 @@ func main() {
 			return nil
 		}).
 		Module("hotstuff main metrics", func(node *cmd.FlowNodeBuilder) error {
-			mainMetrics = metrics.NewHotstuffCollector(node.GenesisChainID)
+			mainMetrics = metrics.NewHotstuffCollector(node.RootChainID)
 			return nil
 		}).
 		Module("sync core", func(node *cmd.FlowNodeBuilder) error {

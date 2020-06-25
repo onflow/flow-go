@@ -30,23 +30,25 @@ const (
 )
 
 const (
-	ResourceUndefined       = "undefined"
-	ResourceProposal        = "proposal"
-	ResourceHeader          = "header"
-	ResourceIndex           = "index"
-	ResourceIdentity        = "identity"
-	ResourceGuarantee       = "guarantee"
-	ResourceResult          = "result"
-	ResourceReceipt         = "receipt"
-	ResourcePendingReceipt  = "pending_receipt" // used at verification node
-	ResourceCollection      = "collection"
-	ResourceApproval        = "approval"
-	ResourceSeal            = "seal"
-	ResourceCommit          = "commit"
-	ResourceTransaction     = "transaction"
-	ResourceClusterPayload  = "cluster_payload"
-	ResourceClusterProposal = "cluster_proposal"
-	ResourceChunkDataPack   = "chunk_data_pack"
+	ResourceUndefined          = "undefined"
+	ResourceProposal           = "proposal"
+	ResourceHeader             = "header"
+	ResourceIndex              = "index"
+	ResourceIdentity           = "identity"
+	ResourceGuarantee          = "guarantee"
+	ResourceResult             = "result"
+	ResourceReceipt            = "receipt"
+	ResourceCollection         = "collection"
+	ResourceApproval           = "approval"
+	ResourceSeal               = "seal"
+	ResourceCommit             = "commit"
+	ResourceTransaction        = "transaction"
+	ResourceClusterPayload     = "cluster_payload"
+	ResourceClusterProposal    = "cluster_proposal"
+	ResourceProcessedResultIDs = "processed_result_ids" // verification node, finder engine
+	ResourcePendingReceipt     = "pending_receipt"      // verification node, finder engine
+	ResourcePendingResult      = "pending_result"       // verification node, match engine
+	ResourcePendingChunks      = "pending_chunks"       // verification node, match engine
 )
 
 const (

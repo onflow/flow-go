@@ -20,7 +20,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	chmodel "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/metrics"
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
@@ -35,9 +34,9 @@ type VerifierEngineTestSuite struct {
 	me      *mocklocal.MockLocal
 	sk      crypto.PrivateKey
 	hasher  hash.Hasher
-	conduit *network.Conduit       // mocks conduit for submitting result approvals
-	metrics *metrics.NoopCollector // mocks performance monitoring metrics
 	chain   flow.Chain
+	conduit *network.Conduit                // mocks conduit for submitting result approvals
+	metrics *mockmodule.VerificationMetrics // mocks performance monitoring metrics
 }
 
 func TestVerifierEngine(t *testing.T) {
@@ -50,7 +49,7 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	suite.net = &mockmodule.Network{}
 	suite.ss = &protocol.Snapshot{}
 	suite.conduit = &network.Conduit{}
-	suite.metrics = metrics.NewNoopCollector()
+	suite.metrics = &mockmodule.VerificationMetrics{}
 	suite.chain = flow.Testnet.Chain()
 
 	suite.net.On("Register", uint8(engine.ApprovalProvider), testifymock.Anything).
@@ -118,6 +117,15 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 	suite.me.MockNodeID(myID)
 	suite.ss.On("Identities", testifymock.Anything).Return(consensusNodes, nil)
 
+	// mocks metrics
+	// reception of verifiable chunk
+	suite.metrics.On("OnVerifiableChunkReceived").Return()
+	// emission of result approval
+	suite.metrics.On("OnResultApproval").Return()
+	// chunk verification
+	suite.metrics.On("OnChunkVerificationStarted", vChunk.ChunkDataPack.ChunkID).Return()
+	suite.metrics.On("OnChunkVerificationFinished", vChunk.ChunkDataPack.ChunkID).Return()
+
 	suite.conduit.
 		On("Submit", testifymock.Anything, consensusNodes[0].NodeID).
 		Return(nil).
@@ -151,6 +159,10 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 	suite.me.MockNodeID(myID)
 	suite.ss.On("Identities", testifymock.Anything).Return(consensusNodes, nil)
 
+	// mocks metrics
+	// reception of verifiable chunk
+	suite.metrics.On("OnVerifiableChunkReceived").Return()
+
 	// we shouldn't receive any result approval
 	suite.conduit.
 		On("Submit", testifymock.Anything, consensusNodes[0].NodeID).
@@ -170,6 +182,11 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 		{unittest.VerifiableChunkDataFixture(uint64(3)), nil},
 	}
 	for _, test := range tests {
+		// mocks metrics
+		// chunk verification
+		suite.metrics.On("OnChunkVerificationStarted", test.vc.ChunkDataPack.ChunkID).Return()
+		suite.metrics.On("OnChunkVerificationFinished", test.vc.ChunkDataPack.ChunkID).Return()
+
 		err := eng.Process(myID, test.vc)
 		suite.Assert().NoError(err)
 	}

@@ -337,17 +337,28 @@ func (e *Engine) checkLoop() {
 
 CheckLoop:
 	for {
+		// give the quit channel a priority to be selected
+		select {
+		case <-e.unit.Quit():
+			break CheckLoop
+		default:
+		}
+
 		select {
 		case <-e.unit.Quit():
 			break CheckLoop
 		case <-poll.C:
-			err := e.pollHeight()
-			if network.IsPeerUnreachableError(err) {
-				e.log.Warn().Err(err).Msg("could not poll heights due to peer unreachable")
+			errs := e.pollHeight()
+			if errs.ErrorOrNil() == nil {
 				continue
 			}
-			if err != nil {
-				e.log.Error().Err(err).Msg("could not poll heights")
+
+			// if there are errors, and errors are all PeerUnreachableError, then log as warn
+			// otherwise log as error
+			if network.AllPeerUnreachableError(errs.WrappedErrors()...) {
+				e.log.Warn().Err(errs).Msg("could not poll heights due to peer unreachable")
+			} else {
+				e.log.Error().Err(errs).Msg("could not poll heights")
 			}
 		case <-scan.C:
 			final, err := e.state.Final().Head()
@@ -372,20 +383,28 @@ CheckLoop:
 }
 
 // pollHeight will send a synchronization request to three random nodes.
-func (e *Engine) pollHeight() error {
+func (e *Engine) pollHeight() *multierror.Error {
+
+	var errs *multierror.Error
 
 	// get the last finalized header
 	final, err := e.state.Final().Head()
 	if err != nil {
-		return fmt.Errorf("could not get last finalized header: %w", err)
+		errs = multierror.Append(errs, fmt.Errorf("could not get last finalized header: %w", err))
+		return errs
 	}
 
-	participants, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus))
+	// get all of the consensus nodes from the state
+	participants, err := e.state.Final().Identities(filter.And(
+		filter.HasRole(flow.RoleConsensus),
+		filter.Not(filter.HasNodeID(e.me.NodeID())),
+	))
+
 	if err != nil {
-		return fmt.Errorf("could not get participants: %w", err)
+		errs = multierror.Append(errs, fmt.Errorf("could not send get consensus identities: %w", err))
+		return errs
 	}
 
-	var errs error
 	// send the request for synchronization
 	for _, targetID := range participants.Sample(3).NodeIDs() {
 
