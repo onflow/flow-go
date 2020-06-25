@@ -20,4 +20,6 @@ const (
 	ExecutionReceiptTag = versionPrefix + "ExecutionReceipt"
 	// ResultApprovalTag is used for result approvals
 	ResultApprovalTag = versionPrefix + "ResultApproval"
+	// SPOCKTag is used to generate SPoCK proofs
+	SPOCKTag = versionPrefix + "SPoCK"
 )
