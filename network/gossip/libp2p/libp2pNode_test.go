@@ -169,8 +169,9 @@ func (l *LibP2PNodeTestSuite) TestCreateStream() {
 
 	address2 := addrs[1]
 
+	flowProtocolID := generateProtocolID(genesisID)
 	// Assert that there is no outbound stream to the target yet
-	require.Equal(l.T(), 0, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), flowLibP2PProtocolID, network.DirOutbound))
+	require.Equal(l.T(), 0, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), flowProtocolID, network.DirOutbound))
 
 	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
 	var streams []network.Stream
@@ -180,7 +181,7 @@ func (l *LibP2PNodeTestSuite) TestCreateStream() {
 		require.NoError(l.T(), err)
 		require.NotNil(l.T(), anotherStream)
 		// assert that the stream count within libp2p incremented (a new stream was created)
-		require.Equal(l.T(), i+1, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), flowLibP2PProtocolID, network.DirOutbound))
+		require.Equal(l.T(), i+1, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), flowProtocolID, network.DirOutbound))
 		// assert that the same connection is reused
 		require.Len(l.T(), nodes[0].libP2PHost.Network().Conns(), 1)
 		streams = append(streams, anotherStream)
@@ -197,7 +198,7 @@ func (l *LibP2PNodeTestSuite) TestCreateStream() {
 		}()
 		wg.Wait()
 		// assert that the stream count within libp2p decremented
-		require.Equal(l.T(), i, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), flowLibP2PProtocolID, network.DirOutbound))
+		require.Equal(l.T(), i, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), flowProtocolID, network.DirOutbound))
 	}
 }
 
@@ -363,14 +364,14 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler ...network.StreamHa
 		require.NoError(l.Suite.T(), err)
 
 		// create a node on localhost with a random port assigned by the OS
-		n, nodeID := l.CreateNode(name, pkey, "0.0.0.0", "0", handler...)
+		n, nodeID := l.CreateNode(name, pkey, "0.0.0.0", "0", genesisID, handler...)
 		nodes = append(nodes, n)
 		nodeAddrs = append(nodeAddrs, nodeID)
 	}
 	return nodes, nodeAddrs
 }
 
-func (l *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip string, port string,
+func (l *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip string, port string, genesisID string,
 	handler ...network.StreamHandler) (*P2PNode, NodeAddress) {
 	n := &P2PNode{}
 	nodeID := NodeAddress{
@@ -390,7 +391,7 @@ func (l *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip str
 		handlerFunc = func(network.Stream) {}
 	}
 
-	err := n.Start(l.ctx, nodeID, logger, key, handlerFunc)
+	err := n.Start(l.ctx, nodeID, logger, key, handlerFunc, genesisID)
 	require.NoError(l.T(), err)
 	require.Eventuallyf(l.T(), func() bool {
 		ip, p := n.GetIPPort()

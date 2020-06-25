@@ -23,7 +23,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-var genesisHash = unittest.BlockFixture().ID().String()
+var genesisID = unittest.BlockFixture().ID().String()
 
 type MiddlewareTestSuit struct {
 	suite.Suite
@@ -270,7 +270,7 @@ func (m *MiddlewareTestSuit) createMiddleWares(count int) ([]flow.Identifier, []
 
 		// creates new middleware (with an arbitrary genesis block id)
 		mw, err := NewMiddleware(logger, codec, "0.0.0.0:0", targetID, key, m.metrics, DefaultMaxPubSubMsgSize,
-			genesisHash)
+			genesisID)
 		require.NoError(m.Suite.T(), err)
 
 		mws = append(mws, mw)
