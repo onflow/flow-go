@@ -54,6 +54,7 @@ func (r Resource) ToCadence() string {
 }
 
 type Import struct {
+	Names []string
 	Address flow.Address
 }
 
@@ -81,6 +82,7 @@ func (u UpdateAccountCode) ToCadence() string {
 }
 
 type Main struct {
+	Import  Import
 	ReturnType string
 	Code       string
 }
