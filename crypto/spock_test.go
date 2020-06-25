@@ -26,17 +26,18 @@ func TestSPOCKProveVerifyAgainstData(t *testing.T) {
 		_, err = rand.Read(input)
 		require.NoError(t, err)
 		// SPoCK proof
-		s, err := SPOCKProve(sk, input)
+		kmac := NewBLSKMAC("spock test")
+		s, err := SPOCKProve(sk, input, kmac)
 		require.NoError(t, err)
 		pk := sk.PublicKey()
 		// SPoCK verify against the data
-		result, err := SPOCKVerifyAgainstData(pk, s, input)
+		result, err := SPOCKVerifyAgainstData(pk, s, input, kmac)
 		require.NoError(t, err)
 		assert.True(t, result, fmt.Sprintf(
 			"Verification should succeed:\n signature:%s\n message:%s\n private key:%s", s, input, sk))
 		// test with a different message
 		input[0] ^= 1
-		result, err = SPOCKVerifyAgainstData(pk, s, input)
+		result, err = SPOCKVerifyAgainstData(pk, s, input, kmac)
 		require.NoError(t, err)
 		assert.False(t, result, fmt.Sprintf(
 			"Verification should fail:\n signature:%s\n message:%s\n private key:%s", s, input, sk))
@@ -45,7 +46,7 @@ func TestSPOCKProveVerifyAgainstData(t *testing.T) {
 		seed[0] ^= 1
 		wrongSk, err := GeneratePrivateKey(BLSBLS12381, seed)
 		require.NoError(t, err)
-		result, err = SPOCKVerifyAgainstData(wrongSk.PublicKey(), s, input)
+		result, err = SPOCKVerifyAgainstData(wrongSk.PublicKey(), s, input, kmac)
 		require.NoError(t, err)
 		assert.False(t, result, fmt.Sprintf(
 			"Verification should fail:\n signature:%s\n message:%s\n private key:%s", s, input, sk))
@@ -77,9 +78,10 @@ func TestSPOCKProveVerify(t *testing.T) {
 		require.NoError(t, err)
 
 		// SPoCK proofs
-		pr1, err := SPOCKProve(sk1, input)
+		kmac := NewBLSKMAC("spock test")
+		pr1, err := SPOCKProve(sk1, input, kmac)
 		require.NoError(t, err)
-		pr2, err := SPOCKProve(sk2, input)
+		pr2, err := SPOCKProve(sk2, input, kmac)
 		require.NoError(t, err)
 		// SPoCK verify against the data
 		result, err := SPOCKVerify(sk1.PublicKey(), pr1, sk2.PublicKey(), pr2)
@@ -89,7 +91,7 @@ func TestSPOCKProveVerify(t *testing.T) {
 			pr1, pr2, sk1, sk2, input))
 		// test with a different message
 		input[0] ^= 1
-		pr2bis, err := SPOCKProve(sk2, input)
+		pr2bis, err := SPOCKProve(sk2, input, kmac)
 		require.NoError(t, err)
 		result, err = SPOCKVerify(sk1.PublicKey(), pr1, sk2.PublicKey(), pr2bis)
 		require.NoError(t, err)

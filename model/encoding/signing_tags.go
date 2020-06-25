@@ -11,4 +11,5 @@ const (
 	CollectorVoteTag    = "CollectorVote"
 	ExecutionReceiptTag = "ExecutionReceipt"
 	ResultApprovalTag   = "ResultApproval"
+	SPOCKTag            = "SPoCK"
 )
