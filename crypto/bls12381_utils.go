@@ -6,6 +6,8 @@ package crypto
 // these tools are shared by the BLS signature scheme, the BLS based threshold signature
 // and the BLS distributed key generation protcols
 
+// #cgo coverage CFLAGS: --coverage -fprofile-arcs -ftest-coverage -fprofile-instr-generate -fcoverage-mapping
+// #cgo coverage LDFLAGS: --coverage -fprofile-instr-generate
 // #cgo CFLAGS: -g -Wall -std=c99 -I./ -I./relic/build/include
 // #cgo LDFLAGS: -Lrelic/build/lib -l relic_s
 // #include "bls12381_utils.h"

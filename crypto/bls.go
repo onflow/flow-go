@@ -24,6 +24,8 @@ package crypto
 //  - membership checks in G1 and G2 using Bowe's method (https://eprint.iacr.org/2019/814.pdf)
 //  - implement a G1/G2 swap (signatures on G2 and public keys on G1)
 
+// #cgo coverage CFLAGS: --coverage -fprofile-arcs -ftest-coverage -fprofile-instr-generate -fcoverage-mapping
+// #cgo coverage LDFLAGS: --coverage -fprofile-instr-generate
 // #cgo CFLAGS: -g -Wall -std=c99 -I./ -I./relic/build/include
 // #cgo LDFLAGS: -Lrelic/build/lib -l relic_s
 // #include "bls_include.h"

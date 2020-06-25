@@ -2,6 +2,8 @@
 
 package crypto
 
+// #cgo coverage CFLAGS: --coverage -fprofile-arcs -ftest-coverage -fprofile-instr-generate -fcoverage-mapping
+// #cgo coverage LDFLAGS: --coverage -fprofile-instr-generate
 // #cgo CFLAGS: -g -Wall -std=c99
 // #include "dkg_include.h"
 import "C"
