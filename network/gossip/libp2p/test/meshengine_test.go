@@ -238,7 +238,8 @@ func (m *MeshNetTestSuite) TestMaxMessageSize() {
 	require.NoError(m.T(), err)
 
 	// create a large message approximately equal to max message size
-	overhead := 500                                                       // approx 500 bytes overhead for message headers & encoding overhead
+	// approx 1000 bytes overhead for message headers, encoding overhead and libp2p message overhead
+	overhead := 1000
 	payloadSize := libp2p.DefaultMaxPubSubMsgSize - overhead - len(empty) // max possible payload size
 	payload := make([]byte, payloadSize)                                  // create a message of max possible payload size
 	for i := range payload {

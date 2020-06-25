@@ -18,6 +18,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 type PubSubTestSuite struct {
@@ -61,7 +63,7 @@ func (s *mockDiscovery) FindPeers(_ context.Context, _ string, _ ...discovery.Op
 // TestPubSub checks if nodes can subscribe to a topic and send and receive a message
 func (p *PubSubTestSuite) TestPubSub() {
 	defer p.cancel()
-	topic := "testtopic"
+	topic := "testtopic/" + unittest.BlockFixture().ID().String()
 	count := 4
 	golog.SetAllLoggers(golog.LevelError)
 
