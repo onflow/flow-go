@@ -135,12 +135,25 @@ func main() {
 				node.Logger.Debug().Err(err).Msg("ignoring failures in follower core")
 			}
 
-			follower, err := followereng.New(node.Logger, node.Network, node.Me, node.Metrics.Engine, node.Metrics.Mempool, cleaner, node.Storage.Headers, node.Storage.Payloads, node.State, conCache, core)
+			follower, err := followereng.New(
+				node.Logger,
+				node.Network,
+				node.Me,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
+				cleaner,
+				node.Storage.Headers,
+				node.Storage.Payloads,
+				node.State,
+				conCache,
+				core,
+				syncCore,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
 
-			return follower.WithSynchronization(syncCore), nil
+			return follower, nil
 		}).
 		Component("sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			sync, err := synceng.New(

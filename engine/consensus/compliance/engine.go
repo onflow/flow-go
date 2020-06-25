@@ -58,7 +58,7 @@ func New(
 	state protocol.State,
 	prov network.Engine,
 	pending module.PendingBlockBuffer,
-	blockRateDelay time.Duration,
+	sync module.BlockRequester,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
@@ -75,7 +75,7 @@ func New(
 		state:    state,
 		prov:     prov,
 		pending:  pending,
-		sync:     nil, // use `WithSynchronization`
+		sync:     sync,
 		hotstuff: nil, // use `WithConsensus`
 	}
 
@@ -91,13 +91,6 @@ func New(
 	return e, nil
 }
 
-// WithSynchronization adds the synchronization engine responsible for bringing the node
-// up to speed to the compliance engine.
-func (e *Engine) WithSynchronization(sync module.BlockRequester) *Engine {
-	e.sync = sync
-	return e
-}
-
 // WithConsensus adds the consensus algorithm to the engine. This must be
 // called before the engine can start.
 func (e *Engine) WithConsensus(hot module.HotStuff) *Engine {
@@ -109,14 +102,10 @@ func (e *Engine) WithConsensus(hot module.HotStuff) *Engine {
 // started. For consensus engine, this is true once the underlying consensus
 // algorithm has started.
 func (e *Engine) Ready() <-chan struct{} {
-	if e.sync == nil {
-		panic("must initialize compliance engine with synchronization module")
-	}
 	if e.hotstuff == nil {
 		panic("must initialize compliance engine with hotstuff engine")
 	}
 	return e.unit.Ready(func() {
-		<-e.sync.Ready()
 		<-e.hotstuff.Ready()
 	})
 }
@@ -125,8 +114,6 @@ func (e *Engine) Ready() <-chan struct{} {
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
-		e.log.Debug().Msg("shutting down synchronization engine")
-		<-e.sync.Done()
 		e.log.Debug().Msg("shutting down hotstuff eventloop")
 		<-e.hotstuff.Done()
 		e.log.Debug().Msg("all components have been shut down")

@@ -376,7 +376,7 @@ func (ss *SyncSuite) TestPollHeight() {
 		},
 	)
 	err := ss.e.pollHeight()
-	require.NoError(ss.T(), err, "should pass poll height")
+	require.Nil(ss.T(), err, "should pass poll height")
 	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 3)
 }
 

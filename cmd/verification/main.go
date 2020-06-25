@@ -234,7 +234,7 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, node.Storage.Headers, final, verifier, finderEng, node.GenesisBlock.Header, node.GenesisQC, finalized, pending)
+			followerCore, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, node.Storage.Headers, final, verifier, finderEng, node.GenesisBlock.Header, node.GenesisQC, finalized, pending)
 			if err != nil {
 				// return nil, fmt.Errorf("could not create follower core logic: %w", err)
 				// TODO for now we ignore failures in follower
@@ -244,7 +244,8 @@ func main() {
 				node.Logger.Debug().Err(err).Msg("ignoring failures in follower core")
 			}
 
-			followerEng, err = followereng.New(node.Logger,
+			followerEng, err = followereng.New(
+				node.Logger,
 				node.Network,
 				node.Me,
 				node.Metrics.Engine,
@@ -254,12 +255,14 @@ func main() {
 				node.Storage.Payloads,
 				node.State,
 				conCache,
-				core)
+				followerCore,
+				syncCore,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
 
-			return followerEng.WithSynchronization(syncCore), nil
+			return followerEng, nil
 		}).
 		Component("sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			sync, err := synceng.New(

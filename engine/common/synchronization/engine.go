@@ -426,7 +426,10 @@ func (e *Engine) pollHeight() *multierror.Error {
 // sendRequests sends a request for each range and batch.
 func (e *Engine) sendRequests(ranges []flow.Range, batches []flow.Batch) error {
 
-	participants, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus))
+	participants, err := e.state.Final().Identities(filter.And(
+		filter.HasRole(flow.RoleConsensus),
+		filter.Not(filter.HasNodeID(e.me.NodeID())),
+	))
 	if err != nil {
 		return fmt.Errorf("could not get participants: %w", err)
 	}

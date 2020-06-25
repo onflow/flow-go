@@ -241,7 +241,7 @@ func main() {
 			}
 
 			// creates a consensus follower with noop consumer as the notifier
-			core, err := consensus.NewFollower(
+			followerCore, err := consensus.NewFollower(
 				node.Logger,
 				mainConsensusCommittee,
 				node.Storage.Headers,
@@ -268,13 +268,14 @@ func main() {
 				node.Storage.Payloads,
 				node.State,
 				conCache,
-				core,
+				followerCore,
+				mainChainSyncCore,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
 
-			return followerEng.WithSynchronization(mainChainSyncCore), nil
+			return followerEng, nil
 		}).
 		Component("main chain sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
@@ -349,6 +350,7 @@ func main() {
 				colHeaders,
 				colPayloads,
 				colCache,
+				clusterSyncCore,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize engine: %w", err)
@@ -400,7 +402,7 @@ func main() {
 				return nil, fmt.Errorf("could not initialize hotstuff participant: %w", err)
 			}
 
-			proposalEng = proposalEng.WithConsensus(hot).WithSynchronization(clusterSyncCore)
+			proposalEng = proposalEng.WithConsensus(hot)
 			return proposalEng, nil
 		}).
 		Component("cluster sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {

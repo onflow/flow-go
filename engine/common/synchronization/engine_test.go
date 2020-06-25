@@ -145,7 +145,7 @@ func (ss *SyncSuite) SetupTest() {
 	// initialize the engine
 	log := zerolog.New(ioutil.Discard)
 	metrics := metrics.NewNoopCollector()
-	e, err := New(log, metrics, ss.net, ss.me, ss.participants, ss.state, ss.blocks, ss.comp, ss.core)
+	e, err := New(log, metrics, ss.net, ss.me, ss.state, ss.blocks, ss.comp, ss.core)
 	require.NoError(ss.T(), err, "should pass engine initialization")
 
 	ss.e = e

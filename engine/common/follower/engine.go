@@ -48,6 +48,7 @@ func New(
 	state protocol.State,
 	pending module.PendingBlockBuffer,
 	follower module.HotStuffFollower,
+	sync module.BlockRequester,
 ) (*Engine, error) {
 
 	e := &Engine{
@@ -62,6 +63,7 @@ func New(
 		state:          state,
 		pending:        pending,
 		follower:       follower,
+		sync:           sync,
 	}
 
 	con, err := net.Register(engine.BlockProvider, e)
@@ -73,23 +75,11 @@ func New(
 	return e, nil
 }
 
-// WithSynchronization injects the given synchronization protocol into the
-// hotstuff follower, providing it with blocks proactively, while also allowing
-// it to explicitly request blocks by ID.
-func (e *Engine) WithSynchronization(sync module.BlockRequester) *Engine {
-	e.sync = sync
-	return e
-}
-
 // Ready returns a ready channel that is closed once the engine has fully
 // started. For consensus engine, this is true once the underlying consensus
 // algorithm has started.
 func (e *Engine) Ready() <-chan struct{} {
-	if e.sync == nil {
-		panic("follower engine requires injected synchronization module")
-	}
 	return e.unit.Ready(func() {
-		<-e.sync.Ready()
 		<-e.follower.Ready()
 	})
 }
@@ -99,7 +89,6 @@ func (e *Engine) Ready() <-chan struct{} {
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
 		<-e.follower.Done()
-		<-e.sync.Done()
 	})
 }
 

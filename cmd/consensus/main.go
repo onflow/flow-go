@@ -207,7 +207,7 @@ func main() {
 			proposals := buffer.NewPendingBlocks()
 
 			// initialize the compliance engine
-			comp, err := compliance.New(
+			comp, err = compliance.New(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
@@ -220,7 +220,7 @@ func main() {
 				node.State,
 				prov,
 				proposals,
-				blockRateDelay,
+				syncCore,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
@@ -324,7 +324,7 @@ func main() {
 				return nil, fmt.Errorf("could not initialize hotstuff engine: %w", err)
 			}
 
-			comp = comp.WithSynchronization(syncCore).WithConsensus(hot)
+			comp = comp.WithConsensus(hot)
 			return comp, nil
 		}).
 		Component("sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
