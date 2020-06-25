@@ -16,6 +16,9 @@ type Identifiers interface {
 	// Rem removes the given identifier
 	Rem(id flow.Identifier) bool
 
+	// Size returns total number of identifiers in mempool
+	Size() uint
+
 	// All will retrieve all identifiers that are currently in the memory pool
 	// as an IdentityList
 	All() flow.IdentifierList

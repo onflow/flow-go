@@ -22,6 +22,9 @@ type PendingReceipts interface {
 	// Rem will remove a receipt by ID.
 	Rem(preceiptID flow.Identifier) bool
 
+	// Size returns total number receipts in mempool
+	Size() uint
+
 	// All will return a list of all receipts in the memory pool.
 	All() []*verification.PendingReceipt
 }

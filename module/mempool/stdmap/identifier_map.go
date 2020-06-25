@@ -91,3 +91,8 @@ func (i *IdentifierMap) Get(key flow.Identifier) ([]flow.Identifier, bool) {
 func (i *IdentifierMap) Rem(id flow.Identifier) bool {
 	return i.Backend.Rem(id)
 }
+
+// Size returns number of IdMapEntities in mempool
+func (i *IdentifierMap) Size() uint {
+	return i.Backend.Size()
+}
