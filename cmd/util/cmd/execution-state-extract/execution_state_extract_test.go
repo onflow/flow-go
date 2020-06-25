@@ -119,35 +119,6 @@ func TestExtractExecutionState(t *testing.T) {
 
 					require.FileExists(t, path.Join(outdir, "checkpoint.00000000")) //make sure we have checkpoint file
 
-					//mForest, err := mtrie.NewMForest(ledger.MaxHeight, outdir, 1000, metr, func(evictedTrie *trie.MTrie) error {
-					//	return nil
-					//})
-					//require.NoError(t, err)
-					//
-					//
-					//w, err := wal.NewWAL(nil, nil, outdir, 1000, ledger.MaxHeight)
-					//require.NoError(t, err)
-					//
-					//err = w.Replay(
-					//	func(forestSequencing *flattener.FlattenedForest) error {
-					//		rebuiltTries, err := flattener.RebuildTries(forestSequencing)
-					//		if err != nil {
-					//			return fmt.Errorf("rebuilding forest from sequenced nodes failed: %w", err)
-					//		}
-					//		err = mForest.AddTries(rebuiltTries)
-					//		if err != nil {
-					//			return fmt.Errorf("adding rebuilt tries to forest failed: %w", err)
-					//		}
-					//		return nil
-					//	},
-					//	func(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
-					//		return fmt.Errorf("no WAL updates expected")
-					//	},
-					//	func(stateCommitment flow.StateCommitment) error {
-					//		return fmt.Errorf("no WAL deletion expected")
-					//	},
-					//)
-
 					storage, err := ledger.NewMTrieStorage(outdir, 1000, metr, nil)
 
 					require.NoError(t, err)
