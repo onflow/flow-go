@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/engine/execution/sync"
+	bootstrapFilenames "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -78,6 +80,18 @@ func main() {
 			return nil
 		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+
+			err := bootstrap.BootstrapExecutionDatabase(node.DB, node.RootCommit, node.RootBlock.Header)
+			// Root block already loaded, can simply continued
+			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+				return nil, fmt.Errorf("could not bootstrap execution DB: %w", err)
+			} else if err == nil {
+				// Newly bootstrapped Execution DB. Make sure to load execution state
+				if err := loadCheckpoint(node.BaseConfig.BootstrapDir, triedir); err != nil {
+					return nil, fmt.Errorf("could load bootstrap checkpoint: %w", err)
+				}
+			}
+
 			ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), collector, node.MetricsRegisterer)
 			return ledgerStorage, err
 		}).
@@ -106,12 +120,6 @@ func main() {
 				node.DB,
 				node.Tracer,
 			)
-
-			err = bootstrap.BootstrapExecutionDatabase(node.DB, node.RootCommit, node.RootBlock.Header)
-			// Root block already loaded, can simply continue
-			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-				return nil, fmt.Errorf("could not bootstrap execution DB: %w", err)
-			}
 
 			stateSync := sync.NewStateSynchronizer(executionState)
 
@@ -159,4 +167,27 @@ func main() {
 			return rpcEng, nil
 		}).Run()
 
+}
+
+func loadCheckpoint(dir, trie string) error {
+	src := filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, "checkpoint.00000000")
+	dst := filepath.Join(trie, "checkpoint.00000000")
+
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	if err != nil {
+		return err
+	}
+	return out.Close()
 }
