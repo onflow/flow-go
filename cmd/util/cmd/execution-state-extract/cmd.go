@@ -2,6 +2,7 @@ package extract
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -67,4 +68,6 @@ func run(*cobra.Command, []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot generate checkpoint with state commitment")
 	}
+
+	time.Sleep(2 * time.Second)
 }

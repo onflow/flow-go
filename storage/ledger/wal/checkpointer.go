@@ -184,14 +184,16 @@ type SyncOnCloseFile struct {
 
 func (s *SyncOnCloseFile) Close() error {
 	defer func() {
-		_ = s.file.Close()
+		err := s.file.Close()
+		if err != nil {
+			fmt.Printf("error while closing file: %s", err)
+		}
 	}()
 
 	err := s.Flush()
 	if err != nil {
 		return fmt.Errorf("cannot flush buffer: %w", err)
 	}
-
 	return s.file.Sync()
 }
 
