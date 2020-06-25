@@ -27,6 +27,10 @@ type ExecutionCollector struct {
 	storageStateCommitment           prometheus.Gauge
 	forestApproxMemorySize           prometheus.Gauge
 	forestNumberOfTrees              prometheus.Gauge
+	latestTrieRegCount               prometheus.Gauge
+	latestTrieRegCountDiff           prometheus.Gauge
+	latestTrieMaxDepth               prometheus.Gauge
+	latestTrieMaxDepthDiff           prometheus.Gauge
 	updated                          prometheus.Counter
 	proofSize                        prometheus.Gauge
 	updatedValuesNumber              prometheus.Counter
@@ -39,6 +43,9 @@ type ExecutionCollector struct {
 	readDurationPerValue             prometheus.Histogram
 	collectionRequestSent            prometheus.Counter
 	collectionRequestRetried         prometheus.Counter
+	transactionParseTime             prometheus.Histogram
+	transactionCheckTime             prometheus.Histogram
+	transactionInterpretTime         prometheus.Histogram
 }
 
 func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer) *ExecutionCollector {
@@ -56,6 +63,35 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 		Name:      "forest_number_of_trees",
 		Help:      "number of trees in memory",
 	})
+
+	latestTrieRegCount := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemMTrie,
+		Name:      "latest_trie_reg_count",
+		Help:      "number of allocated registers (latest created trie)",
+	})
+
+	latestTrieRegCountDiff := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemMTrie,
+		Name:      "latest_trie_reg_count_diff",
+		Help:      "the difference between number of unique register allocated of the latest created trie and parent trie",
+	})
+
+	latestTrieMaxDepth := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemMTrie,
+		Name:      "latest_trie_max_depth",
+		Help:      "maximum depth of the latest created trie",
+	})
+
+	latestTrieMaxDepthDiff := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemMTrie,
+		Name:      "latest_trie_max_depth_diff",
+		Help:      "the difference between the max depth of the latest created trie and parent trie",
+	})
+
 	updatedCount := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
@@ -83,6 +119,7 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 		Name:      "update_values_size",
 		Help:      "total size of values for single update in bytes",
 	})
+
 	updatedDuration := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
@@ -90,6 +127,7 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 		Help:      "duration of update operation",
 		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
 	})
+
 	updatedDurationPerValue := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
@@ -97,18 +135,21 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 		Help:      "duration of update operation per value",
 		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
 	})
+
 	readValuesNumber := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "read_values_number",
 		Help:      "total number of values read",
 	})
+
 	readValuesSize := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "read_values_size",
 		Help:      "total size of values for single read in bytes",
 	})
+
 	readDuration := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
@@ -116,6 +157,7 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 		Help:      "duration of read operation",
 		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
 	})
+
 	readDurationPerValue := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
@@ -138,8 +180,33 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 		Help:      "number of collection requests retried",
 	})
 
+	transactionParseTime := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "transaction_parse_time_nanoseconds",
+		Help:      "the parse time for a transaction in nanoseconds",
+	})
+
+	transactionCheckTime := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "transaction_check_time_nanoseconds",
+		Help:      "the checking time for a transaction in nanoseconds",
+	})
+
+	transactionInterpretTime := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "transaction_interpret_time_nanoseconds",
+		Help:      "the interpretation time for a transaction in nanoseconds",
+	})
+
 	registerer.MustRegister(forestApproxMemorySize)
 	registerer.MustRegister(forestNumberOfTrees)
+	registerer.MustRegister(latestTrieRegCount)
+	registerer.MustRegister(latestTrieRegCountDiff)
+	registerer.MustRegister(latestTrieMaxDepth)
+	registerer.MustRegister(latestTrieMaxDepthDiff)
 	registerer.MustRegister(updatedCount)
 	registerer.MustRegister(proofSize)
 	registerer.MustRegister(updatedValuesNumber)
@@ -152,12 +219,19 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 	registerer.MustRegister(readDurationPerValue)
 	registerer.MustRegister(collectionRequestsSent)
 	registerer.MustRegister(collectionRequestsRetries)
+	registerer.MustRegister(transactionParseTime)
+	registerer.MustRegister(transactionCheckTime)
+	registerer.MustRegister(transactionInterpretTime)
 
 	ec := &ExecutionCollector{
 		tracer: tracer,
 
 		forestApproxMemorySize:   forestApproxMemorySize,
 		forestNumberOfTrees:      forestNumberOfTrees,
+		latestTrieRegCount:       latestTrieRegCount,
+		latestTrieRegCountDiff:   latestTrieRegCountDiff,
+		latestTrieMaxDepth:       latestTrieMaxDepth,
+		latestTrieMaxDepthDiff:   latestTrieMaxDepthDiff,
 		updated:                  updatedCount,
 		proofSize:                proofSize,
 		updatedValuesNumber:      updatedValuesNumber,
@@ -170,6 +244,9 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 		readDurationPerValue:     readDurationPerValue,
 		collectionRequestSent:    collectionRequestsSent,
 		collectionRequestRetried: collectionRequestsRetries,
+		transactionParseTime:     transactionParseTime,
+		transactionCheckTime:     transactionCheckTime,
+		transactionInterpretTime: transactionInterpretTime,
 
 		gasUsedPerBlock: promauto.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespaceExecution,
@@ -271,6 +348,26 @@ func (ec *ExecutionCollector) ForestNumberOfTrees(number uint64) {
 	ec.forestNumberOfTrees.Set(float64(number))
 }
 
+// LatestTrieRegCount records the number of unique register allocated (the lastest created trie)
+func (ec *ExecutionCollector) LatestTrieRegCount(number uint64) {
+	ec.latestTrieRegCount.Set(float64(number))
+}
+
+// LatestTrieRegCountDiff records the difference between the number of unique register allocated of the latest created trie and parent trie
+func (ec *ExecutionCollector) LatestTrieRegCountDiff(number uint64) {
+	ec.latestTrieRegCountDiff.Set(float64(number))
+}
+
+// LatestTrieMaxDepth records the maximum depth of the last created trie
+func (ec *ExecutionCollector) LatestTrieMaxDepth(number uint64) {
+	ec.latestTrieMaxDepth.Set(float64(number))
+}
+
+// LatestTrieMaxDepthDiff records the difference between the max depth of the latest created trie and parent trie
+func (ec *ExecutionCollector) LatestTrieMaxDepthDiff(number uint64) {
+	ec.latestTrieMaxDepthDiff.Set(float64(number))
+}
+
 // UpdateCount increase a counter of performed updates
 func (ec *ExecutionCollector) UpdateCount() {
 	ec.updated.Inc()
@@ -327,4 +424,19 @@ func (ec *ExecutionCollector) ExecutionCollectionRequestSent() {
 
 func (ec *ExecutionCollector) ExecutionCollectionRequestRetried() {
 	ec.collectionRequestRetried.Inc()
+}
+
+// TransactionParsed reports the time spent parsing a single transaction
+func (ec *ExecutionCollector) TransactionParsed(dur time.Duration) {
+	ec.transactionParseTime.Observe(float64(dur))
+}
+
+// TransactionChecked reports the time spent checking a single transaction
+func (ec *ExecutionCollector) TransactionChecked(dur time.Duration) {
+	ec.transactionCheckTime.Observe(float64(dur))
+}
+
+// TransactionInterpreted reports the time spent interpreting a single transaction
+func (ec *ExecutionCollector) TransactionInterpreted(dur time.Duration) {
+	ec.transactionInterpretTime.Observe(float64(dur))
 }

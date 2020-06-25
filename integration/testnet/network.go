@@ -54,6 +54,9 @@ const (
 	AccessNodeAPIPort = "access-api-port"
 	// GhostNodeAPIPort is the name used for the access node API port.
 	GhostNodeAPIPort = "ghost-api-port"
+
+	// ExeNodeMetricsPort
+	ExeNodeMetricsPort = "exe-metrics-port"
 )
 
 func init() {
@@ -408,12 +411,20 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			nodeContainer.bindPort(hostPort, containerPort)
 
+			hostMetricsPort := testingdock.RandomPort(t)
+			containerMetricsPort := "8080/tcp"
+
+			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
+
 			nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 			if !nodeContainer.Config.Ghost {
 			}
 			nodeContainer.Ports[ExeNodeAPIPort] = hostPort
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckExecutionGRPC(hostPort))
 			net.AccessPorts[ExeNodeAPIPort] = hostPort
+
+			nodeContainer.Ports[ExeNodeMetricsPort] = hostMetricsPort
+			net.AccessPorts[ExeNodeMetricsPort] = hostMetricsPort
 
 			// create directories for execution state trie and values in the tmp
 			// host directory.
@@ -468,6 +479,10 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 }
 
 func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Block, []ContainerConfig, error) {
+	// Setup as Testnet
+	chainID := flow.Testnet
+	chain := chainID.Chain()
+
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
 	if nNodes == 0 {
@@ -491,13 +506,13 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 
 	// generate the initial execution state
 	dbDir := filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState)
-	commit, err := run.GenerateExecutionState(dbDir, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply)
+	commit, err := run.GenerateExecutionState(dbDir, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply, chain)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// generate genesis block
-	genesis := bootstraprun.GenerateRootBlock(toIdentityList(confs))
+	genesis := bootstraprun.GenerateRootBlock(toIdentityList(confs), chainID)
 
 	// generate QC
 	nodeInfos := bootstrap.FilterByRole(toNodeInfoList(confs), flow.RoleConsensus)

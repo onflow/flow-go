@@ -341,10 +341,6 @@ func TestRandomProofs(t *testing.T) {
 			rand.Seed(time.Now().UnixNano())
 
 			numberOfKeys := rand.Intn(256) + 1
-			if numberOfKeys == 0 {
-				numberOfKeys = 1
-			}
-
 			alreadySelectKeys := make(map[string]bool)
 			i := 0
 			for i < numberOfKeys {

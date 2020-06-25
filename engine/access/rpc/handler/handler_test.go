@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
@@ -19,6 +21,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
+	realstorage "github.com/dapperlabs/flow-go/storage"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -36,6 +39,7 @@ type Suite struct {
 	transactions *storage.Transactions
 	colClient    *mockaccess.AccessAPIClient
 	execClient   *mockaccess.ExecutionAPIClient
+	chainID      flow.ChainID
 }
 
 func TestHandler(t *testing.T) {
@@ -60,7 +64,7 @@ func (suite *Suite) SetupTest() {
 func (suite *Suite) TestPing() {
 	suite.colClient.On("Ping", mock.Anything, &access.PingRequest{}).Return(&access.PingResponse{}, nil)
 	suite.execClient.On("Ping", mock.Anything, &execution.PingRequest{}).Return(&execution.PingResponse{}, nil)
-	handler := NewHandler(suite.log, suite.state, suite.execClient, suite.colClient, nil, nil, nil, nil)
+	handler := NewHandler(suite.log, suite.state, suite.execClient, suite.colClient, nil, nil, nil, nil, suite.chainID)
 	ping := &access.PingRequest{}
 	pong, err := handler.Ping(context.Background(), ping)
 	suite.checkResponse(pong, err)
@@ -70,7 +74,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	// setup the mocks
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(&block, nil).Once()
-	handler := NewHandler(suite.log, suite.state, nil, nil, nil, nil, nil, nil)
+	handler := NewHandler(suite.log, suite.state, nil, nil, nil, nil, nil, nil, suite.chainID)
 
 	// query the handler for the latest finalized block
 	req := &access.GetLatestBlockHeaderRequest{IsSealed: false}
@@ -89,7 +93,7 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 	//setup the mocks
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(&block, nil).Once()
-	handler := NewHandler(suite.log, suite.state, nil, nil, nil, suite.headers, nil, nil)
+	handler := NewHandler(suite.log, suite.state, nil, nil, nil, suite.headers, nil, nil, suite.chainID)
 
 	// query the handler for the latest sealed block
 	req := &access.GetLatestBlockHeaderRequest{IsSealed: true}
@@ -108,7 +112,7 @@ func (suite *Suite) TestGetTransaction() {
 	transaction := unittest.TransactionFixture()
 	expected := transaction.TransactionBody
 	suite.transactions.On("ByID", transaction.ID()).Return(&expected, nil).Once()
-	handler := NewHandler(suite.log, suite.state, nil, nil, nil, nil, nil, suite.transactions)
+	handler := NewHandler(suite.log, suite.state, nil, nil, nil, nil, nil, suite.transactions, suite.chainID)
 	id := transaction.ID()
 	req := &access.GetTransactionRequest{
 		Id: id[:],
@@ -137,7 +141,7 @@ func (suite *Suite) TestGetCollection() {
 	for _, t := range collection.Transactions {
 		suite.transactions.On("ByID", t.ID()).Return(t, nil).Once()
 	}
-	handler := NewHandler(suite.log, suite.state, nil, nil, nil, nil, suite.collections, suite.transactions)
+	handler := NewHandler(suite.log, suite.state, nil, nil, nil, nil, suite.collections, suite.transactions, suite.chainID)
 	id := collection.ID()
 	req := &access.GetCollectionByIDRequest{
 		Id: id[:],
@@ -187,30 +191,97 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	exeEventResp := execution.GetTransactionResultResponse{
 		Events: nil,
 	}
-	// execution node returns an empty list of events each time
-	suite.execClient.On("GetTransactionResult", ctx, &exeEventReq).Return(&exeEventResp, nil)
 
-	handler := NewHandler(suite.log, suite.state, suite.execClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions)
+	handler := NewHandler(suite.log, suite.state, suite.execClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions, suite.chainID)
 	req := &access.GetTransactionRequest{
 		Id: txID[:],
 	}
 
-	// first call - when block under test is ahead of head
+	// Successfully return empty event list
+	suite.execClient.On("GetTransactionResult", ctx, &exeEventReq).Return(&exeEventResp, status.Errorf(codes.NotFound, "not found")).Once()
+	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
 	resp, err := handler.GetTransactionResult(ctx, req)
 	suite.checkResponse(resp, err)
 
 	// status should be finalized since the sealed blocks is smaller in height
 	suite.Assert().Equal(entities.TransactionStatus_FINALIZED, resp.GetStatus())
 
+	// Successfully return empty event list from here on
+	suite.execClient.On("GetTransactionResult", ctx, &exeEventReq).Return(&exeEventResp, nil)
+	// second call - when block under test's height is greater height than the sealed head
+	resp, err = handler.GetTransactionResult(ctx, req)
+	suite.checkResponse(resp, err)
+
+	// status should be executed since no `NotFound` error in the `GetTransactionResult` call
+	suite.Assert().Equal(entities.TransactionStatus_EXECUTED, resp.GetStatus())
+
 	// now let the head block be finalized
 	headBlock.Header.Height = block.Header.Height + 1
 
-	// second call - when block under test is behind head
+	// third call - when block under test's height is less than sealed head's height
 	resp, err = handler.GetTransactionResult(ctx, req)
 	suite.checkResponse(resp, err)
 
 	// status should be sealed since the sealed blocks is greater in height
 	suite.Assert().Equal(entities.TransactionStatus_SEALED, resp.GetStatus())
+
+	// now go far into the future
+	headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry + 1
+
+	// fourth call - when block under test's height so much less than the head's height that it's considered expired,
+	// but since there is a execution result, means it should retain it's sealed status
+	resp, err = handler.GetTransactionResult(ctx, req)
+	suite.checkResponse(resp, err)
+
+	// status should be expired since
+	suite.Assert().Equal(entities.TransactionStatus_SEALED, resp.GetStatus())
+
+	suite.assertAllExpectations()
+}
+
+// TestTransactionExpiredStatusTransition tests that the status of transaction changes from Unknown to Expired
+// when enough blocks pass
+func (suite *Suite) TestTransactionExpiredStatusTransition() {
+
+	ctx := context.Background()
+	collection := unittest.CollectionFixture(1)
+	transactionBody := collection.Transactions[0]
+	block := unittest.BlockFixture()
+	block.Header.Height = 2
+	transactionBody.SetReferenceBlockID(block.ID())
+	headBlock := unittest.BlockFixture()
+	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
+	suite.snapshot.On("Head").Return(headBlock.Header, nil)
+	snapshotAtBlock := new(protocol.Snapshot)
+	snapshotAtBlock.On("Head").Return(block.Header, nil)
+	suite.state.On("AtBlockID", block.ID()).Return(snapshotAtBlock, nil)
+
+	// transaction storage returns the corresponding transaction
+	suite.transactions.On("ByID", transactionBody.ID()).Return(transactionBody, nil)
+	// collection storage returns a not found error
+	suite.collections.On("LightByTransactionID", transactionBody.ID()).Return(nil, realstorage.ErrNotFound)
+
+	txID := transactionBody.ID()
+
+	handler := NewHandler(suite.log, suite.state, suite.execClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions, suite.chainID)
+	req := &access.GetTransactionRequest{
+		Id: txID[:],
+	}
+
+	// first call - referenced block isn't known yet, so should return pending status
+	resp, err := handler.GetTransactionResult(ctx, req)
+	suite.checkResponse(resp, err)
+
+	suite.Assert().Equal(entities.TransactionStatus_PENDING, resp.GetStatus())
+
+	// now go far into the future
+	headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry + 1
+
+	// second call - reference block is now very far behind, and should be considered expired
+	resp, err = handler.GetTransactionResult(ctx, req)
+	suite.checkResponse(resp, err)
+
+	suite.Assert().Equal(entities.TransactionStatus_EXPIRED, resp.GetStatus())
 
 	suite.assertAllExpectations()
 }
@@ -221,7 +292,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 	header := block.Header
 	suite.snapshot.On("Head").Return(header, nil).Once()
 	suite.blocks.On("ByID", header.ID()).Return(&block, nil).Once()
-	handler := NewHandler(suite.log, suite.state, nil, nil, suite.blocks, nil, nil, nil)
+	handler := NewHandler(suite.log, suite.state, nil, nil, suite.blocks, nil, nil, nil, suite.chainID)
 
 	// query the handler for the latest finalized header
 	req := &access.GetLatestBlockRequest{IsSealed: false}
@@ -274,7 +345,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	suite.execClient.On("GetEventsForBlockIDs", ctx, exeReq).Return(&exeResp, nil).Once()
 
 	// create the handler
-	handler := NewHandler(suite.log, suite.state, suite.execClient, nil, nil, nil, nil, nil)
+	handler := NewHandler(suite.log, suite.state, suite.execClient, nil, nil, nil, nil, nil, suite.chainID)
 
 	// execute request
 	req := &access.GetEventsForBlockIDsRequest{BlockIds: blockIDs, Type: string(flow.EventAccountCreated)}
@@ -345,7 +416,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			EndHeight:   minHeight,
 			Type:        string(flow.EventAccountCreated)}
 
-		handler := NewHandler(suite.log, suite.state, nil, nil, nil, nil, nil, nil)
+		handler := NewHandler(suite.log, suite.state, nil, nil, nil, nil, nil, nil, suite.chainID)
 		_, err := handler.GetEventsForHeightRange(ctx, req)
 		require.Error(suite.T(), err)
 		suite.assertAllExpectations() // assert that request was not sent to execution node
@@ -361,7 +432,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		expectedResp := setupExecClient()
 
 		// create handler
-		handler := NewHandler(suite.log, suite.state, suite.execClient, nil, suite.blocks, suite.headers, nil, nil)
+		handler := NewHandler(suite.log, suite.state, suite.execClient, nil, suite.blocks, suite.headers, nil, nil, suite.chainID)
 
 		req := &access.GetEventsForHeightRangeRequest{
 			StartHeight: minHeight,
@@ -383,7 +454,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		expBlockIDs = setupStorage(minHeight, headHeight)
 		expectedResp := setupExecClient()
 
-		handler := NewHandler(suite.log, suite.state, suite.execClient, nil, suite.blocks, suite.headers, nil, nil)
+		handler := NewHandler(suite.log, suite.state, suite.execClient, nil, suite.blocks, suite.headers, nil, nil, suite.chainID)
 
 		req := &access.GetEventsForHeightRangeRequest{
 			StartHeight: minHeight,
@@ -429,7 +500,7 @@ func (suite *Suite) TestGetAccount() {
 	suite.execClient.On("GetAccountAtBlockID", ctx, exeReq).Return(exeResp, nil).Once()
 
 	// create the handler with the mock
-	handler := NewHandler(suite.log, suite.state, suite.execClient, nil, nil, suite.headers, nil, nil)
+	handler := NewHandler(suite.log, suite.state, suite.execClient, nil, nil, suite.headers, nil, nil, suite.chainID)
 
 	suite.Run("happy path - valid request and valid response", func() {
 		expectedResp := &access.GetAccountResponse{
@@ -455,7 +526,7 @@ func (suite *Suite) TestGetAccount() {
 
 func (suite *Suite) TestGetNetworkParameters() {
 	expectedChainID := string(flow.Mainnet)
-	handler := NewHandler(suite.log, nil, nil, nil, nil, nil, nil, nil)
+	handler := NewHandler(suite.log, nil, nil, nil, nil, nil, nil, nil, flow.Mainnet)
 	npReq := &access.GetNetworkParametersRequest{}
 	npResp, err := handler.GetNetworkParameters(context.Background(), npReq)
 	suite.checkResponse(npResp, err)

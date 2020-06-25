@@ -2,16 +2,18 @@ package virtualmachine
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/rand"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/dapperlabs/flow-go/engine/execution/utils"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
 )
@@ -22,30 +24,50 @@ type CheckerFunc func([]byte, runtime.Location) error
 
 type TransactionContext struct {
 	LedgerDAL
-	bc                        BlockContext
-	ledger                    LedgerDAL
-	astCache                  ASTCache
-	signingAccounts           []runtime.Address
-	checker                   CheckerFunc
-	logs                      []string
-	events                    []cadence.Event
-	tx                        *flow.TransactionBody
-	gasLimit                  uint64
-	uuid                      uint64 // TODO: implement proper UUID
-	skipVerification          bool
-	skipDeploymentRestriction bool
-	header                    *flow.Header
-	blocks                    Blocks
+	runtime.Metrics
+	bc                               BlockContext
+	ledger                           LedgerDAL
+	astCache                         ASTCache
+	signingAccounts                  []runtime.Address
+	checker                          CheckerFunc
+	logs                             []string
+	events                           []cadence.Event
+	tx                               *flow.TransactionBody
+	gasLimit                         uint64
+	uuid                             uint64 // TODO: implement proper UUID
+	header                           *flow.Header
+	blocks                           Blocks
+	signatureVerificationEnabled     bool
+	restrictedAccountCreationEnabled bool
+	restrictedDeploymentEnabled      bool
+	simpleAddresses                  bool
+	rng                              *rand.Rand
 }
 
 type TransactionContextOption func(*TransactionContext)
 
-func SkipVerification(ctx *TransactionContext) {
-	ctx.skipVerification = true
+func WithSignatureVerification(enabled bool) TransactionContextOption {
+	return func(ctx *TransactionContext) {
+		ctx.signatureVerificationEnabled = enabled
+	}
 }
 
-func SkipDeploymentRestriction(ctx *TransactionContext) {
-	ctx.skipDeploymentRestriction = true
+func WithRestrictedDeployment(enabled bool) TransactionContextOption {
+	return func(ctx *TransactionContext) {
+		ctx.restrictedAccountCreationEnabled = enabled
+	}
+}
+
+func WithRestrictedAccountCreation(enabled bool) TransactionContextOption {
+	return func(ctx *TransactionContext) {
+		ctx.restrictedDeploymentEnabled = enabled
+	}
+}
+
+func WithMetricsCollector(mc *MetricsCollector) TransactionContextOption {
+	return func(ctx *TransactionContext) {
+		ctx.Metrics = metricsCollector{mc}
+	}
 }
 
 // GetSigningAccounts gets the signing accounts for this context.
@@ -73,13 +95,15 @@ func (r *TransactionContext) Logs() []string {
 
 // GetValue gets a register value from the world state.
 func (r *TransactionContext) GetValue(owner, controller, key []byte) ([]byte, error) {
-	v, _ := r.ledger.Get(fullKeyHash(string(owner), string(controller), string(key)))
+	v, _ := r.ledger.Get(fullKeyHash(string(flow.BytesToAddress(owner).Bytes()), string(
+		flow.BytesToAddress(controller).Bytes()), string(key)))
 	return v, nil
 }
 
 // SetValue sets a register value in the world state.
 func (r *TransactionContext) SetValue(owner, controller, key, value []byte) error {
-	r.ledger.Set(fullKeyHash(string(owner), string(controller), string(key)), value)
+	r.ledger.Set(fullKeyHash(string(flow.BytesToAddress(owner).Bytes()), string(
+		flow.BytesToAddress(controller).Bytes()), string(key)), value)
 	return nil
 }
 
@@ -96,7 +120,9 @@ func (r *TransactionContext) ValueExists(owner, controller, key []byte) (exists 
 //
 // This function returns an error if the input is invalid.
 func (r *TransactionContext) CreateAccount(payer runtime.Address) (runtime.Address, error) {
-	flowErr, fatalErr := r.deductAccountCreationFee(flow.Address(payer))
+	accountAddress := runtimeToFlowAddress(payer)
+
+	flowErr, fatalErr := r.deductAccountCreationFee(accountAddress)
 	if fatalErr != nil {
 		return runtime.Address{}, fatalErr
 	}
@@ -150,11 +176,11 @@ func (r *TransactionContext) CreateAccount(payer runtime.Address) (runtime.Addre
 
 func (r *TransactionContext) initDefaultToken(addr flow.Address) (FlowError, error) {
 	tx := flow.NewTransactionBody().
-		SetScript(InitDefaultTokenTransaction()).
+		SetScript(InitDefaultTokenTransaction(r.ServiceAddress())).
 		AddAuthorizer(addr)
 
 	// TODO: propagate computation limit
-	result, err := r.bc.ExecuteTransaction(r.ledger, tx, SkipVerification)
+	result, err := r.bc.ExecuteTransaction(r.ledger, tx, WithSignatureVerification(false))
 	if err != nil {
 		return nil, err
 	}
@@ -168,11 +194,11 @@ func (r *TransactionContext) initDefaultToken(addr flow.Address) (FlowError, err
 
 func (r *TransactionContext) deductTransactionFee(addr flow.Address) (FlowError, error) {
 	tx := flow.NewTransactionBody().
-		SetScript(DeductTransactionFeeTransaction()).
+		SetScript(DeductTransactionFeeTransaction(r.ServiceAddress())).
 		AddAuthorizer(addr)
 
 	// TODO: propagate computation limit
-	result, err := r.bc.ExecuteTransaction(r.ledger, tx, SkipVerification)
+	result, err := r.bc.ExecuteTransaction(r.ledger, tx, WithSignatureVerification(false))
 	if err != nil {
 		return nil, err
 	}
@@ -185,12 +211,19 @@ func (r *TransactionContext) deductTransactionFee(addr flow.Address) (FlowError,
 }
 
 func (r *TransactionContext) deductAccountCreationFee(addr flow.Address) (FlowError, error) {
+	var script []byte
+	if r.restrictedAccountCreationEnabled {
+		script = DeductAccountCreationFeeWithWhitelistTransaction(r.ServiceAddress())
+	} else {
+		script = DeductAccountCreationFeeTransaction(r.ServiceAddress())
+	}
+
 	tx := flow.NewTransactionBody().
-		SetScript(DeductAccountCreationFeeTransaction()).
+		SetScript(script).
 		AddAuthorizer(addr)
 
 	// TODO: propagate computation limit
-	result, err := r.bc.ExecuteTransaction(r.ledger, tx, SkipVerification)
+	result, err := r.bc.ExecuteTransaction(r.ledger, tx, WithSignatureVerification(false))
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +240,7 @@ func (r *TransactionContext) deductAccountCreationFee(addr flow.Address) (FlowEr
 // This function returns an error if the specified account does not exist or
 // if the key insertion fails.
 func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []byte) error {
-	accountAddress := address.Bytes()
+	accountAddress := runtimeToFlowAddress(address)
 
 	err := r.ledger.CheckAccountExists(accountAddress)
 	if err != nil {
@@ -234,7 +267,7 @@ func (r *TransactionContext) AddAccountKey(address runtime.Address, publicKey []
 // This function returns an error if the specified account does not exist, the
 // provided key is invalid, or if key deletion fails.
 func (r *TransactionContext) RemoveAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
-	accountAddress := address.Bytes()
+	accountAddress := runtimeToFlowAddress(address)
 
 	err = r.ledger.CheckAccountExists(accountAddress)
 	if err != nil {
@@ -271,14 +304,18 @@ func (r *TransactionContext) CheckCode(address runtime.Address, code []byte) (er
 	return r.checkProgram(code, address)
 }
 
+func (r *TransactionContext) ServiceAddress() flow.Address {
+	return r.chain.ServiceAddress()
+}
+
 // UpdateAccountCode updates the deployed code on an existing account.
 //
 // This function returns an error if the specified account does not exist or is
 // not a valid signing account.
-func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []byte, checkPermission bool) (err error) {
-	accountAddress := address.Bytes()
+func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []byte) (err error) {
+	accountAddress := runtimeToFlowAddress(address)
 
-	key := fullKeyHash(string(accountAddress), string(accountAddress), keyCode)
+	key := fullKeyHash(string(accountAddress.Bytes()), string(accountAddress.Bytes()), keyCode)
 
 	prevCode, err := r.ledger.Get(key)
 	if err != nil {
@@ -292,7 +329,7 @@ func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []b
 
 	// currently, every transaction that sets account code (deploys/updates contracts)
 	// must be signed by the service account
-	if !r.skipDeploymentRestriction && !r.isValidSigningAccount(runtime.Address(flow.ServiceAddress())) {
+	if r.restrictedDeploymentEnabled && !r.isValidSigningAccount(runtime.Address(r.ServiceAddress())) {
 		return fmt.Errorf("code deployment requires authorization from the service account")
 	}
 
@@ -318,15 +355,13 @@ func (r *TransactionContext) ResolveImport(location runtime.Location) ([]byte, e
 
 	address := flow.BytesToAddress(addressLocation)
 
-	accountAddress := address.Bytes()
-
-	code, err := r.ledger.Get(fullKeyHash(string(accountAddress), string(accountAddress), keyCode))
+	code, err := r.ledger.Get(fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyCode))
 	if err != nil {
 		return nil, err
 	}
 
 	if code == nil {
-		return nil, fmt.Errorf("no code deployed at address %x", accountAddress)
+		return nil, fmt.Errorf("no code deployed at address %s", address)
 	}
 
 	return code, nil
@@ -383,6 +418,14 @@ func (r *TransactionContext) GetBlockAtHeight(height uint64) (hash runtime.Block
 	return runtime.BlockHash(block.ID()), block.Header.Timestamp.UnixNano(), true, nil
 }
 
+// UnsafeRandom returns a random uint64, where the process of random number derivation is not cryptographically
+// secure.
+func (r *TransactionContext) UnsafeRandom() uint64 {
+	buf := make([]byte, 8)
+	_, _ = r.rng.Read(buf) // Always succeeds, no need to check error
+	return binary.LittleEndian.Uint64(buf)
+}
+
 // checkProgram checks the given code for syntactic and semantic correctness.
 func (r *TransactionContext) checkProgram(code []byte, address runtime.Address) error {
 	if code == nil {
@@ -398,10 +441,6 @@ func (r *TransactionContext) checkProgram(code []byte, address runtime.Address) 
 //
 // An error is returned if any of the expected signatures are invalid or missing.
 func (r *TransactionContext) verifySignatures() FlowError {
-	if r.skipVerification {
-		return nil
-	}
-
 	if r.tx.Payer == flow.EmptyAddress {
 		return &MissingPayerError{}
 	}
@@ -491,7 +530,7 @@ func (r *TransactionContext) checkAndIncrementSequenceNumber() (FlowError, error
 	if err != nil {
 		return nil, err
 	}
-	r.ledger.setAccountPublicKey(account.Address.Bytes(), proposalKey.KeyID, updatedAccountBytes)
+	r.ledger.setAccountPublicKey(account.Address, proposalKey.KeyID, updatedAccountBytes)
 
 	return nil, nil
 }
@@ -545,7 +584,7 @@ func (r *TransactionContext) verifyAccountSignature(
 
 	accountKey := &account.Keys[txSig.KeyID]
 
-	hasher, err := hash.NewHasher(accountKey.HashAlgo)
+	hasher, err := utils.NewHasher(accountKey.HashAlgo)
 	if err != nil {
 		return accountKey, &InvalidHashingAlgorithmError{
 			Address:          txSig.Address,
@@ -588,7 +627,7 @@ func (r *TransactionContext) isValidSigningAccount(address runtime.Address) bool
 	return false
 }
 
-func InitDefaultTokenTransaction() []byte {
+func InitDefaultTokenTransaction(serviceAddress flow.Address) []byte {
 	return []byte(fmt.Sprintf(`
 		import FlowServiceAccount from 0x%s
 
@@ -597,10 +636,10 @@ func InitDefaultTokenTransaction() []byte {
 				FlowServiceAccount.initDefaultToken(acct)
 			}
 		}
-	`, flow.ServiceAddress()))
+	`, serviceAddress))
 }
 
-func DefaultTokenBalanceScript(addr flow.Address) []byte {
+func DefaultTokenBalanceScript(serviceAddress, addr flow.Address) []byte {
 	return []byte(fmt.Sprintf(`
         import FlowServiceAccount from 0x%s
 
@@ -608,10 +647,22 @@ func DefaultTokenBalanceScript(addr flow.Address) []byte {
             let acct = getAccount(0x%s)
             return FlowServiceAccount.defaultTokenBalance(acct)
         }
-    `, flow.ServiceAddress(), addr))
+    `, serviceAddress, addr))
 }
 
-func DeductAccountCreationFeeTransaction() []byte {
+func DeductAccountCreationFeeTransaction(serviceAddress flow.Address) []byte {
+	return []byte(fmt.Sprintf(`
+		import FlowServiceAccount from 0x%s
+
+		transaction {
+			prepare(acct: AuthAccount) {
+				FlowServiceAccount.deductAccountCreationFee(acct)
+			}
+		}
+	`, serviceAddress))
+}
+
+func DeductAccountCreationFeeWithWhitelistTransaction(serviceAddress flow.Address) []byte {
 	return []byte(fmt.Sprintf(`
 		import FlowServiceAccount from 0x%s
 
@@ -624,10 +675,10 @@ func DeductAccountCreationFeeTransaction() []byte {
 				FlowServiceAccount.deductAccountCreationFee(acct)
 			}
 		}
-	`, flow.ServiceAddress()))
+	`, serviceAddress))
 }
 
-func DeductTransactionFeeTransaction() []byte {
+func DeductTransactionFeeTransaction(serviceAddress flow.Address) []byte {
 	return []byte(fmt.Sprintf(`
 		import FlowServiceAccount from 0x%s
 
@@ -636,7 +687,7 @@ func DeductTransactionFeeTransaction() []byte {
 				FlowServiceAccount.deductTransactionFee(acct)
 			}
 		}
-	`, flow.ServiceAddress()))
+	`, serviceAddress))
 }
 
 func DeployDefaultTokenTransaction(contract []byte) []byte {
@@ -661,7 +712,7 @@ func DeployFlowFeesTransaction(contract []byte) []byte {
     `, hex.EncodeToString(contract)))
 }
 
-func MintDefaultTokenTransaction() []byte {
+func MintDefaultTokenTransaction(fungibleTokenAddress, flowTokenAddress flow.Address) []byte {
 	return []byte(fmt.Sprintf(`
 		import FungibleToken from 0x%s
 		import FlowToken from 0x%s
@@ -691,15 +742,19 @@ func MintDefaultTokenTransaction() []byte {
 			destroy minter
 		  }
 		}
-	`, FungibleTokenAddress(), FlowTokenAddress()))
+	`, fungibleTokenAddress, flowTokenAddress))
 }
 
-func FungibleTokenAddress() flow.Address {
-	address, _ := flow.AddressAtIndex(2)
+func FungibleTokenAddress(chain flow.Chain) flow.Address {
+	address, _ := chain.AddressAtIndex(2)
 	return address
 }
 
-func FlowTokenAddress() flow.Address {
-	address, _ := flow.AddressAtIndex(3)
+func FlowTokenAddress(chain flow.Chain) flow.Address {
+	address, _ := chain.AddressAtIndex(3)
 	return address
+}
+
+func runtimeToFlowAddress(address runtime.Address) flow.Address {
+	return flow.Address(address)
 }

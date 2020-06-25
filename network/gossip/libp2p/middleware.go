@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"strconv"
 	"sync"
 
 	ggio "github.com/gogo/protobuf/io"
@@ -288,13 +287,13 @@ func (m *Middleware) connect(flowID string, address string, key crypto.PublicKey
 
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
-		return nil, fmt.Errorf("could not parse address %s:%v", address, err)
+		return nil, fmt.Errorf("could not parse address %s: %w", address, err)
 	}
 
 	// convert the Flow key to a LibP2P key
 	lkey, err := PublicKey(key)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert flow key to libp2p key: %v", err)
+		return nil, fmt.Errorf("could not convert flow key to libp2p key: %w", err)
 	}
 
 	// Create a new NodeAddress
@@ -303,7 +302,7 @@ func (m *Middleware) connect(flowID string, address string, key crypto.PublicKey
 	// Create a stream for it
 	stream, err := m.libP2PNode.CreateStream(m.ctx, nodeAddress)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create stream for %s:%v", nodeAddress.Name, err)
+		return nil, fmt.Errorf("failed to create stream for %s :%w", nodeAddress.Name, err)
 	}
 
 	m.log.Info().Str("target_id", flowID).Str("address", address).Msg("stream created")
@@ -359,8 +358,7 @@ ProcessLoop:
 // Subscribe will subscribe the middleware for a topic with the same name as the channelID
 func (m *Middleware) Subscribe(channelID uint8) error {
 
-	// a Flow ChannelID becomes the topic ID in libp2p
-	topic := topicFromChannelID(channelID)
+	topic := engine.ChannelName(channelID)
 
 	s, err := m.libP2PNode.Subscribe(m.ctx, topic)
 	if err != nil {
@@ -393,13 +391,8 @@ SubscriptionLoop:
 				break SubscriptionLoop
 			}
 
-			channelID, err := channelIDFromTopic(rs.sub.Topic())
-			if err != nil {
-				m.log.Error().Err(err).Str("channel_id", channelID).Msg("failed to report metric")
-			} else {
-				msgSize := msg.Size()
-				m.reportInboundMsgSize(msgSize, channelID)
-			}
+			msgSize := msg.Size()
+			m.reportInboundMsgSize(msgSize, rs.sub.Topic())
 
 			m.processMessage(msg)
 
@@ -442,7 +435,7 @@ func (m *Middleware) publish(channelID uint8, msg *message.Message) error {
 		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, m.maxPubSubMsgSize)
 	}
 
-	topic := topicFromChannelID(channelID)
+	topic := engine.ChannelName(channelID)
 
 	// publish the bytes on the topic
 	err = m.libP2PNode.Publish(m.ctx, topic, data)
@@ -450,7 +443,7 @@ func (m *Middleware) publish(channelID uint8, msg *message.Message) error {
 		return fmt.Errorf("failed to publish the message: %w", err)
 	}
 
-	go m.reportOutboundMsgSize(len(data), engine.ChannelName(channelID))
+	m.reportOutboundMsgSize(len(data), topic)
 
 	return nil
 }
@@ -461,18 +454,4 @@ func (m *Middleware) reportOutboundMsgSize(size int, channel string) {
 
 func (m *Middleware) reportInboundMsgSize(size int, channel string) {
 	m.metrics.NetworkMessageReceived(size, channel)
-}
-
-// topicFromChannelID converts a Flow channel ID to LibP2P pub-sub topic id e.g. 10 -> "10"
-func topicFromChannelID(channelID uint8) string {
-	return strconv.Itoa(int(channelID))
-}
-
-// channelIDFromTopic converts a LibP2P pub-sub topic id to a channel ID string e.g. "10" -> "CollectionProvider"
-func channelIDFromTopic(topic string) (string, error) {
-	channelID, err := strconv.ParseUint(topic, 10, 8)
-	if err != nil {
-		return "", fmt.Errorf(" failed to get channeld ID from topic: %w", err)
-	}
-	return engine.ChannelName(uint8(channelID)), nil
 }

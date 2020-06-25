@@ -19,7 +19,7 @@ func (b *PendingBlocks) Add(originID flow.Identifier, proposal *messages.BlockPr
 }
 
 func (b *PendingBlocks) ByID(blockID flow.Identifier) (*flow.PendingBlock, bool) {
-	item, ok := b.backend.ByID(blockID)
+	item, ok := b.backend.byID(blockID)
 	if !ok {
 		return nil, false
 	}
@@ -61,5 +61,5 @@ func (b *PendingBlocks) PruneByHeight(height uint64) {
 }
 
 func (b *PendingBlocks) Size() uint {
-	return uint(len(b.backend.byID))
+	return uint(len(b.backend.blocksByID))
 }

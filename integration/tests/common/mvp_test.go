@@ -51,7 +51,7 @@ func TestMVP_Emulator(t *testing.T) {
 	key, err := unittest.EmulatorRootKey()
 	require.NoError(t, err)
 
-	c, err := testnet.NewClientWithKey(":3569", key)
+	c, err := testnet.NewClientWithKey(":3569", key, flow.Emulator.Chain())
 	require.NoError(t, err)
 
 	//TODO commented out because main test requires genesis for sending tx
@@ -62,10 +62,12 @@ func TestMVP_Emulator(t *testing.T) {
 
 func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 
-	client, err := testnet.NewClient(fmt.Sprintf(":%s", net.AccessPorts[testnet.AccessNodeAPIPort]))
-	require.NoError(t, err)
-
 	genesis := net.Genesis()
+
+	chain := genesis.Header.ChainID.Chain()
+
+	client, err := testnet.NewClient(fmt.Sprintf(":%s", net.AccessPorts[testnet.AccessNodeAPIPort]), chain)
+	require.NoError(t, err)
 
 	// contract is not deployed, so script fails
 	childCtx, cancel := context.WithTimeout(ctx, defaultTimeout)

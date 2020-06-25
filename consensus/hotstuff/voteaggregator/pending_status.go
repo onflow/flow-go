@@ -5,6 +5,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+// PendingVotes stores all the pending votes for different block proposals
 type PendingVotes struct {
 	// maps block ID to pending status for that block
 	votes map[flow.Identifier]*PendingStatus
@@ -43,10 +44,12 @@ func (ps *PendingStatus) AddVote(vote *model.Vote) bool {
 	return true
 }
 
+// NewPendingVotes creates a PendingVotes instance
 func NewPendingVotes() *PendingVotes {
 	return &PendingVotes{votes: make(map[flow.Identifier]*PendingStatus)}
 }
 
+// NewPendingStatus creates a PendingStatus instance
 func NewPendingStatus() *PendingStatus {
 	return &PendingStatus{voteMap: make(map[flow.Identifier]struct{})}
 }

@@ -17,11 +17,13 @@ import (
 type Client struct {
 	client *client.AccessClient
 	key    *flow.AccountPrivateKey
+	seqNo  uint64
+	Chain  flow.Chain
 }
 
 // NewClientWithKey returns a new client to an Access API listening at the given
 // address, using the given account key for signing transactions.
-func NewClientWithKey(addr string, key *flow.AccountPrivateKey) (*Client, error) {
+func NewClientWithKey(addr string, key *flow.AccountPrivateKey, chain flow.Chain) (*Client, error) {
 
 	client, err := client.NewAccessClient(addr)
 	if err != nil {
@@ -31,19 +33,23 @@ func NewClientWithKey(addr string, key *flow.AccountPrivateKey) (*Client, error)
 	tc := &Client{
 		client: client,
 		key:    key,
+		Chain:  chain,
 	}
 	return tc, nil
 }
 
 // NewClient returns a new client to an Access API listening at the given
 // address, with a generated account key for signing transactions.
-func NewClient(addr string) (*Client, error) {
-	key, err := unittest.AccountKeyFixture()
-	if err != nil {
-		return nil, fmt.Errorf("could not generate key for client")
-	}
+func NewClient(addr string, chain flow.Chain) (*Client, error) {
+	key := unittest.ServiceAccountPrivateKey
 
-	return NewClientWithKey(addr, key)
+	return NewClientWithKey(addr, &key, chain)
+}
+
+func (c *Client) GetSeqNumber() uint64 {
+	n := c.seqNo
+	c.seqNo++
+	return n
 }
 
 // DeployContract submits a transaction to deploy a contract with the given

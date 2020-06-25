@@ -20,7 +20,7 @@ import (
 )
 
 type ComputationManager interface {
-	ExecuteScript([]byte, *flow.Header, *delta.View) ([]byte, error)
+	ExecuteScript([]byte, [][]byte, *flow.Header, *delta.View) ([]byte, error)
 	ComputeBlock(
 		ctx context.Context,
 		block *entity.ExecutableBlock,
@@ -41,6 +41,7 @@ type Manager struct {
 
 func New(
 	logger zerolog.Logger,
+	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
 	me module.Local,
 	protoState protocol.State,
@@ -54,16 +55,16 @@ func New(
 		me:            me,
 		protoState:    protoState,
 		vm:            vm,
-		blockComputer: computer.NewBlockComputer(vm, tracer, blocks),
+		blockComputer: computer.NewBlockComputer(vm, blocks, metrics, tracer),
 		blocks:        blocks,
 	}
 
 	return &e
 }
 
-func (e *Manager) ExecuteScript(script []byte, blockHeader *flow.Header, view *delta.View) ([]byte, error) {
+func (e *Manager) ExecuteScript(script []byte, arguments [][]byte, blockHeader *flow.Header, view *delta.View) ([]byte, error) {
 
-	result, err := e.vm.NewBlockContext(blockHeader, e.blocks).ExecuteScript(view, script)
+	result, err := e.vm.NewBlockContext(blockHeader, e.blocks).ExecuteScript(view, script, arguments)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
 	}

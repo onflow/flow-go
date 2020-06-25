@@ -24,8 +24,8 @@ access(all) contract Container {
 }
 `
 
-func DeployCounterContractTransaction(authorizer flow.Address) *flow.TransactionBody {
-	return CreateContractDeploymentTransaction(CounterContract, authorizer)
+func DeployCounterContractTransaction(authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
+	return CreateContractDeploymentTransaction(CounterContract, authorizer, chain)
 }
 
 func DeployUnauthorizedCounterContractTransaction(authorizer flow.Address) *flow.TransactionBody {

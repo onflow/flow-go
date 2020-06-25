@@ -60,6 +60,19 @@ func NewEmptyMTrie(keyByteSize int, number uint64, parentRootHash []byte) (*MTri
 	}, nil
 }
 
+func NewMTrie(root *node.Node, number uint64, parentRootHash []byte) (*MTrie, error) {
+	maxHeight := root.Height() + 1
+	if !checkHeight(maxHeight) {
+		return nil, errors.New("key length of trie must be integer-multiple of 8")
+	}
+	return &MTrie{
+		root:           root,
+		number:         number,
+		maxHeight:      maxHeight,
+		parentRootHash: parentRootHash,
+	}, nil
+}
+
 // StringRootHash returns the trie's Hex-encoded root hash.
 // Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) StringRootHash() string { return hex.EncodeToString(mt.root.Hash()) }
@@ -80,6 +93,20 @@ func (mt *MTrie) ParentRootHash() []byte { return mt.parentRootHash }
 // KeyLength return the length [in bytes] the trie operates with.
 // Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) KeyLength() int { return mt.keyByteSize }
+
+// AllocatedRegCount returns the number of allocated registers in the trie.
+// Concurrency safe (as Tries are immutable structures by convention)
+func (mt *MTrie) AllocatedRegCount() uint64 { return mt.root.RegCount() }
+
+// MaxDepth returns the length of the longest branch from root to leaf.
+// Concurrency safe (as Tries are immutable structures by convention)
+func (mt *MTrie) MaxDepth() uint16 { return mt.root.MaxDepth() }
+
+// RootNode returns the Trie's root Node
+// Concurrency safe (as Tries are immutable structures by convention)
+func (mt *MTrie) RootNode() *node.Node {
+	return mt.root
+}
 
 // StringRootHash returns the trie's string representation.
 // Concurrency safe (as Tries are immutable structures by convention)
@@ -140,7 +167,7 @@ func (mt *MTrie) read(head *node.Node, keys [][]byte) ([][]byte, error) {
 	return values, nil
 }
 
-// NewTrieCopyOnWrite constructs a new trie containing all registers from the parent trie.
+// NewTrieWithUpdatedRegisters constructs a new trie containing all registers from the parent trie.
 // The key-value pairs specify the registers whose values are supposed to hold updated values
 // compared to the parent trie. Constructing the new trie is done in a COPY-ON-WRITE manner:
 //   * The original trie remains unchanged.
@@ -366,10 +393,7 @@ func (mt *MTrie) Equals(o *MTrie) bool {
 	if o == nil {
 		return false
 	}
-	return o.Number() == mt.Number() &&
-		o.KeyLength() == mt.KeyLength() &&
-		bytes.Equal(o.RootHash(), mt.RootHash()) &&
-		bytes.Equal(o.ParentRootHash(), mt.ParentRootHash())
+	return o.Height() == mt.Height() && bytes.Equal(o.RootHash(), mt.RootHash())
 }
 
 // Store stores the trie key Values to a file

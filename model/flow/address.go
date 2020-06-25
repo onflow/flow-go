@@ -12,25 +12,20 @@ import (
 // Address represents the 8 byte address of an account.
 type Address [AddressLength]byte
 
-// AddressGenerator represents the internal state of the address generation mechanism
-type AddressGenerator struct {
+type AddressGenerator interface {
+	NextAddress() (Address, error)
+	CurrentAddress() Address
+	Bytes() []byte
+}
+
+type MonotonicAddressGenerator struct {
 	state uint64
 }
 
-// NewAddressGenerator returns a new AddressGenerator with an
-// initialized state.
-func NewAddressGenerator() *AddressGenerator {
-	return &AddressGenerator{
-		state: 0,
-	}
-}
-
-// newAddressGenerator returns a new AddressGenerator with the
-// given state.
-func newAddressGeneratorAtState(state uint64) *AddressGenerator {
-	return &AddressGenerator{
-		state: state,
-	}
+// LinearCodeAddressGenerator represents the internal state of the linear code address generation mechanism
+type LinearCodeAddressGenerator struct {
+	chainID ChainID
+	state   uint64
 }
 
 const (
@@ -42,51 +37,8 @@ const (
 	addressStateLength = (linearCodeK + 7) >> 3
 )
 
-// networkType is the type of network for which account addresses
-// are generated and checked.
-//
-// A valid address in one network is invalid in the other networks.
-type networkType uint64
-
-// getNetworkType derives the network type used for address generation from the globally
-// configured chain ID.
-func getNetworkType() networkType {
-	switch GetChainID() {
-	case Mainnet:
-		return networkType(0)
-	case Testnet:
-		return networkType(invalidCodeTestnet)
-	case Emulator:
-		return networkType(invalidCodeEmulator)
-	default:
-		panic("chain ID is invalid or not set")
-	}
-}
-
 // EmptyAddress is the default value of a variable of type Address
 var EmptyAddress = Address{}
-
-// AddressAtState returns the nth generated account address.
-func AddressAtIndex(index uint64) (Address, error) {
-	if index >= maxState {
-		return EmptyAddress, fmt.Errorf("index must be less than %x", maxState)
-	}
-	return newAddressGeneratorAtState(index).generateAddress(), nil
-}
-
-// zeroAddress returns the "zero address" (account that no one owns).
-func zeroAddress() Address {
-	// returned error is guaranteed to be nil
-	address, _ := AddressAtIndex(0)
-	return address
-}
-
-// ServiceAddress returns the root (first) generated account address.
-func ServiceAddress() Address {
-	// returned error is guaranteed to be nil
-	address, _ := AddressAtIndex(1)
-	return address
-}
 
 // HexToAddress converts a hex string to an Address.
 func HexToAddress(h string) Address {
@@ -108,7 +60,9 @@ func BytesToAddress(b []byte) Address {
 }
 
 // Bytes returns the byte representation of the address.
-func (a Address) Bytes() []byte { return a[:] }
+func (a Address) Bytes() []byte {
+	return a[:]
+}
 
 // Hex returns the hex string representation of the address.
 func (a Address) Hex() string {
@@ -158,22 +112,20 @@ func putUint48(b []byte, v uint64) {
 	b[5] = byte(v)
 }
 
-// BytesToAddressState converts an array of bytes into an adress state
-func BytesToAddressState(b []byte) *AddressGenerator {
-	if len(b) > addressStateLength {
-		b = b[len(b)-addressStateLength:]
-	}
-	var stateBytes [addressStateLength]byte
-	copy(stateBytes[addressStateLength-len(b):], b)
-	state := uint48(stateBytes[:])
-	return newAddressGeneratorAtState(state)
+func stateToBytes(state uint64) []byte {
+	stateBytes := make([]byte, addressStateLength)
+	putUint48(stateBytes, state)
+	return stateBytes
 }
 
-// Bytes converts an addresse state into a slice of bytes
-func (gen *AddressGenerator) Bytes() []byte {
-	stateBytes := make([]byte, addressStateLength)
-	putUint48(stateBytes, gen.state)
-	return stateBytes
+// Bytes converts an address state into a slice of bytes
+func (gen *MonotonicAddressGenerator) Bytes() []byte {
+	return stateToBytes(gen.state)
+}
+
+// Bytes converts an address state into a slice of bytes
+func (gen *LinearCodeAddressGenerator) Bytes() []byte {
+	return stateToBytes(gen.state)
 }
 
 const (
@@ -201,6 +153,18 @@ const (
 	maxState = (1 << linearCodeK) - 1
 )
 
+func (s *MonotonicAddressGenerator) NextAddress() (Address, error) {
+	if uint64(s.state) > maxState {
+		return EmptyAddress, fmt.Errorf("the state value is not valid, it must be less or equal to %x", maxState)
+	}
+	s.state++
+	return s.CurrentAddress(), nil
+}
+
+func (s *MonotonicAddressGenerator) CurrentAddress() Address {
+	return uint64ToAddress(s.state)
+}
+
 // NextAddress generates an account address from the addressing state.
 //
 // The address is generated for a specific network (Flow mainnet, testnet..)
@@ -209,9 +173,9 @@ const (
 // addresses in a sequential way.
 // Each state is mapped to exactly one address. There are as many addresses
 // as states.
-// zeroAddress() corresponds to the state "0" while ServiceAddress() corresponds to the
+// ZeroAddress() corresponds to the state "0" while ServiceAddress() corresponds to the
 // state "1".
-func (gen *AddressGenerator) NextAddress() (Address, error) {
+func (gen *LinearCodeAddressGenerator) NextAddress() (Address, error) {
 	err := gen.nextState()
 	if err != nil {
 		return EmptyAddress, err
@@ -220,10 +184,18 @@ func (gen *AddressGenerator) NextAddress() (Address, error) {
 	return address, nil
 }
 
+// CurrentAddress returns the current account address.
+//
+// The returned address is the address of the latest created account.
+func (gen *LinearCodeAddressGenerator) CurrentAddress() Address {
+	address := gen.generateAddress()
+	return address
+}
+
 // returns the next state given an addressing state.
 //
 // The state values are incremented from 0 to 2^k-1
-func (gen *AddressGenerator) nextState() error {
+func (gen *LinearCodeAddressGenerator) nextState() error {
 	if uint64(gen.state) > maxState {
 		return fmt.Errorf("the state value is not valid, it must be less or equal to %x", maxState)
 	}
@@ -250,7 +222,7 @@ func (a *Address) uint64() uint64 {
 // (network) specifies the network to generate the address for (Flow Mainnet, testent..)
 // The function assumes the state is valid (<2^k) which means
 // a check on the state should be done before calling this function.
-func (gen *AddressGenerator) generateAddress() Address {
+func (gen *LinearCodeAddressGenerator) generateAddress() Address {
 	index := gen.state
 
 	// Multiply the index GF(2) vector by the code generator matrix
@@ -263,36 +235,8 @@ func (gen *AddressGenerator) generateAddress() Address {
 	}
 
 	// customize the code word for a specific network
-	address ^= uint64(getNetworkType())
+	address ^= uint64(gen.chainID.getNetworkType())
 	return uint64ToAddress(address)
-}
-
-// IsValid returns true if a given address is a valid account address,
-// and false otherwise.
-//
-// This is an off-chain check that only tells whether the address format is
-// valid. If the function returns true, this does not mean
-// a Flow account with this address has been generated. Such a test would
-// require on on-chain check.
-// zeroAddress() fails the check. Although it has a valid format, no account
-// in Flow is assigned to zeroAddress().
-func (a *Address) IsValid() bool {
-	codeWord := a.uint64()
-	codeWord ^= uint64(getNetworkType())
-
-	if codeWord == 0 {
-		return false
-	}
-
-	// Multiply the code word GF(2)-vector by the parity-check matrix
-	parity := uint(0)
-	for i := 0; i < linearCodeN; i++ {
-		if codeWord&1 == 1 {
-			parity ^= parityCheckMatrixColumns[i]
-		}
-		codeWord >>= 1
-	}
-	return parity == 0
 }
 
 // invalid code-words in the [64,45] code

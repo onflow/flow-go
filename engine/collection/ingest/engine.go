@@ -97,7 +97,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+			engine.LogError(e.log, err)
 		}
 	})
 }
@@ -150,7 +150,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// first, we check if the transaction is valid
 	err := e.ValidateTransaction(tx)
 	if err != nil {
-		return fmt.Errorf("invalid transaction: %w", err)
+		return engine.NewInvalidInputErrorf("invalid transaction: %w", err)
 	}
 
 	// retrieve the set of collector clusters
