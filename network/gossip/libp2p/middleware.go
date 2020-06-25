@@ -98,7 +98,7 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		key:              key,
 		metrics:          metrics,
 		maxPubSubMsgSize: maxPubSubMsgSize,
-		genesisBlockID: genesisBlockID,
+		genesisBlockID:   genesisBlockID,
 		validators:       validators,
 	}
 
