@@ -358,6 +358,7 @@ func main() {
 
 			hot, err := consensus.NewParticipant(
 				node.Logger,
+				node.Tracer,
 				notifier,
 				clusterMetrics,
 				colHeaders,

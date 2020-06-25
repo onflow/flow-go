@@ -314,6 +314,7 @@ func main() {
 			// initialize hotstuff consensus algorithm
 			hot, err := consensus.NewParticipant(
 				node.Logger,
+				node.Tracer,
 				notifier,
 				mainMetrics,
 				node.Storage.Headers,

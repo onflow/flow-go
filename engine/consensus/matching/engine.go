@@ -5,7 +5,9 @@ package matching
 import (
 	"errors"
 	"fmt"
+	"time"
 
+	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -316,6 +318,8 @@ func (e *Engine) checkSealing() {
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
+	start := time.Now()
+
 	// get all results that are sealable
 	results, err := e.sealableResults()
 	if err != nil {
@@ -331,13 +335,20 @@ func (e *Engine) checkSealing() {
 	e.log.Info().Int("num_results", len(results)).Msg("identified sealable execution results")
 
 	for _, result := range results {
+		if span, ok := e.tracer.GetSpan(result.BlockID, trace.CONProcessBlock); ok {
+			childSpan := e.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing, opentracing.StartTime(
+				start))
+			childSpan.Finish()
+		}
+
 		index, err := e.indexDB.ByBlockID(result.BlockID)
 		if err != nil {
 			continue
 		}
 		for _, id := range index.CollectionIDs {
 			if span, ok := e.tracer.GetSpan(id, trace.CONProcessCollection); ok {
-				childSpan := e.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing)
+				childSpan := e.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing, opentracing.StartTime(
+					start))
 				childSpan.Finish()
 			}
 		}
@@ -379,6 +390,8 @@ func (e *Engine) checkSealing() {
 	e.clearPools(sealedResultIDs)
 
 	for _, blockID := range sealedBlockIDs {
+		e.tracer.FinishSpan(blockID, trace.CONProcessBlock)
+
 		index, err := e.indexDB.ByBlockID(blockID)
 		if err != nil {
 			continue

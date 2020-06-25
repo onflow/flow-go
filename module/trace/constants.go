@@ -11,6 +11,10 @@ const (
 	CONProvOnBlockProposal            SpanName = "con.provider.onBlockProposal"
 	CONMatchCheckSealing              SpanName = "con.matching.checkSealing"
 
+	CONProcessBlock                SpanName = "con.processBlock"
+	CONHotEventHandlerStartNewView SpanName = "con.hotstuff.eventHandler.startNewView"
+	CONHotFinalizeBlock            SpanName = "con.hotstuff.finalizeBlock"
+
 	EXEExecuteBlock           SpanName = "exe.ingestion.executeBlock"
 	EXESaveExecutionResults   SpanName = "exe.ingestion.saveExecutionResults"
 	EXESaveTransactionResults SpanName = "exe.ingestion.saveTransactionResults"

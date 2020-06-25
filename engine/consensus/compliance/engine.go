@@ -338,6 +338,17 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 // onBlockProposal handles incoming block proposals.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
+	span, ok := e.tracer.GetSpan(proposal.Header.ID(), trace.CONProcessBlock)
+	if !ok {
+		span = e.tracer.StartSpan(proposal.Header.ID(), trace.CONProcessBlock)
+		span.SetTag("blockID", proposal.Header.ID())
+		span.SetTag("view", proposal.Header.View)
+		span.SetTag("proposer", proposal.Header.ProposerID.String())
+		span.SetTag("leader", false)
+	}
+	childSpan := e.tracer.StartSpanFromParent(span, trace.CONCompOnBlockProposal)
+	defer childSpan.Finish()
+
 	for _, g := range proposal.Payload.Guarantees {
 		if span, ok := e.tracer.GetSpan(g.CollectionID, trace.CONProcessCollection); ok {
 			childSpan := e.tracer.StartSpan(g.CollectionID, trace.CONCompOnBlockProposal, opentracing.ChildOf(

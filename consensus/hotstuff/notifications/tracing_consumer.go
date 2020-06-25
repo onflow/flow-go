@@ -30,6 +30,10 @@ func NewTracingConsumer(log zerolog.Logger, tracer module.Tracer, index storage.
 }
 
 func (tc *TracingConsumer) OnBlockIncorporated(block *model.Block) {
+	if span, ok := tc.tracer.GetSpan(block.BlockID, trace.CONProcessBlock); ok {
+		tc.tracer.StartSpan(block.BlockID, trace.CONHotFinalizeBlock, opentracing.ChildOf(span.Context()))
+	}
+
 	index, err := tc.index.ByBlockID(block.BlockID)
 	if err != nil {
 		tc.log.Error().
@@ -49,6 +53,8 @@ func (tc *TracingConsumer) OnBlockIncorporated(block *model.Block) {
 }
 
 func (tc *TracingConsumer) OnFinalizedBlock(block *model.Block) {
+	tc.tracer.FinishSpan(block.BlockID, trace.CONHotFinalizeBlock)
+
 	index, err := tc.index.ByBlockID(block.BlockID)
 	if err != nil {
 		tc.log.Error().
