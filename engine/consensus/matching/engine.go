@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -27,15 +28,17 @@ var (
 // Engine is the matching engine, which matches execution receipts with result
 // approvals to create block seals.
 type Engine struct {
-	unit      *engine.Unit             // used to control startup/shutdown
-	log       zerolog.Logger           // used to log relevant actions with context
-	metrics   module.EngineMetrics     // used to track sent and received messages
+	unit      *engine.Unit         // used to control startup/shutdown
+	log       zerolog.Logger       // used to log relevant actions with context
+	metrics   module.EngineMetrics // used to track sent and received messages
+	tracer    module.Tracer
 	mempool   module.MempoolMetrics    // used to track mempool size
 	state     protocol.State           // used to access the  protocol state
 	me        module.Local             // used to access local node information
 	resultsDB storage.ExecutionResults // used to permanently store results
 	sealsDB   storage.Seals            // used to check existing seals
 	headersDB storage.Headers          // used to check sealed headers
+	indexDB   storage.Index
 	results   mempool.Results          // holds execution results in memory
 	receipts  mempool.Receipts         // holds execution receipts in memory
 	approvals mempool.Approvals        // holds result approvals in memory
@@ -44,19 +47,37 @@ type Engine struct {
 }
 
 // New creates a new collection propagation engine.
-func New(log zerolog.Logger, collector module.EngineMetrics, mempool module.MempoolMetrics, net module.Network, state protocol.State, me module.Local, resultsDB storage.ExecutionResults, sealsDB storage.Seals, headersDB storage.Headers, results mempool.Results, receipts mempool.Receipts, approvals mempool.Approvals, seals mempool.Seals) (*Engine, error) {
+func New(
+	log zerolog.Logger,
+	collector module.EngineMetrics,
+	tracer module.Tracer,
+	mempool module.MempoolMetrics,
+	net module.Network,
+	state protocol.State,
+	me module.Local,
+	resultsDB storage.ExecutionResults,
+	sealsDB storage.Seals,
+	headersDB storage.Headers,
+	indexDB storage.Index,
+	results mempool.Results,
+	receipts mempool.Receipts,
+	approvals mempool.Approvals,
+	seals mempool.Seals,
+) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		unit:      engine.NewUnit(),
 		log:       log.With().Str("engine", "matching").Logger(),
 		metrics:   collector,
+		tracer:    tracer,
 		mempool:   mempool,
 		state:     state,
 		me:        me,
 		resultsDB: resultsDB,
 		sealsDB:   sealsDB,
 		headersDB: headersDB,
+		indexDB:   indexDB,
 		results:   results,
 		receipts:  receipts,
 		approvals: approvals,
@@ -309,8 +330,22 @@ func (e *Engine) checkSealing() {
 
 	e.log.Info().Int("num_results", len(results)).Msg("identified sealable execution results")
 
-	// process the results results
-	var sealedIDs []flow.Identifier
+	for _, result := range results {
+		index, err := e.indexDB.ByBlockID(result.BlockID)
+		if err != nil {
+			continue
+		}
+		for _, id := range index.CollectionIDs {
+			if span, ok := e.tracer.GetSpan(id, trace.CONProcessCollection); ok {
+				childSpan := e.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing)
+				childSpan.Finish()
+			}
+		}
+	}
+
+	// process the results
+	var sealedResultIDs []flow.Identifier
+	var sealedBlockIDs []flow.Identifier
 	for _, result := range results {
 
 		log := e.log.With().
@@ -334,13 +369,24 @@ func (e *Engine) checkSealing() {
 		}
 
 		// mark the result cleared for mempool cleanup
-		sealedIDs = append(sealedIDs, result.ID())
+		sealedResultIDs = append(sealedResultIDs, result.ID())
+		sealedBlockIDs = append(sealedBlockIDs, result.BlockID)
 
 		log.Info().Msg("sealed execution result")
 	}
 
 	// clear the memory pools
-	e.clearPools(sealedIDs)
+	e.clearPools(sealedResultIDs)
+
+	for _, blockID := range sealedBlockIDs {
+		index, err := e.indexDB.ByBlockID(blockID)
+		if err != nil {
+			continue
+		}
+		for _, id := range index.CollectionIDs {
+			e.tracer.FinishSpan(id, trace.CONProcessCollection)
+		}
+	}
 }
 
 func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {

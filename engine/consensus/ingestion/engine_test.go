@@ -11,6 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	"github.com/dapperlabs/flow-go/module/trace"
 	mocknetwork "github.com/dapperlabs/flow-go/network/mock"
 	mockprotocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	mockstorage "github.com/dapperlabs/flow-go/storage/mock"
@@ -30,6 +31,7 @@ func TestOnCollectionGuaranteeValid(t *testing.T) {
 		state:   state,
 		headers: headers,
 		metrics: metrics,
+		tracer:  trace.NewNoopTracer(),
 		spans:   metrics,
 	}
 
@@ -66,8 +68,9 @@ func TestOnCollectionGuaranteeMissingIdentity(t *testing.T) {
 	final := &mockprotocol.Snapshot{}
 
 	e := &Engine{
-		prop:  prop,
-		state: state,
+		prop:   prop,
+		state:  state,
+		tracer: trace.NewNoopTracer(),
 	}
 
 	originID := unittest.IdentifierFixture()
@@ -98,8 +101,9 @@ func TestOnCollectionGuaranteeInvalidRole(t *testing.T) {
 	final := &mockprotocol.Snapshot{}
 
 	e := &Engine{
-		prop:  prop,
-		state: state,
+		prop:   prop,
+		state:  state,
+		tracer: trace.NewNoopTracer(),
 	}
 
 	originID := unittest.IdentifierFixture()
@@ -138,6 +142,7 @@ func TestOnCollectionGuaranteeExpired(t *testing.T) {
 		headers: headers,
 		metrics: metrics,
 		spans:   metrics,
+		tracer:  trace.NewNoopTracer(),
 	}
 
 	originID := unittest.IdentifierFixture()

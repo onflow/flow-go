@@ -44,6 +44,7 @@ type GenericNode struct {
 	Payloads   storage.Payloads
 	Blocks     storage.Blocks
 	State      protocol.State
+	Index      storage.Index
 	Me         module.Local
 	Net        *stub.Network
 	DBDir      string

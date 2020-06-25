@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -17,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -30,6 +32,7 @@ type Engine struct {
 	unit     *engine.Unit   // used to control startup/shutdown
 	log      zerolog.Logger // used to log relevant actions with context
 	metrics  module.EngineMetrics
+	tracer   module.Tracer
 	mempool  module.MempoolMetrics
 	spans    module.ConsensusMetrics
 	me       module.Local
@@ -48,6 +51,7 @@ type Engine struct {
 func New(
 	log zerolog.Logger,
 	collector module.EngineMetrics,
+	tracer module.Tracer,
 	mempool module.MempoolMetrics,
 	spans module.ConsensusMetrics,
 	net module.Network,
@@ -66,6 +70,7 @@ func New(
 		unit:     engine.NewUnit(),
 		log:      log.With().Str("engine", "compliance").Logger(),
 		metrics:  collector,
+		tracer:   tracer,
 		mempool:  mempool,
 		spans:    spans,
 		me:       me,
@@ -234,6 +239,14 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		return fmt.Errorf("could not retrieve payload for proposal: %w", err)
 	}
 
+	for _, g := range payload.Guarantees {
+		if span, ok := e.tracer.GetSpan(g.CollectionID, trace.CONProcessCollection); ok {
+			childSpan := e.tracer.StartSpan(g.CollectionID, trace.CONCompBroadcastProposalWithDelay, opentracing.ChildOf(
+				span.Context()))
+			childSpan.Finish()
+		}
+	}
+
 	// retrieve all consensus nodes without our ID
 	recipients, err := e.state.AtBlockID(header.ParentID).Identities(filter.And(
 		filter.HasRole(flow.RoleConsensus),
@@ -324,6 +337,14 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 
 // onBlockProposal handles incoming block proposals.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
+
+	for _, g := range proposal.Payload.Guarantees {
+		if span, ok := e.tracer.GetSpan(g.CollectionID, trace.CONProcessCollection); ok {
+			childSpan := e.tracer.StartSpan(g.CollectionID, trace.CONCompOnBlockProposal, opentracing.ChildOf(
+				span.Context()))
+			childSpan.Finish()
+		}
+	}
 
 	header := proposal.Header
 

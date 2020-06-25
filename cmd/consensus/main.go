@@ -139,6 +139,7 @@ func main() {
 			match, err := matching.New(
 				node.Logger,
 				node.Metrics.Engine,
+				node.Tracer,
 				node.Metrics.Mempool,
 				node.Network,
 				node.State,
@@ -146,6 +147,7 @@ func main() {
 				resultsDB,
 				sealsDB,
 				node.Storage.Headers,
+				node.Storage.Index,
 				results,
 				receipts,
 				approvals,
@@ -157,6 +159,7 @@ func main() {
 			prov, err = provider.New(
 				node.Logger,
 				node.Metrics.Engine,
+				node.Tracer,
 				node.Network,
 				node.State,
 				node.Me,
@@ -168,6 +171,7 @@ func main() {
 				node.Logger,
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
+				node.Tracer,
 				conMetrics,
 				node.Network,
 				node.State,
@@ -180,6 +184,7 @@ func main() {
 			ing, err := ingestion.New(
 				node.Logger,
 				node.Metrics.Engine,
+				node.Tracer,
 				conMetrics,
 				node.Network,
 				prop,
@@ -204,6 +209,7 @@ func main() {
 			comp, err := compliance.New(
 				node.Logger,
 				node.Metrics.Engine,
+				node.Tracer,
 				node.Metrics.Mempool,
 				conMetrics,
 				node.Network,
@@ -295,7 +301,7 @@ func main() {
 			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations
 
 			// initialize a logging notifier for hotstuff
-			notifier := createNotifier(node.Logger, mainMetrics)
+			notifier := createNotifier(node.Logger, mainMetrics, node.Tracer, node.Storage.Index)
 			// initialize the persister
 			persist := persister.New(node.DB)
 
