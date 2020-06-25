@@ -14,7 +14,7 @@ func GenerateRootBlock(identityList flow.IdentityList, chainID flow.ChainID) *fl
 	header := flow.Header{
 		ChainID:        chainID,
 		ParentID:       flow.ZeroID,
-		Height:         0,
+		Height:         1501901,
 		PayloadHash:    payload.Hash(),
 		Timestamp:      flow.GenesisTime(),
 		View:           0,
