@@ -101,12 +101,12 @@ func statusWorker(workerID int, txs chan *txInFlight, done <-chan bool, fclient 
 		select {
 		case <-done:
 			fmt.Printf("worker %d stoped!\n", workerID)
-			break
+			return
 		case tx := <-txs:
 
 			if clientContErrorCounter > 10 {
 				fmt.Printf("worker %d: calling client has failed for the last 10 times\n", workerID)
-				break
+				return
 			}
 			if tx.expiresAt.Before(time.Now()) {
 				if tx.onTimeout != nil {

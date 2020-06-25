@@ -221,6 +221,7 @@ func (lg *LoadGenerator) createAccounts() error {
 		lg.txTracker.AddTx(createAccountTx.ID(),
 			nil,
 			func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
+				defer allTxWG.Done()
 				for _, event := range res.Events {
 					if event.Type == flowsdk.EventAccountCreated {
 						accountCreatedEvent := flowsdk.AccountCreatedEvent(event)
@@ -230,7 +231,6 @@ func (lg *LoadGenerator) createAccounts() error {
 						fmt.Printf("new account %v added\n", accountAddress)
 					}
 				}
-				allTxWG.Done()
 			},
 			nil, // on sealed
 			nil, // on expired
