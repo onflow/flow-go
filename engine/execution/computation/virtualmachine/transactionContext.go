@@ -95,15 +95,13 @@ func (r *TransactionContext) Logs() []string {
 
 // GetValue gets a register value from the world state.
 func (r *TransactionContext) GetValue(owner, controller, key []byte) ([]byte, error) {
-	v, _ := r.ledger.Get(fullKeyHash(string(flow.BytesToAddress(owner).Bytes()), string(
-		flow.BytesToAddress(controller).Bytes()), string(key)))
+	v, _ := r.ledger.Get(fullKeyHash(string(owner), string(controller), string(key)))
 	return v, nil
 }
 
 // SetValue sets a register value in the world state.
 func (r *TransactionContext) SetValue(owner, controller, key, value []byte) error {
-	r.ledger.Set(fullKeyHash(string(flow.BytesToAddress(owner).Bytes()), string(
-		flow.BytesToAddress(controller).Bytes()), string(key)), value)
+	r.ledger.Set(fullKeyHash(string(owner), string(controller), string(key)), value)
 	return nil
 }
 
