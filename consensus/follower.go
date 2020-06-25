@@ -36,7 +36,7 @@ func NewFollower(log zerolog.Logger, committee hotstuff.Committee, headers stora
 	}
 
 	// initialize the follower logic
-	logic, err := follower.New(log, validator, finalizer, notifier)
+	logic, err := follower.New(log, validator, finalizer)
 	if err != nil {
 		return nil, fmt.Errorf("could not create follower logic: %w", err)
 	}
