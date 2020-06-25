@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/hex"
+	"flag"
 	"fmt"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
@@ -15,9 +16,10 @@ import (
 
 func main() {
 
-	chainID := flowsdk.Testnet
-	accessNodeAddress := "localhost:3569"
-	serviceAccountPrivateKeyHex := unittest.ServiceAccountPrivateKeyHex
+	chainIDStr := flag.String("chain", string(flowsdk.Testnet), "chain ID")
+	chainID := flowsdk.ChainID([]byte(*chainIDStr))
+	accessNodeAddress := flag.String("access", "localhost:3569", "access node address")
+	serviceAccountPrivateKeyHex := flag.String("servPrivHex", unittest.ServiceAccountPrivateKeyHex, "service account private key hex")
 
 	addressGen := flowsdk.NewAddressGenerator(chainID)
 	serviceAccountAddress := addressGen.NextAddress()
@@ -27,7 +29,7 @@ func main() {
 	flowTokenAddress := addressGen.NextAddress()
 	fmt.Println("Flow Address:", flowTokenAddress)
 
-	serviceAccountPrivateKeyBytes, err := hex.DecodeString(serviceAccountPrivateKeyHex)
+	serviceAccountPrivateKeyBytes, err := hex.DecodeString(*serviceAccountPrivateKeyHex)
 	if err != nil {
 		panic("error while hex decoding hardcoded root key")
 	}
@@ -41,7 +43,7 @@ func main() {
 	// get the private key string
 	priv := hex.EncodeToString(ServiceAccountPrivateKey.PrivateKey.Encode())
 
-	flowClient, err := client.New(accessNodeAddress, grpc.WithInsecure())
+	flowClient, err := client.New(*accessNodeAddress, grpc.WithInsecure())
 	lg, err := utils.NewLoadGenerator(flowClient, priv, &serviceAccountAddress, &fungibleTokenAddress, &flowTokenAddress, 100, false)
 	if err != nil {
 		panic(err)
