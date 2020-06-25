@@ -10,6 +10,8 @@ import (
 	"github.com/spf13/viper"
 
 	extract "github.com/dapperlabs/flow-go/cmd/util/cmd/execution-state-extract"
+	"github.com/dapperlabs/flow-go/cmd/util/cmd/find-block"
+	"github.com/dapperlabs/flow-go/cmd/util/cmd/read-execution-state"
 )
 
 var (
@@ -44,6 +46,8 @@ func init() {
 
 func addCommands() {
 	rootCmd.AddCommand(extract.Cmd)
+	rootCmd.AddCommand(find.Cmd)
+	rootCmd.AddCommand(read.Cmd)
 }
 
 func initConfig() {
