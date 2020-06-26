@@ -5,7 +5,7 @@ go 1.13
 require (
 	github.com/dapperlabs/flow-go v0.0.0-00010101000000-000000000000
 	github.com/dapperlabs/flow-go/crypto v0.3.2-0.20200312195452-df4550a863b7
-	github.com/dapperlabs/testingdock v0.4.3-0.20200424073047-26b38aa03602
+	github.com/dapperlabs/testingdock v0.4.3-0.20200626075145-ea23fc16bb90
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/docker/docker v1.4.2-0.20190513124817-8c8457b0f2f8
 	github.com/docker/go-connections v0.4.0
@@ -15,7 +15,6 @@ require (
 	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200619174948-a3a856d16a27
 	github.com/rs/zerolog v1.19.0
 	github.com/stretchr/testify v1.6.1
-	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	google.golang.org/grpc v1.28.0
 	gopkg.in/yaml.v2 v2.2.5
