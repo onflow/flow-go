@@ -1,4 +1,4 @@
-package execution
+package benchmark
 
 import (
 	"bufio"
@@ -55,9 +55,8 @@ func TestTransactionsPerSecondBenchmark(t *testing.T) {
 
 type TransactionsPerSecondSuite struct {
 	execution.Suite
-	accessAddr    string
-	privateKeyHex string
-	metricsAddr   string
+	accessAddr  string
+	metricsAddr string
 }
 
 func (gs *TransactionsPerSecondSuite) SetupTest() {
@@ -66,24 +65,7 @@ func (gs *TransactionsPerSecondSuite) SetupTest() {
 
 	// Change these to corresponding values if using against non-local testnet
 	gs.accessAddr = fmt.Sprintf(":%s", gs.AccessPort())
-	gs.privateKeyHex = gs.privateKey()
 	gs.metricsAddr = fmt.Sprintf("http://localhost:%s/metrics", gs.MetricsPort())
-}
-
-func (gs *TransactionsPerSecondSuite) privateKey() string {
-	serviceAccountPrivateKeyBytes, err := hex.DecodeString(unittest.ServiceAccountPrivateKeyHex)
-	if err != nil {
-		panic("error while hex decoding hardcoded root key")
-	}
-
-	// RLP decode the key
-	ServiceAccountPrivateKey, err := flow.DecodeAccountPrivateKey(serviceAccountPrivateKeyBytes)
-	if err != nil {
-		panic("error while decoding hardcoded root key bytes")
-	}
-
-	// get the private key string
-	return hex.EncodeToString(ServiceAccountPrivateKey.PrivateKey.Encode())
 }
 
 // TestTransactionsPerSecond submits transactions and measures the average transaction per second of the execution node
@@ -97,7 +79,7 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 	// therefore lets just set them here
 	chainID := flowsdk.Testnet
 	accessNodeAddress := gs.accessAddr
-	serviceAccountPrivateKeyHex := gs.privateKey()
+	serviceAccountPrivateKeyHex := unittest.ServiceAccountPrivateKeyHex
 
 	addressGen := flowsdk.NewAddressGenerator(chainID)
 	serviceAccountAddress := addressGen.NextAddress()
