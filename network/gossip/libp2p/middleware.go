@@ -65,7 +65,7 @@ type Middleware struct {
 // given codec to encode/decode messages to our peers.
 func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flowID flow.Identifier,
 	key crypto.PrivateKey, metrics module.NetworkMetrics, maxPubSubMsgSize int,
-	genesisBlockID string, validators ...validators.MessageValidator) (*Middleware, error) {
+	rootBlockID string, validators ...validators.MessageValidator) (*Middleware, error) {
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
@@ -98,7 +98,7 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		key:              key,
 		metrics:          metrics,
 		maxPubSubMsgSize: maxPubSubMsgSize,
-		genesisBlockID:   genesisBlockID,
+		genesisBlockID:   rootBlockID,
 		validators:       validators,
 	}
 

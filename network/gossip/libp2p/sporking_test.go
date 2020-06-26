@@ -33,7 +33,7 @@ func (h *SporkingTestSuite) TestNetworkKeyChangedAfterHardSpoon() {
 	// create and start node 1 on localhost and random port
 	node1key, err := generateNetworkingKey("abc")
 	assert.NoError(h.T(), err)
-	node1, address1 := h.CreateNode("node1", node1key, "0.0.0.0", "0", genesisID)
+	node1, address1 := h.CreateNode("node1", node1key, "0.0.0.0", "0", rootID)
 	defer h.StopNode(node1)
 	h.T().Logf(" %s node started on %s:%s", node1.name, address1.IP, address1.Port)
 	h.T().Logf("libp2p ID for %s: %s", node1.name, node1.libP2PHost.ID())
@@ -41,7 +41,7 @@ func (h *SporkingTestSuite) TestNetworkKeyChangedAfterHardSpoon() {
 	// create and start node 2 on localhost and random port
 	node2key, err := generateNetworkingKey("def")
 	assert.NoError(h.T(), err)
-	node2, address2 := h.CreateNode("node2", node2key, "0.0.0.0", "0", genesisID)
+	node2, address2 := h.CreateNode("node2", node2key, "0.0.0.0", "0", rootID)
 	h.T().Logf(" %s node started on %s:%s", node2.name, address2.IP, address2.Port)
 	h.T().Logf("libp2p ID for %s: %s", node2.name, node2.libP2PHost.ID())
 
@@ -61,7 +61,7 @@ func (h *SporkingTestSuite) TestNetworkKeyChangedAfterHardSpoon() {
 	assert.False(h.T(), node2key.Equals(node2keyNew))
 
 	// start node2 with the same name, ip and port but with the new key
-	node2, address2New := h.CreateNode(node2.name, node2keyNew, address2.IP, address2.Port, genesisID)
+	node2, address2New := h.CreateNode(node2.name, node2keyNew, address2.IP, address2.Port, rootID)
 	defer h.StopNode(node2)
 	h.T().Logf(" %s node again started on %s:%s", node2.name, address2New.IP, address2New.Port)
 	h.T().Logf("new libp2p ID for %s: %s", node2.name, node2.libP2PHost.ID())

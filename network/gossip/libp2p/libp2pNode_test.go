@@ -169,7 +169,7 @@ func (l *LibP2PNodeTestSuite) TestCreateStream() {
 
 	address2 := addrs[1]
 
-	flowProtocolID := generateProtocolID(genesisID)
+	flowProtocolID := generateProtocolID(rootID)
 	// Assert that there is no outbound stream to the target yet
 	require.Equal(l.T(), 0, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), flowProtocolID, network.DirOutbound))
 
@@ -364,7 +364,7 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler ...network.StreamHa
 		require.NoError(l.Suite.T(), err)
 
 		// create a node on localhost with a random port assigned by the OS
-		n, nodeID := l.CreateNode(name, pkey, "0.0.0.0", "0", genesisID, handler...)
+		n, nodeID := l.CreateNode(name, pkey, "0.0.0.0", "0", rootID, handler...)
 		nodes = append(nodes, n)
 		nodeAddrs = append(nodeAddrs, nodeID)
 	}

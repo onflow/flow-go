@@ -27,7 +27,7 @@ import (
 )
 
 // A unique Libp2p protocol ID prefix for Flow (https://docs.libp2p.io/concepts/protocols/)
-// All nodes communicate with each other using this protocol id suffixed with the id of the genesis block
+// All nodes communicate with each other using this protocol id suffixed with the id of the root block
 const (
 	FlowLibP2PProtocolIDPrefix string = "/flow/push/"
 )
@@ -59,13 +59,13 @@ type P2PNode struct {
 
 // Start starts a libp2p node on the given address.
 func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logger, key lcrypto.PrivKey,
-	handler network.StreamHandler, genesisID string, psOption ...pubsub.Option) error {
+	handler network.StreamHandler, rootBlockID string, psOption ...pubsub.Option) error {
 	p.Lock()
 	defer p.Unlock()
 
 	p.name = n.Name
 	p.logger = logger
-	p.flowLibP2PProtocolID = generateProtocolID(genesisID)
+	p.flowLibP2PProtocolID = generateProtocolID(rootBlockID)
 	addr := MultiaddressStr(n)
 	sourceMultiAddr, err := multiaddr.NewMultiaddr(addr)
 	if err != nil {
@@ -375,6 +375,6 @@ func MultiaddressStr(address NodeAddress) string {
 	return fmt.Sprintf("/dns4/%s/tcp/%s", address.IP, address.Port)
 }
 
-func generateProtocolID(genesisID string) protocol.ID {
-	return protocol.ID(FlowLibP2PProtocolIDPrefix + genesisID)
+func generateProtocolID(rootBlockID string) protocol.ID {
+	return protocol.ID(FlowLibP2PProtocolIDPrefix + rootBlockID)
 }
