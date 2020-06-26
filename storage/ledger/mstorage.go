@@ -38,6 +38,9 @@ type MTrieStorage struct {
 	metrics module.LedgerMetrics
 }
 
+const MaxHeight = 257
+const CacheSize = 1000
+
 // NewMTrieStorage creates a new in-memory trie-backed ledger storage with persistence.
 func NewMTrieStorage(dbDir string, capacity int, metrics module.LedgerMetrics, reg prometheus.Registerer) (*MTrieStorage, error) {
 

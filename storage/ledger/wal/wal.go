@@ -62,7 +62,18 @@ func (w *LedgerWAL) Replay(
 	if err != nil {
 		return err
 	}
-	return w.replay(from, to, checkpointFn, updateFn, deleteFn)
+	return w.replay(from, to, checkpointFn, updateFn, deleteFn, true)
+}
+
+func (w *LedgerWAL) ReplayLogsOnly(
+	updateFn func(flow.StateCommitment, [][]byte, [][]byte) error,
+	deleteFn func(flow.StateCommitment) error,
+) error {
+	from, to, err := w.wal.Segments()
+	if err != nil {
+		return err
+	}
+	return w.replay(from, to, nil, updateFn, deleteFn, false)
 }
 
 func (w *LedgerWAL) replay(
@@ -70,43 +81,47 @@ func (w *LedgerWAL) replay(
 	checkpointFn func(forestSequencing *flattener.FlattenedForest) error,
 	updateFn func(flow.StateCommitment, [][]byte, [][]byte) error,
 	deleteFn func(flow.StateCommitment) error,
+	useCheckpoints bool,
 ) error {
 
 	if to < from {
 		return fmt.Errorf("end of range cannot be smaller than beginning")
 	}
 
-	checkpointer, err := w.NewCheckpointer()
-	if err != nil {
-		return fmt.Errorf("cannot create checkpointer: %w", err)
-	}
-
-	latestCheckpoint, err := checkpointer.LatestCheckpoint()
-	if err != nil {
-		return fmt.Errorf("cannot get latest checkpoint: %w", err)
-	}
-
 	loadedCheckpoint := false
-
-	if latestCheckpoint != -1 && latestCheckpoint+1 >= from { //+1 to account for connected checkpoint and segments
-		forestSequencing, err := checkpointer.LoadCheckpoint(latestCheckpoint)
-		if err != nil {
-			return fmt.Errorf("cannot load checkpoint %d: %w", latestCheckpoint, err)
-		}
-		err = checkpointFn(forestSequencing)
-		if err != nil {
-			return fmt.Errorf("error while handling checkpoint: %w", err)
-		}
-		loadedCheckpoint = true
-	}
-
-	if loadedCheckpoint && to == latestCheckpoint {
-		return nil
-	}
-
 	startSegment := from
-	if loadedCheckpoint {
-		startSegment = latestCheckpoint + 1
+
+	if useCheckpoints {
+
+		checkpointer, err := w.NewCheckpointer()
+		if err != nil {
+			return fmt.Errorf("cannot create checkpointer: %w", err)
+		}
+
+		latestCheckpoint, err := checkpointer.LatestCheckpoint()
+		if err != nil {
+			return fmt.Errorf("cannot get latest checkpoint: %w", err)
+		}
+
+		if latestCheckpoint != -1 && latestCheckpoint+1 >= from { //+1 to account for connected checkpoint and segments
+			forestSequencing, err := checkpointer.LoadCheckpoint(latestCheckpoint)
+			if err != nil {
+				return fmt.Errorf("cannot load checkpoint %d: %w", latestCheckpoint, err)
+			}
+			err = checkpointFn(forestSequencing)
+			if err != nil {
+				return fmt.Errorf("error while handling checkpoint: %w", err)
+			}
+			loadedCheckpoint = true
+		}
+
+		if loadedCheckpoint && to == latestCheckpoint {
+			return nil
+		}
+
+		if loadedCheckpoint {
+			startSegment = latestCheckpoint + 1
+		}
 	}
 
 	sr, err := prometheusWAL.NewSegmentsRangeReader(prometheusWAL.SegmentRange{
