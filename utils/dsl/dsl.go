@@ -60,7 +60,10 @@ type Import struct {
 
 func (i Import) ToCadence() string {
 	if i.Address != flow.EmptyAddress {
-		return fmt.Sprintf("import 0x%s", i.Address.Short())
+		if len(i.Names) > 0 {
+			return fmt.Sprintf("import %s from 0x%s\n", strings.Join(i.Names, ", "), i.Address.Short())
+		}
+		return fmt.Sprintf("import 0x%s\n", i.Address.Short())
 	}
 	return ""
 }
@@ -88,7 +91,7 @@ type Main struct {
 }
 
 func (m Main) ToCadence() string {
-	return fmt.Sprintf("import 0x01\npub fun main(): %s { %s }", m.ReturnType, m.Code)
+	return fmt.Sprintf("%s \npub fun main(): %s { %s }", m.Import.ToCadence(), m.ReturnType, m.Code)
 }
 
 type Code string
