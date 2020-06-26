@@ -333,7 +333,7 @@ func ReadStorableNode(reader io.Reader) (*flattener.StorableNode, error) {
 // 2-bytes Big Endian uint16 RootHash length
 // RootHash bytes
 func EncodeStorableTrie(storableTrie *flattener.StorableTrie) []byte {
-	length := 8 + 2 + len(storableTrie.RootHash) + 2
+	length := 8 + 2 + len(storableTrie.RootHash)
 	buf := make([]byte, length)
 	pos := writeUint64(buf, 0, storableTrie.RootIndex)
 	writeShortData(buf, pos, storableTrie.RootHash)
