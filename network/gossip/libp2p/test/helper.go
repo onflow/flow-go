@@ -16,7 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-var genesisID = unittest.IdentifierFixture().String()
+var rootBlockID = unittest.IdentifierFixture().String()
 
 // helper offers a set of functions that are shared among different tests
 // CreateIDs creates and initializes count-many flow identifiers instances
@@ -39,7 +39,8 @@ func CreateIDs(count int) []*flow.Identity {
 // and for each middleware creates a network instance on top
 // it returns the slice of created middlewares
 // csize is the receive cache size of the nodes
-func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.IdentityList, csize int, dryrun bool, tops ...middleware.Topology) ([]*libp2p.Network, error) {
+func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.IdentityList, csize int, dryrun bool,
+	tops ...middleware.Topology) ([]*libp2p.Network, error) {
 	count := len(mws)
 	nets := make([]*libp2p.Network, 0)
 	metrics := metrics.NewNoopCollector()
@@ -121,7 +122,7 @@ func CreateMiddleware(log zerolog.Logger, identities []*flow.Identity) ([]*libp2
 
 		// creating middleware of nodes
 		mw, err := libp2p.NewMiddleware(log, json.NewCodec(), "0.0.0.0:0", identities[i].NodeID, key, metrics,
-			libp2p.DefaultMaxPubSubMsgSize, genesisID)
+			libp2p.DefaultMaxPubSubMsgSize, rootBlockID)
 		if err != nil {
 			return nil, err
 		}

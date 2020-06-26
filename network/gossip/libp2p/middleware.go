@@ -57,7 +57,7 @@ type Middleware struct {
 	key              crypto.PrivateKey
 	metrics          module.NetworkMetrics
 	maxPubSubMsgSize int
-	genesisBlockID   string
+	rootBlockID      string
 	validators       []validators.MessageValidator
 }
 
@@ -98,7 +98,7 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		key:              key,
 		metrics:          metrics,
 		maxPubSubMsgSize: maxPubSubMsgSize,
-		genesisBlockID:   rootBlockID,
+		rootBlockID:      rootBlockID,
 		validators:       validators,
 	}
 
@@ -154,7 +154,7 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 	}
 
 	// start the libp2p node
-	err = m.libP2PNode.Start(m.ctx, nodeAddress, m.log, libp2pKey, m.handleIncomingStream, m.genesisBlockID, psOptions...)
+	err = m.libP2PNode.Start(m.ctx, nodeAddress, m.log, libp2pKey, m.handleIncomingStream, m.rootBlockID, psOptions...)
 	if err != nil {
 		return fmt.Errorf("failed to start libp2p node: %w", err)
 	}
@@ -361,7 +361,7 @@ ProcessLoop:
 // Subscribe will subscribe the middleware for a topic with the fully qualified channel ID name
 func (m *Middleware) Subscribe(channelID uint8) error {
 
-	topic := engine.FullyQualifiedChannelName(channelID, m.genesisBlockID)
+	topic := engine.FullyQualifiedChannelName(channelID, m.rootBlockID)
 
 	s, err := m.libP2PNode.Subscribe(m.ctx, topic)
 	if err != nil {
@@ -438,7 +438,7 @@ func (m *Middleware) publish(channelID uint8, msg *message.Message) error {
 		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, m.maxPubSubMsgSize)
 	}
 
-	topic := engine.FullyQualifiedChannelName(channelID, m.genesisBlockID)
+	topic := engine.FullyQualifiedChannelName(channelID, m.rootBlockID)
 
 	// publish the bytes on the topic
 	err = m.libP2PNode.Publish(m.ctx, topic, data)

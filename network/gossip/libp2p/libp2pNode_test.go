@@ -371,7 +371,7 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler ...network.StreamHa
 	return nodes, nodeAddrs
 }
 
-func (l *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip string, port string, genesisID string,
+func (l *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip string, port string, rootID string,
 	handler ...network.StreamHandler) (*P2PNode, NodeAddress) {
 	n := &P2PNode{}
 	nodeID := NodeAddress{
@@ -391,7 +391,7 @@ func (l *LibP2PNodeTestSuite) CreateNode(name string, key crypto.PrivKey, ip str
 		handlerFunc = func(network.Stream) {}
 	}
 
-	err := n.Start(l.ctx, nodeID, logger, key, handlerFunc, genesisID)
+	err := n.Start(l.ctx, nodeID, logger, key, handlerFunc, rootID)
 	require.NoError(l.T(), err)
 	require.Eventuallyf(l.T(), func() bool {
 		ip, p := n.GetIPPort()
