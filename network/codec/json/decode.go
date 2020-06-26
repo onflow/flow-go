@@ -4,6 +4,7 @@ package json
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/pkg/errors"
 
@@ -91,7 +92,7 @@ func decode(env Envelope) (interface{}, error) {
 	// unmarshal the payload
 	err := json.Unmarshal(env.Data, v)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not decode payload")
+		return nil, fmt.Errorf("could not decode payload: %w", err)
 	}
 
 	return v, nil

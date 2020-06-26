@@ -4,8 +4,7 @@ package json
 
 import (
 	"encoding/json"
-
-	"github.com/pkg/errors"
+	"fmt"
 )
 
 // Encoder is an encoder to write serialized JSON to a writer.
@@ -20,13 +19,13 @@ func (e *Encoder) Encode(v interface{}) error {
 	// encode the value
 	env, err := encode(v)
 	if err != nil {
-		return errors.Wrap(err, "could not encode value")
+		return fmt.Errorf("could not encode value: %w", err)
 	}
 
 	// write the envelope to network
 	err = e.enc.Encode(env)
 	if err != nil {
-		return errors.Wrap(err, "could not encode envelope")
+		return fmt.Errorf("could not encode envelope: %w", err)
 	}
 
 	return nil

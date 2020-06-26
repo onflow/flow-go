@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
@@ -17,12 +18,177 @@ import (
 	mock2 "github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
+	chmodel "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
 	"github.com/dapperlabs/flow-go/utils/logging"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
+
+// VerificationHappyPath runs `verNodeCount`-many verification nodes
+// and checks that concurrently received execution receipts with the same result part that
+// by each verification node results in:
+// - the selection of the assigned chunks by the ingest engine
+// - request of the associated chunk data pack to the assigned chunks
+// - formation of a complete verifiable chunk by the ingest engine for each assigned chunk
+// - submitting a verifiable chunk locally to the verify engine by the ingest engine
+// - dropping the ingestion of the ERs that share the same result once the verifiable chunk is submitted to verify engine
+// - broadcast of a matching result approval to consensus nodes for each assigned chunk
+func VerificationHappyPath(t *testing.T,
+	verificationMetrics module.VerificationMetrics,
+	mempoolMetrics module.MempoolMetrics,
+	verNodeCount int,
+	chunkNum int) {
+	// to demarcate the debug logs
+	log.Debug().
+		Int("verification_nodes_count", verNodeCount).
+		Int("chunk_num", chunkNum).
+		Msg("TestHappyPath started")
+
+	// ingest engine parameters
+	// set based on following issue
+	// https://github.com/dapperlabs/flow-go/issues/3443
+	requestInterval := uint(1000)
+	failureThreshold := uint(2)
+
+	// generates network hub
+	hub := stub.NewNetworkHub()
+
+	chainID := flow.Mainnet
+
+	// generates identities of nodes, one of each type, `verNodeCount` many of verification nodes
+	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	exeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	verIdentities := unittest.IdentityListFixture(verNodeCount, unittest.WithRole(flow.RoleVerification))
+	conIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
+
+	identities := flow.IdentityList{colIdentity, conIdentity, exeIdentity}
+	identities = append(identities, verIdentities...)
+
+	// Execution receipt and chunk assignment
+	//
+	// creates an execution receipt and its associated data
+	// with `chunkNum` chunks
+	completeER := utils.CompleteExecutionResultFixture(t, chunkNum, flow.Testnet.Chain())
+
+	// mocks the assignment to only assign "some" chunks to the verIdentity
+	// the assignment is done based on `isAssgined` function
+	assigner := &mock.ChunkAssigner{}
+	a := chmodel.NewAssignment()
+	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
+		assignees := make([]flow.Identifier, 0)
+		for _, verIdentity := range verIdentities {
+			if IsAssigned(chunk.Index) {
+				assignees = append(assignees, verIdentity.NodeID)
+			}
+		}
+		a.Add(chunk, assignees)
+	}
+	assigner.On("Assign",
+		testifymock.Anything,
+		completeER.Receipt.ExecutionResult.Chunks,
+		testifymock.Anything).
+		Return(a, nil)
+
+	// nodes and engines
+	//
+	// verification node
+	verNodes := make([]mock2.VerificationNode, 0)
+	for _, verIdentity := range verIdentities {
+		verNode := testutil.VerificationNode(t,
+			hub,
+			verificationMetrics,
+			mempoolMetrics,
+			verIdentity,
+			identities,
+			assigner,
+			requestInterval,
+			failureThreshold,
+			chainID)
+
+		// starts all the engines
+		<-verNode.FinderEngine.Ready()
+		<-verNode.MatchEngine.(module.ReadyDoneAware).Ready()
+		<-verNode.VerifierEngine.(module.ReadyDoneAware).Ready()
+
+		// assumes the verification node has received the block
+		err := verNode.Blocks.Store(completeER.Block)
+		assert.Nil(t, err)
+
+		verNodes = append(verNodes, verNode)
+	}
+
+	// mock execution node
+	exeNode, exeEngine := setupMockExeNode(t, hub, exeIdentity, verIdentities, identities, chainID, completeER)
+
+	// mock consensus node
+	conNode, conEngine, conWG := setupMockConsensusNode(t, hub, conIdentity, verIdentities, identities, completeER, chainID)
+
+	// sends execution receipt to each of verification nodes
+	verWG := sync.WaitGroup{}
+	for _, verNode := range verNodes {
+		verWG.Add(1)
+		go func(vn mock2.VerificationNode, receipt *flow.ExecutionReceipt) {
+			defer verWG.Done()
+			err := vn.FinderEngine.Process(exeIdentity.NodeID, receipt)
+			require.NoError(t, err)
+		}(verNode, completeER.Receipt)
+	}
+
+	// requires all verification nodes process the receipt
+	unittest.RequireReturnsBefore(t, verWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second)
+
+	// creates a network instance for each verification node
+	// and sets it in continuous delivery mode
+	// then flushes the collection requests
+	verNets := make([]*stub.Network, 0)
+	for _, verIdentity := range verIdentities {
+		verNet, ok := hub.GetNetwork(verIdentity.NodeID)
+		assert.True(t, ok)
+		verNet.StartConDev(requestInterval, true)
+		verNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
+			return m.ChannelID == engine.CollectionProvider
+		})
+
+		verNets = append(verNets, verNet)
+	}
+
+	// requires all verification nodes send a result approval per assigned chunk
+	unittest.RequireReturnsBefore(t, conWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second)
+	// assert that the RA was received
+	conEngine.AssertExpectations(t)
+
+	// assert proper number of calls made
+	exeEngine.AssertExpectations(t)
+
+	// stops verification nodes
+	// Note: this should be done prior to any evaluation to make sure that
+	// the process method of Ingest engines is done working.
+	for _, verNode := range verNodes {
+		// stops all the engines
+		<-verNode.FinderEngine.Done()
+		<-verNode.MatchEngine.(module.ReadyDoneAware).Done()
+		<-verNode.VerifierEngine.(module.ReadyDoneAware).Done()
+	}
+
+	// stops continuous delivery of nodes
+	for _, verNet := range verNets {
+		verNet.StopConDev()
+	}
+
+	conNode.Done()
+	exeNode.Done()
+
+	// to demarcate the debug logs
+	log.Debug().
+		Int("verification_nodes_count", verNodeCount).
+		Int("chunk_num", chunkNum).
+		Msg("TestHappyPath finishes")
+}
 
 // setupMockExeNode creates and returns an execution node and its registered engine in the network (hub)
 // it mocks the process method of execution node that on receiving a chunk data pack request from
@@ -35,10 +201,11 @@ func setupMockExeNode(t *testing.T,
 	exeIdentity *flow.Identity,
 	verIdentities flow.IdentityList,
 	othersIdentity flow.IdentityList,
+	chainID flow.ChainID,
 	completeER utils.CompleteExecutionResult) (*mock2.GenericNode, *network.Engine) {
 	// mock the execution node with a generic node and mocked engine
 	// to handle request for chunk state
-	exeNode := testutil.GenericNode(t, hub, exeIdentity, othersIdentity)
+	exeNode := testutil.GenericNode(t, hub, exeIdentity, othersIdentity, chainID)
 	exeEngine := new(network.Engine)
 
 	// determines the expected number of result chunk data pack requests
@@ -105,7 +272,8 @@ func setupMockConsensusNode(t *testing.T,
 	conIdentity *flow.Identity,
 	verIdentities flow.IdentityList,
 	othersIdentity flow.IdentityList,
-	completeER utils.CompleteExecutionResult) (*mock2.GenericNode, *network.Engine, *sync.WaitGroup) {
+	completeER utils.CompleteExecutionResult,
+	chainID flow.ChainID) (*mock2.GenericNode, *network.Engine, *sync.WaitGroup) {
 	// determines the expected number of result approvals this node should receive
 	approvalsCount := 0
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
@@ -123,7 +291,7 @@ func setupMockConsensusNode(t *testing.T,
 
 	// mock the consensus node with a generic node and mocked engine to assert
 	// that the result approval is broadcast
-	conNode := testutil.GenericNode(t, hub, conIdentity, othersIdentity)
+	conNode := testutil.GenericNode(t, hub, conIdentity, othersIdentity, chainID)
 	conEngine := new(network.Engine)
 
 	// map form verIds --> result approval ID

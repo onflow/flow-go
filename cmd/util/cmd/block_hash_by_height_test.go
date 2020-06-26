@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/cmd/util/cmd/common"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
@@ -20,12 +21,12 @@ import (
 )
 
 func TestBlockHashByHeight(t *testing.T) {
-	metr := metrics.NewCacheCollector(flow.GetChainID())
+	metr := metrics.NewNoopCollector()
 
 	t.Run("AllowUnfinalizedUnsealed", func(t *testing.T) {
 		datadir, err := tempDBDir()
 		require.NoError(t, err)
-		db := initStorage(datadir)
+		db := common.InitStorage(datadir)
 		headers := bstorage.NewHeaders(metr, db)
 
 		h := unittest.BlockHeaderFixture()
@@ -49,7 +50,7 @@ func TestBlockHashByHeight(t *testing.T) {
 		datadir, err := tempDBDir()
 		require.NoError(t, err)
 
-		db := initStorage(datadir)
+		db := common.InitStorage(datadir)
 		headers := bstorage.NewHeaders(metr, db)
 
 		h1 := unittest.BlockHeaderFixture()
@@ -79,7 +80,7 @@ func TestBlockHashByHeight(t *testing.T) {
 		datadir, err := tempDBDir()
 		require.NoError(t, err)
 
-		db := initStorage(datadir)
+		db := common.InitStorage(datadir)
 		headers := bstorage.NewHeaders(metr, db)
 		seals := bstorage.NewSeals(metr, db)
 

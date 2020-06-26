@@ -287,13 +287,13 @@ func (m *Middleware) connect(flowID string, address string, key crypto.PublicKey
 
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
-		return nil, fmt.Errorf("could not parse address %s:%v", address, err)
+		return nil, fmt.Errorf("could not parse address %s: %w", address, err)
 	}
 
 	// convert the Flow key to a LibP2P key
 	lkey, err := PublicKey(key)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert flow key to libp2p key: %v", err)
+		return nil, fmt.Errorf("could not convert flow key to libp2p key: %w", err)
 	}
 
 	// Create a new NodeAddress
@@ -302,7 +302,7 @@ func (m *Middleware) connect(flowID string, address string, key crypto.PublicKey
 	// Create a stream for it
 	stream, err := m.libP2PNode.CreateStream(m.ctx, nodeAddress)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create stream for %s:%v", nodeAddress.Name, err)
+		return nil, fmt.Errorf("failed to create stream for %s :%w", nodeAddress.Name, err)
 	}
 
 	m.log.Info().Str("target_id", flowID).Str("address", address).Msg("stream created")

@@ -39,7 +39,7 @@ func Recover(log zerolog.Logger, finalized *flow.Header, pending []*flow.Header,
 
 		// verify the proposal
 		err := validator.ValidateProposal(proposal)
-		if errors.Is(err, model.ErrorInvalidBlock{}) {
+		if model.IsInvalidBlockError(err) {
 			log.Warn().
 				Hex("block_id", logging.ID(proposal.Block.BlockID)).
 				Err(err).

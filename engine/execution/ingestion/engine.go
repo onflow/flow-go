@@ -315,7 +315,7 @@ func (e *Engine) handleBlockProposal(ctx context.Context, proposal *messages.Blo
 					panic(fmt.Sprintf("could not enqueue orphaned block"))
 				}
 				e.tryRequeueOrphans(executableBlock, queue, orphanQueues)
-				e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("added block to new orphan queue")
+				e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Hex("parent_id", logging.ID(executableBlock.Block.Header.ParentID)).Msg("added block to new orphan queue")
 				// special case when sync threshold is reached
 				if queue.Height() < e.syncModeThreshold {
 					return nil
@@ -462,7 +462,7 @@ func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 	if eb.IsComplete() {
 		e.log.Debug().
 			Hex("block_id", logging.Entity(eb.Block)).
-			Msg("executing block")
+			Msg("block complete, starting execution")
 
 		if e.extensiveLogging {
 			e.logExecutableBlock(eb)

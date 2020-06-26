@@ -19,6 +19,7 @@ import (
 type Engine struct {
 	unit               *engine.Unit
 	log                zerolog.Logger
+	metrics            module.VerificationMetrics
 	me                 module.Local
 	match              network.Engine
 	receipts           mempool.PendingReceipts // used to keep the receipts as mempool
@@ -30,6 +31,7 @@ type Engine struct {
 
 func New(
 	log zerolog.Logger,
+	metrics module.VerificationMetrics,
 	net module.Network,
 	me module.Local,
 	match network.Engine,
@@ -42,6 +44,7 @@ func New(
 	e := &Engine{
 		unit:               engine.NewUnit(),
 		log:                log.With().Str("engine", "finder").Logger(),
+		metrics:            metrics,
 		me:                 me,
 		match:              match,
 		headerStorage:      headerStorage,
@@ -125,6 +128,9 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		Hex("receipt_id", logging.ID(receiptID)).
 		Hex("result_id", logging.ID(resultID)).Logger()
 	log.Info().Msg("execution receipt arrived")
+
+	// monitoring: increases number of received execution receipts
+	e.metrics.OnExecutionReceiptReceived()
 
 	// checks if the result has already been handled
 	if e.processedResult.Has(resultID) {
@@ -226,6 +232,9 @@ func (e *Engine) processResult(originID flow.Identifier, result *flow.ExecutionR
 		return fmt.Errorf("submission error to match engine: %w", err)
 	}
 
+	// monitoring: increases number of execution results sent
+	e.metrics.OnExecutionResultSent()
+
 	return nil
 }
 
@@ -236,7 +245,6 @@ func (e *Engine) onResultProcessed(resultID flow.Identifier) {
 	log := e.log.With().
 		Hex("result_id", logging.ID(resultID)).
 		Logger()
-
 	// marks result as processed
 	added := e.processedResult.Add(resultID)
 	if added {
