@@ -35,6 +35,9 @@ crypto/relic/update:
 cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
 
+cmd/util/util:
+	go build -o cmd/util/util cmd/util/main.go
+
 .PHONY: install-tools
 install-tools: crypto/relic/build check-go-version
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.23.8; \
