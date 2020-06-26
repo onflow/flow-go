@@ -1,8 +1,6 @@
 package rpc
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -21,24 +19,25 @@ type HTTPServer struct {
 }
 
 var defaultHTTPHeaders = []HTTPHeader{
-		{
-			Key:   "Access-Control-Allow-Origin",
-			Value: "*",
-		},
-		{
-			Key:   "Access-Control-Allow-Methods",
-			Value: "POST, GET, OPTIONS, PUT, DELETE",
-		},
-		{
-			Key:   "Access-Control-Allow-Headers",
-			Value: "*",
-		},
-	}
+	{
+		Key:   "Access-Control-Allow-Origin",
+		Value: "*",
+	},
+	{
+		Key:   "Access-Control-Allow-Methods",
+		Value: "POST, GET, OPTIONS, PUT, DELETE",
+	},
+	{
+		Key:   "Access-Control-Allow-Headers",
+		Value: "*",
+	},
+}
 
+// NewHTTPServer creates and intializes a new HTTP GRPC proxy server
 func NewHTTPServer(
 	grpcServer *grpc.Server,
 	port int,
-) *HTTPServer {
+) *http.Server {
 	wrappedServer := grpcweb.WrapServer(
 		grpcServer,
 		grpcweb.WithOriginFunc(func(origin string) bool { return true }),
@@ -54,22 +53,7 @@ func NewHTTPServer(
 		Handler: mux,
 	}
 
-	return &HTTPServer{
-		httpServer: httpServer,
-	}
-}
-
-func (h *HTTPServer) Start() error {
-	err := h.httpServer.ListenAndServe()
-	if errors.Is(err, http.ErrServerClosed) {
-		return nil
-	}
-
-	return err
-}
-
-func (h *HTTPServer) Stop() {
-	_ = h.httpServer.Shutdown(context.Background())
+	return httpServer
 }
 
 func wrappedHandler(wrappedServer *grpcweb.WrappedGrpcServer, headers []HTTPHeader) http.HandlerFunc {
@@ -84,8 +68,8 @@ func wrappedHandler(wrappedServer *grpcweb.WrappedGrpcServer, headers []HTTPHead
 	}
 }
 
-func setResponseHeaders(w *http.ResponseWriter, headers []HTTPHeader) {
+func setResponseHeaders(w http.ResponseWriter, headers []HTTPHeader) {
 	for _, header := range headers {
-		(*w).Header().Set(header.Key, header.Value)
+		w.Header().Set(header.Key, header.Value)
 	}
 }

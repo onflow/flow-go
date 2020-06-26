@@ -1,7 +1,10 @@
 package rpc
 
 import (
+	"context"
+	"errors"
 	"net"
+	"net/http"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
@@ -32,7 +35,7 @@ type Engine struct {
 	log        zerolog.Logger
 	handler    *handler.Handler // the gRPC service implementation
 	grpcServer *grpc.Server     // the gRPC server
-	httpServer *HTTPServer
+	httpServer *http.Server
 	config     Config
 }
 
@@ -88,7 +91,14 @@ func (e *Engine) Ready() <-chan struct{} {
 // Done returns a done channel that is closed once the engine has fully stopped.
 // It sends a signal to stop the gRPC server, then closes the channel.
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done(e.grpcServer.GracefulStop, e.httpServer.Stop)
+	return e.unit.Done(
+		e.grpcServer.GracefulStop,
+		func() {
+		err := e.httpServer.Shutdown(context.Background())
+		if err != nil {
+			e.log.Error().Err(err).Msg("error stopping http server")
+		}
+	})
 }
 
 // serve starts the gRPC server and the http proxy server
@@ -108,7 +118,10 @@ func (e *Engine) serve() {
 	}
 
 	e.log.Info().Msgf("starting http server on address %s", e.config.HTTPListenAddr)
-	err = e.httpServer.Start()
+	err = e.httpServer.ListenAndServe()
+	if errors.Is(err, http.ErrServerClosed) {
+		return
+	}
 	if err != nil {
 		e.log.Err(err).Msg("failed to start the http proxy server")
 	}
