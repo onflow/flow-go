@@ -87,7 +87,9 @@ func main() {
 				panic(fmt.Sprintf("error while bootstrapping execution state: no service account public key"))
 			}
 
-			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage, *node.GenesisAccountPublicKey, node.GenesisTokenSupply, node.RootChainID.Chain())
+			bootstrapper := bootstrap.NewBootstrapper(node.Logger)
+
+			bootstrappedStateCommitment, err := bootstrapper.BootstrapLedger(ledgerStorage, *node.GenesisAccountPublicKey, node.GenesisTokenSupply, node.RootChainID.Chain())
 			if err != nil {
 				panic(fmt.Sprintf("error while bootstrapping execution state: %s", err))
 			}
@@ -96,7 +98,7 @@ func main() {
 				panic(fmt.Sprintf("genesis seal state commitment (%x) different from precalculated (%x)", bootstrappedStateCommitment, node.GenesisCommit))
 			}
 
-			err = bootstrap.BootstrapExecutionDatabase(node.DB, bootstrappedStateCommitment, block.Header)
+			err = bootstrapper.BootstrapExecutionDatabase(node.DB, bootstrappedStateCommitment, block.Header)
 			if err != nil {
 				panic(fmt.Sprintf("error while bootstrapping execution state - cannot bootstrap database: %s", err))
 			}

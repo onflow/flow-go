@@ -73,3 +73,18 @@ func (c *AccessClient) ExecuteScript(ctx context.Context, script []byte) ([]byte
 
 	return res.GetValue(), nil
 }
+
+func (c *AccessClient) GetEvents(ctx context.Context, typ string) ([]*access.EventsResponse_Result, error) {
+
+	events, err := c.rpcClient.GetEventsForHeightRange(ctx, &access.GetEventsForHeightRangeRequest{
+		Type:        typ,
+		StartHeight: 0,
+		EndHeight:   1000,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return events.Results, nil
+}

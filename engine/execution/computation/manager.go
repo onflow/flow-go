@@ -55,7 +55,7 @@ func New(
 		me:            me,
 		protoState:    protoState,
 		vm:            vm,
-		blockComputer: computer.NewBlockComputer(vm, blocks, metrics, tracer),
+		blockComputer: computer.NewBlockComputer(vm, blocks, metrics, tracer, log.With().Str("component", "block_computer").Logger()),
 		blocks:        blocks,
 	}
 

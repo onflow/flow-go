@@ -36,7 +36,7 @@ type Suite struct {
 	follower *module.HotStuffFollower
 
 	engine *follower.Engine
-	sync   *module.Synchronization
+	sync   *module.BlockRequester
 }
 
 func (suite *Suite) SetupTest() {
@@ -52,7 +52,7 @@ func (suite *Suite) SetupTest() {
 	suite.snapshot = new(protocol.Snapshot)
 	suite.cache = new(module.PendingBlockBuffer)
 	suite.follower = new(module.HotStuffFollower)
-	suite.sync = new(module.Synchronization)
+	suite.sync = new(module.BlockRequester)
 
 	suite.net.On("Register", mock.Anything, mock.Anything).Return(suite.con, nil)
 	suite.cleaner.On("RunGC").Return()
@@ -64,9 +64,8 @@ func (suite *Suite) SetupTest() {
 	suite.cache.On("Size", mock.Anything).Return(uint(0))
 
 	metrics := metrics.NewNoopCollector()
-	eng, err := follower.New(zerolog.Logger{}, suite.net, suite.me, metrics, metrics, suite.cleaner, suite.headers, suite.payloads, suite.state, suite.cache, suite.follower)
+	eng, err := follower.New(zerolog.Logger{}, suite.net, suite.me, metrics, metrics, suite.cleaner, suite.headers, suite.payloads, suite.state, suite.cache, suite.follower, suite.sync)
 	require.Nil(suite.T(), err)
-	eng.WithSynchronization(suite.sync)
 
 	suite.engine = eng
 }

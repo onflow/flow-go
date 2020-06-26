@@ -45,7 +45,7 @@ type Engine struct {
 	pending        module.PendingClusterBlockBuffer // pending block cache
 	participants   flow.IdentityList                // consensus participants in our cluster
 
-	sync     module.Synchronization
+	sync     module.BlockRequester
 	hotstuff module.HotStuff
 }
 
@@ -65,6 +65,7 @@ func New(
 	headers storage.Headers,
 	payloads storage.ClusterPayloads,
 	cache module.PendingClusterBlockBuffer,
+	sync module.BlockRequester,
 ) (*Engine, error) {
 
 	participants, err := protocol.ClusterFor(protoState.Final(), me.NodeID())
@@ -88,7 +89,7 @@ func New(
 		payloads:       payloads,
 		pending:        cache,
 		participants:   participants,
-		sync:           nil, // use WithSynchronization
+		sync:           sync,
 		hotstuff:       nil, // use WithHotStuff
 	}
 
@@ -101,13 +102,6 @@ func New(
 	e.con = con
 
 	return e, nil
-}
-
-// WithSynchronization adds the synchronization engine responsible for bringing the node
-// up to speed to the compliance engine.
-func (e *Engine) WithSynchronization(sync module.Synchronization) *Engine {
-	e.sync = sync
-	return e
 }
 
 // WithConsensus adds the consensus algorithm to the engine. This must be
@@ -128,7 +122,6 @@ func (e *Engine) Ready() <-chan struct{} {
 		panic("must initialize compliance engine with hotstuff engine")
 	}
 	return e.unit.Ready(func() {
-		<-e.sync.Ready()
 		<-e.hotstuff.Ready()
 	})
 }
@@ -136,8 +129,6 @@ func (e *Engine) Ready() <-chan struct{} {
 // Done returns a done channel that is closed once the engine has fully stopped.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
-		e.log.Debug().Msg("shutting down synchronization engine")
-		<-e.sync.Done()
 		e.log.Debug().Msg("shutting down hotstuff eventloop")
 		<-e.hotstuff.Done()
 		e.log.Debug().Msg("all components have been shut down")

@@ -23,11 +23,13 @@ import (
 // detected and should result in an error.
 func TestInvalidTransaction(t *testing.T) {
 
+	chainID := flow.Mainnet
+
 	identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	identity := identities.Filter(filter.HasRole(flow.RoleCollection))[0]
 	hub := stub.NewNetworkHub()
 
-	node := testutil.CollectionNode(t, hub, identity, identities)
+	node := testutil.CollectionNode(t, hub, identity, identities, chainID)
 	defer node.Done()
 
 	genesis, err := node.State.Final().Head()
@@ -112,9 +114,11 @@ func TestClusterRouting(t *testing.T) {
 		nClusters = 3
 	)
 
+	chainID := flow.Testnet
+
 	t.Run("should store transaction for local cluster", func(t *testing.T) {
 		hub := stub.NewNetworkHub()
-		nodes := testutil.CollectionNodes(t, hub, nNodes, protocol.SetClusters(nClusters))
+		nodes := testutil.CollectionNodes(t, hub, nNodes, chainID, protocol.SetClusters(nClusters))
 		for _, node := range nodes {
 			defer node.Done()
 		}
@@ -153,7 +157,7 @@ func TestClusterRouting(t *testing.T) {
 
 	t.Run("should propagate locally submitted transaction", func(t *testing.T) {
 		hub := stub.NewNetworkHub()
-		nodes := testutil.CollectionNodes(t, hub, nNodes, protocol.SetClusters(nClusters))
+		nodes := testutil.CollectionNodes(t, hub, nNodes, chainID, protocol.SetClusters(nClusters))
 		for _, node := range nodes {
 			defer node.Done()
 		}
@@ -193,7 +197,7 @@ func TestClusterRouting(t *testing.T) {
 
 	t.Run("should not propagate remotely submitted transaction", func(t *testing.T) {
 		hub := stub.NewNetworkHub()
-		nodes := testutil.CollectionNodes(t, hub, nNodes, protocol.SetClusters(nClusters))
+		nodes := testutil.CollectionNodes(t, hub, nNodes, chainID, protocol.SetClusters(nClusters))
 		for _, node := range nodes {
 			defer node.Done()
 		}
@@ -233,7 +237,7 @@ func TestClusterRouting(t *testing.T) {
 
 	t.Run("should not process invalid transaction", func(t *testing.T) {
 		hub := stub.NewNetworkHub()
-		nodes := testutil.CollectionNodes(t, hub, nNodes, protocol.SetClusters(nClusters))
+		nodes := testutil.CollectionNodes(t, hub, nNodes, chainID, protocol.SetClusters(nClusters))
 		for _, node := range nodes {
 			defer node.Done()
 		}

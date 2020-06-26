@@ -575,11 +575,11 @@ func (r *TransactionContext) verifyAccountSignature(
 ) (*flow.AccountPublicKey, FlowError) {
 	account := r.ledger.GetAccount(txSig.Address)
 	if account == nil {
-		return nil, &InvalidSignatureAccountError{Address: txSig.Address}
+		return nil, &SignatureAccountDoesNotExist{Address: txSig.Address}
 	}
 
 	if int(txSig.KeyID) >= len(account.Keys) {
-		return nil, &InvalidSignatureAccountError{Address: txSig.Address}
+		return nil, &SignatureAccountKeyDoesNotExist{Address: txSig.Address, KeyID: txSig.KeyID}
 	}
 
 	accountKey := &account.Keys[txSig.KeyID]
