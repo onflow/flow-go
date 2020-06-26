@@ -20,8 +20,7 @@ type HTTPServer struct {
 	httpServer *http.Server
 }
 
-var (
-	defaultHTTPHeaders = []HTTPHeader{
+var defaultHTTPHeaders = []HTTPHeader{
 		{
 			Key:   "Access-Control-Allow-Origin",
 			Value: "*",
@@ -35,7 +34,6 @@ var (
 			Value: "*",
 		},
 	}
-)
 
 func NewHTTPServer(
 	grpcServer *grpc.Server,
