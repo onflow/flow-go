@@ -49,12 +49,12 @@ install-tools: crypto/relic/build check-go-version
 .PHONY: unittest
 unittest:
 	# test all packages with Relic library enabled
-	#GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) --tags relic ./...
+	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) --tags relic ./...
 	cd crypto \
 		&& CGO_LDFLAGS_ALLOW="--coverage|-fprofile-instr-generate" CGO_CFLAGS_ALLOW="--coverage|-fprofile-arcs|-ftest-coverage|-fprofile-instr-generate|-fcoverage-mapping" go test -tags=relic,coverage -c \
 		&& ./crypto.test \
 		&& cd ..
-	#$(MAKE) -C integration test
+	$(MAKE) -C integration test
 
 .PHONY: test
 test: generate-mocks unittest
@@ -71,11 +71,11 @@ benchmark: docker-build-flow
 coverage:
 ifeq ($(COVER), true)
 	# Cover summary has to produce cover.json
-	#COVER_PROFILE=$(COVER_PROFILE) ./cover-summary.sh
+	COVER_PROFILE=$(COVER_PROFILE) ./cover-summary.sh
 	# file has to be called index.html
-	#gocov-html cover.json > index.html
+	gocov-html cover.json > index.html
 	# coverage.zip will automatically be picked up by teamcity
-	#zip coverage.zip index.html
+	zip coverage.zip index.html
 	# Cover summary of the crypto C code
 	llvm-profdata merge -sparse ./crypto/default.profraw -o ./crypto/default.profdata
 	llvm-cov show ./crypto/crypto.test -instr-profile=./crypto/default.profdata -format html -ignore-filename-regex="`pwd`/crypto/relic.*" `pwd` > index_crypto_c.html
