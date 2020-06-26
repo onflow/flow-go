@@ -10,22 +10,21 @@ import (
 	chmodels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/ptrie"
 )
 
 // ChunkVerifier is a verifier based on the current definitions of the flow network
 type ChunkVerifier struct {
-	vm        virtualmachine.VirtualMachine
-	trieDepth int
-	blocks    storage.Blocks
+	vm     virtualmachine.VirtualMachine
+	blocks storage.Blocks
 }
 
 // NewChunkVerifier creates a chunk verifier containing a flow virtual machine
 func NewChunkVerifier(vm virtualmachine.VirtualMachine, blocks storage.Blocks) *ChunkVerifier {
 	return &ChunkVerifier{
-		vm:        vm,
-		trieDepth: 257,
-		blocks:    blocks,
+		vm:     vm,
+		blocks: blocks,
 	}
 }
 
@@ -47,7 +46,7 @@ func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) (chmodels
 		return nil, fmt.Errorf("missing chunk data pack")
 	}
 	psmt, err := ptrie.NewPSMT(vc.ChunkDataPack.StartState,
-		fcv.trieDepth,
+		ledger.RegisterKeySize,
 		vc.ChunkDataPack.Registers(),
 		vc.ChunkDataPack.Values(),
 		vc.ChunkDataPack.Proofs(),
