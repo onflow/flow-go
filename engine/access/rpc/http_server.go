@@ -76,7 +76,7 @@ func wrappedHandler(wrappedServer *grpcweb.WrappedGrpcServer, headers []HTTPHead
 	return func(res http.ResponseWriter, req *http.Request) {
 		setResponseHeaders(res, headers)
 
-		if (*req).Method == "OPTIONS" {
+		if req.Method == "OPTIONS" {
 			return
 		}
 
