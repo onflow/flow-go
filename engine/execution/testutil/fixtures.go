@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
@@ -166,7 +167,7 @@ func CreateAccountsWithSimpleAddresses(
 	for _, privateKey := range privateKeys {
 		accountKey := privateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold)
 		encAccountKey, _ := flow.EncodeRuntimeAccountPublicKey(accountKey)
-		cadAccountKey := bytesToCadenceArray(encAccountKey)
+		cadAccountKey := BytesToCadenceArray(encAccountKey)
 		encCadAccountKey, _ := jsoncdc.Encode(cadAccountKey)
 
 		tx := flow.NewTransactionBody().
@@ -202,11 +203,11 @@ func CreateAccountsWithSimpleAddresses(
 
 func RootBootstrappedLedger(chain flow.Chain) virtualmachine.Ledger {
 	ledger := make(virtualmachine.MapLedger)
-	bootstrap.BootstrapView(ledger, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply, chain)
+	bootstrap.NewBootstrapper(zerolog.Nop()).BootstrapView(ledger, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply, chain)
 	return ledger
 }
 
-func bytesToCadenceArray(l []byte) cadence.Array {
+func BytesToCadenceArray(l []byte) cadence.Array {
 	values := make([]cadence.Value, len(l))
 	for i, b := range l {
 		values[i] = cadence.NewInt(int(b))
