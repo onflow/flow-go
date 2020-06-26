@@ -16,7 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-var genesisHash = unittest.BlockFixture().ID().String()
+var genesisID = unittest.IdentifierFixture().String()
 
 // helper offers a set of functions that are shared among different tests
 // CreateIDs creates and initializes count-many flow identifiers instances
