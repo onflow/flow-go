@@ -72,6 +72,8 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	requestInterval := uint(1000)
 	failureThreshold := uint(2)
 
+	chainID := flow.Mainnet
+
 	// network identity setup
 	hub := stub.NewNetworkHub()
 	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
@@ -82,7 +84,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	identities := flow.IdentityList{colIdentity, conIdentity, exeIdentity, verIdentity}
 
 	// complete ER counter example
-	completeER := utils.CompleteExecutionResultFixture(t, 1, flow.Testnet.Chain())
+	completeER := utils.CompleteExecutionResultFixture(t, 1, chainID.Chain())
 	chunk, ok := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(0))
 	assert.True(t, ok)
 
@@ -108,7 +110,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 		identities,
 		assigner,
 		requestInterval,
-		failureThreshold)
+		failureThreshold, chainID)
 	// inject block
 	err := verNode.Blocks.Store(completeER.Block)
 	assert.Nil(t, err)
@@ -124,7 +126,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	verNet.StartConDev(100, true)
 
 	// execution node
-	exeNode := testutil.GenericNode(t, hub, exeIdentity, identities)
+	exeNode := testutil.GenericNode(t, hub, exeIdentity, identities, chainID)
 	exeEngine := new(network.Engine)
 	exeChunkDataConduit, err := exeNode.Net.Register(engine.ChunkDataPackProvider, exeEngine)
 	assert.Nil(t, err)
@@ -143,7 +145,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 		}).Return(nil).Once()
 
 	// consensus node
-	conNode := testutil.GenericNode(t, hub, conIdentity, identities)
+	conNode := testutil.GenericNode(t, hub, conIdentity, identities, chainID)
 	conEngine := new(network.Engine)
 	approvalWG := sync.WaitGroup{}
 	approvalWG.Add(1)

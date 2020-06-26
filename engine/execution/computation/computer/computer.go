@@ -6,6 +6,7 @@ import (
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/log"
+	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
@@ -15,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // A BlockComputer executes the transactions in a block.
@@ -27,6 +29,7 @@ type blockComputer struct {
 	blocks  storage.Blocks
 	metrics module.ExecutionMetrics
 	tracer  module.Tracer
+	log     zerolog.Logger
 }
 
 // NewBlockComputer creates a new block executor.
@@ -35,12 +38,14 @@ func NewBlockComputer(
 	blocks storage.Blocks,
 	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
+	logger zerolog.Logger,
 ) BlockComputer {
 	return &blockComputer{
 		vm:      vm,
 		blocks:  blocks,
 		metrics: metrics,
 		tracer:  tracer,
+		log:     logger,
 	}
 }
 
@@ -88,6 +93,8 @@ func (e *blockComputer) executeBlock(
 	for i, collection := range collections {
 
 		collectionView := stateView.NewChild()
+
+		e.log.Debug().Hex("collection_id", logging.Entity(collection.Guarantee)).Msg("executing collection")
 
 		collEvents, txResults, nextIndex, gas, err := e.executeCollection(
 			ctx, txIndex, blockCtx, collectionView, collection,
@@ -188,9 +195,11 @@ func (e *blockComputer) executeCollection(
 			txResult := flow.TransactionResult{
 				TransactionID: tx.ID(),
 			}
-
 			if result.Error != nil {
 				txResult.ErrorMessage = result.Error.ErrorMessage()
+				e.log.Debug().Hex("tx_id", logging.Entity(tx)).Str("error_message", result.Error.ErrorMessage()).Uint32("error_code", result.Error.StatusCode()).Msg("transaction execution failed")
+			} else {
+				e.log.Debug().Hex("tx_id", logging.Entity(tx)).Msg("transaction executed successfully")
 			}
 
 			txResults = append(txResults, txResult)

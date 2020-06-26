@@ -58,6 +58,8 @@ func VerificationHappyPath(t *testing.T,
 	// generates network hub
 	hub := stub.NewNetworkHub()
 
+	chainID := flow.Mainnet
+
 	// generates identities of nodes, one of each type, `verNodeCount` many of verification nodes
 	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	exeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
@@ -105,7 +107,8 @@ func VerificationHappyPath(t *testing.T,
 			identities,
 			assigner,
 			requestInterval,
-			failureThreshold)
+			failureThreshold,
+			chainID)
 
 		// starts all the engines
 		<-verNode.FinderEngine.Ready()
@@ -120,10 +123,10 @@ func VerificationHappyPath(t *testing.T,
 	}
 
 	// mock execution node
-	exeNode, exeEngine := setupMockExeNode(t, hub, exeIdentity, verIdentities, identities, completeER)
+	exeNode, exeEngine := setupMockExeNode(t, hub, exeIdentity, verIdentities, identities, chainID, completeER)
 
 	// mock consensus node
-	conNode, conEngine, conWG := setupMockConsensusNode(t, hub, conIdentity, verIdentities, identities, completeER)
+	conNode, conEngine, conWG := setupMockConsensusNode(t, hub, conIdentity, verIdentities, identities, completeER, chainID)
 
 	// sends execution receipt to each of verification nodes
 	verWG := sync.WaitGroup{}
@@ -198,10 +201,11 @@ func setupMockExeNode(t *testing.T,
 	exeIdentity *flow.Identity,
 	verIdentities flow.IdentityList,
 	othersIdentity flow.IdentityList,
+	chainID flow.ChainID,
 	completeER utils.CompleteExecutionResult) (*mock2.GenericNode, *network.Engine) {
 	// mock the execution node with a generic node and mocked engine
 	// to handle request for chunk state
-	exeNode := testutil.GenericNode(t, hub, exeIdentity, othersIdentity)
+	exeNode := testutil.GenericNode(t, hub, exeIdentity, othersIdentity, chainID)
 	exeEngine := new(network.Engine)
 
 	// determines the expected number of result chunk data pack requests
@@ -268,7 +272,8 @@ func setupMockConsensusNode(t *testing.T,
 	conIdentity *flow.Identity,
 	verIdentities flow.IdentityList,
 	othersIdentity flow.IdentityList,
-	completeER utils.CompleteExecutionResult) (*mock2.GenericNode, *network.Engine, *sync.WaitGroup) {
+	completeER utils.CompleteExecutionResult,
+	chainID flow.ChainID) (*mock2.GenericNode, *network.Engine, *sync.WaitGroup) {
 	// determines the expected number of result approvals this node should receive
 	approvalsCount := 0
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
@@ -286,7 +291,7 @@ func setupMockConsensusNode(t *testing.T,
 
 	// mock the consensus node with a generic node and mocked engine to assert
 	// that the result approval is broadcast
-	conNode := testutil.GenericNode(t, hub, conIdentity, othersIdentity)
+	conNode := testutil.GenericNode(t, hub, conIdentity, othersIdentity, chainID)
 	conEngine := new(network.Engine)
 
 	// map form verIds --> result approval ID
