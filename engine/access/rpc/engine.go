@@ -94,11 +94,11 @@ func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(
 		e.grpcServer.GracefulStop,
 		func() {
-		err := e.httpServer.Shutdown(context.Background())
-		if err != nil {
-			e.log.Error().Err(err).Msg("error stopping http server")
-		}
-	})
+			err := e.httpServer.Shutdown(context.Background())
+			if err != nil {
+				e.log.Error().Err(err).Msg("error stopping http server")
+			}
+		})
 }
 
 // serve starts the gRPC server and the http proxy server
