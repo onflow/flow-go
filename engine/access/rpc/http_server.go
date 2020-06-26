@@ -74,7 +74,7 @@ func (h *HTTPServer) Stop() {
 
 func wrappedHandler(wrappedServer *grpcweb.WrappedGrpcServer, headers []HTTPHeader) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		setResponseHeaders(&res, headers)
+		setResponseHeaders(res, headers)
 
 		if (*req).Method == "OPTIONS" {
 			return
