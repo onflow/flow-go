@@ -364,17 +364,17 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 func TestExecutionQueryMissingBlocks(t *testing.T) {
 	hub := stub.NewNetworkHub()
 
+	chainID := flow.Testnet
+
 	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 
 	identities := unittest.CompleteIdentitySet(colID, conID, exeID)
 
-	// collectionNode := testutil.GenericNode(t, hub, colID, identities)
-	// defer collectionNode.Done()
-	consensusNode := testutil.GenericNode(t, hub, conID, identities)
+	consensusNode := testutil.GenericNode(t, hub, conID, identities, chainID)
 	defer consensusNode.Done()
-	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 0)
+	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 0, chainID)
 	exeNode.Ready()
 	defer exeNode.Done()
 
