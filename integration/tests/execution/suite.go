@@ -35,7 +35,8 @@ func (s *Suite) Ghost() *client.GhostClient {
 }
 
 func (s *Suite) AccessClient() *testnet.Client {
-	client, err := testnet.NewClient(fmt.Sprintf(":%s", s.net.AccessPorts[testnet.AccessNodeAPIPort]))
+	client, err := testnet.NewClient(fmt.Sprintf(":%s", s.net.AccessPorts[testnet.AccessNodeAPIPort]),
+		s.net.Genesis().Header.ChainID.Chain())
 	require.NoError(s.T(), err, "could not get access client")
 	return client
 }
