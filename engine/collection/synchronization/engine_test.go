@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	model "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/events"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -20,8 +21,8 @@ import (
 	module "github.com/dapperlabs/flow-go/module/mock"
 	netint "github.com/dapperlabs/flow-go/network"
 	network "github.com/dapperlabs/flow-go/network/mock"
-	protocolint "github.com/dapperlabs/flow-go/state/protocol"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
+	clusterint "github.com/dapperlabs/flow-go/state/cluster"
+	cluster "github.com/dapperlabs/flow-go/state/cluster/mock"
 	storerr "github.com/dapperlabs/flow-go/storage"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -36,14 +37,14 @@ type SyncSuite struct {
 	myID         flow.Identifier
 	participants flow.IdentityList
 	head         *flow.Header
-	heights      map[uint64]*flow.Block
-	blockIDs     map[flow.Identifier]*flow.Block
+	heights      map[uint64]*model.Block
+	blockIDs     map[flow.Identifier]*model.Block
 	net          *module.Network
 	con          *network.Conduit
 	me           *module.Local
-	state        *protocol.State
-	snapshot     *protocol.Snapshot
-	blocks       *storage.Blocks
+	state        *cluster.State
+	snapshot     *cluster.Snapshot
+	blocks       *storage.ClusterBlocks
 	comp         *network.Engine
 	core         *module.SyncCore
 	e            *Engine
@@ -62,8 +63,8 @@ func (ss *SyncSuite) SetupTest() {
 	ss.head = &header
 
 	// create maps to enable block returns
-	ss.heights = make(map[uint64]*flow.Block)
-	ss.blockIDs = make(map[flow.Identifier]*flow.Block)
+	ss.heights = make(map[uint64]*model.Block)
+	ss.blockIDs = make(map[flow.Identifier]*model.Block)
 
 	// set up the network module mock
 	ss.net = &module.Network{}
@@ -86,15 +87,15 @@ func (ss *SyncSuite) SetupTest() {
 	)
 
 	// set up the protocol state mock
-	ss.state = &protocol.State{}
+	ss.state = &cluster.State{}
 	ss.state.On("Final").Return(
-		func() protocolint.Snapshot {
+		func() clusterint.Snapshot {
 			return ss.snapshot
 		},
 	)
 
 	// set up the snapshot mock
-	ss.snapshot = &protocol.Snapshot{}
+	ss.snapshot = &cluster.Snapshot{}
 	ss.snapshot.On("Head").Return(
 		func() *flow.Header {
 			return ss.head
@@ -109,9 +110,9 @@ func (ss *SyncSuite) SetupTest() {
 	)
 
 	// set up blocks storage mock
-	ss.blocks = &storage.Blocks{}
+	ss.blocks = &storage.ClusterBlocks{}
 	ss.blocks.On("ByHeight", mock.Anything).Return(
-		func(height uint64) *flow.Block {
+		func(height uint64) *model.Block {
 			return ss.heights[height]
 		},
 		func(height uint64) error {
@@ -123,7 +124,7 @@ func (ss *SyncSuite) SetupTest() {
 		},
 	)
 	ss.blocks.On("ByID", mock.Anything).Return(
-		func(blockID flow.Identifier) *flow.Block {
+		func(blockID flow.Identifier) *model.Block {
 			return ss.blockIDs[blockID]
 		},
 		func(blockID flow.Identifier) error {
@@ -145,7 +146,7 @@ func (ss *SyncSuite) SetupTest() {
 	// initialize the engine
 	log := zerolog.New(ioutil.Discard)
 	metrics := metrics.NewNoopCollector()
-	e, err := New(log, metrics, ss.net, ss.me, ss.state, ss.blocks, ss.comp, ss.core)
+	e, err := New(log, metrics, ss.net, ss.me, ss.participants, ss.state, ss.blocks, ss.comp, ss.core)
 	require.NoError(ss.T(), err, "should pass engine initialization")
 
 	ss.e = e
@@ -223,7 +224,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 	// fill in blocks at heights -1 to -4 from head
 	ref := ss.head.Height
 	for height := ref; height >= ref-4; height-- {
-		block := unittest.BlockFixture()
+		block := unittest.ClusterBlockFixture()
 		block.Header.Height = height
 		ss.heights[height] = &block
 	}
@@ -247,8 +248,8 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 	req.ToHeight = ref - 1
 	ss.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Once().Run(
 		func(args mock.Arguments) {
-			res := args.Get(0).(*messages.BlockResponse)
-			expected := []*flow.Block{ss.heights[ref-1]}
+			res := args.Get(0).(*messages.ClusterBlockResponse)
+			expected := []*model.Block{ss.heights[ref-1]}
 			assert.ElementsMatch(ss.T(), expected, res.Blocks, "response should contain right blocks")
 			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 			recipientID := args.Get(1).(flow.Identifier)
@@ -263,8 +264,8 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 	req.ToHeight = ref + 2
 	ss.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Once().Run(
 		func(args mock.Arguments) {
-			res := args.Get(0).(*messages.BlockResponse)
-			expected := []*flow.Block{ss.heights[ref-2], ss.heights[ref-1], ss.heights[ref]}
+			res := args.Get(0).(*messages.ClusterBlockResponse)
+			expected := []*model.Block{ss.heights[ref-2], ss.heights[ref-1], ss.heights[ref]}
 			assert.ElementsMatch(ss.T(), expected, res.Blocks, "response should contain right blocks")
 			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 			recipientID := args.Get(1).(flow.Identifier)
@@ -279,8 +280,8 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 	req.ToHeight = ref
 	ss.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Once().Run(
 		func(args mock.Arguments) {
-			res := args.Get(0).(*messages.BlockResponse)
-			expected := []*flow.Block{ss.heights[ref-2], ss.heights[ref-1], ss.heights[ref]}
+			res := args.Get(0).(*messages.ClusterBlockResponse)
+			expected := []*model.Block{ss.heights[ref-2], ss.heights[ref-1], ss.heights[ref]}
 			assert.ElementsMatch(ss.T(), expected, res.Blocks, "response should contain right blocks")
 			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 			recipientID := args.Get(1).(flow.Identifier)
@@ -313,14 +314,14 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 0)
 
 	// a non-empty request for existing block IDs should send right response
-	block := unittest.BlockFixture()
+	block := unittest.ClusterBlockFixture()
 	block.Header.Height = ss.head.Height - 1
 	req.BlockIDs = []flow.Identifier{block.ID()}
 	ss.blockIDs[block.ID()] = &block
 	ss.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
-			res := args.Get(0).(*messages.BlockResponse)
-			assert.ElementsMatch(ss.T(), []*flow.Block{&block}, res.Blocks, "response should contain right block")
+			res := args.Get(0).(*messages.ClusterBlockResponse)
+			assert.ElementsMatch(ss.T(), []*model.Block{&block}, res.Blocks, "response should contain right block")
 			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 			recipientID := args.Get(1).(flow.Identifier)
 			assert.Equal(ss.T(), originID, recipientID, "response should be send to original requester")
@@ -334,23 +335,23 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 
 	// generate origin and block response
 	originID := unittest.IdentifierFixture()
-	res := &messages.BlockResponse{
+	res := &messages.ClusterBlockResponse{
 		Nonce:  rand.Uint64(),
-		Blocks: []*flow.Block{},
+		Blocks: []*model.Block{},
 	}
 
 	// add one block that should be processed
-	processable := unittest.BlockFixture()
+	processable := unittest.ClusterBlockFixture()
 	ss.core.On("HandleBlock", processable.Header).Return(true)
 	res.Blocks = append(res.Blocks, &processable)
 
 	// add one block that should not be processed
-	unprocessable := unittest.BlockFixture()
+	unprocessable := unittest.ClusterBlockFixture()
 	ss.core.On("HandleBlock", unprocessable.Header).Return(false)
 	res.Blocks = append(res.Blocks, &unprocessable)
 
 	ss.comp.On("SubmitLocal", mock.Anything).Run(func(args mock.Arguments) {
-		res := args.Get(0).(*events.SyncedBlock)
+		res := args.Get(0).(*events.SyncedClusterBlock)
 		ss.Assert().Equal(&processable, res.Block)
 		ss.Assert().Equal(originID, res.OriginID)
 	},
@@ -374,8 +375,8 @@ func (ss *SyncSuite) TestPollHeight() {
 			require.Contains(ss.T(), consensus.NodeIDs(), targetID, "target should be in participants")
 		},
 	)
-	errs := ss.e.pollHeight()
-	require.NoError(ss.T(), errs.ErrorOrNil(), "should pass poll height")
+	err := ss.e.pollHeight()
+	require.Nil(ss.T(), err, "should pass poll height")
 	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 3)
 }
 

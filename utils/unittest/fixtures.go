@@ -731,3 +731,38 @@ func EmulatorRootKey() (*flow.AccountPrivateKey, error) {
 func NoopTxScript() []byte {
 	return []byte("transaction {}")
 }
+
+func RangeFixture() flow.Range {
+	return flow.Range{
+		From: rand.Uint64(),
+		To:   rand.Uint64(),
+	}
+}
+
+func BatchFixture() flow.Batch {
+	return flow.Batch{
+		BlockIDs: IdentifierListFixture(10),
+	}
+}
+
+func RangeListFixture(n int) []flow.Range {
+	if n <= 0 {
+		return nil
+	}
+	ranges := make([]flow.Range, n)
+	for i := range ranges {
+		ranges[i] = RangeFixture()
+	}
+	return ranges
+}
+
+func BatchListFixture(n int) []flow.Batch {
+	if n <= 0 {
+		return nil
+	}
+	batches := make([]flow.Batch, n)
+	for i := range batches {
+		batches[i] = BatchFixture()
+	}
+	return batches
+}
