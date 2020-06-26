@@ -10,6 +10,7 @@ require (
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/docker/docker v1.4.2-0.20190513124817-8c8457b0f2f8
 	github.com/docker/go-connections v0.4.0
+	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/onflow/cadence v0.4.1-0.20200604200650-30a200f9c324
 	github.com/onflow/flow-go-sdk v0.4.0
 	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200611205353-548107cc9aca
