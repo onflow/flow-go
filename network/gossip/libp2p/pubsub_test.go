@@ -63,7 +63,7 @@ func (s *mockDiscovery) FindPeers(_ context.Context, _ string, _ ...discovery.Op
 // TestPubSub checks if nodes can subscribe to a topic and send and receive a message
 func (p *PubSubTestSuite) TestPubSub() {
 	defer p.cancel()
-	topic := "testtopic/" + unittest.BlockFixture().ID().String()
+	topic := "testtopic/" + unittest.IdentifierFixture().String()
 	count := 4
 	golog.SetAllLoggers(golog.LevelError)
 
