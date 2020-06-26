@@ -14,6 +14,16 @@ type Tracer interface {
 	StartSpan(entity flow.Identifier, spanName string, opts ...opentracing.StartSpanOption) opentracing.Span
 	FinishSpan(entity flow.Identifier, spanName string)
 	GetSpan(entity flow.Identifier, spanName string) (opentracing.Span, bool)
-	StartSpanFromContext(ctx context.Context, operationName string) (opentracing.Span, context.Context)
-	StartSpanFromParent(span opentracing.Span, operationName string) opentracing.Span
+
+	StartSpanFromContext(
+		ctx context.Context,
+		operationName string,
+		opts ...opentracing.StartSpanOption,
+	) (opentracing.Span, context.Context)
+
+	StartSpanFromParent(
+		span opentracing.Span,
+		operationName string,
+		opts ...opentracing.StartSpanOption,
+	) opentracing.Span
 }

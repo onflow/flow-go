@@ -91,6 +91,14 @@ func (mt *MTrie) ParentRootHash() []byte { return mt.parentRootHash }
 // Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) Height() int { return mt.maxHeight - 1 }
 
+// AllocatedRegCount returns the number of allocated registers in the trie.
+// Concurrency safe (as Tries are immutable structures by convention)
+func (mt *MTrie) AllocatedRegCount() uint64 { return mt.root.RegCount() }
+
+// MaxDepth returns the length of the longest branch from root to leaf.
+// Concurrency safe (as Tries are immutable structures by convention)
+func (mt *MTrie) MaxDepth() uint16 { return mt.root.MaxDepth() }
+
 // RootNode returns the Trie's root Node
 // Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) RootNode() *node.Node {
@@ -156,7 +164,7 @@ func (mt *MTrie) read(head *node.Node, keys [][]byte) ([][]byte, error) {
 	return values, nil
 }
 
-// NewTrieCopyOnWrite constructs a new trie containing all registers from the parent trie.
+// NewTrieWithUpdatedRegisters constructs a new trie containing all registers from the parent trie.
 // The key-value pairs specify the registers whose values are supposed to hold updated values
 // compared to the parent trie. Constructing the new trie is done in a COPY-ON-WRITE manner:
 //   * The original trie remains unchanged.

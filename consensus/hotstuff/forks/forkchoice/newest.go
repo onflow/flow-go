@@ -20,6 +20,7 @@ type NewestForkChoice struct {
 	notifier        hotstuff.Consumer
 }
 
+// NewNewestForkChoice creates a new NewNewestForkChoice instance
 func NewNewestForkChoice(finalizer *finalizer.Finalizer, notifier hotstuff.Consumer) (*NewestForkChoice, error) {
 
 	// build the initial block-QC pair
@@ -76,7 +77,7 @@ func (fc *NewestForkChoice) MakeForkChoice(curView uint64) (*model.QuorumCertifi
 	return choice.QC, choice.Block, nil
 }
 
-// updateQC updates `preferredParent` according to the fork-choice rule.
+// AddQC updates `preferredParent` according to the fork-choice rule.
 // Currently, we implement 'Chained HotStuff Protocol' where the fork-choice
 // rule is: "build on newest QC"
 // It assumes the QC has been validated
@@ -115,7 +116,7 @@ func (fc *NewestForkChoice) ensureBlockStored(qc *model.QuorumCertificate) (*mod
 		//   (as NewestForkChoice tracks the qc with the largest view)
 		// => qc.View > fc.finalizer.FinalizedBlock().View()
 		//    any block whose view is larger than the latest finalized block should be stored in finalizer
-		return nil, &model.ErrorMissingBlock{View: qc.View, BlockID: qc.BlockID}
+		return nil, model.MissingBlockError{View: qc.View, BlockID: qc.BlockID}
 	}
 	if block.View != qc.View {
 		return nil, fmt.Errorf("invalid qc with mismatching view")
