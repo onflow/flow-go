@@ -2,6 +2,8 @@ package trace
 
 // Span names
 const (
+	// Consensus Node
+
 	CONProcessCollection              SpanName = "con.processCollection"
 	CONHotFinalizeCollection          SpanName = "con.hotstuff.finalizeCollection"
 	CONIngOnCollectionGuarantee       SpanName = "con.ingestion.onCollectionGuarantee"
@@ -14,6 +16,8 @@ const (
 	CONProcessBlock                SpanName = "con.processBlock"
 	CONHotEventHandlerStartNewView SpanName = "con.hotstuff.eventHandler.startNewView"
 	CONHotFinalizeBlock            SpanName = "con.hotstuff.finalizeBlock"
+
+	// Execution Node
 
 	EXEExecuteBlock           SpanName = "exe.ingestion.executeBlock"
 	EXESaveExecutionResults   SpanName = "exe.ingestion.saveExecutionResults"
@@ -36,6 +40,24 @@ const (
 	EXERetrieveStateDelta                 SpanName = "exe.state.retrieveStateDelta"
 	EXEUpdateHighestExecutedBlockIfHigher SpanName = "exe.state.updateHighestExecutedBlockIfHigher"
 	EXEGetHighestExecutedBlockID          SpanName = "exe.state.getHighestExecutedBlockID"
+
+	// Verification node
+
+	VERProcessExecutionReceipt    SpanName = "ver.processExecutionReceipt"
+	VERFindHandleExecutionReceipt SpanName = "ver.find.handleExecutionReceipt"
+	VERFindOnFinalizedBlock       SpanName = "ver.finder.OnFinalizedBlock"
+	VERFindCheckReceipts          SpanName = "ver.finder.checkReceipts"
+	VERFindProcessResult          SpanName = "ver.finder.processResult"
+	VERFindOnResultProcessed      SpanName = "ver.finder.onResultProcessed"
+
+	VERProcessExecutionResult     SpanName = "ver.processExecutionResult"
+	VERMatchHandleExecutionResult SpanName = "ver.match.handleExecutionResult"
+	VERMatchHandleChunkDataPack   SpanName = "ver.match.handleChunkDataPack"
+	VERMatchMyChunkAssignments    SpanName = "ver.match.myChunkAssignments"
+
+	VERVerVerifyWithMetrics      SpanName = "ver.verify.verifyWithMetrics"
+	VERVerChunkVerify            SpanName = "ver.verify.ChunkVerifier.Verify"
+	VERVerGenerateResultApproval SpanName = "ver.verify.GenerateResultApproval"
 )
 
 // Tag names

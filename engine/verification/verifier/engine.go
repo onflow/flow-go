@@ -1,8 +1,10 @@
 package verifier
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
@@ -13,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -26,6 +29,7 @@ type Engine struct {
 	unit    *engine.Unit               // used to control startup/shutdown
 	log     zerolog.Logger             // used to log relevant actions
 	metrics module.VerificationMetrics // used to capture the performance metrics
+	tracer  module.Tracer              // used for tracing
 	conduit network.Conduit            // used to propagate result approvals
 	me      module.Local               // used to access local node information
 	state   protocol.State             // used to access the protocol state
@@ -37,6 +41,7 @@ type Engine struct {
 func New(
 	log zerolog.Logger,
 	metrics module.VerificationMetrics,
+	tracer module.Tracer,
 	net module.Network,
 	state protocol.State,
 	me module.Local,
@@ -47,6 +52,7 @@ func New(
 		unit:    engine.NewUnit(),
 		log:     log.With().Str("engine", "verifier").Logger(),
 		metrics: metrics,
+		tracer:  tracer,
 		state:   state,
 		me:      me,
 		chVerif: chVerif,
@@ -118,7 +124,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 //
 // If any part of verification fails, an error is returned, indicating to the
 // initiating engine that the verification must be re-tried.
-func (e *Engine) verify(originID flow.Identifier, vc *verification.VerifiableChunkData) error {
+func (e *Engine) verify(ctx context.Context, originID flow.Identifier, vc *verification.VerifiableChunkData) error {
 	// log it first
 	log := e.log.With().Timestamp().
 		Hex("origin", logging.ID(originID)).
@@ -151,7 +157,9 @@ func (e *Engine) verify(originID flow.Identifier, vc *verification.VerifiableChu
 	log.With().Hex("chunk_id", logging.Entity(ch)).Logger()
 
 	// execute the assigned chunk
+	span, _ := e.tracer.StartSpanFromContext(ctx, trace.VERVerChunkVerify)
 	chFault, err := e.chVerif.Verify(vc)
+	span.Finish()
 	// Any err means that something went wrong when verify the chunk
 	// the outcome of the verification is captured inside the chFault and not the err
 	if err != nil {
@@ -176,7 +184,9 @@ func (e *Engine) verify(originID flow.Identifier, vc *verification.VerifiableChu
 	}
 
 	// Generate result approval
+	span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERVerGenerateResultApproval)
 	approval, err := e.GenerateResultApproval(vc.Chunk.Index, vc.Result.ID(), vc.Header.ID())
+	span.Finish()
 	if err != nil {
 		return fmt.Errorf("couldn't generate a result approval: %w", err)
 	}
@@ -234,6 +244,14 @@ func (e *Engine) GenerateResultApproval(chunkIndex uint64, execResultID flow.Ide
 
 // verifyWithMetrics acts as a wrapper around the verify method that captures its performance-related metrics
 func (e *Engine) verifyWithMetrics(originID flow.Identifier, ch *verification.VerifiableChunkData) error {
+	ctx := context.Background()
+	if span, ok := e.tracer.GetSpan(ch.Result.ID(), trace.VERProcessExecutionResult); ok {
+		defer span.Finish()
+		childSpan := e.tracer.StartSpanFromParent(span, trace.VERVerVerifyWithMetrics)
+		ctx = opentracing.ContextWithSpan(ctx, childSpan)
+		defer childSpan.Finish()
+	}
+
 	// increments number of received verifiable chunks
 	// for sake of metrics
 	e.metrics.OnVerifiableChunkReceived()
@@ -243,7 +261,7 @@ func (e *Engine) verifyWithMetrics(originID flow.Identifier, ch *verification.Ve
 		e.metrics.OnChunkVerificationStarted(ch.ChunkDataPack.ChunkID)
 	}
 	// starts verification of chunk
-	err := e.verify(originID, ch)
+	err := e.verify(ctx, originID, ch)
 	// closes verification performance metrics trackers
 	if ch.ChunkDataPack != nil {
 		e.metrics.OnChunkVerificationFinished(ch.ChunkDataPack.ChunkID)
