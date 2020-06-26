@@ -58,6 +58,8 @@ func VerificationHappyPath(t *testing.T,
 	// generates network hub
 	hub := stub.NewNetworkHub()
 
+	chainID := flow.Mainnet
+
 	// generates identities of nodes, one of each type, `verNodeCount` many of verification nodes
 	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	exeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
@@ -105,7 +107,8 @@ func VerificationHappyPath(t *testing.T,
 			identities,
 			assigner,
 			requestInterval,
-			failureThreshold)
+			failureThreshold,
+			chainID)
 
 		// starts all the engines
 		<-verNode.FinderEngine.Ready()
@@ -120,10 +123,10 @@ func VerificationHappyPath(t *testing.T,
 	}
 
 	// mock execution node
-	exeNode, exeEngine := setupMockExeNode(t, hub, exeIdentity, verIdentities, identities, completeER)
+	exeNode, exeEngine := setupMockExeNode(t, hub, exeIdentity, verIdentities, identities, chainID, completeER)
 
 	// mock consensus node
-	conNode, conEngine, conWG := setupMockConsensusNode(t, hub, conIdentity, verIdentities, identities, completeER)
+	conNode, conEngine, conWG := setupMockConsensusNode(t, hub, conIdentity, verIdentities, identities, completeER, chainID)
 
 	// sends execution receipt to each of verification nodes
 	verWG := sync.WaitGroup{}

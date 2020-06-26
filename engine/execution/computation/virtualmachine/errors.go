@@ -9,6 +9,18 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+const InvalidSignaturePublicKeyErrorCode = 1
+const MissingSignatureErrorCode = 2
+const MissingPayerErrorCode = 3
+const SignatureAccountDoesNotExistErrorCode = 4
+const InvalidHashingAlgorithmErrorCode = 5
+const PublicKeyVerificationErrorCode = 6
+const InvalidProposalSequenceNumberErrorCode = 7
+const MissingSignatureForProposalKeyErrorCode = 8
+const CodeExecutionErrorCode = 9
+const InvalidProposalKeyErrorCode = 10
+const SignatureAccountKeyDoesNotExistErrorCode = 11
+
 // FlowError represents an expected error inside Flow. Not to be confused with standard Go errors which
 // indicate exceptional situation. FlowErrors are really values which should be returned to a client.
 type FlowError interface {
@@ -26,7 +38,7 @@ func (e *InvalidSignaturePublicKeyError) ErrorMessage() string {
 	return fmt.Sprintf("invalid signature for key %d on account %s", e.KeyID, e.Address)
 }
 func (e *InvalidSignaturePublicKeyError) StatusCode() uint32 {
-	return 1
+	return InvalidSignaturePublicKeyErrorCode
 }
 
 // A MissingSignatureError indicates that a transaction is missing a required signature.
@@ -39,7 +51,7 @@ func (e *MissingSignatureError) ErrorMessage() string {
 }
 
 func (e *MissingSignatureError) StatusCode() uint32 {
-	return 2
+	return MissingSignatureErrorCode
 }
 
 // A MissingPayerError indicates that a transaction is missing a payer.
@@ -51,7 +63,7 @@ func (e *MissingPayerError) ErrorMessage() string {
 }
 
 func (e *MissingPayerError) StatusCode() uint32 {
-	return 3
+	return MissingPayerErrorCode
 }
 
 // An SignatureAccountDoesNotExist indicates that a signature references a nonexistent account.
@@ -64,35 +76,13 @@ func (e *SignatureAccountDoesNotExist) ErrorMessage() string {
 }
 
 func (e *SignatureAccountDoesNotExist) StatusCode() uint32 {
-	return 10
+	return SignatureAccountDoesNotExistErrorCode
 }
 
 // An SignatureAccountKeyDoesNotExist indicates that a signature references a nonexistent account.
 type SignatureAccountKeyDoesNotExist struct {
 	Address flow.Address
 	KeyID   uint64
-}
-
-func (e *SignatureAccountKeyDoesNotExist) ErrorMessage() string {
-	return fmt.Sprintf("key %d on account with address %s does not exist", e.KeyID, e.Address)
-}
-
-func (e *SignatureAccountKeyDoesNotExist) StatusCode() uint32 {
-	return 11
-}
-
-// An InvalidProposalKeyError indicates that proposal key references an invalid public key.
-type InvalidProposalKeyError struct {
-	Address flow.Address
-	KeyID   uint64
-}
-
-func (e *InvalidProposalKeyError) ErrorMessage() string {
-	return fmt.Sprintf("invalid proposal key %d on account %s", e.KeyID, e.Address)
-}
-
-func (e *InvalidProposalKeyError) StatusCode() uint32 {
-	return 10
 }
 
 // An InvalidHashingAlgorithmError indicates that given key has invalid key algorithm
@@ -107,7 +97,7 @@ func (e *InvalidHashingAlgorithmError) ErrorMessage() string {
 }
 
 func (e *InvalidHashingAlgorithmError) StatusCode() uint32 {
-	return 5
+	return InvalidHashingAlgorithmErrorCode
 }
 
 // An PublicKeyVerificationError indicates unexpected error while verifying signature using given key
@@ -122,7 +112,7 @@ func (e *PublicKeyVerificationError) ErrorMessage() string {
 }
 
 func (e *PublicKeyVerificationError) StatusCode() uint32 {
-	return 6
+	return PublicKeyVerificationErrorCode
 }
 
 // An InvalidProposalSequenceNumberError indicates that proposal key sequence number does not match the on-chain value.
@@ -138,7 +128,7 @@ func (e *InvalidProposalSequenceNumberError) ErrorMessage() string {
 }
 
 func (e *InvalidProposalSequenceNumberError) StatusCode() uint32 {
-	return 7
+	return InvalidProposalSequenceNumberErrorCode
 }
 
 // A MissingSignatureForProposalKeyError indicates that a transaction is missing a required signature for proposal key.
@@ -152,7 +142,7 @@ func (e *MissingSignatureForProposalKeyError) ErrorMessage() string {
 }
 
 func (e *MissingSignatureForProposalKeyError) StatusCode() uint32 {
-	return 8
+	return MissingSignatureForProposalKeyErrorCode
 }
 
 // A MissingSignatureForProposalKeyError indicates that a transaction is missing a required signature for proposal key.
@@ -165,5 +155,27 @@ func (e *CodeExecutionError) ErrorMessage() string {
 }
 
 func (e *CodeExecutionError) StatusCode() uint32 {
-	return 9
+	return CodeExecutionErrorCode
+}
+
+// An InvalidProposalKeyError indicates that proposal key references an invalid public key.
+type InvalidProposalKeyError struct {
+	Address flow.Address
+	KeyID   uint64
+}
+
+func (e *InvalidProposalKeyError) ErrorMessage() string {
+	return fmt.Sprintf("invalid proposal key %d on account %s", e.KeyID, e.Address)
+}
+
+func (e *InvalidProposalKeyError) StatusCode() uint32 {
+	return InvalidProposalKeyErrorCode
+}
+
+func (e *SignatureAccountKeyDoesNotExist) ErrorMessage() string {
+	return fmt.Sprintf("key %d on account with address %s does not exist", e.KeyID, e.Address)
+}
+
+func (e *SignatureAccountKeyDoesNotExist) StatusCode() uint32 {
+	return SignatureAccountKeyDoesNotExistErrorCode
 }

@@ -45,18 +45,20 @@ func NewClientWithKey(addr string, key *flow.AccountPrivateKey, chain flow.Chain
 func NewClient(addr string, chain flow.Chain) (*Client, error) {
 	key := unittest.ServiceAccountPrivateKey
 
-	json, err := key.MarshalJSON()
-	if err != nil {
-		return nil, fmt.Errorf("cannot marshal key json: %w", err)
-	}
-	public := key.PublicKey(1000)
-	publicJson, err := public.MarshalJSON()
-	if err != nil {
-		return nil, fmt.Errorf("cannot marshal key json: %w", err)
-	}
+	// Uncomment for debugging keys
 
-	fmt.Printf("New client with private key: \n%s\n", json)
-	fmt.Printf("and public key: \n%s\n", publicJson)
+	//json, err := key.MarshalJSON()
+	//if err != nil {
+	//	return nil, fmt.Errorf("cannot marshal key json: %w", err)
+	//}
+	//public := key.PublicKey(1000)
+	//publicJson, err := public.MarshalJSON()
+	//if err != nil {
+	//	return nil, fmt.Errorf("cannot marshal key json: %w", err)
+	//}
+
+	//fmt.Printf("New client with private key: \n%s\n", json)
+	//fmt.Printf("and public key: \n%s\n", publicJson)
 
 	return NewClientWithKey(addr, &key, chain)
 }

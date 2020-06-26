@@ -538,7 +538,6 @@ func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resul
 
 func handle(err error) {
 	if err != nil {
-		fmt.Println("err:", err.Error())
 		panic(err)
 	}
 }
