@@ -12,6 +12,7 @@ require (
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/ethereum/go-ethereum v1.9.9
 	github.com/go-kit/kit v0.9.0
+	github.com/go-openapi/strfmt v0.19.5 // indirect
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/mock v1.4.3
 	github.com/golang/protobuf v1.4.0
