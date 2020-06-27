@@ -5,7 +5,7 @@ import (
 )
 
 // TODO consolidate this with model/flow/Block.Genesis
-func GenerateRootBlock(identityList flow.IdentityList, chainID flow.ChainID) *flow.Block {
+func GenerateRootBlock(identityList flow.IdentityList, chainID flow.ChainID, height uint64) *flow.Block {
 	payload := flow.Payload{
 		Identities: identityList,
 		Guarantees: nil,
@@ -14,7 +14,7 @@ func GenerateRootBlock(identityList flow.IdentityList, chainID flow.ChainID) *fl
 	header := flow.Header{
 		ChainID:        chainID,
 		ParentID:       flow.ZeroID,
-		Height:         1501901,
+		Height:         height,
 		PayloadHash:    payload.Hash(),
 		Timestamp:      flow.GenesisTime(),
 		View:           0,

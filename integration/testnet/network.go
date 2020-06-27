@@ -518,7 +518,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 
 	// generate root block
-	root := bootstraprun.GenerateRootBlock(toIdentityList(confs), chainID)
+	root := bootstraprun.GenerateRootBlock(toIdentityList(confs), chainID, 0)
 
 	// generate QC
 	nodeInfos := bootstrap.FilterByRole(toNodeInfoList(confs), flow.RoleConsensus)

@@ -6,9 +6,9 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func constructRootBlock(nodes []model.NodeInfo, chainID flow.ChainID) *flow.Block {
+func constructRootBlock(nodes []model.NodeInfo, chainID flow.ChainID, height uint64) *flow.Block {
 	identityList := generateIdentityList(nodes)
-	block := run.GenerateRootBlock(identityList, chainID)
+	block := run.GenerateRootBlock(identityList, chainID, height)
 
 	writeJSON(model.PathRootBlock, block)
 

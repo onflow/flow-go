@@ -75,7 +75,7 @@ func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint) ([]*N
 
 	// add all identities to genesis block and
 	// create and bootstrap consensus node with the genesis
-	genesis := run.GenerateRootBlock(participants)
+	genesis := run.GenerateRootBlock(participants, flow.Testnet, 0)
 
 	hub := NewHub()
 	stopper := NewStopper(stopAtView, stopCountAt)

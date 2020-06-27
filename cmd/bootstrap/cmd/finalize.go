@@ -22,6 +22,7 @@ var (
 	flagFastKG                                       bool
 	flagStateCommitment                              string
 	flagChainID                                      string
+	flagHeight                                       uint64
 )
 
 type PartnerStakes map[flow.Identifier]uint64
@@ -55,7 +56,7 @@ and block seal.`,
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ constructing root block")
-		block := constructRootBlock(stakingNodes, chainID)
+		block := constructRootBlock(stakingNodes, chainID, flagHeight)
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ constructing root QC")
@@ -115,6 +116,7 @@ func init() {
 		"bootstrap execution result & block seal")
 	_ = finalizeCmd.MarkFlagRequired("state-commitment")
 	finalizeCmd.Flags().StringVar(&flagChainID, "chain-id", "", "chain ID for the root block (can be \"main\", \"test\" or \"emulator\"")
+	finalizeCmd.Flags().Uint64Var(&flagHeight, "height", 0, "height of the root block")
 }
 
 func assemblePartnerNodes() []model.NodeInfo {
