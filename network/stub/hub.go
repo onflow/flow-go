@@ -31,10 +31,14 @@ func (hub *Hub) DeliverAll() {
 }
 
 func (hub *Hub) Eventually(t *testing.T, condition func() bool) {
+	hub.EventuallyUntil(t, condition, time.Second*10, time.Millisecond*500)
+}
+
+func (hub *Hub) EventuallyUntil(t *testing.T, condition func() bool, waitFor time.Duration, tick time.Duration) {
 	require.Eventually(t, func() bool {
 		hub.DeliverAll()
 		return condition()
-	}, time.Second*10, time.Millisecond*500)
+	}, waitFor, tick)
 }
 
 // GetNetwork returns the Network by the network ID (or node ID)

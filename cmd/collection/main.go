@@ -42,6 +42,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
+	"github.com/dapperlabs/flow-go/module/synchronization"
 	clusterkv "github.com/dapperlabs/flow-go/state/cluster/badger"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	storage "github.com/dapperlabs/flow-go/storage"
@@ -85,11 +86,15 @@ func main() {
 		clusterGenesis *clustermodel.Block              // genesis block for the cluster
 		clusterQC      *hotstuffmodel.QuorumCertificate // QC for the cluster
 
-		prov           *provider.Engine
-		ing            *ingest.Engine
-		colMetrics     module.CollectionMetrics
-		clusterMetrics module.HotstuffMetrics
-		err            error
+		prov              *provider.Engine
+		ing               *ingest.Engine
+		clusterSyncCore   *synchronization.Core
+		mainChainSyncCore *synchronization.Core
+		followerEng       *followereng.Engine
+		proposalEng       *proposal.Engine
+		colMetrics        module.CollectionMetrics
+		clusterMetrics    module.HotstuffMetrics
+		err               error
 	)
 
 	cmd.FlowNode(flow.RoleCollection.String()).
@@ -193,6 +198,14 @@ func main() {
 
 			return nil
 		}).
+		Module("main chain sync engine", func(node *cmd.FlowNodeBuilder) error {
+			mainChainSyncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
+			return err
+		}).
+		Module("cluster chain sync core", func(node *cmd.FlowNodeBuilder) error {
+			clusterSyncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
+			return err
+		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
@@ -228,7 +241,7 @@ func main() {
 			}
 
 			// creates a consensus follower with noop consumer as the notifier
-			core, err := consensus.NewFollower(
+			followerCore, err := consensus.NewFollower(
 				node.Logger,
 				mainConsensusCommittee,
 				node.Storage.Headers,
@@ -244,7 +257,7 @@ func main() {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
 
-			follower, err := followereng.New(
+			followerEng, err = followereng.New(
 				node.Logger,
 				node.Network,
 				node.Me,
@@ -255,11 +268,16 @@ func main() {
 				node.Storage.Payloads,
 				node.State,
 				conCache,
-				core,
+				followerCore,
+				mainChainSyncCore,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
+
+			return followerEng, nil
+		}).
+		Component("main chain sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			// create a block synchronization engine to handle follower getting
 			// out of sync
@@ -270,13 +288,14 @@ func main() {
 				node.Me,
 				node.State,
 				node.Storage.Blocks,
-				follower,
+				followerEng,
+				clusterSyncCore,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
 
-			return follower.WithSynchronization(sync), nil
+			return sync, nil
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			ing, err = ingest.New(
@@ -316,7 +335,7 @@ func main() {
 			)
 			finalizer := colfinalizer.NewFinalizer(node.DB, pool, prov, colMetrics, clusterID)
 
-			prop, err := proposal.New(
+			proposalEng, err = proposal.New(
 				node.Logger,
 				node.Network,
 				node.Me,
@@ -331,6 +350,7 @@ func main() {
 				colHeaders,
 				colPayloads,
 				colCache,
+				clusterSyncCore,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize engine: %w", err)
@@ -366,7 +386,7 @@ func main() {
 				finalizer,
 				persist,
 				signer,
-				prop,
+				proposalEng,
 				clusterGenesis.Header,
 				clusterQC,
 				finalized,
@@ -382,6 +402,10 @@ func main() {
 				return nil, fmt.Errorf("could not initialize hotstuff participant: %w", err)
 			}
 
+			proposalEng = proposalEng.WithConsensus(hot)
+			return proposalEng, nil
+		}).
+		Component("cluster sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			sync, err := colsync.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -390,14 +414,13 @@ func main() {
 				myCluster,
 				clusterState,
 				colBlocks,
-				prop,
+				proposalEng,
+				clusterSyncCore,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create cluster sync engine: %w", err)
 			}
-
-			prop = prop.WithConsensus(hot).WithSynchronization(sync)
-			return prop, nil
+			return sync, nil
 		}).
 		Run()
 }

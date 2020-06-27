@@ -17,6 +17,7 @@ require (
 	github.com/golang/protobuf v1.4.0
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.4
+	github.com/improbable-eng/grpc-web v0.12.0
 	github.com/ipfs/go-log v1.0.4
 	github.com/jrick/bitset v1.0.0
 	github.com/libp2p/go-libp2p v0.10.0
