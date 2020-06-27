@@ -23,6 +23,7 @@ var (
 	flagStateCommitment                              string
 	flagChainID                                      string
 	flagHeight                                       uint64
+	flagParentID                                     string
 )
 
 type PartnerStakes map[flow.Identifier]uint64
@@ -55,8 +56,13 @@ and block seal.`,
 		dkgData := runDKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
 		log.Info().Msg("")
 
+		parentID, err := flow.HexStringToIdentifier(flagParentID)
+		if err != nil {
+			log.Error().Err(err).Msg("could not parse parent id")
+		}
+
 		log.Info().Msg("✨ constructing root block")
-		block := constructRootBlock(stakingNodes, chainID, flagHeight)
+		block := constructRootBlock(stakingNodes, chainID, flagHeight, parentID)
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ constructing root QC")
@@ -117,6 +123,7 @@ func init() {
 	_ = finalizeCmd.MarkFlagRequired("state-commitment")
 	finalizeCmd.Flags().StringVar(&flagChainID, "chain-id", "", "chain ID for the root block (can be \"main\", \"test\" or \"emulator\"")
 	finalizeCmd.Flags().Uint64Var(&flagHeight, "height", 0, "height of the root block")
+	finalizeCmd.Flags().StringVar(&flagParentID, "parent-id", "00", "optional parent ID for root block")
 }
 
 func assemblePartnerNodes() []model.NodeInfo {
