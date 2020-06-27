@@ -3,6 +3,7 @@ module github.com/dapperlabs/flow-go/integration
 go 1.13
 
 require (
+	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
 	github.com/dapperlabs/flow-go v0.0.0-00010101000000-000000000000
 	github.com/dapperlabs/flow-go/crypto v0.3.2-0.20200312195452-df4550a863b7
 	github.com/dapperlabs/testingdock v0.4.3-0.20200424073047-26b38aa03602
@@ -14,7 +15,9 @@ require (
 	github.com/onflow/flow-go-sdk v0.5.1-0.20200620041402-7cc94298795c
 	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200619174948-a3a856d16a27
 	github.com/rs/zerolog v1.19.0
+	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.6.1
+	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	google.golang.org/grpc v1.28.0
 	gopkg.in/yaml.v2 v2.2.5

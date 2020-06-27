@@ -22,6 +22,7 @@ var checkpointFilenamePrefix = "checkpoint."
 
 const MagicBytes uint16 = 0x2137
 const VersionV1 uint16 = 0x01
+const VersionV2 uint16 = 0x02
 
 type Checkpointer struct {
 	dir            string
@@ -223,7 +224,7 @@ func StoreCheckpoint(forestSequencing *flattener.FlattenedForest, writer io.Writ
 	header := make([]byte, 4+8+2)
 
 	pos := writeUint16(header, 0, MagicBytes)
-	pos = writeUint16(header, pos, VersionV1)
+	pos = writeUint16(header, pos, VersionV2)
 	pos = writeUint64(header, pos, uint64(len(storableNodes)-1)) // -1 to account for 0 node meaning nil
 	writeUint16(header, pos, uint16(len(storableTries)))
 
@@ -280,8 +281,11 @@ func (c *Checkpointer) LoadCheckpoint(checkpoint int) (*flattener.FlattenedFores
 	if magicBytes != MagicBytes {
 		return nil, fmt.Errorf("unknown file format. Magic constant %x does not match expected %x", magicBytes, MagicBytes)
 	}
-	if version != VersionV1 {
-		return nil, fmt.Errorf("unsupported file version %x ", version)
+	if version == VersionV1 {
+		return nil, fmt.Errorf("unsupported file version 1 - please regenerate checkpoints")
+	}
+	if version != VersionV2 {
+		return nil, fmt.Errorf("unsupported file version %x", version)
 	}
 
 	nodes := make([]*flattener.StorableNode, nodesCount+1) //+1 for 0 index meaning nil
