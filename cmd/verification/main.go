@@ -159,7 +159,8 @@ func main() {
 				return nil, err
 			}
 			chunkVerifier := chunks.NewChunkVerifier(vm, node.Storage.Blocks)
-			verifierEng, err = verifier.New(node.Logger, collector, node.Network, node.State, node.Me, chunkVerifier)
+			verifierEng, err = verifier.New(node.Logger, collector, node.Tracer, node.Network, node.State, node.Me,
+				chunkVerifier)
 			return verifierEng, err
 		}).
 		Component("match engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -169,6 +170,7 @@ func main() {
 			}
 			matchEng, err = match.New(node.Logger,
 				collector,
+				node.Tracer,
 				node.Network,
 				node.Me,
 				pendingResults,
@@ -184,6 +186,7 @@ func main() {
 		Component("finder engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			finderEng, err = finder.New(node.Logger,
 				collector,
+				node.Tracer,
 				node.Network,
 				node.Me,
 				matchEng,

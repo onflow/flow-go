@@ -37,6 +37,7 @@ type Engine struct {
 func New(
 	log zerolog.Logger,
 	metrics module.VerificationMetrics,
+	tracer module.Tracer,
 	net module.Network,
 	me module.Local,
 	match network.Engine,
@@ -50,6 +51,7 @@ func New(
 		unit:               engine.NewUnit(),
 		log:                log.With().Str("engine", "finder").Logger(),
 		metrics:            metrics,
+		tracer:             tracer,
 		me:                 me,
 		match:              match,
 		headerStorage:      headerStorage,
