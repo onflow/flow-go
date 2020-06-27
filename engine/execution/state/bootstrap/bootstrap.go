@@ -82,12 +82,6 @@ func (b *Bootstrapper) BootstrapExecutionDatabase(db *badger.DB, commit flow.Sta
 	return nil
 }
 
-type AddressState interface {
-	Bytes() []byte
-	NextAddress() (flow.Address, error)
-	CurrentAddress() flow.Address
-}
-
 func (b *Bootstrapper) BootstrapView(
 	ledger virtualmachine.Ledger,
 	serviceAccountPublicKey flow.AccountPublicKey,

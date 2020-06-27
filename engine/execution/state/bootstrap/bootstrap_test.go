@@ -38,8 +38,7 @@ func TestGenerateGenesisState(t *testing.T) {
 }
 
 func TestGenerateGenesisState_ZeroTokenSupply(t *testing.T) {
-	var expectedStateCommitment, _ = hex.DecodeString("f8ce9e9f774b401b8d4e4c1cacf7b2047136df5897b95f6f4f282f83f2cdf5c7")
-
+	var expectedStateCommitment, _ = hex.DecodeString("95c75fdc93069dfd119f98988eb05495b75bde8108c7a6549754bd068810ffa9")
 	unittest.RunWithTempDir(t, func(dbDir string) {
 
 		chain := flow.Mainnet.Chain()

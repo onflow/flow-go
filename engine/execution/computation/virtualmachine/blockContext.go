@@ -56,7 +56,6 @@ func (bc *blockContext) newTransactionContext(
 
 	ledgerDAL := NewLedgerDAL(ledger, bc.chain)
 	ctx := &TransactionContext{
-		LedgerDAL:                        ledgerDAL,
 		bc:                               bc,
 		ledger:                           ledgerDAL,
 		astCache:                         bc.vm.cache,
@@ -67,7 +66,6 @@ func (bc *blockContext) newTransactionContext(
 		events:                           nil,
 		tx:                               tx,
 		gasLimit:                         tx.GasLimit,
-		uuid:                             0,
 		header:                           bc.header,
 		blocks:                           bc.blocks,
 		signatureVerificationEnabled:     true,
