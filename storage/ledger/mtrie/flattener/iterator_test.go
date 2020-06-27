@@ -11,7 +11,7 @@ import (
 )
 
 func TestEmptyTrie(t *testing.T) {
-	emptyTrie, err := trie.NewEmptyMTrie(9)
+	emptyTrie, err := trie.NewEmptyMTrie(1)
 	require.NoError(t, err)
 
 	itr := flattener.NewNodeIterator(emptyTrie)
