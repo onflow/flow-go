@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	collectioningest "github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
+	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
@@ -288,6 +289,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		txResultStorage,
 		computationEngine,
 		providerEngine,
+		nil,
 		execState,
 		syncThreshold,
 		node.Metrics,
@@ -298,11 +300,25 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	require.NoError(t, err)
 
+	syncEngine, err := synchronization.New(
+		node.Log,
+		node.Metrics,
+		node.Net,
+		node.Me,
+		node.State,
+		node.Blocks,
+		ingestionEngine,
+	)
+	require.NoError(t, err)
+
+	ingestionEngine = ingestionEngine.WithSynchronization(syncEngine)
+
 	return mock.ExecutionNode{
 		GenericNode:     node,
 		IngestionEngine: ingestionEngine,
 		ExecutionEngine: computationEngine,
 		ReceiptsEngine:  providerEngine,
+		SyncEngine:      syncEngine,
 		BadgerDB:        node.DB,
 		VM:              vm,
 		ExecutionState:  execState,
