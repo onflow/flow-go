@@ -251,7 +251,9 @@ func TestBootstrapExistingAddress(t *testing.T) {
 	})
 }
 
+// Skipping for now, since sporking allows non zero parent
 func TestBootstrapNonZeroParent(t *testing.T) {
+	t.Skip()
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
 		block := unittest.GenesisFixture(participants)

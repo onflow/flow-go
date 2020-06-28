@@ -12,7 +12,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
 var (
@@ -25,21 +24,12 @@ var (
 
 // blockHashByHeight retreives the block hash by height
 func blockHashByHeight(_ *cobra.Command, _ []string) {
-	fmt.Println(flagDatadir)
 	db := common.InitStorage(flagDatadir)
 	cache := &metrics.NoopCollector{}
 	headers := bstorage.NewHeaders(cache, db)
 	seals := bstorage.NewSeals(cache, db)
 
 	var h *flow.Header
-
-	var finalized uint64
-	err := db.View(operation.RetrieveFinalizedHeight(&finalized))
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not get finalized height")
-	}
-
-	fmt.Println(finalized)
 
 	if !flagAllowUnfinalized {
 		// verify finalized
