@@ -34,7 +34,7 @@ func (b *Bootstrapper) BootstrapLedger(
 ) (flow.StateCommitment, error) {
 	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.EmptyStateCommitment()))
 
-	vm := fvm.New(runtime.NewInterpreterRuntime())
+	vm := fvm.New(runtime.NewInterpreterRuntime(), chain)
 
 	_, err := vm.NewContext().Invoke(fvm.Bootstrap(servicePublicKey, initialTokenSupply), view)
 	if err != nil {
