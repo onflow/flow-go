@@ -17,9 +17,7 @@ func NewInvalidExtensionError(msg string) error {
 }
 
 func NewInvalidExtensionErrorf(msg string, args ...interface{}) error {
-	return InvalidExtensionError{
-		msg: fmt.Sprintf(msg, args...),
-	}
+	return NewInvalidExtensionError(fmt.Sprintf(msg, args...))
 }
 
 func (e InvalidExtensionError) Error() string {
@@ -47,9 +45,7 @@ func NewOutdatedExtensionError(msg string) error {
 }
 
 func NewOutdatedExtensionErrorf(msg string, args ...interface{}) error {
-	return OutdatedExtensionError{
-		msg: fmt.Sprintf(msg, args...),
-	}
+	return NewOutdatedExtensionError(fmt.Sprintf(msg, args...))
 }
 
 func (e OutdatedExtensionError) Error() string {
