@@ -397,7 +397,7 @@ func VerificationNode(t testing.TB,
 	if node.Chunks == nil {
 		node.Chunks = match.NewChunks(1000)
 		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourcePendingChunks, node.Chunks.Size)
+		err = mempoolCollector.Register(metrics.ResourcePendingChunk, node.Chunks.Size)
 		require.Nil(t, err)
 	}
 
@@ -405,17 +405,23 @@ func VerificationNode(t testing.TB,
 		node.ProcessedResultIDs, err = stdmap.NewIdentifiers(1000)
 		require.Nil(t, err)
 		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourceProcessedResultIDs, node.ProcessedResultIDs.Size)
+		err = mempoolCollector.Register(metrics.ResourceProcessedResultID, node.ProcessedResultIDs.Size)
 		require.Nil(t, err)
 	}
 
 	if node.ReceiptIDsByBlock == nil {
 		node.ReceiptIDsByBlock, err = stdmap.NewIdentifierMap(1000)
 		require.Nil(t, err)
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourcePendingReceiptIDsByBlock, node.ReceiptIDsByBlock.Size)
+		require.Nil(t, err)
 	}
 
 	if node.ReceiptIDsByResult == nil {
 		node.ReceiptIDsByResult, err = stdmap.NewIdentifierMap(1000)
+		require.Nil(t, err)
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourcePendingReceiptIDsByResult, node.ReceiptIDsByResult.Size)
 		require.Nil(t, err)
 	}
 

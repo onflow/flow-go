@@ -203,8 +203,7 @@ func (vc *VerificationCollector) OnChunkVerificationFinished(chunkID flow.Identi
 // chunk. It adds the size of the verifiable chunk to the histogram. A verifiable chunk is assumed
 // to capture all the resources needed to verify a chunk.
 // The purpose of this function is to track the overall chunk resources size on disk.
-// Todo wire this up to do monitoring
-// https://github.com/dapperlabs/flow-go/issues/3183
+// Todo wire this up to do monitoring (3183)
 func (vc *VerificationCollector) LogVerifiableChunkSize(size float64) {
 	vc.storagePerChunk.Set(size)
 }
