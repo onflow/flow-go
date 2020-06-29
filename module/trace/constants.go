@@ -4,7 +4,7 @@ package trace
 const (
 	// Consensus Node
 
-	CONProcessCollection              SpanName = "con.processCollection"
+	CONProcessCollection SpanName = "con.processCollection"
 	// children of CONProcessCollection
 	CONHotFinalizeCollection          SpanName = "con.hotstuff.finalizeCollection"
 	CONIngOnCollectionGuarantee       SpanName = "con.ingestion.onCollectionGuarantee"
@@ -14,7 +14,8 @@ const (
 	CONProvOnBlockProposal            SpanName = "con.provider.onBlockProposal"
 	CONMatchCheckSealing              SpanName = "con.matching.checkSealing"
 
-	CONProcessBlock                SpanName = "con.processBlock"
+	CONProcessBlock SpanName = "con.processBlock"
+	// children of CONProcessBlock
 	CONHotEventHandlerStartNewView SpanName = "con.hotstuff.eventHandler.startNewView"
 	CONHotFinalizeBlock            SpanName = "con.hotstuff.finalizeBlock"
 
@@ -44,21 +45,22 @@ const (
 
 	// Verification node
 
-	VERProcessExecutionReceipt    SpanName = "ver.processExecutionReceipt"
+	VERProcessExecutionReceipt SpanName = "ver.processExecutionReceipt"
+	// children of VERProcessExecutionReceipt
 	VERFindHandleExecutionReceipt SpanName = "ver.find.handleExecutionReceipt"
 	VERFindOnFinalizedBlock       SpanName = "ver.finder.OnFinalizedBlock"
 	VERFindCheckReceipts          SpanName = "ver.finder.checkReceipts"
 	VERFindProcessResult          SpanName = "ver.finder.processResult"
 	VERFindOnResultProcessed      SpanName = "ver.finder.onResultProcessed"
 
-	VERProcessExecutionResult     SpanName = "ver.processExecutionResult"
+	VERProcessExecutionResult SpanName = "ver.processExecutionResult"
+	// children of VERProcessExecutionResult
 	VERMatchHandleExecutionResult SpanName = "ver.match.handleExecutionResult"
 	VERMatchHandleChunkDataPack   SpanName = "ver.match.handleChunkDataPack"
 	VERMatchMyChunkAssignments    SpanName = "ver.match.myChunkAssignments"
-
-	VERVerVerifyWithMetrics      SpanName = "ver.verify.verifyWithMetrics"
-	VERVerChunkVerify            SpanName = "ver.verify.ChunkVerifier.Verify"
-	VERVerGenerateResultApproval SpanName = "ver.verify.GenerateResultApproval"
+	VERVerVerifyWithMetrics       SpanName = "ver.verify.verifyWithMetrics"
+	VERVerChunkVerify             SpanName = "ver.verify.ChunkVerifier.Verify"
+	VERVerGenerateResultApproval  SpanName = "ver.verify.GenerateResultApproval"
 )
 
 // Tag names

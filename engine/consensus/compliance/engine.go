@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -241,8 +240,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 
 	for _, g := range payload.Guarantees {
 		if span, ok := e.tracer.GetSpan(g.CollectionID, trace.CONProcessCollection); ok {
-			childSpan := e.tracer.StartSpan(g.CollectionID, trace.CONCompBroadcastProposalWithDelay, opentracing.ChildOf(
-				span.Context()))
+			childSpan := e.tracer.StartSpanFromParent(span, trace.CONCompBroadcastProposalWithDelay)
 			defer childSpan.Finish()
 		}
 	}
@@ -350,8 +348,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 	for _, g := range proposal.Payload.Guarantees {
 		if span, ok := e.tracer.GetSpan(g.CollectionID, trace.CONProcessCollection); ok {
-			childSpan := e.tracer.StartSpan(g.CollectionID, trace.CONCompOnBlockProposal, opentracing.ChildOf(
-				span.Context()))
+			childSpan := e.tracer.StartSpanFromParent(span, trace.CONCompOnBlockProposal)
 			defer childSpan.Finish()
 		}
 	}

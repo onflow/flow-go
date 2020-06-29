@@ -29,3 +29,7 @@ execution-tests:
 .PHONY: benchmark
 benchmark:
 	GO111MODULE=on go test -tags relic -count=1 -timeout 30m ./benchmark -run Benchmark
+
+.PHONY: spam-localnet
+spam:
+	GO111MODULE=on go run -tags relic ./benchmark/main -verbose=true

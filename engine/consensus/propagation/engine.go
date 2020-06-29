@@ -5,7 +5,6 @@ package propagation
 import (
 	"fmt"
 
-	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -133,7 +132,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // from another node on the network.
 func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 	if span, ok := e.tracer.GetSpan(guarantee.CollectionID, trace.CONProcessCollection); ok {
-		childSpan := e.tracer.StartSpan(guarantee.CollectionID, trace.CONPropOnGuarantee, opentracing.ChildOf(span.Context()))
+		childSpan := e.tracer.StartSpanFromParent(span, trace.CONPropOnGuarantee)
 		defer childSpan.Finish()
 	}
 
