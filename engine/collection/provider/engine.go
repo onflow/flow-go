@@ -24,7 +24,7 @@ import (
 
 // Engine is the collection provider engine, which provides access to resources
 // held by the collection node.
-// TODO consolidate with common resource provider engine https://github.com/dapperlabs/flow-go/issues/4148
+// TODO consolidate with common resource provider engine (4148)
 type Engine struct {
 	unit         *engine.Unit
 	log          zerolog.Logger
