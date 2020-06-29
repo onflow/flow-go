@@ -14,7 +14,7 @@ import (
 func createNotifier(log zerolog.Logger, metrics module.HotstuffMetrics, tracer module.Tracer, index storage.Index,
 ) hotstuff.Consumer {
 	logConsumer := notifications.NewLogConsumer(log)
-	tracingConsumer := notifications.NewTracingConsumer(log, tracer, index)
+	tracingConsumer := notifications.NewConsensusTracingConsumer(log, tracer, index)
 	metricsConsumer := metricsconsumer.NewMetricsConsumer(metrics)
 	dis := pubsub.NewDistributor()
 	dis.AddConsumer(logConsumer)

@@ -11,8 +11,8 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-// TracingConsumer is an implementation of the notifications consumer that adds tracing
-type TracingConsumer struct {
+// ConsensusTracingConsumer is an implementation of the notifications consumer that adds tracing for consensus node hotstuff
+type ConsensusTracingConsumer struct {
 	// inherit from noop consumer in order to satisfy the full interface
 	NoopConsumer
 	log    zerolog.Logger
@@ -20,8 +20,8 @@ type TracingConsumer struct {
 	index  storage.Index
 }
 
-func NewTracingConsumer(log zerolog.Logger, tracer module.Tracer, index storage.Index) *TracingConsumer {
-	tc := &TracingConsumer{
+func NewConsensusTracingConsumer(log zerolog.Logger, tracer module.Tracer, index storage.Index) *ConsensusTracingConsumer {
+	tc := &ConsensusTracingConsumer{
 		log:    log,
 		tracer: tracer,
 		index:  index,
@@ -29,7 +29,7 @@ func NewTracingConsumer(log zerolog.Logger, tracer module.Tracer, index storage.
 	return tc
 }
 
-func (tc *TracingConsumer) OnBlockIncorporated(block *model.Block) {
+func (tc *ConsensusTracingConsumer) OnBlockIncorporated(block *model.Block) {
 	if span, ok := tc.tracer.GetSpan(block.BlockID, trace.CONProcessBlock); ok {
 		tc.tracer.StartSpan(block.BlockID, trace.CONHotFinalizeBlock, opentracing.ChildOf(span.Context()))
 	}
@@ -43,6 +43,7 @@ func (tc *TracingConsumer) OnBlockIncorporated(block *model.Block) {
 			Hex("proposer_id", logging.ID(block.ProposerID)).
 			Hex("payload_hash", logging.ID(block.PayloadHash)).
 			Msg("unable to find index for block to be finalized for tracing")
+		return
 	}
 
 	for _, id := range index.CollectionIDs {
@@ -52,7 +53,7 @@ func (tc *TracingConsumer) OnBlockIncorporated(block *model.Block) {
 	}
 }
 
-func (tc *TracingConsumer) OnFinalizedBlock(block *model.Block) {
+func (tc *ConsensusTracingConsumer) OnFinalizedBlock(block *model.Block) {
 	tc.tracer.FinishSpan(block.BlockID, trace.CONHotFinalizeBlock)
 
 	index, err := tc.index.ByBlockID(block.BlockID)
@@ -64,6 +65,7 @@ func (tc *TracingConsumer) OnFinalizedBlock(block *model.Block) {
 			Hex("proposer_id", logging.ID(block.ProposerID)).
 			Hex("payload_hash", logging.ID(block.PayloadHash)).
 			Msg("unable to find index for finalized block for tracing")
+		return
 	}
 
 	for _, id := range index.CollectionIDs {
