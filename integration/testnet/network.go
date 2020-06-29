@@ -52,6 +52,8 @@ const (
 	ExeNodeAPIPort = "exe-api-port"
 	// AccessNodeAPIPort is the name used for the access node API port.
 	AccessNodeAPIPort = "access-api-port"
+	// AccessNodeAPIProxyPort is the name used for the access node API HTTP proxy port.
+	AccessNodeAPIProxyPort = "access-api-http-proxy-port"
 	// GhostNodeAPIPort is the name used for the access node API port.
 	GhostNodeAPIPort = "ghost-api-port"
 
@@ -439,18 +441,24 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.addFlag("triedir", DefaultExecutionRootDir)
 
 		case flow.RoleAccess:
-			hostPort := testingdock.RandomPort(t)
-			containerPort := "9000/tcp"
+			hostGRPCPort := testingdock.RandomPort(t)
+			hostHTTPProxyPort := testingdock.RandomPort(t)
+			containerGRPCPort := "9000/tcp"
+			containerHTTPProxyPort := "8080/tcp"
 
-			nodeContainer.bindPort(hostPort, containerPort)
+			nodeContainer.bindPort(hostGRPCPort, containerGRPCPort)
+			nodeContainer.bindPort(hostHTTPProxyPort, containerHTTPProxyPort)
 
 			nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+			nodeContainer.addFlag("http-addr", fmt.Sprintf("%s:8080", nodeContainer.Name()))
 			// Should always have at least 1 collection and execution node
 			nodeContainer.addFlag("ingress-addr", "collection_1:9000")
 			nodeContainer.addFlag("script-addr", "execution_1:9000")
-			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
-			nodeContainer.Ports[AccessNodeAPIPort] = hostPort
-			net.AccessPorts[AccessNodeAPIPort] = hostPort
+			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostGRPCPort))
+			nodeContainer.Ports[AccessNodeAPIPort] = hostGRPCPort
+			nodeContainer.Ports[AccessNodeAPIProxyPort] = hostHTTPProxyPort
+			net.AccessPorts[AccessNodeAPIPort] = hostGRPCPort
+			net.AccessPorts[AccessNodeAPIProxyPort] = hostHTTPProxyPort
 
 		case flow.RoleVerification:
 			nodeContainer.addFlag("alpha", "1")

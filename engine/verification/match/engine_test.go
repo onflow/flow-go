@@ -194,6 +194,23 @@ func VerifierCalledNTimes(verifier *network.Engine, n int) <-chan []*verificatio
 	return c
 }
 
+func OnVerifiableChunkSentMetricCalledNTimes(metrics *module.VerificationMetrics, n int) <-chan struct{} {
+	var wg sync.WaitGroup
+	c := make(chan struct{}, 1)
+
+	wg.Add(n)
+	metrics.On("OnVerifiableChunkSent").Run(func(args mock.Arguments) {
+		wg.Done()
+	}).Return().Times(n)
+
+	go func() {
+		wg.Wait()
+		c <- struct{}{}
+		close(c)
+	}()
+	return c
+}
+
 // Happy Path: When receives a ER, and 1 chunk is assigned to me,
 // it will fetch that collection and chunk data, and produces a verifiable chunk
 func TestChunkVerified(t *testing.T) {
@@ -578,7 +595,7 @@ func TestProcessChunkDataPackConcurrently(t *testing.T) {
 	// receiving `len(result.Chunk)`-many result
 	metrics.On("OnExecutionResultReceived").Return().Once()
 	// sending `len(result.Chunk)`-many verifiable chunks
-	metrics.On("OnVerifiableChunkSent").Return().Times(len(result.Chunks))
+	sentMetricsC := OnVerifiableChunkSentMetricCalledNTimes(metrics, len(result.Chunks))
 	// receiving `len(result.Chunk)`-many chunk data packs
 	metrics.On("OnChunkDataPackReceived").Return().Times(len(result.Chunks))
 
@@ -621,6 +638,8 @@ func TestProcessChunkDataPackConcurrently(t *testing.T) {
 
 	// wait until verifier are called
 	<-vchunksC
+	// wait until verifier metrics are called
+	<-sentMetricsC
 
 	mock.AssertExpectationsForObjects(t, assigner, con, verifier, metrics)
 	e.Done()
