@@ -131,13 +131,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.BlockProvider)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.ExecutionSync)), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
-	syncEngine := new(module2.Synchronization)
-	closed := func() <-chan struct{} {
-		channel := make(chan struct{})
-		close(channel)
-		return channel
-	}()
-	syncEngine.On("Done", mock.Anything).Return(closed)
+	blockSync := new(module2.BlockRequester)
 
 	engine, err = New(
 		log,
@@ -151,7 +145,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		txResults,
 		computationManager,
 		providerEngine,
-		syncEngine,
+		blockSync,
 		executionState,
 		21,
 		metrics,

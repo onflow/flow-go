@@ -23,6 +23,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	chainsync "github.com/dapperlabs/flow-go/module/synchronization"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/ledger"
@@ -36,6 +37,7 @@ func main() {
 		events             storage.Events
 		txResults          storage.TransactionResults
 		providerEngine     *provider.Engine
+		syncCore           *chainsync.Core
 		computationManager *computation.Manager
 		syncEngine         *synchronization.Engine
 		ingestionEng       *ingestion.Engine
@@ -82,6 +84,10 @@ func main() {
 		// Trie storage is required to bootstrap, but also should be handled while shutting down
 		Module("ledger storage", func(node *cmd.FlowNodeBuilder) error {
 			ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), collector, node.MetricsRegisterer)
+			return err
+		}).
+		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
+			syncCore, err = chainsync.New(node.Logger, chainsync.DefaultConfig())
 			return err
 		}).
 		GenesisHandler(func(node *cmd.FlowNodeBuilder, block *flow.Block) {
@@ -165,7 +171,7 @@ func main() {
 				txResults,
 				computationManager,
 				providerEngine,
-				nil,
+				syncCore,
 				executionState,
 				6, // TODO - config param maybe?
 				collector,
@@ -176,7 +182,7 @@ func main() {
 			)
 			return ingestionEng, err
 		}).
-		Module("sychronization engine", func(node *cmd.FlowNodeBuilder) error {
+		Component("sychronization engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			// initialize the synchronization engine
 			syncEngine, err = synchronization.New(
 				node.Logger,
@@ -186,14 +192,13 @@ func main() {
 				node.State,
 				node.Storage.Blocks,
 				ingestionEng,
+				syncCore,
 			)
 			if err != nil {
-				return fmt.Errorf("could not initialize synchronization engine: %w", err)
+				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 			}
 
-			ingestionEng = ingestionEng.WithSynchronization(syncEngine)
-
-			return nil
+			return syncEngine, nil
 		}).
 		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, events, txResults)

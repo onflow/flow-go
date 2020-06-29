@@ -34,6 +34,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	chainsync "github.com/dapperlabs/flow-go/module/synchronization"
 	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/stub"
@@ -277,6 +278,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	require.NoError(t, err)
 
+	syncCore, err := chainsync.New(node.Log, chainsync.DefaultConfig())
+	require.NoError(t, err)
+
 	ingestionEngine, err := ingestion.New(
 		node.Log,
 		node.Net,
@@ -289,7 +293,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		txResultStorage,
 		computationEngine,
 		providerEngine,
-		nil,
+		syncCore,
 		execState,
 		syncThreshold,
 		node.Metrics,
@@ -308,10 +312,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.State,
 		node.Blocks,
 		ingestionEngine,
+		syncCore,
 	)
 	require.NoError(t, err)
-
-	ingestionEngine = ingestionEngine.WithSynchronization(syncEngine)
 
 	return mock.ExecutionNode{
 		GenericNode:     node,
