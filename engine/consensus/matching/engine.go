@@ -334,18 +334,24 @@ func (e *Engine) checkSealing() {
 
 	e.log.Info().Int("num_results", len(results)).Msg("identified sealable execution results")
 
+	// Start spans for tracing within the parent spans trace.CONProcessBlock and trace.CONProcessCollection
 	for _, result := range results {
+		// For each execution result, we load the trace.CONProcessBlock span for the executed block. If we find it, we
+		// start a child span that will run until this function returns.
 		if span, ok := e.tracer.GetSpan(result.BlockID, trace.CONProcessBlock); ok {
 			childSpan := e.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing, opentracing.StartTime(
 				start))
 			defer childSpan.Finish()
 		}
 
+		// For each execution result, we load all the collection that are in the executed block.
 		index, err := e.indexDB.ByBlockID(result.BlockID)
 		if err != nil {
 			continue
 		}
 		for _, id := range index.CollectionIDs {
+			// For each collection, we load the trace.CONProcessCollection span. If we find it, we start a child span
+			// that will run until this functiosn returns.
 			if span, ok := e.tracer.GetSpan(id, trace.CONProcessCollection); ok {
 				childSpan := e.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing, opentracing.StartTime(
 					start))
