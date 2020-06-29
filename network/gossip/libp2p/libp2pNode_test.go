@@ -130,8 +130,7 @@ func (l *LibP2PNodeTestSuite) TestGetPeerInfo() {
 func (l *LibP2PNodeTestSuite) TestAddPeers() {
 	defer l.cancel()
 
-	// count value of 10 runs into this issue on localhost
-	// https://github.com/libp2p/go-libp2p-pubsub/issues/96
+	// count value of 10 runs into issue (96) on localhost
 	// since localhost connection have short deadlines
 	count := 3
 

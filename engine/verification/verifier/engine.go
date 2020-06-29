@@ -135,7 +135,6 @@ func (e *Engine) verify(originID flow.Identifier, vc *verification.VerifiableChu
 	// extracts list of verifier nodes id
 	//
 	// TODO state extraction should be done based on block references
-	// https://github.com/dapperlabs/flow-go/issues/2787
 	consensusNodes, err := e.state.Final().
 		Identities(filter.HasRole(flow.RoleConsensus))
 	if err != nil {

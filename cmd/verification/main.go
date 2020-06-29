@@ -41,15 +41,13 @@ const (
 
 	// requestIntervalMs represents the time interval in milliseconds that the
 	// ingest engine retries sending resource requests to the network
-	// this value is set following this issue:
-	// https://github.com/dapperlabs/flow-go/issues/3443
+	// this value is set following issue (3443).
 	requestIntervalMs = 1000 * time.Millisecond
 
 	// failureThreshold represents the number of retries ingest engine sends
 	// at `requestIntervalMs` milliseconds for each of the missing resources.
 	// When it reaches the threshold ingest engine makes a missing challenge for the resources.
-	// this value is set following this issue:
-	// https://github.com/dapperlabs/flow-go/issues/3443
+	// this value is set following issue (3443).
 	failureThreshold = 2
 )
 
@@ -62,7 +60,7 @@ func main() {
 		err                 error
 		pendingReceipts     *stdmap.PendingReceipts
 		pendingResults      *stdmap.PendingResults
-		conCache            *buffer.PendingBlocks
+		pendingBlocks       *buffer.PendingBlocks
 		receiptIDsByBlock   *stdmap.IdentifierMap
 		receiptIDsByResult  *stdmap.IdentifierMap
 		pendingChunks       *match.Chunks
@@ -86,7 +84,7 @@ func main() {
 			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegisterer, node.Logger)
 			return nil
 		}).
-		Module("execution pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
+		Module("pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
 			pendingReceipts, err = stdmap.NewPendingReceipts(receiptLimit)
 			if err != nil {
 				return err
@@ -105,12 +103,24 @@ func main() {
 				return err
 			}
 
+			// registers size method of backend for metrics
+			err = node.Metrics.Mempool.Register(metrics.ResourcePendingReceiptIDsByBlock, receiptIDsByBlock.Size)
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
+			}
+
 			return nil
 		}).
 		Module("pending receipt ids by result mempool", func(node *cmd.FlowNodeBuilder) error {
 			receiptIDsByResult, err = stdmap.NewIdentifierMap(receiptLimit)
 			if err != nil {
 				return err
+			}
+
+			// registers size method of backend for metrics
+			err = node.Metrics.Mempool.Register(metrics.ResourcePendingReceiptIDsByResult, receiptIDsByResult.Size)
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
 			}
 
 			return nil
@@ -125,10 +135,10 @@ func main() {
 			}
 			return nil
 		}).
-		Module("match chunks mempool", func(node *cmd.FlowNodeBuilder) error {
+		Module("pending chunks mempool", func(node *cmd.FlowNodeBuilder) error {
 			pendingChunks = match.NewChunks(chunkLimit)
 
-			err = node.Metrics.Mempool.Register(metrics.ResourcePendingChunks, pendingChunks.Size)
+			err = node.Metrics.Mempool.Register(metrics.ResourcePendingChunk, pendingChunks.Size)
 			if err != nil {
 				return fmt.Errorf("could not register backend metric: %w", err)
 			}
@@ -140,15 +150,22 @@ func main() {
 				return err
 			}
 			// registers size method of backend for metrics
-			err = node.Metrics.Mempool.Register(metrics.ResourceProcessedResultIDs, processedResultsIDs.Size)
+			err = node.Metrics.Mempool.Register(metrics.ResourceProcessedResultID, processedResultsIDs.Size)
 			if err != nil {
 				return fmt.Errorf("could not register backend metric: %w", err)
 			}
 			return nil
 		}).
-		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
+		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
 			// consensus cache for follower engine
-			conCache = buffer.NewPendingBlocks()
+			pendingBlocks = buffer.NewPendingBlocks()
+
+			// registers size method of backend for metrics
+			err = node.Metrics.Mempool.Register(metrics.ResourcePendingBlock, pendingBlocks.Size)
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
+			}
+
 			return nil
 		}).
 		Module("header storage", func(node *cmd.FlowNodeBuilder) error {
@@ -254,7 +271,7 @@ func main() {
 				node.Storage.Headers,
 				node.Storage.Payloads,
 				node.State,
-				conCache,
+				pendingBlocks,
 				followerCore,
 				syncCore,
 			)

@@ -50,10 +50,6 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-const (
-	proposalTimeout = time.Second * 4
-)
-
 func main() {
 
 	var (
@@ -99,21 +95,39 @@ func main() {
 
 	cmd.FlowNode(flow.RoleCollection.String()).
 		ExtraFlags(func(flags *pflag.FlagSet) {
-			flags.UintVar(&txLimit, "tx-limit", 50000, "maximum number of transactions in the memory pool")
-			flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000", "the address the ingress server listens on")
-			flags.Uint64Var(&ingestConf.MaxGasLimit, "ingest-max-gas-limit", flow.DefaultMaxGasLimit, "maximum per-transaction gas limit")
-			flags.BoolVar(&ingestConf.CheckScriptsParse, "ingest-check-scripts-parse", true, "whether we check that inbound transactions are parse-able")
-			flags.BoolVar(&ingestConf.AllowUnknownReference, "ingest-allow-unknown-reference", true, "whether we ingest transactions referencing an unknown block")
-			flags.UintVar(&ingestConf.ExpiryBuffer, "ingest-expiry-buffer", 30, "expiry buffer for inbound transactions")
-			flags.UintVar(&ingestConf.PropagationRedundancy, "ingest-tx-propagation-redundancy", 2, "how many additional cluster members we propagate transactions to")
-			flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", 15, "expiry buffer for transactions in proposed collections")
-			flags.UintVar(&maxCollectionSize, "builder-max-collection-size", 100, "maximum number of transactions in proposed collections")
-			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second, "the initial timeout for the hotstuff pacemaker")
-			flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", proposalTimeout, "the lower timeout bound for the hotstuff pacemaker")
-			flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor", timeout.DefaultConfig.TimeoutIncrease, "multiplicative increase of timeout value in case of time out event")
-			flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor", timeout.DefaultConfig.TimeoutDecrease, "multiplicative decrease of timeout value in case of progress")
-			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", timeout.DefaultConfig.VoteAggregationTimeoutFraction, "additional fraction of replica timeout that the primary will wait for votes")
-			flags.DurationVar(&blockRateDelay, "block-rate-delay", 1000*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
+			flags.UintVar(&txLimit, "tx-limit", 50000,
+				"maximum number of transactions in the memory pool")
+			flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000",
+				"the address the ingress server listens on")
+			flags.Uint64Var(&ingestConf.MaxGasLimit, "ingest-max-gas-limit", flow.DefaultMaxGasLimit,
+				"maximum per-transaction gas limit")
+			flags.BoolVar(&ingestConf.CheckScriptsParse, "ingest-check-scripts-parse", true,
+				"whether we check that inbound transactions are parse-able")
+			flags.BoolVar(&ingestConf.AllowUnknownReference, "ingest-allow-unknown-reference", true,
+				"whether we ingest transactions referencing an unknown block")
+			flags.UintVar(&ingestConf.ExpiryBuffer, "ingest-expiry-buffer", 30,
+				"expiry buffer for inbound transactions")
+			flags.UintVar(&ingestConf.PropagationRedundancy, "ingest-tx-propagation-redundancy", 2,
+				"how many additional cluster members we propagate transactions to")
+			flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", 15,
+				"expiry buffer for transactions in proposed collections")
+			flags.UintVar(&maxCollectionSize, "builder-max-collection-size", 100,
+				"maximum number of transactions in proposed collections")
+			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second,
+				"the initial timeout for the hotstuff pacemaker")
+			flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond,
+				"the lower timeout bound for the hotstuff pacemaker")
+			flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor",
+				timeout.DefaultConfig.TimeoutIncrease,
+				"multiplicative increase of timeout value in case of time out event")
+			flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor",
+				timeout.DefaultConfig.TimeoutDecrease,
+				"multiplicative decrease of timeout value in case of progress")
+			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction",
+				timeout.DefaultConfig.VoteAggregationTimeoutFraction,
+				"additional fraction of replica timeout that the primary will wait for votes")
+			flags.DurationVar(&blockRateDelay, "block-rate-delay", 1000*time.Millisecond,
+				"the delay to broadcast block proposal in order to control block production rate")
 		}).
 		Module("transactions mempool", func(node *cmd.FlowNodeBuilder) error {
 			pool, err = stdmap.NewTransactions(txLimit)
@@ -133,16 +147,13 @@ func main() {
 			colBlocks = storagekv.NewClusterBlocks(node.DB, clusterID, colHeaders, colPayloads)
 			return nil
 		}).
-		Module("block mempool", func(node *cmd.FlowNodeBuilder) error {
-			colCache = buffer.NewPendingClusterBlocks()
-			conCache = buffer.NewPendingBlocks()
+		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
+			colCache = buffer.NewPendingClusterBlocks() // for cluster consensus
+			conCache = buffer.NewPendingBlocks()        // for following main chain consensus
 			return nil
 		}).
-		Module("collection node metrics", func(node *cmd.FlowNodeBuilder) error {
+		Module("metrics", func(node *cmd.FlowNodeBuilder) error {
 			colMetrics = metrics.NewCollectionCollector(node.Tracer)
-			return nil
-		}).
-		Module("hotstuff cluster metrics", func(node *cmd.FlowNodeBuilder) error {
 			clusterMetrics = metrics.NewHotstuffCollector(clusterID)
 			return nil
 		}).
@@ -198,7 +209,7 @@ func main() {
 
 			return nil
 		}).
-		Module("main chain sync engine", func(node *cmd.FlowNodeBuilder) error {
+		Module("main chain sync core", func(node *cmd.FlowNodeBuilder) error {
 			mainChainSyncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
@@ -279,8 +290,7 @@ func main() {
 		}).
 		Component("main chain sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
-			// create a block synchronization engine to handle follower getting
-			// out of sync
+			// create a block synchronization engine to handle follower getting out of sync
 			sync, err := consync.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -310,7 +320,7 @@ func main() {
 			)
 			return ing, err
 		}).
-		Component("ingress server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("transaction ingress server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			server := ingress.New(ingressConf, ing)
 			return server, nil
 		}).
@@ -378,6 +388,7 @@ func main() {
 
 			hot, err := consensus.NewParticipant(
 				node.Logger,
+				node.Tracer,
 				notifier,
 				clusterMetrics,
 				colHeaders,
