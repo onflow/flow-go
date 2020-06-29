@@ -7,8 +7,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/verification"
 )
 
-// TODO consolidate with PendingCollections to preserve DRY
-// https://github.com/dapperlabs/flow-go/issues/3690
 // PendingReceipts implements the execution receipts memory pool of the consensus node,
 // used to store execution receipts and to generate block seals.
 type PendingReceipts struct {

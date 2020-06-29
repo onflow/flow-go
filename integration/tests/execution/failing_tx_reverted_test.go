@@ -8,15 +8,19 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/integration/tests/common"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestExecutionFailingTxReverted(t *testing.T) {
-	suite.Run(t, new(FailingTxRevertedSuite))
+	suite.Run(t, &FailingTxRevertedSuite{
+		chainID: flow.Testnet,
+	})
 }
 
 type FailingTxRevertedSuite struct {
 	Suite
+	chainID flow.ChainID
 }
 
 func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
@@ -35,7 +39,7 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 
 	// send transaction that panics and should revert
 	tx := unittest.TransactionBodyFixture(
-		unittest.WithTransactionDSL(common.CreateCounterPanicTx),
+		unittest.WithTransactionDSL(common.CreateCounterPanicTx(s.chainID.Chain())),
 		unittest.WithReferenceBlock(s.net.Genesis().ID()),
 	)
 	err = s.AccessClient().SendTransaction(context.Background(), tx)
@@ -43,7 +47,7 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 
 	// send transaction that has no sigs and should not execute
 	tx = unittest.TransactionBodyFixture(
-		unittest.WithTransactionDSL(common.CreateCounterTx),
+		unittest.WithTransactionDSL(common.CreateCounterTx(s.chainID.Chain().ServiceAddress())),
 		unittest.WithReferenceBlock(s.net.Genesis().ID()),
 	)
 	tx.PayloadSignatures = nil

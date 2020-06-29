@@ -20,7 +20,7 @@ type handlerAccounts struct {
 	headers      storage.Headers
 }
 
-func (h *handlerAccounts) GetAccount(ctx context.Context, req *access.GetAccountRequest) (*access.GetAccountResponse, error) {
+func (h *handlerAccounts) GetAccountAtLatestBlock(ctx context.Context, req *access.GetAccountAtLatestBlockRequest) (*access.AccountResponse, error) {
 
 	address := req.GetAddress()
 
@@ -43,7 +43,40 @@ func (h *handlerAccounts) GetAccount(ctx context.Context, req *access.GetAccount
 		return nil, err
 	}
 
-	return &access.GetAccountResponse{
+	return &access.AccountResponse{
+		Account: account,
+	}, nil
+
+}
+
+func (h *handlerAccounts) GetAccountAtBlockHeight(ctx context.Context,
+	req *access.GetAccountAtBlockHeightRequest) (*access.AccountResponse, error) {
+
+	address := req.GetAddress()
+
+	if len(address) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "account address is required")
+	}
+
+	height := req.GetBlockHeight()
+
+	// get header at given height
+	header, err := h.headers.ByHeight(height)
+	if err != nil {
+		err = convertStorageError(err)
+		return nil, err
+	}
+
+	// get block ID of the header at the given height
+	blockID := header.ID()
+
+	account, err := h.getAccountAtBlockID(ctx, address, blockID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.AccountResponse{
 		Account: account,
 	}, nil
 

@@ -155,7 +155,6 @@ func (id *addressedChain) AddressAtIndex(index uint64) (Address, error) {
 func (id *addressedChain) ServiceAddress() Address {
 	// returned error is guaranteed to be nil
 	address, _ := id.AddressAtIndex(1)
-	fmt.Printf("getting service address: %s\n", address)
 	return address
 }
 

@@ -11,8 +11,6 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-// TODO consolidate with PendingCollections to preserve DRY
-// https://github.com/dapperlabs/flow-go/issues/3690
 // TestPendingReceiptsLRUEject evaluates the ejection mechanism of PendingReceipts mempool
 // every time the mempool gets full, the oldest entry should be ejected
 func TestPendingReceiptsLRUEject(t *testing.T) {

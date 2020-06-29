@@ -28,5 +28,5 @@ func TestNestedWrappedMultiError(t *testing.T) {
 	require.True(t, IsPeerUnreachableError(err))
 	var outerError *multierror.Error
 	outerError = multierror.Append(outerError, fmt.Errorf("inner: %w", err))
-	require.True(t, AllPeerUnreachableError(outerError))
+	require.True(t, AllPeerUnreachableError(outerError.WrappedErrors()...))
 }

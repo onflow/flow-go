@@ -14,7 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	protocolRecovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
-	"github.com/dapperlabs/flow-go/engine/common/synchronization"
+	synceng "github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/verification/finder"
 	"github.com/dapperlabs/flow-go/engine/verification/match"
@@ -28,6 +28,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
+	"github.com/dapperlabs/flow-go/module/synchronization"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
@@ -40,15 +41,13 @@ const (
 
 	// requestIntervalMs represents the time interval in milliseconds that the
 	// ingest engine retries sending resource requests to the network
-	// this value is set following this issue:
-	// https://github.com/dapperlabs/flow-go/issues/3443
+	// this value is set following issue (3443).
 	requestIntervalMs = 1000 * time.Millisecond
 
 	// failureThreshold represents the number of retries ingest engine sends
 	// at `requestIntervalMs` milliseconds for each of the missing resources.
 	// When it reaches the threshold ingest engine makes a missing challenge for the resources.
-	// this value is set following this issue:
-	// https://github.com/dapperlabs/flow-go/issues/3443
+	// this value is set following issue (3443).
 	failureThreshold = 2
 )
 
@@ -61,7 +60,7 @@ func main() {
 		err                 error
 		pendingReceipts     *stdmap.PendingReceipts
 		pendingResults      *stdmap.PendingResults
-		conCache            *buffer.PendingBlocks
+		pendingBlocks       *buffer.PendingBlocks
 		receiptIDsByBlock   *stdmap.IdentifierMap
 		receiptIDsByResult  *stdmap.IdentifierMap
 		pendingChunks       *match.Chunks
@@ -70,6 +69,8 @@ func main() {
 		finderEng           *finder.Engine
 		verifierEng         *verifier.Engine
 		matchEng            *match.Engine
+		followerEng         *followereng.Engine
+		syncCore            *synchronization.Core
 		collector           module.VerificationMetrics
 	)
 
@@ -83,7 +84,7 @@ func main() {
 			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegisterer, node.Logger)
 			return nil
 		}).
-		Module("execution pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
+		Module("pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
 			pendingReceipts, err = stdmap.NewPendingReceipts(receiptLimit)
 			if err != nil {
 				return err
@@ -102,12 +103,24 @@ func main() {
 				return err
 			}
 
+			// registers size method of backend for metrics
+			err = node.Metrics.Mempool.Register(metrics.ResourcePendingReceiptIDsByBlock, receiptIDsByBlock.Size)
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
+			}
+
 			return nil
 		}).
 		Module("pending receipt ids by result mempool", func(node *cmd.FlowNodeBuilder) error {
 			receiptIDsByResult, err = stdmap.NewIdentifierMap(receiptLimit)
 			if err != nil {
 				return err
+			}
+
+			// registers size method of backend for metrics
+			err = node.Metrics.Mempool.Register(metrics.ResourcePendingReceiptIDsByResult, receiptIDsByResult.Size)
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
 			}
 
 			return nil
@@ -122,10 +135,10 @@ func main() {
 			}
 			return nil
 		}).
-		Module("match chunks mempool", func(node *cmd.FlowNodeBuilder) error {
+		Module("pending chunks mempool", func(node *cmd.FlowNodeBuilder) error {
 			pendingChunks = match.NewChunks(chunkLimit)
 
-			err = node.Metrics.Mempool.Register(metrics.ResourcePendingChunks, pendingChunks.Size)
+			err = node.Metrics.Mempool.Register(metrics.ResourcePendingChunk, pendingChunks.Size)
 			if err != nil {
 				return fmt.Errorf("could not register backend metric: %w", err)
 			}
@@ -137,20 +150,31 @@ func main() {
 				return err
 			}
 			// registers size method of backend for metrics
-			err = node.Metrics.Mempool.Register(metrics.ResourceProcessedResultIDs, processedResultsIDs.Size)
+			err = node.Metrics.Mempool.Register(metrics.ResourceProcessedResultID, processedResultsIDs.Size)
 			if err != nil {
 				return fmt.Errorf("could not register backend metric: %w", err)
 			}
 			return nil
 		}).
-		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
+		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
 			// consensus cache for follower engine
-			conCache = buffer.NewPendingBlocks()
+			pendingBlocks = buffer.NewPendingBlocks()
+
+			// registers size method of backend for metrics
+			err = node.Metrics.Mempool.Register(metrics.ResourcePendingBlock, pendingBlocks.Size)
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
+			}
+
 			return nil
 		}).
 		Module("header storage", func(node *cmd.FlowNodeBuilder) error {
 			headerStorage = storage.NewHeaders(node.Metrics.Cache, node.DB)
 			return nil
+		}).
+		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
+			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
+			return err
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rt := runtime.NewInterpreterRuntime()
@@ -227,7 +251,7 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, node.Storage.Headers, final, verifier, finderEng, node.GenesisBlock.Header, node.GenesisQC, finalized, pending)
+			followerCore, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, node.Storage.Headers, final, verifier, finderEng, node.GenesisBlock.Header, node.GenesisQC, finalized, pending)
 			if err != nil {
 				// return nil, fmt.Errorf("could not create follower core logic: %w", err)
 				// TODO for now we ignore failures in follower
@@ -237,7 +261,8 @@ func main() {
 				node.Logger.Debug().Err(err).Msg("ignoring failures in follower core")
 			}
 
-			followerEng, err := followereng.New(node.Logger,
+			followerEng, err = followereng.New(
+				node.Logger,
 				node.Network,
 				node.Me,
 				node.Metrics.Engine,
@@ -246,26 +271,31 @@ func main() {
 				node.Storage.Headers,
 				node.Storage.Payloads,
 				node.State,
-				conCache,
-				core)
+				pendingBlocks,
+				followerCore,
+				syncCore,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
 
-			// create a block synchronization engine to handle follower getting
-			// out of sync
-			sync, err := synchronization.New(node.Logger,
+			return followerEng, nil
+		}).
+		Component("sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			sync, err := synceng.New(
+				node.Logger,
 				node.Metrics.Engine,
 				node.Network,
 				node.Me,
 				node.State,
 				node.Storage.Blocks,
-				followerEng)
+				followerEng,
+				syncCore,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
-
-			return followerEng.WithSynchronization(sync), nil
+			return sync, nil
 		}).
 		Run()
 }
