@@ -7,6 +7,7 @@ import (
 type Options struct {
 	astCache                         ASTCache
 	blocks                           Blocks
+	metrics                          *MetricsCollector
 	gasLimit                         uint64
 	blockHeader                      *flow.Header
 	signatureVerificationEnabled     bool
@@ -55,6 +56,13 @@ func WithBlockHeader(header *flow.Header) Option {
 func WithBlocks(blocks Blocks) Option {
 	return func(opts Options) Options {
 		opts.blocks = blocks
+		return opts
+	}
+}
+
+func WithMetricsCollector(mc *MetricsCollector) Option {
+	return func(opts Options) Options {
+		opts.metrics = mc
 		return opts
 	}
 }

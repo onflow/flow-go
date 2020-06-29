@@ -49,10 +49,10 @@ func (m metricsCollector) ProgramInterpreted(location ast.Location, duration tim
 func (m metricsCollector) ValueEncoded(duration time.Duration) {}
 func (m metricsCollector) ValueDecoded(duration time.Duration) {}
 
-type emptyMetricsCollector struct{}
+type noopMetricsCollector struct{}
 
-func (m emptyMetricsCollector) ProgramParsed(location ast.Location, duration time.Duration)      {}
-func (m emptyMetricsCollector) ProgramChecked(location ast.Location, duration time.Duration)     {}
-func (m emptyMetricsCollector) ProgramInterpreted(location ast.Location, duration time.Duration) {}
-func (m emptyMetricsCollector) ValueEncoded(duration time.Duration)                              {}
-func (m emptyMetricsCollector) ValueDecoded(duration time.Duration)                              {}
+func (m noopMetricsCollector) ProgramParsed(location ast.Location, duration time.Duration)      {}
+func (m noopMetricsCollector) ProgramChecked(location ast.Location, duration time.Duration)     {}
+func (m noopMetricsCollector) ProgramInterpreted(location ast.Location, duration time.Duration) {}
+func (m noopMetricsCollector) ValueEncoded(duration time.Duration)                              {}
+func (m noopMetricsCollector) ValueDecoded(duration time.Duration)                              {}

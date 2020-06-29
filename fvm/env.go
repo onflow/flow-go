@@ -20,6 +20,8 @@ type hostEnv struct {
 	astCache ASTCache
 	blocks   Blocks
 
+	runtime.Metrics
+
 	gasLimit    uint64
 	uuid        uint64
 	blockHeader *flow.Header
@@ -37,6 +39,7 @@ func newEnvironment(ledger Ledger, opts Options) *hostEnv {
 		ledger:                     ledger,
 		astCache:                   opts.astCache,
 		blocks:                     opts.blocks,
+		Metrics:                    &noopMetricsCollector{},
 		gasLimit:                   opts.gasLimit,
 		restrictContractDeployment: opts.restrictedDeploymentEnabled,
 		restrictAccountCreation:    opts.restrictedAccountCreationEnabled,
@@ -44,6 +47,10 @@ func newEnvironment(ledger Ledger, opts Options) *hostEnv {
 
 	if opts.blockHeader != nil {
 		return env.setBlockHeader(opts.blockHeader)
+	}
+
+	if opts.metrics != nil {
+		env.Metrics = &metricsCollector{opts.metrics}
 	}
 
 	return env
