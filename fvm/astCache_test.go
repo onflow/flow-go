@@ -25,7 +25,7 @@ func TestTransactionASTCache(t *testing.T) {
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt, chain)
+	vm := fvm.New(rt)
 
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
@@ -42,7 +42,6 @@ func TestTransactionASTCache(t *testing.T) {
             `),
 		}
 
-		chain := flow.Mainnet.Chain()
 		err := testutil.SignTransactionAsServiceAccount(tx, 0, chain)
 		require.NoError(t, err)
 
@@ -63,7 +62,6 @@ func TestTransactionASTCache(t *testing.T) {
 		require.NotNil(t, program)
 		require.NoError(t, err)
 	})
-
 }
 
 func TestScriptASTCache(t *testing.T) {
@@ -71,7 +69,7 @@ func TestScriptASTCache(t *testing.T) {
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt, chain)
+	vm := fvm.New(rt)
 
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
@@ -85,7 +83,7 @@ func TestScriptASTCache(t *testing.T) {
 			}
 		`)
 
-		ledger := testutil.RootBootstrappedLedger(flow.Mainnet.Chain())
+		ledger := testutil.RootBootstrappedLedger(chain)
 
 		result, err := ctx.Invoke(fvm.Script(script), ledger)
 		require.NoError(t, err)
@@ -108,7 +106,7 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt, chain)
+	vm := fvm.New(rt)
 
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
@@ -169,7 +167,7 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 	rt := runtime.NewInterpreterRuntime()
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt, chain)
+	vm := fvm.New(rt)
 
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(b, err)
@@ -246,7 +244,7 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt, chain)
+	vm := fvm.New(rt)
 
 	ctx := vm.NewContext(fvm.WithASTCache(&nonFunctioningCache{}))
 
@@ -303,7 +301,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt, chain)
+	vm := fvm.New(rt)
 
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)

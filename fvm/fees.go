@@ -49,17 +49,23 @@ func deductAccountCreationFeeTransaction(address flow.Address, restrictedAccount
 		script = deductAccountCreationFeeTransactionTemplate
 	}
 
+	// TODO: remove hard-coded chain
+	chain := flow.Mainnet.Chain()
+
 	tx := flow.NewTransactionBody().
-		SetScript([]byte(fmt.Sprintf(script, flow.ServiceAddress()))).
+		SetScript([]byte(fmt.Sprintf(script, chain.ServiceAddress()))).
 		AddAuthorizer(address)
 
 	return Transaction(tx)
 }
 
 func deductTransactionFeeTransaction(address flow.Address) InvokableTransaction {
+	// TODO: remove hard-coded chain
+	chain := flow.Mainnet.Chain()
+
 	return Transaction(
 		flow.NewTransactionBody().
-			SetScript([]byte(fmt.Sprintf(deductTransactionFeeTransactionTemplate, flow.ServiceAddress()))).
+			SetScript([]byte(fmt.Sprintf(deductTransactionFeeTransactionTemplate, chain.ServiceAddress()))).
 			AddAuthorizer(address),
 	)
 }

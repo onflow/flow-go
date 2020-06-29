@@ -2,6 +2,7 @@ package fvm_test
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/onflow/cadence"
@@ -23,6 +24,9 @@ import (
 
 func TestBlockContext_ExecuteTransaction(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
+
+	chain := flow.Mainnet.Chain()
+
 	vm := fvm.New(rt)
 
 	cache, err := fvm.NewLRUASTCache(CacheSize)
@@ -39,10 +43,10 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
             `)).
 			AddAuthorizer(unittest.AddressFixture())
 
-		err := execTestutil.SignTransactionByRoot(tx, 0)
+		err := execTestutil.SignTransactionAsServiceAccount(tx, 0, chain)
 		require.NoError(t, err)
 
-		ledger := execTestutil.RootBootstrappedLedger()
+		ledger := execTestutil.RootBootstrappedLedger(chain)
 
 		var result *fvm.InvocationResult
 		result, err = ctx.Invoke(fvm.Transaction(tx), ledger)
@@ -72,10 +76,10 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
                 }
             `))
 
-		err := execTestutil.SignTransactionByRoot(tx, 0)
+		err := execTestutil.SignTransactionAsServiceAccount(tx, 0, chain)
 		require.NoError(t, err)
 
-		ledger := execTestutil.RootBootstrappedLedger()
+		ledger := execTestutil.RootBootstrappedLedger(chain)
 
 		var result *fvm.InvocationResult
 		result, err = ctx.Invoke(fvm.Transaction(tx), ledger)
@@ -96,10 +100,10 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
                 }
             `))
 
-		err := execTestutil.SignTransactionByRoot(tx, 0)
+		err := execTestutil.SignTransactionAsServiceAccount(tx, 0, chain)
 		require.NoError(t, err)
 
-		ledger := execTestutil.RootBootstrappedLedger()
+		ledger := execTestutil.RootBootstrappedLedger(chain)
 
 		var result *fvm.InvocationResult
 		result, err = ctx.Invoke(fvm.Transaction(tx), ledger)
@@ -119,12 +123,12 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 				  }
                 }
             `)).
-			AddAuthorizer(flow.ServiceAddress())
+			AddAuthorizer(chain.ServiceAddress())
 
-		err := execTestutil.SignTransactionByRoot(tx, 0)
+		err := execTestutil.SignTransactionAsServiceAccount(tx, 0, chain)
 		require.NoError(t, err)
 
-		ledger := execTestutil.RootBootstrappedLedger()
+		ledger := execTestutil.RootBootstrappedLedger(chain)
 
 		var result *fvm.InvocationResult
 		result, err = ctx.Invoke(fvm.Transaction(tx), ledger)
@@ -144,31 +148,33 @@ func TestBlockContext_DeployContract(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 	vm := fvm.New(rt)
 
+	chain := flow.Mainnet.Chain()
+
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
 	ctx := vm.NewContext(fvm.WithASTCache(cache))
 
 	t.Run("account update with set code succeeds as service account", func(t *testing.T) {
-		ledger := execTestutil.RootBootstrappedLedger()
+		ledger := execTestutil.RootBootstrappedLedger(chain)
 
 		// Create an account private key.
 		privateKeys, err := execTestutil.GenerateAccountPrivateKeys(1)
 		require.NoError(t, err)
 
 		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := execTestutil.CreateAccounts(vm, ledger, privateKeys)
+		accounts, err := execTestutil.CreateAccounts(vm, ledger, privateKeys, chain)
 		require.NoError(t, err)
 
-		tx := execTestutil.DeployCounterContractTransaction(accounts[0])
+		tx := execTestutil.DeployCounterContractTransaction(accounts[0], chain)
 
-		tx.SetProposalKey(flow.ServiceAddress(), 0, 0)
-		tx.SetPayer(flow.ServiceAddress())
+		tx.SetProposalKey(chain.ServiceAddress(), 0, 0)
+		tx.SetPayer(chain.ServiceAddress())
 
 		err = execTestutil.SignPayload(tx, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
-		err = execTestutil.SignEnvelope(tx, flow.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		err = execTestutil.SignEnvelope(tx, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
 		var result *fvm.InvocationResult
@@ -183,14 +189,14 @@ func TestBlockContext_DeployContract(t *testing.T) {
 	})
 
 	t.Run("account update with set code fails if not signed by service account", func(t *testing.T) {
-		ledger := execTestutil.RootBootstrappedLedger()
+		ledger := execTestutil.RootBootstrappedLedger(chain)
 
 		// Create an account private key.
 		privateKeys, err := execTestutil.GenerateAccountPrivateKeys(1)
 		require.NoError(t, err)
 
 		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := execTestutil.CreateAccounts(vm, ledger, privateKeys)
+		accounts, err := execTestutil.CreateAccounts(vm, ledger, privateKeys, chain)
 		require.NoError(t, err)
 
 		tx := execTestutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
@@ -215,6 +221,8 @@ func TestBlockContext_DeployContract(t *testing.T) {
 func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 	vm := fvm.New(rt)
+
+	chain := flow.Mainnet.Chain()
 
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
@@ -268,10 +276,10 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 					execute { log(x); log(y) }
 				}`,
 			args:        [][]byte{arg1, arg2},
-			authorizers: []flow.Address{flow.ServiceAddress()},
+			authorizers: []flow.Address{chain.ServiceAddress()},
 			check: func(t *testing.T, result *fvm.InvocationResult) {
 				require.Nil(t, result.Error)
-				assert.ElementsMatch(t, []string{"0x" + flow.ServiceAddress().Hex(), "42", `"foo"`}, result.Logs)
+				assert.ElementsMatch(t, []string{"0x" + chain.ServiceAddress().Hex(), "42", `"foo"`}, result.Logs)
 			},
 		},
 	}
@@ -286,9 +294,9 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 				tx.AddAuthorizer(authorizer)
 			}
 
-			ledger := execTestutil.RootBootstrappedLedger()
+			ledger := execTestutil.RootBootstrappedLedger(chain)
 
-			err := execTestutil.SignTransactionByRoot(tx, 0)
+			err := execTestutil.SignTransactionAsServiceAccount(tx, 0, chain)
 			require.NoError(t, err)
 
 			result, err := ctx.Invoke(fvm.Transaction(tx), ledger)
@@ -316,6 +324,8 @@ func gasLimitScript(depth int) string {
 func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 	vm := fvm.New(rt)
+
+	chain := flow.Mainnet.Chain()
 
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
@@ -362,9 +372,9 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 				SetScript([]byte(tt.script)).
 				SetGasLimit(tt.gasLimit)
 
-			ledger := execTestutil.RootBootstrappedLedger()
+			ledger := execTestutil.RootBootstrappedLedger(chain)
 
-			err := execTestutil.SignTransactionByRoot(tx, 0)
+			err := execTestutil.SignTransactionAsServiceAccount(tx, 0, chain)
 			require.NoError(t, err)
 
 			result, err := ctx.Invoke(fvm.Transaction(tx), ledger)
@@ -379,6 +389,8 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 	vm := fvm.New(rt)
 
+	chain := flow.Mainnet.Chain()
+
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
@@ -387,8 +399,8 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 	privateKeys, err := execTestutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 
-	ledger := execTestutil.RootBootstrappedLedger()
-	accounts, err := execTestutil.CreateAccounts(vm, ledger, privateKeys)
+	ledger := execTestutil.RootBootstrappedLedger(chain)
+	accounts, err := execTestutil.CreateAccounts(vm, ledger, privateKeys, chain)
 	require.NoError(t, err)
 
 	createAccountScript := []byte(`
@@ -422,16 +434,16 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 	addAccountCreator := func(account flow.Address, seqNum uint64) {
 		script := []byte(
 			fmt.Sprintf(addAccountCreatorTemplate,
-				flow.ServiceAddress().String(),
+				chain.ServiceAddress().String(),
 				account.String(),
 			),
 		)
 
 		validTx := flow.NewTransactionBody().
 			SetScript(script).
-			AddAuthorizer(flow.ServiceAddress())
+			AddAuthorizer(chain.ServiceAddress())
 
-		err = execTestutil.SignTransactionByRoot(validTx, seqNum)
+		err = execTestutil.SignTransactionAsServiceAccount(validTx, seqNum, chain)
 		require.NoError(t, err)
 
 		result, err := ctx.Invoke(fvm.Transaction(validTx), ledger)
@@ -466,16 +478,16 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 		script := []byte(
 			fmt.Sprintf(
 				removeAccountCreatorTemplate,
-				flow.ServiceAddress(),
+				chain.ServiceAddress(),
 				account.String(),
 			),
 		)
 
 		validTx := flow.NewTransactionBody().
 			SetScript(script).
-			AddAuthorizer(flow.ServiceAddress())
+			AddAuthorizer(chain.ServiceAddress())
 
-		err = execTestutil.SignTransactionByRoot(validTx, seqNum)
+		err = execTestutil.SignTransactionAsServiceAccount(validTx, seqNum, chain)
 		require.NoError(t, err)
 
 		result, err := ctx.Invoke(fvm.Transaction(validTx), ledger)
@@ -492,7 +504,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 		err = execTestutil.SignPayload(invalidTx, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
-		err = execTestutil.SignTransactionByRoot(invalidTx, 0)
+		err = execTestutil.SignTransactionAsServiceAccount(invalidTx, 0, chain)
 		require.NoError(t, err)
 
 		result, err := ctx.Invoke(fvm.Transaction(invalidTx), ledger)
@@ -504,9 +516,9 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 	t.Run("Valid account creator", func(t *testing.T) {
 		validTx := flow.NewTransactionBody().
 			SetScript(createAccountScript).
-			AddAuthorizer(flow.ServiceAddress())
+			AddAuthorizer(chain.ServiceAddress())
 
-		err = execTestutil.SignTransactionByRoot(validTx, 0)
+		err = execTestutil.SignTransactionAsServiceAccount(validTx, 0, chain)
 		require.NoError(t, err)
 
 		result, err := ctx.Invoke(fvm.Transaction(validTx), ledger)
@@ -556,6 +568,8 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 	vm := fvm.New(rt)
 
+	chain := flow.Mainnet.Chain()
+
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
@@ -568,7 +582,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 			}
 		`)
 
-		ledger := execTestutil.RootBootstrappedLedger()
+		ledger := execTestutil.RootBootstrappedLedger(chain)
 
 		result, err := ctx.Invoke(fvm.Script(script), ledger)
 		assert.NoError(t, err)
@@ -583,7 +597,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 			}
 		`)
 
-		ledger := execTestutil.RootBootstrappedLedger()
+		ledger := execTestutil.RootBootstrappedLedger(chain)
 
 		result, err := ctx.Invoke(fvm.Script(script), ledger)
 
@@ -601,7 +615,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 			}
 		`)
 
-		ledger := execTestutil.RootBootstrappedLedger()
+		ledger := execTestutil.RootBootstrappedLedger(chain)
 
 		result, err := ctx.Invoke(fvm.Script(script), ledger)
 		assert.NoError(t, err)
@@ -614,6 +628,8 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 func TestBlockContext_GetBlockInfo(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
+
+	chain := flow.Mainnet.Chain()
 
 	block1 := unittest.BlockFixture()
 	block2 := unittest.BlockWithParentFixture(block1.Header)
@@ -649,10 +665,10 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 				}
 			`))
 
-		err := execTestutil.SignTransactionByRoot(tx, 0)
+		err := execTestutil.SignTransactionAsServiceAccount(tx, 0, chain)
 		require.NoError(t, err)
 
-		ledger := execTestutil.RootBootstrappedLedger()
+		ledger := execTestutil.RootBootstrappedLedger(chain)
 		require.NoError(t, err)
 
 		result, err := blockCtx.Invoke(fvm.Transaction(tx), ledger)
@@ -678,7 +694,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 			}
 		`)
 
-		ledger := execTestutil.RootBootstrappedLedger()
+		ledger := execTestutil.RootBootstrappedLedger(chain)
 
 		result, err := blockCtx.Invoke(fvm.Script(script), ledger)
 		assert.NoError(t, err)
@@ -703,10 +719,10 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 				}
 			`))
 
-		err := execTestutil.SignTransactionByRoot(tx, 0)
+		err := execTestutil.SignTransactionAsServiceAccount(tx, 0, chain)
 		require.NoError(t, err)
 
-		ledger := execTestutil.RootBootstrappedLedger()
+		ledger := execTestutil.RootBootstrappedLedger(chain)
 		require.NoError(t, err)
 
 		assert.PanicsWithValue(t, interpreter.ExternalError{
@@ -724,7 +740,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 			}
 		`)
 
-		ledger := execTestutil.RootBootstrappedLedger()
+		ledger := execTestutil.RootBootstrappedLedger(chain)
 
 		assert.PanicsWithValue(t, interpreter.ExternalError{
 			Recovered: logPanic{},
@@ -735,8 +751,11 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 }
 
 func TestBlockContext_GetAccount(t *testing.T) {
-	count := 100
+	const count = 100
+
 	rt := runtime.NewInterpreterRuntime()
+
+	chain := flow.Mainnet.Chain()
 
 	vm := fvm.New(rt)
 
@@ -747,21 +766,20 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	sequenceNumber := uint64(0)
 
-	ledger := execTestutil.RootBootstrappedLedger()
+	ledger := execTestutil.RootBootstrappedLedger(chain)
 
 	createAccount := func() (flow.Address, crypto.PublicKey) {
-		privateKey, tx := execTestutil.CreateAccountCreationTransaction(t)
+		privateKey, tx := execTestutil.CreateAccountCreationTransaction(t, chain)
 
-		err := execTestutil.SignTransactionByRoot(tx, sequenceNumber)
+		err := execTestutil.SignTransactionAsServiceAccount(tx, sequenceNumber, chain)
 		require.NoError(t, err)
 
 		sequenceNumber++
 
-		rootHasher, err := hash.NewHasher(unittest.ServiceAccountPrivateKey.HashAlgo)
-		require.NoError(t, err)
+		rootHasher := hash.NewSHA2_256()
 
 		err = tx.SignEnvelope(
-			flow.ServiceAddress(),
+			chain.ServiceAddress(),
 			0,
 			unittest.ServiceAccountPrivateKey.PrivateKey,
 			rootHasher,
@@ -787,7 +805,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		return address, privateKey.PublicKey(fvm.AccountKeyWeightThreshold).PublicKey
 	}
 
-	addressGen := flow.NewAddressGenerator()
+	addressGen := chain.NewAddressGenerator()
 	// skip the addresses of 4 reserved accounts
 	for i := 0; i < 4; i++ {
 		_, err := addressGen.NextAddress()
