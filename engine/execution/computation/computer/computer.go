@@ -15,7 +15,6 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/module/trace"
-	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
