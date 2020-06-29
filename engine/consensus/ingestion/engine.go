@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -135,8 +134,7 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	span := e.tracer.StartSpan(guarantee.CollectionID, trace.CONProcessCollection)
 	// TODO finish span if we error? How are they shown in Jaeger?
 	span.SetTag("collection_id", guarantee.CollectionID)
-	childSpan := e.tracer.StartSpan(guarantee.CollectionID, trace.CONIngOnCollectionGuarantee,
-		opentracing.ChildOf(span.Context()))
+	childSpan := e.tracer.StartSpanFromParent(span, trace.CONIngOnCollectionGuarantee)
 	defer childSpan.Finish()
 
 	log := e.log.With().

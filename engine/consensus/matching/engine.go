@@ -351,7 +351,7 @@ func (e *Engine) checkSealing() {
 		}
 		for _, id := range index.CollectionIDs {
 			// For each collection, we load the trace.CONProcessCollection span. If we find it, we start a child span
-			// that will run until this functiosn returns.
+			// that will run until this function returns.
 			if span, ok := e.tracer.GetSpan(id, trace.CONProcessCollection); ok {
 				childSpan := e.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing, opentracing.StartTime(
 					start))
