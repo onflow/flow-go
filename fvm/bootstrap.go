@@ -16,6 +16,7 @@ import (
 type BootstrapProcedure struct {
 	metaCtx Context
 	ledger  Ledger
+	chain   flow.Chain
 
 	// genesis parameters
 	serviceAccountPublicKey flow.AccountPublicKey
@@ -47,12 +48,10 @@ func (b *BootstrapProcedure) Invoke(ctx Context, ledger Ledger) (*InvocationResu
 	)
 
 	b.ledger = ledger
-
-	// TODO: remove hard-coded chain
-	chain := flow.Mainnet.Chain()
+	b.chain = ctx.Options().chain
 
 	// initialize the account addressing state
-	setAddressState(ledger, chain.NewAddressGenerator())
+	setAddressState(ledger, b.chain.NewAddressGenerator())
 
 	service := b.createServiceAccount(b.serviceAccountPublicKey)
 
@@ -70,7 +69,7 @@ func (b *BootstrapProcedure) Invoke(ctx Context, ledger Ledger) (*InvocationResu
 }
 
 func (b *BootstrapProcedure) createAccount() flow.Address {
-	address, err := createAccount(b.ledger, nil)
+	address, err := createAccount(b.ledger, b.chain, nil)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create account: %s", err))
 	}
@@ -79,7 +78,7 @@ func (b *BootstrapProcedure) createAccount() flow.Address {
 }
 
 func (b *BootstrapProcedure) createServiceAccount(accountKey flow.AccountPublicKey) flow.Address {
-	address, err := createAccount(b.ledger, []flow.AccountPublicKey{accountKey})
+	address, err := createAccount(b.ledger, b.chain, []flow.AccountPublicKey{accountKey})
 	if err != nil {
 		panic(fmt.Sprintf("failed to create service account: %s", err))
 	}

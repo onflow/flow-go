@@ -18,6 +18,7 @@ import (
 var _ runtime.Interface = &hostEnv{}
 
 type hostEnv struct {
+	chain    flow.Chain
 	ledger   Ledger
 	astCache ASTCache
 	blocks   Blocks
@@ -40,6 +41,7 @@ type hostEnv struct {
 func newEnvironment(ledger Ledger, opts Options) *hostEnv {
 	env := &hostEnv{
 		ledger:                     ledger,
+		chain:                      opts.chain,
 		astCache:                   opts.astCache,
 		blocks:                     opts.blocks,
 		Metrics:                    &noopMetricsCollector{},
@@ -76,7 +78,14 @@ func (e *hostEnv) setTransaction(
 	tx *flow.TransactionBody,
 	txCtx Context,
 ) *hostEnv {
-	e.transactionEnv = newTransactionEnv(e.ledger, tx, txCtx, e.restrictContractDeployment, e.restrictAccountCreation)
+	e.transactionEnv = newTransactionEnv(
+		e.ledger,
+		e.chain,
+		tx,
+		txCtx,
+		e.restrictContractDeployment,
+		e.restrictAccountCreation,
+	)
 	return e
 }
 
@@ -264,6 +273,7 @@ func (e *hostEnv) GetSigningAccounts() []runtime.Address {
 
 type transactionEnv struct {
 	ledger Ledger
+	chain  flow.Chain
 	tx     *flow.TransactionBody
 
 	// txCtx is an execution context used to execute meta transactions
@@ -277,6 +287,7 @@ type transactionEnv struct {
 
 func newTransactionEnv(
 	ledger Ledger,
+	chain flow.Chain,
 	tx *flow.TransactionBody,
 	txCtx Context,
 	restrictContractDeployment bool,
@@ -284,6 +295,7 @@ func newTransactionEnv(
 ) *transactionEnv {
 	return &transactionEnv{
 		ledger:                     ledger,
+		chain:                      chain,
 		tx:                         tx,
 		txCtx:                      txCtx,
 		restrictContractDeployment: restrictContractDeployment,
@@ -311,7 +323,7 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	var result *InvocationResult
 
 	result, err = e.txCtx.Invoke(
-		deductAccountCreationFeeTransaction(flow.Address(payer), e.restrictAccountCreation),
+		deductAccountCreationFeeTransaction(flow.Address(payer), e.chain.ServiceAddress(), e.restrictAccountCreation),
 		e.ledger,
 	)
 	if err != nil {
@@ -336,12 +348,12 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 
 	var flowAddress flow.Address
 
-	flowAddress, err = createAccount(e.ledger, nil)
+	flowAddress, err = createAccount(e.ledger, e.chain, nil)
 	if err != nil {
 		return address, err
 	}
 
-	result, err = e.txCtx.Invoke(initFlowTokenTransaction(flowAddress), e.ledger)
+	result, err = e.txCtx.Invoke(initFlowTokenTransaction(flowAddress, e.chain.ServiceAddress()), e.ledger)
 	if err != nil {
 		return address, err
 	}
@@ -453,16 +465,13 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, index int) (p
 // This function returns an error if the specified account does not exist or is
 // not a valid signing account.
 func (e *transactionEnv) UpdateAccountCode(address runtime.Address, code []byte) (err error) {
-	accountAddress := flow.Address(address)
-
-	// TODO: remove hard-coded chain
-	chain := flow.Mainnet.Chain()
-
 	// currently, every transaction that sets account code (deploys/updates contracts)
 	// must be signed by the service account
-	if e.restrictContractDeployment && !e.isValidSigningAccount(runtime.Address(chain.ServiceAddress())) {
+	if e.restrictContractDeployment && !e.isValidSigningAccount(runtime.Address(e.chain.ServiceAddress())) {
 		return fmt.Errorf("code deployment requires authorization from the service account")
 	}
+
+	accountAddress := flow.Address(address)
 
 	return setAccountCode(e.ledger, accountAddress, code)
 }

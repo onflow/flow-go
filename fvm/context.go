@@ -46,7 +46,7 @@ func (ctx *context) Invoke(i Invokable, ledger Ledger) (*InvocationResult, error
 }
 
 func (ctx *context) GetAccount(address flow.Address, ledger Ledger) (*flow.Account, error) {
-	account, err := getAccount(ctx, ledger, address)
+	account, err := getAccount(ctx, ledger, ctx.opts.chain, address)
 	if err != nil {
 		// TODO: wrap error
 		return nil, err

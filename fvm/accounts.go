@@ -21,7 +21,7 @@ func keyPublicKey(index uint64) string {
 	return fmt.Sprintf("public_key_%d", index)
 }
 
-func getAccount(ctx Context, ledger Ledger, address flow.Address) (*flow.Account, error) {
+func getAccount(ctx Context, ledger Ledger, chain flow.Chain, address flow.Address) (*flow.Account, error) {
 	var ok bool
 	var err error
 
@@ -45,7 +45,7 @@ func getAccount(ctx Context, ledger Ledger, address flow.Address) (*flow.Account
 		panic(err)
 	}
 
-	result, err := ctx.Invoke(getFlowTokenBalanceScript(address), ledger)
+	result, err := ctx.Invoke(getFlowTokenBalanceScript(address, chain.ServiceAddress()), ledger)
 	if err != nil {
 		return nil, err
 	}
@@ -84,8 +84,12 @@ func accountExists(ledger Ledger, address flow.Address) (bool, error) {
 	return false, nil
 }
 
-func createAccount(ledger Ledger, publicKeys []flow.AccountPublicKey) (flow.Address, error) {
-	addressState, err := getAddressState(ledger)
+func createAccount(
+	ledger Ledger,
+	chain flow.Chain,
+	publicKeys []flow.AccountPublicKey,
+) (flow.Address, error) {
+	addressState, err := getAddressState(ledger, chain)
 	if err != nil {
 		return flow.Address{}, err
 	}
@@ -261,17 +265,13 @@ func setAccountCode(ledger Ledger, address flow.Address, code []byte) error {
 	return nil
 }
 
-func getAddressState(ledger Ledger) (flow.AddressGenerator, error) {
+func getAddressState(ledger Ledger, chain flow.Chain) (flow.AddressGenerator, error) {
 	stateBytes, err := ledger.Get(fullKeyHash("", "", keyAddressState))
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: remove hard-coded chain
-	chain := flow.Mainnet.Chain()
-
-	state := chain.BytesToAddressState(stateBytes)
-	return state, nil
+	return chain.BytesToAddressState(stateBytes), nil
 }
 
 func setAddressState(ledger Ledger, state flow.AddressGenerator) {
@@ -298,20 +298,14 @@ pub fun main(): UFix64 {
 }
 `
 
-func initFlowTokenTransaction(address flow.Address) InvokableTransaction {
-	// TODO: remove hard-coded chain
-	chain := flow.Mainnet.Chain()
-
+func initFlowTokenTransaction(accountAddress, serviceAddress flow.Address) InvokableTransaction {
 	return Transaction(
 		flow.NewTransactionBody().
-			SetScript([]byte(fmt.Sprintf(initFlowTokenTransactionTemplate, chain.ServiceAddress()))).
-			AddAuthorizer(address),
+			SetScript([]byte(fmt.Sprintf(initFlowTokenTransactionTemplate, serviceAddress))).
+			AddAuthorizer(accountAddress),
 	)
 }
 
-func getFlowTokenBalanceScript(address flow.Address) InvokableScript {
-	// TODO: remove hard-coded chain
-	chain := flow.Mainnet.Chain()
-
-	return Script([]byte(fmt.Sprintf(getFlowTokenBalanceScriptTemplate, chain.ServiceAddress(), address)))
+func getFlowTokenBalanceScript(accountAddress, serviceAddress flow.Address) InvokableScript {
+	return Script([]byte(fmt.Sprintf(getFlowTokenBalanceScriptTemplate, serviceAddress, accountAddress)))
 }
