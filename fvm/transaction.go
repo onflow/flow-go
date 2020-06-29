@@ -29,6 +29,8 @@ func (i InvokableTransaction) Invoke(ctx Context, ledger Ledger) (*InvocationRes
 		WithFeePayments(false),
 	)
 
+	chain := ctx.Options().chain
+
 	txID := i.tx.ID()
 
 	if ctx.Options().signatureVerificationEnabled {
@@ -56,7 +58,7 @@ func (i InvokableTransaction) Invoke(ctx Context, ledger Ledger) (*InvocationRes
 	}
 
 	if ctx.Options().feePaymentsEnabled {
-		result, err := metaCtx.Invoke(deductTransactionFeeTransaction(i.tx.Payer), ledger)
+		result, err := metaCtx.Invoke(deductTransactionFeeTransaction(i.tx.Payer, chain.ServiceAddress()), ledger)
 		if err != nil {
 			return nil, err
 		}

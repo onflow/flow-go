@@ -25,7 +25,7 @@ func TestTransactionASTCache(t *testing.T) {
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.New(rt, chain)
 
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
@@ -69,7 +69,7 @@ func TestScriptASTCache(t *testing.T) {
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.New(rt, chain)
 
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
@@ -106,7 +106,7 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.New(rt, chain)
 
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
@@ -167,7 +167,7 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 	rt := runtime.NewInterpreterRuntime()
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.New(rt, chain)
 
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(b, err)
@@ -244,7 +244,7 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.New(rt, chain)
 
 	ctx := vm.NewContext(fvm.WithASTCache(&nonFunctioningCache{}))
 
@@ -301,7 +301,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.New(rt, chain)
 
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)

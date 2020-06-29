@@ -5,6 +5,7 @@ import (
 )
 
 type Options struct {
+	chain                            flow.Chain
 	astCache                         ASTCache
 	blocks                           Blocks
 	metrics                          *MetricsCollector
@@ -18,9 +19,12 @@ type Options struct {
 
 const defaultGasLimit = 100000
 
-func defaultOptions() Options {
+func defaultOptions(chain flow.Chain) Options {
 	return Options{
+		chain:                            chain,
 		astCache:                         nil,
+		blocks:                           nil,
+		metrics:                          nil,
 		gasLimit:                         defaultGasLimit,
 		blockHeader:                      nil,
 		signatureVerificationEnabled:     true,
@@ -30,7 +34,7 @@ func defaultOptions() Options {
 	}
 }
 
-type Option func(config Options) Options
+type Option func(opts Options) Options
 
 func WithASTCache(cache ASTCache) Option {
 	return func(opts Options) Options {
