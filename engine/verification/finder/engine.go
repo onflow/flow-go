@@ -130,7 +130,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	ctx := context.Background()
 	if !ok {
 		span = e.tracer.StartSpan(receipt.ID(), trace.VERProcessExecutionReceipt)
-		span.SetTag("executionReceiptID", receipt.ID())
+		span.SetTag("execution_receipt_id", receipt.ID())
 		defer span.Finish()
 	}
 	ctx = opentracing.ContextWithSpan(ctx, span)
@@ -218,7 +218,7 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 		ctx := context.Background()
 		if !ok {
 			span = e.tracer.StartSpan(erId, trace.VERProcessExecutionReceipt, opentracing.StartTime(start))
-			span.SetTag("executionReceiptID", erId)
+			span.SetTag("execution_receipt_id", erId)
 			defer span.Finish()
 		}
 		ctx = opentracing.ContextWithSpan(ctx, span)

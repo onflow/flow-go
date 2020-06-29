@@ -154,7 +154,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // It stores the result in memory, in order to check if a chunk still needs to be processed.
 func (e *Engine) handleExecutionResult(originID flow.Identifier, r *flow.ExecutionResult) error {
 	span := e.tracer.StartSpan(r.ID(), trace.VERProcessExecutionResult)
-	span.SetTag("executionResultID", r.ID())
+	span.SetTag("execution_result_id", r.ID())
 	ctx := opentracing.ContextWithSpan(context.Background(), span)
 	childSpan, ctx := e.tracer.StartSpanFromContext(ctx, trace.VERMatchHandleExecutionResult)
 	defer childSpan.Finish()
