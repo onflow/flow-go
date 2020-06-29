@@ -12,7 +12,7 @@ var (
 	DirnameExecutionState = "execution-state"
 
 	// public genesis information
-	DirnamePublicBootstrap    = "public-root-information"
+	DirnamePublicBootstrap    = "public-genesis-information"
 	PathNodeInfosPub          = filepath.Join(DirnamePublicBootstrap, "node-infos.pub.json")
 	PathDKGDataPub            = filepath.Join(DirnamePublicBootstrap, "dkg-data.pub.json")
 	PathPartnerNodeInfoPrefix = filepath.Join(DirnamePublicBootstrap, "node-info.pub.")
@@ -25,7 +25,7 @@ var (
 	PathRootClusterQC         = filepath.Join(DirnamePublicBootstrap, "root-cluster-qc.%v.json")    // %v will be replaced by cluster ID
 
 	// private genesis information
-	DirPrivateRoot           = "private-root-information"
+	DirPrivateRoot           = "private-genesis-information"
 	FilenameRandomBeaconPriv = "random-beacon.priv.json"
 	PathNodeInfoPriv         = filepath.Join(DirPrivateRoot, "private-node-info_%v", "node-info.priv.json")    // %v will be replaced by NodeID
 	PathRandomBeaconPriv     = filepath.Join(DirPrivateRoot, "private-node-info_%v", FilenameRandomBeaconPriv) // %v will be replaced by NodeID

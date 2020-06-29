@@ -188,6 +188,7 @@ func validateStake(stake uint64) uint64 {
 
 func readPartnerNodes() []model.PartnerNodeInfoPub {
 	var partners []model.PartnerNodeInfoPub
+	fmt.Println(flagPartnerNodeInfoDir)
 	files, err := filesInDir(flagPartnerNodeInfoDir)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read partner node infos")
@@ -197,6 +198,7 @@ func readPartnerNodes() []model.PartnerNodeInfoPub {
 		if !strings.Contains(f, model.PathPartnerNodeInfoPrefix) {
 			continue
 		}
+		fmt.Println(f)
 
 		// read file and append to partners
 		var p model.PartnerNodeInfoPub

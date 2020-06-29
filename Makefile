@@ -10,6 +10,7 @@ IMAGE_TAG := ${VERSION}
 ifeq (${IMAGE_TAG},)
 IMAGE_TAG := ${SHORT_COMMIT}
 endif
+INTERNAL_TAG := candidate4
 # Name of the cover profile
 COVER_PROFILE := cover.out
 # Disable go sum database lookup for private repos
@@ -182,7 +183,7 @@ docker-ci-integration-team-city:
 .PHONY: docker-build-collection
 docker-build-collection:
 	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=collection --target production \
-		-t gcr.io/dl-flow/collection:devnet8 \
+		-t gcr.io/dl-flow/collection:$(INTERNAL_TAG) \
 		-t gcr.io/flow-container-registry/collection:latest \
 		-t "gcr.io/flow-container-registry/collection:$(SHORT_COMMIT)" \
 		-t gcr.io/flow-container-registry/collection:$(IMAGE_TAG) \
@@ -199,7 +200,7 @@ docker-build-collection-debug:
 .PHONY: docker-build-consensus
 docker-build-consensus:
 	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=consensus --target production \
-		-t gcr.io/dl-flow/consensus:devnet8 \
+		-t gcr.io/dl-flow/consensus:$(INTERNAL_TAG) \
 		-t gcr.io/flow-container-registry/consensus:latest \
 		-t "gcr.io/flow-container-registry/consensus:$(SHORT_COMMIT)" \
 		-t "gcr.io/flow-container-registry/consensus:$(IMAGE_TAG)" \
@@ -216,7 +217,7 @@ docker-build-consensus-debug:
 .PHONY: docker-build-execution
 docker-build-execution:
 	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=execution --target production \
-		-t gcr.io/dl-flow/execution:devnet8 \
+		-t gcr.io/dl-flow/execution:$(INTERNAL_TAG) \
 		-t gcr.io/flow-container-registry/execution:latest \
 		-t "gcr.io/flow-container-registry/execution:$(SHORT_COMMIT)" \
 		-t "gcr.io/flow-container-registry/execution:$(IMAGE_TAG)" \
@@ -233,7 +234,7 @@ docker-build-execution-debug:
 .PHONY: docker-build-verification
 docker-build-verification:
 	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=verification --target production \
-		-t gcr.io/dl-flow/verification:devnet8 \
+		-t gcr.io/dl-flow/verification:$(INTERNAL_TAG) \
 		-t gcr.io/flow-container-registry/verification:latest \
 		-t "gcr.io/flow-container-registry/verification:$(SHORT_COMMIT)" \
 		-t "gcr.io/flow-container-registry/verification:$(IMAGE_TAG)" \
@@ -250,7 +251,7 @@ docker-build-verification-debug:
 .PHONY: docker-build-access
 docker-build-access:
 	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=access --target production \
-		-t gcr.io/dl-flow/access:devnet8 \
+		-t gcr.io/dl-flow/access:$(INTERNAL_TAG) \
 		-t gcr.io/flow-container-registry/access:latest \
 		-t "gcr.io/flow-container-registry/access:$(SHORT_COMMIT)" \
 		-t "gcr.io/flow-container-registry/access:$(IMAGE_TAG)" \
@@ -301,35 +302,35 @@ docker-build-flow: docker-build-collection docker-build-consensus docker-build-e
 
 .PHONY: docker-push-collection
 docker-push-collection:
-	docker push gcr.io/dl-flow/collection:devnet8
+	docker push gcr.io/dl-flow/collection:$(INTERNAL_TAG)
 	docker push gcr.io/flow-container-registry/collection:latest
 	docker push "gcr.io/flow-container-registry/collection:$(SHORT_COMMIT)"
 	docker push "gcr.io/flow-container-registry/collection:$(IMAGE_TAG)"
 
 .PHONY: docker-push-consensus
 docker-push-consensus:
-	docker push gcr.io/dl-flow/consensus:devnet8
+	docker push gcr.io/dl-flow/consensus:$(INTERNAL_TAG)
 	docker push gcr.io/flow-container-registry/consensus:latest
 	docker push "gcr.io/flow-container-registry/consensus:$(SHORT_COMMIT)"
 	docker push "gcr.io/flow-container-registry/consensus:$(IMAGE_TAG)"
 
 .PHONY: docker-push-execution
 docker-push-execution:
-	docker push gcr.io/dl-flow/execution:devnet8
+	docker push gcr.io/dl-flow/execution:$(INTERNAL_TAG)
 	docker push gcr.io/flow-container-registry/execution:latest
 	docker push "gcr.io/flow-container-registry/execution:$(SHORT_COMMIT)"
 	docker push "gcr.io/flow-container-registry/execution:$(IMAGE_TAG)"
 
 .PHONY: docker-push-verification
 docker-push-verification:
-	docker push gcr.io/dl-flow/verification:devnet8
+	docker push gcr.io/dl-flow/verification:$(INTERNAL_TAG)
 	docker push gcr.io/flow-container-registry/verification:latest
 	docker push "gcr.io/flow-container-registry/verification:$(SHORT_COMMIT)"
 	docker push "gcr.io/flow-container-registry/verification:$(IMAGE_TAG)"
 
 .PHONY: docker-push-access
 docker-push-access:
-	docker push gcr.io/dl-flow/access:devnet8
+	docker push gcr.io/dl-flow/access:$(INTERNAL_TAG)
 	docker push gcr.io/flow-container-registry/access:latest
 	docker push "gcr.io/flow-container-registry/access:$(SHORT_COMMIT)"
 	docker push "gcr.io/flow-container-registry/access:$(IMAGE_TAG)"
