@@ -264,7 +264,7 @@ func (e *EventHandler) startNewView() error {
 		}
 
 		span := e.tracer.StartSpan(proposal.Block.BlockID, trace.CONProcessBlock, opentracing.StartTime(startTime))
-		span.SetTag("blockID", proposal.Block.BlockID)
+		span.SetTag("block_id", proposal.Block.BlockID)
 		span.SetTag("view", proposal.Block.View)
 		span.SetTag("proposer", proposal.Block.ProposerID.String())
 		span.SetTag("leader", true)

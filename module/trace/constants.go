@@ -2,7 +2,8 @@ package trace
 
 // Span names
 const (
-	CONProcessCollection              SpanName = "con.processCollection"
+	CONProcessCollection SpanName = "con.processCollection"
+	// children of CONProcessCollection
 	CONHotFinalizeCollection          SpanName = "con.hotstuff.finalizeCollection"
 	CONIngOnCollectionGuarantee       SpanName = "con.ingestion.onCollectionGuarantee"
 	CONPropOnGuarantee                SpanName = "con.propagation.onGuarantee"

@@ -134,7 +134,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 	span := e.tracer.StartSpan(guarantee.CollectionID, trace.CONProcessCollection)
 	// TODO finish span if we error? How are they shown in Jaeger?
-	span.SetTag("guaranteeID", guarantee.CollectionID)
+	span.SetTag("collection_id", guarantee.CollectionID)
 	childSpan := e.tracer.StartSpan(guarantee.CollectionID, trace.CONIngOnCollectionGuarantee,
 		opentracing.ChildOf(span.Context()))
 	defer childSpan.Finish()

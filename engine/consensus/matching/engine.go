@@ -338,7 +338,7 @@ func (e *Engine) checkSealing() {
 		if span, ok := e.tracer.GetSpan(result.BlockID, trace.CONProcessBlock); ok {
 			childSpan := e.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing, opentracing.StartTime(
 				start))
-			childSpan.Finish()
+			defer childSpan.Finish()
 		}
 
 		index, err := e.indexDB.ByBlockID(result.BlockID)
@@ -349,7 +349,7 @@ func (e *Engine) checkSealing() {
 			if span, ok := e.tracer.GetSpan(id, trace.CONProcessCollection); ok {
 				childSpan := e.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing, opentracing.StartTime(
 					start))
-				childSpan.Finish()
+				defer childSpan.Finish()
 			}
 		}
 	}
@@ -390,8 +390,6 @@ func (e *Engine) checkSealing() {
 	e.clearPools(sealedResultIDs)
 
 	for _, blockID := range sealedBlockIDs {
-		e.tracer.FinishSpan(blockID, trace.CONProcessBlock)
-
 		index, err := e.indexDB.ByBlockID(blockID)
 		if err != nil {
 			continue
@@ -399,6 +397,7 @@ func (e *Engine) checkSealing() {
 		for _, id := range index.CollectionIDs {
 			e.tracer.FinishSpan(id, trace.CONProcessCollection)
 		}
+		e.tracer.FinishSpan(blockID, trace.CONProcessBlock)
 	}
 }
 

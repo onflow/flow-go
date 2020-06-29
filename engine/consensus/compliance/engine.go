@@ -243,7 +243,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		if span, ok := e.tracer.GetSpan(g.CollectionID, trace.CONProcessCollection); ok {
 			childSpan := e.tracer.StartSpan(g.CollectionID, trace.CONCompBroadcastProposalWithDelay, opentracing.ChildOf(
 				span.Context()))
-			childSpan.Finish()
+			defer childSpan.Finish()
 		}
 	}
 
@@ -341,10 +341,9 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	span, ok := e.tracer.GetSpan(proposal.Header.ID(), trace.CONProcessBlock)
 	if !ok {
 		span = e.tracer.StartSpan(proposal.Header.ID(), trace.CONProcessBlock)
-		span.SetTag("blockID", proposal.Header.ID())
+		span.SetTag("block_id", proposal.Header.ID())
 		span.SetTag("view", proposal.Header.View)
 		span.SetTag("proposer", proposal.Header.ProposerID.String())
-		span.SetTag("leader", false)
 	}
 	childSpan := e.tracer.StartSpanFromParent(span, trace.CONCompOnBlockProposal)
 	defer childSpan.Finish()
@@ -353,7 +352,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		if span, ok := e.tracer.GetSpan(g.CollectionID, trace.CONProcessCollection); ok {
 			childSpan := e.tracer.StartSpan(g.CollectionID, trace.CONCompOnBlockProposal, opentracing.ChildOf(
 				span.Context()))
-			childSpan.Finish()
+			defer childSpan.Finish()
 		}
 	}
 
