@@ -48,8 +48,11 @@ func (b *BootstrapProcedure) Invoke(ctx Context, ledger Ledger) (*InvocationResu
 
 	b.ledger = ledger
 
+	// TODO: remove hard-coded chain
+	chain := flow.Mainnet.Chain()
+
 	// initialize the account addressing state
-	setAddressState(ledger, flow.NewAddressGenerator())
+	setAddressState(ledger, chain.NewAddressGenerator())
 
 	service := b.createServiceAccount(b.serviceAccountPublicKey)
 

@@ -141,7 +141,7 @@ func CreateAccounts(
 }
 
 func CreateAccountsWithSimpleAddresses(
-	vm fvm.VirtualMachine,
+	vm *fvm.VirtualMachine,
 	ledger fvm.Ledger,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
@@ -201,7 +201,7 @@ func CreateAccountsWithSimpleAddresses(
 func RootBootstrappedLedger(chain flow.Chain) fvm.Ledger {
 	ledger := make(fvm.MapLedger)
 
-	vm := fvm.New(runtime.NewInterpreterRuntime(), chain)
+	vm := fvm.New(runtime.NewInterpreterRuntime())
 
 	_, _ = vm.NewContext().Invoke(
 		fvm.Bootstrap(unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply),

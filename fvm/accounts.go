@@ -261,16 +261,20 @@ func setAccountCode(ledger Ledger, address flow.Address, code []byte) error {
 	return nil
 }
 
-func getAddressState(ledger Ledger) (*flow.AddressGenerator, error) {
+func getAddressState(ledger Ledger) (flow.AddressGenerator, error) {
 	stateBytes, err := ledger.Get(fullKeyHash("", "", keyAddressState))
 	if err != nil {
 		return nil, err
 	}
-	state := flow.BytesToAddressState(stateBytes)
+
+	// TODO: remove hard-coded chain
+	chain := flow.Mainnet.Chain()
+
+	state := chain.BytesToAddressState(stateBytes)
 	return state, nil
 }
 
-func setAddressState(ledger Ledger, state *flow.AddressGenerator) {
+func setAddressState(ledger Ledger, state flow.AddressGenerator) {
 	stateBytes := state.Bytes()
 	ledger.Set(fullKeyHash("", "", keyAddressState), stateBytes)
 }
@@ -295,13 +299,19 @@ pub fun main(): UFix64 {
 `
 
 func initFlowTokenTransaction(address flow.Address) InvokableTransaction {
+	// TODO: remove hard-coded chain
+	chain := flow.Mainnet.Chain()
+
 	return Transaction(
 		flow.NewTransactionBody().
-			SetScript([]byte(fmt.Sprintf(initFlowTokenTransactionTemplate, flow.ServiceAddress()))).
+			SetScript([]byte(fmt.Sprintf(initFlowTokenTransactionTemplate, chain.ServiceAddress()))).
 			AddAuthorizer(address),
 	)
 }
 
 func getFlowTokenBalanceScript(address flow.Address) InvokableScript {
-	return Script([]byte(fmt.Sprintf(getFlowTokenBalanceScriptTemplate, flow.ServiceAddress(), address)))
+	// TODO: remove hard-coded chain
+	chain := flow.Mainnet.Chain()
+
+	return Script([]byte(fmt.Sprintf(getFlowTokenBalanceScriptTemplate, chain.ServiceAddress(), address)))
 }

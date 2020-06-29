@@ -455,9 +455,12 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, index int) (p
 func (e *transactionEnv) UpdateAccountCode(address runtime.Address, code []byte) (err error) {
 	accountAddress := flow.Address(address)
 
+	// TODO: remove hard-coded chain
+	chain := flow.Mainnet.Chain()
+
 	// currently, every transaction that sets account code (deploys/updates contracts)
 	// must be signed by the service account
-	if e.restrictContractDeployment && !e.isValidSigningAccount(runtime.Address(flow.ServiceAddress())) {
+	if e.restrictContractDeployment && !e.isValidSigningAccount(runtime.Address(chain.ServiceAddress())) {
 		return fmt.Errorf("code deployment requires authorization from the service account")
 	}
 

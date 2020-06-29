@@ -6,6 +6,12 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+type AddressState interface {
+	Bytes() []byte
+	NextAddress() (flow.Address, error)
+	CurrentAddress() flow.Address
+}
+
 // SimpleAddressState implements an address generator that returns sequential addresses starting with 0x1
 // (flow.Address{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1} to be precise) and incrementing it by 1 for each next address.
 // It is supposed to be used by the emulator for simpler reasoning about addresses.

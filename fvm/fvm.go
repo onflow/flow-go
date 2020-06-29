@@ -2,8 +2,6 @@ package fvm
 
 import (
 	"github.com/onflow/cadence/runtime"
-
-	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 type Invokable interface {
@@ -17,7 +15,7 @@ type VirtualMachine struct {
 }
 
 // New creates a new virtual machine instance with the provided runtime.
-func New(rt runtime.Runtime, chain flow.Chain) *VirtualMachine {
+func New(rt runtime.Runtime) *VirtualMachine {
 	return &VirtualMachine{rt: rt}
 }
 

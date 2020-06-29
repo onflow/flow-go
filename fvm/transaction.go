@@ -241,7 +241,7 @@ func verifyAccountSignature(
 	}
 
 	if !ok {
-		return nil, &InvalidSignatureAccountError{Address: txSig.Address}, nil
+		return nil, &SignatureAccountDoesNotExist{Address: txSig.Address}, nil
 	}
 
 	var accountKeys []flow.AccountPublicKey
@@ -252,13 +252,13 @@ func verifyAccountSignature(
 	}
 
 	if int(txSig.KeyID) >= len(accountKeys) {
-		return nil, &InvalidSignatureAccountError{Address: txSig.Address}, nil
+		return nil, &SignatureAccountDoesNotExist{Address: txSig.Address}, nil
 	}
 
 	accountKey := &accountKeys[txSig.KeyID]
 
-	hasher, err := hash.NewHasher(accountKey.HashAlgo)
-	if err != nil {
+	hasher := newHasher(accountKey.HashAlgo)
+	if hasher == nil {
 		return accountKey, &InvalidHashingAlgorithmError{
 			Address:          txSig.Address,
 			KeyID:            txSig.KeyID,
@@ -288,4 +288,15 @@ func sigIsForProposalKey(txSig flow.TransactionSignature, proposalKey flow.Propo
 
 func hasSufficientKeyWeight(weights map[flow.Address]int, address flow.Address) bool {
 	return weights[address] >= AccountKeyWeightThreshold
+}
+
+func newHasher(hashAlgo hash.HashingAlgorithm) hash.Hasher {
+	switch hashAlgo {
+	case hash.SHA2_256:
+		return hash.NewSHA2_256()
+	case hash.SHA3_256:
+		return hash.NewSHA3_256()
+	}
+
+	return nil
 }

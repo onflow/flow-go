@@ -37,7 +37,7 @@ func (i InvokableScript) Invoke(ctx Context, ledger Ledger) (*InvocationResult, 
 
 	scriptID := flow.HashToID(scriptHash)
 
-	value, err := ctx.Runtime().ExecuteScript(i.script, env, location)
+	value, err := ctx.Runtime().ExecuteScript(i.script, i.args, env, location)
 
 	return createInvocationResult(scriptID, value, env.getEvents(), env.getLogs(), err)
 }
