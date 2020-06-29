@@ -109,6 +109,7 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 		Seals:      seals,
 		Payloads:   payloads,
 		Blocks:     blocks,
+		Index:      index,
 		State:      state,
 		Me:         me,
 		Net:        stubnet,
@@ -183,13 +184,13 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	seals, err := stdmap.NewSeals(1000)
 	require.NoError(t, err)
 
-	propagationEngine, err := propagation.New(node.Log, node.Metrics, node.Metrics, node.Metrics, node.Net, node.State, node.Me, guarantees)
+	propagationEngine, err := propagation.New(node.Log, node.Metrics, node.Metrics, node.Tracer, node.Metrics, node.Net, node.State, node.Me, guarantees)
 	require.NoError(t, err)
 
-	ingestionEngine, err := consensusingest.New(node.Log, node.Metrics, node.Metrics, node.Net, propagationEngine, node.State, node.Headers, node.Me)
+	ingestionEngine, err := consensusingest.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Net, propagationEngine, node.State, node.Headers, node.Me)
 	require.Nil(t, err)
 
-	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Metrics, node.Net, node.State, node.Me, resultsDB, sealsDB, node.Headers, results, receipts, approvals, seals)
+	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Net, node.State, node.Me, resultsDB, sealsDB, node.Headers, node.Index, results, receipts, approvals, seals)
 	require.Nil(t, err)
 
 	return mock.ConsensusNode{
