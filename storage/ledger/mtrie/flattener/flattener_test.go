@@ -17,13 +17,13 @@ import (
 )
 
 func TestForestStoreAndLoad(t *testing.T) {
-	trieHeight := 9
+	keyByteSize := 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	mForest, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
+	mForest, err := mtrie.NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash := mForest.GetEmptyRootHash()
 
@@ -62,7 +62,7 @@ func TestForestStoreAndLoad(t *testing.T) {
 	forestSequencing, err := flattener.FlattenForest(mForest)
 	require.NoError(t, err)
 
-	newMForest, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
+	newMForest, err := mtrie.NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
 	//forests are different
