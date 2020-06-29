@@ -829,5 +829,48 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 		assert.Nil(t, account)
 	})
+}
 
+func TestBlockContext_UnsafeRandom(t *testing.T) {
+	rt := runtime.NewInterpreterRuntime()
+
+	chain := flow.Mainnet.Chain()
+
+	vm := fvm.New(rt)
+
+	cache, err := fvm.NewLRUASTCache(CacheSize)
+	require.NoError(t, err)
+
+	header := flow.Header{Height: 42}
+
+	ctx := vm.NewContext(fvm.WithASTCache(cache), fvm.WithBlockHeader(&header))
+
+	t.Run("works as transaction", func(t *testing.T) {
+		tx := flow.NewTransactionBody().
+			SetScript([]byte(`
+				transaction {
+					execute {
+						let rand = unsafeRandom()
+						log(rand)
+					}
+				}
+			`))
+
+		err := execTestutil.SignTransactionAsServiceAccount(tx, 0, chain)
+		require.NoError(t, err)
+
+		ledger := execTestutil.RootBootstrappedLedger(chain)
+		require.NoError(t, err)
+
+		result, err := ctx.Invoke(fvm.Transaction(tx), ledger)
+		assert.NoError(t, err)
+
+		assert.True(t, result.Succeeded())
+
+		require.Len(t, result.Logs, 1)
+
+		num, err := strconv.ParseUint(result.Logs[0], 10, 64)
+		require.NoError(t, err)
+		require.Equal(t, uint64(0xb9c618010e32a0fb), num)
+	})
 }
