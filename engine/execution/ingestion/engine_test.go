@@ -132,7 +132,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.ExecutionSync)), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 	blockSync := new(module2.BlockRequester)
-	//blockSync.On("RequestBlock", mock.Anything).Return()
 
 	engine, err = New(
 		log,
