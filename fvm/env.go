@@ -1,8 +1,10 @@
 package fvm
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/rand"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -25,6 +27,7 @@ type hostEnv struct {
 	gasLimit    uint64
 	uuid        uint64
 	blockHeader *flow.Header
+	rng         *rand.Rand
 
 	events []cadence.Event
 	logs   []string
@@ -46,7 +49,8 @@ func newEnvironment(ledger Ledger, opts Options) *hostEnv {
 	}
 
 	if opts.blockHeader != nil {
-		return env.setBlockHeader(opts.blockHeader)
+		env.setBlockHeader(opts.blockHeader)
+		env.seedRNG(opts.blockHeader)
 	}
 
 	if opts.metrics != nil {
@@ -56,9 +60,16 @@ func newEnvironment(ledger Ledger, opts Options) *hostEnv {
 	return env
 }
 
-func (e *hostEnv) setBlockHeader(header *flow.Header) *hostEnv {
+func (e *hostEnv) setBlockHeader(header *flow.Header) {
 	e.blockHeader = header
-	return e
+}
+
+func (e *hostEnv) seedRNG(header *flow.Header) {
+	// Seed the random number generator with entropy created from the block header ID. The random number generator will
+	// be used by the UnsafeRandom function.
+	id := header.ID()
+	source := rand.NewSource(int64(binary.BigEndian.Uint64(id[:])))
+	e.rng = rand.New(source)
 }
 
 func (e *hostEnv) setTransaction(
@@ -175,6 +186,18 @@ func (e *hostEnv) GetCurrentBlockHeight() uint64 {
 	}
 
 	return e.blockHeader.Height
+}
+
+// UnsafeRandom returns a random uint64, where the process of random number derivation is not cryptographically
+// secure.
+func (e *hostEnv) UnsafeRandom() uint64 {
+	if e.rng == nil {
+		panic("UnsafeRandom is not supported by this environment")
+	}
+
+	buf := make([]byte, 8)
+	_, _ = e.rng.Read(buf) // Always succeeds, no need to check error
+	return binary.LittleEndian.Uint64(buf)
 }
 
 // GetBlockAtHeight returns the block at the given height.
