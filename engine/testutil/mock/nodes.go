@@ -110,6 +110,7 @@ func (en ExecutionNode) Ready() {
 func (en ExecutionNode) Done() {
 	<-en.IngestionEngine.Done()
 	<-en.ReceiptsEngine.Done()
+	<-en.SyncEngine.Done()
 	<-en.Ledger.Done()
 	os.RemoveAll(en.LevelDbDir)
 	en.GenericNode.Done()
