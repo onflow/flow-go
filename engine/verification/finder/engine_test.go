@@ -14,8 +14,10 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/verification"
+	realModule "github.com/dapperlabs/flow-go/module"
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	module "github.com/dapperlabs/flow-go/module/mock"
+	"github.com/dapperlabs/flow-go/module/trace"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -30,6 +32,7 @@ type FinderEngineTestSuite struct {
 	// mock conduit for receiving receipts
 	receiptsConduit *network.Conduit
 	metrics         *module.VerificationMetrics
+	tracer          realModule.Tracer
 
 	// mock mempools
 	receipts           *mempool.PendingReceipts
@@ -67,6 +70,7 @@ func (suite *FinderEngineTestSuite) SetupTest() {
 	suite.net = &module.Network{}
 	suite.me = &module.Local{}
 	suite.metrics = &module.VerificationMetrics{}
+	suite.tracer = trace.NewNoopTracer()
 	suite.headerStorage = &storage.Headers{}
 	suite.receipts = &mempool.PendingReceipts{}
 	suite.processedResultIDs = &mempool.Identifiers{}
@@ -105,6 +109,7 @@ func (suite *FinderEngineTestSuite) SetupTest() {
 func (suite *FinderEngineTestSuite) TestNewFinderEngine() *finder.Engine {
 	e, err := finder.New(zerolog.Logger{},
 		suite.metrics,
+		suite.tracer,
 		suite.net,
 		suite.me,
 		suite.matchEng,
