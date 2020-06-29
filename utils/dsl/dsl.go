@@ -54,13 +54,16 @@ func (r Resource) ToCadence() string {
 }
 
 type Import struct {
-	Names []string
+	Names   []string
 	Address flow.Address
 }
 
 func (i Import) ToCadence() string {
 	if i.Address != flow.EmptyAddress {
-		return fmt.Sprintf("import 0x%s", i.Address.Short())
+		if len(i.Names) > 0 {
+			return fmt.Sprintf("import %s from 0x%s\n", strings.Join(i.Names, ", "), i.Address.Short())
+		}
+		return fmt.Sprintf("import 0x%s\n", i.Address.Short())
 	}
 	return ""
 }
@@ -82,13 +85,13 @@ func (u UpdateAccountCode) ToCadence() string {
 }
 
 type Main struct {
-	Import  Import
+	Import     Import
 	ReturnType string
 	Code       string
 }
 
 func (m Main) ToCadence() string {
-	return fmt.Sprintf("import 0x01\npub fun main(): %s { %s }", m.ReturnType, m.Code)
+	return fmt.Sprintf("%s \npub fun main(): %s { %s }", m.Import.ToCadence(), m.ReturnType, m.Code)
 }
 
 type Code string

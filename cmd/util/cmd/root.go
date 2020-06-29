@@ -8,6 +8,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	extract "github.com/dapperlabs/flow-go/cmd/util/cmd/execution-state-extract"
 )
 
 var (
@@ -36,6 +38,12 @@ func init() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	cobra.OnInitialize(initConfig)
+
+	addCommands()
+}
+
+func addCommands() {
+	rootCmd.AddCommand(extract.Cmd)
 }
 
 func initConfig() {
