@@ -54,7 +54,7 @@ type Engine struct {
 	transactionResults                  storage.TransactionResults
 	computationManager                  computation.ComputationManager
 	providerEngine                      provider.ProviderEngine
-	syncEngine                          module.Synchronization
+	blockSync                           module.BlockRequester
 	mempool                             *Mempool
 	execState                           state.ExecutionState
 	wg                                  sync.WaitGroup
@@ -82,7 +82,7 @@ func New(
 	transactionResults storage.TransactionResults,
 	executionEngine computation.ComputationManager,
 	providerEngine provider.ProviderEngine,
-	syncEngine module.Synchronization,
+	blockSync module.BlockRequester,
 	execState state.ExecutionState,
 	syncThreshold uint64,
 	metrics module.ExecutionMetrics,
@@ -108,7 +108,7 @@ func New(
 		transactionResults:                  transactionResults,
 		computationManager:                  executionEngine,
 		providerEngine:                      providerEngine,
-		syncEngine:                          syncEngine,
+		blockSync:                           blockSync,
 		mempool:                             mempool,
 		execState:                           execState,
 		syncModeThreshold:                   syncThreshold,
@@ -133,7 +133,7 @@ func New(
 
 	syncConduit, err := net.Register(engine.ExecutionSync, &eng)
 	if err != nil {
-		return nil, fmt.Errorf("could not register execution sync engine: %w", err)
+		return nil, fmt.Errorf("could not register execution blockSync engine: %w", err)
 	}
 
 	eng.conduit = con
@@ -141,13 +141,6 @@ func New(
 	eng.syncConduit = syncConduit
 
 	return &eng, nil
-}
-
-// WithSynchronization adds the synchronization engine responsible for bringing the node
-// up to speed to the ingestion engine.
-func (e *Engine) WithSynchronization(sync module.Synchronization) *Engine {
-	e.syncEngine = sync
-	return e
 }
 
 // Engine boilerplate
@@ -171,12 +164,7 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 // Ready returns a channel that will close when the engine has
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
-	if e.syncEngine == nil {
-		panic("must initialize ingestion engine with synchronization module")
-	}
-	return e.unit.Ready(func() {
-		<-e.syncEngine.Ready()
-	})
+	return e.unit.Ready()
 }
 
 // Done returns a channel that will close when the engine has
@@ -199,9 +187,6 @@ func (e *Engine) Done() <-chan struct{} {
 		})
 
 		e.Wait()
-
-		e.log.Debug().Msg("shutting down synchronization engine")
-		<-e.syncEngine.Done()
 	})
 }
 
@@ -1019,7 +1004,7 @@ func (e *Engine) StartSync(ctx context.Context, firstKnown *entity.ExecutableBlo
 	if len(otherNodes) < 1 {
 		e.log.Debug().
 			Msgf("no other execution nodes found, request last block instead at height %d", targetHeight)
-		e.syncEngine.RequestBlock(targetBlockID)
+		e.blockSync.RequestBlock(targetBlockID)
 		return
 	}
 
