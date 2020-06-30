@@ -95,13 +95,13 @@ func (r *TransactionContext) Logs() []string {
 
 // GetValue gets a register value from the world state.
 func (r *TransactionContext) GetValue(owner, controller, key []byte) ([]byte, error) {
-	v, _ := r.ledger.Get(fullKeyHash(string(owner), string(controller), string(key)))
+	v, _ := r.ledger.Get(FullKeyHash(string(owner), string(controller), string(key)))
 	return v, nil
 }
 
 // SetValue sets a register value in the world state.
 func (r *TransactionContext) SetValue(owner, controller, key, value []byte) error {
-	r.ledger.Set(fullKeyHash(string(owner), string(controller), string(key)), value)
+	r.ledger.Set(FullKeyHash(string(owner), string(controller), string(key)), value)
 	return nil
 }
 
@@ -313,7 +313,7 @@ func (r *TransactionContext) ServiceAddress() flow.Address {
 func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []byte) (err error) {
 	accountAddress := runtimeToFlowAddress(address)
 
-	key := fullKeyHash(string(accountAddress.Bytes()), string(accountAddress.Bytes()), keyCode)
+	key := FullKeyHash(string(accountAddress.Bytes()), string(accountAddress.Bytes()), keyCode)
 
 	prevCode, err := r.ledger.Get(key)
 	if err != nil {
@@ -353,7 +353,7 @@ func (r *TransactionContext) ResolveImport(location runtime.Location) ([]byte, e
 
 	address := flow.BytesToAddress(addressLocation)
 
-	code, err := r.ledger.Get(fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyCode))
+	code, err := r.ledger.Get(FullKeyHash(string(address.Bytes()), string(address.Bytes()), keyCode))
 	if err != nil {
 		return nil, err
 	}
