@@ -6,8 +6,12 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	list_accounts "github.com/dapperlabs/flow-go/cmd/util/cmd/read-execution-state/list-accounts"
+	list_tries "github.com/dapperlabs/flow-go/cmd/util/cmd/read-execution-state/list-tries"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
+	"github.com/dapperlabs/flow-go/storage/ledger/wal"
 )
 
 var (
@@ -22,20 +26,51 @@ var Cmd = &cobra.Command{
 
 func init() {
 
-	Cmd.Flags().StringVar(&flagExecutionStateDir, "execution-state-dir", "",
+	Cmd.PersistentFlags().StringVar(&flagExecutionStateDir, "execution-state-dir", "",
 		"Execution Node state dir (where WAL logs are written")
-	_ = Cmd.MarkFlagRequired("execution-state-dir")
+	_ = Cmd.MarkPersistentFlagRequired("execution-state-dir")
 
+	addSubcommands()
+}
+
+func addSubcommands() {
+	Cmd.AddCommand(list_tries.Init(loadExecutionState))
+	Cmd.AddCommand(list_accounts.Init(loadExecutionState))
+}
+
+func loadExecutionState() *mtrie.MForest {
+
+	w, err := wal.NewWAL(
+		nil,
+		nil,
+		flagExecutionStateDir,
+		ledger.CacheSize,
+		ledger.MaxHeight,
+	)
+	if err != nil {
+		log.Fatal().Err(err).Msg("error while creating WAL")
+	}
+
+	mForest, err := mtrie.NewMForest(ledger.MaxHeight, flagExecutionStateDir, ledger.CacheSize, metrics.NewNoopCollector(), nil)
+	if err != nil {
+		log.Fatal().Err(err).Msg("error while creating mForest")
+	}
+
+	err = w.ReplayOnMForest(mForest)
+	if err != nil {
+		log.Fatal().Err(err).Msg("error while replaying execution state")
+	}
+
+	return mForest
 }
 
 func run(*cobra.Command, []string) {
 
+	log.Info().Msg("reading")
+
 	startTime := time.Now()
 
-	_, err := ledger.NewMTrieStorage(flagExecutionStateDir, ledger.CacheSize, metrics.NewNoopCollector(), nil)
-	if err != nil {
-		log.Fatal().Err(err).Msg("error while reading execution state")
-	}
+	_ = loadExecutionState()
 
 	duration := time.Since(startTime)
 

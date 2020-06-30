@@ -6,8 +6,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
@@ -57,28 +55,7 @@ func NewMTrieStorage(dbDir string, capacity int, metrics module.LedgerMetrics, r
 		metrics: metrics,
 	}
 
-	err = w.Replay(
-		func(forestSequencing *flattener.FlattenedForest) error {
-			rebuiltTries, err := flattener.RebuildTries(forestSequencing)
-			if err != nil {
-				return fmt.Errorf("rebuilding forest from sequenced nodes failed: %w", err)
-			}
-			err = storage.mForest.AddTries(rebuiltTries)
-			if err != nil {
-				return fmt.Errorf("adding rebuilt tries to forest failed: %w", err)
-			}
-			return nil
-		},
-		func(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
-			_, err = storage.mForest.Update(stateCommitment, keys, values)
-			// _, err := trie.UpdateRegisters(keys, values, stateCommitment)
-			return err
-		},
-		func(stateCommitment flow.StateCommitment) error {
-			storage.mForest.RemoveTrie(stateCommitment)
-			return nil
-		},
-	)
+	err = w.ReplayOnMForest(mForest)
 
 	if err != nil {
 		return nil, fmt.Errorf("cannot restore LedgerWAL: %w", err)
