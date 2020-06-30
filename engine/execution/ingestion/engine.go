@@ -212,6 +212,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 			err = e.handleBlockProposal(ctx, p)
 		case *messages.BlockProposal:
 			log.Debug().Hex("block_id", logging.Entity(v.Header)).
+				Hex("parent_id", v.Header.ParentID[:]).
 				Uint64("block_view", v.Header.View).
 				Uint64("block_height", v.Header.Height).
 				Hex("block_proposal", logging.Entity(v.Header)).Msg("received block proposal")
