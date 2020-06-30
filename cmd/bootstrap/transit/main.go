@@ -32,7 +32,7 @@ var (
 const fileMode = os.FileMode(0644)
 
 // TODO: make sure the bucket and folders are updated remotely
-const flowBucket = "flow-root-bootstrap"
+const flowBucket = "flow-genesis-bootstrap"
 
 var (
 
