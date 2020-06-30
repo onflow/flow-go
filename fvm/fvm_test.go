@@ -17,7 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/fvm"
-	vmMock "github.com/dapperlabs/flow-go/fvm/mock"
+	fvmmock "github.com/dapperlabs/flow-go/fvm/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -643,7 +643,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 	ctx := fvm.NewContext(fvm.WithASTCache(cache))
 
-	blocks := new(vmMock.Blocks)
+	blocks := new(fvmmock.Blocks)
 
 	block1 := unittest.BlockFixture()
 	block2 := unittest.BlockWithParentFixture(block1.Header)
