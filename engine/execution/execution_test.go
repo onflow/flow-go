@@ -2,9 +2,11 @@ package execution_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -357,6 +359,130 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	collectionEngine.AssertExpectations(t)
 	consensusEngine.AssertExpectations(t)
+}
+
+func TestExecutionQueryMissingBlocks(t *testing.T) {
+	hub := stub.NewNetworkHub()
+
+	chainID := flow.Testnet
+
+	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
+	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+
+	identities := unittest.CompleteIdentitySet(colID, conID, exeID)
+
+	consensusNode := testutil.GenericNode(t, hub, conID, identities, chainID)
+	defer consensusNode.Done()
+	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 0, chainID)
+	exeNode.Ready()
+	defer exeNode.Done()
+
+	genesis, err := exeNode.State.AtHeight(0).Head()
+	require.NoError(t, err)
+
+	fmt.Println("genesis block ID", genesis.ID())
+	exeNode.AssertHighestExecutedBlock(t, genesis)
+
+	block1 := unittest.BlockWithParentFixture(genesis)
+	block1.Header.View = 1
+	block1.Header.ProposerID = conID.ID()
+	block1.SetPayload(flow.Payload{})
+	// proposal1 := unittest.ProposalFromBlock(&block1)
+
+	block2 := unittest.BlockWithParentFixture(block1.Header)
+	block2.Header.View = 2
+	block2.Header.ProposerID = conID.ID()
+	block2.SetPayload(flow.Payload{})
+	proposal2 := unittest.ProposalFromBlock(&block2)
+
+	// register sync engine
+	syncEngine := new(network.Engine)
+	syncConduit, _ := consensusNode.Net.Register(engine.ProtocolSynchronization, syncEngine)
+	syncEngine.On("Submit", mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			originID := args[0].(flow.Identifier)
+			switch msg := args[1].(type) {
+			case *messages.SyncRequest:
+				consensusNode.Log.Debug().Hex("origin", originID[:]).Uint64("height", msg.Height).
+					Uint64("nonce", msg.Nonce).Msg("protocol sync request received")
+
+				res := &messages.SyncResponse{
+					Height: block2.Header.Height,
+					Nonce:  msg.Nonce,
+				}
+
+				err := syncConduit.Submit(res, originID)
+				assert.NoError(t, err)
+			case *messages.BatchRequest:
+				ids := zerolog.Arr()
+				for _, b := range msg.BlockIDs {
+					ids.Hex(b[:])
+				}
+
+				consensusNode.Log.Debug().Hex("origin", originID[:]).Array("blockIDs", ids).
+					Uint64("nonce", msg.Nonce).Msg("protocol batch request received")
+
+				blocks := make([]*flow.Block, 0)
+				for _, id := range msg.BlockIDs {
+					if id == block1.ID() {
+						blocks = append(blocks, &block1)
+					} else if id == block2.ID() {
+						blocks = append(blocks, &block2)
+					} else {
+						require.FailNow(t, "unknown block requested: %v", id)
+					}
+				}
+
+				// send the response
+				res := &messages.BlockResponse{
+					Nonce:  msg.Nonce,
+					Blocks: blocks,
+				}
+
+				err := syncConduit.Submit(res, originID)
+				assert.NoError(t, err)
+			default:
+				t.Errorf("unexpected msg to sync engine: %T, %v", args[1], args[1])
+			}
+		}).Return(nil)
+
+	receiptsReceived := 0
+
+	// register consensus engine to track receipts
+	consensusEngine := new(network.Engine)
+	_, _ = consensusNode.Net.Register(engine.ExecutionReceiptProvider, consensusEngine)
+	consensusEngine.On("Submit", mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			receiptsReceived++
+			originID := args[0].(flow.Identifier)
+			receipt := args[1].(*flow.ExecutionReceipt)
+			consensusNode.Log.Debug().
+				Hex("origin", originID[:]).
+				Hex("block", receipt.ExecutionResult.BlockID[:]).
+				Hex("commit", receipt.ExecutionResult.FinalStateCommit).
+				Msg("execution receipt delivered")
+
+		}).Return(nil)
+
+	// submit block2 from consensus node to execution node
+	exeNode.IngestionEngine.Submit(conID.NodeID, proposal2)
+
+	// ensure block 1 has been executed
+	hub.EventuallyUntil(t, func() bool {
+		return receiptsReceived == 2
+	}, 30*time.Second, 500*time.Millisecond)
+
+	// ensure blocks have been executed
+	exeNode.AssertHighestExecutedBlock(t, block2.Header)
+
+	scExeGenesis, err := exeNode.ExecutionState.StateCommitmentByBlockID(context.Background(), genesis.ID())
+	assert.NoError(t, err)
+	scExeBlock2, err := exeNode.ExecutionState.StateCommitmentByBlockID(context.Background(), block2.ID())
+	assert.NoError(t, err)
+	assert.Equal(t, scExeGenesis, scExeBlock2)
+
+	syncEngine.AssertExpectations(t)
 }
 
 func TestBroadcastToMultipleVerificationNodes(t *testing.T) {

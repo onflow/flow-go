@@ -50,8 +50,7 @@ func VerificationHappyPath(t *testing.T,
 		Msg("TestHappyPath started")
 
 	// ingest engine parameters
-	// set based on following issue
-	// https://github.com/dapperlabs/flow-go/issues/3443
+	// set based on issue (3443)
 	requestInterval := uint(1000)
 	failureThreshold := uint(2)
 

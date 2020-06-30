@@ -42,7 +42,7 @@ func TestInvalidTransaction(t *testing.T) {
 
 		err := node.IngestionEngine.ProcessLocal(&tx)
 		if assert.Error(t, err) {
-			assert.True(t, errors.Is(err, ingest.IncompleteTransactionError{}))
+			assert.True(t, errors.As(err, &ingest.IncompleteTransactionError{}))
 		}
 	})
 
@@ -52,7 +52,7 @@ func TestInvalidTransaction(t *testing.T) {
 
 		err := node.IngestionEngine.ProcessLocal(&tx)
 		if assert.Error(t, err) {
-			assert.True(t, errors.Is(err, ingest.GasLimitExceededError{}))
+			assert.True(t, errors.As(err, &ingest.GasLimitExceededError{}))
 		}
 	})
 
@@ -62,7 +62,7 @@ func TestInvalidTransaction(t *testing.T) {
 
 		err := node.IngestionEngine.ProcessLocal(&tx)
 		t.Log(err)
-		assert.True(t, errors.Is(err, ingest.ErrUnknownReferenceBlock))
+		assert.True(t, errors.As(err, &ingest.ErrUnknownReferenceBlock))
 	})
 
 	t.Run("un-parseable script", func(t *testing.T) {
@@ -72,7 +72,7 @@ func TestInvalidTransaction(t *testing.T) {
 
 		err := node.IngestionEngine.ProcessLocal(&tx)
 		t.Log(err)
-		assert.True(t, errors.Is(err, ingest.InvalidScriptError{}))
+		assert.True(t, errors.As(err, &ingest.InvalidScriptError{}))
 	})
 
 	t.Run("invalid signature", func(t *testing.T) {
@@ -100,7 +100,7 @@ func TestInvalidTransaction(t *testing.T) {
 
 			err := node.IngestionEngine.ProcessLocal(&tx)
 			t.Log(err)
-			assert.True(t, errors.Is(err, ingest.ExpiredTransactionError{}))
+			assert.True(t, errors.As(err, &ingest.ExpiredTransactionError{}))
 		})
 	})
 }

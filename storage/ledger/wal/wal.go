@@ -13,21 +13,21 @@ import (
 )
 
 type LedgerWAL struct {
-	wal       *prometheusWAL.WAL
-	cacheSize int
-	maxHeight int
+	wal            *prometheusWAL.WAL
+	forestCapacity int
+	keyByteSize    int
 }
 
 // TODO use real logger and metrics, but that would require passing them to Trie storage
-func NewWAL(logger log.Logger, reg prometheus.Registerer, dir string, cacheSize int, maxHeight int) (*LedgerWAL, error) {
+func NewWAL(logger log.Logger, reg prometheus.Registerer, dir string, forestCapacity int, keyByteSize int) (*LedgerWAL, error) {
 	w, err := prometheusWAL.NewSize(logger, reg, dir, 32*1024)
 	if err != nil {
 		return nil, err
 	}
 	return &LedgerWAL{
-		wal:       w,
-		cacheSize: cacheSize,
-		maxHeight: maxHeight,
+		wal:            w,
+		forestCapacity: forestCapacity,
+		keyByteSize:    keyByteSize,
 	}, nil
 }
 
@@ -167,7 +167,7 @@ func (w *LedgerWAL) replay(
 
 // NewCheckpointer returns a Checkpointer for this WAL
 func (w *LedgerWAL) NewCheckpointer() (*Checkpointer, error) {
-	return NewCheckpointer(w, w.maxHeight, w.cacheSize), nil
+	return NewCheckpointer(w, w.keyByteSize, w.forestCapacity), nil
 }
 
 func (w *LedgerWAL) Close() error {

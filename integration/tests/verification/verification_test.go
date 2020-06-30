@@ -67,8 +67,7 @@ func TestHappyPath(t *testing.T) {
 // are submited to the verification node.
 func TestSingleCollectionProcessing(t *testing.T) {
 	// ingest engine parameters
-	// set based on following issue
-	// https://github.com/dapperlabs/flow-go/issues/3443
+	// set based on issue (3443)
 	requestInterval := uint(1000)
 	failureThreshold := uint(2)
 

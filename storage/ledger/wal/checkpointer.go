@@ -24,18 +24,18 @@ const MagicBytes uint16 = 0x2137
 const VersionV1 uint16 = 0x01
 
 type Checkpointer struct {
-	dir       string
-	wal       *LedgerWAL
-	maxHeight int
-	cacheSize int
+	dir            string
+	wal            *LedgerWAL
+	keyByteSize    int
+	forestCapacity int
 }
 
-func NewCheckpointer(wal *LedgerWAL, maxHeight int, cacheSize int) *Checkpointer {
+func NewCheckpointer(wal *LedgerWAL, keyByteSize int, forestCapacity int) *Checkpointer {
 	return &Checkpointer{
-		dir:       wal.wal.Dir(),
-		wal:       wal,
-		maxHeight: maxHeight,
-		cacheSize: cacheSize,
+		dir:            wal.wal.Dir(),
+		wal:            wal,
+		keyByteSize:    keyByteSize,
+		forestCapacity: forestCapacity,
 	}
 }
 
@@ -121,7 +121,7 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 		return fmt.Errorf("no segments to checkpoint to %d, latests not checkpointed segment: %d", to, notCheckpointedTo)
 	}
 
-	mForest, err := mtrie.NewMForest(c.maxHeight, c.dir, c.cacheSize, &metrics.NoopCollector{}, func(evictedTrie *trie.MTrie) error {
+	mForest, err := mtrie.NewMForest(c.keyByteSize, c.dir, c.forestCapacity, &metrics.NoopCollector{}, func(evictedTrie *trie.MTrie) error {
 		return nil
 	})
 	if err != nil {
