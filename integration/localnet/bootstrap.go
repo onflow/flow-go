@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -21,9 +22,10 @@ const (
 	ProfilerDir              = "./profiler"
 	DataDir                  = "./data"
 	TrieDir                  = "./trie"
-	DockerComposeFile        = "./docker-compose.nodes.yml"
+	DockerComposeFile        = "docker-compose.nodes.yml"
 	DockerComposeFileVersion = "3.7"
-	PrometheusTargetsFile    = "./targets.nodes.json"
+	PrometheusTargetsFile    = "targets.nodes.json"
+	CheckpointFile           = "checkpoint.00000000"
 	DefaultCollectionCount   = 1
 	DefaultConsensusCount    = 3
 	DefaultExecutionCount    = 1
@@ -336,6 +338,20 @@ func prepareExecutionService(container testnet.ContainerConfig, i int) Service {
 		panic(err)
 	}
 
+	// check if there is a checkpoint file in the execution state and copy if so
+	sourceFile := sourceDir + "/" + CheckpointFile
+	destFile := trieDir + "/" + CheckpointFile
+	_, err = os.Stat(sourceFile)
+	if err != nil && !os.IsNotExist(err) {
+		panic(err)
+	}
+	if err == nil {
+		err = copyFile(sourceFile, destFile)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	service.Command = append(
 		service.Command,
 		"--triedir=/trie",
@@ -463,4 +479,25 @@ func openAndTruncate(filename string) (*os.File, error) {
 	}
 
 	return f, nil
+}
+
+func copyFile(src string, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(out, in)
+	if err != nil {
+		return err
+	}
+	err = out.Close()
+	if err != nil {
+		return err
+	}
+	return nil
 }
