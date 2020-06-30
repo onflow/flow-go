@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
+	computermock "github.com/dapperlabs/flow-go/engine/execution/computation/computer/mock"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/fvm"
-	vmmock "github.com/dapperlabs/flow-go/fvm/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 )
@@ -22,19 +22,16 @@ import (
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("single collection", func(t *testing.T) {
-		globalCtx := new(vmmock.Context)
-		blockCtx := new(vmmock.Context)
-		txCtx := new(vmmock.Context)
+		execCtx := fvm.NewContext()
 
-		exe := computer.NewBlockComputer(globalCtx, nil, nil, zerolog.Nop())
+		vm := new(computermock.VirtualMachine)
+
+		exe := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
 
 		// create a block with 1 collection with 2 transactions
 		block := generateBlock(1, 2)
 
-		globalCtx.On("NewChild", mock.Anything, mock.Anything).Return(blockCtx)
-		blockCtx.On("NewChild", mock.Anything).Return(txCtx)
-
-		txCtx.On("Invoke", mock.Anything, mock.Anything).
+		vm.On("Invoke", mock.Anything, mock.Anything, mock.Anything).
 			Return(&fvm.InvocationResult{}, nil).
 			Twice()
 
@@ -46,16 +43,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
 
-		globalCtx.AssertExpectations(t)
-		blockCtx.AssertExpectations(t)
+		vm.AssertExpectations(t)
 	})
 
 	t.Run("multiple collections", func(t *testing.T) {
-		globalCtx := new(vmmock.Context)
-		blockCtx := new(vmmock.Context)
-		txCtx := new(vmmock.Context)
+		execCtx := fvm.NewContext()
 
-		exe := computer.NewBlockComputer(globalCtx, nil, nil, zerolog.Nop())
+		vm := new(computermock.VirtualMachine)
+
+		exe := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
 
 		collectionCount := 2
 		transactionsPerCollection := 2
@@ -69,10 +65,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		// create dummy events
 		events := generateEvents(eventsPerTransaction)
 
-		globalCtx.On("NewChild", mock.Anything, mock.Anything).Return(blockCtx)
-		blockCtx.On("NewChild", mock.Anything).Return(txCtx)
-
-		txCtx.On("Invoke", mock.Anything, mock.Anything).
+		vm.On("Invoke", mock.Anything, mock.Anything, mock.Anything).
 			Return(&fvm.InvocationResult{Events: events, Error: &fvm.MissingPayerError{}}, nil).
 			Times(totalTransactionCount)
 
@@ -112,8 +105,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		}
 		assert.ElementsMatch(t, expectedResults, result.TransactionResult)
 
-		globalCtx.AssertExpectations(t)
-		blockCtx.AssertExpectations(t)
+		vm.AssertExpectations(t)
 	})
 }
 

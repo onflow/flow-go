@@ -19,21 +19,20 @@ func (i InvokableTransaction) Transaction() *flow.TransactionBody {
 	return i.tx
 }
 
-func (i InvokableTransaction) Parse(ctx Context, ledger Ledger) (Invokable, error) {
+func (i InvokableTransaction) Parse(vm *VirtualMachine, ctx Context, ledger Ledger) (Invokable, error) {
 	panic("implement me")
 }
 
-func (i InvokableTransaction) Invoke(ctx Context, ledger Ledger) (*InvocationResult, error) {
-	metaCtx := ctx.NewChild(
+func (i InvokableTransaction) Invoke(vm *VirtualMachine, ctx Context, ledger Ledger) (*InvocationResult, error) {
+	metaCtx := NewContextFromParent(
+		ctx,
 		WithSignatureVerification(false),
 		WithFeePayments(false),
 	)
 
-	opts := ctx.Options()
-
 	txID := i.tx.ID()
 
-	if opts.SignatureVerificationEnabled {
+	if ctx.SignatureVerificationEnabled {
 		flowErr, err := verifySignatures(ledger, i.tx)
 		if err != nil {
 			return nil, err
@@ -57,9 +56,10 @@ func (i InvokableTransaction) Invoke(ctx Context, ledger Ledger) (*InvocationRes
 		}
 	}
 
-	if opts.FeePaymentsEnabled {
-		result, err := metaCtx.Invoke(
-			deductTransactionFeeTransaction(i.tx.Payer, opts.Chain.ServiceAddress()),
+	if ctx.FeePaymentsEnabled {
+		result, err := vm.Invoke(
+			metaCtx,
+			deductTransactionFeeTransaction(i.tx.Payer, vm.chain.ServiceAddress()),
 			ledger,
 		)
 		if err != nil {
@@ -74,11 +74,11 @@ func (i InvokableTransaction) Invoke(ctx Context, ledger Ledger) (*InvocationRes
 		}
 	}
 
-	env := newEnvironment(ledger, opts).setTransaction(i.tx, metaCtx)
+	env := newEnvironment(vm, ctx, ledger).setTransaction(i.tx, metaCtx)
 
 	location := runtime.TransactionLocation(txID[:])
 
-	err := ctx.Runtime().ExecuteTransaction(i.tx.Script, i.tx.Arguments, env, location)
+	err := vm.runtime.ExecuteTransaction(i.tx.Script, i.tx.Arguments, env, location)
 
 	return createInvocationResult(txID, nil, env.getEvents(), env.getLogs(), err)
 }

@@ -97,13 +97,13 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 
 		blocks := new(storage.Blocks)
 
-		execCtx := vm.NewContext(fvm.WithBlocks(blocks))
+		execCtx := fvm.NewContext(fvm.WithBlocks(blocks))
 
 		// create state.View
 		view := delta.NewView(state.LedgerGetRegister(led, startStateCommitment))
 
 		// create BlockComputer
-		bc := computer.NewBlockComputer(execCtx, nil, nil, log)
+		bc := computer.NewBlockComputer(vm, execCtx, nil, nil, log)
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
 		completeColls[guarantee.ID()] = &entity.CompleteCollection{

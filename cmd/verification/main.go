@@ -180,9 +180,7 @@ func main() {
 
 			vm := fvm.New(rt, node.RootChainID.Chain())
 
-			execCtx := vm.NewContext(fvm.WithBlocks(node.Storage.Blocks))
-
-			chunkVerifier := chunks.NewChunkVerifier(execCtx)
+			chunkVerifier := chunks.NewChunkVerifier(vm, node.Storage.Blocks)
 			verifierEng, err = verifier.New(node.Logger, collector, node.Tracer, node.Network, node.State, node.Me,
 				chunkVerifier)
 			return verifierEng, err

@@ -18,7 +18,7 @@ import (
 var _ runtime.Interface = &hostEnv{}
 
 type hostEnv struct {
-	chain    flow.Chain
+	vm       *VirtualMachine
 	ledger   Ledger
 	astCache ASTCache
 	blocks   Blocks
@@ -38,25 +38,25 @@ type hostEnv struct {
 	restrictAccountCreation    bool
 }
 
-func newEnvironment(ledger Ledger, opts Options) *hostEnv {
+func newEnvironment(vm *VirtualMachine, ctx Context, ledger Ledger) *hostEnv {
 	env := &hostEnv{
+		vm:                         vm,
 		ledger:                     ledger,
-		chain:                      opts.Chain,
-		astCache:                   opts.ASTCache,
-		blocks:                     opts.Blocks,
+		astCache:                   ctx.ASTCache,
+		blocks:                     ctx.Blocks,
 		Metrics:                    &noopMetricsCollector{},
-		gasLimit:                   opts.GasLimit,
-		restrictContractDeployment: opts.RestrictedDeploymentEnabled,
-		restrictAccountCreation:    opts.RestrictedAccountCreationEnabled,
+		gasLimit:                   ctx.GasLimit,
+		restrictContractDeployment: ctx.RestrictedDeploymentEnabled,
+		restrictAccountCreation:    ctx.RestrictedAccountCreationEnabled,
 	}
 
-	if opts.BlockHeader != nil {
-		env.setBlockHeader(opts.BlockHeader)
-		env.seedRNG(opts.BlockHeader)
+	if ctx.BlockHeader != nil {
+		env.setBlockHeader(ctx.BlockHeader)
+		env.seedRNG(ctx.BlockHeader)
 	}
 
-	if opts.Metrics != nil {
-		env.Metrics = &metricsCollector{opts.Metrics}
+	if ctx.Metrics != nil {
+		env.Metrics = &metricsCollector{ctx.Metrics}
 	}
 
 	return env
@@ -79,8 +79,8 @@ func (e *hostEnv) setTransaction(
 	txCtx Context,
 ) *hostEnv {
 	e.transactionEnv = newTransactionEnv(
+		e.vm,
 		e.ledger,
-		e.chain,
 		tx,
 		txCtx,
 		e.restrictContractDeployment,
@@ -285,8 +285,8 @@ func (e *hostEnv) GetSigningAccounts() []runtime.Address {
 // Transaction Environment
 
 type transactionEnv struct {
+	vm     *VirtualMachine
 	ledger Ledger
-	chain  flow.Chain
 	tx     *flow.TransactionBody
 
 	// txCtx is an execution context used to execute meta transactions
@@ -299,16 +299,16 @@ type transactionEnv struct {
 }
 
 func newTransactionEnv(
+	vm *VirtualMachine,
 	ledger Ledger,
-	chain flow.Chain,
 	tx *flow.TransactionBody,
 	txCtx Context,
 	restrictContractDeployment bool,
 	restrictAccountCreation bool,
 ) *transactionEnv {
 	return &transactionEnv{
+		vm:                         vm,
 		ledger:                     ledger,
-		chain:                      chain,
 		tx:                         tx,
 		txCtx:                      txCtx,
 		restrictContractDeployment: restrictContractDeployment,
@@ -335,8 +335,13 @@ func (e *transactionEnv) GetComputationLimit() uint64 {
 func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
 	var result *InvocationResult
 
-	result, err = e.txCtx.Invoke(
-		deductAccountCreationFeeTransaction(flow.Address(payer), e.chain.ServiceAddress(), e.restrictAccountCreation),
+	result, err = e.vm.Invoke(
+		e.txCtx,
+		deductAccountCreationFeeTransaction(
+			flow.Address(payer),
+			e.vm.chain.ServiceAddress(),
+			e.restrictAccountCreation,
+		),
 		e.ledger,
 	)
 	if err != nil {
@@ -361,12 +366,16 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 
 	var flowAddress flow.Address
 
-	flowAddress, err = createAccount(e.ledger, e.chain, nil)
+	flowAddress, err = createAccount(e.ledger, e.vm.chain, nil)
 	if err != nil {
 		return address, err
 	}
 
-	result, err = e.txCtx.Invoke(initFlowTokenTransaction(flowAddress, e.chain.ServiceAddress()), e.ledger)
+	result, err = e.vm.Invoke(
+		e.txCtx,
+		initFlowTokenTransaction(flowAddress, e.vm.chain.ServiceAddress()),
+		e.ledger,
+	)
 	if err != nil {
 		return address, err
 	}
@@ -480,7 +489,7 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, index int) (p
 func (e *transactionEnv) UpdateAccountCode(address runtime.Address, code []byte) (err error) {
 	// currently, every transaction that sets account code (deploys/updates contracts)
 	// must be signed by the service account
-	if e.restrictContractDeployment && !e.isValidSigningAccount(runtime.Address(e.chain.ServiceAddress())) {
+	if e.restrictContractDeployment && !e.isValidSigningAccount(runtime.Address(e.vm.chain.ServiceAddress())) {
 		return fmt.Errorf("code deployment requires authorization from the service account")
 	}
 

@@ -14,9 +14,9 @@ import (
 // A BootstrapProcedure is an invokable that can be used to bootstrap the ledger state
 // with the default accounts and contracts required by the Flow virtual machine.
 type BootstrapProcedure struct {
-	metaCtx Context
+	vm      *VirtualMachine
 	ledger  Ledger
-	chain   flow.Chain
+	metaCtx Context
 
 	// genesis parameters
 	serviceAccountPublicKey flow.AccountPublicKey
@@ -35,23 +35,24 @@ func Bootstrap(
 	}
 }
 
-func (b *BootstrapProcedure) Parse(ctx Context, ledger Ledger) (Invokable, error) {
+func (b *BootstrapProcedure) Parse(vm *VirtualMachine, ctx Context, ledger Ledger) (Invokable, error) {
 	// no-op: Bootstrapping invocation does not support pre-parsing
 	return b, nil
 }
 
-func (b *BootstrapProcedure) Invoke(ctx Context, ledger Ledger) (*InvocationResult, error) {
-	b.metaCtx = ctx.NewChild(
+func (b *BootstrapProcedure) Invoke(vm *VirtualMachine, ctx Context, ledger Ledger) (*InvocationResult, error) {
+	b.metaCtx = NewContextFromParent(
+		ctx,
 		WithSignatureVerification(false),
 		WithFeePayments(false),
 		WithRestrictedDeployment(false),
 	)
 
+	b.vm = vm
 	b.ledger = ledger
-	b.chain = ctx.Options().Chain
 
 	// initialize the account addressing state
-	setAddressState(ledger, b.chain.NewAddressGenerator())
+	setAddressState(ledger, vm.chain.NewAddressGenerator())
 
 	service := b.createServiceAccount(b.serviceAccountPublicKey)
 
@@ -69,7 +70,7 @@ func (b *BootstrapProcedure) Invoke(ctx Context, ledger Ledger) (*InvocationResu
 }
 
 func (b *BootstrapProcedure) createAccount() flow.Address {
-	address, err := createAccount(b.ledger, b.chain, nil)
+	address, err := createAccount(b.ledger, b.vm.chain, nil)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create account: %s", err))
 	}
@@ -78,7 +79,7 @@ func (b *BootstrapProcedure) createAccount() flow.Address {
 }
 
 func (b *BootstrapProcedure) createServiceAccount(accountKey flow.AccountPublicKey) flow.Address {
-	address, err := createAccount(b.ledger, b.chain, []flow.AccountPublicKey{accountKey})
+	address, err := createAccount(b.ledger, b.vm.chain, []flow.AccountPublicKey{accountKey})
 	if err != nil {
 		panic(fmt.Sprintf("failed to create service account: %s", err))
 	}
@@ -140,7 +141,7 @@ func (b *BootstrapProcedure) mintInitialTokens(service, fungibleToken, flowToken
 }
 
 func (b *BootstrapProcedure) mustInvoke(i Invokable) *InvocationResult {
-	result, err := b.metaCtx.Invoke(i, b.ledger)
+	result, err := b.vm.Invoke(b.metaCtx, i, b.ledger)
 	if err != nil {
 		panic(err)
 	}

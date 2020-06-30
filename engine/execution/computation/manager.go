@@ -15,8 +15,14 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
+
+type VirtualMachine interface {
+	Invoke(fvm.Context, fvm.Invokable, fvm.Ledger) (*fvm.InvocationResult, error)
+	GetAccount(fvm.Context, flow.Address, fvm.Ledger) (*flow.Account, error)
+}
 
 type ComputationManager interface {
 	ExecuteScript([]byte, [][]byte, *flow.Header, *delta.View) ([]byte, error)
@@ -33,6 +39,7 @@ type Manager struct {
 	log           zerolog.Logger
 	me            module.Local
 	protoState    protocol.State
+	vm            VirtualMachine
 	execCtx       fvm.Context
 	blockComputer computer.BlockComputer
 }
@@ -43,16 +50,21 @@ func New(
 	tracer module.Tracer,
 	me module.Local,
 	protoState protocol.State,
-	execCtx fvm.Context,
+	blocks storage.Blocks,
+	vm VirtualMachine,
 ) *Manager {
 	log := logger.With().Str("engine", "computation").Logger()
+
+	execCtx := fvm.NewContext(fvm.WithBlocks(blocks))
 
 	e := Manager{
 		log:        log,
 		me:         me,
 		protoState: protoState,
+		vm:         vm,
 		execCtx:    execCtx,
 		blockComputer: computer.NewBlockComputer(
+			vm,
 			execCtx,
 			metrics,
 			tracer,
@@ -65,9 +77,9 @@ func New(
 
 func (e *Manager) ExecuteScript(script []byte, arguments [][]byte, blockHeader *flow.Header, view *delta.View) ([]byte, error) {
 
-	scriptCtx := e.execCtx.NewChild(fvm.WithBlockHeader(blockHeader))
+	blockCtx := fvm.NewContextFromParent(e.execCtx, fvm.WithBlockHeader(blockHeader))
 
-	result, err := scriptCtx.Invoke(fvm.Script(script).WithArguments(arguments), view)
+	result, err := e.vm.Invoke(blockCtx, fvm.Script(script).WithArguments(arguments), view)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
 	}
@@ -111,7 +123,9 @@ func (e *Manager) ComputeBlock(
 }
 
 func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, view *delta.View) (*flow.Account, error) {
-	account, err := e.execCtx.NewChild(fvm.WithBlockHeader(blockHeader)).GetAccount(address, view)
+	blockCtx := fvm.NewContextFromParent(e.execCtx, fvm.WithBlockHeader(blockHeader))
+
+	account, err := e.vm.GetAccount(blockCtx, address, view)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account at block (%s): %w", blockHeader.ID(), err)
 	}

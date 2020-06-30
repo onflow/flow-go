@@ -63,15 +63,14 @@ func main() {
 
 			vm := fvm.New(rt, node.RootChainID.Chain())
 
-			execCtx := vm.NewContext(fvm.WithBlocks(node.Storage.Blocks))
-
 			computationManager = computation.New(
 				node.Logger,
 				collector,
 				node.Tracer,
 				node.Me,
 				node.State,
-				execCtx,
+				node.Storage.Blocks,
+				vm,
 			)
 
 			return nil

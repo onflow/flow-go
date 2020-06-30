@@ -12,13 +12,13 @@ type Invokable struct {
 	mock.Mock
 }
 
-// Invoke provides a mock function with given fields: ctx, ledger
-func (_m *Invokable) Invoke(ctx fvm.Context, ledger fvm.Ledger) (*fvm.InvocationResult, error) {
-	ret := _m.Called(ctx, ledger)
+// Invoke provides a mock function with given fields: vm, ctx, ledger
+func (_m *Invokable) Invoke(vm *fvm.VirtualMachine, ctx fvm.Context, ledger fvm.Ledger) (*fvm.InvocationResult, error) {
+	ret := _m.Called(vm, ctx, ledger)
 
 	var r0 *fvm.InvocationResult
-	if rf, ok := ret.Get(0).(func(fvm.Context, fvm.Ledger) *fvm.InvocationResult); ok {
-		r0 = rf(ctx, ledger)
+	if rf, ok := ret.Get(0).(func(*fvm.VirtualMachine, fvm.Context, fvm.Ledger) *fvm.InvocationResult); ok {
+		r0 = rf(vm, ctx, ledger)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*fvm.InvocationResult)
@@ -26,8 +26,8 @@ func (_m *Invokable) Invoke(ctx fvm.Context, ledger fvm.Ledger) (*fvm.Invocation
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(fvm.Context, fvm.Ledger) error); ok {
-		r1 = rf(ctx, ledger)
+	if rf, ok := ret.Get(1).(func(*fvm.VirtualMachine, fvm.Context, fvm.Ledger) error); ok {
+		r1 = rf(vm, ctx, ledger)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -35,13 +35,13 @@ func (_m *Invokable) Invoke(ctx fvm.Context, ledger fvm.Ledger) (*fvm.Invocation
 	return r0, r1
 }
 
-// Parse provides a mock function with given fields: ctx, ledger
-func (_m *Invokable) Parse(ctx fvm.Context, ledger fvm.Ledger) (fvm.Invokable, error) {
-	ret := _m.Called(ctx, ledger)
+// Parse provides a mock function with given fields: vm, ctx, ledger
+func (_m *Invokable) Parse(vm *fvm.VirtualMachine, ctx fvm.Context, ledger fvm.Ledger) (fvm.Invokable, error) {
+	ret := _m.Called(vm, ctx, ledger)
 
 	var r0 fvm.Invokable
-	if rf, ok := ret.Get(0).(func(fvm.Context, fvm.Ledger) fvm.Invokable); ok {
-		r0 = rf(ctx, ledger)
+	if rf, ok := ret.Get(0).(func(*fvm.VirtualMachine, fvm.Context, fvm.Ledger) fvm.Invokable); ok {
+		r0 = rf(vm, ctx, ledger)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(fvm.Invokable)
@@ -49,8 +49,8 @@ func (_m *Invokable) Parse(ctx fvm.Context, ledger fvm.Ledger) (fvm.Invokable, e
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(fvm.Context, fvm.Ledger) error); ok {
-		r1 = rf(ctx, ledger)
+	if rf, ok := ret.Get(1).(func(*fvm.VirtualMachine, fvm.Context, fvm.Ledger) error); ok {
+		r1 = rf(vm, ctx, ledger)
 	} else {
 		r1 = ret.Error(1)
 	}

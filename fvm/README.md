@@ -15,7 +15,7 @@ import (
 
 vm := fvm.New(runtime.NewInterpreterRuntime())
 
-ctx := vm.NewContext()
+ctx := fvm.NewContext()
 
 tx := flow.NewTransactionBody().
     SetScript(`transaction { execute { log("Hello, World!") } }`)
@@ -83,7 +83,7 @@ a new child context.
 ```go
 vm := fvm.New(runtime.NewInterpreterRuntime())
 
-globalCtx := vm.NewContext()
+globalCtx := fvm.NewContext()
 
 // create separate contexts for different blocks
 block1Ctx := globalCtx.NewChild(fvm.WithBlockHeader(block1))
