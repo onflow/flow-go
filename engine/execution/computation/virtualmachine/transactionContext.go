@@ -315,7 +315,7 @@ func (r *TransactionContext) ServiceAddress() flow.Address {
 func (r *TransactionContext) UpdateAccountCode(address runtime.Address, code []byte) (err error) {
 	accountAddress := runtimeToFlowAddress(address)
 
-	key := fullKeyHash(string(accountAddress.Bytes()), string(accountAddress.Bytes()), keyCode)
+	key := FullKeyHash(string(accountAddress.Bytes()), string(accountAddress.Bytes()), keyCode)
 
 	prevCode, err := r.ledger.Get(key)
 	if err != nil {
@@ -355,7 +355,7 @@ func (r *TransactionContext) ResolveImport(location runtime.Location) ([]byte, e
 
 	address := flow.BytesToAddress(addressLocation)
 
-	code, err := r.ledger.Get(fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyCode))
+	code, err := r.ledger.Get(FullKeyHash(string(address.Bytes()), string(address.Bytes()), keyCode))
 	if err != nil {
 		return nil, err
 	}
