@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -20,8 +21,11 @@ var (
 	flagPartnerStakes                                string
 	flagCollectorGenerationMaxHashGrindingIterations uint
 	flagFastKG                                       bool
-	flagStateCommitment                              string
-	flagChainID                                      string
+	flagRootChain                                    string
+	flagRootParent                                   string
+	flagRootHeight                                   uint64
+	flagRootTimestamp                                string
+	flagRootCommit                                   string
 )
 
 type PartnerStakes map[flow.Identifier]uint64
@@ -34,8 +38,6 @@ var finalizeCmd = &cobra.Command{
 running the DKG for the generation of the random beacon keys and generating the root block, QC, execution result
 and block seal.`,
 	Run: func(cmd *cobra.Command, args []string) {
-
-		chainID := parseChainID(flagChainID)
 
 		log.Info().Msg("✨ collecting partner network and staking keys")
 		partnerNodes := assemblePartnerNodes()
@@ -55,7 +57,7 @@ and block seal.`,
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ constructing root block")
-		block := constructRootBlock(stakingNodes, chainID)
+		block := constructRootBlock(flagRootChain, flagRootParent, flagRootHeight, flagRootTimestamp, stakingNodes)
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ constructing root QC")
@@ -68,7 +70,7 @@ and block seal.`,
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ constructing root execution result and block seal")
-		constructRootResultAndSeal(flagStateCommitment, block)
+		constructRootResultAndSeal(flagRootCommit, block)
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ computing collection node clusters")
@@ -90,9 +92,32 @@ and block seal.`,
 func init() {
 	rootCmd.AddCommand(finalizeCmd)
 
+	// required parameters for network configuration and generation of root node identities
 	finalizeCmd.Flags().StringVar(&flagConfig, "config", "",
 		"path to a JSON file containing multiple node configurations (fields Role, Address, Stake)")
+	finalizeCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", fmt.Sprintf("path to directory "+
+		"containing one JSON file starting with %v for every partner node (fields Role, Address, NodeID, "+
+		"NetworkPubKey, StakingPubKey)", model.PathPartnerNodeInfoPrefix))
+	finalizeCmd.Flags().StringVar(&flagPartnerStakes, "partner-stakes", "", "path to a JSON file containing "+
+		"a map from partner node's NodeID to their stake")
+
 	_ = finalizeCmd.MarkFlagRequired("config")
+	_ = finalizeCmd.MarkFlagRequired("partner-dir")
+	_ = finalizeCmd.MarkFlagRequired("partner-stakes")
+
+	// required parameters for generation of root block, root execution result and root block seal
+	finalizeCmd.Flags().StringVar(&flagRootChain, "root-chain", "emulator", "chain ID for the root block (can be \"main\", \"test\" or \"emulator\"")
+	finalizeCmd.Flags().StringVar(&flagRootParent, "root-parent", "0x0000000000000000000000000000000000000000000000000000000000000000", "ID for the parent of the root block")
+	finalizeCmd.Flags().Uint64Var(&flagRootHeight, "root-height", 0, "height of the root block")
+	finalizeCmd.Flags().StringVar(&flagRootTimestamp, "root-timestamp", time.Now().UTC().Format(time.RFC3339), "timestamp of the root block (RFC3339)")
+	finalizeCmd.Flags().StringVar(&flagRootCommit, "root-commit", "0x0000000000000000000000000000000000000000000000000000000000000000", "state commitment of root execution state")
+
+	_ = finalizeCmd.MarkFlagRequired("root-chain")
+	_ = finalizeCmd.MarkFlagRequired("root-parent")
+	_ = finalizeCmd.MarkFlagRequired("root-height")
+	_ = finalizeCmd.MarkFlagRequired("root-commit")
+
+	// optional parameters to influence various aspects of identity generation
 	finalizeCmd.Flags().Uint16Var(&flagCollectionClusters, "collection-clusters", 2,
 		"number of collection clusters")
 	finalizeCmd.Flags().StringVar(&flagGeneratedCollectorAddressTemplate, "generated-collector-address-template",
@@ -102,19 +127,9 @@ func init() {
 		"stake for collector nodes that will be generated")
 	finalizeCmd.Flags().UintVar(&flagCollectorGenerationMaxHashGrindingIterations, "collector-gen-max-iter", 1000,
 		"max hash grinding iterations for collector generation")
-	finalizeCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", fmt.Sprintf("path to directory "+
-		"containing one JSON file starting with %v for every partner node (fields Role, Address, NodeID, "+
-		"NetworkPubKey, StakingPubKey)", model.PathPartnerNodeInfoPrefix))
-	_ = finalizeCmd.MarkFlagRequired("partner-dir")
-	finalizeCmd.Flags().StringVar(&flagPartnerStakes, "partner-stakes", "", "path to a JSON file containing "+
-		"a map from partner node's NodeID to their stake")
-	_ = finalizeCmd.MarkFlagRequired("partner-stakes")
 	finalizeCmd.Flags().BoolVar(&flagFastKG, "fast-kg", false, "use fast (centralized) random beacon key generation "+
 		"instead of DKG")
-	finalizeCmd.Flags().StringVar(&flagStateCommitment, "state-commitment", "", "initial state commitment for "+
-		"bootstrap execution result & block seal")
-	_ = finalizeCmd.MarkFlagRequired("state-commitment")
-	finalizeCmd.Flags().StringVar(&flagChainID, "chain-id", "", "chain ID for the root block (can be \"main\", \"test\" or \"emulator\"")
+
 }
 
 func assemblePartnerNodes() []model.NodeInfo {
@@ -217,18 +232,4 @@ func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) []model.NodeIn
 	}
 
 	return nodes
-}
-
-func parseChainID(chainID string) flow.ChainID {
-	switch chainID {
-	case "main":
-		return flow.Mainnet
-	case "test":
-		return flow.Testnet
-	case "emulator":
-		return flow.Emulator
-	default:
-		log.Fatal().Str("chain_id", chainID).Msg("invalid chain ID")
-		return ""
-	}
 }

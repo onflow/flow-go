@@ -52,7 +52,7 @@ func currentUser() string {
 	return fmt.Sprintf("%s:%s", cur.Uid, cur.Gid)
 }
 
-func toIdentityList(confs []ContainerConfig) flow.IdentityList {
+func toParticipants(confs []ContainerConfig) flow.IdentityList {
 	il := make(flow.IdentityList, 0, len(confs))
 	for _, conf := range confs {
 		il = append(il, conf.Identity())
@@ -60,7 +60,7 @@ func toIdentityList(confs []ContainerConfig) flow.IdentityList {
 	return il
 }
 
-func toNodeInfoList(confs []ContainerConfig) []bootstrap.NodeInfo {
+func toNodeInfos(confs []ContainerConfig) []bootstrap.NodeInfo {
 	infos := make([]bootstrap.NodeInfo, 0, len(confs))
 	for _, conf := range confs {
 		infos = append(infos, conf.NodeInfo)

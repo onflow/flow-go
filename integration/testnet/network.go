@@ -525,11 +525,16 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, nil, err
 	}
 
+	// define root block parameters
+	parentID := flow.ZeroID
+	height := uint64(0)
+	timestamp := time.Now().UTC()
+
 	// generate root block
-	root := bootstraprun.GenerateRootBlock(toIdentityList(confs), chainID)
+	root := bootstraprun.GenerateRootBlock(chainID, parentID, height, timestamp, toParticipants(confs))
 
 	// generate QC
-	nodeInfos := bootstrap.FilterByRole(toNodeInfoList(confs), flow.RoleConsensus)
+	nodeInfos := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
 	signerData := bootstrapcmd.GenerateQCParticipantData(nodeInfos, nodeInfos, dkg)
 	qc, err := bootstraprun.GenerateRootQC(signerData, root)
 	if err != nil {
@@ -561,7 +566,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 
 	// write public DKG data
-	consensusNodes := bootstrap.FilterByRole(toNodeInfoList(confs), flow.RoleConsensus)
+	consensusNodes := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
 	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathDKGDataPub), dkg.Public(consensusNodes))
 	if err != nil {
 		return nil, nil, nil, err
@@ -691,7 +696,7 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 func runDKG(confs []ContainerConfig) (bootstrap.DKGData, error) {
 
 	// filter by consensus nodes
-	consensusNodes := bootstrap.FilterByRole(toNodeInfoList(confs), flow.RoleConsensus)
+	consensusNodes := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
 	nConsensusNodes := len(consensusNodes)
 
 	// run the core dkg algorithm
@@ -722,7 +727,7 @@ func runDKG(confs []ContainerConfig) (bootstrap.DKGData, error) {
 //   * a cluster-specific root QC
 func setupClusterGenesisBlockQCs(nClusters uint, confs []ContainerConfig, root *flow.Block) ([]*cluster.Block, []*hotstuff.QuorumCertificate, error) {
 
-	identities := toIdentityList(confs)
+	identities := toParticipants(confs)
 	clusters := protocol.Clusters(nClusters, identities)
 
 	blocks := make([]*cluster.Block, 0, nClusters)
