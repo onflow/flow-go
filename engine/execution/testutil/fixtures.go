@@ -146,7 +146,7 @@ func CreateAccountsWithSimpleAddresses(
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) ([]flow.Address, error) {
-	ctx := vm.NewContext(fvm.WithSignatureVerification(false))
+	ctx := fvm.NewContext(fvm.WithSignatureVerification(false))
 
 	var accounts []flow.Address
 
@@ -172,7 +172,7 @@ func CreateAccountsWithSimpleAddresses(
 			AddArgument(encCadAccountKey).
 			AddAuthorizer(serviceAddress)
 
-		result, err := ctx.Invoke(fvm.Transaction(tx), ledger)
+		result, err := vm.Invoke(ctx, fvm.Transaction(tx), ledger)
 		if err != nil {
 			return nil, err
 		}
@@ -203,7 +203,8 @@ func RootBootstrappedLedger(chain flow.Chain) fvm.Ledger {
 
 	vm := fvm.New(runtime.NewInterpreterRuntime(), chain)
 
-	_, _ = vm.NewContext().Invoke(
+	_, _ = vm.Invoke(
+		fvm.NewContext(),
 		fvm.Bootstrap(unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply),
 		ledger,
 	)

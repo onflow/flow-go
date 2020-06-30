@@ -7,19 +7,17 @@ import (
 	"time"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/runtime"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/fvm"
-	fvmMock "github.com/dapperlabs/flow-go/fvm/mock"
-	chModels "github.com/dapperlabs/flow-go/model/chunks"
+	chunksmodels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
+	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -34,10 +32,10 @@ func (s *ChunkVerifierTestSuite) SetupTest() {
 	// seed the RNG
 	rand.Seed(time.Now().UnixNano())
 
-	execCtx := new(fvmMock.Context)
-	execCtx.On("NewChild", mock.Anything).Return(&blockContextMock{})
+	vm := new(vmMock)
+	blocks := new(storage.Blocks)
 
-	s.verifier = chunks.NewChunkVerifier(execCtx)
+	s.verifier = chunks.NewChunkVerifier(vm, blocks)
 }
 
 // TestChunkVerifier invokes all the tests in this test suite
@@ -63,7 +61,7 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 	chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.NotNil(s.T(), chFaults)
-	_, ok := chFaults.(*chModels.CFMissingRegisterTouch)
+	_, ok := chFaults.(*chunksmodels.CFMissingRegisterTouch)
 	assert.True(s.T(), ok)
 }
 
@@ -76,7 +74,7 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
 	chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.NotNil(s.T(), chFaults)
-	_, ok := chFaults.(*chModels.CFMissingRegisterTouch)
+	_, ok := chFaults.(*chunksmodels.CFMissingRegisterTouch)
 	assert.True(s.T(), ok)
 }
 
@@ -89,7 +87,7 @@ func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 	chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.NotNil(s.T(), chFaults)
-	_, ok := chFaults.(*chModels.CFNonMatchingFinalState)
+	_, ok := chFaults.(*chunksmodels.CFNonMatchingFinalState)
 	assert.True(s.T(), ok)
 }
 
@@ -201,21 +199,11 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 	})
 
 	return &verifiableChunkData
-
 }
 
-type blockContextMock struct{}
+type vmMock struct{}
 
-func (bc *blockContextMock) NewChild(opts ...fvm.Option) fvm.Context {
-	return nil
-}
-
-func (bc *blockContextMock) Parse(i fvm.Invokable, ledger fvm.Ledger) (fvm.Invokable, error) {
-	return nil, nil
-}
-
-func (bc *blockContextMock) Invoke(i fvm.Invokable, ledger fvm.Ledger) (*fvm.InvocationResult, error) {
-
+func (vm *vmMock) Invoke(ctx fvm.Context, i fvm.Invokable, ledger fvm.Ledger) (*fvm.InvocationResult, error) {
 	invokableTx, ok := i.(fvm.InvokableTransaction)
 	if !ok {
 		return nil, fmt.Errorf("invokable is not a transaction")
@@ -264,10 +252,3 @@ func (bc *blockContextMock) Invoke(i fvm.Invokable, ledger fvm.Ledger) (*fvm.Inv
 	}
 	return &txRes, nil
 }
-
-func (bc *blockContextMock) GetAccount(address flow.Address, ledger fvm.Ledger) (*flow.Account, error) {
-	return nil, nil
-}
-
-func (bc *blockContextMock) Options() fvm.Options     { return fvm.Options{} }
-func (bc *blockContextMock) Runtime() runtime.Runtime { return nil }

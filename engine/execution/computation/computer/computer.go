@@ -18,12 +18,17 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
+type VirtualMachine interface {
+	Invoke(fvm.Context, fvm.Invokable, fvm.Ledger) (*fvm.InvocationResult, error)
+}
+
 // A BlockComputer executes the transactions in a block.
 type BlockComputer interface {
 	ExecuteBlock(context.Context, *entity.ExecutableBlock, *delta.View) (*execution.ComputationResult, error)
 }
 
 type blockComputer struct {
+	vm      VirtualMachine
 	execCtx fvm.Context
 	metrics module.ExecutionMetrics
 	tracer  module.Tracer
@@ -32,12 +37,14 @@ type blockComputer struct {
 
 // NewBlockComputer creates a new block executor.
 func NewBlockComputer(
+	vm VirtualMachine,
 	execCtx fvm.Context,
 	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
 	logger zerolog.Logger,
 ) BlockComputer {
 	return &blockComputer{
+		vm:      vm,
 		execCtx: execCtx,
 		metrics: metrics,
 		tracer:  tracer,
@@ -73,7 +80,7 @@ func (e *blockComputer) executeBlock(
 	stateView *delta.View,
 ) (*execution.ComputationResult, error) {
 
-	blockCtx := e.execCtx.NewChild(fvm.WithBlockHeader(block.Block.Header))
+	blockCtx := fvm.NewContextFromParent(e.execCtx, fvm.WithBlockHeader(block.Block.Header))
 
 	collections := block.Collections()
 
@@ -165,9 +172,9 @@ func (e *blockComputer) executeCollection(
 
 			txView := collectionView.NewChild()
 
-			txCtx := blockCtx.NewChild(fvm.WithMetricsCollector(txMetrics))
+			txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsCollector(txMetrics))
 
-			result, err := txCtx.Invoke(fvm.Transaction(tx), txView)
+			result, err := e.vm.Invoke(txCtx, fvm.Transaction(tx), txView)
 
 			if e.metrics != nil {
 				e.metrics.TransactionParsed(txMetrics.Parsed())

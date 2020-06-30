@@ -21,7 +21,13 @@ func keyPublicKey(index uint64) string {
 	return fmt.Sprintf("public_key_%d", index)
 }
 
-func getAccount(ctx Context, ledger Ledger, chain flow.Chain, address flow.Address) (*flow.Account, error) {
+func getAccount(
+	vm *VirtualMachine,
+	ctx Context,
+	ledger Ledger,
+	chain flow.Chain,
+	address flow.Address,
+) (*flow.Account, error) {
 	var ok bool
 	var err error
 
@@ -45,7 +51,11 @@ func getAccount(ctx Context, ledger Ledger, chain flow.Chain, address flow.Addre
 		panic(err)
 	}
 
-	result, err := ctx.Invoke(getFlowTokenBalanceScript(address, chain.ServiceAddress()), ledger)
+	result, err := vm.Invoke(
+		ctx,
+		getFlowTokenBalanceScript(address, chain.ServiceAddress()),
+		ledger,
+	)
 	if err != nil {
 		return nil, err
 	}
