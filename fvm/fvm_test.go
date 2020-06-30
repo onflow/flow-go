@@ -22,7 +22,10 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func vmTest(f func(t *testing.T, ctx fvm.Context, ledger fvm.Ledger), opts ...fvm.Option) func(t *testing.T) {
+func vmTest(
+	f func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger fvm.Ledger),
+	opts ...fvm.Option,
+) func(t *testing.T) {
 	return func(t *testing.T) {
 		rt := runtime.NewInterpreterRuntime()
 
@@ -43,7 +46,7 @@ func vmTest(f func(t *testing.T, ctx fvm.Context, ledger fvm.Ledger), opts ...fv
 		_, err = vm.Invoke(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply), ledger)
 		require.NoError(t, err)
 
-		f(t, ctx, ledger)
+		f(t, vm, chain, ctx, ledger)
 	}
 }
 
