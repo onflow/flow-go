@@ -6,6 +6,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+// A Context is an execution context in which invokables are applied to the
+// ledger state.
 type Context interface {
 	NewChild(opts ...Option) Context
 
@@ -46,7 +48,7 @@ func (ctx *context) Invoke(i Invokable, ledger Ledger) (*InvocationResult, error
 }
 
 func (ctx *context) GetAccount(address flow.Address, ledger Ledger) (*flow.Account, error) {
-	account, err := getAccount(ctx, ledger, ctx.opts.chain, address)
+	account, err := getAccount(ctx, ledger, ctx.opts.Chain, address)
 	if err != nil {
 		// TODO: wrap error
 		return nil, err

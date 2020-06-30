@@ -48,7 +48,7 @@ func (b *BootstrapProcedure) Invoke(ctx Context, ledger Ledger) (*InvocationResu
 	)
 
 	b.ledger = ledger
-	b.chain = ctx.Options().chain
+	b.chain = ctx.Options().Chain
 
 	// initialize the account addressing state
 	setAddressState(ledger, b.chain.NewAddressGenerator())

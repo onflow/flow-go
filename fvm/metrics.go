@@ -16,6 +16,7 @@ type MetricsCollector struct {
 	interpreted time.Duration
 }
 
+// NewMetricsCollectors returns a new runtime metrics collector.
 func NewMetricsCollector() *MetricsCollector {
 	return &MetricsCollector{}
 }
