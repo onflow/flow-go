@@ -15,11 +15,17 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
+type VirtualMachine interface {
+	Invoke(fvm.Context, fvm.Invokable, fvm.Ledger) (*fvm.InvocationResult, error)
+	GetAccount(fvm.Context, flow.Address, fvm.Ledger) (*flow.Account, error)
+}
+
 type ComputationManager interface {
-	ExecuteScript([]byte, *flow.Header, *delta.View) ([]byte, error)
+	ExecuteScript([]byte, [][]byte, *flow.Header, *delta.View) ([]byte, error)
 	ComputeBlock(
 		ctx context.Context,
 		block *entity.ExecutableBlock,
@@ -33,39 +39,52 @@ type Manager struct {
 	log           zerolog.Logger
 	me            module.Local
 	protoState    protocol.State
+	vm            VirtualMachine
 	execCtx       fvm.Context
 	blockComputer computer.BlockComputer
 }
 
 func New(
 	logger zerolog.Logger,
+	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
 	me module.Local,
 	protoState protocol.State,
-	execCtx fvm.Context,
+	blocks storage.Blocks,
+	vm VirtualMachine,
 ) *Manager {
 	log := logger.With().Str("engine", "computation").Logger()
 
+	execCtx := fvm.NewContext(fvm.WithBlocks(blocks))
+
 	e := Manager{
-		log:           log,
-		me:            me,
-		protoState:    protoState,
-		execCtx:       execCtx,
-		blockComputer: computer.NewBlockComputer(execCtx, tracer),
+		log:        log,
+		me:         me,
+		protoState: protoState,
+		vm:         vm,
+		execCtx:    execCtx,
+		blockComputer: computer.NewBlockComputer(
+			vm,
+			execCtx,
+			metrics,
+			tracer,
+			log.With().Str("component", "block_computer").Logger(),
+		),
 	}
 
 	return &e
 }
 
-func (e *Manager) ExecuteScript(script []byte, blockHeader *flow.Header, view *delta.View) ([]byte, error) {
+func (e *Manager) ExecuteScript(script []byte, arguments [][]byte, blockHeader *flow.Header, view *delta.View) ([]byte, error) {
+	blockCtx := fvm.NewContextFromParent(e.execCtx, fvm.WithBlockHeader(blockHeader))
 
-	result, err := e.execCtx.NewChild(fvm.WithBlockHeader(blockHeader)).Invoke(fvm.Script(script), view)
+	result, err := e.vm.Invoke(blockCtx, fvm.Script(script).WithArguments(arguments), view)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
 	}
 
 	if !result.Succeeded() {
-		return nil, fmt.Errorf("failed to execute script at block (%s): %s", blockHeader.ID(), result.Error.ErrorMessage())
+		return nil, fmt.Errorf("failed to execute script at block (%s): %s", blockHeader.ID(), result.Error.Error())
 	}
 
 	encodedValue, err := jsoncdc.Encode(result.Value)
@@ -103,7 +122,9 @@ func (e *Manager) ComputeBlock(
 }
 
 func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, view *delta.View) (*flow.Account, error) {
-	account, err := e.execCtx.NewChild(fvm.WithBlockHeader(blockHeader)).GetAccount(address, view)
+	blockCtx := fvm.NewContextFromParent(e.execCtx, fvm.WithBlockHeader(blockHeader))
+
+	account, err := e.vm.GetAccount(blockCtx, address, view)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account at block (%s): %w", blockHeader.ID(), err)
 	}

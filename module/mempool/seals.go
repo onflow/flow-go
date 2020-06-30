@@ -28,6 +28,9 @@ type Seals interface {
 	// Size will return the current size of the memory pool.
 	Size() uint
 
+	// Limit will return the maximum size of the memory pool
+	Limit() uint
+
 	// All will retrieve all block seals that are currently in the memory pool
 	// as a slice.
 	All() []*flow.Seal

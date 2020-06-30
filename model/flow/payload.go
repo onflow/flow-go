@@ -16,8 +16,8 @@ func (p Payload) Hash() Identifier {
 }
 
 // Index returns the index for the payload.
-func (p Payload) Index() Index {
-	idx := Index{
+func (p Payload) Index() *Index {
+	idx := &Index{
 		NodeIDs:       GetIDs(p.Identities),
 		CollectionIDs: GetIDs(p.Guarantees),
 		SealIDs:       GetIDs(p.Seals),

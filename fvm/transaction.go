@@ -19,19 +19,20 @@ func (i InvokableTransaction) Transaction() *flow.TransactionBody {
 	return i.tx
 }
 
-func (i InvokableTransaction) Parse(ctx Context, ledger Ledger) (Invokable, error) {
+func (i InvokableTransaction) Parse(vm *VirtualMachine, ctx Context, ledger Ledger) (Invokable, error) {
 	panic("implement me")
 }
 
-func (i InvokableTransaction) Invoke(ctx Context, ledger Ledger) (*InvocationResult, error) {
-	metaCtx := ctx.NewChild(
+func (i InvokableTransaction) Invoke(vm *VirtualMachine, ctx Context, ledger Ledger) (*InvocationResult, error) {
+	metaCtx := NewContextFromParent(
+		ctx,
 		WithSignatureVerification(false),
 		WithFeePayments(false),
 	)
 
 	txID := i.tx.ID()
 
-	if ctx.Options().signatureVerificationEnabled {
+	if ctx.SignatureVerificationEnabled {
 		err := verifySignatures(ledger, i.tx)
 		if err != nil {
 			return createInvocationResult(txID, nil, nil, nil, err)
@@ -43,18 +44,22 @@ func (i InvokableTransaction) Invoke(ctx Context, ledger Ledger) (*InvocationRes
 		}
 	}
 
-	if ctx.Options().feePaymentsEnabled {
-		err := invokeMetaTransaction(metaCtx, deductTransactionFeeTransaction(i.tx.Payer), ledger)
+	if ctx.FeePaymentsEnabled {
+		err := vm.invokeMetaTransaction(
+			metaCtx,
+			deductTransactionFeeTransaction(i.tx.Payer, vm.chain.ServiceAddress()),
+			ledger,
+		)
 		if err != nil {
 			return createInvocationResult(txID, nil, nil, nil, err)
 		}
 	}
 
-	env := newEnvironment(ledger, ctx.Options()).setTransaction(i.tx, metaCtx)
+	env := newEnvironment(vm, ctx, ledger).setTransaction(i.tx, metaCtx)
 
 	location := runtime.TransactionLocation(txID[:])
 
-	err := ctx.Runtime().ExecuteTransaction(i.tx.Script, i.tx.Arguments, env, location)
+	err := vm.runtime.ExecuteTransaction(i.tx.Script, i.tx.Arguments, env, location)
 
 	return createInvocationResult(txID, nil, env.getEvents(), env.getLogs(), err)
 }
@@ -226,8 +231,8 @@ func verifyAccountSignature(
 
 	accountKey := &accountKeys[txSig.KeyID]
 
-	hasher, err := hash.NewHasher(accountKey.HashAlgo)
-	if err != nil {
+	hasher := newHasher(accountKey.HashAlgo)
+	if hasher == nil {
 		return accountKey, &InvalidHashAlgorithmError{
 			Address:  txSig.Address,
 			KeyID:    txSig.KeyID,
@@ -245,7 +250,7 @@ func verifyAccountSignature(
 	}
 
 	if !valid {
-		return accountKey, &InvalidSignaturePublicKeyError{Address: txSig.Address, KeyID: txSig.KeyID}
+		return nil, &InvalidSignaturePublicKeyError{Address: txSig.Address, KeyID: txSig.KeyID}
 	}
 
 	return accountKey, nil
@@ -257,4 +262,15 @@ func sigIsForProposalKey(txSig flow.TransactionSignature, proposalKey flow.Propo
 
 func hasSufficientKeyWeight(weights map[flow.Address]int, address flow.Address) bool {
 	return weights[address] >= AccountKeyWeightThreshold
+}
+
+func newHasher(hashAlgo hash.HashingAlgorithm) hash.Hasher {
+	switch hashAlgo {
+	case hash.SHA2_256:
+		return hash.NewSHA2_256()
+	case hash.SHA3_256:
+		return hash.NewSHA3_256()
+	}
+
+	return nil
 }

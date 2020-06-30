@@ -12,14 +12,16 @@ import (
 )
 
 type Collections struct {
-	db *badger.DB
+	db           *badger.DB
+	transactions *Transactions
 }
 
-func NewCollections(db *badger.DB) *Collections {
-	c := Collections{
-		db: db,
+func NewCollections(db *badger.DB, transactions *Transactions) *Collections {
+	c := &Collections{
+		db:           db,
+		transactions: transactions,
 	}
-	return &c
+	return c
 }
 
 func (c *Collections) StoreLight(collection *flow.LightCollection) error {
@@ -40,9 +42,9 @@ func (c *Collections) Store(collection *flow.Collection) error {
 		}
 
 		for _, tx := range collection.Transactions {
-			err = operation.SkipDuplicates(operation.InsertTransaction(tx))(btx)
+			err = c.transactions.storeTx(tx)(btx)
 			if err != nil {
-				return err
+				return fmt.Errorf("could not insert transaction: %w", err)
 			}
 		}
 
@@ -66,8 +68,7 @@ func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 		}
 
 		for _, txID := range light.Transactions {
-			var tx flow.TransactionBody
-			err = operation.RetrieveTransaction(txID, &tx)(btx)
+			tx, err := c.transactions.ByID(txID)
 			if err != nil {
 				if errors.Is(err, badger.ErrKeyNotFound) {
 					return storage.ErrNotFound
@@ -75,7 +76,7 @@ func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
 				return fmt.Errorf("could not retrieve transaction: %w", err)
 			}
 
-			collection.Transactions = append(collection.Transactions, &tx)
+			collection.Transactions = append(collection.Transactions, tx)
 		}
 
 		return nil

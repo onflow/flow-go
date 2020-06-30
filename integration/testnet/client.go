@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/onflow/flow/protobuf/go/flow/access"
+
+	"github.com/dapperlabs/flow-go/engine/execution/utils"
 	"github.com/dapperlabs/flow-go/integration/client"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/dsl"
@@ -17,11 +19,13 @@ import (
 type Client struct {
 	client *client.AccessClient
 	key    *flow.AccountPrivateKey
+	seqNo  uint64
+	Chain  flow.Chain
 }
 
 // NewClientWithKey returns a new client to an Access API listening at the given
 // address, using the given account key for signing transactions.
-func NewClientWithKey(addr string, key *flow.AccountPrivateKey) (*Client, error) {
+func NewClientWithKey(addr string, key *flow.AccountPrivateKey, chain flow.Chain) (*Client, error) {
 
 	client, err := client.NewAccessClient(addr)
 	if err != nil {
@@ -31,19 +35,42 @@ func NewClientWithKey(addr string, key *flow.AccountPrivateKey) (*Client, error)
 	tc := &Client{
 		client: client,
 		key:    key,
+		Chain:  chain,
 	}
 	return tc, nil
 }
 
 // NewClient returns a new client to an Access API listening at the given
-// address, with a generated account key for signing transactions.
-func NewClient(addr string) (*Client, error) {
-	key, err := unittest.AccountKeyFixture()
-	if err != nil {
-		return nil, fmt.Errorf("could not generate key for client")
-	}
+// address, with a test service account key for signing transactions.
+func NewClient(addr string, chain flow.Chain) (*Client, error) {
+	key := unittest.ServiceAccountPrivateKey
 
-	return NewClientWithKey(addr, key)
+	// Uncomment for debugging keys
+
+	//json, err := key.MarshalJSON()
+	//if err != nil {
+	//	return nil, fmt.Errorf("cannot marshal key json: %w", err)
+	//}
+	//public := key.PublicKey(1000)
+	//publicJson, err := public.MarshalJSON()
+	//if err != nil {
+	//	return nil, fmt.Errorf("cannot marshal key json: %w", err)
+	//}
+
+	//fmt.Printf("New client with private key: \n%s\n", json)
+	//fmt.Printf("and public key: \n%s\n", publicJson)
+
+	return NewClientWithKey(addr, &key, chain)
+}
+
+func (c *Client) GetSeqNumber() uint64 {
+	n := c.seqNo
+	c.seqNo++
+	return n
+}
+
+func (c *Client) Events(ctx context.Context, typ string) ([]*access.EventsResponse_Result, error) {
+	return c.client.GetEvents(ctx, typ)
 }
 
 // DeployContract submits a transaction to deploy a contract with the given
@@ -57,19 +84,25 @@ func (c *Client) DeployContract(ctx context.Context, refID flow.Identifier, cont
 		},
 	}
 
-	tx := unittest.TransactionBodyFixture(
-		unittest.WithTransactionDSL(code),
-		unittest.WithReferenceBlock(refID),
-	)
+	tx := flow.NewTransactionBody().
+		SetScript([]byte(code.ToCadence())).
+		SetReferenceBlockID(refID).
+		SetProposalKey(c.Chain.ServiceAddress(), 0, c.GetSeqNumber()).
+		SetPayer(c.Chain.ServiceAddress()).
+		AddAuthorizer(c.Chain.ServiceAddress())
 
-	return c.SendTransaction(ctx, tx)
+	return c.SignAndSendTransaction(ctx, *tx)
 }
 
 // SignTransaction signs the transaction using the proposer's key
 func (c *Client) SignTransaction(tx flow.TransactionBody) (flow.TransactionBody, error) {
 
-	hasher := hash.NewSHA3_256()
-	err := tx.SignPayload(tx.Payer, tx.ProposalKey.KeyID, c.key.PrivateKey, hasher)
+	hasher, err := utils.NewHasher(c.key.HashAlgo)
+	if err != nil {
+		return flow.TransactionBody{}, err
+	}
+
+	err = tx.SignPayload(tx.Payer, tx.ProposalKey.KeyID, c.key.PrivateKey, hasher)
 	if err != nil {
 		return flow.TransactionBody{}, err
 	}

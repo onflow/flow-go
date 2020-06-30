@@ -9,12 +9,14 @@ import (
 	"testing"
 	"time"
 
+	golog "github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
 	"github.com/dapperlabs/flow-go/network/codec/json"
@@ -42,7 +44,7 @@ func (m *MeshNetTestSuite) SetupTest() {
 	// defines total number of nodes in our network (minimum 3 needed to use 1-k messaging)
 	const count = 10
 	const cacheSize = 100
-	//golog.SetAllLoggers(gologging.INFO)
+	golog.SetAllLoggers(golog.LevelInfo)
 
 	m.ids = CreateIDs(count)
 
@@ -84,7 +86,7 @@ func (m *MeshNetTestSuite) TestAllToAll() {
 	// log[i][j] keeps the message that node i sends to node j
 	log := make(map[int][]string)
 	for i := range m.nets {
-		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, 1)
+		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, engine.CollectionProvider)
 		engs = append(engs, eng)
 		log[i] = make([]string, 0)
 	}
@@ -157,7 +159,7 @@ func (m *MeshNetTestSuite) TestTargetValidator() {
 	wg := sync.WaitGroup{}
 
 	for i := range m.nets {
-		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, 1)
+		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, engine.CollectionIngest)
 		engs = append(engs, eng)
 	}
 
@@ -217,7 +219,7 @@ func (m *MeshNetTestSuite) TestMaxMessageSize() {
 	wg := sync.WaitGroup{}
 
 	for i := range m.nets {
-		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, 1)
+		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, engine.CollectionIngest)
 		engs = append(engs, eng)
 	}
 
@@ -236,7 +238,8 @@ func (m *MeshNetTestSuite) TestMaxMessageSize() {
 	require.NoError(m.T(), err)
 
 	// create a large message approximately equal to max message size
-	overhead := 500                                                       // approx 500 bytes overhead for message headers & encoding overhead
+	// approx 1000 bytes overhead for message headers, encoding overhead and libp2p message overhead
+	overhead := 1000
 	payloadSize := libp2p.DefaultMaxPubSubMsgSize - overhead - len(empty) // max possible payload size
 	payload := make([]byte, payloadSize)                                  // create a message of max possible payload size
 	for i := range payload {

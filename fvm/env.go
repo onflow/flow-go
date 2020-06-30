@@ -1,8 +1,10 @@
 package fvm
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/rand"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -16,13 +18,17 @@ import (
 var _ runtime.Interface = &hostEnv{}
 
 type hostEnv struct {
+	vm       *VirtualMachine
 	ledger   Ledger
 	astCache ASTCache
 	blocks   Blocks
 
+	runtime.Metrics
+
 	gasLimit    uint64
 	uuid        uint64
 	blockHeader *flow.Header
+	rng         *rand.Rand
 
 	events []cadence.Event
 	logs   []string
@@ -32,33 +38,54 @@ type hostEnv struct {
 	restrictAccountCreation    bool
 }
 
-func newEnvironment(ledger Ledger, opts Options) *hostEnv {
+func newEnvironment(vm *VirtualMachine, ctx Context, ledger Ledger) *hostEnv {
 	env := &hostEnv{
+		vm:                         vm,
 		ledger:                     ledger,
-		astCache:                   opts.astCache,
-		blocks:                     opts.blocks,
-		gasLimit:                   opts.gasLimit,
-		restrictContractDeployment: opts.restrictedDeploymentEnabled,
-		restrictAccountCreation:    opts.restrictedAccountCreationEnabled,
+		astCache:                   ctx.ASTCache,
+		blocks:                     ctx.Blocks,
+		Metrics:                    &noopMetricsCollector{},
+		gasLimit:                   ctx.GasLimit,
+		restrictContractDeployment: ctx.RestrictedDeploymentEnabled,
+		restrictAccountCreation:    ctx.RestrictedAccountCreationEnabled,
 	}
 
-	if opts.blockHeader != nil {
-		return env.setBlockHeader(opts.blockHeader)
+	if ctx.BlockHeader != nil {
+		env.setBlockHeader(ctx.BlockHeader)
+		env.seedRNG(ctx.BlockHeader)
+	}
+
+	if ctx.Metrics != nil {
+		env.Metrics = &metricsCollector{ctx.Metrics}
 	}
 
 	return env
 }
 
-func (e *hostEnv) setBlockHeader(header *flow.Header) *hostEnv {
+func (e *hostEnv) setBlockHeader(header *flow.Header) {
 	e.blockHeader = header
-	return e
+}
+
+func (e *hostEnv) seedRNG(header *flow.Header) {
+	// Seed the random number generator with entropy created from the block header ID. The random number generator will
+	// be used by the UnsafeRandom function.
+	id := header.ID()
+	source := rand.NewSource(int64(binary.BigEndian.Uint64(id[:])))
+	e.rng = rand.New(source)
 }
 
 func (e *hostEnv) setTransaction(
 	tx *flow.TransactionBody,
 	txCtx Context,
 ) *hostEnv {
-	e.transactionEnv = newTransactionEnv(e.ledger, tx, txCtx, e.restrictContractDeployment, e.restrictAccountCreation)
+	e.transactionEnv = newTransactionEnv(
+		e.vm,
+		e.ledger,
+		tx,
+		txCtx,
+		e.restrictContractDeployment,
+		e.restrictAccountCreation,
+	)
 	return e
 }
 
@@ -71,12 +98,25 @@ func (e *hostEnv) getLogs() []string {
 }
 
 func (e *hostEnv) GetValue(owner, controller, key []byte) ([]byte, error) {
-	v, _ := e.ledger.Get(fullKeyHash(string(owner), string(controller), string(key)))
+	v, _ := e.ledger.Get(
+		fullKeyHash(
+			string(flow.BytesToAddress(owner).Bytes()),
+			string(flow.BytesToAddress(controller).Bytes()),
+			string(key),
+		),
+	)
 	return v, nil
 }
 
 func (e *hostEnv) SetValue(owner, controller, key, value []byte) error {
-	e.ledger.Set(fullKeyHash(string(owner), string(controller), string(key)), value)
+	e.ledger.Set(
+		fullKeyHash(
+			string(flow.BytesToAddress(owner).Bytes()),
+			string(flow.BytesToAddress(controller).Bytes()),
+			string(key),
+		),
+		value,
+	)
 	return nil
 }
 
@@ -170,6 +210,18 @@ func (e *hostEnv) GetCurrentBlockHeight() uint64 {
 	return e.blockHeader.Height
 }
 
+// UnsafeRandom returns a random uint64, where the process of random number derivation is not cryptographically
+// secure.
+func (e *hostEnv) UnsafeRandom() uint64 {
+	if e.rng == nil {
+		panic("UnsafeRandom is not supported by this environment")
+	}
+
+	buf := make([]byte, 8)
+	_, _ = e.rng.Read(buf) // Always succeeds, no need to check error
+	return binary.LittleEndian.Uint64(buf)
+}
+
 // GetBlockAtHeight returns the block at the given height.
 func (e *hostEnv) GetBlockAtHeight(height uint64) (hash runtime.BlockHash, timestamp int64, exists bool, err error) {
 	if e.blocks == nil {
@@ -233,6 +285,7 @@ func (e *hostEnv) GetSigningAccounts() []runtime.Address {
 // Transaction Environment
 
 type transactionEnv struct {
+	vm     *VirtualMachine
 	ledger Ledger
 	tx     *flow.TransactionBody
 
@@ -246,6 +299,7 @@ type transactionEnv struct {
 }
 
 func newTransactionEnv(
+	vm *VirtualMachine,
 	ledger Ledger,
 	tx *flow.TransactionBody,
 	txCtx Context,
@@ -253,6 +307,7 @@ func newTransactionEnv(
 	restrictAccountCreation bool,
 ) *transactionEnv {
 	return &transactionEnv{
+		vm:                         vm,
 		ledger:                     ledger,
 		tx:                         tx,
 		txCtx:                      txCtx,
@@ -278,10 +333,13 @@ func (e *transactionEnv) GetComputationLimit() uint64 {
 }
 
 func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
-
-	err = invokeMetaTransaction(
+	err = e.vm.invokeMetaTransaction(
 		e.txCtx,
-		deductAccountCreationFeeTransaction(flow.Address(payer), e.restrictAccountCreation),
+		deductAccountCreationFeeTransaction(
+			flow.Address(payer),
+			e.vm.chain.ServiceAddress(),
+			e.restrictAccountCreation,
+		),
 		e.ledger,
 	)
 	if err != nil {
@@ -290,12 +348,16 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 
 	var flowAddress flow.Address
 
-	flowAddress, err = createAccount(e.ledger, nil)
+	flowAddress, err = createAccount(e.ledger, e.vm.chain, nil)
 	if err != nil {
 		return address, err
 	}
 
-	err = invokeMetaTransaction(e.txCtx, initFlowTokenTransaction(flowAddress), e.ledger)
+	err = e.vm.invokeMetaTransaction(
+		e.txCtx,
+		initFlowTokenTransaction(flowAddress, e.vm.chain.ServiceAddress()),
+		e.ledger,
+	)
 	if err != nil {
 		return address, err
 	}
@@ -397,7 +459,7 @@ func (e *transactionEnv) UpdateAccountCode(address runtime.Address, code []byte)
 
 	// currently, every transaction that sets account code (deploys/updates contracts)
 	// must be signed by the service account
-	if e.restrictContractDeployment && !e.isAuthorizer(runtime.Address(flow.ServiceAddress())) {
+	if e.restrictContractDeployment && !e.isAuthorizer(runtime.Address(e.vm.chain.ServiceAddress())) {
 		return fmt.Errorf("code deployment requires authorization from the service account")
 	}
 

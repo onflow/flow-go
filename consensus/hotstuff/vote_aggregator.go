@@ -4,6 +4,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 )
 
+// VoteAggregator aggregates votes and produces quorum certificates.
 type VoteAggregator interface {
 
 	// StorePendingVote is used to store a vote for a block for which we don't

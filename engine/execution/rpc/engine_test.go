@@ -167,7 +167,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 func (suite *Suite) TestGetAccountAtBlockID() {
 
 	id := unittest.IdentifierFixture()
-	serviceAddress := flow.ServiceAddress()
+	serviceAddress := flow.Mainnet.Chain().ServiceAddress()
 
 	serviceAccount := flow.Account{
 		Address: serviceAddress,

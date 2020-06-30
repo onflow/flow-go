@@ -22,32 +22,32 @@ type FollowerLogic struct {
 	log               zerolog.Logger
 	validator         hotstuff.Validator
 	finalizationLogic forks.Finalizer
-	notifier          hotstuff.FinalizationConsumer
 }
 
+// New creates a new FollowerLogic instance
 func New(
 	log zerolog.Logger,
 	validator hotstuff.Validator,
 	finalizationLogic forks.Finalizer,
-	notifier hotstuff.FinalizationConsumer,
 ) (*FollowerLogic, error) {
 	return &FollowerLogic{
 		log:               log.With().Str("hotstuff", "follower").Logger(),
 		validator:         validator,
 		finalizationLogic: finalizationLogic,
-		notifier:          notifier,
 	}, nil
 }
 
+// FinalizedBlock returns the latest finalized block
 func (f *FollowerLogic) FinalizedBlock() *model.Block {
 	return f.finalizationLogic.FinalizedBlock()
 }
 
+// AddBlock processes the given block proposal
 func (f *FollowerLogic) AddBlock(blockProposal *model.Proposal) error {
 	// validate the block. skip if the proposal is invalid
 	err := f.validator.ValidateProposal(blockProposal)
-	if errors.Is(err, model.ErrorInvalidBlock{}) {
-		f.log.Warn().AnErr("err", err).Hex("block_id", logging.ID(blockProposal.Block.BlockID)).
+	if model.IsInvalidBlockError(err) {
+		f.log.Warn().Err(err).Hex("block_id", logging.ID(blockProposal.Block.BlockID)).
 			Msg("invalid proposal")
 		return nil
 	}

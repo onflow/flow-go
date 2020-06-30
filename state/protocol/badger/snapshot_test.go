@@ -163,3 +163,54 @@ func TestClusters(t *testing.T) {
 		assert.Len(t, actual.ByIndex(2), 2)
 	}, protocol.SetClusters(3))
 }
+
+func TestSeed(t *testing.T) {
+
+	// should not be able to get random beacon seed from a block with no children
+	t.Run("no children", func(t *testing.T) {
+		util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+			identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+			genesis := unittest.GenesisFixture(identities)
+			commit := unittest.StateCommitmentFixture()
+
+			err := state.Mutate().Bootstrap(commit, genesis)
+			assert.Nil(t, err)
+
+			_, err = state.Final().(*protocol.Snapshot).Seed(1, 2, 3, 4)
+			t.Log(err)
+			assert.Error(t, err)
+		})
+	})
+
+	// should not be able to get random beacon seed from a block with only invalid
+	// or unvalidated children
+	t.Run("un-validated child", func(t *testing.T) {
+		util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
+
+			identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+			genesis := unittest.GenesisFixture(identities)
+			commit := unittest.StateCommitmentFixture()
+
+			err := state.Mutate().Bootstrap(commit, genesis)
+			assert.Nil(t, err)
+
+			// add child
+			unvalidatedChild := unittest.BlockWithParentFixture(genesis.Header)
+			unvalidatedChild.Payload.Guarantees = nil
+			unvalidatedChild.Header.PayloadHash = unvalidatedChild.Payload.Hash()
+			err = state.Mutate().Extend(&unvalidatedChild)
+			assert.Nil(t, err)
+
+			_, err = state.Final().(*protocol.Snapshot).Seed(1, 2, 3, 4)
+			t.Log(err)
+			assert.Error(t, err)
+		})
+	})
+
+	// should be able to get random beacon seed from a block with a valid child
+	t.Run("valid child", func(t *testing.T) {
+		t.Skip()
+		// TODO
+	})
+}

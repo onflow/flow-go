@@ -14,8 +14,9 @@ import (
 // A BootstrapProcedure is an invokable that can be used to bootstrap the ledger state
 // with the default accounts and contracts required by the Flow virtual machine.
 type BootstrapProcedure struct {
-	metaCtx Context
+	vm      *VirtualMachine
 	ledger  Ledger
+	metaCtx Context
 
 	// genesis parameters
 	serviceAccountPublicKey flow.AccountPublicKey
@@ -34,22 +35,24 @@ func Bootstrap(
 	}
 }
 
-func (b *BootstrapProcedure) Parse(ctx Context, ledger Ledger) (Invokable, error) {
+func (b *BootstrapProcedure) Parse(vm *VirtualMachine, ctx Context, ledger Ledger) (Invokable, error) {
 	// no-op: Bootstrapping invocation does not support pre-parsing
 	return b, nil
 }
 
-func (b *BootstrapProcedure) Invoke(ctx Context, ledger Ledger) (*InvocationResult, error) {
-	b.metaCtx = ctx.NewChild(
+func (b *BootstrapProcedure) Invoke(vm *VirtualMachine, ctx Context, ledger Ledger) (*InvocationResult, error) {
+	b.metaCtx = NewContextFromParent(
+		ctx,
 		WithSignatureVerification(false),
 		WithFeePayments(false),
 		WithRestrictedDeployment(false),
 	)
 
+	b.vm = vm
 	b.ledger = ledger
 
 	// initialize the account addressing state
-	setAddressState(ledger, flow.NewAddressGenerator())
+	setAddressState(ledger, vm.chain.NewAddressGenerator())
 
 	service := b.createServiceAccount(b.serviceAccountPublicKey)
 
@@ -67,7 +70,7 @@ func (b *BootstrapProcedure) Invoke(ctx Context, ledger Ledger) (*InvocationResu
 }
 
 func (b *BootstrapProcedure) createAccount() flow.Address {
-	address, err := createAccount(b.ledger, nil)
+	address, err := createAccount(b.ledger, b.vm.chain, nil)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create account: %s", err))
 	}
@@ -76,7 +79,7 @@ func (b *BootstrapProcedure) createAccount() flow.Address {
 }
 
 func (b *BootstrapProcedure) createServiceAccount(accountKey flow.AccountPublicKey) flow.Address {
-	address, err := createAccount(b.ledger, []flow.AccountPublicKey{accountKey})
+	address, err := createAccount(b.ledger, b.vm.chain, []flow.AccountPublicKey{accountKey})
 	if err != nil {
 		panic(fmt.Sprintf("failed to create service account: %s", err))
 	}
@@ -87,7 +90,7 @@ func (b *BootstrapProcedure) createServiceAccount(accountKey flow.AccountPublicK
 func (b *BootstrapProcedure) deployFungibleToken() flow.Address {
 	fungibleToken := b.createAccount()
 
-	err := invokeMetaTransaction(
+	err := b.vm.invokeMetaTransaction(
 		b.metaCtx,
 		deployContractTransaction(fungibleToken, contracts.FungibleToken()),
 		b.ledger,
@@ -104,7 +107,7 @@ func (b *BootstrapProcedure) deployFlowToken(service, fungibleToken flow.Address
 
 	contract := contracts.FlowToken(fungibleToken.Hex())
 
-	err := invokeMetaTransaction(
+	err := b.vm.invokeMetaTransaction(
 		b.metaCtx,
 		deployFlowTokenTransaction(flowToken, service, contract),
 		b.ledger,
@@ -121,7 +124,7 @@ func (b *BootstrapProcedure) deployFlowFees(service, fungibleToken, flowToken fl
 
 	contract := contracts.FlowFees(fungibleToken.Hex(), flowToken.Hex())
 
-	err := invokeMetaTransaction(
+	err := b.vm.invokeMetaTransaction(
 		b.metaCtx,
 		deployFlowFeesTransaction(flowFees, service, contract),
 		b.ledger,
@@ -136,7 +139,7 @@ func (b *BootstrapProcedure) deployFlowFees(service, fungibleToken, flowToken fl
 func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowToken, feeContract flow.Address) {
 	contract := contracts.FlowServiceAccount(fungibleToken.Hex(), flowToken.Hex(), feeContract.Hex())
 
-	err := invokeMetaTransaction(
+	err := b.vm.invokeMetaTransaction(
 		b.metaCtx,
 		deployContractTransaction(service, contract),
 		b.ledger,
@@ -147,7 +150,7 @@ func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowTo
 }
 
 func (b *BootstrapProcedure) mintInitialTokens(service, fungibleToken, flowToken flow.Address, initialSupply uint64) {
-	err := invokeMetaTransaction(
+	err := b.vm.invokeMetaTransaction(
 		b.metaCtx,
 		mintFlowTokenTransaction(fungibleToken, flowToken, service, initialSupply),
 		b.ledger,
@@ -259,12 +262,12 @@ const (
 	flowTokenAccountIndex     = 3
 )
 
-func FungibleTokenAddress() flow.Address {
-	address, _ := flow.AddressAtIndex(fungibleTokenAccountIndex)
+func FungibleTokenAddress(chain flow.Chain) flow.Address {
+	address, _ := chain.AddressAtIndex(fungibleTokenAccountIndex)
 	return address
 }
 
-func FlowTokenAddress() flow.Address {
-	address, _ := flow.AddressAtIndex(flowTokenAccountIndex)
+func FlowTokenAddress(chain flow.Chain) flow.Address {
+	address, _ := chain.AddressAtIndex(flowTokenAccountIndex)
 	return address
 }

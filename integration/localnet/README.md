@@ -1,6 +1,25 @@
 # Flow Local Instrumented Test Environment (FLITE)
 
-## Bootstrap the network
+FLITE is a tool for running a full version of the Flow blockchain.
+
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+## Table of Contents
+
+- [Bootstrapping](#bootstrapping)
+  - [Configuration](#configuration)
+  - [Profiling](#profiling)
+- [Start the network](#start-the-network)
+- [Stop the network](#stop-the-network)
+- [Logs](#logs)
+- [Metrics](#metrics)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+## Bootstrapping
+
+Before running the Flow network it is necessary to run a bootstrapping process. 
+This generates keys for each of the nodes and a genesis block to build on.
 
 Bootstrap a new network:
 
@@ -8,15 +27,36 @@ Bootstrap a new network:
 make init
 ```
 
-You can optionally specify the number of nodes for each role:
+### Configuration
+
+Various properties of the local network can be configured when it is initialized.
+All configuration is optional.
+
+Specify the number of nodes for each role:
 
 ```sh
 make -e COLLECTION=2 CONSENSUS=5 EXECUTION=3 VERIFICATION=2 ACCESS=2 init
 ```
 
+Specify the number of collector clusters:
+
+```sh
+make -e NCLUSTERS=3 init
+```
+
+### Profiling
+
+You can turn on automatic profiling for all nodes. Profiles are written every 2
+minutes to `./profiler`.
+
+```sh
+make -e PROFILER=true init
+```
+
 ## Start the network
 
-This command will automatically build new Docker images from your latest code changes and then start the test network:
+This command will automatically build new Docker images from your latest code changes
+and then start the test network:
 
 ```sh
 make start

@@ -49,9 +49,7 @@ func New(
 	config Config,
 ) (*Engine, error) {
 
-	logger := log.With().
-		Str("engine", "ingest").
-		Logger()
+	logger := log.With().Str("engine", "ingest").Logger()
 
 	e := &Engine{
 		unit:       engine.NewUnit(),
@@ -97,7 +95,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+			engine.LogError(e.log, err)
 		}
 	})
 }
@@ -150,7 +148,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// first, we check if the transaction is valid
 	err := e.ValidateTransaction(tx)
 	if err != nil {
-		return fmt.Errorf("invalid transaction: %w", err)
+		return engine.NewInvalidInputErrorf("invalid transaction: %w", err)
 	}
 
 	// retrieve the set of collector clusters
@@ -159,8 +157,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 		return fmt.Errorf("could not cluster collection nodes: %w", err)
 	}
 
-	// get the locally assigned cluster and the cluster responsible for the
-	// transaction
+	// get the locally assigned cluster and the cluster responsible for the transaction
 	txCluster := clusters.ByTxID(tx.ID())
 	localID := e.me.NodeID()
 	localCluster, ok := clusters.ByNodeID(localID)
@@ -173,7 +170,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 		Hex("tx_cluster", logging.ID(txCluster.Fingerprint())).
 		Logger()
 
-	// if our cluster is responsible for the transaction, store it
+	// if our cluster is responsible for the transaction, add it to the mempool
 	if localCluster.Fingerprint() == txCluster.Fingerprint() {
 		_ = e.pool.Add(tx)
 		e.colMetrics.TransactionIngested(tx.ID())
@@ -184,7 +181,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// propagate it to all members of the responsible cluster
 	if originID == localID {
 
-		// always send the transaction to one node in the responsible cluster,
+		// always send the transaction to one node in the responsible cluster
 		// send to additional nodes based on configuration
 		targetIDs := txCluster.
 			Filter(filter.Not(filter.HasNodeID(localID))).

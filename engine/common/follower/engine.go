@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
+	"github.com/dapperlabs/flow-go/state"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -32,7 +33,7 @@ type Engine struct {
 	pending        module.PendingBlockBuffer
 	follower       module.HotStuffFollower
 	con            network.Conduit
-	sync           module.Synchronization
+	sync           module.BlockRequester
 }
 
 func New(
@@ -47,6 +48,7 @@ func New(
 	state protocol.State,
 	pending module.PendingBlockBuffer,
 	follower module.HotStuffFollower,
+	sync module.BlockRequester,
 ) (*Engine, error) {
 
 	e := &Engine{
@@ -61,6 +63,7 @@ func New(
 		state:          state,
 		pending:        pending,
 		follower:       follower,
+		sync:           sync,
 	}
 
 	con, err := net.Register(engine.BlockProvider, e)
@@ -72,23 +75,11 @@ func New(
 	return e, nil
 }
 
-// WithSynchronization injects the given synchronization protocol into the
-// hotstuff follower, providing it with blocks proactively, while also allowing
-// it to explicitly request blocks by ID.
-func (e *Engine) WithSynchronization(sync module.Synchronization) *Engine {
-	e.sync = sync
-	return e
-}
-
 // Ready returns a ready channel that is closed once the engine has fully
 // started. For consensus engine, this is true once the underlying consensus
 // algorithm has started.
 func (e *Engine) Ready() <-chan struct{} {
-	if e.sync == nil {
-		panic("follower engine requires injected synchronization module")
-	}
 	return e.unit.Ready(func() {
-		<-e.sync.Ready()
 		<-e.follower.Ready()
 	})
 }
@@ -98,7 +89,6 @@ func (e *Engine) Ready() <-chan struct{} {
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
 		<-e.follower.Done()
-		<-e.sync.Done()
 	})
 }
 
@@ -114,7 +104,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+			engine.LogError(e.log, err)
 		}
 	})
 }
@@ -308,7 +298,20 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 		Header:  proposal.Header,
 		Payload: proposal.Payload,
 	}
+
 	err := e.state.Mutate().Extend(block)
+	// if the error is a known invalid extension of the protocol state, then
+	// the input is invalid
+	if state.IsInvalidExtensionError(err) {
+		return engine.NewInvalidInputErrorf("invalid extension of protocol state: %w", err)
+	}
+
+	// if the error is a known outdated extension of the protocol state, then
+	// the input is outdated
+	if state.IsOutdatedExtensionError(err) {
+		return engine.NewOutdatedInputErrorf("outdated extension of protocol state: %w", err)
+	}
+
 	if err != nil {
 		return fmt.Errorf("could not extend protocol state: %w", err)
 	}

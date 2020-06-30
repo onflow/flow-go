@@ -20,7 +20,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	protocolRecovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
-	"github.com/dapperlabs/flow-go/engine/common/synchronization"
+	synceng "github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
 	"github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
@@ -34,9 +34,11 @@ import (
 	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/mempool/ejectors"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
+	"github.com/dapperlabs/flow-go/module/synchronization"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
@@ -66,7 +68,8 @@ func main() {
 		seals          mempool.Seals
 		prop           *propagation.Engine
 		prov           *provider.Engine
-		sync           *synchronization.Engine
+		syncCore       *synchronization.Core
+		comp           *compliance.Engine
 		conMetrics     module.ConsensusMetrics
 		mainMetrics    module.HotstuffMetrics
 	)
@@ -85,9 +88,6 @@ func main() {
 			flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor", timeout.DefaultConfig.TimeoutIncrease, "multiplicative increase of timeout value in case of time out event")
 			flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor", timeout.DefaultConfig.TimeoutDecrease, "multiplicative decrease of timeout value in case of progress")
 			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", 0.6, "additional fraction of replica timeout that the primary will wait for votes")
-			// From the experiment,
-			// if block rate delay is 1 second, then 0.8 block will be finalized per second in average.
-			// if block rate delay is 1.5 second, then 0.5 block will be finalized per second in average
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
 		}).
 		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
@@ -121,7 +121,10 @@ func main() {
 			return err
 		}).
 		Module("block seals mempool", func(node *cmd.FlowNodeBuilder) error {
-			seals, err = stdmap.NewSeals(sealLimit)
+			// use a custom ejector so we don't eject seals that would break
+			// the chain of seals
+			ejector := ejectors.NewLatestSeal(node.Storage.Headers)
+			seals, err = stdmap.NewSeals(sealLimit, stdmap.WithEject(ejector.Eject))
 			return err
 		}).
 		Module("consensus node metrics", func(node *cmd.FlowNodeBuilder) error {
@@ -129,20 +132,28 @@ func main() {
 			return nil
 		}).
 		Module("hotstuff main metrics", func(node *cmd.FlowNodeBuilder) error {
-			mainMetrics = metrics.NewHotstuffCollector(flow.GetChainID())
+			mainMetrics = metrics.NewHotstuffCollector(node.RootChainID)
 			return nil
+		}).
+		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
+			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
+			return err
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			resultsDB := bstorage.NewExecutionResults(node.DB)
+			sealsDB := bstorage.NewSeals(node.Metrics.Cache, node.DB)
 			match, err := matching.New(
 				node.Logger,
 				node.Metrics.Engine,
+				node.Tracer,
 				node.Metrics.Mempool,
 				node.Network,
 				node.State,
 				node.Me,
 				resultsDB,
+				sealsDB,
 				node.Storage.Headers,
+				node.Storage.Index,
 				results,
 				receipts,
 				approvals,
@@ -154,6 +165,7 @@ func main() {
 			prov, err = provider.New(
 				node.Logger,
 				node.Metrics.Engine,
+				node.Tracer,
 				node.Network,
 				node.State,
 				node.Me,
@@ -165,6 +177,7 @@ func main() {
 				node.Logger,
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
+				node.Tracer,
 				conMetrics,
 				node.Network,
 				node.State,
@@ -177,6 +190,7 @@ func main() {
 			ing, err := ingestion.New(
 				node.Logger,
 				node.Metrics.Engine,
+				node.Tracer,
 				conMetrics,
 				node.Network,
 				prop,
@@ -192,15 +206,16 @@ func main() {
 
 			// initialize the entity database accessors
 			// TODO frequency of 0 turns off the cleaner, turn back on once we know the proper tuning
-			cleaner := bstorage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), 0)
+			cleaner := bstorage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
 
 			// initialize the pending blocks cache
 			proposals := buffer.NewPendingBlocks()
 
 			// initialize the compliance engine
-			comp, err := compliance.New(
+			comp, err = compliance.New(
 				node.Logger,
 				node.Metrics.Engine,
+				node.Tracer,
 				node.Metrics.Mempool,
 				conMetrics,
 				node.Network,
@@ -211,24 +226,10 @@ func main() {
 				node.State,
 				prov,
 				proposals,
-				blockRateDelay,
+				syncCore,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
-			}
-
-			// initialize the synchronization engine
-			sync, err = synchronization.New(
-				node.Logger,
-				node.Metrics.Engine,
-				node.Network,
-				node.Me,
-				node.State,
-				node.Storage.Blocks,
-				comp,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 			}
 
 			// initialize the block builder
@@ -292,7 +293,7 @@ func main() {
 			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations
 
 			// initialize a logging notifier for hotstuff
-			notifier := createNotifier(node.Logger, mainMetrics)
+			notifier := createNotifier(node.Logger, mainMetrics, node.Tracer, node.Storage.Index)
 			// initialize the persister
 			persist := persister.New(node.DB)
 
@@ -305,6 +306,7 @@ func main() {
 			// initialize hotstuff consensus algorithm
 			hot, err := consensus.NewParticipant(
 				node.Logger,
+				node.Tracer,
 				notifier,
 				mainMetrics,
 				node.Storage.Headers,
@@ -329,8 +331,25 @@ func main() {
 				return nil, fmt.Errorf("could not initialize hotstuff engine: %w", err)
 			}
 
-			comp = comp.WithSynchronization(sync).WithConsensus(hot)
+			comp = comp.WithConsensus(hot)
 			return comp, nil
+		}).
+		Component("sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			sync, err := synceng.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				node.Storage.Blocks,
+				comp,
+				syncCore,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
+			}
+
+			return sync, nil
 		}).
 		Run()
 }

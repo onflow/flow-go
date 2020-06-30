@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
@@ -160,12 +159,16 @@ func (n *Network) SetIDs(ids flow.IdentityList) {
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
 	// checks the cache for deduplication and adds the message if not already present
 	if n.rcache.Add(message.EventID, message.ChannelID) {
-		// drops duplicate message
-		channelName := engine.ChannelName(uint8(message.ChannelID))
-		n.logger.Debug().
-			Str("channel", channelName).
+		log := n.logger.With().
 			Hex("sender_id", senderID[:]).
 			Hex("event_id", message.EventID).
+			Logger()
+
+		channelName := engine.ChannelName(uint8(message.ChannelID))
+
+		// drops duplicate message
+		log.Debug().
+			Str("channel", channelName).
 			Msg("dropping message due to duplication")
 		n.metrics.NetworkDuplicateMessagesDropped(channelName)
 		return nil
@@ -195,19 +198,19 @@ func (n *Network) genNetworkMessage(channelID uint8, event interface{}, targetID
 	// encode the payload using the configured codec
 	payload, err := n.codec.Encode(event)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not encode event")
+		return nil, fmt.Errorf("could not encode event: %w", err)
 	}
 
 	// use a hash with an engine-specific salt to get the payload hash
 	h := hash.NewSHA3_384()
 	_, err = h.Write([]byte("libp2ppacking" + fmt.Sprintf("%03d", channelID)))
 	if err != nil {
-		return nil, errors.Wrap(err, "could not hash channel ID as salt")
+		return nil, fmt.Errorf("could not hash channel ID as salt: %w", err)
 	}
 
 	_, err = h.Write(payload)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not hash event")
+		return nil, fmt.Errorf("could not hash event: %w", err)
 	}
 
 	payloadHash := h.SumHash()
@@ -241,14 +244,14 @@ func (n *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.I
 	// genNetworkMessage the event to get payload and event ID
 	msg, err := n.genNetworkMessage(channelID, event, targetIDs...)
 	if err != nil {
-		return errors.Wrap(err, "could not cast the event into network message")
+		return fmt.Errorf("could not cast the event into network message: %w", err)
 	}
 
 	// TODO: dedup the message here
 
 	err = n.mw.Send(channelID, msg, targetIDs...)
 	if err != nil {
-		return errors.Wrap(err, "could not gossip event")
+		return fmt.Errorf("could not gossip event: %w", err)
 	}
 
 	return nil

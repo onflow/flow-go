@@ -8,20 +8,20 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
-
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/dapperlabs/flow-go/engine/execution/utils"
 	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func CreateContractDeploymentTransaction(contract string, authorizer flow.Address) *flow.TransactionBody {
+func CreateContractDeploymentTransaction(contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
 	encoded := hex.EncodeToString([]byte(contract))
 
 	return flow.NewTransactionBody().
@@ -32,7 +32,7 @@ func CreateContractDeploymentTransaction(contract string, authorizer flow.Addres
             }`, encoded)),
 		).
 		AddAuthorizer(authorizer).
-		AddAuthorizer(flow.ServiceAddress())
+		AddAuthorizer(chain.ServiceAddress())
 }
 
 func CreateUnauthorizedContractDeploymentTransaction(contract string, authorizer flow.Address) *flow.TransactionBody {
@@ -53,7 +53,7 @@ func SignPayload(
 	account flow.Address,
 	privateKey flow.AccountPrivateKey,
 ) error {
-	hasher, err := hash.NewHasher(privateKey.HashAlgo)
+	hasher, err := utils.NewHasher(privateKey.HashAlgo)
 	if err != nil {
 		return fmt.Errorf("failed to create hasher: %w", err)
 	}
@@ -68,7 +68,7 @@ func SignPayload(
 }
 
 func SignEnvelope(tx *flow.TransactionBody, account flow.Address, privateKey flow.AccountPrivateKey) error {
-	hasher, err := hash.NewHasher(privateKey.HashAlgo)
+	hasher, err := utils.NewHasher(privateKey.HashAlgo)
 	if err != nil {
 		return fmt.Errorf("failed to create hasher: %w", err)
 	}
@@ -93,8 +93,8 @@ func SignTransaction(
 	return SignEnvelope(tx, address, privateKey)
 }
 
-func SignTransactionByRoot(tx *flow.TransactionBody, seqNum uint64) error {
-	return SignTransaction(tx, flow.ServiceAddress(), unittest.ServiceAccountPrivateKey, seqNum)
+func SignTransactionAsServiceAccount(tx *flow.TransactionBody, seqNum uint64, chain flow.Chain) error {
+	return SignTransaction(tx, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey, seqNum)
 }
 
 // GenerateAccountPrivateKeys generates a number of private keys.
@@ -135,8 +135,18 @@ func CreateAccounts(
 	vm *fvm.VirtualMachine,
 	ledger fvm.Ledger,
 	privateKeys []flow.AccountPrivateKey,
+	chain flow.Chain,
 ) ([]flow.Address, error) {
-	ctx := vm.NewContext(fvm.WithSignatureVerification(false))
+	return CreateAccountsWithSimpleAddresses(vm, ledger, privateKeys, chain)
+}
+
+func CreateAccountsWithSimpleAddresses(
+	vm *fvm.VirtualMachine,
+	ledger fvm.Ledger,
+	privateKeys []flow.AccountPrivateKey,
+	chain flow.Chain,
+) ([]flow.Address, error) {
+	ctx := fvm.NewContext(fvm.WithSignatureVerification(false))
 
 	var accounts []flow.Address
 
@@ -149,18 +159,20 @@ func CreateAccounts(
 	  }
 	`)
 
+	serviceAddress := chain.ServiceAddress()
+
 	for _, privateKey := range privateKeys {
 		accountKey := privateKey.PublicKey(fvm.AccountKeyWeightThreshold)
 		encAccountKey, _ := flow.EncodeRuntimeAccountPublicKey(accountKey)
-		cadAccountKey := bytesToCadenceArray(encAccountKey)
+		cadAccountKey := BytesToCadenceArray(encAccountKey)
 		encCadAccountKey, _ := jsoncdc.Encode(cadAccountKey)
 
 		tx := flow.NewTransactionBody().
 			SetScript(script).
 			AddArgument(encCadAccountKey).
-			AddAuthorizer(flow.ServiceAddress())
+			AddAuthorizer(serviceAddress)
 
-		result, err := ctx.Invoke(fvm.Transaction(tx), ledger)
+		result, err := vm.Invoke(ctx, fvm.Transaction(tx), ledger)
 		if err != nil {
 			return nil, err
 		}
@@ -186,12 +198,13 @@ func CreateAccounts(
 	return accounts, nil
 }
 
-func RootBootstrappedLedger() fvm.Ledger {
+func RootBootstrappedLedger(chain flow.Chain) fvm.Ledger {
 	ledger := make(fvm.MapLedger)
 
-	vm := fvm.New(runtime.NewInterpreterRuntime())
+	vm := fvm.New(runtime.NewInterpreterRuntime(), chain)
 
-	_, _ = vm.NewContext().Invoke(
+	_, _ = vm.Invoke(
+		fvm.NewContext(),
 		fvm.Bootstrap(unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply),
 		ledger,
 	)
@@ -199,7 +212,7 @@ func RootBootstrappedLedger() fvm.Ledger {
 	return ledger
 }
 
-func bytesToCadenceArray(l []byte) cadence.Array {
+func BytesToCadenceArray(l []byte) cadence.Array {
 	values := make([]cadence.Value, len(l))
 	for i, b := range l {
 		values[i] = cadence.NewInt(int(b))
@@ -211,7 +224,7 @@ func bytesToCadenceArray(l []byte) cadence.Array {
 // CreateAccountCreationTransaction creates a transaction which will create a new account.
 //
 // This function returns a randomly generated private key and the transaction.
-func CreateAccountCreationTransaction(t *testing.T) (flow.AccountPrivateKey, *flow.TransactionBody) {
+func CreateAccountCreationTransaction(t *testing.T, chain flow.Chain) (flow.AccountPrivateKey, *flow.TransactionBody) {
 	accountKey, err := GenerateAccountPrivateKey()
 	require.NoError(t, err)
 
@@ -231,7 +244,7 @@ func CreateAccountCreationTransaction(t *testing.T) (flow.AccountPrivateKey, *fl
 	// create the transaction to create the account
 	tx := flow.NewTransactionBody().
 		SetScript([]byte(script)).
-		AddAuthorizer(flow.ServiceAddress())
+		AddAuthorizer(chain.ServiceAddress())
 
 	return accountKey, tx
 }

@@ -43,6 +43,13 @@ const (
 	subsystemRuntime      = "runtime"
 )
 
+// Verification Subsystems
+const (
+	subsystemFinderEngine   = "finder"
+	subsystemMatchEngine    = "match"
+	subsystemVerifierEngine = "verifier"
+)
+
 // METRIC NAMING GUIDELINES
 // Namespace:
 //   * If it's under a module, use the module name. eg: hotstuff, network, storage, mempool, interpreter, crypto

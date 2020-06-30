@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path"
 	"time"
 
 	"gopkg.in/yaml.v2"
@@ -16,6 +17,7 @@ import (
 const (
 	BootstrapDir             = "./bootstrap"
 	ProfilerDir              = "./profiler"
+	DataDir                  = "./datadir"
 	DockerComposeFile        = "./docker-compose.nodes.yml"
 	DockerComposeFileVersion = "3.7"
 	PrometheusTargetsFile    = "./targets.nodes.json"
@@ -26,6 +28,8 @@ const (
 	DefaultAccessCount       = 1
 	DefaultNClusters         = 1
 	DefaultProfiler          = false
+	DefaultConsensusDelay    = 800 * time.Millisecond
+	DefaultCollectionDelay   = 950 * time.Millisecond
 	AccessAPIPort            = 3569
 	MetricsPort              = 8080
 	RPCPort                  = 9000
@@ -39,6 +43,8 @@ var (
 	accessCount       int
 	nClusters         uint
 	profiler          bool
+	consensusDelay    time.Duration
+	collectionDelay   time.Duration
 )
 
 func init() {
@@ -49,6 +55,8 @@ func init() {
 	flag.IntVar(&accessCount, "access", DefaultAccessCount, "number of access nodes")
 	flag.UintVar(&nClusters, "nclusters", DefaultNClusters, "number of collector clusters")
 	flag.BoolVar(&profiler, "profiler", DefaultProfiler, "whether to enable the auto-profiler")
+	flag.DurationVar(&consensusDelay, "consensus-delay", DefaultConsensusDelay, "delay on consensus node block proposals")
+	flag.DurationVar(&collectionDelay, "collection-delay", DefaultCollectionDelay, "delay on collection node block proposals")
 }
 
 func main() {
@@ -78,6 +86,16 @@ func main() {
 	}
 
 	err = os.Mkdir(ProfilerDir, 0755)
+	if err != nil && !os.IsExist(err) {
+		panic(err)
+	}
+
+	err = os.RemoveAll(DataDir)
+	if err != nil && !os.IsNotExist(err) {
+		panic(err)
+	}
+
+	err = os.Mkdir(DataDir, 0755)
 	if err != nil && !os.IsExist(err) {
 		panic(err)
 	}
@@ -196,6 +214,21 @@ func prepareServices(containers []testnet.ContainerConfig) Services {
 }
 
 func prepareService(container testnet.ContainerConfig, i int) Service {
+
+	// create a data dir for the node
+	// Join removes the ./ prefix for some reason...
+	datadir := "./" + path.Join(DataDir, container.Role.String(), container.NodeID.String())
+	err := os.MkdirAll(datadir, 0755)
+	if err != nil && !os.IsExist(err) {
+		panic(err)
+	}
+
+	profilerdir := "./" + path.Join(ProfilerDir, container.Role.String(), container.NodeID.String())
+	err = os.MkdirAll(profilerdir, 0755)
+	if err != nil && !os.IsExist(err) {
+		panic(err)
+	}
+
 	service := Service{
 		Image: fmt.Sprintf("localnet-%s", container.Role),
 		Command: []string{
@@ -210,7 +243,8 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 		},
 		Volumes: []string{
 			fmt.Sprintf("%s:/bootstrap", BootstrapDir),
-			fmt.Sprintf("%s:/profiler", ProfilerDir),
+			fmt.Sprintf("%s:/profiler", profilerdir),
+			fmt.Sprintf("%s:/flowdb", datadir),
 		},
 		Environment: []string{
 			"JAEGER_AGENT_HOST=jaeger",
@@ -241,9 +275,12 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 func prepareConsensusService(container testnet.ContainerConfig, i int) Service {
 	service := prepareService(container, i)
 
+	timeout := 1200*time.Millisecond + consensusDelay
 	service.Command = append(
 		service.Command,
-		fmt.Sprintf("--block-rate-delay=%s", time.Duration(0)),
+		fmt.Sprintf("--block-rate-delay=%s", consensusDelay),
+		fmt.Sprintf("--hotstuff-timeout=%s", timeout),
+		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 	)
 
 	return service
@@ -252,8 +289,12 @@ func prepareConsensusService(container testnet.ContainerConfig, i int) Service {
 func prepareCollectionService(container testnet.ContainerConfig, i int) Service {
 	service := prepareService(container, i)
 
+	timeout := 1200*time.Millisecond + collectionDelay
 	service.Command = append(
 		service.Command,
+		fmt.Sprintf("--block-rate-delay=%s", collectionDelay),
+		fmt.Sprintf("--hotstuff-timeout=%s", timeout),
+		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--ingress-addr=%s:%d", container.ContainerName, RPCPort),
 	)
 

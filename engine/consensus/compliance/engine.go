@@ -17,7 +17,9 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
+	"github.com/dapperlabs/flow-go/state"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -29,6 +31,7 @@ type Engine struct {
 	unit     *engine.Unit   // used to control startup/shutdown
 	log      zerolog.Logger // used to log relevant actions with context
 	metrics  module.EngineMetrics
+	tracer   module.Tracer
 	mempool  module.MempoolMetrics
 	spans    module.ConsensusMetrics
 	me       module.Local
@@ -39,7 +42,7 @@ type Engine struct {
 	con      network.Conduit
 	prov     network.Engine
 	pending  module.PendingBlockBuffer // pending block cache
-	sync     module.Synchronization
+	sync     module.BlockRequester
 	hotstuff module.HotStuff
 }
 
@@ -47,6 +50,7 @@ type Engine struct {
 func New(
 	log zerolog.Logger,
 	collector module.EngineMetrics,
+	tracer module.Tracer,
 	mempool module.MempoolMetrics,
 	spans module.ConsensusMetrics,
 	net module.Network,
@@ -57,7 +61,7 @@ func New(
 	state protocol.State,
 	prov network.Engine,
 	pending module.PendingBlockBuffer,
-	blockRateDelay time.Duration,
+	sync module.BlockRequester,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
@@ -65,6 +69,7 @@ func New(
 		unit:     engine.NewUnit(),
 		log:      log.With().Str("engine", "compliance").Logger(),
 		metrics:  collector,
+		tracer:   tracer,
 		mempool:  mempool,
 		spans:    spans,
 		me:       me,
@@ -74,7 +79,7 @@ func New(
 		state:    state,
 		prov:     prov,
 		pending:  pending,
-		sync:     nil, // use `WithSynchronization`
+		sync:     sync,
 		hotstuff: nil, // use `WithConsensus`
 	}
 
@@ -90,13 +95,6 @@ func New(
 	return e, nil
 }
 
-// WithSynchronization adds the synchronization engine responsible for bringing the node
-// up to speed to the compliance engine.
-func (e *Engine) WithSynchronization(sync module.Synchronization) *Engine {
-	e.sync = sync
-	return e
-}
-
 // WithConsensus adds the consensus algorithm to the engine. This must be
 // called before the engine can start.
 func (e *Engine) WithConsensus(hot module.HotStuff) *Engine {
@@ -108,14 +106,10 @@ func (e *Engine) WithConsensus(hot module.HotStuff) *Engine {
 // started. For consensus engine, this is true once the underlying consensus
 // algorithm has started.
 func (e *Engine) Ready() <-chan struct{} {
-	if e.sync == nil {
-		panic("must initialize compliance engine with synchronization module")
-	}
 	if e.hotstuff == nil {
 		panic("must initialize compliance engine with hotstuff engine")
 	}
 	return e.unit.Ready(func() {
-		<-e.sync.Ready()
 		<-e.hotstuff.Ready()
 	})
 }
@@ -124,8 +118,6 @@ func (e *Engine) Ready() <-chan struct{} {
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
-		e.log.Debug().Msg("shutting down synchronization engine")
-		<-e.sync.Done()
 		e.log.Debug().Msg("shutting down hotstuff eventloop")
 		<-e.hotstuff.Done()
 		e.log.Debug().Msg("all components have been shut down")
@@ -144,7 +136,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("compliance could not process submitted event")
+			engine.LogError(e.log, err)
 		}
 	})
 }
@@ -231,6 +223,13 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 	payload, err := e.payloads.ByBlockID(header.ID())
 	if err != nil {
 		return fmt.Errorf("could not retrieve payload for proposal: %w", err)
+	}
+
+	for _, g := range payload.Guarantees {
+		if span, ok := e.tracer.GetSpan(g.CollectionID, trace.CONProcessCollection); ok {
+			childSpan := e.tracer.StartSpanFromParent(span, trace.CONCompBroadcastProposalWithDelay)
+			defer childSpan.Finish()
+		}
 	}
 
 	// retrieve all consensus nodes without our ID
@@ -323,6 +322,23 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 
 // onBlockProposal handles incoming block proposals.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
+
+	span, ok := e.tracer.GetSpan(proposal.Header.ID(), trace.CONProcessBlock)
+	if !ok {
+		span = e.tracer.StartSpan(proposal.Header.ID(), trace.CONProcessBlock)
+		span.SetTag("block_id", proposal.Header.ID())
+		span.SetTag("view", proposal.Header.View)
+		span.SetTag("proposer", proposal.Header.ProposerID.String())
+	}
+	childSpan := e.tracer.StartSpanFromParent(span, trace.CONCompOnBlockProposal)
+	defer childSpan.Finish()
+
+	for _, g := range proposal.Payload.Guarantees {
+		if span, ok := e.tracer.GetSpan(g.CollectionID, trace.CONProcessCollection); ok {
+			childSpan := e.tracer.StartSpanFromParent(span, trace.CONCompOnBlockProposal)
+			defer childSpan.Finish()
+		}
+	}
 
 	header := proposal.Header
 
@@ -465,7 +481,21 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 		Header:  proposal.Header,
 		Payload: proposal.Payload,
 	}
+
 	err := e.state.Mutate().Extend(block)
+	// if the error is a known invalid extension of the protocol state, then
+	// the input is invalid
+	if state.IsInvalidExtensionError(err) {
+		return engine.NewInvalidInputErrorf("invalid extension of protocol state (block: %x, height: %d): %w",
+			header.ID(), header.Height, err)
+	}
+
+	// if the error is an known outdated extension of the protocol state, then
+	// the input is outdated
+	if state.IsOutdatedExtensionError(err) {
+		return engine.NewOutdatedInputErrorf("outdated extension of protocol state: %w", err)
+	}
+
 	if err != nil {
 		return fmt.Errorf("could not extend protocol state (block: %x, height: %d): %w", header.ID(), header.Height, err)
 	}

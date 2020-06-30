@@ -26,6 +26,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/voter"
 	"github.com/dapperlabs/flow-go/model/flow"
 	module "github.com/dapperlabs/flow-go/module/mock"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -277,7 +278,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		},
 	)
 
-	in.finalizer.On("MakePending", mock.Anything).Return(nil)
+	in.finalizer.On("MakeValid", mock.Anything).Return(nil)
 
 	// initialize error handling and logging
 	var err error
@@ -322,7 +323,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.voter = voter.New(in.signer, in.forks, in.persist, DefaultVoted())
 
 	// initialize the event handler
-	in.handler, err = eventhandler.New(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.committee, in.aggregator, in.voter, in.validator, notifier)
+	in.handler, err = eventhandler.New(log, trace.NewNoopTracer(), in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.committee, in.aggregator, in.voter, in.validator, notifier)
 	require.NoError(t, err)
 
 	return &in

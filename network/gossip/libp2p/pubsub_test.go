@@ -18,7 +18,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	gologging "github.com/whyrusleeping/go-logging"
+
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 type PubSubTestSuite struct {
@@ -62,9 +63,9 @@ func (s *mockDiscovery) FindPeers(_ context.Context, _ string, _ ...discovery.Op
 // TestPubSub checks if nodes can subscribe to a topic and send and receive a message
 func (p *PubSubTestSuite) TestPubSub() {
 	defer p.cancel()
-	topic := "testtopic"
+	topic := "testtopic/" + unittest.IdentifierFixture().String()
 	count := 4
-	golog.SetAllLoggers(gologging.CRITICAL)
+	golog.SetAllLoggers(golog.LevelError)
 
 	// Step 1: Creates nodes
 	d := &mockDiscovery{}
@@ -169,7 +170,7 @@ func (psts *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []*
 		}
 
 		psOption := pubsub.WithDiscovery(d)
-		err = n.Start(psts.ctx, nodeID, logger, pkey, handlerFunc, psOption)
+		err = n.Start(psts.ctx, nodeID, logger, pkey, handlerFunc, rootID, psOption)
 		require.NoError(psts.Suite.T(), err)
 		require.Eventuallyf(psts.Suite.T(), func() bool {
 			ip, p := n.GetIPPort()

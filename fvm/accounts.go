@@ -21,7 +21,13 @@ func keyPublicKey(index uint64) string {
 	return fmt.Sprintf("public_key_%d", index)
 }
 
-func getAccount(ctx Context, ledger Ledger, address flow.Address) (*flow.Account, error) {
+func getAccount(
+	vm *VirtualMachine,
+	ctx Context,
+	ledger Ledger,
+	chain flow.Chain,
+	address flow.Address,
+) (*flow.Account, error) {
 	var ok bool
 	var err error
 
@@ -47,7 +53,11 @@ func getAccount(ctx Context, ledger Ledger, address flow.Address) (*flow.Account
 	}
 
 	var result *InvocationResult
-	result, err = ctx.Invoke(getFlowTokenBalanceScript(address), ledger)
+	result, err = vm.Invoke(
+		ctx,
+		getFlowTokenBalanceScript(address, chain.ServiceAddress()),
+		ledger,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -91,8 +101,8 @@ func accountExists(ledger Ledger, address flow.Address) (bool, error) {
 	return false, nil
 }
 
-func createAccount(ledger Ledger, publicKeys []flow.AccountPublicKey) (flow.Address, error) {
-	addressState, err := getAddressState(ledger)
+func createAccount(ledger Ledger, chain flow.Chain, publicKeys []flow.AccountPublicKey) (flow.Address, error) {
+	addressState, err := getAddressState(ledger, chain)
 	if err != nil {
 		return flow.EmptyAddress, err
 	}
@@ -100,13 +110,14 @@ func createAccount(ledger Ledger, publicKeys []flow.AccountPublicKey) (flow.Addr
 	// generate the new account address
 	var newAddress flow.Address
 	newAddress, err = addressState.NextAddress()
+
 	if err != nil {
 		return flow.EmptyAddress, err
 	}
 
 	err = createAccountWithAddress(ledger, newAddress, publicKeys)
 	if err != nil {
-		return flow.EmptyAddress, err
+		return flow.Address{}, err
 	}
 
 	// update the address state
@@ -271,16 +282,16 @@ func setAccountCode(ledger Ledger, address flow.Address, code []byte) error {
 	return nil
 }
 
-func getAddressState(ledger Ledger) (*flow.AddressGenerator, error) {
+func getAddressState(ledger Ledger, chain flow.Chain) (flow.AddressGenerator, error) {
 	stateBytes, err := ledger.Get(fullKeyHash("", "", keyAddressState))
 	if err != nil {
 		return nil, err
 	}
-	state := flow.BytesToAddressState(stateBytes)
-	return state, nil
+
+	return chain.BytesToAddressState(stateBytes), nil
 }
 
-func setAddressState(ledger Ledger, state *flow.AddressGenerator) {
+func setAddressState(ledger Ledger, state flow.AddressGenerator) {
 	stateBytes := state.Bytes()
 	ledger.Set(fullKeyHash("", "", keyAddressState), stateBytes)
 }
@@ -304,16 +315,16 @@ pub fun main(): UFix64 {
 }
 `
 
-func initFlowTokenTransaction(address flow.Address) InvokableTransaction {
+func initFlowTokenTransaction(accountAddress, serviceAddress flow.Address) InvokableTransaction {
 	return Transaction(
 		flow.NewTransactionBody().
-			SetScript([]byte(fmt.Sprintf(initFlowTokenTransactionTemplate, flow.ServiceAddress()))).
-			AddAuthorizer(address),
+			SetScript([]byte(fmt.Sprintf(initFlowTokenTransactionTemplate, serviceAddress))).
+			AddAuthorizer(accountAddress),
 	)
 }
 
-func getFlowTokenBalanceScript(address flow.Address) InvokableScript {
-	return Script([]byte(fmt.Sprintf(getFlowTokenBalanceScriptTemplate, flow.ServiceAddress(), address)))
+func getFlowTokenBalanceScript(accountAddress, serviceAddress flow.Address) InvokableScript {
+	return Script([]byte(fmt.Sprintf(getFlowTokenBalanceScriptTemplate, serviceAddress, accountAddress)))
 }
 
 func newLedgerGetError(key string, address flow.Address, err error) error {

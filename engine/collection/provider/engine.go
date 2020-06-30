@@ -4,6 +4,7 @@
 package provider
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -23,6 +24,7 @@ import (
 
 // Engine is the collection provider engine, which provides access to resources
 // held by the collection node.
+// TODO consolidate with common resource provider engine (4148)
 type Engine struct {
 	unit         *engine.Unit
 	log          zerolog.Logger
@@ -82,7 +84,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+			engine.LogError(e.log, err)
 		}
 	})
 }
@@ -136,7 +138,14 @@ func (e *Engine) onCollectionRequest(originID flow.Identifier, req *messages.Col
 	log.Debug().Msg("received collection request")
 
 	coll, err := e.collections.ByID(req.ID)
+	// we don't have the collection requested by other node
+	if errors.Is(err, storage.ErrNotFound) {
+		log.Warn().Err(err).Msg("requested collection not found")
+		return nil
+	}
+
 	if err != nil {
+		// running into some exception
 		return fmt.Errorf("could not retrieve requested collection: %w", err)
 	}
 
