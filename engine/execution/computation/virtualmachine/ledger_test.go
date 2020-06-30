@@ -35,7 +35,7 @@ func Test_AccountWithNoKeysCounter(t *testing.T) {
 	address, err := dal.CreateAccount(nil)
 	require.NoError(t, err)
 
-	countRegister := FullKeyHash(string(address.Bytes()), string(address.Bytes()), keyPublicKeyCount)
+	countRegister := fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyPublicKeyCount)
 
 	ledger.Delete(countRegister)
 
