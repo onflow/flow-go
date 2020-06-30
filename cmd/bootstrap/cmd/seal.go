@@ -8,9 +8,9 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func constructRootResultAndSeal(commitString string, block *flow.Block) {
+func constructRootResultAndSeal(rootCommit string, block *flow.Block) {
 
-	commit, err := hex.DecodeString(commitString)
+	commit, err := hex.DecodeString(rootCommit)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not decode state commitment")
 	}
