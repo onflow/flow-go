@@ -22,7 +22,7 @@ type Config struct {
 	MaxMsgSize int // In bytes
 }
 
-// RPC implements a gRPC server for the Ghost Node
+// RPC implements a gRPC server for the Ghost node
 type RPC struct {
 	unit    *engine.Unit
 	log     zerolog.Logger

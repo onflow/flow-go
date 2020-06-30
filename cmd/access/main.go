@@ -17,7 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/access/ingestion"
 	"github.com/dapperlabs/flow-go/engine/access/rpc"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
-	"github.com/dapperlabs/flow-go/engine/common/synchronization"
+	synceng "github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
@@ -25,6 +25,7 @@ import (
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
+	"github.com/dapperlabs/flow-go/module/synchronization"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 	grpcutils "github.com/dapperlabs/flow-go/utils/grpc"
 )
@@ -36,12 +37,12 @@ func main() {
 		collectionLimit uint
 		receiptLimit    uint
 		ingestEng       *ingestion.Engine
+		followerEng     *followereng.Engine
+		syncCore        *synchronization.Core
 		rpcConf         rpc.Config
 		collectionRPC   access.AccessAPIClient
 		executionRPC    execution.ExecutionAPIClient
 		err             error
-		collections     *storage.Collections
-		transactions    *storage.Transactions
 		conCache        *buffer.PendingBlocks // pending block cache for follower
 	)
 
@@ -50,7 +51,8 @@ func main() {
 			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
 			flags.UintVar(&collectionLimit, "collection-limit", 1000, "maximum number of collections in the memory pool")
 			flags.UintVar(&blockLimit, "block-limit", 1000, "maximum number of result blocks in the memory pool")
-			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "r", "localhost:9000", "the address the gRPC server listens on")
+			flags.StringVarP(&rpcConf.GRPCListenAddr, "rpc-addr", "r", "localhost:9000", "the address the gRPC server listens on")
+			flags.StringVarP(&rpcConf.HTTPListenAddr, "http-addr", "h", "localhost:8080", "the address the http proxy server listens on")
 			flags.StringVarP(&rpcConf.CollectionAddr, "ingress-addr", "i", "localhost:9000", "the address (of the collection node) to send transactions to")
 			flags.StringVarP(&rpcConf.ExecutionAddr, "script-addr", "s", "localhost:9000", "the address (of the execution node) forward the script to")
 		}).
@@ -80,24 +82,23 @@ func main() {
 			executionRPC = execution.NewExecutionAPIClient(executionRPCConn)
 			return nil
 		}).
-		Module("persistent storage", func(node *cmd.FlowNodeBuilder) error {
-			collections = storage.NewCollections(node.DB)
-			transactions = storage.NewTransactions(node.DB)
-			return nil
-		}).
 		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
 			conCache = buffer.NewPendingBlocks()
 			return nil
 		}).
+		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
+			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
+			return err
+		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, node.Storage.Blocks, node.Storage.Headers, collections, transactions)
+			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions)
 			return ingestEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
 			// TODO frequency of 0 turns off the cleaner, turn back on once we know the proper tuning
-			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), 0)
+			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
 
 			// create a finalizer that will handle updating the protocol
 			// state when the follower detects newly finalized blocks
@@ -135,22 +136,44 @@ func main() {
 				node.Logger.Debug().Err(err).Msg("ignoring failures in follower core")
 			}
 
-			follower, err := followereng.New(node.Logger, node.Network, node.Me, node.Metrics.Engine, node.Metrics.Mempool, cleaner, node.Storage.Headers, node.Storage.Payloads, node.State, conCache, core)
+			follower, err := followereng.New(
+				node.Logger,
+				node.Network,
+				node.Me,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
+				cleaner,
+				node.Storage.Headers,
+				node.Storage.Payloads,
+				node.State,
+				conCache,
+				core,
+				syncCore,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
 
-			// create a block synchronization engine to handle follower getting
-			// out of sync
-			sync, err := synchronization.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State, node.Storage.Blocks, follower)
+			return follower, nil
+		}).
+		Component("sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			sync, err := synceng.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				node.Storage.Blocks,
+				followerEng,
+				syncCore,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
-
-			return follower.WithSynchronization(sync), nil
+			return sync, nil
 		}).
 		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, node.Storage.Blocks, node.Storage.Headers, collections, transactions)
+			rpcEng := rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.RootChainID)
 			return rpcEng, nil
 		}).
 		Run()

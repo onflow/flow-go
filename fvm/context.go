@@ -1,80 +1,138 @@
 package fvm
 
 import (
-	"github.com/onflow/cadence/runtime"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-type Context interface {
-	NewChild(opts ...Option) Context
-
-	Parse(i Invokable, ledger Ledger) (Invokable, error)
-	Invoke(i Invokable, ledger Ledger) (*InvocationResult, error)
-	GetAccount(address flow.Address, ledger Ledger) (*flow.Account, error)
-
-	Options() Options
-	Runtime() runtime.Runtime
+// A Context defines a set execution parameters used by the virtual machine.
+type Context struct {
+	ASTCache                         ASTCache
+	Blocks                           Blocks
+	Metrics                          *MetricsCollector
+	GasLimit                         uint64
+	BlockHeader                      *flow.Header
+	SignatureVerificationEnabled     bool
+	FeePaymentsEnabled               bool
+	RestrictedAccountCreationEnabled bool
+	RestrictedDeploymentEnabled      bool
 }
 
-type context struct {
-	rt   runtime.Runtime
-	opts Options
+// NewContext initializes a new execution context with the provided options.
+func NewContext(opts ...Option) Context {
+	return newContext(defaultContext(), opts...)
 }
 
-func newContext(rt runtime.Runtime, options Options, opts ...Option) Context {
+// NewContextFromParent spawns a child execution context with the provided options.
+func NewContextFromParent(parent Context, opts ...Option) Context {
+	return newContext(parent, opts...)
+}
+
+func newContext(ctx Context, opts ...Option) Context {
 	for _, applyOption := range opts {
-		options = applyOption(options)
+		ctx = applyOption(ctx)
 	}
 
-	return &context{
-		rt:   rt,
-		opts: options,
+	return ctx
+}
+
+const defaultGasLimit = 100000
+
+func defaultContext() Context {
+	return Context{
+		ASTCache:                         nil,
+		Blocks:                           nil,
+		Metrics:                          nil,
+		GasLimit:                         defaultGasLimit,
+		BlockHeader:                      nil,
+		SignatureVerificationEnabled:     true,
+		FeePaymentsEnabled:               true,
+		RestrictedAccountCreationEnabled: true,
+		RestrictedDeploymentEnabled:      true,
 	}
 }
 
-func (ctx *context) NewChild(opts ...Option) Context {
-	return newContext(ctx.rt, ctx.opts, opts...)
-}
+// An Option sets a configuration parameter for a virtual machine context.
+type Option func(ctx Context) Context
 
-func (ctx *context) Parse(i Invokable, ledger Ledger) (Invokable, error) {
-	return i.Parse(ctx, ledger)
-}
-
-func (ctx *context) Invoke(i Invokable, ledger Ledger) (*InvocationResult, error) {
-	return i.Invoke(ctx, ledger)
-}
-
-func (ctx *context) GetAccount(address flow.Address, ledger Ledger) (*flow.Account, error) {
-	account, err := getAccount(ctx, ledger, address)
-	if err != nil {
-		return nil, err
+// WithASTCache sets the AST cache for a virtual machine context.
+func WithASTCache(cache ASTCache) Option {
+	return func(ctx Context) Context {
+		ctx.ASTCache = cache
+		return ctx
 	}
-
-	return account, nil
 }
 
-func (ctx *context) Options() Options {
-	return ctx.opts
+// WithGasLimit sets the gas limit for a virtual machine context.
+func WithGasLimit(limit uint64) Option {
+	return func(ctx Context) Context {
+		ctx.GasLimit = limit
+		return ctx
+	}
 }
 
-func (ctx *context) Runtime() runtime.Runtime {
-	return ctx.rt
-}
-
-// invokeMetaTransaction invokes a meta transaction inside the context of an outer transaction.
+// WithBlockHeader sets the block header for a virtual machine context.
 //
-// Errors that occur in a meta transaction are propagated as a single error that can be
-// captured by the Cadence runtime and eventually disambiguated by the parent context.
-func invokeMetaTransaction(ctx Context, tx InvokableTransaction, ledger Ledger) error {
-	result, err := ctx.Invoke(tx, ledger)
-	if err != nil {
-		return err
+// The VM uses the header to provide current block information to the Cadence runtime,
+// as well as to seed the pseudorandom number generator.
+func WithBlockHeader(header *flow.Header) Option {
+	return func(ctx Context) Context {
+		ctx.BlockHeader = header
+		return ctx
 	}
+}
 
-	if result.Error != nil {
-		return result.Error
+// WithBlocks sets the block storage provider for a virtual machine context.
+//
+// The VM uses the block storage provider to provide historical block information to
+// the Cadence runtime.
+func WithBlocks(blocks Blocks) Option {
+	return func(ctx Context) Context {
+		ctx.Blocks = blocks
+		return ctx
 	}
+}
 
-	return nil
+// WithMetricsCollector sets the metrics collector for a virtual machine context.
+//
+// A metrics collector is used to gather metrics reported by the Cadence runtime.
+func WithMetricsCollector(mc *MetricsCollector) Option {
+	return func(ctx Context) Context {
+		ctx.Metrics = mc
+		return ctx
+	}
+}
+
+// WithSignatureVerification enables or disables signature verification and sequence
+// number checks for a virtual machine context.
+func WithSignatureVerification(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.SignatureVerificationEnabled = enabled
+		return ctx
+	}
+}
+
+// WithFeePayments enables or disables fee payments for a virtual machine context.
+func WithFeePayments(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.FeePaymentsEnabled = enabled
+		return ctx
+	}
+}
+
+// WithRestrictedDeployment enables or disables restricted contract deployment for a
+// virtual machine context.
+func WithRestrictedDeployment(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.RestrictedDeploymentEnabled = enabled
+		return ctx
+	}
+}
+
+// WithRestrictedAccountCreation enables or disables restricted account creation for a
+// virtual machine context
+func WithRestrictedAccountCreation(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.RestrictedAccountCreationEnabled = enabled
+		return ctx
+	}
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/onflow/cadence/runtime"
+	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
@@ -14,7 +15,44 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
-func BootstrapExecutionDatabase(db *badger.DB, commit flow.StateCommitment, genesis *flow.Header) error {
+type Bootstrapper struct {
+	logger zerolog.Logger
+}
+
+func NewBootstrapper(logger zerolog.Logger) *Bootstrapper {
+	return &Bootstrapper{
+		logger: logger,
+	}
+}
+
+// BootstrapLedger adds the above root account to the ledger and initializes execution node-only data
+func (b *Bootstrapper) BootstrapLedger(
+	ledger storage.Ledger,
+	servicePublicKey flow.AccountPublicKey,
+	initialTokenSupply uint64,
+	chain flow.Chain,
+) (flow.StateCommitment, error) {
+	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.EmptyStateCommitment()))
+
+	vm := fvm.New(runtime.NewInterpreterRuntime(), chain)
+
+	ctx := fvm.NewContext()
+
+	_, err := vm.Invoke(ctx, fvm.Bootstrap(servicePublicKey, initialTokenSupply), view)
+	if err != nil {
+		return nil, err
+	}
+
+	newStateCommitment, err := state.CommitDelta(ledger, view.Delta(), ledger.EmptyStateCommitment())
+	if err != nil {
+		return nil, err
+	}
+
+	return newStateCommitment, nil
+}
+
+func (b *Bootstrapper) BootstrapExecutionDatabase(db *badger.DB, commit flow.StateCommitment, genesis *flow.Header) error {
+
 	err := operation.RetryOnConflict(db.Update, func(txn *badger.Txn) error {
 
 		err := operation.InsertExecutedBlock(genesis.ID())(txn)
@@ -46,27 +84,4 @@ func BootstrapExecutionDatabase(db *badger.DB, commit flow.StateCommitment, gene
 	}
 
 	return nil
-}
-
-// BootstrapLedger adds the above root account to the ledger and initializes execution node-only data
-func BootstrapLedger(
-	ledger storage.Ledger,
-	servicePublicKey flow.AccountPublicKey,
-	initialTokenSupply uint64,
-) (flow.StateCommitment, error) {
-	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.EmptyStateCommitment()))
-
-	vm := fvm.New(runtime.NewInterpreterRuntime())
-
-	_, err := vm.NewContext().Invoke(fvm.Bootstrap(servicePublicKey, initialTokenSupply), view)
-	if err != nil {
-		return nil, err
-	}
-
-	newStateCommitment, err := state.CommitDelta(ledger, view.Delta(), ledger.EmptyStateCommitment())
-	if err != nil {
-		return nil, err
-	}
-
-	return newStateCommitment, nil
 }

@@ -213,7 +213,11 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 		defer span.Finish()
 	}
 
-	return s.executionResults.Lookup(blockID)
+	res, err := s.executionResults.ByBlockID(blockID)
+	if err != nil {
+		return flow.ZeroID, err
+	}
+	return res.ID(), nil
 }
 
 func (s *state) PersistExecutionResult(ctx context.Context, blockID flow.Identifier, result flow.ExecutionResult) error {

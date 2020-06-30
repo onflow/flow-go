@@ -21,7 +21,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
-	"github.com/dapperlabs/flow-go/engine/common/synchronization"
+	synceng "github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/buffer"
@@ -30,6 +30,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	synccore "github.com/dapperlabs/flow-go/module/synchronization"
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
@@ -46,7 +47,7 @@ type Node struct {
 	log           zerolog.Logger
 	id            *flow.Identity
 	compliance    *compliance.Engine
-	sync          *synchronization.Engine
+	sync          *synceng.Engine
 	hot           *hotstuff.EventLoop
 	state         *protocol.State
 	headers       *storage.Headers
@@ -98,7 +99,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	guaranteesDB := storage.NewGuarantees(metrics, db)
 	sealsDB := storage.NewSeals(metrics, db)
 	indexDB := storage.NewIndex(metrics, db)
-	payloadsDB := storage.NewPayloads(indexDB, identitiesDB, guaranteesDB, sealsDB)
+	payloadsDB := storage.NewPayloads(db, indexDB, identitiesDB, guaranteesDB, sealsDB)
 	blocksDB := storage.NewBlocks(db, headersDB, payloadsDB)
 
 	state, err := protocol.NewState(metrics, db, headersDB, identitiesDB, sealsDB, payloadsDB, blocksDB)
@@ -189,12 +190,15 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	prov := &networkmock.Engine{}
 	prov.On("SubmitLocal", mock.Anything).Return(nil)
 
+	syncCore, err := synccore.New(log, synccore.DefaultConfig())
+	require.NoError(t, err)
+
 	// initialize the compliance engine
-	comp, err := compliance.New(log, metrics, metrics, metrics, net, local, cleaner, headersDB, payloadsDB, state, prov, cache)
+	comp, err := compliance.New(log, metrics, metrics, metrics, net, local, cleaner, headersDB, payloadsDB, state, prov, cache, syncCore)
 	require.NoError(t, err)
 
 	// initialize the synchronization engine
-	sync, err := synchronization.New(log, metrics, net, local, state, blocksDB, comp)
+	sync, err := synceng.New(log, metrics, net, local, state, blocksDB, comp, syncCore)
 	require.NoError(t, err)
 
 	pending := []*flow.Header{}
@@ -205,7 +209,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 
 	require.NoError(t, err)
 
-	comp = comp.WithSynchronization(sync).WithConsensus(hot)
+	comp = comp.WithConsensus(hot)
 
 	node.compliance = comp
 	node.sync = sync

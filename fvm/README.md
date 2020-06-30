@@ -15,14 +15,13 @@ import (
 
 vm := fvm.New(runtime.NewInterpreterRuntime())
 
-ctx := vm.NewContext()
-
 tx := flow.NewTransactionBody().
     SetScript(`transaction { execute { log("Hello, World!") } }`)
 
+ctx := fvm.NewContext()
 ledger := make(fvm.MapLedger)
 
-result, err := ctx.Invoke(fvm.Transaction(tx), ledger)
+result, err := vm.Invoke(ctx, fvm.Transaction(tx), ledger)
 if err != nil {
   panic("fatal error during invocation!")
 }
@@ -83,15 +82,15 @@ a new child context.
 ```go
 vm := fvm.New(runtime.NewInterpreterRuntime())
 
-globalCtx := vm.NewContext()
+globalCtx := fvm.NewContext()
 
 // create separate contexts for different blocks
-block1Ctx := globalCtx.NewChild(fvm.WithBlockHeader(block1))
-block2Ctx := globalCtx.NewChild(fvm.WithBlockHeader(block2))
+block1Ctx := fvm.NewContextFromParent(globalCtx, fvm.WithBlockHeader(block1))
+block2Ctx := fvm.NewContextFromParent(globalCtx, fvm.WithBlockHeader(block2))
 
 // contexts can be safely used in parallel
-go executeBlock(block1Ctx)
-go executeBlock(block2Ctx)
+go executeBlock(vm, block1Ctx)
+go executeBlock(vm, block2Ctx)
 ```
 
 #### Context Options

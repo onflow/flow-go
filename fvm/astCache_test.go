@@ -22,12 +22,15 @@ const CacheSize = 256
 
 func TestTransactionASTCache(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
-	vm := fvm.New(rt)
+
+	chain := flow.Mainnet.Chain()
+
+	vm := fvm.New(rt, chain)
 
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := vm.NewContext(fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(fvm.WithASTCache(cache))
 
 	t.Run("transaction execution results in cached program", func(t *testing.T) {
 		tx := &flow.TransactionBody{
@@ -39,12 +42,12 @@ func TestTransactionASTCache(t *testing.T) {
             `),
 		}
 
-		err := testutil.SignTransactionByRoot(tx, 0)
+		err := testutil.SignTransactionAsServiceAccount(tx, 0, chain)
 		require.NoError(t, err)
 
-		ledger := testutil.RootBootstrappedLedger()
+		ledger := testutil.RootBootstrappedLedger(chain)
 
-		result, err := ctx.Invoke(fvm.Transaction(tx), ledger)
+		result, err := vm.Invoke(ctx, fvm.Transaction(tx), ledger)
 		require.NoError(t, err)
 
 		require.True(t, result.Succeeded())
@@ -59,17 +62,19 @@ func TestTransactionASTCache(t *testing.T) {
 		require.NotNil(t, program)
 		require.NoError(t, err)
 	})
-
 }
 
 func TestScriptASTCache(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
-	vm := fvm.New(rt)
+
+	chain := flow.Mainnet.Chain()
+
+	vm := fvm.New(rt, chain)
 
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := vm.NewContext(fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(fvm.WithASTCache(cache))
 
 	t.Run("script execution results in cached program", func(t *testing.T) {
 		script := []byte(`
@@ -78,9 +83,9 @@ func TestScriptASTCache(t *testing.T) {
 			}
 		`)
 
-		ledger := testutil.RootBootstrappedLedger()
+		ledger := testutil.RootBootstrappedLedger(chain)
 
-		result, err := ctx.Invoke(fvm.Script(script), ledger)
+		result, err := vm.Invoke(ctx, fvm.Script(script), ledger)
 		require.NoError(t, err)
 		require.True(t, result.Succeeded())
 
@@ -98,20 +103,23 @@ func TestScriptASTCache(t *testing.T) {
 
 func TestTransactionWithProgramASTCache(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
-	vm := fvm.New(rt)
+
+	chain := flow.Mainnet.Chain()
+
+	vm := fvm.New(rt, chain)
 
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := vm.NewContext(fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(fvm.WithASTCache(cache))
 
 	// Create a number of account private keys.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 
 	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-	ledger := testutil.RootBootstrappedLedger()
-	accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys)
+	ledger := testutil.RootBootstrappedLedger(chain)
+	accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
 	require.NoError(t, err)
 
 	// Create deployment transaction that imports the FlowToken contract
@@ -125,20 +133,20 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 						destroy v
 					}
 				}
-			`, fvm.FlowTokenAddress())),
+			`, fvm.FlowTokenAddress(chain))),
 		).
 		AddAuthorizer(accounts[0]).
 		SetProposalKey(accounts[0], 0, 0).
-		SetPayer(flow.ServiceAddress())
+		SetPayer(chain.ServiceAddress())
 
 	err = testutil.SignPayload(useImportTx, accounts[0], privateKeys[0])
 	require.NoError(t, err)
 
-	err = testutil.SignEnvelope(useImportTx, flow.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+	err = testutil.SignEnvelope(useImportTx, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 	require.NoError(t, err)
 
 	// Run the Use import (FT Vault resource) transaction
-	result, err := ctx.Invoke(fvm.Transaction(useImportTx), ledger)
+	result, err := vm.Invoke(ctx, fvm.Transaction(useImportTx), ledger)
 	require.NoError(t, err)
 
 	if !assert.Nil(t, result.Error) {
@@ -157,20 +165,23 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 
 func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 	rt := runtime.NewInterpreterRuntime()
-	vm := fvm.New(rt)
+
+	chain := flow.Mainnet.Chain()
+
+	vm := fvm.New(rt, chain)
 
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(b, err)
 
-	ctx := vm.NewContext(fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(fvm.WithASTCache(cache))
 
 	// Create a number of account private keys.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(b, err)
 
 	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-	ledger := testutil.RootBootstrappedLedger()
-	accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys)
+	ledger := testutil.RootBootstrappedLedger(chain)
+	accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
 	require.NoError(b, err)
 
 	// Create many transactions that import the FlowToken contract.
@@ -188,16 +199,16 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 						destroy v
 					}
 				}
-			`, fvm.FlowTokenAddress(), i)),
+			`, fvm.FlowTokenAddress(chain), i)),
 			).
 			AddAuthorizer(accounts[0]).
 			SetProposalKey(accounts[0], 0, uint64(i)).
-			SetPayer(flow.ServiceAddress())
+			SetPayer(chain.ServiceAddress())
 
 		err = testutil.SignPayload(tx, accounts[0], privateKeys[0])
 		require.NoError(b, err)
 
-		err = testutil.SignEnvelope(tx, flow.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		err = testutil.SignEnvelope(tx, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 		require.NoError(b, err)
 
 		txs = append(txs, tx)
@@ -208,7 +219,7 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		for _, tx := range txs {
 			// Run the Use import (FT Vault resource) transaction.
-			result, err := ctx.Invoke(fvm.Transaction(tx), ledger)
+			result, err := vm.Invoke(ctx, fvm.Transaction(tx), ledger)
 			require.NoError(b, err)
 
 			if !assert.Nil(b, result.Error) {
@@ -231,17 +242,20 @@ func (cache *nonFunctioningCache) SetProgram(location ast.Location, program *ast
 
 func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 	rt := runtime.NewInterpreterRuntime()
-	vm := fvm.New(rt)
 
-	ctx := vm.NewContext(fvm.WithASTCache(&nonFunctioningCache{}))
+	chain := flow.Mainnet.Chain()
+
+	vm := fvm.New(rt, chain)
+
+	ctx := fvm.NewContext(fvm.WithASTCache(&nonFunctioningCache{}))
 
 	// Create a number of account private keys.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(b, err)
 
 	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-	ledger := testutil.RootBootstrappedLedger()
-	accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys)
+	ledger := testutil.RootBootstrappedLedger(chain)
+	accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
 	require.NoError(b, err)
 
 	// Create many transactions that import the FlowToken contract.
@@ -259,7 +273,7 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 						destroy v
 					}
 				}
-			`, fvm.FlowTokenAddress(), i)),
+			`, fvm.FlowTokenAddress(chain), i)),
 			).
 			AddAuthorizer(accounts[0]).
 			SetPayer(accounts[0]).
@@ -276,7 +290,7 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		for _, tx := range txs {
 			// Run the Use import (FT Vault resource) transaction.
-			result, err := ctx.Invoke(fvm.Transaction(tx), ledger)
+			result, err := vm.Invoke(ctx, fvm.Transaction(tx), ledger)
 			require.True(b, result.Succeeded())
 			require.NoError(b, err)
 		}
@@ -285,15 +299,18 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 
 func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
-	vm := fvm.New(rt)
+
+	chain := flow.Mainnet.Chain()
+
+	vm := fvm.New(rt, chain)
 
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := vm.NewContext(fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(fvm.WithASTCache(cache))
 
 	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-	ledger := testutil.RootBootstrappedLedger()
+	ledger := testutil.RootBootstrappedLedger(chain)
 
 	var wg sync.WaitGroup
 	for i := 0; i < 100; i++ {
@@ -309,9 +326,9 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 					let v <- FlowToken.createEmptyVault()
 					destroy v
 				}
-			`, fvm.FlowTokenAddress(), id))
+			`, fvm.FlowTokenAddress(chain), id))
 
-			result, err := ctx.Invoke(fvm.Script(script), view)
+			result, err := vm.Invoke(ctx, fvm.Script(script), view)
 			if !assert.True(t, result.Succeeded()) {
 				t.Log(result.Error)
 			}
@@ -321,7 +338,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 	}
 	wg.Wait()
 
-	location := runtime.AddressLocation(fvm.FlowTokenAddress().Bytes())
+	location := runtime.AddressLocation(fvm.FlowTokenAddress(chain).Bytes())
 
 	// Get cached program
 	var program *ast.Program

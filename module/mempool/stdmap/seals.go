@@ -13,9 +13,9 @@ type Seals struct {
 }
 
 // NewSeals creates a new memory pool for block seals.
-func NewSeals(limit uint) (*Seals, error) {
+func NewSeals(limit uint, opts ...OptionFunc) (*Seals, error) {
 	s := &Seals{
-		Backend: NewBackend(WithLimit(limit)),
+		Backend: NewBackend(append(opts, WithLimit(limit))...),
 	}
 
 	return s, nil

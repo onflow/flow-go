@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/cmd"
+	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	"github.com/dapperlabs/flow-go/engine/execution/provider"
@@ -22,19 +23,23 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	chainsync "github.com/dapperlabs/flow-go/module/synchronization"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/ledger"
+	"github.com/dapperlabs/flow-go/storage/ledger/wal"
 )
 
 func main() {
 
 	var (
-		ledgerStorage      storage.Ledger
+		ledgerStorage      *ledger.MTrieStorage
 		events             storage.Events
 		txResults          storage.TransactionResults
 		providerEngine     *provider.Engine
+		syncCore           *chainsync.Core
 		computationManager *computation.Manager
+		syncEngine         *synchronization.Engine
 		ingestionEng       *ingestion.Engine
 		rpcConf            rpc.Config
 		err                error
@@ -55,16 +60,17 @@ func main() {
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
-			vm := fvm.New(rt)
 
-			execCtx := vm.NewContext(fvm.WithBlocks(node.Storage.Blocks))
+			vm := fvm.New(rt, node.RootChainID.Chain())
 
 			computationManager = computation.New(
 				node.Logger,
+				collector,
 				node.Tracer,
 				node.Me,
 				node.State,
-				execCtx,
+				node.Storage.Blocks,
+				vm,
 			)
 
 			return nil
@@ -76,7 +82,10 @@ func main() {
 		// Trie storage is required to bootstrap, but also should be handled while shutting down
 		Module("ledger storage", func(node *cmd.FlowNodeBuilder) error {
 			ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), collector, node.MetricsRegisterer)
-
+			return err
+		}).
+		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
+			syncCore, err = chainsync.New(node.Logger, chainsync.DefaultConfig())
 			return err
 		}).
 		GenesisHandler(func(node *cmd.FlowNodeBuilder, block *flow.Block) {
@@ -84,7 +93,9 @@ func main() {
 				panic(fmt.Sprintf("error while bootstrapping execution state: no service account public key"))
 			}
 
-			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage, *node.GenesisAccountPublicKey, node.GenesisTokenSupply)
+			bootstrapper := bootstrap.NewBootstrapper(node.Logger)
+
+			bootstrappedStateCommitment, err := bootstrapper.BootstrapLedger(ledgerStorage, *node.GenesisAccountPublicKey, node.GenesisTokenSupply, node.RootChainID.Chain())
 			if err != nil {
 				panic(fmt.Sprintf("error while bootstrapping execution state: %s", err))
 			}
@@ -93,13 +104,23 @@ func main() {
 				panic(fmt.Sprintf("genesis seal state commitment (%x) different from precalculated (%x)", bootstrappedStateCommitment, node.GenesisCommit))
 			}
 
-			err = bootstrap.BootstrapExecutionDatabase(node.DB, bootstrappedStateCommitment, block.Header)
+			err = bootstrapper.BootstrapExecutionDatabase(node.DB, bootstrappedStateCommitment, block.Header)
 			if err != nil {
 				panic(fmt.Sprintf("error while bootstrapping execution state - cannot bootstrap database: %s", err))
 			}
 		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			return ledgerStorage, nil
+		}).
+		Component("execution state ledger WAL compactor", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+
+			checkpointer, err := ledgerStorage.Checkpointer()
+			if err != nil {
+				return nil, fmt.Errorf("cannot create checkpointer: %w", err)
+			}
+			compactor := wal.NewCompactor(checkpointer, 10*time.Second)
+
+			return compactor, nil
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			chunkDataPacks := badger.NewChunkDataPacks(node.DB)
@@ -132,8 +153,6 @@ func main() {
 			return providerEngine, err
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			// Only needed for ingestion engine
-			collections := badger.NewCollections(node.DB)
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
 			events = badger.NewEvents(node.DB)
@@ -145,11 +164,12 @@ func main() {
 				node.State,
 				node.Storage.Blocks,
 				node.Storage.Payloads,
-				collections,
+				node.Storage.Collections,
 				events,
 				txResults,
 				computationManager,
 				providerEngine,
+				syncCore,
 				executionState,
 				6, // TODO - config param maybe?
 				collector,
@@ -159,6 +179,24 @@ func main() {
 				10,          // TODO - config param
 			)
 			return ingestionEng, err
+		}).
+		Component("sychronization engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			// initialize the synchronization engine
+			syncEngine, err = synchronization.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				node.Storage.Blocks,
+				ingestionEng,
+				syncCore,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
+			}
+
+			return syncEngine, nil
 		}).
 		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, events, txResults)

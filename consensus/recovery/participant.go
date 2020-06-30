@@ -10,9 +10,9 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// Participant recovers the hotstuff state for consensus nodes.
-// It reads the pending blocks from storage and pass them to the input Forks instance
-// to recover its state form the restart.
+// Participant recovers the HotStuff state for a consensus participant.
+// It reads the pending blocks from storage and pass them to the input Forks
+// instance to recover its state from before the restart.
 func Participant(
 	log zerolog.Logger,
 	forks hotstuff.Forks,

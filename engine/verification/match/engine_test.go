@@ -16,8 +16,10 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
+	realModule "github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	module "github.com/dapperlabs/flow-go/module/mock"
+	"github.com/dapperlabs/flow-go/module/trace"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
@@ -27,6 +29,8 @@ import (
 func SetupTest(t *testing.T, maxTry int) (
 	e *Engine,
 	participants flow.IdentityList,
+	metrics *module.VerificationMetrics,
+	tracer realModule.Tracer,
 	myID flow.Identifier,
 	otherID flow.Identifier,
 	head *flow.Header,
@@ -69,14 +73,16 @@ func SetupTest(t *testing.T, maxTry int) (
 	er = stdmap.NewPendingResults()
 	verifier = &network.Engine{}
 	assigner = &module.ChunkAssigner{}
+	metrics = &module.VerificationMetrics{}
+	tracer = trace.NewNoopTracer()
 	chunks = NewChunks(10)
 
 	log := zerolog.New(os.Stderr)
 	retryInterval := 100 * time.Millisecond
 
-	e, err := New(log, net, me, er, verifier, assigner, state, chunks, headers, retryInterval, maxTry)
+	e, err := New(log, metrics, tracer, net, me, er, verifier, assigner, state, chunks, headers, retryInterval, maxTry)
 	require.NoError(t, err)
-	return e, participants, myID, otherID, head, me, con, net, headers, headerDB, state, snapshot, er, verifier, chunks, assigner
+	return e, participants, metrics, tracer, myID, otherID, head, me, con, net, headers, headerDB, state, snapshot, er, verifier, chunks, assigner
 }
 
 func createExecutionResult(blockID flow.Identifier, options ...func(result *flow.ExecutionResult, assignments *chunks.Assignment)) (*flow.ExecutionResult, *chunks.Assignment) {
@@ -192,10 +198,27 @@ func VerifierCalledNTimes(verifier *network.Engine, n int) <-chan []*verificatio
 	return c
 }
 
+func OnVerifiableChunkSentMetricCalledNTimes(metrics *module.VerificationMetrics, n int) <-chan struct{} {
+	var wg sync.WaitGroup
+	c := make(chan struct{}, 1)
+
+	wg.Add(n)
+	metrics.On("OnVerifiableChunkSent").Run(func(args mock.Arguments) {
+		wg.Done()
+	}).Return().Times(n)
+
+	go func() {
+		wg.Wait()
+		c <- struct{}{}
+		close(c)
+	}()
+	return c
+}
+
 // Happy Path: When receives a ER, and 1 chunk is assigned to me,
 // it will fetch that collection and chunk data, and produces a verifiable chunk
 func TestChunkVerified(t *testing.T) {
-	e, participants, myID, _, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, 1)
+	e, participants, metrics, _, myID, _, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, 1)
 	// create a execution result that assigns to me
 	result, assignment := createExecutionResult(
 		head.ID(),
@@ -203,6 +226,14 @@ func TestChunkVerified(t *testing.T) {
 			WithAssignee(myID),
 		),
 	)
+
+	// metrics
+	// receiving an execution result
+	metrics.On("OnExecutionResultReceived").Return().Once()
+	// sending a verifiable chunk
+	metrics.On("OnVerifiableChunkSent").Return().Once()
+	// receiving a chunk data pack
+	metrics.On("OnChunkDataPackReceived").Return().Once()
 
 	// add assignment to assigner
 	assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
@@ -242,14 +273,14 @@ func TestChunkVerified(t *testing.T) {
 	require.Equal(t, result, vchunks[0].Result)
 	require.Equal(t, &chunkDataPack, vchunks[0].ChunkDataPack)
 
-	mock.AssertExpectationsForObjects(t, assigner, con, verifier)
+	mock.AssertExpectationsForObjects(t, assigner, con, verifier, metrics)
 	e.Done()
 }
 
 // No assignment: When receives a ER, and no chunk is assigned to me, then I won’t fetch any collection or chunk,
 // nor produce any verifiable chunk
 func TestNoAssignment(t *testing.T) {
-	e, participants, _, otherID, head, _, _, _, _, headerDB, _, _, _, _, _, assigner := SetupTest(t, 1)
+	e, participants, metrics, _, _, otherID, head, _, _, _, _, headerDB, _, _, _, _, _, assigner := SetupTest(t, 1)
 	// create a execution result that assigns to me
 	result, assignment := createExecutionResult(
 		head.ID(),
@@ -257,6 +288,10 @@ func TestNoAssignment(t *testing.T) {
 			WithAssignee(otherID),
 		),
 	)
+
+	// metrics
+	// receiving an execution result
+	metrics.On("OnExecutionResultReceived").Return().Once()
 
 	// add assignment to assigner
 	assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
@@ -272,12 +307,13 @@ func TestNoAssignment(t *testing.T) {
 	err := e.Process(en.ID(), result)
 	require.NoError(t, err)
 	e.Done()
+	mock.AssertExpectationsForObjects(t, metrics)
 }
 
 // Multiple Assignments: When receives a ER, and 2 chunks out of 3 are assigned to me,
 // it will produce 2 verifiable chunks.
 func TestMultiAssignment(t *testing.T) {
-	e, participants, myID, otherID, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, 1)
+	e, participants, metrics, _, myID, otherID, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, 1)
 	// create a execution result that assigns to me
 	result, assignment := createExecutionResult(
 		head.ID(),
@@ -287,6 +323,14 @@ func TestMultiAssignment(t *testing.T) {
 			WithAssignee(myID),
 		),
 	)
+
+	// metrics
+	// receiving an execution result
+	metrics.On("OnExecutionResultReceived").Return().Once()
+	// sending two verifiable chunks
+	metrics.On("OnVerifiableChunkSent").Return().Twice()
+	// receiving two chunk data packs
+	metrics.On("OnChunkDataPackReceived").Return().Twice()
 
 	// add assignment to assigner
 	assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
@@ -321,7 +365,7 @@ func TestMultiAssignment(t *testing.T) {
 
 // Duplication: When receives 2 ER for the same block, which only has 1 chunk, only 1 verifiable chunk will be produced.
 func TestDuplication(t *testing.T) {
-	e, participants, myID, otherID, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, 1)
+	e, participants, metrics, _, myID, otherID, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, 1)
 	// create a execution result that assigns to me
 	result, assignment := createExecutionResult(
 		head.ID(),
@@ -330,6 +374,14 @@ func TestDuplication(t *testing.T) {
 			WithAssignee(otherID),
 		),
 	)
+
+	// metrics
+	// receiving an execution result
+	metrics.On("OnExecutionResultReceived").Return().Twice()
+	// sending one verifiable chunks
+	metrics.On("OnVerifiableChunkSent").Return().Once()
+	// receiving one chunk data packs
+	metrics.On("OnChunkDataPackReceived").Return().Once()
 
 	// add assignment to assigner
 	assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
@@ -355,12 +407,12 @@ func TestDuplication(t *testing.T) {
 
 	// engine processes the execution result again
 	err = e.Process(en.ID(), result)
-	require.Contains(t, err.Error(), "execution result has been added")
+	require.NoError(t, err)
 
 	// wait until verifier has been called
 	<-vchunksC
 
-	mock.AssertExpectationsForObjects(t, assigner, con, verifier)
+	mock.AssertExpectationsForObjects(t, assigner, con, verifier, metrics)
 	e.Done()
 }
 
@@ -369,7 +421,7 @@ func TestDuplication(t *testing.T) {
 // and successful to return in the 3rd try, a verifiable chunk will be produced
 func TestRetry(t *testing.T) {
 	maxTry := 3
-	e, participants, myID, _, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, maxTry)
+	e, participants, metrics, _, myID, _, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, maxTry)
 	// create a execution result that assigns to me
 	result, assignment := createExecutionResult(
 		head.ID(),
@@ -377,6 +429,14 @@ func TestRetry(t *testing.T) {
 			WithAssignee(myID),
 		),
 	)
+
+	// metrics
+	// receiving an execution result
+	metrics.On("OnExecutionResultReceived").Return().Once()
+	// sending one verifiable chunk
+	metrics.On("OnVerifiableChunkSent").Return().Once()
+	// receiving one chunk data pack
+	metrics.On("OnChunkDataPackReceived").Return().Once()
 
 	// add assignment to assigner
 	assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
@@ -409,7 +469,7 @@ func TestRetry(t *testing.T) {
 	// wait until verifier has been called
 	<-vchunksC
 
-	mock.AssertExpectationsForObjects(t, assigner, con, verifier)
+	mock.AssertExpectationsForObjects(t, assigner, con, verifier, metrics)
 	e.Done()
 }
 
@@ -417,7 +477,7 @@ func TestRetry(t *testing.T) {
 // and the execution node fails to return data for the first 2 requests, then no verifiable chunk will be produced
 func TestMaxRetry(t *testing.T) {
 	maxAttempt := 3
-	e, participants, myID, _, head, _, con, _, _, headerDB, _, _, _, _, _, assigner := SetupTest(t, maxAttempt)
+	e, participants, metrics, _, myID, _, head, _, con, _, _, headerDB, _, _, _, _, _, assigner := SetupTest(t, maxAttempt)
 	// create a execution result that assigns to me
 	result, assignment := createExecutionResult(
 		head.ID(),
@@ -425,6 +485,10 @@ func TestMaxRetry(t *testing.T) {
 			WithAssignee(myID),
 		),
 	)
+
+	// metrics
+	// receiving an execution result
+	metrics.On("OnExecutionResultReceived").Return().Once()
 
 	// add assignment to assigner
 	assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
@@ -454,12 +518,21 @@ func TestMaxRetry(t *testing.T) {
 // Concurrency: When 10 different ER are received concurrently, chunks from both
 // results will be processed
 func TestProcessExecutionResultConcurrently(t *testing.T) {
-	e, participants, myID, _, _, _, con, _, _, headerDB, _, _, _, verifier, _, assigner :=
+	e, participants, metrics, _, myID, _, _, _, con, _, _, headerDB, _, _, _, verifier, _, assigner :=
 		SetupTest(t, 1)
 
 	ers := make([]*flow.ExecutionResult, 0)
 
 	count := 10
+
+	// metrics
+	// receiving `count`-many result
+	metrics.On("OnExecutionResultReceived").Return().Times(count)
+	// sending `count`-many verifiable chunks
+	metrics.On("OnVerifiableChunkSent").Return().Times(count)
+	// receiving `count`-many chunk data packs
+	metrics.On("OnChunkDataPackReceived").Return().Times(count)
+
 	for i := 0; i < count; i++ {
 		header := &flow.Header{View: uint64(i)}
 		// create a execution result that assigns to me
@@ -469,7 +542,6 @@ func TestProcessExecutionResultConcurrently(t *testing.T) {
 				WithAssignee(myID),
 			),
 		)
-
 		// add assignment to assigner
 		assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
 
@@ -507,7 +579,7 @@ func TestProcessExecutionResultConcurrently(t *testing.T) {
 // Concurrency: When chunk data pack are sent concurrently, match engine is able to receive
 // all of them, and process concurrently.
 func TestProcessChunkDataPackConcurrently(t *testing.T) {
-	e, participants, myID, _, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner :=
+	e, participants, metrics, _, myID, _, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner :=
 		SetupTest(t, 1)
 
 	// create a execution result that assigns to me
@@ -522,6 +594,14 @@ func TestProcessChunkDataPackConcurrently(t *testing.T) {
 			WithAssignee(myID),
 		),
 	)
+
+	// metrics
+	// receiving `len(result.Chunk)`-many result
+	metrics.On("OnExecutionResultReceived").Return().Once()
+	// sending `len(result.Chunk)`-many verifiable chunks
+	sentMetricsC := OnVerifiableChunkSentMetricCalledNTimes(metrics, len(result.Chunks))
+	// receiving `len(result.Chunk)`-many chunk data packs
+	metrics.On("OnChunkDataPackReceived").Return().Times(len(result.Chunks))
 
 	// add assignment to assigner
 	assigner.On("Assign", mock.Anything, result.Chunks, mock.Anything).Return(assignment, nil).Once()
@@ -562,7 +642,9 @@ func TestProcessChunkDataPackConcurrently(t *testing.T) {
 
 	// wait until verifier are called
 	<-vchunksC
+	// wait until verifier metrics are called
+	<-sentMetricsC
 
-	mock.AssertExpectationsForObjects(t, assigner, con, verifier)
+	mock.AssertExpectationsForObjects(t, assigner, con, verifier, metrics)
 	e.Done()
 }

@@ -1,7 +1,10 @@
 package rpc
 
 import (
+	"context"
+	"errors"
 	"net"
+	"net/http"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
@@ -11,14 +14,16 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/access/rpc/handler"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	grpcutils "github.com/dapperlabs/flow-go/utils/grpc"
 )
 
-// Config defines the configurable options for the gRPC server.
+// Config defines the configurable options for the access node server
 type Config struct {
-	ListenAddr     string
+	GRPCListenAddr string
+	HTTPListenAddr string
 	ExecutionAddr  string
 	CollectionAddr string
 	MaxMsgSize     int // In bytes
@@ -26,11 +31,12 @@ type Config struct {
 
 // Engine implements a gRPC server with a simplified version of the Observation API.
 type Engine struct {
-	unit    *engine.Unit
-	log     zerolog.Logger
-	handler *handler.Handler // the gRPC service implementation
-	server  *grpc.Server     // the gRPC server
-	config  Config
+	unit       *engine.Unit
+	log        zerolog.Logger
+	handler    *handler.Handler // the gRPC service implementation
+	grpcServer *grpc.Server     // the gRPC server
+	httpServer *http.Server
+	config     Config
 }
 
 // New returns a new RPC engine.
@@ -42,7 +48,8 @@ func New(log zerolog.Logger,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
-	transactions storage.Transactions) *Engine {
+	transactions storage.Transactions,
+	chainID flow.ChainID) *Engine {
 
 	log = log.With().Str("engine", "rpc").Logger()
 
@@ -50,18 +57,25 @@ func New(log zerolog.Logger,
 		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
 	}
 
+	// create a GRPC server to serve GRPC clients
+	grpcServer := grpc.NewServer(
+		grpc.MaxRecvMsgSize(config.MaxMsgSize),
+		grpc.MaxSendMsgSize(config.MaxMsgSize),
+	)
+
+	// wrap the GRPC server with an HTTP proxy server to serve HTTP clients
+	httpServer := NewHTTPServer(grpcServer, 8080)
+
 	eng := &Engine{
-		log:     log,
-		unit:    engine.NewUnit(),
-		handler: handler.NewHandler(log, state, executionRPC, collectionRPC, blocks, headers, collections, transactions),
-		server: grpc.NewServer(
-			grpc.MaxRecvMsgSize(config.MaxMsgSize),
-			grpc.MaxSendMsgSize(config.MaxMsgSize),
-		),
-		config: config,
+		log:        log,
+		unit:       engine.NewUnit(),
+		handler:    handler.NewHandler(log, state, executionRPC, collectionRPC, blocks, headers, collections, transactions, chainID),
+		grpcServer: grpcServer,
+		httpServer: httpServer,
+		config:     config,
 	}
 
-	access.RegisterAccessAPIServer(eng.server, eng.handler)
+	access.RegisterAccessAPIServer(eng.grpcServer, eng.handler)
 
 	return eng
 }
@@ -77,23 +91,38 @@ func (e *Engine) Ready() <-chan struct{} {
 // Done returns a done channel that is closed once the engine has fully stopped.
 // It sends a signal to stop the gRPC server, then closes the channel.
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done(e.server.GracefulStop)
+	return e.unit.Done(
+		e.grpcServer.GracefulStop,
+		func() {
+			err := e.httpServer.Shutdown(context.Background())
+			if err != nil {
+				e.log.Error().Err(err).Msg("error stopping http server")
+			}
+		})
 }
 
-// serve starts the gRPC server .
-//
+// serve starts the gRPC server and the http proxy server
 // When this function returns, the server is considered ready.
 func (e *Engine) serve() {
-	e.log.Info().Msgf("starting server on address %s", e.config.ListenAddr)
+	e.log.Info().Msgf("starting grpc server on address %s", e.config.GRPCListenAddr)
 
-	l, err := net.Listen("tcp", e.config.ListenAddr)
+	l, err := net.Listen("tcp", e.config.GRPCListenAddr)
 	if err != nil {
-		e.log.Err(err).Msg("failed to start server")
+		e.log.Err(err).Msg("failed to start the grpc server")
 		return
 	}
 
-	err = e.server.Serve(l)
+	err = e.grpcServer.Serve(l)
 	if err != nil {
-		e.log.Err(err).Msg("fatal error in server")
+		e.log.Err(err).Msg("fatal error in grpc server")
+	}
+
+	e.log.Info().Msgf("starting http server on address %s", e.config.HTTPListenAddr)
+	err = e.httpServer.ListenAndServe()
+	if errors.Is(err, http.ErrServerClosed) {
+		return
+	}
+	if err != nil {
+		e.log.Err(err).Msg("failed to start the http proxy server")
 	}
 }

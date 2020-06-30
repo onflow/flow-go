@@ -34,7 +34,7 @@ var ErrPrunedAncestry = errors.New("cannot resolve pruned ancestry")
 
 func New(trustedRoot *forks.BlockQC, finalizationCallback module.Finalizer, notifier hotstuff.FinalizationConsumer) (*Finalizer, error) {
 	if (trustedRoot.Block.BlockID != trustedRoot.QC.BlockID) || (trustedRoot.Block.View != trustedRoot.QC.View) {
-		return nil, &model.ErrorConfiguration{Msg: "invalid root: root qc is not pointing to root block"}
+		return nil, &model.ConfigurationError{Msg: "invalid root: root qc is not pointing to root block"}
 	}
 
 	fnlzr := Finalizer{
@@ -147,16 +147,16 @@ func (r *Finalizer) AddBlock(block *model.Block) error {
 	if err != nil {
 		return fmt.Errorf("updating consensus state failed: %w", err)
 	}
-	err = r.finalizationCallback.MakePending(blockContainer.Block.BlockID)
+	err = r.finalizationCallback.MakeValid(blockContainer.Block.BlockID)
 	if err != nil {
-		return fmt.Errorf("MakePending fails in other component: %w", err)
+		return fmt.Errorf("MakeValid fails in other component: %w", err)
 	}
 	r.notifier.OnBlockIncorporated(blockContainer.Block)
 	return nil
 }
 
 // checkForConflictingQCs checks if qc conflicts with a stored Quorum Certificate.
-// In case a conflicting QC is found, an ErrorByzantineThresholdExceeded is returned.
+// In case a conflicting QC is found, an ByzantineThresholdExceededError is returned.
 //
 // Two Quorum Certificates q1 and q2 are defined as conflicting iff:
 //     * q1.View == q2.View
@@ -178,7 +178,7 @@ func (r *Finalizer) checkForConflictingQCs(qc *model.QuorumCertificate) error {
 			if otherChildren.HasNext() {
 				otherChild := otherChildren.NextVertex()
 				conflictingQC := otherChild.(*BlockContainer).Block.QC
-				return &model.ErrorByzantineThresholdExceeded{Evidence: fmt.Sprintf(
+				return model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
 					"conflicting QCs at view %d: %v and %v",
 					qc.View, qc.BlockID, conflictingQC.BlockID,
 				)}
@@ -270,7 +270,7 @@ func (r *Finalizer) getNextAncestryLevel(block *model.Block) (*forks.BlockQC, er
 	}
 	parentVertex, parentBlockKnown := r.forest.GetVertex(block.QC.BlockID)
 	if !parentBlockKnown {
-		return nil, &model.ErrorMissingBlock{View: block.QC.View, BlockID: block.QC.BlockID}
+		return nil, model.MissingBlockError{View: block.QC.View, BlockID: block.QC.BlockID}
 	}
 	newBlock := parentVertex.(*BlockContainer).Block
 	if newBlock.BlockID != block.QC.BlockID || newBlock.View != block.QC.View {
@@ -323,7 +323,7 @@ func (r *Finalizer) updateFinalizedBlockQc(ancestryChain *ancestryChain) error {
 // and calls OnFinalizedBlock on the newly finalized blocks in the respective order
 func (r *Finalizer) finalizeUpToBlock(qc *model.QuorumCertificate) error {
 	if qc.View < r.lastFinalized.Block.View {
-		return &model.ErrorByzantineThresholdExceeded{Evidence: fmt.Sprintf(
+		return model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
 			"finalizing blocks with view %d which is lower than previously finalized block at view %d",
 			qc.View, r.lastFinalized.Block.View,
 		)}
@@ -331,7 +331,7 @@ func (r *Finalizer) finalizeUpToBlock(qc *model.QuorumCertificate) error {
 	if qc.View == r.lastFinalized.Block.View {
 		// Sanity check: the previously last Finalized Block must be an ancestor of `block`
 		if r.lastFinalized.Block.BlockID != qc.BlockID {
-			return &model.ErrorByzantineThresholdExceeded{Evidence: fmt.Sprintf(
+			return model.ByzantineThresholdExceededError{Evidence: fmt.Sprintf(
 				"finalizing blocks at conflicting forks: %v and %v",
 				qc.BlockID, r.lastFinalized.Block.BlockID,
 			)}
@@ -388,7 +388,7 @@ func (r *Finalizer) VerifyBlock(block *model.Block) error {
 	}
 	// for block whose parents are _not_ below the pruning height, we expect the parent to be known.
 	if _, isParentKnown := r.forest.GetVertex(block.QC.BlockID); !isParentKnown { // we are missing the parent
-		return &model.ErrorMissingBlock{
+		return model.MissingBlockError{
 			View:    block.QC.View,
 			BlockID: block.QC.BlockID,
 		}

@@ -6,6 +6,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 )
 
+// EventHandler runs a state machine to process proposals, votes and local timeouts.
 type EventHandler interface {
 
 	// OnReceiveVote processes a vote received from another HotStuff consensus

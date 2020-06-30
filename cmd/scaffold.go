@@ -70,14 +70,15 @@ type Metrics struct {
 }
 
 type Storage struct {
-	Headers     storage.Headers
-	Index       storage.Index
-	Identities  storage.Identities
-	Guarantees  storage.Guarantees
-	Seals       storage.Seals
-	Payloads    storage.Payloads
-	Blocks      storage.Blocks
-	Collections storage.Collections
+	Headers      storage.Headers
+	Index        storage.Index
+	Identities   storage.Identities
+	Guarantees   storage.Guarantees
+	Seals        storage.Seals
+	Payloads     storage.Payloads
+	Blocks       storage.Blocks
+	Transactions storage.Transactions
+	Collections  storage.Collections
 }
 
 type namedModuleFunc struct {
@@ -134,6 +135,7 @@ type FlowNodeBuilder struct {
 	GenesisQC               *model.QuorumCertificate
 	GenesisAccountPublicKey *flow.AccountPublicKey
 	GenesisTokenSupply      uint64
+	RootChainID             flow.ChainID
 }
 
 func (fnb *FlowNodeBuilder) baseFlags() {
@@ -165,7 +167,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		}
 
 		mw, err := libp2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel), codec, myAddr, fnb.Me.NodeID(),
-			fnb.networkKey, fnb.Metrics.Network, libp2p.DefaultMaxPubSubMsgSize, fnb.MsgValidators...)
+			fnb.networkKey, fnb.Metrics.Network, libp2p.DefaultMaxPubSubMsgSize, fnb.GenesisBlock.ID().String(), fnb.MsgValidators...)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize middleware: %w", err)
 		}
@@ -262,7 +264,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		Network:    metrics.NewNetworkCollector(),
 		Engine:     metrics.NewEngineCollector(),
 		Compliance: metrics.NewComplianceCollector(),
-		Cache:      metrics.NewCacheCollector(flow.GetChainID()),
+		Cache:      metrics.NewCacheCollector(fnb.RootChainID),
 		Mempool:    mempools,
 	}
 
@@ -276,10 +278,9 @@ func (fnb *FlowNodeBuilder) initProfiler() {
 	if !fnb.BaseConfig.profilerEnabled {
 		return
 	}
-	dir := filepath.Join(fnb.BaseConfig.profilerDir, fnb.BaseConfig.nodeRole, fnb.BaseConfig.nodeIDHex)
 	profiler, err := debug.NewAutoProfiler(
 		fnb.Logger,
-		dir,
+		fnb.BaseConfig.profilerDir,
 		fnb.BaseConfig.profilerInterval,
 		fnb.BaseConfig.profilerDuration,
 	)
@@ -289,7 +290,7 @@ func (fnb *FlowNodeBuilder) initProfiler() {
 	})
 }
 
-func (fnb *FlowNodeBuilder) initStorage() {
+func (fnb *FlowNodeBuilder) initDB() {
 	// Pre-create DB path (Badger creates only one-level dirs)
 	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
 	fnb.MustNot(err).Str("dir", fnb.BaseConfig.datadir).Msg("could not create datadir")
@@ -303,37 +304,45 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	opts := badger.
 		DefaultOptions(fnb.BaseConfig.datadir).
 		WithKeepL0InMemory(true).
-		WithLogger(log)
+		WithLogger(log).
+		WithValueLogFileSize(128 << 20). // Default is 1 GB
+		WithValueLogMaxEntries(100000)   // Default is 1000000
+
 	db, err := badger.Open(opts)
 	fnb.MustNot(err).Msg("could not open key-value store")
+	fnb.DB = db
+}
+
+func (fnb *FlowNodeBuilder) initStorage() {
 
 	// in order to void long iterations with big keys when initializing with an
 	// already populated database, we bootstrap the initial maximum key size
 	// upon starting
-	err = operation.RetryOnConflict(db.Update, func(tx *badger.Txn) error {
+	err := operation.RetryOnConflict(fnb.DB.Update, func(tx *badger.Txn) error {
 		return operation.InitMax(tx)
 	})
 	fnb.MustNot(err).Msg("could not initialize max tracker")
 
-	headers := bstorage.NewHeaders(fnb.Metrics.Cache, db)
-	identities := bstorage.NewIdentities(fnb.Metrics.Cache, db)
-	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, db)
-	seals := bstorage.NewSeals(fnb.Metrics.Cache, db)
-	index := bstorage.NewIndex(fnb.Metrics.Cache, db)
-	payloads := bstorage.NewPayloads(index, identities, guarantees, seals)
-	blocks := bstorage.NewBlocks(db, headers, payloads)
-	collections := bstorage.NewCollections(db)
+	headers := bstorage.NewHeaders(fnb.Metrics.Cache, fnb.DB)
+	identities := bstorage.NewIdentities(fnb.Metrics.Cache, fnb.DB)
+	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB)
+	seals := bstorage.NewSeals(fnb.Metrics.Cache, fnb.DB)
+	index := bstorage.NewIndex(fnb.Metrics.Cache, fnb.DB)
+	payloads := bstorage.NewPayloads(fnb.DB, index, identities, guarantees, seals)
+	blocks := bstorage.NewBlocks(fnb.DB, headers, payloads)
+	transactions := bstorage.NewTransactions(fnb.Metrics.Cache, fnb.DB)
+	collections := bstorage.NewCollections(fnb.DB, transactions)
 
-	fnb.DB = db
 	fnb.Storage = Storage{
-		Headers:     headers,
-		Identities:  identities,
-		Guarantees:  guarantees,
-		Seals:       seals,
-		Index:       index,
-		Payloads:    payloads,
-		Blocks:      blocks,
-		Collections: collections,
+		Headers:      headers,
+		Identities:   identities,
+		Guarantees:   guarantees,
+		Seals:        seals,
+		Index:        index,
+		Payloads:     payloads,
+		Blocks:       blocks,
+		Transactions: transactions,
+		Collections:  collections,
 	}
 }
 
@@ -380,7 +389,7 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
 		}
 
-		flow.SetChainID(fnb.GenesisBlock.Header.ChainID)
+		fnb.RootChainID = fnb.GenesisBlock.Header.ChainID
 
 		// load genesis QC and DKG data from bootstrap files
 		fnb.GenesisQC, err = loadRootBlockQC(fnb.BaseConfig.BootstrapDir)
@@ -420,7 +429,7 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap, reading genesis header")
 		}
 
-		flow.SetChainID(fnb.GenesisBlock.Header.ChainID)
+		fnb.RootChainID = fnb.GenesisBlock.Header.ChainID
 
 		// load genesis QC and DKG data from bootstrap files for recovery
 		fnb.GenesisQC, err = loadRootBlockQC(fnb.BaseConfig.BootstrapDir)
@@ -600,9 +609,11 @@ func (fnb *FlowNodeBuilder) Run() {
 
 	fnb.initLogger()
 
-	fnb.initMetrics()
-
 	fnb.initProfiler()
+
+	fnb.initDB()
+
+	fnb.initMetrics()
 
 	fnb.initStorage()
 

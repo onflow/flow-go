@@ -25,19 +25,19 @@ func (i InvokableScript) WithArguments(args [][]byte) InvokableScript {
 	}
 }
 
-func (i InvokableScript) Parse(ctx Context, ledger Ledger) (Invokable, error) {
+func (i InvokableScript) Parse(vm *VirtualMachine, ctx Context, ledger Ledger) (Invokable, error) {
 	panic("implement me")
 }
 
-func (i InvokableScript) Invoke(ctx Context, ledger Ledger) (*InvocationResult, error) {
-	env := newEnvironment(ledger, ctx.Options())
+func (i InvokableScript) Invoke(vm *VirtualMachine, ctx Context, ledger Ledger) (*InvocationResult, error) {
+	env := newEnvironment(vm, ctx, ledger)
 
 	scriptHash := hash.DefaultHasher.ComputeHash(i.script)
 	location := runtime.ScriptLocation(scriptHash)
 
 	scriptID := flow.HashToID(scriptHash)
 
-	value, err := ctx.Runtime().ExecuteScript(i.script, env, location)
+	value, err := vm.runtime.ExecuteScript(i.script, i.args, env, location)
 
 	return createInvocationResult(scriptID, value, env.getEvents(), env.getLogs(), err)
 }

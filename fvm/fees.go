@@ -40,7 +40,10 @@ transaction {
 }
 `
 
-func deductAccountCreationFeeTransaction(address flow.Address, restrictedAccountCreationEnabled bool) InvokableTransaction {
+func deductAccountCreationFeeTransaction(
+	accountAddress, serviceAddress flow.Address,
+	restrictedAccountCreationEnabled bool,
+) InvokableTransaction {
 	var script string
 
 	if restrictedAccountCreationEnabled {
@@ -50,16 +53,16 @@ func deductAccountCreationFeeTransaction(address flow.Address, restrictedAccount
 	}
 
 	tx := flow.NewTransactionBody().
-		SetScript([]byte(fmt.Sprintf(script, flow.ServiceAddress()))).
-		AddAuthorizer(address)
+		SetScript([]byte(fmt.Sprintf(script, serviceAddress))).
+		AddAuthorizer(accountAddress)
 
 	return Transaction(tx)
 }
 
-func deductTransactionFeeTransaction(address flow.Address) InvokableTransaction {
+func deductTransactionFeeTransaction(accountAddress, serviceAddress flow.Address) InvokableTransaction {
 	return Transaction(
 		flow.NewTransactionBody().
-			SetScript([]byte(fmt.Sprintf(deductTransactionFeeTransactionTemplate, flow.ServiceAddress()))).
-			AddAuthorizer(address),
+			SetScript([]byte(fmt.Sprintf(deductTransactionFeeTransactionTemplate, serviceAddress))).
+			AddAuthorizer(accountAddress),
 	)
 }

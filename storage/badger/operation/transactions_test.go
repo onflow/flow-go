@@ -15,7 +15,7 @@ func TestTransactions(t *testing.T) {
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := unittest.TransactionFixture()
-		err := db.Update(InsertTransaction(&expected.TransactionBody))
+		err := db.Update(InsertTransaction(expected.ID(), &expected.TransactionBody))
 		require.Nil(t, err)
 
 		var actual flow.Transaction
