@@ -29,11 +29,11 @@ func (i InvokableTransaction) Invoke(ctx Context, ledger Ledger) (*InvocationRes
 		WithFeePayments(false),
 	)
 
-	chain := ctx.Options().chain
+	opts := ctx.Options()
 
 	txID := i.tx.ID()
 
-	if ctx.Options().signatureVerificationEnabled {
+	if opts.SignatureVerificationEnabled {
 		flowErr, err := verifySignatures(ledger, i.tx)
 		if err != nil {
 			return nil, err
@@ -57,8 +57,11 @@ func (i InvokableTransaction) Invoke(ctx Context, ledger Ledger) (*InvocationRes
 		}
 	}
 
-	if ctx.Options().feePaymentsEnabled {
-		result, err := metaCtx.Invoke(deductTransactionFeeTransaction(i.tx.Payer, chain.ServiceAddress()), ledger)
+	if opts.FeePaymentsEnabled {
+		result, err := metaCtx.Invoke(
+			deductTransactionFeeTransaction(i.tx.Payer, opts.Chain.ServiceAddress()),
+			ledger,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -71,7 +74,7 @@ func (i InvokableTransaction) Invoke(ctx Context, ledger Ledger) (*InvocationRes
 		}
 	}
 
-	env := newEnvironment(ledger, ctx.Options()).setTransaction(i.tx, metaCtx)
+	env := newEnvironment(ledger, opts).setTransaction(i.tx, metaCtx)
 
 	location := runtime.TransactionLocation(txID[:])
 

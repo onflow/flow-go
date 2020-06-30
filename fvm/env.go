@@ -41,22 +41,22 @@ type hostEnv struct {
 func newEnvironment(ledger Ledger, opts Options) *hostEnv {
 	env := &hostEnv{
 		ledger:                     ledger,
-		chain:                      opts.chain,
-		astCache:                   opts.astCache,
-		blocks:                     opts.blocks,
+		chain:                      opts.Chain,
+		astCache:                   opts.ASTCache,
+		blocks:                     opts.Blocks,
 		Metrics:                    &noopMetricsCollector{},
-		gasLimit:                   opts.gasLimit,
-		restrictContractDeployment: opts.restrictedDeploymentEnabled,
-		restrictAccountCreation:    opts.restrictedAccountCreationEnabled,
+		gasLimit:                   opts.GasLimit,
+		restrictContractDeployment: opts.RestrictedDeploymentEnabled,
+		restrictAccountCreation:    opts.RestrictedAccountCreationEnabled,
 	}
 
-	if opts.blockHeader != nil {
-		env.setBlockHeader(opts.blockHeader)
-		env.seedRNG(opts.blockHeader)
+	if opts.BlockHeader != nil {
+		env.setBlockHeader(opts.BlockHeader)
+		env.seedRNG(opts.BlockHeader)
 	}
 
-	if opts.metrics != nil {
-		env.Metrics = &metricsCollector{opts.metrics}
+	if opts.Metrics != nil {
+		env.Metrics = &metricsCollector{opts.Metrics}
 	}
 
 	return env

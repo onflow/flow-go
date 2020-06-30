@@ -6,6 +6,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+// An Invokable is an operation that can be applied to a ledger within a
+// virtual machine context.
 type Invokable interface {
 	Parse(ctx Context, ledger Ledger) (Invokable, error)
 	Invoke(ctx Context, ledger Ledger) (*InvocationResult, error)
