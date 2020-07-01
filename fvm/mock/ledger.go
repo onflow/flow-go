@@ -41,3 +41,8 @@ func (_m *Ledger) Get(key []byte) ([]byte, error) {
 func (_m *Ledger) Set(key []byte, value []byte) {
 	_m.Called(key, value)
 }
+
+// Touch provides a mock function with given fields: key
+func (_m *Ledger) Touch(key []byte) {
+	_m.Called(key)
+}
