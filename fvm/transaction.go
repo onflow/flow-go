@@ -1,7 +1,10 @@
 package fvm
 
 import (
+	"fmt"
+
 	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -40,6 +43,27 @@ func (inv *InvokableTransaction) Invoke(vm *VirtualMachine, ctx Context, ledger 
 	}
 
 	return nil
+}
+
+func (inv InvokableTransaction) ConvertEvents(txIndex uint32) ([]flow.Event, error) {
+	flowEvents := make([]flow.Event, len(inv.Events))
+
+	for i, event := range inv.Events {
+		payload, err := jsoncdc.Encode(event)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode event: %w", err)
+		}
+
+		flowEvents[i] = flow.Event{
+			Type:             flow.EventType(event.EventType.ID()),
+			TransactionID:    inv.ID,
+			TransactionIndex: txIndex,
+			EventIndex:       uint32(i),
+			Payload:          payload,
+		}
+	}
+
+	return flowEvents, nil
 }
 
 type TransactionInvocator struct{}
