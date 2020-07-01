@@ -1,11 +1,11 @@
 # Flow Cryptography
 
-The Go package provides all the cryptography tools needed by Flow blockchain.  
+This Go package provides the cryptography tools needed by Flow blockchain.  
 Most of the primitives and protocols can be used in other projects and are not specific to Flow.
 
-Flow is an ongoing project, new features will still be added and modifications will still be made to improve security and performance of the cryptography package.
+Flow is an ongoing project, which means that new features will still be added and modifications will still be made to improve security and performance of the cryptography package.
 
-NOTE: The package does not provide any security against side channel or tampering attacks.
+NOTE: This package does not provide any security against side channel or tampering attacks.
 
 ## Package import
 
@@ -15,10 +15,10 @@ Cloning Flow repository and following the [installation steps](https://github.co
 
 - Get Flow cryptography package
 ```
-go get "github.com/dapperlabs/flow-go/crypto"
+go get github.com/dapperlabs/flow-go/crypto
 ```
 - Install [CMake](https://cmake.org/install/), which is used for building the package.
-- Build the package dependencies
+- Build the package dependencies:
 ```
 go generate github.com/dapperlabs/flow-go/crypto
 ``` -->
@@ -85,7 +85,7 @@ All signature schemes use the generic interfaces of `PrivateKey` and `PublicKey`
 
 ### Discrete-Log based distributed key generation
 
- All supported Distributed Key Generation protocols are [discrete log based](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.50.2737&rep=rep1&type=pdf) and are implemented for the same BLS setup on the BLS 12-381 curve. The protocols generate key sets for the BLS-based threshold signature. 
+All supported Distributed Key Generation protocols are [discrete log based](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.50.2737&rep=rep1&type=pdf) and are implemented for the same BLS setup on the BLS 12-381 curve. The protocols generate key sets for the BLS-based threshold signature. 
 
  * Feldman VSS
     * simple centralized verifiable secret sharing
