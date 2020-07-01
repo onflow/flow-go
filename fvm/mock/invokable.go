@@ -13,47 +13,15 @@ type Invokable struct {
 }
 
 // Invoke provides a mock function with given fields: vm, ctx, ledger
-func (_m *Invokable) Invoke(vm *fvm.VirtualMachine, ctx fvm.Context, ledger fvm.Ledger) (*fvm.InvocationResult, error) {
+func (_m *Invokable) Invoke(vm *fvm.VirtualMachine, ctx fvm.Context, ledger fvm.Ledger) error {
 	ret := _m.Called(vm, ctx, ledger)
 
-	var r0 *fvm.InvocationResult
-	if rf, ok := ret.Get(0).(func(*fvm.VirtualMachine, fvm.Context, fvm.Ledger) *fvm.InvocationResult); ok {
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*fvm.VirtualMachine, fvm.Context, fvm.Ledger) error); ok {
 		r0 = rf(vm, ctx, ledger)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*fvm.InvocationResult)
-		}
+		r0 = ret.Error(0)
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(*fvm.VirtualMachine, fvm.Context, fvm.Ledger) error); ok {
-		r1 = rf(vm, ctx, ledger)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// Parse provides a mock function with given fields: vm, ctx, ledger
-func (_m *Invokable) Parse(vm *fvm.VirtualMachine, ctx fvm.Context, ledger fvm.Ledger) (fvm.Invokable, error) {
-	ret := _m.Called(vm, ctx, ledger)
-
-	var r0 fvm.Invokable
-	if rf, ok := ret.Get(0).(func(*fvm.VirtualMachine, fvm.Context, fvm.Ledger) fvm.Invokable); ok {
-		r0 = rf(vm, ctx, ledger)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(fvm.Invokable)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(*fvm.VirtualMachine, fvm.Context, fvm.Ledger) error); ok {
-		r1 = rf(vm, ctx, ledger)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
