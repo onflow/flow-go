@@ -421,6 +421,14 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.RootQC, err = loadRootQC(fnb.BaseConfig.BootstrapDir)
 		fnb.MustNot(err).Msg("could not load root QC")
 
+		// load the root execution result from bootstrap files
+		fnb.RootResult, err = loadRootResult(fnb.BaseConfig.BootstrapDir)
+		fnb.MustNot(err).Msg("could not load root execution result")
+
+		// load the root block seal from bootstrap files
+		fnb.RootSeal, err = loadRootSeal(fnb.BaseConfig.BootstrapDir)
+		fnb.MustNot(err).Msg("could not load root seal")
+
 		// load the DKG public data from bootstrap files
 		dkgPubData, err := loadDKGPublicData(fnb.BaseConfig.BootstrapDir)
 		fnb.MustNot(err).Msg("could not load public DKG data")

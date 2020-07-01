@@ -68,7 +68,7 @@ func main() {
 		seals          mempool.Seals
 		prop           *propagation.Engine
 		prov           *provider.Engine
-		core           *synchronization.Core
+		syncCore       *synchronization.Core
 		comp           *compliance.Engine
 		conMetrics     module.ConsensusMetrics
 		mainMetrics    module.HotstuffMetrics
@@ -136,7 +136,7 @@ func main() {
 			return nil
 		}).
 		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
-			core, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
+			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -226,7 +226,7 @@ func main() {
 				node.State,
 				prov,
 				proposals,
-				core,
+				syncCore,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
@@ -343,7 +343,7 @@ func main() {
 				node.State,
 				node.Storage.Blocks,
 				comp,
-				core,
+				syncCore,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
