@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
+	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
@@ -18,8 +19,18 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
+type Bootstrapper struct {
+	logger zerolog.Logger
+}
+
+func NewBootstrapper(logger zerolog.Logger) *Bootstrapper {
+	return &Bootstrapper{
+		logger: logger,
+	}
+}
+
 // BootstrapLedger adds the above root account to the ledger and initializes execution node-only data
-func BootstrapLedger(
+func (b *Bootstrapper) BootstrapLedger(
 	ledger storage.Ledger,
 	rootPublicKey flow.AccountPublicKey,
 	initialTokenSupply uint64,
@@ -27,7 +38,7 @@ func BootstrapLedger(
 ) (flow.StateCommitment, error) {
 	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.EmptyStateCommitment()))
 
-	BootstrapView(view, rootPublicKey, initialTokenSupply, chain)
+	b.BootstrapView(view, rootPublicKey, initialTokenSupply, chain)
 
 	newStateCommitment, err := state.CommitDelta(ledger, view.Delta(), ledger.EmptyStateCommitment())
 	if err != nil {
@@ -37,7 +48,7 @@ func BootstrapLedger(
 	return newStateCommitment, nil
 }
 
-func BootstrapExecutionDatabase(db *badger.DB, commit flow.StateCommitment, genesis *flow.Header) error {
+func (b *Bootstrapper) BootstrapExecutionDatabase(db *badger.DB, commit flow.StateCommitment, genesis *flow.Header) error {
 	err := operation.RetryOnConflict(db.Update, func(txn *badger.Txn) error {
 
 		err := operation.InsertExecutedBlock(genesis.ID())(txn)
@@ -77,7 +88,7 @@ type AddressState interface {
 	CurrentAddress() flow.Address
 }
 
-func BootstrapView(
+func (b *Bootstrapper) BootstrapView(
 	ledger virtualmachine.Ledger,
 	serviceAccountPublicKey flow.AccountPublicKey,
 	initialTokenSupply uint64,
@@ -91,6 +102,13 @@ func BootstrapView(
 	l.SetAddressState(addressGenerator)
 
 	service := createServiceAccount(ledger, serviceAccountPublicKey, chain)
+
+	publicKeyJSON, err := serviceAccountPublicKey.MarshalJSON()
+	if err != nil {
+		panic(fmt.Sprintf("cannot marshal public key: %s", err))
+	}
+
+	b.logger.Debug().Str("account_address", service.Short()).RawJSON("public_key", publicKeyJSON).Msg("created service account")
 
 	rt := runtime.NewInterpreterRuntime()
 	vm, err := virtualmachine.New(rt, chain)

@@ -17,12 +17,13 @@ import (
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go-sdk/examples"
+
 	"github.com/onflow/flow-go-sdk/templates"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 
+	"github.com/dapperlabs/flow-go/integration/tests/common"
 	"github.com/dapperlabs/flow-go/integration/tests/execution"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -43,7 +44,7 @@ const (
 const (
 	// total test accounts to create
 	// This is a long running test. On a local environment use more conservative numbers for TotalAccounts (~3)
-	TotalAccounts = 10
+	TotalAccounts = 3
 	// each account transfers 10 tokens to the next account RoundsOfTransfer number of times
 	RoundsOfTransfer = 50
 )
@@ -156,7 +157,7 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 	transferWG := sync.WaitGroup{}
 	prevAddr := flowTokenAddress
 	gs.ref, err = flowClient.GetLatestBlockHeader(context.Background(), false)
-	examples.Handle(err)
+	handle(err)
 
 	for accountAddr, accountKey := range gs.accounts {
 		if prevAddr != flowTokenAddress {
@@ -200,7 +201,7 @@ func (gs *TransactionsPerSecondSuite) SetTokenAddresses() {
 func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(keyIndex int) (flowsdk.Address, *flowsdk.AccountKey) {
 	ctx := context.Background()
 
-	myPrivateKey := examples.RandomPrivateKey()
+	myPrivateKey := common.RandomPrivateKey()
 	accountKey := flowsdk.NewAccountKey().
 		FromPrivateKey(myPrivateKey).
 		SetHashAlgo(crypto.SHA3_256).
@@ -209,7 +210,7 @@ func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(keyIndex int) (fl
 
 	// Generate an account creation script
 	createAccountScript, err := templates.CreateAccount([]*flowsdk.AccountKey{accountKey}, nil)
-	examples.Handle(err)
+	handle(err)
 
 	createAccountTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(gs.ref.ID).
@@ -220,20 +221,20 @@ func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(keyIndex int) (fl
 
 	gs.rootSignerLock.Lock()
 	err = createAccountTx.SignEnvelope(gs.rootAcctAddr, keyIndex, gs.rootSigner)
-	examples.Handle(err)
+	handle(err)
 
 	gs.ref, err = gs.flowClient.GetLatestBlockHeader(context.Background(), false)
-	examples.Handle(err)
+	handle(err)
 
 	err = gs.flowClient.SendTransaction(ctx, *createAccountTx)
-	examples.Handle(err)
+	handle(err)
 
 	createAccountTxID := createAccountTx.ID()
 
 	gs.rootSignerLock.Unlock()
 
 	accountCreationTxRes := WaitForFinalized(ctx, gs.flowClient, createAccountTxID)
-	examples.Handle(accountCreationTxRes.Error)
+	handle(accountCreationTxRes.Error)
 
 	// Successful Tx, increment sequence number
 	gs.sequenceNumbers[keyIndex]++
@@ -267,19 +268,19 @@ func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(keyIndex int) (fl
 
 	gs.rootSignerLock.Lock()
 	err = transferTx.SignEnvelope(gs.rootAcctAddr, keyIndex, gs.rootSigner)
-	examples.Handle(err)
+	handle(err)
 
 	gs.ref, err = gs.flowClient.GetLatestBlockHeader(context.Background(), false)
-	examples.Handle(err)
+	handle(err)
 
 	err = gs.flowClient.SendTransaction(ctx, *transferTx)
-	examples.Handle(err)
+	handle(err)
 
 	transferTxID := transferTx.ID()
 	gs.rootSignerLock.Unlock()
 
 	transferTxResp := WaitForFinalized(ctx, gs.flowClient, transferTxID)
-	examples.Handle(transferTxResp.Error)
+	handle(transferTxResp.Error)
 
 	// Successful Tx, increment sequence number
 	gs.sequenceNumbers[keyIndex]++
@@ -300,10 +301,10 @@ func (gs *TransactionsPerSecondSuite) Transfer10Tokens(flowClient *client.Client
 		AddAuthorizer(fromAddr)
 
 	err := transferTx.SignEnvelope(fromAddr, fromKey.ID, gs.signers[fromAddr])
-	examples.Handle(err)
+	handle(err)
 
 	err = flowClient.SendTransaction(ctx, *transferTx)
-	examples.Handle(err)
+	handle(err)
 
 	transferTxResp := WaitForFinalized(ctx, flowClient, transferTx.ID())
 
@@ -397,7 +398,7 @@ func WaitForFinalized(ctx context.Context, c *client.Client, id flowsdk.Identifi
 // GenerateTransferScript Creates a script that transfer some amount of FTs
 func GenerateTransferScript(ftAddr, flowToken, toAddr flowsdk.Address, amount int) []byte {
 	mintCode, err := DownloadFile(FungibleTokenTransactionsBaseURL + TransferTokens)
-	examples.Handle(err)
+	handle(err)
 
 	withFTAddr := strings.ReplaceAll(string(mintCode), "0x02", "0x"+ftAddr.Hex())
 	withFlowTokenAddr := strings.Replace(string(withFTAddr), "0x03", "0x"+flowToken.Hex(), 1)
@@ -444,13 +445,13 @@ func (gs *TransactionsPerSecondSuite) AddKeys(flowClient *client.Client) {
 		AddAuthorizer(gs.rootAcctAddr)
 
 	err := addKeysTx.SignEnvelope(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootSigner)
-	examples.Handle(err)
+	handle(err)
 
 	err = flowClient.SendTransaction(ctx, *addKeysTx)
-	examples.Handle(err)
+	handle(err)
 
 	addKeysTxResp := WaitForFinalized(ctx, flowClient, addKeysTx.ID())
-	examples.Handle(addKeysTxResp.Error)
+	handle(addKeysTxResp.Error)
 
 	// Successful Tx, increment sequence number
 	gs.rootAcctKey.SequenceNumber++
@@ -532,5 +533,11 @@ func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resul
 			gs.ref, err = gs.flowClient.GetLatestBlockHeader(context.Background(), false)
 			require.NoError(gs.T(), err, "could not update finalized block")
 		}
+	}
+}
+
+func handle(err error) {
+	if err != nil {
+		panic(err)
 	}
 }

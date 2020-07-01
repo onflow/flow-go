@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/runtime"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -85,7 +86,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	blockComputer := computer.NewBlockComputer(vm, nil, new(storage.Blocks))
+	blockComputer := computer.NewBlockComputer(vm, new(storage.Blocks), nil, nil, zerolog.Nop())
 
 	engine := &Manager{
 		blockComputer: blockComputer,

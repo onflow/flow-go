@@ -16,6 +16,11 @@ import (
 	"github.com/dapperlabs/flow-go/storage/ledger/wal"
 )
 
+const (
+	// RegisterKeySize is the size of a Execution register's key [bytes]
+	RegisterKeySize = 32
+)
+
 // MTrieStorage is a fast memory-efficient fork-aware thread-safe trie-based key/value storage.
 // MTrieStorage holds an array of registers (key value pairs) and keep tracks of changes over a limited time.
 // Each register is referenced by an ID (key) and holds a value (byte slice).
@@ -33,18 +38,17 @@ type MTrieStorage struct {
 	metrics module.LedgerMetrics
 }
 
-var maxHeight = 257
+const CacheSize = 1000
 
 // NewMTrieStorage creates a new in-memory trie-backed ledger storage with persistence.
 func NewMTrieStorage(dbDir string, capacity int, metrics module.LedgerMetrics, reg prometheus.Registerer) (*MTrieStorage, error) {
 
-	w, err := wal.NewWAL(nil, reg, dbDir, capacity, maxHeight)
-
+	w, err := wal.NewWAL(nil, reg, dbDir, capacity, RegisterKeySize)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create LedgerWAL: %w", err)
 	}
 
-	mForest, err := mtrie.NewMForest(maxHeight, dbDir, capacity, metrics, func(evictedTrie *trie.MTrie) error {
+	mForest, err := mtrie.NewMForest(RegisterKeySize, dbDir, capacity, metrics, func(evictedTrie *trie.MTrie) error {
 		return w.RecordDelete(evictedTrie.RootHash())
 	})
 	if err != nil {
@@ -78,7 +82,6 @@ func NewMTrieStorage(dbDir string, capacity int, metrics module.LedgerMetrics, r
 			return nil
 		},
 	)
-
 	if err != nil {
 		return nil, fmt.Errorf("cannot restore LedgerWAL: %w", err)
 	}
@@ -169,10 +172,10 @@ func (f *MTrieStorage) UpdateRegisters(
 	}
 
 	newTrie, err := f.mForest.Update(stateCommitment, ids, values)
-	newStateCommitment = newTrie.RootHash()
 	if err != nil {
 		return nil, fmt.Errorf("cannot update state: %w", err)
 	}
+	newStateCommitment = newTrie.RootHash()
 
 	// TODO update to proper value once https://github.com/dapperlabs/flow-go/pull/3720 is merged
 	f.metrics.ForestApproxMemorySize(0)

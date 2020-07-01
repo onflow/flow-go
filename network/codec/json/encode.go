@@ -4,6 +4,7 @@ package json
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/pkg/errors"
 
@@ -84,7 +85,7 @@ func encode(v interface{}) (*Envelope, error) {
 	// encode the payload
 	data, err := json.Marshal(v)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not encode payload")
+		return nil, fmt.Errorf("could not encode payload: %w", err)
 	}
 
 	env := Envelope{

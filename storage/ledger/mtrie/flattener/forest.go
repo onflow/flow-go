@@ -90,6 +90,8 @@ func toStorableNode(node *node.Node, indexForNode node2indexMap) (*StorableNode,
 		Key:       node.Key(),
 		Value:     node.Value(),
 		HashValue: node.Hash(),
+		MaxDepth:  node.MaxDepth(),
+		RegCount:  node.RegCount(),
 	}
 	return storableNode, nil
 }
@@ -100,10 +102,8 @@ func toStorableTrie(mtrie *trie.MTrie, indexForNode node2indexMap) (*StorableTri
 		return nil, fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(mtrie.RootNode().Hash()))
 	}
 	storableTrie := &StorableTrie{
-		RootIndex:      rootIndex,
-		Number:         mtrie.Number(),
-		RootHash:       mtrie.RootHash(),
-		ParentRootHash: mtrie.ParentRootHash(),
+		RootIndex: rootIndex,
+		RootHash:  mtrie.RootHash(),
 	}
 
 	return storableTrie, nil
@@ -118,11 +118,7 @@ func RebuildTries(flatForest *FlattenedForest) ([]*trie.MTrie, error) {
 
 	//restore tries
 	for _, storableTrie := range flatForest.Tries {
-		mtrie, err := trie.NewMTrie(
-			nodes[storableTrie.RootIndex],
-			storableTrie.Number,
-			storableTrie.ParentRootHash,
-		)
+		mtrie, err := trie.NewMTrie(nodes[storableTrie.RootIndex])
 		if err != nil {
 			return nil, fmt.Errorf("restoring trie failed: %w", err)
 		}
@@ -143,7 +139,7 @@ func RebuildNodes(storableNodes []*StorableNode) ([]*node.Node, error) {
 		if (snode.LIndex >= uint64(i)) || (snode.RIndex >= uint64(i)) {
 			return nil, fmt.Errorf("sequence of StorableNodes does not satisfy Descendents-First-Relationship")
 		}
-		nodes = append(nodes, node.NewNode(int(snode.Height), nodes[snode.LIndex], nodes[snode.RIndex], snode.Key, snode.Value, snode.HashValue))
+		nodes = append(nodes, node.NewNode(int(snode.Height), nodes[snode.LIndex], nodes[snode.RIndex], snode.Key, snode.Value, snode.HashValue, snode.MaxDepth, snode.RegCount))
 	}
 	return nodes, nil
 }

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"sort"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -24,33 +23,23 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-//TODO this is duplicated in collection/synchronization
-// We should refactor both engines using module/synchronization/core
-
 // Engine is the synchronization engine, responsible for synchronizing chain state.
 type Engine struct {
-	unit     *engine.Unit
-	log      zerolog.Logger
-	metrics  module.EngineMetrics
-	me       module.Local
-	state    protocol.State
-	con      network.Conduit
-	blocks   storage.Blocks
-	comp     network.Engine // compliance engine
-	heights  map[uint64]*Status
-	blockIDs map[flow.Identifier]*Status
+	unit    *engine.Unit
+	log     zerolog.Logger
+	metrics module.EngineMetrics
+	me      module.Local
+	state   protocol.State
+	con     network.Conduit
+	blocks  storage.Blocks
+	comp    network.Engine // compliance layer engine
 
-	// config parameters
-	pollInterval  time.Duration // how often we poll other nodes for their finalized height
-	scanInterval  time.Duration // how often we scan our pending statuses and request blocks
-	retryInterval time.Duration // the initial interval before we retry a request, uses exponential backoff
-	tolerance     uint          // determines how big of a difference in block heights we tolerated before actively syncing with range requests
-	maxAttempts   uint          // the maximum number of attempts we make for each requested block/height before discarding
-	maxSize       uint          // the maximum number of blocks we request in the same block request message
-	maxRequests   uint          // the maximum number of requests we send during each scanning period
+	pollInterval time.Duration
+	scanInterval time.Duration
+	core         module.SyncCore
 }
 
-// New creates a new consensus propagation engine.
+// New creates a new main chain synchronization engine.
 func New(
 	log zerolog.Logger,
 	metrics module.EngineMetrics,
@@ -59,27 +48,21 @@ func New(
 	state protocol.State,
 	blocks storage.Blocks,
 	comp network.Engine,
+	core module.SyncCore,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:     engine.NewUnit(),
-		log:      log.With().Str("engine", "synchronization").Logger(),
-		metrics:  metrics,
-		me:       me,
-		state:    state,
-		blocks:   blocks,
-		comp:     comp,
-		heights:  make(map[uint64]*Status),
-		blockIDs: make(map[flow.Identifier]*Status),
-
-		pollInterval:  8 * time.Second,
-		scanInterval:  2 * time.Second,
-		retryInterval: 4 * time.Second,
-		tolerance:     10,
-		maxAttempts:   5,
-		maxSize:       64,
-		maxRequests:   3,
+		unit:         engine.NewUnit(),
+		log:          log.With().Str("engine", "synchronization").Logger(),
+		metrics:      metrics,
+		me:           me,
+		state:        state,
+		blocks:       blocks,
+		comp:         comp,
+		core:         core,
+		pollInterval: 8 * time.Second,
+		scanInterval: 2 * time.Second,
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -96,6 +79,9 @@ func New(
 // started. For consensus engine, this is true once the underlying consensus
 // algorithm has started.
 func (e *Engine) Ready() <-chan struct{} {
+	if e.comp == nil {
+		panic("must initialize synchronization engine with comp engine")
+	}
 	e.unit.Launch(e.checkLoop)
 	return e.unit.Ready()
 }
@@ -118,7 +104,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("synchronization could not process submitted event")
+			engine.LogError(e.log, err)
 		}
 	})
 }
@@ -134,22 +120,6 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
-}
-
-// RequestBlock is an external provider allowing users to request block downloads
-// by block ID.
-func (e *Engine) RequestBlock(blockID flow.Identifier) {
-	e.unit.Lock()
-	defer e.unit.Unlock()
-
-	// if we already received this block, reset its status so we can re-queue
-	status := e.blockIDs[blockID]
-	if status.WasReceived() {
-		delete(e.blockIDs, status.Header.ID())
-		delete(e.heights, status.Header.Height)
-	}
-
-	e.queueByBlockID(blockID)
 }
 
 // process processes events for the propagation engine on the consensus node.
@@ -196,31 +166,21 @@ func (e *Engine) after(msg string) {
 // we have a lower height, we add the difference to our own download queue.
 func (e *Engine) onSyncRequest(originID flow.Identifier, req *messages.SyncRequest) error {
 
-	// get the header at the latest finalized state
 	final, err := e.state.Final().Head()
 	if err != nil {
-		return fmt.Errorf("could not get finalized head: %w", err)
+		return fmt.Errorf("could not get finalized height: %w", err)
 	}
 
-	// if we are within the tolerance threshold we do nothing
-	lower := final.Height - uint64(e.tolerance)
-	if lower > final.Height { // overflow check
-		lower = 0
-	}
-	upper := final.Height + uint64(e.tolerance)
-	if req.Height >= lower && req.Height <= upper {
+	// queue any missing heights as needed
+	e.core.HandleHeight(final, req.Height)
+
+	// don't bother sending a response if we're within tolerance or if we're
+	// behind the requester
+	if e.core.WithinTolerance(final, req.Height) || req.Height > final.Height {
 		return nil
 	}
 
-	// if we are behind, we want to sync the missing blocks
-	if req.Height > final.Height {
-		for height := final.Height + 1; height <= req.Height; height++ {
-			e.queueByHeight(height)
-		}
-		return nil
-	}
-
-	// create the response and send
+	// if we're sufficiently ahead of the requester, send a response
 	res := &messages.SyncResponse{
 		Height: final.Height,
 		Nonce:  req.Nonce,
@@ -238,23 +198,12 @@ func (e *Engine) onSyncRequest(originID flow.Identifier, req *messages.SyncReque
 // onSyncResponse processes a synchronization response.
 func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResponse) error {
 
-	// get the header at the latest finalized state
 	final, err := e.state.Final().Head()
 	if err != nil {
-		return fmt.Errorf("could not get finalized head: %w", err)
+		return fmt.Errorf("could not get finalized height: %w", err)
 	}
 
-	// if we are within the tolerance threshold we do nothing
-	upper := final.Height + uint64(e.tolerance)
-	if res.Height <= upper {
-		return nil
-	}
-
-	// mark the missing height
-	for height := final.Height + 1; height <= res.Height; height++ {
-		e.queueByHeight(height)
-	}
-
+	e.core.HandleHeight(final, res.Height)
 	return nil
 }
 
@@ -277,7 +226,7 @@ func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeReq
 	for height := req.FromHeight; height <= req.ToHeight; height++ {
 		block, err := e.blocks.ByHeight(height)
 		if errors.Is(err, storage.ErrNotFound) {
-			e.log.Debug().Uint64("height", height).Msg("skipping unknown heights")
+			e.log.Error().Uint64("height", height).Msg("skipping unknown heights")
 			break
 		}
 		if err != nil {
@@ -367,68 +316,14 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 	return nil
 }
 
-// queueByHeight queues a request for the finalized block at the given height,
-// only if no equivalent request has been queued before.
-func (e *Engine) queueByHeight(height uint64) {
-
-	// only queue the request if have never queued it before
-	if e.heights[height].WasQueued() {
-		return
-	}
-
-	// queue the request
-	e.heights[height] = NewQueuedStatus()
-}
-
-// queueByBlockID queues a request for a block by block ID, only if no
-// equivalent request has been queued before.
-func (e *Engine) queueByBlockID(blockID flow.Identifier) {
-
-	// only queue the request if have never queued it before
-	if e.blockIDs[blockID].WasQueued() {
-		return
-	}
-
-	// queue the request
-	e.blockIDs[blockID] = NewQueuedStatus()
-}
-
-// getRequestStatus retrieves a request status for a block, regardless of
-// whether it was queued by height or by block ID.
-func (e *Engine) getRequestStatus(block *flow.Block) *Status {
-	heightStatus := e.heights[block.Header.Height]
-	idStatus := e.blockIDs[block.ID()]
-
-	if heightStatus.WasQueued() {
-		return heightStatus
-	}
-	if idStatus.WasQueued() {
-		return idStatus
-	}
-	return nil
-}
-
 // processIncoming processes an incoming block, so we can take into account the
 // overlap between block IDs and heights.
 func (e *Engine) processIncomingBlock(originID flow.Identifier, block *flow.Block) {
 
-	status := e.getRequestStatus(block)
-	// if we never asked for this block, discard it
-	if !status.WasQueued() {
+	shouldProcess := e.core.HandleBlock(block.Header)
+	if !shouldProcess {
 		return
 	}
-	// if we have already received this block, exit
-	if status.WasReceived() {
-		return
-	}
-
-	// this is a new block, remember that we've seen it
-	status.Header = block.Header
-	status.Received = time.Now()
-
-	// track it by ID and by height so we don't accidentally request it again
-	e.blockIDs[block.ID()] = status
-	e.heights[block.Header.Height] = status
 
 	synced := &events.SyncedBlock{
 		OriginID: originID,
@@ -445,30 +340,43 @@ func (e *Engine) checkLoop() {
 
 CheckLoop:
 	for {
+		// give the quit channel a priority to be selected
+		select {
+		case <-e.unit.Quit():
+			break CheckLoop
+		default:
+		}
+
 		select {
 		case <-e.unit.Quit():
 			break CheckLoop
 		case <-poll.C:
-			err := e.pollHeight()
-			if err != nil {
-				if network.IsPeerUnreachableError(err) {
-					e.log.Warn().Err(err).Msg("could not poll heights due to peer unreachable")
-				} else {
-					e.log.Error().Err(err).Msg("could not poll heights")
-				}
+			errs := e.pollHeight()
+			if errs.ErrorOrNil() == nil {
 				continue
+			}
+
+			// if there are errors, and errors are all PeerUnreachableError, then log as warn
+			// otherwise log as error
+			if network.AllPeerUnreachableError(errs.WrappedErrors()...) {
+				e.log.Warn().Err(errs).Msg("could not poll heights due to peer unreachable")
+			} else {
+				e.log.Error().Err(errs).Msg("could not poll heights")
 			}
 		case <-scan.C:
-			heights, blockIDs, err := e.scanPending()
+			final, err := e.state.Final().Head()
 			if err != nil {
-				e.log.Error().Err(err).Msg("could not scan pending")
+				e.log.Error().Err(err).Msg("could not get final height")
 				continue
 			}
-			err = e.sendRequests(heights, blockIDs)
+
+			e.unit.Lock()
+			ranges, batches := e.core.ScanPending(final)
+			err = e.sendRequests(ranges, batches)
 			if err != nil {
 				e.log.Error().Err(err).Msg("could not send requests")
-				continue
 			}
+			e.unit.Unlock()
 		}
 	}
 
@@ -478,28 +386,30 @@ CheckLoop:
 }
 
 // pollHeight will send a synchronization request to three random nodes.
-func (e *Engine) pollHeight() error {
-	e.unit.Lock()
-	defer e.unit.Unlock()
+func (e *Engine) pollHeight() *multierror.Error {
+
+	var errs *multierror.Error
 
 	// get the last finalized header
 	final, err := e.state.Final().Head()
 	if err != nil {
-		return fmt.Errorf("could not get last finalized header: %w", err)
+		errs = multierror.Append(errs, fmt.Errorf("could not get last finalized header: %w", err))
+		return errs
 	}
 
 	// get all of the consensus nodes from the state
-	identities, err := e.state.Final().Identities(filter.And(
+	participants, err := e.state.Final().Identities(filter.And(
 		filter.HasRole(flow.RoleConsensus),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
 	))
+
 	if err != nil {
-		return fmt.Errorf("could not send get consensus identities: %w", err)
+		errs = multierror.Append(errs, fmt.Errorf("could not send get consensus identities: %w", err))
+		return errs
 	}
 
-	var errs error
 	// send the request for synchronization
-	for _, targetID := range identities.Sample(3).NodeIDs() {
+	for _, targetID := range participants.Sample(3).NodeIDs() {
 
 		req := &messages.SyncRequest{
 			Nonce:  rand.Uint64(),
@@ -516,257 +426,46 @@ func (e *Engine) pollHeight() error {
 	return errs
 }
 
-// prune removes any pending requests which we have received and which is below
-// the finalized height, or which we received sufficiently long ago.
-//
-// NOTE: the caller must acquire the engine lock!
-func (e *Engine) prune() {
+// sendRequests sends a request for each range and batch.
+func (e *Engine) sendRequests(ranges []flow.Range, batches []flow.Batch) error {
 
-	final, err := e.state.Final().Head()
-	if err != nil {
-		e.log.Error().Err(err).Msg("failed to prune")
-		return
-	}
-
-	// track how many statuses we are pruning
-	initialHeights := len(e.heights)
-	initialBlockIDs := len(e.blockIDs)
-
-	for height := range e.heights {
-		if height <= final.Height {
-			delete(e.heights, height)
-			continue
-		}
-	}
-
-	for blockID, status := range e.blockIDs {
-		if status.WasReceived() {
-			header := status.Header
-
-			if header.Height <= final.Height {
-				delete(e.blockIDs, blockID)
-				continue
-			}
-		}
-	}
-
-	prunedHeights := len(e.heights) - initialHeights
-	prunedBlockIDs := len(e.blockIDs) - initialBlockIDs
-	e.log.Debug().
-		Uint64("final_height", final.Height).
-		Msgf("pruned %d heights, %d block IDs", prunedHeights, prunedBlockIDs)
-}
-
-// scanPending will check which items shall be requested.
-func (e *Engine) scanPending() ([]uint64, []flow.Identifier, error) {
-	e.unit.Lock()
-	defer e.unit.Unlock()
-
-	// first, prune any finalized heights
-	e.prune()
-
-	// TODO: we will probably want to limit the maximum amount of in-flight
-	// requests and maximum amount of blocks requested at the same time here;
-	// for now, we just ignore that problem, but once we do, we should always
-	// prioritize range requests over batch requests
-
-	now := time.Now()
-
-	// create a list of all height requests that should be sent
-	var heights []uint64
-	for height, status := range e.heights {
-
-		// if the last request is young enough, skip
-		retryAfter := status.Requested.Add(e.retryInterval << status.Attempts)
-		if now.Before(retryAfter) {
-			continue
-		}
-
-		// if we've already received this block, skip
-		if status.WasReceived() {
-			continue
-		}
-
-		// if we reached maximum number of attempts, delete
-		if status.Attempts >= e.maxAttempts {
-			delete(e.heights, height)
-			continue
-		}
-
-		// otherwise, append to heights to be requested
-		heights = append(heights, height)
-	}
-
-	// create list of all the block IDs blocks that are missing
-	var blockIDs []flow.Identifier
-	for blockID, status := range e.blockIDs {
-
-		// if the last request is young enough, skip
-		retryAfter := status.Requested.Add(e.retryInterval << status.Attempts)
-		if now.Before(retryAfter) {
-			continue
-		}
-
-		// if we've already received this block, skip
-		if status.WasReceived() {
-			continue
-		}
-
-		// if we reached the maximum number of attempts for a queue item, drop
-		if status.Attempts >= e.maxAttempts {
-			delete(e.blockIDs, blockID)
-			continue
-		}
-
-		// otherwise, append to blockIDs to be requested
-		blockIDs = append(blockIDs, blockID)
-	}
-
-	return heights, blockIDs, nil
-}
-
-// sendRequests will divide the given heights and block IDs appropriately and
-// request the desired blocks.
-func (e *Engine) sendRequests(heights []uint64, blockIDs []flow.Identifier) error {
-	e.unit.Lock()
-	defer e.unit.Unlock()
-
-	// get all of the consensus nodes from the state
-	// NOTE: we want to request from consensus nodes even on other node roles
-	identities, err := e.state.Final().Identities(filter.And(
+	participants, err := e.state.Final().Identities(filter.And(
 		filter.HasRole(flow.RoleConsensus),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
 	))
 	if err != nil {
-		return fmt.Errorf("could not send get consensus identities: %w", err)
+		return fmt.Errorf("could not get participants: %w", err)
 	}
 
-	// sort the heights so we can build contiguous ranges more easily
-	sort.Slice(heights, func(i int, j int) bool {
-		return heights[i] < heights[j]
-	})
-
-	// build contiguous height ranges with maximum batch size
-	start := uint64(0)
-	end := uint64(0)
-	var ranges []Range
-	for index, height := range heights {
-
-		// on the first iteration, we set the start pointer, so we don't need to
-		// guard the for loop when heights is empty
-		if index == 0 {
-			start = height
-		}
-
-		// we always forward the end pointer to the new height
-		end = height
-
-		// if we have the end of the loop, we always create one final range
-		if index >= len(heights)-1 {
-			r := Range{From: start, To: end}
-			ranges = append(ranges, r)
-			break
-		}
-
-		// at this point, we will have a next height as iteration will continue
-		nextHeight := heights[index+1]
-
-		// if we have reached the maximum size for a range, we create the range
-		// and forward the start pointer to the next height
-		rangeSize := end - start + 1
-		if rangeSize >= uint64(e.maxSize) {
-			r := Range{From: start, To: end}
-			ranges = append(ranges, r)
-			start = nextHeight
-			continue
-		}
-
-		// if end is more than one smaller than the next height, we have a gap
-		// next, so we create a range and forward the start pointer
-		if nextHeight > end+1 {
-			r := Range{From: start, To: end}
-			ranges = append(ranges, r)
-			start = nextHeight
-			continue
-		}
-	}
-
-	// for each range, send a request until reaching max number
-	totalRequests := uint(0)
+	var errs error
 	for _, ran := range ranges {
-
-		// send the request first
 		req := &messages.RangeRequest{
 			Nonce:      rand.Uint64(),
 			FromHeight: ran.From,
 			ToHeight:   ran.To,
 		}
-		err := e.con.Submit(req, identities.Sample(3).NodeIDs()...)
+		err := e.con.Submit(req, participants.Sample(3).NodeIDs()...)
 		if err != nil {
-			return fmt.Errorf("could not send range request: %w", err)
+			errs = multierror.Append(errs, fmt.Errorf("could not submit range request: %w", err))
+			continue
 		}
-
+		e.core.RangeRequested(ran)
 		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageRangeRequest)
-
-		// mark all of the heights as requested
-		for height := ran.From; height <= ran.To; height++ {
-			// NOTE: during the short window between scan and send, we could
-			// have evicted a status
-			status, exists := e.heights[height]
-			if !exists {
-				continue
-			}
-			status.Requested = time.Now()
-			status.Attempts++
-		}
-
-		// check if we reached the maximum number of requests for this period
-		totalRequests++
-		if totalRequests >= e.maxRequests {
-			return nil
-		}
 	}
 
-	// split the block IDs into maximum sized requests
-	for from := 0; from < len(blockIDs); from += int(e.maxSize) {
-
-		// make sure last range is not out of bounds
-		to := from + int(e.maxSize)
-		if to > len(blockIDs) {
-			to = len(blockIDs)
-		}
-
-		// create the block IDs slice
-		requestIDs := blockIDs[from:to]
+	for _, batch := range batches {
 		req := &messages.BatchRequest{
 			Nonce:    rand.Uint64(),
-			BlockIDs: requestIDs,
+			BlockIDs: batch.BlockIDs,
 		}
-		err := e.con.Submit(req, identities.Sample(3).NodeIDs()...)
+		err := e.con.Submit(req, participants.Sample(3).NodeIDs()...)
 		if err != nil {
-			return fmt.Errorf("could not send batch request: %w", err)
+			errs = multierror.Append(errs, fmt.Errorf("could not submit batch request: %w", err))
+			continue
 		}
-
+		e.core.BatchRequested(batch)
 		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBatchRequest)
-
-		// mark all of the blocks as requested
-		for _, blockID := range requestIDs {
-			// NOTE: during the short window between scan and send, we could
-			// have received a block and removed a key
-			status, needed := e.blockIDs[blockID]
-			if !needed {
-				continue
-			}
-			status.Requested = time.Now()
-			status.Attempts++
-		}
-
-		// check if we reached maximum requests
-		totalRequests++
-		if totalRequests >= e.maxRequests {
-			return nil
-		}
 	}
 
-	return nil
+	return errs
 }

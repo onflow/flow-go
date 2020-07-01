@@ -9,7 +9,6 @@ import (
 )
 
 func TestTrieUntrustedAndVerify(t *testing.T) {
-	trieH := 257
 	unittest.RunWithTempDir(t, func(dbDir string) {
 		metricsCollector := &metrics.NoopCollector{}
 		f, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
@@ -24,7 +23,7 @@ func TestTrieUntrustedAndVerify(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		v := ledger.NewTrieVerifier(trieH)
+		v := ledger.NewTrieVerifier(ledger.RegisterKeySize)
 		_, err = v.VerifyRegistersProof(ids, values, proofs, newRoot)
 		if err != nil {
 			t.Fatal(err)

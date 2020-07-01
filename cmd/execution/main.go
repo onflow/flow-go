@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/cmd"
+	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
@@ -22,6 +23,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	chainsync "github.com/dapperlabs/flow-go/module/synchronization"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/ledger"
@@ -35,7 +37,9 @@ func main() {
 		events             storage.Events
 		txResults          storage.TransactionResults
 		providerEngine     *provider.Engine
+		syncCore           *chainsync.Core
 		computationManager *computation.Manager
+		syncEngine         *synchronization.Engine
 		ingestionEng       *ingestion.Engine
 		rpcConf            rpc.Config
 		err                error
@@ -56,13 +60,14 @@ func main() {
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
-			vm, err := virtualmachine.New(rt, node.GenesisChainID.Chain())
+			vm, err := virtualmachine.New(rt, node.RootChainID.Chain())
 			if err != nil {
 				return err
 			}
 
 			computationManager = computation.New(
 				node.Logger,
+				collector,
 				node.Tracer,
 				node.Me,
 				node.State,
@@ -81,12 +86,18 @@ func main() {
 			ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), collector, node.MetricsRegisterer)
 			return err
 		}).
+		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
+			syncCore, err = chainsync.New(node.Logger, chainsync.DefaultConfig())
+			return err
+		}).
 		GenesisHandler(func(node *cmd.FlowNodeBuilder, block *flow.Block) {
 			if node.GenesisAccountPublicKey == nil {
 				panic(fmt.Sprintf("error while bootstrapping execution state: no service account public key"))
 			}
 
-			bootstrappedStateCommitment, err := bootstrap.BootstrapLedger(ledgerStorage, *node.GenesisAccountPublicKey, node.GenesisTokenSupply, node.GenesisChainID.Chain())
+			bootstrapper := bootstrap.NewBootstrapper(node.Logger)
+
+			bootstrappedStateCommitment, err := bootstrapper.BootstrapLedger(ledgerStorage, *node.GenesisAccountPublicKey, node.GenesisTokenSupply, node.RootChainID.Chain())
 			if err != nil {
 				panic(fmt.Sprintf("error while bootstrapping execution state: %s", err))
 			}
@@ -95,7 +106,7 @@ func main() {
 				panic(fmt.Sprintf("genesis seal state commitment (%x) different from precalculated (%x)", bootstrappedStateCommitment, node.GenesisCommit))
 			}
 
-			err = bootstrap.BootstrapExecutionDatabase(node.DB, bootstrappedStateCommitment, block.Header)
+			err = bootstrapper.BootstrapExecutionDatabase(node.DB, bootstrappedStateCommitment, block.Header)
 			if err != nil {
 				panic(fmt.Sprintf("error while bootstrapping execution state - cannot bootstrap database: %s", err))
 			}
@@ -160,6 +171,7 @@ func main() {
 				txResults,
 				computationManager,
 				providerEngine,
+				syncCore,
 				executionState,
 				6, // TODO - config param maybe?
 				collector,
@@ -169,6 +181,24 @@ func main() {
 				10,          // TODO - config param
 			)
 			return ingestionEng, err
+		}).
+		Component("sychronization engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			// initialize the synchronization engine
+			syncEngine, err = synchronization.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				node.Storage.Blocks,
+				ingestionEng,
+				syncCore,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
+			}
+
+			return syncEngine, nil
 		}).
 		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, events, txResults)

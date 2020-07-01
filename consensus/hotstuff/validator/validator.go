@@ -80,7 +80,7 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 
 	// validate the proposer's vote and get his identity
 	_, err := v.ValidateVote(proposal.ProposerVote(), block)
-	if errors.Is(err, model.ErrorInvalidVote{}) {
+	if model.IsInvalidVoteError(err) {
 		return newInvalidBlockError(block, fmt.Errorf("invalid proposer signature: %w", err))
 	}
 	if err != nil {
@@ -102,7 +102,7 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 		// Forks is _allowed_ to (but obliged to) prune blocks whose view is below the newest finalized block.
 		if qc.View >= v.forks.FinalizedView() {
 			// If the parent block is equal or above the finalized view, then Forks should have it. Otherwise, we are missing a block!
-			return &model.ErrorMissingBlock{View: qc.View, BlockID: qc.BlockID}
+			return model.MissingBlockError{View: qc.View, BlockID: qc.BlockID}
 		}
 
 		// Forks has already pruned the parent block. I.e., we can't validate that the qc matches
@@ -160,7 +160,7 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 }
 
 func newInvalidBlockError(block *model.Block, err error) error {
-	return &model.ErrorInvalidBlock{
+	return model.InvalidBlockError{
 		BlockID: block.BlockID,
 		View:    block.View,
 		Err:     err,
@@ -168,7 +168,7 @@ func newInvalidBlockError(block *model.Block, err error) error {
 }
 
 func newInvalidVoteError(vote *model.Vote, err error) error {
-	return &model.ErrorInvalidVote{
+	return model.InvalidVoteError{
 		VoteID: vote.ID(),
 		View:   vote.View,
 		Err:    err,
