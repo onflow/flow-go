@@ -19,7 +19,9 @@ type InvokableTransaction struct {
 	ID          flow.Identifier
 	Logs        []string
 	Events      []cadence.Event
-	Err         Error
+	// TODO: report gas consumption: https://github.com/dapperlabs/flow-go/issues/4139
+	GasUsed uint64
+	Err     Error
 }
 
 type TransactionProcessor interface {
