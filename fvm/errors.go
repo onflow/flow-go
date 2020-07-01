@@ -27,6 +27,7 @@ const (
 )
 
 var ErrAccountNotFound = errors.New("account not found")
+var ErrInvalidHashAlgorithm = errors.New("invalid hash algorithm")
 
 // An Error represents a non-fatal error that is expected during normal operation of the virtual machine.
 //

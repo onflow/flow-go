@@ -4,17 +4,19 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// A Context defines a set execution parameters used by the virtual machine.
+// A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
 	ASTCache                         ASTCache
 	Blocks                           Blocks
 	Metrics                          *MetricsCollector
 	GasLimit                         uint64
 	BlockHeader                      *flow.Header
-	SignatureVerificationEnabled     bool
-	FeePaymentsEnabled               bool
 	RestrictedAccountCreationEnabled bool
 	RestrictedDeploymentEnabled      bool
+	SignatureVerifier                SignatureVerifier
+	TransactionSignatureVerifier     TransactionSignatureVerifier
+	TransactionSequenceNumberChecker TransactionSequenceNumberChecker
+	TransactionFeeDeductor           TransactionFeeDeductor
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -44,10 +46,12 @@ func defaultContext() Context {
 		Metrics:                          nil,
 		GasLimit:                         defaultGasLimit,
 		BlockHeader:                      nil,
-		SignatureVerificationEnabled:     true,
-		FeePaymentsEnabled:               true,
 		RestrictedAccountCreationEnabled: true,
 		RestrictedDeploymentEnabled:      true,
+		SignatureVerifier:                NewDefaultSignatureVerifier(),
+		TransactionSignatureVerifier:     NewDefaultTransactionSignatureVerifier(AccountKeyWeightThreshold),
+		TransactionSequenceNumberChecker: NewDefaultTransactionSequenceNumberChecker(),
+		TransactionFeeDeductor:           NewDefaultTransactionFeeDeductor(),
 	}
 }
 
@@ -102,19 +106,29 @@ func WithMetricsCollector(mc *MetricsCollector) Option {
 	}
 }
 
-// WithSignatureVerification enables or disables signature verification and sequence
-// number checks for a virtual machine context.
-func WithSignatureVerification(enabled bool) Option {
+// WithTransactionSignatureVerifier sets the transaction signature verifier for a
+// virtual machine context.
+func WithTransactionSignatureVerifier(v TransactionSignatureVerifier) Option {
 	return func(ctx Context) Context {
-		ctx.SignatureVerificationEnabled = enabled
+		ctx.TransactionSignatureVerifier = v
 		return ctx
 	}
 }
 
-// WithFeePayments enables or disables fee payments for a virtual machine context.
-func WithFeePayments(enabled bool) Option {
+// WithTransactionSequenceNumberChecker sets the transaction sequence number checker for a
+// virtual machine context.
+func WithTransactionSequenceNumberChecker(c TransactionSequenceNumberChecker) Option {
 	return func(ctx Context) Context {
-		ctx.FeePaymentsEnabled = enabled
+		ctx.TransactionSequenceNumberChecker = c
+		return ctx
+	}
+}
+
+// WithTransactionFeeDeductor sets the transaction fee payment deductor for a
+// virtual machine context.
+func WithTransactionFeeDeductor(d TransactionFeeDeductor) Option {
+	return func(ctx Context) Context {
+		ctx.TransactionFeeDeductor = d
 		return ctx
 	}
 }

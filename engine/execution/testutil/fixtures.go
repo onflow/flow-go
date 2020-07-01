@@ -146,7 +146,10 @@ func CreateAccountsWithSimpleAddresses(
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) ([]flow.Address, error) {
-	ctx := fvm.NewContext(fvm.WithSignatureVerification(false))
+	ctx := fvm.NewContext(
+		fvm.WithTransactionSignatureVerifier(nil),
+		fvm.WithTransactionSequenceNumberChecker(nil),
+	)
 
 	var accounts []flow.Address
 

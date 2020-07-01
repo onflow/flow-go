@@ -14,9 +14,9 @@ import (
 // A BootstrapProcedure is an invokable that can be used to bootstrap the ledger state
 // with the default accounts and contracts required by the Flow virtual machine.
 type BootstrapProcedure struct {
-	vm      *VirtualMachine
-	ledger  Ledger
-	metaCtx Context
+	vm     *VirtualMachine
+	ctx    Context
+	ledger Ledger
 
 	// genesis parameters
 	serviceAccountPublicKey flow.AccountPublicKey
@@ -41,14 +41,8 @@ func (b *BootstrapProcedure) Parse(vm *VirtualMachine, ctx Context, ledger Ledge
 }
 
 func (b *BootstrapProcedure) Invoke(vm *VirtualMachine, ctx Context, ledger Ledger) (*InvocationResult, error) {
-	b.metaCtx = NewContextFromParent(
-		ctx,
-		WithSignatureVerification(false),
-		WithFeePayments(false),
-		WithRestrictedDeployment(false),
-	)
-
 	b.vm = vm
+	b.ctx = NewContextFromParent(ctx, WithRestrictedDeployment(false))
 	b.ledger = ledger
 
 	// initialize the account addressing state
@@ -91,7 +85,7 @@ func (b *BootstrapProcedure) deployFungibleToken() flow.Address {
 	fungibleToken := b.createAccount()
 
 	err := b.vm.invokeMetaTransaction(
-		b.metaCtx,
+		b.ctx,
 		deployContractTransaction(fungibleToken, contracts.FungibleToken()),
 		b.ledger,
 	)
@@ -108,7 +102,7 @@ func (b *BootstrapProcedure) deployFlowToken(service, fungibleToken flow.Address
 	contract := contracts.FlowToken(fungibleToken.Hex())
 
 	err := b.vm.invokeMetaTransaction(
-		b.metaCtx,
+		b.ctx,
 		deployFlowTokenTransaction(flowToken, service, contract),
 		b.ledger,
 	)
@@ -125,7 +119,7 @@ func (b *BootstrapProcedure) deployFlowFees(service, fungibleToken, flowToken fl
 	contract := contracts.FlowFees(fungibleToken.Hex(), flowToken.Hex())
 
 	err := b.vm.invokeMetaTransaction(
-		b.metaCtx,
+		b.ctx,
 		deployFlowFeesTransaction(flowFees, service, contract),
 		b.ledger,
 	)
@@ -140,7 +134,7 @@ func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowTo
 	contract := contracts.FlowServiceAccount(fungibleToken.Hex(), flowToken.Hex(), feeContract.Hex())
 
 	err := b.vm.invokeMetaTransaction(
-		b.metaCtx,
+		b.ctx,
 		deployContractTransaction(service, contract),
 		b.ledger,
 	)
@@ -151,7 +145,7 @@ func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowTo
 
 func (b *BootstrapProcedure) mintInitialTokens(service, fungibleToken, flowToken flow.Address, initialSupply uint64) {
 	err := b.vm.invokeMetaTransaction(
-		b.metaCtx,
+		b.ctx,
 		mintFlowTokenTransaction(fungibleToken, flowToken, service, initialSupply),
 		b.ledger,
 	)
