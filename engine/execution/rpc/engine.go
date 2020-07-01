@@ -116,6 +116,11 @@ func (h *handler) ExecuteScriptAtBlockID(
 	ctx context.Context,
 	req *execution.ExecuteScriptAtBlockIDRequest,
 ) (*execution.ExecuteScriptAtBlockIDResponse, error) {
+
+	if err := validate.BlockID(req.GetBlockId()); err != nil {
+		return nil, err
+	}
+
 	blockID := flow.HashToID(req.GetBlockId())
 
 	value, err := h.engine.ExecuteScriptAtBlockID(ctx, req.GetScript(), req.GetArguments(), blockID)
@@ -133,14 +138,14 @@ func (h *handler) ExecuteScriptAtBlockID(
 func (h *handler) GetEventsForBlockIDs(_ context.Context,
 	req *execution.GetEventsForBlockIDsRequest) (*execution.GetEventsForBlockIDsResponse, error) {
 
+	// validate request
 	blockIDs := req.GetBlockIds()
-	if len(blockIDs) == 0 {
-		return nil, status.Errorf(codes.InvalidArgument, "no block IDs provided")
+	if err := validate.BlockIDs(blockIDs); err != nil {
+		return nil, err
 	}
-
 	reqEvent := req.GetType()
-	if reqEvent == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid event type")
+	if err := validate.EventType(reqEvent); err != nil {
+		return nil, err
 	}
 
 	eType := flow.EventType(reqEvent)
@@ -176,13 +181,13 @@ func (h *handler) GetTransactionResult(
 ) (*execution.GetTransactionResultResponse, error) {
 
 	reqBlockID := req.GetBlockId()
-	if reqBlockID == nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid block id")
+	if err := validate.BlockID(reqBlockID); err != nil {
+		return nil, err
 	}
 
 	reqTxID := req.GetTransactionId()
-	if reqTxID == nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid transaction id")
+	if err := validate.TransactionID(reqTxID); err != nil {
+		return nil, err
 	}
 
 	blockID := flow.HashToID(reqBlockID)
@@ -247,8 +252,8 @@ func (h *handler) GetAccountAtBlockID(
 ) (*execution.GetAccountAtBlockIDResponse, error) {
 
 	blockID := req.GetBlockId()
-	if blockID == nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid block ID")
+	if err := validate.BlockID(blockID); err != nil {
+		return nil, err
 	}
 	blockFlowID := flow.HashToID(blockID)
 
@@ -256,7 +261,6 @@ func (h *handler) GetAccountAtBlockID(
 	if err := validate.Address(address); err != nil {
 		return nil, err
 	}
-
 	flowAddress := flow.BytesToAddress(address)
 
 	value, err := h.engine.GetAccount(ctx, flowAddress, blockFlowID)

@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/dapperlabs/flow-go/engine/common/convert"
+	"github.com/dapperlabs/flow-go/engine/common/rpc/validate"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -53,7 +54,12 @@ func (h *handlerTransactions) SendTransaction(ctx context.Context, req *access.S
 
 func (h *handlerTransactions) GetTransaction(_ context.Context, req *access.GetTransactionRequest) (*access.TransactionResponse, error) {
 
-	id := flow.HashToID(req.Id)
+	reqTxID := req.GetId()
+	if err := validate.TransactionID(reqTxID); err != nil {
+		return nil, err
+	}
+
+	id := flow.HashToID(reqTxID)
 	// look up transaction from storage
 	tx, err := h.transactions.ByID(id)
 	if err != nil {
@@ -72,8 +78,12 @@ func (h *handlerTransactions) GetTransaction(_ context.Context, req *access.GetT
 
 func (h *handlerTransactions) GetTransactionResult(ctx context.Context, req *access.GetTransactionRequest) (*access.TransactionResultResponse, error) {
 
-	id := flow.HashToID(req.GetId())
+	reqTxID := req.GetId()
+	if err := validate.TransactionID(reqTxID); err != nil {
+		return nil, err
+	}
 
+	id := flow.HashToID(reqTxID)
 	// look up transaction from storage
 	tx, err := h.transactions.ByID(id)
 	if err != nil {

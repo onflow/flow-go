@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/dapperlabs/flow-go/engine/common/convert"
+	"github.com/dapperlabs/flow-go/engine/common/rpc/validate"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -105,7 +106,11 @@ func (h *Handler) Ping(ctx context.Context, req *access.PingRequest) (*access.Pi
 
 func (h *Handler) GetCollectionByID(_ context.Context, req *access.GetCollectionByIDRequest) (*access.CollectionResponse, error) {
 
-	id := flow.HashToID(req.Id)
+	reqCollID := req.GetId()
+	if err := validate.CollectionID(reqCollID); err != nil {
+		return nil, err
+	}
+	id := flow.HashToID(reqCollID)
 
 	// retrieve the collection from the collection storage
 	cl, err := h.collections.LightByID(id)

@@ -24,8 +24,10 @@ type handlerEvents struct {
 func (h *handlerEvents) GetEventsForHeightRange(ctx context.Context, req *access.GetEventsForHeightRangeRequest) (*access.EventsResponse, error) {
 
 	// validate the request
-	if req.GetEndHeight() < req.GetStartHeight() {
-		return nil, status.Error(codes.InvalidArgument, "invalid start or end height")
+	minHeight := req.GetStartHeight()
+	maxHeight := req.GetEndHeight()
+	if err := validate.BlockHeight(minHeight, maxHeight); err != nil {
+		return nil, err
 	}
 
 	// validate the event type
@@ -40,16 +42,9 @@ func (h *handlerEvents) GetEventsForHeightRange(ctx context.Context, req *access
 		return nil, status.Errorf(codes.Internal, " failed to get events: %v", err)
 	}
 
-	var minHeight, maxHeight uint64
-
-	// derive bounds for block height
-	minHeight = req.GetStartHeight()
-
 	// limit max height to last sealed block in the chain
-	if head.Height < req.GetEndHeight() {
+	if head.Height < maxHeight {
 		maxHeight = head.Height
-	} else {
-		maxHeight = req.GetEndHeight()
 	}
 
 	// find the block IDs for all the blocks between min and max height (inclusive)

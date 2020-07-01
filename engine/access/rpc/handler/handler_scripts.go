@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
+	"github.com/dapperlabs/flow-go/engine/common/rpc/validate"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 )
@@ -41,8 +42,8 @@ func (h *handlerScripts) ExecuteScriptAtBlockID(ctx context.Context,
 	blockID := req.GetBlockId()
 
 	// validate request
-	if blockID == nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid block id")
+	if err := validate.BlockID(blockID); err != nil {
+		return nil, err
 	}
 
 	// execute script on the execution node at that block id
