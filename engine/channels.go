@@ -2,73 +2,77 @@
 
 package engine
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // Enum of channel IDs to avoid accidental conflicts.
 const (
 
-	// Reserved 000-009
+	// Channels used for testing
+	TestNetwork = 00
+	TestMetrics = 01
 
-	// Collection 010-029
-	CollectionProvider             = 10 // providing collections/transactions to non-collection nodes
-	CollectionIngest               = 11 // ingesting transactions and routing to appropriate cluster
-	ProtocolClusterConsensus       = 20 // cluster-specific consensus protocol
-	ProtocolClusterSynchronization = 21 // cluster-specific consensus synchronization
+	// Channels for consensus protocols
+	ConsensusCommittee = 10
+	ConsensusCluster   = 11
 
-	// Observation 030-049
+	// Channels for protocols actively synchronizing state across nodes
+	SyncCommittee = 20
+	SyncCluster   = 21
+	SyncExecution = 22
 
-	// Consensus 050-099
-	BlockProvider           = 50 // providing blocks to non-consensus nodes
-	BlockPropagation        = 51 // propagating entities to be included in blocks between consensus nodes
-	ProtocolConsensus       = 60 // consensus protocol
-	ProtocolSynchronization = 66 // synchronization protocol
+	// Channels for actively pushing entities to subscribers
+	PushTransactions = 100
+	PushGuarantees   = 101
+	PushBlocks       = 102
+	PushReceipts     = 103
+	PushApprovals    = 104
 
-	// Execution 100-199
-	ExecutionReceiptProvider = 100
-	ExecutionStateProvider   = 101
-	ExecutionComputer        = 102
-	ChunkDataPackProvider    = 103
-	ExecutionSync            = 104
+	// Channels for actively requesting missing entities
+	RequestCollections = 200
+	RequestChunks      = 201
 
-	// Verification 150-199
-	ApprovalProvider = 150
-
-	// Testing 200-255
-	SimulationColdstuff = 200
+	// Channel aliases to make the code more readable / more robust to errors
+	ReceiveTransactions = PushTransactions
+	ReceiveGuarantees   = PushGuarantees
+	ReceiveBlocks       = PushBlocks
+	ReceiveReceipts     = PushReceipts
+	ReceiveApprovals    = PushApprovals
+	ProvideCollections  = RequestCollections
+	ProvideChunks       = RequestChunks
 )
 
 func ChannelName(channelID uint8) string {
 	switch channelID {
-	case CollectionProvider:
-		return "CollectionProvider"
-	case CollectionIngest:
-		return "CollectionIngest"
-	case ProtocolClusterConsensus:
-		return "ProtocolClusterConsensus"
-	case ProtocolClusterSynchronization:
-		return "ProtocolClusterSynchronization"
-	case BlockProvider:
-		return "BlockProvider"
-	case BlockPropagation:
-		return "BlockPropagation"
-	case ProtocolConsensus:
-		return "ProtocolConsensus"
-	case ProtocolSynchronization:
-		return "ProtocolSynchronization"
-	case ExecutionReceiptProvider:
-		return "ExecutionReceiptProvider"
-	case ExecutionStateProvider:
-		return "ExecutionStateProvider"
-	case ExecutionComputer:
-		return "ExecutionComputer"
-	case ChunkDataPackProvider:
-		return "ChunkDataPackProvider"
-	case ExecutionSync:
-		return "ExecutionSync"
-	case ApprovalProvider:
-		return "ApprovalProvider"
-	case SimulationColdstuff:
-		return "SimulationColdstuff"
+	case TestNetwork:
+		return "test-network"
+	case TestMetrics:
+		return "test-metrics"
+	case ConsensusCommittee:
+		return "consensus-committee"
+	case ConsensusCluster:
+		return "consensus-cluster"
+	case SyncCommittee:
+		return "sync-committee"
+	case SyncCluster:
+		return "sync-cluster"
+	case SyncExecution:
+		return "sync-execution"
+	case PushTransactions:
+		return "push-transactions"
+	case PushGuarantees:
+		return "push-guarantees"
+	case PushBlocks:
+		return "push-blocks"
+	case PushReceipts:
+		return "push-receipts"
+	case PushApprovals:
+		return "push-approvals"
+	case RequestCollections:
+		return "request-collections"
+	case RequestChunks:
+		return "request-chunks"
 	}
 	return fmt.Sprintf("unknown-channel-%d", channelID)
 }

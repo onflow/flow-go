@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
@@ -18,17 +17,14 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/access/ingestion"
 	accessmock "github.com/dapperlabs/flow-go/engine/access/mock"
 	"github.com/dapperlabs/flow-go/engine/access/rpc"
 	"github.com/dapperlabs/flow-go/engine/access/rpc/handler"
 	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
-	networkmock "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
@@ -38,15 +34,14 @@ import (
 
 type Suite struct {
 	suite.Suite
-	state              *protocol.State
-	snapshot           *protocol.Snapshot
-	log                zerolog.Logger
-	net                *mockmodule.Network
-	collClient         *accessmock.AccessAPIClient
-	execClient         *accessmock.ExecutionAPIClient
-	collectionsConduit *networkmock.Conduit
-	me                 *mockmodule.Local
-	chainID            flow.ChainID
+	state      *protocol.State
+	snapshot   *protocol.Snapshot
+	log        zerolog.Logger
+	request    *mockmodule.Requester
+	collClient *accessmock.AccessAPIClient
+	execClient *accessmock.ExecutionAPIClient
+	me         *mockmodule.Local
+	chainID    flow.ChainID
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -63,8 +58,8 @@ func (suite *Suite) SetupTest() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
-	suite.net = new(mockmodule.Network)
-	suite.collectionsConduit = &networkmock.Conduit{}
+	suite.request = new(mockmodule.Requester)
+	suite.request.On("EntityByID", mock.Anything, mock.Anything)
 	suite.me = new(mockmodule.Local)
 	obsIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 	suite.me.On("NodeID").Return(obsIdentity.NodeID)
@@ -205,12 +200,9 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// setup mocks
 		originID := unittest.IdentifierFixture()
-		suite.net.On("Register", uint8(engine.CollectionProvider), mock.Anything).
-			Return(suite.collectionsConduit, nil).
-			Once()
+		suite.request.On("Request", mock.Anything, mock.Anything).Return()
 		colIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
 		suite.snapshot.On("Identities", mock.Anything).Return(colIdentities, nil).Once()
-		suite.collectionsConduit.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(len(block.Payload.Guarantees))
 
 		exeEventResp := execution.GetTransactionResultResponse{
 			Events: nil,
@@ -226,7 +218,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		rpcEng := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions, suite.chainID)
 
 		// create the ingest engine
-		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, blocks, headers, collections, transactions, rpcEng)
+		ingestEng, err := ingestion.New(suite.log, suite.state, suite.me, suite.request, blocks, headers, collections, transactions, rpcEng)
 		require.NoError(suite.T(), err)
 
 		// create the handler (called by the grpc engine)
@@ -243,21 +235,19 @@ func (suite *Suite) TestGetSealedTransaction() {
 			BlockID: block.ID(),
 		}
 		ingestEng.OnFinalizedBlock(mb)
-		time.Sleep(1 * time.Second)
 
-		// 3. Ingest engine requests all collections of the block
-		suite.collectionsConduit.AssertExpectations(suite.T())
+		// 3. Request engine is used to request missing collection
+		suite.request.On("EntityByID", collection.ID(), mock.Anything).Return()
 
-		// 4. Ingest engine receives the requested collection
-		cr := &messages.CollectionResponse{Collection: collection}
-		err = ingestEng.Process(originID, cr)
-		require.NoError(suite.T(), err)
+		// 4. Ingest engine receives the requested collection and finishes processing
+		ingestEng.OnCollection(originID, &collection)
+		<-ingestEng.Done()
 
 		// 5. client requests a transaction
 		tx := collection.Transactions[0]
-		id := tx.ID()
+		txID := tx.ID()
 		getReq := &access.GetTransactionRequest{
-			Id: id[:],
+			Id: txID[:],
 		}
 		gResp, err := handler.GetTransactionResult(context.Background(), getReq)
 		require.NoError(suite.T(), err)
@@ -353,12 +343,13 @@ func (suite *Suite) TestExecuteScript() {
 
 func (suite *Suite) createChain() (flow.Block, flow.Collection) {
 	collection := unittest.CollectionFixture(10)
-	cg := &flow.CollectionGuarantee{
+	guarantee := &flow.CollectionGuarantee{
 		CollectionID: collection.ID(),
 		Signature:    crypto.Signature([]byte("signature A")),
 	}
 	block := unittest.BlockFixture()
-	block.Payload.Guarantees = []*flow.CollectionGuarantee{cg}
+	block.Payload.Guarantees = []*flow.CollectionGuarantee{guarantee}
+	block.Header.PayloadHash = block.Payload.Hash()
 
 	return block, collection
 }

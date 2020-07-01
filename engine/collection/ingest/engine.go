@@ -62,7 +62,7 @@ func New(
 		config:     config,
 	}
 
-	con, err := net.Register(engine.CollectionIngest, e)
+	con, err := net.Register(engine.PushTransactions, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
