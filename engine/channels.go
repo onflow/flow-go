@@ -2,7 +2,9 @@
 
 package engine
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // Enum of channel IDs to avoid accidental conflicts.
 const (
@@ -22,7 +24,7 @@ const (
 	BlockPropagation        = 51 // propagating entities to be included in blocks between consensus nodes
 	ProtocolConsensus       = 60 // consensus protocol
 	ProtocolSynchronization = 66 // synchronization protocol
-	ProtocolProvider        = 70 // reply engine for request-reply protocol
+	ProtocolExchange        = 70 // request-reply protocol
 
 	// Execution 100-199
 	ExecutionReceiptProvider = 100
