@@ -1,7 +1,6 @@
 package rpc
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
@@ -31,7 +30,7 @@ var defaultHTTPHeaders = []HTTPHeader{
 // NewHTTPServer creates and intializes a new HTTP GRPC proxy server
 func NewHTTPServer(
 	grpcServer *grpc.Server,
-	port int,
+	address string,
 ) *http.Server {
 	wrappedServer := grpcweb.WrapServer(
 		grpcServer,
@@ -44,7 +43,7 @@ func NewHTTPServer(
 	mux.Handle("/", wrappedHandler(wrappedServer, defaultHTTPHeaders))
 
 	httpServer := &http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
+		Addr:    address,
 		Handler: mux,
 	}
 
