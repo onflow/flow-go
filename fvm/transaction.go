@@ -1,61 +1,71 @@
 package fvm
 
 import (
+	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func Transaction(tx *flow.TransactionBody) InvokableTransaction {
-	return InvokableTransaction{tx: tx}
+func Transaction(tx *flow.TransactionBody) *InvokableTransaction {
+	return &InvokableTransaction{Transaction: tx}
 }
 
 type InvokableTransaction struct {
-	tx *flow.TransactionBody
+	Transaction *flow.TransactionBody
+	ID          flow.Identifier
+	Logs        []string
+	Events      []cadence.Event
+	Err         Error
 }
 
-func (i InvokableTransaction) Transaction() *flow.TransactionBody {
-	return i.tx
+type TransactionProcessor interface {
+	Process(*VirtualMachine, Context, *InvokableTransaction, Ledger) error
 }
 
-func (i InvokableTransaction) Parse(vm *VirtualMachine, ctx Context, ledger Ledger) (Invokable, error) {
-	panic("implement me")
-}
+func (inv *InvokableTransaction) Invoke(vm *VirtualMachine, ctx Context, ledger Ledger) error {
+	inv.ID = inv.Transaction.ID()
 
-func (i InvokableTransaction) Invoke(vm *VirtualMachine, ctx Context, ledger Ledger) (*InvocationResult, error) {
-	if ctx.TransactionSignatureVerifier != nil {
-		err := ctx.TransactionSignatureVerifier.Verify(i.tx, ledger)
-		if err != nil {
-			return createInvocationResult(i.tx.ID(), nil, nil, nil, err)
+	for _, p := range ctx.TransactionProcessors {
+		err := p.Process(vm, ctx, inv, ledger)
+		vmErr, fatalErr := handleError(err)
+		if fatalErr != nil {
+			return fatalErr
+		}
+
+		if vmErr != nil {
+			inv.Err = vmErr
+			return nil
 		}
 	}
 
-	if ctx.TransactionSequenceNumberChecker != nil {
-		err := ctx.TransactionSequenceNumberChecker.Check(i.tx, ledger)
-		if err != nil {
-			return createInvocationResult(i.tx.ID(), nil, nil, nil, err)
-		}
-	}
-
-	if ctx.TransactionFeeDeductor != nil {
-		err := ctx.TransactionFeeDeductor.DeductFees(vm, ctx, i.tx, ledger)
-		if err != nil {
-			return createInvocationResult(i.tx.ID(), nil, nil, nil, err)
-		}
-	}
-
-	return i.invoke(vm, ctx, ledger)
+	return nil
 }
 
-func (i InvokableTransaction) invoke(vm *VirtualMachine, ctx Context, ledger Ledger) (*InvocationResult, error) {
-	txID := i.tx.ID()
+type TransactionInvocator struct{}
 
-	env := newEnvironment(vm, ctx, ledger)
-	env.setTransaction(i.tx)
+func NewTransactionInvocator() *TransactionInvocator {
+	return &TransactionInvocator{}
+}
 
-	location := runtime.TransactionLocation(txID[:])
+func (i *TransactionInvocator) Process(
+	vm *VirtualMachine,
+	ctx Context,
+	inv *InvokableTransaction,
+	ledger Ledger,
+) error {
+	env := newEnvironment(ctx, ledger)
+	env.setTransaction(vm, inv.Transaction)
 
-	err := vm.runtime.ExecuteTransaction(i.tx.Script, i.tx.Arguments, env, location)
+	location := runtime.TransactionLocation(inv.ID[:])
 
-	return createInvocationResult(txID, nil, env.getEvents(), env.getLogs(), err)
+	err := vm.Runtime.ExecuteTransaction(inv.Transaction.Script, inv.Transaction.Arguments, env, location)
+	if err != nil {
+		return err
+	}
+
+	inv.Events = env.getEvents()
+	inv.Logs = env.getLogs()
+
+	return nil
 }

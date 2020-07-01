@@ -147,8 +147,9 @@ func CreateAccountsWithSimpleAddresses(
 	chain flow.Chain,
 ) ([]flow.Address, error) {
 	ctx := fvm.NewContext(
-		fvm.WithTransactionSignatureVerifier(nil),
-		fvm.WithTransactionSequenceNumberChecker(nil),
+		fvm.WithTransactionProcessors([]fvm.TransactionProcessor{
+			fvm.NewTransactionInvocator(),
+		}),
 	)
 
 	var accounts []flow.Address
@@ -170,23 +171,24 @@ func CreateAccountsWithSimpleAddresses(
 		cadAccountKey := BytesToCadenceArray(encAccountKey)
 		encCadAccountKey, _ := jsoncdc.Encode(cadAccountKey)
 
-		tx := flow.NewTransactionBody().
+		txBody := flow.NewTransactionBody().
 			SetScript(script).
 			AddArgument(encCadAccountKey).
 			AddAuthorizer(serviceAddress)
 
-		result, err := vm.Invoke(ctx, fvm.Transaction(tx), ledger)
+		tx := fvm.Transaction(txBody)
+		err := vm.Invoke(ctx, tx, ledger)
 		if err != nil {
 			return nil, err
 		}
 
-		if result.Error != nil {
-			return nil, fmt.Errorf("failed to create account: %w", result.Error)
+		if tx.Err != nil {
+			return nil, fmt.Errorf("failed to create account: %w", tx.Err)
 		}
 
 		var addr flow.Address
 
-		for _, event := range result.Events {
+		for _, event := range tx.Events {
 			if event.EventType.ID() == string(flow.EventAccountCreated) {
 				addr = event.Fields[0].ToGoValue().([8]byte)
 				break
@@ -209,7 +211,7 @@ func RootBootstrappedLedger(chain flow.Chain) *fvm.MapLedger {
 
 	vm := fvm.New(runtime.NewInterpreterRuntime(), chain)
 
-	_, _ = vm.Invoke(
+	_ = vm.Invoke(
 		fvm.NewContext(),
 		fvm.Bootstrap(unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply),
 		ledger,

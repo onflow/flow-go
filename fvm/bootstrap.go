@@ -35,12 +35,7 @@ func Bootstrap(
 	}
 }
 
-func (b *BootstrapProcedure) Parse(vm *VirtualMachine, ctx Context, ledger Ledger) (Invokable, error) {
-	// no-op: Bootstrapping invocation does not support pre-parsing
-	return b, nil
-}
-
-func (b *BootstrapProcedure) Invoke(vm *VirtualMachine, ctx Context, ledger Ledger) (*InvocationResult, error) {
+func (b *BootstrapProcedure) Invoke(vm *VirtualMachine, ctx Context, ledger Ledger) error {
 	b.vm = vm
 	b.ctx = NewContextFromParent(ctx, WithRestrictedDeployment(false))
 	b.ledger = ledger
@@ -60,7 +55,7 @@ func (b *BootstrapProcedure) Invoke(vm *VirtualMachine, ctx Context, ledger Ledg
 
 	b.deployServiceAccount(service, fungibleToken, flowToken, feeContract)
 
-	return nil, nil
+	return nil
 }
 
 func (b *BootstrapProcedure) createAccount() flow.Address {
@@ -211,7 +206,7 @@ transaction(amount: UFix64) {
 }
 `
 
-func deployContractTransaction(address flow.Address, contract []byte) InvokableTransaction {
+func deployContractTransaction(address flow.Address, contract []byte) *InvokableTransaction {
 	return Transaction(
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(deployContractTransactionTemplate, hex.EncodeToString(contract)))).
@@ -219,7 +214,7 @@ func deployContractTransaction(address flow.Address, contract []byte) InvokableT
 	)
 }
 
-func deployFlowTokenTransaction(flowToken, service flow.Address, contract []byte) InvokableTransaction {
+func deployFlowTokenTransaction(flowToken, service flow.Address, contract []byte) *InvokableTransaction {
 	return Transaction(
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(deployFlowTokenTransactionTemplate, hex.EncodeToString(contract)))).
@@ -228,7 +223,7 @@ func deployFlowTokenTransaction(flowToken, service flow.Address, contract []byte
 	)
 }
 
-func deployFlowFeesTransaction(flowFees, service flow.Address, contract []byte) InvokableTransaction {
+func deployFlowFeesTransaction(flowFees, service flow.Address, contract []byte) *InvokableTransaction {
 	return Transaction(
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(deployFlowFeesTransactionTemplate, hex.EncodeToString(contract)))).
@@ -237,7 +232,10 @@ func deployFlowFeesTransaction(flowFees, service flow.Address, contract []byte) 
 	)
 }
 
-func mintFlowTokenTransaction(fungibleToken, flowToken, service flow.Address, initialSupply uint64) InvokableTransaction {
+func mintFlowTokenTransaction(
+	fungibleToken, flowToken, service flow.Address,
+	initialSupply uint64,
+) *InvokableTransaction {
 	initialSupplyArg, err := jsoncdc.Encode(cadence.NewUFix64(initialSupply))
 	if err != nil {
 		panic(fmt.Sprintf("failed to encode initial token supply: %s", err.Error()))

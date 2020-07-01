@@ -52,10 +52,11 @@ func getAccount(
 		return nil, err
 	}
 
-	var result *InvocationResult
-	result, err = vm.Invoke(
+	script := getFlowTokenBalanceScript(address, chain.ServiceAddress())
+
+	err = vm.Invoke(
 		ctx,
-		getFlowTokenBalanceScript(address, chain.ServiceAddress()),
+		script,
 		ledger,
 	)
 	if err != nil {
@@ -67,8 +68,8 @@ func getAccount(
 	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, balance will be 0.
 	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
 	// 2. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
-	if result.Error == nil {
-		balance = result.Value.ToGoValue().(uint64)
+	if script.Err == nil {
+		balance = script.Value.ToGoValue().(uint64)
 	}
 
 	return &flow.Account{
@@ -315,7 +316,7 @@ pub fun main(): UFix64 {
 }
 `
 
-func initFlowTokenTransaction(accountAddress, serviceAddress flow.Address) InvokableTransaction {
+func initFlowTokenTransaction(accountAddress, serviceAddress flow.Address) *InvokableTransaction {
 	return Transaction(
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(initFlowTokenTransactionTemplate, serviceAddress))).
@@ -323,7 +324,7 @@ func initFlowTokenTransaction(accountAddress, serviceAddress flow.Address) Invok
 	)
 }
 
-func getFlowTokenBalanceScript(accountAddress, serviceAddress flow.Address) InvokableScript {
+func getFlowTokenBalanceScript(accountAddress, serviceAddress flow.Address) *InvokableScript {
 	return Script([]byte(fmt.Sprintf(getFlowTokenBalanceScriptTemplate, serviceAddress, accountAddress)))
 }
 

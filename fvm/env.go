@@ -18,7 +18,6 @@ import (
 var _ runtime.Interface = &hostEnv{}
 
 type hostEnv struct {
-	vm     *VirtualMachine
 	ctx    Context
 	ledger Ledger
 
@@ -31,9 +30,8 @@ type hostEnv struct {
 	rng            *rand.Rand
 }
 
-func newEnvironment(vm *VirtualMachine, ctx Context, ledger Ledger) *hostEnv {
+func newEnvironment(ctx Context, ledger Ledger) *hostEnv {
 	env := &hostEnv{
-		vm:      vm,
 		ctx:     ctx,
 		ledger:  ledger,
 		Metrics: &noopMetricsCollector{},
@@ -58,9 +56,9 @@ func (e *hostEnv) seedRNG(header *flow.Header) {
 	e.rng = rand.New(source)
 }
 
-func (e *hostEnv) setTransaction(tx *flow.TransactionBody) {
+func (e *hostEnv) setTransaction(vm *VirtualMachine, tx *flow.TransactionBody) {
 	e.transactionEnv = newTransactionEnv(
-		e.vm,
+		vm,
 		e.ctx,
 		e.ledger,
 		tx,

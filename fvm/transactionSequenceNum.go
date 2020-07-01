@@ -4,17 +4,22 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-type TransactionSequenceNumberChecker interface {
-	Check(tx *flow.TransactionBody, ledger Ledger) error
+type TransactionSequenceNumberChecker struct{}
+
+func NewTransactionSequenceNumberChecker() *TransactionSequenceNumberChecker {
+	return &TransactionSequenceNumberChecker{}
 }
 
-type DefaultTransactionSequenceNumberChecker struct{}
-
-func NewDefaultTransactionSequenceNumberChecker() DefaultTransactionSequenceNumberChecker {
-	return DefaultTransactionSequenceNumberChecker{}
+func (c *TransactionSequenceNumberChecker) Process(
+	vm *VirtualMachine,
+	ctx Context,
+	inv *InvokableTransaction,
+	ledger Ledger,
+) error {
+	return c.checkAndIncrementSequenceNumber(inv.Transaction, ledger)
 }
 
-func (DefaultTransactionSequenceNumberChecker) Check(
+func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	tx *flow.TransactionBody,
 	ledger Ledger,
 ) error {

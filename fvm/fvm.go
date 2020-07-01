@@ -8,31 +8,25 @@ import (
 
 // An Invokable is a procedure that can be executed by the virtual machine.
 type Invokable interface {
-	Parse(vm *VirtualMachine, ctx Context, ledger Ledger) (Invokable, error)
-	Invoke(vm *VirtualMachine, ctx Context, ledger Ledger) (*InvocationResult, error)
+	Invoke(vm *VirtualMachine, ctx Context, ledger Ledger) error
 }
 
 // A VirtualMachine augments the Cadence runtime with Flow host functionality.
 type VirtualMachine struct {
-	runtime runtime.Runtime
+	Runtime runtime.Runtime
 	chain   flow.Chain
 }
 
 // New creates a new virtual machine instance with the provided runtime.
 func New(rt runtime.Runtime, chain flow.Chain) *VirtualMachine {
 	return &VirtualMachine{
-		runtime: rt,
+		Runtime: rt,
 		chain:   chain,
 	}
 }
 
-// Parse parses an invokable in a context against the given ledger.
-func (vm *VirtualMachine) Parse(ctx Context, i Invokable, ledger Ledger) (Invokable, error) {
-	return i.Parse(vm, ctx, ledger)
-}
-
 // Invoke invokes an invokable in a context against the given ledger.
-func (vm *VirtualMachine) Invoke(ctx Context, i Invokable, ledger Ledger) (*InvocationResult, error) {
+func (vm *VirtualMachine) Invoke(ctx Context, i Invokable, ledger Ledger) error {
 	return i.Invoke(vm, ctx, ledger)
 }
 
@@ -51,21 +45,21 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, ledger L
 //
 // Errors that occur in a meta transaction are propagated as a single error that can be
 // captured by the Cadence runtime and eventually disambiguated by the parent context.
-func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx InvokableTransaction, ledger Ledger) error {
+func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *InvokableTransaction, ledger Ledger) error {
 	ctx = NewContextFromParent(
 		ctx,
-		WithTransactionSignatureVerifier(nil),
-		WithTransactionSequenceNumberChecker(nil),
-		WithTransactionFeeDeductor(nil),
+		WithTransactionProcessors([]TransactionProcessor{
+			NewTransactionInvocator(),
+		}),
 	)
 
-	result, err := vm.Invoke(ctx, tx, ledger)
+	err := vm.Invoke(ctx, tx, ledger)
 	if err != nil {
 		return err
 	}
 
-	if result.Error != nil {
-		return result.Error
+	if tx.Err != nil {
+		return tx.Err
 	}
 
 	return nil

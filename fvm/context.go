@@ -1,11 +1,15 @@
 package fvm
 
 import (
+	"github.com/onflow/cadence/runtime"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
+	Runtime                          runtime.Runtime
+	Chain                            flow.Chain
 	ASTCache                         ASTCache
 	Blocks                           Blocks
 	Metrics                          *MetricsCollector
@@ -14,9 +18,8 @@ type Context struct {
 	RestrictedAccountCreationEnabled bool
 	RestrictedDeploymentEnabled      bool
 	SignatureVerifier                SignatureVerifier
-	TransactionSignatureVerifier     TransactionSignatureVerifier
-	TransactionSequenceNumberChecker TransactionSequenceNumberChecker
-	TransactionFeeDeductor           TransactionFeeDeductor
+	TransactionProcessors            []TransactionProcessor
+	ScriptProcessors                 []ScriptProcessor
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -41,6 +44,8 @@ const defaultGasLimit = 100000
 
 func defaultContext() Context {
 	return Context{
+		Runtime:                          runtime.NewInterpreterRuntime(),
+		Chain:                            flow.Mainnet.Chain(),
 		ASTCache:                         nil,
 		Blocks:                           nil,
 		Metrics:                          nil,
@@ -49,9 +54,15 @@ func defaultContext() Context {
 		RestrictedAccountCreationEnabled: true,
 		RestrictedDeploymentEnabled:      true,
 		SignatureVerifier:                NewDefaultSignatureVerifier(),
-		TransactionSignatureVerifier:     NewDefaultTransactionSignatureVerifier(AccountKeyWeightThreshold),
-		TransactionSequenceNumberChecker: NewDefaultTransactionSequenceNumberChecker(),
-		TransactionFeeDeductor:           NewDefaultTransactionFeeDeductor(),
+		TransactionProcessors: []TransactionProcessor{
+			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
+			NewTransactionSequenceNumberChecker(),
+			NewTransactionFeeDeductor(),
+			NewTransactionInvocator(),
+		},
+		ScriptProcessors: []ScriptProcessor{
+			NewScriptInvocator(),
+		},
 	}
 }
 
@@ -106,29 +117,11 @@ func WithMetricsCollector(mc *MetricsCollector) Option {
 	}
 }
 
-// WithTransactionSignatureVerifier sets the transaction signature verifier for a
+// WithTransactionSignatureVerifier sets the transaction processors for a
 // virtual machine context.
-func WithTransactionSignatureVerifier(v TransactionSignatureVerifier) Option {
+func WithTransactionProcessors(processors []TransactionProcessor) Option {
 	return func(ctx Context) Context {
-		ctx.TransactionSignatureVerifier = v
-		return ctx
-	}
-}
-
-// WithTransactionSequenceNumberChecker sets the transaction sequence number checker for a
-// virtual machine context.
-func WithTransactionSequenceNumberChecker(c TransactionSequenceNumberChecker) Option {
-	return func(ctx Context) Context {
-		ctx.TransactionSequenceNumberChecker = c
-		return ctx
-	}
-}
-
-// WithTransactionFeeDeductor sets the transaction fee payment deductor for a
-// virtual machine context.
-func WithTransactionFeeDeductor(d TransactionFeeDeductor) Option {
-	return func(ctx Context) Context {
-		ctx.TransactionFeeDeductor = d
+		ctx.TransactionProcessors = processors
 		return ctx
 	}
 }

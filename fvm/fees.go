@@ -6,29 +6,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-type TransactionFeeDeductor interface {
-	DeductFees(vm *VirtualMachine, ctx Context, tx *flow.TransactionBody, ledger Ledger) error
-}
-
-type DefaultTransactionFeeDeductor struct{}
-
-func NewDefaultTransactionFeeDeductor() DefaultTransactionFeeDeductor {
-	return DefaultTransactionFeeDeductor{}
-}
-
-func (DefaultTransactionFeeDeductor) DeductFees(
-	vm *VirtualMachine,
-	ctx Context,
-	tx *flow.TransactionBody,
-	ledger Ledger,
-) error {
-	return vm.invokeMetaTransaction(
-		ctx,
-		deductTransactionFeeTransaction(tx.Payer, vm.chain.ServiceAddress()),
-		ledger,
-	)
-}
-
 const deductAccountCreationFeeTransactionTemplate = `
 import FlowServiceAccount from 0x%s
 
@@ -66,7 +43,7 @@ transaction {
 func deductAccountCreationFeeTransaction(
 	accountAddress, serviceAddress flow.Address,
 	restrictedAccountCreationEnabled bool,
-) InvokableTransaction {
+) *InvokableTransaction {
 	var script string
 
 	if restrictedAccountCreationEnabled {
@@ -82,7 +59,7 @@ func deductAccountCreationFeeTransaction(
 	return Transaction(tx)
 }
 
-func deductTransactionFeeTransaction(accountAddress, serviceAddress flow.Address) InvokableTransaction {
+func deductTransactionFeeTransaction(accountAddress, serviceAddress flow.Address) *InvokableTransaction {
 	return Transaction(
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(deductTransactionFeeTransactionTemplate, serviceAddress))).

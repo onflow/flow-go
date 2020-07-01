@@ -6,23 +6,31 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-type TransactionSignatureVerifier interface {
-	Verify(tx *flow.TransactionBody, ledger Ledger) error
-}
-
-type DefaultTransactionSignatureVerifier struct {
+type TransactionSignatureVerifier struct {
 	SignatureVerifier  SignatureVerifier
 	KeyWeightThreshold int
 }
 
-func NewDefaultTransactionSignatureVerifier(keyWeightThreshold int) *DefaultTransactionSignatureVerifier {
-	return &DefaultTransactionSignatureVerifier{
+func NewTransactionSignatureVerifier(keyWeightThreshold int) *TransactionSignatureVerifier {
+	return &TransactionSignatureVerifier{
 		SignatureVerifier:  DefaultSignatureVerifier{},
 		KeyWeightThreshold: keyWeightThreshold,
 	}
 }
 
-func (v *DefaultTransactionSignatureVerifier) Verify(tx *flow.TransactionBody, ledger Ledger) (err error) {
+func (v *TransactionSignatureVerifier) Process(
+	vm *VirtualMachine,
+	ctx Context,
+	inv *InvokableTransaction,
+	ledger Ledger,
+) error {
+	return v.verifyTransactionSignatures(inv.Transaction, ledger)
+}
+
+func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
+	tx *flow.TransactionBody,
+	ledger Ledger,
+) (err error) {
 	if tx.Payer == flow.EmptyAddress {
 		return &MissingPayerError{}
 	}
@@ -82,7 +90,7 @@ func (v *DefaultTransactionSignatureVerifier) Verify(tx *flow.TransactionBody, l
 	return nil
 }
 
-func (v *DefaultTransactionSignatureVerifier) aggregateAccountSignatures(
+func (v *TransactionSignatureVerifier) aggregateAccountSignatures(
 	ledger Ledger,
 	signatures []flow.TransactionSignature,
 	message []byte,
@@ -124,7 +132,7 @@ func (v *DefaultTransactionSignatureVerifier) aggregateAccountSignatures(
 //
 // An error is returned if the account does not contain a public key that
 // correctly verifies the signature against the given message.
-func (v *DefaultTransactionSignatureVerifier) verifyAccountSignature(
+func (v *TransactionSignatureVerifier) verifyAccountSignature(
 	ledger Ledger,
 	txSig flow.TransactionSignature,
 	message []byte,
@@ -180,14 +188,14 @@ func (v *DefaultTransactionSignatureVerifier) verifyAccountSignature(
 	return accountKey, valid, nil
 }
 
-func (v *DefaultTransactionSignatureVerifier) hasSufficientKeyWeight(
+func (v *TransactionSignatureVerifier) hasSufficientKeyWeight(
 	weights map[flow.Address]int,
 	address flow.Address,
 ) bool {
 	return weights[address] >= v.KeyWeightThreshold
 }
 
-func (v *DefaultTransactionSignatureVerifier) sigIsForProposalKey(
+func (v *TransactionSignatureVerifier) sigIsForProposalKey(
 	txSig flow.TransactionSignature,
 	proposalKey flow.ProposalKey,
 ) bool {

@@ -1,43 +1,84 @@
 package fvm
 
 import (
+	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/hash"
 )
 
-func Script(script []byte) InvokableScript {
-	return InvokableScript{
-		script: script,
+func Script(script []byte) *InvokableScript {
+	return &InvokableScript{
+		Script: script,
 	}
 }
 
 type InvokableScript struct {
-	script []byte
-	args   [][]byte
+	Script    []byte
+	Arguments [][]byte
+	ID        flow.Identifier
+	Value     cadence.Value
+	Logs      []string
+	Events    []cadence.Event
+	Err       Error
 }
 
-func (i InvokableScript) WithArguments(args [][]byte) InvokableScript {
-	return InvokableScript{
-		script: i.script,
-		args:   args,
+type ScriptProcessor interface {
+	Process(*VirtualMachine, Context, *InvokableScript, Ledger) error
+}
+
+func (inv *InvokableScript) WithArguments(args [][]byte) *InvokableScript {
+	return &InvokableScript{
+		Script:    inv.Script,
+		Arguments: args,
 	}
 }
 
-func (i InvokableScript) Parse(vm *VirtualMachine, ctx Context, ledger Ledger) (Invokable, error) {
-	panic("implement me")
+func (inv *InvokableScript) Invoke(vm *VirtualMachine, ctx Context, ledger Ledger) error {
+	scriptHash := hash.DefaultHasher.ComputeHash(inv.Script)
+	inv.ID = flow.HashToID(scriptHash)
+
+	for _, p := range ctx.ScriptProcessors {
+		err := p.Process(vm, ctx, inv, ledger)
+		vmErr, fatalErr := handleError(err)
+		if fatalErr != nil {
+			return fatalErr
+		}
+
+		if vmErr != nil {
+			inv.Err = vmErr
+			return nil
+		}
+	}
+
+	return nil
 }
 
-func (i InvokableScript) Invoke(vm *VirtualMachine, ctx Context, ledger Ledger) (*InvocationResult, error) {
-	env := newEnvironment(vm, ctx, ledger)
+type ScriptInvocator struct{}
 
-	scriptHash := hash.DefaultHasher.ComputeHash(i.script)
-	location := runtime.ScriptLocation(scriptHash)
+func NewScriptInvocator() ScriptInvocator {
+	return ScriptInvocator{}
+}
 
-	scriptID := flow.HashToID(scriptHash)
+func (i ScriptInvocator) Process(
+	vm *VirtualMachine,
+	ctx Context,
+	inv *InvokableScript,
+	ledger Ledger,
+) error {
+	env := newEnvironment(ctx, ledger)
 
-	value, err := vm.runtime.ExecuteScript(i.script, i.args, env, location)
+	location := runtime.ScriptLocation(inv.ID[:])
 
-	return createInvocationResult(scriptID, value, env.getEvents(), env.getLogs(), err)
+	value, err := vm.Runtime.ExecuteScript(inv.Script, inv.Arguments, env, location)
+	if err != nil {
+		return err
+	}
+
+	inv.Value = value
+	inv.Logs = env.getLogs()
+	inv.Events = env.getEvents()
+
+	return nil
 }
