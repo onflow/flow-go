@@ -361,6 +361,8 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 }
 
 func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
+	t.Skip()
+
 	rt := runtime.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()

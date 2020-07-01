@@ -211,6 +211,17 @@ func (e *hostEnv) Logs() []string {
 	return e.logs
 }
 
+func (e *hostEnv) VerifySignature(
+	signature []byte,
+	tag []byte,
+	signedData []byte,
+	publicKey []byte,
+	signatureAlgorithm string,
+	hashAlgorithm string,
+) bool {
+	panic("implement me")
+}
+
 // Block Environment Functions
 
 // GetCurrentBlockHeight returns the current block height.
