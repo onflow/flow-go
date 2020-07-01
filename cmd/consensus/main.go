@@ -167,8 +167,8 @@ func main() {
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			blockHandler := provider.Handler{
 				Resource: messages.ResourceBlock,
-				Filter:   filter.Any,
-				Retrieve: func(blockID flow.Identifier) (interface{}, error) {
+				Selector: filter.Any,
+				Retrieve: func(blockID flow.Identifier) (flow.Entity, error) {
 					block, err := node.Storage.Blocks.ByID(blockID)
 					return block, err
 				},
