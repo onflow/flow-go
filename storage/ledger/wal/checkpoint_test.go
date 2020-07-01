@@ -34,7 +34,7 @@ func RunWithWALCheckpointerWithFiles(t *testing.T, names ...interface{}) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		util.CreateFiles(t, dir, fileNames...)
 
-		wal, err := realWAL.NewWAL(nil, nil, dir, 10, 9)
+		wal, err := realWAL.NewWAL(nil, nil, dir, 10, 1)
 		require.NoError(t, err)
 
 		checkpointer, err := wal.NewCheckpointer()
@@ -123,7 +123,7 @@ func Test_Checkpointing(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		f, err := mtrie.NewMForest(33, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f, err := mtrie.NewMForest(keyByteSize, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		var stateCommitment = f.GetEmptyRootHash()
@@ -131,9 +131,9 @@ func Test_Checkpointing(t *testing.T) {
 		//saved data after updates
 		savedData := make(map[string]map[string][]byte)
 
-		t.Run("create WAL and inital trie", func(t *testing.T) {
+		t.Run("create WAL and initial trie", func(t *testing.T) {
 
-			wal, err := realWAL.NewWAL(nil, nil, dir, size*10, 33)
+			wal, err := realWAL.NewWAL(nil, nil, dir, size*10, keyByteSize)
 			require.NoError(t, err)
 
 			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
@@ -168,14 +168,14 @@ func Test_Checkpointing(t *testing.T) {
 		})
 
 		// create a new forest and reply WAL
-		f2, err := mtrie.NewMForest(33, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f2, err := mtrie.NewMForest(keyByteSize, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		t.Run("replay WAL and create checkpoint", func(t *testing.T) {
 
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000010"))
 
-			wal2, err := realWAL.NewWAL(nil, nil, dir, size*10, 33)
+			wal2, err := realWAL.NewWAL(nil, nil, dir, size*10, keyByteSize)
 			require.NoError(t, err)
 
 			err = wal2.Replay(
@@ -206,11 +206,11 @@ func Test_Checkpointing(t *testing.T) {
 			require.NoError(t, err)
 		})
 
-		f3, err := mtrie.NewMForest(33, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f3, err := mtrie.NewMForest(keyByteSize, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		t.Run("read checkpoint", func(t *testing.T) {
-			wal3, err := realWAL.NewWAL(nil, nil, dir, size*10, 33)
+			wal3, err := realWAL.NewWAL(nil, nil, dir, size*10, keyByteSize)
 			require.NoError(t, err)
 
 			err = wal3.Replay(
@@ -269,7 +269,7 @@ func Test_Checkpointing(t *testing.T) {
 			require.NoFileExists(t, path.Join(dir, "00000011"))
 
 			//generate one more segment
-			wal4, err := realWAL.NewWAL(nil, nil, dir, size*10, 33)
+			wal4, err := realWAL.NewWAL(nil, nil, dir, size*10, keyByteSize)
 			require.NoError(t, err)
 
 			err = wal4.RecordUpdate(stateCommitment, keys2, values2)
@@ -285,11 +285,11 @@ func Test_Checkpointing(t *testing.T) {
 			require.FileExists(t, path.Join(dir, "00000011")) //make sure we have extra segment
 		})
 
-		f5, err := mtrie.NewMForest(33, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f5, err := mtrie.NewMForest(keyByteSize, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		t.Run("replay both checkpoint and updates after checkpoint", func(t *testing.T) {
-			wal5, err := realWAL.NewWAL(nil, nil, dir, size*10, 33)
+			wal5, err := realWAL.NewWAL(nil, nil, dir, size*10, keyByteSize)
 			require.NoError(t, err)
 
 			updatesLeft := 1 // there should be only one update

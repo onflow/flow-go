@@ -336,31 +336,23 @@ func ReadStorableNode(reader io.Reader) (*flattener.StorableNode, error) {
 }
 
 // EncodeStorableTrie encodes StorableTrie
-// 8-bytes Big Endian uint64 Number
 // 8-bytes Big Endian uint64 RootIndex
 // 2-bytes Big Endian uint16 RootHash length
 // RootHash bytes
-// 2-bytes Big Endian uint16 ParentRootHash length
-// ParentRootHash bytes
 func EncodeStorableTrie(storableTrie *flattener.StorableTrie) []byte {
-	length := 8 + 8 + 2 + len(storableTrie.RootHash) + 2 + len(storableTrie.ParentRootHash)
-
+	length := 8 + 2 + len(storableTrie.RootHash)
 	buf := make([]byte, length)
-
-	pos := 0
-
-	pos = writeUint64(buf, pos, storableTrie.Number)
-	pos = writeUint64(buf, pos, storableTrie.RootIndex)
-	pos = writeShortData(buf, pos, storableTrie.RootHash)
-	writeShortData(buf, pos, storableTrie.ParentRootHash)
+	pos := writeUint64(buf, 0, storableTrie.RootIndex)
+	writeShortData(buf, pos, storableTrie.RootHash)
 
 	return buf
 }
 
 func ReadStorableTrie(reader io.Reader) (*flattener.StorableTrie, error) {
+	storableNode := &flattener.StorableTrie{}
 
-	buf := make([]byte, 8+8)
-
+	// read root uint64 RootIndex
+	buf := make([]byte, 8)
 	read, err := io.ReadFull(reader, buf)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read fixed-legth part: %w", err)
@@ -368,21 +360,12 @@ func ReadStorableTrie(reader io.Reader) (*flattener.StorableTrie, error) {
 	if read != len(buf) {
 		return nil, fmt.Errorf("not enough bytes read %d expected %d", read, len(buf))
 	}
+	storableNode.RootIndex, _ = readUint64(buf, 0)
 
-	pos := 0
-
-	storableNode := &flattener.StorableTrie{}
-
-	storableNode.Number, pos = readUint64(buf, pos)
-	storableNode.RootIndex, _ = readUint64(buf, pos)
-
+	// read RootHash bytes: variable length
 	storableNode.RootHash, err = readShortDataFromReader(reader)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read roothash data: %w", err)
-	}
-	storableNode.ParentRootHash, err = readShortDataFromReader(reader)
-	if err != nil {
-		return nil, fmt.Errorf("cannot read parentRootHash data: %w", err)
 	}
 
 	return storableNode, nil

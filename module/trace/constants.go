@@ -2,27 +2,41 @@ package trace
 
 // Span names
 const (
-	EXEExecuteBlock           = "ingestion.executeBlock"
-	EXESaveExecutionResults   = "ingestion.saveExecutionResults"
-	EXESaveTransactionResults = "ingestion.saveTransactionResults"
+	CONProcessCollection SpanName = "con.processCollection"
+	// children of CONProcessCollection
+	CONHotFinalizeCollection          SpanName = "con.hotstuff.finalizeCollection"
+	CONIngOnCollectionGuarantee       SpanName = "con.ingestion.onCollectionGuarantee"
+	CONPropOnGuarantee                SpanName = "con.propagation.onGuarantee"
+	CONCompBroadcastProposalWithDelay SpanName = "con.compliance.BroadcastProposalWithDelay"
+	CONCompOnBlockProposal            SpanName = "con.compliance.onBlockProposal"
+	CONProvOnBlockProposal            SpanName = "con.provider.onBlockProposal"
+	CONMatchCheckSealing              SpanName = "con.matching.checkSealing"
 
-	EXEBroadcastExecutionReceipt = "provider.broadcastExecutionReceipt"
+	CONProcessBlock                SpanName = "con.processBlock"
+	CONHotEventHandlerStartNewView SpanName = "con.hotstuff.eventHandler.startNewView"
+	CONHotFinalizeBlock            SpanName = "con.hotstuff.finalizeBlock"
 
-	EXEComputeBlock       = "computer.computeBlock"
-	EXEComputeCollection  = "computer.computeCollection"
-	EXEComputeTransaction = "computer.computeTransaction"
+	EXEExecuteBlock           SpanName = "exe.ingestion.executeBlock"
+	EXESaveExecutionResults   SpanName = "exe.ingestion.saveExecutionResults"
+	EXESaveTransactionResults SpanName = "exe.ingestion.saveTransactionResults"
 
-	EXECommitDelta                        = "state.commitDelta"
-	EXEGetRegisters                       = "state.getRegisters"
-	EXEGetRegistersWithProofs             = "state.getRegistersWithProofs"
-	EXEPersistStateCommitment             = "state.persistStateCommitment"
-	EXEPersistChunkDataPack               = "state.persistChunkDataPack"
-	EXEGetExecutionResultID               = "state.getExecutionResultID"
-	EXEPersistExecutionResult             = "state.persistExecutionResult"
-	EXEPersistStateInteractions           = "state.persistStateInteractions"
-	EXERetrieveStateDelta                 = "state.retrieveStateDelta"
-	EXEUpdateHighestExecutedBlockIfHigher = "state.updateHighestExecutedBlockIfHigher"
-	EXEGetHighestExecutedBlockID          = "state.getHighestExecutedBlockID"
+	EXEBroadcastExecutionReceipt SpanName = "exe.provider.broadcastExecutionReceipt"
+
+	EXEComputeBlock       SpanName = "exe.computer.computeBlock"
+	EXEComputeCollection  SpanName = "exe.computer.computeCollection"
+	EXEComputeTransaction SpanName = "exe.computer.computeTransaction"
+
+	EXECommitDelta                        SpanName = "exe.state.commitDelta"
+	EXEGetRegisters                       SpanName = "exe.state.getRegisters"
+	EXEGetRegistersWithProofs             SpanName = "exe.state.getRegistersWithProofs"
+	EXEPersistStateCommitment             SpanName = "exe.state.persistStateCommitment"
+	EXEPersistChunkDataPack               SpanName = "exe.state.persistChunkDataPack"
+	EXEGetExecutionResultID               SpanName = "exe.state.getExecutionResultID"
+	EXEPersistExecutionResult             SpanName = "exe.state.persistExecutionResult"
+	EXEPersistStateInteractions           SpanName = "exe.state.persistStateInteractions"
+	EXERetrieveStateDelta                 SpanName = "exe.state.retrieveStateDelta"
+	EXEUpdateHighestExecutedBlockIfHigher SpanName = "exe.state.updateHighestExecutedBlockIfHigher"
+	EXEGetHighestExecutedBlockID          SpanName = "exe.state.getHighestExecutedBlockID"
 )
 
 // Tag names

@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	collectioningest "github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
+	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
@@ -33,6 +34,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	chainsync "github.com/dapperlabs/flow-go/module/synchronization"
 	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/stub"
@@ -107,6 +109,7 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 		Seals:      seals,
 		Payloads:   payloads,
 		Blocks:     blocks,
+		Index:      index,
 		State:      state,
 		Me:         me,
 		Net:        stubnet,
@@ -181,13 +184,13 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	seals, err := stdmap.NewSeals(1000)
 	require.NoError(t, err)
 
-	propagationEngine, err := propagation.New(node.Log, node.Metrics, node.Metrics, node.Metrics, node.Net, node.State, node.Me, guarantees)
+	propagationEngine, err := propagation.New(node.Log, node.Metrics, node.Metrics, node.Tracer, node.Metrics, node.Net, node.State, node.Me, guarantees)
 	require.NoError(t, err)
 
-	ingestionEngine, err := consensusingest.New(node.Log, node.Metrics, node.Metrics, node.Net, propagationEngine, node.State, node.Headers, node.Me)
+	ingestionEngine, err := consensusingest.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Net, propagationEngine, node.State, node.Headers, node.Me)
 	require.Nil(t, err)
 
-	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Metrics, node.Net, node.State, node.Me, resultsDB, sealsDB, node.Headers, results, receipts, approvals, seals)
+	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Net, node.State, node.Me, resultsDB, sealsDB, node.Headers, node.Index, results, receipts, approvals, seals)
 	require.Nil(t, err)
 
 	return mock.ConsensusNode{
@@ -276,6 +279,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	require.NoError(t, err)
 
+	syncCore, err := chainsync.New(node.Log, chainsync.DefaultConfig())
+	require.NoError(t, err)
+
 	ingestionEngine, err := ingestion.New(
 		node.Log,
 		node.Net,
@@ -288,6 +294,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		txResultStorage,
 		computationEngine,
 		providerEngine,
+		syncCore,
 		execState,
 		syncThreshold,
 		node.Metrics,
@@ -298,11 +305,24 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	require.NoError(t, err)
 
+	syncEngine, err := synchronization.New(
+		node.Log,
+		node.Metrics,
+		node.Net,
+		node.Me,
+		node.State,
+		node.Blocks,
+		ingestionEngine,
+		syncCore,
+	)
+	require.NoError(t, err)
+
 	return mock.ExecutionNode{
 		GenericNode:     node,
 		IngestionEngine: ingestionEngine,
 		ExecutionEngine: computationEngine,
 		ReceiptsEngine:  providerEngine,
+		SyncEngine:      syncEngine,
 		BadgerDB:        node.DB,
 		VM:              vm,
 		ExecutionState:  execState,
@@ -378,7 +398,7 @@ func VerificationNode(t testing.TB,
 	if node.Chunks == nil {
 		node.Chunks = match.NewChunks(1000)
 		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourcePendingChunks, node.Chunks.Size)
+		err = mempoolCollector.Register(metrics.ResourcePendingChunk, node.Chunks.Size)
 		require.Nil(t, err)
 	}
 
@@ -386,17 +406,23 @@ func VerificationNode(t testing.TB,
 		node.ProcessedResultIDs, err = stdmap.NewIdentifiers(1000)
 		require.Nil(t, err)
 		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourceProcessedResultIDs, node.ProcessedResultIDs.Size)
+		err = mempoolCollector.Register(metrics.ResourceProcessedResultID, node.ProcessedResultIDs.Size)
 		require.Nil(t, err)
 	}
 
 	if node.ReceiptIDsByBlock == nil {
 		node.ReceiptIDsByBlock, err = stdmap.NewIdentifierMap(1000)
 		require.Nil(t, err)
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourcePendingReceiptIDsByBlock, node.ReceiptIDsByBlock.Size)
+		require.Nil(t, err)
 	}
 
 	if node.ReceiptIDsByResult == nil {
 		node.ReceiptIDsByResult, err = stdmap.NewIdentifierMap(1000)
+		require.Nil(t, err)
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourcePendingReceiptIDsByResult, node.ReceiptIDsByResult.Size)
 		require.Nil(t, err)
 	}
 

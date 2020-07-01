@@ -107,17 +107,13 @@ func TestStorableNode(t *testing.T) {
 func TestStorableTrie(t *testing.T) {
 
 	storableTrie := &flattener.StorableTrie{
-		RootIndex:      21,
-		Number:         37,
-		RootHash:       []byte{2, 2, 2},
-		ParentRootHash: []byte{3, 3, 3},
+		RootIndex: 21,
+		RootHash:  []byte{2, 2, 2},
 	}
 
 	expected := []byte{
-		0, 0, 0, 0, 0, 0, 0, 37, // Number
 		0, 0, 0, 0, 0, 0, 0, 21, // RootIndex
 		0, 3, 2, 2, 2, // RootHash length + data
-		0, 3, 3, 3, 3, // ParentRootHash length + data
 	}
 
 	t.Run("encode", func(t *testing.T) {

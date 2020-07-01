@@ -51,7 +51,7 @@ type Suite struct {
 	builder      *module.Builder
 	finalizer    *module.Finalizer
 	pending      *module.PendingClusterBlockBuffer
-	sync         *module.Synchronization
+	sync         *module.BlockRequester
 	hotstuff     *module.HotStuff
 	eng          *proposal.Engine
 }
@@ -106,12 +106,12 @@ func (suite *Suite) SetupTest() {
 	suite.pending = new(module.PendingClusterBlockBuffer)
 	suite.pending.On("Size").Return(uint(0))
 	suite.pending.On("PruneByHeight", mock.Anything).Return()
-	suite.sync = new(module.Synchronization)
+	suite.sync = new(module.BlockRequester)
 	suite.hotstuff = new(module.HotStuff)
 
-	eng, err := proposal.New(log, suite.net, suite.me, metrics, metrics, metrics, suite.proto.state, suite.cluster.state, suite.validator, suite.pool, suite.transactions, suite.headers, suite.payloads, suite.pending)
+	eng, err := proposal.New(log, suite.net, suite.me, metrics, metrics, metrics, suite.proto.state, suite.cluster.state, suite.validator, suite.pool, suite.transactions, suite.headers, suite.payloads, suite.pending, suite.sync)
 	require.NoError(suite.T(), err)
-	suite.eng = eng.WithConsensus(suite.hotstuff).WithSynchronization(suite.sync)
+	suite.eng = eng.WithConsensus(suite.hotstuff)
 }
 
 func (suite *Suite) TestHandleProposal() {

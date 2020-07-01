@@ -117,6 +117,15 @@ func (e *Engine) serveGRPC() {
 	if err != nil {
 		e.log.Err(err).Msg("fatal error in grpc server")
 	}
+
+	e.log.Info().Msgf("starting http server on address %s", e.config.HTTPListenAddr)
+	err = e.httpServer.ListenAndServe()
+	if errors.Is(err, http.ErrServerClosed) {
+		return
+	}
+	if err != nil {
+		e.log.Err(err).Msg("failed to start the http proxy server")
+	}
 }
 
 // serveGRPCWebProxy starts the gRPC web proxy server
