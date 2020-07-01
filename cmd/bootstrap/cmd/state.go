@@ -6,7 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
+	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -22,7 +22,7 @@ func genGenesisExecutionState(serviceAccountKey *flow.AccountPublicKey, genesisT
 		writeJSON(bootstrap.PathServiceAccountPriv, enc)
 
 		serviceAccountKey = new(flow.AccountPublicKey)
-		*serviceAccountKey = serviceAccountPriv.PublicKey(virtualmachine.AccountKeyWeightThreshold)
+		*serviceAccountKey = serviceAccountPriv.PublicKey(fvm.AccountKeyWeightThreshold)
 		writeJSON(bootstrap.PathServiceAccountPublicKey, serviceAccountKey)
 	}
 

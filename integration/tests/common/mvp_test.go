@@ -10,8 +10,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/testutil"
+	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -77,7 +77,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	require.NoError(t, err)
 
 	childCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
-	err = createAccount(childCtx, serviceAccountClient, genesis, []byte(CounterContract.ToCadence()), accountPrivateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold))
+	err = createAccount(childCtx, serviceAccountClient, genesis, []byte(CounterContract.ToCadence()), accountPrivateKey.PublicKey(fvm.AccountKeyWeightThreshold))
 	cancel()
 
 	var newAccountAddress = flow.EmptyAddress

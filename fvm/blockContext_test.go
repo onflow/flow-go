@@ -1,4 +1,4 @@
-package virtualmachine_test
+package fvm_test
 
 import (
 	"crypto"
@@ -16,10 +16,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
-	vmMock "github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine/mock"
 	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/engine/execution/utils"
+	"github.com/dapperlabs/flow-go/fvm"
+	vmMock "github.com/dapperlabs/flow-go/fvm/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -33,8 +33,9 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 	chain := flow.Testnet.Chain()
 
-	vm, err := virtualmachine.New(rt, chain)
+	vm, err := fvm.New(rt, chain)
 	require.NoError(t, err)
+
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	t.Run("transaction success", func(t *testing.T) {
@@ -152,9 +153,9 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 	chain := flow.Emulator.Chain()
 
-	vm, err := virtualmachine.New(rt, chain)
-
+	vm, err := fvm.New(rt, chain)
 	require.NoError(t, err)
+
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	t.Run("account update with set code succeeds as service account", func(t *testing.T) {
@@ -225,8 +226,9 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 
 	chain := flow.Emulator.Chain()
 
-	vm, err := virtualmachine.New(rt, chain)
+	vm, err := fvm.New(rt, chain)
 	assert.NoError(t, err)
+
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	arg1, _ := jsoncdc.Encode(cadence.NewInt(42))
@@ -237,13 +239,13 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 		script      string
 		args        [][]byte
 		authorizers []flow.Address
-		check       func(t *testing.T, result *virtualmachine.TransactionResult)
+		check       func(t *testing.T, result *fvm.TransactionResult)
 	}{
 		{
 			label:  "no parameters",
 			script: `transaction { execute { log("Hello, World!") } }`,
 			args:   [][]byte{arg1},
-			check: func(t *testing.T, result *virtualmachine.TransactionResult) {
+			check: func(t *testing.T, result *fvm.TransactionResult) {
 				assert.NotNil(t, result.Error)
 			},
 		},
@@ -251,7 +253,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 			label:  "single parameter",
 			script: `transaction(x: Int) { execute { log(x) } }`,
 			args:   [][]byte{arg1},
-			check: func(t *testing.T, result *virtualmachine.TransactionResult) {
+			check: func(t *testing.T, result *fvm.TransactionResult) {
 				require.Nil(t, result.Error)
 				require.Len(t, result.Logs, 1)
 				assert.Equal(t, "42", result.Logs[0])
@@ -261,7 +263,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 			label:  "multiple parameters",
 			script: `transaction(x: Int, y: String) { execute { log(x); log(y) } }`,
 			args:   [][]byte{arg1, arg2},
-			check: func(t *testing.T, result *virtualmachine.TransactionResult) {
+			check: func(t *testing.T, result *fvm.TransactionResult) {
 				require.Nil(t, result.Error)
 				require.Len(t, result.Logs, 2)
 				assert.Equal(t, "42", result.Logs[0])
@@ -277,7 +279,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 				}`,
 			args:        [][]byte{arg1, arg2},
 			authorizers: []flow.Address{chain.ServiceAddress()},
-			check: func(t *testing.T, result *virtualmachine.TransactionResult) {
+			check: func(t *testing.T, result *fvm.TransactionResult) {
 				require.Nil(t, result.Error)
 
 				// TODO uncomment once address shortening is identical in Cadence and Flow
@@ -332,21 +334,22 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 
 	chain := flow.Mainnet.Chain()
 
-	vm, err := virtualmachine.New(rt, chain)
+	vm, err := fvm.New(rt, chain)
 	assert.NoError(t, err)
+
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	var tests = []struct {
 		label    string
 		script   string
 		gasLimit uint64
-		check    func(t *testing.T, result *virtualmachine.TransactionResult)
+		check    func(t *testing.T, result *fvm.TransactionResult)
 	}{
 		{
 			label:    "zero",
 			script:   gasLimitScript(100), // 100 function calls
 			gasLimit: 0,
-			check: func(t *testing.T, result *virtualmachine.TransactionResult) {
+			check: func(t *testing.T, result *fvm.TransactionResult) {
 				// gas limit of zero is ignored by runtime
 				require.Nil(t, result.Error)
 			},
@@ -355,7 +358,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 			label:    "insufficient",
 			script:   gasLimitScript(100), // 100 function calls
 			gasLimit: 5,
-			check: func(t *testing.T, result *virtualmachine.TransactionResult) {
+			check: func(t *testing.T, result *fvm.TransactionResult) {
 				assert.NotNil(t, result.Error)
 			},
 		},
@@ -363,7 +366,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 			label:    "sufficient",
 			script:   gasLimitScript(100), // 100 function calls
 			gasLimit: 1000,
-			check: func(t *testing.T, result *virtualmachine.TransactionResult) {
+			check: func(t *testing.T, result *fvm.TransactionResult) {
 				require.Nil(t, result.Error)
 				require.Len(t, result.Logs, 100)
 			},
@@ -404,9 +407,9 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 
 	chain := flow.Testnet.Chain()
 
-	vm, err := virtualmachine.New(rt, chain)
-
+	vm, err := fvm.New(rt, chain)
 	assert.NoError(t, err)
+
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	privateKeys, err := execTestutil.GenerateAccountPrivateKeys(1)
@@ -577,7 +580,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithSimpleAddresses(t *te
 
 	h := unittest.BlockHeaderFixtureOnChain(chainID)
 
-	vm, err := virtualmachine.New(rt, chain)
+	vm, err := fvm.New(rt, chain)
 	assert.NoError(t, err)
 
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
@@ -610,15 +613,16 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 	chain := flow.Emulator.Chain()
 
-	vm, err := virtualmachine.New(rt, chain)
+	vm, err := fvm.New(rt, chain)
 	require.NoError(t, err)
+
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	var tests = []struct {
 		label  string
 		script string
 		args   [][]byte
-		check  func(t *testing.T, result *virtualmachine.ScriptResult)
+		check  func(t *testing.T, result *fvm.ScriptResult)
 	}{
 		{
 			label: "script success",
@@ -627,7 +631,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 					return 42
 				}
 			`,
-			check: func(t *testing.T, result *virtualmachine.ScriptResult) {
+			check: func(t *testing.T, result *fvm.ScriptResult) {
 				assert.True(t, result.Succeeded())
 			},
 		},
@@ -639,7 +643,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 					return 42
 				}
 			`,
-			check: func(t *testing.T, result *virtualmachine.ScriptResult) {
+			check: func(t *testing.T, result *fvm.ScriptResult) {
 				assert.False(t, result.Succeeded())
 				assert.NotNil(t, result.Error)
 			},
@@ -653,7 +657,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 					return 42
 				}
 			`,
-			check: func(t *testing.T, result *virtualmachine.ScriptResult) {
+			check: func(t *testing.T, result *fvm.ScriptResult) {
 				require.Len(t, result.Logs, 2)
 				assert.Equal(t, "\"foo\"", result.Logs[0])
 				assert.Equal(t, "\"bar\"", result.Logs[1])
@@ -680,8 +684,9 @@ func TestBlockContext_ExecuteScript_WithArguments(t *testing.T) {
 
 	chain := flow.Emulator.Chain()
 
-	vm, err := virtualmachine.New(rt, chain)
+	vm, err := fvm.New(rt, chain)
 	require.NoError(t, err)
+
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	arg1, _ := jsoncdc.Encode(cadence.NewInt(42))
@@ -692,7 +697,7 @@ func TestBlockContext_ExecuteScript_WithArguments(t *testing.T) {
 		label  string
 		script string
 		args   [][]byte
-		check  func(t *testing.T, result *virtualmachine.ScriptResult)
+		check  func(t *testing.T, result *fvm.ScriptResult)
 	}{
 		{
 			label: "script success, no arguments",
@@ -701,7 +706,7 @@ func TestBlockContext_ExecuteScript_WithArguments(t *testing.T) {
 					return 42
 				}
 			`,
-			check: func(t *testing.T, result *virtualmachine.ScriptResult) {
+			check: func(t *testing.T, result *fvm.ScriptResult) {
 				assert.True(t, result.Succeeded())
 			},
 		},
@@ -713,7 +718,7 @@ func TestBlockContext_ExecuteScript_WithArguments(t *testing.T) {
 					return val
 				}
 			`,
-			check: func(t *testing.T, result *virtualmachine.ScriptResult) {
+			check: func(t *testing.T, result *fvm.ScriptResult) {
 				assert.True(t, result.Succeeded())
 			},
 		},
@@ -726,7 +731,7 @@ func TestBlockContext_ExecuteScript_WithArguments(t *testing.T) {
 					return a + b
 				}
 			`,
-			check: func(t *testing.T, result *virtualmachine.ScriptResult) {
+			check: func(t *testing.T, result *fvm.ScriptResult) {
 				assert.True(t, result.Succeeded())
 				assert.Contains(t, result.Logs, "15")
 				assert.Equal(t, cadence.NewInt(15), result.Value)
@@ -741,7 +746,7 @@ func TestBlockContext_ExecuteScript_WithArguments(t *testing.T) {
 				}
 			`,
 			args: nil,
-			check: func(t *testing.T, result *virtualmachine.ScriptResult) {
+			check: func(t *testing.T, result *fvm.ScriptResult) {
 				assert.False(t, result.Succeeded())
 				assert.NotNil(t, result.Error)
 			},
@@ -769,8 +774,9 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 	chain := flow.Mainnet.Chain()
 
-	vm, err := virtualmachine.New(rt, chain)
+	vm, err := fvm.New(rt, chain)
 	require.NoError(t, err)
+
 	blocks := new(vmMock.Blocks)
 	bc := vm.NewBlockContext(block1.Header, blocks)
 	blocks.On("ByHeight", block1.Header.Height).Return(&block1, nil)
@@ -884,7 +890,7 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 
 	chain := flow.Testnet.Chain()
 
-	vm, err := virtualmachine.New(rt, chain)
+	vm, err := fvm.New(rt, chain)
 	require.NoError(t, err)
 	header := flow.Header{Height: 42}
 	blocks := new(vmMock.Blocks)
@@ -930,15 +936,16 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	chain := flow.Testnet.Chain()
 
-	vm, err := virtualmachine.New(rt, chain)
+	vm, err := fvm.New(rt, chain)
 	require.NoError(t, err)
+
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	sequenceNumber := uint64(0)
 
 	ledger := execTestutil.RootBootstrappedLedger(chain)
 
-	ledgerAccess := virtualmachine.NewLedgerDAL(ledger, chain)
+	ledgerAccess := fvm.NewLedgerDAL(ledger, chain)
 
 	createAccount := func() (flow.Address, crypto.PublicKey) {
 		privateKey, tx := execTestutil.CreateAccountCreationTransaction(t, chain)
@@ -974,7 +981,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		// read the address of the account created (e.g. "0x01" and convert it to flow.address)
 		address := flow.BytesToAddress(result.Events[0].Fields[0].(cadence.Address).Bytes())
 
-		return address, privateKey.PublicKey(virtualmachine.AccountKeyWeightThreshold).PublicKey
+		return address, privateKey.PublicKey(fvm.AccountKeyWeightThreshold).PublicKey
 	}
 
 	addressGen := chain.NewAddressGenerator()
