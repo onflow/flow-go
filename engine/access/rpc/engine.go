@@ -105,7 +105,9 @@ func (e *Engine) Done() <-chan struct{} {
 // serveGRPC starts the gRPC server
 // When this function returns, the server is considered ready.
 func (e *Engine) serveGRPC() {
-	e.log.Info().Msgf("starting grpc server on address %s", e.config.GRPCListenAddr)
+	log := e.log.With().Str("grpc_address", e.config.GRPCListenAddr).Logger()
+
+	log.Info().Msg("starting grpc server on address")
 
 	l, err := net.Listen("tcp", e.config.GRPCListenAddr)
 	if err != nil {
@@ -117,20 +119,14 @@ func (e *Engine) serveGRPC() {
 	if err != nil {
 		e.log.Err(err).Msg("fatal error in grpc server")
 	}
-
-	e.log.Info().Msgf("starting http server on address %s", e.config.HTTPListenAddr)
-	err = e.httpServer.ListenAndServe()
-	if errors.Is(err, http.ErrServerClosed) {
-		return
-	}
-	if err != nil {
-		e.log.Err(err).Msg("failed to start the http proxy server")
-	}
 }
 
 // serveGRPCWebProxy starts the gRPC web proxy server
 func (e *Engine) serveGRPCWebProxy() {
-	e.log.Info().Msgf("starting http proxy server on address %s", e.config.HTTPListenAddr)
+	log := e.log.With().Str("http_proxy_address", e.config.HTTPListenAddr).Logger()
+
+	log.Info().Msg("starting http proxy server on address")
+
 	err := e.httpServer.ListenAndServe()
 	if errors.Is(err, http.ErrServerClosed) {
 		return
