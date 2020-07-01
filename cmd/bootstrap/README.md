@@ -86,7 +86,10 @@ This step will generate the entire root information for all nodes (incl. keys fo
 
 #### Required Inputs
 Each input is a config file specified as a command line parameter:
-* parameter with state commitment for the initial execution state
+* parameter with the ID for the chain for the root block (`root-chain`)
+* parameter with the ID of the parent block for the root block (`root-parent`)
+* parameter with height of the root block to bootstrap from (`root-height`)
+* parameter with state commitment for the initial execution state (`root-commit`)
 * `json` containing configuration for all Dapper-Controlled nodes (see `./example_files/node-config.json`)
 * folder containing the `<NodeID>.node-info.pub.json` files for _all_ partner nodes (see `.example_files/partner-node-infos`)
 * `json` containing the stake value for all partner nodes (see `./example_files/partner-stakes.json`).
@@ -94,7 +97,9 @@ Each input is a config file specified as a command line parameter:
 
 #### Example
 ```bash
-go run -tags relic ./cmd/bootstrap finalize --state-commitment 4b8d01975cf0cd23e046b1fae36518e542f92a6e35bedd627c43da30f4ae761a \
+go run -tags relic ./cmd/bootstrap finalize --root-chain main --root-height 0
+--root-parent 0000000000000000000000000000000000000000000000000000000000000000
+--root-commitment 4b8d01975cf0cd23e046b1fae36518e542f92a6e35bedd627c43da30f4ae761a \
 --config ./cmd/bootstrap/example_files/node-config.json --partner-dir ./cmd/bootstrap/example_files/partner-node-infos \
 --partner-stakes ./cmd/bootstrap/example_files/partner-stakes.json -o ./bootstrap/root-infos
 ```
