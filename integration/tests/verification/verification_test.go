@@ -20,7 +20,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
@@ -58,9 +57,7 @@ func TestHappyPath(t *testing.T) {
 		t.Run(fmt.Sprintf("%d-verification node %d-chunk number", tc.verNodeCount, tc.chunkCount), func(t *testing.T) {
 			mu.Lock()
 			defer mu.Unlock()
-			// no metrics is meant to be collected, hence both verification and mempool collectors are noop
-			collector := metrics.NewNoopCollector()
-			VerificationHappyPath(t, collector, collector, tc.verNodeCount, tc.chunkCount)
+			VerificationHappyPath(t, tc.verNodeCount, tc.chunkCount)
 		})
 	}
 }
@@ -86,6 +83,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 	// https://github.com/dapperlabs/flow-go/issues/3443
 	requestInterval := uint(1000)
 	failureThreshold := uint(2)
+	chainID := flow.Testnet
 
 	// generates network hub
 	hub := stub.NewNetworkHub()
@@ -129,7 +127,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 	// verification node
 	verNodes := make([]mock2.VerificationNode, 0)
 	for _, verIdentity := range verIdentities {
-		verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold)
+		verNode := testutil.VerificationNode(t, hub, verIdentity, identities, assigner, requestInterval, failureThreshold, chainID)
 
 		// starts all the engines
 		<-verNode.FinderEngine.Ready()
@@ -144,10 +142,10 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 	}
 
 	// mock execution node
-	exeNode, exeEngine := setupMockExeNode(t, hub, exeIdentity, verIdentities, identities, completeER)
+	exeNode, exeEngine := setupMockExeNode(t, hub, exeIdentity, verIdentities, identities, chainID, completeER)
 
 	// mock consensus node
-	conNode, conEngine, conWG := setupMockConsensusNode(t, hub, conIdentity, verIdentities, identities, completeER)
+	conNode, conEngine, conWG := setupMockConsensusNode(t, hub, conIdentity, verIdentities, identities, completeER, chainID)
 
 	// sends execution receipt to each of verification nodes
 	verWG := sync.WaitGroup{}
@@ -215,6 +213,9 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 // path assuming a single collection (including transactions on counter example)
 // are submited to the verification node.
 func TestSingleCollectionProcessing(t *testing.T) {
+
+	chainID := flow.Testnet
+
 	// ingest engine parameters
 	// set based on issue (3443)
 	requestInterval := uint(1000)
@@ -247,16 +248,15 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	// setup nodes
 	//
 	// verification node
-	collector := metrics.NewNoopCollector()
 	verNode := testutil.VerificationNode(t,
 		hub,
-		collector,
-		collector,
 		verIdentity,
 		identities,
 		assigner,
 		requestInterval,
-		failureThreshold, chainID)
+		failureThreshold,
+		chainID,
+	)
 	// inject block
 	err := verNode.Blocks.Store(completeER.Block)
 	assert.Nil(t, err)

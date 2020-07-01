@@ -39,8 +39,6 @@ import (
 // - dropping the ingestion of the ERs that share the same result once the verifiable chunk is submitted to verify engine
 // - broadcast of a matching result approval to consensus nodes for each assigned chunk
 func VerificationHappyPath(t *testing.T,
-	verificationMetrics module.VerificationMetrics,
-	mempoolMetrics module.MempoolMetrics,
 	verNodeCount int,
 	chunkNum int) {
 	// to demarcate the debug logs
@@ -100,8 +98,6 @@ func VerificationHappyPath(t *testing.T,
 	for _, verIdentity := range verIdentities {
 		verNode := testutil.VerificationNode(t,
 			hub,
-			verificationMetrics,
-			mempoolMetrics,
 			verIdentity,
 			identities,
 			assigner,

@@ -49,7 +49,7 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 
 	// send transaction that has no sigs and should not execute
 	tx = unittest.TransactionBodyFixture(
-		unittest.WithTransactionDSL(common.CreateCounterTx(chain)),
+		unittest.WithTransactionDSL(common.CreateCounterTx(chain.ServiceAddress())),
 		unittest.WithReferenceBlock(s.net.Root().ID()),
 	)
 	tx.PayloadSignatures = nil
