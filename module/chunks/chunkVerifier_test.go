@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/cadence"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
@@ -17,7 +16,6 @@ import (
 	"github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
-	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -33,9 +31,9 @@ func (s *ChunkVerifierTestSuite) SetupTest() {
 	rand.Seed(time.Now().UnixNano())
 
 	vm := new(vmMock)
-	blocks := new(storage.Blocks)
+	vmCtx := fvm.NewContext()
 
-	s.verifier = chunks.NewChunkVerifier(vm, blocks)
+	s.verifier = chunks.NewChunkVerifier(vm, vmCtx)
 }
 
 // TestChunkVerifier invokes all the tests in this test suite
@@ -203,38 +201,27 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 
 type vmMock struct{}
 
-func (vm *vmMock) Invoke(ctx fvm.Context, i fvm.Invokable, ledger fvm.Ledger) (*fvm.InvocationResult, error) {
-	invokableTx, ok := i.(fvm.InvokableTransaction)
+func (vm *vmMock) Invoke(ctx fvm.Context, i fvm.Invokable, ledger fvm.Ledger) error {
+	tx, ok := i.(*fvm.InvokableTransaction)
 	if !ok {
-		return nil, fmt.Errorf("invokable is not a transaction")
+		return fmt.Errorf("invokable is not a transaction")
 	}
 
-	var txRes fvm.InvocationResult
-	switch string(invokableTx.Transaction().Script) {
+	switch string(tx.Transaction.Script) {
 	case "wrongEndState":
 		id1 := make([]byte, 32)
 		UpdatedValue1 := []byte{'F'}
 		// add updates to the ledger
 		ledger.Set(id1, UpdatedValue1)
-		txRes = fvm.InvocationResult{
-			ID:      unittest.IdentifierFixture(),
-			Events:  []cadence.Event{},
-			Logs:    []string{"log1", "log2"},
-			Error:   nil,
-			GasUsed: 0,
-		}
+
+		tx.Logs = []string{"log1", "log2"}
 	case "failedTx":
 		id1 := make([]byte, 32)
 		UpdatedValue1 := []byte{'F'}
 		// add updates to the ledger
 		ledger.Set(id1, UpdatedValue1)
-		txRes = fvm.InvocationResult{
-			ID:      unittest.IdentifierFixture(),
-			Events:  []cadence.Event{},
-			Logs:    nil,
-			Error:   &fvm.MissingPayerError{}, // inside the runtime (e.g. div by zero, access account)
-			GasUsed: 0,
-		}
+
+		tx.Err = &fvm.MissingPayerError{} // inside the runtime (e.g. div by zero, access account)
 	default:
 		id1 := make([]byte, 32)
 		id2 := make([]byte, 32)
@@ -242,13 +229,9 @@ func (vm *vmMock) Invoke(ctx fvm.Context, i fvm.Invokable, ledger fvm.Ledger) (*
 		UpdatedValue2 := []byte{'B'}
 		_, _ = ledger.Get(id1)
 		ledger.Set(id2, UpdatedValue2)
-		txRes = fvm.InvocationResult{
-			ID:      unittest.IdentifierFixture(),
-			Events:  []cadence.Event{},
-			Logs:    []string{"log1", "log2"},
-			Error:   nil,
-			GasUsed: 0,
-		}
+
+		tx.Logs = []string{"log1", "log2"}
 	}
-	return &txRes, nil
+
+	return nil
 }

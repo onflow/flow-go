@@ -33,7 +33,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		block := generateBlock(1, 2)
 
 		vm.On("Invoke", mock.Anything, mock.Anything, mock.Anything).
-			Return(&fvm.InvocationResult{}, nil).
+			Return(nil).
 			Twice()
 
 		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
@@ -67,7 +67,13 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		events := generateEvents(eventsPerTransaction)
 
 		vm.On("Invoke", mock.Anything, mock.Anything, mock.Anything).
-			Return(&fvm.InvocationResult{Events: events, Error: &fvm.MissingPayerError{}}, nil).
+			Run(func(args mock.Arguments) {
+				tx := args[1].(*fvm.InvokableTransaction)
+
+				tx.Err = &fvm.MissingPayerError{}
+				tx.Events = events
+			}).
+			Return(nil).
 			Times(totalTransactionCount)
 
 		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {

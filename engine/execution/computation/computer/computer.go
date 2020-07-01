@@ -19,7 +19,7 @@ import (
 )
 
 type VirtualMachine interface {
-	Invoke(fvm.Context, fvm.Invokable, fvm.Ledger) (*fvm.InvocationResult, error)
+	Invoke(fvm.Context, fvm.Invokable, fvm.Ledger) error
 }
 
 // A BlockComputer executes the transactions in a block.
@@ -29,7 +29,7 @@ type BlockComputer interface {
 
 type blockComputer struct {
 	vm      VirtualMachine
-	execCtx fvm.Context
+	vmCtx   fvm.Context
 	metrics module.ExecutionMetrics
 	tracer  module.Tracer
 	log     zerolog.Logger
@@ -38,14 +38,14 @@ type blockComputer struct {
 // NewBlockComputer creates a new block executor.
 func NewBlockComputer(
 	vm VirtualMachine,
-	execCtx fvm.Context,
+	vmCtx fvm.Context,
 	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
 	logger zerolog.Logger,
 ) BlockComputer {
 	return &blockComputer{
 		vm:      vm,
-		execCtx: execCtx,
+		vmCtx:   vmCtx,
 		metrics: metrics,
 		tracer:  tracer,
 		log:     logger,
@@ -80,7 +80,7 @@ func (e *blockComputer) executeBlock(
 	stateView *delta.View,
 ) (*execution.ComputationResult, error) {
 
-	blockCtx := fvm.NewContextFromParent(e.execCtx, fvm.WithBlockHeader(block.Block.Header))
+	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(block.Block.Header))
 
 	collections := block.Collections()
 
@@ -149,8 +149,8 @@ func (e *blockComputer) executeCollection(
 
 	txMetrics := fvm.NewMetricsCollector()
 
-	for _, tx := range collection.Transactions {
-		err := func(tx *flow.TransactionBody) error {
+	for _, txBody := range collection.Transactions {
+		err := func(txBody *flow.TransactionBody) error {
 			if e.tracer != nil {
 				txSpan := e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
 
@@ -174,7 +174,9 @@ func (e *blockComputer) executeCollection(
 
 			txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsCollector(txMetrics))
 
-			result, err := e.vm.Invoke(txCtx, fvm.Transaction(tx), txView)
+			tx := fvm.Transaction(txBody)
+
+			err := e.vm.Invoke(txCtx, tx, txView)
 
 			if e.metrics != nil {
 				e.metrics.TransactionParsed(txMetrics.Parsed())
@@ -187,9 +189,10 @@ func (e *blockComputer) executeCollection(
 				return fmt.Errorf("failed to execute transaction: %w", err)
 			}
 
-			txEvents, err := result.TransactionEvents(txIndex)
+			txEvents, err := tx.ConvertEvents(txIndex)
 			txIndex++
-			gasUsed += result.GasUsed
+
+			gasUsed += tx.GasUsed
 
 			if err != nil {
 				return fmt.Errorf("failed to create flow events: %w", err)
@@ -197,24 +200,33 @@ func (e *blockComputer) executeCollection(
 
 			events = append(events, txEvents...)
 
+			fmt.Println(tx)
+
 			txResult := flow.TransactionResult{
-				TransactionID: tx.ID(),
+				TransactionID: tx.ID,
 			}
-			if result.Error != nil {
-				txResult.ErrorMessage = result.Error.Error()
-				e.log.Debug().Hex("tx_id", logging.Entity(tx)).Str("error_message", result.Error.Error()).Uint32("error_code", result.Error.Code()).Msg("transaction execution failed")
+
+			if tx.Err != nil {
+				txResult.ErrorMessage = tx.Err.Error()
+				e.log.Debug().
+					Hex("tx_id", logging.Entity(txBody)).
+					Str("error_message", tx.Err.Error()).
+					Uint32("error_code", tx.Err.Code()).
+					Msg("transaction execution failed")
 			} else {
-				e.log.Debug().Hex("tx_id", logging.Entity(tx)).Msg("transaction executed successfully")
+				e.log.Debug().
+					Hex("tx_id", logging.Entity(txBody)).
+					Msg("transaction executed successfully")
 			}
 
 			txResults = append(txResults, txResult)
 
-			if result.Succeeded() {
+			if tx.Err == nil {
 				collectionView.MergeView(txView)
 			}
 
 			return nil
-		}(tx)
+		}(txBody)
 
 		if err != nil {
 			return nil, nil, txIndex, 0, err

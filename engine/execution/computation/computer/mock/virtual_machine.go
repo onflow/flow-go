@@ -13,24 +13,15 @@ type VirtualMachine struct {
 }
 
 // Invoke provides a mock function with given fields: _a0, _a1, _a2
-func (_m *VirtualMachine) Invoke(_a0 fvm.Context, _a1 fvm.Invokable, _a2 fvm.Ledger) (*fvm.InvocationResult, error) {
+func (_m *VirtualMachine) Invoke(_a0 fvm.Context, _a1 fvm.Invokable, _a2 fvm.Ledger) error {
 	ret := _m.Called(_a0, _a1, _a2)
 
-	var r0 *fvm.InvocationResult
-	if rf, ok := ret.Get(0).(func(fvm.Context, fvm.Invokable, fvm.Ledger) *fvm.InvocationResult); ok {
+	var r0 error
+	if rf, ok := ret.Get(0).(func(fvm.Context, fvm.Invokable, fvm.Ledger) error); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*fvm.InvocationResult)
-		}
+		r0 = ret.Error(0)
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(fvm.Context, fvm.Invokable, fvm.Ledger) error); ok {
-		r1 = rf(_a0, _a1, _a2)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
