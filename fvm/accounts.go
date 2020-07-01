@@ -86,6 +86,7 @@ func getAccountCode(ledger Ledger, address flow.Address) ([]byte, error) {
 	}
 
 	return code, nil
+
 }
 
 func accountExists(ledger Ledger, address flow.Address) (bool, error) {
@@ -110,7 +111,6 @@ func createAccount(ledger Ledger, chain flow.Chain, publicKeys []flow.AccountPub
 	// generate the new account address
 	var newAddress flow.Address
 	newAddress, err = addressState.NextAddress()
-
 	if err != nil {
 		return flow.EmptyAddress, err
 	}

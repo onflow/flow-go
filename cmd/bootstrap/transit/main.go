@@ -53,12 +53,13 @@ var (
 func main() {
 
 	var bootdir, keydir, wrapId, role string
-	var pull, push bool
+	var pull, push, prepare bool
 
 	flag.StringVar(&bootdir, "d", "~/bootstrap", "The bootstrap directory containing your node-info files")
 	flag.StringVar(&keydir, "t", "", "Token provided by the Flow team to access the transit server")
 	flag.BoolVar(&pull, "pull", false, "Fetch keys and metadata from the transit server")
 	flag.BoolVar(&push, "push", false, "Upload public keys to the transit server")
+	flag.BoolVar(&prepare, "prepare", false, "Generate transit keys for push step")
 	flag.StringVar(&role, "role", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
 	flag.StringVar(&wrapId, "x-server-wrap", "", "(Flow Team Use), wrap response keys for consensus node")
 	flag.Parse()
@@ -84,19 +85,14 @@ func main() {
 		return
 	}
 
-	if pull && push {
+	if optionsSelected(pull, push, prepare) != 1 {
 		flag.Usage()
-		log.Fatal("Only one of -pull or -push may be specified\n")
+		log.Fatal("Exactly one of -pull, -push, or -prepare must be specified\n")
 	}
 
-	if !(pull || push) {
+	if !prepare && keydir == "" {
 		flag.Usage()
-		log.Fatal("One of -pull or -push must be specified")
-	}
-
-	if keydir == "" {
-		flag.Usage()
-		log.Fatal("Access key required")
+		log.Fatal("Access key, '-t', required for push and pull commands")
 	}
 
 	nodeId, err := fetchNodeId(bootdir)
@@ -115,6 +111,11 @@ func main() {
 
 	if pull {
 		runPull(ctx, bootdir, keydir, nodeId, flowRole)
+		return
+	}
+
+	if prepare {
+		runPrepare(bootdir, nodeId, flowRole)
 		return
 	}
 }
@@ -182,11 +183,30 @@ func runPull(ctx context.Context, bootdir, token, nodeId string, role flow.Role)
 	log.Printf("MD5 of the genesis block is: %s\n", genesisMd5)
 }
 
+// Run the prepare process
+// - create transit keypair (if the role type is Consensus)
+func runPrepare(bootdir, nodeId string, role flow.Role) {
+	if role == flow.RoleConsensus {
+		log.Println("creating transit-keys")
+		err := generateKeys(bootdir, nodeId)
+		if err != nil {
+			log.Fatalf("Failed to prepare: %s", err)
+		}
+		return
+	}
+	log.Printf("no preparation needed for role: %s", role.String())
+}
+
 // generateKeys creates the transit keypair and writes them to disk for later
 func generateKeys(bootdir, nodeId string) error {
 
 	privPath := filepath.Join(bootdir, fmt.Sprintf(FilenameTransitKeyPriv, nodeId))
 	pubPath := filepath.Join(bootdir, fmt.Sprintf(FilenameTransitKeyPub, nodeId))
+
+	if fileExists(privPath) && fileExists(pubPath) {
+		log.Print("transit-key-path priv & pub both exist, exiting")
+		return nil
+	}
 
 	log.Print("Generating keypair")
 
@@ -418,4 +438,22 @@ func getFileMd5(file string) (string, error) {
 	}
 
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
+}
+
+func optionsSelected(options ...bool) int {
+	n := 0
+	for _, v := range options {
+		if v {
+			n++
+		}
+	}
+	return n
+}
+
+func fileExists(filename string) bool {
+	info, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
 }

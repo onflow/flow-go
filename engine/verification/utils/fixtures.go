@@ -92,6 +92,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 		require.NoError(t, err)
 
 		rt := runtime.NewInterpreterRuntime()
+
 		vm := fvm.New(rt, chain)
 
 		blocks := new(storage.Blocks)

@@ -55,3 +55,24 @@ func IndexCollectionBlock(collID flow.Identifier, blockID flow.Identifier) func(
 func LookupCollectionBlock(collID flow.Identifier, blockID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeCollectionBlock, collID), blockID)
 }
+
+// FindHeaders iterates through all headers, calling `filter` on each, and adding
+// them to the `found` slice if `filter` returned true
+func FindHeaders(filter func(header *flow.Header) bool, found *[]flow.Header) func(*badger.Txn) error {
+	return traverse(makePrefix(codeHeader), func() (checkFunc, createFunc, handleFunc) {
+		check := func(key []byte) bool {
+			return true
+		}
+		var val flow.Header
+		create := func() interface{} {
+			return &val
+		}
+		handle := func() error {
+			if filter(&val) {
+				*found = append(*found, val)
+			}
+			return nil
+		}
+		return check, create, handle
+	})
+}
