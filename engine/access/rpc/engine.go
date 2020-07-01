@@ -64,7 +64,7 @@ func New(log zerolog.Logger,
 	)
 
 	// wrap the GRPC server with an HTTP proxy server to serve HTTP clients
-	httpServer := NewHTTPServer(grpcServer, 8080)
+	httpServer := NewHTTPServer(grpcServer, config.HTTPListenAddr)
 
 	eng := &Engine{
 		log:        log,
@@ -84,7 +84,8 @@ func New(log zerolog.Logger,
 // started. The RPC engine is ready when the gRPC server has successfully
 // started.
 func (e *Engine) Ready() <-chan struct{} {
-	e.unit.Launch(e.serve)
+	e.unit.Launch(e.serveGRPC)
+	e.unit.Launch(e.serveGRPCWebProxy)
 	return e.unit.Ready()
 }
 
@@ -101,9 +102,9 @@ func (e *Engine) Done() <-chan struct{} {
 		})
 }
 
-// serve starts the gRPC server and the http proxy server
+// serveGRPC starts the gRPC server
 // When this function returns, the server is considered ready.
-func (e *Engine) serve() {
+func (e *Engine) serveGRPC() {
 	e.log.Info().Msgf("starting grpc server on address %s", e.config.GRPCListenAddr)
 
 	l, err := net.Listen("tcp", e.config.GRPCListenAddr)
@@ -116,9 +117,12 @@ func (e *Engine) serve() {
 	if err != nil {
 		e.log.Err(err).Msg("fatal error in grpc server")
 	}
+}
 
-	e.log.Info().Msgf("starting http server on address %s", e.config.HTTPListenAddr)
-	err = e.httpServer.ListenAndServe()
+// serveGRPCWebProxy starts the gRPC web proxy server
+func (e *Engine) serveGRPCWebProxy() {
+	e.log.Info().Msgf("starting http proxy server on address %s", e.config.HTTPListenAddr)
+	err := e.httpServer.ListenAndServe()
 	if errors.Is(err, http.ErrServerClosed) {
 		return
 	}
