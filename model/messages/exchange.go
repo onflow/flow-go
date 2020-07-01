@@ -35,13 +35,13 @@ func (r Resource) String() string {
 }
 
 type ResourceRequest struct {
-	Resource   Resource
-	ResourceID flow.Identifier
-	Nonce      uint64
+	Resource Resource
+	EntityID flow.Identifier
+	Nonce    uint64
 }
 
-type ResourceReply struct {
+type ResourceResponse struct {
 	Resource Resource
-	Value    interface{}
+	Entity   flow.Entity
 	Nonce    uint64
 }
