@@ -16,14 +16,16 @@ import (
 	"github.com/dapperlabs/flow-go/engine/testutil"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-// testConcurrency evaluates behavior of finder engine against:
+// TestConcurrency evaluates behavior of finder engine against:
 // - finder engine receives concurrent receipts from different sources
 // - for each distinct receipt with an available block finder engine emits it to the matching engine
+// Each test case is tried with a scenario where block goes first then receipt, and vice versa.
 func TestConcurrency(t *testing.T) {
 	var mu sync.Mutex
 	testcases := []struct {
@@ -68,17 +70,26 @@ func TestConcurrency(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testcases {
-		t.Run(fmt.Sprintf("%d-ers/%d-senders/%d-chunks",
-			tc.erCount, tc.senderCount, tc.chunksNum), func(t *testing.T) {
-			mu.Lock()
-			defer mu.Unlock()
-			testConcurrency(t, tc.erCount, tc.senderCount, tc.chunksNum)
-		})
+	for _, blockFirst := range []bool{true, false} {
+		for _, tc := range testcases {
+			t.Run(fmt.Sprintf("%d-ers/%d-senders/%d-chunks",
+				tc.erCount, tc.senderCount, tc.chunksNum), func(t *testing.T) {
+				mu.Lock()
+				defer mu.Unlock()
+				testConcurrency(t, tc.erCount, tc.senderCount, tc.chunksNum, blockFirst)
+			})
+		}
 	}
 }
 
-func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
+// testConcurrency sends `erCount` many execution receipts each with `chunkNum` many chunks, concurrently by
+// `senderCount` senders to the verification node.
+// If blockFirst is true, the block arrives at verification node earlier than the receipt.
+// Otherwise, the block arrives after the receipt.
+// This test successfully is passed if each unique execution result is passed to Match engine by the Finder engine
+// in verification node. It also checks the result is marked as processed, and the receipts with process results are
+// cleaned up.
+func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFirst bool) {
 	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
 	// to demarcate the logs
 	t.Logf("TestConcurrencyStarted: %d-receipts/%d-senders/%d-chunks", erCount, senderCount, chunksNum)
@@ -113,9 +124,10 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	assigner := utils.NewMockAssigner(verID.NodeID, IsAssigned)
 
 	// creates a verification node with a real finder engine, and mock matching engine.
-	verNode := testutil.VerificationNode(t, hub, verID, identities,
-		assigner, requestInterval, failureThreshold, true,
-		true, testutil.WithMatchEngine(matchEng))
+	// no metrics is meant to be collected, hence both verification and mempool collectors are noop
+	collector := metrics.NewNoopCollector()
+	verNode := testutil.VerificationNode(t, hub, collector, collector, verID, identities,
+		assigner, requestInterval, failureThreshold, testutil.WithMatchEngine(matchEng))
 
 	// the wait group tracks goroutines for each Execution Receipt sent to finder engine
 	var senderWG sync.WaitGroup
@@ -159,15 +171,13 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 					require.NoError(t, err)
 				}
 
-				// chooses randomly between sending the receipt first, or the block
-				switch j % 2 {
-				case 0:
+				if blockFirst {
 					// block then receipt
 					sendBlock()
 					// allows another goroutine to run before sending receipt
 					time.Sleep(time.Nanosecond)
 					sendReceipt()
-				case 1:
+				} else {
 					// receipt then block
 					sendReceipt()
 					// allows another goroutine to run before sending block
@@ -185,9 +195,16 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int) {
 	// waits for all distinct execution results sent to matching engine of verification node
 	unittest.RequireReturnsBefore(t, matchEngWG.Wait, time.Duration(senderCount*chunksNum*erCount*5)*time.Second)
 
+	// sleeps to make sure that the cleaning of processed execution receipts
+	// happens. This sleep is necessary since we are evaluating cleanup right after the sleep.
+	time.Sleep(1 * time.Second)
+
 	for _, er := range ers {
-		// all distinct execution results should be processed
-		assert.True(t, verNode.IngestedResultIDs.Has(er.Receipt.ExecutionResult.ID()))
+		// all distinct execution results should be marked as processed by finder engine
+		assert.True(t, verNode.ProcessedResultIDs.Has(er.Receipt.ExecutionResult.ID()))
+
+		// no execution receipt should reside in mempool of finder engine
+		assert.False(t, verNode.PendingReceipts.Has(er.Receipt.ID()))
 	}
 
 	verNode.Done()

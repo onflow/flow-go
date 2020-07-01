@@ -17,6 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/state/protocol/util"
 	stoerr "github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -267,6 +268,13 @@ func TestExtendValid(t *testing.T) {
 		finalCommit, err := state.Final().Commit()
 		assert.NoError(t, err)
 		assert.Equal(t, commit, finalCommit)
+
+		// the extending block should be indexed by its parent (genesis)
+		var childIDs []flow.Identifier
+		err = db.View(procedure.LookupBlockChildren(genesis.ID(), &childIDs))
+		assert.Nil(t, err)
+		require.Len(t, childIDs, 1)
+		assert.Equal(t, block.ID(), childIDs[0])
 	})
 }
 

@@ -3,6 +3,7 @@ package virtualmachine
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
@@ -38,6 +39,8 @@ type blockContext struct {
 	vm     *virtualMachine
 	header *flow.Header
 	blocks Blocks
+	chain  flow.Chain
+	rng    *rand.Rand
 }
 
 func (bc *blockContext) newTransactionContext(
@@ -51,18 +54,27 @@ func (bc *blockContext) newTransactionContext(
 		signingAccounts[i] = runtime.Address(addr)
 	}
 
+	ledgerDAL := NewLedgerDAL(ledger, bc.chain)
 	ctx := &TransactionContext{
+		LedgerDAL:                        ledgerDAL,
 		bc:                               bc,
+		ledger:                           ledgerDAL,
 		astCache:                         bc.vm.cache,
-		ledger:                           NewLedgerDAL(ledger),
+		Metrics:                          emptyMetricsCollector{},
 		signingAccounts:                  signingAccounts,
+		checker:                          nil,
+		logs:                             nil,
+		events:                           nil,
 		tx:                               tx,
 		gasLimit:                         tx.GasLimit,
+		uuid:                             0,
 		header:                           bc.header,
 		blocks:                           bc.blocks,
 		signatureVerificationEnabled:     true,
 		restrictedAccountCreationEnabled: true,
 		restrictedDeploymentEnabled:      true,
+		simpleAddresses:                  false,
+		rng:                              bc.rng,
 	}
 
 	for _, option := range options {
@@ -76,7 +88,8 @@ func (bc *blockContext) newScriptContext(ledger Ledger) *TransactionContext {
 	return &TransactionContext{
 		bc:       bc,
 		astCache: bc.vm.cache,
-		ledger:   NewLedgerDAL(ledger),
+		Metrics:  emptyMetricsCollector{},
+		ledger:   NewLedgerDAL(ledger, bc.chain),
 		header:   bc.header,
 		blocks:   bc.blocks,
 		gasLimit: scriptGasLimit,
@@ -166,6 +179,7 @@ func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte, arguments []
 
 	ctx := bc.newScriptContext(ledger)
 	value, err := bc.vm.executeScript(script, arguments, ctx, location)
+
 	if err != nil {
 		possibleRuntimeError := runtime.Error{}
 		if errors.As(err, &possibleRuntimeError) {
@@ -191,13 +205,15 @@ func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte, arguments []
 }
 
 func (bc *blockContext) GetAccount(ledger Ledger, addr flow.Address) (*flow.Account, error) {
-	ledgerAccess := NewLedgerDAL(ledger)
+	ledgerAccess := NewLedgerDAL(ledger, bc.chain)
 	acct := ledgerAccess.GetAccount(addr)
 	if acct == nil {
 		return nil, nil
 	}
 
-	result, err := bc.ExecuteScript(ledger, DefaultTokenBalanceScript(addr), nil)
+	serviceAddress := bc.chain.ServiceAddress()
+
+	result, err := bc.ExecuteScript(ledger, DefaultTokenBalanceScript(serviceAddress, addr), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +227,6 @@ func (bc *blockContext) GetAccount(ledger Ledger, addr flow.Address) (*flow.Acco
 
 // ConvertEvents creates flow.Events from runtime.events
 func ConvertEvents(txIndex uint32, tr *TransactionResult) ([]flow.Event, error) {
-
 	flowEvents := make([]flow.Event, len(tr.Events))
 
 	for i, event := range tr.Events {

@@ -113,12 +113,21 @@ func (t *OpenTracer) GetSpan(entityID flow.Identifier, spanName string) (opentra
 	return span, exists
 }
 
-func (t *OpenTracer) StartSpanFromContext(ctx context.Context, operationName string) (opentracing.Span, context.Context) {
-	return opentracing.StartSpanFromContextWithTracer(ctx, t.Tracer, operationName)
+func (t *OpenTracer) StartSpanFromContext(
+	ctx context.Context,
+	operationName string,
+	opts ...opentracing.StartSpanOption,
+) (opentracing.Span, context.Context) {
+	return opentracing.StartSpanFromContextWithTracer(ctx, t.Tracer, operationName, opts...)
 }
 
-func (t *OpenTracer) StartSpanFromParent(span opentracing.Span, operationName string) opentracing.Span {
-	return t.Tracer.StartSpan(operationName, opentracing.FollowsFrom(span.Context()))
+func (t *OpenTracer) StartSpanFromParent(
+	span opentracing.Span,
+	operationName string,
+	opts ...opentracing.StartSpanOption,
+) opentracing.Span {
+	opts = append(opts, opentracing.FollowsFrom(span.Context()))
+	return t.Tracer.StartSpan(operationName, opts...)
 }
 
 // in order to avoid different spans using the same entityID as the key, which creates a conflict,

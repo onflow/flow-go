@@ -20,6 +20,7 @@ typedef uint8_t byte;
 #define MIN(a,b) ((a)>(b)?(b):(a))
 
 // Fields and Group serialization lengths
+#define SEC_BITS  128
 #define Fp_BITS   381
 #define Fr_BITS   255
 #define Fp_BYTES  BITS_TO_BYTES(Fp_BITS)
@@ -66,17 +67,18 @@ prec_st* init_precomputed_data_BLS12_381();
 void     precomputed_data_set(prec_st* p);
 void     seed_relic(byte*, int);
 
-int      ep_read_bin_compact(ep_st*, const byte *, const int);
-void     ep_write_bin_compact(byte *, const ep_st *,  const int);
-int      ep2_read_bin_compact(ep2_st* , const byte *,  const int);
-void     ep2_write_bin_compact(byte *, const ep2_st *,  const int);
+int      ep_read_bin_compact(ep_t, const byte *, const int);
+void     ep_write_bin_compact(byte *, const ep_t,  const int);
+int      ep2_read_bin_compact(ep2_t, const byte *,  const int);
+void     ep2_write_bin_compact(byte *, const ep2_t,  const int);
 
-void     ep_mult_gen(ep_st*, const bn_st*);
-void     ep_mult(ep_st*, const ep_st*, const bn_st*);
-void     ep2_mult_gen(ep2_st*, const bn_st*);
+void     ep_mult_gen(ep_t, const bn_t);
+void     ep_mult(ep_t, const ep_t, const bn_t);
+void     ep2_mult_gen(ep2_t, const bn_t);
 
 void     bn_randZr(bn_t);
-void     bn_map_to_Zr(bn_st*, const uint8_t*, int);
+void     bn_randZr_star(bn_t);
+void     bn_map_to_Zr_star(bn_t, const uint8_t*, int);
 
 // Debugging related functions
 void     bytes_print_(char*, byte*, int);

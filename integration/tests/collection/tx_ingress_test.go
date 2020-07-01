@@ -34,7 +34,7 @@ func (suite *CollectorSuite) TestTransactionIngress_InvalidTransaction() {
 
 	t.Run("missing reference block id", func(t *testing.T) {
 		malformed := suite.NextTransaction(func(tx *sdk.Transaction) {
-			tx.SetReferenceBlockID(sdk.ZeroID)
+			tx.SetReferenceBlockID(sdk.EmptyID)
 		})
 
 		expected := ingest.IncompleteTransactionError{

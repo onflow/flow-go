@@ -12,6 +12,10 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
+// Recover implements the core logic for recovering HotStuff state after a restart.
+// It accepts the finalized block and a list of pending blocks that have been
+// received but not finalized, and that share the latest finalized block as a common
+// ancestor.
 func Recover(log zerolog.Logger, finalized *flow.Header, pending []*flow.Header, validator hotstuff.Validator, onProposal func(*model.Proposal) error) error {
 	blocks := make(map[flow.Identifier]*flow.Header, len(pending)+1)
 
@@ -35,7 +39,7 @@ func Recover(log zerolog.Logger, finalized *flow.Header, pending []*flow.Header,
 
 		// verify the proposal
 		err := validator.ValidateProposal(proposal)
-		if errors.Is(err, model.ErrorInvalidBlock{}) {
+		if model.IsInvalidBlockError(err) {
 			log.Warn().
 				Hex("block_id", logging.ID(proposal.Block.BlockID)).
 				Err(err).

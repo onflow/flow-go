@@ -37,6 +37,22 @@ func (p *PendingReceipts) Add(preceipt *verification.PendingReceipt) bool {
 	return ok
 }
 
+// Get returns the pending receipt and true, if the pending receipt is in the
+// mempool. Otherwise, it returns nil and false.
+func (p *PendingReceipts) Get(preceiptID flow.Identifier) (*verification.PendingReceipt, bool) {
+	entity, ok := p.Backend.ByID(preceiptID)
+	if !ok {
+		return nil, false
+	}
+
+	pr, ok := entity.(*verification.PendingReceipt)
+	if !ok {
+		return nil, false
+	}
+
+	return pr, true
+}
+
 // Rem will remove a pending receipt by ID.
 func (p *PendingReceipts) Rem(preceiptID flow.Identifier) bool {
 	ok := p.Backend.Rem(preceiptID)

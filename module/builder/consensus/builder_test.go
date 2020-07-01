@@ -39,7 +39,7 @@ type BuilderSuite struct {
 	seals      []*flow.Seal
 	headers    map[flow.Identifier]*flow.Header
 	heights    map[uint64]*flow.Header
-	index      map[flow.Identifier]flow.Index
+	index      map[flow.Identifier]*flow.Index
 
 	// real dependencies
 	dir      string
@@ -99,7 +99,7 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.seals = nil
 	bs.headers = make(map[flow.Identifier]*flow.Header)
 	bs.heights = make(map[uint64]*flow.Header)
-	bs.index = make(map[flow.Identifier]flow.Index)
+	bs.index = make(map[flow.Identifier]*flow.Index)
 
 	// initialize behaviour tracking
 	bs.assembled = nil
@@ -111,7 +111,7 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.firstID = first.ID()
 	bs.headers[first.ID()] = &first
 	bs.heights[first.Height] = &first
-	bs.index[first.ID()] = flow.Index{}
+	bs.index[first.ID()] = &flow.Index{}
 	bs.last = &flow.Seal{
 		BlockID:      first.ID(),
 		ResultID:     flow.ZeroID,
@@ -126,7 +126,7 @@ func (bs *BuilderSuite) SetupTest() {
 		bs.finalizedIDs = append(bs.finalizedIDs, finalized.ID())
 		bs.headers[finalized.ID()] = &finalized
 		bs.heights[finalized.Height] = &finalized
-		bs.index[finalized.ID()] = flow.Index{}
+		bs.index[finalized.ID()] = &flow.Index{}
 		bs.chainSeal(finalized.ID())
 		previous = &finalized
 	}
@@ -136,7 +136,7 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.finalID = final.ID()
 	bs.headers[final.ID()] = &final
 	bs.heights[final.Height] = &final
-	bs.index[final.ID()] = flow.Index{}
+	bs.index[final.ID()] = &flow.Index{}
 	bs.chainSeal(final.ID())
 
 	// insert the finalized ancestors with empty payload
@@ -145,7 +145,7 @@ func (bs *BuilderSuite) SetupTest() {
 		pending := unittest.BlockHeaderWithParentFixture(previous)
 		bs.pendingIDs = append(bs.pendingIDs, pending.ID())
 		bs.headers[pending.ID()] = &pending
-		bs.index[pending.ID()] = flow.Index{}
+		bs.index[pending.ID()] = &flow.Index{}
 		bs.chainSeal(pending.ID())
 		previous = &pending
 	}
@@ -154,7 +154,7 @@ func (bs *BuilderSuite) SetupTest() {
 	parent := unittest.BlockHeaderWithParentFixture(previous)
 	bs.parentID = parent.ID()
 	bs.headers[parent.ID()] = &parent
-	bs.index[parent.ID()] = flow.Index{}
+	bs.index[parent.ID()] = &flow.Index{}
 	bs.chainSeal(parent.ID())
 
 	// set up temporary database for tests
@@ -199,7 +199,7 @@ func (bs *BuilderSuite) SetupTest() {
 	)
 	bs.indexDB = &storage.Index{}
 	bs.indexDB.On("ByBlockID", mock.Anything).Return(
-		func(blockID flow.Identifier) flow.Index {
+		func(blockID flow.Identifier) *flow.Index {
 			return bs.index[blockID]
 		},
 		func(blockID flow.Identifier) error {

@@ -5,6 +5,8 @@ VERIFICATION = 1
 ACCESS = 1
 NCLUSTERS=1
 PROFILER=false
+CONSENSUS_DELAY=800ms
+COLLECTION_DELAY=950ms
 
 .PHONY: init
 init:
@@ -15,7 +17,9 @@ init:
 		-verification=$(VERIFICATION) \
 		-access=$(ACCESS) \
 		-nclusters=$(NCLUSTERS) \
-		-profiler=$(PROFILER)
+		-profiler=$(PROFILER) \
+		-consensus-delay=$(CONSENSUS_DELAY) \
+		-collection-delay=$(COLLECTION_DELAY) \
 
 .PHONY: start
 start:

@@ -22,43 +22,53 @@ type Headers struct {
 
 func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 
-	h := &Headers{db: db}
-
-	store := func(headerID flow.Identifier, header interface{}) error {
-		return operation.RetryOnConflict(db.Update, h.storeTx(header.(*flow.Header)))
+	store := func(blockID flow.Identifier, v interface{}) func(tx *badger.Txn) error {
+		header := v.(*flow.Header)
+		return operation.InsertHeader(blockID, header)
 	}
 
-	retrieve := func(blockID flow.Identifier) (interface{}, error) {
+	retrieve := func(blockID flow.Identifier) func(tx *badger.Txn) (interface{}, error) {
 		var header flow.Header
-		err := db.View(operation.RetrieveHeader(blockID, &header))
-		return &header, err
+		return func(tx *badger.Txn) (interface{}, error) {
+			err := db.View(operation.RetrieveHeader(blockID, &header))
+			return &header, err
+		}
 	}
 
-	h.cache = newCache(collector,
-		withLimit(4*flow.DefaultTransactionExpiry),
-		withStore(store),
-		withRetrieve(retrieve),
-		withResource(metrics.ResourceHeader))
+	h := &Headers{
+		db: db,
+		cache: newCache(collector,
+			withLimit(4*flow.DefaultTransactionExpiry),
+			withStore(store),
+			withRetrieve(retrieve),
+			withResource(metrics.ResourceHeader)),
+	}
 
 	return h
 }
 
-func (h *Headers) Store(header *flow.Header) error {
+func (h *Headers) storeTx(header *flow.Header) func(*badger.Txn) error {
 	return h.cache.Put(header.ID(), header)
 }
 
-func (h *Headers) storeTx(header *flow.Header) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-		return operation.InsertHeader(header.ID(), header)(tx)
+func (h *Headers) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Header, error) {
+	return func(tx *badger.Txn) (*flow.Header, error) {
+		v, err := h.cache.Get(blockID)(tx)
+		if err != nil {
+			return nil, err
+		}
+		return v.(*flow.Header), nil
 	}
 }
 
+func (h *Headers) Store(header *flow.Header) error {
+	return operation.RetryOnConflict(h.db.Update, h.storeTx(header))
+}
+
 func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
-	header, err := h.cache.Get(blockID)
-	if err != nil {
-		return nil, err
-	}
-	return header.(*flow.Header), nil
+	tx := h.db.NewTransaction(false)
+	defer tx.Discard()
+	return h.retrieveTx(blockID)(tx)
 }
 
 func (h *Headers) ByHeight(height uint64) (*flow.Header, error) {

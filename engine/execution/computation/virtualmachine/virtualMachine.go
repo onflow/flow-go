@@ -1,7 +1,9 @@
 package virtualmachine
 
 import (
+	"encoding/binary"
 	"fmt"
+	"math/rand"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
@@ -24,35 +26,58 @@ type VirtualMachine interface {
 }
 
 // New creates a new virtual machine instance with the provided runtime.
-func New(rt runtime.Runtime) (VirtualMachine, error) {
-	cache, err := NewLRUASTCache(MaxProgramASTCacheSize)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create vm ast cache, %w", err)
-	}
-	return &virtualMachine{
+func New(rt runtime.Runtime, chain flow.Chain, options ...VirtualMachineOption) (VirtualMachine, error) {
+	vm := &virtualMachine{
 		rt:    rt,
-		cache: cache,
-	}, nil
+		chain: chain,
+	}
+
+	for _, option := range options {
+		option(vm)
+	}
+
+	if vm.cache == nil {
+		cache, err := NewLRUASTCache(MaxProgramASTCacheSize)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create vm ast cache, %w", err)
+		}
+		vm.cache = cache
+	}
+
+	return vm, nil
 }
 
-func NewWithCache(rt runtime.Runtime, cache ASTCache) (VirtualMachine, error) {
-	return &virtualMachine{
-		rt:    rt,
-		cache: cache,
-	}, nil
+type VirtualMachineOption func(*virtualMachine)
+
+func WithCache(cache ASTCache) VirtualMachineOption {
+	return func(ctx *virtualMachine) {
+		ctx.cache = cache
+	}
 }
 
 type virtualMachine struct {
 	rt    runtime.Runtime
 	cache ASTCache
+	chain flow.Chain
 }
 
 func (vm *virtualMachine) NewBlockContext(header *flow.Header, blocks Blocks) BlockContext {
-	return &blockContext{
+	bc := &blockContext{
 		vm:     vm,
 		header: header,
 		blocks: blocks,
+		chain:  vm.chain,
 	}
+
+	// Seed the random number generator with entropy created from the block header ID. The random number generator will
+	// be used by the UnsafeRandom function.
+	// TODO: replace with better source of randomness.
+	if header != nil {
+		id := header.ID()
+		bc.rng = rand.New(rand.NewSource(int64(binary.BigEndian.Uint64(id[:]))))
+	}
+
+	return bc
 }
 
 func (vm *virtualMachine) ASTCache() ASTCache {

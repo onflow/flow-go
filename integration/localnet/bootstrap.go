@@ -28,6 +28,8 @@ const (
 	DefaultAccessCount       = 1
 	DefaultNClusters         = 1
 	DefaultProfiler          = false
+	DefaultConsensusDelay    = 800 * time.Millisecond
+	DefaultCollectionDelay   = 950 * time.Millisecond
 	AccessAPIPort            = 3569
 	MetricsPort              = 8080
 	RPCPort                  = 9000
@@ -41,6 +43,8 @@ var (
 	accessCount       int
 	nClusters         uint
 	profiler          bool
+	consensusDelay    time.Duration
+	collectionDelay   time.Duration
 )
 
 func init() {
@@ -51,6 +55,8 @@ func init() {
 	flag.IntVar(&accessCount, "access", DefaultAccessCount, "number of access nodes")
 	flag.UintVar(&nClusters, "nclusters", DefaultNClusters, "number of collector clusters")
 	flag.BoolVar(&profiler, "profiler", DefaultProfiler, "whether to enable the auto-profiler")
+	flag.DurationVar(&consensusDelay, "consensus-delay", DefaultConsensusDelay, "delay on consensus node block proposals")
+	flag.DurationVar(&collectionDelay, "collection-delay", DefaultCollectionDelay, "delay on collection node block proposals")
 }
 
 func main() {
@@ -269,9 +275,12 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 func prepareConsensusService(container testnet.ContainerConfig, i int) Service {
 	service := prepareService(container, i)
 
+	timeout := 1200*time.Millisecond + consensusDelay
 	service.Command = append(
 		service.Command,
-		fmt.Sprintf("--block-rate-delay=%s", time.Duration(0)),
+		fmt.Sprintf("--block-rate-delay=%s", consensusDelay),
+		fmt.Sprintf("--hotstuff-timeout=%s", timeout),
+		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 	)
 
 	return service
@@ -280,8 +289,12 @@ func prepareConsensusService(container testnet.ContainerConfig, i int) Service {
 func prepareCollectionService(container testnet.ContainerConfig, i int) Service {
 	service := prepareService(container, i)
 
+	timeout := 1200*time.Millisecond + collectionDelay
 	service.Command = append(
 		service.Command,
+		fmt.Sprintf("--block-rate-delay=%s", collectionDelay),
+		fmt.Sprintf("--hotstuff-timeout=%s", timeout),
+		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--ingress-addr=%s:%d", container.ContainerName, RPCPort),
 	)
 

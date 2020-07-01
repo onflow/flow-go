@@ -4,9 +4,8 @@ package json
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
-
-	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/network"
 )
@@ -39,13 +38,13 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 	// encode the value
 	env, err := encode(v)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not encode envelope")
+		return nil, fmt.Errorf("could not encode envelope: %w", err)
 	}
 
 	// encode the envelope
 	data, err := json.Marshal(env)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not encode value")
+		return nil, fmt.Errorf("could not encode value: %w", err)
 	}
 
 	return data, nil
@@ -58,13 +57,13 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 	var env Envelope
 	err := json.Unmarshal(data, &env)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not decode envelope")
+		return nil, fmt.Errorf("could not decode envelope: %w", err)
 	}
 
 	// decode the value
 	v, err := decode(env)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not decode value")
+		return nil, fmt.Errorf("could not decode value: %w", err)
 	}
 
 	return v, nil

@@ -2,7 +2,7 @@
 
 package flow
 
-func Genesis(identities IdentityList) *Block {
+func Genesis(identities IdentityList, chainID ChainID) *Block {
 
 	// create the raw content for the genesis block
 	payload := Payload{
@@ -13,7 +13,7 @@ func Genesis(identities IdentityList) *Block {
 
 	// create the header
 	header := Header{
-		ChainID:     GetChainID(),
+		ChainID:     chainID,
 		ParentID:    ZeroID,
 		Height:      0,
 		PayloadHash: payload.Hash(),
