@@ -11,7 +11,10 @@ import (
 )
 
 func Transaction(tx *flow.TransactionBody) *InvokableTransaction {
-	return &InvokableTransaction{Transaction: tx}
+	return &InvokableTransaction{
+		Transaction: tx,
+		ID:          tx.ID(),
+	}
 }
 
 type InvokableTransaction struct {
@@ -29,8 +32,6 @@ type TransactionProcessor interface {
 }
 
 func (inv *InvokableTransaction) Invoke(vm *VirtualMachine, ctx Context, ledger Ledger) error {
-	inv.ID = inv.Transaction.ID()
-
 	for _, p := range ctx.TransactionProcessors {
 		err := p.Process(vm, ctx, inv, ledger)
 		vmErr, fatalErr := handleError(err)
@@ -47,7 +48,7 @@ func (inv *InvokableTransaction) Invoke(vm *VirtualMachine, ctx Context, ledger 
 	return nil
 }
 
-func (inv InvokableTransaction) ConvertEvents(txIndex uint32) ([]flow.Event, error) {
+func (inv *InvokableTransaction) ConvertEvents(txIndex uint32) ([]flow.Event, error) {
 	flowEvents := make([]flow.Event, len(inv.Events))
 
 	for i, event := range inv.Events {

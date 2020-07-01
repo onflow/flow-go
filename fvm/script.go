@@ -8,9 +8,12 @@ import (
 	"github.com/dapperlabs/flow-go/model/hash"
 )
 
-func Script(script []byte) *InvokableScript {
+func Script(code []byte) *InvokableScript {
+	scriptHash := hash.DefaultHasher.ComputeHash(code)
+
 	return &InvokableScript{
-		Script: script,
+		Script: code,
+		ID:     flow.HashToID(scriptHash),
 	}
 }
 
@@ -21,7 +24,9 @@ type InvokableScript struct {
 	Value     cadence.Value
 	Logs      []string
 	Events    []cadence.Event
-	Err       Error
+	// TODO: report gas consumption: https://github.com/dapperlabs/flow-go/issues/4139
+	GasUsed uint64
+	Err     Error
 }
 
 type ScriptProcessor interface {
@@ -36,9 +41,6 @@ func (inv *InvokableScript) WithArguments(args [][]byte) *InvokableScript {
 }
 
 func (inv *InvokableScript) Invoke(vm *VirtualMachine, ctx Context, ledger Ledger) error {
-	scriptHash := hash.DefaultHasher.ComputeHash(inv.Script)
-	inv.ID = flow.HashToID(scriptHash)
-
 	for _, p := range ctx.ScriptProcessors {
 		err := p.Process(vm, ctx, inv, ledger)
 		vmErr, fatalErr := handleError(err)
