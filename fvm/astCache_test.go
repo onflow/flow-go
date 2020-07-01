@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -361,8 +360,6 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 }
 
 func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
-	t.Skip()
-
 	rt := runtime.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()
@@ -374,15 +371,14 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 
 	ctx := fvm.NewContext(fvm.WithASTCache(cache))
 
-	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-	ledger := testutil.RootBootstrappedLedger(chain)
-
 	var wg sync.WaitGroup
 	for i := 0; i < 100; i++ {
 		wg.Add(1)
+
+		ledger := testutil.RootBootstrappedLedger(chain)
+
 		go func(id int, wg *sync.WaitGroup) {
 			defer wg.Done()
-			view := delta.NewView(ledger.Get)
 
 			script := []byte(fmt.Sprintf(`
 				import FlowToken from 0x%s
@@ -393,7 +389,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 				}
 			`, fvm.FlowTokenAddress(chain), id))
 
-			result, err := vm.Invoke(ctx, fvm.Script(script), view)
+			result, err := vm.Invoke(ctx, fvm.Script(script), ledger)
 			if !assert.True(t, result.Succeeded()) {
 				t.Log(result.Error.ErrorMessage())
 			}
