@@ -25,6 +25,7 @@ type hostEnv struct {
 
 	events []cadence.Event
 	logs   []string
+	uuid   uint64
 
 	transactionEnv *transactionEnv
 	rng            *rand.Rand
@@ -163,7 +164,8 @@ func (e *hostEnv) EmitEvent(event cadence.Event) {
 
 func (e *hostEnv) GenerateUUID() uint64 {
 	// TODO: https://github.com/dapperlabs/flow-go/issues/4141
-	return 0
+	defer func() { e.uuid++ }()
+	return e.uuid
 }
 
 func (e *hostEnv) GetComputationLimit() uint64 {
