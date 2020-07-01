@@ -140,7 +140,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 		}
 
 		require.Len(t, result.Events, 1)
-		assert.EqualValues(t, "flow.AccountCreated", result.Events[0].EventType.ID())
+		assert.EqualValues(t, "S.flow.AccountCreated", result.Events[0].EventType.ID())
 	})
 }
 
@@ -597,7 +597,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 	t.Run("script failure", func(t *testing.T) {
 		script := []byte(`
 			pub fun main(): Int {
-				assert 1 == 2
+				assert(1 == 2)
 				return 42
 			}
 		`)

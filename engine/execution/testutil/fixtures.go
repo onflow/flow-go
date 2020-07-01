@@ -198,8 +198,11 @@ func CreateAccountsWithSimpleAddresses(
 	return accounts, nil
 }
 
-func RootBootstrappedLedger(chain flow.Chain) fvm.Ledger {
-	ledger := make(fvm.MapLedger)
+func RootBootstrappedLedger(chain flow.Chain) *fvm.MapLedger {
+	ledger := &fvm.MapLedger{
+		RegTouchSet: make(map[string]bool),
+		Registers:   make(map[string]flow.RegisterValue),
+	}
 
 	vm := fvm.New(runtime.NewInterpreterRuntime(), chain)
 

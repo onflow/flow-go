@@ -154,7 +154,19 @@ func (e *hostEnv) GetCachedProgram(location ast.Location) (*ast.Program, error) 
 		return nil, nil
 	}
 
-	return e.astCache.GetProgram(location)
+	program, err := e.astCache.GetProgram(location)
+	if program != nil {
+		// Program was found within cache, do an explicit ledger register touch
+		// to ensure consistent reads during chunk verification.
+		addressLocation, ok := location.(runtime.AddressLocation)
+		if !ok {
+			return nil, fmt.Errorf("import location must be an account address")
+		}
+		key := fullKeyHash(string(addressLocation), string(addressLocation), keyCode)
+		e.ledger.Touch(key)
+	}
+
+	return program, err
 }
 
 func (e *hostEnv) CacheProgram(location ast.Location, program *ast.Program) error {
@@ -197,6 +209,17 @@ func (e *hostEnv) Events() []cadence.Event {
 
 func (e *hostEnv) Logs() []string {
 	return e.logs
+}
+
+func (e *hostEnv) VerifySignature(
+	signature []byte,
+	tag []byte,
+	signedData []byte,
+	publicKey []byte,
+	signatureAlgorithm string,
+	hashAlgorithm string,
+) bool {
+	panic("implement me")
 }
 
 // Block Environment Functions
