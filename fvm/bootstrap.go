@@ -41,7 +41,7 @@ func (b *BootstrapProcedure) Invoke(vm *VirtualMachine, ctx Context, ledger Ledg
 	b.ledger = ledger
 
 	// initialize the account addressing state
-	setAddressState(ledger, vm.chain.NewAddressGenerator())
+	setAddressState(ledger, ctx.Chain.NewAddressGenerator())
 
 	service := b.createServiceAccount(b.serviceAccountPublicKey)
 
@@ -59,7 +59,7 @@ func (b *BootstrapProcedure) Invoke(vm *VirtualMachine, ctx Context, ledger Ledg
 }
 
 func (b *BootstrapProcedure) createAccount() flow.Address {
-	address, err := createAccount(b.ledger, b.vm.chain, nil)
+	address, err := createAccount(b.ledger, b.ctx.Chain, nil)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create account: %s", err))
 	}
@@ -68,7 +68,7 @@ func (b *BootstrapProcedure) createAccount() flow.Address {
 }
 
 func (b *BootstrapProcedure) createServiceAccount(accountKey flow.AccountPublicKey) flow.Address {
-	address, err := createAccount(b.ledger, b.vm.chain, []flow.AccountPublicKey{accountKey})
+	address, err := createAccount(b.ledger, b.ctx.Chain, []flow.AccountPublicKey{accountKey})
 	if err != nil {
 		panic(fmt.Sprintf("failed to create service account: %s", err))
 	}

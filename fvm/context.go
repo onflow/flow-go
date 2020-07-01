@@ -1,14 +1,11 @@
 package fvm
 
 import (
-	"github.com/onflow/cadence/runtime"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
-	Runtime                          runtime.Runtime
 	Chain                            flow.Chain
 	ASTCache                         ASTCache
 	Blocks                           Blocks
@@ -44,7 +41,6 @@ const defaultGasLimit = 100000
 
 func defaultContext() Context {
 	return Context{
-		Runtime:                          runtime.NewInterpreterRuntime(),
 		Chain:                            flow.Mainnet.Chain(),
 		ASTCache:                         nil,
 		Blocks:                           nil,
@@ -68,6 +64,14 @@ func defaultContext() Context {
 
 // An Option sets a configuration parameter for a virtual machine context.
 type Option func(ctx Context) Context
+
+// WithChain sets the chain parameters for a virtual machine context.
+func WithChain(chain flow.Chain) Option {
+	return func(ctx Context) Context {
+		ctx.Chain = chain
+		return ctx
+	}
+}
 
 // WithASTCache sets the AST cache for a virtual machine context.
 func WithASTCache(cache ASTCache) Option {

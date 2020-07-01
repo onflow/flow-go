@@ -25,7 +25,6 @@ func getAccount(
 	vm *VirtualMachine,
 	ctx Context,
 	ledger Ledger,
-	chain flow.Chain,
 	address flow.Address,
 ) (*flow.Account, error) {
 	var ok bool
@@ -52,7 +51,7 @@ func getAccount(
 		return nil, err
 	}
 
-	script := getFlowTokenBalanceScript(address, chain.ServiceAddress())
+	script := getFlowTokenBalanceScript(address, ctx.Chain.ServiceAddress())
 
 	err = vm.Invoke(
 		ctx,

@@ -326,7 +326,7 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 		e.ctx,
 		deductAccountCreationFeeTransaction(
 			flow.Address(payer),
-			e.vm.chain.ServiceAddress(),
+			e.ctx.Chain.ServiceAddress(),
 			e.ctx.RestrictedAccountCreationEnabled,
 		),
 		e.ledger,
@@ -337,14 +337,14 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 
 	var flowAddress flow.Address
 
-	flowAddress, err = createAccount(e.ledger, e.vm.chain, nil)
+	flowAddress, err = createAccount(e.ledger, e.ctx.Chain, nil)
 	if err != nil {
 		return address, err
 	}
 
 	err = e.vm.invokeMetaTransaction(
 		e.ctx,
-		initFlowTokenTransaction(flowAddress, e.vm.chain.ServiceAddress()),
+		initFlowTokenTransaction(flowAddress, e.ctx.Chain.ServiceAddress()),
 		e.ledger,
 	)
 	if err != nil {
@@ -448,7 +448,7 @@ func (e *transactionEnv) UpdateAccountCode(address runtime.Address, code []byte)
 
 	// currently, every transaction that sets account code (deploys/updates contracts)
 	// must be signed by the service account
-	if e.ctx.RestrictedDeploymentEnabled && !e.isAuthorizer(runtime.Address(e.vm.chain.ServiceAddress())) {
+	if e.ctx.RestrictedDeploymentEnabled && !e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress())) {
 		return fmt.Errorf("code deployment requires authorization from the service account")
 	}
 

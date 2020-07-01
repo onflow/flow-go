@@ -10,7 +10,6 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto"
@@ -203,16 +202,14 @@ func CreateAccountsWithSimpleAddresses(
 	return accounts, nil
 }
 
-func RootBootstrappedLedger(chain flow.Chain) *fvm.MapLedger {
+func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context) *fvm.MapLedger {
 	ledger := &fvm.MapLedger{
 		RegTouchSet: make(map[string]bool),
 		Registers:   make(map[string]flow.RegisterValue),
 	}
 
-	vm := fvm.New(runtime.NewInterpreterRuntime(), chain)
-
 	_ = vm.Invoke(
-		fvm.NewContext(),
+		ctx,
 		fvm.Bootstrap(unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply),
 		ledger,
 	)

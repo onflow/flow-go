@@ -14,14 +14,12 @@ type Invokable interface {
 // A VirtualMachine augments the Cadence runtime with Flow host functionality.
 type VirtualMachine struct {
 	Runtime runtime.Runtime
-	chain   flow.Chain
 }
 
 // New creates a new virtual machine instance with the provided runtime.
-func New(rt runtime.Runtime, chain flow.Chain) *VirtualMachine {
+func New(rt runtime.Runtime) *VirtualMachine {
 	return &VirtualMachine{
 		Runtime: rt,
-		chain:   chain,
 	}
 }
 
@@ -32,7 +30,7 @@ func (vm *VirtualMachine) Invoke(ctx Context, i Invokable, ledger Ledger) error 
 
 // GetAccount returns the account with the given address or an error if none exists.
 func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, ledger Ledger) (*flow.Account, error) {
-	account, err := getAccount(vm, ctx, ledger, vm.chain, address)
+	account, err := getAccount(vm, ctx, ledger, address)
 	if err != nil {
 		// TODO: wrap error
 		return nil, err

@@ -25,7 +25,7 @@ func (d *TransactionFeeDeductor) deductFees(
 ) error {
 	return vm.invokeMetaTransaction(
 		ctx,
-		deductTransactionFeeTransaction(tx.Payer, vm.chain.ServiceAddress()),
+		deductTransactionFeeTransaction(tx.Payer, ctx.Chain.ServiceAddress()),
 		ledger,
 	)
 }

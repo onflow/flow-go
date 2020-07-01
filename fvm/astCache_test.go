@@ -24,12 +24,12 @@ func TestTransactionASTCache(t *testing.T) {
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt, chain)
+	vm := fvm.New(rt)
 
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := fvm.NewContext(fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(fvm.WithChain(chain), fvm.WithASTCache(cache))
 
 	t.Run("transaction execution results in cached program", func(t *testing.T) {
 		txBody := flow.NewTransactionBody().
@@ -43,7 +43,7 @@ func TestTransactionASTCache(t *testing.T) {
 		err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 		require.NoError(t, err)
 
-		ledger := testutil.RootBootstrappedLedger(chain)
+		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
 		tx := fvm.Transaction(txBody)
 
@@ -68,12 +68,12 @@ func TestScriptASTCache(t *testing.T) {
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt, chain)
+	vm := fvm.New(rt)
 
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := fvm.NewContext(fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(fvm.WithChain(chain), fvm.WithASTCache(cache))
 
 	t.Run("script execution results in cached program", func(t *testing.T) {
 		code := []byte(`
@@ -82,7 +82,7 @@ func TestScriptASTCache(t *testing.T) {
 			}
 		`)
 
-		ledger := testutil.RootBootstrappedLedger(chain)
+		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
 		script := fvm.Script(code)
 
@@ -108,19 +108,19 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt, chain)
+	vm := fvm.New(rt)
 
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := fvm.NewContext(fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(fvm.WithChain(chain), fvm.WithASTCache(cache))
 
 	// Create a number of account private keys.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 
 	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-	ledger := testutil.RootBootstrappedLedger(chain)
+	ledger := testutil.RootBootstrappedLedger(vm, ctx)
 	accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
 	require.NoError(t, err)
 
@@ -173,12 +173,13 @@ func TestTransactionWithProgramASTCacheConsistentRegTouches(t *testing.T) {
 
 		chain := flow.Mainnet.Chain()
 
-		vm := fvm.New(rt, chain)
+		vm := fvm.New(rt)
 
 		cache, err := fvm.NewLRUASTCache(CacheSize)
 		require.NoError(t, err)
 
 		options := []fvm.Option{
+			fvm.WithChain(chain),
 			fvm.WithBlockHeader(&h),
 		}
 
@@ -193,7 +194,7 @@ func TestTransactionWithProgramASTCacheConsistentRegTouches(t *testing.T) {
 		require.NoError(t, err)
 
 		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		ledger := testutil.RootBootstrappedLedger(chain)
+		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 		accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
 		require.NoError(t, err)
 
@@ -240,19 +241,19 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt, chain)
+	vm := fvm.New(rt)
 
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(b, err)
 
-	ctx := fvm.NewContext(fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(fvm.WithChain(chain), fvm.WithASTCache(cache))
 
 	// Create a number of account private keys.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(b, err)
 
 	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-	ledger := testutil.RootBootstrappedLedger(chain)
+	ledger := testutil.RootBootstrappedLedger(vm, ctx)
 	accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
 	require.NoError(b, err)
 
@@ -317,16 +318,16 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt, chain)
+	vm := fvm.New(rt)
 
-	ctx := fvm.NewContext(fvm.WithASTCache(&nonFunctioningCache{}))
+	ctx := fvm.NewContext(fvm.WithChain(chain), fvm.WithASTCache(&nonFunctioningCache{}))
 
 	// Create a number of account private keys.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(b, err)
 
 	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-	ledger := testutil.RootBootstrappedLedger(chain)
+	ledger := testutil.RootBootstrappedLedger(vm, ctx)
 	accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
 	require.NoError(b, err)
 
@@ -377,18 +378,18 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt, chain)
+	vm := fvm.New(rt)
 
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := fvm.NewContext(fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(fvm.WithChain(chain), fvm.WithASTCache(cache))
 
 	var wg sync.WaitGroup
 	for i := 0; i < 100; i++ {
 		wg.Add(1)
 
-		ledger := testutil.RootBootstrappedLedger(chain)
+		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
 		go func(id int, wg *sync.WaitGroup) {
 			defer wg.Done()
