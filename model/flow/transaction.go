@@ -51,11 +51,11 @@ var (
 	// TransactionDomainTag is the prefix of all signed transaction payloads
 	//
 	// The string decoding into bytes is using utf8
-	TransactionDomainTag = []byte("FLOW-V0.0-transaction")
+	TransactionDomainTag = []byte("FLOW-V00.00-transaction")
 	// UserDomainTag is the prefix of all signed user space payloads
 	//
 	// The string decoding into bytes is using utf8
-	UserDomainTag = []byte("FLOW-V0.0-user-domain")
+	UserDomainTag = []byte("FLOW-V00.00-user-domain")
 )
 
 // NewTransactionBody initializes and returns an empty transaction body
