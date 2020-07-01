@@ -1,7 +1,8 @@
-package provider
+package requester
 
 import (
 	"fmt"
+	"math/rand"
 
 	"github.com/rs/zerolog"
 
@@ -22,11 +23,12 @@ type Engine struct {
 	me       module.Local
 	state    protocol.State
 	con      network.Conduit
-	handlers map[messages.Resource]Handler
+	sources  map[messages.Resource]Source
+	requests map[uint64]Request
 }
 
 // New creates a new consensus propagation engine.
-func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, me module.Local, state protocol.State, handlers ...Handler) (*Engine, error) {
+func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, me module.Local, state protocol.State, sources ...Source) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
@@ -35,7 +37,7 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 		metrics:  metrics,
 		me:       me,
 		state:    state,
-		handlers: make(map[messages.Resource]Handler),
+		requests: make(map[uint64]Request),
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -45,13 +47,12 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 	}
 	e.con = con
 
-	// process all the handlers
-	for _, handler := range handlers {
-		_, duplicate := e.handlers[handler.Resource]
+	for _, source := range sources {
+		_, duplicate := e.sources[source.Resource]
 		if duplicate {
-			return nil, fmt.Errorf("duplicate handler (%s)", handler.Resource)
+			return nil, fmt.Errorf("duplicate source for resource (%s)", source.Resource)
 		}
-		e.handlers[handler.Resource] = handler
+		e.sources[source.Resource] = source
 	}
 
 	return e, nil
@@ -100,13 +101,68 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
+// Request allows us to request an entity to be processed by the given callback.
+func (e *Engine) Request(resource messages.Resource, entityID flow.Identifier, process ProcessFunc) error {
+
+	// TODO: keep track of in-flight requests to avoid duplicates
+
+	// TODO: add delay so we can compound requests
+
+	// TODO: add automatic retrying and rotating valid recipients
+
+	// TODO: protect against race-conditions upon concurrent request/reply
+
+	// get the source for the request
+	source, exists := e.sources[resource]
+	if !exists {
+		return fmt.Errorf("request for resource without source (%s)", resource)
+	}
+
+	// determine which identities are valid recipients of the request
+	selector := filter.And(
+		source.Selector, // limit to valid sources
+		filter.Not(filter.HasNodeID(e.me.NodeID())), // disallow requests to self
+		filter.HasStake(true),                       // disallow requests to unstaked nodes
+	)
+	identities, err := e.state.Final().Identities(selector)
+	if err != nil {
+		return fmt.Errorf("could not get identities: %w", err)
+	}
+	if len(identities) == 0 {
+		return fmt.Errorf("not valid targets for request available")
+	}
+
+	// select a random recipient for the request
+	target := identities[rand.Intn(len(identities))]
+	req := &messages.ResourceRequest{
+		Resource: resource,
+		EntityID: entityID,
+		Nonce:    rand.Uint64(),
+	}
+	err = e.con.Submit(&req, target.NodeID)
+	if err != nil {
+		return fmt.Errorf("could not send resource request: %w", err)
+	}
+
+	// store the request for later reference
+	request := Request{
+		Nonce:    req.Nonce,
+		TargetID: target.NodeID,
+		EntityID: entityID,
+		Process:  process,
+	}
+	e.requests[req.Nonce] = request
+
+	return nil
+}
+
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
-	case *messages.ResourceRequest:
+	case *messages.ResourceResponse:
 		e.before(metrics.MessageResourceRequest)
 		defer e.after(metrics.MessageResourceRequest)
-		return e.onResourceRequest(originID, ev)
+		return e.onResourceResponse(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -122,49 +178,26 @@ func (e *Engine) after(msg string) {
 	e.metrics.MessageHandled(metrics.EngineSynchronization, msg)
 }
 
-func (e *Engine) onResourceRequest(originID flow.Identifier, req *messages.ResourceRequest) error {
+func (e *Engine) onResourceResponse(originID flow.Identifier, res *messages.ResourceResponse) error {
 
-	// TODO: track previous requests to protect against spam / repeated requests
+	// TODO: add support for batch requests & responses
 
-	// TODO: add support for batch requests (multiple IDs in requests, multiple resources in response)
+	// TODO: add reputation system to punish offenders of protocol conventions, slow responses
 
-	// TODO: add delay to allow compounding of requests
-
-	// first, we check if we know how to handle the requested resource
-	handler, exists := e.handlers[req.Resource]
-	if !exists {
-		return fmt.Errorf("handler for requested resource does not exist (%s)", req.Resource)
+	// check if we got a pending request for the given resource to the given target
+	request, ok := e.requests[res.Nonce]
+	if !ok {
+		return fmt.Errorf("response for unknown request nonce (%d)", res.Nonce)
+	}
+	if originID != request.TargetID {
+		return fmt.Errorf("response origin mismatch with target (%x != %x)", originID, request.TargetID)
+	}
+	if res.Entity.ID() != request.EntityID {
+		return fmt.Errorf("response entity mismatch with requested (%x != %x)", res.Entity.ID(), request.EntityID)
 	}
 
-	// then, we try to get the current identity of the requester and check it against the filter
-	// for the handler to make sure the requester is authorized for this resource
-	selector := filter.And(
-		handler.Selector, // checks provided by the handler
-		filter.Not(filter.HasNodeID(e.me.NodeID())), // disallow requests from self
-		filter.HasStake(true),                       // disallow requests from nodes without stake
-	)
-	identities, err := e.state.Final().Identities(selector)
-	if err != nil {
-		return fmt.Errorf("could not retrieve identity for origin: %w", err)
-	}
-	if len(identities) == 0 {
-		return fmt.Errorf("origin is not allowed to request resource")
-	}
-
-	// finally, execute the retrieve function to get the resource and send the response
-	entity, err := handler.Retrieve(req.EntityID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve entity: %w", err)
-	}
-	rep := &messages.ResourceResponse{
-		Resource: req.Resource,
-		Entity:   entity,
-		Nonce:    req.Nonce,
-	}
-	err = e.con.Submit(rep, originID)
-	if err != nil {
-		return fmt.Errorf("could not send resource response: %w", err)
-	}
+	// forward the entity to the process function
+	request.Process(originID, res.Entity)
 
 	return nil
 }
