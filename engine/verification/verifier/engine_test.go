@@ -20,7 +20,9 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	chmodel "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
+	realModule "github.com/dapperlabs/flow-go/module"
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
+	"github.com/dapperlabs/flow-go/module/trace"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -29,6 +31,7 @@ import (
 type VerifierEngineTestSuite struct {
 	suite.Suite
 	net     *mockmodule.Network
+	tracer  realModule.Tracer
 	state   *protocol.State
 	ss      *protocol.Snapshot
 	me      *mocklocal.MockLocal
@@ -47,6 +50,7 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 
 	suite.state = &protocol.State{}
 	suite.net = &mockmodule.Network{}
+	suite.tracer = trace.NewNoopTracer()
 	suite.ss = &protocol.Snapshot{}
 	suite.conduit = &network.Conduit{}
 	suite.metrics = &mockmodule.VerificationMetrics{}
@@ -74,7 +78,7 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 }
 
 func (suite *VerifierEngineTestSuite) TestNewEngine() *verifier.Engine {
-	e, err := verifier.New(zerolog.Logger{}, suite.metrics, suite.net, suite.state, suite.me, ChunkVerifierMock{})
+	e, err := verifier.New(zerolog.Logger{}, suite.metrics, suite.tracer, suite.net, suite.state, suite.me, ChunkVerifierMock{})
 	require.Nil(suite.T(), err)
 
 	suite.net.AssertExpectations(suite.T())

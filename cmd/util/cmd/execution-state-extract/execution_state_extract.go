@@ -24,7 +24,7 @@ func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flo
 
 func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDir string, log zerolog.Logger) error {
 
-	w, err := wal.NewWAL(nil, nil, dir, ledger.CacheSize, ledger.MaxHeight)
+	w, err := wal.NewWAL(nil, nil, dir, ledger.CacheSize, ledger.RegisterKeySize)
 	if err != nil {
 		return fmt.Errorf("cannot create WAL: %w", err)
 	}
@@ -32,7 +32,7 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 		_ = w.Close()
 	}()
 
-	mForest, err := mtrie.NewMForest(ledger.MaxHeight, outputDir, 1000, &metrics.NoopCollector{}, func(evictedTrie *trie.MTrie) error { return nil })
+	mForest, err := mtrie.NewMForest(ledger.RegisterKeySize, outputDir, 1000, &metrics.NoopCollector{}, func(evictedTrie *trie.MTrie) error { return nil })
 	if err != nil {
 		return fmt.Errorf("cannot create mForest: %w", err)
 	}

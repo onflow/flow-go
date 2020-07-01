@@ -24,6 +24,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	module2 "github.com/dapperlabs/flow-go/module/mock"
 	module "github.com/dapperlabs/flow-go/module/mocks"
 	"github.com/dapperlabs/flow-go/module/trace"
 	network "github.com/dapperlabs/flow-go/network/mocks"
@@ -130,6 +131,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.BlockProvider)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.ExecutionSync)), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
+	blockSync := new(module2.BlockRequester)
 
 	engine, err = New(
 		log,
@@ -143,6 +145,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		txResults,
 		computationManager,
 		providerEngine,
+		blockSync,
 		executionState,
 		21,
 		metrics,
