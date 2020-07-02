@@ -200,8 +200,6 @@ func (e *blockComputer) executeCollection(
 
 			events = append(events, txEvents...)
 
-			fmt.Println(tx)
-
 			txResult := flow.TransactionResult{
 				TransactionID: tx.ID,
 			}
