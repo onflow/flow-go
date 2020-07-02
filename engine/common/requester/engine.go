@@ -23,12 +23,20 @@ type Engine struct {
 	me       module.Local
 	state    protocol.State
 	con      network.Conduit
-	sources  map[messages.Resource]Source
-	requests map[uint64]Request
+	selector flow.IdentityFilter
+	requests map[flow.Identifier]Request
 }
 
 // New creates a new consensus propagation engine.
-func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, me module.Local, state protocol.State, sources ...Source) (*Engine, error) {
+func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, me module.Local, state protocol.State,
+	channel uint8, selector flow.IdentityFilter) (*Engine, error) {
+
+	// make sure we don't send requests from self or unstaked nodes
+	selector = filter.And(
+		selector,
+		filter.HasStake(true),
+		filter.Not(filter.HasNodeID(me.NodeID())),
+	)
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
@@ -37,23 +45,16 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 		metrics:  metrics,
 		me:       me,
 		state:    state,
-		requests: make(map[uint64]Request),
+		selector: selector,
+		requests: make(map[flow.Identifier]Request),
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.ProtocolExchange, e)
+	con, err := net.Register(channel, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 	e.con = con
-
-	for _, source := range sources {
-		_, duplicate := e.sources[source.Resource]
-		if duplicate {
-			return nil, fmt.Errorf("duplicate source for resource (%s)", source.Resource)
-		}
-		e.sources[source.Resource] = source
-	}
 
 	return e, nil
 }
@@ -102,7 +103,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 // Request allows us to request an entity to be processed by the given callback.
-func (e *Engine) Request(resource messages.Resource, entityID flow.Identifier, process ProcessFunc) error {
+func (e *Engine) Request(entityID flow.Identifier, process ProcessFunc) error {
 
 	// TODO: keep track of in-flight requests to avoid duplicates
 
@@ -112,19 +113,8 @@ func (e *Engine) Request(resource messages.Resource, entityID flow.Identifier, p
 
 	// TODO: protect against race-conditions upon concurrent request/reply
 
-	// get the source for the request
-	source, exists := e.sources[resource]
-	if !exists {
-		return fmt.Errorf("request for resource without source (%s)", resource)
-	}
-
 	// determine which identities are valid recipients of the request
-	selector := filter.And(
-		source.Selector, // limit to valid sources
-		filter.Not(filter.HasNodeID(e.me.NodeID())), // disallow requests to self
-		filter.HasStake(true),                       // disallow requests to unstaked nodes
-	)
-	identities, err := e.state.Final().Identities(selector)
+	identities, err := e.state.Final().Identities(e.selector)
 	if err != nil {
 		return fmt.Errorf("could not get identities: %w", err)
 	}
@@ -135,7 +125,6 @@ func (e *Engine) Request(resource messages.Resource, entityID flow.Identifier, p
 	// select a random recipient for the request
 	target := identities[rand.Intn(len(identities))]
 	req := &messages.ResourceRequest{
-		Resource: resource,
 		EntityID: entityID,
 		Nonce:    rand.Uint64(),
 	}
@@ -151,7 +140,7 @@ func (e *Engine) Request(resource messages.Resource, entityID flow.Identifier, p
 		EntityID: entityID,
 		Process:  process,
 	}
-	e.requests[req.Nonce] = request
+	e.requests[req.EntityID] = request
 
 	return nil
 }
@@ -185,7 +174,7 @@ func (e *Engine) onResourceResponse(originID flow.Identifier, res *messages.Reso
 	// TODO: add reputation system to punish offenders of protocol conventions, slow responses
 
 	// check if we got a pending request for the given resource to the given target
-	request, ok := e.requests[res.Nonce]
+	request, ok := e.requests[res.Entity.ID()]
 	if !ok {
 		return fmt.Errorf("response for unknown request nonce (%d)", res.Nonce)
 	}

@@ -62,7 +62,7 @@ func New(
 	}
 
 	// register the engine with the network layer and store the conduit
-	_, err := net.Register(engine.CollectionProvider, e)
+	_, err := net.Register(engine.PushGuarantees, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}

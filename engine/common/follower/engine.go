@@ -66,7 +66,7 @@ func New(
 		sync:           sync,
 	}
 
-	con, err := net.Register(engine.BlockProvider, e)
+	con, err := net.Register(engine.PushBlocks, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine to network: %w", err)
 	}

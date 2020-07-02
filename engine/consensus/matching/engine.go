@@ -93,13 +93,13 @@ func New(
 	e.mempool.MempoolEntries(metrics.ResourceSeal, e.seals.Size())
 
 	// register engine with the receipt provider
-	_, err := net.Register(engine.ExecutionReceiptProvider, e)
+	_, err := net.Register(engine.PushReceipts, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for results: %w", err)
 	}
 
 	// register engine with the approval provider
-	_, err = net.Register(engine.ApprovalProvider, e)
+	_, err = net.Register(engine.PushApprovals, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for approvals: %w", err)
 	}
