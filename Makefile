@@ -35,14 +35,20 @@ crypto/relic/update:
 cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
 
+.PHONY: clang
+clang: 
+	apt-get install
+
+ifeq ($(UNAME), Linux)
+install-tools: clang
+endif
+
+ifeq ($(UNAME), Debian)
+install-tools: clang
+endif
+
 .PHONY: install-tools
 install-tools: crypto/relic/build check-go-version
-	ifeq ($(uname -s), Linux)
-		apt-get install clang
-	endif
-	ifeq ($(uname -s), Debian)
-		apt-get install clang
-	endif
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.23.8; \
 	cd ${GOPATH}; \
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
