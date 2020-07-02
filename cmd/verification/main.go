@@ -254,7 +254,7 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			core, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, node.Storage.Headers, final, verifier, finderEng, node.RootBlock.Header, node.RootQC, finalized, pending)
+			followerCore, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, node.Storage.Headers, final, verifier, finderEng, node.RootBlock.Header, node.RootQC, finalized, pending)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
@@ -270,7 +270,7 @@ func main() {
 				node.Storage.Payloads,
 				node.State,
 				pendingBlocks,
-				core,
+				followerCore,
 				syncCore,
 			)
 			if err != nil {

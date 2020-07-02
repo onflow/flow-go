@@ -99,7 +99,6 @@ type namedDoneObject struct {
 // It runs a node process with following structure, in sequential order
 // Base inits (network, storage, state, logger)
 //   PostInit handlers, if any
-//   Bootstrap handlers, if protocol state was bootstrapped
 // Components handlers, if any, wait sequentially
 // Run() <- main loop
 // Components destructors, if any

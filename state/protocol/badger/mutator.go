@@ -4,7 +4,6 @@ package badger
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
@@ -39,10 +38,8 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 
 		// FIRST: validate the root block and its payload
 
-		// the root block can not have a parent
-		if root.Header.ParentID != flow.ZeroID {
-			return errors.New("root block must not have parent")
-		}
+		// NOTE: we might need to relax these restrictions and find a way to process the
+		// payload of the root block once we implement epochs
 
 		// the root block should have an empty guarantee payload
 		if len(root.Payload.Guarantees) > 0 {

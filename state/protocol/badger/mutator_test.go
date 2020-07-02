@@ -255,6 +255,7 @@ func TestBootstrapNonZeroParent(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
 		block := unittest.GenesisFixture(participants)
+		block.Header.Height = 13
 		block.Header.ParentID = unittest.IdentifierFixture()
 
 		result := unittest.ExecutionResultFixture()
@@ -266,7 +267,7 @@ func TestBootstrapNonZeroParent(t *testing.T) {
 		seal.FinalState = result.FinalStateCommit
 
 		err := state.Mutate().Bootstrap(block, result, seal)
-		require.Error(t, err)
+		require.NoError(t, err)
 	})
 }
 
