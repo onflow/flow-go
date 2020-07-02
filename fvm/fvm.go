@@ -46,3 +46,20 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, ledger L
 
 	return account, nil
 }
+
+// invokeMetaTransaction invokes a meta transaction inside the context of an outer transaction.
+//
+// Errors that occur in a meta transaction are propagated as a single error that can be
+// captured by the Cadence runtime and eventually disambiguated by the parent context.
+func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx InvokableTransaction, ledger Ledger) error {
+	result, err := vm.Invoke(ctx, tx, ledger)
+	if err != nil {
+		return err
+	}
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	return nil
+}

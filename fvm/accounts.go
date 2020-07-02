@@ -37,10 +37,11 @@ func getAccount(
 	}
 
 	if !ok {
-		return nil, nil
+		return nil, ErrAccountNotFound
 	}
 
-	code, err := getAccountCode(ledger, address)
+	var code []byte
+	code, err = getAccountCode(ledger, address)
 	if err != nil {
 		return nil, err
 	}
@@ -48,10 +49,11 @@ func getAccount(
 	var publicKeys []flow.AccountPublicKey
 	publicKeys, err = getAccountPublicKeys(ledger, address)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	result, err := vm.Invoke(
+	var result *InvocationResult
+	result, err = vm.Invoke(
 		ctx,
 		getFlowTokenBalanceScript(address, chain.ServiceAddress()),
 		ledger,
@@ -78,13 +80,19 @@ func getAccount(
 }
 
 func getAccountCode(ledger Ledger, address flow.Address) ([]byte, error) {
-	return ledger.Get(fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyCode))
+	code, err := ledger.Get(fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyCode))
+	if err != nil {
+		return nil, newLedgerGetError(keyCode, address, err)
+	}
+
+	return code, nil
+
 }
 
 func accountExists(ledger Ledger, address flow.Address) (bool, error) {
 	exists, err := ledger.Get(fullKeyHash(string(address.Bytes()), "", keyExists))
 	if err != nil {
-		return false, err
+		return false, newLedgerGetError(keyExists, address, err)
 	}
 
 	if len(exists) != 0 {
@@ -94,18 +102,15 @@ func accountExists(ledger Ledger, address flow.Address) (bool, error) {
 	return false, nil
 }
 
-func createAccount(
-	ledger Ledger,
-	chain flow.Chain,
-	publicKeys []flow.AccountPublicKey,
-) (flow.Address, error) {
+func createAccount(ledger Ledger, chain flow.Chain, publicKeys []flow.AccountPublicKey) (flow.Address, error) {
 	addressState, err := getAddressState(ledger, chain)
 	if err != nil {
-		return flow.Address{}, err
+		return flow.EmptyAddress, err
 	}
 
 	// generate the new account address
-	newAddress, err := addressState.NextAddress()
+	var newAddress flow.Address
+	newAddress, err = addressState.NextAddress()
 	if err != nil {
 		return flow.EmptyAddress, err
 	}
@@ -140,15 +145,16 @@ func createAccountWithAddress(
 }
 
 func getAccountPublicKeys(ledger Ledger, address flow.Address) (publicKeys []flow.AccountPublicKey, err error) {
-	countBytes, err := ledger.Get(
+	var countBytes []byte
+	countBytes, err = ledger.Get(
 		fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyPublicKeyCount),
 	)
 	if err != nil {
-		return nil, err
+		return nil, newLedgerGetError(keyPublicKeyCount, address, err)
 	}
 
 	if countBytes == nil {
-		return nil, fmt.Errorf("key count not set")
+		return nil, fmt.Errorf("public key count not set on account %s", address)
 	}
 
 	countInt := new(big.Int).SetBytes(countBytes)
@@ -167,16 +173,16 @@ func getAccountPublicKeys(ledger Ledger, address flow.Address) (publicKeys []flo
 			fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyPublicKey(i)),
 		)
 		if err != nil {
-			return nil, err
+			return nil, newLedgerGetError(keyPublicKey(i), address, err)
 		}
 
 		if publicKey == nil {
-			return nil, fmt.Errorf("failed to retrieve key from account %s", address)
+			return nil, fmt.Errorf("failed to retrieve public key from account %s", address)
 		}
 
 		decodedPublicKey, err := flow.DecodeAccountPublicKey(publicKey)
 		if err != nil {
-			return nil, fmt.Errorf("failed to decode account public key: %w", err)
+			return nil, fmt.Errorf("failed to decode public key: %w", err)
 		}
 
 		publicKeys[i] = decodedPublicKey
@@ -193,7 +199,7 @@ func setAccountPublicKeys(ledger Ledger, address flow.Address, publicKeys []flow
 		fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyPublicKeyCount),
 	)
 	if err != nil {
-		return err
+		return newLedgerGetError(keyPublicKeyCount, address, err)
 	}
 
 	if countBytes != nil {
@@ -221,12 +227,12 @@ func setAccountPublicKeys(ledger Ledger, address flow.Address, publicKeys []flow
 
 		err = publicKey.Validate()
 		if err != nil {
-			return err
+			return fmt.Errorf("invalid public key: %w", err)
 		}
 
 		publicKeyBytes, err := flow.EncodeAccountPublicKey(publicKey)
 		if err != nil {
-			return fmt.Errorf("cannot encode account public key: %w", err)
+			return fmt.Errorf("failed to encode public key: %w", err)
 		}
 
 		// asserted length of publicKeys so i should always fit into uint64
@@ -260,7 +266,8 @@ func setAccountCode(ledger Ledger, address flow.Address, code []byte) error {
 
 	key := fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyCode)
 
-	prevCode, err := ledger.Get(key)
+	var prevCode []byte
+	prevCode, err = ledger.Get(key)
 	if err != nil {
 		return fmt.Errorf("cannot retreive previous code: %w", err)
 	}
@@ -318,4 +325,8 @@ func initFlowTokenTransaction(accountAddress, serviceAddress flow.Address) Invok
 
 func getFlowTokenBalanceScript(accountAddress, serviceAddress flow.Address) InvokableScript {
 	return Script([]byte(fmt.Sprintf(getFlowTokenBalanceScriptTemplate, serviceAddress, accountAddress)))
+}
+
+func newLedgerGetError(key string, address flow.Address, err error) error {
+	return fmt.Errorf("failed to read key %s on account %s: %w", key, address, err)
 }

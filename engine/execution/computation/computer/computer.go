@@ -201,8 +201,8 @@ func (e *blockComputer) executeCollection(
 				TransactionID: tx.ID(),
 			}
 			if result.Error != nil {
-				txResult.ErrorMessage = result.Error.ErrorMessage()
-				e.log.Debug().Hex("tx_id", logging.Entity(tx)).Str("error_message", result.Error.ErrorMessage()).Uint32("error_code", result.Error.StatusCode()).Msg("transaction execution failed")
+				txResult.ErrorMessage = result.Error.Error()
+				e.log.Debug().Hex("tx_id", logging.Entity(tx)).Str("error_message", result.Error.Error()).Uint32("error_code", result.Error.Code()).Msg("transaction execution failed")
 			} else {
 				e.log.Debug().Hex("tx_id", logging.Entity(tx)).Msg("transaction executed successfully")
 			}

@@ -40,7 +40,10 @@ transaction {
 }
 `
 
-func deductAccountCreationFeeTransaction(accountAddress, serviceAddress flow.Address, restrictedAccountCreationEnabled bool) InvokableTransaction {
+func deductAccountCreationFeeTransaction(
+	accountAddress, serviceAddress flow.Address,
+	restrictedAccountCreationEnabled bool,
+) InvokableTransaction {
 	var script string
 
 	if restrictedAccountCreationEnabled {

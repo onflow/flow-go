@@ -90,9 +90,13 @@ func (b *BootstrapProcedure) createServiceAccount(accountKey flow.AccountPublicK
 func (b *BootstrapProcedure) deployFungibleToken() flow.Address {
 	fungibleToken := b.createAccount()
 
-	result := b.mustInvoke(deployContractTransaction(fungibleToken, contracts.FungibleToken()))
-	if result.Error != nil {
-		panic(fmt.Sprintf("failed to deploy fungible token contract: %s", result.Error.ErrorMessage()))
+	err := b.vm.invokeMetaTransaction(
+		b.metaCtx,
+		deployContractTransaction(fungibleToken, contracts.FungibleToken()),
+		b.ledger,
+	)
+	if err != nil {
+		panic(fmt.Sprintf("failed to deploy fungible token contract: %s", err.Error()))
 	}
 
 	return fungibleToken
@@ -103,9 +107,13 @@ func (b *BootstrapProcedure) deployFlowToken(service, fungibleToken flow.Address
 
 	contract := contracts.FlowToken(fungibleToken.Hex())
 
-	result := b.mustInvoke(deployFlowTokenTransaction(flowToken, service, contract))
-	if result.Error != nil {
-		panic(fmt.Sprintf("failed to deploy Flow token contract: %s", result.Error.ErrorMessage()))
+	err := b.vm.invokeMetaTransaction(
+		b.metaCtx,
+		deployFlowTokenTransaction(flowToken, service, contract),
+		b.ledger,
+	)
+	if err != nil {
+		panic(fmt.Sprintf("failed to deploy Flow token contract: %s", err.Error()))
 	}
 
 	return flowToken
@@ -116,9 +124,13 @@ func (b *BootstrapProcedure) deployFlowFees(service, fungibleToken, flowToken fl
 
 	contract := contracts.FlowFees(fungibleToken.Hex(), flowToken.Hex())
 
-	result := b.mustInvoke(deployFlowFeesTransaction(flowFees, service, contract))
-	if result.Error != nil {
-		panic(fmt.Sprintf("failed to deploy fees contract: %s", result.Error.ErrorMessage()))
+	err := b.vm.invokeMetaTransaction(
+		b.metaCtx,
+		deployFlowFeesTransaction(flowFees, service, contract),
+		b.ledger,
+	)
+	if err != nil {
+		panic(fmt.Sprintf("failed to deploy fees contract: %s", err.Error()))
 	}
 
 	return flowFees
@@ -127,30 +139,25 @@ func (b *BootstrapProcedure) deployFlowFees(service, fungibleToken, flowToken fl
 func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowToken, feeContract flow.Address) {
 	contract := contracts.FlowServiceAccount(fungibleToken.Hex(), flowToken.Hex(), feeContract.Hex())
 
-	result := b.mustInvoke(deployContractTransaction(service, contract))
-	if result.Error != nil {
-		panic(fmt.Sprintf("failed to deploy service account contract: %s", result.Error.ErrorMessage()))
+	err := b.vm.invokeMetaTransaction(
+		b.metaCtx,
+		deployContractTransaction(service, contract),
+		b.ledger,
+	)
+	if err != nil {
+		panic(fmt.Sprintf("failed to deploy service account contract: %s", err.Error()))
 	}
 }
 
 func (b *BootstrapProcedure) mintInitialTokens(service, fungibleToken, flowToken flow.Address, initialSupply uint64) {
-	result := b.mustInvoke(mintFlowTokenTransaction(fungibleToken, flowToken, service, initialSupply))
-	if result.Error != nil {
-		panic(fmt.Sprintf("failed to mint initial token supply: %s", result.Error.ErrorMessage()))
-	}
-}
-
-func (b *BootstrapProcedure) mustInvoke(i Invokable) *InvocationResult {
-	result, err := b.vm.Invoke(b.metaCtx, i, b.ledger)
+	err := b.vm.invokeMetaTransaction(
+		b.metaCtx,
+		mintFlowTokenTransaction(fungibleToken, flowToken, service, initialSupply),
+		b.ledger,
+	)
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("failed to mint initial token supply: %s", err.Error()))
 	}
-
-	if result.Error != nil {
-		panic(result.Error.ErrorMessage())
-	}
-
-	return result
 }
 
 const deployContractTransactionTemplate = `

@@ -136,7 +136,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		assert.True(t, result.Succeeded())
 		if !assert.Nil(t, result.Error) {
-			t.Log(result.Error.ErrorMessage())
+			t.Log(result.Error)
 		}
 
 		require.Len(t, result.Events, 1)
@@ -185,7 +185,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		assert.True(t, result.Succeeded())
 
 		if !assert.Nil(t, result.Error) {
-			t.Log(result.Error.ErrorMessage())
+			t.Log(result.Error)
 		}
 	})
 
@@ -212,10 +212,10 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		assert.False(t, result.Succeeded())
 		assert.NotNil(t, result.Error)
 
-		expectedErr := "code execution failed: Execution failed:\ncode deployment requires authorization from the service account\n"
+		expectedErr := "Execution failed:\ncode deployment requires authorization from the service account\n"
 
-		assert.Equal(t, expectedErr, result.Error.ErrorMessage())
-		assert.Equal(t, uint32(9), result.Error.StatusCode())
+		assert.Equal(t, expectedErr, result.Error.Error())
+		assert.Equal(t, (&fvm.ExecutionError{}).Code(), result.Error.Code())
 	})
 }
 
@@ -454,7 +454,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 		require.NoError(t, err)
 
 		if !assert.True(t, result.Succeeded()) {
-			t.Log(result.Error.ErrorMessage())
+			t.Log(result.Error)
 		}
 	}
 
@@ -649,12 +649,13 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 	block2 := unittest.BlockWithParentFixture(block1.Header)
 	block3 := unittest.BlockWithParentFixture(block2.Header)
 
-	blockCtx := fvm.NewContextFromParent(ctx, fvm.WithBlocks(blocks), fvm.WithBlockHeader(block1.Header))
 	blocks.On("ByHeight", block1.Header.Height).Return(&block1, nil)
 	blocks.On("ByHeight", block2.Header.Height).Return(&block2, nil)
 
 	type logPanic struct{}
 	blocks.On("ByHeight", block3.Header.Height).Run(func(args mock.Arguments) { panic(logPanic{}) })
+
+	blockCtx := fvm.NewContextFromParent(ctx, fvm.WithBlocks(blocks), fvm.WithBlockHeader(block1.Header))
 
 	t.Run("works as transaction", func(t *testing.T) {
 		tx := flow.NewTransactionBody().
@@ -798,7 +799,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 		assert.True(t, result.Succeeded())
 		if !assert.Nil(t, result.Error) {
-			t.Log(result.Error.ErrorMessage())
+			t.Log(result.Error)
 		}
 
 		assert.Len(t, result.Events, 2)
@@ -848,8 +849,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 		var account *flow.Account
 		account, err = vm.GetAccount(ctx, address, ledger)
-		require.NoError(t, err)
-
+		assert.Equal(t, fvm.ErrAccountNotFound, err)
 		assert.Nil(t, account)
 	})
 }
@@ -923,7 +923,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 	require.NoError(t, err)
 
 	if !assert.True(t, result.Succeeded()) {
-		t.Fatal(result.Error.ErrorMessage())
+		t.Fatal(result.Error.Error())
 	}
 
 	require.Len(t, result.Events, 1)

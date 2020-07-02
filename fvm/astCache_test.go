@@ -149,7 +149,7 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 	require.NoError(t, err)
 
 	if !assert.Nil(t, result.Error) {
-		t.Fatal(result.Error.ErrorMessage())
+		t.Fatal(result.Error)
 	}
 
 	// Determine location of transaction
@@ -228,6 +228,7 @@ func TestTransactionWithProgramASTCacheConsistentRegTouches(t *testing.T) {
 
 func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 	rt := runtime.NewInterpreterRuntime()
+
 	chain := flow.Mainnet.Chain()
 
 	vm := fvm.New(rt, chain)
@@ -285,7 +286,7 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 			require.NoError(b, err)
 
 			if !assert.Nil(b, result.Error) {
-				b.Fatal(result.Error.ErrorMessage())
+				b.Fatal(result.Error)
 			}
 		}
 	}
@@ -391,7 +392,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 
 			result, err := vm.Invoke(ctx, fvm.Script(script), ledger)
 			if !assert.True(t, result.Succeeded()) {
-				t.Log(result.Error.ErrorMessage())
+				t.Log(result.Error)
 			}
 			require.NoError(t, err)
 			require.True(t, result.Succeeded())

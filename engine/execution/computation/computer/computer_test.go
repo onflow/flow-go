@@ -22,6 +22,7 @@ import (
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("single collection", func(t *testing.T) {
+
 		execCtx := fvm.NewContext()
 
 		vm := new(computermock.VirtualMachine)

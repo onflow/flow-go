@@ -76,7 +76,6 @@ func New(
 }
 
 func (e *Manager) ExecuteScript(script []byte, arguments [][]byte, blockHeader *flow.Header, view *delta.View) ([]byte, error) {
-
 	blockCtx := fvm.NewContextFromParent(e.execCtx, fvm.WithBlockHeader(blockHeader))
 
 	result, err := e.vm.Invoke(blockCtx, fvm.Script(script).WithArguments(arguments), view)
@@ -85,7 +84,7 @@ func (e *Manager) ExecuteScript(script []byte, arguments [][]byte, blockHeader *
 	}
 
 	if !result.Succeeded() {
-		return nil, fmt.Errorf("failed to execute script at block (%s): %s", blockHeader.ID(), result.Error.ErrorMessage())
+		return nil, fmt.Errorf("failed to execute script at block (%s): %s", blockHeader.ID(), result.Error.Error())
 	}
 
 	encodedValue, err := jsoncdc.Encode(result.Value)

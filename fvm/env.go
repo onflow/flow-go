@@ -356,9 +356,7 @@ func (e *transactionEnv) GetComputationLimit() uint64 {
 }
 
 func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
-	var result *InvocationResult
-
-	result, err = e.vm.Invoke(
+	err = e.vm.invokeMetaTransaction(
 		e.txCtx,
 		deductAccountCreationFeeTransaction(
 			flow.Address(payer),
@@ -371,22 +369,6 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 		return address, err
 	}
 
-	if result.Error != nil {
-		// TODO: properly propagate this error
-
-		switch err := result.Error.(type) {
-		case *CodeExecutionError:
-			return address, err.RuntimeError.Unwrap()
-		default:
-			// Account creation should fail due to insufficient balance, which is reported in `flowErr`.
-			// Should we tree other FlowErrors as fatal?
-			return address, fmt.Errorf(
-				"failed to deduct account creation fee: %s",
-				err.ErrorMessage(),
-			)
-		}
-	}
-
 	var flowAddress flow.Address
 
 	flowAddress, err = createAccount(e.ledger, e.vm.chain, nil)
@@ -394,27 +376,13 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 		return address, err
 	}
 
-	result, err = e.vm.Invoke(
+	err = e.vm.invokeMetaTransaction(
 		e.txCtx,
 		initFlowTokenTransaction(flowAddress, e.vm.chain.ServiceAddress()),
 		e.ledger,
 	)
 	if err != nil {
 		return address, err
-	}
-
-	if result.Error != nil {
-		// TODO: properly propagate this error
-
-		switch err := result.Error.(type) {
-		case *CodeExecutionError:
-			return runtime.Address{}, err.RuntimeError.Unwrap()
-		default:
-			return runtime.Address{}, fmt.Errorf(
-				"failed to initialize default token: %s",
-				err.ErrorMessage(),
-			)
-		}
 	}
 
 	return runtime.Address(flowAddress), nil
@@ -510,18 +478,18 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, index int) (p
 // This function returns an error if the specified account does not exist or is
 // not a valid signing account.
 func (e *transactionEnv) UpdateAccountCode(address runtime.Address, code []byte) (err error) {
+	accountAddress := flow.Address(address)
+
 	// currently, every transaction that sets account code (deploys/updates contracts)
 	// must be signed by the service account
-	if e.restrictContractDeployment && !e.isValidSigningAccount(runtime.Address(e.vm.chain.ServiceAddress())) {
+	if e.restrictContractDeployment && !e.isAuthorizer(runtime.Address(e.vm.chain.ServiceAddress())) {
 		return fmt.Errorf("code deployment requires authorization from the service account")
 	}
-
-	accountAddress := flow.Address(address)
 
 	return setAccountCode(e.ledger, accountAddress, code)
 }
 
-func (e *transactionEnv) isValidSigningAccount(address runtime.Address) bool {
+func (e *transactionEnv) isAuthorizer(address runtime.Address) bool {
 	for _, accountAddress := range e.GetSigningAccounts() {
 		if accountAddress == address {
 			return true
