@@ -108,7 +108,11 @@ func (stt *SparseTopologyTestSuite) TestDisjointedNetwork() {
 	// create engines
 	engs := make([]*MeshEngine, 0)
 	for _, n := range stt.nets {
+<<<<<<< HEAD
 		eng := NewMeshEngine(stt.Suite.T(), n, count-1, engine.TestNetwork)
+=======
+		eng := NewMeshEngine(stt.Suite.T(), n, count-1, engine.PushTransactions)
+>>>>>>> 5079ec686... made exchange engines single-entity
 		engs = append(engs, eng)
 	}
 
