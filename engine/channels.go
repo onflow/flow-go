@@ -21,39 +21,91 @@ const (
 	SyncCluster   = 21
 	SyncExecution = 22
 
-	// Channels for actively requesting missing entities related to transactions
-	ExchangeTransactions = 100
-	ExchangeCollections  = 101
-	ExchangeGuarantees   = 102
-
-	// Channels for actively requesting missing entities related to consensus
-	ExchangeHeaders  = 110
-	ExchangeIndexes  = 111
-	ExchangePayloads = 112
-	ExchangeBlocks   = 113
-
-	// Channels for actively requesting missing entities related to execution
-	ExchangeChunks    = 120
-	ExchangeReceipts  = 121
-	ExchangeResults   = 122
-	ExchangeApprovals = 123
-	ExchangeSeals     = 124
-
 	// Channels for actively pushing entities related to transactions
-	PushTransactions = 200
-	PushGuarantees   = 201
-	PushCollections  = 202
+	PushTransactions = 100
+	PushGuarantees   = 101
+	PushCollections  = 102
 
 	// Channels for actively pushing entities related to blocks
-	PushBlocks = 203
+	PushBlocks = 110
 
 	// Channels for actively pushing entities related to execution
-	PushChunks    = 204
-	PushReceipts  = 205
-	PushApprovals = 206
+	PushChunks    = 120
+	PushReceipts  = 121
+	PushApprovals = 122
+
+	// Channels for actively requesting missing entities related to transactions
+	ExchangeTransactions = 200
+	ExchangeCollections  = 201
+	ExchangeGuarantees   = 202
+
+	// Channels for actively requesting missing entities related to consensus
+	ExchangeHeaders  = 210
+	ExchangeIndexes  = 211
+	ExchangePayloads = 212
+	ExchangeBlocks   = 213
+
+	// Channels for actively requesting missing entities related to execution
+	ExchangeChunks    = 220
+	ExchangeReceipts  = 221
+	ExchangeResults   = 222
+	ExchangeApprovals = 223
+	ExchangeSeals     = 224
 )
 
 func ChannelName(channelID uint8) string {
+	switch channelID {
+	case TestEcho:
+		return "test-echo"
+	case ConsensusCommittee:
+		return "consensus-committee"
+	case ConsensusCluster:
+		return "consensus-cluster"
+	case SyncCommittee:
+		return "sync-committee"
+	case SyncCluster:
+		return "sync-cluster"
+	case SyncExecution:
+		return "sync-execution"
+	case PushTransactions:
+		return "push-transactions"
+	case PushGuarantees:
+		return "push-guarantees"
+	case PushCollections:
+		return "push-collections"
+	case PushBlocks:
+		return "push-blocks"
+	case PushChunks:
+		return "push-chunks"
+	case PushReceipts:
+		return "push-receipts"
+	case PushApprovals:
+		return "push-approvals"
+	case ExchangeTransactions:
+		return "exchange-transactions"
+	case ExchangeCollections:
+		return "exchange-collections"
+	case ExchangeGuarantees:
+		return "exchange-guarantees"
+	case ExchangeHeaders:
+		return "exchange-headers"
+	case ExchangeIndexes:
+		return "exchange-indexes"
+	case ExchangePayloads:
+		return "exchange-payloads"
+	case ExchangeBlocks:
+		return "exchange-blocks"
+	case ExchangeChunks:
+		return "exchange-chunks"
+	case ExchangeReceipts:
+		return "exchange-receipts"
+	case ExchangeResults:
+		return "exchange-results"
+	case ExchangeApprovals:
+		return "exchange-approvals"
+	case ExchangeSeals:
+		return "exchange-seals"
+	}
 	return fmt.Sprintf("unknown-channel-%d", channelID)
 }
 
