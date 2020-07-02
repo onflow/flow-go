@@ -26,6 +26,9 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	proposalKey := tx.ProposalKey
 
 	accountKeys, err := getAccountPublicKeys(ledger, proposalKey.Address)
+	if err != nil {
+		return err
+	}
 
 	if int(proposalKey.KeyID) >= len(accountKeys) {
 		return &ProposalKeyDoesNotExistError{
