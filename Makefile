@@ -37,7 +37,7 @@ cmd/collection/collection:
 
 .PHONY: clang
 clang: 
-	apt-get install
+	apt-get install clang
 
 ifeq ($(UNAME), Linux)
 install-tools: clang
