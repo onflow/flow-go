@@ -106,8 +106,6 @@ func registerConduits(net module.Network, eng network.Engine) (map[uint8]network
 		engine.PushChunks,
 		engine.PushReceipts,
 		engine.PushApprovals,
-		engine.ExecutionStateProvider,
-		engine.ExecutionComputer,
 	}
 
 	conduitMap := make(map[uint8]network.Conduit, len(allEngineIDs))

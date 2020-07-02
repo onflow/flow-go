@@ -9,14 +9,17 @@ import (
 // Enum of channel IDs to avoid accidental conflicts.
 const (
 
+	// Channels used for testing
+	TestEcho = 00
+
 	// Channels for consensus protocols
-	ConsensusCommittee = 01
-	ConsensusCluster   = 02
+	ConsensusCommittee = 10
+	ConsensusCluster   = 11
 
 	// Channels for protocols actively synchronizing state across nodes
-	SyncCommittee = 10
-	SyncCluster   = 11
-	SyncExecution = 12
+	SyncCommittee = 20
+	SyncCluster   = 21
+	SyncExecution = 22
 
 	// Channels for actively requesting missing entities related to transactions
 	ExchangeTransactions = 100
@@ -48,10 +51,6 @@ const (
 	PushChunks    = 204
 	PushReceipts  = 205
 	PushApprovals = 206
-
-	// Special channels for state exchange
-	ExecutionStateProvider = 101
-	ExecutionComputer      = 102
 )
 
 func ChannelName(channelID uint8) string {

@@ -115,10 +115,10 @@ func (s *StubEngineTestSuite) TestDuplicateMessageSequential() {
 	rcvID := 1
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, engine.ExecutionComputer, false)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, engine.TestEcho, false)
 
 	// receiver's engine
-	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.ExecutionComputer, false)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.TestEcho, false)
 
 	// Sends a message from sender to receiver
 	event := &message.Echo{
@@ -146,10 +146,10 @@ func (s *StubEngineTestSuite) TestDuplicateMessageParallel() {
 	rcvID := 1
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, engine.ExecutionComputer, false)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, engine.TestEcho, false)
 
 	// receiver's engine
-	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.ExecutionComputer, false)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.TestEcho, false)
 
 	// Sends a message from sender to receiver
 	event := &message.Echo{
@@ -184,7 +184,7 @@ func (s *StubEngineTestSuite) TestDuplicateMessageDifferentChan() {
 	)
 	const (
 		channel1 = engine.PushReceipts
-		channel2 = engine.ExecutionComputer
+		channel2 = engine.TestEcho
 	)
 	// registers engines in the network
 	// first type
@@ -241,10 +241,10 @@ func (s *StubEngineTestSuite) singleMessage(echo bool) {
 
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, engine.ExecutionComputer, echo)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, engine.TestEcho, echo)
 
 	// receiver's engine
-	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.ExecutionComputer, echo)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.TestEcho, echo)
 
 	// Sends a message from sender to receiver
 	event := &message.Echo{
@@ -311,10 +311,10 @@ func (s *StubEngineTestSuite) multiMessageSync(echo bool, count int) {
 	rcvID := 1
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, engine.ExecutionComputer, echo)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, engine.TestEcho, echo)
 
 	// receiver's engine
-	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.ExecutionComputer, echo)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.TestEcho, echo)
 
 	for i := 0; i < count; i++ {
 		// Send the message to receiver
@@ -384,10 +384,10 @@ func (s *StubEngineTestSuite) multiMessageAsync(echo bool, count int) {
 
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, engine.ExecutionComputer, echo)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, engine.TestEcho, echo)
 
 	// receiver's engine
-	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.ExecutionComputer, echo)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, engine.TestEcho, echo)
 
 	// keeps track of async received messages at receiver side
 	received := make(map[string]struct{})
