@@ -14,7 +14,7 @@ import (
 )
 
 type VirtualMachine interface {
-	Invoke(fvm.Context, fvm.Invokable, fvm.Ledger) error
+	Run(fvm.Context, fvm.Procedure, fvm.Ledger) error
 }
 
 // ChunkVerifier is a verifier based on the current definitions of the flow network
@@ -82,7 +82,7 @@ func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) (chmodels
 
 		tx := fvm.Transaction(txBody)
 
-		err := fcv.vm.Invoke(blockCtx, tx, txView)
+		err := fcv.vm.Run(blockCtx, tx, txView)
 		if err != nil {
 			// this covers unexpected and very rare cases (e.g. system memory issues...),
 			// so we shouldn't be here even if transaction naturally fails (e.g. permission, runtime ... )

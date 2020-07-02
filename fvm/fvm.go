@@ -6,9 +6,9 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// An Invokable is a procedure that can be executed by the virtual machine.
-type Invokable interface {
-	Invoke(vm *VirtualMachine, ctx Context, ledger Ledger) error
+// An Procedure is an operation (or set of operations) that reads or writes ledger state.
+type Procedure interface {
+	Run(vm *VirtualMachine, ctx Context, ledger Ledger) error
 }
 
 // A VirtualMachine augments the Cadence runtime with Flow host functionality.
@@ -23,12 +23,12 @@ func New(rt runtime.Runtime) *VirtualMachine {
 	}
 }
 
-// Invoke invokes an invokable in a context against the given ledger.
-func (vm *VirtualMachine) Invoke(ctx Context, i Invokable, ledger Ledger) error {
-	return i.Invoke(vm, ctx, ledger)
+// Run runs a procedure against a ledger in the given context.
+func (vm *VirtualMachine) Run(ctx Context, proc Procedure, ledger Ledger) error {
+	return proc.Run(vm, ctx, ledger)
 }
 
-// GetAccount returns the account with the given address or an error if none exists.
+// GetAccount returns an account by address or an error if none exists.
 func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, ledger Ledger) (*flow.Account, error) {
 	account, err := getAccount(vm, ctx, ledger, address)
 	if err != nil {
@@ -43,7 +43,7 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, ledger L
 //
 // Errors that occur in a meta transaction are propagated as a single error that can be
 // captured by the Cadence runtime and eventually disambiguated by the parent context.
-func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *InvokableTransaction, ledger Ledger) error {
+func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *TransactionProcedure, ledger Ledger) error {
 	ctx = NewContextFromParent(
 		ctx,
 		WithTransactionProcessors([]TransactionProcessor{
@@ -51,7 +51,7 @@ func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *InvokableTransa
 		}),
 	)
 
-	err := vm.Invoke(ctx, tx, ledger)
+	err := vm.Run(ctx, tx, ledger)
 	if err != nil {
 		return err
 	}

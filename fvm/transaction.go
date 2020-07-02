@@ -10,14 +10,14 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func Transaction(tx *flow.TransactionBody) *InvokableTransaction {
-	return &InvokableTransaction{
+func Transaction(tx *flow.TransactionBody) *TransactionProcedure {
+	return &TransactionProcedure{
 		Transaction: tx,
 		ID:          tx.ID(),
 	}
 }
 
-type InvokableTransaction struct {
+type TransactionProcedure struct {
 	Transaction *flow.TransactionBody
 	ID          flow.Identifier
 	Logs        []string
@@ -28,19 +28,19 @@ type InvokableTransaction struct {
 }
 
 type TransactionProcessor interface {
-	Process(*VirtualMachine, Context, *InvokableTransaction, Ledger) error
+	Process(*VirtualMachine, Context, *TransactionProcedure, Ledger) error
 }
 
-func (inv *InvokableTransaction) Invoke(vm *VirtualMachine, ctx Context, ledger Ledger) error {
+func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, ledger Ledger) error {
 	for _, p := range ctx.TransactionProcessors {
-		err := p.Process(vm, ctx, inv, ledger)
+		err := p.Process(vm, ctx, proc, ledger)
 		vmErr, fatalErr := handleError(err)
 		if fatalErr != nil {
 			return fatalErr
 		}
 
 		if vmErr != nil {
-			inv.Err = vmErr
+			proc.Err = vmErr
 			return nil
 		}
 	}
@@ -48,10 +48,10 @@ func (inv *InvokableTransaction) Invoke(vm *VirtualMachine, ctx Context, ledger 
 	return nil
 }
 
-func (inv *InvokableTransaction) ConvertEvents(txIndex uint32) ([]flow.Event, error) {
-	flowEvents := make([]flow.Event, len(inv.Events))
+func (proc *TransactionProcedure) ConvertEvents(txIndex uint32) ([]flow.Event, error) {
+	flowEvents := make([]flow.Event, len(proc.Events))
 
-	for i, event := range inv.Events {
+	for i, event := range proc.Events {
 		payload, err := jsoncdc.Encode(event)
 		if err != nil {
 			return nil, fmt.Errorf("failed to encode event: %w", err)
@@ -59,7 +59,7 @@ func (inv *InvokableTransaction) ConvertEvents(txIndex uint32) ([]flow.Event, er
 
 		flowEvents[i] = flow.Event{
 			Type:             flow.EventType(event.EventType.ID()),
-			TransactionID:    inv.ID,
+			TransactionID:    proc.ID,
 			TransactionIndex: txIndex,
 			EventIndex:       uint32(i),
 			Payload:          payload,
@@ -78,21 +78,21 @@ func NewTransactionInvocator() *TransactionInvocator {
 func (i *TransactionInvocator) Process(
 	vm *VirtualMachine,
 	ctx Context,
-	inv *InvokableTransaction,
+	proc *TransactionProcedure,
 	ledger Ledger,
 ) error {
 	env := newEnvironment(ctx, ledger)
-	env.setTransaction(vm, inv.Transaction)
+	env.setTransaction(vm, proc.Transaction)
 
-	location := runtime.TransactionLocation(inv.ID[:])
+	location := runtime.TransactionLocation(proc.ID[:])
 
-	err := vm.Runtime.ExecuteTransaction(inv.Transaction.Script, inv.Transaction.Arguments, env, location)
+	err := vm.Runtime.ExecuteTransaction(proc.Transaction.Script, proc.Transaction.Arguments, env, location)
 	if err != nil {
 		return err
 	}
 
-	inv.Events = env.getEvents()
-	inv.Logs = env.getLogs()
+	proc.Events = env.getEvents()
+	proc.Logs = env.getLogs()
 
 	return nil
 }

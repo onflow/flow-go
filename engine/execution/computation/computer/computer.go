@@ -19,7 +19,7 @@ import (
 )
 
 type VirtualMachine interface {
-	Invoke(fvm.Context, fvm.Invokable, fvm.Ledger) error
+	Run(fvm.Context, fvm.Procedure, fvm.Ledger) error
 }
 
 // A BlockComputer executes the transactions in a block.
@@ -176,7 +176,7 @@ func (e *blockComputer) executeCollection(
 
 			tx := fvm.Transaction(txBody)
 
-			err := e.vm.Invoke(txCtx, tx, txView)
+			err := e.vm.Run(txCtx, tx, txView)
 
 			if e.metrics != nil {
 				e.metrics.TransactionParsed(txMetrics.Parsed())

@@ -32,7 +32,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		// create a block with 1 collection with 2 transactions
 		block := generateBlock(1, 2)
 
-		vm.On("Invoke", mock.Anything, mock.Anything, mock.Anything).
+		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
 			Twice()
 
@@ -66,9 +66,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		// create dummy events
 		events := generateEvents(eventsPerTransaction)
 
-		vm.On("Invoke", mock.Anything, mock.Anything, mock.Anything).
+		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
 			Run(func(args mock.Arguments) {
-				tx := args[1].(*fvm.InvokableTransaction)
+				tx := args[1].(*fvm.TransactionProcedure)
 
 				tx.Err = &fvm.MissingPayerError{}
 				tx.Events = events

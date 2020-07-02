@@ -35,7 +35,7 @@ func Bootstrap(
 	}
 }
 
-func (b *BootstrapProcedure) Invoke(vm *VirtualMachine, ctx Context, ledger Ledger) error {
+func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, ledger Ledger) error {
 	b.vm = vm
 	b.ctx = NewContextFromParent(ctx, WithRestrictedDeployment(false))
 	b.ledger = ledger
@@ -206,7 +206,7 @@ transaction(amount: UFix64) {
 }
 `
 
-func deployContractTransaction(address flow.Address, contract []byte) *InvokableTransaction {
+func deployContractTransaction(address flow.Address, contract []byte) *TransactionProcedure {
 	return Transaction(
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(deployContractTransactionTemplate, hex.EncodeToString(contract)))).
@@ -214,7 +214,7 @@ func deployContractTransaction(address flow.Address, contract []byte) *Invokable
 	)
 }
 
-func deployFlowTokenTransaction(flowToken, service flow.Address, contract []byte) *InvokableTransaction {
+func deployFlowTokenTransaction(flowToken, service flow.Address, contract []byte) *TransactionProcedure {
 	return Transaction(
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(deployFlowTokenTransactionTemplate, hex.EncodeToString(contract)))).
@@ -223,7 +223,7 @@ func deployFlowTokenTransaction(flowToken, service flow.Address, contract []byte
 	)
 }
 
-func deployFlowFeesTransaction(flowFees, service flow.Address, contract []byte) *InvokableTransaction {
+func deployFlowFeesTransaction(flowFees, service flow.Address, contract []byte) *TransactionProcedure {
 	return Transaction(
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(deployFlowFeesTransactionTemplate, hex.EncodeToString(contract)))).
@@ -235,7 +235,7 @@ func deployFlowFeesTransaction(flowFees, service flow.Address, contract []byte) 
 func mintFlowTokenTransaction(
 	fungibleToken, flowToken, service flow.Address,
 	initialSupply uint64,
-) *InvokableTransaction {
+) *TransactionProcedure {
 	initialSupplyArg, err := jsoncdc.Encode(cadence.NewUFix64(initialSupply))
 	if err != nil {
 		panic(fmt.Sprintf("failed to encode initial token supply: %s", err.Error()))

@@ -13,10 +13,10 @@ func NewTransactionSequenceNumberChecker() *TransactionSequenceNumberChecker {
 func (c *TransactionSequenceNumberChecker) Process(
 	vm *VirtualMachine,
 	ctx Context,
-	inv *InvokableTransaction,
+	proc *TransactionProcedure,
 	ledger Ledger,
 ) error {
-	return c.checkAndIncrementSequenceNumber(inv.Transaction, ledger)
+	return c.checkAndIncrementSequenceNumber(proc.Transaction, ledger)
 }
 
 func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(

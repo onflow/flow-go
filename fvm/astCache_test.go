@@ -47,7 +47,7 @@ func TestTransactionASTCache(t *testing.T) {
 
 		tx := fvm.Transaction(txBody)
 
-		err = vm.Invoke(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -86,7 +86,7 @@ func TestScriptASTCache(t *testing.T) {
 
 		script := fvm.Script(code)
 
-		err := vm.Invoke(ctx, script, ledger)
+		err := vm.Run(ctx, script, ledger)
 		require.NoError(t, err)
 
 		assert.NoError(t, script.Err)
@@ -151,7 +151,7 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 
 	tx := fvm.Transaction(txBody)
 
-	err = vm.Invoke(ctx, tx, ledger)
+	err = vm.Run(ctx, tx, ledger)
 	require.NoError(t, err)
 
 	assert.NoError(t, tx.Err)
@@ -225,7 +225,7 @@ func TestTransactionWithProgramASTCacheConsistentRegTouches(t *testing.T) {
 
 		tx := fvm.Transaction(txBody)
 
-		err = vm.Invoke(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -294,7 +294,7 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 			// Run the Use import (FT Vault resource) transaction.
 			tx := fvm.Transaction(txBody)
 
-			err := vm.Invoke(ctx, tx, ledger)
+			err := vm.Run(ctx, tx, ledger)
 			assert.NoError(b, err)
 
 			assert.NoError(b, tx.Err)
@@ -365,7 +365,7 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 			// Run the Use import (FT Vault resource) transaction.
 			tx := fvm.Transaction(txBody)
 
-			err := vm.Invoke(ctx, tx, ledger)
+			err := vm.Run(ctx, tx, ledger)
 			assert.NoError(b, err)
 
 			assert.NoError(b, tx.Err)
@@ -405,7 +405,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 
 			script := fvm.Script(code)
 
-			err := vm.Invoke(ctx, script, ledger)
+			err := vm.Run(ctx, script, ledger)
 			require.NoError(t, err)
 
 			assert.NoError(t, script.Err)

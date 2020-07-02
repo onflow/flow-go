@@ -8,16 +8,16 @@ import (
 	"github.com/dapperlabs/flow-go/model/hash"
 )
 
-func Script(code []byte) *InvokableScript {
+func Script(code []byte) *ScriptProcedure {
 	scriptHash := hash.DefaultHasher.ComputeHash(code)
 
-	return &InvokableScript{
+	return &ScriptProcedure{
 		Script: code,
 		ID:     flow.HashToID(scriptHash),
 	}
 }
 
-type InvokableScript struct {
+type ScriptProcedure struct {
 	Script    []byte
 	Arguments [][]byte
 	ID        flow.Identifier
@@ -30,26 +30,26 @@ type InvokableScript struct {
 }
 
 type ScriptProcessor interface {
-	Process(*VirtualMachine, Context, *InvokableScript, Ledger) error
+	Process(*VirtualMachine, Context, *ScriptProcedure, Ledger) error
 }
 
-func (inv *InvokableScript) WithArguments(args [][]byte) *InvokableScript {
-	return &InvokableScript{
-		Script:    inv.Script,
+func (proc *ScriptProcedure) WithArguments(args [][]byte) *ScriptProcedure {
+	return &ScriptProcedure{
+		Script:    proc.Script,
 		Arguments: args,
 	}
 }
 
-func (inv *InvokableScript) Invoke(vm *VirtualMachine, ctx Context, ledger Ledger) error {
+func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, ledger Ledger) error {
 	for _, p := range ctx.ScriptProcessors {
-		err := p.Process(vm, ctx, inv, ledger)
+		err := p.Process(vm, ctx, proc, ledger)
 		vmErr, fatalErr := handleError(err)
 		if fatalErr != nil {
 			return fatalErr
 		}
 
 		if vmErr != nil {
-			inv.Err = vmErr
+			proc.Err = vmErr
 			return nil
 		}
 	}
@@ -66,21 +66,21 @@ func NewScriptInvocator() ScriptInvocator {
 func (i ScriptInvocator) Process(
 	vm *VirtualMachine,
 	ctx Context,
-	inv *InvokableScript,
+	proc *ScriptProcedure,
 	ledger Ledger,
 ) error {
 	env := newEnvironment(ctx, ledger)
 
-	location := runtime.ScriptLocation(inv.ID[:])
+	location := runtime.ScriptLocation(proc.ID[:])
 
-	value, err := vm.Runtime.ExecuteScript(inv.Script, inv.Arguments, env, location)
+	value, err := vm.Runtime.ExecuteScript(proc.Script, proc.Arguments, env, location)
 	if err != nil {
 		return err
 	}
 
-	inv.Value = value
-	inv.Logs = env.getLogs()
-	inv.Events = env.getEvents()
+	proc.Value = value
+	proc.Logs = env.getLogs()
+	proc.Events = env.getEvents()
 
 	return nil
 }

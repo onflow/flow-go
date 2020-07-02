@@ -11,10 +11,10 @@ func NewTransactionFeeDeductor() *TransactionFeeDeductor {
 func (d *TransactionFeeDeductor) Process(
 	vm *VirtualMachine,
 	ctx Context,
-	inv *InvokableTransaction,
+	proc *TransactionProcedure,
 	ledger Ledger,
 ) error {
-	return d.deductFees(vm, ctx, inv.Transaction, ledger)
+	return d.deductFees(vm, ctx, proc.Transaction, ledger)
 }
 
 func (d *TransactionFeeDeductor) deductFees(

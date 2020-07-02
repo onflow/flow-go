@@ -176,7 +176,7 @@ func CreateAccountsWithSimpleAddresses(
 			AddAuthorizer(serviceAddress)
 
 		tx := fvm.Transaction(txBody)
-		err := vm.Invoke(ctx, tx, ledger)
+		err := vm.Run(ctx, tx, ledger)
 		if err != nil {
 			return nil, err
 		}
@@ -208,7 +208,7 @@ func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context) *fvm.MapLed
 		Registers:   make(map[string]flow.RegisterValue),
 	}
 
-	_ = vm.Invoke(
+	_ = vm.Run(
 		ctx,
 		fvm.Bootstrap(unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply),
 		ledger,

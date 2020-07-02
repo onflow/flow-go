@@ -38,7 +38,7 @@ func (b *Bootstrapper) BootstrapLedger(
 
 	ctx := fvm.NewContext(fvm.WithChain(chain))
 
-	err := vm.Invoke(ctx, fvm.Bootstrap(servicePublicKey, initialTokenSupply), view)
+	err := vm.Run(ctx, fvm.Bootstrap(servicePublicKey, initialTokenSupply), view)
 	if err != nil {
 		return nil, err
 	}

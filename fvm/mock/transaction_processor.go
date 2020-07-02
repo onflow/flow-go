@@ -13,11 +13,11 @@ type TransactionProcessor struct {
 }
 
 // Process provides a mock function with given fields: _a0, _a1, _a2, _a3
-func (_m *TransactionProcessor) Process(_a0 *fvm.VirtualMachine, _a1 fvm.Context, _a2 *fvm.InvokableTransaction, _a3 fvm.Ledger) error {
+func (_m *TransactionProcessor) Process(_a0 *fvm.VirtualMachine, _a1 fvm.Context, _a2 *fvm.TransactionProcedure, _a3 fvm.Ledger) error {
 	ret := _m.Called(_a0, _a1, _a2, _a3)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*fvm.VirtualMachine, fvm.Context, *fvm.InvokableTransaction, fvm.Ledger) error); ok {
+	if rf, ok := ret.Get(0).(func(*fvm.VirtualMachine, fvm.Context, *fvm.TransactionProcedure, fvm.Ledger) error); ok {
 		r0 = rf(_a0, _a1, _a2, _a3)
 	} else {
 		r0 = ret.Error(0)

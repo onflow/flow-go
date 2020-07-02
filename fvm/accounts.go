@@ -53,7 +53,7 @@ func getAccount(
 
 	script := getFlowTokenBalanceScript(address, ctx.Chain.ServiceAddress())
 
-	err = vm.Invoke(
+	err = vm.Run(
 		ctx,
 		script,
 		ledger,
@@ -315,7 +315,7 @@ pub fun main(): UFix64 {
 }
 `
 
-func initFlowTokenTransaction(accountAddress, serviceAddress flow.Address) *InvokableTransaction {
+func initFlowTokenTransaction(accountAddress, serviceAddress flow.Address) *TransactionProcedure {
 	return Transaction(
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(initFlowTokenTransactionTemplate, serviceAddress))).
@@ -323,7 +323,7 @@ func initFlowTokenTransaction(accountAddress, serviceAddress flow.Address) *Invo
 	)
 }
 
-func getFlowTokenBalanceScript(accountAddress, serviceAddress flow.Address) *InvokableScript {
+func getFlowTokenBalanceScript(accountAddress, serviceAddress flow.Address) *ScriptProcedure {
 	return Script([]byte(fmt.Sprintf(getFlowTokenBalanceScriptTemplate, serviceAddress, accountAddress)))
 }
 

@@ -12,12 +12,12 @@ type VirtualMachine struct {
 	mock.Mock
 }
 
-// Invoke provides a mock function with given fields: _a0, _a1, _a2
-func (_m *VirtualMachine) Invoke(_a0 fvm.Context, _a1 fvm.Invokable, _a2 fvm.Ledger) error {
+// Run provides a mock function with given fields: _a0, _a1, _a2
+func (_m *VirtualMachine) Run(_a0 fvm.Context, _a1 fvm.Procedure, _a2 fvm.Ledger) error {
 	ret := _m.Called(_a0, _a1, _a2)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(fvm.Context, fvm.Invokable, fvm.Ledger) error); ok {
+	if rf, ok := ret.Get(0).(func(fvm.Context, fvm.Procedure, fvm.Ledger) error); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
 		r0 = ret.Error(0)

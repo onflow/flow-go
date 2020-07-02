@@ -50,7 +50,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		tx := fvm.Transaction(txBody)
 
-		err = vm.Invoke(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.Nil(t, tx.Err)
@@ -83,7 +83,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		tx := fvm.Transaction(txBody)
 
-		err = vm.Invoke(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.Error(t, tx.Err)
@@ -107,7 +107,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		tx := fvm.Transaction(txBody)
 
-		err = vm.Invoke(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		require.Len(t, tx.Logs, 2)
@@ -133,7 +133,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		tx := fvm.Transaction(txBody)
 
-		err = vm.Invoke(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -179,7 +179,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx := fvm.Transaction(txBody)
 
-		err = vm.Invoke(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -203,7 +203,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx := fvm.Transaction(txBody)
 
-		err = vm.Invoke(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.Error(t, tx.Err)
@@ -235,13 +235,13 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 		script      string
 		args        [][]byte
 		authorizers []flow.Address
-		check       func(t *testing.T, tx *fvm.InvokableTransaction)
+		check       func(t *testing.T, tx *fvm.TransactionProcedure)
 	}{
 		{
 			label:  "No parameters",
 			script: `transaction { execute { log("Hello, World!") } }`,
 			args:   [][]byte{arg1},
-			check: func(t *testing.T, tx *fvm.InvokableTransaction) {
+			check: func(t *testing.T, tx *fvm.TransactionProcedure) {
 				assert.Error(t, tx.Err)
 			},
 		},
@@ -249,7 +249,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 			label:  "Single parameter",
 			script: `transaction(x: Int) { execute { log(x) } }`,
 			args:   [][]byte{arg1},
-			check: func(t *testing.T, tx *fvm.InvokableTransaction) {
+			check: func(t *testing.T, tx *fvm.TransactionProcedure) {
 				require.NoError(t, tx.Err)
 				require.Len(t, tx.Logs, 1)
 				assert.Equal(t, "42", tx.Logs[0])
@@ -259,7 +259,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 			label:  "Multiple parameters",
 			script: `transaction(x: Int, y: String) { execute { log(x); log(y) } }`,
 			args:   [][]byte{arg1, arg2},
-			check: func(t *testing.T, tx *fvm.InvokableTransaction) {
+			check: func(t *testing.T, tx *fvm.TransactionProcedure) {
 				require.NoError(t, tx.Err)
 				require.Len(t, tx.Logs, 2)
 				assert.Equal(t, "42", tx.Logs[0])
@@ -275,7 +275,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 				}`,
 			args:        [][]byte{arg1, arg2},
 			authorizers: []flow.Address{chain.ServiceAddress()},
-			check: func(t *testing.T, tx *fvm.InvokableTransaction) {
+			check: func(t *testing.T, tx *fvm.TransactionProcedure) {
 				require.NoError(t, tx.Err)
 				assert.ElementsMatch(t, []string{"0x" + chain.ServiceAddress().Hex(), "42", `"foo"`}, tx.Logs)
 			},
@@ -299,7 +299,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 
 			tx := fvm.Transaction(txBody)
 
-			err = vm.Invoke(ctx, tx, ledger)
+			err = vm.Run(ctx, tx, ledger)
 			require.NoError(t, err)
 
 			tt.check(t, tx)
@@ -337,13 +337,13 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 		label    string
 		script   string
 		gasLimit uint64
-		check    func(t *testing.T, tx *fvm.InvokableTransaction)
+		check    func(t *testing.T, tx *fvm.TransactionProcedure)
 	}{
 		{
 			label:    "Zero",
 			script:   gasLimitScript(100),
 			gasLimit: 0,
-			check: func(t *testing.T, tx *fvm.InvokableTransaction) {
+			check: func(t *testing.T, tx *fvm.TransactionProcedure) {
 				// gas limit of zero is ignored by runtime
 				require.NoError(t, tx.Err)
 			},
@@ -352,7 +352,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 			label:    "Insufficient",
 			script:   gasLimitScript(100),
 			gasLimit: 5,
-			check: func(t *testing.T, tx *fvm.InvokableTransaction) {
+			check: func(t *testing.T, tx *fvm.TransactionProcedure) {
 				assert.Error(t, tx.Err)
 			},
 		},
@@ -360,7 +360,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 			label:    "Sufficient",
 			script:   gasLimitScript(100),
 			gasLimit: 1000,
-			check: func(t *testing.T, tx *fvm.InvokableTransaction) {
+			check: func(t *testing.T, tx *fvm.TransactionProcedure) {
 				require.NoError(t, tx.Err)
 				require.Len(t, tx.Logs, 100)
 			},
@@ -380,7 +380,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 
 			tx := fvm.Transaction(txBody)
 
-			err = vm.Invoke(ctx, tx, ledger)
+			err = vm.Run(ctx, tx, ledger)
 			require.NoError(t, err)
 
 			tt.check(t, tx)
@@ -452,7 +452,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 
 		tx := fvm.Transaction(txBody)
 
-		err := vm.Invoke(ctx, tx, ledger)
+		err := vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -496,7 +496,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 
 		tx := fvm.Transaction(txBody)
 
-		err := vm.Invoke(ctx, tx, ledger)
+		err := vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -515,7 +515,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 
 		tx := fvm.Transaction(txBody)
 
-		err := vm.Invoke(ctx, tx, ledger)
+		err := vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.Error(t, tx.Err)
@@ -531,7 +531,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 
 		tx := fvm.Transaction(txBody)
 
-		err := vm.Invoke(ctx, tx, ledger)
+		err := vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -551,7 +551,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 
 		tx := fvm.Transaction(txBody)
 
-		err := vm.Invoke(ctx, tx, ledger)
+		err := vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -571,7 +571,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 
 		tx := fvm.Transaction(txBody)
 
-		err := vm.Invoke(ctx, tx, ledger)
+		err := vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.Error(t, tx.Err)
@@ -601,7 +601,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		script := fvm.Script(code)
 
-		err := vm.Invoke(ctx, script, ledger)
+		err := vm.Run(ctx, script, ledger)
 		assert.NoError(t, err)
 
 		assert.NoError(t, script.Err)
@@ -619,7 +619,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		script := fvm.Script(code)
 
-		err := vm.Invoke(ctx, script, ledger)
+		err := vm.Run(ctx, script, ledger)
 		assert.NoError(t, err)
 
 		assert.Error(t, script.Err)
@@ -638,7 +638,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		script := fvm.Script(code)
 
-		err := vm.Invoke(ctx, script, ledger)
+		err := vm.Run(ctx, script, ledger)
 		assert.NoError(t, err)
 
 		assert.NoError(t, script.Err)
@@ -696,7 +696,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 		tx := fvm.Transaction(txBody)
 
-		err = vm.Invoke(blockCtx, tx, ledger)
+		err = vm.Run(blockCtx, tx, ledger)
 		assert.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -723,7 +723,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 		script := fvm.Script(code)
 
-		err := vm.Invoke(blockCtx, script, ledger)
+		err := vm.Run(blockCtx, script, ledger)
 		assert.NoError(t, err)
 
 		assert.NoError(t, script.Err)
@@ -755,7 +755,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		assert.PanicsWithValue(t, interpreter.ExternalError{
 			Recovered: logPanic{},
 		}, func() {
-			_ = vm.Invoke(blockCtx, fvm.Transaction(tx), ledger)
+			_ = vm.Run(blockCtx, fvm.Transaction(tx), ledger)
 		})
 	})
 
@@ -772,7 +772,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		assert.PanicsWithValue(t, interpreter.ExternalError{
 			Recovered: logPanic{},
 		}, func() {
-			_ = vm.Invoke(blockCtx, fvm.Script(script), ledger)
+			_ = vm.Run(blockCtx, fvm.Script(script), ledger)
 		})
 	})
 }
@@ -816,7 +816,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		// execute the transaction
 		tx := fvm.Transaction(txBody)
 
-		err = vm.Invoke(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -906,7 +906,7 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 
 		tx := fvm.Transaction(txBody)
 
-		err = vm.Invoke(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger)
 		assert.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -942,7 +942,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 
 	tx := fvm.Transaction(txBody)
 
-	err = vm.Invoke(ctx, tx, ledger)
+	err = vm.Run(ctx, tx, ledger)
 	assert.NoError(t, err)
 
 	assert.NoError(t, tx.Err)

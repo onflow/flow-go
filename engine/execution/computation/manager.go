@@ -19,7 +19,7 @@ import (
 )
 
 type VirtualMachine interface {
-	Invoke(fvm.Context, fvm.Invokable, fvm.Ledger) error
+	Run(fvm.Context, fvm.Procedure, fvm.Ledger) error
 	GetAccount(fvm.Context, flow.Address, fvm.Ledger) (*flow.Account, error)
 }
 
@@ -77,7 +77,7 @@ func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *fl
 
 	script := fvm.Script(code).WithArguments(arguments)
 
-	err := e.vm.Invoke(blockCtx, script, view)
+	err := e.vm.Run(blockCtx, script, view)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
 	}
