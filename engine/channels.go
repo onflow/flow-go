@@ -29,23 +29,9 @@ const (
 	PushReceipts     = 103
 	PushApprovals    = 104
 
-	// Channels for actively requesting missing entities related to transactions
-	RequestTransactions = 200
-	RequestCollections  = 201
-	RequestGuarantees   = 202
-
-	// Channels for actively requesting missing entities related to consensus
-	RequestHeaders  = 210
-	RequestIndexes  = 211
-	RequestPayloads = 212
-	RequestBlocks   = 213
-
-	// Channels for actively requesting missing entities related to execution
-	RequestChunks    = 220
-	RequestReceipts  = 221
-	RequestResults   = 222
-	RequestApprovals = 223
-	RequestSeals     = 224
+	// Channels for actively requesting missing entities
+	RequestCollections = 200
+	RequestChunks      = 201
 
 	// Channel aliases to make the code more readable / more robust to errors
 	ReceiveTransactions = PushTransactions
@@ -53,18 +39,8 @@ const (
 	ReceiveBlocks       = PushBlocks
 	ReceiveReceipts     = PushReceipts
 	ReceiveApprovals    = PushApprovals
-	ProvideTransactinos = RequestTransactions
 	ProvideCollections  = RequestCollections
-	ProvideGuarantees   = RequestGuarantees
-	ProvideHeaders      = RequestHeaders
-	ProvideIndexes      = RequestIndexes
-	ProvidePayloads     = RequestPayloads
-	ProvideBlocks       = RequestBlocks
 	ProvideChunks       = RequestChunks
-	ProvideReceipts     = RequestReceipts
-	ProvideResults      = RequestResults
-	ProvideApprovals    = RequestApprovals
-	ProvideSeals        = RequestSeals
 )
 
 func ChannelName(channelID uint8) string {
@@ -93,30 +69,10 @@ func ChannelName(channelID uint8) string {
 		return "push-receipts"
 	case PushApprovals:
 		return "push-approvals"
-	case RequestTransactions:
-		return "request-transactions"
 	case RequestCollections:
 		return "request-collections"
-	case RequestGuarantees:
-		return "request-guarantees"
-	case RequestHeaders:
-		return "request-headers"
-	case RequestIndexes:
-		return "request-indexes"
-	case RequestPayloads:
-		return "request-payloads"
-	case RequestBlocks:
-		return "request-blocks"
 	case RequestChunks:
 		return "request-chunks"
-	case RequestReceipts:
-		return "request-receipts"
-	case RequestResults:
-		return "request-results"
-	case RequestApprovals:
-		return "request-approvals"
-	case RequestSeals:
-		return "request-seals"
 	}
 	return fmt.Sprintf("unknown-channel-%d", channelID)
 }
