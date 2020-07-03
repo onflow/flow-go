@@ -22,18 +22,12 @@ const (
 	SyncCluster   = 21
 	SyncExecution = 22
 
-	// Channels for actively pushing entities related to transactions
+	// Channels for actively pushing entities to subscribers
 	PushTransactions = 100
 	PushGuarantees   = 101
-	PushCollections  = 102
-
-	// Channels for actively pushing entities related to blocks
-	PushBlocks = 110
-
-	// Channels for actively pushing entities related to execution
-	PushChunks    = 120
-	PushReceipts  = 121
-	PushApprovals = 122
+	PushBlocks       = 102
+	PushReceipts     = 103
+	PushApprovals    = 104
 
 	// Channels for actively requesting missing entities related to transactions
 	RequestTransactions = 200
@@ -95,8 +89,6 @@ func ChannelName(channelID uint8) string {
 		return "push-transactions"
 	case PushGuarantees:
 		return "push-guarantees"
-	case PushCollections:
-		return "push-collections"
 	case PushBlocks:
 		return "push-blocks"
 	case PushChunks:

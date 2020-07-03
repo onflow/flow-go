@@ -320,7 +320,7 @@ func setupMockConsensusNode(t *testing.T,
 			wg.Done()
 		}).Return(nil)
 
-	_, err := conNode.Net.Register(engine.PushApprovals, conEngine)
+	_, err := conNode.Net.Register(engine.ReceiveApprovals, conEngine)
 	assert.Nil(t, err)
 
 	return &conNode, conEngine, wg

@@ -183,8 +183,8 @@ func (s *StubEngineTestSuite) TestDuplicateMessageDifferentChan() {
 		rcvNode
 	)
 	const (
-		channel1 = engine.PushReceipts
-		channel2 = engine.TestNetwork
+		channel1 = engine.TestNetwork
+		channel2 = engine.TestMetrics
 	)
 	// registers engines in the network
 	// first type
