@@ -16,6 +16,7 @@ require (
 	github.com/golang/protobuf v1.4.0
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.4
+	github.com/improbable-eng/grpc-web v0.12.0
 	github.com/ipfs/go-log v1.0.4
 	github.com/jrick/bitset v1.0.0
 	github.com/libp2p/go-libp2p v0.10.0
@@ -26,7 +27,7 @@ require (
 	github.com/libp2p/go-tcp-transport v0.2.0
 	github.com/multiformats/go-multiaddr v0.2.2
 	github.com/onflow/cadence v0.4.1-0.20200604200650-30a200f9c324
-	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200611205353-548107cc9aca
+	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200619174948-a3a856d16a27
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.3.0

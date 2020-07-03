@@ -8,7 +8,7 @@ test:
 
 # Run the integration test suite
 .PHONY: integration-test
-integration-test: collection-tests consensus-tests common-tests execution-tests
+integration-test: collection-tests consensus-tests common-tests execution-tests verification-tests
 
 .PHONY: collection-tests
 collection-tests:
@@ -26,6 +26,14 @@ common-tests:
 execution-tests:
 	GO111MODULE=on go test -tags relic -count=1 ./tests/execution
 
+.PHONY: verification-tests
+verification-tests:
+	GO111MODULE=on go test -tags relic -count=1 ./tests/verification
+
 .PHONY: benchmark
 benchmark:
 	GO111MODULE=on go test -tags relic -count=1 -timeout 30m ./benchmark -run Benchmark
+
+.PHONY: spam-localnet
+spam:
+	GO111MODULE=on go run -tags relic ./benchmark/main -verbose=true

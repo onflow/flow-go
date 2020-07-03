@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
@@ -84,6 +85,9 @@ func writeUint64(buffer []byte, location int, value uint64) int {
 
 // writeShortData writes data shorter than 16kB and returns next free position
 func writeShortData(buffer []byte, location int, data []byte) int {
+	if len(data) > math.MaxUint16 {
+		panic(fmt.Sprintf("short data too long! %d", len(data)))
+	}
 	location = writeUint16(buffer, location, uint16(len(data)))
 	return writeData(buffer, location, data)
 }
@@ -140,6 +144,9 @@ func readLongDataFromReader(reader io.Reader) ([]byte, error) {
 
 // writeLongData writes data shorter than 32MB and returns next free position
 func writeLongData(buffer []byte, location int, data []byte) int {
+	if len(data) > math.MaxUint32 {
+		panic(fmt.Sprintf("long data too long! %d", len(data)))
+	}
 	location = writeUint32(buffer, location, uint32(len(data)))
 	return writeData(buffer, location, data)
 }
@@ -329,53 +336,36 @@ func ReadStorableNode(reader io.Reader) (*flattener.StorableNode, error) {
 }
 
 // EncodeStorableTrie encodes StorableTrie
-// 8-bytes Big Endian uint64 Number
 // 8-bytes Big Endian uint64 RootIndex
 // 2-bytes Big Endian uint16 RootHash length
 // RootHash bytes
-// 2-bytes Big Endian uint16 ParentRootHash length
-// ParentRootHash bytes
 func EncodeStorableTrie(storableTrie *flattener.StorableTrie) []byte {
-	length := 8 + 8 + 2 + len(storableTrie.RootHash) + 2 + len(storableTrie.ParentRootHash)
-
+	length := 8 + 2 + len(storableTrie.RootHash)
 	buf := make([]byte, length)
-
-	pos := 0
-
-	pos = writeUint64(buf, pos, storableTrie.Number)
-	pos = writeUint64(buf, pos, storableTrie.RootIndex)
-	pos = writeShortData(buf, pos, storableTrie.RootHash)
-	writeShortData(buf, pos, storableTrie.ParentRootHash)
+	pos := writeUint64(buf, 0, storableTrie.RootIndex)
+	writeShortData(buf, pos, storableTrie.RootHash)
 
 	return buf
 }
 
 func ReadStorableTrie(reader io.Reader) (*flattener.StorableTrie, error) {
+	storableNode := &flattener.StorableTrie{}
 
-	buf := make([]byte, 8+8)
-
-	read, err := reader.Read(buf)
+	// read root uint64 RootIndex
+	buf := make([]byte, 8)
+	read, err := io.ReadFull(reader, buf)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read fixed-legth part: %w", err)
 	}
 	if read != len(buf) {
 		return nil, fmt.Errorf("not enough bytes read %d expected %d", read, len(buf))
 	}
+	storableNode.RootIndex, _ = readUint64(buf, 0)
 
-	pos := 0
-
-	storableNode := &flattener.StorableTrie{}
-
-	storableNode.Number, pos = readUint64(buf, pos)
-	storableNode.RootIndex, _ = readUint64(buf, pos)
-
+	// read RootHash bytes: variable length
 	storableNode.RootHash, err = readShortDataFromReader(reader)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read roothash data: %w", err)
-	}
-	storableNode.ParentRootHash, err = readShortDataFromReader(reader)
-	if err != nil {
-		return nil, fmt.Errorf("cannot read parentRootHash data: %w", err)
 	}
 
 	return storableNode, nil

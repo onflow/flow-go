@@ -5,14 +5,15 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/runtime"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/engine/execution/testutil"
+	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -75,12 +76,14 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 
 	metricsCollector := &metrics.NoopCollector{}
 
+	log := zerolog.Nop()
+
 	unittest.RunWithTempDir(t, func(dir string) {
 		led, err := ledger.NewMTrieStorage(dir, 100, metricsCollector, nil)
 		require.NoError(t, err)
 		defer led.Done()
 
-		startStateCommitment, err := bootstrap.BootstrapLedger(
+		startStateCommitment, err := bootstrap.NewBootstrapper(log).BootstrapLedger(
 			led,
 			unittest.ServiceAccountPublicKey,
 			unittest.GenesisTokenSupply,
@@ -89,14 +92,15 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 		require.NoError(t, err)
 
 		rt := runtime.NewInterpreterRuntime()
-		vm, err := virtualmachine.New(rt, chain)
+
+		vm, err := fvm.New(rt, chain)
 		require.NoError(t, err)
 
 		// create state.View
 		view := delta.NewView(state.LedgerGetRegister(led, startStateCommitment))
 
 		// create BlockComputer
-		bc := computer.NewBlockComputer(vm, new(storage.Blocks), nil, nil)
+		bc := computer.NewBlockComputer(vm, new(storage.Blocks), nil, nil, log)
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
 		completeColls[guarantee.ID()] = &entity.CompleteCollection{

@@ -43,6 +43,6 @@ func init() {
 	}
 
 	// Cannot import virtual machine, due to circular dependency. Just use the value of
-	// virtualmachine.AccountKeyWeightThreshold here
+	// fvm.AccountKeyWeightThreshold here
 	ServiceAccountPublicKey = ServiceAccountPrivateKey.PublicKey(1000)
 }

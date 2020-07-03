@@ -11,16 +11,17 @@ import (
 
 	collectioningest "github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
+	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/verification/finder"
 	"github.com/dapperlabs/flow-go/engine/verification/match"
+	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -44,6 +45,7 @@ type GenericNode struct {
 	Payloads   storage.Payloads
 	Blocks     storage.Blocks
 	State      protocol.State
+	Index      storage.Index
 	Me         module.Local
 	Net        *stub.Network
 	DBDir      string
@@ -90,17 +92,26 @@ type ExecutionNode struct {
 	IngestionEngine *ingestion.Engine
 	ExecutionEngine *computation.Manager
 	ReceiptsEngine  *executionprovider.Engine
+	SyncEngine      *synchronization.Engine
 	BadgerDB        *badger.DB
-	VM              virtualmachine.VirtualMachine
+	VM              fvm.VirtualMachine
 	ExecutionState  state.ExecutionState
 	Ledger          storage.Ledger
 	LevelDbDir      string
 	Collections     storage.Collections
 }
 
+func (en ExecutionNode) Ready() {
+	<-en.Ledger.Ready()
+	<-en.ReceiptsEngine.Ready()
+	<-en.IngestionEngine.Ready()
+	<-en.SyncEngine.Ready()
+}
+
 func (en ExecutionNode) Done() {
 	<-en.IngestionEngine.Done()
 	<-en.ReceiptsEngine.Done()
+	<-en.SyncEngine.Done()
 	<-en.Ledger.Done()
 	os.RemoveAll(en.LevelDbDir)
 	en.GenericNode.Done()

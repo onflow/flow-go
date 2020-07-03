@@ -1,5 +1,3 @@
-// Package proposal implements an engine for proposing and guaranteeing
-// collections and submitting them to consensus nodes.
 package proposal
 
 import (
@@ -47,10 +45,11 @@ type Engine struct {
 	pending        module.PendingClusterBlockBuffer // pending block cache
 	participants   flow.IdentityList                // consensus participants in our cluster
 
-	sync     module.Synchronization
+	sync     module.BlockRequester
 	hotstuff module.HotStuff
 }
 
+// New returns a new collection proposal engine.
 func New(
 	log zerolog.Logger,
 	net module.Network,
@@ -66,6 +65,7 @@ func New(
 	headers storage.Headers,
 	payloads storage.ClusterPayloads,
 	cache module.PendingClusterBlockBuffer,
+	sync module.BlockRequester,
 ) (*Engine, error) {
 
 	participants, err := protocol.ClusterFor(protoState.Final(), me.NodeID())
@@ -89,7 +89,7 @@ func New(
 		payloads:       payloads,
 		pending:        cache,
 		participants:   participants,
-		sync:           nil, // use WithSynchronization
+		sync:           sync,
 		hotstuff:       nil, // use WithHotStuff
 	}
 
@@ -102,13 +102,6 @@ func New(
 	e.con = con
 
 	return e, nil
-}
-
-// WithSynchronization adds the synchronization engine responsible for bringing the node
-// up to speed to the compliance engine.
-func (e *Engine) WithSynchronization(sync module.Synchronization) *Engine {
-	e.sync = sync
-	return e
 }
 
 // WithConsensus adds the consensus algorithm to the engine. This must be
@@ -129,7 +122,6 @@ func (e *Engine) Ready() <-chan struct{} {
 		panic("must initialize compliance engine with hotstuff engine")
 	}
 	return e.unit.Ready(func() {
-		<-e.sync.Ready()
 		<-e.hotstuff.Ready()
 	})
 }
@@ -137,8 +129,6 @@ func (e *Engine) Ready() <-chan struct{} {
 // Done returns a done channel that is closed once the engine has fully stopped.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
-		e.log.Debug().Msg("shutting down synchronization engine")
-		<-e.sync.Done()
 		e.log.Debug().Msg("shutting down hotstuff eventloop")
 		<-e.hotstuff.Done()
 		e.log.Debug().Msg("all components have been shut down")
@@ -328,7 +318,7 @@ func (e *Engine) after(msg string) {
 	e.engMetrics.MessageHandled(metrics.EngineProposal, msg)
 }
 
-// onSyncedBlock processes a block synced by the assembly engine.
+// onSyncedBlock processes a block synced by the synchronization engine.
 func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedClusterBlock) error {
 
 	// a block that is synced has to come locally, from the synchronization engine
@@ -345,19 +335,20 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedCl
 	return e.onBlockProposal(synced.Block.Header.ProposerID, proposal)
 }
 
-// onBlockProposal handles proposals for new blocks.
+// onBlockProposal handles block proposals. Proposals are either processed
+// immediately if possible, or added to the pending cache.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
 
 	header := proposal.Header
 	payload := proposal.Payload
 
 	log := e.log.With().
-		Hex("origin_id", logging.ID(originID)).
-		Hex("block_id", logging.ID(header.ID())).
+		Hex("origin_id", originID[:]).
+		Hex("block_id", logging.Entity(header)).
 		Uint64("block_height", header.Height).
-		Int("collection_size", payload.Collection.Len()).
 		Str("chain_id", header.ChainID.String()).
 		Hex("parent_id", logging.ID(header.ParentID)).
+		Int("collection_size", payload.Collection.Len()).
 		Logger()
 
 	log.Debug().Msg("received proposal")
@@ -469,6 +460,9 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	return nil
 }
 
+// processBlockProposal processes a block that connects to finalized state.
+// First we ensure the block is a valid extension of chain state, then store
+// the block on disk, then enqueue the block for processing by HotStuff.
 func (e *Engine) processBlockProposal(proposal *messages.ClusterBlockProposal) error {
 
 	header := proposal.Header
@@ -534,6 +528,9 @@ func (e *Engine) processBlockProposal(proposal *messages.ClusterBlockProposal) e
 
 }
 
+// processPendingChildren handles processing pending children after successfully
+// processing their parent. Regardless of whether processing succeeds, each
+// child will be discarded (and re-requested later on if needed).
 func (e *Engine) processPendingChildren(header *flow.Header) error {
 	blockID := header.ID()
 
@@ -580,7 +577,8 @@ func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.ClusterBlo
 	return nil
 }
 
-// prunePendingCache prunes the pending block cache.
+// prunePendingCache prunes the pending block cache by removing any blocks that
+// are below the finalized height.
 func (e *Engine) prunePendingCache() {
 
 	// retrieve the finalized height

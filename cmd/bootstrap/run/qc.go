@@ -23,6 +23,7 @@ import (
 	"github.com/dapperlabs/flow-go/state/protocol"
 	protoBadger "github.com/dapperlabs/flow-go/state/protocol/badger"
 	storeBadger "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 type Participant struct {
@@ -35,14 +36,14 @@ type ParticipantData struct {
 	Participants []Participant
 }
 
-func GenerateGenesisQC(participantData ParticipantData, block *flow.Block) (*model.QuorumCertificate, error) {
-	ps, db, err := NewProtocolState(block)
+func GenerateRootQC(participantData ParticipantData, block *flow.Block) (*model.QuorumCertificate, error) {
+	state, db, err := NewProtocolState(block)
 	if err != nil {
 		return nil, err
 	}
 	defer db.Close()
 
-	validators, signers, err := createValidators(ps, participantData, block)
+	validators, signers, err := createValidators(state, participantData, block)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +159,9 @@ func NewProtocolState(block *flow.Block) (*protoBadger.State, *badger.DB, error)
 		return nil, nil, err
 	}
 
-	err = state.Mutate().Bootstrap(nil, block)
+	result := bootstrap.Result(block, unittest.GenesisStateCommitment)
+	seal := bootstrap.Seal(result)
+	err = state.Mutate().Bootstrap(block, result, seal)
 	if err != nil {
 		return nil, nil, err
 	}

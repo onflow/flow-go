@@ -15,9 +15,11 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
+	realModule "github.com/dapperlabs/flow-go/module"
 	real "github.com/dapperlabs/flow-go/module/buffer"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	module "github.com/dapperlabs/flow-go/module/mock"
+	"github.com/dapperlabs/flow-go/module/trace"
 	netint "github.com/dapperlabs/flow-go/network"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protint "github.com/dapperlabs/flow-go/state/protocol"
@@ -48,6 +50,7 @@ type ComplianceSuite struct {
 	// mocked dependencies
 	me       *module.Local
 	metrics  *metrics.NoopCollector
+	tracer   realModule.Tracer
 	cleaner  *storage.Cleaner
 	headers  *storage.Headers
 	payloads *storage.Payloads
@@ -59,7 +62,7 @@ type ComplianceSuite struct {
 	prov     *network.Engine
 	pending  *module.PendingBlockBuffer
 	hotstuff *module.HotStuff
-	sync     *module.Synchronization
+	sync     *module.BlockRequester
 
 	// engine under test
 	e *Engine
@@ -236,7 +239,7 @@ func (cs *ComplianceSuite) SetupTest() {
 	cs.hotstuff.On("Done", mock.Anything).Return(closed)
 
 	// set up synchronization module mock
-	cs.sync = &module.Synchronization{}
+	cs.sync = &module.BlockRequester{}
 	cs.sync.On("RequestBlock", mock.Anything).Return(nil)
 
 	cs.sync.On("Done", mock.Anything).Return(closed)
@@ -244,14 +247,16 @@ func (cs *ComplianceSuite) SetupTest() {
 	// set up no-op metrics mock
 	cs.metrics = metrics.NewNoopCollector()
 
+	// set up no-op tracer
+	cs.tracer = trace.NewNoopTracer()
+
 	// initialize the engine
 	log := zerolog.New(os.Stderr)
-	blockRateDelay := time.Duration(0)
-	e, err := New(log, cs.metrics, cs.metrics, cs.metrics, cs.net, cs.me, cs.cleaner, cs.headers, cs.payloads, cs.state, cs.prov, cs.pending, blockRateDelay)
+	e, err := New(log, cs.metrics, cs.tracer, cs.metrics, cs.metrics, cs.net, cs.me, cs.cleaner, cs.headers, cs.payloads, cs.state, cs.prov, cs.pending, cs.sync)
 	require.NoError(cs.T(), err, "engine initialization should pass")
 
 	// assign engine with consensus & synchronization
-	cs.e = e.WithConsensus(cs.hotstuff).WithSynchronization(cs.sync)
+	cs.e = e.WithConsensus(cs.hotstuff)
 }
 
 func (cs *ComplianceSuite) TestSendVote() {
