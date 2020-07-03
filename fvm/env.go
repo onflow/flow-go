@@ -192,7 +192,7 @@ func (e *hostEnv) Logs() []string {
 
 func (e *hostEnv) VerifySignature(
 	signature []byte,
-	tag []byte,
+	tag string,
 	message []byte,
 	rawPublicKey []byte,
 	rawSigAlgo string,

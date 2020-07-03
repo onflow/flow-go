@@ -5,6 +5,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 type SignatureVerifier interface {
@@ -61,7 +62,7 @@ func newHasher(hashAlgo hash.HashingAlgorithm) hash.Hasher {
 func verifySignatureFromRuntime(
 	verifier SignatureVerifier,
 	signature []byte,
-	tag []byte,
+	rawTag string,
 	message []byte,
 	rawPublicKey []byte,
 	rawSigAlgo string,
@@ -74,6 +75,12 @@ func verifySignatureFromRuntime(
 	if err != nil {
 		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return false, err
+	}
+
+	tag := parseRuntimeDomainTag(rawTag)
+	if tag == nil {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return false, fmt.Errorf("invalid domain tag")
 	}
 
 	valid, err := verifier.Verify(
@@ -89,4 +96,14 @@ func verifySignatureFromRuntime(
 	}
 
 	return valid, nil
+}
+
+const runtimeUserDomainTag = "user"
+
+func parseRuntimeDomainTag(tag string) []byte {
+	if tag == runtimeUserDomainTag {
+		return flow.UserDomainTag[:]
+	}
+
+	return nil
 }

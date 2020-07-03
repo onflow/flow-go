@@ -1066,8 +1066,7 @@ func TestSignatureVerification(t *testing.T) {
 
 	signMessage := func(privateKey crypto.PrivateKey, m []byte) cadence.Array {
 		message := append(
-			// TODO: replace with constant
-			[]byte("FLOW-V0.0-user"),
+			flow.UserDomainTag[:],
 			m...,
 		)
 
