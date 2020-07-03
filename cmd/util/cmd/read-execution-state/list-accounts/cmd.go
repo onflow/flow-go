@@ -10,8 +10,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
+	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
 )
@@ -77,7 +77,7 @@ func run(*cobra.Command, []string) {
 		return values[0], nil
 	})
 
-	dal := virtualmachine.NewLedgerDAL(ledger, chain)
+	dal := fvm.NewLedgerDAL(ledger, chain)
 
 	finalGenerator, err := dal.GetAddressState()
 	if err != nil {

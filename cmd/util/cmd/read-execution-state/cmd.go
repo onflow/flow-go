@@ -45,13 +45,13 @@ func loadExecutionState() *mtrie.MForest {
 		nil,
 		flagExecutionStateDir,
 		ledger.CacheSize,
-		ledger.MaxHeight,
+		ledger.RegisterKeySize,
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while creating WAL")
 	}
 
-	mForest, err := mtrie.NewMForest(ledger.MaxHeight, flagExecutionStateDir, ledger.CacheSize, metrics.NewNoopCollector(), nil)
+	mForest, err := mtrie.NewMForest(ledger.RegisterKeySize, flagExecutionStateDir, ledger.CacheSize, metrics.NewNoopCollector(), nil)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while creating mForest")
 	}
