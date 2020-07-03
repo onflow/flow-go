@@ -19,22 +19,29 @@ type Ledger interface {
 //
 // This implementation is designed for testing purposes.
 type MapLedger struct {
-	RegTouchSet map[string]bool
-	Registers   map[string]flow.RegisterValue
+	Registers       map[string]flow.RegisterValue
+	RegisterTouches map[string]bool
+}
+
+func NewMapLedger() *MapLedger {
+	return &MapLedger{
+		Registers:       make(map[string]flow.RegisterValue),
+		RegisterTouches: make(map[string]bool),
+	}
 }
 
 func (m MapLedger) Set(key flow.RegisterID, value flow.RegisterValue) {
-	m.RegTouchSet[string(key)] = true
+	m.RegisterTouches[string(key)] = true
 	m.Registers[string(key)] = value
 }
 
 func (m MapLedger) Get(key flow.RegisterID) (flow.RegisterValue, error) {
-	m.RegTouchSet[string(key)] = true
+	m.RegisterTouches[string(key)] = true
 	return m.Registers[string(key)], nil
 }
 
 func (m MapLedger) Touch(key flow.RegisterID) {
-	m.RegTouchSet[string(key)] = true
+	m.RegisterTouches[string(key)] = true
 }
 
 func (m MapLedger) Delete(key flow.RegisterID) {

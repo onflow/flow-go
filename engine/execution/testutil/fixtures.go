@@ -203,10 +203,7 @@ func CreateAccountsWithSimpleAddresses(
 }
 
 func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context) *fvm.MapLedger {
-	ledger := &fvm.MapLedger{
-		RegTouchSet: make(map[string]bool),
-		Registers:   make(map[string]flow.RegisterValue),
-	}
+	ledger := fvm.NewMapLedger()
 
 	_ = vm.Run(
 		ctx,
