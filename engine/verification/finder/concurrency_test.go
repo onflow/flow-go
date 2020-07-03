@@ -16,7 +16,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/testutil"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/metrics"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -126,9 +125,7 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 	assigner := utils.NewMockAssigner(verID.NodeID, IsAssigned)
 
 	// creates a verification node with a real finder engine, and mock matching engine.
-	// no metrics is meant to be collected, hence both verification and mempool collectors are noop
-	collector := metrics.NewNoopCollector()
-	verNode := testutil.VerificationNode(t, hub, collector, collector, verID, identities,
+	verNode := testutil.VerificationNode(t, hub, verID, identities,
 		assigner, requestInterval, failureThreshold, chainID, testutil.WithMatchEngine(matchEng))
 
 	// the wait group tracks goroutines for each Execution Receipt sent to finder engine
