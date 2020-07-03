@@ -7,7 +7,7 @@ require (
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/dapperlabs/flow-core-contracts/contracts v0.0.0-20200526041238-ad2360621a1a
 	github.com/dapperlabs/flow-go/crypto v0.3.2-0.20200312195452-df4550a863b7
-	github.com/dapperlabs/flow-go/integration v0.0.0-00010101000000-000000000000
+	github.com/dapperlabs/flow-go/integration v0.0.0-20200703223707-7a384b7e6166
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/ethereum/go-ethereum v1.9.9
