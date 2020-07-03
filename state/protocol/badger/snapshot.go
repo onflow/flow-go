@@ -33,17 +33,24 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		return nil, s.err
 	}
 
-	// NOTE: we always use the genesis identities for now
-	var genesisID flow.Identifier
-	err := s.state.db.View(operation.LookupBlockHeight(0, &genesisID))
+	// retrieve the root height
+	var height uint64
+	err := s.state.db.View(operation.RetrieveRootHeight(&height))
 	if err != nil {
-		return nil, fmt.Errorf("could not look up genesis block: %w", err)
+		return nil, fmt.Errorf("could not retrieve root height: %w", err)
+	}
+
+	// retrieve root block ID
+	var rootID flow.Identifier
+	err = s.state.db.View(operation.LookupBlockHeight(height, &rootID))
+	if err != nil {
+		return nil, fmt.Errorf("could not look up root block: %w", err)
 	}
 
 	// retrieve identities from storage
-	payload, err := s.state.payloads.ByBlockID(genesisID)
+	payload, err := s.state.payloads.ByBlockID(rootID)
 	if err != nil {
-		return nil, fmt.Errorf("could not get identities for block: %w", err)
+		return nil, fmt.Errorf("could not get root block payload: %w", err)
 	}
 
 	// apply the filter to the identities

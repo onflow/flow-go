@@ -18,4 +18,4 @@ Useful for sporking the network.
 
 Content of `output-dir` shall be used as Execution Node state directory to boot EN.
 
-Command should also print 
+Command should also print state commitment.

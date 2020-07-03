@@ -27,11 +27,10 @@ var (
 	FilenameTransitKeyPub      = "transit-key.pub.%v"
 	FilenameTransitKeyPriv     = "transit-key.priv.%v"
 	FilenameRandomBeaconCipher = bootstrap.FilenameRandomBeaconPriv + ".%v.enc"
+	flowBucket                 string
 )
 
 const fileMode = os.FileMode(0644)
-
-const flowBucket = "flow-genesis-bootstrap"
 
 var (
 
@@ -44,7 +43,7 @@ var (
 	filesToUploadConsensus = FilenameTransitKeyPub
 
 	// default folder to download for all role type
-	folderToDownload = bootstrap.DirnamePublicGenesis
+	folderToDownload = bootstrap.DirnamePublicBootstrap
 
 	// consensus node additionally gets the random beacon file
 	filesToDownloadConsensus = FilenameRandomBeaconCipher
@@ -52,15 +51,16 @@ var (
 
 func main() {
 
-	var bootdir, keydir, wrapId, role string
-	var pull, push bool
+	var bootDir, keyDir, wrapID, role string
+	var pull, push, prepare bool
 
-	flag.StringVar(&bootdir, "d", "~/bootstrap", "The bootstrap directory containing your node-info files")
-	flag.StringVar(&keydir, "t", "", "Token provided by the Flow team to access the transit server")
+	flag.StringVar(&bootDir, "d", "~/bootstrap", "The bootstrap directory containing your node-info files")
+	flag.StringVar(&keyDir, "t", "", "Token provided by the Flow team to access the transit server")
 	flag.BoolVar(&pull, "pull", false, "Fetch keys and metadata from the transit server")
 	flag.BoolVar(&push, "push", false, "Upload public keys to the transit server")
+	flag.BoolVar(&prepare, "prepare", false, "Generate transit keys for push step")
 	flag.StringVar(&role, "role", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
-	flag.StringVar(&wrapId, "x-server-wrap", "", "(Flow Team Use), wrap response keys for consensus node")
+	flag.StringVar(&wrapID, "x-server-wrap", "", "(Flow Team Use), wrap response keys for consensus node")
 	flag.Parse()
 
 	if role == "" {
@@ -75,31 +75,26 @@ func main() {
 	}
 
 	// Wrap takes precedence, so we just do that first
-	if wrapId != "" && flowRole == flow.RoleConsensus {
-		log.Printf("Wrapping response for node %s\n", wrapId)
-		err := wrapFile(bootdir, wrapId)
+	if wrapID != "" && flowRole == flow.RoleConsensus {
+		log.Printf("Wrapping response for node %s\n", wrapID)
+		err := wrapFile(bootDir, wrapID)
 		if err != nil {
 			log.Fatalf("Failed to wrap response: %s\n", err)
 		}
 		return
 	}
 
-	if pull && push {
+	if optionsSelected(pull, push, prepare) != 1 {
 		flag.Usage()
-		log.Fatal("Only one of -pull or -push may be specified\n")
+		log.Fatal("Exactly one of -pull, -push, or -prepare must be specified\n")
 	}
 
-	if !(pull || push) {
+	if !prepare && keyDir == "" {
 		flag.Usage()
-		log.Fatal("One of -pull or -push must be specified")
+		log.Fatal("Access key, '-t', required for push and pull commands")
 	}
 
-	if keydir == "" {
-		flag.Usage()
-		log.Fatal("Access key required")
-	}
-
-	nodeId, err := fetchNodeId(bootdir)
+	nodeID, err := fetchNodeID(bootDir)
 	if err != nil {
 		log.Fatalf("Could not determine node ID: %s\n", err)
 	}
@@ -109,19 +104,24 @@ func main() {
 	defer cancel()
 
 	if push {
-		runPush(ctx, bootdir, keydir, nodeId, flowRole)
+		runPush(ctx, bootDir, keyDir, nodeID, flowRole)
 		return
 	}
 
 	if pull {
-		runPull(ctx, bootdir, keydir, nodeId, flowRole)
+		runPull(ctx, bootDir, keyDir, nodeID, flowRole)
+		return
+	}
+
+	if prepare {
+		runPrepare(bootDir, nodeID, flowRole)
 		return
 	}
 }
 
 // Read the NodeID file to build other paths from
-func fetchNodeId(bootdir string) (string, error) {
-	path := filepath.Join(bootdir, bootstrap.PathNodeId)
+func fetchNodeID(bootDir string) (string, error) {
+	path := filepath.Join(bootDir, bootstrap.PathNodeID)
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("Error reading file %s: %w", path, err)
@@ -133,11 +133,11 @@ func fetchNodeId(bootdir string) (string, error) {
 // Run the push process
 // - create transit keypair (if the role type is Consensus)
 // - upload files to GCS bucket
-func runPush(ctx context.Context, bootdir, token, nodeId string, role flow.Role) {
+func runPush(ctx context.Context, bootDir, token, nodeId string, role flow.Role) {
 	log.Println("Running push")
 
 	if role == flow.RoleConsensus {
-		err := generateKeys(bootdir, nodeId)
+		err := generateKeys(bootDir, nodeId)
 		if err != nil {
 			log.Fatalf("Failed to push: %s", err)
 		}
@@ -146,14 +146,14 @@ func runPush(ctx context.Context, bootdir, token, nodeId string, role flow.Role)
 	files := getFilesToUpload(role)
 
 	for _, file := range files {
-		err := bucketUpload(ctx, bootdir, fmt.Sprintf(file, nodeId), token)
+		err := bucketUpload(ctx, bootDir, fmt.Sprintf(file, nodeId), token)
 		if err != nil {
 			log.Fatalf("Failed to push: %s", err)
 		}
 	}
 }
 
-func runPull(ctx context.Context, bootdir, token, nodeId string, role flow.Role) {
+func runPull(ctx context.Context, bootDir, token, nodeId string, role flow.Role) {
 
 	log.Println("Running pull")
 
@@ -162,31 +162,50 @@ func runPull(ctx context.Context, bootdir, token, nodeId string, role flow.Role)
 	var err error
 
 	// download the public folder from the bucket and any additional files
-	err = bucketDownload(ctx, bootdir, folderToDownload, bootstrap.DirnamePublicGenesis, token, extraFiles...)
+	err = bucketDownload(ctx, bootDir, folderToDownload, bootstrap.DirnamePublicBootstrap, token, extraFiles...)
 	if err != nil {
 		log.Fatalf("Failed to pull: %s", err)
 	}
 
 	if role == flow.RoleConsensus {
-		err = unwrapFile(bootdir, nodeId)
+		err = unwrapFile(bootDir, nodeId)
 		if err != nil {
 			log.Fatalf("Failed to pull: %s", err)
 		}
 	}
 
-	genesisFile := filepath.Join(bootdir, bootstrap.PathGenesisBlock)
-	genesisMd5, err := getFileMd5(genesisFile)
+	rootFile := filepath.Join(bootDir, bootstrap.PathRootBlock)
+	rootMD5, err := getFileMD5(rootFile)
 	if err != nil {
-		log.Fatalf("Failed to calculate md5 of %s: %v", genesisFile, err)
+		log.Fatalf("Failed to calculate md5 of %s: %v", rootFile, err)
 	}
-	log.Printf("MD5 of the genesis block is: %s\n", genesisMd5)
+	log.Printf("MD5 of the root block is: %s\n", rootMD5)
+}
+
+// Run the prepare process
+// - create transit keypair (if the role type is Consensus)
+func runPrepare(bootdir, nodeId string, role flow.Role) {
+	if role == flow.RoleConsensus {
+		log.Println("creating transit-keys")
+		err := generateKeys(bootdir, nodeId)
+		if err != nil {
+			log.Fatalf("Failed to prepare: %s", err)
+		}
+		return
+	}
+	log.Printf("no preparation needed for role: %s", role.String())
 }
 
 // generateKeys creates the transit keypair and writes them to disk for later
-func generateKeys(bootdir, nodeId string) error {
+func generateKeys(bootDir, nodeId string) error {
 
-	privPath := filepath.Join(bootdir, fmt.Sprintf(FilenameTransitKeyPriv, nodeId))
-	pubPath := filepath.Join(bootdir, fmt.Sprintf(FilenameTransitKeyPub, nodeId))
+	privPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPriv, nodeId))
+	pubPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPub, nodeId))
+
+	if fileExists(privPath) && fileExists(pubPath) {
+		log.Print("transit-key-path priv & pub both exist, exiting")
+		return nil
+	}
 
 	log.Print("Generating keypair")
 
@@ -211,14 +230,14 @@ func generateKeys(bootdir, nodeId string) error {
 	return nil
 }
 
-func unwrapFile(bootdir, nodeId string) error {
+func unwrapFile(bootDir, nodeId string) error {
 
 	log.Print("Decrypting Random Beacon key")
 
-	pubKeyPath := filepath.Join(bootdir, fmt.Sprintf(FilenameTransitKeyPub, nodeId))
-	privKeyPath := filepath.Join(bootdir, fmt.Sprintf(FilenameTransitKeyPriv, nodeId))
-	ciphertextPath := filepath.Join(bootdir, fmt.Sprintf(FilenameRandomBeaconCipher, nodeId))
-	plaintextPath := filepath.Join(bootdir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeId))
+	pubKeyPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPub, nodeId))
+	privKeyPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPriv, nodeId))
+	ciphertextPath := filepath.Join(bootDir, fmt.Sprintf(FilenameRandomBeaconCipher, nodeId))
+	plaintextPath := filepath.Join(bootDir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeId))
 
 	ciphertext, err := ioutil.ReadFile(ciphertextPath)
 	if err != nil {
@@ -254,10 +273,10 @@ func unwrapFile(bootdir, nodeId string) error {
 	return nil
 }
 
-func wrapFile(bootdir, nodeId string) error {
-	pubKeyPath := filepath.Join(bootdir, fmt.Sprintf(FilenameTransitKeyPub, nodeId))
-	plaintextPath := filepath.Join(bootdir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeId))
-	ciphertextPath := filepath.Join(bootdir, fmt.Sprintf(FilenameRandomBeaconCipher, nodeId))
+func wrapFile(bootDir, nodeId string) error {
+	pubKeyPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPub, nodeId))
+	plaintextPath := filepath.Join(bootDir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeId))
+	ciphertextPath := filepath.Join(bootDir, fmt.Sprintf(FilenameRandomBeaconCipher, nodeId))
 
 	plaintext, err := ioutil.ReadFile(plaintextPath)
 	if err != nil {
@@ -287,7 +306,7 @@ func wrapFile(bootdir, nodeId string) error {
 	return nil
 }
 
-func bucketUpload(ctx context.Context, bootdir, filename, token string) error {
+func bucketUpload(ctx context.Context, bootDir, filename, token string) error {
 
 	gcsClient, err := storage.NewClient(ctx, option.WithoutAuthentication())
 	if err != nil {
@@ -295,7 +314,7 @@ func bucketUpload(ctx context.Context, bootdir, filename, token string) error {
 	}
 	defer gcsClient.Close()
 
-	path := filepath.Join(bootdir, filename)
+	path := filepath.Join(bootDir, filename)
 	log.Printf("Uploading %s\n", path)
 
 	upload := gcsClient.Bucket(flowBucket).
@@ -324,8 +343,8 @@ func bucketUpload(ctx context.Context, bootdir, filename, token string) error {
 	return nil
 }
 
-// bucketDownload downloads all the files in srcFolder to bootdir/destFolder and additional fileNames to bootDir
-func bucketDownload(ctx context.Context, bootdir, srcFolder, destFolder, token string, fileNames ...string) error {
+// bucketDownload downloads all the files in srcFolder to bootDir/destFolder and additional fileNames to bootDir
+func bucketDownload(ctx context.Context, bootDir, srcFolder, destFolder, token string, fileNames ...string) error {
 
 	gcsClient, err := storage.NewClient(ctx, option.WithoutAuthentication())
 	if err != nil {
@@ -347,7 +366,7 @@ func bucketDownload(ctx context.Context, bootdir, srcFolder, destFolder, token s
 			return fmt.Errorf("Bucket(%q).Objects(): %v", flowBucket, err)
 		}
 
-		err = bucketFileDownload(gcsClient, ctx, filepath.Join(bootdir, destFolder), attrs.Name)
+		err = bucketFileDownload(gcsClient, ctx, filepath.Join(bootDir, destFolder), attrs.Name)
 		if err != nil {
 			return err
 		}
@@ -355,7 +374,7 @@ func bucketDownload(ctx context.Context, bootdir, srcFolder, destFolder, token s
 
 	for _, file := range fileNames {
 		objectName := filepath.Join(token, file)
-		err = bucketFileDownload(gcsClient, ctx, bootdir, objectName)
+		err = bucketFileDownload(gcsClient, ctx, bootDir, objectName)
 		if err != nil {
 			return err
 		}
@@ -405,7 +424,7 @@ func getAdditionalFilesToDownload(role flow.Role, nodeId string) []string {
 	return make([]string, 0)
 }
 
-func getFileMd5(file string) (string, error) {
+func getFileMD5(file string) (string, error) {
 	f, err := os.Open(file)
 	if err != nil {
 		return "", err
@@ -418,4 +437,22 @@ func getFileMd5(file string) (string, error) {
 	}
 
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
+}
+
+func optionsSelected(options ...bool) int {
+	n := 0
+	for _, v := range options {
+		if v {
+			n++
+		}
+	}
+	return n
+}
+
+func fileExists(filename string) bool {
+	info, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
 }

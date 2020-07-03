@@ -98,7 +98,12 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 	if err != nil {
 		return fmt.Errorf("cannot create checkpointer writer: %w", err)
 	}
-	defer checkpointWriter.Close()
+	defer func() {
+		err := checkpointWriter.Close()
+		if err != nil {
+			log.Err(err).Msg("error while writing checkpoint")
+		}
+	}()
 
 	err = wal.StoreCheckpoint(flattenForest, checkpointWriter)
 	if err != nil {
