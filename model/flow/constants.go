@@ -1,7 +1,6 @@
 package flow
 
 import (
-	"bytes"
 	"time"
 )
 
@@ -21,7 +20,6 @@ func GenesisTime() time.Time {
 const DefaultValueLogGCFrequency = 10 * 60
 
 const domainTagLength = 40
-const domainTagPad = "\x1F" // https://en.wikipedia.org/wiki/C0_and_C1_control_codes#Field_separators
 
 // TransactionDomainTag is the prefix of all signed transaction payloads.
 //
@@ -33,13 +31,10 @@ var TransactionDomainTag = domainTag("FLOW-V0.0-transaction")
 // A domain tag is encoded as UTF-8 bytes, right padded to a total length of 40 bytes.
 var UserDomainTag = domainTag("FLOW-V0.0-user-domain")
 
-func domainTag(s string) []byte {
-	tag := []byte(s)
-	tag = append(tag, bytes.Repeat([]byte(domainTagPad), domainTagLength-len(tag))...)
+func domainTag(s string) [domainTagLength]byte {
+	var tag [domainTagLength]byte
 
-	if len(tag) != domainTagLength {
-		panic("domain tag length is invalid")
-	}
+	copy(tag[:], s)
 
 	return tag
 }
