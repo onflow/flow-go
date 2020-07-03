@@ -189,12 +189,27 @@ func (e *hostEnv) Logs() []string {
 func (e *hostEnv) VerifySignature(
 	signature []byte,
 	tag []byte,
-	signedData []byte,
-	publicKey []byte,
-	signatureAlgorithm string,
-	hashAlgorithm string,
+	message []byte,
+	rawPublicKey []byte,
+	rawSigAlgo string,
+	rawHashAlgo string,
 ) bool {
-	panic("implement me")
+	valid, err := verifySignatureFromRuntime(
+		e.ctx.SignatureVerifier,
+		signature,
+		tag,
+		message,
+		rawPublicKey,
+		rawSigAlgo,
+		rawHashAlgo,
+	)
+
+	if err != nil {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		panic(err)
+	}
+
+	return valid
 }
 
 // Block Environment Functions
