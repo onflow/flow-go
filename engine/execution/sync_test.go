@@ -160,7 +160,7 @@ func TestSyncFlow(t *testing.T) {
 	ebMutex := sync.RWMutex{}
 
 	verificationEngine := new(network.Engine)
-	_, _ = verificationNode.Net.Register(engine.PushReceipts, verificationEngine)
+	_, _ = verificationNode.Net.Register(engine.ReceiveReceipts, verificationEngine)
 	verificationEngine.On("Submit", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			ebMutex.Lock()
@@ -173,7 +173,7 @@ func TestSyncFlow(t *testing.T) {
 		Return(nil).Times(0)
 
 	consensusEngine := new(network.Engine)
-	_, _ = consensusNode.Net.Register(engine.PushReceipts, consensusEngine)
+	_, _ = consensusNode.Net.Register(engine.ReceiveReceipts, consensusEngine)
 	consensusEngine.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(0)
 
 	// submit block from consensus node
