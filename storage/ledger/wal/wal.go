@@ -7,6 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	prometheusWAL "github.com/prometheus/tsdb/wal"
 
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -51,6 +52,31 @@ func (w *LedgerWAL) RecordDelete(stateCommitment flow.StateCommitment) error {
 		return fmt.Errorf("error while recording delete in LedgerWAL: %w", err)
 	}
 	return nil
+}
+
+func (w *LedgerWAL) ReplayOnMForest(mForest *mtrie.MForest) error {
+	return w.Replay(
+		func(forestSequencing *flattener.FlattenedForest) error {
+			rebuiltTries, err := flattener.RebuildTries(forestSequencing)
+			if err != nil {
+				return fmt.Errorf("rebuilding forest from sequenced nodes failed: %w", err)
+			}
+			err = mForest.AddTries(rebuiltTries)
+			if err != nil {
+				return fmt.Errorf("adding rebuilt tries to forest failed: %w", err)
+			}
+			return nil
+		},
+		func(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
+			_, err := mForest.Update(stateCommitment, keys, values)
+			// _, err := trie.UpdateRegisters(keys, values, stateCommitment)
+			return err
+		},
+		func(stateCommitment flow.StateCommitment) error {
+			mForest.RemoveTrie(stateCommitment)
+			return nil
+		},
+	)
 }
 
 func (w *LedgerWAL) Replay(
