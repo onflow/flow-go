@@ -68,7 +68,7 @@ func (suite *Suite) SetupTest() {
 
 	suite.net = new(module.Network)
 	suite.collectionsConduit = &network.Conduit{}
-	suite.net.On("Register", uint8(engine.PushCollections), mock.Anything).
+	suite.net.On("Register", uint8(engine.ExchangeCollections), mock.Anything).
 		Return(suite.collectionsConduit, nil).
 		Once()
 

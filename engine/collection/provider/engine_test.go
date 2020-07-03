@@ -27,12 +27,13 @@ type Suite struct {
 	hub        *stub.Hub
 	identities flow.IdentityList
 
-	colNode   mock.CollectionNode // the node we are testing
-	conNode   mock.ConsensusNode  // used for checking collection guarantee transmission
-	reqNode   mock.GenericNode    // used for request/response flows
-	reqEngine *mocknetwork.Engine
-	conduit   network.Conduit
-	chainID   flow.ChainID
+	colNode         mock.CollectionNode // the node we are testing
+	conNode         mock.ConsensusNode  // used for checking collection guarantee transmission
+	reqNode         mock.GenericNode    // used for request/response flows
+	reqEngine       *mocknetwork.Engine
+	pushConduit     network.Conduit
+	exchangeConduit network.Conduit
+	chainID         flow.ChainID
 }
 
 func (suite *Suite) SetupTest() {
@@ -52,7 +53,8 @@ func (suite *Suite) SetupTest() {
 	suite.reqNode = testutil.GenericNode(suite.T(), suite.hub, reqIdentity, suite.identities, suite.chainID)
 
 	suite.reqEngine = new(mocknetwork.Engine)
-	suite.conduit, err = suite.reqNode.Net.Register(engine.PushCollections, suite.reqEngine)
+	suite.pushConduit, err = suite.reqNode.Net.Register(engine.PushGuarantees, suite.reqEngine)
+	suite.exchangeConduit, err = suite.reqNode.Net.Register(engine.ExchangeCollections, suite.reqEngine)
 	suite.Require().Nil(err)
 }
 
@@ -111,7 +113,7 @@ func (suite *Suite) TestCollectionRequest() {
 
 		// send a request for the collection
 		req := messages.CollectionRequest{ID: coll.ID(), Nonce: nonce}
-		err = suite.conduit.Submit(&req, suite.colNode.Me.NodeID())
+		err = suite.exchangeConduit.Submit(&req, suite.colNode.Me.NodeID())
 		assert.NoError(t, err)
 
 		// flush the request

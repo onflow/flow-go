@@ -125,7 +125,7 @@ func New(
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 
-	collConduit, err := net.Register(engine.PushCollections, &eng)
+	collConduit, err := net.Register(engine.ExchangeCollections, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register collection provider engine: %w", err)
 	}

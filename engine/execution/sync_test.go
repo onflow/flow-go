@@ -139,7 +139,7 @@ func TestSyncFlow(t *testing.T) {
 	fmt.Printf("block5 ID %x parent %x\n", block5.ID(), block5.Header.ParentID)
 
 	collectionEngine := new(network.Engine)
-	colConduit, _ := collectionNode.Net.Register(engine.PushCollections, collectionEngine)
+	colConduit, _ := collectionNode.Net.Register(engine.ExchangeCollections, collectionEngine)
 
 	collectionEngine.On("Submit", exe2ID.NodeID, mock.MatchedBy(func(r *messages.CollectionRequest) bool { return r.ID == col1.ID() })).Run(func(args mock.Arguments) {
 		_ = colConduit.Submit(&messages.CollectionResponse{Collection: col1}, exe2ID.NodeID)
