@@ -215,7 +215,7 @@ func setupMockExeNode(t *testing.T,
 		}
 	}
 
-	exeChunkDataConduit, err := exeNode.Net.Register(engine.PushChunks, exeEngine)
+	exeChunkDataConduit, err := exeNode.Net.Register(engine.ProvideChunks, exeEngine)
 	assert.Nil(t, err)
 
 	chunkNum := len(completeER.ChunkDataPacks)

@@ -50,9 +50,7 @@ const (
 	// Channel aliases to make the code more readable / more robust to errors
 	ReceiveTransactions = PushTransactions
 	ReceiveGuarantees   = PushGuarantees
-	ReceiveCollections  = PushCollections
 	ReceiveBlocks       = PushBlocks
-	ReceiveChunks       = PushChunks
 	ReceiveReceipts     = PushReceipts
 	ReceiveApprovals    = PushApprovals
 	ProvideTransactinos = RequestTransactions
@@ -91,8 +89,6 @@ func ChannelName(channelID uint8) string {
 		return "push-guarantees"
 	case PushBlocks:
 		return "push-blocks"
-	case PushChunks:
-		return "push-chunks"
 	case PushReceipts:
 		return "push-receipts"
 	case PushApprovals:
