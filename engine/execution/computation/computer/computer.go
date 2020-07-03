@@ -9,8 +9,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
+	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
@@ -25,7 +25,7 @@ type BlockComputer interface {
 }
 
 type blockComputer struct {
-	vm      virtualmachine.VirtualMachine
+	vm      fvm.VirtualMachine
 	blocks  storage.Blocks
 	metrics module.ExecutionMetrics
 	tracer  module.Tracer
@@ -34,7 +34,7 @@ type blockComputer struct {
 
 // NewBlockComputer creates a new block executor.
 func NewBlockComputer(
-	vm virtualmachine.VirtualMachine,
+	vm fvm.VirtualMachine,
 	blocks storage.Blocks,
 	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
@@ -127,7 +127,7 @@ func (e *blockComputer) executeBlock(
 func (e *blockComputer) executeCollection(
 	ctx context.Context,
 	txIndex uint32,
-	blockCtx virtualmachine.BlockContext,
+	blockCtx fvm.BlockContext,
 	collectionView *delta.View,
 	collection *entity.CompleteCollection,
 ) ([]flow.Event, []flow.TransactionResult, uint32, uint64, error) {
@@ -144,7 +144,7 @@ func (e *blockComputer) executeCollection(
 		gasUsed   uint64
 	)
 
-	txMetrics := virtualmachine.NewMetricsCollector()
+	txMetrics := fvm.NewMetricsCollector()
 
 	for _, tx := range collection.Transactions {
 		err := func(tx *flow.TransactionBody) error {
@@ -169,7 +169,7 @@ func (e *blockComputer) executeCollection(
 
 			txView := collectionView.NewChild()
 
-			result, err := blockCtx.ExecuteTransaction(txView, tx, virtualmachine.WithMetricsCollector(txMetrics))
+			result, err := blockCtx.ExecuteTransaction(txView, tx, fvm.WithMetricsCollector(txMetrics))
 
 			if e.metrics != nil {
 				e.metrics.TransactionParsed(txMetrics.Parsed())
@@ -182,7 +182,7 @@ func (e *blockComputer) executeCollection(
 				return fmt.Errorf("failed to execute transaction: %w", err)
 			}
 
-			txEvents, err := virtualmachine.ConvertEvents(txIndex, result)
+			txEvents, err := fvm.ConvertEvents(txIndex, result)
 			txIndex++
 			gasUsed += result.GasUsed
 

@@ -4,6 +4,7 @@ package mock
 
 import (
 	flow "github.com/dapperlabs/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
 )
 

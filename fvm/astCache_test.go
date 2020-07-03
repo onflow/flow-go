@@ -1,4 +1,4 @@
-package virtualmachine_test
+package fvm_test
 
 import (
 	"fmt"
@@ -10,10 +10,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
-	vmMock "github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine/mock"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/engine/execution/testutil"
+	"github.com/dapperlabs/flow-go/fvm"
+	vmMock "github.com/dapperlabs/flow-go/fvm/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/hash"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -25,8 +25,9 @@ func TestTransactionASTCache(t *testing.T) {
 
 	chain := flow.Mainnet.Chain()
 
-	vm, err := virtualmachine.New(rt, chain)
+	vm, err := fvm.New(rt, chain)
 	require.NoError(t, err)
+
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	t.Run("transaction execution results in cached program", func(t *testing.T) {
@@ -69,9 +70,9 @@ func TestScriptASTCache(t *testing.T) {
 
 	chain := flow.Mainnet.Chain()
 
-	vm, err := virtualmachine.New(rt, chain)
-
+	vm, err := fvm.New(rt, chain)
 	require.NoError(t, err)
+
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	t.Run("script execution results in cached program", func(t *testing.T) {
@@ -105,8 +106,9 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 
 	chain := flow.Mainnet.Chain()
 
-	vm, err := virtualmachine.New(rt, chain)
+	vm, err := fvm.New(rt, chain)
 	require.NoError(t, err)
+
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	// Create a number of account private keys.
@@ -129,7 +131,7 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 						destroy v
 					}
 				}
-			`, virtualmachine.FlowTokenAddress(chain))),
+			`, fvm.FlowTokenAddress(chain))),
 		).
 		AddAuthorizer(accounts[0]).
 		SetProposalKey(accounts[0], 0, 0).
@@ -165,8 +167,9 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 
 	chain := flow.Testnet.Chain()
 
-	vm, err := virtualmachine.New(rt, chain)
+	vm, err := fvm.New(rt, chain)
 	require.NoError(b, err)
+
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	// Create a number of account private keys.
@@ -193,7 +196,7 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 						destroy v
 					}
 				}
-			`, virtualmachine.FlowTokenAddress(chain), i)),
+			`, fvm.FlowTokenAddress(chain), i)),
 			).
 			AddAuthorizer(accounts[0]).
 			SetProposalKey(accounts[0], 0, uint64(i)).
@@ -240,8 +243,9 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 
 	chain := flow.Emulator.Chain()
 
-	vm, err := virtualmachine.New(rt, chain, virtualmachine.WithCache(&nonFunctioningCache{}))
+	vm, err := fvm.New(rt, chain, fvm.WithCache(&nonFunctioningCache{}))
 	require.NoError(b, err)
+
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	// Create a number of account private keys.
@@ -268,7 +272,7 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 						destroy v
 					}
 				}
-			`, virtualmachine.FlowTokenAddress(chain), i)),
+			`, fvm.FlowTokenAddress(chain), i)),
 			).
 			AddAuthorizer(accounts[0]).
 			SetPayer(accounts[0]).
@@ -298,8 +302,9 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 
 	chain := flow.Mainnet.Chain()
 
-	vm, err := virtualmachine.New(rt, chain)
+	vm, err := fvm.New(rt, chain)
 	require.NoError(t, err)
+
 	bc := vm.NewBlockContext(&h, new(vmMock.Blocks))
 
 	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
@@ -318,7 +323,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 					let v <- FlowToken.createEmptyVault()
 					destroy v
 				}
-			`, virtualmachine.FlowTokenAddress(chain), id)), nil)
+			`, fvm.FlowTokenAddress(chain), id)), nil)
 			if !assert.True(t, result.Succeeded()) {
 				t.Log(result.Error.ErrorMessage())
 			}
@@ -328,7 +333,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 	}
 	wg.Wait()
 
-	location := runtime.AddressLocation(virtualmachine.FlowTokenAddress(chain).Bytes())
+	location := runtime.AddressLocation(fvm.FlowTokenAddress(chain).Bytes())
 
 	// Get cached program
 	program, err := vm.ASTCache().GetProgram(location)

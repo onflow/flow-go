@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,13 +13,13 @@ import (
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	"github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/rpc"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/engine/execution/sync"
+	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -60,7 +60,7 @@ func main() {
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
-			vm, err := virtualmachine.New(rt, node.RootChainID.Chain())
+			vm, err := fvm.New(rt, node.RootChainID.Chain())
 			if err != nil {
 				return err
 			}
@@ -81,38 +81,13 @@ func main() {
 			collector = metrics.NewExecutionCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
 		}).
-		// Trie storage is required to bootstrap, but also should be handled while shutting down
-		Module("ledger storage", func(node *cmd.FlowNodeBuilder) error {
-			ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), collector, node.MetricsRegisterer)
-			return err
-		}).
 		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
 			syncCore, err = chainsync.New(node.Logger, chainsync.DefaultConfig())
 			return err
 		}).
-		GenesisHandler(func(node *cmd.FlowNodeBuilder, block *flow.Block) {
-			if node.GenesisAccountPublicKey == nil {
-				panic(fmt.Sprintf("error while bootstrapping execution state: no service account public key"))
-			}
-
-			bootstrapper := bootstrap.NewBootstrapper(node.Logger)
-
-			bootstrappedStateCommitment, err := bootstrapper.BootstrapLedger(ledgerStorage, *node.GenesisAccountPublicKey, node.GenesisTokenSupply, node.RootChainID.Chain())
-			if err != nil {
-				panic(fmt.Sprintf("error while bootstrapping execution state: %s", err))
-			}
-
-			if !bytes.Equal(bootstrappedStateCommitment, node.GenesisCommit) {
-				panic(fmt.Sprintf("genesis seal state commitment (%x) different from precalculated (%x)", bootstrappedStateCommitment, node.GenesisCommit))
-			}
-
-			err = bootstrapper.BootstrapExecutionDatabase(node.DB, bootstrappedStateCommitment, block.Header)
-			if err != nil {
-				panic(fmt.Sprintf("error while bootstrapping execution state - cannot bootstrap database: %s", err))
-			}
-		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			return ledgerStorage, nil
+			ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), collector, node.MetricsRegisterer)
+			return ledgerStorage, err
 		}).
 		Component("execution state ledger WAL compactor", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
@@ -139,6 +114,13 @@ func main() {
 				node.DB,
 				node.Tracer,
 			)
+
+			bootstrapper := bootstrap.NewBootstrapper(node.Logger)
+			err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal.FinalState, node.RootBlock.Header)
+			// Root block already loaded, can simply continue
+			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+				return nil, fmt.Errorf("could not bootstrap execution DB: %w", err)
+			}
 
 			stateSync := sync.NewStateSynchronizer(executionState)
 

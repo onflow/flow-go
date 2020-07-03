@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/engine/verification"
+	"github.com/dapperlabs/flow-go/fvm"
 	chmodels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
@@ -16,12 +16,12 @@ import (
 
 // ChunkVerifier is a verifier based on the current definitions of the flow network
 type ChunkVerifier struct {
-	vm     virtualmachine.VirtualMachine
+	vm     fvm.VirtualMachine
 	blocks storage.Blocks
 }
 
 // NewChunkVerifier creates a chunk verifier containing a flow virtual machine
-func NewChunkVerifier(vm virtualmachine.VirtualMachine, blocks storage.Blocks) *ChunkVerifier {
+func NewChunkVerifier(vm fvm.VirtualMachine, blocks storage.Blocks) *ChunkVerifier {
 	return &ChunkVerifier{
 		vm:     vm,
 		blocks: blocks,
