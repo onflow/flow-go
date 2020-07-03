@@ -10,7 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	collectioningest "github.com/dapperlabs/flow-go/engine/collection/ingest"
-	"github.com/dapperlabs/flow-go/engine/collection/provider"
+	"github.com/dapperlabs/flow-go/engine/collection/pusher"
+	"github.com/dapperlabs/flow-go/engine/common/provider"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
@@ -70,6 +71,7 @@ type CollectionNode struct {
 	Collections     storage.Collections
 	Transactions    storage.Transactions
 	IngestionEngine *collectioningest.Engine
+	PusherEngine    *pusher.Engine
 	ProviderEngine  *provider.Engine
 }
 
