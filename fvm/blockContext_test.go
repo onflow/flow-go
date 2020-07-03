@@ -24,11 +24,6 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestECDSADomainTags(t *testing.T) {
-	assert.Equal(t, len(flow.TransactionDomainTag), len(flow.UserDomainTag),
-		"tag lengths must be equal")
-}
-
 func TestBlockContext_ExecuteTransaction(t *testing.T) {
 	// seed the RNG
 	rand.Seed(time.Now().UnixNano())
