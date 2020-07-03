@@ -109,7 +109,7 @@ func (e *hostEnv) ValueExists(owner, controller, key []byte) (exists bool, err e
 func (e *hostEnv) ResolveImport(location runtime.Location) ([]byte, error) {
 	addressLocation, ok := location.(runtime.AddressLocation)
 	if !ok {
-		return nil, fmt.Errorf("import location must be an account address")
+		return nil, nil
 	}
 
 	address := flow.BytesToAddress(addressLocation)
@@ -135,12 +135,10 @@ func (e *hostEnv) GetCachedProgram(location ast.Location) (*ast.Program, error) 
 	if program != nil {
 		// Program was found within cache, do an explicit ledger register touch
 		// to ensure consistent reads during chunk verification.
-		addressLocation, ok := location.(runtime.AddressLocation)
-		if !ok {
-			return nil, fmt.Errorf("import location must be an account address")
+		if addressLocation, ok := location.(runtime.AddressLocation); ok {
+			key := fullKeyHash(string(addressLocation), string(addressLocation), keyCode)
+			e.ledger.Touch(key)
 		}
-		key := fullKeyHash(string(addressLocation), string(addressLocation), keyCode)
-		e.ledger.Touch(key)
 	}
 
 	return program, err
