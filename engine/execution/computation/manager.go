@@ -75,7 +75,7 @@ func New(
 func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *flow.Header, view *delta.View) ([]byte, error) {
 	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(blockHeader))
 
-	script := fvm.Script(code).WithArguments(arguments)
+	script := fvm.Script(code).WithArguments(arguments...)
 
 	err := e.vm.Run(blockCtx, script, view)
 	if err != nil {
