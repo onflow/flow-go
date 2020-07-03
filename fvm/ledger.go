@@ -86,18 +86,20 @@ func (r *LedgerDAL) GetAccountPublicKeys(address flow.Address) (publicKeys []flo
 		return nil, err
 	}
 
-	if countBytes == nil {
-		return nil, fmt.Errorf("key count not set")
-	}
+	var count uint64
 
-	countInt := new(big.Int).SetBytes(countBytes)
-	if !countInt.IsUint64() {
-		return nil, fmt.Errorf(
-			"retrieved public key account count bytes (hex-encoded): %x do not represent valid uint64",
-			countBytes,
-		)
+	if countBytes == nil {
+		count = 0
+	} else {
+		countInt := new(big.Int).SetBytes(countBytes)
+		if !countInt.IsUint64() {
+			return nil, fmt.Errorf(
+				"retrieved public key account count bytes (hex-encoded): %x do not represent valid uint64",
+				countBytes,
+			)
+		}
+		count = countInt.Uint64()
 	}
-	count := countInt.Uint64()
 
 	publicKeys = make([]flow.AccountPublicKey, count)
 
