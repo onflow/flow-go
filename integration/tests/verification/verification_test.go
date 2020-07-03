@@ -127,7 +127,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	// execution node
 	exeNode := testutil.GenericNode(t, hub, exeIdentity, identities, chainID)
 	exeEngine := new(network.Engine)
-	exeChunkDataConduit, err := exeNode.Net.Register(engine.ChunkDataPackProvider, exeEngine)
+	exeChunkDataConduit, err := exeNode.Net.Register(engine.PushChunks, exeEngine)
 	assert.Nil(t, err)
 	exeEngine.On("Process", verIdentity.NodeID, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
@@ -155,7 +155,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 			approvalWG.Done()
 		}).Return(nil).Once()
 
-	_, err = conNode.Net.Register(engine.ApprovalProvider, conEngine)
+	_, err = conNode.Net.Register(engine.PushApprovals, conEngine)
 	assert.Nil(t, err)
 
 	// send the ER from execution to verification node

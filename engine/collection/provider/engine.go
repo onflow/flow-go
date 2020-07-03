@@ -51,7 +51,7 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, engMetric
 		transactions: transactions,
 	}
 
-	con, err := net.Register(engine.PushCollections, e)
+	con, err := net.Register(engine.PushGuarantees, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -172,12 +172,16 @@ func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) 
 		return fmt.Errorf("could not get consensus nodes: %w", err)
 	}
 
-	err = e.con.Submit(guarantee, consensusNodes.NodeIDs()...)
+	// we only need to send to a small sub-sample, as consensus nodes already propagate
+	// the collection guarantee to the whole consensus committee; let's set this to
+	// one for now and implement a retry mechanism for when the sending fails
+	err = e.con.Submit(guarantee, consensusNodes.Sample(1).NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not submit collection guarantee: %w", err)
 	}
 
 	e.engMetrics.MessageSent(metrics.EngineCollectionProvider, metrics.MessageCollectionGuarantee)
+
 	e.log.Debug().
 		Hex("guarantee_id", logging.ID(guarantee.ID())).
 		Hex("ref_block_id", logging.ID(guarantee.ReferenceBlockID)).

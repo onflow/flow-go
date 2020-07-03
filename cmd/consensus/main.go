@@ -26,7 +26,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
 	"github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
-	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -68,7 +67,6 @@ func main() {
 		receipts       mempool.Receipts
 		approvals      mempool.Approvals
 		seals          mempool.Seals
-		prop           *propagation.Engine
 		prov           *provider.Engine
 		syncCore       *synchronization.Core
 		comp           *compliance.Engine
@@ -180,31 +178,18 @@ func main() {
 			)
 			return prov, err
 		}).
-		Component("propagation engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			prop, err = propagation.New(
-				node.Logger,
-				node.Metrics.Engine,
-				node.Metrics.Mempool,
-				node.Tracer,
-				conMetrics,
-				node.Network,
-				node.State,
-				node.Me,
-				guarantees,
-			)
-			return prop, err
-		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			ing, err := ingestion.New(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Tracer,
 				conMetrics,
+				node.Metrics.Mempool,
 				node.Network,
-				prop,
 				node.State,
 				node.Storage.Headers,
 				node.Me,
+				guarantees,
 			)
 			return ing, err
 		}).

@@ -10,7 +10,8 @@ import (
 const (
 
 	// Channels used for testing
-	TestEcho = 00
+	TestNetwork = 00
+	TestMetrics = 01
 
 	// Channels for consensus protocols
 	ConsensusCommittee = 10
@@ -55,8 +56,10 @@ const (
 
 func ChannelName(channelID uint8) string {
 	switch channelID {
-	case TestEcho:
-		return "test-echo"
+	case TestNetwork:
+		return "test-network"
+	case TestMetrics:
+		return "test-metrics"
 	case ConsensusCommittee:
 		return "consensus-committee"
 	case ConsensusCluster:

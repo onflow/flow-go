@@ -87,6 +87,13 @@ func registerConduits(net module.Network, eng network.Engine) (map[uint8]network
 		engine.SyncCommittee,
 		engine.SyncCluster,
 		engine.SyncExecution,
+		engine.PushTransactions,
+		engine.PushGuarantees,
+		engine.PushCollections,
+		engine.PushBlocks,
+		engine.PushChunks,
+		engine.PushReceipts,
+		engine.PushApprovals,
 		engine.ExchangeTransactions,
 		engine.ExchangeCollections,
 		engine.ExchangeGuarantees,
@@ -99,13 +106,6 @@ func registerConduits(net module.Network, eng network.Engine) (map[uint8]network
 		engine.ExchangeResults,
 		engine.ExchangeApprovals,
 		engine.ExchangeSeals,
-		engine.PushTransactions,
-		engine.PushGuarantees,
-		engine.PushCollections,
-		engine.PushBlocks,
-		engine.PushChunks,
-		engine.PushReceipts,
-		engine.PushApprovals,
 	}
 
 	conduitMap := make(map[uint8]network.Conduit, len(allEngineIDs))

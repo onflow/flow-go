@@ -159,7 +159,7 @@ func (m *MeshNetTestSuite) TestTargetValidator() {
 	wg := sync.WaitGroup{}
 
 	for i := range m.nets {
-		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, engine.PushTransactions)
+		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, engine.TestNetwork)
 		engs = append(engs, eng)
 	}
 
@@ -219,7 +219,7 @@ func (m *MeshNetTestSuite) TestMaxMessageSize() {
 	wg := sync.WaitGroup{}
 
 	for i := range m.nets {
-		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, engine.PushTransactions)
+		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, engine.TestNetwork)
 		engs = append(engs, eng)
 	}
 
