@@ -12,13 +12,13 @@ import (
 	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
-	protocolRecovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
+	recovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
 	synceng "github.com/dapperlabs/flow-go/engine/common/synchronization"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/verification/finder"
 	"github.com/dapperlabs/flow-go/engine/verification/match"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
+	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
@@ -178,7 +178,7 @@ func main() {
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rt := runtime.NewInterpreterRuntime()
-			vm, err := virtualmachine.New(rt, node.RootChainID.Chain())
+			vm, err := fvm.New(rt, node.RootChainID.Chain())
 			if err != nil {
 				return nil, err
 			}
@@ -247,21 +247,16 @@ func main() {
 			// initialize the verifier for the protocol consensus
 			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, node.DKGState, staking, beacon, merger)
 
-			finalized, pending, err := protocolRecovery.FindLatest(node.State, node.Storage.Headers, node.GenesisBlock.Header)
+			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			followerCore, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, node.Storage.Headers, final, verifier, finderEng, node.GenesisBlock.Header, node.GenesisQC, finalized, pending)
+			followerCore, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, node.Storage.Headers, final, verifier, finderEng, node.RootBlock.Header, node.RootQC, finalized, pending)
 			if err != nil {
-				// return nil, fmt.Errorf("could not create follower core logic: %w", err)
-				// TODO for now we ignore failures in follower
-				// this is necessary for integration tests to run, until they are
-				// updated to generate/use valid genesis QC and DKG files.
-				// ref https://github.com/dapperlabs/flow-go/issues/3057
-				node.Logger.Debug().Err(err).Msg("ignoring failures in follower core")
+				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
 
 			followerEng, err = followereng.New(

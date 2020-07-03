@@ -4,30 +4,29 @@ import "path/filepath"
 
 // Canonical filenames/paths for bootstrapping files.
 var (
+	// The Node ID file is used as a helper by the transit scripts
+	FilenameNodeID = "node-id"
+	PathNodeID     = filepath.Join(DirnamePublicBootstrap, FilenameNodeID) // %v will be replaced by NodeID
+
 	// execution state
 	DirnameExecutionState = "execution-state"
 
 	// public genesis information
-	DirnamePublicGenesis        = "public-genesis-information"
-	PathDKGDataPub              = filepath.Join(DirnamePublicGenesis, "dkg-data.pub.json")
-	PathGenesisBlock            = filepath.Join(DirnamePublicGenesis, "genesis-block.json")
-	PathGenesisClusterBlock     = filepath.Join(DirnamePublicGenesis, "genesis-cluster-block.%v.json") // %v will be replaced by cluster ID
-	PathGenesisClusterQC        = filepath.Join(DirnamePublicGenesis, "genesis-cluster-qc.%v.json")    // %v will be replaced by cluster ID
-	PathGenesisCommit           = filepath.Join(DirnamePublicGenesis, "genesis-commit.json")
-	PathGenesisQC               = filepath.Join(DirnamePublicGenesis, "genesis-qc.json")
-	PathGenesisTokenSupply      = filepath.Join(DirnamePublicGenesis, "genesis-token-supply.json")
-	PathServiceAccountPublicKey = filepath.Join(DirnamePublicGenesis, "service-account.pub.json")
-	PathNodeInfosPub            = filepath.Join(DirnamePublicGenesis, "node-infos.pub.json")
-	PathNodeInfoPub             = filepath.Join(DirnamePublicGenesis, "node-info.pub.%v.json") // %v will be replaced by NodeID
-	PathPartnerNodeInfoPrefix   = filepath.Join(DirnamePublicGenesis, "node-info.pub.")
-	// The Node ID file is used as a helper by the transit scripts
-	FilenameNodeId = "node-id"
-	PathNodeId     = filepath.Join(DirnamePublicGenesis, FilenameNodeId) // %v will be replaced by NodeID
+	DirnamePublicBootstrap    = "public-root-information"
+	PathNodeInfosPub          = filepath.Join(DirnamePublicBootstrap, "node-infos.pub.json")
+	PathDKGDataPub            = filepath.Join(DirnamePublicBootstrap, "dkg-data.pub.json")
+	PathPartnerNodeInfoPrefix = filepath.Join(DirnamePublicBootstrap, "node-info.pub.")
+	PathNodeInfoPub           = filepath.Join(DirnamePublicBootstrap, "node-info.pub.%v.json") // %v will be replaced by NodeID
+	PathRootBlock             = filepath.Join(DirnamePublicBootstrap, "root-block.json")
+	PathRootQC                = filepath.Join(DirnamePublicBootstrap, "root-qc.json")
+	PathRootResult            = filepath.Join(DirnamePublicBootstrap, "root-execution-result.json")
+	PathRootSeal              = filepath.Join(DirnamePublicBootstrap, "root-block-seal.json")
+	PathRootClusterBlock      = filepath.Join(DirnamePublicBootstrap, "root-cluster-block.%v.json") // %v will be replaced by cluster ID
+	PathRootClusterQC         = filepath.Join(DirnamePublicBootstrap, "root-cluster-qc.%v.json")    // %v will be replaced by cluster ID
 
 	// private genesis information
-	DirPrivateGenesis        = "private-genesis-information"
-	PathServiceAccountPriv   = filepath.Join(DirPrivateGenesis, "service-account.priv.json")
-	PathNodeInfoPriv         = filepath.Join(DirPrivateGenesis, "private-node-info_%v", "node-info.priv.json") // %v will be replaced by NodeID
+	DirPrivateRoot           = "private-root-information"
 	FilenameRandomBeaconPriv = "random-beacon.priv.json"
-	PathRandomBeaconPriv     = filepath.Join(DirPrivateGenesis, "private-node-info_%v", FilenameRandomBeaconPriv) // %v will be replaced by NodeID
+	PathNodeInfoPriv         = filepath.Join(DirPrivateRoot, "private-node-info_%v", "node-info.priv.json")    // %v will be replaced by NodeID
+	PathRandomBeaconPriv     = filepath.Join(DirPrivateRoot, "private-node-info_%v", FilenameRandomBeaconPriv) // %v will be replaced by NodeID
 )

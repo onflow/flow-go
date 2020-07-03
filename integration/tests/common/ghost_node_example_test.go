@@ -141,7 +141,7 @@ func TestGhostNodeExample_Send(t *testing.T) {
 func sendTransaction(t *testing.T, net *testnet.FlowNetwork, collectionID flow.Identifier) {
 	colContainer1 := net.ContainerByID(collectionID)
 
-	collectionClient, err := testnet.NewClient(colContainer1.Addr(testnet.ColNodeAPIPort), net.Genesis().Header.ChainID.Chain())
+	collectionClient, err := testnet.NewClient(colContainer1.Addr(testnet.ColNodeAPIPort), net.Root().Header.ChainID.Chain())
 	assert.Nil(t, err)
 
 	tx := unittest.TransactionBodyFixture()
@@ -160,7 +160,7 @@ func sendTransaction(t *testing.T, net *testnet.FlowNetwork, collectionID flow.I
 func generateTransaction(t *testing.T, net *testnet.FlowNetwork, collectionID flow.Identifier) flow.TransactionBody {
 	colContainer1 := net.ContainerByID(collectionID)
 
-	collectionClient, err := testnet.NewClient(colContainer1.Addr(testnet.ColNodeAPIPort), net.Genesis().Header.ChainID.Chain())
+	collectionClient, err := testnet.NewClient(colContainer1.Addr(testnet.ColNodeAPIPort), net.Root().Header.ChainID.Chain())
 	assert.Nil(t, err)
 
 	tx := unittest.TransactionBodyFixture()

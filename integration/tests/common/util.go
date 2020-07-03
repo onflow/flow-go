@@ -108,7 +108,7 @@ func CreateCounterPanicTx(chain flow.Chain) dsl.Transaction {
 	}
 }
 
-func createAccount(ctx context.Context, client *testnet.Client, genesis flow.Block, code []byte, key flow.AccountPublicKey) error {
+func createAccount(ctx context.Context, client *testnet.Client, root *flow.Block, code []byte, key flow.AccountPublicKey) error {
 
 	var createAccountScript = []byte(`
 	transaction(code: [Int], key: [Int]) {
@@ -139,7 +139,7 @@ func createAccount(ctx context.Context, client *testnet.Client, genesis flow.Blo
 
 	tx := flow.NewTransactionBody().
 		SetScript([]byte(createAccountScript)).
-		SetReferenceBlockID(genesis.ID()).
+		SetReferenceBlockID(root.ID()).
 		SetProposalKey(client.Chain.ServiceAddress(), 0, client.GetSeqNumber()).
 		SetPayer(client.Chain.ServiceAddress()).
 		AddAuthorizer(client.Chain.ServiceAddress()).

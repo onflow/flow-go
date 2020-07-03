@@ -10,6 +10,12 @@ import (
 // obtain snapshots of the state at any point of the protocol state history.
 type ReadOnlyState interface {
 
+	// Root returns the root header of the current consensus state.
+	Root() (*flow.Header, error)
+
+	// ChainID returns the chain ID for the current consensus state.
+	ChainID() (flow.ChainID, error)
+
 	// Final returns the snapshot of the persistent protocol state at the latest
 	// finalized block, and the returned snapshot is therefore immutable over
 	// time.
