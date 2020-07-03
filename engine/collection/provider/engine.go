@@ -58,7 +58,7 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, engMetric
 	}
 	e.push = push
 
-	exchange, err := net.Register(engine.ExchangeCollections, e)
+	exchange, err := net.Register(engine.ProvideCollections, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for exchange protocol: %w", err)
 	}

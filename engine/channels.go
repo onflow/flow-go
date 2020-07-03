@@ -36,22 +36,43 @@ const (
 	PushApprovals = 122
 
 	// Channels for actively requesting missing entities related to transactions
-	ExchangeTransactions = 200
-	ExchangeCollections  = 201
-	ExchangeGuarantees   = 202
+	RequestTransactions = 200
+	RequestCollections  = 201
+	RequestGuarantees   = 202
 
 	// Channels for actively requesting missing entities related to consensus
-	ExchangeHeaders  = 210
-	ExchangeIndexes  = 211
-	ExchangePayloads = 212
-	ExchangeBlocks   = 213
+	RequestHeaders  = 210
+	RequestIndexes  = 211
+	RequestPayloads = 212
+	RequestBlocks   = 213
 
 	// Channels for actively requesting missing entities related to execution
-	ExchangeChunks    = 220
-	ExchangeReceipts  = 221
-	ExchangeResults   = 222
-	ExchangeApprovals = 223
-	ExchangeSeals     = 224
+	RequestChunks    = 220
+	RequestReceipts  = 221
+	RequestResults   = 222
+	RequestApprovals = 223
+	RequestSeals     = 224
+
+	// Channel aliases to make the code more readable / more robust to errors
+	ReceiveTransactions = PushTransactions
+	ReceiveGuarantees   = PushGuarantees
+	ReceiveCollections  = PushCollections
+	ReceiveBlocks       = PushBlocks
+	ReceiveChunks       = PushChunks
+	ReceiveReceipts     = PushReceipts
+	ReceiveApprovals    = PushApprovals
+	ProvideTransactinos = RequestTransactions
+	ProvideCollections  = RequestCollections
+	ProvideGuarantees   = RequestGuarantees
+	ProvideHeaders      = RequestHeaders
+	ProvideIndexes      = RequestIndexes
+	ProvidePayloads     = RequestPayloads
+	ProvideBlocks       = RequestBlocks
+	ProvideChunks       = RequestChunks
+	ProvideReceipts     = RequestReceipts
+	ProvideResults      = RequestResults
+	ProvideApprovals    = RequestApprovals
+	ProvideSeals        = RequestSeals
 )
 
 func ChannelName(channelID uint8) string {
@@ -84,30 +105,30 @@ func ChannelName(channelID uint8) string {
 		return "push-receipts"
 	case PushApprovals:
 		return "push-approvals"
-	case ExchangeTransactions:
-		return "exchange-transactions"
-	case ExchangeCollections:
-		return "exchange-collections"
-	case ExchangeGuarantees:
-		return "exchange-guarantees"
-	case ExchangeHeaders:
-		return "exchange-headers"
-	case ExchangeIndexes:
-		return "exchange-indexes"
-	case ExchangePayloads:
-		return "exchange-payloads"
-	case ExchangeBlocks:
-		return "exchange-blocks"
-	case ExchangeChunks:
-		return "exchange-chunks"
-	case ExchangeReceipts:
-		return "exchange-receipts"
-	case ExchangeResults:
-		return "exchange-results"
-	case ExchangeApprovals:
-		return "exchange-approvals"
-	case ExchangeSeals:
-		return "exchange-seals"
+	case RequestTransactions:
+		return "request-transactions"
+	case RequestCollections:
+		return "request-collections"
+	case RequestGuarantees:
+		return "request-guarantees"
+	case RequestHeaders:
+		return "request-headers"
+	case RequestIndexes:
+		return "request-indexes"
+	case RequestPayloads:
+		return "request-payloads"
+	case RequestBlocks:
+		return "request-blocks"
+	case RequestChunks:
+		return "request-chunks"
+	case RequestReceipts:
+		return "request-receipts"
+	case RequestResults:
+		return "request-results"
+	case RequestApprovals:
+		return "request-approvals"
+	case RequestSeals:
+		return "request-seals"
 	}
 	return fmt.Sprintf("unknown-channel-%d", channelID)
 }

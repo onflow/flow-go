@@ -172,7 +172,7 @@ func main() {
 				node.Network,
 				node.Me,
 				node.State,
-				engine.ExchangeBlocks,
+				engine.ProvideBlocks,
 				retrieve,
 				filter.Any,
 			)

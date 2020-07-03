@@ -129,7 +129,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	require.NoError(t, err)
 
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.PushBlocks)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
-	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.ExchangeCollections)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
+	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.RequestCollections)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.SyncExecution)), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 	blockSync := new(module2.BlockRequester)
 

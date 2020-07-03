@@ -150,7 +150,7 @@ func VerificationHappyPath(t *testing.T,
 		assert.True(t, ok)
 		verNet.StartConDev(requestInterval, true)
 		verNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
-			return m.ChannelID == engine.ExchangeCollections
+			return m.ChannelID == engine.RequestCollections
 		})
 
 		verNets = append(verNets, verNet)

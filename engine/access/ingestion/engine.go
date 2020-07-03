@@ -62,7 +62,7 @@ func New(log zerolog.Logger,
 		transactions: transactions,
 	}
 
-	con, err := net.Register(engine.ExchangeCollections, eng)
+	con, err := net.Register(engine.RequestCollections, eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register collection provider engine: %w", err)
 	}

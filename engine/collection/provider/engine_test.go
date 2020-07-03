@@ -54,7 +54,7 @@ func (suite *Suite) SetupTest() {
 
 	suite.reqEngine = new(mocknetwork.Engine)
 	suite.pushConduit, err = suite.reqNode.Net.Register(engine.PushGuarantees, suite.reqEngine)
-	suite.exchangeConduit, err = suite.reqNode.Net.Register(engine.ExchangeCollections, suite.reqEngine)
+	suite.exchangeConduit, err = suite.reqNode.Net.Register(engine.ProvideCollections, suite.reqEngine)
 	suite.Require().Nil(err)
 }
 

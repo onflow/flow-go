@@ -200,7 +200,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// setup mocks
 		originID := unittest.IdentifierFixture()
-		suite.net.On("Register", uint8(engine.ExchangeCollections), mock.Anything).
+		suite.net.On("Register", uint8(engine.RequestCollections), mock.Anything).
 			Return(suite.collectionsConduit, nil).
 			Once()
 		colIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))

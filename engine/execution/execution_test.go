@@ -88,7 +88,7 @@ func TestExecutionFlow(t *testing.T) {
 	defer consensusNode.Done()
 
 	collectionEngine := new(network.Engine)
-	colConduit, _ := collectionNode.Net.Register(engine.ExchangeCollections, collectionEngine)
+	colConduit, _ := collectionNode.Net.Register(engine.RequestCollections, collectionEngine)
 	collectionEngine.On("Submit", exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			originID, _ := args[0].(flow.Identifier)
@@ -280,7 +280,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	// setup mocks and assertions
 	collectionEngine := new(network.Engine)
-	colConduit, _ := collectionNode.Net.Register(engine.ExchangeCollections, collectionEngine)
+	colConduit, _ := collectionNode.Net.Register(engine.RequestCollections, collectionEngine)
 	collectionEngine.On("Submit", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			originID := args[0].(flow.Identifier)
