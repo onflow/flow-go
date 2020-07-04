@@ -21,13 +21,14 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
+	bootstrapexec "github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/engine/verification/finder"
 	"github.com/dapperlabs/flow-go/engine/verification/match"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/fvm"
+	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/chunks"
@@ -73,7 +74,9 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	require.NoError(t, err)
 
 	genesis := flow.Genesis(participants, chainID)
-	err = state.Mutate().Bootstrap(unittest.GenesisStateCommitment, genesis)
+	result := bootstrap.Result(genesis, unittest.GenesisStateCommitment)
+	seal := bootstrap.Seal(result)
+	err = state.Mutate().Bootstrap(genesis, result, seal)
 	require.NoError(t, err)
 
 	for _, option := range options {
@@ -244,8 +247,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	genesisHead, err := node.State.Final().Head()
 	require.NoError(t, err)
 
-	bootstrapper := bootstrap.NewBootstrapper(node.Log)
-
+	bootstrapper := bootstrapexec.NewBootstrapper(node.Log)
 	commit, err := bootstrapper.BootstrapLedger(ls, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply, node.ChainID.Chain())
 	require.NoError(t, err)
 
@@ -352,8 +354,6 @@ func WithMatchEngine(eng network.Engine) VerificationOpt {
 
 func VerificationNode(t testing.TB,
 	hub *stub.Hub,
-	verificationCollector module.VerificationMetrics,
-	mempoolCollector module.MempoolMetrics,
 	identity *flow.Identity,
 	identities []*flow.Identity,
 	assigner module.ChunkAssigner,
@@ -371,27 +371,20 @@ func VerificationNode(t testing.TB,
 		apply(&node)
 	}
 
+	collector := metrics.NewNoopCollector()
+
 	if node.Receipts == nil {
 		node.Receipts, err = stdmap.NewReceipts(1000)
-		require.Nil(t, err)
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourceReceipt, node.Receipts.Size)
 		require.Nil(t, err)
 	}
 
 	if node.PendingReceipts == nil {
 		node.PendingReceipts, err = stdmap.NewPendingReceipts(1000)
 		require.Nil(t, err)
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourcePendingReceipt, node.PendingReceipts.Size)
-		require.Nil(t, err)
 	}
 
 	if node.PendingResults == nil {
 		node.PendingResults = stdmap.NewPendingResults()
-		require.Nil(t, err)
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourcePendingResult, node.PendingResults.Size)
 		require.Nil(t, err)
 	}
 
@@ -401,32 +394,20 @@ func VerificationNode(t testing.TB,
 
 	if node.Chunks == nil {
 		node.Chunks = match.NewChunks(1000)
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourcePendingChunk, node.Chunks.Size)
-		require.Nil(t, err)
 	}
 
 	if node.ProcessedResultIDs == nil {
 		node.ProcessedResultIDs, err = stdmap.NewIdentifiers(1000)
-		require.Nil(t, err)
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourceProcessedResultID, node.ProcessedResultIDs.Size)
 		require.Nil(t, err)
 	}
 
 	if node.ReceiptIDsByBlock == nil {
 		node.ReceiptIDsByBlock, err = stdmap.NewIdentifierMap(1000)
 		require.Nil(t, err)
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourcePendingReceiptIDsByBlock, node.ReceiptIDsByBlock.Size)
-		require.Nil(t, err)
 	}
 
 	if node.ReceiptIDsByResult == nil {
 		node.ReceiptIDsByResult, err = stdmap.NewIdentifierMap(1000)
-		require.Nil(t, err)
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourcePendingReceiptIDsByResult, node.ReceiptIDsByResult.Size)
 		require.Nil(t, err)
 	}
 
@@ -443,7 +424,7 @@ func VerificationNode(t testing.TB,
 		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
 
 		node.VerifierEngine, err = verifier.New(node.Log,
-			verificationCollector,
+			collector,
 			node.Tracer,
 			node.Net,
 			node.State,
@@ -454,7 +435,7 @@ func VerificationNode(t testing.TB,
 
 	if node.MatchEngine == nil {
 		node.MatchEngine, err = match.New(node.Log,
-			verificationCollector,
+			collector,
 			node.Tracer,
 			node.Net,
 			node.Me,
@@ -471,7 +452,7 @@ func VerificationNode(t testing.TB,
 
 	if node.FinderEngine == nil {
 		node.FinderEngine, err = finder.New(node.Log,
-			verificationCollector,
+			collector,
 			node.Tracer,
 			node.Net,
 			node.Me,
