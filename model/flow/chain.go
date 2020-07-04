@@ -16,6 +16,9 @@ const Testnet ChainID = "flow-testnet"
 // Emulator is the chain ID for the emulated node chain.
 const Emulator ChainID = "flow-emulator"
 
+// MonotonicEmulator is the chain ID for the emulated node chain with monotonic address generation.
+const MonotonicEmulator ChainID = "flow-emulator-monotonic"
+
 // networkType is the type of network for which account addresses
 // are generated and checked.
 //
@@ -33,7 +36,7 @@ func (c ChainID) getNetworkType() networkType {
 	case Emulator:
 		return networkType(invalidCodeEmulator)
 	default:
-		panic(fmt.Sprintf("chain ID [%s] is invalid ", c))
+		panic(fmt.Sprintf("chain ID [%s] is invalid or does not support linear code address generation", c))
 	}
 }
 
@@ -103,6 +106,13 @@ var testnet = &addressedChain{
 
 var emulator = &addressedChain{
 	chainID: Emulator,
+	impl: &LinearCodeImpl{
+		chainID: Emulator,
+	},
+}
+
+var monotonicEmulator = &addressedChain{
+	chainID: Emulator,
 	impl:    &MonotonicImpl{},
 }
 
@@ -114,6 +124,8 @@ func (c ChainID) Chain() Chain {
 		return testnet
 	case Emulator:
 		return emulator
+	case MonotonicEmulator:
+		return monotonicEmulator
 	default:
 		panic(fmt.Sprintf("chain ID [%s] is invalid ", c))
 	}
