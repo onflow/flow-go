@@ -28,26 +28,30 @@ func fullKeyHash(owner, controller, key string) flow.RegisterID {
 func Test_AccountWithNoKeys(t *testing.T) {
 	chain := flow.Mainnet.Chain()
 
-	ledger := testutil.RootBootstrappedLedger(chain)
-
 	rt := runtime.NewInterpreterRuntime()
-	vm := fvm.New(rt, chain)
+	vm := fvm.New(rt)
 
 	txBody := flow.NewTransactionBody().
 		SetScript(createAccountScript).
 		AddAuthorizer(chain.ServiceAddress())
 
 	ctx := fvm.NewContext(
-		fvm.WithSignatureVerification(false),
-		fvm.WithFeePayments(false),
+		fvm.WithChain(chain),
 		fvm.WithRestrictedAccountCreation(false),
+		fvm.WithTransactionProcessors([]fvm.TransactionProcessor{
+			fvm.NewTransactionInvocator(),
+		}),
 	)
 
-	result, err := vm.Invoke(ctx, fvm.Transaction(txBody), ledger)
-	require.NoError(t, err)
-	require.NoError(t, result.Error)
+	ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
-	address := flow.BytesToAddress(result.Events[0].Fields[0].(cadence.Address).Bytes())
+	tx := fvm.Transaction(txBody)
+
+	err := vm.Run(ctx, tx, ledger)
+	require.NoError(t, err)
+	require.NoError(t, tx.Err)
+
+	address := flow.BytesToAddress(tx.Events[0].Fields[0].(cadence.Address).Bytes())
 
 	require.NotPanics(t, func() {
 		_, _ = vm.GetAccount(ctx, address, ledger)
@@ -59,26 +63,30 @@ func Test_AccountWithNoKeys(t *testing.T) {
 func Test_AccountWithNoKeysCounter(t *testing.T) {
 	chain := flow.Mainnet.Chain()
 
-	ledger := testutil.RootBootstrappedLedger(chain)
-
 	rt := runtime.NewInterpreterRuntime()
-	vm := fvm.New(rt, chain)
+	vm := fvm.New(rt)
 
 	txBody := flow.NewTransactionBody().
 		SetScript(createAccountScript).
 		AddAuthorizer(chain.ServiceAddress())
 
 	ctx := fvm.NewContext(
-		fvm.WithSignatureVerification(false),
-		fvm.WithFeePayments(false),
+		fvm.WithChain(chain),
 		fvm.WithRestrictedAccountCreation(false),
+		fvm.WithTransactionProcessors([]fvm.TransactionProcessor{
+			fvm.NewTransactionInvocator(),
+		}),
 	)
 
-	result, err := vm.Invoke(ctx, fvm.Transaction(txBody), ledger)
-	require.NoError(t, err)
-	require.NoError(t, result.Error)
+	ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
-	address := flow.BytesToAddress(result.Events[0].Fields[0].(cadence.Address).Bytes())
+	tx := fvm.Transaction(txBody)
+
+	err := vm.Run(ctx, tx, ledger)
+	require.NoError(t, err)
+	require.NoError(t, tx.Err)
+
+	address := flow.BytesToAddress(tx.Events[0].Fields[0].(cadence.Address).Bytes())
 
 	countRegister := fullKeyHash(
 		string(address.Bytes()),
