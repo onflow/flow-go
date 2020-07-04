@@ -100,8 +100,8 @@ func (e *hostEnv) getLogs() []string {
 func (e *hostEnv) GetValue(owner, controller, key []byte) ([]byte, error) {
 	v, _ := e.ledger.Get(
 		fullKeyHash(
-			string(flow.BytesToAddress(owner).Bytes()),
-			string(flow.BytesToAddress(controller).Bytes()),
+			string(owner),
+			string(controller),
 			string(key),
 		),
 	)
@@ -111,8 +111,8 @@ func (e *hostEnv) GetValue(owner, controller, key []byte) ([]byte, error) {
 func (e *hostEnv) SetValue(owner, controller, key, value []byte) error {
 	e.ledger.Set(
 		fullKeyHash(
-			string(flow.BytesToAddress(owner).Bytes()),
-			string(flow.BytesToAddress(controller).Bytes()),
+			string(owner),
+			string(controller),
 			string(key),
 		),
 		value,
