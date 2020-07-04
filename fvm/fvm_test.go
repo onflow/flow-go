@@ -965,7 +965,7 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 
-	chain := flow.Emulator.Chain()
+	chain := flow.MonotonicEmulator.Chain()
 
 	vm := fvm.New(rt)
 
@@ -1081,7 +1081,7 @@ func TestSignatureVerification(t *testing.T) {
 			privateKey, publicKey := createKey()
 			signableMessage, message := createMessage("foo")
 			signature := signMessage(privateKey, signableMessage)
-			weight := cadence.NewUFix64(1_00000000) // 1.0
+			weight, _ := cadence.NewUFix64("1.0")
 
 			publicKeys := cadence.NewArray([]cadence.Value{
 				publicKey,
@@ -1184,7 +1184,7 @@ func TestSignatureVerification(t *testing.T) {
 			signatureB := signMessage(privateKeyB, signableMessage)
 			signatureC := signMessage(privateKeyC, signableMessage)
 
-			weight := cadence.NewUFix64(50000000) // 0.5
+			weight, _ := cadence.NewUFix64("0.5")
 
 			t.Run("3 of 3", func(t *testing.T) {
 				signatures := cadence.NewArray([]cadence.Value{

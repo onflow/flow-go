@@ -3,6 +3,8 @@ package unittest
 import (
 	"encoding/hex"
 
+	"github.com/onflow/cadence"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -20,7 +22,7 @@ const GenesisStateCommitmentHex = "b0c3a818c6e1adee71c43ef3825636f377dd60e588afe
 
 var GenesisStateCommitment flow.StateCommitment
 
-const GenesisTokenSupply uint64 = 1_000_000_000_000_000
+var GenesisTokenSupply, _ = cadence.NewUFix64("10000000.00000000")
 
 var ServiceAccountPrivateKey flow.AccountPrivateKey
 var ServiceAccountPublicKey flow.AccountPublicKey
