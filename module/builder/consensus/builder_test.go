@@ -163,6 +163,8 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.Require().NoError(err)
 	err = bs.db.Update(operation.IndexBlockHeight(final.Height, bs.finalID))
 	bs.Require().NoError(err)
+	err = bs.db.Update(operation.InsertRootHeight(13))
+	bs.Require().NoError(err)
 	bs.sentinel = 1337
 	bs.setter = func(header *flow.Header) error {
 		header.View = 1337
