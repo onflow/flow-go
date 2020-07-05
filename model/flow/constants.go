@@ -19,7 +19,7 @@ func GenesisTime() time.Time {
 // badger value log GC. Equivalent to 10 mins for a 1 second block time
 const DefaultValueLogGCFrequency = 10 * 60
 
-const domainTagLength = 40
+const domainTagLength = 32
 
 // TransactionDomainTag is the prefix of all signed transaction payloads.
 //
