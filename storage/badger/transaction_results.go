@@ -21,7 +21,7 @@ func NewTransactionResults(db *badger.DB) *TransactionResults {
 
 // Store will store the transaction result for the given block ID
 func (tr *TransactionResults) Store(blockID flow.Identifier, transactionResult *flow.TransactionResult) error {
-	err := operation.RetryOnConflict(tr.db.Update, operation.InsertTransactionResult(blockID, transactionResult))
+	err := operation.RetryOnConflict(tr.db.Update, operation.SkipDuplicates(operation.InsertTransactionResult(blockID, transactionResult)))
 	if err != nil {
 		return fmt.Errorf("could not insert transaction result: %w", err)
 	}
