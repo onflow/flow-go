@@ -12,14 +12,14 @@ import (
 
 func Transaction(tx *flow.TransactionBody) *TransactionProcedure {
 	return &TransactionProcedure{
-		Transaction: tx,
 		ID:          tx.ID(),
+		Transaction: tx,
 	}
 }
 
 type TransactionProcedure struct {
-	Transaction *flow.TransactionBody
 	ID          flow.Identifier
+	Transaction *flow.TransactionBody
 	Logs        []string
 	Events      []cadence.Event
 	// TODO: report gas consumption: https://github.com/dapperlabs/flow-go/issues/4139

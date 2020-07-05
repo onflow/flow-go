@@ -18,9 +18,9 @@ func Script(code []byte) *ScriptProcedure {
 }
 
 type ScriptProcedure struct {
+	ID        flow.Identifier
 	Script    []byte
 	Arguments [][]byte
-	ID        flow.Identifier
 	Value     cadence.Value
 	Logs      []string
 	Events    []cadence.Event
@@ -35,6 +35,7 @@ type ScriptProcessor interface {
 
 func (proc *ScriptProcedure) WithArguments(args [][]byte) *ScriptProcedure {
 	return &ScriptProcedure{
+		ID:        proc.ID,
 		Script:    proc.Script,
 		Arguments: args,
 	}
