@@ -29,7 +29,7 @@ var TransactionDomainTag = domainTag("FLOW-V0.0-transaction")
 // UserDomainTag is the prefix of all signed user space payloads.
 //
 // A domain tag is encoded as UTF-8 bytes, right padded to a total length of 40 bytes.
-var UserDomainTag = domainTag("FLOW-V0.0-user-domain")
+var UserDomainTag = domainTag("FLOW-V0.0-user")
 
 func domainTag(s string) [domainTagLength]byte {
 	var tag [domainTagLength]byte
