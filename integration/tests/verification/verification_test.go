@@ -15,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
 	mock2 "github.com/dapperlabs/flow-go/engine/testutil/mock"
+	"github.com/dapperlabs/flow-go/engine/testutil/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	chmodel "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -57,7 +58,7 @@ func TestHappyPath(t *testing.T) {
 		t.Run(fmt.Sprintf("%d-verification node %d-chunk number", tc.verNodeCount, tc.chunkCount), func(t *testing.T) {
 			mu.Lock()
 			defer mu.Unlock()
-			VerificationHappyPath(t, tc.verNodeCount, tc.chunkCount)
+			verification.VerificationHappyPath(t, tc.verNodeCount, tc.chunkCount)
 		})
 	}
 }
@@ -110,7 +111,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
 		assignees := make([]flow.Identifier, 0)
 		for _, verIdentity := range verIdentities {
-			if IsAssigned(chunk.Index) {
+			if verification.IsAssigned(chunk.Index) {
 				assignees = append(assignees, verIdentity.NodeID)
 			}
 		}
@@ -142,10 +143,10 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 	}
 
 	// mock execution node
-	exeNode, exeEngine := setupMockExeNode(t, hub, exeIdentity, verIdentities, identities, chainID, completeER)
+	exeNode, exeEngine := verification.SetupMockExeNode(t, hub, exeIdentity, verIdentities, identities, chainID, completeER)
 
 	// mock consensus node
-	conNode, conEngine, conWG := setupMockConsensusNode(t, hub, conIdentity, verIdentities, identities, completeER, chainID)
+	conNode, conEngine, conWG := verification.SetupMockConsensusNode(t, hub, conIdentity, verIdentities, identities, completeER, chainID)
 
 	// sends execution receipt to each of verification nodes
 	verWG := sync.WaitGroup{}

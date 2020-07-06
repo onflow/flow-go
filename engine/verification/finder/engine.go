@@ -211,14 +211,14 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 	}
 
 	// constructs list of receipts pending for this block
-	ers := make([]*verification.PendingReceipt, len(erIDs))
-	ctxs := make([]context.Context, len(erIDs))
-	for index, erId := range erIDs {
-		span, ok := e.tracer.GetSpan(erId, trace.VERProcessExecutionReceipt)
+	ers := make([]*verification.PendingReceipt, 0, len(erIDs))
+	ctxs := make([]context.Context, 0, len(erIDs))
+	for _, erID := range erIDs {
+		span, ok := e.tracer.GetSpan(erID, trace.VERProcessExecutionReceipt)
 		ctx := context.Background()
 		if !ok {
-			span = e.tracer.StartSpan(erId, trace.VERProcessExecutionReceipt, opentracing.StartTime(start))
-			span.SetTag("execution_receipt_id", erId)
+			span = e.tracer.StartSpan(erID, trace.VERProcessExecutionReceipt, opentracing.StartTime(start))
+			span.SetTag("execution_receipt_id", erID)
 			defer span.Finish()
 		}
 		ctx = opentracing.ContextWithSpan(ctx, span)
@@ -226,15 +226,15 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 			opentracing.StartTime(start))
 		defer childSpan.Finish()
 
-		er, ok := e.receipts.Get(erId)
+		er, ok := e.receipts.Get(erID)
 		if !ok {
 			e.log.Debug().
-				Hex("receipt_id", logging.ID(erId)).
+				Hex("receipt_id", logging.ID(erID)).
 				Msg("could not retrieve pending receipt")
 			continue
 		}
-		ers[index] = er
-		ctxs[index] = ctx
+		ers = append(ers, er)
+		ctxs = append(ctxs, ctx)
 	}
 	e.checkReceipts(ctxs, ers)
 }

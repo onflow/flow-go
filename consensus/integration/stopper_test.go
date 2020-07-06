@@ -1,5 +1,3 @@
-// +build timesensitivetest
-
 package integration_test
 
 import (
@@ -45,6 +43,12 @@ type Stopper struct {
 // to catch up.
 // a better strategy is to wait until all nodes has entered a certain view,
 // then stop them all.
+//
+// stopAtView - if all node's curview have reached this view, then all nodes will be terminated.
+// stopAtCount - if any node has finalized a total of "stopAtCount" blocks, then all nodes will be
+// terminated.
+// for example: NewStopper(100, 10000) means all nodes will be terminated if all nodes have passed
+// view 100 or any node has finalized 10000 blocks.
 func NewStopper(stopAtView uint64, stopAtCount uint) *Stopper {
 	return &Stopper{
 		running:     make(map[flow.Identifier]struct{}),
@@ -82,7 +86,11 @@ func (s *Stopper) onEnteringView(id flow.Identifier, view uint64) {
 
 	// if there is no running nodes, stop all
 	if len(s.running) == 0 {
-		s.stopAll()
+		// terminating all nodes in a different goroutine,
+		// otherwise onEnteringView will be blocking,
+		// which will block hotstuff eventloop from exiting, and
+		// cause deadlock
+		go s.stopAll()
 	}
 }
 
@@ -99,7 +107,11 @@ func (s *Stopper) onFinalizedTotal(id flow.Identifier, total uint) {
 
 	// if there is no running nodes, stop all
 	if len(s.running) == 0 {
-		s.stopAll()
+		// terminating all nodes in a different goroutine,
+		// otherwise onEnteringView will be blocking,
+		// which will block hotstuff eventloop from exiting, and
+		// cause deadlock
+		go s.stopAll()
 	}
 }
 
@@ -118,15 +130,7 @@ func (s *Stopper) stopAll() {
 		// stop compliance will also stop both hotstuff and synchronization engine
 		go func(i int) {
 			// TODO better to wait until it's done, but needs to figure out why hotstuff.Done doesn't finish
-			s.nodes[i].compliance.Done()
-			s.nodes[i].hot.Done()
-			// 2 seconds waiting is more than enough for local, but sometime still not enough on slow CI environment.
-			// if there is error like this, it means we didn't wait long enough before closing the database
-			// panic: runtime error: invalid memory address or nil pointer dereference
-			// [signal SIGSEGV: segmentation violation code=0x1 addr=0x10 pc=0x94fc7a]
-			// goroutine 147 [running]:
-			// github.com/dgraph-io/badger/v2/skl.(*Skiplist).IncrRef(...)
-			time.Sleep(2 * time.Second)
+			<-s.nodes[i].compliance.Done()
 			wg.Done()
 		}(i)
 	}
