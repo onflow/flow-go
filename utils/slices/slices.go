@@ -15,7 +15,7 @@ func Concat(slices [][]byte) []byte {
 }
 
 // EnsureByteSliceSize returns a copy of input bytes with given length
-// trimming or padding with zeros front bytes accordingly
+// trimming or left-padding with zero bytes accordingly
 func EnsureByteSliceSize(b []byte, length int) []byte {
 	if len(b) > length {
 		b = b[len(b)-length:]
