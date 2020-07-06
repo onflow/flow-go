@@ -11,7 +11,6 @@ import (
 const AccountKeyWeightThreshold = 1000
 
 const (
-	keyAddressState   = "account_address_state"
 	keyExists         = "exists"
 	keyCode           = "code"
 	keyPublicKeyCount = "public_key_count"
@@ -21,17 +20,23 @@ func keyPublicKey(index uint64) string {
 	return fmt.Sprintf("public_key_%d", index)
 }
 
-func getAccount(
-	vm *VirtualMachine,
-	ctx Context,
-	ledger Ledger,
-	chain flow.Chain,
-	address flow.Address,
-) (*flow.Account, error) {
+type Accounts struct {
+	ledger    Ledger
+	chain     flow.Chain
+	addresses *Addresses
+}
+
+func NewAccounts(ledger Ledger, chain flow.Chain, addresses *Addresses) *Accounts {
+	return &Accounts{
+		ledger: ledger,
+	}
+}
+
+func (a *Accounts) Get(address flow.Address) (*flow.Account, error) {
 	var ok bool
 	var err error
 
-	ok, err = accountExists(ledger, address)
+	ok, err = a.Exists(address)
 	if err != nil {
 		return nil, err
 	}
@@ -41,56 +46,84 @@ func getAccount(
 	}
 
 	var code []byte
-	code, err = getAccountCode(ledger, address)
+	code, err = a.GetCode(address)
 	if err != nil {
 		return nil, err
 	}
 
 	var publicKeys []flow.AccountPublicKey
-	publicKeys, err = getAccountPublicKeys(ledger, address)
+	publicKeys, err = a.GetPublicKeys(address)
 	if err != nil {
 		return nil, err
-	}
-
-	var result *InvocationResult
-	result, err = vm.Invoke(
-		ctx,
-		getFlowTokenBalanceScript(address, chain.ServiceAddress()),
-		ledger,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	var balance uint64
-
-	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, balance will be 0.
-	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
-	// 2. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
-	if result.Error == nil {
-		balance = result.Value.ToGoValue().(uint64)
 	}
 
 	return &flow.Account{
 		Address: address,
-		Balance: balance,
 		Code:    code,
 		Keys:    publicKeys,
 	}, nil
 }
 
-func getAccountCode(ledger Ledger, address flow.Address) ([]byte, error) {
-	code, err := ledger.Get(fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyCode))
-	if err != nil {
-		return nil, newLedgerGetError(keyCode, address, err)
-	}
+// func getAccount(
+// 	vm *VirtualMachine,
+// 	ctx Context,
+// 	ledger Ledger,
+// 	chain flow.Chain,
+// 	address flow.Address,
+// ) (*flow.Account, error) {
+// 	var ok bool
+// 	var err error
+//
+// 	ok, err = accountExists(ledger, address)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	if !ok {
+// 		return nil, ErrAccountNotFound
+// 	}
+//
+// 	var code []byte
+// 	code, err = getAccountCode(ledger, address)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	var publicKeys []flow.AccountPublicKey
+// 	publicKeys, err = getAccountPublicKeys(ledger, address)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	var result *InvocationResult
+// 	result, err = vm.Invoke(
+// 		ctx,
+// 		getFlowTokenBalanceScript(address, chain.ServiceAddress()),
+// 		ledger,
+// 	)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	var balance uint64
+//
+// 	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, balance will be 0.
+// 	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
+// 	// 2. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
+// 	if result.Error == nil {
+// 		balance = result.Value.ToGoValue().(uint64)
+// 	}
+//
+// 	return &flow.Account{
+// 		Address: address,
+// 		Balance: balance,
+// 		Code:    code,
+// 		Keys:    publicKeys,
+// 	}, nil
+// }
 
-	return code, nil
-
-}
-
-func accountExists(ledger Ledger, address flow.Address) (bool, error) {
-	exists, err := ledger.Get(fullKeyHash(string(address.Bytes()), "", keyExists))
+func (a *Accounts) Exists(address flow.Address) (bool, error) {
+	exists, err := a.ledger.Get(fullKeyHash(string(address.Bytes()), "", keyExists))
 	if err != nil {
 		return false, newLedgerGetError(keyExists, address, err)
 	}
@@ -102,8 +135,8 @@ func accountExists(ledger Ledger, address flow.Address) (bool, error) {
 	return false, nil
 }
 
-func createAccount(ledger Ledger, chain flow.Chain, publicKeys []flow.AccountPublicKey) (flow.Address, error) {
-	addressState, err := getAddressState(ledger, chain)
+func (a *Accounts) Create(publicKeys []flow.AccountPublicKey) (flow.Address, error) {
+	addressState, err := a.addresses.GetGeneratorState()
 	if err != nil {
 		return flow.EmptyAddress, err
 	}
@@ -115,38 +148,25 @@ func createAccount(ledger Ledger, chain flow.Chain, publicKeys []flow.AccountPub
 		return flow.EmptyAddress, err
 	}
 
-	err = createAccountWithAddress(ledger, newAddress, publicKeys)
+	// mark that this account exists
+	a.ledger.Set(fullKeyHash(string(newAddress.Bytes()), "", keyExists), []byte{1})
+
+	a.ledger.Set(fullKeyHash(string(newAddress.Bytes()), string(newAddress.Bytes()), keyCode), nil)
+
+	err = a.SetPublicKeys(newAddress, publicKeys)
 	if err != nil {
-		return flow.Address{}, err
+		return flow.EmptyAddress, err
 	}
 
 	// update the address state
-	setAddressState(ledger, addressState)
+	a.addresses.SetGeneratorState(addressState)
 
 	return newAddress, nil
 }
 
-func createAccountWithAddress(
-	ledger Ledger,
-	address flow.Address,
-	publicKeys []flow.AccountPublicKey,
-) error {
-	// mark that this account exists
-	ledger.Set(fullKeyHash(string(address.Bytes()), "", keyExists), []byte{1})
-
-	ledger.Set(fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyCode), nil)
-
-	err := setAccountPublicKeys(ledger, address, publicKeys)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func getAccountPublicKeys(ledger Ledger, address flow.Address) (publicKeys []flow.AccountPublicKey, err error) {
+func (a *Accounts) GetPublicKeys(address flow.Address) (publicKeys []flow.AccountPublicKey, err error) {
 	var countBytes []byte
-	countBytes, err = ledger.Get(
+	countBytes, err = a.ledger.Get(
 		fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyPublicKeyCount),
 	)
 	if err != nil {
@@ -171,7 +191,7 @@ func getAccountPublicKeys(ledger Ledger, address flow.Address) (publicKeys []flo
 	publicKeys = make([]flow.AccountPublicKey, count)
 
 	for i := uint64(0); i < count; i++ {
-		publicKey, err := ledger.Get(
+		publicKey, err := a.ledger.Get(
 			fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyPublicKey(i)),
 		)
 		if err != nil {
@@ -193,11 +213,11 @@ func getAccountPublicKeys(ledger Ledger, address flow.Address) (publicKeys []flo
 	return publicKeys, nil
 }
 
-func setAccountPublicKeys(ledger Ledger, address flow.Address, publicKeys []flow.AccountPublicKey) error {
+func (a *Accounts) SetPublicKeys(address flow.Address, publicKeys []flow.AccountPublicKey) error {
 
 	var existingCount uint64
 
-	countBytes, err := ledger.Get(
+	countBytes, err := a.ledger.Get(
 		fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyPublicKeyCount),
 	)
 	if err != nil {
@@ -220,7 +240,7 @@ func setAccountPublicKeys(ledger Ledger, address flow.Address, publicKeys []flow
 	newCount := uint64(len(publicKeys)) // len returns int and this won't exceed uint64
 	newKeyCount := new(big.Int).SetUint64(newCount)
 
-	ledger.Set(
+	a.ledger.Set(
 		fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyPublicKeyCount),
 		newKeyCount.Bytes(),
 	)
@@ -238,26 +258,35 @@ func setAccountPublicKeys(ledger Ledger, address flow.Address, publicKeys []flow
 		}
 
 		// asserted length of publicKeys so i should always fit into uint64
-		setAccountPublicKey(ledger, address, uint64(i), publicKeyBytes)
+		a.SetPublicKey(address, uint64(i), publicKeyBytes)
 	}
 
 	// delete leftover keys
 	for i := newCount; i < existingCount; i++ {
-		ledger.Delete(fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyPublicKey(i)))
+		a.ledger.Delete(fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyPublicKey(i)))
 	}
 
 	return nil
 }
 
-func setAccountPublicKey(ledger Ledger, address flow.Address, keyID uint64, publicKey []byte) {
-	ledger.Set(
+func (a *Accounts) SetPublicKey(address flow.Address, keyID uint64, publicKey []byte) {
+	a.ledger.Set(
 		fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyPublicKey(keyID)),
 		publicKey,
 	)
 }
 
-func setAccountCode(ledger Ledger, address flow.Address, code []byte) error {
-	ok, err := accountExists(ledger, address)
+func (a *Accounts) GetCode(address flow.Address) ([]byte, error) {
+	code, err := a.ledger.Get(fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyCode))
+	if err != nil {
+		return nil, newLedgerGetError(keyCode, address, err)
+	}
+
+	return code, nil
+}
+
+func (a *Accounts) SetCode(address flow.Address, code []byte) error {
+	ok, err := a.Exists(address)
 	if err != nil {
 		return err
 	}
@@ -269,7 +298,7 @@ func setAccountCode(ledger Ledger, address flow.Address, code []byte) error {
 	key := fullKeyHash(string(address.Bytes()), string(address.Bytes()), keyCode)
 
 	var prevCode []byte
-	prevCode, err = ledger.Get(key)
+	prevCode, err = a.ledger.Get(key)
 	if err != nil {
 		return fmt.Errorf("cannot retreive previous code: %w", err)
 	}
@@ -279,23 +308,9 @@ func setAccountCode(ledger Ledger, address flow.Address, code []byte) error {
 		return nil
 	}
 
-	ledger.Set(key, code)
+	a.ledger.Set(key, code)
 
 	return nil
-}
-
-func getAddressState(ledger Ledger, chain flow.Chain) (flow.AddressGenerator, error) {
-	stateBytes, err := ledger.Get(fullKeyHash("", "", keyAddressState))
-	if err != nil {
-		return nil, err
-	}
-
-	return chain.BytesToAddressState(stateBytes), nil
-}
-
-func setAddressState(ledger Ledger, state flow.AddressGenerator) {
-	stateBytes := state.Bytes()
-	ledger.Set(fullKeyHash("", "", keyAddressState), stateBytes)
 }
 
 const initFlowTokenTransactionTemplate = `

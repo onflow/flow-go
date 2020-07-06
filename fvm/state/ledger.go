@@ -41,6 +41,14 @@ func (m MapLedger) Delete(key flow.RegisterID) {
 	delete(m.Registers, string(key))
 }
 
+const (
+	keyAddressState   = "account_address_state"
+	keyUUID           = "uuid"
+	keyExists         = "exists"
+	keyCode           = "code"
+	keyPublicKeyCount = "public_key_count"
+)
+
 func fullKey(owner, controller, key string) string {
 	// https://en.wikipedia.org/wiki/C0_and_C1_control_codes#Field_separators
 	return strings.Join([]string{owner, controller, key}, "\x1F")
