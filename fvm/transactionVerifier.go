@@ -3,6 +3,7 @@ package fvm
 import (
 	"errors"
 
+	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -22,14 +23,17 @@ func (v *TransactionSignatureVerifier) Process(
 	vm *VirtualMachine,
 	ctx Context,
 	proc *TransactionProcedure,
-	ledger Ledger,
+	ledger state.Ledger,
 ) error {
-	return v.verifyTransactionSignatures(proc.Transaction, ledger)
+	addresses := state.NewAddresses(ledger, ctx.Chain)
+	accounts := state.NewAccounts(ledger, addresses)
+
+	return v.verifyTransactionSignatures(proc.Transaction, accounts)
 }
 
 func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	tx *flow.TransactionBody,
-	ledger Ledger,
+	accounts *state.Accounts,
 ) (err error) {
 	if tx.Payer == flow.EmptyAddress {
 		return &MissingPayerError{}
@@ -39,7 +43,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	var proposalKeyVerifiedInPayload bool
 
 	payloadWeights, proposalKeyVerifiedInPayload, err = v.aggregateAccountSignatures(
-		ledger,
+		accounts,
 		tx.PayloadSignatures,
 		tx.PayloadMessage(),
 		tx.ProposalKey,
@@ -52,7 +56,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	var proposalKeyVerifiedInEnvelope bool
 
 	envelopeWeights, proposalKeyVerifiedInEnvelope, err = v.aggregateAccountSignatures(
-		ledger,
+		accounts,
 		tx.EnvelopeSignatures,
 		tx.EnvelopeMessage(),
 		tx.ProposalKey,
@@ -91,7 +95,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 }
 
 func (v *TransactionSignatureVerifier) aggregateAccountSignatures(
-	ledger Ledger,
+	accounts *state.Accounts,
 	signatures []flow.TransactionSignature,
 	message []byte,
 	proposalKey flow.ProposalKey,
@@ -103,7 +107,7 @@ func (v *TransactionSignatureVerifier) aggregateAccountSignatures(
 	weights = make(map[flow.Address]int)
 
 	for _, txSig := range signatures {
-		accountKey, valid, err := v.verifyAccountSignature(ledger, txSig, message)
+		accountKey, valid, err := v.verifyAccountSignature(accounts, txSig, message)
 		if err != nil {
 			return nil, false, err
 		}
@@ -133,14 +137,14 @@ func (v *TransactionSignatureVerifier) aggregateAccountSignatures(
 // An error is returned if the account does not contain a public key that
 // correctly verifies the signature against the given message.
 func (v *TransactionSignatureVerifier) verifyAccountSignature(
-	ledger Ledger,
+	accounts *state.Accounts,
 	txSig flow.TransactionSignature,
 	message []byte,
 ) (*flow.AccountPublicKey, bool, error) {
 	var ok bool
 	var err error
 
-	ok, err = accountExists(ledger, txSig.Address)
+	ok, err = accounts.Exists(txSig.Address)
 	if err != nil {
 		return nil, false, err
 	}
@@ -151,7 +155,7 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 
 	var accountKeys []flow.AccountPublicKey
 
-	accountKeys, err = getAccountPublicKeys(ledger, txSig.Address)
+	accountKeys, err = accounts.GetPublicKeys(txSig.Address)
 	if err != nil {
 		return nil, false, err
 	}

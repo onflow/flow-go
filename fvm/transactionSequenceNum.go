@@ -1,6 +1,7 @@
 package fvm
 
 import (
+	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -14,18 +15,21 @@ func (c *TransactionSequenceNumberChecker) Process(
 	vm *VirtualMachine,
 	ctx Context,
 	proc *TransactionProcedure,
-	ledger Ledger,
+	ledger state.Ledger,
 ) error {
-	return c.checkAndIncrementSequenceNumber(proc.Transaction, ledger)
+	addresses := state.NewAddresses(ledger, ctx.Chain)
+	accounts := state.NewAccounts(ledger, addresses)
+
+	return c.checkAndIncrementSequenceNumber(proc.Transaction, accounts)
 }
 
 func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	tx *flow.TransactionBody,
-	ledger Ledger,
+	accounts *state.Accounts,
 ) error {
 	proposalKey := tx.ProposalKey
 
-	accountKeys, err := getAccountPublicKeys(ledger, proposalKey.Address)
+	accountKeys, err := accounts.GetPublicKeys(proposalKey.Address)
 	if err != nil {
 		return err
 	}
@@ -58,7 +62,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 		return err
 	}
 
-	setAccountPublicKey(ledger, proposalKey.Address, proposalKey.KeyID, updatedAccountKeyBytes)
+	accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyID, updatedAccountKeyBytes)
 
 	return nil
 }

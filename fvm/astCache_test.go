@@ -233,7 +233,10 @@ func TestTransactionWithProgramASTCacheConsistentRegTouches(t *testing.T) {
 		return ledger.RegisterTouches
 	}
 
-	assert.Equal(t, createLedgerOps(true), createLedgerOps(false))
+	assert.Equal(t,
+		createLedgerOps(true),
+		createLedgerOps(false),
+	)
 }
 
 func BenchmarkTransactionWithProgramASTCache(b *testing.B) {

@@ -1,4 +1,4 @@
-package fvm
+package state
 
 import (
 	"crypto/sha256"
@@ -46,6 +46,10 @@ func (m MapLedger) Touch(key flow.RegisterID) {
 
 func (m MapLedger) Delete(key flow.RegisterID) {
 	delete(m.Registers, string(key))
+}
+
+func RegisterID(owner, controller, key string) flow.RegisterID {
+	return fullKeyHash(owner, controller, key)
 }
 
 func fullKey(owner, controller, key string) string {

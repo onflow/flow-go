@@ -7,6 +7,7 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 
+	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -28,10 +29,10 @@ type TransactionProcedure struct {
 }
 
 type TransactionProcessor interface {
-	Process(*VirtualMachine, Context, *TransactionProcedure, Ledger) error
+	Process(*VirtualMachine, Context, *TransactionProcedure, state.Ledger) error
 }
 
-func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, ledger Ledger) error {
+func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, ledger state.Ledger) error {
 	for _, p := range ctx.TransactionProcessors {
 		err := p.Process(vm, ctx, proc, ledger)
 		vmErr, fatalErr := handleError(err)
@@ -79,7 +80,7 @@ func (i *TransactionInvocator) Process(
 	vm *VirtualMachine,
 	ctx Context,
 	proc *TransactionProcedure,
-	ledger Ledger,
+	ledger state.Ledger,
 ) error {
 	env := newEnvironment(ctx, ledger)
 	env.setTransaction(vm, proc.Transaction)
