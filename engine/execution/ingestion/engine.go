@@ -44,7 +44,6 @@ type Engine struct {
 	me                                  module.Local
 	state                               protocol.State
 	receiptHasher                       hash.Hasher // used as hasher to sign the execution receipt
-	conduit                             network.Conduit
 	collectionConduit                   network.Conduit
 	syncConduit                         network.Conduit
 	blocks                              storage.Blocks
@@ -121,22 +120,21 @@ func New(
 		maximumCollectionRequestRetryNumber: maximumCollectionRequestRetryNumber,
 	}
 
-	con, err := net.Register(engine.BlockProvider, &eng)
+	_, err := net.Register(engine.PushBlocks, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 
-	collConduit, err := net.Register(engine.CollectionProvider, &eng)
+	collConduit, err := net.Register(engine.PushCollections, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register collection provider engine: %w", err)
 	}
 
-	syncConduit, err := net.Register(engine.ExecutionSync, &eng)
+	syncConduit, err := net.Register(engine.SyncExecution, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register execution blockSync engine: %w", err)
 	}
 
-	eng.conduit = con
 	eng.collectionConduit = collConduit
 	eng.syncConduit = syncConduit
 

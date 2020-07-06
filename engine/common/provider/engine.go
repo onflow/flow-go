@@ -22,11 +22,20 @@ type Engine struct {
 	me       module.Local
 	state    protocol.State
 	con      network.Conduit
-	handlers map[messages.Resource]Handler
+	retrieve RetrieveFunc
+	selector flow.IdentityFilter
 }
 
 // New creates a new consensus propagation engine.
-func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, me module.Local, state protocol.State, handlers ...Handler) (*Engine, error) {
+func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, me module.Local, state protocol.State,
+	channel uint8, retrieve RetrieveFunc, selector flow.IdentityFilter) (*Engine, error) {
+
+	// make sure we don't respond to requests sent by self or non-staked nodes
+	selector = filter.And(
+		selector,
+		filter.HasStake(true),
+		filter.Not(filter.HasNodeID(me.NodeID())),
+	)
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
@@ -35,24 +44,16 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 		metrics:  metrics,
 		me:       me,
 		state:    state,
-		handlers: make(map[messages.Resource]Handler),
+		retrieve: retrieve,
+		selector: selector,
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.ProtocolExchange, e)
+	con, err := net.Register(channel, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 	e.con = con
-
-	// process all the handlers
-	for _, handler := range handlers {
-		_, duplicate := e.handlers[handler.Resource]
-		if duplicate {
-			return nil, fmt.Errorf("duplicate handler (%s)", handler.Resource)
-		}
-		e.handlers[handler.Resource] = handler
-	}
 
 	return e, nil
 }
@@ -130,20 +131,9 @@ func (e *Engine) onResourceRequest(originID flow.Identifier, req *messages.Resou
 
 	// TODO: add delay to allow compounding of requests
 
-	// first, we check if we know how to handle the requested resource
-	handler, exists := e.handlers[req.Resource]
-	if !exists {
-		return fmt.Errorf("handler for requested resource does not exist (%s)", req.Resource)
-	}
-
 	// then, we try to get the current identity of the requester and check it against the filter
 	// for the handler to make sure the requester is authorized for this resource
-	selector := filter.And(
-		handler.Selector, // checks provided by the handler
-		filter.Not(filter.HasNodeID(e.me.NodeID())), // disallow requests from self
-		filter.HasStake(true),                       // disallow requests from nodes without stake
-	)
-	identities, err := e.state.Final().Identities(selector)
+	identities, err := e.state.Final().Identities(e.selector)
 	if err != nil {
 		return fmt.Errorf("could not retrieve identity for origin: %w", err)
 	}
@@ -152,14 +142,13 @@ func (e *Engine) onResourceRequest(originID flow.Identifier, req *messages.Resou
 	}
 
 	// finally, execute the retrieve function to get the resource and send the response
-	entity, err := handler.Retrieve(req.EntityID)
+	entity, err := e.retrieve(req.EntityID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve entity: %w", err)
 	}
 	rep := &messages.ResourceResponse{
-		Resource: req.Resource,
-		Entity:   entity,
-		Nonce:    req.Nonce,
+		Entity: entity,
+		Nonce:  req.Nonce,
 	}
 	err = e.con.Submit(rep, originID)
 	if err != nil {

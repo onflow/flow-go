@@ -63,7 +63,7 @@ func New(
 	e.mempool.MempoolEntries(metrics.ResourceGuarantee, e.guarantees.Size())
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.BlockPropagation, e)
+	con, err := net.Register(engine.PushCollections, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}

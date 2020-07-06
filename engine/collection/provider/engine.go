@@ -51,7 +51,7 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, engMetric
 		transactions: transactions,
 	}
 
-	con, err := net.Register(engine.CollectionProvider, e)
+	con, err := net.Register(engine.PushCollections, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
