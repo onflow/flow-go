@@ -966,7 +966,7 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 
-	chain := flow.Emulator.Chain()
+	chain := flow.MonotonicEmulator.Chain()
 
 	vm := fvm.New(rt)
 
