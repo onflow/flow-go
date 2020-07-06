@@ -1,5 +1,3 @@
-// +build timesensitivetest
-
 package integration_test
 
 import (
@@ -23,6 +21,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
 	synceng "github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
+	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
@@ -31,6 +30,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	synccore "github.com/dapperlabs/flow-go/module/synchronization"
+	"github.com/dapperlabs/flow-go/module/trace"
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
@@ -74,9 +74,13 @@ func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint) ([]*N
 	// append additional nodes to consensus
 	participants := append(consensus, collection, verification, execution)
 
+	chainID := flow.Testnet
+	parentID := flow.ZeroID
+	height := uint64(0)
+	timestamp := time.Now().UTC()
 	// add all identities to genesis block and
 	// create and bootstrap consensus node with the genesis
-	genesis := run.GenerateRootBlock(participants)
+	genesis := run.GenerateRootBlock(chainID, parentID, height, timestamp, participants)
 
 	hub := NewHub()
 	stopper := NewStopper(stopAtView, stopCountAt)
@@ -93,6 +97,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	db, dbDir := unittest.TempBadgerDB(t)
 
 	metrics := metrics.NewNoopCollector()
+	tracer := trace.NewNoopTracer()
 
 	headersDB := storage.NewHeaders(metrics, db)
 	identitiesDB := storage.NewIdentities(metrics, db)
@@ -102,10 +107,12 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	payloadsDB := storage.NewPayloads(db, indexDB, identitiesDB, guaranteesDB, sealsDB)
 	blocksDB := storage.NewBlocks(db, headersDB, payloadsDB)
 
-	state, err := protocol.NewState(metrics, db, headersDB, identitiesDB, sealsDB, payloadsDB, blocksDB)
+	state, err := protocol.NewState(metrics, db, headersDB, identitiesDB, sealsDB, indexDB, payloadsDB, blocksDB)
 	require.NoError(t, err)
 
-	err = state.Mutate().Bootstrap(flow.GenesisStateCommitment, genesis)
+	result := bootstrap.Result(genesis, unittest.GenesisStateCommitment)
+	seal := bootstrap.Seal(result)
+	err = state.Mutate().Bootstrap(genesis, result, seal)
 	require.NoError(t, err)
 
 	localID := identity.ID()
@@ -157,7 +164,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	require.NoError(t, err)
 
 	// initialize the block builder
-	build := builder.NewBuilder(metrics, db, headersDB, sealsDB, payloadsDB, blocksDB, guarantees, seals)
+	build := builder.NewBuilder(metrics, db, headersDB, sealsDB, indexDB, blocksDB, guarantees, seals)
 
 	signer := &Signer{identity.ID()}
 
@@ -194,7 +201,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	require.NoError(t, err)
 
 	// initialize the compliance engine
-	comp, err := compliance.New(log, metrics, metrics, metrics, net, local, cleaner, headersDB, payloadsDB, state, prov, cache, syncCore)
+	comp, err := compliance.New(log, metrics, tracer, metrics, metrics, net, local, cleaner, headersDB, payloadsDB, state, prov, cache, syncCore)
 	require.NoError(t, err)
 
 	// initialize the synchronization engine
@@ -203,9 +210,9 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 
 	pending := []*flow.Header{}
 	// initialize the block finalizer
-	hot, err := consensus.NewParticipant(log, dis, metrics, headersDB,
+	hot, err := consensus.NewParticipant(log, tracer, dis, metrics, headersDB,
 		com, build, final, persist, signer, comp, rootHeader,
-		rootQC, rootHeader, pending, consensus.WithTimeout(hotstuffTimeout))
+		rootQC, rootHeader, pending, consensus.WithInitialTimeout(hotstuffTimeout))
 
 	require.NoError(t, err)
 
