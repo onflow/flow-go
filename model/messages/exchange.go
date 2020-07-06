@@ -35,8 +35,8 @@ func (r Resource) String() string {
 }
 
 type ResourceRequest struct {
-	Nonce    uint64
-	EntityID flow.Identifier
+	Nonce     uint64
+	EntityIDs []flow.Identifier
 }
 
 type ResourceResponse struct {

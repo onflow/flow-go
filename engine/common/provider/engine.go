@@ -26,8 +26,8 @@ type Engine struct {
 	state    protocol.State
 	con      network.Conduit
 	channel  uint8
-	retrieve RetrieveFunc
 	selector flow.IdentityFilter
+	retrieve RetrieveFunc
 	requests map[flow.Identifier]Request
 }
 
@@ -51,14 +51,14 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		unit:     engine.NewUnit(),
-		log:      log.With().Str("engine", "synchronization").Logger(),
+		log:      log.With().Str("engine", "provider").Logger(),
 		cfg:      cfg,
 		metrics:  metrics,
 		me:       me,
 		state:    state,
 		channel:  channel,
-		retrieve: retrieve,
 		selector: selector,
+		retrieve: retrieve,
 		requests: make(map[flow.Identifier]Request),
 	}
 
@@ -157,10 +157,9 @@ func (e *Engine) onResourceRequest(originID flow.Identifier, req *messages.Resou
 
 	// add each entity ID to the requests
 	// NOTE: we could punish here for duplicate requests
-	// for _, entityID := range req.EntityIDs {
-	// 	request.EntityIDs[entityID] = struct{}{}
-	// }
-	request.EntityIDs[req.EntityID] = struct{}{}
+	for _, entityID := range req.EntityIDs {
+		request.EntityIDs[entityID] = struct{}{}
+	}
 
 	// if the batch size is still too small, skip immediate processing
 	if uint(len(request.EntityIDs)) < e.cfg.BatchThreshold {

@@ -14,13 +14,13 @@ type Requester struct {
 	mock.Mock
 }
 
-// Request provides a mock function with given fields: entityID, process
-func (_m *Requester) Request(entityID flow.Identifier, process module.ProcessFunc) error {
-	ret := _m.Called(entityID, process)
+// Request provides a mock function with given fields: entityID, handle
+func (_m *Requester) Request(entityID flow.Identifier, handle module.HandleFunc) error {
+	ret := _m.Called(entityID, handle)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, module.ProcessFunc) error); ok {
-		r0 = rf(entityID, process)
+	if rf, ok := ret.Get(0).(func(flow.Identifier, module.HandleFunc) error); ok {
+		r0 = rf(entityID, handle)
 	} else {
 		r0 = ret.Error(0)
 	}

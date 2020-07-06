@@ -156,7 +156,7 @@ func (m *MockRequester) EXPECT() *MockRequesterMockRecorder {
 }
 
 // Request mocks base method
-func (m *MockRequester) Request(arg0 flow.Identifier, arg1 module.ProcessFunc) error {
+func (m *MockRequester) Request(arg0 flow.Identifier, arg1 module.HandleFunc) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Request", arg0, arg1)
 	ret0, _ := ret[0].(error)

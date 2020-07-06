@@ -3,6 +3,7 @@ package requester
 import (
 	"fmt"
 	"math/rand"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -14,22 +15,32 @@ import (
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 type Engine struct {
-	unit     *engine.Unit
-	log      zerolog.Logger
-	metrics  module.EngineMetrics
-	me       module.Local
-	state    protocol.State
-	con      network.Conduit
-	selector flow.IdentityFilter
-	requests map[flow.Identifier]Request
+	unit      *engine.Unit
+	log       zerolog.Logger
+	cfg       Config
+	metrics   module.EngineMetrics
+	me        module.Local
+	state     protocol.State
+	con       network.Conduit
+	channel   uint8
+	selector  flow.IdentityFilter
+	queued    map[flow.Identifier]module.HandleFunc
+	requested map[flow.Identifier]module.HandleFunc
 }
 
 // New creates a new consensus propagation engine.
 func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, me module.Local, state protocol.State,
 	channel uint8, selector flow.IdentityFilter) (*Engine, error) {
+
+	// initialize the default config
+	cfg := Config{
+		BatchThreshold: 128,
+		BatchInterval:  time.Second,
+	}
 
 	// make sure we don't send requests from self or unstaked nodes
 	selector = filter.And(
@@ -40,13 +51,16 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:     engine.NewUnit(),
-		log:      log.With().Str("engine", "synchronization").Logger(),
-		metrics:  metrics,
-		me:       me,
-		state:    state,
-		selector: selector,
-		requests: make(map[flow.Identifier]Request),
+		unit:      engine.NewUnit(),
+		log:       log.With().Str("engine", "requester").Logger(),
+		cfg:       cfg,
+		metrics:   metrics,
+		me:        me,
+		state:     state,
+		channel:   channel,
+		selector:  selector,
+		queued:    make(map[flow.Identifier]module.HandleFunc),
+		requested: make(map[flow.Identifier]module.HandleFunc),
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -103,15 +117,46 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 // Request allows us to request an entity to be processed by the given callback.
-func (e *Engine) Request(entityID flow.Identifier, process module.ProcessFunc) error {
+func (e *Engine) Request(entityID flow.Identifier, handle module.HandleFunc) error {
+	e.unit.Lock()
+	defer e.unit.Unlock()
 
 	// TODO: keep track of in-flight requests to avoid duplicates
 
-	// TODO: add delay so we can compound requests
-
 	// TODO: add automatic retrying and rotating valid recipients
 
-	// TODO: protect against race-conditions upon concurrent request/reply
+	// skip entities that are already queued to be requested
+	_, queued := e.queued[entityID]
+	if queued {
+		e.log.Debug().Hex("entity", entityID[:]).Msg("ignoring already queued entity")
+		return nil
+	}
+
+	// skip duplicates without error for now
+	_, requested := e.queued[entityID]
+	if requested {
+		e.log.Debug().Hex("entity", entityID[:]).Msg("ignoring already requested entity")
+		return nil
+	}
+
+	// add the entity to the list of queued entities
+	e.queued[entityID] = handle
+
+	// if we have not reached the batch threshold, send now
+	if uint(len(e.queued)) < e.cfg.BatchThreshold {
+		return nil
+	}
+
+	// otherwise, create a new request and keep track
+	err := e.executeRequest()
+	if err != nil {
+		return fmt.Errorf("could not execute request: %w", err)
+	}
+
+	return nil
+}
+
+func (e *Engine) executeRequest() error {
 
 	// determine which identities are valid recipients of the request
 	identities, err := e.state.Final().Identities(e.selector)
@@ -122,71 +167,76 @@ func (e *Engine) Request(entityID flow.Identifier, process module.ProcessFunc) e
 		return fmt.Errorf("no valid targets for request available")
 	}
 
-	// select a random recipient for the request
-	target := identities[rand.Intn(len(identities))]
-	req := &messages.ResourceRequest{
-		EntityID: entityID,
-		Nonce:    rand.Uint64(),
+	// put the list of pending entity IDs into the request
+	entityIDs := make([]flow.Identifier, 0, len(e.queued))
+	for entityID, handle := range e.queued {
+		entityIDs = append(entityIDs, entityID)
+		e.requested[entityID] = handle
+		delete(e.queued, entityID)
 	}
+	req := &messages.ResourceRequest{
+		Nonce:     rand.Uint64(),
+		EntityIDs: entityIDs,
+	}
+
+	// select a random recipient for the request and send
+	target := identities[rand.Intn(len(identities))]
 	err = e.con.Submit(&req, target.NodeID)
 	if err != nil {
 		return fmt.Errorf("could not send resource request: %w", err)
 	}
 
-	// store the request for later reference
-	request := Request{
-		TargetID: target.NodeID,
-		EntityID: entityID,
-		Process:  process,
-	}
-	e.requests[req.EntityID] = request
+	e.metrics.MessageSent(engine.ChannelName(e.channel), metrics.MessageResourceRequest)
 
 	return nil
 }
 
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+	e.unit.Lock()
+	defer e.unit.Unlock()
+
 	switch ev := event.(type) {
 	case *messages.ResourceResponse:
-		e.before(metrics.MessageResourceRequest)
-		defer e.after(metrics.MessageResourceRequest)
+		e.metrics.MessageReceived(engine.ChannelName(e.channel), metrics.MessageResourceResponse)
+		defer e.metrics.MessageHandled(engine.ChannelName(e.channel), metrics.MessageResourceResponse)
 		return e.onResourceResponse(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
 }
 
-func (e *Engine) before(msg string) {
-	e.metrics.MessageReceived(metrics.EngineSynchronization, msg)
-	e.unit.Lock()
-}
-
-func (e *Engine) after(msg string) {
-	e.unit.Unlock()
-	e.metrics.MessageHandled(metrics.EngineSynchronization, msg)
-}
-
 func (e *Engine) onResourceResponse(originID flow.Identifier, res *messages.ResourceResponse) error {
-
-	// TODO: add support for batch requests & responses
 
 	// TODO: add reputation system to punish offenders of protocol conventions, slow responses
 
-	// check if we got a pending request for the given resource to the given target
+	// for each entity contained in the response, process it
 	for _, entity := range res.Entities {
-		request, ok := e.requests[entity.ID()]
-		if !ok {
-			return fmt.Errorf("response for unknown request nonce (%d)", res.Nonce)
+		err := e.processEntity(originID, entity)
+		if err != nil {
+			return fmt.Errorf("could not process entity (%x): %w", entity.ID(), err)
 		}
-		if originID != request.TargetID {
-			return fmt.Errorf("response origin mismatch with target (%x != %x)", originID, request.TargetID)
-		}
-		if entity.ID() != request.EntityID {
-			return fmt.Errorf("response entity mismatch with requested (%x != %x)", entity.ID(), request.EntityID)
-		}
+	}
 
-		// forward the entity to the process function
-		request.Process(originID, entity)
+	return nil
+}
+
+func (e *Engine) processEntity(originID flow.Identifier, entity flow.Entity) error {
+
+	// check if this entity is actually still pending
+	handle, requested := e.requested[entity.ID()]
+	if !requested {
+		e.log.Debug().Hex("entity", logging.Entity(entity)).Msg("discarding non-requested entity")
+		return nil
+	}
+
+	// remove the entity from the requested list
+	delete(e.requested, entity.ID())
+
+	// process the entity with the injected handle function
+	err := handle(originID, entity)
+	if err != nil {
+		return fmt.Errorf("could not handle entity: %w", err)
 	}
 
 	return nil
