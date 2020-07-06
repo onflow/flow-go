@@ -9,10 +9,6 @@ import (
 )
 
 func TestDomainTags(t *testing.T) {
-	assert.Equal(
-		t,
-		len(flow.TransactionDomainTag),
-		len(flow.UserDomainTag),
-		"tag lengths must be equal",
-	)
+	assert.Len(t, flow.TransactionDomainTag, flow.DomainTagLength)
+	assert.Len(t, flow.UserDomainTag, flow.DomainTagLength)
 }
