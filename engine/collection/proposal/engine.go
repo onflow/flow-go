@@ -374,21 +374,6 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 		return fmt.Errorf("could not check proposal: %w", err)
 	}
 
-	// we haven't seen this proposal yet, so at this point validate any
-	// transactions we haven't yet seen
-	var merr *multierror.Error
-	for _, tx := range payload.Collection.Transactions {
-		if !e.pool.Has(tx.ID()) {
-			err = e.validator.ValidateTransaction(tx)
-			if err != nil {
-				merr = multierror.Append(merr, err)
-			}
-		}
-	}
-	if err := merr.ErrorOrNil(); err != nil {
-		return engine.NewInvalidInputErrorf("cannot validate block proposal (id=%x) with invalid transactions: %w", header.ID(), err)
-	}
-
 	// there are two possibilities if the proposal is neither already pending
 	// processing in the cache, nor has already been processed:
 	// 1) the proposal is unverifiable because parent or ancestor is unknown
