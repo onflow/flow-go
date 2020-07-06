@@ -37,7 +37,6 @@ type Engine struct {
 	me             module.Local
 	protoState     protocol.State  // flow-wide protocol chain state
 	clusterState   clusterkv.State // cluster-specific chain state
-	validator      module.TransactionValidator
 	pool           mempool.Transactions
 	transactions   storage.Transactions
 	headers        storage.Headers
@@ -59,7 +58,6 @@ func New(
 	mempoolMetrics module.MempoolMetrics,
 	protoState protocol.State,
 	clusterState clusterkv.State,
-	validator module.TransactionValidator,
 	pool mempool.Transactions,
 	transactions storage.Transactions,
 	headers storage.Headers,
@@ -82,7 +80,6 @@ func New(
 		me:             me,
 		protoState:     protoState,
 		clusterState:   clusterState,
-		validator:      validator,
 		pool:           pool,
 		transactions:   transactions,
 		headers:        headers,

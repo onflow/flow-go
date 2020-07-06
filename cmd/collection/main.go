@@ -354,7 +354,6 @@ func main() {
 				node.Metrics.Mempool,
 				node.State,
 				clusterState,
-				ing,
 				pool,
 				node.Storage.Transactions,
 				colHeaders,

@@ -146,7 +146,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	}
 
 	// first, we check if the transaction is valid
-	err := e.ValidateTransaction(tx)
+	err := e.validateTransaction(tx)
 	if err != nil {
 		return engine.NewInvalidInputErrorf("invalid transaction: %w", err)
 	}
@@ -204,9 +204,9 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	return nil
 }
 
-// ValidateTransaction validates the transaction in order to determine whether
+// validateTransaction validates the transaction in order to determine whether
 // the transaction should be included in a collection.
-func (e *Engine) ValidateTransaction(tx *flow.TransactionBody) error {
+func (e *Engine) validateTransaction(tx *flow.TransactionBody) error {
 
 	// ensure all required fields are set
 	missingFields := tx.MissingFields()
