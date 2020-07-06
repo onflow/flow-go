@@ -62,8 +62,8 @@ func main() {
 				collector.FinishBlockToSeal(flow.HashToID(entityID))
 			}
 
-			collProvider := engine.ChannelName(engine.PushCollections)
-			collIngest := engine.ChannelName(engine.PushTransactions)
+			collProvider := engine.ChannelName(engine.TestNetwork)
+			collIngest := engine.ChannelName(engine.TestMetrics)
 
 			collector.NetworkMessageSent(rand.Intn(1000), collProvider)
 			collector.NetworkMessageSent(rand.Intn(1000), collIngest)

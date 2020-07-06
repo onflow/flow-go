@@ -95,7 +95,7 @@ func (suite *FinderEngineTestSuite) SetupTest() {
 	}
 
 	// mocking the network registration of the engine
-	suite.net.On("Register", uint8(engine.PushReceipts), testifymock.Anything).
+	suite.net.On("Register", uint8(engine.ReceiveReceipts), testifymock.Anything).
 		Return(suite.receiptsConduit, nil).
 		Once()
 

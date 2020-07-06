@@ -79,7 +79,7 @@ func New(
 		return nil, fmt.Errorf("max retry can not be 0")
 	}
 
-	con, err := net.Register(engine.PushChunks, e)
+	con, err := net.Register(engine.RequestChunks, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register chunk data pack provider engine: %w", err)
 	}
