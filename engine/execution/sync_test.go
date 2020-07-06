@@ -139,7 +139,7 @@ func TestSyncFlow(t *testing.T) {
 	fmt.Printf("block5 ID %x parent %x\n", block5.ID(), block5.Header.ParentID)
 
 	collectionEngine := new(network.Engine)
-	colConduit, _ := collectionNode.Net.Register(engine.PushCollections, collectionEngine)
+	colConduit, _ := collectionNode.Net.Register(engine.RequestCollections, collectionEngine)
 
 	collectionEngine.On("Submit", exe2ID.NodeID, mock.MatchedBy(func(r *messages.CollectionRequest) bool { return r.ID == col1.ID() })).Run(func(args mock.Arguments) {
 		_ = colConduit.Submit(&messages.CollectionResponse{Collection: col1}, exe2ID.NodeID)
@@ -160,7 +160,7 @@ func TestSyncFlow(t *testing.T) {
 	ebMutex := sync.RWMutex{}
 
 	verificationEngine := new(network.Engine)
-	_, _ = verificationNode.Net.Register(engine.PushReceipts, verificationEngine)
+	_, _ = verificationNode.Net.Register(engine.ReceiveReceipts, verificationEngine)
 	verificationEngine.On("Submit", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			ebMutex.Lock()
@@ -173,7 +173,7 @@ func TestSyncFlow(t *testing.T) {
 		Return(nil).Times(0)
 
 	consensusEngine := new(network.Engine)
-	_, _ = consensusNode.Net.Register(engine.PushReceipts, consensusEngine)
+	_, _ = consensusNode.Net.Register(engine.ReceiveReceipts, consensusEngine)
 	consensusEngine.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(0)
 
 	// submit block from consensus node
