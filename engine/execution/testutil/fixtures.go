@@ -10,7 +10,6 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto"
@@ -147,7 +146,11 @@ func CreateAccountsWithSimpleAddresses(
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) ([]flow.Address, error) {
-	ctx := fvm.NewContext(fvm.WithSignatureVerification(false))
+	ctx := fvm.NewContext(
+		fvm.WithTransactionProcessors([]fvm.TransactionProcessor{
+			fvm.NewTransactionInvocator(),
+		}),
+	)
 
 	var accounts []flow.Address
 
@@ -168,23 +171,24 @@ func CreateAccountsWithSimpleAddresses(
 		cadAccountKey := BytesToCadenceArray(encAccountKey)
 		encCadAccountKey, _ := jsoncdc.Encode(cadAccountKey)
 
-		tx := flow.NewTransactionBody().
+		txBody := flow.NewTransactionBody().
 			SetScript(script).
 			AddArgument(encCadAccountKey).
 			AddAuthorizer(serviceAddress)
 
-		result, err := vm.Invoke(ctx, fvm.Transaction(tx), ledger)
+		tx := fvm.Transaction(txBody)
+		err := vm.Run(ctx, tx, ledger)
 		if err != nil {
 			return nil, err
 		}
 
-		if result.Error != nil {
-			return nil, fmt.Errorf("failed to create account: %w", result.Error)
+		if tx.Err != nil {
+			return nil, fmt.Errorf("failed to create account: %w", tx.Err)
 		}
 
 		var addr flow.Address
 
-		for _, event := range result.Events {
+		for _, event := range tx.Events {
 			if event.EventType.ID() == string(flow.EventAccountCreated) {
 				addr = event.Fields[0].ToGoValue().([8]byte)
 				break
@@ -199,16 +203,11 @@ func CreateAccountsWithSimpleAddresses(
 	return accounts, nil
 }
 
-func RootBootstrappedLedger(chain flow.Chain) *state.MapLedger {
-	ledger := &state.MapLedger{
-		RegTouchSet: make(map[string]bool),
-		Registers:   make(map[string]flow.RegisterValue),
-	}
+func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context) *state.MapLedger {
+	ledger := state.NewMapLedger()
 
-	vm := fvm.New(runtime.NewInterpreterRuntime(), chain)
-
-	_, _ = vm.Invoke(
-		fvm.NewContext(),
+	_ = vm.Run(
+		ctx,
 		fvm.Bootstrap(unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply),
 		ledger,
 	)

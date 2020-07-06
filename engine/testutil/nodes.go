@@ -267,7 +267,12 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	rt := runtime.NewInterpreterRuntime()
 
-	vm := fvm.New(rt, node.ChainID.Chain())
+	vm := fvm.New(rt)
+
+	vmCtx := fvm.NewContext(
+		fvm.WithChain(node.ChainID.Chain()),
+		fvm.WithBlocks(node.Blocks),
+	)
 
 	computationEngine := computation.New(
 		node.Log,
@@ -275,8 +280,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Tracer,
 		node.Me,
 		node.State,
-		node.Blocks,
 		vm,
+		vmCtx,
 	)
 	require.NoError(t, err)
 
@@ -409,9 +414,14 @@ func VerificationNode(t testing.TB,
 	if node.VerifierEngine == nil {
 		rt := runtime.NewInterpreterRuntime()
 
-		vm := fvm.New(rt, node.ChainID.Chain())
+		vm := fvm.New(rt)
 
-		chunkVerifier := chunks.NewChunkVerifier(vm, node.Blocks)
+		vmCtx := fvm.NewContext(
+			fvm.WithChain(node.ChainID.Chain()),
+			fvm.WithBlocks(node.Blocks),
+		)
+
+		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
 
 		node.VerifierEngine, err = verifier.New(node.Log,
 			collector,

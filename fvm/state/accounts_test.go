@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -13,7 +12,7 @@ import (
 func TestAccounts_GetWithNoKeys(t *testing.T) {
 	chain := flow.Mainnet.Chain()
 
-	ledger := testutil.RootBootstrappedLedger(chain)
+	ledger := state.NewMapLedger()
 
 	addresses := state.NewAddresses(ledger, chain)
 	accounts := state.NewAccounts(ledger, addresses)
@@ -31,7 +30,7 @@ func TestAccounts_GetWithNoKeys(t *testing.T) {
 func TestAccounts_GetWithNoKeysCounter(t *testing.T) {
 	chain := flow.Mainnet.Chain()
 
-	ledger := testutil.RootBootstrappedLedger(chain)
+	ledger := state.NewMapLedger()
 
 	addresses := state.NewAddresses(ledger, chain)
 	accounts := state.NewAccounts(ledger, addresses)

@@ -7,39 +7,31 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// An Invokable is a procedure that can be executed by the virtual machine.
-type Invokable interface {
-	Parse(vm *VirtualMachine, ctx Context, ledger state.Ledger) (Invokable, error)
-	Invoke(vm *VirtualMachine, ctx Context, ledger state.Ledger) (*InvocationResult, error)
+// An Procedure is an operation (or set of operations) that reads or writes ledger state.
+type Procedure interface {
+	Run(vm *VirtualMachine, ctx Context, ledger state.Ledger) error
 }
 
 // A VirtualMachine augments the Cadence runtime with Flow host functionality.
 type VirtualMachine struct {
-	runtime runtime.Runtime
-	chain   flow.Chain
+	Runtime runtime.Runtime
 }
 
 // New creates a new virtual machine instance with the provided runtime.
-func New(rt runtime.Runtime, chain flow.Chain) *VirtualMachine {
+func New(rt runtime.Runtime) *VirtualMachine {
 	return &VirtualMachine{
-		runtime: rt,
-		chain:   chain,
+		Runtime: rt,
 	}
 }
 
-// Parse parses an invokable in a context against the given ledger.
-func (vm *VirtualMachine) Parse(ctx Context, i Invokable, ledger state.Ledger) (Invokable, error) {
-	return i.Parse(vm, ctx, ledger)
+// Run runs a procedure against a ledger in the given context.
+func (vm *VirtualMachine) Run(ctx Context, proc Procedure, ledger state.Ledger) error {
+	return proc.Run(vm, ctx, ledger)
 }
 
-// Invoke invokes an invokable in a context against the given ledger.
-func (vm *VirtualMachine) Invoke(ctx Context, i Invokable, ledger state.Ledger) (*InvocationResult, error) {
-	return i.Invoke(vm, ctx, ledger)
-}
-
-// GetAccount returns the account with the given address or an error if none exists.
+// GetAccount returns an account by address or an error if none exists.
 func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, ledger state.Ledger) (*flow.Account, error) {
-	account, err := getAccount(vm, ctx, ledger, vm.chain, address)
+	account, err := getAccount(vm, ctx, ledger, ctx.Chain, address)
 	if err != nil {
 		// TODO: wrap error
 		return nil, err
@@ -52,14 +44,21 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, ledger s
 //
 // Errors that occur in a meta transaction are propagated as a single error that can be
 // captured by the Cadence runtime and eventually disambiguated by the parent context.
-func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx InvokableTransaction, ledger state.Ledger) error {
-	result, err := vm.Invoke(ctx, tx, ledger)
+func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *TransactionProcedure, ledger state.Ledger) error {
+	ctx = NewContextFromParent(
+		ctx,
+		WithTransactionProcessors([]TransactionProcessor{
+			NewTransactionInvocator(),
+		}),
+	)
+
+	err := vm.Run(ctx, tx, ledger)
 	if err != nil {
 		return err
 	}
 
-	if result.Error != nil {
-		return result.Error
+	if tx.Err != nil {
+		return tx.Err
 	}
 
 	return nil

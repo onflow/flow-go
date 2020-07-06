@@ -19,49 +19,36 @@ import (
 var _ runtime.Interface = &hostEnv{}
 
 type hostEnv struct {
-	vm            *VirtualMachine
+	ctx           Context
 	ledger        state.Ledger
-	astCache      ASTCache
-	blocks        Blocks
 	accounts      *state.Accounts
 	uuidGenerator *UUIDGenerator
 
 	runtime.Metrics
 
-	gasLimit    uint64
-	blockHeader *flow.Header
-	rng         *rand.Rand
-
 	events []cadence.Event
 	logs   []string
 
-	transactionEnv             *transactionEnv
-	restrictContractDeployment bool
-	restrictAccountCreation    bool
+	transactionEnv *transactionEnv
+	rng            *rand.Rand
 }
 
-func newEnvironment(vm *VirtualMachine, ctx Context, ledger state.Ledger) *hostEnv {
-	addresses := state.NewAddresses(ledger, vm.chain)
+func newEnvironment(ctx Context, ledger state.Ledger) *hostEnv {
+	addresses := state.NewAddresses(ledger, ctx.Chain)
 	accounts := state.NewAccounts(ledger, addresses)
 
 	uuids := state.NewUUIDs(ledger)
 	uuidGenerator := NewUUIDGenerator(uuids)
 
 	env := &hostEnv{
-		vm:                         vm,
-		ledger:                     ledger,
-		astCache:                   ctx.ASTCache,
-		blocks:                     ctx.Blocks,
-		accounts:                   accounts,
-		uuidGenerator:              uuidGenerator,
-		Metrics:                    &noopMetricsCollector{},
-		gasLimit:                   ctx.GasLimit,
-		restrictContractDeployment: ctx.RestrictedDeploymentEnabled,
-		restrictAccountCreation:    ctx.RestrictedAccountCreationEnabled,
+		ctx:           ctx,
+		ledger:        ledger,
+		Metrics:       &noopMetricsCollector{},
+		accounts:      accounts,
+		uuidGenerator: uuidGenerator,
 	}
 
 	if ctx.BlockHeader != nil {
-		env.setBlockHeader(ctx.BlockHeader)
 		env.seedRNG(ctx.BlockHeader)
 	}
 
@@ -72,10 +59,6 @@ func newEnvironment(vm *VirtualMachine, ctx Context, ledger state.Ledger) *hostE
 	return env
 }
 
-func (e *hostEnv) setBlockHeader(header *flow.Header) {
-	e.blockHeader = header
-}
-
 func (e *hostEnv) seedRNG(header *flow.Header) {
 	// Seed the random number generator with entropy created from the block header ID. The random number generator will
 	// be used by the UnsafeRandom function.
@@ -84,20 +67,14 @@ func (e *hostEnv) seedRNG(header *flow.Header) {
 	e.rng = rand.New(source)
 }
 
-func (e *hostEnv) setTransaction(
-	tx *flow.TransactionBody,
-	txCtx Context,
-) *hostEnv {
+func (e *hostEnv) setTransaction(vm *VirtualMachine, tx *flow.TransactionBody) {
 	e.transactionEnv = newTransactionEnv(
-		e.vm,
+		vm,
+		e.ctx,
 		e.ledger,
 		e.accounts,
 		tx,
-		txCtx,
-		e.restrictContractDeployment,
-		e.restrictAccountCreation,
 	)
-	return e
 }
 
 func (e *hostEnv) getEvents() []cadence.Event {
@@ -161,11 +138,11 @@ func (e *hostEnv) ResolveImport(location runtime.Location) ([]byte, error) {
 }
 
 func (e *hostEnv) GetCachedProgram(location ast.Location) (*ast.Program, error) {
-	if e.astCache == nil {
+	if e.ctx.ASTCache == nil {
 		return nil, nil
 	}
 
-	program, err := e.astCache.GetProgram(location)
+	program, err := e.ctx.ASTCache.GetProgram(location)
 	if program != nil {
 		// Program was found within cache, do an explicit ledger register touch
 		// to ensure consistent reads during chunk verification.
@@ -183,11 +160,11 @@ func (e *hostEnv) GetCachedProgram(location ast.Location) (*ast.Program, error) 
 }
 
 func (e *hostEnv) CacheProgram(location ast.Location, program *ast.Program) error {
-	if e.astCache == nil {
+	if e.ctx.ASTCache == nil {
 		return nil
 	}
 
-	return e.astCache.SetProgram(location, program)
+	return e.ctx.ASTCache.SetProgram(location, program)
 }
 
 func (e *hostEnv) Log(message string) {
@@ -213,7 +190,7 @@ func (e *hostEnv) GetComputationLimit() uint64 {
 		return e.transactionEnv.GetComputationLimit()
 	}
 
-	return e.gasLimit
+	return e.ctx.GasLimit
 }
 
 func (e *hostEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {
@@ -243,11 +220,11 @@ func (e *hostEnv) VerifySignature(
 
 // GetCurrentBlockHeight returns the current block height.
 func (e *hostEnv) GetCurrentBlockHeight() uint64 {
-	if e.blockHeader == nil {
+	if e.ctx.BlockHeader == nil {
 		panic("GetCurrentBlockHeight is not supported by this environment")
 	}
 
-	return e.blockHeader.Height
+	return e.ctx.BlockHeader.Height
 }
 
 // UnsafeRandom returns a random uint64, where the process of random number derivation is not cryptographically
@@ -264,11 +241,11 @@ func (e *hostEnv) UnsafeRandom() uint64 {
 
 // GetBlockAtHeight returns the block at the given height.
 func (e *hostEnv) GetBlockAtHeight(height uint64) (hash runtime.BlockHash, timestamp int64, exists bool, err error) {
-	if e.blocks == nil {
+	if e.ctx.Blocks == nil {
 		panic("GetBlockAtHeight is not supported by this environment")
 	}
 
-	block, err := e.blocks.ByHeight(height)
+	block, err := e.ctx.Blocks.ByHeight(height)
 	// TODO remove dependency on storage
 	if errors.Is(err, storage.ErrNotFound) {
 		return runtime.BlockHash{}, 0, false, nil
@@ -326,36 +303,27 @@ func (e *hostEnv) GetSigningAccounts() []runtime.Address {
 
 type transactionEnv struct {
 	vm       *VirtualMachine
+	ctx      Context
 	ledger   state.Ledger
 	accounts *state.Accounts
-	tx       *flow.TransactionBody
 
-	// txCtx is an execution context used to execute meta transactions
-	// within this transaction context.
-	txCtx Context
-
-	authorizers                []runtime.Address
-	restrictContractDeployment bool
-	restrictAccountCreation    bool
+	tx          *flow.TransactionBody
+	authorizers []runtime.Address
 }
 
 func newTransactionEnv(
 	vm *VirtualMachine,
+	ctx Context,
 	ledger state.Ledger,
 	accounts *state.Accounts,
 	tx *flow.TransactionBody,
-	txCtx Context,
-	restrictContractDeployment bool,
-	restrictAccountCreation bool,
 ) *transactionEnv {
 	return &transactionEnv{
-		vm:                         vm,
-		ledger:                     ledger,
-		accounts:                   accounts,
-		tx:                         tx,
-		txCtx:                      txCtx,
-		restrictContractDeployment: restrictContractDeployment,
-		restrictAccountCreation:    restrictAccountCreation,
+		vm:       vm,
+		ctx:      ctx,
+		ledger:   ledger,
+		accounts: accounts,
+		tx:       tx,
 	}
 }
 
@@ -377,11 +345,11 @@ func (e *transactionEnv) GetComputationLimit() uint64 {
 
 func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
 	err = e.vm.invokeMetaTransaction(
-		e.txCtx,
+		e.ctx,
 		deductAccountCreationFeeTransaction(
 			flow.Address(payer),
-			e.vm.chain.ServiceAddress(),
-			e.restrictAccountCreation,
+			e.ctx.Chain.ServiceAddress(),
+			e.ctx.RestrictedAccountCreationEnabled,
 		),
 		e.ledger,
 	)
@@ -397,8 +365,8 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	}
 
 	err = e.vm.invokeMetaTransaction(
-		e.txCtx,
-		initFlowTokenTransaction(flowAddress, e.vm.chain.ServiceAddress()),
+		e.ctx,
+		initFlowTokenTransaction(flowAddress, e.ctx.Chain.ServiceAddress()),
 		e.ledger,
 	)
 	if err != nil {
@@ -502,7 +470,7 @@ func (e *transactionEnv) UpdateAccountCode(address runtime.Address, code []byte)
 
 	// currently, every transaction that sets account code (deploys/updates contracts)
 	// must be signed by the service account
-	if e.restrictContractDeployment && !e.isAuthorizer(runtime.Address(e.vm.chain.ServiceAddress())) {
+	if e.ctx.RestrictedDeploymentEnabled && !e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress())) {
 		return fmt.Errorf("code deployment requires authorization from the service account")
 	}
 

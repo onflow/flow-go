@@ -4,17 +4,19 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// A Context defines a set execution parameters used by the virtual machine.
+// A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
+	Chain                            flow.Chain
 	ASTCache                         ASTCache
 	Blocks                           Blocks
 	Metrics                          *MetricsCollector
 	GasLimit                         uint64
 	BlockHeader                      *flow.Header
-	SignatureVerificationEnabled     bool
-	FeePaymentsEnabled               bool
 	RestrictedAccountCreationEnabled bool
 	RestrictedDeploymentEnabled      bool
+	SignatureVerifier                SignatureVerifier
+	TransactionProcessors            []TransactionProcessor
+	ScriptProcessors                 []ScriptProcessor
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -41,20 +43,37 @@ const defaultGasLimit = 100000
 
 func defaultContext() Context {
 	return Context{
+		Chain:                            flow.Mainnet.Chain(),
 		ASTCache:                         nil,
 		Blocks:                           nil,
 		Metrics:                          nil,
 		GasLimit:                         defaultGasLimit,
 		BlockHeader:                      nil,
-		SignatureVerificationEnabled:     true,
-		FeePaymentsEnabled:               true,
 		RestrictedAccountCreationEnabled: true,
 		RestrictedDeploymentEnabled:      true,
+		SignatureVerifier:                NewDefaultSignatureVerifier(),
+		TransactionProcessors: []TransactionProcessor{
+			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
+			NewTransactionSequenceNumberChecker(),
+			NewTransactionFeeDeductor(),
+			NewTransactionInvocator(),
+		},
+		ScriptProcessors: []ScriptProcessor{
+			NewScriptInvocator(),
+		},
 	}
 }
 
 // An Option sets a configuration parameter for a virtual machine context.
 type Option func(ctx Context) Context
+
+// WithChain sets the chain parameters for a virtual machine context.
+func WithChain(chain flow.Chain) Option {
+	return func(ctx Context) Context {
+		ctx.Chain = chain
+		return ctx
+	}
+}
 
 // WithASTCache sets the AST cache for a virtual machine context.
 func WithASTCache(cache ASTCache) Option {
@@ -104,19 +123,11 @@ func WithMetricsCollector(mc *MetricsCollector) Option {
 	}
 }
 
-// WithSignatureVerification enables or disables signature verification and sequence
-// number checks for a virtual machine context.
-func WithSignatureVerification(enabled bool) Option {
+// WithTransactionSignatureVerifier sets the transaction processors for a
+// virtual machine context.
+func WithTransactionProcessors(processors []TransactionProcessor) Option {
 	return func(ctx Context) Context {
-		ctx.SignatureVerificationEnabled = enabled
-		return ctx
-	}
-}
-
-// WithFeePayments enables or disables fee payments for a virtual machine context.
-func WithFeePayments(enabled bool) Option {
-	return func(ctx Context) Context {
-		ctx.FeePaymentsEnabled = enabled
+		ctx.TransactionProcessors = processors
 		return ctx
 	}
 }

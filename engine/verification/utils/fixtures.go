@@ -93,11 +93,14 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 
 		rt := runtime.NewInterpreterRuntime()
 
-		vm := fvm.New(rt, chain)
+		vm := fvm.New(rt)
 
 		blocks := new(storage.Blocks)
 
-		execCtx := fvm.NewContext(fvm.WithBlocks(blocks))
+		execCtx := fvm.NewContext(
+			fvm.WithChain(chain),
+			fvm.WithBlocks(blocks),
+		)
 
 		// create state.View
 		view := delta.NewView(state.LedgerGetRegister(led, startStateCommitment))
