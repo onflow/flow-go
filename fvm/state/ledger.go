@@ -30,13 +30,6 @@ func NewMapLedger() *MapLedger {
 	}
 }
 
-func NewMapLedger() *MapLedger {
-	return &MapLedger{
-		RegTouchSet: make(map[string]bool),
-		Registers:   make(map[string]flow.RegisterValue),
-	}
-}
-
 func (m MapLedger) Set(key flow.RegisterID, value flow.RegisterValue) {
 	m.RegisterTouches[string(key)] = true
 	m.Registers[string(key)] = value
