@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/dapperlabs/flow-go/engine/common/rpc/validate"
+	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -19,13 +19,14 @@ type handlerAccounts struct {
 	state        protocol.State
 	executionRPC execution.ExecutionAPIClient
 	headers      storage.Headers
+	chainID      flow.ChainID
 }
 
 func (h *handlerAccounts) GetAccountAtLatestBlock(ctx context.Context, req *access.GetAccountAtLatestBlockRequest) (*access.AccountResponse, error) {
 
 	address := req.GetAddress()
 
-	if err := validate.Address(address); err != nil {
+	if _, err := convert.Address(address, h.chainID.Chain()); err != nil {
 		return nil, err
 	}
 
@@ -55,7 +56,7 @@ func (h *handlerAccounts) GetAccountAtBlockHeight(ctx context.Context,
 
 	address := req.GetAddress()
 
-	if err := validate.Address(address); err != nil {
+	if _, err := convert.Address(address, h.chainID.Chain()); err != nil {
 		return nil, err
 	}
 

@@ -12,8 +12,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
-	"github.com/dapperlabs/flow-go/engine/common/convert"
-	"github.com/dapperlabs/flow-go/engine/common/rpc/validate"
+	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -65,6 +64,7 @@ func NewHandler(log zerolog.Logger,
 			collectionRPC: c,
 			executionRPC:  e,
 			state:         s,
+			chainID:       chainID,
 			collections:   collections,
 			blocks:        blocks,
 			transactions:  transactions,
@@ -85,6 +85,7 @@ func NewHandler(log zerolog.Logger,
 		handlerAccounts: handlerAccounts{
 			executionRPC: e,
 			state:        s,
+			chainID:      chainID,
 			headers:      headers,
 		},
 		chainID: chainID,
@@ -107,10 +108,10 @@ func (h *Handler) Ping(ctx context.Context, req *access.PingRequest) (*access.Pi
 func (h *Handler) GetCollectionByID(_ context.Context, req *access.GetCollectionByIDRequest) (*access.CollectionResponse, error) {
 
 	reqCollID := req.GetId()
-	if err := validate.CollectionID(reqCollID); err != nil {
+	id, err := convert.CollectionID(reqCollID)
+	if err != nil {
 		return nil, err
 	}
-	id := flow.HashToID(reqCollID)
 
 	// retrieve the collection from the collection storage
 	cl, err := h.collections.LightByID(id)

@@ -12,8 +12,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
-	"github.com/dapperlabs/flow-go/engine/common/convert"
-	"github.com/dapperlabs/flow-go/engine/common/rpc/validate"
+	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -26,21 +25,22 @@ type handlerTransactions struct {
 	collections   storage.Collections
 	blocks        storage.Blocks
 	state         protocol.State
+	chainID       flow.ChainID
 }
 
 // SendTransaction forwards the transaction to the collection node
 func (h *handlerTransactions) SendTransaction(ctx context.Context, req *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {
 
-	// send the transaction to the collection node
+	// convert the request message to a transaction (has the side effect of validating the address in the tx as well)
+	tx, err := convert.MessageToTransaction(req.Transaction, h.chainID.Chain())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to convert transaction: %v", err))
+	}
+
+	// send the transaction to the collection node if valid
 	resp, err := h.collectionRPC.SendTransaction(ctx, req)
 	if err != nil {
 		return resp, status.Error(codes.Internal, fmt.Sprintf("failed to send transaction to a collection node: %v", err))
-	}
-
-	// convert the request message to a transaction
-	tx, err := convert.MessageToTransaction(req.Transaction)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to convert transaction: %v", err))
 	}
 
 	// store the transaction locally
@@ -55,11 +55,11 @@ func (h *handlerTransactions) SendTransaction(ctx context.Context, req *access.S
 func (h *handlerTransactions) GetTransaction(_ context.Context, req *access.GetTransactionRequest) (*access.TransactionResponse, error) {
 
 	reqTxID := req.GetId()
-	if err := validate.TransactionID(reqTxID); err != nil {
+	id, err := convert.TransactionID(reqTxID)
+	if err != nil {
 		return nil, err
 	}
 
-	id := flow.HashToID(reqTxID)
 	// look up transaction from storage
 	tx, err := h.transactions.ByID(id)
 	if err != nil {
@@ -79,11 +79,11 @@ func (h *handlerTransactions) GetTransaction(_ context.Context, req *access.GetT
 func (h *handlerTransactions) GetTransactionResult(ctx context.Context, req *access.GetTransactionRequest) (*access.TransactionResultResponse, error) {
 
 	reqTxID := req.GetId()
-	if err := validate.TransactionID(reqTxID); err != nil {
+	id, err := convert.TransactionID(reqTxID)
+	if err != nil {
 		return nil, err
 	}
 
-	id := flow.HashToID(reqTxID)
 	// look up transaction from storage
 	tx, err := h.transactions.ByID(id)
 	if err != nil {

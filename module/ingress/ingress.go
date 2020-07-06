@@ -15,7 +15,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
-	"github.com/dapperlabs/flow-go/engine/common/convert"
+	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network"
 	grpcutils "github.com/dapperlabs/flow-go/utils/grpc"
 )
@@ -37,7 +38,7 @@ type Ingress struct {
 }
 
 // New returns a new ingress server.
-func New(config Config, e *ingest.Engine) *Ingress {
+func New(config Config, e *ingest.Engine, chainID flow.ChainID) *Ingress {
 	if config.MaxMsgSize == 0 {
 		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
 	}
@@ -46,6 +47,7 @@ func New(config Config, e *ingest.Engine) *Ingress {
 		handler: &handler{
 			UnimplementedAccessAPIServer: access.UnimplementedAccessAPIServer{},
 			engine:                       e,
+			chainID:                      chainID,
 		},
 		server: grpc.NewServer(
 			grpc.MaxRecvMsgSize(config.MaxMsgSize),
@@ -97,7 +99,8 @@ func (i *Ingress) serve() {
 // handler implements a subset of the Observation API.
 type handler struct {
 	access.UnimplementedAccessAPIServer
-	engine network.Engine
+	engine  network.Engine
+	chainID flow.ChainID
 }
 
 // Ping responds to requests when the server is up.
@@ -108,7 +111,7 @@ func (h *handler) Ping(ctx context.Context, req *access.PingRequest) (*access.Pi
 // SendTransaction accepts new transactions and inputs them to the ingress
 // engine for validation and routing.
 func (h *handler) SendTransaction(ctx context.Context, req *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {
-	tx, err := convert.MessageToTransaction(req.Transaction)
+	tx, err := convert.MessageToTransaction(req.Transaction, h.chainID.Chain())
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to convert transaction: %v", err))
 	}

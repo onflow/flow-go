@@ -13,8 +13,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/common/convert"
-	"github.com/dapperlabs/flow-go/engine/common/rpc/validate"
+	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
@@ -37,7 +36,8 @@ type Engine struct {
 }
 
 // New returns a new RPC engine.
-func New(log zerolog.Logger, config Config, e *ingestion.Engine, blocks storage.Blocks, events storage.Events, txResults storage.TransactionResults) *Engine {
+func New(log zerolog.Logger, config Config, e *ingestion.Engine, blocks storage.Blocks, events storage.Events,
+	txResults storage.TransactionResults, chainID flow.ChainID) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
 
 	if config.MaxMsgSize == 0 {
@@ -49,6 +49,7 @@ func New(log zerolog.Logger, config Config, e *ingestion.Engine, blocks storage.
 		unit: engine.NewUnit(),
 		handler: &handler{
 			engine:             e,
+			chain:              chainID,
 			blocks:             blocks,
 			events:             events,
 			transactionResults: txResults,
@@ -100,6 +101,7 @@ func (e *Engine) serve() {
 // handler implements a subset of the Observation API.
 type handler struct {
 	engine             ingestion.IngestRPC
+	chain              flow.ChainID
 	blocks             storage.Blocks
 	events             storage.Events
 	transactionResults storage.TransactionResults
@@ -117,11 +119,10 @@ func (h *handler) ExecuteScriptAtBlockID(
 	req *execution.ExecuteScriptAtBlockIDRequest,
 ) (*execution.ExecuteScriptAtBlockIDResponse, error) {
 
-	if err := validate.BlockID(req.GetBlockId()); err != nil {
+	blockID, err := convert.BlockID(req.GetBlockId())
+	if err != nil {
 		return nil, err
 	}
-
-	blockID := flow.HashToID(req.GetBlockId())
 
 	value, err := h.engine.ExecuteScriptAtBlockID(ctx, req.GetScript(), req.GetArguments(), blockID)
 	if err != nil {
@@ -140,21 +141,20 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 
 	// validate request
 	blockIDs := req.GetBlockIds()
-	if err := validate.BlockIDs(blockIDs); err != nil {
+	flowBlockIDs, err := convert.BlockIDs(blockIDs)
+	if err != nil {
 		return nil, err
 	}
 	reqEvent := req.GetType()
-	if err := validate.EventType(reqEvent); err != nil {
+	eType, err := convert.EventType(reqEvent)
+	if err != nil {
 		return nil, err
 	}
-
-	eType := flow.EventType(reqEvent)
 
 	results := make([]*execution.GetEventsForBlockIDsResponse_Result, len(blockIDs))
 
 	// collect all the events and create a EventsResponse_Result for each block
-	for i, b := range blockIDs {
-		bID := flow.HashToID(b)
+	for i, bID := range flowBlockIDs {
 
 		// lookup events
 		blockEvents, err := h.events.ByBlockIDEventType(bID, eType)
@@ -181,17 +181,16 @@ func (h *handler) GetTransactionResult(
 ) (*execution.GetTransactionResultResponse, error) {
 
 	reqBlockID := req.GetBlockId()
-	if err := validate.BlockID(reqBlockID); err != nil {
+	blockID, err := convert.BlockID(reqBlockID)
+	if err != nil {
 		return nil, err
 	}
 
 	reqTxID := req.GetTransactionId()
-	if err := validate.TransactionID(reqTxID); err != nil {
+	txID, err := convert.TransactionID(reqTxID)
+	if err != nil {
 		return nil, err
 	}
-
-	blockID := flow.HashToID(reqBlockID)
-	txID := flow.HashToID(reqTxID)
 
 	// lookup events by block id and transaction ID
 	blockEvents, err := h.events.ByBlockIDTransactionID(blockID, txID)
@@ -252,16 +251,15 @@ func (h *handler) GetAccountAtBlockID(
 ) (*execution.GetAccountAtBlockIDResponse, error) {
 
 	blockID := req.GetBlockId()
-	if err := validate.BlockID(blockID); err != nil {
+	blockFlowID, err := convert.BlockID(blockID)
+	if err != nil {
 		return nil, err
 	}
-	blockFlowID := flow.HashToID(blockID)
 
-	address := req.GetAddress()
-	if err := validate.Address(address); err != nil {
+	flowAddress, err := convert.Address(req.GetAddress(), h.chain.Chain())
+	if err != nil {
 		return nil, err
 	}
-	flowAddress := flow.BytesToAddress(address)
 
 	value, err := h.engine.GetAccount(ctx, flowAddress, blockFlowID)
 	if err != nil {

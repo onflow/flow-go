@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
 	mockaccess "github.com/dapperlabs/flow-go/engine/access/mock"
-	"github.com/dapperlabs/flow-go/engine/common/convert"
+	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	realstorage "github.com/dapperlabs/flow-go/storage"
@@ -59,6 +59,7 @@ func (suite *Suite) SetupTest() {
 	suite.collections = new(storage.Collections)
 	suite.colClient = new(mockaccess.AccessAPIClient)
 	suite.execClient = new(mockaccess.ExecutionAPIClient)
+	suite.chainID = flow.Mainnet
 }
 
 func (suite *Suite) TestPing() {
@@ -121,7 +122,7 @@ func (suite *Suite) TestGetTransaction() {
 	resp, err := handler.GetTransaction(context.Background(), req)
 	suite.checkResponse(resp, err)
 
-	actual, err := convert.MessageToTransaction(resp.GetTransaction())
+	actual, err := convert.MessageToTransaction(resp.GetTransaction(), suite.chainID.Chain())
 	suite.checkResponse(resp, err)
 	suite.Require().Equal(expected, actual)
 	suite.assertAllExpectations()
@@ -472,9 +473,11 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 func (suite *Suite) TestGetAccount() {
 
-	address := []byte{1}
+	address, err := suite.chainID.Chain().NewAddressGenerator().NextAddress()
+	suite.Require().NoError(err)
+
 	account := &entities.Account{
-		Address: address,
+		Address: address.Bytes(),
 	}
 	ctx := context.Background()
 
@@ -488,7 +491,7 @@ func (suite *Suite) TestGetAccount() {
 	blockID := header.ID()
 	exeReq := &execution.GetAccountAtBlockIDRequest{
 		BlockId: blockID[:],
-		Address: address,
+		Address: address.Bytes(),
 	}
 
 	// create the expected execution API response
@@ -507,7 +510,7 @@ func (suite *Suite) TestGetAccount() {
 			Account: account,
 		}
 		req := &access.GetAccountAtLatestBlockRequest{
-			Address: address,
+			Address: address.Bytes(),
 		}
 		actualResp, err := handler.GetAccountAtLatestBlock(ctx, req)
 		suite.checkResponse(actualResp, err)
@@ -553,7 +556,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 	suite.execClient.On("GetAccountAtBlockID", ctx, exeReq).Return(exeResp, nil).Once()
 
 	// create the handler with the mock
-	handler := NewHandler(suite.log, suite.state, suite.execClient, nil, nil, suite.headers, nil, nil, flow.Testnet)
+	handler := NewHandler(suite.log, suite.state, suite.execClient, nil, nil, suite.headers, nil, nil, flow.Mainnet)
 
 	suite.Run("happy path - valid request and valid response", func() {
 		expectedResp := &access.AccountResponse{

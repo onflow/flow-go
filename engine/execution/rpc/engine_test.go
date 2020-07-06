@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
-	"github.com/dapperlabs/flow-go/engine/common/convert"
+	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	ingestion "github.com/dapperlabs/flow-go/engine/execution/ingestion/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
@@ -81,6 +81,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		blocks:             suite.blocks,
 		events:             suite.events,
 		transactionResults: suite.txResults,
+		chain: flow.Mainnet,
 	}
 
 	concoctReq := func(errType string, blockIDs [][]byte) *execution.GetEventsForBlockIDsRequest {
@@ -178,6 +179,7 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 	// create the handler
 	handler := &handler{
 		engine: mockEngine,
+		chain: flow.Mainnet,
 	}
 
 	createReq := func(id []byte, address []byte) *execution.GetAccountAtBlockIDRequest {
@@ -253,6 +255,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			blocks:             suite.blocks,
 			events:             suite.events,
 			transactionResults: txResults,
+			chain: flow.Mainnet,
 		}
 		return handler
 	}

@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
-	"github.com/dapperlabs/flow-go/engine/common/rpc/validate"
+	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 )
@@ -41,8 +41,8 @@ func (h *handlerScripts) ExecuteScriptAtBlockID(ctx context.Context,
 
 	blockID := req.GetBlockId()
 
-	// validate request
-	if err := validate.BlockID(blockID); err != nil {
+	// validate request (ignore the conversion to Flow ID)
+	if _, err := convert.BlockID(blockID); err != nil {
 		return nil, err
 	}
 

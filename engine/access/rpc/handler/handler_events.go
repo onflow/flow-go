@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
-	"github.com/dapperlabs/flow-go/engine/common/rpc/validate"
+	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 )
@@ -26,13 +26,13 @@ func (h *handlerEvents) GetEventsForHeightRange(ctx context.Context, req *access
 	// validate the request
 	minHeight := req.GetStartHeight()
 	maxHeight := req.GetEndHeight()
-	if err := validate.BlockHeight(minHeight, maxHeight); err != nil {
+	if err := convert.BlockHeight(minHeight, maxHeight); err != nil {
 		return nil, err
 	}
 
 	// validate the event type
 	reqEvent := req.GetType()
-	if err := validate.EventType(reqEvent); err != nil {
+	if _, err := convert.EventType(reqEvent); err != nil {
 		return nil, err
 	}
 
@@ -58,7 +58,7 @@ func (h *handlerEvents) GetEventsForHeightRange(ctx context.Context, req *access
 		blockIDs = append(blockIDs, id[:])
 	}
 
-	if err := validate.BlockIDs(blockIDs); err != nil {
+	if _, err := convert.BlockIDs(blockIDs); err != nil {
 		return nil, err
 	}
 
@@ -70,18 +70,18 @@ func (h *handlerEvents) GetEventsForBlockIDs(ctx context.Context, req *access.Ge
 
 	// validate the block ids
 	blockIDs := req.GetBlockIds()
-	if err := validate.BlockIDs(blockIDs); err != nil {
+	if _, err := convert.BlockIDs(blockIDs); err != nil {
 		return nil, err
 	}
 
 	// validate the event type
 	reqEvent := req.GetType()
-	if err := validate.EventType(reqEvent); err != nil {
+	if _, err := convert.EventType(reqEvent); err != nil {
 		return nil, err
 	}
 
 	// forward the request to the execution node
-	return h.getBlockEventsFromExecutionNode(ctx, req.GetBlockIds(), reqEvent)
+	return h.getBlockEventsFromExecutionNode(ctx, blockIDs, reqEvent)
 }
 
 func (h *handlerEvents) getBlockEventsFromExecutionNode(ctx context.Context, blockIDs [][]byte, etype string) (*access.EventsResponse, error) {
