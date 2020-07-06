@@ -40,6 +40,6 @@ type ResourceRequest struct {
 }
 
 type ResourceResponse struct {
-	Nonce  uint64
-	Entity flow.Entity
+	Nonce    uint64
+	Entities []flow.Entity
 }

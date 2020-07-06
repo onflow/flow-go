@@ -2,6 +2,8 @@ package provider
 
 import (
 	"fmt"
+	"math/rand"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -18,17 +20,26 @@ import (
 type Engine struct {
 	unit     *engine.Unit
 	log      zerolog.Logger
+	cfg      Config
 	metrics  module.EngineMetrics
 	me       module.Local
 	state    protocol.State
 	con      network.Conduit
+	channel  uint8
 	retrieve RetrieveFunc
 	selector flow.IdentityFilter
+	requests map[flow.Identifier]Request
 }
 
 // New creates a new consensus propagation engine.
 func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, me module.Local, state protocol.State,
 	channel uint8, selector flow.IdentityFilter, retrieve RetrieveFunc) (*Engine, error) {
+
+	// initialize the default configuration
+	cfg := Config{
+		BatchThreshold: 128,
+		BatchInterval:  time.Second,
+	}
 
 	// make sure we don't respond to requests sent by self or non-staked nodes
 	selector = filter.And(
@@ -41,11 +52,14 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 	e := &Engine{
 		unit:     engine.NewUnit(),
 		log:      log.With().Str("engine", "synchronization").Logger(),
+		cfg:      cfg,
 		metrics:  metrics,
 		me:       me,
 		state:    state,
+		channel:  channel,
 		retrieve: retrieve,
 		selector: selector,
+		requests: make(map[flow.Identifier]Request),
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -103,33 +117,22 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+	e.unit.Lock()
+	defer e.unit.Unlock()
+
 	switch ev := event.(type) {
 	case *messages.ResourceRequest:
-		e.before(metrics.MessageResourceRequest)
-		defer e.after(metrics.MessageResourceRequest)
+		e.metrics.MessageReceived(engine.ChannelName(e.channel), metrics.MessageResourceRequest)
+		defer e.metrics.MessageHandled(engine.ChannelName(e.channel), metrics.MessageResourceRequest)
 		return e.onResourceRequest(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
 }
 
-func (e *Engine) before(msg string) {
-	e.metrics.MessageReceived(metrics.EngineSynchronization, msg)
-	e.unit.Lock()
-}
-
-func (e *Engine) after(msg string) {
-	e.unit.Unlock()
-	e.metrics.MessageHandled(metrics.EngineSynchronization, msg)
-}
-
 func (e *Engine) onResourceRequest(originID flow.Identifier, req *messages.ResourceRequest) error {
 
-	// TODO: track previous requests to protect against spam / repeated requests
-
-	// TODO: add support for batch requests (multiple IDs in requests, multiple resources in response)
-
-	// TODO: add delay to allow compounding of requests
+	// TODO: add reputation system to punish nodes for malicious behaviour (spam / repeated requests)
 
 	// then, we try to get the current identity of the requester and check it against the filter
 	// for the handler to make sure the requester is authorized for this resource
@@ -141,19 +144,71 @@ func (e *Engine) onResourceRequest(originID flow.Identifier, req *messages.Resou
 		return fmt.Errorf("origin is not allowed to request resource")
 	}
 
-	// finally, execute the retrieve function to get the resource and send the response
-	entity, err := e.retrieve(req.EntityID)
+	// get the currently pending requested entities for the origin
+	request, exists := e.requests[originID]
+	if !exists {
+		request = Request{
+			OriginID:  originID,
+			EntityIDs: nil,
+			Timestamp: time.Now().UTC(),
+		}
+		e.requests[originID] = request
+	}
+
+	// add each entity ID to the requests
+	// NOTE: we could punish here for duplicate requests
+	// for _, entityID := range req.EntityIDs {
+	// 	request.EntityIDs[entityID] = struct{}{}
+	// }
+	request.EntityIDs[req.EntityID] = struct{}{}
+
+	// if the batch size is still too small, skip immediate processing
+	if uint(len(request.EntityIDs)) < e.cfg.BatchThreshold {
+		return nil
+	}
+
+	// otherwise, we sent this response now and zero out the entry
+	err = e.processResponse(request)
 	if err != nil {
-		return fmt.Errorf("could not retrieve entity: %w", err)
+		return fmt.Errorf("could not process response: %w", err)
 	}
+
+	return nil
+}
+
+func (e *Engine) processResponse(request Request) error {
+
+	// remove the request from the map
+	delete(e.requests, request.OriginID)
+
+	// collect all entities for the given IDs
+	entities := make([]flow.Entity, 0, len(request.EntityIDs))
+	for entityID := range request.EntityIDs {
+		entity, err := e.retrieve(entityID)
+		if err != nil {
+			e.log.Debug().Hex("entity", entityID[:]).Msg("unknown entity requested")
+			continue
+		}
+		entities = append(entities, entity)
+	}
+
+	// if no entities are in the response, we bail now
+	if len(entities) == 0 {
+		e.log.Debug().Msg("no entities to send in resource response")
+		return nil
+	}
+
+	// otherwise, send the response to the original requester
 	rep := &messages.ResourceResponse{
-		Entity: entity,
-		Nonce:  req.Nonce,
+		Nonce:    rand.Uint64(),
+		Entities: entities,
 	}
-	err = e.con.Submit(rep, originID)
+	err := e.con.Submit(rep, request.OriginID)
 	if err != nil {
 		return fmt.Errorf("could not send resource response: %w", err)
 	}
+
+	e.metrics.MessageSent(engine.ChannelName(e.channel), metrics.MessageResourceResponse)
 
 	return nil
 }

@@ -6,7 +6,6 @@ import (
 )
 
 type Request struct {
-	Nonce    uint64
 	TargetID flow.Identifier
 	EntityID flow.Identifier
 	Process  module.ProcessFunc

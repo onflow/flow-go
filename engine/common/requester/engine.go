@@ -135,7 +135,6 @@ func (e *Engine) Request(entityID flow.Identifier, process module.ProcessFunc) e
 
 	// store the request for later reference
 	request := Request{
-		Nonce:    req.Nonce,
 		TargetID: target.NodeID,
 		EntityID: entityID,
 		Process:  process,
@@ -174,19 +173,21 @@ func (e *Engine) onResourceResponse(originID flow.Identifier, res *messages.Reso
 	// TODO: add reputation system to punish offenders of protocol conventions, slow responses
 
 	// check if we got a pending request for the given resource to the given target
-	request, ok := e.requests[res.Entity.ID()]
-	if !ok {
-		return fmt.Errorf("response for unknown request nonce (%d)", res.Nonce)
-	}
-	if originID != request.TargetID {
-		return fmt.Errorf("response origin mismatch with target (%x != %x)", originID, request.TargetID)
-	}
-	if res.Entity.ID() != request.EntityID {
-		return fmt.Errorf("response entity mismatch with requested (%x != %x)", res.Entity.ID(), request.EntityID)
-	}
+	for _, entity := range res.Entities {
+		request, ok := e.requests[entity.ID()]
+		if !ok {
+			return fmt.Errorf("response for unknown request nonce (%d)", res.Nonce)
+		}
+		if originID != request.TargetID {
+			return fmt.Errorf("response origin mismatch with target (%x != %x)", originID, request.TargetID)
+		}
+		if entity.ID() != request.EntityID {
+			return fmt.Errorf("response entity mismatch with requested (%x != %x)", entity.ID(), request.EntityID)
+		}
 
-	// forward the entity to the process function
-	request.Process(originID, res.Entity)
+		// forward the entity to the process function
+		request.Process(originID, entity)
+	}
 
 	return nil
 }
