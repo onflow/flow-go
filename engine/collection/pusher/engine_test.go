@@ -1,4 +1,4 @@
-package provider_test
+package pusher_test
 
 import (
 	"math/rand"
@@ -64,7 +64,7 @@ func (suite *Suite) TearDownTest() {
 	suite.conNode.Done()
 }
 
-func TestProviderEngine(t *testing.T) {
+func TestPusherEngine(t *testing.T) {
 	suite.Run(t, new(Suite))
 }
 
@@ -79,7 +79,7 @@ func (suite *Suite) TestSubmitCollectionGuarantee() {
 	assert.NoError(t, err)
 	guarantee.ReferenceBlockID = genesis.ID()
 
-	err = suite.colNode.ProviderEngine.SubmitCollectionGuarantee(guarantee)
+	err = suite.colNode.PusherEngine.SubmitCollectionGuarantee(guarantee)
 	assert.NoError(t, err)
 
 	// flush messages from the collection node
@@ -137,7 +137,7 @@ func (suite *Suite) TestCollectionRequest() {
 		req := &messages.CollectionRequest{ID: unittest.IdentifierFixture(), Nonce: rand.Uint64()}
 
 		// provider should return error
-		err := suite.colNode.ProviderEngine.ProcessLocal(req)
+		err := suite.colNode.PusherEngine.ProcessLocal(req)
 		// we can't distinguish from invalid fingerprint or not found (because we are behind),
 		// so there won't be an error
 		assert.Nil(t, err)

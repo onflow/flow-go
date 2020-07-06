@@ -109,7 +109,6 @@ func (stt *SparseTopologyTestSuite) TestDisjointedNetwork() {
 	engs := make([]*MeshEngine, 0)
 	for _, n := range stt.nets {
 		eng := NewMeshEngine(stt.Suite.T(), n, count-1, engine.TestNetwork)
-		engs = append(engs, eng)
 	}
 
 	// wait for nodes to heartbeat and discover each other

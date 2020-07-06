@@ -275,7 +275,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	// execution node
 	exeNode := testutil.GenericNode(t, hub, exeIdentity, identities, chainID)
 	exeEngine := new(network.Engine)
-	exeChunkDataConduit, err := exeNode.Net.Register(engine.PushChunks, exeEngine)
+	exeChunkDataConduit, err := exeNode.Net.Register(engine.ProvideChunks, exeEngine)
 	assert.Nil(t, err)
 	exeEngine.On("Process", verIdentity.NodeID, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
