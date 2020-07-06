@@ -28,7 +28,6 @@ type hostEnv struct {
 
 	events []cadence.Event
 	logs   []string
-	uuid   uint64
 
 	transactionEnv *transactionEnv
 	rng            *rand.Rand
