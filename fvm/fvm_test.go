@@ -19,12 +19,13 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/fvm"
 	fvmmock "github.com/dapperlabs/flow-go/fvm/mock"
+	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func vmTest(
-	f func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger fvm.Ledger),
+	f func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger),
 	opts ...fvm.Option,
 ) func(t *testing.T) {
 	return func(t *testing.T) {
@@ -46,7 +47,7 @@ func vmTest(
 
 		ctx := fvm.NewContext(opts...)
 
-		ledger := fvm.NewMapLedger()
+		ledger := state.NewMapLedger()
 
 		err = vm.Run(
 			ctx,
@@ -1077,7 +1078,7 @@ func TestSignatureVerification(t *testing.T) {
 	}
 
 	t.Run("Single key", vmTest(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger fvm.Ledger) {
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger) {
 			privateKey, publicKey := createKey()
 			signableMessage, message := createMessage("foo")
 			signature := signMessage(privateKey, signableMessage)
@@ -1167,7 +1168,7 @@ func TestSignatureVerification(t *testing.T) {
 	))
 
 	t.Run("Multiple keys", vmTest(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger fvm.Ledger) {
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger) {
 			privateKeyA, publicKeyA := createKey()
 			privateKeyB, publicKeyB := createKey()
 			privateKeyC, publicKeyC := createKey()
