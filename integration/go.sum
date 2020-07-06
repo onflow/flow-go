@@ -803,6 +803,7 @@ github.com/onflow/cadence v0.4.1-0.20200604185918-21edaa9bfcdd/go.mod h1:dgj1JPl
 github.com/onflow/cadence v0.5.0-beta2 h1:ZUHQ1jxJ8+FNdoOU1oKeewpiN86IeKObLV3E48Nog/s=
 github.com/onflow/cadence v0.5.0-beta2/go.mod h1:dgj1JPlSDeY6ZSqD/yCW06reFSt+19d/IFgQ1eE8Bfg=
 github.com/onflow/cadence v0.5.0-beta3/go.mod h1:dgj1JPlSDeY6ZSqD/yCW06reFSt+19d/IFgQ1eE8Bfg=
+github.com/onflow/cadence v0.5.0-beta4/go.mod h1:dgj1JPlSDeY6ZSqD/yCW06reFSt+19d/IFgQ1eE8Bfg=
 github.com/onflow/flow-ft/contracts v0.0.0-20200525235630-0e8024a483ce h1:I8SaLOFlQN7Jr+aU1mZB0mnsq2qlaaJPeji4PmkTWfA=
 github.com/onflow/flow-ft/contracts v0.0.0-20200525235630-0e8024a483ce h1:I8SaLOFlQN7Jr+aU1mZB0mnsq2qlaaJPeji4PmkTWfA=
 github.com/onflow/flow-ft/contracts v0.0.0-20200525235630-0e8024a483ce/go.mod h1:KwzrK5thiLObKHTHaHf9lrvOS3HLr9jntNEZUQ4yJgw=

@@ -1001,9 +1001,9 @@ func TestSignatureVerification(t *testing.T) {
       import Crypto
 
       pub fun main(
-          rawPublicKeys: [[Int]],
-          message: [Int], 
-          signatures: [[Int]],
+          rawPublicKeys: [[UInt8]],
+          message: [UInt8], 
+          signatures: [[UInt8]],
           weight: UFix64,
       ): Bool {
           let keyList = Crypto.KeyList()
