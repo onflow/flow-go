@@ -2,15 +2,12 @@ package requester
 
 import (
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
 )
 
 type Request struct {
 	Nonce    uint64
 	TargetID flow.Identifier
 	EntityID flow.Identifier
-	Process  ProcessFunc
+	Process  module.ProcessFunc
 }
-
-// TODO: should we use `flow.Entity` here? It would make sense, but it
-// would mean we can't use the normal `engine.Process` function.
-type ProcessFunc func(originID flow.Identifier, entity interface{})

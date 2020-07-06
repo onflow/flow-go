@@ -18,7 +18,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/access/ingestion"
 	accessmock "github.com/dapperlabs/flow-go/engine/access/mock"
 	"github.com/dapperlabs/flow-go/engine/access/rpc"
@@ -41,7 +40,7 @@ type Suite struct {
 	state              *protocol.State
 	snapshot           *protocol.Snapshot
 	log                zerolog.Logger
-	net                *mockmodule.Network
+	request            *mockmodule.Requester
 	collClient         *accessmock.AccessAPIClient
 	execClient         *accessmock.ExecutionAPIClient
 	collectionsConduit *networkmock.Conduit
@@ -63,7 +62,7 @@ func (suite *Suite) SetupTest() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
-	suite.net = new(mockmodule.Network)
+	suite.request = new(mockmodule.Requester)
 	suite.collectionsConduit = &networkmock.Conduit{}
 	suite.me = new(mockmodule.Local)
 	obsIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
@@ -205,9 +204,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// setup mocks
 		originID := unittest.IdentifierFixture()
-		suite.net.On("Register", uint8(engine.RequestCollections), mock.Anything).
-			Return(suite.collectionsConduit, nil).
-			Once()
+		suite.request.On("Request", mock.Anything, mock.Anything).Return()
 		colIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
 		suite.snapshot.On("Identities", mock.Anything).Return(colIdentities, nil).Once()
 		suite.collectionsConduit.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(len(block.Payload.Guarantees))
@@ -226,7 +223,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		rpcEng := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions, suite.chainID)
 
 		// create the ingest engine
-		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, blocks, headers, collections, transactions, rpcEng)
+		ingestEng, err := ingestion.New(suite.log, suite.state, suite.me, suite.request, blocks, headers, collections, transactions, rpcEng)
 		require.NoError(suite.T(), err)
 
 		// create the handler (called by the grpc engine)

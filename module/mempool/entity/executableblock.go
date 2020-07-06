@@ -1,8 +1,6 @@
 package entity
 
 import (
-	"time"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -20,7 +18,6 @@ type ExecutableBlock struct {
 type BlocksByCollection struct {
 	CollectionID     flow.Identifier
 	ExecutableBlocks map[flow.Identifier]*ExecutableBlock
-	TimeoutTimer     *time.Timer
 }
 
 func (c *CompleteCollection) Collection() flow.Collection {

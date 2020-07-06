@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/access/rpc"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -37,13 +36,14 @@ type Suite struct {
 	}
 
 	me           *module.Local
-	net          *module.Network
+	request      *module.Requester
 	provider     *network.Engine
 	blocks       *storage.Blocks
 	headers      *storage.Headers
 	collections  *storage.Collections
 	transactions *storage.Transactions
-	eng          *Engine
+
+	eng *Engine
 
 	// mock conduit for requesting/receiving collections
 	collectionsConduit *network.Conduit
@@ -67,11 +67,8 @@ func (suite *Suite) SetupTest() {
 	suite.me = new(module.Local)
 	suite.me.On("NodeID").Return(obsIdentity.NodeID)
 
-	suite.net = new(module.Network)
-	suite.collectionsConduit = &network.Conduit{}
-	suite.net.On("Register", uint8(engine.RequestCollections), mock.Anything).
-		Return(suite.collectionsConduit, nil).
-		Once()
+	suite.request = new(module.Requester)
+	suite.request.On("Request", mock.Anything, mock.Anything).Return()
 
 	suite.provider = new(network.Engine)
 	suite.blocks = new(storage.Blocks)
@@ -81,7 +78,7 @@ func (suite *Suite) SetupTest() {
 
 	rpcEng := rpc.New(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections, suite.transactions, flow.Testnet)
 
-	eng, err := New(log, suite.net, suite.proto.state, suite.me, suite.blocks, suite.headers, suite.collections, suite.transactions, rpcEng)
+	eng, err := New(log, suite.proto.state, suite.me, suite.request, suite.blocks, suite.headers, suite.collections, suite.transactions, rpcEng)
 	require.NoError(suite.T(), err)
 	suite.eng = eng
 
