@@ -1,6 +1,10 @@
 package flow
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/dapperlabs/flow-go/utils/slices"
+)
 
 // A ChainID is a unique identifier for a specific Flow network instance.
 //
@@ -128,7 +132,7 @@ type Chain interface {
 	AddressAtIndex(index uint64) (Address, error)
 	ServiceAddress() Address
 	ZeroAddress() Address
-	BytesToAddressState(b []byte) AddressGenerator
+	BytesToAddressGenerator(b []byte) AddressGenerator
 	IsValid(Address) bool
 	newAddressGeneratorAtState(state uint64) AddressGenerator
 }
@@ -165,14 +169,11 @@ func (id *addressedChain) ZeroAddress() Address {
 	return address
 }
 
-// BytesToAddressState converts an array of bytes into an address state
-func (id *addressedChain) BytesToAddressState(b []byte) AddressGenerator {
-	if len(b) > addressStateLength {
-		b = b[len(b)-addressStateLength:]
-	}
-	var stateBytes [addressStateLength]byte
-	copy(stateBytes[addressStateLength-len(b):], b)
-	state := uint48(stateBytes[:])
+// BytesToAddressGenerator converts an array of bytes into an address state
+func (id *addressedChain) BytesToAddressGenerator(b []byte) AddressGenerator {
+	bytes := slices.EnsureByteSliceSize(b, addressStateLength)
+
+	state := uint48(bytes[:])
 	return id.newAddressGeneratorAtState(state)
 }
 

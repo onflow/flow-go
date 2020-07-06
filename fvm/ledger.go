@@ -2,11 +2,13 @@ package fvm
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"math/big"
 	"strings"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/utils/slices"
 )
 
 // A Ledger is the storage interface used by the virtual machine to read and write register values.
@@ -35,6 +37,7 @@ func (m MapLedger) Delete(key flow.RegisterID) {
 
 const (
 	keyAddressState   = "account_address_state"
+	keyUUID           = "uuid"
 	keyExists         = "exists"
 	keyCode           = "code"
 	keyPublicKeyCount = "public_key_count"
@@ -146,24 +149,34 @@ func (r *LedgerDAL) GetAccount(address flow.Address) *flow.Account {
 	}
 }
 
-type AddressState interface {
-	Bytes() []byte
-	NextAddress() (flow.Address, error)
-	CurrentAddress() flow.Address
-}
-
 func (r *LedgerDAL) GetAddressState() (flow.AddressGenerator, error) {
 	stateBytes, err := r.Get(fullKeyHash("", "", keyAddressState))
 	if err != nil {
 		return nil, err
 	}
 
-	return r.chain.BytesToAddressState(stateBytes), nil
+	return r.chain.BytesToAddressGenerator(stateBytes), nil
 }
 
 func (r *LedgerDAL) SetAddressState(state flow.AddressGenerator) {
 	stateBytes := state.Bytes()
 	r.Set(fullKeyHash("", "", keyAddressState), stateBytes)
+}
+
+func (r *LedgerDAL) GetUUID() (uint64, error) {
+	stateBytes, err := r.Get(fullKeyHash("", "", keyUUID))
+	if err != nil {
+		return 0, err
+	}
+	bytes := slices.EnsureByteSliceSize(stateBytes, 8)
+
+	return binary.BigEndian.Uint64(bytes), nil
+}
+
+func (r *LedgerDAL) SetUUID(uuid uint64) {
+	bytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(bytes, uuid)
+	r.Set(fullKeyHash("", "", keyUUID), bytes)
 }
 
 func (r *LedgerDAL) CreateAccount(publicKeys []flow.AccountPublicKey) (flow.Address, error) {

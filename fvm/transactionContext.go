@@ -23,7 +23,6 @@ const scriptGasLimit = 100000
 type CheckerFunc func([]byte, runtime.Location) error
 
 type TransactionContext struct {
-	LedgerDAL
 	runtime.Metrics
 	bc                               BlockContext
 	ledger                           LedgerDAL
@@ -34,7 +33,6 @@ type TransactionContext struct {
 	events                           []cadence.Event
 	tx                               *flow.TransactionBody
 	gasLimit                         uint64
-	uuid                             uint64 // TODO: implement proper UUID
 	header                           *flow.Header
 	blocks                           Blocks
 	signatureVerificationEnabled     bool
@@ -303,7 +301,7 @@ func (r *TransactionContext) CheckCode(address runtime.Address, code []byte) (er
 }
 
 func (r *TransactionContext) ServiceAddress() flow.Address {
-	return r.chain.ServiceAddress()
+	return r.ledger.chain.ServiceAddress()
 }
 
 // UpdateAccountCode updates the deployed code on an existing account.
@@ -386,8 +384,17 @@ func (r *TransactionContext) EmitEvent(event cadence.Event) {
 }
 
 func (r *TransactionContext) GenerateUUID() uint64 {
-	defer func() { r.uuid++ }()
-	return r.uuid
+	uuid, err := r.ledger.GetUUID()
+	if err != nil {
+		// TODO - Return error once Cadence interface accommodates it
+		panic(fmt.Errorf("cannot get UUID: %w", err))
+	}
+
+	defer func() {
+		uuid++
+		r.ledger.SetUUID(uuid)
+	}()
+	return uuid
 }
 
 func (r *TransactionContext) GetComputationLimit() uint64 {
