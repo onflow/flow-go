@@ -23,7 +23,6 @@ const scriptGasLimit = 100000
 type CheckerFunc func([]byte, runtime.Location) error
 
 type TransactionContext struct {
-	//LedgerDAL
 	runtime.Metrics
 	bc                               BlockContext
 	ledger                           LedgerDAL
@@ -387,7 +386,7 @@ func (r *TransactionContext) EmitEvent(event cadence.Event) {
 func (r *TransactionContext) GenerateUUID() uint64 {
 	uuid, err := r.ledger.GetUUID()
 	if err != nil {
-		// TODO -
+		// TODO - Return error once Cadence interface accommodates it
 		panic(fmt.Errorf("cannot get UUID: %w", err))
 	}
 
