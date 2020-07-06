@@ -9,8 +9,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 
+	verification3 "github.com/dapperlabs/flow-go/engine/testutil/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/match"
-	"github.com/dapperlabs/flow-go/integration/tests/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	verification2 "github.com/dapperlabs/flow-go/model/verification"
@@ -47,7 +47,7 @@ func happyPathExample() {
 
 		// starts happy path
 		t := &testing.T{}
-		verification.VerificationHappyPath(t, 1, 10)
+		verification3.VerificationHappyPath(t, 1, 10)
 
 		<-mempoolCollector.Done()
 	})
