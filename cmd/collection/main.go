@@ -21,11 +21,13 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/consensus/recovery/cluster"
 	protocolRecovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
+	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/proposal"
-	"github.com/dapperlabs/flow-go/engine/collection/provider"
+	"github.com/dapperlabs/flow-go/engine/collection/pusher"
 	colsync "github.com/dapperlabs/flow-go/engine/collection/synchronization"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
+	"github.com/dapperlabs/flow-go/engine/common/provider"
 	consync "github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	clustermodel "github.com/dapperlabs/flow-go/model/cluster"
@@ -82,7 +84,7 @@ func main() {
 		clusterGenesis *clustermodel.Block              // genesis block for the cluster
 		clusterQC      *hotstuffmodel.QuorumCertificate // QC for the cluster
 
-		prov              *provider.Engine
+		push              *pusher.Engine
 		ing               *ingest.Engine
 		clusterSyncCore   *synchronization.Core
 		mainChainSyncCore *synchronization.Core
@@ -325,7 +327,18 @@ func main() {
 			return server, nil
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			prov, err = provider.New(
+			retrieve := func(collID flow.Identifier) (flow.Entity, error) {
+				coll, err := node.Storage.Collections.ByID(collID)
+				return coll, err
+			}
+			return provider.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
+				engine.ProvideCollections,
+				filter.HasRole(flow.RoleAccess, flow.RoleVerification),
+				retrieve,
+			)
+		}).
+		Component("pusher engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			push, err = pusher.New(
 				node.Logger,
 				node.Network,
 				node.State,
@@ -336,14 +349,14 @@ func main() {
 				node.Storage.Collections,
 				node.Storage.Transactions,
 			)
-			return prov, err
+			return push, err
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			builder := builder.NewBuilder(node.DB, colHeaders, colPayloads, pool,
 				builder.WithMaxCollectionSize(maxCollectionSize),
 				builder.WithExpiryBuffer(builderExpiryBuffer),
 			)
-			finalizer := colfinalizer.NewFinalizer(node.DB, pool, prov, colMetrics, clusterID)
+			finalizer := colfinalizer.NewFinalizer(node.DB, pool, push, colMetrics, clusterID)
 
 			proposalEng, err = proposal.New(
 				node.Logger,

@@ -103,7 +103,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 // Request allows us to request an entity to be processed by the given callback.
-func (e *Engine) Request(entityID flow.Identifier, process ProcessFunc) error {
+func (e *Engine) Request(entityID flow.Identifier, process module.ProcessFunc) error {
 
 	// TODO: keep track of in-flight requests to avoid duplicates
 
@@ -119,7 +119,7 @@ func (e *Engine) Request(entityID flow.Identifier, process ProcessFunc) error {
 		return fmt.Errorf("could not get identities: %w", err)
 	}
 	if len(identities) == 0 {
-		return fmt.Errorf("not valid targets for request available")
+		return fmt.Errorf("no valid targets for request available")
 	}
 
 	// select a random recipient for the request

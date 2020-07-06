@@ -28,7 +28,7 @@ type Engine struct {
 
 // New creates a new consensus propagation engine.
 func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, me module.Local, state protocol.State,
-	channel uint8, retrieve RetrieveFunc, selector flow.IdentityFilter) (*Engine, error) {
+	channel uint8, selector flow.IdentityFilter, retrieve RetrieveFunc) (*Engine, error) {
 
 	// make sure we don't respond to requests sent by self or non-staked nodes
 	selector = filter.And(
