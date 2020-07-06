@@ -20,8 +20,8 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	protocolRecovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
+	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/common/provider"
-	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	synceng "github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
 	"github.com/dapperlabs/flow-go/engine/consensus/ingestion"
@@ -31,7 +31,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
@@ -165,22 +164,19 @@ func main() {
 			return match, err
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			blockHandler := provider.Handler{
-				Resource: messages.ResourceBlock,
-				Selector: filter.Any,
-				Retrieve: func(blockID flow.Identifier) (flow.Entity, error) {
-					block, err := node.Storage.Blocks.ByID(blockID)
-					return block, err
-				},
+			retrieve := func(blockID flow.Identifier) (flow.Entity, error) {
+				block, err := node.Storage.Blocks.ByID(blockID)
+				return block, err
 			}
 			prov, err = provider.New(
 				node.Logger,
 				node.Metrics.Engine,
-				node.Tracer,
 				node.Network,
 				node.Me,
 				node.State,
-				blockHandler,
+				engine.ExchangeBlocks,
+				retrieve,
+				filter.Any,
 			)
 			return prov, err
 		}).

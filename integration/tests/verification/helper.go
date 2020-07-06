@@ -150,7 +150,7 @@ func VerificationHappyPath(t *testing.T,
 		assert.True(t, ok)
 		verNet.StartConDev(requestInterval, true)
 		verNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
-			return m.ChannelID == engine.CollectionProvider
+			return m.ChannelID == engine.PushCollections
 		})
 
 		verNets = append(verNets, verNet)
@@ -215,7 +215,7 @@ func setupMockExeNode(t *testing.T,
 		}
 	}
 
-	exeChunkDataConduit, err := exeNode.Net.Register(engine.ChunkDataPackProvider, exeEngine)
+	exeChunkDataConduit, err := exeNode.Net.Register(engine.PushChunks, exeEngine)
 	assert.Nil(t, err)
 
 	chunkNum := len(completeER.ChunkDataPacks)
@@ -320,7 +320,7 @@ func setupMockConsensusNode(t *testing.T,
 			wg.Done()
 		}).Return(nil)
 
-	_, err := conNode.Net.Register(engine.ApprovalProvider, conEngine)
+	_, err := conNode.Net.Register(engine.PushApprovals, conEngine)
 	assert.Nil(t, err)
 
 	return &conNode, conEngine, wg

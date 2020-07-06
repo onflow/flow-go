@@ -95,7 +95,7 @@ func New(
 
 	e.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, e.pending.Size())
 
-	con, err := net.Register(engine.ProtocolClusterConsensus, e)
+	con, err := net.Register(engine.ConsensusCluster, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
