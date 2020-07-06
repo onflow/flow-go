@@ -52,7 +52,7 @@ func (suite *Suite) SetupTest() {
 	suite.reqNode = testutil.GenericNode(suite.T(), suite.hub, reqIdentity, suite.identities, suite.chainID)
 
 	suite.reqEngine = new(mocknetwork.Engine)
-	suite.conduit, err = suite.reqNode.Net.Register(engine.CollectionProvider, suite.reqEngine)
+	suite.conduit, err = suite.reqNode.Net.Register(engine.PushCollections, suite.reqEngine)
 	suite.Require().Nil(err)
 }
 

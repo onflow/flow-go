@@ -86,7 +86,7 @@ func (m *MeshNetTestSuite) TestAllToAll() {
 	// log[i][j] keeps the message that node i sends to node j
 	log := make(map[int][]string)
 	for i := range m.nets {
-		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, engine.CollectionProvider)
+		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, engine.PushCollections)
 		engs = append(engs, eng)
 		log[i] = make([]string, 0)
 	}
@@ -159,7 +159,7 @@ func (m *MeshNetTestSuite) TestTargetValidator() {
 	wg := sync.WaitGroup{}
 
 	for i := range m.nets {
-		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, engine.CollectionIngest)
+		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, engine.PushTransactions)
 		engs = append(engs, eng)
 	}
 
@@ -219,7 +219,7 @@ func (m *MeshNetTestSuite) TestMaxMessageSize() {
 	wg := sync.WaitGroup{}
 
 	for i := range m.nets {
-		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, engine.CollectionIngest)
+		eng := NewMeshEngine(m.Suite.T(), m.nets[i], count-1, engine.PushTransactions)
 		engs = append(engs, eng)
 	}
 
