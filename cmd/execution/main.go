@@ -11,6 +11,8 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/cmd"
+	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/common/requester"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
@@ -21,6 +23,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	chainsync "github.com/dapperlabs/flow-go/module/synchronization"
@@ -40,6 +43,7 @@ func main() {
 		syncCore           *chainsync.Core
 		computationManager *computation.Manager
 		syncEngine         *synchronization.Engine
+		requestEng         *requester.Engine
 		ingestionEng       *ingestion.Engine
 		rpcConf            rpc.Config
 		err                error
@@ -154,6 +158,13 @@ func main() {
 
 			return providerEngine, err
 		}).
+		Component("requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			requestEng, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
+				engine.RequestCollections,
+				filter.HasRole(flow.RoleCollection),
+			)
+			return requestEng, err
+		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
@@ -163,6 +174,7 @@ func main() {
 				node.Logger,
 				node.Network,
 				node.Me,
+				requestEng,
 				node.State,
 				node.Storage.Blocks,
 				node.Storage.Payloads,

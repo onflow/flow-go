@@ -15,6 +15,7 @@ import (
 	collectioningest "github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/pusher"
 	"github.com/dapperlabs/flow-go/engine/common/provider"
+	"github.com/dapperlabs/flow-go/engine/common/requester"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
@@ -265,6 +266,13 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	stateSync := sync.NewStateSynchronizer(execState)
 
+	requestEngine, err := requester.New(
+		node.Log, node.Metrics, node.Net, node.Me, node.State,
+		engine.RequestCollections,
+		filter.HasRole(flow.RoleCollection),
+	)
+	require.NoError(t, err)
+
 	pusherEngine, err := executionprovider.New(
 		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, stateSync,
 	)
@@ -293,6 +301,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Log,
 		node.Net,
 		node.Me,
+		requestEngine,
 		node.State,
 		node.Blocks,
 		node.Payloads,
