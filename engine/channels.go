@@ -9,69 +9,102 @@ import (
 // Enum of channel IDs to avoid accidental conflicts.
 const (
 
-	// Reserved 000-009
+	// Channels used for testing
+	TestEcho = 00
 
-	// Collection 010-029
-	CollectionProvider             = 10 // providing collections/transactions to non-collection nodes
-	CollectionIngest               = 11 // ingesting transactions and routing to appropriate cluster
-	ProtocolClusterConsensus       = 20 // cluster-specific consensus protocol
-	ProtocolClusterSynchronization = 21 // cluster-specific consensus synchronization
+	// Channels for consensus protocols
+	ConsensusCommittee = 10
+	ConsensusCluster   = 11
 
-	// Observation 030-049
+	// Channels for protocols actively synchronizing state across nodes
+	SyncCommittee = 20
+	SyncCluster   = 21
+	SyncExecution = 22
 
-	// Consensus 050-099
-	BlockProvider           = 50 // providing blocks to non-consensus nodes
-	BlockPropagation        = 51 // propagating entities to be included in blocks between consensus nodes
-	ProtocolConsensus       = 60 // consensus protocol
-	ProtocolSynchronization = 66 // synchronization protocol
-	ProtocolExchange        = 70 // request-reply protocol
+	// Channels for actively pushing entities related to transactions
+	PushTransactions = 100
+	PushGuarantees   = 101
+	PushCollections  = 102
 
-	// Execution 100-199
-	ExecutionReceiptProvider = 100
-	ExecutionStateProvider   = 101
-	ExecutionComputer        = 102
-	ChunkDataPackProvider    = 103
-	ExecutionSync            = 104
+	// Channels for actively pushing entities related to blocks
+	PushBlocks = 110
 
-	// Verification 150-199
-	ApprovalProvider = 150
+	// Channels for actively pushing entities related to execution
+	PushChunks    = 120
+	PushReceipts  = 121
+	PushApprovals = 122
 
-	// Testing 200-255
-	SimulationColdstuff = 200
+	// Channels for actively requesting missing entities related to transactions
+	ExchangeTransactions = 200
+	ExchangeCollections  = 201
+	ExchangeGuarantees   = 202
+
+	// Channels for actively requesting missing entities related to consensus
+	ExchangeHeaders  = 210
+	ExchangeIndexes  = 211
+	ExchangePayloads = 212
+	ExchangeBlocks   = 213
+
+	// Channels for actively requesting missing entities related to execution
+	ExchangeChunks    = 220
+	ExchangeReceipts  = 221
+	ExchangeResults   = 222
+	ExchangeApprovals = 223
+	ExchangeSeals     = 224
 )
 
 func ChannelName(channelID uint8) string {
 	switch channelID {
-	case CollectionProvider:
-		return "CollectionProvider"
-	case CollectionIngest:
-		return "CollectionIngest"
-	case ProtocolClusterConsensus:
-		return "ProtocolClusterConsensus"
-	case ProtocolClusterSynchronization:
-		return "ProtocolClusterSynchronization"
-	case BlockProvider:
-		return "BlockProvider"
-	case BlockPropagation:
-		return "BlockPropagation"
-	case ProtocolConsensus:
-		return "ProtocolConsensus"
-	case ProtocolSynchronization:
-		return "ProtocolSynchronization"
-	case ExecutionReceiptProvider:
-		return "ExecutionReceiptProvider"
-	case ExecutionStateProvider:
-		return "ExecutionStateProvider"
-	case ExecutionComputer:
-		return "ExecutionComputer"
-	case ChunkDataPackProvider:
-		return "ChunkDataPackProvider"
-	case ExecutionSync:
-		return "ExecutionSync"
-	case ApprovalProvider:
-		return "ApprovalProvider"
-	case SimulationColdstuff:
-		return "SimulationColdstuff"
+	case TestEcho:
+		return "test-echo"
+	case ConsensusCommittee:
+		return "consensus-committee"
+	case ConsensusCluster:
+		return "consensus-cluster"
+	case SyncCommittee:
+		return "sync-committee"
+	case SyncCluster:
+		return "sync-cluster"
+	case SyncExecution:
+		return "sync-execution"
+	case PushTransactions:
+		return "push-transactions"
+	case PushGuarantees:
+		return "push-guarantees"
+	case PushCollections:
+		return "push-collections"
+	case PushBlocks:
+		return "push-blocks"
+	case PushChunks:
+		return "push-chunks"
+	case PushReceipts:
+		return "push-receipts"
+	case PushApprovals:
+		return "push-approvals"
+	case ExchangeTransactions:
+		return "exchange-transactions"
+	case ExchangeCollections:
+		return "exchange-collections"
+	case ExchangeGuarantees:
+		return "exchange-guarantees"
+	case ExchangeHeaders:
+		return "exchange-headers"
+	case ExchangeIndexes:
+		return "exchange-indexes"
+	case ExchangePayloads:
+		return "exchange-payloads"
+	case ExchangeBlocks:
+		return "exchange-blocks"
+	case ExchangeChunks:
+		return "exchange-chunks"
+	case ExchangeReceipts:
+		return "exchange-receipts"
+	case ExchangeResults:
+		return "exchange-results"
+	case ExchangeApprovals:
+		return "exchange-approvals"
+	case ExchangeSeals:
+		return "exchange-seals"
 	}
 	return fmt.Sprintf("unknown-channel-%d", channelID)
 }

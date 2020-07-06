@@ -62,12 +62,10 @@ func New(log zerolog.Logger,
 		transactions: transactions,
 	}
 
-	collConduit, err := net.Register(engine.CollectionProvider, eng)
+	_, err := net.Register(engine.PushCollections, eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register collection provider engine: %w", err)
 	}
-
-	eng.collectionConduit = collConduit
 
 	return eng, nil
 }

@@ -61,7 +61,7 @@ func New(
 		receiptIDsByResult: receiptsByResult,
 	}
 
-	_, err := net.Register(engine.ExecutionReceiptProvider, e)
+	_, err := net.Register(engine.PushReceipts, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine on execution receipt provider channel: %w", err)
 	}

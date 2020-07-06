@@ -86,7 +86,7 @@ func New(
 	e.mempool.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.ProtocolConsensus, e)
+	con, err := net.Register(engine.ConsensusCommittee, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
