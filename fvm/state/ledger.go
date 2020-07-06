@@ -1,4 +1,4 @@
-package fvm
+package state
 
 import (
 	"crypto/sha256"
@@ -23,6 +23,13 @@ type MapLedger struct {
 	Registers   map[string]flow.RegisterValue
 }
 
+func NewMapLedger() *MapLedger {
+	return &MapLedger{
+		RegTouchSet: make(map[string]bool),
+		Registers:   make(map[string]flow.RegisterValue),
+	}
+}
+
 func (m MapLedger) Set(key flow.RegisterID, value flow.RegisterValue) {
 	m.RegTouchSet[string(key)] = true
 	m.Registers[string(key)] = value
@@ -39,6 +46,10 @@ func (m MapLedger) Touch(key flow.RegisterID) {
 
 func (m MapLedger) Delete(key flow.RegisterID) {
 	delete(m.Registers, string(key))
+}
+
+func RegisterID(owner, controller, key string) flow.RegisterID {
+	return fullKeyHash(owner, controller, key)
 }
 
 func fullKey(owner, controller, key string) string {
