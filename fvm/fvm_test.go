@@ -1,6 +1,7 @@
 package fvm_test
 
 import (
+	"crypto/rand"
 	"fmt"
 	"strconv"
 	"testing"
@@ -18,9 +19,52 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/testutil"
 	"github.com/dapperlabs/flow-go/fvm"
 	fvmmock "github.com/dapperlabs/flow-go/fvm/mock"
+	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
+
+func vmTest(
+	f func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger),
+	opts ...fvm.Option,
+) func(t *testing.T) {
+	return func(t *testing.T) {
+		rt := runtime.NewInterpreterRuntime()
+
+		chain := flow.Mainnet.Chain()
+
+		vm := fvm.New(rt)
+
+		cache, err := fvm.NewLRUASTCache(CacheSize)
+		require.NoError(t, err)
+
+		baseOpts := []fvm.Option{
+			fvm.WithChain(chain),
+			fvm.WithASTCache(cache),
+		}
+
+		opts = append(baseOpts, opts...)
+
+		ctx := fvm.NewContext(opts...)
+
+		ledger := state.NewMapLedger()
+
+		err = vm.Run(
+			ctx,
+			fvm.Bootstrap(unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply),
+			ledger,
+		)
+		require.NoError(t, err)
+
+		f(t, vm, chain, ctx, ledger)
+	}
+}
+
+func encodeJSONCDC(t *testing.T, value cadence.Value) []byte {
+	b, err := jsoncdc.Encode(value)
+	require.NoError(t, err)
+	return b
+}
 
 func TestBlockContext_ExecuteTransaction(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
@@ -94,9 +138,9 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 			SetScript([]byte(`
                 transaction {
                   execute {
-				    log("foo")
-				    log("bar")
-				  }
+                    log("foo")
+                    log("bar")
+                  }
                 }
             `))
 
@@ -120,8 +164,8 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 			SetScript([]byte(`
                 transaction {
                   prepare(signer: AuthAccount) {
-				    AuthAccount(payer: signer)
-				  }
+                    AuthAccount(payer: signer)
+                  }
                 }
             `)).
 			AddAuthorizer(chain.ServiceAddress())
@@ -269,10 +313,10 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 		{
 			label: "Parameters and authorizer",
 			script: `
-				transaction(x: Int, y: String) {
-					prepare(acct: AuthAccount) { log(acct.address) }
-					execute { log(x); log(y) }
-				}`,
+                transaction(x: Int, y: String) {
+                    prepare(acct: AuthAccount) { log(acct.address) }
+                    execute { log(x); log(y) }
+                }`,
 			args:        [][]byte{arg1, arg2},
 			authorizers: []flow.Address{chain.ServiceAddress()},
 			check: func(t *testing.T, tx *fvm.TransactionProcedure) {
@@ -309,16 +353,16 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 
 func gasLimitScript(depth int) string {
 	return fmt.Sprintf(`
-		pub fun foo(_ i: Int) {
-			if i <= 0 {
-				return
-			}
-			log("foo")
-			foo(i-1)
-		}
+        pub fun foo(_ i: Int) {
+            if i <= 0 {
+                return
+            }
+            log("foo")
+            foo(i-1)
+        }
 
-		transaction { execute { foo(%d) } }
-	`, depth)
+        transaction { execute { foo(%d) } }
+    `, depth)
 }
 
 func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
@@ -389,11 +433,11 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 }
 
 var createAccountScript = []byte(`
-	transaction {
-		prepare(signer: AuthAccount) {
-			let acct = AuthAccount(payer: signer)
-		}
-	}
+    transaction {
+        prepare(signer: AuthAccount) {
+            let acct = AuthAccount(payer: signer)
+        }
+    }
 `)
 
 func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
@@ -416,24 +460,24 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 	require.NoError(t, err)
 
 	addAccountCreatorTemplate := `
-	import FlowServiceAccount from 0x%s
-	transaction {
-		let serviceAccountAdmin: &FlowServiceAccount.Administrator
-		prepare(signer: AuthAccount) {
-			// Borrow reference to FlowServiceAccount Administrator resource.
-			//
-			self.serviceAccountAdmin = signer.borrow<&FlowServiceAccount.Administrator>(from: /storage/flowServiceAdmin)
-				?? panic("Unable to borrow reference to administrator resource")
-		}
-		execute {
-			// Add account to account creator whitelist.
-			//
-			// Will emit AccountCreatorAdded(accountCreator: accountCreator).
-			//
-			self.serviceAccountAdmin.addAccountCreator(0x%s)
-		}
-	}
-	`
+    import FlowServiceAccount from 0x%s
+    transaction {
+        let serviceAccountAdmin: &FlowServiceAccount.Administrator
+        prepare(signer: AuthAccount) {
+            // Borrow reference to FlowServiceAccount Administrator resource.
+            //
+            self.serviceAccountAdmin = signer.borrow<&FlowServiceAccount.Administrator>(from: /storage/flowServiceAdmin)
+                ?? panic("Unable to borrow reference to administrator resource")
+        }
+        execute {
+            // Add account to account creator whitelist.
+            //
+            // Will emit AccountCreatorAdded(accountCreator: accountCreator).
+            //
+            self.serviceAccountAdmin.addAccountCreator(0x%s)
+        }
+    }
+    `
 
 	addAccountCreator := func(account flow.Address, seqNum uint64) {
 		script := []byte(
@@ -459,24 +503,24 @@ func TestBlockContext_ExecuteTransaction_CreateAccount(t *testing.T) {
 	}
 
 	removeAccountCreatorTemplate := `
-	import FlowServiceAccount from 0x%s
-	transaction {
-		let serviceAccountAdmin: &FlowServiceAccount.Administrator
-		prepare(signer: AuthAccount) {
-			// Borrow reference to FlowServiceAccount Administrator resource.
-			//
-			self.serviceAccountAdmin = signer.borrow<&FlowServiceAccount.Administrator>(from: /storage/flowServiceAdmin)
-				?? panic("Unable to borrow reference to administrator resource")
-		}
-		execute {
-			// Remove account from account creator whitelist.
-			//
-			// Will emit AccountCreatorRemoved(accountCreator: accountCreator).
-			//
-			self.serviceAccountAdmin.removeAccountCreator(0x%s)
-		}
-	}
-	`
+    import FlowServiceAccount from 0x%s
+    transaction {
+        let serviceAccountAdmin: &FlowServiceAccount.Administrator
+        prepare(signer: AuthAccount) {
+            // Borrow reference to FlowServiceAccount Administrator resource.
+            //
+            self.serviceAccountAdmin = signer.borrow<&FlowServiceAccount.Administrator>(from: /storage/flowServiceAdmin)
+                ?? panic("Unable to borrow reference to administrator resource")
+        }
+        execute {
+            // Remove account from account creator whitelist.
+            //
+            // Will emit AccountCreatorRemoved(accountCreator: accountCreator).
+            //
+            self.serviceAccountAdmin.removeAccountCreator(0x%s)
+        }
+    }
+    `
 
 	removeAccountCreator := func(account flow.Address, seqNum uint64) {
 		script := []byte(
@@ -592,10 +636,10 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 	t.Run("script success", func(t *testing.T) {
 		code := []byte(`
-			pub fun main(): Int {
-				return 42
-			}
-		`)
+            pub fun main(): Int {
+                return 42
+            }
+        `)
 
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
@@ -609,11 +653,11 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 	t.Run("script failure", func(t *testing.T) {
 		code := []byte(`
-			pub fun main(): Int {
-				assert(1 == 2)
-				return 42
-			}
-		`)
+            pub fun main(): Int {
+                assert(1 == 2)
+                return 42
+            }
+        `)
 
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
@@ -627,12 +671,12 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 	t.Run("script logs", func(t *testing.T) {
 		code := []byte(`
-			pub fun main(): Int {
-				log("foo")
-				log("bar")
-				return 42
-			}
-		`)
+            pub fun main(): Int {
+                log("foo")
+                log("bar")
+                return 42
+            }
+        `)
 
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
@@ -677,16 +721,16 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 	t.Run("works as transaction", func(t *testing.T) {
 		txBody := flow.NewTransactionBody().
 			SetScript([]byte(`
-				transaction {
-					execute {
-						let block = getCurrentBlock()
-						log(block)
+                transaction {
+                    execute {
+                        let block = getCurrentBlock()
+                        log(block)
 
-						let nextBlock = getBlock(at: block.height + UInt64(1))
-						log(nextBlock)
-					}
-				}
-			`))
+                        let nextBlock = getBlock(at: block.height + UInt64(1))
+                        log(nextBlock)
+                    }
+                }
+            `))
 
 		err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 		require.NoError(t, err)
@@ -710,14 +754,14 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 	t.Run("works as script", func(t *testing.T) {
 		code := []byte(`
-			pub fun main() {
-				let block = getCurrentBlock()
-				log(block)
+            pub fun main() {
+                let block = getCurrentBlock()
+                log(block)
 
-				let nextBlock = getBlock(at: block.height + UInt64(1))
-				log(nextBlock)
-			}
-		`)
+                let nextBlock = getBlock(at: block.height + UInt64(1))
+                log(nextBlock)
+            }
+        `)
 
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
@@ -738,13 +782,13 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 	t.Run("panics if external function panics in transaction", func(t *testing.T) {
 		tx := flow.NewTransactionBody().
 			SetScript([]byte(`
-				transaction {
-					execute {
-						let block = getCurrentBlock()
-						let nextBlock = getBlock(at: block.height + UInt64(2))
-					}
-				}
-			`))
+                transaction {
+                    execute {
+                        let block = getCurrentBlock()
+                        let nextBlock = getBlock(at: block.height + UInt64(2))
+                    }
+                }
+            `))
 
 		err := testutil.SignTransactionAsServiceAccount(tx, 0, chain)
 		require.NoError(t, err)
@@ -761,11 +805,11 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 	t.Run("panics if external function panics in script", func(t *testing.T) {
 		script := []byte(`
-			pub fun main() {
-				let block = getCurrentBlock()
-				let nextBlock = getBlock(at: block.height + UInt64(2))
-			}
-		`)
+            pub fun main() {
+                let block = getCurrentBlock()
+                let nextBlock = getBlock(at: block.height + UInt64(2))
+            }
+        `)
 
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
@@ -890,13 +934,13 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 	t.Run("works as transaction", func(t *testing.T) {
 		txBody := flow.NewTransactionBody().
 			SetScript([]byte(`
-				transaction {
-					execute {
-						let rand = unsafeRandom()
-						log(rand)
-					}
-				}
-			`))
+                transaction {
+                    execute {
+                        let rand = unsafeRandom()
+                        log(rand)
+                    }
+                }
+            `))
 
 		err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 		require.NoError(t, err)
@@ -950,4 +994,258 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 	require.Len(t, tx.Events, 1)
 	require.Equal(t, string(flow.EventAccountCreated), tx.Events[0].EventType.TypeID)
 	assert.Equal(t, flow.HexToAddress("05"), flow.Address(tx.Events[0].Fields[0].(cadence.Address)))
+}
+
+func TestSignatureVerification(t *testing.T) {
+	code := []byte(`
+      import Crypto
+
+      pub fun main(
+          rawPublicKeys: [[Int]],
+          message: [Int], 
+          signatures: [[Int]],
+          weight: UFix64,
+      ): Bool {
+          let keyList = Crypto.KeyList()
+        
+          for rawPublicKey in rawPublicKeys {
+              keyList.add(
+                  Crypto.PublicKey(
+                      publicKey: rawPublicKey,
+                      signatureAlgorithm: Crypto.ECDSA_P256
+                  ),
+                  hashAlgorithm: Crypto.SHA3_256,
+                  weight: weight,
+              )
+          }
+
+          let signatureSet: [Crypto.KeyListSignature] = []
+
+          var i = 0
+          for signature in signatures {
+              signatureSet.append(
+                  Crypto.KeyListSignature(
+                      keyIndex: i,
+                      signature: signature
+                  )
+              )
+              i = i + 1
+          }
+
+          return keyList.isValid(
+              signatureSet: signatureSet,
+              signedData: message,
+          )
+      }
+    `)
+
+	createKey := func() (privateKey crypto.PrivateKey, publicKey cadence.Array) {
+		seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
+
+		var err error
+
+		_, err = rand.Read(seed)
+		require.NoError(t, err)
+
+		privateKey, err = crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
+		require.NoError(t, err)
+
+		publicKey = testutil.BytesToCadenceArray(
+			privateKey.PublicKey().Encode(),
+		)
+
+		return privateKey, publicKey
+	}
+
+	createMessage := func(m string) (signableMessage []byte, message cadence.Array) {
+		signableMessage = []byte(m)
+
+		message = testutil.BytesToCadenceArray(signableMessage)
+
+		return signableMessage, message
+	}
+
+	signMessage := func(privateKey crypto.PrivateKey, m []byte) cadence.Array {
+		message := append(
+			flow.UserDomainTag[:],
+			m...,
+		)
+
+		signature, err := privateKey.Sign(message, hash.NewSHA3_256())
+		require.NoError(t, err)
+
+		return testutil.BytesToCadenceArray(signature)
+	}
+
+	t.Run("Single key", vmTest(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger) {
+			privateKey, publicKey := createKey()
+			signableMessage, message := createMessage("foo")
+			signature := signMessage(privateKey, signableMessage)
+			weight := cadence.NewUFix64(1_00000000) // 1.0
+
+			publicKeys := cadence.NewArray([]cadence.Value{
+				publicKey,
+			})
+
+			signatures := cadence.NewArray([]cadence.Value{
+				signature,
+			})
+
+			t.Run("Valid", func(t *testing.T) {
+				script := fvm.Script(code).WithArguments(
+					encodeJSONCDC(t, publicKeys),
+					encodeJSONCDC(t, message),
+					encodeJSONCDC(t, signatures),
+					encodeJSONCDC(t, weight),
+				)
+
+				err := vm.Run(ctx, script, ledger)
+				assert.NoError(t, err)
+				assert.NoError(t, script.Err)
+
+				assert.Equal(t, cadence.NewBool(true), script.Value)
+			})
+
+			t.Run("Invalid message", func(t *testing.T) {
+				_, invalidRawMessage := createMessage("bar")
+
+				script := fvm.Script(code).WithArguments(
+					encodeJSONCDC(t, publicKeys),
+					encodeJSONCDC(t, invalidRawMessage),
+					encodeJSONCDC(t, signatures),
+					encodeJSONCDC(t, weight),
+				)
+
+				err := vm.Run(ctx, script, ledger)
+				assert.NoError(t, err)
+				assert.NoError(t, script.Err)
+
+				assert.Equal(t, cadence.NewBool(false), script.Value)
+			})
+
+			t.Run("Invalid signature", func(t *testing.T) {
+				invalidPrivateKey, _ := createKey()
+				invalidRawSignature := signMessage(invalidPrivateKey, signableMessage)
+
+				invalidRawSignatures := cadence.NewArray([]cadence.Value{
+					invalidRawSignature,
+				})
+
+				script := fvm.Script(code).WithArguments(
+					encodeJSONCDC(t, publicKeys),
+					encodeJSONCDC(t, message),
+					encodeJSONCDC(t, invalidRawSignatures),
+					encodeJSONCDC(t, weight),
+				)
+
+				err := vm.Run(ctx, script, ledger)
+				assert.NoError(t, err)
+				assert.NoError(t, script.Err)
+
+				assert.Equal(t, cadence.NewBool(false), script.Value)
+			})
+
+			t.Run("Malformed public key", func(t *testing.T) {
+				invalidPublicKey := testutil.BytesToCadenceArray([]byte{1, 2, 3})
+
+				invalidPublicKeys := cadence.NewArray([]cadence.Value{
+					invalidPublicKey,
+				})
+
+				script := fvm.Script(code).WithArguments(
+					encodeJSONCDC(t, invalidPublicKeys),
+					encodeJSONCDC(t, message),
+					encodeJSONCDC(t, signatures),
+					encodeJSONCDC(t, weight),
+				)
+
+				err := vm.Run(ctx, script, ledger)
+				require.NoError(t, err)
+				assert.Error(t, script.Err)
+			})
+		},
+	))
+
+	t.Run("Multiple keys", vmTest(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger) {
+			privateKeyA, publicKeyA := createKey()
+			privateKeyB, publicKeyB := createKey()
+			privateKeyC, publicKeyC := createKey()
+
+			publicKeys := cadence.NewArray([]cadence.Value{
+				publicKeyA,
+				publicKeyB,
+				publicKeyC,
+			})
+
+			signableMessage, message := createMessage("foo")
+
+			signatureA := signMessage(privateKeyA, signableMessage)
+			signatureB := signMessage(privateKeyB, signableMessage)
+			signatureC := signMessage(privateKeyC, signableMessage)
+
+			weight := cadence.NewUFix64(50000000) // 0.5
+
+			t.Run("3 of 3", func(t *testing.T) {
+				signatures := cadence.NewArray([]cadence.Value{
+					signatureA,
+					signatureB,
+					signatureC,
+				})
+
+				script := fvm.Script(code).WithArguments(
+					encodeJSONCDC(t, publicKeys),
+					encodeJSONCDC(t, message),
+					encodeJSONCDC(t, signatures),
+					encodeJSONCDC(t, weight),
+				)
+
+				err := vm.Run(ctx, script, ledger)
+				assert.NoError(t, err)
+				assert.NoError(t, script.Err)
+
+				assert.Equal(t, cadence.NewBool(true), script.Value)
+			})
+
+			t.Run("2 of 3", func(t *testing.T) {
+				signatures := cadence.NewArray([]cadence.Value{
+					signatureA,
+					signatureB,
+				})
+
+				script := fvm.Script(code).WithArguments(
+					encodeJSONCDC(t, publicKeys),
+					encodeJSONCDC(t, message),
+					encodeJSONCDC(t, signatures),
+					encodeJSONCDC(t, weight),
+				)
+
+				err := vm.Run(ctx, script, ledger)
+				assert.NoError(t, err)
+				assert.NoError(t, script.Err)
+
+				assert.Equal(t, cadence.NewBool(true), script.Value)
+			})
+
+			t.Run("1 of 3", func(t *testing.T) {
+				signatures := cadence.NewArray([]cadence.Value{
+					signatureA,
+				})
+
+				script := fvm.Script(code).WithArguments(
+					encodeJSONCDC(t, publicKeys),
+					encodeJSONCDC(t, message),
+					encodeJSONCDC(t, signatures),
+					encodeJSONCDC(t, weight),
+				)
+
+				err := vm.Run(ctx, script, ledger)
+				assert.NoError(t, err)
+				assert.NoError(t, script.Err)
+
+				assert.Equal(t, cadence.NewBool(false), script.Value)
+			})
+		},
+	))
 }

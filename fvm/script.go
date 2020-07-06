@@ -34,7 +34,7 @@ type ScriptProcessor interface {
 	Process(*VirtualMachine, Context, *ScriptProcedure, state.Ledger) error
 }
 
-func (proc *ScriptProcedure) WithArguments(args [][]byte) *ScriptProcedure {
+func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
 	return &ScriptProcedure{
 		ID:        proc.ID,
 		Script:    proc.Script,
