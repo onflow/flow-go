@@ -30,7 +30,8 @@ type Engine struct {
 	log          zerolog.Logger
 	engMetrics   module.EngineMetrics
 	colMetrics   module.CollectionMetrics
-	con          network.Conduit
+	push         network.Conduit
+	exchange     network.Conduit
 	me           module.Local
 	state        protocol.State
 	pool         mempool.Transactions
@@ -51,12 +52,17 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, engMetric
 		transactions: transactions,
 	}
 
-	con, err := net.Register(engine.PushCollections, e)
+	push, err := net.Register(engine.PushGuarantees, e)
 	if err != nil {
-		return nil, fmt.Errorf("could not register engine: %w", err)
+		return nil, fmt.Errorf("could not register for push protocol: %w", err)
 	}
+	e.push = push
 
-	e.con = con
+	exchange, err := net.Register(engine.ProvideCollections, e)
+	if err != nil {
+		return nil, fmt.Errorf("could not register for exchange protocol: %w", err)
+	}
+	e.exchange = exchange
 
 	return e, nil
 }
@@ -153,7 +159,7 @@ func (e *Engine) onCollectionRequest(originID flow.Identifier, req *messages.Col
 		Collection: *coll,
 		Nonce:      req.Nonce,
 	}
-	err = e.con.Submit(res, originID)
+	err = e.exchange.Submit(res, originID)
 	if err != nil {
 		return fmt.Errorf("could not respond to collection requester: %w", err)
 	}
@@ -172,12 +178,16 @@ func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) 
 		return fmt.Errorf("could not get consensus nodes: %w", err)
 	}
 
-	err = e.con.Submit(guarantee, consensusNodes.NodeIDs()...)
+	// we only need to send to a small sub-sample, as consensus nodes already propagate
+	// the collection guarantee to the whole consensus committee; let's set this to
+	// one for now and implement a retry mechanism for when the sending fails
+	err = e.push.Submit(guarantee, consensusNodes.Sample(1).NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not submit collection guarantee: %w", err)
 	}
 
 	e.engMetrics.MessageSent(metrics.EngineCollectionProvider, metrics.MessageCollectionGuarantee)
+
 	e.log.Debug().
 		Hex("guarantee_id", logging.ID(guarantee.ID())).
 		Hex("ref_block_id", logging.ID(guarantee.ReferenceBlockID)).
