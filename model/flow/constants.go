@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -19,20 +20,24 @@ func GenesisTime() time.Time {
 // badger value log GC. Equivalent to 10 mins for a 1 second block time
 const DefaultValueLogGCFrequency = 10 * 60
 
-const domainTagLength = 40
+const DomainTagLength = 32
 
 // TransactionDomainTag is the prefix of all signed transaction payloads.
 //
-// A domain tag is encoded as UTF-8 bytes, right padded to a total length of 40 bytes.
-var TransactionDomainTag = domainTag("FLOW-V0.0-transaction")
+// A domain tag is encoded as UTF-8 bytes, right padded to a total length of 32 bytes.
+var TransactionDomainTag = paddedDomainTag("FLOW-V0.0-transaction")
 
 // UserDomainTag is the prefix of all signed user space payloads.
 //
-// A domain tag is encoded as UTF-8 bytes, right padded to a total length of 40 bytes.
-var UserDomainTag = domainTag("FLOW-V0.0-user-domain")
+// A domain tag is encoded as UTF-8 bytes, right padded to a total length of 32 bytes.
+var UserDomainTag = paddedDomainTag("FLOW-V0.0-user")
 
-func domainTag(s string) [domainTagLength]byte {
-	var tag [domainTagLength]byte
+func paddedDomainTag(s string) [DomainTagLength]byte {
+	var tag [DomainTagLength]byte
+
+	if len(s) > DomainTagLength {
+		panic(fmt.Sprintf("domain tag %s cannot be longer than %d characters", s, DomainTagLength))
+	}
 
 	copy(tag[:], s)
 
