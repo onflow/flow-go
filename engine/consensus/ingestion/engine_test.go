@@ -27,7 +27,6 @@ func TestOnCollectionGuaranteeValid(t *testing.T) {
 	metrics := metrics.NewNoopCollector()
 
 	e := &Engine{
-		prop:    prop,
 		state:   state,
 		headers: headers,
 		metrics: metrics,
@@ -68,7 +67,6 @@ func TestOnCollectionGuaranteeMissingIdentity(t *testing.T) {
 	final := &mockprotocol.Snapshot{}
 
 	e := &Engine{
-		prop:   prop,
 		state:  state,
 		tracer: trace.NewNoopTracer(),
 	}
@@ -101,7 +99,6 @@ func TestOnCollectionGuaranteeInvalidRole(t *testing.T) {
 	final := &mockprotocol.Snapshot{}
 
 	e := &Engine{
-		prop:   prop,
 		state:  state,
 		tracer: trace.NewNoopTracer(),
 	}
@@ -137,7 +134,6 @@ func TestOnCollectionGuaranteeExpired(t *testing.T) {
 	metrics := metrics.NewNoopCollector()
 
 	e := &Engine{
-		prop:    prop,
 		state:   state,
 		headers: headers,
 		metrics: metrics,

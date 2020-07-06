@@ -16,7 +16,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
-	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
@@ -187,24 +186,20 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	seals, err := stdmap.NewSeals(1000)
 	require.NoError(t, err)
 
-	propagationEngine, err := propagation.New(node.Log, node.Metrics, node.Metrics, node.Tracer, node.Metrics, node.Net, node.State, node.Me, guarantees)
-	require.NoError(t, err)
-
-	ingestionEngine, err := consensusingest.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Net, propagationEngine, node.State, node.Headers, node.Me)
+	ingestionEngine, err := consensusingest.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Metrics, node.Net, node.State, node.Headers, node.Me, guarantees)
 	require.Nil(t, err)
 
 	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Net, node.State, node.Me, resultsDB, sealsDB, node.Headers, node.Index, results, receipts, approvals, seals)
 	require.Nil(t, err)
 
 	return mock.ConsensusNode{
-		GenericNode:       node,
-		Guarantees:        guarantees,
-		Approvals:         approvals,
-		Receipts:          receipts,
-		Seals:             seals,
-		PropagationEngine: propagationEngine,
-		IngestionEngine:   ingestionEngine,
-		MatchingEngine:    matchingEngine,
+		GenericNode:     node,
+		Guarantees:      guarantees,
+		Approvals:       approvals,
+		Receipts:        receipts,
+		Seals:           seals,
+		IngestionEngine: ingestionEngine,
+		MatchingEngine:  matchingEngine,
 	}
 }
 

@@ -14,7 +14,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
-	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
@@ -77,13 +76,12 @@ type CollectionNode struct {
 // ConsensusNode implements an in-process consensus node for tests.
 type ConsensusNode struct {
 	GenericNode
-	Guarantees        mempool.Guarantees
-	Approvals         mempool.Approvals
-	Receipts          mempool.Receipts
-	Seals             mempool.Seals
-	IngestionEngine   *consensusingest.Engine
-	PropagationEngine *propagation.Engine
-	MatchingEngine    *matching.Engine
+	Guarantees      mempool.Guarantees
+	Approvals       mempool.Approvals
+	Receipts        mempool.Receipts
+	Seals           mempool.Seals
+	IngestionEngine *consensusingest.Engine
+	MatchingEngine  *matching.Engine
 }
 
 // ExecutionNode implements a mocked execution node for tests.

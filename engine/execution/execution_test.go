@@ -88,7 +88,7 @@ func TestExecutionFlow(t *testing.T) {
 	defer consensusNode.Done()
 
 	collectionEngine := new(network.Engine)
-	colConduit, _ := collectionNode.Net.Register(engine.PushCollections, collectionEngine)
+	colConduit, _ := collectionNode.Net.Register(engine.RequestCollections, collectionEngine)
 	collectionEngine.On("Submit", exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			originID, _ := args[0].(flow.Identifier)
@@ -110,7 +110,7 @@ func TestExecutionFlow(t *testing.T) {
 	var receipt *flow.ExecutionReceipt
 
 	verificationEngine := new(network.Engine)
-	_, _ = verificationNode.Net.Register(engine.PushReceipts, verificationEngine)
+	_, _ = verificationNode.Net.Register(engine.ReceiveReceipts, verificationEngine)
 	verificationEngine.On("Submit", exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			receipt, _ = args[1].(*flow.ExecutionReceipt)
@@ -121,7 +121,7 @@ func TestExecutionFlow(t *testing.T) {
 		Once()
 
 	consensusEngine := new(network.Engine)
-	_, _ = consensusNode.Net.Register(engine.PushReceipts, consensusEngine)
+	_, _ = consensusNode.Net.Register(engine.ReceiveReceipts, consensusEngine)
 	consensusEngine.On("Submit", exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			receipt, _ = args[1].(*flow.ExecutionReceipt)
@@ -193,8 +193,8 @@ func TestBlockIngestionMultipleConsensusNodes(t *testing.T) {
 	actualCalls := 0
 
 	consensusEngine := new(network.Engine)
-	_, _ = consensus1Node.Net.Register(engine.PushReceipts, consensusEngine)
-	_, _ = consensus2Node.Net.Register(engine.PushReceipts, consensusEngine)
+	_, _ = consensus1Node.Net.Register(engine.ReceiveReceipts, consensusEngine)
+	_, _ = consensus2Node.Net.Register(engine.ReceiveReceipts, consensusEngine)
 	consensusEngine.On("Submit", exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) { actualCalls++ }).
 		Return(nil)
@@ -280,7 +280,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	// setup mocks and assertions
 	collectionEngine := new(network.Engine)
-	colConduit, _ := collectionNode.Net.Register(engine.PushCollections, collectionEngine)
+	colConduit, _ := collectionNode.Net.Register(engine.RequestCollections, collectionEngine)
 	collectionEngine.On("Submit", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			originID := args[0].(flow.Identifier)
@@ -301,7 +301,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	receiptsReceived := 0
 
 	consensusEngine := new(network.Engine)
-	_, _ = consensusNode.Net.Register(engine.PushReceipts, consensusEngine)
+	_, _ = consensusNode.Net.Register(engine.ReceiveReceipts, consensusEngine)
 	consensusEngine.On("Submit", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			receiptsReceived++
@@ -451,7 +451,7 @@ func TestExecutionQueryMissingBlocks(t *testing.T) {
 
 	// register consensus engine to track receipts
 	consensusEngine := new(network.Engine)
-	_, _ = consensusNode.Net.Register(engine.PushReceipts, consensusEngine)
+	_, _ = consensusNode.Net.Register(engine.ReceiveReceipts, consensusEngine)
 	consensusEngine.On("Submit", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			receiptsReceived++
@@ -518,8 +518,8 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	var receipt *flow.ExecutionReceipt
 
 	verificationEngine := new(network.Engine)
-	_, _ = verification1Node.Net.Register(engine.PushReceipts, verificationEngine)
-	_, _ = verification2Node.Net.Register(engine.PushReceipts, verificationEngine)
+	_, _ = verification1Node.Net.Register(engine.ReceiveReceipts, verificationEngine)
+	_, _ = verification2Node.Net.Register(engine.ReceiveReceipts, verificationEngine)
 	verificationEngine.On("Submit", exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			actualCalls++

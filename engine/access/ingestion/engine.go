@@ -68,10 +68,11 @@ func New(log zerolog.Logger,
 		rpcEngine:    rpcEngine,
 	}
 
-	_, err := net.Register(engine.PushCollections, eng)
+	con, err := net.Register(engine.RequestCollections, eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register collection provider engine: %w", err)
 	}
+	eng.collectionConduit = con
 
 	return eng, nil
 }

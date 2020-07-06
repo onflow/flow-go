@@ -120,12 +120,12 @@ func New(
 		maximumCollectionRequestRetryNumber: maximumCollectionRequestRetryNumber,
 	}
 
-	_, err := net.Register(engine.PushBlocks, &eng)
+	_, err := net.Register(engine.ReceiveBlocks, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 
-	collConduit, err := net.Register(engine.PushCollections, &eng)
+	collConduit, err := net.Register(engine.RequestCollections, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register collection provider engine: %w", err)
 	}
