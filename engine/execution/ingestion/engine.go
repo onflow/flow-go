@@ -42,9 +42,9 @@ type Engine struct {
 	unit                                *engine.Unit
 	log                                 zerolog.Logger
 	me                                  module.Local
+	request                             module.Requester // used to request collections
 	state                               protocol.State
 	receiptHasher                       hash.Hasher // used as hasher to sign the execution receipt
-	collectionConduit                   network.Conduit
 	syncConduit                         network.Conduit
 	blocks                              storage.Blocks
 	payloads                            storage.Payloads
@@ -73,6 +73,7 @@ func New(
 	logger zerolog.Logger,
 	net module.Network,
 	me module.Local,
+	request module.Requester,
 	state protocol.State,
 	blocks storage.Blocks,
 	payloads storage.Payloads,
@@ -98,6 +99,7 @@ func New(
 		unit:                                engine.NewUnit(),
 		log:                                 log,
 		me:                                  me,
+		request:                             request,
 		state:                               state,
 		receiptHasher:                       utils.NewExecutionReceiptHasher(),
 		blocks:                              blocks,
@@ -125,17 +127,11 @@ func New(
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 
-	collConduit, err := net.Register(engine.RequestCollections, &eng)
-	if err != nil {
-		return nil, fmt.Errorf("could not register collection provider engine: %w", err)
-	}
-
 	syncConduit, err := net.Register(engine.SyncExecution, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register execution blockSync engine: %w", err)
 	}
 
-	eng.collectionConduit = collConduit
 	eng.syncConduit = syncConduit
 
 	return &eng, nil
@@ -169,21 +165,6 @@ func (e *Engine) Ready() <-chan struct{} {
 // successfully stopped.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
-
-		// stop all timers
-		_ = e.mempool.BlockByCollection.Run(func(backdata *stdmap.BlockByCollectionBackdata) error {
-			for _, ent := range backdata.All() {
-				blocksByCollection, ok := ent.(*entity.BlocksByCollection)
-				if !ok {
-					panic(fmt.Sprintf("unknown type in BlockByCollection mempool: %T", ent))
-				}
-				if blocksByCollection.TimeoutTimer != nil {
-					blocksByCollection.TimeoutTimer.Stop()
-				}
-			}
-			return nil
-		})
-
 		e.Wait()
 	})
 }
@@ -215,9 +196,6 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 				Uint64("block_height", v.Header.Height).
 				Hex("block_proposal", logging.Entity(v.Header)).Msg("received block proposal")
 			err = e.handleBlockProposal(ctx, v)
-		case *messages.CollectionResponse:
-			log.Debug().Hex("collection_id", logging.Entity(v.Collection)).Msg("received collection response")
-			err = e.handleCollectionResponse(ctx, v)
 		case *messages.ExecutionStateDelta:
 			log.Debug().
 				Hex("block_id", logging.Entity(v.Block)).
@@ -459,12 +437,28 @@ func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 	return false
 }
 
-func (e *Engine) handleCollectionResponse(ctx context.Context, response *messages.CollectionResponse) error {
+func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
 
-	collection := response.Collection
+	// convert entity to strongly typed collection
+	collection, ok := entity.(*flow.Collection)
+	if !ok {
+		e.log.Error().Str("entity", fmt.Sprintf("%T", entity)).Msg("invalid entity type")
+		return
+	}
+
+	// process the collection
+	err := e.handleCollection(originID, collection)
+	if err != nil {
+		e.log.Error().Err(err).Msg("could not process collection")
+		return
+	}
+}
+
+func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Collection) error {
+
 	collID := collection.ID()
 
-	err := e.collections.Store(&collection)
+	err := e.collections.Store(collection)
 	if err != nil {
 		return fmt.Errorf("cannot store collection: %w", err)
 	}
@@ -475,10 +469,6 @@ func (e *Engine) handleCollectionResponse(ctx context.Context, response *message
 			if !exists {
 				return fmt.Errorf("could not find block for collection")
 			}
-
-			blockByCollectionId.TimeoutTimer.Stop()
-			//set to nil to prevent stopping twice while shutting down
-			blockByCollectionId.TimeoutTimer = nil
 
 			executableBlocks := blockByCollectionId.ExecutableBlocks
 
@@ -503,31 +493,6 @@ func (e *Engine) handleCollectionResponse(ctx context.Context, response *message
 			return nil
 		},
 	)
-}
-
-func (e *Engine) findCollectionNodesForGuarantee(
-	blockID flow.Identifier,
-	guarantee *flow.CollectionGuarantee,
-) ([]flow.Identifier, error) {
-
-	filter := filter.And(
-		filter.HasRole(flow.RoleCollection),
-		filter.HasNodeID(guarantee.SignerIDs...))
-
-	identities, err := e.state.AtBlockID(blockID).Identities(filter)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve identities (%s): %w", blockID, err)
-	}
-	if len(identities) < 1 {
-		return nil, fmt.Errorf("no collection identity found")
-	}
-
-	identifiers := make([]flow.Identifier, len(identities))
-	for i, id := range identities {
-		identifiers[i] = id.NodeID
-	}
-
-	return identifiers, nil
 }
 
 func (e *Engine) onExecutionStateSyncRequest(
@@ -594,38 +559,6 @@ func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Que
 	return newQueue(blockify, queues)
 }
 
-func (e *Engine) submitCollectionRequest(timer **time.Timer, collID flow.Identifier, recipients []flow.Identifier, retry uint) {
-
-	request := &messages.CollectionRequest{
-		ID:    collID,
-		Nonce: rand.Uint64(),
-	}
-
-	if retry >= e.maximumCollectionRequestRetryNumber {
-		e.log.Error().Hex("collection_id", collID[:]).Msg("exceeded maximum number of retries of collection request")
-		return
-	}
-
-	if retry > 0 {
-		e.log.Info().Hex("collection_id", collID[:]).Uint("retry", retry).Msg("retrying request for collection")
-		e.metrics.ExecutionCollectionRequestRetried()
-	} else {
-		e.metrics.ExecutionCollectionRequestSent()
-	}
-
-	err := e.collectionConduit.Submit(
-		request,
-		recipients...,
-	)
-	if err != nil {
-		e.log.Warn().Err(err).Hex("collection_id", collID[:]).Msg("cannot submit collection requests")
-	}
-
-	*timer = time.AfterFunc(e.collectionRequestTimeout, func() {
-		e.submitCollectionRequest(timer, collID, recipients, retry+1)
-	})
-}
-
 func (e *Engine) matchOrRequestCollections(
 	executableBlock *entity.ExecutableBlock,
 	backdata *stdmap.BlockByCollectionBackdata,
@@ -656,20 +589,16 @@ func (e *Engine) matchOrRequestCollections(
 					return fmt.Errorf("collection already mapped to block")
 				}
 
-				collectionGuaranteesIdentifiers, err := e.findCollectionNodesForGuarantee(
-					executableBlock.Block.ID(),
-					guarantee,
-				)
-				if err != nil {
-					return err
-				}
-
 				e.log.Debug().
 					Hex("block_id", logging.Entity(executableBlock.Block)).
 					Hex("collection_id", logging.ID(guarantee.ID())).
 					Msg("requesting collection")
 
-				e.submitCollectionRequest(&maybeBlockByCollection.TimeoutTimer, guarantee.ID(), collectionGuaranteesIdentifiers, 0)
+				err := e.request.Request(guarantee.ID(), e.OnCollection)
+				if err != nil {
+					return fmt.Errorf("could not request collection: %w", err)
+				}
+
 			} else {
 				return fmt.Errorf("error while querying for collection: %w", err)
 			}

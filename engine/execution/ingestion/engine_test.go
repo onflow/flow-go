@@ -67,6 +67,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	ctrl := gomock.NewController(t)
 
 	net := module.NewMockNetwork(ctrl)
+	request := module.NewMockRequester(ctrl)
 
 	// initialize the mocks and engine
 	conduit := network.NewMockConduit(ctrl)
@@ -137,6 +138,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		log,
 		net,
 		me,
+		request,
 		protocolState,
 		blocks,
 		payloads,
