@@ -1,6 +1,8 @@
-package fvm
+package state
 
-import "github.com/dapperlabs/flow-go/model/flow"
+import (
+	"github.com/dapperlabs/flow-go/model/flow"
+)
 
 const keyAddressState = "account_address_state"
 
@@ -16,16 +18,20 @@ func NewAddresses(ledger Ledger, chain flow.Chain) *Addresses {
 	}
 }
 
+func (a *Addresses) InitGeneratorState() {
+	a.SetGeneratorState(a.chain.NewAddressGenerator())
+}
+
 func (a *Addresses) GetGeneratorState() (flow.AddressGenerator, error) {
-	stateBytes, err := a.ledger.Get(fullKeyHash("", "", keyAddressState))
+	stateBytes, err := a.ledger.Get(RegisterID("", "", keyAddressState))
 	if err != nil {
 		return nil, err
 	}
 
-	return a.chain.BytesToAddressState(stateBytes), nil
+	return a.chain.BytesToAddressGenerator(stateBytes), nil
 }
 
 func (a *Addresses) SetGeneratorState(state flow.AddressGenerator) {
 	stateBytes := state.Bytes()
-	a.ledger.Set(fullKeyHash("", "", keyAddressState), stateBytes)
+	a.ledger.Set(RegisterID("", "", keyAddressState), stateBytes)
 }

@@ -3,6 +3,7 @@ package fvm
 import (
 	"github.com/onflow/cadence/runtime"
 
+	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/hash"
 )
@@ -25,11 +26,11 @@ func (i InvokableScript) WithArguments(args [][]byte) InvokableScript {
 	}
 }
 
-func (i InvokableScript) Parse(vm *VirtualMachine, ctx Context, ledger Ledger) (Invokable, error) {
+func (i InvokableScript) Parse(vm *VirtualMachine, ctx Context, ledger state.Ledger) (Invokable, error) {
 	panic("implement me")
 }
 
-func (i InvokableScript) Invoke(vm *VirtualMachine, ctx Context, ledger Ledger) (*InvocationResult, error) {
+func (i InvokableScript) Invoke(vm *VirtualMachine, ctx Context, ledger state.Ledger) (*InvocationResult, error) {
 	env := newEnvironment(vm, ctx, ledger)
 
 	scriptHash := hash.DefaultHasher.ComputeHash(i.script)

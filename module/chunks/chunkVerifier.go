@@ -7,6 +7,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/fvm"
+	"github.com/dapperlabs/flow-go/fvm/state"
 	chmodels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
@@ -15,7 +16,7 @@ import (
 )
 
 type VirtualMachine interface {
-	Invoke(fvm.Context, fvm.Invokable, fvm.Ledger) (*fvm.InvocationResult, error)
+	Invoke(fvm.Context, fvm.Invokable, state.Ledger) (*fvm.InvocationResult, error)
 }
 
 // ChunkVerifier is a verifier based on the current definitions of the flow network

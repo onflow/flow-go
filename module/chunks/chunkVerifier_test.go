@@ -12,6 +12,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/fvm"
+	"github.com/dapperlabs/flow-go/fvm/state"
 	chunksmodels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/chunks"
@@ -203,7 +204,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 
 type vmMock struct{}
 
-func (vm *vmMock) Invoke(ctx fvm.Context, i fvm.Invokable, ledger fvm.Ledger) (*fvm.InvocationResult, error) {
+func (vm *vmMock) Invoke(ctx fvm.Context, i fvm.Invokable, ledger state.Ledger) (*fvm.InvocationResult, error) {
 	invokableTx, ok := i.(fvm.InvokableTransaction)
 	if !ok {
 		return nil, fmt.Errorf("invokable is not a transaction")

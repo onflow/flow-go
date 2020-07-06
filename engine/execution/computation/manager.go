@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/fvm"
+	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
@@ -20,8 +21,8 @@ import (
 )
 
 type VirtualMachine interface {
-	Invoke(fvm.Context, fvm.Invokable, fvm.Ledger) (*fvm.InvocationResult, error)
-	GetAccount(fvm.Context, flow.Address, fvm.Ledger) (*flow.Account, error)
+	Invoke(fvm.Context, fvm.Invokable, state.Ledger) (*fvm.InvocationResult, error)
+	GetAccount(fvm.Context, flow.Address, state.Ledger) (*flow.Account, error)
 }
 
 type ComputationManager interface {

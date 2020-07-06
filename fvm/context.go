@@ -35,6 +35,8 @@ func newContext(ctx Context, opts ...Option) Context {
 	return ctx
 }
 
+const AccountKeyWeightThreshold = 1000
+
 const defaultGasLimit = 100000
 
 func defaultContext() Context {

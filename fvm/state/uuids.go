@@ -1,11 +1,12 @@
-package fvm
+package state
 
 import (
 	"encoding/binary"
 
-	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/utils/slices"
 )
+
+const keyUUID = "uuid"
 
 type UUIDs struct {
 	ledger Ledger
@@ -18,7 +19,7 @@ func NewUUIDs(ledger Ledger) *UUIDs {
 }
 
 func (u *UUIDs) GetUUID() (uint64, error) {
-	stateBytes, err := u.ledger.Get(state.fullKeyHash("", "", state.keyUUID))
+	stateBytes, err := u.ledger.Get(RegisterID("", "", keyUUID))
 	if err != nil {
 		return 0, err
 	}
@@ -30,5 +31,5 @@ func (u *UUIDs) GetUUID() (uint64, error) {
 func (u *UUIDs) SetUUID(uuid uint64) {
 	bytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(bytes, uuid)
-	u.ledger.Set(state.fullKeyHash("", "", state.keyUUID), bytes)
+	u.ledger.Set(RegisterID("", "", keyUUID), bytes)
 }

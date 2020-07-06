@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -19,11 +20,11 @@ func (i InvokableTransaction) Transaction() *flow.TransactionBody {
 	return i.tx
 }
 
-func (i InvokableTransaction) Parse(vm *VirtualMachine, ctx Context, ledger Ledger) (Invokable, error) {
+func (i InvokableTransaction) Parse(vm *VirtualMachine, ctx Context, ledger state.Ledger) (Invokable, error) {
 	panic("implement me")
 }
 
-func (i InvokableTransaction) Invoke(vm *VirtualMachine, ctx Context, ledger Ledger) (*InvocationResult, error) {
+func (i InvokableTransaction) Invoke(vm *VirtualMachine, ctx Context, ledger state.Ledger) (*InvocationResult, error) {
 	metaCtx := NewContextFromParent(
 		ctx,
 		WithSignatureVerification(false),
@@ -32,13 +33,16 @@ func (i InvokableTransaction) Invoke(vm *VirtualMachine, ctx Context, ledger Led
 
 	txID := i.tx.ID()
 
+	addresses := state.NewAddresses(ledger, vm.chain)
+	accounts := state.NewAccounts(ledger, addresses)
+
 	if ctx.SignatureVerificationEnabled {
-		err := verifySignatures(ledger, i.tx)
+		err := verifySignatures(accounts, i.tx)
 		if err != nil {
 			return createInvocationResult(txID, nil, nil, nil, err)
 		}
 
-		err = checkAndIncrementSequenceNumber(ledger, i.tx.ProposalKey)
+		err = checkAndIncrementSequenceNumber(accounts, i.tx.ProposalKey)
 		if err != nil {
 			return createInvocationResult(txID, nil, nil, nil, err)
 		}
@@ -64,8 +68,8 @@ func (i InvokableTransaction) Invoke(vm *VirtualMachine, ctx Context, ledger Led
 	return createInvocationResult(txID, nil, env.getEvents(), env.getLogs(), err)
 }
 
-func checkAndIncrementSequenceNumber(ledger Ledger, proposalKey flow.ProposalKey) error {
-	accountKeys, err := getAccountPublicKeys(ledger, proposalKey.Address)
+func checkAndIncrementSequenceNumber(accounts *state.Accounts, proposalKey flow.ProposalKey) error {
+	accountKeys, err := accounts.GetPublicKeys(proposalKey.Address)
 	if err != nil {
 		return err
 	}
@@ -98,7 +102,7 @@ func checkAndIncrementSequenceNumber(ledger Ledger, proposalKey flow.ProposalKey
 		return err
 	}
 
-	setAccountPublicKey(ledger, proposalKey.Address, proposalKey.KeyID, updatedAccountKeyBytes)
+	accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyID, updatedAccountKeyBytes)
 
 	return nil
 }
@@ -106,7 +110,7 @@ func checkAndIncrementSequenceNumber(ledger Ledger, proposalKey flow.ProposalKey
 // verifySignatures verifies that a transaction contains the necessary signatures.
 //
 // An error is returned if any of the expected signatures are invalid or missing.
-func verifySignatures(ledger Ledger, tx *flow.TransactionBody) (err error) {
+func verifySignatures(accounts *state.Accounts, tx *flow.TransactionBody) (err error) {
 	if tx.Payer == flow.EmptyAddress {
 		return &MissingPayerError{}
 	}
@@ -115,7 +119,7 @@ func verifySignatures(ledger Ledger, tx *flow.TransactionBody) (err error) {
 	var proposalKeyVerifiedInPayload bool
 
 	payloadWeights, proposalKeyVerifiedInPayload, err = aggregateAccountSignatures(
-		ledger,
+		accounts,
 		tx.PayloadSignatures,
 		tx.PayloadMessage(),
 		tx.ProposalKey,
@@ -128,7 +132,7 @@ func verifySignatures(ledger Ledger, tx *flow.TransactionBody) (err error) {
 	var proposalKeyVerifiedInEnvelope bool
 
 	envelopeWeights, proposalKeyVerifiedInEnvelope, err = aggregateAccountSignatures(
-		ledger,
+		accounts,
 		tx.EnvelopeSignatures,
 		tx.EnvelopeMessage(),
 		tx.ProposalKey,
@@ -167,7 +171,7 @@ func verifySignatures(ledger Ledger, tx *flow.TransactionBody) (err error) {
 }
 
 func aggregateAccountSignatures(
-	ledger Ledger,
+	accounts *state.Accounts,
 	signatures []flow.TransactionSignature,
 	message []byte,
 	proposalKey flow.ProposalKey,
@@ -179,7 +183,7 @@ func aggregateAccountSignatures(
 	weights = make(map[flow.Address]int)
 
 	for _, txSig := range signatures {
-		accountKey, err := verifyAccountSignature(ledger, txSig, message)
+		accountKey, err := verifyAccountSignature(accounts, txSig, message)
 		if err != nil {
 			return nil, false, err
 		}
@@ -202,14 +206,14 @@ func aggregateAccountSignatures(
 // An error is returned if the account does not contain a public key that
 // correctly verifies the signature against the given message.
 func verifyAccountSignature(
-	ledger Ledger,
+	accounts *state.Accounts,
 	txSig flow.TransactionSignature,
 	message []byte,
 ) (*flow.AccountPublicKey, error) {
 	var ok bool
 	var err error
 
-	ok, err = accountExists(ledger, txSig.Address)
+	ok, err = accounts.Exists(txSig.Address)
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +224,7 @@ func verifyAccountSignature(
 
 	var accountKeys []flow.AccountPublicKey
 
-	accountKeys, err = getAccountPublicKeys(ledger, txSig.Address)
+	accountKeys, err = accounts.GetPublicKeys(txSig.Address)
 	if err != nil {
 		return nil, err
 	}

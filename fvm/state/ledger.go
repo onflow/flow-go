@@ -1,4 +1,4 @@
-package fvm
+package state
 
 import (
 	"crypto/sha256"
@@ -23,6 +23,13 @@ type MapLedger struct {
 	Registers   map[string]flow.RegisterValue
 }
 
+func NewMapLedger() *MapLedger {
+	return &MapLedger{
+		RegTouchSet: make(map[string]bool),
+		Registers:   make(map[string]flow.RegisterValue),
+	}
+}
+
 func (m MapLedger) Set(key flow.RegisterID, value flow.RegisterValue) {
 	m.RegTouchSet[string(key)] = true
 	m.Registers[string(key)] = value
@@ -41,13 +48,9 @@ func (m MapLedger) Delete(key flow.RegisterID) {
 	delete(m.Registers, string(key))
 }
 
-const (
-	keyAddressState   = "account_address_state"
-	keyUUID           = "uuid"
-	keyExists         = "exists"
-	keyCode           = "code"
-	keyPublicKeyCount = "public_key_count"
-)
+func RegisterID(owner, controller, key string) flow.RegisterID {
+	return fullKeyHash(owner, controller, key)
+}
 
 func fullKey(owner, controller, key string) string {
 	// https://en.wikipedia.org/wiki/C0_and_C1_control_codes#Field_separators

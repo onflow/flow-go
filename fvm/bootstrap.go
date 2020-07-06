@@ -8,15 +8,17 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
+	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // A BootstrapProcedure is an invokable that can be used to bootstrap the ledger state
 // with the default accounts and contracts required by the Flow virtual machine.
 type BootstrapProcedure struct {
-	vm      *VirtualMachine
-	ledger  Ledger
-	metaCtx Context
+	vm       *VirtualMachine
+	ledger   state.Ledger
+	accounts *state.Accounts
+	metaCtx  Context
 
 	// genesis parameters
 	serviceAccountPublicKey flow.AccountPublicKey
@@ -35,12 +37,12 @@ func Bootstrap(
 	}
 }
 
-func (b *BootstrapProcedure) Parse(vm *VirtualMachine, ctx Context, ledger Ledger) (Invokable, error) {
+func (b *BootstrapProcedure) Parse(vm *VirtualMachine, ctx Context, ledger state.Ledger) (Invokable, error) {
 	// no-op: Bootstrapping invocation does not support pre-parsing
 	return b, nil
 }
 
-func (b *BootstrapProcedure) Invoke(vm *VirtualMachine, ctx Context, ledger Ledger) (*InvocationResult, error) {
+func (b *BootstrapProcedure) Invoke(vm *VirtualMachine, ctx Context, ledger state.Ledger) (*InvocationResult, error) {
 	b.metaCtx = NewContextFromParent(
 		ctx,
 		WithSignatureVerification(false),
@@ -52,7 +54,10 @@ func (b *BootstrapProcedure) Invoke(vm *VirtualMachine, ctx Context, ledger Ledg
 	b.ledger = ledger
 
 	// initialize the account addressing state
-	setAddressState(ledger, vm.chain.NewAddressGenerator())
+	addresses := state.NewAddresses(ledger, vm.chain)
+	addresses.InitGeneratorState()
+
+	b.accounts = state.NewAccounts(ledger, addresses)
 
 	service := b.createServiceAccount(b.serviceAccountPublicKey)
 
@@ -70,7 +75,7 @@ func (b *BootstrapProcedure) Invoke(vm *VirtualMachine, ctx Context, ledger Ledg
 }
 
 func (b *BootstrapProcedure) createAccount() flow.Address {
-	address, err := createAccount(b.ledger, b.vm.chain, nil)
+	address, err := b.accounts.Create(nil)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create account: %s", err))
 	}
@@ -79,7 +84,7 @@ func (b *BootstrapProcedure) createAccount() flow.Address {
 }
 
 func (b *BootstrapProcedure) createServiceAccount(accountKey flow.AccountPublicKey) flow.Address {
-	address, err := createAccount(b.ledger, b.vm.chain, []flow.AccountPublicKey{accountKey})
+	address, err := b.accounts.Create([]flow.AccountPublicKey{accountKey})
 	if err != nil {
 		panic(fmt.Sprintf("failed to create service account: %s", err))
 	}
