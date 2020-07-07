@@ -105,6 +105,10 @@ func (e *hostEnv) SetValue(owner, controller, key, value []byte) error {
 		),
 		value,
 	)
+	setValueHandler := e.ctx.SetValueHandler
+	if setValueHandler != nil {
+		setValueHandler(owner, controller, key, value)
+	}
 	return nil
 }
 
