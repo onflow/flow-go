@@ -2,7 +2,6 @@ package requester
 
 import (
 	"fmt"
-	"math/rand"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -15,7 +14,6 @@ import (
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 type Engine struct {
@@ -28,20 +26,30 @@ type Engine struct {
 	con      network.Conduit
 	channel  uint8
 	selector flow.IdentityFilter
+	handle   module.HandleFunc
+	items    map[flow.Identifier]Item
 	pending  uint64
 	batches  map[uint64]Batch
 	entities map[flow.Identifier]uint64
-	handlers map[flow.Identifier]module.HandleFunc
 }
 
 // New creates a new consensus propagation engine.
 func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, me module.Local, state protocol.State,
-	channel uint8, selector flow.IdentityFilter) (*Engine, error) {
+	channel uint8, selector flow.IdentityFilter, options ...OptionFunc) (*Engine, error) {
 
 	// initialize the default config
 	cfg := Config{
 		BatchThreshold: 128,
 		BatchInterval:  time.Second,
+		RetryInitial:   4 * time.Second,
+		RetryFunction:  RetryGeometric(2),
+		RetryMaximum:   2 * time.Minute,
+		RetryAttempts:  3,
+	}
+
+	// apply the custom option parameters
+	for _, option := range options {
+		option(&cfg)
 	}
 
 	// make sure we don't send requests from self or unstaked nodes
@@ -61,10 +69,11 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 		state:    state,
 		channel:  channel,
 		selector: selector,
-		pending:  0,                                           // identifies the batch currently being built
-		batches:  make(map[uint64]Batch),                      // holds a list of all active batches
-		entities: make(map[flow.Identifier]uint64),            // holds a list of all active entities
-		handlers: make(map[flow.Identifier]module.HandleFunc), // holds the procesing function
+		handle:   nil,
+		items:    make(map[flow.Identifier]Item),   // holds all pending items
+		pending:  0,                                // identifies the batch currently being built
+		batches:  make(map[uint64]Batch),           // holds a list of all active batches
+		entities: make(map[flow.Identifier]uint64), // holds a list of all active entities
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -77,10 +86,19 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 	return e, nil
 }
 
+// WithHandle will set the handler function to process entities.
+func (e *Engine) WithHandle(handle module.HandleFunc) {
+	e.handle = handle
+}
+
 // Ready returns a ready channel that is closed once the engine has fully
 // started. For consensus engine, this is true once the underlying consensus
 // algorithm has started.
 func (e *Engine) Ready() <-chan struct{} {
+	if e.handle == nil {
+		panic("must initialize requester engine with handler")
+	}
+	e.unit.Launch(e.poll)
 	return e.unit.Ready()
 }
 
@@ -121,58 +139,56 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 // Request allows us to request an entity to be processed by the given callback.
-func (e *Engine) Request(entityID flow.Identifier, handle module.HandleFunc) error {
+func (e *Engine) Request(entityID flow.Identifier) error {
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
-	return e.requestEntity(entityID, handle)
+	return e.requestEntity(entityID)
 }
 
-func (e *Engine) requestEntity(entityID flow.Identifier, handle module.HandleFunc) error {
+func (e *Engine) requestEntity(entityID flow.Identifier) error {
 
-	// check if the given entity was already tried
-	_, duplicate := e.entities[entityID]
+	// check if we already have an item for this entity
+	_, duplicate := e.items[entityID]
 	if duplicate {
 		return nil
 	}
 
-	// first, we check if we should start a new batch
-	batch, exists := e.batches[e.pending]
-	if !exists {
-		targets, err := e.state.Final().Identities(e.selector)
-		if err != nil {
-			return fmt.Errorf("could not get identities: %w", err)
+	// otherwise, add a new item to the list
+	item := Item{
+		EntityID:  entityID,
+		Attempts:  0,
+		Timestamp: time.Time{},
+		Interval:  e.cfg.RetryInitial,
+		Nonce:     0,
+	}
+	e.items[entityID] = item
+
+	return nil
+}
+
+func (e *Engine) poll() {
+	ticker := time.NewTicker(e.cfg.BatchInterval)
+
+PollLoop:
+	for {
+		select {
+		case <-e.unit.Quit():
+			break PollLoop
+
+		case <-ticker.C:
+			err := e.dispatchRequests()
+			if err != nil {
+				e.log.Error().Err(err).Msg("could not dispatch requests")
+				continue PollLoop
+			}
 		}
-		if len(targets) == 0 {
-			return fmt.Errorf("no valid identities available")
-		}
-		targetID := targets.Sample(1).NodeIDs()[0]
-		batch = Batch{
-			Nonce:     rand.Uint64(),    // use the randomly generated nonce
-			Timestamp: time.Now().UTC(), // use current timestamp
-			TargetID:  targetID,         // use a randomly selected target
-			EntityIDs: nil,              // start with an empty batch each time
-		}
-		e.batches[batch.Nonce] = batch
-		e.pending = batch.Nonce
 	}
 
-	// add the entity to the batch and map the entity to the batch nonce
-	batch.EntityIDs = append(batch.EntityIDs, entityID)
-	e.entities[entityID] = batch.Nonce
-	e.handlers[entityID] = handle
+	ticker.Stop()
+}
 
-	// check if we reached the limit for this batch
-	if uint(len(batch.EntityIDs)) < e.cfg.BatchThreshold {
-		return nil
-	}
-
-	// at this point, the batch has reached the threshold, so dispatch it
-	err := e.dispatchBatch(batch.Nonce)
-	if err != nil {
-		return fmt.Errorf("could not execute request: %w", err)
-	}
-
+func (e *Engine) dispatchRequests() error {
 	return nil
 }
 
@@ -251,13 +267,8 @@ func (e *Engine) onResourceResponse(originID flow.Identifier, res *messages.Reso
 
 	// requeue all entities that have not been delivered yet
 	for entityID := range needed {
-		handle, exists := e.handlers[entityID]
-		if !exists {
-			return fmt.Errorf("missing handler (%x)", entityID)
-		}
 		delete(e.entities, entityID)
-		delete(e.handlers, entityID)
-		err := e.requestEntity(entityID, handle)
+		err := e.requestEntity(entityID)
 		if err != nil {
 			return fmt.Errorf("could not re-queue entity: %w", err)
 		}
@@ -268,19 +279,11 @@ func (e *Engine) onResourceResponse(originID flow.Identifier, res *messages.Reso
 
 func (e *Engine) processEntity(originID flow.Identifier, entity flow.Entity) error {
 
-	// check if this entity is actually still pending
-	handle, requested := e.handlers[entity.ID()]
-	if !requested {
-		e.log.Warn().Hex("entity", logging.Entity(entity)).Msg("discarding entity with missing handler")
-		return nil
-	}
-
 	// remove the entity from the requested list
-	delete(e.handlers, entity.ID())
 	delete(e.entities, entity.ID())
 
 	// process the entity with the injected handle function
-	err := handle(originID, entity)
+	err := e.handle(originID, entity)
 	if err != nil {
 		return fmt.Errorf("could not handle entity: %w", err)
 	}

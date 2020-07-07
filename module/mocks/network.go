@@ -8,7 +8,6 @@ import (
 	crypto "github.com/dapperlabs/flow-go/crypto"
 	hash "github.com/dapperlabs/flow-go/crypto/hash"
 	flow "github.com/dapperlabs/flow-go/model/flow"
-	module "github.com/dapperlabs/flow-go/module"
 	network "github.com/dapperlabs/flow-go/network"
 	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
@@ -156,15 +155,15 @@ func (m *MockRequester) EXPECT() *MockRequesterMockRecorder {
 }
 
 // Request mocks base method
-func (m *MockRequester) Request(arg0 flow.Identifier, arg1 module.HandleFunc) error {
+func (m *MockRequester) Request(arg0 flow.Identifier) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Request", arg0, arg1)
+	ret := m.ctrl.Call(m, "Request", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Request indicates an expected call of Request
-func (mr *MockRequesterMockRecorder) Request(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockRequesterMockRecorder) Request(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Request", reflect.TypeOf((*MockRequester)(nil).Request), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Request", reflect.TypeOf((*MockRequester)(nil).Request), arg0)
 }

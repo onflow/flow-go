@@ -186,7 +186,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 
 func (e *Engine) requestCollections(guarantees ...*flow.CollectionGuarantee) error {
 	for _, guarantee := range guarantees {
-		err := e.request.Request(guarantee.ID(), e.OnCollection)
+		err := e.request.Request(guarantee.ID())
 		if err != nil {
 			return fmt.Errorf("could not request collection (%x)", guarantee.ID())
 		}
