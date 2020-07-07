@@ -20,7 +20,6 @@ import (
 type Engine struct {
 	unit     *engine.Unit
 	log      zerolog.Logger
-	cfg      Config
 	metrics  module.EngineMetrics
 	me       module.Local
 	state    protocol.State
@@ -35,12 +34,6 @@ type Engine struct {
 func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, me module.Local, state protocol.State,
 	channel uint8, selector flow.IdentityFilter, retrieve RetrieveFunc) (*Engine, error) {
 
-	// initialize the default configuration
-	cfg := Config{
-		BatchThreshold: 128,
-		BatchInterval:  time.Second,
-	}
-
 	// make sure we don't respond to requests sent by self or non-staked nodes
 	selector = filter.And(
 		selector,
@@ -52,7 +45,6 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 	e := &Engine{
 		unit:     engine.NewUnit(),
 		log:      log.With().Str("engine", "provider").Logger(),
-		cfg:      cfg,
 		metrics:  metrics,
 		me:       me,
 		state:    state,
@@ -159,11 +151,6 @@ func (e *Engine) onResourceRequest(originID flow.Identifier, req *messages.Resou
 	// NOTE: we could punish here for duplicate requests
 	for _, entityID := range req.EntityIDs {
 		request.EntityIDs[entityID] = struct{}{}
-	}
-
-	// if the batch size is still too small, skip immediate processing
-	if uint(len(request.EntityIDs)) < e.cfg.BatchThreshold {
-		return nil
 	}
 
 	// otherwise, we sent this response now and zero out the entry

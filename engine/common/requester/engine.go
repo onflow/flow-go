@@ -19,17 +19,19 @@ import (
 )
 
 type Engine struct {
-	unit      *engine.Unit
-	log       zerolog.Logger
-	cfg       Config
-	metrics   module.EngineMetrics
-	me        module.Local
-	state     protocol.State
-	con       network.Conduit
-	channel   uint8
-	selector  flow.IdentityFilter
-	queued    map[flow.Identifier]module.HandleFunc
-	requested map[flow.Identifier]module.HandleFunc
+	unit     *engine.Unit
+	log      zerolog.Logger
+	cfg      Config
+	metrics  module.EngineMetrics
+	me       module.Local
+	state    protocol.State
+	con      network.Conduit
+	channel  uint8
+	selector flow.IdentityFilter
+	pending  uint64
+	batches  map[uint64]Batch
+	entities map[flow.Identifier]uint64
+	handlers map[flow.Identifier]module.HandleFunc
 }
 
 // New creates a new consensus propagation engine.
@@ -51,16 +53,18 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:      engine.NewUnit(),
-		log:       log.With().Str("engine", "requester").Logger(),
-		cfg:       cfg,
-		metrics:   metrics,
-		me:        me,
-		state:     state,
-		channel:   channel,
-		selector:  selector,
-		queued:    make(map[flow.Identifier]module.HandleFunc),
-		requested: make(map[flow.Identifier]module.HandleFunc),
+		unit:     engine.NewUnit(),
+		log:      log.With().Str("engine", "requester").Logger(),
+		cfg:      cfg,
+		metrics:  metrics,
+		me:       me,
+		state:    state,
+		channel:  channel,
+		selector: selector,
+		pending:  0,                                           // identifies the batch currently being built
+		batches:  make(map[uint64]Batch),                      // holds a list of all active batches
+		entities: make(map[flow.Identifier]uint64),            // holds a list of all active entities
+		handlers: make(map[flow.Identifier]module.HandleFunc), // holds the procesing function
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -121,34 +125,50 @@ func (e *Engine) Request(entityID flow.Identifier, handle module.HandleFunc) err
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
-	// TODO: keep track of in-flight requests to avoid duplicates
+	return e.requestEntity(entityID, handle)
+}
 
-	// TODO: add automatic retrying and rotating valid recipients
+func (e *Engine) requestEntity(entityID flow.Identifier, handle module.HandleFunc) error {
 
-	// skip entities that are already queued to be requested
-	_, queued := e.queued[entityID]
-	if queued {
-		e.log.Debug().Hex("entity", entityID[:]).Msg("ignoring already queued entity")
+	// check if the given entity was already tried
+	_, duplicate := e.entities[entityID]
+	if duplicate {
 		return nil
 	}
 
-	// skip duplicates without error for now
-	_, requested := e.queued[entityID]
-	if requested {
-		e.log.Debug().Hex("entity", entityID[:]).Msg("ignoring already requested entity")
+	// first, we check if we should start a new batch
+	batch, exists := e.batches[e.pending]
+	if !exists {
+		targets, err := e.state.Final().Identities(e.selector)
+		if err != nil {
+			return fmt.Errorf("could not get identities: %w", err)
+		}
+		if len(targets) == 0 {
+			return fmt.Errorf("no valid identities available")
+		}
+		targetID := targets.Sample(1).NodeIDs()[0]
+		batch = Batch{
+			Nonce:     rand.Uint64(),    // use the randomly generated nonce
+			Timestamp: time.Now().UTC(), // use current timestamp
+			TargetID:  targetID,         // use a randomly selected target
+			EntityIDs: nil,              // start with an empty batch each time
+		}
+		e.batches[batch.Nonce] = batch
+		e.pending = batch.Nonce
+	}
+
+	// add the entity to the batch and map the entity to the batch nonce
+	batch.EntityIDs = append(batch.EntityIDs, entityID)
+	e.entities[entityID] = batch.Nonce
+	e.handlers[entityID] = handle
+
+	// check if we reached the limit for this batch
+	if uint(len(batch.EntityIDs)) < e.cfg.BatchThreshold {
 		return nil
 	}
 
-	// add the entity to the list of queued entities
-	e.queued[entityID] = handle
-
-	// if we have not reached the batch threshold, send now
-	if uint(len(e.queued)) < e.cfg.BatchThreshold {
-		return nil
-	}
-
-	// otherwise, create a new request and keep track
-	err := e.executeRequest()
+	// at this point, the batch has reached the threshold, so dispatch it
+	err := e.dispatchBatch(batch.Nonce)
 	if err != nil {
 		return fmt.Errorf("could not execute request: %w", err)
 	}
@@ -156,32 +176,24 @@ func (e *Engine) Request(entityID flow.Identifier, handle module.HandleFunc) err
 	return nil
 }
 
-func (e *Engine) executeRequest() error {
+func (e *Engine) dispatchBatch(nonce uint64) error {
 
-	// determine which identities are valid recipients of the request
-	identities, err := e.state.Final().Identities(e.selector)
-	if err != nil {
-		return fmt.Errorf("could not get identities: %w", err)
-	}
-	if len(identities) == 0 {
-		return fmt.Errorf("no valid targets for request available")
+	// get the batch from the map
+	batch, exists := e.batches[nonce]
+	if !exists {
+		return fmt.Errorf("unknown batch nonce (%d)", nonce)
 	}
 
-	// put the list of pending entity IDs into the request
-	entityIDs := make([]flow.Identifier, 0, len(e.queued))
-	for entityID, handle := range e.queued {
-		entityIDs = append(entityIDs, entityID)
-		e.requested[entityID] = handle
-		delete(e.queued, entityID)
-	}
+	// remove the batch from pending
+	// NOTE: the batch will still be retried if it fails
+	e.pending = 0
+
+	// create the resource request and send to target
 	req := &messages.ResourceRequest{
-		Nonce:     rand.Uint64(),
-		EntityIDs: entityIDs,
+		Nonce:     batch.Nonce,
+		EntityIDs: batch.EntityIDs,
 	}
-
-	// select a random recipient for the request and send
-	target := identities[rand.Intn(len(identities))]
-	err = e.con.Submit(&req, target.NodeID)
+	err := e.con.Submit(&req, batch.TargetID)
 	if err != nil {
 		return fmt.Errorf("could not send resource request: %w", err)
 	}
@@ -208,13 +220,46 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 func (e *Engine) onResourceResponse(originID flow.Identifier, res *messages.ResourceResponse) error {
 
-	// TODO: add reputation system to punish offenders of protocol conventions, slow responses
+	// check if there is a request pending with the given nonce
+	batch, exists := e.batches[res.Nonce]
+	if !exists {
+		// NOTE: we can use alternative logic by entity ID if
+		// we want to use outdated responses
+		return nil
+	}
 
-	// for each entity contained in the response, process it
+	// create map of entities needed
+	needed := make(map[flow.Identifier]struct{})
+	for _, entityID := range batch.EntityIDs {
+		needed[entityID] = struct{}{}
+	}
+
+	// go through all entities and check if it is still needed
 	for _, entity := range res.Entities {
+		entityID := entity.ID()
+		_, requested := needed[entityID]
+		if !requested {
+			e.log.Warn().Hex("entity", entityID[:]).Msg("provider sent non-requested entity")
+			continue
+		}
+		delete(needed, entityID)
 		err := e.processEntity(originID, entity)
 		if err != nil {
-			return fmt.Errorf("could not process entity (%x): %w", entity.ID(), err)
+			return fmt.Errorf("could not process entity (%x): %w", entityID, err)
+		}
+	}
+
+	// requeue all entities that have not been delivered yet
+	for entityID := range needed {
+		handle, exists := e.handlers[entityID]
+		if !exists {
+			return fmt.Errorf("missing handler (%x)", entityID)
+		}
+		delete(e.entities, entityID)
+		delete(e.handlers, entityID)
+		err := e.requestEntity(entityID, handle)
+		if err != nil {
+			return fmt.Errorf("could not re-queue entity: %w", err)
 		}
 	}
 
@@ -224,14 +269,15 @@ func (e *Engine) onResourceResponse(originID flow.Identifier, res *messages.Reso
 func (e *Engine) processEntity(originID flow.Identifier, entity flow.Entity) error {
 
 	// check if this entity is actually still pending
-	handle, requested := e.requested[entity.ID()]
+	handle, requested := e.handlers[entity.ID()]
 	if !requested {
-		e.log.Debug().Hex("entity", logging.Entity(entity)).Msg("discarding non-requested entity")
+		e.log.Warn().Hex("entity", logging.Entity(entity)).Msg("discarding entity with missing handler")
 		return nil
 	}
 
 	// remove the entity from the requested list
-	delete(e.requested, entity.ID())
+	delete(e.handlers, entity.ID())
+	delete(e.entities, entity.ID())
 
 	// process the entity with the injected handle function
 	err := handle(originID, entity)
