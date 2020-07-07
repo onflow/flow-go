@@ -87,7 +87,18 @@ func (i *TransactionInvocator) Process(
 
 	location := runtime.TransactionLocation(proc.ID[:])
 
-	err := vm.Runtime.ExecuteTransaction(proc.Transaction.Script, proc.Transaction.Arguments, env, location)
+	vm.Runtime.SetOnWriteValue(func(owner runtime.Address, key string, value cadence.Value) {
+		if ctx.OnWriteValue != nil {
+			ctx.OnWriteValue(owner, key, value)
+		}
+	})
+
+	err := vm.Runtime.ExecuteTransaction(
+		proc.Transaction.Script,
+		proc.Transaction.Arguments,
+		env,
+		location,
+	)
 	if err != nil {
 		return err
 	}
