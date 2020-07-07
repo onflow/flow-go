@@ -18,6 +18,8 @@ import (
 	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
+type HandleFunc func(originID flow.Identifier, entity flow.Entity) error
+
 type Engine struct {
 	unit     *engine.Unit
 	log      zerolog.Logger
@@ -28,7 +30,7 @@ type Engine struct {
 	con      network.Conduit
 	channel  uint8
 	selector flow.IdentityFilter
-	handle   module.HandleFunc
+	handle   HandleFunc
 	items    map[flow.Identifier]Item
 	requests map[uint64]*messages.ResourceRequest
 }
@@ -85,7 +87,7 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 }
 
 // WithHandle will set the handler function to process entities.
-func (e *Engine) WithHandle(handle module.HandleFunc) {
+func (e *Engine) WithHandle(handle HandleFunc) {
 	e.handle = handle
 }
 

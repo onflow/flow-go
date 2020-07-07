@@ -1,9 +1,8 @@
 package provider
 
 import (
+	"errors"
 	"fmt"
-	"math/rand"
-	"time"
 
 	"github.com/rs/zerolog"
 
@@ -15,7 +14,10 @@ import (
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 )
+
+type RetrieveFunc func(flow.Identifier) (flow.Entity, error)
 
 type Engine struct {
 	unit     *engine.Unit
@@ -27,7 +29,6 @@ type Engine struct {
 	channel  uint8
 	selector flow.IdentityFilter
 	retrieve RetrieveFunc
-	requests map[flow.Identifier]Request
 }
 
 // New creates a new consensus propagation engine.
@@ -51,7 +52,6 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 		channel:  channel,
 		selector: selector,
 		retrieve: retrieve,
-		requests: make(map[flow.Identifier]Request),
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -128,7 +128,10 @@ func (e *Engine) onResourceRequest(originID flow.Identifier, req *messages.Resou
 
 	// then, we try to get the current identity of the requester and check it against the filter
 	// for the handler to make sure the requester is authorized for this resource
-	identities, err := e.state.Final().Identities(e.selector)
+	identities, err := e.state.Final().Identities(filter.And(
+		e.selector,
+		filter.HasNodeID(originID)),
+	)
 	if err != nil {
 		return fmt.Errorf("could not retrieve identity for origin: %w", err)
 	}
@@ -136,62 +139,31 @@ func (e *Engine) onResourceRequest(originID flow.Identifier, req *messages.Resou
 		return fmt.Errorf("origin is not allowed to request resource")
 	}
 
-	// get the currently pending requested entities for the origin
-	request, exists := e.requests[originID]
-	if !exists {
-		request = Request{
-			OriginID:  originID,
-			EntityIDs: nil,
-			Timestamp: time.Now().UTC(),
-		}
-		e.requests[originID] = request
-	}
-
-	// add each entity ID to the requests
-	// NOTE: we could punish here for duplicate requests
+	// try to retrieve each entity and skip missing ones
+	entities := make([]flow.Entity, 0, len(req.EntityIDs))
 	for _, entityID := range req.EntityIDs {
-		request.EntityIDs[entityID] = struct{}{}
-	}
-
-	// otherwise, we sent this response now and zero out the entry
-	err = e.processResponse(request)
-	if err != nil {
-		return fmt.Errorf("could not process response: %w", err)
-	}
-
-	return nil
-}
-
-func (e *Engine) processResponse(request Request) error {
-
-	// remove the request from the map
-	delete(e.requests, request.OriginID)
-
-	// collect all entities for the given IDs
-	entities := make([]flow.Entity, 0, len(request.EntityIDs))
-	for entityID := range request.EntityIDs {
 		entity, err := e.retrieve(entityID)
-		if err != nil {
-			e.log.Debug().Hex("entity", entityID[:]).Msg("unknown entity requested")
+		if errors.Is(err, storage.ErrNotFound) {
 			continue
+		}
+		if err != nil {
+			return fmt.Errorf("could not retrieve entity: %w", err)
 		}
 		entities = append(entities, entity)
 	}
 
-	// if no entities are in the response, we bail now
-	if len(entities) == 0 {
-		e.log.Debug().Msg("no entities to send in resource response")
-		return nil
-	}
+	// NOTE: we do _NOT_ avoid sending empty responses, as this will allow
+	// the requester to know we don't have any of the requested entities, so
+	// he can retry those immediately, rather than waiting
 
-	// otherwise, send the response to the original requester
-	rep := &messages.ResourceResponse{
-		Nonce:    rand.Uint64(),
+	// send back the response
+	res := &messages.ResourceResponse{
+		Nonce:    req.Nonce,
 		Entities: entities,
 	}
-	err := e.con.Submit(rep, request.OriginID)
+	err = e.con.Submit(res, originID)
 	if err != nil {
-		return fmt.Errorf("could not send resource response: %w", err)
+		return fmt.Errorf("could not send response: %w", err)
 	}
 
 	e.metrics.MessageSent(engine.ChannelName(e.channel), metrics.MessageResourceResponse)
