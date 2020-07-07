@@ -2,6 +2,7 @@ package requester
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"time"
 
@@ -38,12 +39,12 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 
 	// initialize the default config
 	cfg := Config{
-		BatchThreshold: 128,
+		BatchThreshold: 32,
 		BatchInterval:  time.Second,
 		RetryInitial:   4 * time.Second,
 		RetryFunction:  RetryGeometric(2),
 		RetryMaximum:   2 * time.Minute,
-		RetryAttempts:  3,
+		RetryAttempts:  math.MaxUint32,
 	}
 
 	// apply the custom option parameters
@@ -213,12 +214,12 @@ func (e *Engine) dispatchRequests() error {
 		}
 	}
 
-	// if there are no items, return
+	// if there are no items to request, return
 	if len(entityIDs) == 0 {
 		return nil
 	}
 
-	// determine who to send the request to
+	// pick a random target from the valid providers
 	targets, err := e.state.Final().Identities(e.selector)
 	if err != nil {
 		return fmt.Errorf("could not retrieve targets: %w", err)
@@ -228,7 +229,7 @@ func (e *Engine) dispatchRequests() error {
 	}
 	targetID := targets.Sample(1)[0].NodeID
 
-	// create a batch request, send it and store it
+	// create a batch request, send it and store it for reference
 	req := &messages.ResourceRequest{
 		Nonce:     rand.Uint64(),
 		EntityIDs: entityIDs,
@@ -238,6 +239,16 @@ func (e *Engine) dispatchRequests() error {
 		return fmt.Errorf("could not send request: %w", err)
 	}
 	e.requests[req.Nonce] = req
+
+	// NOTE: we forget about requests after the expiry of the shortest retry time
+	// from the entities in the list; this means that we purge requests aggressively.
+	// However, most requests should be responded to on the first attempt and clearing
+	// these up only removes the ability to instantly retry upon partial responses, so
+	// it won't affect much.
+	go func() {
+		<-time.After(e.cfg.RetryInitial)
+		delete(e.requests, req.Nonce)
+	}()
 
 	e.metrics.MessageSent(engine.ChannelName(e.channel), metrics.MessageResourceRequest)
 
@@ -275,9 +286,19 @@ func (e *Engine) onResourceResponse(originID flow.Identifier, res *messages.Reso
 	// NOTE: this requires engines to be somewhat idempotent, which is a good
 	// thing, as it increases the robustness of their code
 	for _, entity := range res.Entities {
+
+		// the entity might already have been returned in another response
 		entityID := entity.ID()
+		_, exists := e.items[entityID]
+		if !exists {
+			continue
+		}
+
+		// remove from needed items and pending items
 		delete(needed, entityID)
 		delete(e.items, entityID)
+
+		// process the entity
 		err := e.handle(originID, entity)
 		if err != nil {
 			return fmt.Errorf("could not handle entity (%x): %w", entityID, err)
