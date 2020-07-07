@@ -203,10 +203,18 @@ func (e *Engine) dispatchRequests() error {
 		}
 
 		// add item to list and set retry parameters
+		entityIDs = append(entityIDs, entityID)
+		item.Attempts++
 		item.Timestamp = item.Timestamp.Add(item.Interval)
 		item.Interval = e.cfg.RetryFunction(item.Interval)
-		item.Attempts++
-		entityIDs = append(entityIDs, entityID)
+
+		// make sure the interval is within parameters
+		if item.Interval < e.cfg.RetryInitial {
+			item.Interval = e.cfg.RetryInitial
+		}
+		if item.Interval > e.cfg.RetryMaximum {
+			item.Interval = e.cfg.RetryMaximum
+		}
 
 		// if we reached the maximum size for a batch, bail
 		if uint(len(entityIDs)) >= e.cfg.BatchThreshold {
