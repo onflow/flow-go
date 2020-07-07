@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/onflow/flow/protobuf/go/flow/execution"
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -14,21 +16,25 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 )
 
 type handlerTransactions struct {
-	collectionRPC access.AccessAPIClient
-	executionRPC  execution.ExecutionAPIClient
-	transactions  storage.Transactions
-	collections   storage.Collections
-	blocks        storage.Blocks
-	state         protocol.State
+	log                zerolog.Logger
+	collectionRPC      access.AccessAPIClient
+	executionRPC       execution.ExecutionAPIClient
+	transactions       storage.Transactions
+	collections        storage.Collections
+	blocks             storage.Blocks
+	state              protocol.State
+	transactionMetrics module.TransactionMetrics
 }
 
 // SendTransaction forwards the transaction to the collection node
 func (h *handlerTransactions) SendTransaction(ctx context.Context, req *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {
+	now := time.Now().UTC()
 
 	// send the transaction to the collection node
 	resp, err := h.collectionRPC.SendTransaction(ctx, req)
@@ -41,6 +47,8 @@ func (h *handlerTransactions) SendTransaction(ctx context.Context, req *access.S
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to convert transaction: %v", err))
 	}
+
+	h.transactionMetrics.TransactionReceived(tx.ID(), now)
 
 	// store the transaction locally
 	err = h.transactions.Store(&tx)

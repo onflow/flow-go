@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -38,6 +39,9 @@ type Engine struct {
 	headers      storage.Headers
 	collections  storage.Collections
 	transactions storage.Transactions
+
+	// metrics
+	transactionMetrics module.TransactionMetrics
 }
 
 // New creates a new access ingestion engine
@@ -48,18 +52,21 @@ func New(log zerolog.Logger,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
-	transactions storage.Transactions) (*Engine, error) {
+	transactions storage.Transactions,
+	transactionMetrics module.TransactionMetrics,
+) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	eng := &Engine{
-		unit:         engine.NewUnit(),
-		log:          log.With().Str("engine", "ingestion").Logger(),
-		state:        state,
-		me:           me,
-		blocks:       blocks,
-		headers:      headers,
-		collections:  collections,
-		transactions: transactions,
+		unit:               engine.NewUnit(),
+		log:                log.With().Str("engine", "ingestion").Logger(),
+		state:              state,
+		me:                 me,
+		blocks:             blocks,
+		headers:            headers,
+		collections:        collections,
+		transactions:       transactions,
+		transactionMetrics: transactionMetrics,
 	}
 
 	collConduit, err := net.Register(engine.CollectionProvider, eng)
@@ -68,6 +75,12 @@ func New(log zerolog.Logger,
 	}
 
 	eng.collectionConduit = collConduit
+
+	// register engine with the execution receipt provider
+	_, err = net.Register(engine.ExecutionReceiptProvider, eng)
+	if err != nil {
+		return nil, fmt.Errorf("could not register for results: %w", err)
+	}
 
 	return eng, nil
 }
@@ -122,6 +135,8 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch entity := event.(type) {
 	case *messages.CollectionResponse:
 		return e.handleCollectionResponse(originID, entity)
+	case *flow.ExecutionReceipt:
+		return e.handleExecutionReceipt(originID, entity)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -136,6 +151,7 @@ func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 			e.log.Error().Err(err).Hex("block_id", id[:]).Msg("failed to process block")
 			return
 		}
+		e.trackFinalizedMetric(hb)
 	})
 }
 
@@ -160,6 +176,66 @@ func (e *Engine) processFinalizedBlock(id flow.Identifier) error {
 
 	// request each of the collections from the collection node
 	return e.requestCollections(block.Payload.Guarantees...)
+}
+
+func (e *Engine) trackFinalizedMetric(hb *model.Block) {
+	// retrieve the block
+	b, err := e.blocks.ByID(hb.BlockID)
+
+	// TODO lookup actual finalization time by looking at the block finalizing `b`
+	now := time.Now().UTC()
+
+	if err != nil {
+		e.log.Warn().Err(err).Msg("could not track tx finalized metric: finalized block not found locally")
+		return
+	}
+
+	// mark all transactions as finalized
+	// TODO: sample to reduce performance overhead
+	for _, g := range b.Payload.Guarantees {
+		l, err := e.collections.LightByID(g.CollectionID)
+		if err != nil {
+			e.log.Warn().Err(err).Str("collection_id", g.CollectionID.String()).
+				Msg("could not track tx finalized metric: finalized collection not found locally")
+			continue
+		}
+
+		for _, t := range l.Transactions {
+			e.transactionMetrics.TransactionFinalized(t, now)
+		}
+	}
+}
+
+func (e *Engine) handleExecutionReceipt(originID flow.Identifier, r *flow.ExecutionReceipt) error {
+	e.trackExecutedMetric(r)
+	return nil
+}
+
+func (e *Engine) trackExecutedMetric(r *flow.ExecutionReceipt) {
+	// retrieve the block
+	b, err := e.blocks.ByID(r.ExecutionResult.BlockID)
+
+	// TODO add actual execution time to execution receipt?
+	now := time.Now().UTC()
+
+	if err != nil {
+		e.log.Warn().Err(err).Msg("could not track tx executed metric: executed block not found locally")
+	}
+
+	// mark all transactions as executed
+	// TODO: sample to reduce performance overhead
+	for _, g := range b.Payload.Guarantees {
+		l, err := e.collections.LightByID(g.CollectionID)
+		if err != nil {
+			e.log.Warn().Err(err).Str("collection_id", g.CollectionID.String()).
+				Msg("could not track tx executed metric: executed collection not found locally")
+			continue
+		}
+
+		for _, t := range l.Transactions {
+			e.transactionMetrics.TransactionFinalized(t, now)
+		}
+	}
 }
 
 // handleCollectionResponse handles the response of the a collection request made earlier when a block was received

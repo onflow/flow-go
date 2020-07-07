@@ -15,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/access/rpc/handler"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	grpcutils "github.com/dapperlabs/flow-go/utils/grpc"
@@ -31,12 +32,13 @@ type Config struct {
 
 // Engine implements a gRPC server with a simplified version of the Observation API.
 type Engine struct {
-	unit       *engine.Unit
-	log        zerolog.Logger
-	handler    *handler.Handler // the gRPC service implementation
-	grpcServer *grpc.Server     // the gRPC server
-	httpServer *http.Server
-	config     Config
+	unit               *engine.Unit
+	log                zerolog.Logger
+	handler            *handler.Handler // the gRPC service implementation
+	grpcServer         *grpc.Server     // the gRPC server
+	httpServer         *http.Server
+	config             Config
+	transactionMetrics module.TransactionMetrics
 }
 
 // New returns a new RPC engine.
@@ -49,7 +51,9 @@ func New(log zerolog.Logger,
 	headers storage.Headers,
 	collections storage.Collections,
 	transactions storage.Transactions,
-	chainID flow.ChainID) *Engine {
+	chainID flow.ChainID,
+	transactionMetrics module.TransactionMetrics,
+) *Engine {
 
 	log = log.With().Str("engine", "rpc").Logger()
 
@@ -67,12 +71,13 @@ func New(log zerolog.Logger,
 	httpServer := NewHTTPServer(grpcServer, config.HTTPListenAddr)
 
 	eng := &Engine{
-		log:        log,
-		unit:       engine.NewUnit(),
-		handler:    handler.NewHandler(log, state, executionRPC, collectionRPC, blocks, headers, collections, transactions, chainID),
-		grpcServer: grpcServer,
-		httpServer: httpServer,
-		config:     config,
+		log:                log,
+		unit:               engine.NewUnit(),
+		handler:            handler.NewHandler(log, state, executionRPC, collectionRPC, blocks, headers, collections, transactions, chainID, transactionMetrics),
+		grpcServer:         grpcServer,
+		httpServer:         httpServer,
+		config:             config,
+		transactionMetrics: transactionMetrics,
 	}
 
 	access.RegisterAccessAPIServer(eng.grpcServer, eng.handler)

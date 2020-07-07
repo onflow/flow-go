@@ -23,6 +23,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
+	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/module/synchronization"
@@ -33,17 +34,21 @@ import (
 func main() {
 
 	var (
-		blockLimit      uint
-		collectionLimit uint
-		receiptLimit    uint
-		ingestEng       *ingestion.Engine
-		followerEng     *followereng.Engine
-		syncCore        *synchronization.Core
-		rpcConf         rpc.Config
-		collectionRPC   access.AccessAPIClient
-		executionRPC    execution.ExecutionAPIClient
-		err             error
-		conCache        *buffer.PendingBlocks // pending block cache for follower
+		blockLimit                   uint
+		collectionLimit              uint
+		receiptLimit                 uint
+		ingestEng                    *ingestion.Engine
+		followerEng                  *followereng.Engine
+		syncCore                     *synchronization.Core
+		rpcConf                      rpc.Config
+		collectionRPC                access.AccessAPIClient
+		executionRPC                 execution.ExecutionAPIClient
+		err                          error
+		conCache                     *buffer.PendingBlocks // pending block cache for follower
+		transactionMetrics           module.TransactionMetrics
+		logTxTimeToFinalized         bool
+		logTxTimeToExecuted          bool
+		logTxTimeToFinalizedExecuted bool
 	)
 
 	cmd.FlowNode(flow.RoleAccess.String()).
@@ -55,6 +60,9 @@ func main() {
 			flags.StringVarP(&rpcConf.HTTPListenAddr, "http-addr", "h", "localhost:8000", "the address the http proxy server listens on")
 			flags.StringVarP(&rpcConf.CollectionAddr, "ingress-addr", "i", "localhost:9000", "the address (of the collection node) to send transactions to")
 			flags.StringVarP(&rpcConf.ExecutionAddr, "script-addr", "s", "localhost:9000", "the address (of the execution node) forward the script to")
+			flags.BoolVar(&logTxTimeToFinalized, "log-tx-time-to-finalized", false, "log transaction time to finalized")
+			flags.BoolVar(&logTxTimeToExecuted, "log-tx-time-to-executed", false, "log transaction time to executed")
+			flags.BoolVar(&logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", false, "log transaction time to finalized and executed")
 		}).
 		Module("collection node client", func(node *cmd.FlowNodeBuilder) error {
 			node.Logger.Info().Err(err).Msgf("Collection node Addr: %s", rpcConf.CollectionAddr)
@@ -90,8 +98,18 @@ func main() {
 			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
+		Module("transaction metrics", func(node *cmd.FlowNodeBuilder) error {
+			transactionTimings, err := stdmap.NewTransactionTimings(1500 * 120) // assume 1500 TPS * 120 seconds
+			if err != nil {
+				return err
+			}
+
+			transactionMetrics = metrics.NewTransactionCollector(transactionTimings, node.Logger, logTxTimeToFinalized,
+				logTxTimeToExecuted, logTxTimeToFinalizedExecuted)
+			return nil
+		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions)
+			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, transactionMetrics)
 			return ingestEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -169,7 +187,7 @@ func main() {
 			return sync, nil
 		}).
 		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.RootChainID)
+			rpcEng := rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.RootChainID, transactionMetrics)
 			return rpcEng, nil
 		}).
 		Run()

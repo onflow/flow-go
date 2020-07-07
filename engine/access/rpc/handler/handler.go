@@ -14,6 +14,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/common/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 )
@@ -50,7 +51,9 @@ func NewHandler(log zerolog.Logger,
 	headers storage.Headers,
 	collections storage.Collections,
 	transactions storage.Transactions,
-	chainID flow.ChainID) *Handler {
+	chainID flow.ChainID,
+	transactionMetrics module.TransactionMetrics,
+) *Handler {
 	return &Handler{
 		executionRPC: e,
 		state:        s,
@@ -61,12 +64,14 @@ func NewHandler(log zerolog.Logger,
 			state:        s,
 		},
 		handlerTransactions: handlerTransactions{
-			collectionRPC: c,
-			executionRPC:  e,
-			state:         s,
-			collections:   collections,
-			blocks:        blocks,
-			transactions:  transactions,
+			log:                log,
+			collectionRPC:      c,
+			executionRPC:       e,
+			state:              s,
+			collections:        collections,
+			blocks:             blocks,
+			transactions:       transactions,
+			transactionMetrics: transactionMetrics,
 		},
 		handlerEvents: handlerEvents{
 			executionRPC: e,
