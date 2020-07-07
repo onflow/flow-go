@@ -9,8 +9,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 
+	verification3 "github.com/dapperlabs/flow-go/engine/testutil/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/match"
-	"github.com/dapperlabs/flow-go/integration/tests/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	verification2 "github.com/dapperlabs/flow-go/model/verification"
@@ -39,20 +39,15 @@ func main() {
 // a single execution receipt of 10 chunks
 func happyPathExample() {
 	example.WithMetricsServer(func(logger zerolog.Logger) {
-		tracer, err := trace.NewTracer(logger, "verification")
-		if err != nil {
-			panic(err)
-		}
 
 		// initiates and starts mempool collector
 		// since happy path goes very fast leap timer on collector set to 1 nanosecond.
 		mempoolCollector := metrics.NewMempoolCollector(1 * time.Nanosecond)
 		<-mempoolCollector.Ready()
-		verificationCollector := metrics.NewVerificationCollector(tracer, prometheus.DefaultRegisterer, logger)
 
 		// starts happy path
 		t := &testing.T{}
-		verification.VerificationHappyPath(t, verificationCollector, mempoolCollector, 1, 10)
+		verification3.VerificationHappyPath(t, 1, 10)
 
 		<-mempoolCollector.Done()
 	})

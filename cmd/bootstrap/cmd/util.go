@@ -8,8 +8,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/rs/zerolog/log"
-
 	"github.com/dapperlabs/flow-go/crypto"
 )
 

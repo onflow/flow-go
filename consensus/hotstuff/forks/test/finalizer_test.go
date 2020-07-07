@@ -560,9 +560,10 @@ func TestNotification(t *testing.T) {
 	genesisBQ := makeGenesis()
 
 	fin, err := finalizer.New(genesisBQ, finalizationCallback, notifier)
+	require.NoError(t, err)
 
 	err = addBlocksToFinalizer(fin, blocks)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	notifier.AssertExpectations(t)
 	finalizationCallback.AssertExpectations(t)
 }

@@ -39,8 +39,6 @@ import (
 // - dropping the ingestion of the ERs that share the same result once the verifiable chunk is submitted to verify engine
 // - broadcast of a matching result approval to consensus nodes for each assigned chunk
 func VerificationHappyPath(t *testing.T,
-	verificationMetrics module.VerificationMetrics,
-	mempoolMetrics module.MempoolMetrics,
 	verNodeCount int,
 	chunkNum int) {
 	// to demarcate the debug logs
@@ -100,8 +98,6 @@ func VerificationHappyPath(t *testing.T,
 	for _, verIdentity := range verIdentities {
 		verNode := testutil.VerificationNode(t,
 			hub,
-			verificationMetrics,
-			mempoolMetrics,
 			verIdentity,
 			identities,
 			assigner,
@@ -122,10 +118,10 @@ func VerificationHappyPath(t *testing.T,
 	}
 
 	// mock execution node
-	exeNode, exeEngine := setupMockExeNode(t, hub, exeIdentity, verIdentities, identities, chainID, completeER)
+	exeNode, exeEngine := SetupMockExeNode(t, hub, exeIdentity, verIdentities, identities, chainID, completeER)
 
 	// mock consensus node
-	conNode, conEngine, conWG := setupMockConsensusNode(t, hub, conIdentity, verIdentities, identities, completeER, chainID)
+	conNode, conEngine, conWG := SetupMockConsensusNode(t, hub, conIdentity, verIdentities, identities, completeER, chainID)
 
 	// sends execution receipt to each of verification nodes
 	verWG := sync.WaitGroup{}
@@ -189,13 +185,13 @@ func VerificationHappyPath(t *testing.T,
 		Msg("TestHappyPath finishes")
 }
 
-// setupMockExeNode creates and returns an execution node and its registered engine in the network (hub)
+// SetupMockExeNode creates and returns an execution node and its registered engine in the network (hub)
 // it mocks the process method of execution node that on receiving a chunk data pack request from
 // a certain verifier node (verIdentity) about a chunk that is assigned to it, replies the chunk back
 // data pack back to the node. Otherwise, if the request is not a chunk data pack request, or if the
 // requested chunk data pack is not about an assigned chunk to the verifier node (verIdentity), it fails the
 // test.
-func setupMockExeNode(t *testing.T,
+func SetupMockExeNode(t *testing.T,
 	hub *stub.Hub,
 	exeIdentity *flow.Identity,
 	verIdentities flow.IdentityList,
@@ -263,10 +259,10 @@ func setupMockExeNode(t *testing.T,
 	return &exeNode, exeEngine
 }
 
-// setupMockConsensusNode creates and returns a mock consensus node (conIdentity) and its registered engine in the
+// SetupMockConsensusNode creates and returns a mock consensus node (conIdentity) and its registered engine in the
 // network (hub). It mocks the process method of the consensus engine to receive a message from a certain
 // verification node (verIdentity) evaluates whether it is a result approval about an assigned chunk to that verifier node.
-func setupMockConsensusNode(t *testing.T,
+func SetupMockConsensusNode(t *testing.T,
 	hub *stub.Hub,
 	conIdentity *flow.Identity,
 	verIdentities flow.IdentityList,
