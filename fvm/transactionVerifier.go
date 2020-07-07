@@ -25,8 +25,7 @@ func (v *TransactionSignatureVerifier) Process(
 	proc *TransactionProcedure,
 	ledger state.Ledger,
 ) error {
-	addresses := state.NewAddresses(ledger, ctx.Chain)
-	accounts := state.NewAccounts(ledger, addresses)
+	accounts := state.NewAccounts(ledger, ctx.Chain)
 
 	return v.verifyTransactionSignatures(proc.Transaction, accounts)
 }

@@ -22,11 +22,13 @@ func keyPublicKey(index uint64) string {
 }
 
 type Accounts struct {
-	ledger    Ledger
-	addresses *Addresses
+	ledger Ledger
+	*addresses
 }
 
-func NewAccounts(ledger Ledger, addresses *Addresses) *Accounts {
+func NewAccounts(ledger Ledger, chain flow.Chain) *Accounts {
+	addresses := newAddresses(ledger, chain)
+
 	return &Accounts{
 		ledger:    ledger,
 		addresses: addresses,
@@ -79,7 +81,7 @@ func (a *Accounts) Exists(address flow.Address) (bool, error) {
 }
 
 func (a *Accounts) Create(publicKeys []flow.AccountPublicKey) (flow.Address, error) {
-	addressState, err := a.addresses.GetGeneratorState()
+	addressState, err := a.addresses.GetAddressGeneratorState()
 	if err != nil {
 		return flow.EmptyAddress, err
 	}
@@ -102,7 +104,7 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey) (flow.Address, err
 	}
 
 	// update the address state
-	a.addresses.SetGeneratorState(addressState)
+	a.addresses.SetAddressGeneratorState(addressState)
 
 	return newAddress, nil
 }

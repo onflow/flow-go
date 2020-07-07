@@ -6,23 +6,23 @@ import (
 
 const keyAddressState = "account_address_state"
 
-type Addresses struct {
+type addresses struct {
 	ledger Ledger
 	chain  flow.Chain
 }
 
-func NewAddresses(ledger Ledger, chain flow.Chain) *Addresses {
-	return &Addresses{
+func newAddresses(ledger Ledger, chain flow.Chain) *addresses {
+	return &addresses{
 		ledger: ledger,
 		chain:  chain,
 	}
 }
 
-func (a *Addresses) InitGeneratorState() {
-	a.SetGeneratorState(a.chain.NewAddressGenerator())
+func (a *addresses) InitAddressGeneratorState() {
+	a.SetAddressGeneratorState(a.chain.NewAddressGenerator())
 }
 
-func (a *Addresses) GetGeneratorState() (flow.AddressGenerator, error) {
+func (a *addresses) GetAddressGeneratorState() (flow.AddressGenerator, error) {
 	stateBytes, err := a.ledger.Get(RegisterID("", "", keyAddressState))
 	if err != nil {
 		return nil, err
@@ -31,7 +31,7 @@ func (a *Addresses) GetGeneratorState() (flow.AddressGenerator, error) {
 	return a.chain.BytesToAddressGenerator(stateBytes), nil
 }
 
-func (a *Addresses) SetGeneratorState(state flow.AddressGenerator) {
+func (a *addresses) SetAddressGeneratorState(state flow.AddressGenerator) {
 	stateBytes := state.Bytes()
 	a.ledger.Set(RegisterID("", "", keyAddressState), stateBytes)
 }

@@ -34,8 +34,7 @@ type hostEnv struct {
 }
 
 func newEnvironment(ctx Context, ledger state.Ledger) *hostEnv {
-	addresses := state.NewAddresses(ledger, ctx.Chain)
-	accounts := state.NewAccounts(ledger, addresses)
+	accounts := state.NewAccounts(ledger, ctx.Chain)
 
 	uuids := state.NewUUIDs(ledger)
 	uuidGenerator := NewUUIDGenerator(uuids)

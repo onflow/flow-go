@@ -14,8 +14,7 @@ func TestAccounts_GetWithNoKeys(t *testing.T) {
 
 	ledger := state.NewMapLedger()
 
-	addresses := state.NewAddresses(ledger, chain)
-	accounts := state.NewAccounts(ledger, addresses)
+	accounts := state.NewAccounts(ledger, chain)
 
 	address, err := accounts.Create(nil)
 	require.NoError(t, err)
@@ -32,8 +31,7 @@ func TestAccounts_GetWithNoKeysCounter(t *testing.T) {
 
 	ledger := state.NewMapLedger()
 
-	addresses := state.NewAddresses(ledger, chain)
-	accounts := state.NewAccounts(ledger, addresses)
+	accounts := state.NewAccounts(ledger, chain)
 
 	address, err := accounts.Create(nil)
 	require.NoError(t, err)

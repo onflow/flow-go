@@ -43,10 +43,8 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, ledger state.L
 	b.ledger = ledger
 
 	// initialize the account addressing state
-	addresses := state.NewAddresses(ledger, ctx.Chain)
-	addresses.InitGeneratorState()
-
-	b.accounts = state.NewAccounts(ledger, addresses)
+	b.accounts = state.NewAccounts(ledger, ctx.Chain)
+	b.accounts.InitAddressGeneratorState()
 
 	service := b.createServiceAccount(b.serviceAccountPublicKey)
 
