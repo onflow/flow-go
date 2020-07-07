@@ -369,18 +369,20 @@ func (e *transactionEnv) GetComputationLimit() uint64 {
 }
 
 func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
-	err = e.vm.invokeMetaTransaction(
-		e.ctx,
-		deductAccountCreationFeeTransaction(
-			flow.Address(payer),
-			e.ctx.Chain.ServiceAddress(),
-			e.ctx.RestrictedAccountCreationEnabled,
-		),
-		e.ledger,
-	)
-	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return address, err
+	if e.ctx.DefaultTokenEnabled {
+		err = e.vm.invokeMetaTransaction(
+			e.ctx,
+			deductAccountCreationFeeTransaction(
+				flow.Address(payer),
+				e.ctx.Chain.ServiceAddress(),
+				e.ctx.RestrictedAccountCreationEnabled,
+			),
+			e.ledger,
+		)
+		if err != nil {
+			// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+			return address, err
+		}
 	}
 
 	var flowAddress flow.Address
@@ -391,14 +393,16 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 		return address, err
 	}
 
-	err = e.vm.invokeMetaTransaction(
-		e.ctx,
-		initFlowTokenTransaction(flowAddress, e.ctx.Chain.ServiceAddress()),
-		e.ledger,
-	)
-	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return address, err
+	if e.ctx.DefaultTokenEnabled {
+		err = e.vm.invokeMetaTransaction(
+			e.ctx,
+			initFlowTokenTransaction(flowAddress, e.ctx.Chain.ServiceAddress()),
+			e.ledger,
+		)
+		if err != nil {
+			// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+			return address, err
+		}
 	}
 
 	return runtime.Address(flowAddress), nil

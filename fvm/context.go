@@ -20,6 +20,7 @@ type Context struct {
 	TransactionProcessors            []TransactionProcessor
 	ScriptProcessors                 []ScriptProcessor
 	SetValueHandler                  SetValueHandler
+	DefaultTokenEnabled              bool
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -56,6 +57,7 @@ func defaultContext() Context {
 		RestrictedDeploymentEnabled:      true,
 		SignatureVerifier:                NewDefaultSignatureVerifier(),
 		SetValueHandler:                  nil,
+		DefaultTokenEnabled:              true,
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
 			NewTransactionSequenceNumberChecker(),
@@ -159,6 +161,15 @@ func WithRestrictedAccountCreation(enabled bool) Option {
 func WithSetValueHandler(handler SetValueHandler) Option {
 	return func(ctx Context) Context {
 		ctx.SetValueHandler = handler
+		return ctx
+	}
+}
+
+// WithDefaultTokenEnabled enables or disables the default token use for a
+// virtual machine context
+func WithDefaultTokenEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.DefaultTokenEnabled = enabled
 		return ctx
 	}
 }
