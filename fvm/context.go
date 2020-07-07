@@ -4,8 +4,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-type SetValueHandler func(owner, controller, key, value []byte)
-
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
 	Chain                            flow.Chain
@@ -19,7 +17,6 @@ type Context struct {
 	SignatureVerifier                SignatureVerifier
 	TransactionProcessors            []TransactionProcessor
 	ScriptProcessors                 []ScriptProcessor
-	SetValueHandler                  SetValueHandler
 	DefaultTokenEnabled              bool
 }
 
@@ -56,7 +53,6 @@ func defaultContext() Context {
 		RestrictedAccountCreationEnabled: true,
 		RestrictedDeploymentEnabled:      true,
 		SignatureVerifier:                NewDefaultSignatureVerifier(),
-		SetValueHandler:                  nil,
 		DefaultTokenEnabled:              true,
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
@@ -152,15 +148,6 @@ func WithRestrictedDeployment(enabled bool) Option {
 func WithRestrictedAccountCreation(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.RestrictedAccountCreationEnabled = enabled
-		return ctx
-	}
-}
-
-// WithSetValueHandler sets the handler for the value setter for a
-// virtual machine context
-func WithSetValueHandler(handler SetValueHandler) Option {
-	return func(ctx Context) Context {
-		ctx.SetValueHandler = handler
 		return ctx
 	}
 }
