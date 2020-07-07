@@ -155,7 +155,7 @@ func CreateAccountsWithSimpleAddresses(
 	var accounts []flow.Address
 
 	script := []byte(`
-	  transaction(publicKey: [Int]) {
+	  transaction(publicKey: [UInt8]) {
 	    prepare(signer: AuthAccount) {
 	  	  let acct = AuthAccount(payer: signer)
 	  	  acct.addPublicKey(publicKey)
@@ -218,7 +218,7 @@ func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context) *state.MapL
 func BytesToCadenceArray(l []byte) cadence.Array {
 	values := make([]cadence.Value, len(l))
 	for i, b := range l {
-		values[i] = cadence.NewInt(int(b))
+		values[i] = cadence.NewUInt8(b)
 	}
 
 	return cadence.NewArray(values)

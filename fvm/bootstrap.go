@@ -22,14 +22,14 @@ type BootstrapProcedure struct {
 
 	// genesis parameters
 	serviceAccountPublicKey flow.AccountPublicKey
-	initialTokenSupply      uint64
+	initialTokenSupply      cadence.UFix64
 }
 
 // Bootstrap returns a new BootstrapProcedure instance configured with the provided
 // genesis parameters.
 func Bootstrap(
 	servicePublicKey flow.AccountPublicKey,
-	initialTokenSupply uint64,
+	initialTokenSupply cadence.UFix64,
 ) *BootstrapProcedure {
 	return &BootstrapProcedure{
 		serviceAccountPublicKey: servicePublicKey,
@@ -143,7 +143,10 @@ func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowTo
 	}
 }
 
-func (b *BootstrapProcedure) mintInitialTokens(service, fungibleToken, flowToken flow.Address, initialSupply uint64) {
+func (b *BootstrapProcedure) mintInitialTokens(
+	service, fungibleToken, flowToken flow.Address,
+	initialSupply cadence.UFix64,
+) {
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		mintFlowTokenTransaction(fungibleToken, flowToken, service, initialSupply),
@@ -239,9 +242,9 @@ func deployFlowFeesTransaction(flowFees, service flow.Address, contract []byte) 
 
 func mintFlowTokenTransaction(
 	fungibleToken, flowToken, service flow.Address,
-	initialSupply uint64,
+	initialSupply cadence.UFix64,
 ) *TransactionProcedure {
-	initialSupplyArg, err := jsoncdc.Encode(cadence.NewUFix64(initialSupply))
+	initialSupplyArg, err := jsoncdc.Encode(initialSupply)
 	if err != nil {
 		panic(fmt.Sprintf("failed to encode initial token supply: %s", err.Error()))
 	}

@@ -1001,9 +1001,9 @@ func TestSignatureVerification(t *testing.T) {
       import Crypto
 
       pub fun main(
-          rawPublicKeys: [[Int]],
-          message: [Int], 
-          signatures: [[Int]],
+          rawPublicKeys: [[UInt8]],
+          message: [UInt8], 
+          signatures: [[UInt8]],
           weight: UFix64,
       ): Bool {
           let keyList = Crypto.KeyList()
@@ -1082,7 +1082,7 @@ func TestSignatureVerification(t *testing.T) {
 			privateKey, publicKey := createKey()
 			signableMessage, message := createMessage("foo")
 			signature := signMessage(privateKey, signableMessage)
-			weight := cadence.NewUFix64(1_00000000) // 1.0
+			weight, _ := cadence.NewUFix64("1.0")
 
 			publicKeys := cadence.NewArray([]cadence.Value{
 				publicKey,
@@ -1185,7 +1185,7 @@ func TestSignatureVerification(t *testing.T) {
 			signatureB := signMessage(privateKeyB, signableMessage)
 			signatureC := signMessage(privateKeyC, signableMessage)
 
-			weight := cadence.NewUFix64(50000000) // 0.5
+			weight, _ := cadence.NewUFix64("0.5")
 
 			t.Run("3 of 3", func(t *testing.T) {
 				signatures := cadence.NewArray([]cadence.Value{

@@ -48,7 +48,12 @@ func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
 		ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 		require.NoError(t, err)
 
-		stateCommitment, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(ls, unittest.ServiceAccountPublicKey, 0, chain)
+		stateCommitment, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(
+			ls,
+			unittest.ServiceAccountPublicKey,
+			0,
+			chain,
+		)
 		require.NoError(t, err)
 
 		if !assert.Equal(t, expectedStateCommitment, stateCommitment) {
