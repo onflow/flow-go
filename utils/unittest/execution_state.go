@@ -2,6 +2,7 @@ package unittest
 
 import (
 	"encoding/hex"
+	"fmt"
 
 	"github.com/onflow/cadence"
 
