@@ -62,6 +62,7 @@ func (suite *SnapshotSuite) SetupTest() {
 
 	// just bootstrap with a genesis block, we'll use this as reference
 	suite.protoState, err = protocol.NewState(metrics, suite.db, headers, identities, seals, index, conPayloads, blocks)
+	suite.Assert().Nil(err)
 	genesis := unittest.GenesisFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
 	result := bootstrap.Result(genesis, unittest.GenesisStateCommitment)
 	seal := bootstrap.Seal(result)
