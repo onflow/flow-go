@@ -1,8 +1,11 @@
 package finder
 
 import (
+	"context"
 	"fmt"
+	"time"
 
+	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
@@ -11,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/verification"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -20,6 +24,7 @@ type Engine struct {
 	unit               *engine.Unit
 	log                zerolog.Logger
 	metrics            module.VerificationMetrics
+	tracer             module.Tracer
 	me                 module.Local
 	match              network.Engine
 	receipts           mempool.PendingReceipts // used to keep the receipts as mempool
@@ -32,6 +37,7 @@ type Engine struct {
 func New(
 	log zerolog.Logger,
 	metrics module.VerificationMetrics,
+	tracer module.Tracer,
 	net module.Network,
 	me module.Local,
 	match network.Engine,
@@ -45,6 +51,7 @@ func New(
 		unit:               engine.NewUnit(),
 		log:                log.With().Str("engine", "finder").Logger(),
 		metrics:            metrics,
+		tracer:             tracer,
 		me:                 me,
 		match:              match,
 		headerStorage:      headerStorage,
@@ -119,6 +126,17 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // conditions are satisfied:
 // - It has not yet been added to the mempool
 func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
+	span, ok := e.tracer.GetSpan(receipt.ID(), trace.VERProcessExecutionReceipt)
+	ctx := context.Background()
+	if !ok {
+		span = e.tracer.StartSpan(receipt.ID(), trace.VERProcessExecutionReceipt)
+		span.SetTag("execution_receipt_id", receipt.ID())
+		defer span.Finish()
+	}
+	ctx = opentracing.ContextWithSpan(ctx, span)
+	childSpan, _ := e.tracer.StartSpanFromContext(ctx, trace.VERFindHandleExecutionReceipt)
+	defer childSpan.Finish()
+
 	receiptID := receipt.ID()
 	resultID := receipt.ExecutionResult.ID()
 
@@ -158,7 +176,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	log.Info().Msg("execution receipt successfully handled")
 
 	// checks receipt being processable
-	e.checkReceipts([]*verification.PendingReceipt{pr})
+	e.checkReceipts([]context.Context{ctx}, []*verification.PendingReceipt{pr})
 
 	return nil
 }
@@ -176,6 +194,8 @@ func (e *Engine) OnBlockIncorporated(*model.Block) {
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 func (e *Engine) OnFinalizedBlock(block *model.Block) {
+	start := time.Now()
+
 	// retrieves all receipts that are pending for this block
 	erIDs, ok := e.receiptIDsByBlock.Get(block.BlockID)
 	if !ok {
@@ -191,18 +211,32 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 	}
 
 	// constructs list of receipts pending for this block
-	ers := make([]*verification.PendingReceipt, len(erIDs))
-	for index, erId := range erIDs {
-		er, ok := e.receipts.Get(erId)
+	ers := make([]*verification.PendingReceipt, 0, len(erIDs))
+	ctxs := make([]context.Context, 0, len(erIDs))
+	for _, erID := range erIDs {
+		span, ok := e.tracer.GetSpan(erID, trace.VERProcessExecutionReceipt)
+		ctx := context.Background()
+		if !ok {
+			span = e.tracer.StartSpan(erID, trace.VERProcessExecutionReceipt, opentracing.StartTime(start))
+			span.SetTag("execution_receipt_id", erID)
+			defer span.Finish()
+		}
+		ctx = opentracing.ContextWithSpan(ctx, span)
+		childSpan, _ := e.tracer.StartSpanFromContext(ctx, trace.VERFindOnFinalizedBlock,
+			opentracing.StartTime(start))
+		defer childSpan.Finish()
+
+		er, ok := e.receipts.Get(erID)
 		if !ok {
 			e.log.Debug().
-				Hex("receipt_id", logging.ID(erId)).
+				Hex("receipt_id", logging.ID(erID)).
 				Msg("could not retrieve pending receipt")
 			continue
 		}
-		ers[index] = er
+		ers = append(ers, er)
+		ctxs = append(ctxs, ctx)
 	}
-	e.checkReceipts(ers)
+	e.checkReceipts(ctxs, ers)
 }
 
 // To implement FinalizationConsumer
@@ -219,7 +253,10 @@ func (e *Engine) isProcessable(result *flow.ExecutionResult) bool {
 
 // processResult submits the result to the match engine.
 // originID is the identifier of the node that initially sends a receipt containing this result.
-func (e *Engine) processResult(originID flow.Identifier, result *flow.ExecutionResult) error {
+func (e *Engine) processResult(ctx context.Context, originID flow.Identifier, result *flow.ExecutionResult) error {
+	span, _ := e.tracer.StartSpanFromContext(ctx, trace.VERFindProcessResult)
+	defer span.Finish()
+
 	resultID := result.ID()
 	if e.processedResult.Has(resultID) {
 		e.log.Debug().
@@ -241,7 +278,10 @@ func (e *Engine) processResult(originID flow.Identifier, result *flow.ExecutionR
 // onResultProcessed is called whenever a result is processed completely and
 // is passed to the match engine. It marks the result as processed, and removes
 // all receipts with the same result from mempool.
-func (e *Engine) onResultProcessed(resultID flow.Identifier) {
+func (e *Engine) onResultProcessed(ctx context.Context, resultID flow.Identifier) {
+	span, _ := e.tracer.StartSpanFromContext(ctx, trace.VERFindOnResultProcessed)
+	defer span.Finish()
+
 	log := e.log.With().
 		Hex("result_id", logging.ID(resultID)).
 		Logger()
@@ -271,16 +311,21 @@ func (e *Engine) onResultProcessed(resultID flow.Identifier) {
 
 // checkReceipts receives a set of receipts and evaluates each of them
 // against being processable. If a receipt is processable, it gets processed.
-func (e *Engine) checkReceipts(receipts []*verification.PendingReceipt) {
+func (e *Engine) checkReceipts(ctxs []context.Context, receipts []*verification.PendingReceipt) {
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
-	for _, pr := range receipts {
+	for i, pr := range receipts {
+		ctx := ctxs[i]
+		var span opentracing.Span
+		span, ctx = e.tracer.StartSpanFromContext(ctx, trace.VERFindCheckReceipts)
+		defer span.Finish()
+
 		receiptID := pr.Receipt.ID()
 		resultID := pr.Receipt.ExecutionResult.ID()
 		if e.isProcessable(&pr.Receipt.ExecutionResult) {
 			// checks if result is ready to process
-			err := e.processResult(pr.OriginID, &pr.Receipt.ExecutionResult)
+			err := e.processResult(ctx, pr.OriginID, &pr.Receipt.ExecutionResult)
 			if err != nil {
 				e.log.Error().
 					Err(err).
@@ -291,7 +336,7 @@ func (e *Engine) checkReceipts(receipts []*verification.PendingReceipt) {
 			}
 
 			// performs clean up
-			e.onResultProcessed(resultID)
+			e.onResultProcessed(ctx, resultID)
 		} else {
 			// receipt is not processable
 			// keeps track of it in id map

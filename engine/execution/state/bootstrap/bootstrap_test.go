@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -22,7 +23,7 @@ func TestGenerateGenesisState(t *testing.T) {
 		ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 		require.NoError(t, err)
 
-		stateCommitment, err := BootstrapLedger(
+		stateCommitment, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(
 			ls,
 			unittest.ServiceAccountPublicKey,
 			unittest.GenesisTokenSupply,
@@ -37,8 +38,7 @@ func TestGenerateGenesisState(t *testing.T) {
 }
 
 func TestGenerateGenesisState_ZeroTokenSupply(t *testing.T) {
-	var expectedStateCommitment, _ = hex.DecodeString("f8ce9e9f774b401b8d4e4c1cacf7b2047136df5897b95f6f4f282f83f2cdf5c7")
-
+	var expectedStateCommitment, _ = hex.DecodeString("0189af4919ddc65db33edf6156aa6c9ad8aab77ba632095f078f22a65c68658a")
 	unittest.RunWithTempDir(t, func(dbDir string) {
 
 		chain := flow.Mainnet.Chain()
@@ -47,7 +47,7 @@ func TestGenerateGenesisState_ZeroTokenSupply(t *testing.T) {
 		ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 		require.NoError(t, err)
 
-		stateCommitment, err := BootstrapLedger(ls, unittest.ServiceAccountPublicKey, 0, chain)
+		stateCommitment, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(ls, unittest.ServiceAccountPublicKey, 0, chain)
 		require.NoError(t, err)
 
 		if !assert.Equal(t, expectedStateCommitment, stateCommitment) {

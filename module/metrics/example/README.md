@@ -3,18 +3,27 @@
 1. Launch a local metrics server, which exposes the metrics data via the `/metrics` endpoint.
 
 You can choose one of the following:
-```
-go run module/metrics/example/collection/main.go
-```
-```
-go run module/metrics/example/execution/main.go
-```
-```
-go run module/metrics/example/verification/main.go
-```
-```
-go run module/metrics/example/consensus/main.go
-```
+
+- Collection Node:
+    ```
+    go run module/metrics/example/collection/main.go
+    ```
+
+- Execution Node:
+    ```
+    go run module/metrics/example/execution/main.go
+    ```
+- Verification Node:
+    
+    Note: Running example with `-happypath` flag examines the metrics collection on a real
+    happy path of verification node. 
+    ```
+    go run --tags=relic module/metrics/example/verification/main.go
+    ```
+ - Consensus Node: 
+    ```
+    go run module/metrics/example/consensus/main.go
+    ```
 The above commands each launch a metrics server on localhost with port 9090
 
 2. Install the prometheus server

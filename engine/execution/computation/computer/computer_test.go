@@ -7,13 +7,14 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
-	vmmock "github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine/mock"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
+	"github.com/dapperlabs/flow-go/fvm"
+	vmmock "github.com/dapperlabs/flow-go/fvm/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
@@ -26,7 +27,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		bc := new(vmmock.BlockContext)
 		blocks := new(storage.Blocks)
 
-		exe := computer.NewBlockComputer(vm, blocks, nil, nil)
+		exe := computer.NewBlockComputer(vm, blocks, nil, nil, zerolog.Nop())
 
 		// create a block with 1 collection with 2 transactions
 		block := generateBlock(1, 2)
@@ -34,7 +35,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm.On("NewBlockContext", block.Block.Header, mock.Anything).Return(bc)
 
 		bc.On("ExecuteTransaction", mock.Anything, mock.Anything, mock.Anything).
-			Return(&virtualmachine.TransactionResult{}, nil).
+			Return(&fvm.TransactionResult{}, nil).
 			Twice()
 
 		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
@@ -54,7 +55,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		bc := new(vmmock.BlockContext)
 		blocks := new(storage.Blocks)
 
-		exe := computer.NewBlockComputer(vm, blocks, nil, nil)
+		exe := computer.NewBlockComputer(vm, blocks, nil, nil, zerolog.Nop())
 
 		collectionCount := 2
 		transactionsPerCollection := 2
@@ -71,7 +72,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm.On("NewBlockContext", block.Block.Header, mock.Anything).Return(bc)
 
 		bc.On("ExecuteTransaction", mock.Anything, mock.Anything, mock.Anything).
-			Return(&virtualmachine.TransactionResult{Events: events, Error: &virtualmachine.MissingPayerError{}}, nil).
+			Return(&fvm.TransactionResult{Events: events, Error: &fvm.MissingPayerError{}}, nil).
 			Times(totalTransactionCount)
 
 		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {

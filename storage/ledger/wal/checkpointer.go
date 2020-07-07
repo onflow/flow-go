@@ -20,19 +20,22 @@ import (
 
 var checkpointFilenamePrefix = "checkpoint."
 
+const MagicBytes uint16 = 0x2137
+const VersionV1 uint16 = 0x01
+
 type Checkpointer struct {
-	dir       string
-	wal       *LedgerWAL
-	maxHeight int
-	cacheSize int
+	dir            string
+	wal            *LedgerWAL
+	keyByteSize    int
+	forestCapacity int
 }
 
-func NewCheckpointer(wal *LedgerWAL, maxHeight int, cacheSize int) *Checkpointer {
+func NewCheckpointer(wal *LedgerWAL, keyByteSize int, forestCapacity int) *Checkpointer {
 	return &Checkpointer{
-		dir:       wal.wal.Dir(),
-		wal:       wal,
-		maxHeight: maxHeight,
-		cacheSize: cacheSize,
+		dir:            wal.wal.Dir(),
+		wal:            wal,
+		keyByteSize:    keyByteSize,
+		forestCapacity: forestCapacity,
 	}
 }
 
@@ -118,7 +121,7 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 		return fmt.Errorf("no segments to checkpoint to %d, latests not checkpointed segment: %d", to, notCheckpointedTo)
 	}
 
-	mForest, err := mtrie.NewMForest(c.maxHeight, c.dir, c.cacheSize, &metrics.NoopCollector{}, func(evictedTrie *trie.MTrie) error {
+	mForest, err := mtrie.NewMForest(c.keyByteSize, c.dir, c.forestCapacity, &metrics.NoopCollector{}, func(evictedTrie *trie.MTrie) error {
 		return nil
 	})
 	if err != nil {
@@ -144,7 +147,7 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 			return err
 		}, func(commitment flow.StateCommitment) error {
 			return nil
-		})
+		}, true)
 
 	if err != nil {
 		return fmt.Errorf("cannot replay WAL: %w", err)
@@ -163,7 +166,7 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 	}
 	defer writer.Close()
 
-	err = c.StoreCheckpoint(forestSequencing, writer)
+	err = StoreCheckpoint(forestSequencing, writer)
 
 	return err
 }
@@ -184,21 +187,27 @@ type SyncOnCloseFile struct {
 
 func (s *SyncOnCloseFile) Close() error {
 	defer func() {
-		_ = s.file.Close()
+		err := s.file.Close()
+		if err != nil {
+			fmt.Printf("error while closing file: %s", err)
+		}
 	}()
 
 	err := s.Flush()
 	if err != nil {
 		return fmt.Errorf("cannot flush buffer: %w", err)
 	}
-
 	return s.file.Sync()
 }
 
 func (c *Checkpointer) CheckpointWriter(to int) (io.WriteCloser, error) {
-	file, err := os.Create(path.Join(c.dir, numberToFilename(to)))
+	return CreateCheckpointWriter(c.dir, to)
+}
+
+func CreateCheckpointWriter(dir string, fileNo int) (io.WriteCloser, error) {
+	file, err := os.Create(path.Join(dir, numberToFilename(fileNo)))
 	if err != nil {
-		return nil, fmt.Errorf("cannot create file for checkpoint %d: %w", to, err)
+		return nil, fmt.Errorf("cannot create file for checkpoint %d: %w", fileNo, err)
 	}
 
 	writer := bufio.NewWriter(file)
@@ -208,12 +217,14 @@ func (c *Checkpointer) CheckpointWriter(to int) (io.WriteCloser, error) {
 	}, nil
 }
 
-func (c *Checkpointer) StoreCheckpoint(forestSequencing *flattener.FlattenedForest, writer io.WriteCloser) error {
+func StoreCheckpoint(forestSequencing *flattener.FlattenedForest, writer io.WriteCloser) error {
 	storableNodes := forestSequencing.Nodes
 	storableTries := forestSequencing.Tries
-	header := make([]byte, 8+2)
+	header := make([]byte, 4+8+2)
 
-	pos := writeUint64(header, 0, uint64(len(storableNodes)-1)) // -1 to account for 0 node meaning nil
+	pos := writeUint16(header, 0, MagicBytes)
+	pos = writeUint16(header, pos, VersionV1)
+	pos = writeUint64(header, pos, uint64(len(storableNodes)-1)) // -1 to account for 0 node meaning nil
 	writeUint16(header, pos, uint16(len(storableTries)))
 
 	_, err := writer.Write(header)
@@ -254,15 +265,24 @@ func (c *Checkpointer) LoadCheckpoint(checkpoint int) (*flattener.FlattenedFores
 
 	reader := bufio.NewReader(file)
 
-	header := make([]byte, 8+2)
+	header := make([]byte, 4+8+2)
 
 	_, err = io.ReadFull(reader, header)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read header bytes: %w", err)
 	}
 
-	nodesCount, pos := readUint64(header, 0)
+	magicBytes, pos := readUint16(header, 0)
+	version, pos := readUint16(header, pos)
+	nodesCount, pos := readUint64(header, pos)
 	triesCount, _ := readUint16(header, pos)
+
+	if magicBytes != MagicBytes {
+		return nil, fmt.Errorf("unknown file format. Magic constant %x does not match expected %x", magicBytes, MagicBytes)
+	}
+	if version != VersionV1 {
+		return nil, fmt.Errorf("unsupported file version %x ", version)
+	}
 
 	nodes := make([]*flattener.StorableNode, nodesCount+1) //+1 for 0 index meaning nil
 	tries := make([]*flattener.StorableTrie, triesCount)
