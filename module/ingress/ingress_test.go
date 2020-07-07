@@ -21,7 +21,7 @@ func TestSubmitTransaction(t *testing.T) {
 
 	h := handler{
 		chainID: flow.Mainnet,
-		engine: &engine,
+		engine:  &engine,
 	}
 
 	tx := unittest.TransactionBodyFixture()

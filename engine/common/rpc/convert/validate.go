@@ -44,8 +44,8 @@ func BlockIDs(blockIDs [][]byte) ([]flow.Identifier, error) {
 	}
 	flowBlockIDs := make([]flow.Identifier, len(blockIDs))
 	for i, b := range blockIDs {
-		 flowBlockID, err := BlockID(b)
-		 if err != nil {
+		flowBlockID, err := BlockID(b)
+		if err != nil {
 			return nil, err
 		}
 		flowBlockIDs[i] = flowBlockID

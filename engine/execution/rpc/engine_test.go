@@ -81,7 +81,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		blocks:             suite.blocks,
 		events:             suite.events,
 		transactionResults: suite.txResults,
-		chain: flow.Mainnet,
+		chain:              flow.Mainnet,
 	}
 
 	concoctReq := func(errType string, blockIDs [][]byte) *execution.GetEventsForBlockIDsRequest {
@@ -179,7 +179,7 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 	// create the handler
 	handler := &handler{
 		engine: mockEngine,
-		chain: flow.Mainnet,
+		chain:  flow.Mainnet,
 	}
 
 	createReq := func(id []byte, address []byte) *execution.GetAccountAtBlockIDRequest {
@@ -255,7 +255,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			blocks:             suite.blocks,
 			events:             suite.events,
 			transactionResults: txResults,
-			chain: flow.Mainnet,
+			chain:              flow.Mainnet,
 		}
 		return handler
 	}
