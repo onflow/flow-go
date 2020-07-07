@@ -13,22 +13,24 @@ import (
 )
 
 func TestBatchProofEncoderDecoder(t *testing.T) {
-	keyByteSize := 1 // key size of 8 bits
+	pathByteSize := 1 // key size of 8 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	fStore, err := mtrie.NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
+	fStore, err := mtrie.NewMForest(pathByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
-	k1 := []byte([]uint8{uint8(1)})
-	v1 := []byte{'A'}
+	p1 := []byte([]uint8{uint8(1)})
+	k1 := []byte{'k'}
+	v1 := []byte{'v'}
+	paths := [][]byte{p1}
 	keys := [][]byte{k1}
 	values := [][]byte{v1}
-	testTrie, err := fStore.Update(fStore.GetEmptyRootHash(), keys, values)
+	testTrie, err := fStore.Update(fStore.GetEmptyRootHash(), paths, keys, values)
 	require.NoError(t, err)
-	batchProof, err := fStore.Proofs(testTrie.RootHash(), keys)
+	batchProof, err := fStore.Proofs(testTrie.RootHash(), paths)
 	require.NoError(t, err)
 
 	encProf, _ := proof.EncodeBatchProof(batchProof)

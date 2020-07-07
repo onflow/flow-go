@@ -30,20 +30,18 @@ func NewProof() *Proof {
 
 // Verify verifies the proof, by constructing all the
 // hash from the leaf to the root and comparing the rootHash
+// TODO RAMTIN
 func (p *Proof) Verify(key []byte, value []byte, expectedRootHash []byte, expectedKeySize int) bool {
-	if len(key) != expectedKeySize { // key has unexpected length
-		return false
-	}
+	path := common.KeyToPath(key)
 	treeHeight := 8 * expectedKeySize
 	leafHeight := treeHeight - int(p.Steps)             // p.Steps is the number of edges we are traversing until we hit the compactified leaf.
 	if !(0 <= leafHeight && leafHeight <= treeHeight) { // sanity check
 		return false
 	}
-
 	// We start with the leaf and hash our way upwards towards the root
-	proofIndex := len(p.Values) - 1                                // the index of the last non-default value furthest down the tree (-1 if there is none)
-	computed := common.ComputeCompactValue(key, value, leafHeight) // we first compute the hash of the fully-expanded leaf (at height 0)
-	for h := leafHeight + 1; h <= treeHeight; h++ {                // then, we hash our way upwards until we hit the root (at height `treeHeight`)
+	proofIndex := len(p.Values) - 1                                      // the index of the last non-default value furthest down the tree (-1 if there is none)
+	computed := common.ComputeCompactValue(path, key, value, leafHeight) // we first compute the hash of the fully-expanded leaf (at height 0)
+	for h := leafHeight + 1; h <= treeHeight; h++ {                      // then, we hash our way upwards until we hit the root (at height `treeHeight`)
 		// we are currently at a node n (initially the leaf). In this iteration, we want to compute the
 		// parent's hash. Here, h is the height of the parent, whose hash want to compute.
 		// The parent has two children: child n, whose hash we have already computed (aka `computed`);
@@ -60,7 +58,7 @@ func (p *Proof) Verify(key []byte, value []byte, expectedRootHash []byte, expect
 			siblingHash = common.GetDefaultHashForHeight(h - 1)
 		}
 		// hashing is order dependant
-		if utils.IsBitSet(key, treeHeight-h) { // we hash our way up to the parent along the parent's right branch
+		if utils.IsBitSet(path, treeHeight-h) { // we hash our way up to the parent along the parent's right branch
 			computed = common.HashInterNode(siblingHash, computed)
 		} else { // we hash our way up to the parent along the parent's left branch
 			computed = common.HashInterNode(computed, siblingHash)
@@ -226,26 +224,25 @@ func DecodeBatchProof(proofs [][]byte) (*BatchProof, error) {
 	return bp, nil
 }
 
-// SplitKeyProofs splits a set of unordered key and proof pairs based on the value of bit (bitIndex)
-func SplitKeyProofs(keys [][]byte, proofs []*Proof, bitIndex int) ([][]byte, []*Proof, [][]byte, []*Proof, error) {
-
-	rkeys := make([][]byte, 0, len(keys))
+// SplitProofsByPath splits a set of unordered path and proof pairs based on the value of bit (bitIndex) of path
+func SplitProofsByPath(paths [][]byte, proofs []*Proof, bitIndex int) ([][]byte, []*Proof, [][]byte, []*Proof, error) {
+	rpaths := make([][]byte, 0, len(paths))
 	rproofs := make([]*Proof, 0, len(proofs))
-	lkeys := make([][]byte, 0, len(keys))
+	lpaths := make([][]byte, 0, len(paths))
 	lproofs := make([]*Proof, 0, len(proofs))
 
-	for i, key := range keys {
-		bitIsSet, err := common.IsBitSet(key, bitIndex)
+	for i, path := range paths {
+		bitIsSet, err := common.IsBitSet(path, bitIndex)
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("can't split key proof pairs , error: %v", err)
 		}
 		if bitIsSet {
-			rkeys = append(rkeys, key)
+			rpaths = append(rpaths, path)
 			rproofs = append(rproofs, proofs[i])
 		} else {
-			lkeys = append(lkeys, key)
+			lpaths = append(lpaths, path)
 			lproofs = append(lproofs, proofs[i])
 		}
 	}
-	return lkeys, lproofs, rkeys, rproofs, nil
+	return lpaths, lproofs, rpaths, rproofs, nil
 }

@@ -66,7 +66,7 @@ type NodeIterator struct {
 // as for each node, the children have been previously encountered.
 func NewNodeIterator(mTrie *trie.MTrie) *NodeIterator {
 	// for a Trie with k := mTrie.KeyLength() [bytes], the longest possible path can contain at most 8k+1 vertices
-	stackSize := mTrie.KeyLength()*8 + 1
+	stackSize := mTrie.PathLength()*8 + 1
 	i := &NodeIterator{
 		stack: make([]*node.Node, 0, stackSize),
 	}

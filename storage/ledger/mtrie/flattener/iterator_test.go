@@ -28,14 +28,17 @@ func TestPopulatedTrie(t *testing.T) {
 	emptyTrie, err := trie.NewEmptyMTrie(1)
 	require.NoError(t, err)
 
-	k1 := []byte([]uint8{uint8(1)}) // key: 0000...
-	v1 := []byte{'A'}
-	k2 := []byte([]uint8{uint8(64)}) // key: 0100....
-	v2 := []byte{'B'}
+	p1 := []byte([]uint8{uint8(1)}) // key: 0000...
+	k1 := []byte{'A'}
+	v1 := []byte{'a'}
+	p2 := []byte([]uint8{uint8(64)}) // key: 0100....
+	k2 := []byte{'B'}
+	v2 := []byte{'b'}
+	paths := [][]byte{p1, p2}
 	keys := [][]byte{k1, k2}
 	values := [][]byte{v1, v2}
 
-	testTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, keys, values)
+	testTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, keys, values)
 	require.NoError(t, err)
 	fmt.Println("BASE TRIE:")
 	fmt.Println(testTrie.String())
@@ -49,24 +52,26 @@ func TestPopulatedTrie(t *testing.T) {
 	itr := flattener.NewNodeIterator(testTrie)
 
 	require.True(t, itr.Next())
-	k1_leaf := itr.Value()
-	require.Equal(t, k1, k1_leaf.Key())
-	require.Equal(t, v1, k1_leaf.Value())
+	p1_leaf := itr.Value()
+	require.Equal(t, p1, p1_leaf.Path())
+	require.Equal(t, k1, p1_leaf.Key())
+	require.Equal(t, v1, p1_leaf.Value())
 
 	require.True(t, itr.Next())
-	k2_leaf := itr.Value()
-	require.Equal(t, k2, k2_leaf.Key())
-	require.Equal(t, v2, k2_leaf.Value())
+	p2_leaf := itr.Value()
+	require.Equal(t, p2, p2_leaf.Path())
+	require.Equal(t, k2, p2_leaf.Key())
+	require.Equal(t, v2, p2_leaf.Value())
 
 	require.True(t, itr.Next())
-	k_parent := itr.Value()
-	require.Equal(t, k1_leaf, k_parent.LeftChild())
-	require.Equal(t, k2_leaf, k_parent.RigthChild())
+	p_parent := itr.Value()
+	require.Equal(t, p1_leaf, p_parent.LeftChild())
+	require.Equal(t, p2_leaf, p_parent.RigthChild())
 
 	require.True(t, itr.Next())
 	root := itr.Value()
 	require.Equal(t, testTrie.RootNode(), root)
-	require.Equal(t, k_parent, root.LeftChild())
+	require.Equal(t, p_parent, root.LeftChild())
 	require.True(t, nil == root.RigthChild())
 
 	require.False(t, itr.Next())

@@ -87,6 +87,7 @@ func toStorableNode(node *node.Node, indexForNode node2indexMap) (*StorableNode,
 		LIndex:    leftIndex,
 		RIndex:    rightIndex,
 		Height:    uint16(node.Height()),
+		Path:      node.Path(),
 		Key:       node.Key(),
 		Value:     node.Value(),
 		HashValue: node.Hash(),
@@ -139,7 +140,7 @@ func RebuildNodes(storableNodes []*StorableNode) ([]*node.Node, error) {
 		if (snode.LIndex >= uint64(i)) || (snode.RIndex >= uint64(i)) {
 			return nil, fmt.Errorf("sequence of StorableNodes does not satisfy Descendents-First-Relationship")
 		}
-		nodes = append(nodes, node.NewNode(int(snode.Height), nodes[snode.LIndex], nodes[snode.RIndex], snode.Key, snode.Value, snode.HashValue, snode.MaxDepth, snode.RegCount))
+		nodes = append(nodes, node.NewNode(int(snode.Height), nodes[snode.LIndex], nodes[snode.RIndex], snode.Path, snode.Key, snode.Value, snode.HashValue, snode.MaxDepth, snode.RegCount))
 	}
 	return nodes, nil
 }

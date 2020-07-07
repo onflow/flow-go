@@ -4,6 +4,7 @@ type StorableNode struct {
 	LIndex    uint64
 	RIndex    uint64
 	Height    uint16 // Height where the node is at
+	Path      []byte
 	Key       []byte
 	Value     []byte
 	HashValue []byte

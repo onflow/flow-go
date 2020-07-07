@@ -1,11 +1,15 @@
 package common
 
-import "github.com/dapperlabs/flow-go/crypto/hash"
+import (
+	"crypto/sha256"
+
+	"github.com/dapperlabs/flow-go/crypto/hash"
+)
 
 var emptySlice []byte
-var defaultLeafHash = HashLeaf([]byte("default:"), emptySlice)
+var defaultLeafHash = HashLeaf([]byte("default:"), emptySlice, emptySlice)
 
-// we are currently supporting keys of a size up to 32 bytes. I.e. path length from the rootNode of a fully expanded tree to the leaf node is 256. A path of length k is comprised of k+1 vertices. Hence, we need 257 default hashes.
+// we are currently supporting paths of a size up to 32 bytes. I.e. path length from the rootNode of a fully expanded tree to the leaf node is 256. A path of length k is comprised of k+1 vertices. Hence, we need 257 default hashes.
 var defaultHashes [257][]byte
 
 func init() {
@@ -33,9 +37,10 @@ func GetDefaultHashForHeight(height int) []byte {
 }
 
 // HashLeaf generates hash value for leaf nodes (SHA3-256).
-func HashLeaf(key []byte, value []byte) []byte {
+// Currently we ignore the key since is already included in path
+func HashLeaf(path []byte, key []byte, value []byte) []byte {
 	hasher := hash.NewSHA3_256()
-	_, err := hasher.Write(key)
+	_, err := hasher.Write(path)
 	if err != nil {
 		panic(err)
 	}
@@ -62,19 +67,19 @@ func HashInterNode(hash1 []byte, hash2 []byte) []byte {
 }
 
 // ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.
-func ComputeCompactValue(key []byte, value []byte, nodeHeight int) []byte {
+func ComputeCompactValue(path []byte, key []byte, value []byte, nodeHeight int) []byte {
 	// if register is unallocated: return default hash
 	if len(value) == 0 {
 		return GetDefaultHashForHeight(nodeHeight)
 	}
 
 	// register is allocated
-	treeHeight := 8 * len(key)
-	computedHash := HashLeaf(key, value) // we first compute the hash of the fully-expanded leaf
-	for h := 1; h <= nodeHeight; h++ {   // then, we hash our way upwards towards the root until we hit the specified nodeHeight
+	treeHeight := 8 * len(path)
+	computedHash := HashLeaf(path, key, value) // we first compute the hash of the fully-expanded leaf
+	for h := 1; h <= nodeHeight; h++ {         // then, we hash our way upwards towards the root until we hit the specified nodeHeight
 		// h is the height of the node, whose hash we are computing in this iteration.
 		// The hash is computed from the node's children at height h-1.
-		bitIsSet, err := IsBitSet(key, treeHeight-h)
+		bitIsSet, err := IsBitSet(path, treeHeight-h)
 		if err != nil { // this won't happen ever
 			panic(err)
 		}
@@ -85,4 +90,12 @@ func ComputeCompactValue(key []byte, value []byte, nodeHeight int) []byte {
 		}
 	}
 	return computedHash
+}
+
+// KeyToPath computes the storage path given a key
+func KeyToPath(key []byte) []byte {
+	// TODO change this to Sha3
+	h := sha256.New()
+	_, _ = h.Write(key)
+	return h.Sum(nil)
 }

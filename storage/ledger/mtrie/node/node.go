@@ -15,7 +15,7 @@ import (
 //       downward path between v and a tree leaf.
 //
 // Conceptually, an MTrie is a sparse Merkle Trie, which has three different types of nodes:
-//    * LEAF node: fully defined by key-value pair and a height
+//    * LEAF node: fully defined by a storage path, a key-value pair and a height
 //      hash is pre-computed, lChild and rChild are nil)
 //    * INTERIOR node: at least one of lChild or rChild is not nil.
 //      Height, and Hash value are set; (key-value is nil)
@@ -27,12 +27,13 @@ import (
 // for performance reasons, we not not copy read.
 // TODO: optimized data structures might be able to reduce memory consumption
 type Node struct {
-	lChild    *Node // Left Child
-	rChild    *Node // Right Child
-	height    int   // height where the Node is at
-	key       []byte
-	value     []byte
-	hashValue []byte
+	lChild    *Node  // Left Child
+	rChild    *Node  // Right Child
+	height    int    // height where the Node is at
+	path      []byte // the storage path (e.g. hash of key)
+	key       []byte // key part of key/value pair
+	value     []byte // value part of key/value pair
+	hashValue []byte // hash of path and value
 	maxDepth  uint16 // captures the longest path from this node to compacted leafs in the subtree
 	regCount  uint64 // number of registers allocated in the subtree
 }
@@ -40,11 +41,12 @@ type Node struct {
 // NewNode creates a new Node.
 // UNCHECKED requirement: combination of values must conform to
 // a valid node type (see documentation of `Node` for details)
-func NewNode(height int, lchild, rchild *Node, key, value, hashValue []byte, maxDepth uint16, regCount uint64) *Node {
+func NewNode(height int, lchild, rchild *Node, path, key, value, hashValue []byte, maxDepth uint16, regCount uint64) *Node {
 	n := &Node{
 		lChild:    lchild,
 		rChild:    rchild,
 		height:    height,
+		path:      path,
 		key:       key,
 		value:     value,
 		hashValue: hashValue,
@@ -61,6 +63,7 @@ func NewEmptyTreeRoot(height int) *Node {
 		lChild:   nil,
 		rChild:   nil,
 		height:   height,
+		path:     nil,
 		key:      nil,
 		value:    nil,
 		maxDepth: 0,
@@ -72,15 +75,16 @@ func NewEmptyTreeRoot(height int) *Node {
 
 // NewLeaf creates a compact leaf Node
 // UNCHECKED requirement: height must be non-negative
-func NewLeaf(key, value []byte, height int) *Node {
+func NewLeaf(path, key, value []byte, height int) *Node {
 	regCount := uint64(0)
-	if key != nil {
+	if path != nil {
 		regCount = uint64(1)
 	}
 	n := &Node{
 		lChild:   nil,
 		rChild:   nil,
 		height:   height,
+		path:     path,
 		key:      key,
 		value:    value,
 		maxDepth: 0,
@@ -109,6 +113,7 @@ func NewInterimNode(height int, lchild, rchild *Node) *Node {
 		rChild:   rchild,
 		height:   height,
 		key:      nil,
+		path:     nil,
 		value:    nil,
 		maxDepth: common.MaxUint16(lMaxDepth, rMaxDepth) + uint16(1),
 		regCount: lRegCount + rRegCount,
@@ -118,14 +123,14 @@ func NewInterimNode(height int, lchild, rchild *Node) *Node {
 }
 
 // computeNodeHash computes the hashValue for the given Node
-// if forced it set it won't trust hash Values of children and
-// recomputes it.
+// TODO change this logic to compute hash of key and value instead of path and value
+// we kept it this way to stay compatible with the previous versions
 func (n *Node) computeNodeHash() []byte {
 	if n.lChild == nil && n.rChild == nil {
 		// both ROOT NODE and LEAF NODE have n.lChild == n.rChild == nil
 		if len(n.value) > 0 {
 			// LEAF node: defined by key-value pair
-			return common.ComputeCompactValue(n.key, n.value, n.height)
+			return common.ComputeCompactValue(n.path, n.key, n.value, n.height)
 		}
 		// ROOT NODE: no children, no key-value pair
 		return common.GetDefaultHashForHeight(n.height)
@@ -143,7 +148,7 @@ func (n *Node) computeNodeHash() []byte {
 	return common.HashInterNode(h1, h2)
 }
 
-// Height returns the Node's hash value.
+// Hash returns the Node's hash value.
 // Do NOT MODIFY returned slice!
 func (n *Node) Hash() []byte { return n.hashValue }
 
@@ -158,6 +163,22 @@ func (n *Node) MaxDepth() uint16 { return n.maxDepth }
 
 // RegCount returns number of registers allocated in the subtrie of this node.
 func (n *Node) RegCount() uint64 { return n.regCount }
+
+// Path returns the the Node's register storage path.
+func (n *Node) Path() []byte { return n.path }
+
+// SubPathStr returns a subset of the path used upto this point.
+func (n *Node) SubPathStr() string {
+	str := ""
+	if n.height < 1 || len(n.path) < 1 {
+		return str
+	}
+
+	for _, b := range n.path {
+		str += fmt.Sprintf("%08b", b)
+	}
+	return str[:n.height]
+}
 
 // Key returns the the Node's register key.
 // The present node is a LEAF node, if and only if the returned key is NOT NULL.
@@ -186,23 +207,32 @@ func (n *Node) IsLeaf() bool {
 }
 
 // FmtStr provides formatted string representation of the Node and sub tree
-func (n Node) FmtStr(prefix string, path string) string {
+func (n Node) FmtStr(prefix string, subpath string) string {
 	right := ""
 	if n.rChild != nil {
-		right = fmt.Sprintf("\n%v", n.rChild.FmtStr(prefix+"\t", path+"1"))
+		right = fmt.Sprintf("\n%v", n.rChild.FmtStr(prefix+"\t", subpath+"1"))
 	}
 	left := ""
 	if n.lChild != nil {
-		left = fmt.Sprintf("\n%v", n.lChild.FmtStr(prefix+"\t", path+"0"))
+		left = fmt.Sprintf("\n%v", n.lChild.FmtStr(prefix+"\t", subpath+"0"))
 	}
-	return fmt.Sprintf("%v%v: (k:%v, v:%v, h:%v)[%s] %v %v ", prefix, n.height, n.key, hex.EncodeToString(n.value), hex.EncodeToString(n.hashValue), path, left, right)
+	return fmt.Sprintf("%v%v: (k:%v, v:%v, h:%v)[%s] %v %v ", prefix, n.height, n.key, hex.EncodeToString(n.value), hex.EncodeToString(n.hashValue), subpath, left, right)
 }
 
 // DeepCopy returns a deep copy of the Node (including deep copy of children)
 // TODO: potentially can be removed
 func (n *Node) DeepCopy() *Node {
 	newNode := &Node{height: n.height}
-
+	if n.path != nil {
+		path := make([]byte, len(n.path))
+		copy(path, n.path)
+		newNode.path = path
+	}
+	if n.hashValue != nil {
+		h := make([]byte, len(n.hashValue))
+		copy(h, n.hashValue)
+		newNode.hashValue = h
+	}
 	if n.value != nil {
 		value := make([]byte, len(n.value))
 		copy(value, n.value)
@@ -212,11 +242,6 @@ func (n *Node) DeepCopy() *Node {
 		key := make([]byte, len(n.key))
 		copy(key, n.key)
 		newNode.key = key
-	}
-	if n.hashValue != nil {
-		h := make([]byte, len(n.hashValue))
-		copy(h, n.key)
-		newNode.key = h
 	}
 	if n.lChild != nil {
 		newNode.lChild = n.lChild.DeepCopy()
@@ -238,12 +263,10 @@ func (n *Node) Equals(o *Node) bool {
 	if o == nil {
 		return false
 	}
-
 	// height don't match
 	if n.height != o.height {
 		return false
 	}
-
 	// Values don't match
 	if (n.value == nil) != (o.value == nil) {
 		return false
@@ -251,7 +274,6 @@ func (n *Node) Equals(o *Node) bool {
 	if n.value != nil && o.value != nil && !bytes.Equal(n.value, o.value) {
 		return false
 	}
-
 	// keys don't match
 	if (n.key == nil) != (o.key == nil) {
 		return false
@@ -259,7 +281,13 @@ func (n *Node) Equals(o *Node) bool {
 	if n.key != nil && o.key != nil && !bytes.Equal(n.key, o.key) {
 		return false
 	}
-
+	// path don't match
+	if (n.path == nil) != (o.path == nil) {
+		return false
+	}
+	if n.path != nil && o.path != nil && !bytes.Equal(n.path, o.path) {
+		return false
+	}
 	// hashValues don't match
 	if (n.hashValue == nil) != (o.hashValue == nil) {
 		return false
@@ -267,7 +295,6 @@ func (n *Node) Equals(o *Node) bool {
 	if n.hashValue != nil && o.hashValue != nil && !bytes.Equal(n.hashValue, o.hashValue) {
 		return false
 	}
-
 	// left children don't match
 	if (n.lChild == nil) != (o.lChild == nil) {
 		return false
@@ -275,7 +302,6 @@ func (n *Node) Equals(o *Node) bool {
 	if n.lChild != nil && o.lChild != nil && !n.lChild.Equals(o.lChild) {
 		return false
 	}
-
 	// right children don't match
 	if (n.rChild == nil) != (o.rChild == nil) {
 		return false
@@ -283,6 +309,5 @@ func (n *Node) Equals(o *Node) bool {
 	if n.rChild != nil && o.rChild != nil && !n.rChild.Equals(o.rChild) {
 		return false
 	}
-
 	return true
 }

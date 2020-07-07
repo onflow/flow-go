@@ -17,39 +17,44 @@ import (
 )
 
 func TestForestStoreAndLoad(t *testing.T) {
-	keyByteSize := 1
+	pathByteSize := 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	mForest, err := mtrie.NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
+	mForest, err := mtrie.NewMForest(pathByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash := mForest.GetEmptyRootHash()
 
-	k1 := []byte([]uint8{uint8(1)})
-	v1 := []byte{'A'}
-	k2 := []byte([]uint8{uint8(2)})
-	v2 := []byte{'B'}
-	k3 := []byte([]uint8{uint8(130)})
-	v3 := []byte{'C'}
-	k4 := []byte([]uint8{uint8(131)})
-	v4 := []byte{'D'}
-	k5 := []byte([]uint8{uint8(132)})
-	v5 := []byte{'E'}
+	p1 := []byte([]uint8{uint8(1)})
+	k1 := []byte{'A'}
+	v1 := []byte{'a'}
+	p2 := []byte([]uint8{uint8(2)})
+	k2 := []byte{'B'}
+	v2 := []byte{'b'}
+	p3 := []byte([]uint8{uint8(130)})
+	k3 := []byte{'C'}
+	v3 := []byte{'c'}
+	p4 := []byte([]uint8{uint8(131)})
+	k4 := []byte{'D'}
+	v4 := []byte{'d'}
+	p5 := []byte([]uint8{uint8(132)})
+	k5 := []byte{'E'}
+	v5 := []byte{'e'}
 
+	paths := [][]byte{p1, p2, p3, p4, p5}
 	keys := [][]byte{k1, k2, k3, k4, k5}
 	values := [][]byte{v1, v2, v3, v4, v5}
-	newTrie, err := mForest.Update(rootHash, keys, values)
+	newTrie, err := mForest.Update(rootHash, paths, keys, values)
 	require.NoError(t, err)
 	rootHash = newTrie.RootHash()
 
-	k6 := []byte([]uint8{uint8(133)})
-	v6 := []byte{'F'}
+	p6 := []byte([]uint8{uint8(133)})
+	k6 := []byte{'F'}
+	v6 := []byte{'f'}
 
-	keys6 := [][]byte{k6}
-	values6 := [][]byte{v6}
-	newTrie, err = mForest.Update(rootHash, keys6, values6)
+	newTrie, err = mForest.Update(rootHash, [][]byte{p6}, [][]byte{k6}, [][]byte{v6})
 	require.NoError(t, err)
 	rootHash = newTrie.RootHash()
 
@@ -62,7 +67,7 @@ func TestForestStoreAndLoad(t *testing.T) {
 	forestSequencing, err := flattener.FlattenForest(mForest)
 	require.NoError(t, err)
 
-	newMForest, err := mtrie.NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
+	newMForest, err := mtrie.NewMForest(pathByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
 	//forests are different
@@ -76,11 +81,11 @@ func TestForestStoreAndLoad(t *testing.T) {
 	//forests are the same now
 	assert.Equal(t, *mForest, *newMForest)
 
-	retValues, err := mForest.Read(rootHash, keys)
+	retValues, err := mForest.Read(rootHash, paths)
 	require.NoError(t, err)
-	newRetValues, err := newMForest.Read(rootHash, keys)
+	newRetValues, err := newMForest.Read(rootHash, paths)
 	require.NoError(t, err)
-	for i := range keys {
+	for i := range paths {
 		require.True(t, bytes.Equal(values[i], retValues[i]))
 		require.True(t, bytes.Equal(values[i], newRetValues[i]))
 	}

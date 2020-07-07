@@ -24,75 +24,78 @@ func SetBit(b []byte, i int) error {
 	return nil
 }
 
-// SplitKeyValues splits a set of unordered key value pairs based on the value of bit (bitIndex)
+// SplitByPath splits a set of unordered key value pairs based on the value of bit (bitIndex) of path
 // TODO: remove error return
-func SplitKeyValues(keys [][]byte, values [][]byte, bitIndex int) ([][]byte, [][]byte, [][]byte, [][]byte, error) {
-
+func SplitByPath(paths [][]byte, keys [][]byte, values [][]byte, bitIndex int) ([][]byte, [][]byte, [][]byte, [][]byte, [][]byte, [][]byte, error) {
+	rpaths := make([][]byte, 0, len(paths))
 	rkeys := make([][]byte, 0, len(keys))
 	rvalues := make([][]byte, 0, len(values))
+	lpaths := make([][]byte, 0, len(paths))
 	lkeys := make([][]byte, 0, len(keys))
 	lvalues := make([][]byte, 0, len(values))
 
-	for i, key := range keys {
-		bitIsSet, err := IsBitSet(key, bitIndex)
+	for i, path := range paths {
+		bitIsSet, err := IsBitSet(path, bitIndex)
 		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("can't split key values, error: %v", err)
+			return nil, nil, nil, nil, nil, nil, fmt.Errorf("can't split key values, error: %v", err)
 		}
 		if bitIsSet {
-			rkeys = append(rkeys, key)
+			rpaths = append(rpaths, path)
+			rkeys = append(rkeys, keys[i])
 			rvalues = append(rvalues, values[i])
 		} else {
-			lkeys = append(lkeys, key)
+			lpaths = append(lpaths, path)
+			lkeys = append(lkeys, keys[i])
 			lvalues = append(lvalues, values[i])
 		}
 	}
-	return lkeys, lvalues, rkeys, rvalues, nil
+	return lpaths, lkeys, lvalues, rpaths, rkeys, rvalues, nil
 }
 
-// SplitSortedKeys splits a set of ordered keys based on the value of bit (bitIndex)
-func SplitSortedKeys(keys [][]byte, bitIndex int) ([][]byte, [][]byte, error) {
-	for i, key := range keys {
-		bitIsSet, err := IsBitSet(key, bitIndex)
+// SplitSortedPaths splits a set of ordered paths based on the value of bit (bitIndex)
+func SplitSortedPaths(paths [][]byte, bitIndex int) ([][]byte, [][]byte, error) {
+	for i, path := range paths {
+		bitIsSet, err := IsBitSet(path, bitIndex)
 		if err != nil {
 			return nil, nil, fmt.Errorf("can't split keys, error: %v", err)
 		}
 		// found the breaking point
 		if bitIsSet {
-			return keys[:i], keys[i:], nil
+			return paths[:i], paths[i:], nil
 		}
 	}
-	// all keys have unset bit at bitIndex
-	return keys, nil, nil
+	// all paths have unset bit at bitIndex
+	return paths, nil, nil
 }
 
-// GetRandomKeysRandN generate m random keys (key size: byteSize),
-// the number of keys generates, m, is also randomly selected from the range [1, maxN]
-func GetRandomKeysRandN(maxN int, byteSize int) [][]byte {
-	numberOfKeys := rand.Intn(maxN) + 1
-	return GetRandomKeysFixedN(numberOfKeys, byteSize)
+// GetRandomPathsRandN generate m random paths (size: byteSize),
+// the number of paths, m, is also randomly selected from the range [1, maxN]
+func GetRandomPathsRandN(maxN int, byteSize int) [][]byte {
+	numberOfPaths := rand.Intn(maxN) + 1
+	return GetRandomPathsFixedN(numberOfPaths, byteSize)
 }
 
-// GetRandomKeysFixedN generates n random (no repetition) fixed sized (byteSize) keys
-func GetRandomKeysFixedN(n int, byteSize int) [][]byte {
-	keys := make([][]byte, 0, n)
-	alreadySelectKeys := make(map[string]bool)
+// GetRandomPathsFixedN generates n random (no repetition) fixed sized (byteSize) paths
+func GetRandomPathsFixedN(n int, byteSize int) [][]byte {
+	paths := make([][]byte, 0, n)
+	alreadySelectPaths := make(map[string]bool)
 	i := 0
 	for i < n {
-		key := make([]byte, byteSize)
-		rand.Read(key)
+		path := make([]byte, byteSize)
+		rand.Read(path)
 		// deduplicate
-		if _, found := alreadySelectKeys[string(key)]; !found {
-			keys = append(keys, key)
-			alreadySelectKeys[string(key)] = true
+		if _, found := alreadySelectPaths[string(path)]; !found {
+			paths = append(paths, path)
+			alreadySelectPaths[string(path)] = true
 			i++
 		}
 	}
-	return keys
+	return paths
 }
 
-// GetRandomValues generate an slice (len n) of
-// random values (byte slice) of random size from the range [1, maxByteSize]
-func GetRandomValues(n int, maxByteSize int) [][]byte {
+// GetRandomByteSlices generate an slice of n
+// random byte slices of random size from the range [1, maxByteSize]
+func GetRandomByteSlices(n int, maxByteSize int) [][]byte {
 	values := make([][]byte, 0, n)
 	for i := 0; i < n; i++ {
 		byteSize := rand.Intn(maxByteSize) + 1

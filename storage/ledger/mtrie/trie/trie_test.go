@@ -11,16 +11,16 @@ import (
 )
 
 const (
-	// ReferenceImplKeyByteSize is the key length in reference implementation: 2 bytes.
+	// ReferenceImplPathByteSize is the path length in reference implementation: 2 bytes.
 	// Please do NOT CHANGE.
-	ReferenceImplKeyByteSize = 2
+	ReferenceImplPathByteSize = 2
 )
 
 // TestEmptyTrie tests whether the root hash of an empty trie matches the formal specification.
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_EmptyTrie(t *testing.T) {
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplKeyByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
 	require.NoError(t, err)
 
 	expectedRootHashHex := "6e24e2397f130d9d17bef32b19a77b8f5bcf03fb7e9e75fd89b8a455675d574a"
@@ -32,12 +32,12 @@ func Test_EmptyTrie(t *testing.T) {
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithLeftRegister(t *testing.T) {
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplKeyByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
 	require.NoError(t, err)
-
-	key := uint2binary(0)
+	path := uint2binary(0)
+	key := uint2binary(11)
 	value := uint2binary(12345)
-	leftPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, [][]byte{key}, [][]byte{value})
+	leftPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, [][]byte{path}, [][]byte{key}, [][]byte{value})
 	require.NoError(t, err)
 	expectedRootHashHex := "ff472d38a97b3b1786c4dfffa0005370aa3c16805d342ed7618876df7101f760"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(leftPopulatedTrie.RootHash()))
@@ -48,12 +48,13 @@ func Test_TrieWithLeftRegister(t *testing.T) {
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithRightRegister(t *testing.T) {
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplKeyByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
 	require.NoError(t, err)
 
-	key := uint2binary(65535)
+	path := uint2binary(65535)
+	key := uint2binary(12346)
 	value := uint2binary(54321)
-	rightPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, [][]byte{key}, [][]byte{value})
+	rightPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, [][]byte{path}, [][]byte{key}, [][]byte{value})
 	require.NoError(t, err)
 	expectedRootHashHex := "d1fb1c7c84bcd02205fbc7bdf73ee8e943b8bb4b7db6bcc26ae7af67e507fb8d"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(rightPopulatedTrie.RootHash()))
@@ -64,12 +65,13 @@ func Test_TrieWithRightRegister(t *testing.T) {
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithMiddleRegister(t *testing.T) {
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplKeyByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
 	require.NoError(t, err)
 
-	key := uint2binary(56809)
+	path := uint2binary(56809)
+	key := uint2binary(12346)
 	value := uint2binary(59656)
-	leftPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, [][]byte{key}, [][]byte{value})
+	leftPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, [][]byte{path}, [][]byte{key}, [][]byte{value})
 	require.NoError(t, err)
 	expectedRootHashHex := "b44a9a00c182ba2203fca6886c4c99b854f9f8279a9978b180ad10e82362e412"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(leftPopulatedTrie.RootHash()))
@@ -80,13 +82,13 @@ func Test_TrieWithMiddleRegister(t *testing.T) {
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithManyRegisters(t *testing.T) {
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplKeyByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
 	require.NoError(t, err)
 
 	// allocate single random register
 	rng := &LinearCongruentialGenerator{seed: 0}
-	keys, values := deduplicateRegisterWrites(sampleRandomRegisterWrites(rng, 12001))
-	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, keys, values)
+	paths, keys, values := deduplicateRegisterWrites(sampleRandomRegisterWrites(rng, 12001))
+	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, keys, values)
 	require.NoError(t, err)
 	expectedRootHashHex := "18a7c33a0ecf148274f860246f23dffdc6d15dc846e0ae34f6887a43ec67124c"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
@@ -97,7 +99,7 @@ func Test_TrieWithManyRegisters(t *testing.T) {
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_FullTrie(t *testing.T) {
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplKeyByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
 	require.NoError(t, err)
 
 	// allocate single random register
@@ -109,7 +111,7 @@ func Test_FullTrie(t *testing.T) {
 		keys = append(keys, uint2binary(uint16(i)))
 		values = append(values, uint2binary(rng.next()))
 	}
-	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, keys, values)
+	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, keys, keys, values)
 	require.NoError(t, err)
 	expectedRootHashHex := "0a1e74e7a4dfcc916dcafbd3f1c826280f047cd5608295f01a32c9af5949898f"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
@@ -142,21 +144,23 @@ func Test_UpdateTrie(t *testing.T) {
 	}
 
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplKeyByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
 	require.NoError(t, err)
 
 	// allocate single random register
 	rng := &LinearCongruentialGenerator{seed: 0}
-	key := uint2binary(rng.next())
+	path := uint2binary(rng.next())
+	// TODO update rng to assign proper keys
+	key := path
 	value := uint2binary(rng.next())
-	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, [][]byte{key}, [][]byte{value})
+	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, [][]byte{path}, [][]byte{key}, [][]byte{value})
 	require.NoError(t, err)
 	expectedRootHashHex := "a8dc0574fdeeaab4b5d3b2a798c19bee5746337a9aea735ebc4dfd97311503c5"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
 
 	for r := 0; r < 20; r++ {
-		keys, values := deduplicateRegisterWrites(sampleRandomRegisterWrites(rng, r*100))
-		updatedTrie, err = trie.NewTrieWithUpdatedRegisters(updatedTrie, keys, values)
+		paths, keys, values := deduplicateRegisterWrites(sampleRandomRegisterWrites(rng, r*100))
+		updatedTrie, err = trie.NewTrieWithUpdatedRegisters(updatedTrie, paths, keys, values)
 		require.NoError(t, err)
 		require.Equal(t, expectedRootHashes[r], hex.EncodeToString(updatedTrie.RootHash()))
 	}
@@ -167,34 +171,34 @@ func Test_UpdateTrie(t *testing.T) {
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_UnallocateRegisters(t *testing.T) {
 	rng := &LinearCongruentialGenerator{seed: 0}
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplKeyByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
 	require.NoError(t, err)
 
 	// we first draw 99 random key-value pairs that will be first allocated and later unallocated:
-	keys1, values1 := deduplicateRegisterWrites(sampleRandomRegisterWrites(rng, 99))
-	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, keys1, values1)
+	paths1, keys1, values1 := deduplicateRegisterWrites(sampleRandomRegisterWrites(rng, 99))
+	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths1, keys1, values1)
 	require.NoError(t, err)
 
 	// we then write an additional 117 registers
-	keys2, values2 := deduplicateRegisterWrites(sampleRandomRegisterWrites(rng, 117))
-	updatedTrie, err = trie.NewTrieWithUpdatedRegisters(updatedTrie, keys2, values2)
+	paths2, keys2, values2 := deduplicateRegisterWrites(sampleRandomRegisterWrites(rng, 117))
+	updatedTrie, err = trie.NewTrieWithUpdatedRegisters(updatedTrie, paths2, keys2, values2)
 	require.NoError(t, err)
 
 	// and now we override the first 99 registers with default values, i.e. unallocate them
 	values0 := make([][]byte, len(values1))
-	updatedTrie, err = trie.NewTrieWithUpdatedRegisters(updatedTrie, keys1, values0)
+	updatedTrie, err = trie.NewTrieWithUpdatedRegisters(updatedTrie, paths1, keys1, values0)
 	require.NoError(t, err)
 
 	// this should be identical to the first 99 registers never been written
 	expectedRootHashHex := "ce4883f826deaec46317901b7a274a2f9706bc1d1b2cf6869ca1447afb23b2d5"
-	comparisionTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, keys2, values2)
+	comparisionTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths2, keys2, values2)
 	require.NoError(t, err)
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(comparisionTrie.RootHash()))
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
 }
 
 func uint2binary(integer uint16) []byte {
-	b := make([]byte, ReferenceImplKeyByteSize)
+	b := make([]byte, ReferenceImplPathByteSize)
 	binary.BigEndian.PutUint16(b, integer)
 	return b
 }
@@ -208,32 +212,42 @@ func (rng *LinearCongruentialGenerator) next() uint16 {
 	return uint16(rng.seed)
 }
 
-// sampleRandomRegisterWrites generates key-value prairs for `number` randomly selected registers;
+// sampleRandomRegisterWrites generates path-key-value triples for `number` randomly selected registers;
 // caution: registers might repeat
-func sampleRandomRegisterWrites(rng *LinearCongruentialGenerator, number int) ([][]byte, [][]byte) {
+func sampleRandomRegisterWrites(rng *LinearCongruentialGenerator, number int) ([][]byte, [][]byte, [][]byte) {
+	paths := make([][]byte, 0, number)
 	keys := make([][]byte, 0, number)
 	values := make([][]byte, 0, number)
 	for i := 0; i < number; i++ {
-		keys = append(keys, uint2binary(rng.next()))
+		path := uint2binary(rng.next())
+		paths = append(paths, path)
+		keys = append(keys, path)
 		values = append(values, uint2binary(rng.next()))
 	}
-	return keys, values
+	return paths, keys, values
 }
 
 // deduplicateRegisterWrites retains only the last register write
-func deduplicateRegisterWrites(keys, values [][]byte) ([][]byte, [][]byte) {
-	kvPairs := make(map[string]int)
+func deduplicateRegisterWrites(paths, keys, values [][]byte) ([][]byte, [][]byte, [][]byte) {
+	keyMapping := make(map[string]int)
+	valueMapping := make(map[string]int)
+	if len(paths) != len(keys) {
+		panic("size mismatch (paths and keys)")
+	}
 	if len(keys) != len(values) {
-		panic("mismatching keys and values")
+		panic("size mismatch (keys and values)")
 	}
-	for i, key := range keys {
-		kvPairs[string(key)] = i
+	for i, path := range paths {
+		keyMapping[string(path)] = i
+		valueMapping[string(path)] = i
 	}
-	dedupedKeys := make([][]byte, 0, len(kvPairs))
-	dedupedValues := make([][]byte, 0, len(kvPairs))
-	for _, idx := range kvPairs {
-		dedupedKeys = append(dedupedKeys, keys[idx])
-		dedupedValues = append(dedupedValues, values[idx])
+	dedupedPaths := make([][]byte, 0, len(keyMapping))
+	dedupedKeys := make([][]byte, 0, len(keyMapping))
+	dedupedValues := make([][]byte, 0, len(keyMapping))
+	for path := range keyMapping {
+		dedupedPaths = append(dedupedPaths, []byte(path))
+		dedupedKeys = append(dedupedKeys, keys[keyMapping[path]])
+		dedupedValues = append(dedupedValues, values[valueMapping[path]])
 	}
-	return dedupedKeys, dedupedValues
+	return dedupedPaths, dedupedKeys, dedupedValues
 }
