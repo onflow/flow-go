@@ -35,17 +35,6 @@ crypto/relic/update:
 cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
 
-.PHONY: clang
-clang: 
-	apt-get install clang
-
-ifeq ($(UNAME), Linux)
-install-tools: clang
-endif
-
-ifeq ($(UNAME), Debian)
-install-tools: clang
-endif
 
 .PHONY: install-tools
 install-tools: crypto/relic/build check-go-version
