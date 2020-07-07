@@ -16,11 +16,12 @@ func (r Root) String() string {
 // Height Definition: the height of a node v in a tree is the number
 // of edges on the longest downward path between v and a tree leaf.
 type node struct {
-	value  Root   // Hash
 	lChild *node  // Left Child
 	rChild *node  // Right Child
 	height int    // Height where the node is at
-	key    []byte // key this node is pointing at
+	path   []byte // path
+	key    []byte // key
+	value  []byte // value
 }
 
 // newNode creates a new node with the provided value and no children
