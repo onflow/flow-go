@@ -38,7 +38,7 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 			Help:      "the duration of how long it took between the transaction was received until it was finalized",
 			Objectives: map[float64]float64{
 				0.01: 0.001,
-				0.5:  0.01,
+				0.5:  0.05,
 				0.99: 0.001,
 			},
 			MaxAge:     10 * time.Minute,
@@ -52,7 +52,7 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 			Help:      "the duration of how long it took between the transaction was received until it was executed",
 			Objectives: map[float64]float64{
 				0.01: 0.001,
-				0.5:  0.01,
+				0.5:  0.05,
 				0.99: 0.001,
 			},
 			MaxAge:     10 * time.Minute,
@@ -67,7 +67,7 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 				"finalized and executed",
 			Objectives: map[float64]float64{
 				0.01: 0.001,
-				0.5:  0.01,
+				0.5:  0.05,
 				0.99: 0.001,
 			},
 			MaxAge:     10 * time.Minute,
