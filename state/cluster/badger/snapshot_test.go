@@ -1,6 +1,7 @@
 package badger
 
 import (
+	"math"
 	"math/rand"
 	"os"
 	"testing"
@@ -10,13 +11,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/dapperlabs/flow-go/model/bootstrap"
 	model "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/state/cluster"
+	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
+	"github.com/dapperlabs/flow-go/storage/util"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -27,6 +31,8 @@ type SnapshotSuite struct {
 
 	genesis *model.Block
 	chainID flow.ChainID
+
+	protoState *protocol.State
 
 	state   cluster.State
 	mutator cluster.Mutator
@@ -47,12 +53,21 @@ func (suite *SnapshotSuite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 
-	headers := storage.NewHeaders(metrics, suite.db)
-	payloads := storage.NewClusterPayloads(metrics, suite.db)
+	headers, identities, _, seals, index, conPayloads, blocks := util.StorageLayer(suite.T(), suite.db)
+	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
-	suite.state, err = NewState(suite.db, suite.chainID, headers, payloads)
+	suite.state, err = NewState(suite.db, suite.chainID, headers, colPayloads)
 	suite.Assert().Nil(err)
 	suite.mutator = suite.state.Mutate()
+
+	// just bootstrap with a genesis block, we'll use this as reference
+	suite.protoState, err = protocol.NewState(metrics, suite.db, headers, identities, seals, index, conPayloads, blocks)
+	suite.Assert().Nil(err)
+	genesis := unittest.GenesisFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
+	result := bootstrap.Result(genesis, unittest.GenesisStateCommitment)
+	seal := bootstrap.Seal(result)
+	err = suite.protoState.Mutate().Bootstrap(genesis, result, seal)
+	suite.Require().Nil(err)
 
 	suite.Bootstrap()
 }
@@ -70,6 +85,40 @@ func (suite *SnapshotSuite) Bootstrap() {
 	suite.Assert().Nil(err)
 }
 
+// Payload returns a valid cluster block payload containing the given transactions.
+func (suite *SnapshotSuite) Payload(transactions ...*flow.TransactionBody) model.Payload {
+	final, err := suite.protoState.Final().Head()
+	suite.Require().Nil(err)
+
+	// find the oldest reference block among the transactions
+	minRefID := final.ID() // use final by default
+	minRefHeight := uint64(math.MaxUint64)
+	for _, tx := range transactions {
+		refBlock, err := suite.protoState.AtBlockID(tx.ReferenceBlockID).Head()
+		if err != nil {
+			continue
+		}
+		if refBlock.Height < minRefHeight {
+			minRefHeight = refBlock.Height
+			minRefID = refBlock.ID()
+		}
+	}
+	return model.PayloadFromTransactions(minRefID, transactions...)
+}
+
+// BlockWithParent returns a valid block with the given parent.
+func (suite *SnapshotSuite) BlockWithParent(parent *model.Block) model.Block {
+	block := unittest.ClusterBlockWithParent(parent)
+	payload := suite.Payload()
+	block.SetPayload(payload)
+	return block
+}
+
+// Block returns a valid cluster block with genesis as parent.
+func (suite *SnapshotSuite) Block() model.Block {
+	return suite.BlockWithParent(suite.genesis)
+}
+
 func (suite *SnapshotSuite) InsertBlock(block model.Block) {
 	err := suite.db.Update(procedure.InsertClusterBlock(&block))
 	suite.Assert().Nil(err)
@@ -84,7 +133,7 @@ func (suite *SnapshotSuite) InsertSubtree(parent model.Block, depth, fanout int)
 	}
 
 	for i := 0; i < fanout; i++ {
-		block := unittest.ClusterBlockWithParent(&parent)
+		block := suite.BlockWithParent(&parent)
 		suite.InsertBlock(block)
 		err := suite.db.Update(procedure.IndexBlockChild(parent.ID(), block.ID()))
 		suite.Require().Nil(err)
@@ -129,7 +178,7 @@ func (suite *SnapshotSuite) TestEmptyCollection() {
 	t := suite.T()
 
 	// create a block with an empty collection
-	block := unittest.ClusterBlockWithParent(suite.genesis)
+	block := suite.BlockWithParent(suite.genesis)
 	block.SetPayload(model.EmptyPayload(flow.ZeroID))
 	suite.InsertBlock(block)
 
@@ -145,19 +194,17 @@ func (suite *SnapshotSuite) TestFinalizedBlock() {
 	t := suite.T()
 
 	// create a new finalized block on genesis (height=1)
-	finalizedBlock1 := unittest.ClusterBlockWithParent(suite.genesis)
+	finalizedBlock1 := suite.Block()
 	err := suite.mutator.Extend(&finalizedBlock1)
 	assert.Nil(t, err)
 
 	// create an un-finalized block on genesis (height=1)
-	unFinalizedBlock1 := unittest.ClusterBlockWithParent(suite.genesis)
+	unFinalizedBlock1 := suite.Block()
 	err = suite.mutator.Extend(&unFinalizedBlock1)
 	assert.Nil(t, err)
 
 	// create a second un-finalized on top of the finalized block (height=2)
-	unFinalizedBlock2 := unittest.ClusterBlockWithParent(&finalizedBlock1)
-	t.Logf("header: %x", unFinalizedBlock2.Header.PayloadHash)
-	t.Logf("payload: %x", unFinalizedBlock2.Payload.Hash())
+	unFinalizedBlock2 := suite.BlockWithParent(&finalizedBlock1)
 	err = suite.mutator.Extend(&unFinalizedBlock2)
 	assert.Nil(t, err)
 
@@ -193,7 +240,7 @@ func (suite *SnapshotSuite) TestPending_NoPendingBlocks() {
 	suite.Run("with some chain history", func() {
 		parent := suite.genesis
 		for i := 0; i < 10; i++ {
-			next := unittest.ClusterBlockWithParent(parent)
+			next := suite.BlockWithParent(parent)
 			suite.InsertBlock(next)
 			parent = &next
 		}
@@ -208,11 +255,11 @@ func (suite *SnapshotSuite) TestPending_NoPendingBlocks() {
 func (suite *SnapshotSuite) TestPending_WithPendingBlocks() {
 
 	// build a block that wasn't validated by hotstuff, thus wasn't indexed as a child
-	unvalidated := unittest.ClusterBlockWithParent(suite.genesis)
+	unvalidated := suite.BlockWithParent(suite.genesis)
 	suite.InsertBlock(unvalidated)
 
 	// build a block that was validated by hotstuff, is indexed as a child
-	validated := unittest.ClusterBlockWithParent(suite.genesis)
+	validated := suite.BlockWithParent(suite.genesis)
 	suite.InsertBlock(validated)
 	err := suite.db.Update(procedure.IndexBlockChild(suite.genesis.ID(), validated.ID()))
 	suite.Assert().Nil(err)
