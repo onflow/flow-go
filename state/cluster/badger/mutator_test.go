@@ -335,7 +335,16 @@ func (suite *MutatorSuite) TestExtend_WithExpiredReferenceBlock() {
 }
 
 func (suite *MutatorSuite) TestExtend_WithReferenceBlockFromClusterChain() {
-	// TODO
+	suite.Bootstrap()
+
+	// TODO skipping as this isn't implemented yet
+	suite.T().Skip()
+
+	block := suite.Block()
+	// set genesis from cluster chain as reference block
+	block.SetPayload(model.EmptyPayload(suite.genesis.ID()))
+	err := suite.mutator.Extend(&block)
+	suite.Assert().Error(err)
 }
 
 func (suite *MutatorSuite) TestExtend_UnfinalizedBlockWithDupeTx() {
