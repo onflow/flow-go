@@ -12,8 +12,8 @@ type Requester struct {
 	mock.Mock
 }
 
-// Request provides a mock function with given fields: entityID
-func (_m *Requester) Request(entityID flow.Identifier) error {
+// EntityByID provides a mock function with given fields: entityID
+func (_m *Requester) EntityByID(entityID flow.Identifier) error {
 	ret := _m.Called(entityID)
 
 	var r0 error

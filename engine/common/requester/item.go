@@ -11,5 +11,4 @@ type Item struct {
 	Attempts  uint
 	Timestamp time.Time
 	Interval  time.Duration
-	Nonce     uint64
 }

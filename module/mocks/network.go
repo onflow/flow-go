@@ -154,16 +154,16 @@ func (m *MockRequester) EXPECT() *MockRequesterMockRecorder {
 	return m.recorder
 }
 
-// Request mocks base method
-func (m *MockRequester) Request(arg0 flow.Identifier) error {
+// EntityByID mocks base method
+func (m *MockRequester) EntityByID(arg0 flow.Identifier) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Request", arg0)
+	ret := m.ctrl.Call(m, "EntityByID", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// Request indicates an expected call of Request
-func (mr *MockRequesterMockRecorder) Request(arg0 interface{}) *gomock.Call {
+// EntityByID indicates an expected call of EntityByID
+func (mr *MockRequesterMockRecorder) EntityByID(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Request", reflect.TypeOf((*MockRequester)(nil).Request), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EntityByID", reflect.TypeOf((*MockRequester)(nil).EntityByID), arg0)
 }

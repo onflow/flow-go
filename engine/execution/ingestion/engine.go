@@ -594,7 +594,7 @@ func (e *Engine) matchOrRequestCollections(
 					Hex("collection_id", logging.ID(guarantee.ID())).
 					Msg("requesting collection")
 
-				err := e.request.Request(guarantee.ID())
+				err := e.request.EntityByID(guarantee.ID())
 				if err != nil {
 					return fmt.Errorf("could not request collection: %w", err)
 				}

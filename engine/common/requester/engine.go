@@ -2,6 +2,7 @@ package requester
 
 import (
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -28,9 +29,7 @@ type Engine struct {
 	selector flow.IdentityFilter
 	handle   module.HandleFunc
 	items    map[flow.Identifier]Item
-	pending  uint64
-	batches  map[uint64]Batch
-	entities map[flow.Identifier]uint64
+	requests map[uint64]*messages.ResourceRequest
 }
 
 // New creates a new consensus propagation engine.
@@ -70,10 +69,8 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 		channel:  channel,
 		selector: selector,
 		handle:   nil,
-		items:    make(map[flow.Identifier]Item),   // holds all pending items
-		pending:  0,                                // identifies the batch currently being built
-		batches:  make(map[uint64]Batch),           // holds a list of all active batches
-		entities: make(map[flow.Identifier]uint64), // holds a list of all active entities
+		items:    make(map[flow.Identifier]Item),             // holds all pending items
+		requests: make(map[uint64]*messages.ResourceRequest), // holds all sent requests
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -138,15 +135,14 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-// Request allows us to request an entity to be processed by the given callback.
-func (e *Engine) Request(entityID flow.Identifier) error {
+// EntityByID adds an entity to the list of entities to be requested from the
+// provider. It is idempotent, meaning that adding the same entity to the
+// requester engine multiple times has no effect, unless the item has
+// expired due to too many requests and has thus been deleted from the
+// list.
+func (e *Engine) EntityByID(entityID flow.Identifier) error {
 	e.unit.Lock()
 	defer e.unit.Unlock()
-
-	return e.requestEntity(entityID)
-}
-
-func (e *Engine) requestEntity(entityID flow.Identifier) error {
 
 	// check if we already have an item for this entity
 	_, duplicate := e.items[entityID]
@@ -160,7 +156,6 @@ func (e *Engine) requestEntity(entityID flow.Identifier) error {
 		Attempts:  0,
 		Timestamp: time.Time{},
 		Interval:  e.cfg.RetryInitial,
-		Nonce:     0,
 	}
 	e.items[entityID] = item
 
@@ -189,30 +184,60 @@ PollLoop:
 }
 
 func (e *Engine) dispatchRequests() error {
-	return nil
-}
 
-func (e *Engine) dispatchBatch(nonce uint64) error {
+	// go through each item and decide if it should be requested again
+	now := time.Now().UTC()
+	var entityIDs []flow.Identifier
+	for entityID, item := range e.items {
 
-	// get the batch from the map
-	batch, exists := e.batches[nonce]
-	if !exists {
-		return fmt.Errorf("unknown batch nonce (%d)", nonce)
+		// if the item should not be requested yet, ignore
+		if item.Timestamp.Add(item.Interval).Before(now) {
+			continue
+		}
+
+		// if the item reached maximum amount of retries, drop
+		if item.Attempts >= e.cfg.RetryAttempts {
+			delete(e.items, entityID)
+			continue
+		}
+
+		// add item to list and set retry parameters
+		item.Timestamp = item.Timestamp.Add(item.Interval)
+		item.Interval = e.cfg.RetryFunction(item.Interval)
+		item.Attempts++
+		entityIDs = append(entityIDs, entityID)
+
+		// if we reached the maximum size for a batch, bail
+		if uint(len(entityIDs)) >= e.cfg.BatchThreshold {
+			break
+		}
 	}
 
-	// remove the batch from pending
-	// NOTE: the batch will still be retried if it fails
-	e.pending = 0
-
-	// create the resource request and send to target
-	req := &messages.ResourceRequest{
-		Nonce:     batch.Nonce,
-		EntityIDs: batch.EntityIDs,
+	// if there are no items, return
+	if len(entityIDs) == 0 {
+		return nil
 	}
-	err := e.con.Submit(&req, batch.TargetID)
+
+	// determine who to send the request to
+	targets, err := e.state.Final().Identities(e.selector)
 	if err != nil {
-		return fmt.Errorf("could not send resource request: %w", err)
+		return fmt.Errorf("could not retrieve targets: %w", err)
 	}
+	if len(targets) == 0 {
+		return fmt.Errorf("no request targets available")
+	}
+	targetID := targets.Sample(1)[0].NodeID
+
+	// create a batch request, send it and store it
+	req := &messages.ResourceRequest{
+		Nonce:     rand.Uint64(),
+		EntityIDs: entityIDs,
+	}
+	err = e.con.Submit(req, targetID)
+	if err != nil {
+		return fmt.Errorf("could not send request: %w", err)
+	}
+	e.requests[req.Nonce] = req
 
 	e.metrics.MessageSent(engine.ChannelName(e.channel), metrics.MessageResourceRequest)
 
@@ -236,56 +261,46 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 func (e *Engine) onResourceResponse(originID flow.Identifier, res *messages.ResourceResponse) error {
 
-	// check if there is a request pending with the given nonce
-	batch, exists := e.batches[res.Nonce]
-	if !exists {
-		// NOTE: we can use alternative logic by entity ID if
-		// we want to use outdated responses
-		return nil
-	}
-
-	// create map of entities needed
+	// build a list of needed entities; if not available, process anyway,
+	// but in that case we can't re-queue missing items
 	needed := make(map[flow.Identifier]struct{})
-	for _, entityID := range batch.EntityIDs {
-		needed[entityID] = struct{}{}
+	req, exists := e.requests[res.Nonce]
+	if exists {
+		for _, entityID := range req.EntityIDs {
+			needed[entityID] = struct{}{}
+		}
 	}
 
-	// go through all entities and check if it is still needed
+	// process each entity in the response
+	// NOTE: this requires engines to be somewhat idempotent, which is a good
+	// thing, as it increases the robustness of their code
 	for _, entity := range res.Entities {
 		entityID := entity.ID()
-		_, requested := needed[entityID]
-		if !requested {
-			e.log.Warn().Hex("entity", entityID[:]).Msg("provider sent non-requested entity")
+		delete(needed, entityID)
+		delete(e.items, entityID)
+		err := e.handle(originID, entity)
+		if err != nil {
+			return fmt.Errorf("could not handle entity (%x): %w", entityID, err)
+		}
+	}
+
+	// requeue requested entities that have not been delivered in the response
+	// NOTE: this logic allows a provider to send back an empty response to
+	// indicate that none of the requested entities are available, thus allowing
+	// the requester engine to immediately request them from another provider
+	for entityID := range needed {
+
+		// it's possible the item is unavailable, if it was already received
+		// in another response
+		item, exists := e.items[entityID]
+		if !exists {
+			// the entity could have been received in another request
 			continue
 		}
-		delete(needed, entityID)
-		err := e.processEntity(originID, entity)
-		if err != nil {
-			return fmt.Errorf("could not process entity (%x): %w", entityID, err)
-		}
-	}
 
-	// requeue all entities that have not been delivered yet
-	for entityID := range needed {
-		delete(e.entities, entityID)
-		err := e.requestEntity(entityID)
-		if err != nil {
-			return fmt.Errorf("could not re-queue entity: %w", err)
-		}
-	}
-
-	return nil
-}
-
-func (e *Engine) processEntity(originID flow.Identifier, entity flow.Entity) error {
-
-	// remove the entity from the requested list
-	delete(e.entities, entity.ID())
-
-	// process the entity with the injected handle function
-	err := e.handle(originID, entity)
-	if err != nil {
-		return fmt.Errorf("could not handle entity: %w", err)
+		// we set the timestamp to zero, so that the item will be included
+		// in the next batch regardless of retry interval
+		item.Timestamp = time.Time{}
 	}
 
 	return nil
