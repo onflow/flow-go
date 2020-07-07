@@ -68,13 +68,16 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 func (m *Mutator) Extend(block *cluster.Block) error {
 	err := m.state.db.View(func(tx *badger.Txn) error {
 
+		header := block.Header
+		payload := block.Payload
+
 		// check chain ID
-		if block.Header.ChainID != m.state.chainID {
+		if header.ChainID != m.state.chainID {
 			return state.NewInvalidExtensionErrorf("new block chain ID (%s) does not match configured (%s)", block.Header.ChainID, m.state.chainID)
 		}
 
 		// get the chain ID, which determines which cluster state to query
-		chainID := block.Header.ChainID
+		chainID := header.ChainID
 
 		// get the latest finalized block
 		var final flow.Header
@@ -84,13 +87,13 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 		}
 
 		// get the header of the parent of the new block
-		parent, err := m.state.headers.ByBlockID(block.Header.ParentID)
+		parent, err := m.state.headers.ByBlockID(header.ParentID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve latest finalized header: %w", err)
 		}
 
 		// the extending block must increase height by 1 from parent
-		if block.Header.Height != parent.Height+1 {
+		if header.Height != parent.Height+1 {
 			return state.NewInvalidExtensionErrorf("extending block height (%d) must be parent height + 1 (%d)",
 				block.Header.Height, parent.Height)
 		}
@@ -100,7 +103,7 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 		// latest finalized block, or reach height below the finalized boundary
 
 		// start with the extending block's parent
-		parentID := block.Header.ParentID
+		parentID := header.ParentID
 		for parentID != final.ID() {
 
 			// get the parent of current block
@@ -122,7 +125,7 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 		// check that all transactions within the collection are valid
 		minRefID := flow.ZeroID
 		minRefHeight := uint64(math.MaxUint64)
-		for _, flowTx := range block.Payload.Collection.Transactions {
+		for _, flowTx := range payload.Collection.Transactions {
 			refBlock, err := m.state.headers.ByBlockID(flowTx.ReferenceBlockID)
 			if errors.Is(err, storage.ErrNotFound) {
 				// unknown reference blocks are invalid
@@ -140,12 +143,26 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 
 		// a valid collection must reference the oldest reference block among
 		// its constituent transactions
-		if block.Payload.Collection.Len() > 0 && minRefID != block.Payload.ReferenceBlockID {
+		if payload.Collection.Len() > 0 && minRefID != payload.ReferenceBlockID {
 			return state.NewInvalidExtensionErrorf(
 				"reference block (id=%x) must match oldest transaction's reference block (id=%x)",
-				block.Payload.ReferenceBlockID, minRefID,
+				payload.ReferenceBlockID, minRefID,
 			)
 		}
+
+		// a valid collection must reference a valid reference block
+		// NOTE: it is valid for a collection to be expired at this point,
+		// otherwise we would compromise liveness of the cluster.
+		refBlock, err := m.state.headers.ByBlockID(payload.ReferenceBlockID)
+		if errors.Is(err, storage.ErrNotFound) {
+			return state.NewInvalidExtensionErrorf("unknown reference block (id=%x)", payload.ReferenceBlockID)
+		}
+		if err != nil {
+			return fmt.Errorf("could not check reference block: %w", err)
+		}
+
+		// TODO ensure the reference block is part of the main chain
+		_ = refBlock
 
 		// we go back a fixed number of  blocks to check payload for now
 		// TODO look back based on reference block ID and expiry https://github.com/dapperlabs/flow-go/issues/3556

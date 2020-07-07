@@ -34,7 +34,8 @@ type MutatorSuite struct {
 	chainID flow.ChainID
 
 	// protocol state for reference blocks for transactions
-	protoState *protocol.State
+	protoState   *protocol.State
+	protoGenesis *flow.Header
 
 	state   cluster.State
 	mutator cluster.Mutator
@@ -83,6 +84,7 @@ func (suite *MutatorSuite) Bootstrap() {
 	seal := bootstrap.Seal(result)
 	err := suite.protoState.Mutate().Bootstrap(genesis, result, seal)
 	suite.Require().Nil(err)
+	suite.protoGenesis = genesis.Header
 
 	// bootstrap cluster chain
 	err = suite.mutator.Bootstrap(suite.genesis)
@@ -124,8 +126,11 @@ func (suite *MutatorSuite) Block() model.Block {
 }
 
 func (suite *MutatorSuite) Tx(opts ...func(*flow.TransactionBody)) flow.TransactionBody {
+	final, err := suite.protoState.Final().Head()
+	suite.Require().Nil(err)
+
 	tx := unittest.TransactionBodyFixture(opts...)
-	tx.ReferenceBlockID = suite.genesis.ID()
+	tx.ReferenceBlockID = final.ID()
 	return tx
 }
 
@@ -287,9 +292,50 @@ func (suite *MutatorSuite) TestExtend_WithEmptyCollection() {
 
 	block := suite.Block()
 	// set an empty collection as the payload
-	block.SetPayload(model.EmptyPayload(flow.ZeroID))
+	block.SetPayload(suite.Payload())
 	err := suite.mutator.Extend(&block)
 	suite.Assert().Nil(err)
+}
+
+// an unknown reference block is invalid
+func (suite *MutatorSuite) TestExtend_WithNonExistentReferenceBlock() {
+	suite.Bootstrap()
+
+	block := suite.Block()
+	// set a random reference block ID
+	payload := model.EmptyPayload(unittest.IdentifierFixture())
+	block.SetPayload(payload)
+	err := suite.mutator.Extend(&block)
+	suite.Assert().Error(err)
+}
+
+// a collection with an expired reference block is a VALID extensino of chain state
+func (suite *MutatorSuite) TestExtend_WithExpiredReferenceBlock() {
+	suite.Bootstrap()
+
+	// build enough blocks so that using genesis as a reference block causes
+	// the collection to be expired
+	parent := suite.protoGenesis
+	for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
+		next := unittest.BlockWithParentFixture(parent)
+		next.Payload.Guarantees = nil
+		next.SetPayload(*next.Payload)
+		err := suite.protoState.Mutate().Extend(&next)
+		suite.Require().Nil(err)
+		err = suite.protoState.Mutate().Finalize(next.ID())
+		suite.Require().Nil(err)
+		parent = next.Header
+	}
+
+	block := suite.Block()
+	// set genesis as reference block
+	block.SetPayload(model.EmptyPayload(suite.protoGenesis.ID()))
+	err := suite.mutator.Extend(&block)
+	suite.Assert().Nil(err)
+}
+
+func (suite *MutatorSuite) TestExtend_WithReferenceBlockFromClusterChain() {
+	// TODO
 }
 
 func (suite *MutatorSuite) TestExtend_UnfinalizedBlockWithDupeTx() {
