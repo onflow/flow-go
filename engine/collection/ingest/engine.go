@@ -135,9 +135,23 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
 		Hex("tx_id", logging.Entity(tx)).
+		Hex("ref_block_id", tx.ReferenceBlockID[:]).
 		Logger()
 
-	log.Debug().Msg("transaction message received")
+	// TODO log the reference block and final height for debug purposes
+	{
+		final, err := e.state.Final().Head()
+		if err != nil {
+			return fmt.Errorf("could not get final height: %w", err)
+		}
+		log = log.With().Uint64("final_height", final.Height).Logger()
+		ref, err := e.state.AtBlockID(tx.ReferenceBlockID).Head()
+		if err == nil {
+			log = log.With().Uint64("ref_block_height", ref.Height).Logger()
+		}
+	}
+
+	log.Info().Msg("transaction message received")
 
 	// short-circuit if we have already stored the transaction
 	if e.pool.Has(tx.ID()) {
