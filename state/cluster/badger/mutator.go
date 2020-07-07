@@ -1,13 +1,16 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
+	"math"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
@@ -116,9 +119,36 @@ func (m *Mutator) Extend(block *cluster.Block) error {
 			parentID = ancestor.ParentID
 		}
 
+		// check that all transactions within the collection are valid
+		minRefID := flow.ZeroID
+		minRefHeight := uint64(math.MaxUint64)
+		for _, flowTx := range block.Payload.Collection.Transactions {
+			refBlock, err := m.state.headers.ByBlockID(flowTx.ReferenceBlockID)
+			if errors.Is(err, storage.ErrNotFound) {
+				// unknown reference blocks are invalid
+				return state.NewInvalidExtensionErrorf("unknown reference block (id=%x): %v", flowTx.ReferenceBlockID, err)
+			}
+			if err != nil {
+				return fmt.Errorf("could not check reference block (id=%x): %w", flowTx.ReferenceBlockID, err)
+			}
+
+			if refBlock.Height < minRefHeight {
+				minRefHeight = refBlock.Height
+				minRefID = flowTx.ReferenceBlockID
+			}
+		}
+
+		// a valid collection must reference the oldest reference block among
+		// its constituent transactions
+		if block.Payload.Collection.Len() > 0 && minRefID != block.Payload.ReferenceBlockID {
+			return state.NewInvalidExtensionErrorf(
+				"reference block (id=%x) must match oldest transaction's reference block (id=%x)",
+				block.Payload.ReferenceBlockID, minRefID,
+			)
+		}
+
 		// we go back a fixed number of  blocks to check payload for now
-		//TODO look back based on reference block ID and expiry
-		// ref: https://github.com/dapperlabs/flow-go/issues/3556
+		// TODO look back based on reference block ID and expiry https://github.com/dapperlabs/flow-go/issues/3556
 		limit := block.Header.Height - flow.DefaultTransactionExpiry
 		if limit > block.Header.Height { // overflow check
 			limit = 0
