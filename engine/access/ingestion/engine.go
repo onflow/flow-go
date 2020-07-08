@@ -144,10 +144,9 @@ func (e *Engine) processFinalizedBlock(id flow.Identifier) error {
 		return fmt.Errorf("could not index block for collections: %w", err)
 	}
 
-	// request each of the collections from the collection node
-	err = e.requestCollections(block.Payload.Guarantees...)
-	if err != nil {
-		return fmt.Errorf("could not request collections: %w", err)
+	// queue requesting each of the collections from the collection node
+	for _, guarantee := range block.Payload.Guarantees {
+		e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantee.SignerIDs...))
 	}
 
 	return nil
@@ -183,16 +182,6 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 		}
 	}
 
-	return nil
-}
-
-func (e *Engine) requestCollections(guarantees ...*flow.CollectionGuarantee) error {
-	for _, guarantee := range guarantees {
-		err := e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantee.SignerIDs...))
-		if err != nil {
-			return fmt.Errorf("could not request collection (%x)", guarantee.ID())
-		}
-	}
 	return nil
 }
 

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
@@ -96,14 +95,9 @@ func main() {
 			return err
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-
-			// The access node doesn't need to be super responsive when it comes to availability of collections, so we
-			// use a higher batch interval with a bigger batch size in order to reduce the number of requests.
 			requestEng, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
 				engine.RequestCollections,
 				filter.HasRole(flow.RoleCollection),
-				requester.WithBatchInterval(2*time.Second),
-				requester.WithBatchThreshold(128),
 			)
 			ingestEng, err = ingestion.New(node.Logger, node.State, node.Me, requestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions)
 			requestEng = requestEng.WithHandle(ingestEng.OnCollection)

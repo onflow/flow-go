@@ -11,5 +11,10 @@ type Requester interface {
 	// of valid providers for the entity and allows finer-grained control
 	// over which providers to request a given entity from. Use `filter.Any`
 	// if no additional restrictions are required.
-	EntityByID(entityID flow.Identifier, selector flow.IdentityFilter) error
+	EntityByID(entityID flow.Identifier, selector flow.IdentityFilter)
+
+	// Force will force the dispatcher to send all possible batches immediately.
+	// It can be used in cases where responsiveness is of utmost importance, at
+	// the cost of additional network messages.
+	Force()
 }

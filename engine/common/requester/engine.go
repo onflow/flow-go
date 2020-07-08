@@ -174,14 +174,15 @@ func (e *Engine) Process(originID flow.Identifier, message interface{}) error {
 // control over which subset of providers to request a given entity from, such as
 // selection of a collection cluster. Use `filter.Any` if no additional selection
 // is required.
-func (e *Engine) EntityByID(entityID flow.Identifier, selector flow.IdentityFilter) error {
+func (e *Engine) EntityByID(entityID flow.Identifier, selector flow.IdentityFilter) {
+
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
 	// check if we already have an item for this entity
 	_, duplicate := e.items[entityID]
 	if duplicate {
-		return nil
+		return
 	}
 
 	// otherwise, add a new item to the list
@@ -193,8 +194,21 @@ func (e *Engine) EntityByID(entityID flow.Identifier, selector flow.IdentityFilt
 		ExtraSelector: selector,
 	}
 	e.items[entityID] = item
+}
 
-	return nil
+// Force will force the requester engine to dispatch all currently
+// valid batch requests.
+func (e *Engine) Force() {
+	for {
+		dispatched, err := e.dispatchRequest()
+		if err != nil {
+			e.log.Error().Err(err).Msg("could not dispatch requests")
+			return
+		}
+		if !dispatched {
+			return
+		}
+	}
 }
 
 func (e *Engine) poll() {
@@ -207,7 +221,7 @@ PollLoop:
 			break PollLoop
 
 		case <-ticker.C:
-			err := e.dispatchRequests()
+			_, err := e.dispatchRequest()
 			if err != nil {
 				e.log.Error().Err(err).Msg("could not dispatch requests")
 				continue PollLoop
@@ -218,12 +232,15 @@ PollLoop:
 	ticker.Stop()
 }
 
-func (e *Engine) dispatchRequests() error {
+func (e *Engine) dispatchRequest() (bool, error) {
+
+	e.unit.Lock()
+	defer e.unit.Unlock()
 
 	// get the current top-level set of valid providers
 	providers, err := e.state.Final().Identities(e.selector)
 	if err != nil {
-		return fmt.Errorf("could not get providers: %w", err)
+		return false, fmt.Errorf("could not get providers: %w", err)
 	}
 
 	// go through each item and decide if it should be requested again
@@ -264,7 +281,7 @@ func (e *Engine) dispatchRequests() error {
 		if providerID == flow.ZeroID {
 			providers = providers.Filter(item.ExtraSelector)
 			if len(providers) == 0 {
-				return fmt.Errorf("no valid providers available")
+				return false, fmt.Errorf("no valid providers available")
 			}
 			providerID = providers.Sample(1)[0].NodeID
 		}
@@ -295,7 +312,7 @@ func (e *Engine) dispatchRequests() error {
 
 	// if there are no items to request, return
 	if len(entityIDs) == 0 {
-		return nil
+		return false, nil
 	}
 
 	// create a batch request, send it and store it for reference
@@ -305,7 +322,7 @@ func (e *Engine) dispatchRequests() error {
 	}
 	err = e.con.Submit(req, providerID)
 	if err != nil {
-		return fmt.Errorf("could not send request: %w", err)
+		return true, fmt.Errorf("could not send request: %w", err)
 	}
 	e.requests[req.Nonce] = req
 
@@ -321,7 +338,7 @@ func (e *Engine) dispatchRequests() error {
 
 	e.metrics.MessageSent(engine.ChannelName(e.channel), metrics.MessageEntityRequest)
 
-	return nil
+	return true, nil
 }
 
 // process processes events for the propagation engine on the consensus node.

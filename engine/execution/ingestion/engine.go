@@ -587,10 +587,8 @@ func (e *Engine) matchOrRequestCollections(
 					Hex("collection_id", logging.ID(guarantee.ID())).
 					Msg("requesting collection")
 
-				err := e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantee.SignerIDs...))
-				if err != nil {
-					return fmt.Errorf("could not request collection: %w", err)
-				}
+				// queue the collection to be requested from one of the guarantors
+				e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantee.SignerIDs...))
 
 			} else {
 				return fmt.Errorf("error while querying for collection: %w", err)
@@ -602,6 +600,9 @@ func (e *Engine) matchOrRequestCollections(
 			Transactions: transactions,
 		}
 	}
+
+	// make sure that the requests are dispatched immediately by the requester
+	e.request.Force()
 
 	return nil
 }
