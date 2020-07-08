@@ -186,7 +186,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 
 func (e *Engine) requestCollections(guarantees ...*flow.CollectionGuarantee) error {
 	for _, guarantee := range guarantees {
-		err := e.request.Request(guarantee.ID(), e.OnCollection)
+		err := e.request.EntityByID(guarantee.ID())
 		if err != nil {
 			return fmt.Errorf("could not request collection (%x)", guarantee.ID())
 		}
@@ -194,21 +194,21 @@ func (e *Engine) requestCollections(guarantees ...*flow.CollectionGuarantee) err
 	return nil
 }
 
-func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
+func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) error {
 
 	// convert the entity to a strictly typed collection
 	collection, ok := entity.(*flow.Collection)
 	if !ok {
-		e.log.Error().Str("entity", fmt.Sprintf("%T", entity)).Msg("invalid entity type")
-		return
+		return fmt.Errorf("invalid entity type (%T)", entity)
 	}
 
 	// process the collection
 	err := e.handleCollection(originID, collection)
 	if err != nil {
-		e.log.Error().Err(err).Msg("could not process collection")
-		return
+		return fmt.Errorf("could not handle collection: %w", err)
 	}
+
+	return nil
 }
 
 // OnBlockIncorporated is a noop for this engine since access node is only dealing with finalized blocks
