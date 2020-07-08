@@ -223,7 +223,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		transactions := storage.NewTransactions(metrics, db)
 		collections := storage.NewCollections(db, transactions)
 
-		rpcEng := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions)
+		rpcEng := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions, suite.chainID)
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, blocks, headers, collections, transactions, rpcEng)

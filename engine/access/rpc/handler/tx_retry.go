@@ -6,7 +6,7 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
-	"github.com/dapperlabs/flow-go/engine/common/convert"
+	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 

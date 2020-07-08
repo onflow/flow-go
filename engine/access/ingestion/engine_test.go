@@ -79,7 +79,7 @@ func (suite *Suite) SetupTest() {
 	suite.collections = new(storage.Collections)
 	suite.transactions = new(storage.Transactions)
 
-	rpcEng := rpc.New(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections, suite.transactions)
+	rpcEng := rpc.New(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections, suite.transactions, flow.Testnet)
 
 	eng, err := New(log, suite.net, suite.proto.state, suite.me, suite.blocks, suite.headers, suite.collections, suite.transactions, rpcEng)
 	require.NoError(suite.T(), err)

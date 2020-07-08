@@ -40,7 +40,7 @@ func (suite *Suite) TestTransactionRetry() {
 	// txID := transactionBody.ID()
 	// blockID := block.ID()
 	// Setup Handler + Retry
-	handler := NewHandler(suite.log, suite.state, suite.execClient, suite.colClient, suite.blocks, suite.headers, suite.collections, suite.transactions)
+	handler := NewHandler(suite.log, suite.state, suite.execClient, suite.colClient, suite.blocks, suite.headers, suite.collections, suite.transactions, suite.chainID)
 	retry := newRetry().SetHandler(handler)
 	handler.retry = retry
 
@@ -104,7 +104,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	}
 
 	// Setup Handler + Retry
-	handler := NewHandler(suite.log, suite.state, suite.execClient, suite.colClient, suite.blocks, suite.headers, suite.collections, suite.transactions)
+	handler := NewHandler(suite.log, suite.state, suite.execClient, suite.colClient, suite.blocks, suite.headers, suite.collections, suite.transactions, suite.chainID)
 	retry := newRetry().SetHandler(handler)
 	handler.retry = retry
 
