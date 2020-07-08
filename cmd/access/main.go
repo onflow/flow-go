@@ -102,7 +102,7 @@ func main() {
 		Component("requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			requestEng, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
 				engine.RequestCollections,
-				filter.HasRole(flow.RoleCollection), // TODO: implement filter for cluster somehow
+				filter.HasRole(flow.RoleCollection),
 			)
 			return requestEng, err
 		}).
