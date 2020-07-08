@@ -153,8 +153,6 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 		return fmt.Errorf("cannot replay WAL: %w", err)
 	}
 
-	fmt.Printf("Got the tries...\n")
-
 	forestSequencing, err := flattener.FlattenForest(mForest)
 	if err != nil {
 		return fmt.Errorf("cannot get storables: %w", err)
