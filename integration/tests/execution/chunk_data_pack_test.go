@@ -12,8 +12,8 @@ import (
 	"github.com/dapperlabs/flow-go/integration/tests/common"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/storage/ledger/ptrie"
+	"github.com/dapperlabs/flow-go/ledger"
+	"github.com/dapperlabs/flow-go/ledger/ptrie"
 )
 
 func TestExecutionChunkDataPacks(t *testing.T) {

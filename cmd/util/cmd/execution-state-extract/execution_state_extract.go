@@ -11,11 +11,11 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
-	"github.com/dapperlabs/flow-go/storage/ledger/wal"
+	"github.com/dapperlabs/flow-go/ledger"
+	"github.com/dapperlabs/flow-go/ledger/outright/mtrie"
+	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/flattener"
+	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/trie"
+	"github.com/dapperlabs/flow-go/ledger/wal"
 )
 
 func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flow.StateCommitment, error) {

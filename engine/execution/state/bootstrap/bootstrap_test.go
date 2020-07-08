@@ -10,7 +10,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/storage/ledger"
+	"github.com/dapperlabs/flow-go/ledger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 

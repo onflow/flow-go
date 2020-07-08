@@ -26,8 +26,8 @@ import (
 	chainsync "github.com/dapperlabs/flow-go/module/synchronization"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/storage/ledger"
-	"github.com/dapperlabs/flow-go/storage/ledger/wal"
+	"github.com/dapperlabs/flow-go/ledger"
+	"github.com/dapperlabs/flow-go/ledger/wal"
 )
 
 func main() {
