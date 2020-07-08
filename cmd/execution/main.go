@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/fvm"
+	bootstrapFilenames "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -88,6 +90,17 @@ func main() {
 			return err
 		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			bootstrapper := bootstrap.NewBootstrapper(node.Logger)
+			err := bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal.FinalState, node.RootBlock.Header)
+			// Root block already loaded, can simply continued
+			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+				return nil, fmt.Errorf("could not bootstrap execution DB: %w", err)
+			} else if err == nil {
+				// Newly bootstrapped Execution DB. Make sure to load execution state
+				if err := loadBootstrapState(node.BaseConfig.BootstrapDir, triedir); err != nil {
+					return nil, fmt.Errorf("could not load bootstrap state: %w", err)
+				}
+			}
 			ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), collector, node.MetricsRegisterer)
 			return ledgerStorage, err
 		}).
@@ -116,13 +129,6 @@ func main() {
 				node.DB,
 				node.Tracer,
 			)
-
-			bootstrapper := bootstrap.NewBootstrapper(node.Logger)
-			err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal.FinalState, node.RootBlock.Header)
-			// Root block already loaded, can simply continue
-			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-				return nil, fmt.Errorf("could not bootstrap execution DB: %w", err)
-			}
 
 			stateSync := sync.NewStateSynchronizer(executionState)
 
@@ -189,4 +195,37 @@ func main() {
 			return rpcEng, nil
 		}).Run()
 
+}
+
+func loadBootstrapState(dir, trie string) error {
+	filename := ""
+
+	if _, err := os.Stat(filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, "checkpoint.00000000")); err == nil {
+		filename = "checkpoint.00000000"
+	} else if _, err := os.Stat(filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, "00000000")); err == nil {
+		filename = "00000000"
+	} else {
+		return fmt.Errorf("could not find bootstrapped execution state")
+	}
+
+	src := filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, filename)
+	dst := filepath.Join(trie, filename)
+
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	if err != nil {
+		return err
+	}
+	return out.Close()
 }

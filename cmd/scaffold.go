@@ -39,6 +39,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	sutil "github.com/dapperlabs/flow-go/storage/util"
 	"github.com/dapperlabs/flow-go/utils/debug"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 const notSet = "not set"
@@ -393,6 +394,12 @@ func (fnb *FlowNodeBuilder) initState() {
 
 		// bootstrap the DKG state with the loaded data
 		fnb.DKGState = wrapper.NewState(dkgPubData)
+
+		fnb.Logger.Info().
+			Hex("root_result_id", logging.Entity(fnb.RootResult)).
+			Hex("root_state_commitment", fnb.RootSeal.FinalState).
+			Hex("root_block_id", logging.Entity(fnb.RootBlock)).
+			Msg("genesis state bootstrapped")
 
 	} else if err != nil {
 		fnb.Logger.Fatal().Err(err).Msg("could not check existing database")
