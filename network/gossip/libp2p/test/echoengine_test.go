@@ -122,7 +122,7 @@ func (s *StubEngineTestSuite) TestDuplicateMessageSequential() {
 
 	// Sends a message from sender to receiver
 	event := &message.Echo{
-		Text: fmt.Sprintf("hello"),
+		Text: "hello",
 	}
 
 	// sends the same message 10 times
@@ -153,7 +153,7 @@ func (s *StubEngineTestSuite) TestDuplicateMessageParallel() {
 
 	// Sends a message from sender to receiver
 	event := &message.Echo{
-		Text: fmt.Sprintf("hello"),
+		Text: "hello",
 	}
 
 	// sends the same message 10 times
@@ -204,7 +204,7 @@ func (s *StubEngineTestSuite) TestDuplicateMessageDifferentChan() {
 
 	// Sends a message from sender to receiver
 	event := &message.Echo{
-		Text: fmt.Sprintf("hello"),
+		Text: "hello",
 	}
 
 	// sends the same message 10 times on both channels
@@ -248,7 +248,7 @@ func (s *StubEngineTestSuite) singleMessage(echo bool) {
 
 	// Sends a message from sender to receiver
 	event := &message.Echo{
-		Text: fmt.Sprintf("hello"),
+		Text: "hello",
 	}
 	require.NoError(s.Suite.T(), sender.con.Submit(event, s.ids[rcvID].NodeID))
 

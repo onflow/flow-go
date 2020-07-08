@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -13,8 +14,19 @@ import (
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
+// RetrieveFunc is a function provided to the provider engine upon construction.
+// It is used by the engine when receiving requests in order to retrieve the
+// related entities. It is important that the retrieve function return a
+// `storage.ErrNotFound` error if the entity does not exist locally; otherwise,
+// the logic will error and not send responses when failing to retrieve entities.
+type RetrieveFunc func(flow.Identifier) (flow.Entity, error)
+
+// Engine is a generic provider engine, handling the fulfillment of entity
+// requests on the flow network. It is the `reply` part of the request-reply
+// pattern provided by the pair of generic exchange engines.
 type Engine struct {
 	unit     *engine.Unit
 	log      zerolog.Logger
@@ -22,11 +34,14 @@ type Engine struct {
 	me       module.Local
 	state    protocol.State
 	con      network.Conduit
-	retrieve RetrieveFunc
+	channel  uint8
 	selector flow.IdentityFilter
+	retrieve RetrieveFunc
 }
 
-// New creates a new consensus propagation engine.
+// New creates a new provider engine, operating on the provided network channel, and accepting requests for entities
+// from a node within the set obtained by applying the provided selector filter. It uses the injected retrieve function
+// to manage the fullfilment of these requests.
 func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, me module.Local, state protocol.State,
 	channel uint8, selector flow.IdentityFilter, retrieve RetrieveFunc) (*Engine, error) {
 
@@ -40,12 +55,13 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		unit:     engine.NewUnit(),
-		log:      log.With().Str("engine", "synchronization").Logger(),
+		log:      log.With().Str("engine", "provider").Logger(),
 		metrics:  metrics,
 		me:       me,
 		state:    state,
-		retrieve: retrieve,
+		channel:  channel,
 		selector: selector,
+		retrieve: retrieve,
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -71,89 +87,99 @@ func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
 }
 
-// SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
-	e.Submit(e.me.NodeID(), event)
+// SubmitLocal submits an message originating on the local node.
+func (e *Engine) SubmitLocal(message interface{}) {
+	e.Submit(e.me.NodeID(), message)
 }
 
-// Submit submits the given event from the node with the given origin ID
+// Submit submits the given message from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(originID flow.Identifier, message interface{}) {
 	e.unit.Launch(func() {
-		err := e.Process(originID, event)
+		err := e.Process(originID, message)
 		if err != nil {
-			e.log.Error().Err(err).Msg("synchronization could not process submitted event")
+			e.log.Error().Err(err).Msg("provider could not process message")
 		}
 	})
 }
 
-// ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.Process(e.me.NodeID(), event)
+// ProcessLocal processes an message originating on the local node.
+func (e *Engine) ProcessLocal(message interface{}) error {
+	return e.Process(e.me.NodeID(), message)
 }
 
-// Process processes the given event from the node with the given origin ID in
+// Process processes the given message from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(originID flow.Identifier, message interface{}) error {
 	return e.unit.Do(func() error {
-		return e.process(originID, event)
+		return e.process(originID, message)
 	})
 }
 
 // process processes events for the propagation engine on the consensus node.
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch ev := event.(type) {
-	case *messages.ResourceRequest:
-		e.before(metrics.MessageResourceRequest)
-		defer e.after(metrics.MessageResourceRequest)
-		return e.onResourceRequest(originID, ev)
-	default:
-		return fmt.Errorf("invalid event type (%T)", event)
-	}
-}
+func (e *Engine) process(originID flow.Identifier, message interface{}) error {
 
-func (e *Engine) before(msg string) {
-	e.metrics.MessageReceived(metrics.EngineSynchronization, msg)
+	e.metrics.MessageReceived(engine.ChannelName(e.channel), metrics.MessageResourceRequest)
+	defer e.metrics.MessageHandled(engine.ChannelName(e.channel), metrics.MessageResourceRequest)
+
 	e.unit.Lock()
-}
+	defer e.unit.Unlock()
 
-func (e *Engine) after(msg string) {
-	e.unit.Unlock()
-	e.metrics.MessageHandled(metrics.EngineSynchronization, msg)
+	switch msg := message.(type) {
+	case *messages.ResourceRequest:
+		return e.onResourceRequest(originID, msg)
+	default:
+		return engine.NewInvalidInputErrorf("invalid message type (%T)", message)
+	}
 }
 
 func (e *Engine) onResourceRequest(originID flow.Identifier, req *messages.ResourceRequest) error {
 
-	// TODO: track previous requests to protect against spam / repeated requests
-
-	// TODO: add support for batch requests (multiple IDs in requests, multiple resources in response)
-
-	// TODO: add delay to allow compounding of requests
+	// TODO: add reputation system to punish nodes for malicious behaviour (spam / repeated requests)
 
 	// then, we try to get the current identity of the requester and check it against the filter
 	// for the handler to make sure the requester is authorized for this resource
-	identities, err := e.state.Final().Identities(e.selector)
+	requesters, err := e.state.Final().Identities(filter.And(
+		e.selector,
+		filter.HasNodeID(originID)),
+	)
 	if err != nil {
-		return fmt.Errorf("could not retrieve identity for origin: %w", err)
+		return fmt.Errorf("could not get requesters: %w", err)
 	}
-	if len(identities) == 0 {
-		return fmt.Errorf("origin is not allowed to request resource")
+	if len(requesters) == 0 {
+		return engine.NewInvalidInputErrorf("invalid requester origin (%x)", originID)
 	}
 
-	// finally, execute the retrieve function to get the resource and send the response
-	entity, err := e.retrieve(req.EntityID)
+	// try to retrieve each entity and skip missing ones
+	entities := make([]flow.Entity, 0, len(req.EntityIDs))
+	for _, entityID := range req.EntityIDs {
+		entity, err := e.retrieve(entityID)
+		if errors.Is(err, storage.ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("could not retrieve entity (%x): %w", entityID, err)
+		}
+		entities = append(entities, entity)
+	}
+
+	// NOTE: we do _NOT_ avoid sending empty responses, as this will allow
+	// the requester to know we don't have any of the requested entities, which
+	// allows him to retry them immediately, rather than waiting for the expiry
+	// of the retry interval
+
+	// send back the response
+	res := &messages.ResourceResponse{
+		Nonce:    req.Nonce,
+		Entities: entities,
+	}
+	err = e.con.Submit(res, originID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve entity: %w", err)
+		return fmt.Errorf("could not send response: %w", err)
 	}
-	rep := &messages.ResourceResponse{
-		Entity: entity,
-		Nonce:  req.Nonce,
-	}
-	err = e.con.Submit(rep, originID)
-	if err != nil {
-		return fmt.Errorf("could not send resource response: %w", err)
-	}
+
+	e.metrics.MessageSent(engine.ChannelName(e.channel), metrics.MessageResourceResponse)
 
 	return nil
 }
