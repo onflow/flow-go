@@ -94,5 +94,5 @@ func LogError(log zerolog.Logger, err error) {
 	}
 
 	// all other errors should just be logged as usual
-	log.Error().Err(err).Msg(msg)
+	log.Error().Str("error_type", "generic_error").Err(err).Msg(msg)
 }
