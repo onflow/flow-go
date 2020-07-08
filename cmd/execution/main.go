@@ -149,6 +149,10 @@ func main() {
 			return providerEngine, err
 		}).
 		Component("requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			// TODO: We should implement a filter that makes it possible to select the correct cluster for
+			// a given entity, so that we can send off the request to the correct cluster here, while still
+			// using the generic engine.
+			// => https://github.com/dapperlabs/flow-go/issues/4359
 			requestEng, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
 				engine.RequestCollections,
 				filter.HasRole(flow.RoleCollection),

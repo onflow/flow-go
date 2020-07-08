@@ -120,21 +120,21 @@ func (e *Engine) Process(originID flow.Identifier, message interface{}) error {
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, message interface{}) error {
 
-	e.metrics.MessageReceived(engine.ChannelName(e.channel), metrics.MessageResourceRequest)
-	defer e.metrics.MessageHandled(engine.ChannelName(e.channel), metrics.MessageResourceRequest)
+	e.metrics.MessageReceived(engine.ChannelName(e.channel), metrics.MessageEntityRequest)
+	defer e.metrics.MessageHandled(engine.ChannelName(e.channel), metrics.MessageEntityRequest)
 
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
 	switch msg := message.(type) {
-	case *messages.ResourceRequest:
-		return e.onResourceRequest(originID, msg)
+	case *messages.EntityRequest:
+		return e.onEntityRequest(originID, msg)
 	default:
 		return engine.NewInvalidInputErrorf("invalid message type (%T)", message)
 	}
 }
 
-func (e *Engine) onResourceRequest(originID flow.Identifier, req *messages.ResourceRequest) error {
+func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityRequest) error {
 
 	// TODO: add reputation system to punish nodes for malicious behaviour (spam / repeated requests)
 
@@ -170,7 +170,7 @@ func (e *Engine) onResourceRequest(originID flow.Identifier, req *messages.Resou
 	// of the retry interval
 
 	// send back the response
-	res := &messages.ResourceResponse{
+	res := &messages.EntityResponse{
 		Nonce:    req.Nonce,
 		Entities: entities,
 	}
@@ -179,7 +179,7 @@ func (e *Engine) onResourceRequest(originID flow.Identifier, req *messages.Resou
 		return fmt.Errorf("could not send response: %w", err)
 	}
 
-	e.metrics.MessageSent(engine.ChannelName(e.channel), metrics.MessageResourceResponse)
+	e.metrics.MessageSent(engine.ChannelName(e.channel), metrics.MessageEntityResponse)
 
 	return nil
 }

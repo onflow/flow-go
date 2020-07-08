@@ -41,7 +41,7 @@ type Engine struct {
 	selector flow.IdentityFilter
 	handle   HandleFunc
 	items    map[flow.Identifier]Item
-	requests map[uint64]*messages.ResourceRequest
+	requests map[uint64]*messages.EntityRequest
 }
 
 // New creates a new requester engine, operating on the provided network channel, and requesting entities from a node
@@ -94,8 +94,8 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 		channel:  channel,
 		selector: selector,
 		handle:   nil,
-		items:    make(map[flow.Identifier]Item),             // holds all pending items
-		requests: make(map[uint64]*messages.ResourceRequest), // holds all sent requests
+		items:    make(map[flow.Identifier]Item),           // holds all pending items
+		requests: make(map[uint64]*messages.EntityRequest), // holds all sent requests
 	}
 
 	// register the engine with the network layer and store the conduit
@@ -270,7 +270,7 @@ func (e *Engine) dispatchRequests() error {
 
 	// create a batch request, send it and store it for reference
 	targetID := providers.Sample(1)[0].NodeID
-	req := &messages.ResourceRequest{
+	req := &messages.EntityRequest{
 		Nonce:     rand.Uint64(),
 		EntityIDs: entityIDs,
 	}
@@ -290,7 +290,7 @@ func (e *Engine) dispatchRequests() error {
 		delete(e.requests, req.Nonce)
 	}()
 
-	e.metrics.MessageSent(engine.ChannelName(e.channel), metrics.MessageResourceRequest)
+	e.metrics.MessageSent(engine.ChannelName(e.channel), metrics.MessageEntityRequest)
 
 	return nil
 }
@@ -298,21 +298,21 @@ func (e *Engine) dispatchRequests() error {
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, message interface{}) error {
 
-	e.metrics.MessageReceived(engine.ChannelName(e.channel), metrics.MessageResourceResponse)
-	defer e.metrics.MessageHandled(engine.ChannelName(e.channel), metrics.MessageResourceResponse)
+	e.metrics.MessageReceived(engine.ChannelName(e.channel), metrics.MessageEntityResponse)
+	defer e.metrics.MessageHandled(engine.ChannelName(e.channel), metrics.MessageEntityResponse)
 
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
 	switch msg := message.(type) {
-	case *messages.ResourceResponse:
-		return e.onResourceResponse(originID, msg)
+	case *messages.EntityResponse:
+		return e.onEntityResponse(originID, msg)
 	default:
 		return engine.NewInvalidInputErrorf("invalid message type (%T)", message)
 	}
 }
 
-func (e *Engine) onResourceResponse(originID flow.Identifier, res *messages.ResourceResponse) error {
+func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.EntityResponse) error {
 
 	// check that the response comes from a valid provider
 	providers, err := e.state.Final().Identities(filter.And(
