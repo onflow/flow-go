@@ -125,7 +125,7 @@ func WithMetricsCollector(mc *MetricsCollector) Option {
 
 // WithTransactionSignatureVerifier sets the transaction processors for a
 // virtual machine context.
-func WithTransactionProcessors(processors []TransactionProcessor) Option {
+func WithTransactionProcessors(processors ...TransactionProcessor) Option {
 	return func(ctx Context) Context {
 		ctx.TransactionProcessors = processors
 		return ctx

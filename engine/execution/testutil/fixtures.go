@@ -147,9 +147,9 @@ func CreateAccountsWithSimpleAddresses(
 	chain flow.Chain,
 ) ([]flow.Address, error) {
 	ctx := fvm.NewContext(
-		fvm.WithTransactionProcessors([]fvm.TransactionProcessor{
+		fvm.WithTransactionProcessors(
 			fvm.NewTransactionInvocator(),
-		}),
+		),
 	)
 
 	var accounts []flow.Address

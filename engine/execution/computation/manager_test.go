@@ -85,7 +85,8 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	blockComputer := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+	blockComputer, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+	require.NoError(t, err)
 
 	engine := &Manager{
 		blockComputer: blockComputer,
@@ -99,6 +100,6 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NotEmpty(t, blockView.Delta())
-	require.Len(t, returnedComputationResult.StateSnapshots, 1)
+	require.Len(t, returnedComputationResult.StateSnapshots, 1+1) // 1 coll + 1 system chunk
 	assert.NotEmpty(t, returnedComputationResult.StateSnapshots[0].Delta)
 }

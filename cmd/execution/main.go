@@ -68,7 +68,7 @@ func main() {
 				fvm.WithBlocks(node.Storage.Blocks),
 			)
 
-			computationManager = computation.New(
+			manager, err := computation.New(
 				node.Logger,
 				collector,
 				node.Tracer,
@@ -77,8 +77,9 @@ func main() {
 				vm,
 				vmCtx,
 			)
+			computationManager = manager
 
-			return nil
+			return err
 		}).
 		Module("execution metrics", func(node *cmd.FlowNodeBuilder) error {
 			collector = metrics.NewExecutionCollector(node.Tracer, node.MetricsRegisterer)
