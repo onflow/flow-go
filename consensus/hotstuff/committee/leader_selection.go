@@ -66,6 +66,10 @@ func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]int, e
 		return nil, fmt.Errorf("can not create rng: %w", err)
 	}
 
+	if len(weights) == 0 {
+		return nil, fmt.Errorf("weights is empty")
+	}
+
 	// create an array of weight ranges for each identity.
 	// an i-th identity is selected as the leader if the random number falls into its weight range.
 	weightSum := make([]uint64, 0, len(weights))
@@ -102,6 +106,14 @@ func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]int, e
 // binary search to find the index of the first item in the given array that is
 // bigger or equal to the given value.
 func binarySearch(value uint64, arr []uint64) (int, error) {
+	if len(arr) == 0 {
+		return 0, fmt.Errorf("arr is empty")
+	}
+
+	if value >= arr[len(arr)-1] {
+		return 0, fmt.Errorf("value (%v) exceeds the search range: [0, %v)", value, arr[len(arr)-1])
+	}
+
 	return bsearch(0, len(arr)-1, value, arr), nil
 }
 
