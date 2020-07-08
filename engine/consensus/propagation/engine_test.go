@@ -14,6 +14,7 @@ import (
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	module "github.com/dapperlabs/flow-go/module/mock"
+	"github.com/dapperlabs/flow-go/module/trace"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -44,6 +45,7 @@ func TestOnCollectionGuarantee(t *testing.T) {
 	e := &Engine{
 		log:        log,
 		metrics:    metrics,
+		tracer:     trace.NewNoopTracer(),
 		mempool:    metrics,
 		spans:      metrics,
 		con:        con,

@@ -4,47 +4,56 @@ package badger
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/state"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 type Mutator struct {
 	state *State
 }
 
-func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) error {
+func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal) error {
 	return operation.RetryOnConflict(m.state.db.Update, func(tx *badger.Txn) error {
 
-		// FIRST: execute all the validity checks on the genesis block
+		// NEW: bootstrapping from an arbitrary states requires an execution result and block seal
+		// as input; we need to verify them against each other and against the root block
 
-		// the initial height needs to be height zero
-		if genesis.Header.Height != 0 {
-			return fmt.Errorf("genesis height must be zero")
+		if result.BlockID != root.ID() {
+			return fmt.Errorf("root execution result for wrong block (%x != %x)", result.BlockID, root.ID())
 		}
 
-		// the parent must be zero hash
-		if genesis.Header.ParentID != flow.ZeroID {
-			return errors.New("genesis parent must have zero ID")
+		if seal.BlockID != root.ID() {
+			return fmt.Errorf("root block seal for wrong block (%x != %x)", seal.BlockID, root.ID())
 		}
 
-		// we should have no guarantees
-		if len(genesis.Payload.Guarantees) > 0 {
-			return fmt.Errorf("genesis block must have zero guarantees")
+		if seal.ResultID != result.ID() {
+			return fmt.Errorf("root block seal for wrong execution result (%x != %x)", seal.ResultID, result.ID())
 		}
 
-		// we should have no seals
-		if len(genesis.Payload.Seals) > 0 {
-			return fmt.Errorf("genesis block must have zero seals")
+		// FIRST: validate the root block and its payload
+
+		// NOTE: we might need to relax these restrictions and find a way to process the
+		// payload of the root block once we implement epochs
+
+		// the root block should have an empty guarantee payload
+		if len(root.Payload.Guarantees) > 0 {
+			return fmt.Errorf("root block must not have guarantees")
 		}
 
-		// we should have one role of each type at least
+		// the root block should have an empty seal payload
+		if len(root.Payload.Seals) > 0 {
+			return fmt.Errorf("root block must not have seals")
+		}
+
+		// the root block needs at least one identity for each role
 		roles := make(map[flow.Role]uint)
-		for _, identity := range genesis.Payload.Identities {
+		for _, identity := range root.Payload.Identities {
 			roles[identity.Role]++
 		}
 		if roles[flow.RoleConsensus] < 1 {
@@ -60,9 +69,9 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 			return fmt.Errorf("need at least one verification node")
 		}
 
-		// check that we don't have duplicate identity entries
+		// the root block should not contain duplicate identities
 		identLookup := make(map[flow.Identifier]struct{})
-		for _, identity := range genesis.Payload.Identities {
+		for _, identity := range root.Payload.Identities {
 			_, ok := identLookup[identity.NodeID]
 			if ok {
 				return fmt.Errorf("duplicate node identifier (%x)", identity.NodeID)
@@ -70,9 +79,9 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 			identLookup[identity.NodeID] = struct{}{}
 		}
 
-		// check identities do not have duplicate addresses
+		// the root block identities should not contain duplicate addresses
 		addrLookup := make(map[string]struct{})
-		for _, identity := range genesis.Payload.Identities {
+		for _, identity := range root.Payload.Identities {
 			_, ok := addrLookup[identity.Address]
 			if ok {
 				return fmt.Errorf("duplicate node address (%x)", identity.Address)
@@ -80,85 +89,76 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 			addrLookup[identity.Address] = struct{}{}
 		}
 
-		// for each identity, check it has a non-zero stake
-		for _, identity := range genesis.Payload.Identities {
+		// the root block identities should all have a non-zero stake
+		for _, identity := range root.Payload.Identities {
 			if identity.Stake == 0 {
 				return fmt.Errorf("zero stake identity (%x)", identity.NodeID)
 			}
 		}
 
-		// SECOND: update the underyling database with the genesis data
+		// SECOND: insert the initial protocol state data into the database
 
-		// 1) insert the block, the genesis identities and index it by beight
-		err := m.state.blocks.Store(genesis)
+		// 1) insert the root block with its payload into the state and index it
+		err := m.state.blocks.Store(root)
 		if err != nil {
-			return fmt.Errorf("could not insert header: %w", err)
+			return fmt.Errorf("could not insert root block: %w", err)
 		}
-		err = operation.IndexBlockHeight(0, genesis.ID())(tx)
+		err = operation.IndexBlockHeight(root.Header.Height, root.ID())(tx)
 		if err != nil {
-			return fmt.Errorf("could not initialize boundary: %w", err)
+			return fmt.Errorf("could not index root block: %w", err)
 		}
-		err = operation.InsertBlockChildren(genesis.ID(), nil)(tx)
+		err = operation.InsertBlockChildren(root.ID(), nil)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert empty block children: %w", err)
-		}
-
-		// TODO: put seal into payload to have it signed
-
-		// 2) generate genesis execution result, insert and index by block
-		result := flow.ExecutionResult{ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: flow.ZeroID,
-			BlockID:          genesis.ID(),
-			FinalStateCommit: commit,
-		}}
-		err = operation.InsertExecutionResult(&result)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert genesis result: %w", err)
-		}
-		err = operation.IndexExecutionResult(genesis.ID(), result.ID())(tx)
-		if err != nil {
-			return fmt.Errorf("could not index genesis result: %w", err)
+			return fmt.Errorf("could not initialize root child index: %w", err)
 		}
 
-		// 3) generate genesis block seal, insert and index by block
-		seal := flow.Seal{
-			BlockID:      genesis.ID(),
-			ResultID:     result.ID(),
-			InitialState: commit,
-			FinalState:   result.FinalStateCommit,
-		}
-		err = operation.InsertSeal(seal.ID(), &seal)(tx)
+		// 2) insert the root execution result into the database and index it
+		err = operation.InsertExecutionResult(result)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert genesis seal: %w", err)
+			return fmt.Errorf("could not insert root result: %w", err)
 		}
-		err = operation.IndexBlockSeal(genesis.ID(), seal.ID())(tx)
+		err = operation.IndexExecutionResult(root.ID(), result.ID())(tx)
 		if err != nil {
-			return fmt.Errorf("could not index genesis block seal: %w", err)
+			return fmt.Errorf("could not index root result: %w", err)
 		}
 
-		// 4) initialize all of the special views and heights
-		err = operation.InsertStartedView(genesis.Header.View)(tx)
+		// 3) insert the root block seal into the database and index it
+		err = operation.InsertSeal(seal.ID(), seal)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert root seal: %w", err)
+		}
+		err = operation.IndexBlockSeal(root.ID(), seal.ID())(tx)
+		if err != nil {
+			return fmt.Errorf("could not index root block seal: %w", err)
+		}
+
+		// 4) initialize the current protocol state values
+		err = operation.InsertStartedView(root.Header.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert started view: %w", err)
 		}
-		err = operation.InsertVotedView(genesis.Header.View)(tx)
+		err = operation.InsertVotedView(root.Header.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert started view: %w", err)
 		}
-		err = operation.InsertFinalizedHeight(genesis.Header.Height)(tx)
+		err = operation.InsertRootHeight(root.Header.Height)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert root height: %w", err)
+		}
+		err = operation.InsertFinalizedHeight(root.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert finalized height: %w", err)
 		}
-		err = operation.InsertSealedHeight(genesis.Header.Height)(tx)
+		err = operation.InsertSealedHeight(root.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert sealed height: %w", err)
 		}
 
-		m.state.metrics.FinalizedHeight(0)
-		m.state.metrics.BlockFinalized(genesis)
+		m.state.metrics.FinalizedHeight(root.Header.Height)
+		m.state.metrics.BlockFinalized(root)
 
-		m.state.metrics.SealedHeight(0)
-		m.state.metrics.BlockSealed(genesis)
+		m.state.metrics.SealedHeight(root.Header.Height)
+		m.state.metrics.BlockSealed(root)
 
 		return nil
 	})
@@ -167,16 +167,16 @@ func (m *Mutator) Bootstrap(commit flow.StateCommitment, genesis *flow.Block) er
 func (m *Mutator) Extend(candidate *flow.Block) error {
 
 	// FIRST: We do some initial cheap sanity checks. Currently, only the
-	// genesis block can contain identities. We also want to make sure that the
+	// root block can contain identities. We also want to make sure that the
 	// payload hash has been set correctly.
 
 	header := candidate.Header
 	payload := candidate.Payload
 	if len(payload.Identities) > 0 {
-		return fmt.Errorf("extend block has identities")
+		return state.NewInvalidExtensionError("extend block has identities")
 	}
 	if payload.Hash() != header.PayloadHash {
-		return fmt.Errorf("payload integrity check failed")
+		return state.NewInvalidExtensionError("payload integrity check failed")
 	}
 
 	// SECOND: Next, we can check whether the block is a valid descendant of the
@@ -187,10 +187,12 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		return fmt.Errorf("could not retrieve parent: %w", err)
 	}
 	if header.ChainID != parent.ChainID {
-		return fmt.Errorf("candidate built for invalid chain (candidate: %s, parent: %s)", header.ChainID, parent.ChainID)
+		return state.NewInvalidExtensionErrorf("candidate built for invalid chain (candidate: %s, parent: %s)",
+			header.ChainID, parent.ChainID)
 	}
 	if header.Height != parent.Height+1 {
-		return fmt.Errorf("candidate built with invalid height (candidate: %d, parent: %d)", header.Height, parent.Height)
+		return state.NewInvalidExtensionErrorf("candidate built with invalid height (candidate: %d, parent: %d)",
+			header.Height, parent.Height)
 	}
 
 	// THIRD: Once we have established the block is valid within itself, and the
@@ -216,7 +218,8 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 			return fmt.Errorf("could not retrieve ancestor (%x): %w", ancestorID, err)
 		}
 		if ancestor.Height < finalized {
-			return fmt.Errorf("candidate block conflicts with finalized state (ancestor: %d final: %d)", ancestor.Height, finalized)
+			return state.NewOutdatedExtensionErrorf("candidate block conflicts with finalized state (ancestor: %d final: %d)",
+				ancestor.Height, finalized)
 		}
 		ancestorID = ancestor.ParentID
 	}
@@ -232,6 +235,17 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	limit := header.Height - uint64(m.state.expiry)
 	if limit > header.Height { // overflow check
 		limit = 0
+	}
+
+	// look up the root height so we don't look too far back
+	// initially this is the genesis block height (aka 0).
+	var rootHeight uint64
+	err = m.state.db.View(operation.RetrieveRootHeight(&rootHeight))
+	if err != nil {
+		return fmt.Errorf("could not retrieve root block height: %w", err)
+	}
+	if limit < rootHeight {
+		limit = rootHeight
 	}
 
 	// build a list of all previously used guarantees on this part of the chain
@@ -261,7 +275,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		// if the guarantee was already included before, error
 		_, duplicated := lookup[guarantee.ID()]
 		if duplicated {
-			return fmt.Errorf("payload includes duplicate guarantee (%x)", guarantee.ID())
+			return state.NewInvalidExtensionErrorf("payload includes duplicate guarantee (%x)", guarantee.ID())
 		}
 
 		// get the reference block to check expiry
@@ -272,7 +286,8 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 
 		// if the guarantee references a block with expired height, error
 		if ref.Height < limit {
-			return fmt.Errorf("payload includes expired guarantee (height: %d, limit: %d)", ref.Height, limit)
+			return state.NewInvalidExtensionErrorf("payload includes expired guarantee (height: %d, limit: %d)",
+				ref.Height, limit)
 		}
 	}
 
@@ -291,7 +306,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		byBlock[seal.BlockID] = seal
 	}
 	if len(payload.Seals) > len(byBlock) {
-		return fmt.Errorf("multiple seals for the same block")
+		return state.NewInvalidExtensionErrorf("multiple seals for the same block")
 	}
 
 	// get the parent's block seal, which constitutes the beginning of the
@@ -318,15 +333,15 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		}
 		header, err := m.state.headers.ByHeight(height)
 		if err != nil {
-			return fmt.Errorf("could not get block for height (%d): %w", height, err)
+			return fmt.Errorf("could not get block for sealed height (%d): %w", height, err)
 		}
 		blockID := header.ID()
 		next, found := byBlock[blockID]
 		if !found {
-			return fmt.Errorf("chain of seals broken for finalized (missing: %x)", blockID)
+			return state.NewInvalidExtensionErrorf("chain of seals broken for finalized (missing: %x)", blockID)
 		}
 		if !bytes.Equal(next.InitialState, last.FinalState) {
-			return fmt.Errorf("seal execution states do not connect in finalized")
+			return state.NewInvalidExtensionError("seal execution states do not connect in finalized")
 		}
 		delete(byBlock, blockID)
 		last = next
@@ -358,10 +373,10 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		pendingID := pendingIDs[i]
 		next, found := byBlock[pendingID]
 		if !found {
-			return fmt.Errorf("chain of seals broken for pending (missing: %x)", pendingID)
+			return state.NewInvalidExtensionErrorf("chain of seals broken for pending (missing: %x)", pendingID)
 		}
 		if !bytes.Equal(next.InitialState, last.FinalState) {
-			return fmt.Errorf("seal execution states do not connect in pending")
+			return state.NewInvalidExtensionErrorf("seal execution states do not connect in pending")
 		}
 		delete(byBlock, pendingID)
 		last = next
@@ -386,9 +401,15 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		if err != nil {
 			return fmt.Errorf("could not index candidate seal: %w", err)
 		}
+		// add an empty child index for the added block
 		err = operation.InsertBlockChildren(blockID, nil)(tx)
 		if err != nil {
 			return fmt.Errorf("could not initialize children index: %w", err)
+		}
+		// index the added block as a child of its parent
+		err = procedure.IndexBlockChild(candidate.Header.ParentID, blockID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not add to parent index: %w", err)
 		}
 		return nil
 	})

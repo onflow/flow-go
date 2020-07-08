@@ -5,14 +5,15 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/runtime"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/engine/execution/testutil"
+	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -35,17 +36,17 @@ type CompleteExecutionResult struct {
 // CompleteExecutionResultFixture returns complete execution result with an
 // execution receipt referencing the block/collections.
 // chunkCount determines the number of chunks inside each receipt
-func CompleteExecutionResultFixture(t *testing.T, chunkCount int) CompleteExecutionResult {
+func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain) CompleteExecutionResult {
 
 	// setup collection
-	tx1 := testutil.DeployCounterContractTransaction(flow.ServiceAddress())
-	err := testutil.SignTransactionByRoot(tx1, 0)
+	tx1 := testutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
+	err := testutil.SignTransactionAsServiceAccount(tx1, 0, chain)
 	require.NoError(t, err)
-	tx2 := testutil.CreateCounterTransaction(flow.ServiceAddress(), flow.ServiceAddress())
-	err = testutil.SignTransactionByRoot(tx2, 1)
+	tx2 := testutil.CreateCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+	err = testutil.SignTransactionAsServiceAccount(tx2, 1, chain)
 	require.NoError(t, err)
-	tx3 := testutil.CreateCounterPanicTransaction(flow.ServiceAddress(), flow.ServiceAddress())
-	err = testutil.SignTransactionByRoot(tx3, 2)
+	tx3 := testutil.CreateCounterPanicTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+	err = testutil.SignTransactionAsServiceAccount(tx3, 2, chain)
 	require.NoError(t, err)
 	transactions := []*flow.TransactionBody{tx1, tx2, tx3}
 
@@ -75,27 +76,31 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) CompleteExecut
 
 	metricsCollector := &metrics.NoopCollector{}
 
+	log := zerolog.Nop()
+
 	unittest.RunWithTempDir(t, func(dir string) {
 		led, err := ledger.NewMTrieStorage(dir, 100, metricsCollector, nil)
 		require.NoError(t, err)
 		defer led.Done()
 
-		startStateCommitment, err := bootstrap.BootstrapLedger(
+		startStateCommitment, err := bootstrap.NewBootstrapper(log).BootstrapLedger(
 			led,
 			unittest.ServiceAccountPublicKey,
 			unittest.GenesisTokenSupply,
+			chain,
 		)
 		require.NoError(t, err)
 
 		rt := runtime.NewInterpreterRuntime()
-		vm, err := virtualmachine.New(rt)
+
+		vm, err := fvm.New(rt, chain)
 		require.NoError(t, err)
 
 		// create state.View
 		view := delta.NewView(state.LedgerGetRegister(led, startStateCommitment))
 
 		// create BlockComputer
-		bc := computer.NewBlockComputer(vm, nil, new(storage.Blocks))
+		bc := computer.NewBlockComputer(vm, new(storage.Blocks), nil, nil, log)
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
 		completeColls[guarantee.ID()] = &entity.CompleteCollection{
@@ -158,8 +163,8 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int) CompleteExecut
 
 		for i := 1; i < chunkCount; i++ {
 
-			tx3 = testutil.CreateCounterPanicTransaction(flow.ServiceAddress(), flow.ServiceAddress())
-			err = testutil.SignTransactionByRoot(tx3, 3+uint64(i))
+			tx3 = testutil.CreateCounterPanicTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+			err = testutil.SignTransactionAsServiceAccount(tx3, 3+uint64(i), chain)
 			require.NoError(t, err)
 
 			transactions := []*flow.TransactionBody{tx3}

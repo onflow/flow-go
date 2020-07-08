@@ -12,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -26,6 +27,7 @@ type Engine struct {
 	unit    *engine.Unit            // used to manage concurrency & shutdown
 	log     zerolog.Logger          // used to log relevant actions with context
 	metrics module.EngineMetrics    // used to track sent & received messages
+	tracer  module.Tracer           // used for tracing
 	spans   module.ConsensusMetrics // used to track consensus spans
 	prop    network.Engine          // used to process & propagate collections
 	state   protocol.State          // used to access the protocol state
@@ -34,13 +36,24 @@ type Engine struct {
 }
 
 // New creates a new collection propagation engine.
-func New(log zerolog.Logger, metrics module.EngineMetrics, spans module.ConsensusMetrics, net module.Network, prop network.Engine, state protocol.State, headers storage.Headers, me module.Local) (*Engine, error) {
+func New(
+	log zerolog.Logger,
+	metrics module.EngineMetrics,
+	tracer module.Tracer,
+	spans module.ConsensusMetrics,
+	net module.Network,
+	prop network.Engine,
+	state protocol.State,
+	headers storage.Headers,
+	me module.Local,
+) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		unit:    engine.NewUnit(),
 		log:     log.With().Str("engine", "ingestion").Logger(),
 		metrics: metrics,
+		tracer:  tracer,
 		spans:   spans,
 		prop:    prop,
 		state:   state,
@@ -81,8 +94,10 @@ func (e *Engine) SubmitLocal(event interface{}) {
 func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(originID, event)
-		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+		if engine.IsInvalidInputError(err) {
+			e.log.Error().Str("error_type", "invalid_input").Err(err).Msg("ingestion received invalid event")
+		} else if err != nil {
+			e.log.Error().Err(err).Msg("ingestion could not process submitted event")
 		}
 	})
 }
@@ -116,6 +131,11 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // onCollectionGuarantee is used to process collection guarantees received
 // from nodes that are not consensus nodes (notably collection nodes).
 func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
+	span := e.tracer.StartSpan(guarantee.CollectionID, trace.CONProcessCollection)
+	// TODO finish span if we error? How are they shown in Jaeger?
+	span.SetTag("collection_id", guarantee.CollectionID)
+	childSpan := e.tracer.StartSpanFromParent(span, trace.CONIngOnCollectionGuarantee)
+	defer childSpan.Finish()
 
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
@@ -128,7 +148,7 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	// ensure there is at least one guarantor
 	guarantors := guarantee.SignerIDs
 	if len(guarantors) == 0 {
-		return fmt.Errorf("invalid collection guarantee with no guarantors")
+		return engine.NewInvalidInputError("invalid collection guarantee with no guarantors")
 	}
 
 	// get the identity of the origin node, so we can check if it's a valid
@@ -144,7 +164,7 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	// between consensus nodes anyway; we do no processing or validation in this
 	// engine beyond validating the origin
 	if identity.Role != flow.RoleCollection {
-		return fmt.Errorf("invalid origin node role (%s)", identity.Role)
+		return engine.NewInvalidInputErrorf("invalid origin node role (%s)", identity.Role)
 	}
 
 	// ensure that collection has not expired
@@ -160,7 +180,7 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	}
 	cluster, ok := clusters.ByNodeID(guarantors[0])
 	if !ok {
-		return fmt.Errorf("guarantor (id=%s) does not exist in any cluster", guarantors[0])
+		return engine.NewInvalidInputErrorf("guarantor (id=%s) does not exist in any cluster", guarantors[0])
 	}
 
 	// NOTE: Eventually we should check the signatures, ensure a quorum of the
@@ -173,7 +193,7 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	for _, guarantorID := range guarantors {
 		_, exists := cluster.ByNodeID(guarantorID)
 		if !exists {
-			return fmt.Errorf("inconsistent guarantors from different clusters")
+			return engine.NewInvalidInputError("inconsistent guarantors from different clusters")
 		}
 	}
 
@@ -196,7 +216,7 @@ func (e *Engine) validateExpiry(guarantee *flow.CollectionGuarantee) error {
 	}
 	ref, err := e.headers.ByBlockID(guarantee.ReferenceBlockID)
 	if errors.Is(err, storage.ErrNotFound) {
-		return fmt.Errorf("collection guarantee refers to an unknown block: %x", guarantee.ReferenceBlockID)
+		return engine.NewInvalidInputErrorf("collection guarantee refers to an unknown block: %x", guarantee.ReferenceBlockID)
 	}
 
 	// if head has advanced beyond the block referenced by the collection guarantee by more than 'expiry' number of blocks,
@@ -207,7 +227,7 @@ func (e *Engine) validateExpiry(guarantee *flow.CollectionGuarantee) error {
 		diff = 0
 	}
 	if diff > flow.DefaultTransactionExpiry {
-		return fmt.Errorf("collection guarantee expired ref_height=%d final_height=%d", ref.Height, final.Height)
+		return engine.NewInvalidInputErrorf("collection guarantee expired ref_height=%d final_height=%d", ref.Height, final.Height)
 	}
 
 	return nil

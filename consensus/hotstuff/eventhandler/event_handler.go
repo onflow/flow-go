@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -18,6 +21,7 @@ import (
 // responsible for running the event loop to ensure that.
 type EventHandler struct {
 	log            zerolog.Logger
+	tracer         module.Tracer
 	paceMaker      hotstuff.PaceMaker
 	blockProducer  hotstuff.BlockProducer
 	forks          hotstuff.Forks
@@ -34,6 +38,7 @@ type EventHandler struct {
 // New creates an EventHandler instance with initial components.
 func New(
 	log zerolog.Logger,
+	tracer module.Tracer,
 	paceMaker hotstuff.PaceMaker,
 	blockProducer hotstuff.BlockProducer,
 	forks hotstuff.Forks,
@@ -47,6 +52,7 @@ func New(
 ) (*EventHandler, error) {
 	e := &EventHandler{
 		log:            log.With().Str("hotstuff", "participant").Logger(),
+		tracer:         tracer,
 		paceMaker:      paceMaker,
 		blockProducer:  blockProducer,
 		forks:          forks,
@@ -119,12 +125,12 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 
 		// validate the block. exit if the proposal is invalid
 		err := e.validator.ValidateProposal(proposal)
-		if errors.Is(err, model.ErrorInvalidBlock{}) {
-			log.Warn().AnErr("ErrorInvalidBlock", err).Msg("invalid block proposal")
+		if model.IsInvalidBlockError(err) {
+			log.Warn().Err(err).Msg("invalid block proposal")
 			return nil
 		}
 		if errors.Is(err, model.ErrUnverifiableBlock) {
-			log.Warn().AnErr("ErrUnverifiableBlock", err).Msg("unverifiable block proposal")
+			log.Warn().Err(err).Msg("unverifiable block proposal")
 
 			// even if the block is unverifiable because the QC has been
 			// pruned, it still needs to be added to the forks, otherwise,
@@ -241,6 +247,7 @@ func (e *EventHandler) startNewView() error {
 	log = log.With().Hex("leader_id", currentLeader[:]).Logger()
 
 	if e.committee.Self() == currentLeader {
+		startTime := time.Now()
 
 		log.Debug().Msg("generating block proposal as leader")
 
@@ -255,6 +262,15 @@ func (e *EventHandler) startNewView() error {
 		if err != nil {
 			return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
 		}
+
+		span := e.tracer.StartSpan(proposal.Block.BlockID, trace.CONProcessBlock, opentracing.StartTime(startTime))
+		span.SetTag("block_id", proposal.Block.BlockID)
+		span.SetTag("view", proposal.Block.View)
+		span.SetTag("proposer", proposal.Block.ProposerID.String())
+		span.SetTag("leader", true)
+		childSpan := e.tracer.StartSpanFromParent(span, trace.CONHotEventHandlerStartNewView, opentracing.StartTime(
+			startTime))
+		defer childSpan.Finish()
 
 		block := proposal.Block
 
@@ -364,7 +380,7 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNextLeader(block *model.Blo
 	shouldVote := true
 	ownVote, err := e.voter.ProduceVoteIfVotable(block, curView)
 	if err != nil {
-		if errors.Is(err, model.NoVoteError{}) {
+		if model.IsNoVoteError(err) {
 			// if this block should not be voted, then change shouldVote to false
 			log.Debug().Err(err).Msg("should not vote for this block")
 			shouldVote = false
@@ -415,9 +431,8 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *model.
 
 	ownVote, err := e.voter.ProduceVoteIfVotable(block, curView)
 	shouldVote := true
-	var noVote *model.NoVoteError
 	if err != nil {
-		if !errors.As(err, &noVote) {
+		if !model.IsNoVoteError(err) {
 			// unknown error, exit the event loop
 			return fmt.Errorf("could not produce vote: %w", err)
 		}

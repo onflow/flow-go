@@ -14,6 +14,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+type SpanName string
+
 // OpenTracer is the implementation of the Tracer interface
 type OpenTracer struct {
 	opentracing.Tracer
@@ -82,16 +84,16 @@ func (t *OpenTracer) Done() <-chan struct{} {
 }
 
 // StartSpan starts a span using the flow identifier as a key into the span map
-func (t *OpenTracer) StartSpan(entityID flow.Identifier, spanName string, opts ...opentracing.StartSpanOption) opentracing.Span {
+func (t *OpenTracer) StartSpan(entityID flow.Identifier, spanName SpanName, opts ...opentracing.StartSpanOption) opentracing.Span {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	key := spanKey(entityID, spanName)
-	t.openSpans[key] = t.Tracer.StartSpan(spanName, opts...)
+	t.openSpans[key] = t.Tracer.StartSpan(string(spanName), opts...)
 	return t.openSpans[key]
 }
 
 // FinishSpan finishes a span started with the passed in flow identifier
-func (t *OpenTracer) FinishSpan(entityID flow.Identifier, spanName string) {
+func (t *OpenTracer) FinishSpan(entityID flow.Identifier, spanName SpanName) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	key := spanKey(entityID, spanName)
@@ -105,7 +107,7 @@ func (t *OpenTracer) FinishSpan(entityID flow.Identifier, spanName string) {
 }
 
 // GetSpan will get the span started with the passed in flow identifier
-func (t *OpenTracer) GetSpan(entityID flow.Identifier, spanName string) (opentracing.Span, bool) {
+func (t *OpenTracer) GetSpan(entityID flow.Identifier, spanName SpanName) (opentracing.Span, bool) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 	key := spanKey(entityID, spanName)
@@ -113,16 +115,25 @@ func (t *OpenTracer) GetSpan(entityID flow.Identifier, spanName string) (opentra
 	return span, exists
 }
 
-func (t *OpenTracer) StartSpanFromContext(ctx context.Context, operationName string) (opentracing.Span, context.Context) {
-	return opentracing.StartSpanFromContextWithTracer(ctx, t.Tracer, operationName)
+func (t *OpenTracer) StartSpanFromContext(
+	ctx context.Context,
+	operationName SpanName,
+	opts ...opentracing.StartSpanOption,
+) (opentracing.Span, context.Context) {
+	return opentracing.StartSpanFromContextWithTracer(ctx, t.Tracer, string(operationName), opts...)
 }
 
-func (t *OpenTracer) StartSpanFromParent(span opentracing.Span, operationName string) opentracing.Span {
-	return t.Tracer.StartSpan(operationName, opentracing.FollowsFrom(span.Context()))
+func (t *OpenTracer) StartSpanFromParent(
+	span opentracing.Span,
+	operationName SpanName,
+	opts ...opentracing.StartSpanOption,
+) opentracing.Span {
+	opts = append(opts, opentracing.FollowsFrom(span.Context()))
+	return t.Tracer.StartSpan(string(operationName), opts...)
 }
 
 // in order to avoid different spans using the same entityID as the key, which creates a conflict,
 // we use span name and entity id as the key for a span.
-func spanKey(entityID flow.Identifier, spanName string) string {
+func spanKey(entityID flow.Identifier, spanName SpanName) string {
 	return fmt.Sprintf("%s-%x", spanName, entityID)
 }

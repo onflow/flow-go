@@ -25,12 +25,12 @@ type Forks interface {
 	// Forks must be able to connect `block` to its latest finalized block
 	// (without missing interim ancestors). Otherwise, an error is raised.
 	// When the new block causes the conflicting finalized blocks, it will return
-	// Might error with ErrorByzantineThresholdExceeded (e.g. if finalizing conflicting forks)
+	// Might error with ByzantineThresholdExceededError (e.g. if finalizing conflicting forks)
 	AddBlock(block *model.Block) error
 
 	// AddQC adds a quorum certificate to Forks.
 	// Will error in case the block referenced by the qc is unknown.
-	// Might error with ErrorByzantineThresholdExceeded (e.g. if two conflicting QCs for the
+	// Might error with ByzantineThresholdExceededError (e.g. if two conflicting QCs for the
 	// same view are found)
 	AddQC(qc *model.QuorumCertificate) error
 
@@ -53,6 +53,7 @@ type Forks interface {
 	MakeForkChoice(curView uint64) (*model.QuorumCertificate, *model.Block, error)
 }
 
+// ForksReader only reads the forks' state
 type ForksReader interface {
 
 	// IsSafeBlock returns true if block is safe to vote for

@@ -22,7 +22,7 @@ func TestHeaderInsertCheckRetrieve(t *testing.T) {
 			Timestamp:      time.Now().UTC(),
 			ParentID:       flow.Identifier{0x11},
 			PayloadHash:    flow.Identifier{0x22},
-			ParentVoterIDs: []flow.Identifier{flow.Identifier{0x44}},
+			ParentVoterIDs: []flow.Identifier{{0x44}},
 			ParentVoterSig: crypto.Signature([]byte{0x88}),
 			ProposerID:     flow.Identifier{0x33},
 			ProposerSig:    crypto.Signature{0x77},

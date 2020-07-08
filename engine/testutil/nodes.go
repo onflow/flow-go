@@ -13,25 +13,29 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	collectioningest "github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
+	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
+	bootstrapexec "github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
-	"github.com/dapperlabs/flow-go/engine/verification/ingest"
+	"github.com/dapperlabs/flow-go/engine/verification/finder"
+	"github.com/dapperlabs/flow-go/engine/verification/match"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
+	"github.com/dapperlabs/flow-go/fvm"
+	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	chainsync "github.com/dapperlabs/flow-go/module/synchronization"
 	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/stub"
@@ -41,7 +45,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participants []*flow.Identity, options ...func(*protocol.State)) mock.GenericNode {
+func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participants []*flow.Identity, chainID flow.ChainID, options ...func(*protocol.State)) mock.GenericNode {
 
 	var i int
 	var participant *flow.Identity
@@ -69,8 +73,10 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	state, err := protocol.NewState(metrics, db, headers, identities, seals, index, payloads, blocks)
 	require.NoError(t, err)
 
-	genesis := flow.Genesis(participants)
-	err = state.Mutate().Bootstrap(unittest.GenesisStateCommitment, genesis)
+	genesis := flow.Genesis(participants, chainID)
+	result := bootstrap.Result(genesis, unittest.GenesisStateCommitment)
+	seal := bootstrap.Seal(result)
+	err = state.Mutate().Bootstrap(genesis, result, seal)
 	require.NoError(t, err)
 
 	for _, option := range options {
@@ -106,17 +112,19 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 		Seals:      seals,
 		Payloads:   payloads,
 		Blocks:     blocks,
+		Index:      index,
 		State:      state,
 		Me:         me,
 		Net:        stubnet,
 		DBDir:      dbDir,
+		ChainID:    chainID,
 	}
 }
 
 // CollectionNode returns a mock collection node.
-func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, options ...func(*protocol.State)) mock.CollectionNode {
+func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, chainID flow.ChainID, options ...func(*protocol.State)) mock.CollectionNode {
 
-	node := GenericNode(t, hub, identity, identities, options...)
+	node := GenericNode(t, hub, identity, identities, chainID, options...)
 
 	pool, err := stdmap.NewTransactions(1000)
 	require.NoError(t, err)
@@ -141,7 +149,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 }
 
 // CollectionNodes returns n collection nodes connected to the given hub.
-func CollectionNodes(t *testing.T, hub *stub.Hub, nNodes int, options ...func(*protocol.State)) []mock.CollectionNode {
+func CollectionNodes(t *testing.T, hub *stub.Hub, nNodes int, chainID flow.ChainID, options ...func(*protocol.State)) []mock.CollectionNode {
 	colIdentities := unittest.IdentityListFixture(nNodes, unittest.WithRole(flow.RoleCollection))
 
 	// add some extra dummy identities so we have one of each role
@@ -151,17 +159,18 @@ func CollectionNodes(t *testing.T, hub *stub.Hub, nNodes int, options ...func(*p
 
 	nodes := make([]mock.CollectionNode, 0, len(colIdentities))
 	for _, identity := range colIdentities {
-		nodes = append(nodes, CollectionNode(t, hub, identity, identities, options...))
+		nodes = append(nodes, CollectionNode(t, hub, identity, identities, chainID, options...))
 	}
 
 	return nodes
 }
 
-func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity) mock.ConsensusNode {
+func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, chainID flow.ChainID) mock.ConsensusNode {
 
-	node := GenericNode(t, hub, identity, identities)
+	node := GenericNode(t, hub, identity, identities, chainID)
 
 	resultsDB := storage.NewExecutionResults(node.DB)
+	sealsDB := storage.NewSeals(node.Metrics, node.DB)
 
 	guarantees, err := stdmap.NewGuarantees(1000)
 	require.NoError(t, err)
@@ -178,13 +187,13 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	seals, err := stdmap.NewSeals(1000)
 	require.NoError(t, err)
 
-	propagationEngine, err := propagation.New(node.Log, node.Metrics, node.Metrics, node.Metrics, node.Net, node.State, node.Me, guarantees)
+	propagationEngine, err := propagation.New(node.Log, node.Metrics, node.Metrics, node.Tracer, node.Metrics, node.Net, node.State, node.Me, guarantees)
 	require.NoError(t, err)
 
-	ingestionEngine, err := consensusingest.New(node.Log, node.Metrics, node.Metrics, node.Net, propagationEngine, node.State, node.Headers, node.Me)
+	ingestionEngine, err := consensusingest.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Net, propagationEngine, node.State, node.Headers, node.Me)
 	require.Nil(t, err)
 
-	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Metrics, node.Net, node.State, node.Me, resultsDB, node.Headers, results, receipts, approvals, seals)
+	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Net, node.State, node.Me, resultsDB, sealsDB, node.Headers, node.Index, results, receipts, approvals, seals)
 	require.Nil(t, err)
 
 	return mock.ConsensusNode{
@@ -199,7 +208,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	}
 }
 
-func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int) []mock.ConsensusNode {
+func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int, chainID flow.ChainID) []mock.ConsensusNode {
 	conIdentities := unittest.IdentityListFixture(nNodes, unittest.WithRole(flow.RoleConsensus))
 	for _, id := range conIdentities {
 		t.Log(id.String())
@@ -212,14 +221,14 @@ func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int) []mock.ConsensusNod
 
 	nodes := make([]mock.ConsensusNode, 0, len(conIdentities))
 	for _, identity := range conIdentities {
-		nodes = append(nodes, ConsensusNode(t, hub, identity, identities))
+		nodes = append(nodes, ConsensusNode(t, hub, identity, identities, chainID))
 	}
 
 	return nodes
 }
 
-func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, syncThreshold uint64) mock.ExecutionNode {
-	node := GenericNode(t, hub, identity, identities)
+func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, syncThreshold uint64, chainID flow.ChainID) mock.ExecutionNode {
+	node := GenericNode(t, hub, identity, identities, chainID)
 
 	transactionsStorage := storage.NewTransactions(node.Metrics, node.DB)
 	collectionsStorage := storage.NewCollections(node.DB, transactionsStorage)
@@ -238,10 +247,11 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	genesisHead, err := node.State.Final().Head()
 	require.NoError(t, err)
 
-	commit, err := bootstrap.BootstrapLedger(ls, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply)
+	bootstrapper := bootstrapexec.NewBootstrapper(node.Log)
+	commit, err := bootstrapper.BootstrapLedger(ls, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply, node.ChainID.Chain())
 	require.NoError(t, err)
 
-	err = bootstrap.BootstrapExecutionDatabase(node.DB, commit, genesisHead)
+	err = bootstrapper.BootstrapExecutionDatabase(node.DB, commit, genesisHead)
 	require.NoError(t, err)
 
 	execState := state.NewExecutionState(
@@ -256,18 +266,22 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	rt := runtime.NewInterpreterRuntime()
-	vm, err := virtualmachine.New(rt)
+	vm, err := fvm.New(rt, node.ChainID.Chain())
 
 	require.NoError(t, err)
 
 	computationEngine := computation.New(
 		node.Log,
+		node.Metrics,
 		node.Tracer,
 		node.Me,
 		node.State,
 		vm,
 		node.Blocks,
 	)
+	require.NoError(t, err)
+
+	syncCore, err := chainsync.New(node.Log, chainsync.DefaultConfig())
 	require.NoError(t, err)
 
 	ingestionEngine, err := ingestion.New(
@@ -282,6 +296,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		txResultStorage,
 		computationEngine,
 		providerEngine,
+		syncCore,
 		execState,
 		syncThreshold,
 		node.Metrics,
@@ -292,11 +307,24 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	require.NoError(t, err)
 
+	syncEngine, err := synchronization.New(
+		node.Log,
+		node.Metrics,
+		node.Net,
+		node.Me,
+		node.State,
+		node.Blocks,
+		ingestionEngine,
+		syncCore,
+	)
+	require.NoError(t, err)
+
 	return mock.ExecutionNode{
 		GenericNode:     node,
 		IngestionEngine: ingestionEngine,
 		ExecutionEngine: computationEngine,
 		ReceiptsEngine:  providerEngine,
+		SyncEngine:      syncEngine,
 		BadgerDB:        node.DB,
 		VM:              vm,
 		ExecutionState:  execState,
@@ -314,6 +342,12 @@ func WithVerifierEngine(eng network.Engine) VerificationOpt {
 	}
 }
 
+func WithMatchEngine(eng network.Engine) VerificationOpt {
+	return func(node *mock.VerificationNode) {
+		node.MatchEngine = eng
+	}
+}
+
 func VerificationNode(t testing.TB,
 	hub *stub.Hub,
 	identity *flow.Identity,
@@ -321,20 +355,22 @@ func VerificationNode(t testing.TB,
 	assigner module.ChunkAssigner,
 	requestIntervalMs uint,
 	failureThreshold uint,
-	lightIngestEngine bool,
+	chainID flow.ChainID,
 	opts ...VerificationOpt) mock.VerificationNode {
 
 	var err error
 	node := mock.VerificationNode{
-		GenericNode: GenericNode(t, hub, identity, identities),
+		GenericNode: GenericNode(t, hub, identity, identities, chainID),
 	}
 
 	for _, apply := range opts {
 		apply(&node)
 	}
 
-	if node.AuthReceipts == nil {
-		node.AuthReceipts, err = stdmap.NewReceipts(1000)
+	collector := metrics.NewNoopCollector()
+
+	if node.Receipts == nil {
+		node.Receipts, err = stdmap.NewReceipts(1000)
 		require.Nil(t, err)
 	}
 
@@ -343,109 +379,82 @@ func VerificationNode(t testing.TB,
 		require.Nil(t, err)
 	}
 
-	if node.AuthCollections == nil {
-		node.AuthCollections, err = stdmap.NewCollections(1000)
+	if node.PendingResults == nil {
+		node.PendingResults = stdmap.NewPendingResults()
 		require.Nil(t, err)
 	}
 
-	if node.PendingCollections == nil {
-		node.PendingCollections, err = stdmap.NewPendingCollections(1000)
+	if node.HeaderStorage == nil {
+		node.HeaderStorage = storage.NewHeaders(node.Metrics, node.DB)
+	}
+
+	if node.Chunks == nil {
+		node.Chunks = match.NewChunks(1000)
+	}
+
+	if node.ProcessedResultIDs == nil {
+		node.ProcessedResultIDs, err = stdmap.NewIdentifiers(1000)
 		require.Nil(t, err)
 	}
 
-	if node.CollectionTrackers == nil {
-		node.CollectionTrackers, err = stdmap.NewCollectionTrackers(1000)
+	if node.ReceiptIDsByBlock == nil {
+		node.ReceiptIDsByBlock, err = stdmap.NewIdentifierMap(1000)
 		require.Nil(t, err)
 	}
 
-	if node.ChunkDataPacks == nil {
-		node.ChunkDataPacks, err = stdmap.NewChunkDataPacks(1000)
-		require.Nil(t, err)
-	}
-
-	if node.ChunkDataPackTrackers == nil {
-		node.ChunkDataPackTrackers, err = stdmap.NewChunkDataPackTrackers(1000)
+	if node.ReceiptIDsByResult == nil {
+		node.ReceiptIDsByResult, err = stdmap.NewIdentifierMap(1000)
 		require.Nil(t, err)
 	}
 
 	if node.VerifierEngine == nil {
 		rt := runtime.NewInterpreterRuntime()
-		vm, err := virtualmachine.New(rt)
+
+		vm, err := fvm.New(rt, node.ChainID.Chain())
 		require.NoError(t, err)
+
 		chunkVerifier := chunks.NewChunkVerifier(vm, node.Blocks)
 
 		require.NoError(t, err)
-		node.VerifierEngine, err = verifier.New(node.Log, node.Metrics, node.Net, node.State, node.Me, chunkVerifier)
-		require.Nil(t, err)
-	}
-
-	if node.IngestedChunkIDs == nil {
-		node.IngestedChunkIDs, err = stdmap.NewIdentifiers(1000)
-		require.Nil(t, err)
-	}
-
-	if node.IngestedResultIDs == nil {
-		node.IngestedResultIDs, err = stdmap.NewIdentifiers(1000)
-		require.Nil(t, err)
-	}
-
-	if node.IngestedCollectionIDs == nil {
-		node.IngestedCollectionIDs, err = stdmap.NewIdentifiers(1000)
-		require.Nil(t, err)
-	}
-
-	if node.AssignedChunkIDs == nil {
-		node.AssignedChunkIDs, err = stdmap.NewIdentifiers(1000)
-		require.Nil(t, err)
-	}
-
-	// creates a light ingest engine for the node if lightIngestEngine is set
-	if node.LightIngestEngine == nil && lightIngestEngine {
-		node.LightIngestEngine, err = ingest.NewLightEngine(node.Log,
+		node.VerifierEngine, err = verifier.New(node.Log,
+			collector,
+			node.Tracer,
 			node.Net,
 			node.State,
 			node.Me,
+			chunkVerifier)
+		require.Nil(t, err)
+	}
+
+	if node.MatchEngine == nil {
+		node.MatchEngine, err = match.New(node.Log,
+			collector,
+			node.Tracer,
+			node.Net,
+			node.Me,
+			node.PendingResults,
 			node.VerifierEngine,
-			node.AuthReceipts,
-			node.AuthCollections,
-			node.ChunkDataPacks,
-			node.ChunkDataPackTrackers,
-			node.IngestedChunkIDs,
-			node.IngestedResultIDs,
-			node.AssignedChunkIDs,
-			node.IngestedCollectionIDs,
-			node.Headers,
-			node.Blocks,
 			assigner,
-			requestIntervalMs,
-			failureThreshold,
-		)
+			node.State,
+			node.Chunks,
+			node.HeaderStorage,
+			time.Duration(requestIntervalMs)*time.Millisecond,
+			int(failureThreshold))
 		require.Nil(t, err)
 	}
 
-	// otherwise, creates an (original) ingest engine for the node
-	if node.IngestEngine == nil && !lightIngestEngine {
-		node.IngestEngine, err = ingest.New(node.Log,
+	if node.FinderEngine == nil {
+		node.FinderEngine, err = finder.New(node.Log,
+			collector,
+			node.Tracer,
 			node.Net,
-			node.State,
 			node.Me,
-			node.VerifierEngine,
-			node.AuthReceipts,
+			node.MatchEngine,
 			node.PendingReceipts,
-			node.AuthCollections,
-			node.PendingCollections,
-			node.CollectionTrackers,
-			node.ChunkDataPacks,
-			node.ChunkDataPackTrackers,
-			node.IngestedChunkIDs,
-			node.IngestedResultIDs,
-			node.IngestedCollectionIDs,
 			node.Headers,
-			node.Blocks,
-			assigner,
-			requestIntervalMs,
-			failureThreshold,
-		)
+			node.ProcessedResultIDs,
+			node.ReceiptIDsByBlock,
+			node.ReceiptIDsByResult)
 		require.Nil(t, err)
 	}
 

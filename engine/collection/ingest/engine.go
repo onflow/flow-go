@@ -49,9 +49,7 @@ func New(
 	config Config,
 ) (*Engine, error) {
 
-	logger := log.With().
-		Str("engine", "ingest").
-		Logger()
+	logger := log.With().Str("engine", "ingest").Logger()
 
 	e := &Engine{
 		unit:       engine.NewUnit(),
@@ -97,7 +95,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+			engine.LogError(e.log, err)
 		}
 	})
 }
@@ -137,9 +135,23 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
 		Hex("tx_id", logging.Entity(tx)).
+		Hex("ref_block_id", tx.ReferenceBlockID[:]).
 		Logger()
 
-	log.Debug().Msg("transaction message received")
+	// TODO log the reference block and final height for debug purposes
+	{
+		final, err := e.state.Final().Head()
+		if err != nil {
+			return fmt.Errorf("could not get final height: %w", err)
+		}
+		log = log.With().Uint64("final_height", final.Height).Logger()
+		ref, err := e.state.AtBlockID(tx.ReferenceBlockID).Head()
+		if err == nil {
+			log = log.With().Uint64("ref_block_height", ref.Height).Logger()
+		}
+	}
+
+	log.Info().Msg("transaction message received")
 
 	// short-circuit if we have already stored the transaction
 	if e.pool.Has(tx.ID()) {
@@ -148,9 +160,9 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	}
 
 	// first, we check if the transaction is valid
-	err := e.ValidateTransaction(tx)
+	err := e.validateTransaction(tx)
 	if err != nil {
-		return fmt.Errorf("invalid transaction: %w", err)
+		return engine.NewInvalidInputErrorf("invalid transaction: %w", err)
 	}
 
 	// retrieve the set of collector clusters
@@ -159,8 +171,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 		return fmt.Errorf("could not cluster collection nodes: %w", err)
 	}
 
-	// get the locally assigned cluster and the cluster responsible for the
-	// transaction
+	// get the locally assigned cluster and the cluster responsible for the transaction
 	txCluster := clusters.ByTxID(tx.ID())
 	localID := e.me.NodeID()
 	localCluster, ok := clusters.ByNodeID(localID)
@@ -173,7 +184,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 		Hex("tx_cluster", logging.ID(txCluster.Fingerprint())).
 		Logger()
 
-	// if our cluster is responsible for the transaction, store it
+	// if our cluster is responsible for the transaction, add it to the mempool
 	if localCluster.Fingerprint() == txCluster.Fingerprint() {
 		_ = e.pool.Add(tx)
 		e.colMetrics.TransactionIngested(tx.ID())
@@ -184,7 +195,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// propagate it to all members of the responsible cluster
 	if originID == localID {
 
-		// always send the transaction to one node in the responsible cluster,
+		// always send the transaction to one node in the responsible cluster
 		// send to additional nodes based on configuration
 		targetIDs := txCluster.
 			Filter(filter.Not(filter.HasNodeID(localID))).
@@ -207,9 +218,9 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	return nil
 }
 
-// ValidateTransaction validates the transaction in order to determine whether
+// validateTransaction validates the transaction in order to determine whether
 // the transaction should be included in a collection.
-func (e *Engine) ValidateTransaction(tx *flow.TransactionBody) error {
+func (e *Engine) validateTransaction(tx *flow.TransactionBody) error {
 
 	// ensure all required fields are set
 	missingFields := tx.MissingFields()

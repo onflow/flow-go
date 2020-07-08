@@ -1,8 +1,10 @@
 package verifier
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
@@ -13,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -26,6 +29,7 @@ type Engine struct {
 	unit    *engine.Unit               // used to control startup/shutdown
 	log     zerolog.Logger             // used to log relevant actions
 	metrics module.VerificationMetrics // used to capture the performance metrics
+	tracer  module.Tracer              // used for tracing
 	conduit network.Conduit            // used to propagate result approvals
 	me      module.Local               // used to access local node information
 	state   protocol.State             // used to access the protocol state
@@ -37,6 +41,7 @@ type Engine struct {
 func New(
 	log zerolog.Logger,
 	metrics module.VerificationMetrics,
+	tracer module.Tracer,
 	net module.Network,
 	state protocol.State,
 	me module.Local,
@@ -47,6 +52,7 @@ func New(
 		unit:    engine.NewUnit(),
 		log:     log.With().Str("engine", "verifier").Logger(),
 		metrics: metrics,
+		tracer:  tracer,
 		state:   state,
 		me:      me,
 		chVerif: chVerif,
@@ -84,7 +90,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+			engine.LogError(e.log, err)
 		}
 	})
 }
@@ -105,7 +111,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // process receives verifiable chunks, evaluate them and send them for chunk verifier
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch resource := event.(type) {
-	case *verification.VerifiableChunk:
+	case *verification.VerifiableChunkData:
 		return e.verifyWithMetrics(originID, resource)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
@@ -118,12 +124,12 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 //
 // If any part of verification fails, an error is returned, indicating to the
 // initiating engine that the verification must be re-tried.
-func (e *Engine) verify(originID flow.Identifier, chunk *verification.VerifiableChunk) error {
+func (e *Engine) verify(ctx context.Context, originID flow.Identifier, vc *verification.VerifiableChunkData) error {
 	// log it first
 	log := e.log.With().Timestamp().
 		Hex("origin", logging.ID(originID)).
-		Uint64("chunk_index", chunk.ChunkIndex).
-		Hex("execution_result_id", logging.Entity(chunk.Receipt.ExecutionResult)).
+		Uint64("chunk_index", vc.Chunk.Index).
+		Hex("execution_result_id", logging.Entity(vc.Result)).
 		Logger()
 
 	log.Info().Msg("verifiable chunk received by verifier engine")
@@ -135,7 +141,6 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 	// extracts list of verifier nodes id
 	//
 	// TODO state extraction should be done based on block references
-	// https://github.com/dapperlabs/flow-go/issues/2787
 	consensusNodes, err := e.state.Final().
 		Identities(filter.HasRole(flow.RoleConsensus))
 	if err != nil {
@@ -144,14 +149,16 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 	}
 
 	// extracts chunk ID
-	ch, ok := chunk.Receipt.ExecutionResult.Chunks.ByIndex(chunk.ChunkIndex)
+	ch, ok := vc.Result.Chunks.ByIndex(vc.Chunk.Index)
 	if !ok {
-		return fmt.Errorf("chunk out of range requested: %v", chunk.ChunkIndex)
+		return engine.NewInvalidInputErrorf("chunk out of range requested: %v", vc.Chunk.Index)
 	}
 	log.With().Hex("chunk_id", logging.Entity(ch)).Logger()
 
 	// execute the assigned chunk
-	chFault, err := e.chVerif.Verify(chunk)
+	span, _ := e.tracer.StartSpanFromContext(ctx, trace.VERVerChunkVerify)
+	chFault, err := e.chVerif.Verify(vc)
+	span.Finish()
 	// Any err means that something went wrong when verify the chunk
 	// the outcome of the verification is captured inside the chFault and not the err
 	if err != nil {
@@ -169,14 +176,16 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 			// TODO raise challenge
 			e.log.Error().Msg(chFault.String())
 		default:
-			return fmt.Errorf("unknown type of chunk fault is recieved (type: %T) : %v", chFault, chFault.String())
+			return engine.NewInvalidInputErrorf("unknown type of chunk fault is recieved (type: %T) : %v", chFault, chFault.String())
 		}
 		// don't do anything else, but skip generating result approvals
 		return nil
 	}
 
 	// Generate result approval
-	approval, err := e.GenerateResultApproval(chunk.ChunkIndex, chunk.Receipt.ExecutionResult.ID(), chunk.Block.Header.ID())
+	span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERVerGenerateResultApproval)
+	approval, err := e.GenerateResultApproval(vc.Chunk.Index, vc.Result.ID(), vc.Header.ID())
+	span.Finish()
 	if err != nil {
 		return fmt.Errorf("couldn't generate a result approval: %w", err)
 	}
@@ -188,7 +197,7 @@ func (e *Engine) verify(originID flow.Identifier, chunk *verification.Verifiable
 		return fmt.Errorf("could not submit result approval: %w", err)
 	}
 	log.Info().Msg("result approval submitted")
-	// tracks number of emitted result approvals for this block
+	// increases number of sent result approvals for sake of metrics
 	e.metrics.OnResultApproval()
 
 	return nil
@@ -233,13 +242,25 @@ func (e *Engine) GenerateResultApproval(chunkIndex uint64, execResultID flow.Ide
 }
 
 // verifyWithMetrics acts as a wrapper around the verify method that captures its performance-related metrics
-func (e *Engine) verifyWithMetrics(originID flow.Identifier, ch *verification.VerifiableChunk) error {
+func (e *Engine) verifyWithMetrics(originID flow.Identifier, ch *verification.VerifiableChunkData) error {
+	ctx := context.Background()
+	if span, ok := e.tracer.GetSpan(ch.Result.ID(), trace.VERProcessExecutionResult); ok {
+		defer span.Finish()
+		childSpan := e.tracer.StartSpanFromParent(span, trace.VERVerVerifyWithMetrics)
+		ctx = opentracing.ContextWithSpan(ctx, childSpan)
+		defer childSpan.Finish()
+	}
+
+	// increments number of received verifiable chunks
+	// for sake of metrics
+	e.metrics.OnVerifiableChunkReceived()
+
 	// starts verification performance metrics trackers
 	if ch.ChunkDataPack != nil {
 		e.metrics.OnChunkVerificationStarted(ch.ChunkDataPack.ChunkID)
 	}
 	// starts verification of chunk
-	err := e.verify(originID, ch)
+	err := e.verify(ctx, originID, ch)
 	// closes verification performance metrics trackers
 	if ch.ChunkDataPack != nil {
 		e.metrics.OnChunkVerificationFinished(ch.ChunkDataPack.ChunkID)

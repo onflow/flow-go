@@ -19,6 +19,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/trace"
 )
 
 const (
@@ -168,7 +169,7 @@ func NewVoter(t *testing.T, lastVotedView uint64) *Voter {
 func (v *Voter) ProduceVoteIfVotable(block *model.Block, curView uint64) (*model.Vote, error) {
 	_, ok := v.votable[block.BlockID]
 	if !ok {
-		return nil, &model.NoVoteError{}
+		return nil, model.NoVoteError{Msg: "block not found"}
 	}
 	return createVote(block), nil
 }
@@ -286,7 +287,7 @@ func (v *BlacklistValidator) ValidateProposal(proposal *model.Proposal) error {
 	_, ok := v.invalidProposals[proposal.Block.BlockID]
 	if ok {
 		v.t.Logf("invalid proposal: %v\n", proposal.Block.View)
-		return &model.ErrorInvalidBlock{
+		return model.InvalidBlockError{
 			BlockID: proposal.Block.BlockID,
 			View:    proposal.Block.View,
 			Err:     fmt.Errorf("some error"),
@@ -350,6 +351,7 @@ func (es *EventHandlerSuite) SetupTest() {
 
 	eventhandler, err := eventhandler.New(
 		zerolog.New(os.Stderr),
+		trace.NewNoopTracer(),
 		es.paceMaker,
 		es.blockProducer,
 		es.forks,

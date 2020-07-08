@@ -95,3 +95,23 @@ func uint2binary(integer uint16) []byte {
 	binary.BigEndian.PutUint16(b, integer)
 	return b
 }
+
+func Test_MaxDepth(t *testing.T) {
+	n1 := node.NewLeaf(uint2binary(1), uint2binary(2), 0)
+	n2 := node.NewLeaf(uint2binary(3), uint2binary(4), 0)
+	n3 := node.NewLeaf(uint2binary(5), uint2binary(6), 0)
+
+	n4 := node.NewInterimNode(1, n1, n2)
+	n5 := node.NewInterimNode(1, n4, n3)
+	require.Equal(t, n5.MaxDepth(), uint16(2))
+}
+
+func Test_RegCount(t *testing.T) {
+	n1 := node.NewLeaf(uint2binary(1), uint2binary(2), 0)
+	n2 := node.NewLeaf(uint2binary(3), uint2binary(4), 0)
+	n3 := node.NewLeaf(uint2binary(5), uint2binary(6), 0)
+
+	n4 := node.NewInterimNode(1, n1, n2)
+	n5 := node.NewInterimNode(1, n4, n3)
+	require.Equal(t, n5.RegCount(), uint64(3))
+}

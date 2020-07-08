@@ -22,6 +22,8 @@ import (
 func TestSyncFlow(t *testing.T) {
 	hub := stub.NewNetworkHub()
 
+	chainID := flow.Mainnet
+
 	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 	exe1ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
@@ -31,16 +33,16 @@ func TestSyncFlow(t *testing.T) {
 	identities := unittest.CompleteIdentitySet(colID, conID, exe1ID, exe2ID, verID)
 
 	// exe1 will sync from exe2 after exe2 executes transactions
-	exeNode1 := testutil.ExecutionNode(t, hub, exe1ID, identities, 1)
+	exeNode1 := testutil.ExecutionNode(t, hub, exe1ID, identities, 1, chainID)
 	defer exeNode1.Done()
-	exeNode2 := testutil.ExecutionNode(t, hub, exe2ID, identities, 21)
+	exeNode2 := testutil.ExecutionNode(t, hub, exe2ID, identities, 21, chainID)
 	defer exeNode2.Done()
 
-	collectionNode := testutil.GenericNode(t, hub, colID, identities)
+	collectionNode := testutil.GenericNode(t, hub, colID, identities, chainID)
 	defer collectionNode.Done()
-	verificationNode := testutil.GenericNode(t, hub, verID, identities)
+	verificationNode := testutil.GenericNode(t, hub, verID, identities, chainID)
 	defer verificationNode.Done()
-	consensusNode := testutil.GenericNode(t, hub, conID, identities)
+	consensusNode := testutil.GenericNode(t, hub, conID, identities, chainID)
 	defer consensusNode.Done()
 
 	genesis, err := exeNode1.State.AtHeight(0).Head()
@@ -48,23 +50,25 @@ func TestSyncFlow(t *testing.T) {
 
 	seq := uint64(0)
 
-	tx1 := execTestutil.DeployCounterContractTransaction(flow.ServiceAddress())
-	err = execTestutil.SignTransactionByRoot(tx1, seq)
+	chain := exeNode1.ChainID.Chain()
+
+	tx1 := execTestutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
+	err = execTestutil.SignTransactionAsServiceAccount(tx1, seq, chain)
 	require.NoError(t, err)
 	seq++
 
-	tx2 := execTestutil.CreateCounterTransaction(flow.ServiceAddress(), flow.ServiceAddress())
-	err = execTestutil.SignTransactionByRoot(tx2, seq)
+	tx2 := execTestutil.CreateCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+	err = execTestutil.SignTransactionAsServiceAccount(tx2, seq, chain)
 	require.NoError(t, err)
 	seq++
 
-	tx4 := execTestutil.AddToCounterTransaction(flow.ServiceAddress(), flow.ServiceAddress())
-	err = execTestutil.SignTransactionByRoot(tx4, seq)
+	tx4 := execTestutil.AddToCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+	err = execTestutil.SignTransactionAsServiceAccount(tx4, seq, chain)
 	require.NoError(t, err)
 	seq++
 
-	tx5 := execTestutil.AddToCounterTransaction(flow.ServiceAddress(), flow.ServiceAddress())
-	err = execTestutil.SignTransactionByRoot(tx5, seq)
+	tx5 := execTestutil.AddToCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
+	err = execTestutil.SignTransactionAsServiceAccount(tx5, seq, chain)
 	require.NoError(t, err)
 
 	col1 := flow.Collection{Transactions: []*flow.TransactionBody{tx1}}

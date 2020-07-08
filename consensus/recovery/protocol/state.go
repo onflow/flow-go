@@ -8,10 +8,14 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-func FindLatest(state protocol.State, headers storage.Headers, rootHeader *flow.Header) (*flow.Header, []*flow.Header, error) {
+// FindLatest retrieves the latest finalized header and all of its pending
+// children. These pending children have been verified by the compliance layer
+// but are NOT guaranteed to have been verified by HotStuff. They MUST be
+// validated by HotStuff during the recovery process.
+func FindLatest(state protocol.State, headers storage.Headers) (*flow.Header, []*flow.Header, error) {
+
 	// find finalized block
 	finalized, err := state.Final().Head()
-
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not find finalized block")
 	}

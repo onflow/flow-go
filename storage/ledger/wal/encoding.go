@@ -3,8 +3,11 @@ package wal
 import (
 	"encoding/binary"
 	"fmt"
+	"io"
+	"math"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
 )
 
 type WALOperation uint8
@@ -13,7 +16,7 @@ const WALUpdate WALOperation = 1
 const WALDelete WALOperation = 2
 
 /*
-The WAL update record uses two operations so far - an update which must include all keys and values, and deletion
+The LedgerWAL update record uses two operations so far - an update which must include all keys and values, and deletion
 which only needs a root tree state commitment.
 Updates need to be atomic, hence we prepare binary representation of whole changeset.
 Since keys, values and state commitments date types are variable length, we have to store it as well.
@@ -48,31 +51,110 @@ func updateSize(stateCommitment flow.StateCommitment, keys [][]byte, values [][]
 
 func deleteSize(stateCommitment flow.StateCommitment) int {
 	return headerSize(stateCommitment)
+}
 
+func writeUint16(buffer []byte, location int, value uint16) int {
+	binary.BigEndian.PutUint16(buffer[location:], value)
+	return location + 2
+}
+
+func readUint16(buffer []byte, location int) (uint16, int) {
+	value := binary.BigEndian.Uint16(buffer[location:])
+	return value, location + 2
+}
+
+func readUint32(buffer []byte, location int) (uint32, int) {
+	value := binary.BigEndian.Uint32(buffer[location:])
+	return value, location + 4
+}
+
+func readUint64(buffer []byte, location int) (uint64, int) {
+	value := binary.BigEndian.Uint64(buffer[location:])
+	return value, location + 8
+}
+
+func writeUint32(buffer []byte, location int, value uint32) int {
+	binary.BigEndian.PutUint32(buffer[location:], value)
+	return location + 4
+}
+
+func writeUint64(buffer []byte, location int, value uint64) int {
+	binary.BigEndian.PutUint64(buffer[location:], value)
+	return location + 8
 }
 
 // writeShortData writes data shorter than 16kB and returns next free position
 func writeShortData(buffer []byte, location int, data []byte) int {
-	binary.BigEndian.PutUint16(buffer[location:], uint16(len(data)))
-	return writeData(buffer, location+2, data)
+	if len(data) > math.MaxUint16 {
+		panic(fmt.Sprintf("short data too long! %d", len(data)))
+	}
+	location = writeUint16(buffer, location, uint16(len(data)))
+	return writeData(buffer, location, data)
+}
+
+func readFromBuffer(reader io.Reader, length int) ([]byte, error) {
+	if length == 0 {
+		return nil, nil
+	}
+	buf := make([]byte, length)
+	_, err := io.ReadFull(reader, buf)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read data: %w", err)
+	}
+	return buf, nil
 }
 
 // readShortData read data shorter than 16kB and returns next free position
 func readShortData(buffer []byte, location int) ([]byte, int, error) {
-	size := binary.BigEndian.Uint16(buffer[location:])
-	return readData(buffer, location+2, int(size))
+	size, location := readUint16(buffer, location)
+	return readData(buffer, location, int(size))
+}
+
+// readShortDataFromReader reads data shorter than 16kB from reader
+func readShortDataFromReader(reader io.Reader) ([]byte, error) {
+	buf, err := readFromBuffer(reader, 2)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read short data length: %w", err)
+	}
+	size, _ := readUint16(buf, 0)
+
+	buf, err = readFromBuffer(reader, int(size))
+	if err != nil {
+		return nil, fmt.Errorf("cannot read short data: %w", err)
+	}
+
+	return buf, nil
+}
+
+// readLongDataFromReader reads data shorter than 16kB from reader
+func readLongDataFromReader(reader io.Reader) ([]byte, error) {
+	buf, err := readFromBuffer(reader, 4)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read long data length: %w", err)
+	}
+	size, _ := readUint32(buf, 0)
+
+	buf, err = readFromBuffer(reader, int(size))
+	if err != nil {
+		return nil, fmt.Errorf("cannot read long data: %w", err)
+	}
+
+	return buf, nil
 }
 
 // writeLongData writes data shorter than 32MB and returns next free position
 func writeLongData(buffer []byte, location int, data []byte) int {
-	binary.BigEndian.PutUint32(buffer[location:], uint32(len(data)))
-	return writeData(buffer, location+4, data)
+	if len(data) > math.MaxUint32 {
+		panic(fmt.Sprintf("long data too long! %d", len(data)))
+	}
+	location = writeUint32(buffer, location, uint32(len(data)))
+	return writeData(buffer, location, data)
 }
 
 // readLongData read data shorter than 32MB and returns next free position
 func readLongData(buffer []byte, location int) ([]byte, int, error) {
-	size := binary.BigEndian.Uint32(buffer[location:])
-	return readData(buffer, location+4, int(size))
+	size, location := readUint32(buffer, location)
+	return readData(buffer, location, int(size))
 }
 
 // writeData writes data directly and returns next free position
@@ -104,12 +186,10 @@ func EncodeUpdate(stateCommitment flow.StateCommitment, keys [][]byte, values []
 	pos := writeHeader(buf, WALUpdate, stateCommitment)
 
 	//number of records
-	binary.BigEndian.PutUint32(buf[pos:], uint32(len(keys)))
-	pos += 4
+	pos = writeUint32(buf, pos, uint32(len(keys)))
 
 	//key size
-	binary.BigEndian.PutUint16(buf[pos:], uint16(len(keys[0])))
-	pos += 2
+	pos = writeUint16(buf, pos, uint16(len(keys[0])))
 
 	for i := range keys {
 		pos = writeData(buf, pos, keys[i])
@@ -159,14 +239,16 @@ func Decode(data []byte) (operation WALOperation, stateCommitment flow.StateComm
 		return
 	}
 
-	recordsCount := int(binary.BigEndian.Uint32(data[consumed:]))
-	consumed += 4
+	//recordsCount := int(binary.BigEndian.Uint32(data[consumed:]))
+	//consumed += 4
+	recordsCount, consumed := readUint32(data, consumed)
 
-	keySize := int(binary.BigEndian.Uint16(data[consumed:]))
-	consumed += 2
+	//keySize := int(binary.BigEndian.Uint16(data[consumed:]))
+	//consumed += 2
+	keySize, consumed := readUint16(data, consumed)
 
-	for i := 0; i < recordsCount; i++ {
-		expectedBytes := consumed + keySize + 4
+	for i := 0; i < int(recordsCount); i++ {
+		expectedBytes := consumed + int(keySize) + 4
 		if length < expectedBytes {
 			err = fmt.Errorf("data corrupted, too short to represent next value - expected next %d bytes, but got %d", expectedBytes, length)
 			return
@@ -174,7 +256,7 @@ func Decode(data []byte) (operation WALOperation, stateCommitment flow.StateComm
 		var keyData []byte
 		var valueData []byte
 
-		keyData, consumed, err = readData(data, consumed, keySize)
+		keyData, consumed, err = readData(data, consumed, int(keySize))
 		if err != nil {
 			err = fmt.Errorf("error while reading key data: %w", err)
 			return
@@ -191,4 +273,100 @@ func Decode(data []byte) (operation WALOperation, stateCommitment flow.StateComm
 	}
 
 	return
+}
+
+// EncodeStorableNode encodes StorableNode
+// 2-bytes Big Endian uint16 height
+// 8-bytes Big Endian uint64 LIndex
+// 8-bytes Big Endian uint64 RIndex
+// 2-bytes Big Endian uint16 key length
+// key bytes
+// 4-bytes Big Endian uint32 value length
+// value bytes
+// 2-bytes Big Endian uint16 hashValue length
+// hash value bytes
+func EncodeStorableNode(storableNode *flattener.StorableNode) []byte {
+
+	length := 2 + 8 + 8 + 2 + len(storableNode.Key) + 4 + len(storableNode.Value) + 2 + len(storableNode.HashValue)
+
+	buf := make([]byte, length)
+	pos := 0
+
+	pos = writeUint16(buf, pos, storableNode.Height)
+	pos = writeUint64(buf, pos, storableNode.LIndex)
+	pos = writeUint64(buf, pos, storableNode.RIndex)
+	pos = writeShortData(buf, pos, storableNode.Key)
+	pos = writeLongData(buf, pos, storableNode.Value)
+	writeShortData(buf, pos, storableNode.HashValue)
+
+	return buf
+}
+
+func ReadStorableNode(reader io.Reader) (*flattener.StorableNode, error) {
+
+	buf := make([]byte, 2+8+8)
+
+	_, err := io.ReadFull(reader, buf)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read fixed-legth part: %w", err)
+	}
+
+	pos := 0
+
+	storableNode := &flattener.StorableNode{}
+
+	storableNode.Height, pos = readUint16(buf, pos)
+	storableNode.LIndex, pos = readUint64(buf, pos)
+	storableNode.RIndex, _ = readUint64(buf, pos)
+
+	storableNode.Key, err = readShortDataFromReader(reader)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read key data: %w", err)
+	}
+	storableNode.Value, err = readLongDataFromReader(reader)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read value data: %w", err)
+	}
+	storableNode.HashValue, err = readShortDataFromReader(reader)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read hashValue data: %w", err)
+	}
+
+	return storableNode, nil
+}
+
+// EncodeStorableTrie encodes StorableTrie
+// 8-bytes Big Endian uint64 RootIndex
+// 2-bytes Big Endian uint16 RootHash length
+// RootHash bytes
+func EncodeStorableTrie(storableTrie *flattener.StorableTrie) []byte {
+	length := 8 + 2 + len(storableTrie.RootHash)
+	buf := make([]byte, length)
+	pos := writeUint64(buf, 0, storableTrie.RootIndex)
+	writeShortData(buf, pos, storableTrie.RootHash)
+
+	return buf
+}
+
+func ReadStorableTrie(reader io.Reader) (*flattener.StorableTrie, error) {
+	storableNode := &flattener.StorableTrie{}
+
+	// read root uint64 RootIndex
+	buf := make([]byte, 8)
+	read, err := io.ReadFull(reader, buf)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read fixed-legth part: %w", err)
+	}
+	if read != len(buf) {
+		return nil, fmt.Errorf("not enough bytes read %d expected %d", read, len(buf))
+	}
+	storableNode.RootIndex, _ = readUint64(buf, 0)
+
+	// read RootHash bytes: variable length
+	storableNode.RootHash, err = readShortDataFromReader(reader)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read roothash data: %w", err)
+	}
+
+	return storableNode, nil
 }

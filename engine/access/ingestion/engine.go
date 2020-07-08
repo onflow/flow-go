@@ -19,6 +19,7 @@ import (
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // Engine represents the ingestion engine, used to funnel data from other nodes
@@ -102,7 +103,7 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(originID, event)
 		if err != nil {
-			e.log.Error().Err(err).Msg("could not process submitted event")
+			engine.LogError(e.log, err)
 		}
 	})
 }
@@ -184,6 +185,9 @@ func (e *Engine) handleCollectionResponse(originID flow.Identifier, response *me
 	if err != nil {
 		// ignore collection if already seen
 		if errors.Is(err, storage.ErrAlreadyExists) {
+			e.log.Debug().
+				Hex("collection_id", logging.ID(light.ID())).
+				Msg("collection is already seen")
 			return nil
 		}
 		return err

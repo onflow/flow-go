@@ -4,6 +4,7 @@ package badger
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/order"
 	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
@@ -31,17 +33,24 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		return nil, s.err
 	}
 
-	// NOTE: we always use the genesis identities for now
-	var genesisID flow.Identifier
-	err := s.state.db.View(operation.LookupBlockHeight(0, &genesisID))
+	// retrieve the root height
+	var height uint64
+	err := s.state.db.View(operation.RetrieveRootHeight(&height))
 	if err != nil {
-		return nil, fmt.Errorf("could not look up genesis block: %w", err)
+		return nil, fmt.Errorf("could not retrieve root height: %w", err)
+	}
+
+	// retrieve root block ID
+	var rootID flow.Identifier
+	err = s.state.db.View(operation.LookupBlockHeight(height, &rootID))
+	if err != nil {
+		return nil, fmt.Errorf("could not look up root block: %w", err)
 	}
 
 	// retrieve identities from storage
-	payload, err := s.state.payloads.ByBlockID(genesisID)
+	payload, err := s.state.payloads.ByBlockID(rootID)
 	if err != nil {
-		return nil, fmt.Errorf("could not get identities for block: %w", err)
+		return nil, fmt.Errorf("could not get root block payload: %w", err)
 	}
 
 	// apply the filter to the identities
@@ -68,7 +77,9 @@ func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 
 	// check if node ID is part of identities
 	if len(identities) == 0 {
-		return nil, fmt.Errorf("identity not found (%x)", nodeID)
+		return nil, protocol.IdentityNotFoundErr{
+			NodeID: nodeID,
+		}
 	}
 
 	return identities[0], nil
@@ -136,8 +147,30 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 		return nil, fmt.Errorf("block doesn't have children yet")
 	}
 
+	// find the first child that has been validated
+	var validChildID flow.Identifier
+	for _, childID := range childrenIDs {
+		var valid bool
+		err = s.state.db.View(operation.RetrieveBlockValidity(childID, &valid))
+		// skip blocks whose validity hasn't been checked yet
+		if errors.Is(err, storage.ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("could not get child validity: %w", err)
+		}
+		if valid {
+			validChildID = childID
+			break
+		}
+	}
+
+	if validChildID == flow.ZeroID {
+		return nil, fmt.Errorf("block has no valid children")
+	}
+
 	// get the header of the first child (they all have the same threshold sig)
-	head, err := s.state.headers.ByBlockID(childrenIDs[0])
+	head, err := s.state.headers.ByBlockID(validChildID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get head: %w", err)
 	}

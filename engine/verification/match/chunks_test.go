@@ -13,7 +13,8 @@ func TestCanTry(t *testing.T) {
 	t.Run("maxAttempt=3", func(t *testing.T) {
 		maxAttempt := 3
 		chunks := NewChunks(10)
-		chunk := NewChunkStatus(ChunkWithIndex(flow.Identifier{0x11}, 0), flow.Identifier{0xaa}, flow.Identifier{0xbb})
+		c := ChunkWithIndex(flow.Identifier{0x11}, 0)
+		chunk := NewChunkStatus(c, flow.Identifier{0xaa}, flow.Identifier{0xbb})
 		chunks.Add(chunk)
 		results := []bool{}
 		for i := 0; i < 5; i++ {

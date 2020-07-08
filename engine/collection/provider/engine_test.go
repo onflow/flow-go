@@ -1,7 +1,6 @@
 package provider_test
 
 import (
-	"errors"
 	"math/rand"
 	"testing"
 	"time"
@@ -19,7 +18,6 @@ import (
 	"github.com/dapperlabs/flow-go/network"
 	mocknetwork "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
-	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -34,12 +32,14 @@ type Suite struct {
 	reqNode   mock.GenericNode    // used for request/response flows
 	reqEngine *mocknetwork.Engine
 	conduit   network.Conduit
+	chainID   flow.ChainID
 }
 
 func (suite *Suite) SetupTest() {
 	var err error
 
 	suite.hub = stub.NewNetworkHub()
+	suite.chainID = flow.Mainnet
 
 	// add some dummy identities so we have one of each role
 	suite.identities = unittest.IdentityListFixture(5, unittest.WithAllRoles())
@@ -47,9 +47,9 @@ func (suite *Suite) SetupTest() {
 	conIdentity := suite.identities.Filter(filter.HasRole(flow.RoleConsensus))[0]
 	reqIdentity := suite.identities.Filter(filter.HasRole(flow.RoleExecution))[0]
 
-	suite.colNode = testutil.CollectionNode(suite.T(), suite.hub, colIdentity, suite.identities)
-	suite.conNode = testutil.ConsensusNode(suite.T(), suite.hub, conIdentity, suite.identities)
-	suite.reqNode = testutil.GenericNode(suite.T(), suite.hub, reqIdentity, suite.identities)
+	suite.colNode = testutil.CollectionNode(suite.T(), suite.hub, colIdentity, suite.identities, suite.chainID)
+	suite.conNode = testutil.ConsensusNode(suite.T(), suite.hub, conIdentity, suite.identities, suite.chainID)
+	suite.reqNode = testutil.GenericNode(suite.T(), suite.hub, reqIdentity, suite.identities, suite.chainID)
 
 	suite.reqEngine = new(mocknetwork.Engine)
 	suite.conduit, err = suite.reqNode.Net.Register(engine.CollectionProvider, suite.reqEngine)
@@ -136,6 +136,8 @@ func (suite *Suite) TestCollectionRequest() {
 
 		// provider should return error
 		err := suite.colNode.ProviderEngine.ProcessLocal(req)
-		assert.True(t, errors.Is(err, storage.ErrNotFound))
+		// we can't distinguish from invalid fingerprint or not found (because we are behind),
+		// so there won't be an error
+		assert.Nil(t, err)
 	})
 }

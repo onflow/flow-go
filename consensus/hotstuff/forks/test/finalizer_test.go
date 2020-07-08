@@ -555,14 +555,15 @@ func TestNotification(t *testing.T) {
 	notifier.On("OnFinalizedBlock", blocks[0]).Return(nil).Once()
 	finalizationCallback := &mockm.Finalizer{}
 	finalizationCallback.On("MakeFinal", blocks[0].BlockID).Return(nil).Once()
-	finalizationCallback.On("MakePending", mock.Anything).Return(nil)
+	finalizationCallback.On("MakeValid", mock.Anything).Return(nil)
 
 	genesisBQ := makeGenesis()
 
 	fin, err := finalizer.New(genesisBQ, finalizationCallback, notifier)
+	require.NoError(t, err)
 
 	err = addBlocksToFinalizer(fin, blocks)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	notifier.AssertExpectations(t)
 	finalizationCallback.AssertExpectations(t)
 }
@@ -575,7 +576,7 @@ func newFinalizer(t *testing.T) (forks.Finalizer, *mocks.Consumer, *mockm.Finali
 	notifier.On("OnFinalizedBlock", mock.Anything).Return(nil)
 	finalizationCallback := &mockm.Finalizer{}
 	finalizationCallback.On("MakeFinal", mock.Anything).Return(nil)
-	finalizationCallback.On("MakePending", mock.Anything).Return(nil)
+	finalizationCallback.On("MakeValid", mock.Anything).Return(nil)
 
 	genesisBQ := makeGenesis()
 

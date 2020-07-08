@@ -7,21 +7,33 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
+
+	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
+	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
+type handlerEvents struct {
+	executionRPC execution.ExecutionAPIClient
+	blocks       storage.Blocks
+	state        protocol.State
+}
+
 // GetEventsForHeightRange retrieves events for all sealed blocks between the start block height and the end block height (inclusive) that have the given type
-func (h *Handler) GetEventsForHeightRange(ctx context.Context, req *access.GetEventsForHeightRangeRequest) (*access.EventsResponse, error) {
+func (h *handlerEvents) GetEventsForHeightRange(ctx context.Context, req *access.GetEventsForHeightRangeRequest) (*access.EventsResponse, error) {
 
 	// validate the request
-	if req.GetEndHeight() < req.GetStartHeight() {
-		return nil, status.Error(codes.InvalidArgument, "invalid start or end height")
+	minHeight := req.GetStartHeight()
+	maxHeight := req.GetEndHeight()
+	if err := convert.BlockHeight(minHeight, maxHeight); err != nil {
+		return nil, err
 	}
 
+	// validate the event type
 	reqEvent := req.GetType()
-	if reqEvent == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid event type")
+	if _, err := convert.EventType(reqEvent); err != nil {
+		return nil, err
 	}
 
 	// get the latest sealed block header
@@ -30,16 +42,9 @@ func (h *Handler) GetEventsForHeightRange(ctx context.Context, req *access.GetEv
 		return nil, status.Errorf(codes.Internal, " failed to get events: %v", err)
 	}
 
-	var minHeight, maxHeight uint64
-
-	// derive bounds for block height
-	minHeight = req.GetStartHeight()
-
 	// limit max height to last sealed block in the chain
-	if head.Height < req.GetEndHeight() {
+	if head.Height < maxHeight {
 		maxHeight = head.Height
-	} else {
-		maxHeight = req.GetEndHeight()
 	}
 
 	// find the block IDs for all the blocks between min and max height (inclusive)
@@ -53,25 +58,33 @@ func (h *Handler) GetEventsForHeightRange(ctx context.Context, req *access.GetEv
 		blockIDs = append(blockIDs, id[:])
 	}
 
+	if _, err := convert.BlockIDs(blockIDs); err != nil {
+		return nil, err
+	}
+
 	return h.getBlockEventsFromExecutionNode(ctx, blockIDs, reqEvent)
 }
 
 // GetEventsForBlockIDs retrieves events for all the specified block IDs that have the given type
-func (h *Handler) GetEventsForBlockIDs(ctx context.Context, req *access.GetEventsForBlockIDsRequest) (*access.EventsResponse, error) {
+func (h *handlerEvents) GetEventsForBlockIDs(ctx context.Context, req *access.GetEventsForBlockIDsRequest) (*access.EventsResponse, error) {
 
-	if len(req.GetBlockIds()) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "block IDs not specified")
+	// validate the block ids
+	blockIDs := req.GetBlockIds()
+	if _, err := convert.BlockIDs(blockIDs); err != nil {
+		return nil, err
 	}
 
-	if req.GetType() == "" {
-		return nil, status.Error(codes.InvalidArgument, "invalid event type")
+	// validate the event type
+	reqEvent := req.GetType()
+	if _, err := convert.EventType(reqEvent); err != nil {
+		return nil, err
 	}
 
 	// forward the request to the execution node
-	return h.getBlockEventsFromExecutionNode(ctx, req.GetBlockIds(), req.GetType())
+	return h.getBlockEventsFromExecutionNode(ctx, blockIDs, reqEvent)
 }
 
-func (h *Handler) getBlockEventsFromExecutionNode(ctx context.Context, blockIDs [][]byte, etype string) (*access.EventsResponse, error) {
+func (h *handlerEvents) getBlockEventsFromExecutionNode(ctx context.Context, blockIDs [][]byte, etype string) (*access.EventsResponse, error) {
 
 	// create an execution API request for events at block ID
 	req := execution.GetEventsForBlockIDsRequest{
@@ -92,29 +105,6 @@ func (h *Handler) getBlockEventsFromExecutionNode(ctx context.Context, blockIDs 
 	return &access.EventsResponse{
 		Results: results,
 	}, nil
-}
-
-func (h *Handler) getTransactionResultFromExecutionNode(ctx context.Context, blockID []byte, transactionID []byte) ([]*entities.Event, uint32, string, error) {
-
-	// create an execution API request for events at blockID and transactionID
-	req := execution.GetTransactionResultRequest{
-		BlockId:       blockID,
-		TransactionId: transactionID,
-	}
-
-	// call the execution node gRPC
-	resp, err := h.executionRPC.GetTransactionResult(ctx, &req)
-	if err != nil {
-		if status.Code(err) == codes.NotFound {
-			return nil, 0, "", err
-		}
-
-		return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
-	}
-
-	exeResults := resp.GetEvents()
-
-	return exeResults, resp.GetStatusCode(), resp.GetErrorMessage(), nil
 }
 
 // accessEvents converts execution node api result to access node api result

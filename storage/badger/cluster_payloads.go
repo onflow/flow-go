@@ -1,8 +1,6 @@
 package badger
 
 import (
-	"fmt"
-
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/cluster"
@@ -22,41 +20,47 @@ type ClusterPayloads struct {
 
 func NewClusterPayloads(cacheMetrics module.CacheMetrics, db *badger.DB) *ClusterPayloads {
 
-	cp := &ClusterPayloads{db: db}
-
-	store := func(blockID flow.Identifier, payload interface{}) error {
-		return operation.RetryOnConflict(db.Update, cp.storeTx(blockID, payload.(*cluster.Payload)))
+	store := func(blockID flow.Identifier, v interface{}) func(tx *badger.Txn) error {
+		payload := v.(*cluster.Payload)
+		return procedure.InsertClusterPayload(blockID, payload)
 	}
 
-	retrieve := func(blockID flow.Identifier) (interface{}, error) {
+	retrieve := func(blockID flow.Identifier) func(tx *badger.Txn) (interface{}, error) {
 		var payload cluster.Payload
-		err := db.View(procedure.RetrieveClusterPayload(blockID, &payload))
-		return &payload, err
+		return func(tx *badger.Txn) (interface{}, error) {
+			err := db.View(procedure.RetrieveClusterPayload(blockID, &payload))
+			return &payload, err
+		}
 	}
 
-	cp.cache = newCache(cacheMetrics,
-		withLimit(flow.DefaultTransactionExpiry+100),
-		withStore(store),
-		withRetrieve(retrieve),
-		withResource(metrics.ResourceClusterPayload))
+	cp := &ClusterPayloads{
+		db: db,
+		cache: newCache(cacheMetrics,
+			withLimit(flow.DefaultTransactionExpiry+100),
+			withStore(store),
+			withRetrieve(retrieve),
+			withResource(metrics.ResourceClusterPayload)),
+	}
 
 	return cp
 }
 
-func (cp *ClusterPayloads) Store(blockID flow.Identifier, payload *cluster.Payload) error {
+func (cp *ClusterPayloads) storeTx(blockID flow.Identifier, payload *cluster.Payload) func(*badger.Txn) error {
 	return cp.cache.Put(blockID, payload)
 }
-
-func (cp *ClusterPayloads) storeTx(blockID flow.Identifier, payload *cluster.Payload) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-		return procedure.InsertClusterPayload(blockID, payload)(tx)
+func (cp *ClusterPayloads) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*cluster.Payload, error) {
+	return func(tx *badger.Txn) (*cluster.Payload, error) {
+		v, err := cp.cache.Get(blockID)(tx)
+		return v.(*cluster.Payload), err
 	}
+}
+
+func (cp *ClusterPayloads) Store(blockID flow.Identifier, payload *cluster.Payload) error {
+	return operation.RetryOnConflict(cp.db.Update, cp.storeTx(blockID, payload))
 }
 
 func (cp *ClusterPayloads) ByBlockID(blockID flow.Identifier) (*cluster.Payload, error) {
-	payload, err := cp.cache.Get(blockID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve cluster payload: %w", err)
-	}
-	return payload.(*cluster.Payload), nil
+	tx := cp.db.NewTransaction(false)
+	defer tx.Discard()
+	return cp.retrieveTx(blockID)(tx)
 }

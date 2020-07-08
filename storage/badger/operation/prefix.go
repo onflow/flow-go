@@ -23,6 +23,7 @@ const (
 	codeSealedHeight    = 21 // latest sealed block height
 	codeClusterHeight   = 22 // latest finalized height on cluster
 	codeExecutedBlock   = 23 // latest executed block with max height
+	codeRootHeight      = 24 // the height of the first loaded block
 
 	// codes for single entity storage
 	codeHeader          = 30
@@ -37,6 +38,7 @@ const (
 	codeHeightToBlock       = 40 // index mapping height to block ID
 	codeBlockToSeal         = 41 // index mapping a block its last payload seal
 	codeCollectionReference = 42 // index reference block ID for collection
+	codeBlockValidity       = 43 // validity of block per HotStuff
 
 	// codes for indexing multiple identifiers by identifier
 	codeBlockChildren     = 50 // index mapping block ID to children blocks

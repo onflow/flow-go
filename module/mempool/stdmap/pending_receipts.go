@@ -7,8 +7,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/verification"
 )
 
-// TODO consolidate with PendingCollections to preserve DRY
-// https://github.com/dapperlabs/flow-go/issues/3690
 // PendingReceipts implements the execution receipts memory pool of the consensus node,
 // used to store execution receipts and to generate block seals.
 type PendingReceipts struct {
@@ -35,6 +33,22 @@ func (p *PendingReceipts) Add(preceipt *verification.PendingReceipt) bool {
 		p.qe.Push(preceipt.ID())
 	}
 	return ok
+}
+
+// Get returns the pending receipt and true, if the pending receipt is in the
+// mempool. Otherwise, it returns nil and false.
+func (p *PendingReceipts) Get(preceiptID flow.Identifier) (*verification.PendingReceipt, bool) {
+	entity, ok := p.Backend.ByID(preceiptID)
+	if !ok {
+		return nil, false
+	}
+
+	pr, ok := entity.(*verification.PendingReceipt)
+	if !ok {
+		return nil, false
+	}
+
+	return pr, true
 }
 
 // Rem will remove a pending receipt by ID.

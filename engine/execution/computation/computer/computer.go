@@ -5,15 +5,18 @@ import (
 	"fmt"
 
 	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/log"
+	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
+	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // A BlockComputer executes the transactions in a block.
@@ -22,17 +25,27 @@ type BlockComputer interface {
 }
 
 type blockComputer struct {
-	tracer module.Tracer
-	vm     virtualmachine.VirtualMachine
-	blocks storage.Blocks
+	vm      fvm.VirtualMachine
+	blocks  storage.Blocks
+	metrics module.ExecutionMetrics
+	tracer  module.Tracer
+	log     zerolog.Logger
 }
 
 // NewBlockComputer creates a new block executor.
-func NewBlockComputer(vm virtualmachine.VirtualMachine, tracer module.Tracer, blocks storage.Blocks) BlockComputer {
+func NewBlockComputer(
+	vm fvm.VirtualMachine,
+	blocks storage.Blocks,
+	metrics module.ExecutionMetrics,
+	tracer module.Tracer,
+	logger zerolog.Logger,
+) BlockComputer {
 	return &blockComputer{
-		tracer: tracer,
-		vm:     vm,
-		blocks: blocks,
+		vm:      vm,
+		blocks:  blocks,
+		metrics: metrics,
+		tracer:  tracer,
+		log:     logger,
 	}
 }
 
@@ -81,6 +94,8 @@ func (e *blockComputer) executeBlock(
 
 		collectionView := stateView.NewChild()
 
+		e.log.Debug().Hex("collection_id", logging.Entity(collection.Guarantee)).Msg("executing collection")
+
 		collEvents, txResults, nextIndex, gas, err := e.executeCollection(
 			ctx, txIndex, blockCtx, collectionView, collection,
 		)
@@ -112,7 +127,7 @@ func (e *blockComputer) executeBlock(
 func (e *blockComputer) executeCollection(
 	ctx context.Context,
 	txIndex uint32,
-	blockCtx virtualmachine.BlockContext,
+	blockCtx fvm.BlockContext,
 	collectionView *delta.View,
 	collection *entity.CompleteCollection,
 ) ([]flow.Event, []flow.TransactionResult, uint32, uint64, error) {
@@ -129,22 +144,45 @@ func (e *blockComputer) executeCollection(
 		gasUsed   uint64
 	)
 
+	txMetrics := fvm.NewMetricsCollector()
+
 	for _, tx := range collection.Transactions {
 		err := func(tx *flow.TransactionBody) error {
 			if e.tracer != nil {
 				txSpan := e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
-				defer txSpan.Finish()
+
+				defer func() {
+					// Attach runtime metrics to the transaction span.
+					//
+					// Each duration is the sum of all sub-programs in the transaction.
+					//
+					// For example, metrics.Parsed() returns the total time spent parsing the transaction itself,
+					// as well as any imported programs.
+					txSpan.LogFields(
+						log.Int64(trace.EXEParseDurationTag, int64(txMetrics.Parsed())),
+						log.Int64(trace.EXECheckDurationTag, int64(txMetrics.Checked())),
+						log.Int64(trace.EXEInterpretDurationTag, int64(txMetrics.Interpreted())),
+					)
+					txSpan.Finish()
+				}()
 			}
 
 			txView := collectionView.NewChild()
 
-			result, err := blockCtx.ExecuteTransaction(txView, tx)
+			result, err := blockCtx.ExecuteTransaction(txView, tx, fvm.WithMetricsCollector(txMetrics))
+
+			if e.metrics != nil {
+				e.metrics.TransactionParsed(txMetrics.Parsed())
+				e.metrics.TransactionChecked(txMetrics.Checked())
+				e.metrics.TransactionInterpreted(txMetrics.Interpreted())
+			}
+
 			if err != nil {
 				txIndex++
 				return fmt.Errorf("failed to execute transaction: %w", err)
 			}
 
-			txEvents, err := virtualmachine.ConvertEvents(txIndex, result)
+			txEvents, err := fvm.ConvertEvents(txIndex, result)
 			txIndex++
 			gasUsed += result.GasUsed
 
@@ -157,9 +195,11 @@ func (e *blockComputer) executeCollection(
 			txResult := flow.TransactionResult{
 				TransactionID: tx.ID(),
 			}
-
 			if result.Error != nil {
 				txResult.ErrorMessage = result.Error.ErrorMessage()
+				e.log.Debug().Hex("tx_id", logging.Entity(tx)).Str("error_message", result.Error.ErrorMessage()).Uint32("error_code", result.Error.StatusCode()).Msg("transaction execution failed")
+			} else {
+				e.log.Debug().Hex("tx_id", logging.Entity(tx)).Msg("transaction executed successfully")
 			}
 
 			txResults = append(txResults, txResult)

@@ -1,10 +1,13 @@
 package wal
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
 )
 
 func TestUpdate(t *testing.T) {
@@ -60,6 +63,73 @@ func TestUpdate(t *testing.T) {
 		assert.Equal(t, keys, decodedKeys)
 		assert.Equal(t, vals, decodedValues)
 
+	})
+
+}
+func TestStorableNode(t *testing.T) {
+
+	storableNode := &flattener.StorableNode{
+		LIndex:    0,
+		RIndex:    1,
+		Height:    2137,
+		Key:       []byte{2, 2, 2},
+		Value:     []byte{3, 3, 3},
+		HashValue: []byte{4, 4, 4},
+	}
+
+	expected := []byte{
+		8, 89, // height
+		0, 0, 0, 0, 0, 0, 0, 0, // LIndex
+		0, 0, 0, 0, 0, 0, 0, 1, // RIndex
+		0, 3, 2, 2, 2, // key length + data
+		0, 0, 0, 3, 3, 3, 3, // val length + data
+		0, 3, 4, 4, 4, // hashValue length + data
+	}
+
+	t.Run("encode", func(t *testing.T) {
+		data := EncodeStorableNode(storableNode)
+
+		assert.Equal(t, expected, data)
+	})
+
+	t.Run("decode", func(t *testing.T) {
+
+		reader := bytes.NewReader(expected)
+
+		newStorableNode, err := ReadStorableNode(reader)
+		require.NoError(t, err)
+
+		assert.Equal(t, storableNode, newStorableNode)
+	})
+
+}
+
+func TestStorableTrie(t *testing.T) {
+
+	storableTrie := &flattener.StorableTrie{
+		RootIndex: 21,
+		RootHash:  []byte{2, 2, 2},
+	}
+
+	expected := []byte{
+		0, 0, 0, 0, 0, 0, 0, 21, // RootIndex
+		0, 3, 2, 2, 2, // RootHash length + data
+	}
+
+	t.Run("encode", func(t *testing.T) {
+		data := EncodeStorableTrie(storableTrie)
+
+		assert.Equal(t, expected, data)
+	})
+
+	t.Run("decode", func(t *testing.T) {
+
+		reader := bytes.NewReader(expected)
+
+		newStorableNode, err := ReadStorableTrie(reader)
+		require.NoError(t, err)
+
+		assert.Equal(t, storableTrie, newStorableNode)
 	})
 
 }

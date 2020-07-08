@@ -44,7 +44,6 @@ func TestLedgerFunctionality(t *testing.T) {
 		keyByteSize := 32
 		valueMaxByteSize := 64
 		activeTries := 1000
-		trieHeight := keyByteSize*8 + 1        // 257
 		steps := 40                            // number of steps
 		histStorage := make(map[string][]byte) // historic storage string(key, statecommitment) -> value
 		latestValue := make(map[string][]byte) // key to value
@@ -56,7 +55,7 @@ func TestLedgerFunctionality(t *testing.T) {
 				// add new keys
 				// TODO update some of the existing keys and shuffle them
 				keys := utils.GetRandomKeysRandN(maxNumInsPerStep, keyByteSize)
-				values := utils.GetRandomValues(len(keys), valueMaxByteSize)
+				values := utils.GetRandomValues(len(keys), 0, valueMaxByteSize)
 				newState, err := led.UpdateRegisters(keys, values, stateCommitment)
 				assert.NoError(t, err)
 
@@ -77,7 +76,7 @@ func TestLedgerFunctionality(t *testing.T) {
 				// validate proofs (check individual proof and batch proof)
 				retValues, proofs, err := led.GetRegistersWithProof(keys, newState)
 				assert.NoError(t, err)
-				v := ledger.NewTrieVerifier(trieHeight)
+				v := ledger.NewTrieVerifier(keyByteSize)
 
 				// validate individual proofs
 				isValid, err := v.VerifyRegistersProof(keys, retValues, proofs, newState)
@@ -85,7 +84,7 @@ func TestLedgerFunctionality(t *testing.T) {
 				assert.True(t, isValid)
 
 				// validate proofs as a batch
-				_, err = ptrie.NewPSMT(newState, trieHeight, keys, retValues, proofs)
+				_, err = ptrie.NewPSMT(newState, keyByteSize, keys, retValues, proofs)
 				assert.NoError(t, err)
 
 				// query all exising keys (check no drop)

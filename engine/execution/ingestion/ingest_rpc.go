@@ -10,7 +10,7 @@ import (
 type IngestRPC interface {
 
 	// ExecuteScriptAtBlockID executes a script at the given Block id
-	ExecuteScriptAtBlockID(ctx context.Context, script []byte, blockID flow.Identifier) ([]byte, error)
+	ExecuteScriptAtBlockID(ctx context.Context, script []byte, arguments [][]byte, blockID flow.Identifier) ([]byte, error)
 
 	// GetAccount returns the Account details at the given Block id
 	GetAccount(ctx context.Context, address flow.Address, blockID flow.Identifier) (*flow.Account, error)

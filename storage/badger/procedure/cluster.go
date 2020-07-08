@@ -167,7 +167,7 @@ func InsertClusterPayload(blockID flow.Identifier, payload *cluster.Payload) fun
 
 		// insert constituent transactions
 		for _, colTx := range payload.Collection.Transactions {
-			err = operation.SkipDuplicates(operation.InsertTransaction(colTx))(tx)
+			err = operation.SkipDuplicates(operation.InsertTransaction(colTx.ID(), colTx))(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert payload transaction: %w", err)
 			}

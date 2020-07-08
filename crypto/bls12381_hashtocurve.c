@@ -247,7 +247,7 @@ static int quotient_sqrt(fp_t out, const fp_t u, const fp_t v) {
 // Maps the field element t to a point p in E1(Fp) where E1: y^2 = g(x) = x^3 + a1*x + b1 
 // using optimized non-constant-time SWU impl
 // p point is in Jacobian coordinates
-static inline void map_to_E1_swu(ep_st* p, const fp_t t) {
+static inline void map_to_E1_swu(ep_t p, const fp_t t) {
     const int tmp_len = 6;
     fp_t* fp_tmp = (fp_t*) malloc(tmp_len*sizeof(fp_t));
     for (int i=0; i<tmp_len; i++) fp_new(&fp_tmp[i]);
@@ -303,6 +303,10 @@ static inline void map_to_E1_swu(ep_st* p, const fp_t t) {
     free(fp_tmp);
 }
 
+
+// These constants are taken from https://github.com/kwantam/bls12-381_hash 
+// and converted to the Mongtomery domain. 
+// Copyright 2019 Riad S. Wahby
 const uint64_t iso_Nx_data[ELLP_Nx_LEN][6] = {
     {0xaeac1662734649b7, 0x5610c2d5f2e62d6e, 0xf2627b56cdb4e2c8, 
      0x6b303e88a2d7005f, 0xb809101dd9981585, 0x11a05f2b1e833340, },
@@ -421,6 +425,9 @@ const uint64_t iso_Dy_data[ELLP_Dy_LEN][6] = {
      0x71c40f65e273b853, 0x6b24255e0d7819c1, 0x0e0fa1d816ddc03e, },
 };
 
+// This code is taken from https://github.com/kwantam/bls12-381_hash 
+// and adapted to use Relic modular arithemtic.  
+// Copyright 2019 Riad S. Wahby
 static inline void hornerPolynomial(fp_t accumulator, const fp_t x, 
         const int start_val, const fp_t* fp_tmp) {
     for (int i = start_val; i >= 0; --i) {
@@ -429,6 +436,9 @@ static inline void hornerPolynomial(fp_t accumulator, const fp_t x,
     }
 }
 
+// This code is taken from https://github.com/kwantam/bls12-381_hash 
+// and adapted to use Relic modular arithemtic.  
+// Copyright 2019 Riad S. Wahby
 static inline void compute_map_zvals(const fp_t inv[], fp_t zv[], 
         const unsigned len, fp_t* fp_tmp) {
     for (unsigned i = 0; i < len; ++i) {
@@ -438,7 +448,24 @@ static inline void compute_map_zvals(const fp_t inv[], fp_t zv[],
 
 // 11-isogeny map
 // computes the mapping of p and stores the result in r
-static inline void eval_iso11(ep_st* r, const ep_st*  p) {
+//
+// This code is taken from https://github.com/kwantam/bls12-381_hash 
+// and adapted to use Relic modular arithemtic. The constant tables 
+// iso_D and iso_N were converted to the Montgomery domain. 
+//
+// Copyright 2019 Riad S. Wahby
+// Licensed under the Apache License, Version 2.0 (the "License");
+//    you may not use this file except in compliance with the License.
+//    You may obtain a copy of the License at
+
+//        http://www.apache.org/licenses/LICENSE-2.0
+
+//    Unless required by applicable law or agreed to in writing, software
+//    distributed under the License is distributed on an "AS IS" BASIS,
+//    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//    See the License for the specific language governing permissions and
+//    limitations under the License.
+static inline void eval_iso11(ep_t r, const ep_t  p) {
     const int tmp_len = 32;
     fp_t* fp_tmp = (fp_t*) malloc(tmp_len*sizeof(fp_t));
     for (int i=0; i<tmp_len; i++) fp_new(&fp_tmp[i]);
@@ -502,44 +529,44 @@ static inline void eval_iso11(ep_st* r, const ep_st*  p) {
 }
 
 // map an input point in E to a point in G1 by clearing the cofactor of G1 
-static void clear_cofactor(ep_st* out, const ep_st* in) {
-    bn_st z;
-    bn_new(&z);
-    fp_prime_get_par(&z);
+static void clear_cofactor(ep_t out, const ep_t in) {
+    bn_t z;
+    bn_new(z);
+    fp_prime_get_par(z);
     // compute 1-z 
-    bn_neg(&z, &z);  // keep -z in only 64 bits
-    bn_add_dig(&z, &z, 1);
-    ep_mul_dig(out, in, z.dp[0]);
-    bn_free(&z);
+    bn_neg(z, z);  // keep -z in only 64 bits
+    bn_add_dig(z, z, 1);
+    ep_mul_dig(out, in, z[0].dp[0]);
+    bn_free(z);
 }
 
 // construction 2 section 5 in in https://eprint.iacr.org/2019/403.pdf
 // evaluate the optimized SWU map twice, add resulting points, apply isogeny map, clear cofactor
 // the result is stored in p
 // msg is the input message to hash, must be at least 2*(FP_BYTES+16) = 128 bytes
-static void map_to_G1_opswu(ep_st* p, const uint8_t *msg, int len) {
+static void map_to_G1_opswu(ep_t p, const uint8_t *msg, int len) {
     TRY {
         if (len < 2*(Fp_BYTES+16)) {
             THROW(ERR_NO_BUFFER);
         }
 
         fp_t t1, t2;
-        bn_st tmp;
-        bn_new(&tmp);
-        bn_read_bin(&tmp, msg, len/2);
-        fp_prime_conv(t1, &tmp);
-        bn_read_bin(&tmp, msg + len/2, len - len/2);
-        fp_prime_conv(t2, &tmp);
-        bn_free(&tmp);
+        bn_t tmp;
+        bn_new(tmp);
+        bn_read_bin(tmp, msg, len/2);
+        fp_prime_conv(t1, tmp);
+        bn_read_bin(tmp, msg + len/2, len - len/2);
+        fp_prime_conv(t2, tmp);
+        bn_free(tmp);
 
-        ep_st p_temp;
-        ep_new(&p_temp);
-        map_to_E1_swu(&p_temp, t1); // map to E1
+        ep_t p_temp;
+        ep_new(p_temp);
+        map_to_E1_swu(p_temp, t1); // map to E1
         map_to_E1_swu(p, t2); // map to E1
-        ep_add_projc(p, p, &p_temp);
-        eval_iso11(&p_temp, p); // map to E
-        clear_cofactor(p, &p_temp); // map to G1
-        ep_free(&p_temp);
+        ep_add_projc(p, p, p_temp);
+        eval_iso11(p_temp, p); // map to E
+        clear_cofactor(p, p_temp); // map to G1
+        ep_free(p_temp);
     }
     CATCH_ANY {
 		THROW(ERR_CAUGHT);
@@ -552,23 +579,23 @@ void opswu_test(uint8_t *out, const uint8_t *msg, int len){
             THROW(ERR_NO_BUFFER);
     }
     fp_t t;
-    bn_st tmp;
-    bn_new(&tmp);
-    bn_read_bin(&tmp, msg, len);
-    fp_prime_conv(t, &tmp);
-    bn_free(&tmp);
+    bn_t tmp;
+    bn_new(tmp);
+    bn_read_bin(tmp, msg, len);
+    fp_prime_conv(t, tmp);
+    bn_free(tmp);
 
-    ep_st p;
-    ep_new(&p);
-    map_to_E1_swu(&p, t); // map to E1
-    eval_iso11(&p, &p); // map to E
-    clear_cofactor(&p, &p); // map to G1
-    ep_write_bin_compact(out, &p, SIGNATURE_LEN);
+    ep_t p;
+    ep_new(p);
+    map_to_E1_swu(p, t); // map to E1
+    eval_iso11(p, p); // map to E
+    clear_cofactor(p, p); // map to G1
+    ep_write_bin_compact(out, p, SIGNATURE_LEN);
 }
 #endif
 
 // computes a hash of input data to G1
-void map_to_G1(ep_st* h, const byte* data, const int len) {
+void map_to_G1(ep_t h, const byte* data, const int len) {
     #if hashToPoint==OPSWU
     // construction 2 from section 5 in https://eprint.iacr.org/2019/403.pdf
     map_to_G1_opswu(h, data, len);

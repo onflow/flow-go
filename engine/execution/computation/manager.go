@@ -9,8 +9,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
+	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
@@ -20,7 +20,7 @@ import (
 )
 
 type ComputationManager interface {
-	ExecuteScript([]byte, *flow.Header, *delta.View) ([]byte, error)
+	ExecuteScript([]byte, [][]byte, *flow.Header, *delta.View) ([]byte, error)
 	ComputeBlock(
 		ctx context.Context,
 		block *entity.ExecutableBlock,
@@ -34,17 +34,18 @@ type Manager struct {
 	log           zerolog.Logger
 	me            module.Local
 	protoState    protocol.State
-	vm            virtualmachine.VirtualMachine
+	vm            fvm.VirtualMachine
 	blockComputer computer.BlockComputer
 	blocks        storage.Blocks
 }
 
 func New(
 	logger zerolog.Logger,
+	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
 	me module.Local,
 	protoState protocol.State,
-	vm virtualmachine.VirtualMachine,
+	vm fvm.VirtualMachine,
 	blocks storage.Blocks,
 ) *Manager {
 	log := logger.With().Str("engine", "computation").Logger()
@@ -54,16 +55,16 @@ func New(
 		me:            me,
 		protoState:    protoState,
 		vm:            vm,
-		blockComputer: computer.NewBlockComputer(vm, tracer, blocks),
+		blockComputer: computer.NewBlockComputer(vm, blocks, metrics, tracer, log.With().Str("component", "block_computer").Logger()),
 		blocks:        blocks,
 	}
 
 	return &e
 }
 
-func (e *Manager) ExecuteScript(script []byte, blockHeader *flow.Header, view *delta.View) ([]byte, error) {
+func (e *Manager) ExecuteScript(script []byte, arguments [][]byte, blockHeader *flow.Header, view *delta.View) ([]byte, error) {
 
-	result, err := e.vm.NewBlockContext(blockHeader, e.blocks).ExecuteScript(view, script)
+	result, err := e.vm.NewBlockContext(blockHeader, e.blocks).ExecuteScript(view, script, arguments)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
 	}

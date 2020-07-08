@@ -1,6 +1,7 @@
 package stub
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -42,7 +43,7 @@ func NewNetwork(state protocol.State, me module.Local, hub *Hub) *Network {
 	return o
 }
 
-// GetID returns the identity of the Node.
+// GetID returns the identity of the node.
 func (mn *Network) GetID() flow.Identifier {
 	return mn.me.NodeID()
 }
@@ -163,7 +164,7 @@ func (mn *Network) sendToAllTargets(m *PendingMessage, recursive bool) error {
 		if recursive {
 			err := receiverEngine.Process(m.From, m.Event)
 			if err != nil {
-				return errors.Wrapf(err, "senderEngine failed to process event: %v", m.Event)
+				return fmt.Errorf("senderEngine failed to process event (%v): %w", m.Event, err)
 			}
 		} else {
 			// Call `Submit` to let receiver engine receive the event directly.

@@ -2,53 +2,8 @@ package flow
 
 import (
 	"fmt"
-	"sync"
 	"time"
 )
-
-// A ChainID is a unique identifier for a specific Flow network instance.
-//
-// Chain IDs are used used to prevent replay attacks and to support network-specific address generation.
-type ChainID string
-
-// Mainnet is the chain ID for the mainnet node chain.
-const Mainnet ChainID = "flow-mainnet"
-
-// Testnet is the chain ID for the testnet node chain.
-const Testnet ChainID = "flow-testnet"
-
-// Emulator is the chain ID for the emulated node chain.
-const Emulator ChainID = "flow-emulator"
-
-func (id ChainID) String() string {
-	return string(id)
-}
-
-var chainIDOnce sync.Once
-var chainID = Mainnet
-
-// SetChainID sets the global chain ID.
-//
-// This function should only be called once per process. Subsequent calls
-// will not update the chain ID.
-func SetChainID(id ChainID) {
-	chainIDOnce.Do(func() { setChainID(id) })
-}
-
-// setChainID is an unsafe version of SetChainID that does not enforce singleton behaviour.
-func setChainID(id ChainID) {
-	switch id {
-	case Mainnet, Testnet, Emulator:
-		chainID = id
-	default:
-		panic(fmt.Sprintf("invalid chain ID %s", id))
-	}
-}
-
-// GetChainID returns the global chain ID.
-func GetChainID() ChainID {
-	return chainID
-}
 
 // DefaultTransactionExpiry is the default expiry for transactions, measured
 // in blocks. Equivalent to 10 minutes for a 1-second block time.
@@ -59,4 +14,32 @@ const DefaultMaxGasLimit = 9999
 
 func GenesisTime() time.Time {
 	return time.Date(2018, time.December, 19, 22, 32, 30, 42, time.UTC)
+}
+
+// DefaultValueLogGCFrequency is the default frequency in blocks that we call the
+// badger value log GC. Equivalent to 10 mins for a 1 second block time
+const DefaultValueLogGCFrequency = 10 * 60
+
+const DomainTagLength = 32
+
+// TransactionDomainTag is the prefix of all signed transaction payloads.
+//
+// A domain tag is encoded as UTF-8 bytes, right padded to a total length of 32 bytes.
+var TransactionDomainTag = paddedDomainTag("FLOW-V0.0-transaction")
+
+// UserDomainTag is the prefix of all signed user space payloads.
+//
+// A domain tag is encoded as UTF-8 bytes, right padded to a total length of 32 bytes.
+var UserDomainTag = paddedDomainTag("FLOW-V0.0-user")
+
+func paddedDomainTag(s string) [DomainTagLength]byte {
+	var tag [DomainTagLength]byte
+
+	if len(s) > DomainTagLength {
+		panic(fmt.Sprintf("domain tag %s cannot be longer than %d characters", s, DomainTagLength))
+	}
+
+	copy(tag[:], s)
+
+	return tag
 }

@@ -49,7 +49,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 	stateCommitment := led.EmptyStateCommitment()
 	for i := 0; i < steps; i++ {
 		keys := utils.GetRandomKeysFixedN(numInsPerStep, keyByteSize)
-		values := utils.GetRandomValues(len(keys), valueMaxByteSize)
+		values := utils.GetRandomValues(len(keys), 0, valueMaxByteSize)
 		totalRegOperation += len(keys)
 
 		start := time.Now()
@@ -86,7 +86,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 
 		start = time.Now()
 		// construct a partial trie using proofs
-		_, err = ptrie.NewPSMT(newState, keyByteSize*8+1, keys, retValues, proofs)
+		_, err = ptrie.NewPSMT(newState, keyByteSize, keys, retValues, proofs)
 		if err != nil {
 			b.Fatal("failed to create PSMT")
 		}
