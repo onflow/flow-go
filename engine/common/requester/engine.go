@@ -147,7 +147,7 @@ func (e *Engine) Submit(originID flow.Identifier, message interface{}) {
 	e.unit.Launch(func() {
 		err := e.Process(originID, message)
 		if err != nil {
-			e.log.Error().Err(err).Msg("requester engine could not process message")
+			engine.LogError(e.log, err)
 		}
 	})
 }
