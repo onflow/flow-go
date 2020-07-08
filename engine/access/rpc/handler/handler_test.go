@@ -510,7 +510,7 @@ func (suite *Suite) TestGetAccount() {
 			Account: account,
 		}
 		req := &access.GetAccountRequest{
-			Address: address,
+			Address: address.Bytes(),
 		}
 		actualResp, err := handler.GetAccount(ctx, req)
 		suite.checkResponse(actualResp, err)
