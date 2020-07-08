@@ -70,18 +70,29 @@ func IsOutdatedInputError(err error) bool {
 
 // LogError logs the engine processing error
 func LogError(log zerolog.Logger, err error) {
+
+	msg := "could not process message"
+
+	// Invalid input errors could be logged as warning, because they can be
+	// part of normal operations when the network is open and anyone can send
+	// weird messages around. However, during the non-BFT phase where we
+	// control the majority of the network, we should not be seeing any of
+	// them. Logging them as error will help us to identify and address
+	// issues with our application logic before going full BFT.
 	if IsInvalidInputError(err) {
-		// invalid input could be logged as warning.
-		// but in non-BFT phase, there should not be any invalid input error.
-		// if there is, it must be an exception error, which makes sense
-		// to log as error level
-		log.Error().
-			Str("error_type", "invalid_input").
-			Err(err).
-			Msg("received invalid input")
-	} else if IsOutdatedInputError(err) {
-		// outdated input might happen often and not an expection error, so log
-		// as warning.
-		log.Warn().Err(err).Msg("received outdated input")
+		log.Error().Str("error_type", "invalid_input").Err(err).Msg(msg)
+		return
 	}
+
+	// Outdated input errors, on the other hand, can happen regularly, even
+	// before opening the network up, as some messages might just be late
+	// due to network delays or other infrastructure issues. They should
+	// thus be logged as warnings.
+	if IsOutdatedInputError(err) {
+		log.Warn().Str("error_type", "outdated_input").Err(err).Msg(msg)
+		return
+	}
+
+	// all other errors should just be logged as usual
+	log.Error().Err(err).Msg(msg)
 }
