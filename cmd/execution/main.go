@@ -86,6 +86,18 @@ func main() {
 			return err
 		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			bootstrapper := bootstrap.NewBootstrapper(node.Logger)
+
+			err := bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootCommit, node.RootBlock.Header)
+			// Root block already loaded, can simply continued
+			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+				return nil, fmt.Errorf("could not bootstrap execution DB: %w", err)
+			} else if err == nil {
+				// Newly bootstrapped Execution DB. Make sure to load execution state
+				if err := loadCheckpoint(node.BaseConfig.BootstrapDir, triedir); err != nil {
+					return nil, fmt.Errorf("could load bootstrap checkpoint: %w", err)
+				}
+			}
 			ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), collector, node.MetricsRegisterer)
 			return ledgerStorage, err
 		}).
@@ -114,13 +126,6 @@ func main() {
 				node.DB,
 				node.Tracer,
 			)
-
-			bootstrapper := bootstrap.NewBootstrapper(node.Logger)
-			err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal.FinalState, node.RootBlock.Header)
-			// Root block already loaded, can simply continue
-			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-				return nil, fmt.Errorf("could not bootstrap execution DB: %w", err)
-			}
 
 			stateSync := sync.NewStateSynchronizer(executionState)
 
