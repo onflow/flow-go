@@ -251,11 +251,22 @@ PHONY: docker-build-bootstrap
 docker-build-bootstrap:
 	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=bootstrap --target production \
 		-t gcr.io/dl-flow/bootstrap:latest -t "gcr.io/dl-flow/bootstrap:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/bootstrap:$(IMAGE_TAG)" .
+	docker create --name bootstrap-container gcr.io/dl-flow/bootstrap:latest
+	docker cp bootstrap-container:/bin/app ./bootstrap
+	docker rm -v bootstrap-container
 
 .PHONY: docker-build-bootstrap-transit
 docker-build-bootstrap-transit:
 	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=bootstrap/transit --target production-nocgo \
 		-t gcr.io/dl-flow/bootstrap-transit:latest -t "gcr.io/dl-flow/bootstrap-transit:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/bootstrap-transit:$(IMAGE_TAG)" .
+
+PHONY: docker-build-util
+docker-build-util:
+	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=util --target production \
+		-t gcr.io/dl-flow/util:latest -t "gcr.io/dl-flow/util:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/util:$(IMAGE_TAG)" .
+	docker create --name spork-util-container gcr.io/dl-flow/util:latest
+	docker cp spork-util-container:/bin/app ./spork-util
+	docker rm -v spork-util-container
 
 .PHONY: docker-build-flow
 docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access docker-build-ghost
