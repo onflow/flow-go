@@ -89,7 +89,6 @@ func main() {
 		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			bootstrapper := bootstrap.NewBootstrapper(node.Logger)
-
 			err := bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal.FinalState, node.RootBlock.Header)
 			// Root block already loaded, can simply continued
 			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
@@ -97,7 +96,7 @@ func main() {
 			} else if err == nil {
 				// Newly bootstrapped Execution DB. Make sure to load execution state
 				if err := loadBootstrapState(node.BaseConfig.BootstrapDir, triedir); err != nil {
-					return nil, fmt.Errorf("could load bootstrap checkpoint: %w", err)
+					return nil, fmt.Errorf("could not load bootstrap state: %w", err)
 				}
 			}
 			ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), collector, node.MetricsRegisterer)
@@ -204,7 +203,7 @@ func loadBootstrapState(dir, trie string) error {
 	} else if _, err := os.Stat(filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, "00000000")); err == nil {
 		filename = "00000000"
 	} else {
-		return fmt.Errorf("Could not find bootstrapped execution state")
+		return fmt.Errorf("could not find bootstrapped execution state")
 	}
 
 	src := filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, filename)
