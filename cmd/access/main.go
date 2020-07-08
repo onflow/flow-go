@@ -94,16 +94,13 @@ func main() {
 			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
-		Component("requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			requestEng, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
 				engine.RequestCollections,
 				filter.HasRole(flow.RoleCollection), // TODO: implement filter for cluster somehow
 			)
-			return requestEng, err
-		}).
-		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			ingestEng, err = ingestion.New(node.Logger, node.State, node.Me, requestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions)
-			requestEng.WithHandle(ingestEng.OnCollection)
+			requestEng = requestEng.WithHandle(ingestEng.OnCollection)
 			return ingestEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {

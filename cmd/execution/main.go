@@ -148,7 +148,8 @@ func main() {
 
 			return providerEngine, err
 		}).
-		Component("requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+
 			// TODO: We should implement a filter that makes it possible to select the correct cluster for
 			// a given entity, so that we can send off the request to the correct cluster here, while still
 			// using the generic engine.
@@ -157,9 +158,6 @@ func main() {
 				engine.RequestCollections,
 				filter.HasRole(flow.RoleCollection),
 			)
-			return requestEng, err
-		}).
-		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
 			events = badger.NewEvents(node.DB)
@@ -186,7 +184,11 @@ func main() {
 				time.Second, //TODO - config param
 				10,          // TODO - config param
 			)
-			requestEng.WithHandle(ingestionEng.OnCollection)
+
+			// TODO: we should solve these mutual dependencies better
+			// => https://github.com/dapperlabs/flow-go/issues/4360
+			requestEng = requestEng.WithHandle(ingestionEng.OnCollection)
+
 			return ingestionEng, err
 		}).
 		Component("sychronization engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
