@@ -11,6 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/module/metrics"
 	module "github.com/dapperlabs/flow-go/module/mock"
+	"github.com/dapperlabs/flow-go/module/trace"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -29,6 +30,7 @@ func TestOnBlockProposalValid(t *testing.T) {
 		state:   state,
 		con:     con,
 		message: metrics,
+		tracer:  trace.NewNoopTracer(),
 	}
 
 	proposal := unittest.ProposalFixture()
@@ -67,6 +69,7 @@ func TestOnBlockProposalRemoteOrigin(t *testing.T) {
 		state:   state,
 		con:     con,
 		message: metrics,
+		tracer:  trace.NewNoopTracer(),
 	}
 	proposal := unittest.ProposalFixture()
 	identities := unittest.IdentityListFixture(100)
@@ -97,6 +100,7 @@ func TestOnBlockProposalIdentitiesError(t *testing.T) {
 		state:   state,
 		con:     con,
 		message: metrics,
+		tracer:  trace.NewNoopTracer(),
 	}
 	proposal := unittest.ProposalFixture()
 	identities := unittest.IdentityListFixture(100)
@@ -128,6 +132,7 @@ func TestOnBlockProposalSubmitFail(t *testing.T) {
 		state:   state,
 		con:     con,
 		message: metrics,
+		tracer:  trace.NewNoopTracer(),
 	}
 	proposal := unittest.ProposalFixture()
 	identities := unittest.IdentityListFixture(100)

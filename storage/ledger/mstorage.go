@@ -6,14 +6,17 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/proof"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/wal"
+)
+
+const (
+	// RegisterKeySize is the size of a Execution register's key [bytes]
+	RegisterKeySize = 32
 )
 
 // MTrieStorage is a fast memory-efficient fork-aware thread-safe trie-based key/value storage.
@@ -33,18 +36,17 @@ type MTrieStorage struct {
 	metrics module.LedgerMetrics
 }
 
-var maxHeight = 257
+const CacheSize = 1000
 
 // NewMTrieStorage creates a new in-memory trie-backed ledger storage with persistence.
 func NewMTrieStorage(dbDir string, capacity int, metrics module.LedgerMetrics, reg prometheus.Registerer) (*MTrieStorage, error) {
 
-	w, err := wal.NewWAL(nil, reg, dbDir, capacity, maxHeight)
-
+	w, err := wal.NewWAL(nil, reg, dbDir, capacity, RegisterKeySize)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create LedgerWAL: %w", err)
 	}
 
-	mForest, err := mtrie.NewMForest(maxHeight, dbDir, capacity, metrics, func(evictedTrie *trie.MTrie) error {
+	mForest, err := mtrie.NewMForest(RegisterKeySize, dbDir, capacity, metrics, func(evictedTrie *trie.MTrie) error {
 		return w.RecordDelete(evictedTrie.RootHash())
 	})
 	if err != nil {
@@ -56,29 +58,7 @@ func NewMTrieStorage(dbDir string, capacity int, metrics module.LedgerMetrics, r
 		metrics: metrics,
 	}
 
-	err = w.Replay(
-		func(forestSequencing *flattener.FlattenedForest) error {
-			rebuiltTries, err := flattener.RebuildTries(forestSequencing)
-			if err != nil {
-				return fmt.Errorf("rebuilding forest from sequenced nodes failed: %w", err)
-			}
-			err = storage.mForest.AddTries(rebuiltTries)
-			if err != nil {
-				return fmt.Errorf("adding rebuilt tries to forest failed: %w", err)
-			}
-			return nil
-		},
-		func(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
-			_, err = storage.mForest.Update(stateCommitment, keys, values)
-			// _, err := trie.UpdateRegisters(keys, values, stateCommitment)
-			return err
-		},
-		func(stateCommitment flow.StateCommitment) error {
-			storage.mForest.RemoveTrie(stateCommitment)
-			return nil
-		},
-	)
-
+	err = w.ReplayOnMForest(mForest)
 	if err != nil {
 		return nil, fmt.Errorf("cannot restore LedgerWAL: %w", err)
 	}
@@ -169,10 +149,10 @@ func (f *MTrieStorage) UpdateRegisters(
 	}
 
 	newTrie, err := f.mForest.Update(stateCommitment, ids, values)
-	newStateCommitment = newTrie.RootHash()
 	if err != nil {
 		return nil, fmt.Errorf("cannot update state: %w", err)
 	}
+	newStateCommitment = newTrie.RootHash()
 
 	// TODO update to proper value once https://github.com/dapperlabs/flow-go/pull/3720 is merged
 	f.metrics.ForestApproxMemorySize(0)

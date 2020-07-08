@@ -43,7 +43,6 @@ type Suite struct {
 	me           *module.Local
 	net          *module.Network
 	con          *network.Conduit
-	validator    *module.TransactionValidator
 	pool         *mempool.Transactions
 	transactions *storage.Transactions
 	headers      *storage.Headers
@@ -51,7 +50,7 @@ type Suite struct {
 	builder      *module.Builder
 	finalizer    *module.Finalizer
 	pending      *module.PendingClusterBlockBuffer
-	sync         *module.Synchronization
+	sync         *module.BlockRequester
 	hotstuff     *module.HotStuff
 	eng          *proposal.Engine
 }
@@ -95,7 +94,6 @@ func (suite *Suite) SetupTest() {
 	suite.con = new(network.Conduit)
 	suite.net.On("Register", mock.Anything, mock.Anything).Return(suite.con, nil)
 
-	suite.validator = new(module.TransactionValidator)
 	suite.pool = new(mempool.Transactions)
 	suite.pool.On("Size").Return(uint(0))
 	suite.transactions = new(storage.Transactions)
@@ -106,12 +104,12 @@ func (suite *Suite) SetupTest() {
 	suite.pending = new(module.PendingClusterBlockBuffer)
 	suite.pending.On("Size").Return(uint(0))
 	suite.pending.On("PruneByHeight", mock.Anything).Return()
-	suite.sync = new(module.Synchronization)
+	suite.sync = new(module.BlockRequester)
 	suite.hotstuff = new(module.HotStuff)
 
-	eng, err := proposal.New(log, suite.net, suite.me, metrics, metrics, metrics, suite.proto.state, suite.cluster.state, suite.validator, suite.pool, suite.transactions, suite.headers, suite.payloads, suite.pending)
+	eng, err := proposal.New(log, suite.net, suite.me, metrics, metrics, metrics, suite.proto.state, suite.cluster.state, suite.pool, suite.transactions, suite.headers, suite.payloads, suite.pending, suite.sync)
 	require.NoError(suite.T(), err)
-	suite.eng = eng.WithConsensus(suite.hotstuff).WithSynchronization(suite.sync)
+	suite.eng = eng.WithConsensus(suite.hotstuff)
 }
 
 func (suite *Suite) TestHandleProposal() {
@@ -175,11 +173,6 @@ func (suite *Suite) TestHandleProposalWithUnknownValidTransactions() {
 	suite.pending.On("ByID", parent.ID()).Return(nil, false)
 	// we are missing all the transactions
 	suite.pool.On("Has", mock.Anything).Return(false)
-	// the missing transactions should be verified
-	for _, tx := range block.Payload.Collection.Transactions {
-		// all the transactions are valid
-		suite.validator.On("ValidateTransaction", tx).Return(nil).Once()
-	}
 
 	// should extend state with new block
 	suite.cluster.mutator.On("Extend", &block).Return(nil).Once()
@@ -194,8 +187,6 @@ func (suite *Suite) TestHandleProposalWithUnknownValidTransactions() {
 	// should store block
 	suite.headers.AssertExpectations(suite.T())
 	suite.payloads.AssertExpectations(suite.T())
-	// transactions should have been validated
-	suite.validator.AssertExpectations(suite.T())
 	suite.hotstuff.AssertExpectations(suite.T())
 }
 

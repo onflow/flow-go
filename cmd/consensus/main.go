@@ -19,8 +19,8 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
-	protocolRecovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
-	"github.com/dapperlabs/flow-go/engine/common/synchronization"
+	recovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
+	synceng "github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
 	"github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
@@ -38,6 +38,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/signature"
+	"github.com/dapperlabs/flow-go/module/synchronization"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
@@ -67,7 +68,8 @@ func main() {
 		seals          mempool.Seals
 		prop           *propagation.Engine
 		prov           *provider.Engine
-		sync           *synchronization.Engine
+		syncCore       *synchronization.Core
+		comp           *compliance.Engine
 		conMetrics     module.ConsensusMetrics
 		mainMetrics    module.HotstuffMetrics
 	)
@@ -133,12 +135,17 @@ func main() {
 			mainMetrics = metrics.NewHotstuffCollector(node.RootChainID)
 			return nil
 		}).
+		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
+			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
+			return err
+		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			resultsDB := bstorage.NewExecutionResults(node.DB)
 			sealsDB := bstorage.NewSeals(node.Metrics.Cache, node.DB)
 			match, err := matching.New(
 				node.Logger,
 				node.Metrics.Engine,
+				node.Tracer,
 				node.Metrics.Mempool,
 				node.Network,
 				node.State,
@@ -146,6 +153,7 @@ func main() {
 				resultsDB,
 				sealsDB,
 				node.Storage.Headers,
+				node.Storage.Index,
 				results,
 				receipts,
 				approvals,
@@ -157,6 +165,7 @@ func main() {
 			prov, err = provider.New(
 				node.Logger,
 				node.Metrics.Engine,
+				node.Tracer,
 				node.Network,
 				node.State,
 				node.Me,
@@ -168,6 +177,7 @@ func main() {
 				node.Logger,
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
+				node.Tracer,
 				conMetrics,
 				node.Network,
 				node.State,
@@ -180,6 +190,7 @@ func main() {
 			ing, err := ingestion.New(
 				node.Logger,
 				node.Metrics.Engine,
+				node.Tracer,
 				conMetrics,
 				node.Network,
 				prop,
@@ -201,9 +212,10 @@ func main() {
 			proposals := buffer.NewPendingBlocks()
 
 			// initialize the compliance engine
-			comp, err := compliance.New(
+			comp, err = compliance.New(
 				node.Logger,
 				node.Metrics.Engine,
+				node.Tracer,
 				node.Metrics.Mempool,
 				conMetrics,
 				node.Network,
@@ -214,24 +226,10 @@ func main() {
 				node.State,
 				prov,
 				proposals,
-				blockRateDelay,
+				syncCore,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
-			}
-
-			// initialize the synchronization engine
-			sync, err = synchronization.New(
-				node.Logger,
-				node.Metrics.Engine,
-				node.Network,
-				node.Me,
-				node.State,
-				node.Storage.Blocks,
-				comp,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 			}
 
 			// initialize the block builder
@@ -295,12 +293,12 @@ func main() {
 			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations
 
 			// initialize a logging notifier for hotstuff
-			notifier := createNotifier(node.Logger, mainMetrics)
+			notifier := createNotifier(node.Logger, mainMetrics, node.Tracer, node.Storage.Index)
 			// initialize the persister
 			persist := persister.New(node.DB)
 
 			// query the last finalized block and pending blocks for recovery
-			finalized, pending, err := protocolRecovery.FindLatest(node.State, node.Storage.Headers, node.GenesisBlock.Header)
+			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks: %w", err)
 			}
@@ -308,6 +306,7 @@ func main() {
 			// initialize hotstuff consensus algorithm
 			hot, err := consensus.NewParticipant(
 				node.Logger,
+				node.Tracer,
 				notifier,
 				mainMetrics,
 				node.Storage.Headers,
@@ -317,8 +316,8 @@ func main() {
 				persist,
 				signer,
 				comp,
-				node.GenesisBlock.Header,
-				node.GenesisQC,
+				node.RootBlock.Header,
+				node.RootQC,
 				finalized,
 				pending,
 				consensus.WithInitialTimeout(hotstuffTimeout),
@@ -332,8 +331,25 @@ func main() {
 				return nil, fmt.Errorf("could not initialize hotstuff engine: %w", err)
 			}
 
-			comp = comp.WithSynchronization(sync).WithConsensus(hot)
+			comp = comp.WithConsensus(hot)
 			return comp, nil
+		}).
+		Component("sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			sync, err := synceng.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				node.Storage.Blocks,
+				comp,
+				syncCore,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
+			}
+
+			return sync, nil
 		}).
 		Run()
 }

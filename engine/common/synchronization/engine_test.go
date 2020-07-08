@@ -1,9 +1,6 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package synchronization
 
 import (
-	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"testing"
@@ -23,7 +20,7 @@ import (
 	module "github.com/dapperlabs/flow-go/module/mock"
 	netint "github.com/dapperlabs/flow-go/network"
 	network "github.com/dapperlabs/flow-go/network/mock"
-	protoint "github.com/dapperlabs/flow-go/state/protocol"
+	protocolint "github.com/dapperlabs/flow-go/state/protocol"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	storerr "github.com/dapperlabs/flow-go/storage"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
@@ -48,6 +45,7 @@ type SyncSuite struct {
 	snapshot     *protocol.Snapshot
 	blocks       *storage.Blocks
 	comp         *network.Engine
+	core         *module.SyncCore
 	e            *Engine
 }
 
@@ -90,7 +88,7 @@ func (ss *SyncSuite) SetupTest() {
 	// set up the protocol state mock
 	ss.state = &protocol.State{}
 	ss.state.On("Final").Return(
-		func() protoint.Snapshot {
+		func() protocolint.Snapshot {
 			return ss.snapshot
 		},
 	)
@@ -141,38 +139,16 @@ func (ss *SyncSuite) SetupTest() {
 	ss.comp = &network.Engine{}
 	ss.comp.On("SubmitLocal", mock.Anything).Return()
 
+	// set up sync core
+	ss.core = &module.SyncCore{}
+
 	// initialize the engine
 	log := zerolog.New(ioutil.Discard)
 	metrics := metrics.NewNoopCollector()
-	e, err := New(log, metrics, ss.net, ss.me, ss.state, ss.blocks, ss.comp)
+	e, err := New(log, metrics, ss.net, ss.me, ss.state, ss.blocks, ss.comp, ss.core)
 	require.NoError(ss.T(), err, "should pass engine initialization")
 
-	e.tolerance = 0 // make sure we always sync on difference in heights
 	ss.e = e
-}
-
-func (ss *SyncSuite) QueuedStatus() *Status {
-	return &Status{
-		Queued: time.Now(),
-	}
-}
-
-func (ss *SyncSuite) RequestedStatus() *Status {
-	return &Status{
-		Queued:    time.Now().Add(-time.Second),
-		Requested: time.Now(),
-		Attempts:  1,
-	}
-}
-
-func (ss *SyncSuite) ReceivedStatus(header *flow.Header) *Status {
-	return &Status{
-		Queued:    time.Now().Add(-time.Second * 2),
-		Requested: time.Now().Add(-time.Second),
-		Attempts:  1,
-		Header:    header,
-		Received:  time.Now(),
-	}
 }
 
 func (ss *SyncSuite) TestOnSyncRequest() {
@@ -184,21 +160,25 @@ func (ss *SyncSuite) TestOnSyncRequest() {
 		Height: 0,
 	}
 
-	// on same height as final, we should do nothing and have no error
-	req.Height = ss.head.Height
+	// regardless of request height, if within tolerance, we should not respond
+	ss.core.On("HandleHeight", ss.head, req.Height)
+	ss.core.On("WithinTolerance", ss.head, req.Height).Return(true)
 	err := ss.e.onSyncRequest(originID, req)
-	require.NoError(ss.T(), err, "same height sync request should pass")
+	ss.Assert().NoError(err, "same height sync request should pass")
 	ss.con.AssertNotCalled(ss.T(), "Submit", mock.Anything, mock.Anything)
-	assert.Empty(ss.T(), ss.e.heights, "no height should be added to status map")
 
-	// if the request height is higher than head, we should queue the height
+	// if request height is higher than local finalized, we should not respond
 	req.Height = ss.head.Height + 1
+	ss.core.On("HandleHeight", ss.head, req.Height)
+	ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
 	err = ss.e.onSyncRequest(originID, req)
-	require.NoError(ss.T(), err, "bigger height sync request should pass")
+	ss.Assert().NoError(err, "same height sync request should pass")
 	ss.con.AssertNotCalled(ss.T(), "Submit", mock.Anything, mock.Anything)
-	assert.Contains(ss.T(), ss.e.heights, req.Height, "status map should contain request height")
 
-	// if the request height is lower than head, we should submit correct response
+	// if the request height is lower than head and outside tolerance, we should submit correct response
+	req.Height = ss.head.Height - 1
+	ss.core.On("HandleHeight", ss.head, req.Height)
+	ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
 	ss.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			res := args.Get(0).(*messages.SyncResponse)
@@ -208,9 +188,10 @@ func (ss *SyncSuite) TestOnSyncRequest() {
 			assert.Equal(ss.T(), originID, recipientID, "should send response to original sender")
 		},
 	)
-	req.Height = ss.head.Height - 1
 	err = ss.e.onSyncRequest(originID, req)
 	require.NoError(ss.T(), err, "smaller height sync request should pass")
+
+	ss.core.AssertExpectations(ss.T())
 }
 
 func (ss *SyncSuite) TestOnSyncResponse() {
@@ -219,20 +200,14 @@ func (ss *SyncSuite) TestOnSyncResponse() {
 	originID := unittest.IdentifierFixture()
 	res := &messages.SyncResponse{
 		Nonce:  rand.Uint64(),
-		Height: 0,
+		Height: rand.Uint64(),
 	}
 
-	// if the response height is below or equal to our finalized, do nothing
-	res.Height = ss.head.Height
+	// the height should be handled
+	ss.core.On("HandleHeight", ss.head, res.Height)
 	err := ss.e.onSyncResponse(originID, res)
-	require.NoError(ss.T(), err, "sync response with equal height should pass")
-	assert.Empty(ss.T(), ss.e.heights, "no heights should be added to the status map")
-
-	// if the response is higher than our finalized, queue the height
-	res.Height = ss.head.Height + 1
-	err = ss.e.onSyncResponse(originID, res)
-	require.NoError(ss.T(), err, "sync response with higher height should pass")
-	assert.Contains(ss.T(), ss.e.heights, res.Height, "status map should contain response height")
+	ss.Assert().Nil(err)
+	ss.core.AssertExpectations(ss.T())
 }
 
 func (ss *SyncSuite) TestOnRangeRequest() {
@@ -332,14 +307,14 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 0)
 
 	// a non-empty request for missing block ID should be a no-op
-	req.BlockIDs = []flow.Identifier{ss.head.ID()}
+	req.BlockIDs = unittest.IdentifierListFixture(1)
 	err = ss.e.onBatchRequest(originID, req)
 	require.NoError(ss.T(), err, "should pass request for missing block")
 	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 0)
 
 	// a non-empty request for existing block IDs should send right response
 	block := unittest.BlockFixture()
-	block.Header.Height = ss.head.Height + 1 // this should work, even if it should never happen
+	block.Header.Height = ss.head.Height - 1
 	req.BlockIDs = []flow.Identifier{block.ID()}
 	ss.blockIDs[block.ID()] = &block
 	ss.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Run(
@@ -364,249 +339,27 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 		Blocks: []*flow.Block{},
 	}
 
-	// check if we want the block by height
-	block1 := unittest.BlockFixture()
-	ss.e.heights[block1.Header.Height] = ss.RequestedStatus()
-	res.Blocks = []*flow.Block{&block1}
-	err := ss.e.onBlockResponse(originID, res)
-	require.NoError(ss.T(), err, "should pass block response (by height)")
-	status := ss.e.heights[block1.Header.Height]
-	ss.Assert().True(status.WasRequested())
-	ss.comp.AssertCalled(ss.T(), "SubmitLocal", &events.SyncedBlock{OriginID: originID, Block: &block1})
+	// add one block that should be processed
+	processable := unittest.BlockFixture()
+	ss.core.On("HandleBlock", processable.Header).Return(true)
+	res.Blocks = append(res.Blocks, &processable)
 
-	// check if we want the block by block ID
-	block2 := unittest.BlockFixture()
-	ss.e.blockIDs[block2.ID()] = ss.RequestedStatus()
-	res.Blocks = []*flow.Block{&block2}
-	err = ss.e.onBlockResponse(originID, res)
-	require.NoError(ss.T(), err, "should pass block response (by block ID)")
-	status = ss.e.blockIDs[block2.ID()]
-	ss.Assert().True(status.WasReceived())
-	ss.comp.AssertCalled(ss.T(), "SubmitLocal", &events.SyncedBlock{OriginID: originID, Block: &block2})
+	// add one block that should not be processed
+	unprocessable := unittest.BlockFixture()
+	ss.core.On("HandleBlock", unprocessable.Header).Return(false)
+	res.Blocks = append(res.Blocks, &unprocessable)
 
-	// check if we want the block by neither height or block ID
-	block3 := unittest.BlockFixture()
-	res.Blocks = []*flow.Block{&block3}
-	err = ss.e.onBlockResponse(originID, res)
-	require.NoError(ss.T(), err, "should pass on unwanted block")
-	ss.comp.AssertNotCalled(ss.T(), "SubmitLocal", &events.SyncedBlock{OriginID: originID, Block: &block3})
-
-	// check if we've already received the block
-	block4 := unittest.BlockFixture()
-	status = ss.ReceivedStatus(block4.Header)
-	ss.e.blockIDs[block4.ID()] = status
-	ss.e.heights[block4.Header.Height] = status
-	res.Blocks = []*flow.Block{&block4}
-	err = ss.e.onBlockResponse(originID, res)
-	require.NoError(ss.T(), err, "should pass on already received block")
-	ss.comp.AssertNotCalled(ss.T(), "SubmitLocal", &events.SyncedBlock{OriginID: originID, Block: &block4})
-
-}
-
-func (ss *SyncSuite) TestQueueByHeight() {
-
-	// generate a number of heights
-	var heights []uint64
-	for n := 0; n < 100; n++ {
-		heights = append(heights, rand.Uint64())
-	}
-
-	// add all of them to engine
-	for _, height := range heights {
-		ss.e.queueByHeight(height)
-	}
-
-	// check they are all in the map now
-	for _, height := range heights {
-		assert.Contains(ss.T(), ss.e.heights, height, "status map should contain the height")
-	}
-
-	// get current count and add all again
-	count := len(ss.e.heights)
-	for _, height := range heights {
-		ss.e.queueByHeight(height)
-	}
-
-	// check that operation was idempotent (size still the same)
-	assert.Len(ss.T(), ss.e.heights, count, "height map should be the same")
-
-}
-
-func (ss *SyncSuite) TestQueueByBlockID() {
-
-	// generate a number of block IDs
-	var blockIDs []flow.Identifier
-	for n := 0; n < 100; n++ {
-		blockIDs = append(blockIDs, unittest.IdentifierFixture())
-	}
-
-	// add all of them to engine
-	for _, blockID := range blockIDs {
-		ss.e.queueByBlockID(blockID)
-	}
-
-	// check they are all in the map now
-	for _, blockID := range blockIDs {
-		assert.Contains(ss.T(), ss.e.blockIDs, blockID, "status map should contain the block ID")
-	}
-
-	// get current count and add all again
-	count := len(ss.e.blockIDs)
-	for _, blockID := range blockIDs {
-		ss.e.queueByBlockID(blockID)
-	}
-
-	// check that operation was idempotent (size still the same)
-	assert.Len(ss.T(), ss.e.blockIDs, count, "block ID map should be the same")
-}
-
-func (ss *SyncSuite) TestRequestBlock() {
-
-	queuedID := unittest.IdentifierFixture()
-	requestedID := unittest.IdentifierFixture()
-	received := unittest.BlockFixture()
-
-	ss.e.blockIDs[queuedID] = ss.QueuedStatus()
-	ss.e.blockIDs[requestedID] = ss.RequestedStatus()
-	ss.e.blockIDs[received.ID()] = ss.RequestedStatus()
-	ss.e.processIncomingBlock(unittest.IdentifierFixture(), &received)
-
-	// queued status should stay the same
-	ss.e.RequestBlock(queuedID)
-	assert.True(ss.T(), ss.e.blockIDs[queuedID].WasQueued())
-
-	// requested status should stay the same
-	ss.e.RequestBlock(requestedID)
-	assert.True(ss.T(), ss.e.blockIDs[requestedID].WasRequested())
-
-	// received status should be re-queued by ID
-	ss.e.RequestBlock(received.ID())
-	assert.True(ss.T(), ss.e.blockIDs[received.ID()].WasQueued())
-	assert.False(ss.T(), ss.e.blockIDs[received.ID()].WasReceived())
-	assert.False(ss.T(), ss.e.heights[received.Header.Height].WasQueued())
-}
-
-func (ss *SyncSuite) TestProcessIncomingBlock() {
-
-	var blocks []*flow.Block
-	originID := unittest.IdentifierFixture()
-
-	// generate 3 by height blocks
-	for n := 0; n < 3; n++ {
-		block := unittest.BlockFixture()
-		blocks = append(blocks, &block)
-		ss.e.heights[block.Header.Height] = ss.QueuedStatus()
-	}
-
-	// generate 3 by block ID blocks
-	for n := 0; n < 3; n++ {
-		block := unittest.BlockFixture()
-		blocks = append(blocks, &block)
-		ss.e.blockIDs[block.ID()] = ss.QueuedStatus()
-	}
-
-	// generate 3 unwanted blocks
-	for n := 0; n < 3; n++ {
-		block := unittest.BlockFixture()
-		blocks = append(blocks, &block)
-	}
-
-	// add 2 random heights and block IDs to the height maps
-	ss.e.heights[rand.Uint64()] = ss.QueuedStatus()
-	ss.e.heights[rand.Uint64()] = ss.QueuedStatus()
-	ss.e.blockIDs[unittest.IdentifierFixture()] = ss.QueuedStatus()
-	ss.e.blockIDs[unittest.IdentifierFixture()] = ss.QueuedStatus()
-
-	// process all of the blocks
-	for _, block := range blocks {
-		ss.e.processIncomingBlock(originID, block)
-	}
-
-	// assert the maps have right size and elements
-	assert.Len(ss.T(), ss.e.heights, 3+3+2)
-	for _, block := range blocks[0:3] {
-		status := ss.e.heights[block.Header.Height]
-		assert.True(ss.T(), status.WasReceived())
-	}
-	assert.Len(ss.T(), ss.e.blockIDs, 3+3+2)
-	for _, block := range blocks[3:6] {
-		status := ss.e.blockIDs[block.ID()]
-		assert.True(ss.T(), status.WasReceived())
-	}
-
-	// assert that submit local was called with the right blocks
-	if ss.comp.AssertNumberOfCalls(ss.T(), "SubmitLocal", 6) {
-		for _, block := range blocks[0:6] {
-			ss.comp.AssertCalled(ss.T(), "SubmitLocal", &events.SyncedBlock{OriginID: originID, Block: block})
-		}
-	}
-}
-
-func (ss *SyncSuite) TestPrune() {
-
-	// our latest finalized height is 100
-	finalHeight := uint64(100)
-	ss.head.Height = finalHeight
-
-	var (
-		prunableHeights  []flow.Block
-		prunableBlockIDs []flow.Block
-		unprunable       []flow.Block
+	ss.comp.On("SubmitLocal", mock.Anything).Run(func(args mock.Arguments) {
+		res := args.Get(0).(*events.SyncedBlock)
+		ss.Assert().Equal(&processable, res.Block)
+		ss.Assert().Equal(originID, res.OriginID)
+	},
 	)
 
-	// add some finalized blocks by height
-	for i := 0; i < 3; i++ {
-		block := unittest.BlockFixture()
-		block.Header.Height = uint64(i + 1)
-		ss.e.heights[block.Header.Height] = ss.QueuedStatus()
-		prunableHeights = append(prunableHeights, block)
-	}
-	// add some un-finalized blocks by height
-	for i := 0; i < 3; i++ {
-		block := unittest.BlockFixture()
-		block.Header.Height = finalHeight + uint64(i+1)
-		ss.e.heights[block.Header.Height] = ss.QueuedStatus()
-		unprunable = append(unprunable, block)
-	}
-
-	// add some finalized blocks by block ID
-	for i := 0; i < 3; i++ {
-		block := unittest.BlockFixture()
-		block.Header.Height = uint64(i + 1)
-		ss.e.blockIDs[block.ID()] = ss.ReceivedStatus(block.Header)
-		prunableBlockIDs = append(prunableBlockIDs, block)
-	}
-	// add some un-finalized, received blocks by block ID
-	for i := 0; i < 3; i++ {
-		block := unittest.BlockFixture()
-		block.Header.Height = 100 + uint64(i+1)
-		ss.e.blockIDs[block.ID()] = ss.ReceivedStatus(block.Header)
-		unprunable = append(unprunable, block)
-	}
-
-	heightsBefore := len(ss.e.heights)
-	blockIDsBefore := len(ss.e.blockIDs)
-
-	// prune the pending requests
-	ss.e.prune()
-
-	assert.Equal(ss.T(), heightsBefore-len(prunableHeights), len(ss.e.heights))
-	assert.Equal(ss.T(), blockIDsBefore-len(prunableBlockIDs), len(ss.e.blockIDs))
-
-	// ensure the right things were pruned
-	for _, block := range prunableBlockIDs {
-		_, exists := ss.e.blockIDs[block.ID()]
-		assert.False(ss.T(), exists)
-	}
-	for _, block := range prunableHeights {
-		_, exists := ss.e.heights[block.Header.Height]
-		assert.False(ss.T(), exists)
-	}
-	for _, block := range unprunable {
-		_, heightExists := ss.e.heights[block.Header.Height]
-		_, blockIDExists := ss.e.blockIDs[block.ID()]
-		assert.True(ss.T(), heightExists || blockIDExists)
-	}
+	err := ss.e.onBlockResponse(originID, res)
+	ss.Assert().Nil(err)
+	ss.comp.AssertExpectations(ss.T())
+	ss.core.AssertExpectations(ss.T())
 }
 
 func (ss *SyncSuite) TestPollHeight() {
@@ -626,328 +379,39 @@ func (ss *SyncSuite) TestPollHeight() {
 	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 3)
 }
 
-func (ss *SyncSuite) TestScanPending() {
+func (ss *SyncSuite) TestSendRequests() {
 
-	// get current timestamp and zero timestamp
-	now := time.Now().UTC()
-	zero := time.Time{}
+	ranges := unittest.RangeListFixture(1)
+	batches := unittest.BatchListFixture(1)
 
-	// fill in a height status that should be skipped
-	skipHeight := uint64(rand.Uint64())
-	ss.e.heights[skipHeight] = &Status{
-		Queued:    now,
-		Requested: now,
-		Attempts:  0,
-	}
-
-	// fill in a height status that should be deleted
-	dropHeight := uint64(rand.Uint64())
-	ss.e.heights[dropHeight] = &Status{
-		Queued:    now,
-		Requested: zero,
-		Attempts:  ss.e.maxAttempts,
-	}
-
-	// fill in a height status that should be requested
-	reqHeight := uint64(rand.Uint64())
-	ss.e.heights[reqHeight] = &Status{
-		Queued:    now,
-		Requested: zero,
-		Attempts:  0,
-	}
-
-	// fill in a block ID that should be skipped
-	skipBlockID := unittest.IdentifierFixture()
-	ss.e.blockIDs[skipBlockID] = &Status{
-		Queued:    now,
-		Requested: now,
-		Attempts:  0,
-	}
-
-	// fill in a block ID that should be deleted
-	dropBlockID := unittest.IdentifierFixture()
-	ss.e.blockIDs[dropBlockID] = &Status{
-		Queued:    now,
-		Requested: zero,
-		Attempts:  ss.e.maxAttempts,
-	}
-
-	// fill in a block ID that should be requested
-	reqBlockID := unittest.IdentifierFixture()
-	ss.e.blockIDs[reqBlockID] = &Status{
-		Queued:    now,
-		Requested: zero,
-		Attempts:  0,
-	}
-
-	// execute the pending scan
-	heights, blockIDs, err := ss.e.scanPending()
-	require.NoError(ss.T(), err, "should pass pending scan")
-
-	// check only the request height is in heights
-	require.NotContains(ss.T(), heights, skipHeight, "output should not contain skip height")
-	require.NotContains(ss.T(), heights, dropHeight, "output should not contain drop height")
-	require.Contains(ss.T(), heights, reqHeight, "output should contain request height")
-
-	// check only the request block ID is in block IDs
-	require.NotContains(ss.T(), blockIDs, skipBlockID, "output should not contain skip blockID")
-	require.NotContains(ss.T(), blockIDs, dropBlockID, "output should not contain drop blockID")
-	require.Contains(ss.T(), blockIDs, reqBlockID, "output should contain request blockID")
-
-	// check only delete  height was deleted
-	require.Contains(ss.T(), ss.e.heights, skipHeight, "status should not contain skip height")
-	require.NotContains(ss.T(), ss.e.heights, dropHeight, "status should not contain drop height")
-	require.Contains(ss.T(), ss.e.heights, reqHeight, "status should contain request height")
-
-	// check only the delete block ID was deleted
-	require.Contains(ss.T(), ss.e.blockIDs, skipBlockID, "status should not contain skip blockID")
-	require.NotContains(ss.T(), ss.e.blockIDs, dropBlockID, "status should not contain drop blockID")
-	require.Contains(ss.T(), ss.e.blockIDs, reqBlockID, "status should contain request blockID")
-
-}
-
-func (ss *SyncSuite) TestSendRequestsContinuousRangeMaxSizeExact() {
-
-	// configure request parameters
-	ss.e.maxSize = 10
-	ss.e.maxRequests = 100
-
-	// create a maximum sized batch of heights
-	var maximum []uint64
-	maxSize := uint64(ss.e.maxSize)
-	start := uint64(100)
-	end := start + maxSize
-	for n := start; n < end; n++ {
-		maximum = append(maximum, n)
-		ss.e.heights[n] = &Status{}
-	}
-
-	// set up checks for desired sequence of submit calls
-	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Once().Return(nil).Run(
+	// should submit and mark requested all ranges
+	ss.con.On("Submit", mock.AnythingOfType("*messages.RangeRequest"), mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			req := args.Get(0).(*messages.RangeRequest)
-			assert.Equal(ss.T(), start, req.FromHeight, "request should start at start")
-			assert.Equal(ss.T(), end-1, req.ToHeight, "request should end at end")
+			ss.Assert().Equal(ranges[0].From, req.FromHeight)
+			ss.Assert().Equal(ranges[0].To, req.ToHeight)
 		},
 	)
+	ss.core.On("RangeRequested", ranges[0])
 
-	// set up one additional catch-all to log info on superfluous calls
-	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
-		func(args mock.Arguments) {
-			req := args.Get(0).(*messages.RangeRequest)
-			assert.Fail(ss.T(), fmt.Sprintf("additional request (from: %d, to: %d)", req.FromHeight, req.ToHeight))
-		},
-	)
-
-	// send requests and do checks
-	err := ss.e.sendRequests(maximum, nil)
-	require.NoError(ss.T(), err, "should pass maximum height batch")
-	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 1)
-}
-
-func (ss *SyncSuite) TestSendRequestsContinuousRangeMaxSizePlusOne() {
-
-	// configure the request parameters
-	ss.e.maxSize = 10
-	ss.e.maxRequests = 100
-
-	// create a batch of heights one longer than maximum size
-	var oversized []uint64
-	maxSize := uint64(ss.e.maxSize)
-	start := uint64(200)
-	end := start + maxSize + 1
-	for n := start; n < end; n++ {
-		oversized = append(oversized, n)
-		ss.e.heights[n] = &Status{}
-	}
-
-	// set up checks for desired sequence of submit calls
-	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Once().Return(nil).Run(
-		func(args mock.Arguments) {
-			req := args.Get(0).(*messages.RangeRequest)
-			assert.Equal(ss.T(), start, req.FromHeight, "first request should start at start")
-			assert.Equal(ss.T(), end-2, req.ToHeight, "first request should end at end")
-		},
-	)
-	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Once().Return(nil).Run(
-		func(args mock.Arguments) {
-			req := args.Get(0).(*messages.RangeRequest)
-			assert.Equal(ss.T(), end-1, req.FromHeight, "second request should start at start")
-			assert.Equal(ss.T(), end-1, req.ToHeight, "second request should end at end")
-		},
-	)
-
-	// set up one additional catch-all to log info on superfluous calls
-	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
-		func(args mock.Arguments) {
-			req := args.Get(0).(*messages.RangeRequest)
-			assert.Fail(ss.T(), fmt.Sprintf("additional request (from: %d, to: %d)", req.FromHeight, req.ToHeight))
-		},
-	)
-
-	// send the requests and do checks
-	err := ss.e.sendRequests(oversized, nil)
-	require.NoError(ss.T(), err, "should pass oversized height batch")
-	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 2)
-}
-
-func (ss *SyncSuite) TestSendRequestsTwoRangesEachMaxSizeExact() {
-
-	// configure request parameters
-	ss.e.maxSize = 1
-	ss.e.maxRequests = 100
-
-	// create a slice of two heights, which should be split into two of one each
-	batches := []uint64{1, 2}
-	for _, n := range batches {
-		ss.e.heights[n] = &Status{}
-	}
-
-	// set up checks for desired sequence of submit calls
-	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Once().Return(nil).Run(
-		func(args mock.Arguments) {
-			req := args.Get(0).(*messages.RangeRequest)
-			assert.Equal(ss.T(), uint64(1), req.FromHeight, "first request should start at start")
-			assert.Equal(ss.T(), uint64(1), req.ToHeight, "first request should end at end")
-		},
-	)
-	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Once().Return(nil).Run(
-		func(args mock.Arguments) {
-			req := args.Get(0).(*messages.RangeRequest)
-			assert.Equal(ss.T(), uint64(2), req.FromHeight, "second request should start at start")
-			assert.Equal(ss.T(), uint64(2), req.ToHeight, "second request should end at end")
-		},
-	)
-
-	// set up one additional catch-all to log info on superfluous calls
-	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
-		func(args mock.Arguments) {
-			req := args.Get(0).(*messages.RangeRequest)
-			assert.Fail(ss.T(), fmt.Sprintf("additional request (from: %d, to: %d)", req.FromHeight, req.ToHeight))
-		},
-	)
-
-	// send the requests and do checks
-	err := ss.e.sendRequests(batches, nil)
-	require.NoError(ss.T(), err, "should pass two one-height batches")
-	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 2)
-}
-
-func (ss *SyncSuite) TestSendRequestsFiveRangesWithMaxRequestsFour() {
-
-	// configure request parameters
-	ss.e.maxRequests = 4
-	ss.e.maxSize = 100
-
-	// create a slice of 5 contiguous ranges, which is one more than max requests
-	batches := []uint64{
-		1,
-		3, 4,
-		6, 7, 8,
-		10, 11, 12, 13,
-		15, 16, 17, 18, 19,
-	}
-	for _, n := range batches {
-		ss.e.heights[n] = &Status{}
-	}
-
-	// set up checks for desired sequence of submit calls
-	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Once().Return(nil).Run(
-		func(args mock.Arguments) {
-			req := args.Get(0).(*messages.RangeRequest)
-			assert.Equal(ss.T(), uint64(1), req.FromHeight, "first request should start at start")
-			assert.Equal(ss.T(), uint64(1), req.ToHeight, "first request should end at end")
-		},
-	)
-	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Once().Return(nil).Run(
-		func(args mock.Arguments) {
-			req := args.Get(0).(*messages.RangeRequest)
-			assert.Equal(ss.T(), uint64(3), req.FromHeight, "second request should start at start")
-			assert.Equal(ss.T(), uint64(4), req.ToHeight, "second request should end at end")
-		},
-	)
-	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Once().Return(nil).Run(
-		func(args mock.Arguments) {
-			req := args.Get(0).(*messages.RangeRequest)
-			assert.Equal(ss.T(), uint64(6), req.FromHeight, "second request should start at start")
-			assert.Equal(ss.T(), uint64(8), req.ToHeight, "second request should end at end")
-		},
-	)
-	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Once().Return(nil).Run(
-		func(args mock.Arguments) {
-			req := args.Get(0).(*messages.RangeRequest)
-			assert.Equal(ss.T(), uint64(10), req.FromHeight, "second request should start at start")
-			assert.Equal(ss.T(), uint64(13), req.ToHeight, "second request should end at end")
-		},
-	)
-
-	// set up one additional catch-all to log info on superfluous calls
-	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
-		func(args mock.Arguments) {
-			req := args.Get(0).(*messages.RangeRequest)
-			assert.Fail(ss.T(), fmt.Sprintf("additional request (from: %d, to: %d)", req.FromHeight, req.ToHeight))
-		},
-	)
-
-	// send the requests and do checks
-	err := ss.e.sendRequests(batches, nil)
-	require.NoError(ss.T(), err, "should pass five height batches")
-	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 4)
-}
-
-func (ss *SyncSuite) TestSendRequestsBlockIDs() {
-
-	// configure request parameters
-	ss.e.maxSize = 1024
-	ss.e.maxRequests = 100
-
-	// create a batch twice maximum size plus one, which should lead to 3 requests
-	maxSize := uint64(ss.e.maxSize)
-	var blockIDs []flow.Identifier
-	for n := uint64(0); n < maxSize*2+1; n++ {
-		blockID := unittest.IdentifierFixture()
-		blockIDs = append(blockIDs, blockID)
-		ss.e.blockIDs[blockID] = &Status{}
-	}
-
-	// set up checks for desired sequence of submit calls
-	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Once().Return(nil).Run(
+	// should submit and mark requested all batches
+	ss.con.On("Submit", mock.AnythingOfType("*messages.BatchRequest"), mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			req := args.Get(0).(*messages.BatchRequest)
-			assert.ElementsMatch(ss.T(), blockIDs[:maxSize], req.BlockIDs, "first batch request should have first slice")
+			ss.Assert().Equal(batches[0].BlockIDs, req.BlockIDs)
 		},
 	)
-	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Once().Return(nil).Run(
-		func(args mock.Arguments) {
-			req := args.Get(0).(*messages.BatchRequest)
-			assert.ElementsMatch(ss.T(), blockIDs[maxSize:maxSize*2], req.BlockIDs, "second batch request should have second slice")
-		},
-	)
-	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Once().Return(nil).Run(
-		func(args mock.Arguments) {
-			req := args.Get(0).(*messages.BatchRequest)
-			assert.ElementsMatch(ss.T(), blockIDs[maxSize*2:], req.BlockIDs, "last batch request should have last slice")
-		},
-	)
+	ss.core.On("BatchRequested", batches[0])
 
-	// set up one additional catch-all to log info on superfluous calls
-	ss.con.On("Submit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(
-		func(args mock.Arguments) {
-			req := args.Get(0).(*messages.BatchRequest)
-			assert.Fail(ss.T(), fmt.Sprintf("additional request (blocks: %s)", req.BlockIDs))
-		},
-	)
-
-	// send the requests and do checks
-	err := ss.e.sendRequests(nil, blockIDs)
-	require.NoError(ss.T(), err, "should pass three block ID batches")
-	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 3)
-
+	err := ss.e.sendRequests(ranges, batches)
+	ss.Assert().Nil(err)
+	ss.con.AssertExpectations(ss.T())
 }
 
 // test a synchronization engine can be started and stopped
 func (ss *SyncSuite) TestStartStop() {
-	<-ss.e.Ready()
-	time.Sleep(2 * time.Second)
-	<-ss.e.Done()
+	unittest.AssertReturnsBefore(ss.T(), func() {
+		<-ss.e.Ready()
+		<-ss.e.Done()
+	}, time.Second)
 }

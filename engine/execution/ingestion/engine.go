@@ -22,6 +22,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	executionSync "github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/engine/execution/utils"
+	"github.com/dapperlabs/flow-go/model/events"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -53,6 +54,7 @@ type Engine struct {
 	transactionResults                  storage.TransactionResults
 	computationManager                  computation.ComputationManager
 	providerEngine                      provider.ProviderEngine
+	blockSync                           module.BlockRequester
 	mempool                             *Mempool
 	execState                           state.ExecutionState
 	wg                                  sync.WaitGroup
@@ -80,6 +82,7 @@ func New(
 	transactionResults storage.TransactionResults,
 	executionEngine computation.ComputationManager,
 	providerEngine provider.ProviderEngine,
+	blockSync module.BlockRequester,
 	execState state.ExecutionState,
 	syncThreshold uint64,
 	metrics module.ExecutionMetrics,
@@ -105,6 +108,7 @@ func New(
 		transactionResults:                  transactionResults,
 		computationManager:                  executionEngine,
 		providerEngine:                      providerEngine,
+		blockSync:                           blockSync,
 		mempool:                             mempool,
 		execState:                           execState,
 		syncModeThreshold:                   syncThreshold,
@@ -129,7 +133,7 @@ func New(
 
 	syncConduit, err := net.Register(engine.ExecutionSync, &eng)
 	if err != nil {
-		return nil, fmt.Errorf("could not register execution sync engine: %w", err)
+		return nil, fmt.Errorf("could not register execution blockSync engine: %w", err)
 	}
 
 	eng.conduit = con
@@ -198,8 +202,17 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 		var err error
 		switch v := event.(type) {
+		case *events.SyncedBlock:
+			log.Debug().Hex("block_id", logging.Entity(v.Block.Header)).
+				Uint64("block_view", v.Block.Header.View).
+				Uint64("block_height", v.Block.Header.Height).
+				Msg("received synced block")
+			p := &messages.BlockProposal{
+				Header: v.Block.Header, Payload: v.Block.Payload}
+			err = e.handleBlockProposal(ctx, p)
 		case *messages.BlockProposal:
 			log.Debug().Hex("block_id", logging.Entity(v.Header)).
+				Hex("parent_id", v.Header.ParentID[:]).
 				Uint64("block_view", v.Header.View).
 				Uint64("block_height", v.Header.Height).
 				Hex("block_proposal", logging.Entity(v.Header)).Msg("received block proposal")
@@ -288,7 +301,7 @@ func (e *Engine) handleBlockProposal(ctx context.Context, proposal *messages.Blo
 					panic(fmt.Sprintf("could not enqueue orphaned block"))
 				}
 				e.tryRequeueOrphans(executableBlock, queue, orphanQueues)
-				e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Msg("added block to new orphan queue")
+				e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Hex("parent_id", logging.ID(executableBlock.Block.Header.ParentID)).Msg("added block to new orphan queue")
 				// special case when sync threshold is reached
 				if queue.Height() < e.syncModeThreshold {
 					return nil
@@ -435,7 +448,7 @@ func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 	if eb.IsComplete() {
 		e.log.Debug().
 			Hex("block_id", logging.Entity(eb.Block)).
-			Msg("executing block")
+			Msg("block complete, starting execution")
 
 		if e.extensiveLogging {
 			e.logExecutableBlock(eb)
@@ -990,12 +1003,16 @@ func (e *Engine) StartSync(ctx context.Context, firstKnown *entity.ExecutableBlo
 	}
 
 	if len(otherNodes) < 1 {
-		e.log.Fatal().Err(err).Msg("no other execution nodes to sync from")
+		e.log.Debug().
+			Msgf("no other execution nodes found, request last block instead at height %d", targetHeight)
+		e.blockSync.RequestBlock(targetBlockID)
+		return
 	}
 
 	// select other node at random
 	// TODO - protocol which surveys other nodes for state
 	// TODO - ability to sync from multiple servers
+	// TODO - handle byzantine other node that does not send response
 	otherNodeIdentity := otherNodes[rand.Intn(len(otherNodes))]
 
 	exeStateReq := messages.ExecutionStateSyncRequest{

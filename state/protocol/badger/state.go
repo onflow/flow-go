@@ -53,6 +53,43 @@ func NewState(metrics module.ComplianceMetrics, db *badger.DB, headers storage.H
 	return s, nil
 }
 
+func (s *State) Root() (*flow.Header, error) {
+
+	// retrieve the root height
+	var height uint64
+	err := s.db.View(operation.RetrieveRootHeight(&height))
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve root height: %w", err)
+	}
+
+	// look up root header
+	var rootID flow.Identifier
+	err = s.db.View(operation.LookupBlockHeight(height, &rootID))
+	if err != nil {
+		return nil, fmt.Errorf("could not look up root header: %w", err)
+	}
+
+	// retrieve root header
+	var header flow.Header
+	err = s.db.View(operation.RetrieveHeader(rootID, &header))
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve root header: %w", err)
+	}
+
+	return &header, nil
+}
+
+func (s *State) ChainID() (flow.ChainID, error) {
+
+	// retrieve root header
+	root, err := s.Root()
+	if err != nil {
+		return "", fmt.Errorf("could not get root: %w", err)
+	}
+
+	return root.ChainID, nil
+}
+
 func (s *State) Sealed() protocol.Snapshot {
 
 	// retrieve the latest sealed height
