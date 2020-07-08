@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -18,14 +19,15 @@ type handlerAccounts struct {
 	state        protocol.State
 	executionRPC execution.ExecutionAPIClient
 	headers      storage.Headers
+	chainID      flow.ChainID
 }
 
 func (h *handlerAccounts) GetAccount(ctx context.Context, req *access.GetAccountRequest) (*access.GetAccountResponse, error) {
 
 	address := req.GetAddress()
 
-	if address == nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid address")
+	if _, err := convert.Address(address, h.chainID.Chain()); err != nil {
+		return nil, err
 	}
 
 	// get the latest sealed header
