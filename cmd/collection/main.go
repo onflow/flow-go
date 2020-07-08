@@ -321,7 +321,7 @@ func main() {
 			return ing, err
 		}).
 		Component("transaction ingress server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			server := ingress.New(ingressConf, ing)
+			server := ingress.New(ingressConf, ing, node.RootChainID)
 			return server, nil
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
