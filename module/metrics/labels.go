@@ -74,6 +74,6 @@ const (
 	MessageSubmitGuarantee      = "submit_guarantee"
 	MessageCollectionRequest    = "collection_request"
 	MessageCollectionResponse   = "collection_response"
-	MessageResourceRequest      = "resource_request"
-	MessageResourceResponse     = "resource_response"
+	MessageEntityRequest        = "entity_request"
+	MessageEntityResponse       = "entity_response"
 )

@@ -38,7 +38,8 @@ type Engine struct {
 }
 
 // New creates a new access ingestion engine
-func New(log zerolog.Logger,
+func New(
+	log zerolog.Logger,
 	state protocol.State,
 	me module.Local,
 	request module.Requester,
