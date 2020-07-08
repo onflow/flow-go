@@ -5,6 +5,15 @@ import (
 	"time"
 )
 
+type Config struct {
+	BatchInterval  time.Duration // minimum interval between requests
+	BatchThreshold uint          // maximum batch size for one request
+	RetryInitial   time.Duration // interval after which we retry request for an entity
+	RetryFunction  RetryFunc     // function determining growth of retry interval
+	RetryMaximum   time.Duration // maximum interval for retrying request for an entity
+	RetryAttempts  uint          // maximum amount of request attemps per entity
+}
+
 type RetryFunc func(time.Duration) time.Duration
 
 func RetryConstant() RetryFunc {
@@ -29,15 +38,6 @@ func RetryExponential(exponent float64) RetryFunc {
 	return func(interval time.Duration) time.Duration {
 		return time.Duration(math.Pow(float64(interval), exponent))
 	}
-}
-
-type Config struct {
-	BatchInterval  time.Duration
-	BatchThreshold uint
-	RetryInitial   time.Duration
-	RetryFunction  RetryFunc
-	RetryMaximum   time.Duration
-	RetryAttempts  uint
 }
 
 type OptionFunc func(*Config)

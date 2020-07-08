@@ -7,8 +7,8 @@ import (
 )
 
 type Item struct {
-	EntityID  flow.Identifier
-	Attempts  uint
-	Timestamp time.Time
-	Interval  time.Duration
+	EntityID      flow.Identifier // ID for the entity to be requested
+	NumAttempts   uint            // number of times the entity was requested
+	LastRequested time.Time       // approximate timestamp of last request
+	RetryAfter    time.Duration   // interval until request should be retried
 }

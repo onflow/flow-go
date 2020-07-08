@@ -18,8 +18,17 @@ import (
 	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
+// HandleFunc is a function provided to the requester engine to handle an entity
+// once it has been retrieved from a provider. The function should ideally just
+// error on some basic checks and be non-blocking for the further processing
+// of the entity. In other words, errors in the processing logic of the handling
+// engine should be part of the execution within that engine and happen in a
+// separate goroutine.
 type HandleFunc func(originID flow.Identifier, entity flow.Entity) error
 
+// Engine is a generic requester engine, handling the requesting of entities
+// on the flow network. It is the `request` part of the request-reply
+// pattern provided by the pair of generic exchange engines.
 type Engine struct {
 	unit     *engine.Unit
 	log      zerolog.Logger
@@ -35,7 +44,9 @@ type Engine struct {
 	requests map[uint64]*messages.ResourceRequest
 }
 
-// New creates a new consensus propagation engine.
+// New creates a new requester engine, operating on the provided network channel, and requesting entities from a node
+// within the set obtained by applying the provided selector filter. The options allow customization of the parameters
+// related to the batch and retry logic.
 func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, me module.Local, state protocol.State,
 	channel uint8, selector flow.IdentityFilter, options ...OptionFunc) (*Engine, error) {
 
@@ -52,6 +63,17 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 	// apply the custom option parameters
 	for _, option := range options {
 		option(&cfg)
+	}
+
+	// check validity of retry function
+	interval := cfg.RetryFunction(time.Second)
+	if interval < time.Second {
+		return nil, fmt.Errorf("invalid retry function (interval must always increase)")
+	}
+
+	// check validity of maximum interval
+	if cfg.RetryMaximum < cfg.RetryInitial {
+		return nil, fmt.Errorf("invalid retry maximum (must not be smaller than initial interval)")
 	}
 
 	// make sure we don't send requests from self or unstaked nodes
@@ -86,7 +108,11 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 	return e, nil
 }
 
-// WithHandle will set the handler function to process entities.
+// WithHandle sets the handle function of the requester, which is how it processes
+// returned entities. The engine can not be started without setting the handle
+// function. It is done in a separate call so that the requester can be injected
+// into engines upon construction, and then provide a handle function to the
+// requester from that engine itself.
 func (e *Engine) WithHandle(handle HandleFunc) {
 	e.handle = handle
 }
@@ -108,33 +134,33 @@ func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
 }
 
-// SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
-	e.Submit(e.me.NodeID(), event)
+// SubmitLocal submits an message originating on the local node.
+func (e *Engine) SubmitLocal(message interface{}) {
+	e.Submit(e.me.NodeID(), message)
 }
 
-// Submit submits the given event from the node with the given origin ID
+// Submit submits the given message from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(originID flow.Identifier, message interface{}) {
 	e.unit.Launch(func() {
-		err := e.Process(originID, event)
+		err := e.Process(originID, message)
 		if err != nil {
-			e.log.Error().Err(err).Msg("synchronization could not process submitted event")
+			e.log.Error().Err(err).Msg("requester engine could not process message")
 		}
 	})
 }
 
-// ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.Process(e.me.NodeID(), event)
+// ProcessLocal processes an message originating on the local node.
+func (e *Engine) ProcessLocal(message interface{}) error {
+	return e.Process(e.me.NodeID(), message)
 }
 
-// Process processes the given event from the node with the given origin ID in
+// Process processes the given message from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(originID flow.Identifier, message interface{}) error {
 	return e.unit.Do(func() error {
-		return e.process(originID, event)
+		return e.process(originID, message)
 	})
 }
 
@@ -155,10 +181,10 @@ func (e *Engine) EntityByID(entityID flow.Identifier) error {
 
 	// otherwise, add a new item to the list
 	item := Item{
-		EntityID:  entityID,
-		Attempts:  0,
-		Timestamp: time.Time{},
-		Interval:  e.cfg.RetryInitial,
+		EntityID:      entityID,
+		NumAttempts:   0,
+		LastRequested: time.Time{},
+		RetryAfter:    e.cfg.RetryInitial,
 	}
 	e.items[entityID] = item
 
@@ -194,28 +220,32 @@ func (e *Engine) dispatchRequests() error {
 	for entityID, item := range e.items {
 
 		// if the item should not be requested yet, ignore
-		if item.Timestamp.Add(item.Interval).Before(now) {
+		if item.LastRequested.Add(item.RetryAfter).Before(now) {
 			continue
 		}
 
 		// if the item reached maximum amount of retries, drop
-		if item.Attempts >= e.cfg.RetryAttempts {
+		if item.NumAttempts >= e.cfg.RetryAttempts {
 			delete(e.items, entityID)
 			continue
 		}
 
 		// add item to list and set retry parameters
+		// NOTE: we add the retry interval to the last requested timestamp,
+		// rather than using the current timestamp, in order to conserve a
+		// more even distribution of timestamps over time, which should lead
+		// to a more even distribution of entities over batch requests
 		entityIDs = append(entityIDs, entityID)
-		item.Attempts++
-		item.Timestamp = item.Timestamp.Add(item.Interval)
-		item.Interval = e.cfg.RetryFunction(item.Interval)
+		item.NumAttempts++
+		item.LastRequested = item.LastRequested.Add(item.RetryAfter)
+		item.RetryAfter = e.cfg.RetryFunction(item.RetryAfter)
 
 		// make sure the interval is within parameters
-		if item.Interval < e.cfg.RetryInitial {
-			item.Interval = e.cfg.RetryInitial
+		if item.RetryAfter < e.cfg.RetryInitial {
+			item.RetryAfter = e.cfg.RetryInitial
 		}
-		if item.Interval > e.cfg.RetryMaximum {
-			item.Interval = e.cfg.RetryMaximum
+		if item.RetryAfter > e.cfg.RetryMaximum {
+			item.RetryAfter = e.cfg.RetryMaximum
 		}
 
 		// if we reached the maximum size for a batch, bail
@@ -230,16 +260,16 @@ func (e *Engine) dispatchRequests() error {
 	}
 
 	// pick a random target from the valid providers
-	targets, err := e.state.Final().Identities(e.selector)
+	providers, err := e.state.Final().Identities(e.selector)
 	if err != nil {
-		return fmt.Errorf("could not retrieve targets: %w", err)
+		return fmt.Errorf("could not get providers: %w", err)
 	}
-	if len(targets) == 0 {
-		return fmt.Errorf("no request targets available")
+	if len(providers) == 0 {
+		return fmt.Errorf("no valid providers available")
 	}
-	targetID := targets.Sample(1)[0].NodeID
 
 	// create a batch request, send it and store it for reference
+	targetID := providers.Sample(1)[0].NodeID
 	req := &messages.ResourceRequest{
 		Nonce:     rand.Uint64(),
 		EntityIDs: entityIDs,
@@ -266,7 +296,7 @@ func (e *Engine) dispatchRequests() error {
 }
 
 // process processes events for the propagation engine on the consensus node.
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+func (e *Engine) process(originID flow.Identifier, message interface{}) error {
 
 	e.metrics.MessageReceived(engine.ChannelName(e.channel), metrics.MessageResourceResponse)
 	defer e.metrics.MessageHandled(engine.ChannelName(e.channel), metrics.MessageResourceResponse)
@@ -274,15 +304,27 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
-	switch ev := event.(type) {
+	switch msg := message.(type) {
 	case *messages.ResourceResponse:
-		return e.onResourceResponse(originID, ev)
+		return e.onResourceResponse(originID, msg)
 	default:
-		return fmt.Errorf("invalid event type (%T)", event)
+		return engine.NewInvalidInputErrorf("invalid message type (%T)", message)
 	}
 }
 
 func (e *Engine) onResourceResponse(originID flow.Identifier, res *messages.ResourceResponse) error {
+
+	// check that the response comes from a valid provider
+	providers, err := e.state.Final().Identities(filter.And(
+		e.selector,
+		filter.HasNodeID(originID),
+	))
+	if err != nil {
+		return fmt.Errorf("could not get providers: %w", err)
+	}
+	if len(providers) == 0 {
+		return engine.NewInvalidInputErrorf("invalid provider origin (%x)", originID)
+	}
 
 	// build a list of needed entities; if not available, process anyway,
 	// but in that case we can't re-queue missing items
@@ -333,7 +375,7 @@ func (e *Engine) onResourceResponse(originID flow.Identifier, res *messages.Reso
 
 		// we set the timestamp to zero, so that the item will be included
 		// in the next batch regardless of retry interval
-		item.Timestamp = time.Time{}
+		item.LastRequested = time.Time{}
 	}
 
 	return nil
