@@ -164,3 +164,20 @@ func TestLeaderSelectionAreWeighted(t *testing.T) {
 		require.Less(t, diff, uint64(stdDiff))
 	}
 }
+
+func BenchmarkLeaderSelection(b *testing.B) {
+	nodes := 20
+	identities := make([]*flow.Identity, 0, nodes)
+
+	for i := 0; i < nodes; i++ {
+		identities = append(identities, &flow.Identity{
+			Stake: uint64(i),
+		})
+	}
+
+	for n := 0; n < b.N; n++ {
+		_, err := ComputeLeaderSelectionFromSeed(0, someSeed, 15000000, identities)
+
+		require.NoError(b, err)
+	}
+}
