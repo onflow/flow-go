@@ -61,6 +61,7 @@ func main() {
 	flag.BoolVar(&prepare, "prepare", false, "Generate transit keys for push step")
 	flag.StringVar(&role, "role", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
 	flag.StringVar(&wrapID, "x-server-wrap", "", "(Flow Team Use), wrap response keys for consensus node")
+	flag.StringVar(&flowBucket, "flow-bucket", "flow-genesis-bootstrap", "Storage for the transit server")
 	flag.Parse()
 
 	if role == "" {

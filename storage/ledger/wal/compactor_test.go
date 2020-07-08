@@ -26,6 +26,7 @@ func Test_Compactor(t *testing.T) {
 	valueMaxByteSize := 2 << 16 //64kB
 	size := 10
 	metricsCollector := &metrics.NoopCollector{}
+	checkpointDistance := uint(2)
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
@@ -48,7 +49,7 @@ func Test_Compactor(t *testing.T) {
 			checkpointer, err := wal.NewCheckpointer()
 			require.NoError(t, err)
 
-			compactor := NewCompactor(checkpointer, 100*time.Millisecond)
+			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance)
 
 			// Run Compactor in background.
 			<-compactor.Ready()
@@ -85,7 +86,7 @@ func Test_Compactor(t *testing.T) {
 				from, to, err := checkpointer.NotCheckpointedSegments()
 				require.NoError(t, err)
 
-				return to == from && from == 10 //make sure there is only one segment ahead of checkpoint
+				return from == 10 && to == 10 //make sure there is
 				// this is disk-based operation after all, so give it big timeout
 			}, 15*time.Second, 100*time.Millisecond)
 
@@ -106,7 +107,8 @@ func Test_Compactor(t *testing.T) {
 
 				name := fileInfo.Name()
 
-				if name != "checkpoint.00000009" && name != "00000010" {
+				if name != "checkpoint.00000009" &&
+					name != "00000010" {
 					err := os.Remove(path.Join(dir, name))
 					require.NoError(t, err)
 				}
@@ -172,6 +174,76 @@ func Test_Compactor(t *testing.T) {
 			require.Equal(t, len(forestTries), len(forestTries2))
 		})
 
+	})
+}
+func Test_Compactor_checkpointInterval(t *testing.T) {
+
+	numInsPerStep := 2
+	keyByteSize := 4
+	valueMaxByteSize := 2 << 16 //64kB
+	size := 10
+	metricsCollector := &metrics.NoopCollector{}
+	checkpointDistance := uint(3) // there should be 3 WAL not checkpointed
+
+	unittest.RunWithTempDir(t, func(dir string) {
+
+		f, err := mtrie.NewMForest(4, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		require.NoError(t, err)
+
+		var stateCommitment = f.GetEmptyRootHash()
+
+		t.Run("Compactor creates checkpoints", func(t *testing.T) {
+
+			wal, err := NewWAL(nil, nil, dir, size*10, 4)
+			require.NoError(t, err)
+
+			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
+			// so we should get at least `size` segments
+			checkpointer, err := wal.NewCheckpointer()
+			require.NoError(t, err)
+
+			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance)
+
+			// Generate the tree and create WAL
+			for i := 0; i < size; i++ {
+
+				keys0 := utils.GetRandomKeysFixedN(numInsPerStep, keyByteSize)
+				values0 := utils.GetRandomValues(len(keys0), valueMaxByteSize, valueMaxByteSize)
+				var keys, values [][]byte
+				keys = append(keys, keys0...)
+				keys = append(keys, keys0...)
+				values = append(values, values0...)
+				values = append(values, values0...)
+
+				err = wal.RecordUpdate(stateCommitment, keys, values)
+				require.NoError(t, err)
+
+				newTrie, err := f.Update(stateCommitment, keys, values)
+				require.NoError(t, err)
+				stateCommitment = newTrie.RootHash()
+
+				require.FileExists(t, path.Join(dir, numberToFilenamePart(i)))
+
+				// run compactor after every file
+				err = compactor.Run()
+				require.NoError(t, err)
+			}
+
+			// assert precisely creation of checkpoint files
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000000"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000001"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000002"))
+			require.FileExists(t, path.Join(dir, "checkpoint.00000003"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000004"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000005"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000006"))
+			require.FileExists(t, path.Join(dir, "checkpoint.00000007"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000008"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000009"))
+
+			err = wal.Close()
+			require.NoError(t, err)
+		})
 	})
 }
 
