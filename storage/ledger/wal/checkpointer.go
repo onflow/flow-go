@@ -251,8 +251,11 @@ func StoreCheckpoint(forestSequencing *flattener.FlattenedForest, writer io.Writ
 }
 
 func (c *Checkpointer) LoadCheckpoint(checkpoint int) (*flattener.FlattenedForest, error) {
-
 	filepath := path.Join(c.dir, numberToFilename(checkpoint))
+	return LoadCheckpoint(filepath)
+}
+
+func LoadCheckpoint(filepath string) (*flattener.FlattenedForest, error) {
 	file, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open checkpoint file %s: %w", filepath, err)
