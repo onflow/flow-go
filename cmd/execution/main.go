@@ -185,6 +185,7 @@ func main() {
 				time.Second, //TODO - config param
 				10,          // TODO - config param
 			)
+			requestEng.WithHandle(ingestionEng.OnCollection)
 			return ingestionEng, err
 		}).
 		Component("sychronization engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
