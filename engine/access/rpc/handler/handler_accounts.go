@@ -22,7 +22,7 @@ type handlerAccounts struct {
 	chainID      flow.ChainID
 }
 
-func (h *handlerAccounts) GetAccountAtLatestBlock(ctx context.Context, req *access.GetAccountAtLatestBlockRequest) (*access.AccountResponse, error) {
+func (h *handlerAccounts) GetAccount(ctx context.Context, req *access.GetAccountRequest) (*access.GetAccountResponse, error) {
 
 	address := req.GetAddress()
 
@@ -45,40 +45,7 @@ func (h *handlerAccounts) GetAccountAtLatestBlock(ctx context.Context, req *acce
 		return nil, err
 	}
 
-	return &access.AccountResponse{
-		Account: account,
-	}, nil
-
-}
-
-func (h *handlerAccounts) GetAccountAtBlockHeight(ctx context.Context,
-	req *access.GetAccountAtBlockHeightRequest) (*access.AccountResponse, error) {
-
-	address := req.GetAddress()
-
-	if _, err := convert.Address(address, h.chainID.Chain()); err != nil {
-		return nil, err
-	}
-
-	height := req.GetBlockHeight()
-
-	// get header at given height
-	header, err := h.headers.ByHeight(height)
-	if err != nil {
-		err = convertStorageError(err)
-		return nil, err
-	}
-
-	// get block ID of the header at the given height
-	blockID := header.ID()
-
-	account, err := h.getAccountAtBlockID(ctx, address, blockID)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &access.AccountResponse{
+	return &access.GetAccountResponse{
 		Account: account,
 	}, nil
 
