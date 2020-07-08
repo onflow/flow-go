@@ -50,10 +50,7 @@ func (h *handlerTransactions) SendTransaction(ctx context.Context, req *access.S
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to store transaction: %v", err))
 	}
 
-	err = h.registerTransactionForRetry(&tx)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to register transaction for retries: %v", err))
-	}
+	go h.registerTransactionForRetry(&tx)
 
 	return resp, nil
 }
@@ -226,14 +223,12 @@ func (h *handlerTransactions) lookupTransactionResult(ctx context.Context, txID 
 	return true, events, txStatus, message, nil
 }
 
-func (h *handlerTransactions) registerTransactionForRetry(tx *flow.TransactionBody) error {
+func (h *handlerTransactions) registerTransactionForRetry(tx *flow.TransactionBody) {
 	referenceBlock, err := h.state.AtBlockID(tx.ReferenceBlockID).Head()
 	if err != nil {
-		return err
+		return
 	}
 	h.retry.RegisterTransaction(referenceBlock.Height, tx)
-
-	return nil
 }
 
 func (h *handlerTransactions) getTransactionResultFromExecutionNode(ctx context.Context,
