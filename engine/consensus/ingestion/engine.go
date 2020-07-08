@@ -236,18 +236,18 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	// consensus node committee than over the collection clusters.
 
 	// select all the consensus nodes on the network as our targets
-	identities, err := e.state.Final().Identities(filter.And(
+	committee, err := e.state.Final().Identities(filter.And(
 		filter.HasRole(flow.RoleConsensus),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
 	))
 	if err != nil {
-		return fmt.Errorf("could not get committee identities: %w", err)
+		return fmt.Errorf("could not get committee: %w", err)
 	}
 
-	// send the collection guarantee to all consensus identities
-	err = e.con.Submit(guarantee, identities.NodeIDs()...)
+	// send the collection guarantee to all consensus committee
+	err = e.con.Submit(guarantee, committee.NodeIDs()...)
 	if err != nil {
-		return fmt.Errorf("could not send collection guarantee: %w", err)
+		return fmt.Errorf("could not send guarantee: %w", err)
 	}
 
 	log.Info().Msg("collection guarantee broadcasted to committee")
