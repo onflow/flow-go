@@ -33,9 +33,6 @@ func (r *Retry) SetHandler(rpc *Handler) *Retry {
 }
 
 func (r *Retry) Retry(height uint64) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	// No need to retry if height is lower than DefaultTransactionExpiry
 	if height < flow.DefaultTransactionExpiry {
 		return
@@ -49,20 +46,7 @@ func (r *Retry) Retry(height uint64) {
 	heightToRetry := height - flow.DefaultTransactionExpiry + retryFrequency
 
 	for heightToRetry < height {
-		txsAtHeight := r.transactionByReferencBlockHeight[heightToRetry]
-		for txID, tx := range txsAtHeight {
-			status, err := r.txHandler.DeriveTransactionStatus(tx, false)
-			if err != nil {
-				continue
-			}
-			if status == entities.TransactionStatus_PENDING {
-				txMsg := convert.TransactionToMessage(*tx)
-				_, _ = r.txHandler.SendRawTransaction(context.Background(), txMsg)
-			} else if status != entities.TransactionStatus_UNKNOWN {
-				// not pending or unknown, don't need to retry anymore
-				delete(txsAtHeight, txID)
-			}
-		}
+		r.retryTxsAtHeight(heightToRetry)
 
 		heightToRetry = heightToRetry + retryFrequency
 	}
@@ -89,6 +73,8 @@ func (r *Retry) RegisterTransaction(height uint64, tx *flow.TransactionBody) {
 }
 
 func (r *Retry) prune(height uint64) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	// If height is less than the default, there will be no expired transactions
 	if height < flow.DefaultTransactionExpiry {
 		return
@@ -96,6 +82,25 @@ func (r *Retry) prune(height uint64) {
 	for h := range r.transactionByReferencBlockHeight {
 		if h < height-flow.DefaultTransactionExpiry {
 			delete(r.transactionByReferencBlockHeight, h)
+		}
+	}
+}
+
+func (r *Retry) retryTxsAtHeight(heightToRetry uint64) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	txsAtHeight := r.transactionByReferencBlockHeight[heightToRetry]
+	for txID, tx := range txsAtHeight {
+		status, err := r.txHandler.DeriveTransactionStatus(tx, false)
+		if err != nil {
+			continue
+		}
+		if status == entities.TransactionStatus_PENDING {
+			txMsg := convert.TransactionToMessage(*tx)
+			_, _ = r.txHandler.SendRawTransaction(context.Background(), txMsg)
+		} else if status != entities.TransactionStatus_UNKNOWN {
+			// not pending or unknown, don't need to retry anymore
+			delete(txsAtHeight, txID)
 		}
 	}
 }
