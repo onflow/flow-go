@@ -169,8 +169,12 @@ func (e *Engine) Process(originID flow.Identifier, message interface{}) error {
 // provider. It is idempotent, meaning that adding the same entity to the
 // requester engine multiple times has no effect, unless the item has
 // expired due to too many requests and has thus been deleted from the
-// list.
-func (e *Engine) EntityByID(entityID flow.Identifier) error {
+// list. The provided selector will be applied to the set of valid providers on top
+// of the global selector injected upon construction. It allows for finer-grained
+// control over which subset of providers to request a given entity from, such as
+// selection of a collection cluster. Use `filter.Any` if no additional selection
+// is required.
+func (e *Engine) EntityByID(entityID flow.Identifier, selector flow.IdentityFilter) error {
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
@@ -186,6 +190,7 @@ func (e *Engine) EntityByID(entityID flow.Identifier) error {
 		NumAttempts:   0,
 		LastRequested: time.Time{},
 		RetryAfter:    e.cfg.RetryInitial,
+		ExtraSelector: selector,
 	}
 	e.items[entityID] = item
 
@@ -215,8 +220,15 @@ PollLoop:
 
 func (e *Engine) dispatchRequests() error {
 
+	// get the current top-level set of valid providers
+	providers, err := e.state.Final().Identities(e.selector)
+	if err != nil {
+		return fmt.Errorf("could not get providers: %w", err)
+	}
+
 	// go through each item and decide if it should be requested again
 	now := time.Now().UTC()
+	var providerID flow.Identifier
 	var entityIDs []flow.Identifier
 	for entityID, item := range e.items {
 
@@ -229,6 +241,32 @@ func (e *Engine) dispatchRequests() error {
 		if item.NumAttempts >= e.cfg.RetryAttempts {
 			delete(e.items, entityID)
 			continue
+		}
+
+		// if the provider has already been chosen, check if this item
+		// can be requested from the same provider; otherwise skip it
+		// for now, so it will be part of the next batch request
+		if providerID != flow.ZeroID {
+			overlap := providers.Filter(filter.And(
+				filter.HasNodeID(providerID),
+				item.ExtraSelector,
+			))
+			if len(overlap) == 0 {
+				continue
+			}
+		}
+
+		// if no provider has been chosen yet, choose from restricted set
+		// NOTE: a single item can not permanently block requests going
+		// out when no providers are available for it, because the map
+		// iteration is random and will skip the item most of the times
+		// when other items are available
+		if providerID == flow.ZeroID {
+			providers = providers.Filter(item.ExtraSelector)
+			if len(providers) == 0 {
+				return fmt.Errorf("no valid providers available")
+			}
+			providerID = providers.Sample(1)[0].NodeID
 		}
 
 		// add item to list and set retry parameters
@@ -260,22 +298,12 @@ func (e *Engine) dispatchRequests() error {
 		return nil
 	}
 
-	// pick a random target from the valid providers
-	providers, err := e.state.Final().Identities(e.selector)
-	if err != nil {
-		return fmt.Errorf("could not get providers: %w", err)
-	}
-	if len(providers) == 0 {
-		return fmt.Errorf("no valid providers available")
-	}
-
 	// create a batch request, send it and store it for reference
-	targetID := providers.Sample(1)[0].NodeID
 	req := &messages.EntityRequest{
 		Nonce:     rand.Uint64(),
 		EntityIDs: entityIDs,
 	}
-	err = e.con.Submit(req, targetID)
+	err = e.con.Submit(req, providerID)
 	if err != nil {
 		return fmt.Errorf("could not send request: %w", err)
 	}
