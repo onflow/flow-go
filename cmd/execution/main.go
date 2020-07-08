@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/cmd"
-	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	"github.com/dapperlabs/flow-go/engine/execution/provider"
@@ -41,7 +40,6 @@ func main() {
 		providerEngine     *provider.Engine
 		syncCore           *chainsync.Core
 		computationManager *computation.Manager
-		syncEngine         *synchronization.Engine
 		ingestionEng       *ingestion.Engine
 		rpcConf            rpc.Config
 		err                error
@@ -172,24 +170,24 @@ func main() {
 			)
 			return ingestionEng, err
 		}).
-		Component("sychronization engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			// initialize the synchronization engine
-			syncEngine, err = synchronization.New(
-				node.Logger,
-				node.Metrics.Engine,
-				node.Network,
-				node.Me,
-				node.State,
-				node.Storage.Blocks,
-				ingestionEng,
-				syncCore,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
-			}
+		// Component("sychronization engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		// 	// initialize the synchronization engine
+		// 	syncEngine, err = synchronization.New(
+		// 		node.Logger,
+		// 		node.Metrics.Engine,
+		// 		node.Network,
+		// 		node.Me,
+		// 		node.State,
+		// 		node.Storage.Blocks,
+		// 		ingestionEng,
+		// 		syncCore,
+		// 	)
+		// 	if err != nil {
+		// 		return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
+		// 	}
 
-			return syncEngine, nil
-		}).
+		// 	return syncEngine, nil
+		// }).
 		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, events, txResults, node.RootChainID)
 			return rpcEng, nil
