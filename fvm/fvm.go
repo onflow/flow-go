@@ -1,103 +1,65 @@
 package fvm
 
 import (
-	"encoding/binary"
-	"fmt"
-	"math/rand"
-
-	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 
+	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-const (
-	AccountKeyWeightThreshold = 1000
-	MaxProgramASTCacheSize    = 256
-)
+// An Procedure is an operation (or set of operations) that reads or writes ledger state.
+type Procedure interface {
+	Run(vm *VirtualMachine, ctx Context, ledger state.Ledger) error
+}
 
-// VirtualMachine augments the Cadence runtime with the Flow host functionality required
-// to execute transactions.
-type VirtualMachine interface {
-	// NewBlockContext creates a new block context for executing transactions.
-	NewBlockContext(b *flow.Header, blocks Blocks) BlockContext
-	// GetCache returns the program AST cache.
-	ASTCache() ASTCache
+// A VirtualMachine augments the Cadence runtime with Flow host functionality.
+type VirtualMachine struct {
+	Runtime runtime.Runtime
 }
 
 // New creates a new virtual machine instance with the provided runtime.
-func New(rt runtime.Runtime, chain flow.Chain, options ...VirtualMachineOption) (VirtualMachine, error) {
-	vm := &virtualMachine{
-		rt:    rt,
-		chain: chain,
-	}
-
-	for _, option := range options {
-		option(vm)
-	}
-
-	if vm.cache == nil {
-		cache, err := NewLRUASTCache(MaxProgramASTCacheSize)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create vm ast cache, %w", err)
-		}
-		vm.cache = cache
-	}
-
-	return vm, nil
-}
-
-type VirtualMachineOption func(*virtualMachine)
-
-func WithCache(cache ASTCache) VirtualMachineOption {
-	return func(ctx *virtualMachine) {
-		ctx.cache = cache
+func New(rt runtime.Runtime) *VirtualMachine {
+	return &VirtualMachine{
+		Runtime: rt,
 	}
 }
 
-type virtualMachine struct {
-	rt    runtime.Runtime
-	cache ASTCache
-	chain flow.Chain
+// Run runs a procedure against a ledger in the given context.
+func (vm *VirtualMachine) Run(ctx Context, proc Procedure, ledger state.Ledger) error {
+	return proc.Run(vm, ctx, ledger)
 }
 
-func (vm *virtualMachine) NewBlockContext(header *flow.Header, blocks Blocks) BlockContext {
-	bc := &blockContext{
-		vm:     vm,
-		header: header,
-		blocks: blocks,
-		chain:  vm.chain,
+// GetAccount returns an account by address or an error if none exists.
+func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, ledger state.Ledger) (*flow.Account, error) {
+	account, err := getAccount(vm, ctx, ledger, ctx.Chain, address)
+	if err != nil {
+		// TODO: wrap error
+		return nil, err
 	}
 
-	// Seed the random number generator with entropy created from the block header ID. The random number generator will
-	// be used by the UnsafeRandom function.
-	// TODO: replace with better source of randomness.
-	if header != nil {
-		id := header.ID()
-		bc.rng = rand.New(rand.NewSource(int64(binary.BigEndian.Uint64(id[:]))))
+	return account, nil
+}
+
+// invokeMetaTransaction invokes a meta transaction inside the context of an outer transaction.
+//
+// Errors that occur in a meta transaction are propagated as a single error that can be
+// captured by the Cadence runtime and eventually disambiguated by the parent context.
+func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *TransactionProcedure, ledger state.Ledger) error {
+	ctx = NewContextFromParent(
+		ctx,
+		WithTransactionProcessors([]TransactionProcessor{
+			NewTransactionInvocator(),
+		}),
+	)
+
+	err := vm.Run(ctx, tx, ledger)
+	if err != nil {
+		return err
 	}
 
-	return bc
-}
+	if tx.Err != nil {
+		return tx.Err
+	}
 
-func (vm *virtualMachine) ASTCache() ASTCache {
-	return vm.cache
-}
-
-func (vm *virtualMachine) executeTransaction(
-	script []byte,
-	arguments [][]byte,
-	runtimeInterface runtime.Interface,
-	location runtime.Location,
-) error {
-	return vm.rt.ExecuteTransaction(script, arguments, runtimeInterface, location)
-}
-
-func (vm *virtualMachine) executeScript(
-	script []byte,
-	arguments [][]byte,
-	runtimeInterface runtime.Interface,
-	location runtime.Location,
-) (cadence.Value, error) {
-	return vm.rt.ExecuteScript(script, arguments, runtimeInterface, location)
+	return nil
 }

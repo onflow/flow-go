@@ -1,22 +1,22 @@
 package chunks_test
 
 import (
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
 
-	"github.com/onflow/cadence"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/fvm"
-	chModels "github.com/dapperlabs/flow-go/model/chunks"
+	"github.com/dapperlabs/flow-go/fvm/state"
+	chunksmodels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/ledger"
-	mockStorage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -30,7 +30,11 @@ type ChunkVerifierTestSuite struct {
 func (s *ChunkVerifierTestSuite) SetupTest() {
 	// seed the RNG
 	rand.Seed(time.Now().UnixNano())
-	s.verifier = chunks.NewChunkVerifier(&virtualMachineMock{}, new(mockStorage.Blocks))
+
+	vm := new(vmMock)
+	vmCtx := fvm.NewContext()
+
+	s.verifier = chunks.NewChunkVerifier(vm, vmCtx)
 }
 
 // TestChunkVerifier invokes all the tests in this test suite
@@ -56,7 +60,7 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 	chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.NotNil(s.T(), chFaults)
-	_, ok := chFaults.(*chModels.CFMissingRegisterTouch)
+	_, ok := chFaults.(*chunksmodels.CFMissingRegisterTouch)
 	assert.True(s.T(), ok)
 }
 
@@ -69,7 +73,7 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
 	chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.NotNil(s.T(), chFaults)
-	_, ok := chFaults.(*chModels.CFMissingRegisterTouch)
+	_, ok := chFaults.(*chunksmodels.CFMissingRegisterTouch)
 	assert.True(s.T(), ok)
 }
 
@@ -82,7 +86,7 @@ func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 	chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.NotNil(s.T(), chFaults)
-	_, ok := chFaults.(*chModels.CFNonMatchingFinalState)
+	_, ok := chFaults.(*chunksmodels.CFNonMatchingFinalState)
 	assert.True(s.T(), ok)
 }
 
@@ -194,46 +198,31 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 	})
 
 	return &verifiableChunkData
-
 }
 
-type blockContextMock struct {
-	vm     *virtualMachineMock
-	header *flow.Header
-	blocks fvm.Blocks
-}
+type vmMock struct{}
 
-func (bc *blockContextMock) ExecuteTransaction(
-	ledger fvm.Ledger,
-	tx *flow.TransactionBody,
-	options ...fvm.TransactionContextOption,
-) (*fvm.TransactionResult, error) {
-	var txRes fvm.TransactionResult
-	switch string(tx.Script) {
+func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, ledger state.Ledger) error {
+	tx, ok := proc.(*fvm.TransactionProcedure)
+	if !ok {
+		return fmt.Errorf("invokable is not a transaction")
+	}
+
+	switch string(tx.Transaction.Script) {
 	case "wrongEndState":
 		id1 := make([]byte, 32)
 		UpdatedValue1 := []byte{'F'}
 		// add updates to the ledger
 		ledger.Set(id1, UpdatedValue1)
-		txRes = fvm.TransactionResult{
-			TransactionID: unittest.IdentifierFixture(),
-			Events:        []cadence.Event{},
-			Logs:          []string{"log1", "log2"},
-			Error:         nil,
-			GasUsed:       0,
-		}
+
+		tx.Logs = []string{"log1", "log2"}
 	case "failedTx":
 		id1 := make([]byte, 32)
 		UpdatedValue1 := []byte{'F'}
 		// add updates to the ledger
 		ledger.Set(id1, UpdatedValue1)
-		txRes = fvm.TransactionResult{
-			TransactionID: unittest.IdentifierFixture(),
-			Events:        []cadence.Event{},
-			Logs:          nil,
-			Error:         &fvm.MissingPayerError{}, // inside the runtime (e.g. div by zero, access account)
-			GasUsed:       0,
-		}
+
+		tx.Err = &fvm.MissingPayerError{} // inside the runtime (e.g. div by zero, access account)
 	default:
 		id1 := make([]byte, 32)
 		id2 := make([]byte, 32)
@@ -241,45 +230,9 @@ func (bc *blockContextMock) ExecuteTransaction(
 		UpdatedValue2 := []byte{'B'}
 		_, _ = ledger.Get(id1)
 		ledger.Set(id2, UpdatedValue2)
-		txRes = fvm.TransactionResult{
-			TransactionID: unittest.IdentifierFixture(),
-			Events:        []cadence.Event{},
-			Logs:          []string{"log1", "log2"},
-			Error:         nil,
-			GasUsed:       0,
-		}
+
+		tx.Logs = []string{"log1", "log2"}
 	}
-	return &txRes, nil
-}
 
-func (bc *blockContextMock) ExecuteScript(
-	ledger fvm.Ledger,
-	script []byte,
-	arguments [][]byte,
-) (*fvm.ScriptResult, error) {
-	return nil, nil
-}
-
-func (bc *blockContextMock) GetAccount(_ fvm.Ledger, _ flow.Address) (*flow.Account, error) {
-	return nil, nil
-}
-
-// virtualMachineMock is a mocked virtualMachine
-type virtualMachineMock struct {
-}
-
-func (vm *virtualMachineMock) NewBlockContext(header *flow.Header, blocks fvm.Blocks) fvm.BlockContext {
-	return &blockContextMock{
-		vm:     vm,
-		header: header,
-		blocks: blocks,
-	}
-}
-
-func (vm *virtualMachineMock) ASTCache() fvm.ASTCache {
-	cache, err := fvm.NewLRUASTCache(64)
-	if err != nil {
-		return nil
-	}
-	return cache
+	return nil
 }

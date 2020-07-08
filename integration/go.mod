@@ -3,7 +3,7 @@ module github.com/dapperlabs/flow-go/integration
 go 1.13
 
 require (
-	github.com/dapperlabs/flow-go v0.0.0-00010101000000-000000000000
+	github.com/dapperlabs/flow-go v0.4.1-0.20200703230624-6b64cc19d38b
 	github.com/dapperlabs/flow-go/crypto v0.3.2-0.20200312195452-df4550a863b7
 	github.com/dapperlabs/testingdock v0.4.3-0.20200626075145-ea23fc16bb90
 	github.com/dgraph-io/badger/v2 v2.0.3
@@ -11,7 +11,7 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/go-openapi/strfmt v0.19.5 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
-	github.com/onflow/cadence v0.4.1-0.20200604200650-30a200f9c324
+	github.com/onflow/cadence v0.5.0
 	github.com/onflow/flow-go-sdk v0.5.1-0.20200620041402-7cc94298795c
 	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200619174948-a3a856d16a27
 	github.com/plus3it/gorecurcopy v0.0.1
