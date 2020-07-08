@@ -113,8 +113,9 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 // function. It is done in a separate call so that the requester can be injected
 // into engines upon construction, and then provide a handle function to the
 // requester from that engine itself.
-func (e *Engine) WithHandle(handle HandleFunc) {
+func (e *Engine) WithHandle(handle HandleFunc) *Engine {
 	e.handle = handle
+	return e
 }
 
 // Ready returns a ready channel that is closed once the engine has fully
