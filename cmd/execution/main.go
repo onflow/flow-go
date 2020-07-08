@@ -177,8 +177,6 @@ func main() {
 				collector,
 				node.Tracer,
 				true,
-				time.Second, //TODO - config param
-				10,          // TODO - config param
 			)
 
 			// TODO: we should solve these mutual dependencies better
@@ -209,7 +207,6 @@ func main() {
 			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, events, txResults, node.RootChainID)
 			return rpcEng, nil
 		}).Run()
-
 }
 
 func loadBootstrapState(dir, trie string) error {

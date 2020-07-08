@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math/rand"
 	"sync"
-	"time"
 
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
@@ -39,34 +38,32 @@ import (
 
 // An Engine receives and saves incoming blocks.
 type Engine struct {
-	unit                                *engine.Unit
-	log                                 zerolog.Logger
-	me                                  module.Local
-	request                             module.Requester // used to request collections
-	state                               protocol.State
-	receiptHasher                       hash.Hasher // used as hasher to sign the execution receipt
-	syncConduit                         network.Conduit
-	blocks                              storage.Blocks
-	payloads                            storage.Payloads
-	collections                         storage.Collections
-	events                              storage.Events
-	transactionResults                  storage.TransactionResults
-	computationManager                  computation.ComputationManager
-	providerEngine                      provider.ProviderEngine
-	blockSync                           module.BlockRequester
-	mempool                             *Mempool
-	execState                           state.ExecutionState
-	wg                                  sync.WaitGroup
-	syncWg                              sync.WaitGroup
-	syncModeThreshold                   uint64 // how many consecutive orphaned blocks trigger sync
-	syncInProgress                      *atomic.Bool
-	syncTargetBlockID                   atomic.Value
-	stateSync                           executionSync.StateSynchronizer
-	metrics                             module.ExecutionMetrics
-	tracer                              module.Tracer
-	extensiveLogging                    bool
-	collectionRequestTimeout            time.Duration
-	maximumCollectionRequestRetryNumber uint
+	unit               *engine.Unit
+	log                zerolog.Logger
+	me                 module.Local
+	request            module.Requester // used to request collections
+	state              protocol.State
+	receiptHasher      hash.Hasher // used as hasher to sign the execution receipt
+	syncConduit        network.Conduit
+	blocks             storage.Blocks
+	payloads           storage.Payloads
+	collections        storage.Collections
+	events             storage.Events
+	transactionResults storage.TransactionResults
+	computationManager computation.ComputationManager
+	providerEngine     provider.ProviderEngine
+	blockSync          module.BlockRequester
+	mempool            *Mempool
+	execState          state.ExecutionState
+	wg                 sync.WaitGroup
+	syncWg             sync.WaitGroup
+	syncModeThreshold  uint64 // how many consecutive orphaned blocks trigger sync
+	syncInProgress     *atomic.Bool
+	syncTargetBlockID  atomic.Value
+	stateSync          executionSync.StateSynchronizer
+	metrics            module.ExecutionMetrics
+	tracer             module.Tracer
+	extensiveLogging   bool
 }
 
 func New(
@@ -88,38 +85,34 @@ func New(
 	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
 	extLog bool,
-	collectionRequestTimeout time.Duration,
-	maximumCollectionRequestRetryNumber uint,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "blocks").Logger()
 
 	mempool := newMempool()
 
 	eng := Engine{
-		unit:                                engine.NewUnit(),
-		log:                                 log,
-		me:                                  me,
-		request:                             request,
-		state:                               state,
-		receiptHasher:                       utils.NewExecutionReceiptHasher(),
-		blocks:                              blocks,
-		payloads:                            payloads,
-		collections:                         collections,
-		events:                              events,
-		transactionResults:                  transactionResults,
-		computationManager:                  executionEngine,
-		providerEngine:                      providerEngine,
-		blockSync:                           blockSync,
-		mempool:                             mempool,
-		execState:                           execState,
-		syncModeThreshold:                   syncThreshold,
-		syncInProgress:                      atomic.NewBool(false),
-		stateSync:                           executionSync.NewStateSynchronizer(execState),
-		metrics:                             metrics,
-		tracer:                              tracer,
-		extensiveLogging:                    extLog,
-		collectionRequestTimeout:            collectionRequestTimeout,
-		maximumCollectionRequestRetryNumber: maximumCollectionRequestRetryNumber,
+		unit:               engine.NewUnit(),
+		log:                log,
+		me:                 me,
+		request:            request,
+		state:              state,
+		receiptHasher:      utils.NewExecutionReceiptHasher(),
+		blocks:             blocks,
+		payloads:           payloads,
+		collections:        collections,
+		events:             events,
+		transactionResults: transactionResults,
+		computationManager: executionEngine,
+		providerEngine:     providerEngine,
+		blockSync:          blockSync,
+		mempool:            mempool,
+		execState:          execState,
+		syncModeThreshold:  syncThreshold,
+		syncInProgress:     atomic.NewBool(false),
+		stateSync:          executionSync.NewStateSynchronizer(execState),
+		metrics:            metrics,
+		tracer:             tracer,
+		extensiveLogging:   extLog,
 	}
 
 	_, err := net.Register(engine.ReceiveBlocks, &eng)
