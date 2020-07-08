@@ -150,9 +150,17 @@ func main() {
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
+			// In general, we need to request one collection for each cluster for each block.
+			// The average time between batch requests will be the blocktime divided by the number of clusters.
+			// The average size of each batch request will be the number of collections per block divided by the number
+			// of clusters.
+			// For now, we use a slightly more aggressive setting for the batch interval in order to improve
+			// responsiveness and reduce time to sealing, while providing significant tolerance for the batch size.
 			requestEng, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
 				engine.RequestCollections,
 				filter.HasRole(flow.RoleCollection),
+				requester.WithBatchInterval(100*time.Millisecond),
+				requester.WithBatchThreshold(16),
 			)
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
