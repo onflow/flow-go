@@ -109,13 +109,15 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+
+	e.metrics.MessageReceived(engine.ChannelName(e.channel), metrics.MessageResourceRequest)
+	defer e.metrics.MessageHandled(engine.ChannelName(e.channel), metrics.MessageResourceRequest)
+
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
 	switch ev := event.(type) {
 	case *messages.ResourceRequest:
-		e.metrics.MessageReceived(engine.ChannelName(e.channel), metrics.MessageResourceRequest)
-		defer e.metrics.MessageHandled(engine.ChannelName(e.channel), metrics.MessageResourceRequest)
 		return e.onResourceRequest(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
