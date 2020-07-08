@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -187,7 +188,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 
 func (e *Engine) requestCollections(guarantees ...*flow.CollectionGuarantee) error {
 	for _, guarantee := range guarantees {
-		err := e.request.EntityByID(guarantee.ID())
+		err := e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantee.SignerIDs...))
 		if err != nil {
 			return fmt.Errorf("could not request collection (%x)", guarantee.ID())
 		}

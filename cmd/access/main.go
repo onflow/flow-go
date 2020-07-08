@@ -97,7 +97,7 @@ func main() {
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			requestEng, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
 				engine.RequestCollections,
-				filter.HasRole(flow.RoleCollection), // TODO: implement filter for cluster somehow
+				filter.HasRole(flow.RoleCollection),
 			)
 			ingestEng, err = ingestion.New(node.Logger, node.State, node.Me, requestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions)
 			requestEng = requestEng.WithHandle(ingestEng.OnCollection)
