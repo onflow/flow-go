@@ -1,6 +1,7 @@
 package wal_test
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 	"path"
@@ -329,6 +330,89 @@ func Test_Checkpointing(t *testing.T) {
 			}
 		})
 
+	})
+}
+
+// TestCheckpointsVersions is a test for compatibility with previous binary versions of checkpoints
+// Currently, we support both v1 and v2, but this is likely to evolve.
+// Current version of checkpoints is tested with other tests.
+// `checkpoints` directory contains sample checkpoints made by the code deployed in past environment
+// but they aim to generate the same structure, for size-sake.
+// Generated checkpoint start from empty and should contain 10 tries with 4-bytes keys and 4 byte values.
+// Every tree adds two new entries - key is BigEndian encoded sequential uint32 (starting from 0),
+// while values are 4 repeated bytes of increased value starting with ASCII '0'
+// First update =>  0001 -> '0000', 0002 -> '1111'
+// Second update => 0003 -> '2222', 0004 -> '3333'
+// and so on.
+func TestCheckpointsVersions(t *testing.T) {
+	metricsCollector := &metrics.NoopCollector{}
+
+	unittest.RunWithTempDir(t, func(dir string) {
+
+		modelForest, err := mtrie.NewMForest(4, dir, ledger.CacheSize, metricsCollector, nil)
+		require.NoError(t, err)
+
+		counter := uint32(0)
+		val := byte('0')
+
+		stateCommitment := modelForest.GetEmptyRootHash()
+
+		stateCommitments := make([][]byte, 10)
+		allKeys := make([][][]byte, 10)
+
+		for i := 0; i < 10; i++ {
+			keys := make([][]byte, 2)
+			values := make([][]byte, 2)
+			for j := 0; j < 2; j++ {
+
+				key := make([]byte, 4)
+				binary.BigEndian.PutUint32(key, counter)
+				keys[j] = key
+
+				value := []byte{val, val, val, val}
+				values[j] = value
+
+				counter++
+				val++
+			}
+			allKeys[i] = keys
+
+			mTrie, err := modelForest.Update(stateCommitment, keys, values)
+			require.NoError(t, err)
+
+			stateCommitment = mTrie.RootHash()
+			stateCommitments[i] = stateCommitment
+		}
+
+		t.Run("V1", func(t *testing.T) {
+
+			mForest, err := mtrie.NewMForest(4, dir, ledger.CacheSize, metricsCollector, nil)
+			require.NoError(t, err)
+
+			flattenedForest, err := realWAL.LoadCheckpoint("checkpoints/checkpoint.00000000.v1")
+			require.NoError(t, err)
+
+			err = loadIntoForest(mForest, flattenedForest)
+			require.NoError(t, err)
+
+			for i, stateCommitment := range stateCommitments {
+				modelTrie, err := modelForest.GetTrie(stateCommitment)
+				require.NoError(t, err)
+
+				mTrie, err := mForest.GetTrie(stateCommitment)
+				require.NoError(t, err)
+
+				keys := allKeys[i]
+
+				modelValues, err := modelTrie.UnsafeRead(keys)
+				require.NoError(t, err)
+
+				mValues, err := mTrie.UnsafeRead(keys)
+				require.NoError(t, err)
+
+				assert.Equal(t, modelValues, mValues)
+			}
+		})
 	})
 }
 
