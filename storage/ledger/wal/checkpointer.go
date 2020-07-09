@@ -18,12 +18,14 @@ import (
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/trie"
 )
 
-var checkpointFilenamePrefix = "checkpoint."
+const checkpointFilenamePrefix = "checkpoint."
 
 const MagicBytes uint16 = 0x2137
 
 const VersionV1 uint16 = 0x01
 const VersionV2 uint16 = 0x02
+
+const RootCheckpointFilename = "root.checkpoint"
 
 type Checkpointer struct {
 	dir            string
@@ -176,7 +178,6 @@ func numberToFilenamePart(n int) string {
 }
 
 func numberToFilename(n int) string {
-
 	return fmt.Sprintf("%s%s", checkpointFilenamePrefix, numberToFilenamePart(n))
 }
 
@@ -205,9 +206,14 @@ func (c *Checkpointer) CheckpointWriter(to int) (io.WriteCloser, error) {
 }
 
 func CreateCheckpointWriter(dir string, fileNo int) (io.WriteCloser, error) {
-	file, err := os.Create(path.Join(dir, numberToFilename(fileNo)))
+	filename := path.Join(dir, numberToFilename(fileNo))
+	return CreateCheckpointWriterForFile(filename)
+}
+
+func CreateCheckpointWriterForFile(filename string) (io.WriteCloser, error) {
+	file, err := os.Create(filename)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create file for checkpoint %d: %w", fileNo, err)
+		return nil, fmt.Errorf("cannot create file for checkpoint %s: %w", filename, err)
 	}
 
 	writer := bufio.NewWriter(file)
@@ -255,6 +261,21 @@ func StoreCheckpoint(forestSequencing *flattener.FlattenedForest, writer io.Writ
 func (c *Checkpointer) LoadCheckpoint(checkpoint int) (*flattener.FlattenedForest, error) {
 	filepath := path.Join(c.dir, numberToFilename(checkpoint))
 	return LoadCheckpoint(filepath)
+}
+
+func (c *Checkpointer) LoadRootCheckpoint() (*flattener.FlattenedForest, error) {
+	filepath := path.Join(c.dir, RootCheckpointFilename)
+	return LoadCheckpoint(filepath)
+}
+
+func (c *Checkpointer) HasRootCheckpoint() (bool, error) {
+	if _, err := os.Stat(path.Join(c.dir, RootCheckpointFilename)); err == nil {
+		return true, nil
+	} else if os.IsNotExist(err) {
+		return false, nil
+	} else {
+		return false, err
+	}
 }
 
 func LoadCheckpoint(filepath string) (*flattener.FlattenedForest, error) {
