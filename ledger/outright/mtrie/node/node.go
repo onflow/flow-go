@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/common"
+	"github.com/dapperlabs/flow-go/ledger/common"
 )
 
 // TODO RAMTIN update this documentation

@@ -6,25 +6,6 @@ import (
 	"github.com/dapperlabs/flow-go/ledger"
 )
 
-// IsBitSet returns if the bit at index `idx` in the byte array `b` is set to 1 (big endian)
-// TODO: remove error return
-func IsBitSet(b []byte, idx int) (bool, error) {
-	if idx >= len(b)*8 {
-		return false, fmt.Errorf("input (%v) only has %d bits, can't look up bit %d", b, len(b)*8, idx)
-	}
-	return b[idx/8]&(1<<int(7-idx%8)) != 0, nil
-}
-
-// SetBit sets the bit at position i in the byte array b to 1
-// TODO: remove error return
-func SetBit(b []byte, i int) error {
-	if i >= len(b)*8 {
-		return fmt.Errorf("input (%v) only has %d bits, can't set bit %d", b, len(b)*8, i)
-	}
-	b[i/8] |= 1 << int(7-i%8)
-	return nil
-}
-
 // SplitByPath splits an slice of payloads based on the value of bit (bitIndex) of paths
 // TODO: remove error return
 func SplitByPath(paths []ledger.Path, payloads []ledger.Payload, bitIndex int) ([]ledger.Path, []ledger.Payload, []ledger.Path, []ledger.Payload, error) {
@@ -66,38 +47,14 @@ func SplitSortedPaths(paths []ledger.Path, bitIndex int) ([]ledger.Path, []ledge
 }
 
 // SplitProofsByPath splits a set of unordered path and proof pairs based on the value of bit (bitIndex) of path
-func SplitProofsByPath(paths []ledger.Path, proofs []*Proof, bitIndex int) ([]ledger.Path, []*Proof, []ledger.Path, []*Proof, error) {
+func SplitProofsByPath(paths []ledger.Path, proofs []*ledger.Proof, bitIndex int) ([]ledger.Path, []*ledger.Proof, []ledger.Path, []*ledger.Proof, error) {
 	rpaths := make([]ledger.Path, 0, len(paths))
-	rproofs := make([]*Proof, 0, len(proofs))
+	rproofs := make([]*ledger.Proof, 0, len(proofs))
 	lpaths := make([]ledger.Path, 0, len(paths))
-	lproofs := make([]*Proof, 0, len(proofs))
+	lproofs := make([]*ledger.Proof, 0, len(proofs))
 
 	for i, path := range paths {
-		bitIsSet, err := common.IsBitSet(path, bitIndex)
-		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("can't split key proof pairs , error: %v", err)
-		}
-		if bitIsSet {
-			rpaths = append(rpaths, path)
-			rproofs = append(rproofs, proofs[i])
-		} else {
-			lpaths = append(lpaths, path)
-			lproofs = append(lproofs, proofs[i])
-		}
-	}
-	return lpaths, lproofs, rpaths, rproofs, nil
-}
-
-
-// SplitProofsByPath splits a set of unordered path and proof pairs based on the value of bit (bitIndex) of path
-func SplitProofsByPath(paths []ledger.Path, proofs []*Proof, bitIndex int) ([]ledger.Path, []*Proof, []ledger.Path, []*Proof, error) {
-	rpaths := make([]ledger.Path, 0, len(paths))
-	rproofs := make([]*Proof, 0, len(proofs))
-	lpaths := make([]ledger.Path, 0, len(paths))
-	lproofs := make([]*Proof, 0, len(proofs))
-
-	for i, path := range paths {
-		bitIsSet, err := common.IsBitSet(path, bitIndex)
+		bitIsSet, err := IsBitSet(path, bitIndex)
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("can't split key proof pairs , error: %v", err)
 		}

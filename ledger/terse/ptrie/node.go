@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/common"
+	"github.com/dapperlabs/flow-go/ledger/common"
 )
 
 type Root []byte

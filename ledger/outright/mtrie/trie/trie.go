@@ -10,9 +10,8 @@ import (
 	"github.com/hashicorp/go-multierror"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/common"
+	"github.com/dapperlabs/flow-go/ledger/common"
 	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/node"
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/proof"
 )
 
 const (
@@ -298,11 +297,11 @@ func constructSubtrie(treeHeight int, nodeHeight int, paths []ledger.Path, paylo
 	return node.NewInterimNode(nodeHeight, lChild, rChild), nil
 }
 
-func (mt *MTrie) UnsafeProofs(paths []ledger.Path, proofs []*proof.Proof) error {
+func (mt *MTrie) UnsafeProofs(paths []ledger.Path, proofs []*ledger.Proof) error {
 	return mt.proofs(mt.root, paths, proofs)
 }
 
-func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*proof.Proof) error {
+func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.Proof) error {
 	// we've reached the end of a trie
 	// and path is not found (noninclusion proof)
 	if head == nil {
@@ -339,7 +338,7 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*proof.Pr
 					if err != nil {
 						return err
 					}
-					p.Values = append(p.Values, nodeHash)
+					p.Interims = append(p.Interims, nodeHash)
 				}
 			}
 		}
@@ -359,7 +358,7 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*proof.Pr
 					if err != nil {
 						return err
 					}
-					p.Values = append(p.Values, nodeHash)
+					p.Interims = append(p.Interims, nodeHash)
 				}
 			}
 		}

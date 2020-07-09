@@ -12,10 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/proof"
+	"github.com/dapperlabs/flow-go/ledger/common"
 	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/trie"
 	"github.com/dapperlabs/flow-go/ledger/terse/ptrie"
-
 	"github.com/dapperlabs/flow-go/ledger/utils"
 	"github.com/dapperlabs/flow-go/module/metrics"
 )
@@ -883,9 +882,9 @@ func TestRandomUpdateReadProof(t *testing.T) {
 
 		batchProof, err := fStore.Proofs(testTrie.RootHash(), proofPaths)
 		require.NoError(t, err, "error generating proofs")
-		require.True(t, batchProof.Verify(proofPaths, proofPayloads, testTrie.RootHash(), pathByteSize))
+		require.True(t, common.VerifyBatchProof(batchProof, proofPaths, proofPayloads, testTrie.RootHash(), pathByteSize))
 
-		proofToGo, _ := proof.EncodeBatchProof(batchProof)
+		proofToGo, _ := batchProof.Encode()
 		psmt, err := ptrie.NewPSMT(testTrie.RootHash(), pathByteSize, proofPaths, proofPayloads, proofToGo)
 		require.NoError(t, err, "error building partial trie")
 		require.True(t, bytes.Equal(psmt.RootHash(), testTrie.RootHash()))
@@ -932,7 +931,7 @@ func TestProofGenerationInclusion(t *testing.T) {
 	require.NoError(t, err)
 	proof, err := fStore.Proofs(updatedTrie.RootHash(), paths)
 	require.NoError(t, err)
-	require.True(t, proof.Verify(paths, payloads, updatedTrie.RootHash(), pathByteSize))
+	require.True(t, common.VerifyBatchProof(proof, paths, payloads, updatedTrie.RootHash(), pathByteSize))
 }
 
 func payloadBySlices(keydata []byte, valuedata []byte) *ledger.Payload {

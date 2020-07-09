@@ -1,3 +1,4 @@
+package common
 
 // Full returns the full key (concat )
 // func Mapper(k *Key) []byte {

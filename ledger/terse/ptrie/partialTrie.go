@@ -6,8 +6,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/common"
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/proof"
+	"github.com/dapperlabs/flow-go/ledger/common"
 	"github.com/dapperlabs/flow-go/ledger/utils"
 )
 
@@ -76,7 +75,7 @@ func NewPSMT(
 	if len(proofs) < 1 {
 		return nil, fmt.Errorf("at least a proof is needed to be able to contruct a partial trie")
 	}
-	batchProof, err := proof.DecodeBatchProof(proofs)
+	batchProof, err := ledger.DecodeBatchProof(proofs)
 	if err != nil {
 		return nil, fmt.Errorf("decoding proof failed: %w", err)
 	}
@@ -112,7 +111,7 @@ func NewPSMT(
 			v := common.GetDefaultHashForHeight(currentNode.height - 1)
 			if utils.IsBitSet(pr.Flags, j) {
 				// use the proof at index proofIndex
-				v = pr.Values[prValueIndex]
+				v = pr.Interims[prValueIndex]
 				prValueIndex++
 			}
 			// look at the bit number j (left to right) for branching

@@ -10,7 +10,6 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/proof"
 	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/trie"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/utils/io"
@@ -295,11 +294,11 @@ func (f *MForest) Update(rootHash []byte, paths []ledger.Path, payloads []ledger
 }
 
 // Proofs returns a batch proof for the given paths
-func (f *MForest) Proofs(rootHash []byte, paths []ledger.Path) (*proof.BatchProof, error) {
+func (f *MForest) Proofs(rootHash []byte, paths []ledger.Path) (*ledger.BatchProof, error) {
 
 	// no path, empty batchproof
 	if len(paths) == 0 {
-		return proof.NewBatchProof(), nil
+		return ledger.NewBatchProof(), nil
 	}
 
 	// look up for non existing paths
@@ -362,7 +361,7 @@ func (f *MForest) Proofs(rootHash []byte, paths []ledger.Path) (*proof.BatchProo
 		return bytes.Compare(sortedPaths[i], sortedPaths[j]) < 0
 	})
 
-	bp := proof.NewBatchProofWithEmptyProofs(len(sortedPaths))
+	bp := ledger.NewBatchProofWithEmptyProofs(len(sortedPaths))
 
 	for _, p := range bp.Proofs {
 		p.Flags = make([]byte, f.pathByteSize)
@@ -375,7 +374,7 @@ func (f *MForest) Proofs(rootHash []byte, paths []ledger.Path) (*proof.BatchProo
 	}
 
 	// reconstruct the proofs in the same key order that called the method
-	retbp := proof.NewBatchProofWithEmptyProofs(len(paths))
+	retbp := ledger.NewBatchProofWithEmptyProofs(len(paths))
 	for i, p := range sortedPaths {
 		for _, j := range pathOrgIndex[string(p)] {
 			retbp.Proofs[j] = bp.Proofs[i]
