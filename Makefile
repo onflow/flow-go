@@ -36,7 +36,7 @@ cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
 
 cmd/util/util:
-	go build -o cmd/util/util cmd/util/main.go
+	go build -o cmd/util/util --tags relic cmd/util/main.go
 
 .PHONY: install-tools
 install-tools: crypto/relic/build check-go-version
