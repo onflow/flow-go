@@ -215,6 +215,8 @@ func loadBootstrapState(dir, trie string) error {
 	}
 	defer in.Close()
 
+	os.MkdirAll(trie, os.ModePerm)
+
 	out, err := os.Create(dst)
 	if err != nil {
 		return err
