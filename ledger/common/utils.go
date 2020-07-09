@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/binary"
 	"fmt"
 )
 
@@ -28,5 +29,12 @@ func MaxUint16(a, b uint16) uint16 {
 	if a > b {
 		return a
 	}
+	return b
+}
+
+// Uint2binary converst a uint16 to a byte slice (big endian)
+func Uint2binary(integer uint16) []byte {
+	b := make([]byte, 2)
+	binary.BigEndian.PutUint16(b, integer)
 	return b
 }

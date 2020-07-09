@@ -6,8 +6,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/flattener"
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/trie"
+	"github.com/dapperlabs/flow-go/ledger"
+	"github.com/dapperlabs/flow-go/ledger/common"
+	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/flattener"
+	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/trie"
 )
 
 func TestEmptyTrie(t *testing.T) {
@@ -28,21 +30,19 @@ func TestPopulatedTrie(t *testing.T) {
 	emptyTrie, err := trie.NewEmptyMTrie(1)
 	require.NoError(t, err)
 
-	p1 := []byte([]uint8{uint8(1)}) // key: 0000...
-	k1 := []byte{'A'}
-	v1 := []byte{'a'}
-	p2 := []byte([]uint8{uint8(64)}) // key: 0100....
-	k2 := []byte{'B'}
-	v2 := []byte{'b'}
-	paths := [][]byte{p1, p2}
-	keys := [][]byte{k1, k2}
-	values := [][]byte{v1, v2}
+	// key: 0000...
+	p1 := common.OneBytePath(1)
+	v1 := common.LightPayload8('A', 'a')
 
-	testTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, keys, values)
+	// key: 0100....
+	p2 := common.OneBytePath(64)
+	v2 := common.LightPayload8('B', 'b')
+
+	paths := []ledger.Path{p1, p2}
+	payloads := []ledger.Payload{*v1, *v2}
+
+	testTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads)
 	require.NoError(t, err)
-	fmt.Println("BASE TRIE:")
-	fmt.Println(testTrie.String())
-	fmt.Println("================================")
 
 	for itr := flattener.NewNodeIterator(testTrie); itr.Next(); {
 		fmt.Println(itr.Value().FmtStr("", ""))
@@ -54,14 +54,12 @@ func TestPopulatedTrie(t *testing.T) {
 	require.True(t, itr.Next())
 	p1_leaf := itr.Value()
 	require.Equal(t, p1, p1_leaf.Path())
-	require.Equal(t, k1, p1_leaf.Key())
-	require.Equal(t, v1, p1_leaf.Value())
+	require.Equal(t, v1, p1_leaf.Payload())
 
 	require.True(t, itr.Next())
 	p2_leaf := itr.Value()
 	require.Equal(t, p2, p2_leaf.Path())
-	require.Equal(t, k2, p2_leaf.Key())
-	require.Equal(t, v2, p2_leaf.Value())
+	require.Equal(t, v2, p2_leaf.Payload())
 
 	require.True(t, itr.Next())
 	p_parent := itr.Value()

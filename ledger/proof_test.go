@@ -8,8 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie"
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/proof"
+	"github.com/dapperlabs/flow-go/ledger/complete/mtrie"
 	"github.com/dapperlabs/flow-go/module/metrics"
 )
 
@@ -34,8 +33,8 @@ func TestBatchProofEncoderDecoder(t *testing.T) {
 	batchProof, err := fStore.Proofs(testTrie.RootHash(), []ledger.Path{p1})
 	require.NoError(t, err)
 
-	encProf, _ := proof.EncodeBatchProof(batchProof)
-	p, err := proof.DecodeBatchProof(encProf)
+	encProf, _ := batchProof.Encode()
+	p, err := ledger.DecodeBatchProof(encProf)
 	require.NoError(t, err)
 	require.Equal(t, p, batchProof, "Proof encoder and/or decoder has an issue")
 }

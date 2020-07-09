@@ -1,10 +1,18 @@
 package ledger
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"fmt"
+)
 
 // Key represents a hierarchical ledger key
 type Key struct {
 	KeyParts []KeyPart
+}
+
+// NewKey construct a new key
+func NewKey(kp []KeyPart) *Key {
+	return &Key{KeyParts: kp}
 }
 
 // Size returns the byte size needed to encode the key
@@ -38,8 +46,8 @@ func (k *Key) Encode() []byte {
 }
 
 // DecodeKey constructs a key from an encoded key part
-// TODO add errors
-func DecodeKey(encodedKey []byte) *Key {
+func DecodeKey(encodedKey []byte) (*Key, error) {
+	// TODO add more checks
 	key := &Key{}
 	numOfParts := binary.BigEndian.Uint16(encodedKey[:2])
 	lastIndex := 2
@@ -48,9 +56,13 @@ func DecodeKey(encodedKey []byte) *Key {
 		lastIndex += 2
 		kpEnc := encodedKey[lastIndex : lastIndex+int(kpEncSize)]
 		lastIndex += int(kpEncSize)
-		key.KeyParts = append(key.KeyParts, *DecodeKeyPart(kpEnc))
+		kp, err := DecodeKeyPart(kpEnc)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding a key part: %w", err)
+		}
+		key.KeyParts = append(key.KeyParts, *kp)
 	}
-	return key
+	return key, nil
 }
 
 func (k *Key) String() string {
@@ -69,6 +81,11 @@ type KeyPart struct {
 	Value []byte
 }
 
+// NewKeyPart construct a new key part
+func NewKeyPart(typ uint16, val []byte) *KeyPart {
+	return &KeyPart{Type: typ, Value: val}
+}
+
 // Encode encodes a key part into a byte slice
 func (kp *KeyPart) Encode() []byte {
 	ret := make([]byte, 0)
@@ -82,8 +99,9 @@ func (kp *KeyPart) Encode() []byte {
 }
 
 // DecodeKeyPart constructs a key part from an encoded key part
-func DecodeKeyPart(encodedKeyPart []byte) *KeyPart {
+func DecodeKeyPart(encodedKeyPart []byte) (*KeyPart, error) {
+	// TODO add len checks
 	t := binary.BigEndian.Uint16(encodedKeyPart[:2])
 	v := encodedKeyPart[2:]
-	return &KeyPart{Type: t, Value: v}
+	return &KeyPart{Type: t, Value: v}, nil
 }

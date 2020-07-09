@@ -10,7 +10,7 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/trie"
+	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/trie"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/utils/io"
 )

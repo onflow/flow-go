@@ -10,7 +10,7 @@ import (
 	list_tries "github.com/dapperlabs/flow-go/cmd/util/cmd/read-execution-state/list-tries"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie"
+	"github.com/dapperlabs/flow-go/ledger/complete/mtrie"
 	"github.com/dapperlabs/flow-go/ledger/wal"
 )
 

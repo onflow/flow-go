@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/crypto/sha3"
 
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/common"
+	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/common"
 	"github.com/dapperlabs/flow-go/ledger/utils"
 )
 

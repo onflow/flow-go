@@ -6,6 +6,7 @@ import (
 	"github.com/dapperlabs/flow-go/ledger"
 )
 
+// TODO merge these two functions with the one in common
 // IsBitSet returns if the bit at position i in the byte array b is set to 1
 func IsBitSet(b []byte, i int) bool {
 	return b[i/8]&(1<<int(7-i%8)) != 0

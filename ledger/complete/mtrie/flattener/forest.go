@@ -4,9 +4,10 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie"
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/node"
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/trie"
+	"github.com/dapperlabs/flow-go/ledger"
+	"github.com/dapperlabs/flow-go/ledger/complete/mtrie"
+	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/node"
+	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/trie"
 )
 
 // FlattenedForest represents an MForest as a flattened data structure.
@@ -83,16 +84,19 @@ func toStorableNode(node *node.Node, indexForNode node2indexMap) (*StorableNode,
 		return nil, fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(node.RigthChild().Hash()))
 	}
 
+	EncPayload := []byte{}
+	if node.Payload() != nil {
+		EncPayload = node.Payload().Encode()
+	}
 	storableNode := &StorableNode{
-		LIndex:    leftIndex,
-		RIndex:    rightIndex,
-		Height:    uint16(node.Height()),
-		Path:      node.Path(),
-		Key:       node.Key(),
-		Value:     node.Value(),
-		HashValue: node.Hash(),
-		MaxDepth:  node.MaxDepth(),
-		RegCount:  node.RegCount(),
+		LIndex:     leftIndex,
+		RIndex:     rightIndex,
+		Height:     uint16(node.Height()),
+		Path:       node.Path(),
+		EncPayload: EncPayload,
+		HashValue:  node.Hash(),
+		MaxDepth:   node.MaxDepth(),
+		RegCount:   node.RegCount(),
 	}
 	return storableNode, nil
 }
@@ -110,6 +114,7 @@ func toStorableTrie(mtrie *trie.MTrie, indexForNode node2indexMap) (*StorableTri
 	return storableTrie, nil
 }
 
+// RebuildTries construct a forest from a storable FlattenedForest
 func RebuildTries(flatForest *FlattenedForest) ([]*trie.MTrie, error) {
 	tries := make([]*trie.MTrie, 0, len(flatForest.Tries))
 	nodes, err := RebuildNodes(flatForest.Nodes)
@@ -128,7 +133,7 @@ func RebuildTries(flatForest *FlattenedForest) ([]*trie.MTrie, error) {
 	return tries, nil
 }
 
-// RebuildFromStorables generates a list of Nodes from a sequence of StorableNodes.
+// RebuildNodes generates a list of Nodes from a sequence of StorableNodes.
 // The sequence must obey the DESCENDANTS-FIRST-RELATIONSHIP
 func RebuildNodes(storableNodes []*StorableNode) ([]*node.Node, error) {
 	nodes := make([]*node.Node, 0, len(storableNodes))
@@ -140,7 +145,11 @@ func RebuildNodes(storableNodes []*StorableNode) ([]*node.Node, error) {
 		if (snode.LIndex >= uint64(i)) || (snode.RIndex >= uint64(i)) {
 			return nil, fmt.Errorf("sequence of StorableNodes does not satisfy Descendents-First-Relationship")
 		}
-		nodes = append(nodes, node.NewNode(int(snode.Height), nodes[snode.LIndex], nodes[snode.RIndex], snode.Path, snode.Key, snode.Value, snode.HashValue, snode.MaxDepth, snode.RegCount))
+		payload, err := ledger.DecodePayload(snode.EncPayload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode a payload for an storableNode %w", err)
+		}
+		nodes = append(nodes, node.NewNode(int(snode.Height), nodes[snode.LIndex], nodes[snode.RIndex], snode.Path, payload, snode.HashValue, snode.MaxDepth, snode.RegCount))
 	}
 	return nodes, nil
 }

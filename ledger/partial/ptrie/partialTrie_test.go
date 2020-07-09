@@ -10,8 +10,7 @@ package ptrie
 
 // 	"github.com/stretchr/testify/require"
 
-// 	"github.com/dapperlabs/flow-go/ledger/outright/mtrie"
-// 	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/proof"
+// 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie"
 // 	"github.com/dapperlabs/flow-go/ledger/utils"
 // 	"github.com/dapperlabs/flow-go/module/metrics"
 // )
@@ -54,7 +53,7 @@ package ptrie
 // 		bp, err := mForest.Proofs(rootHash, paths)
 // 		require.NoError(t, err, "error getting proofs values")
 
-// 		encBP, _ := proof.EncodeBatchProof(bp)
+// 		encBP, _ := bp.Encode()
 // 		psmt, err := NewPSMT(rootHash, pathByteSize, paths, keys, retValues, encBP)
 
 // 		require.NoError(t, err, "error building partial trie")
@@ -120,7 +119,7 @@ package ptrie
 // 		bp, err := mForest.Proofs(newRoot, paths)
 // 		require.NoError(t, err, "error getting batch proof")
 
-// 		encBP, _ := proof.EncodeBatchProof(bp)
+// 		encBP, _ := bp.Encode()
 // 		psmt, err := NewPSMT(newRoot, pathByteSize, paths, keys, retvalues, encBP)
 // 		require.NoError(t, err, "error building partial trie")
 
@@ -174,7 +173,7 @@ package ptrie
 // 		bp, err := mForest.Proofs(mForest.GetEmptyRootHash(), paths)
 // 		require.NoError(t, err, "error getting batch proof")
 
-// 		encBP, _ := proof.EncodeBatchProof(bp)
+// 		encBP, _ := bp.Encode()
 // 		psmt, err := NewPSMT(mForest.GetEmptyRootHash(), pathByteSize, paths, keys, retvalues, encBP)
 // 		require.NoError(t, err, "error building partial trie")
 
@@ -233,7 +232,7 @@ package ptrie
 // 		bp, err := mForest.Proofs(mForest.GetEmptyRootHash(), paths)
 // 		require.NoError(t, err, "error getting batch proof")
 
-// 		encBP, _ := proof.EncodeBatchProof(bp)
+// 		encBP, _ := bp.Encode()
 // 		psmt, err := NewPSMT(mForest.GetEmptyRootHash(), pathByteSize, paths, keys, retvalues, encBP)
 // 		require.NoError(t, err, "error building partial trie")
 
@@ -302,7 +301,7 @@ package ptrie
 // 		bp, err := mForest.Proofs(newRoot, paths)
 // 		require.NoError(t, err, "error getting batch proof")
 
-// 		encBP, _ := proof.EncodeBatchProof(bp)
+// 		encBP, _ := bp.Encode()
 // 		psmt, err := NewPSMT(newRoot, pathByteSize, paths, keys, retvalues, encBP)
 // 		require.NoError(t, err, "error building partial trie")
 
@@ -384,7 +383,7 @@ package ptrie
 // 			bp, err := mForest.Proofs(root, paths)
 // 			require.NoError(t, err, "error getting batch proof")
 
-// 			encBP, _ := proof.EncodeBatchProof(bp)
+// 			encBP, _ := bp.Encode()
 // 			psmt, err := NewPSMT(root, pathByteSize, paths, keys, retvalues, encBP)
 // 			require.NoError(t, err, "error building partial trie")
 

@@ -8,6 +8,7 @@ import (
 // through a trie branch from an specific leaf node (key)
 // up to the root of the trie.
 // TODO add Payload (Key, Value)
+// TODO add version
 type Proof struct {
 	// Key       Key      // ledger key
 	// Value     Value    // ledger value
@@ -77,6 +78,7 @@ func (p *Proof) Encode() []byte {
 //
 // TODO (add key interims to batch proof and make it self-included),
 // so there is no need for two calls (read, proofs)
+// TODO add version
 type BatchProof struct {
 	Proofs []*Proof
 }

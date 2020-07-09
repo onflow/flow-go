@@ -1,30 +1,25 @@
 package node_test
 
 import (
-	"encoding/binary"
 	"encoding/hex"
-	"fmt"
 	"testing"
 
-	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/node"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/flow-go/ledger/common"
+	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/node"
 )
 
 const (
-	// ReferenceImplPathByteSize is the path length in reference implementation: 2 bytes.
-	// Please do NOT CHANGE.
-	ReferenceImplPathByteSize  = 2
 	ReferenceImplKeyByteSize   = 2
 	ReferenceImplValueByteSize = 2
 )
 
 // Test_ProperLeaf verifies that the hash value of a proper leaf (at height 0) is computed correctly
 func Test_ProperLeaf(t *testing.T) {
-	path := pathByInt(56809)
-	payload := payloadByInts(56810, 59656)
+	path := common.TwoBytesPath(56809)
+	payload := common.LightPayload(56810, 59656)
 	n := node.NewLeaf(path, payload, 0)
-	fmt.Println(n)
 	expectedRootHashHex := "aa7693d498e9a087b1cadf5bfe9a1ff07829badc1915c210e482f369f9a00a70"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(n.Hash()))
 }
@@ -34,8 +29,8 @@ func Test_ProperLeaf(t *testing.T) {
 // We test the hash at the lowest-possible height (1), for the leaf to be still compactified,
 // at an interim height (9) and the max possible height (16)
 func Test_CompactifiedLeaf(t *testing.T) {
-	path := pathByInt(56809)
-	payload := payloadByInts(56810, 59656)
+	path := common.TwoBytesPath(56809)
+	payload := common.LightPayload(56810, 59656)
 	n := node.NewLeaf(path, payload, 1)
 	expectedRootHashHex := "34ee03b8ca7d5cc8638d28b7cf2d70641efd5dfa428333863904a0fd19930700"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(n.Hash()))
@@ -68,8 +63,8 @@ func Test_InterimNodeWithoutChildren(t *testing.T) {
 // Test_InterimNodeWithOneChild verifies that the hash value of an interim node with
 // only one child (left or right) is computed correctly.
 func Test_InterimNodeWithOneChild(t *testing.T) {
-	path := pathByInt(56809)
-	payload := payloadByInts(56810, 59656)
+	path := common.TwoBytesPath(56809)
+	payload := common.LightPayload(56810, 59656)
 	c := node.NewLeaf(path, payload, 0)
 
 	n := node.NewInterimNode(1, c, nil)
@@ -84,12 +79,12 @@ func Test_InterimNodeWithOneChild(t *testing.T) {
 // Test_InterimNodeWithBothChildren verifies that the hash value of an interim node with
 // both children (left and right) is computed correctly.
 func Test_InterimNodeWithBothChildren(t *testing.T) {
-	leftPath := pathByInt(56809)
-	leftPayload := payloadByInts(56810, 59656)
+	leftPath := common.TwoBytesPath(56809)
+	leftPayload := common.LightPayload(56810, 59656)
 	leftChild := node.NewLeaf(leftPath, leftPayload, 0)
 
-	rightPath := pathByInt(2)
-	rightPayload := payloadByInts(11, 22)
+	rightPath := common.TwoBytesPath(2)
+	rightPayload := common.LightPayload(11, 22)
 	rightChild := node.NewLeaf(rightPath, rightPayload, 0)
 
 	n := node.NewInterimNode(1, leftChild, rightChild)
@@ -98,8 +93,8 @@ func Test_InterimNodeWithBothChildren(t *testing.T) {
 }
 
 func Test_MaxDepth(t *testing.T) {
-	path := pathByInt(1)
-	payload := payloadByInts(2, 3)
+	path := common.TwoBytesPath(1)
+	payload := common.LightPayload(2, 3)
 
 	n1 := node.NewLeaf(path, payload, 0)
 	n2 := node.NewLeaf(path, payload, 0)
@@ -111,8 +106,8 @@ func Test_MaxDepth(t *testing.T) {
 }
 
 func Test_RegCount(t *testing.T) {
-	path := pathByInt(1)
-	payload := payloadByInts(2, 3)
+	path := common.TwoBytesPath(1)
+	payload := common.LightPayload(2, 3)
 	n1 := node.NewLeaf(path, payload, 0)
 	n2 := node.NewLeaf(path, payload, 0)
 	n3 := node.NewLeaf(path, payload, 0)
@@ -120,20 +115,4 @@ func Test_RegCount(t *testing.T) {
 	n4 := node.NewInterimNode(1, n1, n2)
 	n5 := node.NewInterimNode(1, n4, n3)
 	require.Equal(t, n5.RegCount(), uint64(3))
-}
-
-func pathByInt(integer uint16) ledger.Path {
-	b := make([]byte, ReferenceImplPathByteSize)
-	binary.BigEndian.PutUint16(b, integer)
-	return ledger.Path(b)
-}
-
-func payloadByInts(keyInt uint16, valueInt uint16) *ledger.Payload {
-	keydata := make([]byte, ReferenceImplKeyByteSize)
-	binary.BigEndian.PutUint16(keydata, keyInt)
-	valuedata := make([]byte, ReferenceImplValueByteSize)
-	binary.BigEndian.PutUint16(valuedata, valueInt)
-	key := ledger.Key{KeyParts: []ledger.KeyPart{ledger.KeyPart{Type: 0, Value: keydata}}}
-	value := ledger.Value(valuedata)
-	return &ledger.Payload{Key: key, Value: value}
 }

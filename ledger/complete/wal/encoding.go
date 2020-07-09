@@ -6,7 +6,7 @@ import (
 	"io"
 	"math"
 
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/flattener"
+	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -279,15 +279,18 @@ func Decode(data []byte) (operation WALOperation, stateCommitment flow.StateComm
 // 2-bytes Big Endian uint16 height
 // 8-bytes Big Endian uint64 LIndex
 // 8-bytes Big Endian uint64 RIndex
-// 2-bytes Big Endian uint16 key length
-// key bytes
-// 4-bytes Big Endian uint32 value length
-// value bytes
+// 2-bytes Big Endian uint16 path length
+// path bytes
+// 4-bytes Big Endian uint32 payload length
+// payload bytes
 // 2-bytes Big Endian uint16 hashValue length
 // hash value bytes
+// 2-bytes maxDepth
+// 8-bytes regCount
+
 func EncodeStorableNode(storableNode *flattener.StorableNode) []byte {
 
-	length := 2 + 8 + 8 + 2 + len(storableNode.Key) + 4 + len(storableNode.Value) + 2 + len(storableNode.HashValue)
+	length := 2 + 8 + 8 + 2 + len(storableNode.Path) + 4 + len(storableNode.EncPayload) + 2 + len(storableNode.HashValue) + 2 + 8
 
 	buf := make([]byte, length)
 	pos := 0
@@ -295,9 +298,11 @@ func EncodeStorableNode(storableNode *flattener.StorableNode) []byte {
 	pos = writeUint16(buf, pos, storableNode.Height)
 	pos = writeUint64(buf, pos, storableNode.LIndex)
 	pos = writeUint64(buf, pos, storableNode.RIndex)
-	pos = writeShortData(buf, pos, storableNode.Key)
-	pos = writeLongData(buf, pos, storableNode.Value)
-	writeShortData(buf, pos, storableNode.HashValue)
+	pos = writeShortData(buf, pos, storableNode.Path)
+	pos = writeLongData(buf, pos, storableNode.EncPayload)
+	pos = writeShortData(buf, pos, storableNode.HashValue)
+	pos = writeUint16(buf, pos, storableNode.MaxDepth)
+	writeUint64(buf, pos, storableNode.RegCount)
 
 	return buf
 }
@@ -319,11 +324,11 @@ func ReadStorableNode(reader io.Reader) (*flattener.StorableNode, error) {
 	storableNode.LIndex, pos = readUint64(buf, pos)
 	storableNode.RIndex, _ = readUint64(buf, pos)
 
-	storableNode.Key, err = readShortDataFromReader(reader)
+	storableNode.Path, err = readShortDataFromReader(reader)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read key data: %w", err)
 	}
-	storableNode.Value, err = readLongDataFromReader(reader)
+	storableNode.EncPayload, err = readLongDataFromReader(reader)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read value data: %w", err)
 	}
@@ -331,6 +336,15 @@ func ReadStorableNode(reader io.Reader) (*flattener.StorableNode, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot read hashValue data: %w", err)
 	}
+
+	buf = make([]byte, 2+8)
+	_, err = io.ReadFull(reader, buf)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read fixed-legth part: %w", err)
+	}
+	pos = 0
+	storableNode.MaxDepth, pos = readUint16(buf, pos)
+	storableNode.RegCount, _ = readUint64(buf, pos)
 
 	return storableNode, nil
 }

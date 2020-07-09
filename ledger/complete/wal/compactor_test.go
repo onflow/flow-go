@@ -12,9 +12,9 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie"
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/flattener"
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/trie"
+	"github.com/dapperlabs/flow-go/ledger/complete/mtrie"
+	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/flattener"
+	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/trie"
 	"github.com/dapperlabs/flow-go/ledger/utils"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )

@@ -7,10 +7,9 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie"
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/proof"
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/trie"
-	"github.com/dapperlabs/flow-go/ledger/outright/wal"
+	"github.com/dapperlabs/flow-go/ledger/complete/mtrie"
+	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/trie"
+	"github.com/dapperlabs/flow-go/ledger/complete/wal"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 )
@@ -194,7 +193,7 @@ func (f *MTrieStorage) GetRegistersWithProof(
 		return nil, nil, fmt.Errorf("could not get proofs: %w", err)
 	}
 
-	proofToGo, totalProofLength := proof.EncodeBatchProof(batchProof)
+	proofToGo, totalProofLength := batchProof.Encode()
 
 	if len(proofToGo) > 0 {
 		f.metrics.ProofSize(uint32(totalProofLength / len(proofToGo)))

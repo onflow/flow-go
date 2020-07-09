@@ -11,7 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/ledger"
 	"github.com/dapperlabs/flow-go/ledger/common"
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/node"
+	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/node"
 )
 
 const (

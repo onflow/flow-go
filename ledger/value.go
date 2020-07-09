@@ -23,6 +23,6 @@ func (v Value) String() string {
 
 // DecodeValue constructs a value from an encoded value
 // This has been considered for future extensions
-func DecodeValue(encodedValue []byte) Value {
-	return Value(encodedValue)
+func DecodeValue(encodedValue []byte) (Value, error) {
+	return Value(encodedValue), nil
 }

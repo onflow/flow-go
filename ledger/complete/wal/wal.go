@@ -7,8 +7,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	prometheusWAL "github.com/prometheus/tsdb/wal"
 
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie"
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/flattener"
+	"github.com/dapperlabs/flow-go/ledger/complete/mtrie"
+	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/flattener"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 )

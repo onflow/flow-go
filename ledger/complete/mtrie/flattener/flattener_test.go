@@ -10,10 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie"
-
+	"github.com/dapperlabs/flow-go/ledger"
+	"github.com/dapperlabs/flow-go/ledger/common"
+	"github.com/dapperlabs/flow-go/ledger/complete/mtrie"
+	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/flattener"
 )
 
 func TestForestStoreAndLoad(t *testing.T) {
@@ -27,34 +28,27 @@ func TestForestStoreAndLoad(t *testing.T) {
 	require.NoError(t, err)
 	rootHash := mForest.GetEmptyRootHash()
 
-	p1 := []byte([]uint8{uint8(1)})
-	k1 := []byte{'A'}
-	v1 := []byte{'a'}
-	p2 := []byte([]uint8{uint8(2)})
-	k2 := []byte{'B'}
-	v2 := []byte{'b'}
-	p3 := []byte([]uint8{uint8(130)})
-	k3 := []byte{'C'}
-	v3 := []byte{'c'}
-	p4 := []byte([]uint8{uint8(131)})
-	k4 := []byte{'D'}
-	v4 := []byte{'d'}
-	p5 := []byte([]uint8{uint8(132)})
-	k5 := []byte{'E'}
-	v5 := []byte{'e'}
+	p1 := common.OneBytePath(1)
+	v1 := common.LightPayload8('A', 'a')
+	p2 := common.OneBytePath(2)
+	v2 := common.LightPayload8('B', 'b')
+	p3 := common.OneBytePath(130)
+	v3 := common.LightPayload8('C', 'c')
+	p4 := common.OneBytePath(131)
+	v4 := common.LightPayload8('D', 'd')
+	p5 := common.OneBytePath(132)
+	v5 := common.LightPayload8('E', 'e')
 
-	paths := [][]byte{p1, p2, p3, p4, p5}
-	keys := [][]byte{k1, k2, k3, k4, k5}
-	values := [][]byte{v1, v2, v3, v4, v5}
-	newTrie, err := mForest.Update(rootHash, paths, keys, values)
+	paths := []ledger.Path{p1, p2, p3, p4, p5}
+	payloads := []ledger.Payload{*v1, *v2, *v3, *v4, *v5}
+	newTrie, err := mForest.Update(rootHash, paths, payloads)
 	require.NoError(t, err)
 	rootHash = newTrie.RootHash()
 
-	p6 := []byte([]uint8{uint8(133)})
-	k6 := []byte{'F'}
-	v6 := []byte{'f'}
+	p6 := common.OneBytePath(133)
+	v6 := common.LightPayload8('F', 'f')
 
-	newTrie, err = mForest.Update(rootHash, [][]byte{p6}, [][]byte{k6}, [][]byte{v6})
+	newTrie, err = mForest.Update(rootHash, []ledger.Path{p6}, []ledger.Payload{*v6})
 	require.NoError(t, err)
 	rootHash = newTrie.RootHash()
 
@@ -81,12 +75,11 @@ func TestForestStoreAndLoad(t *testing.T) {
 	//forests are the same now
 	assert.Equal(t, *mForest, *newMForest)
 
-	retValues, err := mForest.Read(rootHash, paths)
+	retPayloads, err := mForest.Read(rootHash, paths)
 	require.NoError(t, err)
-	newRetValues, err := newMForest.Read(rootHash, paths)
+	newRetPayloads, err := newMForest.Read(rootHash, paths)
 	require.NoError(t, err)
 	for i := range paths {
-		require.True(t, bytes.Equal(values[i], retValues[i]))
-		require.True(t, bytes.Equal(values[i], newRetValues[i]))
+		require.True(t, bytes.Equal(retPayloads[i].Encode(), newRetPayloads[i].Encode()))
 	}
 }
