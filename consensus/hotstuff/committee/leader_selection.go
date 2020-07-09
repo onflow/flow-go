@@ -59,6 +59,8 @@ func ComputeLeaderSelectionFromSeed(epochStartView uint64, seed []byte, count in
 
 // WeightedRandomSelection - given a seed and a given count, pre-generate the indexs of leader.
 // The chance to be selected as leader is proportional to its weight.
+// This algorithm is essentially Fitness proportionate selection:
+// See https://en.wikipedia.org/wiki/Fitness_proportionate_selection
 func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]int, error) {
 	// create random number generator from the seed
 	rng, err := random.NewRand(seed)
@@ -79,9 +81,13 @@ func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]int, e
 		weightSum = append(weightSum, sum)
 	}
 
-	// after accumulating the weights, the last item is the total weight
+	// after accumulating the weights, the sum is the total weight
 	// total weight is used to specify the range of the random number.
-	totalWeight := weightSum[len(weightSum)-1]
+	totalWeight := sum
+
+	if totalWeight == 0 {
+		return nil, fmt.Errorf("total weight must be greater than 0")
+	}
 
 	leaders := make([]int, 0, count)
 	for i := 0; i < count; i++ {

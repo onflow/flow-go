@@ -181,3 +181,14 @@ func BenchmarkLeaderSelection(b *testing.B) {
 		require.NoError(b, err)
 	}
 }
+
+func TestInvalidTotalWeight(t *testing.T) {
+	identities := []*flow.Identity{
+		&flow.Identity{Stake: 0},
+		&flow.Identity{Stake: 0},
+		&flow.Identity{Stake: 0},
+		&flow.Identity{Stake: 0},
+	}
+	_, err := ComputeLeaderSelectionFromSeed(0, someSeed, 10, identities)
+	require.Error(t, err)
+}
