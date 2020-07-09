@@ -324,7 +324,7 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*proof.Pr
 		p.Steps++
 	}
 	// split paths based on the value of i-th bit (i = trie height - node height)
-	lpaths, lproofs, rpaths, rproofs, err := proof.SplitProofsByPath(paths, proofs, mt.height-head.Height())
+	lpaths, lproofs, rpaths, rproofs, err := common.SplitProofsByPath(paths, proofs, mt.height-head.Height())
 	if err != nil {
 		return fmt.Errorf("proof generation failed, path split error: %w", err)
 	}

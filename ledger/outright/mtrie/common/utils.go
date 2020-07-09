@@ -65,10 +65,49 @@ func SplitSortedPaths(paths []ledger.Path, bitIndex int) ([]ledger.Path, []ledge
 	return paths, nil, nil
 }
 
-// MaxUint16 returns the max value of two uint16
-func MaxUint16(a, b uint16) uint16 {
-	if a > b {
-		return a
+// SplitProofsByPath splits a set of unordered path and proof pairs based on the value of bit (bitIndex) of path
+func SplitProofsByPath(paths []ledger.Path, proofs []*Proof, bitIndex int) ([]ledger.Path, []*Proof, []ledger.Path, []*Proof, error) {
+	rpaths := make([]ledger.Path, 0, len(paths))
+	rproofs := make([]*Proof, 0, len(proofs))
+	lpaths := make([]ledger.Path, 0, len(paths))
+	lproofs := make([]*Proof, 0, len(proofs))
+
+	for i, path := range paths {
+		bitIsSet, err := common.IsBitSet(path, bitIndex)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("can't split key proof pairs , error: %v", err)
+		}
+		if bitIsSet {
+			rpaths = append(rpaths, path)
+			rproofs = append(rproofs, proofs[i])
+		} else {
+			lpaths = append(lpaths, path)
+			lproofs = append(lproofs, proofs[i])
+		}
 	}
-	return b
+	return lpaths, lproofs, rpaths, rproofs, nil
+}
+
+
+// SplitProofsByPath splits a set of unordered path and proof pairs based on the value of bit (bitIndex) of path
+func SplitProofsByPath(paths []ledger.Path, proofs []*Proof, bitIndex int) ([]ledger.Path, []*Proof, []ledger.Path, []*Proof, error) {
+	rpaths := make([]ledger.Path, 0, len(paths))
+	rproofs := make([]*Proof, 0, len(proofs))
+	lpaths := make([]ledger.Path, 0, len(paths))
+	lproofs := make([]*Proof, 0, len(proofs))
+
+	for i, path := range paths {
+		bitIsSet, err := common.IsBitSet(path, bitIndex)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("can't split key proof pairs , error: %v", err)
+		}
+		if bitIsSet {
+			rpaths = append(rpaths, path)
+			rproofs = append(rproofs, proofs[i])
+		} else {
+			lpaths = append(lpaths, path)
+			lproofs = append(lproofs, proofs[i])
+		}
+	}
+	return lpaths, lproofs, rpaths, rproofs, nil
 }

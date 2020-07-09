@@ -1,4 +1,4 @@
-package proof_test
+package ledger_test
 
 import (
 	"io/ioutil"
@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/metrics"
 )
 
+// TODO RAMTIN HERE
 func TestBatchProofEncoderDecoder(t *testing.T) {
 	pathByteSize := 1 // key size of 8 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
