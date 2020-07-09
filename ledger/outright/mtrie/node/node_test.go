@@ -8,7 +8,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/ledger"
 	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/node"
-	"github.com/dapperlabs/flow-go/ledger/utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -129,10 +128,12 @@ func pathByInt(integer uint16) ledger.Path {
 	return ledger.Path(b)
 }
 
-func payloadByInts(keyInt uint16, valueInt uint16) ledger.Payload {
-	key := make([]byte, ReferenceImplKeyByteSize)
-	binary.BigEndian.PutUint16(key, keyInt)
-	value := make([]byte, ReferenceImplValueByteSize)
-	binary.BigEndian.PutUint16(value, valueInt)
-	return utils.NewPayload(key, value)
+func payloadByInts(keyInt uint16, valueInt uint16) *ledger.Payload {
+	keydata := make([]byte, ReferenceImplKeyByteSize)
+	binary.BigEndian.PutUint16(keydata, keyInt)
+	valuedata := make([]byte, ReferenceImplValueByteSize)
+	binary.BigEndian.PutUint16(valuedata, valueInt)
+	key := ledger.Key{KeyParts: []ledger.KeyPart{ledger.KeyPart{Type: 0, Value: keydata}}}
+	value := ledger.Value(valuedata)
+	return &ledger.Payload{Key: key, Value: value}
 }

@@ -103,19 +103,16 @@ func (mt *MTrie) String() string {
 }
 
 // TODO move consistency checks from Forrest into Trie to obtain a safe, self-contained API
-func (mt *MTrie) UnsafeRead(paths [][]byte) ([]ledger.Payload, error) {
+func (mt *MTrie) UnsafeRead(paths []ledger.Path) ([]ledger.Payload, error) {
 	return mt.read(mt.root, paths)
 }
 
-func (mt *MTrie) read(head *node.Node, paths [][]byte) ([]ledger.Payload, error) {
+func (mt *MTrie) read(head *node.Node, paths []ledger.Path) ([]ledger.Payload, error) {
 	// path not found
 	if head == nil {
-		// TODO RAMTIN can't do this, right?
-		// TODO append nil issue (empty payload maybe)
-		// maybe read result object
 		res := make([]ledger.Payload, 0, len(paths))
 		for range paths {
-			res = append(res, nil)
+			res = append(res, *ledger.EmptyPayload())
 		}
 		return res, nil
 	}
@@ -124,9 +121,9 @@ func (mt *MTrie) read(head *node.Node, paths [][]byte) ([]ledger.Payload, error)
 		res := make([]ledger.Payload, 0)
 		for _, p := range paths {
 			if bytes.Equal(head.Path(), p) {
-				res = append(res, head.Payload())
+				res = append(res, *head.Payload())
 			} else {
-				res = append(res, nil)
+				res = append(res, *ledger.EmptyPayload())
 			}
 		}
 		return res, nil
@@ -165,7 +162,7 @@ func (mt *MTrie) read(head *node.Node, paths [][]byte) ([]ledger.Payload, error)
 // UNSAFE: method requires the following conditions to be satisfied:
 //   * keys are NOT duplicated
 // TODO: move consistency checks from MForest to here, to make API is safe and self-contained
-func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths [][]byte, updatedPayloads []ledger.Payload) (*MTrie, error) {
+func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, updatedPayloads []ledger.Payload) (*MTrie, error) {
 	parentRoot := parentTrie.root
 	updatedRoot, err := update(parentTrie.height, parentRoot.Height(), parentRoot, updatedPaths, updatedPayloads)
 	if err != nil {
@@ -185,7 +182,7 @@ func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths [][]byte, updat
 //     (excluding the bit at index headHeight)
 //   * keys are NOT duplicated
 // TODO: remove error return
-func update(treeHeight int, nodeHeight int, parentNode *node.Node, paths [][]byte, payloads []ledger.Payload) (*node.Node, error) {
+func update(treeHeight int, nodeHeight int, parentNode *node.Node, paths []ledger.Path, payloads []ledger.Payload) (*node.Node, error) {
 	if parentNode == nil { // parent Trie has no sub-trie for the set of paths => construct entire subtree
 		return constructSubtrie(treeHeight, nodeHeight, paths, payloads)
 	}
@@ -207,7 +204,7 @@ func update(treeHeight int, nodeHeight int, parentNode *node.Node, paths [][]byt
 		if !overrideExistingValue {
 			// TODO: copy payload when using in-place MergeSort for separating the payloads
 			paths = append(paths, parentNode.Path())
-			payloads = append(payloads, parentNode.Payload())
+			payloads = append(payloads, *parentNode.Payload())
 		}
 		return constructSubtrie(treeHeight, nodeHeight, paths, payloads)
 	}
@@ -253,14 +250,14 @@ func update(treeHeight int, nodeHeight int, parentNode *node.Node, paths [][]byt
 //   * paths contains at least one element
 //   * paths are NOT duplicated
 // TODO: remove error return
-func constructSubtrie(treeHeight int, nodeHeight int, paths [][]byte, payloads []ledger.Payload) (*node.Node, error) {
+func constructSubtrie(treeHeight int, nodeHeight int, paths []ledger.Path, payloads []ledger.Payload) (*node.Node, error) {
 	// no inserts => default value, represented by nil node
 	if len(paths) == 0 {
 		return nil, nil
 	}
 	// If we are at a leaf node, we create the node
 	if len(paths) == 1 {
-		return node.NewLeaf(paths[0], payloads[0], nodeHeight), nil
+		return node.NewLeaf(paths[0], &payloads[0], nodeHeight), nil
 	}
 	// from here on, we have: len(paths) > 1
 
@@ -301,11 +298,11 @@ func constructSubtrie(treeHeight int, nodeHeight int, paths [][]byte, payloads [
 	return node.NewInterimNode(nodeHeight, lChild, rChild), nil
 }
 
-func (mt *MTrie) UnsafeProofs(paths [][]byte, proofs []*proof.Proof) error {
+func (mt *MTrie) UnsafeProofs(paths []ledger.Path, proofs []*proof.Proof) error {
 	return mt.proofs(mt.root, paths, proofs)
 }
 
-func (mt *MTrie) proofs(head *node.Node, paths [][]byte, proofs []*proof.Proof) error {
+func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*proof.Proof) error {
 	// we've reached the end of a trie
 	// and path is not found (noninclusion proof)
 	if head == nil {
@@ -556,7 +553,7 @@ func (mt *MTrie) Equals(o *MTrie) bool {
 // // constructTrieFromKeyValuePairs constructs a trie from the given key-value pairs.
 // // UNSAFE: function requires the following conditions to be satisfied, but does not explicitly check them:
 // //   * keys must have the same PathLength
-// func constructTrieFromKeyValuePairs(pathByteSize int, paths [][]byte, keys [][]byte, values [][]byte) (*MTrie, error) {
+// func constructTrieFromKeyValuePairs(pathByteSize int, paths []ledger.Path, keys [][]byte, values [][]byte) (*MTrie, error) {
 // 	treeHeight := 8 * pathByteSize
 // 	root, err := constructSubtrie(treeHeight, treeHeight, paths, keys, values)
 // 	if err != nil {

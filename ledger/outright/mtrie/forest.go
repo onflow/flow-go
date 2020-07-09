@@ -5,14 +5,14 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"sort"
 
 	lru "github.com/hashicorp/golang-lru"
 
-	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/ledger"
 	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/proof"
 	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/trie"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/utils/io"
 )
 
@@ -25,7 +25,7 @@ import (
 // tries that are still needed. In fully matured Flow, we will have an
 // explicit eviction policy.
 //
-// TODO: Storage Eviction Policy for MForrest
+// TODO: Storage Eviction Policy for MForest
 //       For the execution node: we only evict on sealing a result.
 type MForest struct {
 	// tries stores all MTries in the forest. It is NOT a CACHE in the conventional sense:
@@ -66,7 +66,7 @@ func NewMForest(pathByteSize int, trieStorageDir string, forestCapacity int, met
 		return nil, fmt.Errorf("cannot create forest cache: %w", err)
 	}
 
-	// init Forrest and add an empty trie
+	// init Forest and add an empty trie
 	if pathByteSize < 1 {
 		return nil, errors.New("trie's path size [in bytes] must be positive")
 	}
@@ -105,13 +105,7 @@ func (f *MForest) GetTrie(rootHash []byte) (*trie.MTrie, error) {
 		return ent.(*trie.MTrie), nil
 	}
 
-	// otherwise try to load from disk
-	trie, err := f.LoadTrie(filepath.Join(f.dir, encRootHash))
-	if err != nil {
-		return nil, fmt.Errorf("trie with the given rootHash [%v] not found: %w", encRootHash, err)
-	}
-
-	return trie, nil
+	return nil, fmt.Errorf("trie with the given rootHash [%v] not found", encRootHash)
 }
 
 // GetTries returns list of currently cached tree root hashes
@@ -134,7 +128,7 @@ func (f *MForest) AddTries(newTries []*trie.MTrie) error {
 	for _, t := range newTries {
 		err := f.AddTrie(t)
 		if err != nil {
-			return fmt.Errorf("adding tries to forrest failed: %w", err)
+			return fmt.Errorf("adding tries to forest failed: %w", err)
 		}
 	}
 	return nil
@@ -178,11 +172,11 @@ func (f *MForest) GetEmptyRootHash() []byte {
 }
 
 // Read reads values for an slice of paths and returns values and error (if any)
-func (f *MForest) Read(rootHash []byte, paths [][]byte) ([][]byte, error) {
+func (f *MForest) Read(rootHash []byte, paths []ledger.Path) ([]ledger.Payload, error) {
 
 	// no key no change
 	if len(paths) == 0 {
-		return [][]byte{}, nil
+		return make([]ledger.Payload, 0), nil
 	}
 
 	// lookup the trie by rootHash
@@ -192,7 +186,7 @@ func (f *MForest) Read(rootHash []byte, paths [][]byte) ([][]byte, error) {
 	}
 
 	// sort paths and deduplicate keys
-	sortedPaths := make([][]byte, 0)
+	sortedPaths := make([]ledger.Path, 0)
 	pathOrgIndex := make(map[string][]int)
 	for i, path := range paths {
 		// check key sizes
@@ -213,32 +207,34 @@ func (f *MForest) Read(rootHash []byte, paths [][]byte) ([][]byte, error) {
 		return bytes.Compare(sortedPaths[i], sortedPaths[j]) < 0
 	})
 
-	values, err := trie.UnsafeRead(sortedPaths)
+	payloads, err := trie.UnsafeRead(sortedPaths)
 
 	if err != nil {
 		return nil, err
 	}
 
-	totalValuesSize := 0
+	totalPayloadSize := 0
 
-	// reconstruct the values in the same key order that called the method
-	orderedValues := make([][]byte, len(paths))
+	// reconstruct the payloads in the same key order that called the method
+	orderedPayloads := make([]ledger.Payload, len(paths))
 	for i, p := range sortedPaths {
 		for _, j := range pathOrgIndex[string(p)] {
-			orderedValues[j] = values[i]
-			totalValuesSize += len(values[i])
+			orderedPayloads[j] = payloads[i]
+			totalPayloadSize += payloads[i].Size()
 		}
 	}
 
-	f.metrics.ReadValuesSize(uint64(totalValuesSize))
+	// TODO RAMTIN rename the metric
+	f.metrics.ReadValuesSize(uint64(totalPayloadSize))
 
-	return orderedValues, nil
+	return orderedPayloads, nil
 }
 
 // Update updates the Values for the registers and returns rootHash and error (if any).
 // In case there are multiple updates to the same register, Update will persist the latest
 // written value.
-func (f *MForest) Update(rootHash []byte, paths [][]byte, keys [][]byte, values [][]byte) (*trie.MTrie, error) {
+// TODO RAMTIN Update the Update method to only return state commitment instead of trie
+func (f *MForest) Update(rootHash []byte, paths []ledger.Path, payloads []ledger.Payload) (*trie.MTrie, error) {
 	parentTrie, err := f.GetTrie(rootHash)
 	if err != nil {
 		return nil, err
@@ -249,39 +245,36 @@ func (f *MForest) Update(rootHash []byte, paths [][]byte, keys [][]byte, values 
 	}
 
 	// sort and deduplicate paths (we only consider the last occurrence, and ignore the rest)
-	sortedPaths := make([][]byte, 0)
-	valueMap := make(map[string][]byte)
-	keyMap := make(map[string][]byte)
-	totalValuesSize := 0
+	sortedPaths := make([]ledger.Path, 0)
+	payloadMap := make(map[string]ledger.Payload)
+	totalPayloadSize := 0
 	for i, path := range paths {
 		// check path sizes
 		if len(path) != f.pathByteSize {
 			return nil, fmt.Errorf("path size doesn't match the trie height: %x", len(path))
 		}
 		// check if doesn't exist
-		if _, ok := valueMap[string(path)]; !ok {
+		if _, ok := payloadMap[string(path)]; !ok {
 			sortedPaths = append(sortedPaths, path)
 		}
-		valueMap[string(path)] = values[i]
-		keyMap[string(path)] = keys[i]
-		totalValuesSize += len(values[i])
+		payloadMap[string(path)] = payloads[i]
+		totalPayloadSize += payloads[i].Size()
 	}
 
-	f.metrics.UpdateValuesSize(uint64(totalValuesSize))
+	// TODO rename metrics names
+	f.metrics.UpdateValuesSize(uint64(totalPayloadSize))
 
 	// TODO we might be able to remove this
 	sort.Slice(sortedPaths, func(i, j int) bool {
 		return bytes.Compare(sortedPaths[i], sortedPaths[j]) < 0
 	})
 
-	sortedKeys := make([][]byte, 0, len(sortedPaths))
-	sortedValues := make([][]byte, 0, len(sortedPaths))
+	sortedPayloads := make([]ledger.Payload, 0, len(sortedPaths))
 	for _, path := range sortedPaths {
-		sortedValues = append(sortedValues, valueMap[string(path)])
-		sortedKeys = append(sortedKeys, keyMap[string(path)])
+		sortedPayloads = append(sortedPayloads, payloadMap[string(path)])
 	}
 
-	newTrie, err := trie.NewTrieWithUpdatedRegisters(parentTrie, sortedPaths, sortedKeys, sortedValues)
+	newTrie, err := trie.NewTrieWithUpdatedRegisters(parentTrie, sortedPaths, sortedPayloads)
 	if err != nil {
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
@@ -302,7 +295,7 @@ func (f *MForest) Update(rootHash []byte, paths [][]byte, keys [][]byte, values 
 }
 
 // Proofs returns a batch proof for the given paths
-func (f *MForest) Proofs(rootHash []byte, paths [][]byte) (*proof.BatchProof, error) {
+func (f *MForest) Proofs(rootHash []byte, paths []ledger.Path) (*proof.BatchProof, error) {
 
 	// no path, empty batchproof
 	if len(paths) == 0 {
@@ -310,15 +303,14 @@ func (f *MForest) Proofs(rootHash []byte, paths [][]byte) (*proof.BatchProof, er
 	}
 
 	// look up for non existing paths
-	retValues, err := f.Read(rootHash, paths)
+	retPayloads, err := f.Read(rootHash, paths)
 	if err != nil {
 		return nil, err
 	}
 
-	sortedPaths := make([][]byte, 0)
-	notFoundPaths := make([][]byte, 0)
-	notFoundKeys := make([][]byte, 0)
-	notFoundValues := make([][]byte, 0)
+	sortedPaths := make([]ledger.Path, 0)
+	notFoundPaths := make([]ledger.Path, 0)
+	notFoundPayloads := make([]ledger.Payload, 0)
 	pathOrgIndex := make(map[string][]int)
 	for i, path := range paths {
 		// check key sizes
@@ -330,11 +322,10 @@ func (f *MForest) Proofs(rootHash []byte, paths [][]byte) (*proof.BatchProof, er
 			sortedPaths = append(sortedPaths, path)
 			pathOrgIndex[string(path)] = []int{i}
 
-			// add it only once
-			if len(retValues[i]) == 0 {
+			// add it only once if is empty
+			if retPayloads[i].IsEmpty() {
 				notFoundPaths = append(notFoundPaths, path)
-				notFoundKeys = append(notFoundKeys, []byte{})
-				notFoundValues = append(notFoundValues, []byte{})
+				notFoundPayloads = append(notFoundPayloads, *ledger.EmptyPayload())
 			}
 		} else {
 			// handles duplicated keys
@@ -355,7 +346,7 @@ func (f *MForest) Proofs(rootHash []byte, paths [][]byte) (*proof.BatchProof, er
 			return bytes.Compare(notFoundPaths[i], notFoundPaths[j]) < 0
 		})
 
-		newTrie, err := trie.NewTrieWithUpdatedRegisters(stateTrie, notFoundPaths, notFoundKeys, notFoundValues)
+		newTrie, err := trie.NewTrieWithUpdatedRegisters(stateTrie, notFoundPaths, notFoundPayloads)
 		if err != nil {
 			return nil, err
 		}
@@ -392,29 +383,6 @@ func (f *MForest) Proofs(rootHash []byte, paths [][]byte) (*proof.BatchProof, er
 	}
 
 	return retbp, nil
-}
-
-// StoreTrie stores a trie on disk
-func (f *MForest) StoreTrie(rootHash []byte, filepath string) error {
-	trie, err := f.GetTrie(rootHash)
-	if err != nil {
-		return err
-	}
-	return trie.Store(filepath)
-}
-
-// LoadTrie loads a trie from the disk
-func (f *MForest) LoadTrie(filepath string) (*trie.MTrie, error) {
-	newTrie, err := trie.Load(filepath)
-	if err != nil {
-		return nil, fmt.Errorf("loading trie from '%s' failed: %w", filepath, err)
-	}
-	err = f.AddTrie(newTrie)
-	if err != nil {
-		return nil, fmt.Errorf("adding loaded trie from '%s' to forest failed: %w", filepath, err)
-	}
-
-	return newTrie, nil
 }
 
 // Size returns the number of active tries in this store

@@ -2,6 +2,7 @@ package common
 
 import (
 	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/dapperlabs/flow-go/ledger"
 )
 
 var emptySlice []byte
@@ -64,16 +65,18 @@ func HashInterNode(hash1 []byte, hash2 []byte) []byte {
 }
 
 // ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.
-func ComputeCompactValue(path []byte, payload []byte, nodeHeight int) []byte {
+func ComputeCompactValue(path []byte, payload *ledger.Payload, nodeHeight int) []byte {
 	// if register is unallocated: return default hash
-	if len(payload) == 0 {
+	if len(payload.Value) == 0 {
 		return GetDefaultHashForHeight(nodeHeight)
 	}
 
 	// register is allocated
 	treeHeight := 8 * len(path)
-	computedHash := HashLeaf(path, payload) // we first compute the hash of the fully-expanded leaf
-	for h := 1; h <= nodeHeight; h++ {      // then, we hash our way upwards towards the root until we hit the specified nodeHeight
+	// TODO Change this later to include the key as well
+	// for now is just the value to make it compatible with previous code
+	computedHash := HashLeaf(path, payload.Value) // we first compute the hash of the fully-expanded leaf
+	for h := 1; h <= nodeHeight; h++ {            // then, we hash our way upwards towards the root until we hit the specified nodeHeight
 		// h is the height of the node, whose hash we are computing in this iteration.
 		// The hash is computed from the node's children at height h-1.
 		bitIsSet, err := IsBitSet(path, treeHeight-h)

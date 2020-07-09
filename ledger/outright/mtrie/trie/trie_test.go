@@ -7,7 +7,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/ledger"
 	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/trie"
-	"github.com/dapperlabs/flow-go/ledger/utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,8 +36,8 @@ func Test_TrieWithLeftRegister(t *testing.T) {
 	require.NoError(t, err)
 
 	path := uint2binary(0)
-	payload := utils.NewPayload(uint2binary(11), uint2binary(12345))
-	leftPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, [][]byte{path}, []ledger.Payload{payload})
+	payload := newPayload(uint2binary(11), uint2binary(12345))
+	leftPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
 	expectedRootHashHex := "ff472d38a97b3b1786c4dfffa0005370aa3c16805d342ed7618876df7101f760"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(leftPopulatedTrie.RootHash()))
@@ -53,8 +52,8 @@ func Test_TrieWithRightRegister(t *testing.T) {
 	require.NoError(t, err)
 
 	path := uint2binary(65535)
-	payload := utils.NewPayload(uint2binary(12346), uint2binary(54321))
-	rightPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, [][]byte{path}, []ledger.Payload{payload})
+	payload := newPayload(uint2binary(12346), uint2binary(54321))
+	rightPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
 	expectedRootHashHex := "d1fb1c7c84bcd02205fbc7bdf73ee8e943b8bb4b7db6bcc26ae7af67e507fb8d"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(rightPopulatedTrie.RootHash()))
@@ -69,9 +68,9 @@ func Test_TrieWithMiddleRegister(t *testing.T) {
 	require.NoError(t, err)
 
 	path := uint2binary(56809)
-	payload := utils.NewPayload(uint2binary(12346), uint2binary(59656))
+	payload := newPayload(uint2binary(12346), uint2binary(59656))
 
-	leftPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, [][]byte{path}, []ledger.Payload{payload})
+	leftPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
 	expectedRootHashHex := "b44a9a00c182ba2203fca6886c4c99b854f9f8279a9978b180ad10e82362e412"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(leftPopulatedTrie.RootHash()))
@@ -105,14 +104,13 @@ func Test_FullTrie(t *testing.T) {
 	// allocate single random register
 	capacity := 65536
 	rng := &LinearCongruentialGenerator{seed: 0}
-	// TODO RAMTIN change []byte to ledger.Path at some point
-	paths := make([][]byte, 0, capacity)
+	paths := make([]ledger.Path, 0, capacity)
 	payloads := make([]ledger.Payload, 0, capacity)
 	for i := 0; i < capacity; i++ {
 		paths = append(paths, uint2binary(uint16(i)))
 		temp := rng.next()
-		payload := utils.NewPayload(uint2binary(temp), uint2binary(temp))
-		payloads = append(payloads, payload)
+		payload := newPayload(uint2binary(temp), uint2binary(temp))
+		payloads = append(payloads, *payload)
 	}
 	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads)
 	require.NoError(t, err)
@@ -154,8 +152,8 @@ func Test_UpdateTrie(t *testing.T) {
 	rng := &LinearCongruentialGenerator{seed: 0}
 	path := uint2binary(rng.next())
 	temp := rng.next()
-	payload := utils.NewPayload(uint2binary(temp), uint2binary(temp))
-	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, [][]byte{path}, []ledger.Payload{payload})
+	payload := newPayload(uint2binary(temp), uint2binary(temp))
+	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
 	expectedRootHashHex := "a8dc0574fdeeaab4b5d3b2a798c19bee5746337a9aea735ebc4dfd97311503c5"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
@@ -199,12 +197,6 @@ func Test_UnallocateRegisters(t *testing.T) {
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
 }
 
-func uint2binary(integer uint16) []byte {
-	b := make([]byte, ReferenceImplPathByteSize)
-	binary.BigEndian.PutUint16(b, integer)
-	return b
-}
-
 type LinearCongruentialGenerator struct {
 	seed uint64
 }
@@ -216,22 +208,22 @@ func (rng *LinearCongruentialGenerator) next() uint16 {
 
 // sampleRandomRegisterWrites generates path-payload tuples for `number` randomly selected registers;
 // caution: registers might repeat
-func sampleRandomRegisterWrites(rng *LinearCongruentialGenerator, number int) ([][]byte, []ledger.Payload) {
+func sampleRandomRegisterWrites(rng *LinearCongruentialGenerator, number int) ([]ledger.Path, []ledger.Payload) {
 
-	paths := make([][]byte, 0, number)
+	paths := make([]ledger.Path, 0, number)
 	payloads := make([]ledger.Payload, 0, number)
 	for i := 0; i < number; i++ {
 		path := uint2binary(rng.next())
 		paths = append(paths, path)
 		t := uint2binary(rng.next())
-		payload := utils.NewPayload(t, t)
-		payloads = append(payloads, payload)
+		payload := newPayload(t, t)
+		payloads = append(payloads, *payload)
 	}
 	return paths, payloads
 }
 
 // deduplicateWrites retains only the last register write
-func deduplicateWrites(paths [][]byte, payloads []ledger.Payload) ([][]byte, []ledger.Payload) {
+func deduplicateWrites(paths []ledger.Path, payloads []ledger.Payload) ([]ledger.Path, []ledger.Payload) {
 	payloadMapping := make(map[string]int)
 	if len(paths) != len(payloads) {
 		panic("size mismatch (paths and payloads)")
@@ -240,11 +232,23 @@ func deduplicateWrites(paths [][]byte, payloads []ledger.Payload) ([][]byte, []l
 		// we override the latest in the slice
 		payloadMapping[string(path)] = i
 	}
-	dedupedPaths := make([][]byte, 0, len(payloadMapping))
+	dedupedPaths := make([]ledger.Path, 0, len(payloadMapping))
 	dedupedPayloads := make([]ledger.Payload, 0, len(payloadMapping))
 	for path := range payloadMapping {
 		dedupedPaths = append(dedupedPaths, []byte(path))
 		dedupedPayloads = append(dedupedPayloads, payloads[payloadMapping[path]])
 	}
 	return dedupedPaths, dedupedPayloads
+}
+
+func newPayload(keydata []byte, valuedata []byte) *ledger.Payload {
+	key := ledger.Key{KeyParts: []ledger.KeyPart{ledger.KeyPart{Type: 0, Value: keydata}}}
+	value := ledger.Value(valuedata)
+	return &ledger.Payload{Key: key, Value: value}
+}
+
+func uint2binary(integer uint16) []byte {
+	b := make([]byte, ReferenceImplPathByteSize)
+	binary.BigEndian.PutUint16(b, integer)
+	return b
 }

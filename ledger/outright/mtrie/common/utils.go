@@ -2,7 +2,6 @@ package common
 
 import (
 	"fmt"
-	"math/rand"
 
 	"github.com/dapperlabs/flow-go/ledger"
 )
@@ -28,10 +27,10 @@ func SetBit(b []byte, i int) error {
 
 // SplitByPath splits an slice of payloads based on the value of bit (bitIndex) of paths
 // TODO: remove error return
-func SplitByPath(paths [][]byte, payloads []ledger.Payload, bitIndex int) ([][]byte, []ledger.Payload, [][]byte, []ledger.Payload, error) {
-	rpaths := make([][]byte, 0, len(paths))
+func SplitByPath(paths []ledger.Path, payloads []ledger.Payload, bitIndex int) ([]ledger.Path, []ledger.Payload, []ledger.Path, []ledger.Payload, error) {
+	rpaths := make([]ledger.Path, 0, len(paths))
 	rpayloads := make([]ledger.Payload, 0, len(payloads))
-	lpaths := make([][]byte, 0, len(paths))
+	lpaths := make([]ledger.Path, 0, len(paths))
 	lpayloads := make([]ledger.Payload, 0, len(payloads))
 
 	for i, path := range paths {
@@ -51,7 +50,7 @@ func SplitByPath(paths [][]byte, payloads []ledger.Payload, bitIndex int) ([][]b
 }
 
 // SplitSortedPaths splits a set of ordered paths based on the value of bit (bitIndex)
-func SplitSortedPaths(paths [][]byte, bitIndex int) ([][]byte, [][]byte, error) {
+func SplitSortedPaths(paths []ledger.Path, bitIndex int) ([]ledger.Path, []ledger.Path, error) {
 	for i, path := range paths {
 		bitIsSet, err := IsBitSet(path, bitIndex)
 		if err != nil {
@@ -64,44 +63,6 @@ func SplitSortedPaths(paths [][]byte, bitIndex int) ([][]byte, [][]byte, error) 
 	}
 	// all paths have unset bit at bitIndex
 	return paths, nil, nil
-}
-
-// GetRandomPathsRandN generate m random paths (size: byteSize),
-// the number of paths, m, is also randomly selected from the range [1, maxN]
-func GetRandomPathsRandN(maxN int, byteSize int) [][]byte {
-	numberOfPaths := rand.Intn(maxN) + 1
-	return GetRandomPathsFixedN(numberOfPaths, byteSize)
-}
-
-// GetRandomPathsFixedN generates n random (no repetition) fixed sized (byteSize) paths
-func GetRandomPathsFixedN(n int, byteSize int) [][]byte {
-	paths := make([][]byte, 0, n)
-	alreadySelectPaths := make(map[string]bool)
-	i := 0
-	for i < n {
-		path := make([]byte, byteSize)
-		rand.Read(path)
-		// deduplicate
-		if _, found := alreadySelectPaths[string(path)]; !found {
-			paths = append(paths, path)
-			alreadySelectPaths[string(path)] = true
-			i++
-		}
-	}
-	return paths
-}
-
-// GetRandomByteSlices generate an slice of n
-// random byte slices of random size from the range [1, maxByteSize]
-func GetRandomByteSlices(n int, maxByteSize int) [][]byte {
-	values := make([][]byte, 0, n)
-	for i := 0; i < n; i++ {
-		byteSize := rand.Intn(maxByteSize) + 1
-		value := make([]byte, byteSize)
-		rand.Read(value)
-		values = append(values, value)
-	}
-	return values
 }
 
 // MaxUint16 returns the max value of two uint16

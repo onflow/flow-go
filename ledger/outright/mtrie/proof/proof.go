@@ -32,16 +32,16 @@ func NewProof() *Proof {
 // Verify verifies the proof, by constructing all the
 // hash from the leaf to the root and comparing the rootHash
 // TODO RAMTIN
-func (p *Proof) Verify(path []byte, payload ledger.Payload, expectedRootHash []byte, expectedKeySize int) bool {
+func (p *Proof) Verify(path ledger.Path, payload ledger.Payload, expectedRootHash []byte, expectedKeySize int) bool {
 	treeHeight := 8 * expectedKeySize
 	leafHeight := treeHeight - int(p.Steps)             // p.Steps is the number of edges we are traversing until we hit the compactified leaf.
 	if !(0 <= leafHeight && leafHeight <= treeHeight) { // sanity check
 		return false
 	}
 	// We start with the leaf and hash our way upwards towards the root
-	proofIndex := len(p.Values) - 1                                            // the index of the last non-default value furthest down the tree (-1 if there is none)
-	computed := common.ComputeCompactValue(path, payload.Encode(), leafHeight) // we first compute the hash of the fully-expanded leaf (at height 0)
-	for h := leafHeight + 1; h <= treeHeight; h++ {                            // then, we hash our way upwards until we hit the root (at height `treeHeight`)
+	proofIndex := len(p.Values) - 1                                    // the index of the last non-default value furthest down the tree (-1 if there is none)
+	computed := common.ComputeCompactValue(path, &payload, leafHeight) // we first compute the hash of the fully-expanded leaf (at height 0)
+	for h := leafHeight + 1; h <= treeHeight; h++ {                    // then, we hash our way upwards until we hit the root (at height `treeHeight`)
 		// we are currently at a node n (initially the leaf). In this iteration, we want to compute the
 		// parent's hash. Here, h is the height of the parent, whose hash want to compute.
 		// The parent has two children: child n, whose hash we have already computed (aka `computed`);
@@ -124,7 +124,7 @@ func (bp *BatchProof) Size() int {
 }
 
 // Verify verifies all the proof inside the batchproof
-func (bp *BatchProof) Verify(paths [][]byte, payloads []ledger.Payload, expectedRootHash []byte, expectedKeySize int) bool {
+func (bp *BatchProof) Verify(paths []ledger.Path, payloads []ledger.Payload, expectedRootHash []byte, expectedKeySize int) bool {
 	for i, p := range bp.Proofs {
 		// any invalid proof
 		if !p.Verify(paths[i], payloads[i], expectedRootHash, expectedKeySize) {
@@ -225,10 +225,10 @@ func DecodeBatchProof(proofs [][]byte) (*BatchProof, error) {
 }
 
 // SplitProofsByPath splits a set of unordered path and proof pairs based on the value of bit (bitIndex) of path
-func SplitProofsByPath(paths [][]byte, proofs []*Proof, bitIndex int) ([][]byte, []*Proof, [][]byte, []*Proof, error) {
-	rpaths := make([][]byte, 0, len(paths))
+func SplitProofsByPath(paths []ledger.Path, proofs []*Proof, bitIndex int) ([]ledger.Path, []*Proof, []ledger.Path, []*Proof, error) {
+	rpaths := make([]ledger.Path, 0, len(paths))
 	rproofs := make([]*Proof, 0, len(proofs))
-	lpaths := make([][]byte, 0, len(paths))
+	lpaths := make([]ledger.Path, 0, len(paths))
 	lproofs := make([]*Proof, 0, len(proofs))
 
 	for i, path := range paths {

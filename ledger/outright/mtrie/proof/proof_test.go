@@ -7,9 +7,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/module/metrics"
+	"github.com/dapperlabs/flow-go/ledger"
 	"github.com/dapperlabs/flow-go/ledger/outright/mtrie"
 	"github.com/dapperlabs/flow-go/ledger/outright/mtrie/proof"
+	"github.com/dapperlabs/flow-go/module/metrics"
 )
 
 func TestBatchProofEncoderDecoder(t *testing.T) {
@@ -22,15 +23,14 @@ func TestBatchProofEncoderDecoder(t *testing.T) {
 	fStore, err := mtrie.NewMForest(pathByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
-	p1 := []byte([]uint8{uint8(1)})
-	k1 := []byte{'k'}
-	v1 := []byte{'v'}
-	paths := [][]byte{p1}
-	keys := [][]byte{k1}
-	values := [][]byte{v1}
-	testTrie, err := fStore.Update(fStore.GetEmptyRootHash(), paths, keys, values)
+	p1 := ledger.Path([]byte{'p'})
+	v1 := ledger.Payload{Key: ledger.Key{KeyParts: []ledger.KeyPart{ledger.KeyPart{Type: 0,
+		Value: []byte{'k'}}}},
+		Value: ledger.Value([]byte{'v'})}
+
+	testTrie, err := fStore.Update(fStore.GetEmptyRootHash(), []ledger.Path{p1}, []ledger.Payload{v1})
 	require.NoError(t, err)
-	batchProof, err := fStore.Proofs(testTrie.RootHash(), paths)
+	batchProof, err := fStore.Proofs(testTrie.RootHash(), []ledger.Path{p1})
 	require.NoError(t, err)
 
 	encProf, _ := proof.EncodeBatchProof(batchProof)

@@ -29,14 +29,14 @@ import (
 // TODO: optimized data structures might be able to reduce memory consumption
 
 type Node struct {
-	lChild    *Node          // Left Child
-	rChild    *Node          // Right Child
-	height    int            // height where the Node is at
-	path      ledger.Path    // the storage path (leaf nodes only)
-	payload   ledger.Payload // the payload this node is storing (leaf nodes only)
-	hashValue []byte         // hash value of node (cached)
-	maxDepth  uint16         // captures the longest path from this node to compacted leafs in the subtree
-	regCount  uint64         // number of registers allocated in the subtree
+	lChild    *Node           // Left Child
+	rChild    *Node           // Right Child
+	height    int             // height where the Node is at
+	path      ledger.Path     // the storage path (leaf nodes only)
+	payload   *ledger.Payload // the payload this node is storing (leaf nodes only)
+	hashValue []byte          // hash value of node (cached)
+	maxDepth  uint16          // captures the longest path from this node to compacted leafs in the subtree
+	regCount  uint64          // number of registers allocated in the subtree
 }
 
 // NewNode creates a new Node.
@@ -46,7 +46,7 @@ func NewNode(height int,
 	lchild,
 	rchild *Node,
 	path ledger.Path,
-	payload ledger.Payload,
+	payload *ledger.Payload,
 	hashValue []byte,
 	maxDepth uint16,
 	regCount uint64) *Node {
@@ -81,7 +81,7 @@ func NewEmptyTreeRoot(height int) *Node {
 // NewLeaf creates a compact leaf Node
 // UNCHECKED requirement: height must be non-negative
 func NewLeaf(path ledger.Path,
-	payload ledger.Payload,
+	payload *ledger.Payload,
 	height int) *Node {
 
 	regCount := uint64(0)
@@ -136,7 +136,7 @@ func (n *Node) computeHash() []byte {
 		// both ROOT NODE and LEAF NODE have n.lChild == n.rChild == nil
 		if n.payload != nil {
 			// LEAF node: defined by key-value pair
-			return common.ComputeCompactValue(n.path, n.payload.Encode(), n.height)
+			return common.ComputeCompactValue(n.path, n.payload, n.height)
 		}
 		// ROOT NODE: no children, no key-value pair
 		return common.GetDefaultHashForHeight(n.height)
@@ -176,7 +176,7 @@ func (n *Node) Path() ledger.Path { return n.path }
 // Payload returns the the Node's payload.
 // only leaf nodes have children.
 // Do NOT MODIFY returned slices!
-func (n *Node) Payload() ledger.Payload { return n.payload }
+func (n *Node) Payload() *ledger.Payload { return n.payload }
 
 // LeftChild returns the the Node's left child.
 // Only INTERIOR nodes have children.
@@ -195,7 +195,6 @@ func (n *Node) IsLeaf() bool {
 }
 
 // FmtStr provides formatted string representation of the Node and sub tree
-// TODO switch the subpath to local one
 func (n Node) FmtStr(prefix string, subpath string) string {
 	right := ""
 	if n.rChild != nil {
@@ -205,5 +204,7 @@ func (n Node) FmtStr(prefix string, subpath string) string {
 	if n.lChild != nil {
 		left = fmt.Sprintf("\n%v", n.lChild.FmtStr(prefix+"\t", subpath+"0"))
 	}
-	return fmt.Sprintf("%v%v: (path:%v, phash:%v)[%s] %v %v ", prefix, n.height, n.path, hex.EncodeToString(n.hashValue), subpath, left, right)
+	hashStr := hex.EncodeToString(n.hashValue)
+	hashStr = hashStr[:3] + "..." + hashStr[len(hashStr)-3:]
+	return fmt.Sprintf("%v%v: (path:%v, hash:%v)[%s] %v %v ", prefix, n.height, n.path, hashStr, subpath, left, right)
 }
