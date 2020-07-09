@@ -230,7 +230,7 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 			}
 
 			// assert precisely creation of checkpoint files
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000000"))
+			require.NoFileExists(t, path.Join(dir, RootCheckpointFilename))
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000001"))
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000002"))
 			require.FileExists(t, path.Join(dir, "checkpoint.00000003"))
