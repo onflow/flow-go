@@ -15,14 +15,20 @@ var someSeed = []uint8{0x6A, 0x23, 0x41, 0xB7, 0x80, 0xE1, 0x64, 0x59,
 
 // Test binary search implementation
 func TestBsearch(t *testing.T) {
-	sums := []uint64{1, 3, 6, 9}
-	sel := make([]int, 0, 9)
-	for i := 0; i < 9; i++ {
+	stakes := []uint64{1, 2, 3, 4}
+	var sum uint64
+	sums := make([]uint64, 0)
+	for i := 0; i < len(stakes); i++ {
+		sum += stakes[i]
+		sums = append(sums, sum)
+	}
+	sel := make([]int, 0, 10)
+	for i := 0; i < 10; i++ {
 		index, err := binarySearch(uint64(i), sums)
 		require.NoError(t, err)
 		sel = append(sel, index)
 	}
-	require.Equal(t, []int{0, 1, 1, 2, 2, 2, 3, 3, 3}, sel)
+	require.Equal(t, []int{0, 1, 1, 2, 2, 2, 3, 3, 3, 3}, sel)
 }
 
 // compare the result of binary search with the brute force search,
