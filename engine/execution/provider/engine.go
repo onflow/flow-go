@@ -196,7 +196,8 @@ func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.Ex
 		Hex("final_state", receipt.ExecutionResult.FinalStateCommit).
 		Msg("broadcasting execution receipt")
 
-	identities, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus, flow.RoleVerification))
+	identities, err := e.state.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus,
+		flow.RoleVerification))
 	if err != nil {
 		return fmt.Errorf("could not get consensus and verification identities: %w", err)
 	}

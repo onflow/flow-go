@@ -180,19 +180,18 @@ func (e *Engine) processFinalizedBlock(id flow.Identifier) error {
 
 func (e *Engine) trackFinalizedMetric(hb *model.Block) {
 	// retrieve the block
-	b, err := e.blocks.ByID(hb.BlockID)
-
-	// TODO lookup actual finalization time by looking at the block finalizing `b`
-	now := time.Now().UTC()
-
+	block, err := e.blocks.ByID(hb.BlockID)
 	if err != nil {
 		e.log.Warn().Err(err).Msg("could not track tx finalized metric: finalized block not found locally")
 		return
 	}
 
+	// TODO lookup actual finalization time by looking at the block finalizing `b`
+	now := time.Now().UTC()
+
 	// mark all transactions as finalized
 	// TODO: sample to reduce performance overhead
-	for _, g := range b.Payload.Guarantees {
+	for _, g := range block.Payload.Guarantees {
 		l, err := e.collections.LightByID(g.CollectionID)
 		if err != nil {
 			e.log.Warn().Err(err).Str("collection_id", g.CollectionID.String()).
@@ -213,18 +212,18 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, r *flow.Execut
 
 func (e *Engine) trackExecutedMetric(r *flow.ExecutionReceipt) {
 	// retrieve the block
-	b, err := e.blocks.ByID(r.ExecutionResult.BlockID)
+	block, err := e.blocks.ByID(r.ExecutionResult.BlockID)
+	if err != nil {
+		e.log.Warn().Err(err).Msg("could not track tx executed metric: executed block not found locally")
+		return
+	}
 
 	// TODO add actual execution time to execution receipt?
 	now := time.Now().UTC()
 
-	if err != nil {
-		e.log.Warn().Err(err).Msg("could not track tx executed metric: executed block not found locally")
-	}
-
 	// mark all transactions as executed
 	// TODO: sample to reduce performance overhead
-	for _, g := range b.Payload.Guarantees {
+	for _, g := range block.Payload.Guarantees {
 		l, err := e.collections.LightByID(g.CollectionID)
 		if err != nil {
 			e.log.Warn().Err(err).Str("collection_id", g.CollectionID.String()).

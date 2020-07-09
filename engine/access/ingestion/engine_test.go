@@ -72,6 +72,9 @@ func (suite *Suite) SetupTest() {
 	suite.net.On("Register", uint8(engine.CollectionProvider), mock.Anything).
 		Return(suite.collectionsConduit, nil).
 		Once()
+	suite.net.On("Register", uint8(engine.ExecutionReceiptProvider), mock.Anything).
+		Return(suite.collectionsConduit, nil).
+		Once()
 
 	suite.provider = new(network.Engine)
 	suite.blocks = new(storage.Blocks)
@@ -94,7 +97,12 @@ func (suite *Suite) TestHandleBlock() {
 	cNodeIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
 	suite.proto.snapshot.On("Identities", mock.Anything).Return(cNodeIdentities, nil).Once()
 
-	suite.blocks.On("ByID", block.ID()).Return(&block, nil).Once()
+	suite.blocks.On("ByID", block.ID()).Return(&block, nil).Twice()
+	for _, g := range block.Payload.Guarantees {
+		collection := unittest.CollectionFixture(1)
+		light := collection.Light()
+		suite.collections.On("LightByID", g.CollectionID).Return(&light, nil).Twice()
+	}
 
 	// expect that the block storage is indexed with each of the collection guarantee
 	suite.blocks.On("IndexBlockForCollections", block.ID(), flow.GetIDs(block.Payload.Guarantees)).Return(nil).Once()

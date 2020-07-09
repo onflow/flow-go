@@ -32,13 +32,12 @@ type Config struct {
 
 // Engine implements a gRPC server with a simplified version of the Observation API.
 type Engine struct {
-	unit               *engine.Unit
-	log                zerolog.Logger
-	handler            *handler.Handler // the gRPC service implementation
-	grpcServer         *grpc.Server     // the gRPC server
-	httpServer         *http.Server
-	config             Config
-	transactionMetrics module.TransactionMetrics
+	unit       *engine.Unit
+	log        zerolog.Logger
+	handler    *handler.Handler // the gRPC service implementation
+	grpcServer *grpc.Server     // the gRPC server
+	httpServer *http.Server
+	config     Config
 }
 
 // New returns a new RPC engine.
@@ -71,13 +70,12 @@ func New(log zerolog.Logger,
 	httpServer := NewHTTPServer(grpcServer, config.HTTPListenAddr)
 
 	eng := &Engine{
-		log:                log,
-		unit:               engine.NewUnit(),
-		handler:            handler.NewHandler(log, state, executionRPC, collectionRPC, blocks, headers, collections, transactions, chainID, transactionMetrics),
-		grpcServer:         grpcServer,
-		httpServer:         httpServer,
-		config:             config,
-		transactionMetrics: transactionMetrics,
+		log:        log,
+		unit:       engine.NewUnit(),
+		handler:    handler.NewHandler(log, state, executionRPC, collectionRPC, blocks, headers, collections, transactions, chainID, transactionMetrics),
+		grpcServer: grpcServer,
+		httpServer: httpServer,
+		config:     config,
 	}
 
 	access.RegisterAccessAPIServer(eng.grpcServer, eng.handler)

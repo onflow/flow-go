@@ -207,6 +207,9 @@ func (suite *Suite) TestGetSealedTransaction() {
 		suite.net.On("Register", uint8(engine.CollectionProvider), mock.Anything).
 			Return(suite.collectionsConduit, nil).
 			Once()
+		suite.net.On("Register", uint8(engine.ExecutionReceiptProvider), mock.Anything).
+			Return(suite.collectionsConduit, nil).
+			Once()
 		colIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
 		suite.snapshot.On("Identities", mock.Anything).Return(colIdentities, nil).Once()
 		suite.collectionsConduit.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(len(block.Payload.Guarantees))
