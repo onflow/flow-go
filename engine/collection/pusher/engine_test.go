@@ -1,7 +1,6 @@
 package pusher_test
 
 import (
-	"math/rand"
 	"testing"
 	"time"
 
@@ -14,7 +13,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/network"
 	mocknetwork "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
@@ -27,13 +25,12 @@ type Suite struct {
 	hub        *stub.Hub
 	identities flow.IdentityList
 
-	colNode         mock.CollectionNode // the node we are testing
-	conNode         mock.ConsensusNode  // used for checking collection guarantee transmission
-	reqNode         mock.GenericNode    // used for request/response flows
-	reqEngine       *mocknetwork.Engine
-	pushConduit     network.Conduit
-	exchangeConduit network.Conduit
-	chainID         flow.ChainID
+	colNode     mock.CollectionNode // the node we are testing
+	conNode     mock.ConsensusNode  // used for checking collection guarantee transmission
+	reqNode     mock.GenericNode    // used for request/response flows
+	reqEngine   *mocknetwork.Engine
+	pushConduit network.Conduit
+	chainID     flow.ChainID
 }
 
 func (suite *Suite) SetupTest() {
@@ -54,7 +51,6 @@ func (suite *Suite) SetupTest() {
 
 	suite.reqEngine = new(mocknetwork.Engine)
 	suite.pushConduit, err = suite.reqNode.Net.Register(engine.PushGuarantees, suite.reqEngine)
-	suite.exchangeConduit, err = suite.reqNode.Net.Register(engine.ProvideCollections, suite.reqEngine)
 	suite.Require().Nil(err)
 }
 
@@ -91,55 +87,4 @@ func (suite *Suite) TestSubmitCollectionGuarantee() {
 		has := suite.conNode.Guarantees.Has(guarantee.ID())
 		return has
 	}, time.Millisecond*15, time.Millisecond)
-}
-
-func (suite *Suite) TestCollectionRequest() {
-	suite.Run("should return existing collection", func() {
-		t := suite.T()
-
-		// save a collection to the store
-		coll := unittest.CollectionFixture(3)
-		err := suite.colNode.Collections.Store(&coll)
-		suite.Assert().Nil(err)
-
-		nonce := rand.Uint64()
-
-		// expect that the requester will receive the collection
-		expectedRes := &messages.CollectionResponse{
-			Collection: coll,
-			Nonce:      nonce,
-		}
-		suite.reqEngine.On("Process", suite.colNode.Me.NodeID(), expectedRes).Return(nil).Once()
-
-		// send a request for the collection
-		req := messages.CollectionRequest{ID: coll.ID(), Nonce: nonce}
-		err = suite.exchangeConduit.Submit(&req, suite.colNode.Me.NodeID())
-		assert.NoError(t, err)
-
-		// flush the request
-		net, ok := suite.hub.GetNetwork(suite.reqNode.Me.NodeID())
-		require.True(t, ok)
-		net.DeliverAll(true)
-
-		// flush the response
-		net, ok = suite.hub.GetNetwork(suite.colNode.Me.NodeID())
-		require.True(t, ok)
-		net.DeliverAll(true)
-
-		//assert we received the right collection
-		suite.reqEngine.AssertExpectations(t)
-	})
-
-	suite.Run("should return error for non-existent collection", func() {
-		t := suite.T()
-
-		// create request with invalid/nonexistent fingerprint
-		req := &messages.CollectionRequest{ID: unittest.IdentifierFixture(), Nonce: rand.Uint64()}
-
-		// provider should return error
-		err := suite.colNode.PusherEngine.ProcessLocal(req)
-		// we can't distinguish from invalid fingerprint or not found (because we are behind),
-		// so there won't be an error
-		assert.Nil(t, err)
-	})
 }
