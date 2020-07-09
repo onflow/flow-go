@@ -430,24 +430,21 @@ func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 	return false
 }
 
-func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) error {
+func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
+	err := e.handleCollection(originID, entity)
+	if err != nil {
+		e.log.Error().Err(err).Msg("could not handle collection")
+		return
+	}
+}
+
+func (e *Engine) handleCollection(originID flow.Identifier, entity flow.Entity) error {
 
 	// convert entity to strongly typed collection
 	collection, ok := entity.(*flow.Collection)
 	if !ok {
 		return fmt.Errorf("invalid entity type (%T)", entity)
 	}
-
-	// process the collection
-	err := e.handleCollection(originID, collection)
-	if err != nil {
-		return fmt.Errorf("could not handle collection: %w", err)
-	}
-
-	return nil
-}
-
-func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Collection) error {
 
 	collID := collection.ID()
 

@@ -19,12 +19,9 @@ import (
 )
 
 // HandleFunc is a function provided to the requester engine to handle an entity
-// once it has been retrieved from a provider. The function should ideally just
-// error on some basic checks and be non-blocking for the further processing
-// of the entity. In other words, errors in the processing logic of the handling
-// engine should be part of the execution within that engine and happen in a
-// separate goroutine.
-type HandleFunc func(originID flow.Identifier, entity flow.Entity) error
+// once it has been retrieved from a provider. The function should be non-blocking
+// and errors should be handled internally within the function.
+type HandleFunc func(originID flow.Identifier, entity flow.Entity)
 
 // Engine is a generic requester engine, handling the requesting of entities
 // on the flow network. It is the `request` part of the request-reply
@@ -399,10 +396,7 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 		delete(e.items, entityID)
 
 		// process the entity
-		err := e.handle(originID, entity)
-		if err != nil {
-			return fmt.Errorf("could not handle entity (%x): %w", entityID, err)
-		}
+		go e.handle(originID, entity)
 	}
 
 	// requeue requested entities that have not been delivered in the response

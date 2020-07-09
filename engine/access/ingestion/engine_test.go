@@ -1,7 +1,6 @@
 package ingestion
 
 import (
-	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -14,12 +13,11 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
 
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
-	realstore "github.com/dapperlabs/flow-go/storage"
+	storerr "github.com/dapperlabs/flow-go/storage"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -43,9 +41,6 @@ type Suite struct {
 	transactions *storage.Transactions
 
 	eng *Engine
-
-	// mock conduit for requesting/receiving collections
-	collectionsConduit *network.Conduit
 }
 
 func TestIngestEngine(t *testing.T) {
@@ -81,30 +76,36 @@ func (suite *Suite) SetupTest() {
 
 }
 
-// TestHandleBlock checks that when a block is received, a request for each individual collection is made
-func (suite *Suite) TestHandleBlock() {
+// TestOnFinalizedBlock checks that when a block is received, a request for each individual collection is made
+func (suite *Suite) TestOnFinalizedBlock() {
 
 	block := unittest.BlockFixture()
-
-	cNodeIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
-	suite.proto.snapshot.On("Identities", mock.Anything).Return(cNodeIdentities, nil).Once()
-
-	suite.blocks.On("ByID", block.ID()).Return(&block, nil).Once()
-
-	// expect that the block storage is indexed with each of the collection guarantee
-	suite.blocks.On("IndexBlockForCollections", block.ID(), flow.GetIDs(block.Payload.Guarantees)).Return(nil).Once()
-
-	// expect that the collection is requested
-	suite.collectionsConduit.On("Submit", mock.Anything, mock.Anything).Return(nil).Times(len(block.Payload.Guarantees))
-
-	// create a model.Block with the block ID (other fields of model.block are not needed)
 	modelBlock := model.Block{
 		BlockID: block.ID(),
 	}
 
-	// simulate the follower engine calling the ingest engine with the model block
+	// we should query the block once and index the guarantee payload once
+	suite.blocks.On("ByID", block.ID()).Return(&block, nil).Once()
+	suite.blocks.On("IndexBlockForCollections", block.ID(), flow.GetIDs(block.Payload.Guarantees)).Return(nil).Once()
+
+	// for each of the guarantees, we should request the corresponding collection once
+	needed := make(map[flow.Identifier]struct{})
+	for _, guarantee := range block.Payload.Guarantees {
+		needed[guarantee.ID()] = struct{}{}
+	}
+	suite.request.On("EntityByID", mock.Anything, mock.Anything).Run(
+		func(args mock.Arguments) {
+			collID := args.Get(0).(flow.Identifier)
+			_, pending := needed[collID]
+			suite.Assert().True(pending, "collection should be pending (%x)", collID)
+			delete(needed, collID)
+		},
+	)
+
+	// process the block through the finalized callback
 	suite.eng.OnFinalizedBlock(&modelBlock)
 
+	// wait for engine shutdown
 	done := suite.eng.unit.Done()
 	assert.Eventually(suite.T(), func() bool {
 		select {
@@ -113,42 +114,94 @@ func (suite *Suite) TestHandleBlock() {
 		default:
 			return false
 		}
-	}, time.Second, time.Millisecond)
+	}, time.Second, 20*time.Millisecond)
 
-	suite.proto.snapshot.AssertExpectations(suite.T())
+	// assert that the block was retrieved and all collections were requested
 	suite.headers.AssertExpectations(suite.T())
-	suite.collectionsConduit.AssertExpectations(suite.T())
+	suite.request.AssertNumberOfCalls(suite.T(), "EntityByID", len(block.Payload.Guarantees))
 }
 
-// TestHandleCollection checks that when a Collection is received, it is persisted
-func (suite *Suite) TestHandleCollection() {
+// TestOnCollection checks that when a Collection is received, it is persisted
+func (suite *Suite) TestOnCollection() {
+
 	originID := unittest.IdentifierFixture()
 	collection := unittest.CollectionFixture(5)
 	light := collection.Light()
 
+	// we should store the light collection and index its transactions
 	suite.collections.On("StoreLightAndIndexByTransaction", &light).Return(nil).Once()
-	suite.transactions.On("Store", mock.Anything).Return(nil).Times(len(collection.Transactions))
 
-	cr := messages.CollectionResponse{Collection: collection}
-	err := suite.eng.Process(originID, &cr)
+	// for each transaction in the collection, we should store it
+	needed := make(map[flow.Identifier]struct{})
+	for _, txID := range light.Transactions {
+		needed[txID] = struct{}{}
+	}
+	suite.transactions.On("Store", mock.Anything).Return(nil).Run(
+		func(args mock.Arguments) {
+			tx := args.Get(0).(*flow.TransactionBody)
+			_, pending := needed[tx.ID()]
+			suite.Assert().True(pending, "tx not pending (%x)", tx.ID())
+		},
+	)
 
-	require.NoError(suite.T(), err)
+	// process the block through the collection callback
+	suite.eng.OnCollection(originID, &collection)
+
+	// wait for engine to be done processing
+	done := suite.eng.unit.Done()
+	assert.Eventually(suite.T(), func() bool {
+		select {
+		case <-done:
+			return true
+		default:
+			return false
+		}
+	}, time.Second, 20*time.Millisecond)
+
+	// check that the collection was stored and indexed, and we stored all transactions
 	suite.collections.AssertExpectations(suite.T())
-	suite.transactions.AssertExpectations(suite.T())
+	suite.transactions.AssertNumberOfCalls(suite.T(), "Store", len(collection.Transactions))
 }
 
-// TestHandleDuplicateCollection checks that when a duplicate Collection is received, it is ignored
-func (suite *Suite) TestHandleDuplicateCollection() {
+// TestOnCollection checks that when a duplicate collection is received, the node doesn't
+// crash but just ignores its transactions.
+func (suite *Suite) TestOnCollectionDuplicate() {
+
 	originID := unittest.IdentifierFixture()
 	collection := unittest.CollectionFixture(5)
 	light := collection.Light()
 
-	error := fmt.Errorf("extra text: %w", realstore.ErrAlreadyExists)
-	suite.collections.On("StoreLightAndIndexByTransaction", &light).Return(error).Once()
+	// we should store the light collection and index its transactions
+	suite.collections.On("StoreLightAndIndexByTransaction", &light).Return(storerr.ErrAlreadyExists).Once()
 
-	cr := messages.CollectionResponse{Collection: collection}
-	err := suite.eng.Process(originID, &cr)
+	// for each transaction in the collection, we should store it
+	needed := make(map[flow.Identifier]struct{})
+	for _, txID := range light.Transactions {
+		needed[txID] = struct{}{}
+	}
+	suite.transactions.On("Store", mock.Anything).Return(nil).Run(
+		func(args mock.Arguments) {
+			tx := args.Get(0).(*flow.TransactionBody)
+			_, pending := needed[tx.ID()]
+			suite.Assert().True(pending, "tx not pending (%x)", tx.ID())
+		},
+	)
 
-	require.NoError(suite.T(), err)
+	// process the block through the collection callback
+	suite.eng.OnCollection(originID, &collection)
+
+	// wait for engine to be done processing
+	done := suite.eng.unit.Done()
+	assert.Eventually(suite.T(), func() bool {
+		select {
+		case <-done:
+			return true
+		default:
+			return false
+		}
+	}, time.Second, 20*time.Millisecond)
+
+	// check that the collection was stored and indexed, and we stored all transactions
 	suite.collections.AssertExpectations(suite.T())
+	suite.transactions.AssertNotCalled(suite.T(), "Store", "should not store any transactions")
 }
