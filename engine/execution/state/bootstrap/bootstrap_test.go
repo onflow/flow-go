@@ -14,7 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestGenerateGenesisState(t *testing.T) {
+func TestBootstrapLedger(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dbDir string) {
 
 		chain := flow.Mainnet.Chain()
@@ -37,8 +37,8 @@ func TestGenerateGenesisState(t *testing.T) {
 	})
 }
 
-func TestGenerateGenesisState_ZeroTokenSupply(t *testing.T) {
-	var expectedStateCommitment, _ = hex.DecodeString("9e9cb57df31949260de41afa7fe534396f04bfeb54279ad8aef5922a3974cbf0")
+func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
+	var expectedStateCommitment, _ = hex.DecodeString("0189af4919ddc65db33edf6156aa6c9ad8aab77ba632095f078f22a65c68658a")
 
 	unittest.RunWithTempDir(t, func(dbDir string) {
 
@@ -48,7 +48,12 @@ func TestGenerateGenesisState_ZeroTokenSupply(t *testing.T) {
 		ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 		require.NoError(t, err)
 
-		stateCommitment, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(ls, unittest.ServiceAccountPublicKey, 0, chain)
+		stateCommitment, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(
+			ls,
+			unittest.ServiceAccountPublicKey,
+			0,
+			chain,
+		)
 		require.NoError(t, err)
 
 		if !assert.Equal(t, expectedStateCommitment, stateCommitment) {

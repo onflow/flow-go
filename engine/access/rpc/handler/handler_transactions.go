@@ -7,14 +7,13 @@ import (
 	"time"
 
 	"github.com/onflow/flow/protobuf/go/flow/execution"
-	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
-	"github.com/dapperlabs/flow-go/engine/common/convert"
+	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -22,13 +21,13 @@ import (
 )
 
 type handlerTransactions struct {
-	log                zerolog.Logger
 	collectionRPC      access.AccessAPIClient
 	executionRPC       execution.ExecutionAPIClient
 	transactions       storage.Transactions
 	collections        storage.Collections
 	blocks             storage.Blocks
 	state              protocol.State
+	chainID            flow.ChainID
 	transactionMetrics module.TransactionMetrics
 }
 
@@ -36,16 +35,16 @@ type handlerTransactions struct {
 func (h *handlerTransactions) SendTransaction(ctx context.Context, req *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {
 	now := time.Now().UTC()
 
-	// send the transaction to the collection node
+	// convert the request message to a transaction (has the side effect of validating the address in the tx as well)
+	tx, err := convert.MessageToTransaction(req.Transaction, h.chainID.Chain())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to convert transaction: %v", err))
+	}
+
+	// send the transaction to the collection node if valid
 	resp, err := h.collectionRPC.SendTransaction(ctx, req)
 	if err != nil {
 		return resp, status.Error(codes.Internal, fmt.Sprintf("failed to send transaction to a collection node: %v", err))
-	}
-
-	// convert the request message to a transaction
-	tx, err := convert.MessageToTransaction(req.Transaction)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to convert transaction: %v", err))
 	}
 
 	h.transactionMetrics.TransactionReceived(tx.ID(), now)
@@ -61,7 +60,12 @@ func (h *handlerTransactions) SendTransaction(ctx context.Context, req *access.S
 
 func (h *handlerTransactions) GetTransaction(_ context.Context, req *access.GetTransactionRequest) (*access.TransactionResponse, error) {
 
-	id := flow.HashToID(req.Id)
+	reqTxID := req.GetId()
+	id, err := convert.TransactionID(reqTxID)
+	if err != nil {
+		return nil, err
+	}
+
 	// look up transaction from storage
 	tx, err := h.transactions.ByID(id)
 	if err != nil {
@@ -80,7 +84,11 @@ func (h *handlerTransactions) GetTransaction(_ context.Context, req *access.GetT
 
 func (h *handlerTransactions) GetTransactionResult(ctx context.Context, req *access.GetTransactionRequest) (*access.TransactionResultResponse, error) {
 
-	id := flow.HashToID(req.GetId())
+	reqTxID := req.GetId()
+	id, err := convert.TransactionID(reqTxID)
+	if err != nil {
+		return nil, err
+	}
 
 	// look up transaction from storage
 	tx, err := h.transactions.ByID(id)

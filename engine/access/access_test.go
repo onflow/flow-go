@@ -22,7 +22,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/access/ingestion"
 	accessmock "github.com/dapperlabs/flow-go/engine/access/mock"
 	"github.com/dapperlabs/flow-go/engine/access/rpc/handler"
-	"github.com/dapperlabs/flow-go/engine/common/convert"
+	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -67,6 +67,7 @@ func (suite *Suite) SetupTest() {
 	suite.me = new(mockmodule.Local)
 	obsIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 	suite.me.On("NodeID").Return(obsIdentity.NodeID)
+	suite.chainID = flow.Mainnet
 }
 
 func (suite *Suite) TestSendAndGetTransaction() {

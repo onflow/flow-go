@@ -94,7 +94,7 @@ type ExecutionNode struct {
 	ReceiptsEngine  *executionprovider.Engine
 	SyncEngine      *synchronization.Engine
 	BadgerDB        *badger.DB
-	VM              fvm.VirtualMachine
+	VM              *fvm.VirtualMachine
 	ExecutionState  state.ExecutionState
 	Ledger          storage.Ledger
 	LevelDbDir      string

@@ -11,13 +11,17 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/fvm"
+	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/module/trace"
-	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
+
+type VirtualMachine interface {
+	Run(fvm.Context, fvm.Procedure, state.Ledger) error
+}
 
 // A BlockComputer executes the transactions in a block.
 type BlockComputer interface {
@@ -25,8 +29,8 @@ type BlockComputer interface {
 }
 
 type blockComputer struct {
-	vm      fvm.VirtualMachine
-	blocks  storage.Blocks
+	vm      VirtualMachine
+	vmCtx   fvm.Context
 	metrics module.ExecutionMetrics
 	tracer  module.Tracer
 	log     zerolog.Logger
@@ -34,15 +38,15 @@ type blockComputer struct {
 
 // NewBlockComputer creates a new block executor.
 func NewBlockComputer(
-	vm fvm.VirtualMachine,
-	blocks storage.Blocks,
+	vm VirtualMachine,
+	vmCtx fvm.Context,
 	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
 	logger zerolog.Logger,
 ) BlockComputer {
 	return &blockComputer{
 		vm:      vm,
-		blocks:  blocks,
+		vmCtx:   vmCtx,
 		metrics: metrics,
 		tracer:  tracer,
 		log:     logger,
@@ -77,7 +81,7 @@ func (e *blockComputer) executeBlock(
 	stateView *delta.View,
 ) (*execution.ComputationResult, error) {
 
-	blockCtx := e.vm.NewBlockContext(block.Block.Header, e.blocks)
+	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(block.Block.Header))
 
 	collections := block.Collections()
 
@@ -127,7 +131,7 @@ func (e *blockComputer) executeBlock(
 func (e *blockComputer) executeCollection(
 	ctx context.Context,
 	txIndex uint32,
-	blockCtx fvm.BlockContext,
+	blockCtx fvm.Context,
 	collectionView *delta.View,
 	collection *entity.CompleteCollection,
 ) ([]flow.Event, []flow.TransactionResult, uint32, uint64, error) {
@@ -146,8 +150,8 @@ func (e *blockComputer) executeCollection(
 
 	txMetrics := fvm.NewMetricsCollector()
 
-	for _, tx := range collection.Transactions {
-		err := func(tx *flow.TransactionBody) error {
+	for _, txBody := range collection.Transactions {
+		err := func(txBody *flow.TransactionBody) error {
 			if e.tracer != nil {
 				txSpan := e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
 
@@ -169,7 +173,11 @@ func (e *blockComputer) executeCollection(
 
 			txView := collectionView.NewChild()
 
-			result, err := blockCtx.ExecuteTransaction(txView, tx, fvm.WithMetricsCollector(txMetrics))
+			txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsCollector(txMetrics))
+
+			tx := fvm.Transaction(txBody)
+
+			err := e.vm.Run(txCtx, tx, txView)
 
 			if e.metrics != nil {
 				e.metrics.TransactionParsed(txMetrics.Parsed())
@@ -182,9 +190,10 @@ func (e *blockComputer) executeCollection(
 				return fmt.Errorf("failed to execute transaction: %w", err)
 			}
 
-			txEvents, err := fvm.ConvertEvents(txIndex, result)
+			txEvents, err := tx.ConvertEvents(txIndex)
 			txIndex++
-			gasUsed += result.GasUsed
+
+			gasUsed += tx.GasUsed
 
 			if err != nil {
 				return fmt.Errorf("failed to create flow events: %w", err)
@@ -193,23 +202,30 @@ func (e *blockComputer) executeCollection(
 			events = append(events, txEvents...)
 
 			txResult := flow.TransactionResult{
-				TransactionID: tx.ID(),
+				TransactionID: tx.ID,
 			}
-			if result.Error != nil {
-				txResult.ErrorMessage = result.Error.ErrorMessage()
-				e.log.Debug().Hex("tx_id", logging.Entity(tx)).Str("error_message", result.Error.ErrorMessage()).Uint32("error_code", result.Error.StatusCode()).Msg("transaction execution failed")
+
+			if tx.Err != nil {
+				txResult.ErrorMessage = tx.Err.Error()
+				e.log.Debug().
+					Hex("tx_id", logging.Entity(txBody)).
+					Str("error_message", tx.Err.Error()).
+					Uint32("error_code", tx.Err.Code()).
+					Msg("transaction execution failed")
 			} else {
-				e.log.Debug().Hex("tx_id", logging.Entity(tx)).Msg("transaction executed successfully")
+				e.log.Debug().
+					Hex("tx_id", logging.Entity(txBody)).
+					Msg("transaction executed successfully")
 			}
 
 			txResults = append(txResults, txResult)
 
-			if result.Succeeded() {
+			if tx.Err == nil {
 				collectionView.MergeView(txView)
 			}
 
 			return nil
-		}(tx)
+		}(txBody)
 
 		if err != nil {
 			return nil, nil, txIndex, 0, err

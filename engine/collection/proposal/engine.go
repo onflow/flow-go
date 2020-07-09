@@ -37,7 +37,6 @@ type Engine struct {
 	me             module.Local
 	protoState     protocol.State  // flow-wide protocol chain state
 	clusterState   clusterkv.State // cluster-specific chain state
-	validator      module.TransactionValidator
 	pool           mempool.Transactions
 	transactions   storage.Transactions
 	headers        storage.Headers
@@ -59,7 +58,6 @@ func New(
 	mempoolMetrics module.MempoolMetrics,
 	protoState protocol.State,
 	clusterState clusterkv.State,
-	validator module.TransactionValidator,
 	pool mempool.Transactions,
 	transactions storage.Transactions,
 	headers storage.Headers,
@@ -82,7 +80,6 @@ func New(
 		me:             me,
 		protoState:     protoState,
 		clusterState:   clusterState,
-		validator:      validator,
 		pool:           pool,
 		transactions:   transactions,
 		headers:        headers,
@@ -375,21 +372,6 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	}
 	if !errors.Is(err, storage.ErrNotFound) {
 		return fmt.Errorf("could not check proposal: %w", err)
-	}
-
-	// we haven't seen this proposal yet, so at this point validate any
-	// transactions we haven't yet seen
-	var merr *multierror.Error
-	for _, tx := range payload.Collection.Transactions {
-		if !e.pool.Has(tx.ID()) {
-			err = e.validator.ValidateTransaction(tx)
-			if err != nil {
-				merr = multierror.Append(merr, err)
-			}
-		}
-	}
-	if err := merr.ErrorOrNil(); err != nil {
-		return engine.NewInvalidInputErrorf("cannot validate block proposal (id=%x) with invalid transactions: %w", header.ID(), err)
 	}
 
 	// there are two possibilities if the proposal is neither already pending
