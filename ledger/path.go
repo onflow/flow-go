@@ -2,15 +2,22 @@ package ledger
 
 import (
 	"bytes"
-	"encoding/hex"
+	"fmt"
 )
 
 // Path captures storage path of a payload;
-// where we store this payload in the ledger
+// where we store a payload in the ledger
 type Path []byte
 
 func (p Path) String() string {
-	return hex.EncodeToString(p)
+	str := ""
+	for _, i := range p {
+		str += fmt.Sprintf("%08b", i)
+	}
+	if len(str) > 16 {
+		str = str[0:8] + "..." + str[len(str)-8:]
+	}
+	return str
 }
 
 // Equals compares this path to another path

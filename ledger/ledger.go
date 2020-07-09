@@ -11,22 +11,23 @@ type StateCommitment []byte
 // Ledger takes care of storing and reading registers (key, value pairs)
 type Ledger interface {
 	module.ReadyDoneAware
-	EmptyStateCommitment() flow.StateCommitment
+	InitStateCommitment() flow.StateCommitment
 
-	// Get returns payload by payload ID at specific stateCommitment
-	Get(pID PayloadID, stcom StateCommitment) (payload Payload, err error)
+	// Get returns value by key at specific stateCommitment
+	Get(key *Key, stcom StateCommitment) (value *Value, err error)
 
 	// Get returns payloads for the given payload IDs at specific stateCommitment
-	BatchGet(pID []PayloadID, stcom StateCommitment) (payloads []Payload, err error)
+	BatchGet(keys []Key, stcom StateCommitment) (values []Value, err error)
 
 	// Get returns payload by payload ID at specific stateCommitment
-	Update(payload Payload, stcom StateCommitment) (newStateCommitment StateCommitment, err error)
+	Update(key *Key, value *Value, stcom StateCommitment) (newStateCommitment StateCommitment, err error)
 
 	// Get returns payload by payload ID at specific stateCommitment
-	BatchUpdate(payloads []Payload, stcom StateCommitment) (newStateCommitment StateCommitment, err error)
+	BatchUpdate(keys []Key, values []Value, stcom StateCommitment) (newStateCommitment StateCommitment, err error)
+
+	MemSize() (int64, error)
+
+	DiskSize() (int64, error)
 
 	// TODO Proof and Batch Proof
-
-	// TODO Size
-	DiskSize() (int64, error)
 }

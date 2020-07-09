@@ -1,6 +1,10 @@
 package utils
 
-import "math/rand"
+import (
+	"math/rand"
+
+	"github.com/dapperlabs/flow-go/ledger"
+)
 
 // IsBitSet returns if the bit at position i in the byte array b is set to 1
 func IsBitSet(b []byte, i int) bool {
@@ -14,6 +18,7 @@ func SetBit(b []byte, i int) {
 
 // GetRandomKeysRandN generate m random keys (size: byteSize),
 // assuming m is also randomly selected from zero to maxN
+// TODO remove this
 func GetRandomKeysRandN(maxN int, byteSize int) [][]byte {
 	numberOfKeys := rand.Intn(maxN) + 1
 	// at least return 1 keys
@@ -24,6 +29,7 @@ func GetRandomKeysRandN(maxN int, byteSize int) [][]byte {
 }
 
 // GetRandomKeysFixedN generates n random fixed sized (byteSize) keys
+// TODO remove this
 func GetRandomKeysFixedN(n int, byteSize int) [][]byte {
 	keys := make([][]byte, 0)
 	alreadySelectKeys := make(map[string]bool)
@@ -41,6 +47,7 @@ func GetRandomKeysFixedN(n int, byteSize int) [][]byte {
 	return keys
 }
 
+// TODO remove this
 func GetRandomValues(n int, minByteSize, maxByteSize int) [][]byte {
 	if minByteSize > maxByteSize {
 		panic("minByteSize cannot be smaller then maxByteSize")
@@ -56,4 +63,51 @@ func GetRandomValues(n int, minByteSize, maxByteSize int) [][]byte {
 		values = append(values, value)
 	}
 	return values
+}
+
+// GetRandomPathsRandLen generate m random paths (size: byteSize),
+// the number of paths, m, is also randomly selected from the range [1, maxN]
+func GetRandomPathsRandLen(maxN int, byteSize int) []ledger.Path {
+	numberOfPaths := rand.Intn(maxN) + 1
+	return GetRandomPaths(numberOfPaths, byteSize)
+}
+
+// GetRandomPaths generates n random (no repetition) fixed sized (byteSize) paths
+func GetRandomPaths(n int, byteSize int) []ledger.Path {
+	paths := make([]ledger.Path, 0, n)
+	alreadySelectPaths := make(map[string]bool)
+	i := 0
+	for i < n {
+		path := make([]byte, byteSize)
+		rand.Read(path)
+		// deduplicate
+		if _, found := alreadySelectPaths[string(path)]; !found {
+			paths = append(paths, ledger.Path(path))
+			alreadySelectPaths[string(path)] = true
+			i++
+		}
+	}
+	return paths
+}
+
+// RandomPayload returns a random payload
+func RandomPayload(minByteSize int, maxByteSize int) *ledger.Payload {
+	keyByteSize := minByteSize + rand.Intn(maxByteSize-minByteSize)
+	keydata := make([]byte, keyByteSize)
+	rand.Read(keydata)
+	key := ledger.Key{KeyParts: []ledger.KeyPart{ledger.KeyPart{Type: 0, Value: keydata}}}
+	valueByteSize := minByteSize + rand.Intn(maxByteSize-minByteSize)
+	valuedata := make([]byte, valueByteSize)
+	rand.Read(valuedata)
+	value := ledger.Value(valuedata)
+	return &ledger.Payload{Key: key, Value: value}
+}
+
+// RandomPayloads returns n random payloads
+func RandomPayloads(n int) []ledger.Payload {
+	res := make([]ledger.Payload, 0)
+	for i := 0; i < n; i++ {
+		res = append(res, *RandomPayload(2, 10))
+	}
+	return res
 }
