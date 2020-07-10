@@ -13,15 +13,11 @@ type Requester struct {
 }
 
 // EntityByID provides a mock function with given fields: entityID, selector
-func (_m *Requester) EntityByID(entityID flow.Identifier, selector flow.IdentityFilter) error {
-	ret := _m.Called(entityID, selector)
+func (_m *Requester) EntityByID(entityID flow.Identifier, selector flow.IdentityFilter) {
+	_m.Called(entityID, selector)
+}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.IdentityFilter) error); ok {
-		r0 = rf(entityID, selector)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
+// Force provides a mock function with given fields:
+func (_m *Requester) Force() {
+	_m.Called()
 }

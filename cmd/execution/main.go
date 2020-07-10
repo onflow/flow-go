@@ -156,6 +156,7 @@ func main() {
 			requestEng, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
 				engine.RequestCollections,
 				filter.HasRole(flow.RoleCollection),
+				requester.WithBatchInterval(24*time.Hour), // we are manually triggering batches in execution
 			)
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
@@ -180,8 +181,6 @@ func main() {
 				collector,
 				node.Tracer,
 				true,
-				time.Second, //TODO - config param
-				10,          // TODO - config param
 			)
 
 			// TODO: we should solve these mutual dependencies better
@@ -212,7 +211,6 @@ func main() {
 			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, events, txResults, node.RootChainID)
 			return rpcEng, nil
 		}).Run()
-
 }
 
 func loadBootstrapState(dir, trie string) error {

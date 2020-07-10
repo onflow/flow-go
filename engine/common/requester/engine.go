@@ -19,12 +19,9 @@ import (
 )
 
 // HandleFunc is a function provided to the requester engine to handle an entity
-// once it has been retrieved from a provider. The function should ideally just
-// error on some basic checks and be non-blocking for the further processing
-// of the entity. In other words, errors in the processing logic of the handling
-// engine should be part of the execution within that engine and happen in a
-// separate goroutine.
-type HandleFunc func(originID flow.Identifier, entity flow.Entity) error
+// once it has been retrieved from a provider. The function should be non-blocking
+// and errors should be handled internally within the function.
+type HandleFunc func(originID flow.Identifier, entity flow.Entity)
 
 // Engine is a generic requester engine, handling the requesting of entities
 // on the flow network. It is the `request` part of the request-reply
@@ -40,7 +37,7 @@ type Engine struct {
 	channel  uint8
 	selector flow.IdentityFilter
 	handle   HandleFunc
-	items    map[flow.Identifier]Item
+	items    map[flow.Identifier]*Item
 	requests map[uint64]*messages.EntityRequest
 }
 
@@ -94,7 +91,7 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 		channel:  channel,
 		selector: selector,
 		handle:   nil,
-		items:    make(map[flow.Identifier]Item),           // holds all pending items
+		items:    make(map[flow.Identifier]*Item),          // holds all pending items
 		requests: make(map[uint64]*messages.EntityRequest), // holds all sent requests
 	}
 
@@ -174,18 +171,19 @@ func (e *Engine) Process(originID flow.Identifier, message interface{}) error {
 // control over which subset of providers to request a given entity from, such as
 // selection of a collection cluster. Use `filter.Any` if no additional selection
 // is required.
-func (e *Engine) EntityByID(entityID flow.Identifier, selector flow.IdentityFilter) error {
+func (e *Engine) EntityByID(entityID flow.Identifier, selector flow.IdentityFilter) {
+
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
 	// check if we already have an item for this entity
 	_, duplicate := e.items[entityID]
 	if duplicate {
-		return nil
+		return
 	}
 
 	// otherwise, add a new item to the list
-	item := Item{
+	item := &Item{
 		EntityID:      entityID,
 		NumAttempts:   0,
 		LastRequested: time.Time{},
@@ -193,8 +191,24 @@ func (e *Engine) EntityByID(entityID flow.Identifier, selector flow.IdentityFilt
 		ExtraSelector: selector,
 	}
 	e.items[entityID] = item
+}
 
-	return nil
+// Force will force the requester engine to dispatch all currently
+// valid batch requests.
+func (e *Engine) Force() {
+	count := uint(0)
+	for {
+		dispatched, err := e.dispatchRequest()
+		if err != nil {
+			e.log.Error().Err(err).Msg("could not dispatch requests")
+			return
+		}
+		if !dispatched {
+			e.log.Debug().Uint("requests", count).Msg("forced request dispatch")
+			return
+		}
+		count++
+	}
 }
 
 func (e *Engine) poll() {
@@ -207,33 +221,39 @@ PollLoop:
 			break PollLoop
 
 		case <-ticker.C:
-			err := e.dispatchRequests()
+			_, err := e.dispatchRequest()
 			if err != nil {
 				e.log.Error().Err(err).Msg("could not dispatch requests")
 				continue PollLoop
 			}
+			e.log.Debug().Uint("requests", 1).Msg("regular request dispatch")
 		}
 	}
 
 	ticker.Stop()
 }
 
-func (e *Engine) dispatchRequests() error {
+func (e *Engine) dispatchRequest() (bool, error) {
+
+	e.unit.Lock()
+	defer e.unit.Unlock()
 
 	// get the current top-level set of valid providers
 	providers, err := e.state.Final().Identities(e.selector)
 	if err != nil {
-		return fmt.Errorf("could not get providers: %w", err)
+		return false, fmt.Errorf("could not get providers: %w", err)
 	}
 
 	// go through each item and decide if it should be requested again
 	now := time.Now().UTC()
 	var providerID flow.Identifier
 	var entityIDs []flow.Identifier
+	fmt.Println(len(e.items))
 	for entityID, item := range e.items {
 
 		// if the item should not be requested yet, ignore
-		if item.LastRequested.Add(item.RetryAfter).Before(now) {
+		cutoff := item.LastRequested.Add(item.RetryAfter)
+		if cutoff.After(now) {
 			continue
 		}
 
@@ -264,7 +284,7 @@ func (e *Engine) dispatchRequests() error {
 		if providerID == flow.ZeroID {
 			providers = providers.Filter(item.ExtraSelector)
 			if len(providers) == 0 {
-				return fmt.Errorf("no valid providers available")
+				return false, fmt.Errorf("no valid providers available")
 			}
 			providerID = providers.Sample(1)[0].NodeID
 		}
@@ -276,7 +296,7 @@ func (e *Engine) dispatchRequests() error {
 		// to a more even distribution of entities over batch requests
 		entityIDs = append(entityIDs, entityID)
 		item.NumAttempts++
-		item.LastRequested = item.LastRequested.Add(item.RetryAfter)
+		item.LastRequested = now
 		item.RetryAfter = e.cfg.RetryFunction(item.RetryAfter)
 
 		// make sure the interval is within parameters
@@ -295,7 +315,7 @@ func (e *Engine) dispatchRequests() error {
 
 	// if there are no items to request, return
 	if len(entityIDs) == 0 {
-		return nil
+		return false, nil
 	}
 
 	// create a batch request, send it and store it for reference
@@ -305,7 +325,7 @@ func (e *Engine) dispatchRequests() error {
 	}
 	err = e.con.Submit(req, providerID)
 	if err != nil {
-		return fmt.Errorf("could not send request: %w", err)
+		return true, fmt.Errorf("could not send request: %w", err)
 	}
 	e.requests[req.Nonce] = req
 
@@ -321,7 +341,7 @@ func (e *Engine) dispatchRequests() error {
 
 	e.metrics.MessageSent(engine.ChannelName(e.channel), metrics.MessageEntityRequest)
 
-	return nil
+	return true, nil
 }
 
 // process processes events for the propagation engine on the consensus node.
@@ -360,6 +380,7 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 	needed := make(map[flow.Identifier]struct{})
 	req, exists := e.requests[res.Nonce]
 	if exists {
+		delete(e.requests, req.Nonce)
 		for _, entityID := range req.EntityIDs {
 			needed[entityID] = struct{}{}
 		}
@@ -382,10 +403,7 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 		delete(e.items, entityID)
 
 		// process the entity
-		err := e.handle(originID, entity)
-		if err != nil {
-			return fmt.Errorf("could not handle entity (%x): %w", entityID, err)
-		}
+		go e.handle(originID, entity)
 	}
 
 	// requeue requested entities that have not been delivered in the response

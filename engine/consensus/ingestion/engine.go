@@ -28,10 +28,10 @@ import (
 type Engine struct {
 	unit    *engine.Unit            // used to manage concurrency & shutdown
 	log     zerolog.Logger          // used to log relevant actions with context
-	metrics module.EngineMetrics    // used to track sent & received messages
 	tracer  module.Tracer           // used for tracing
-	spans   module.ConsensusMetrics // used to track consensus spans
+	metrics module.EngineMetrics    // used to track sent & received messages
 	mempool module.MempoolMetrics   // used to track mempool metrics
+	spans   module.ConsensusMetrics // used to track consensus spans
 	state   protocol.State          // used to access the protocol state
 	headers storage.Headers         // used to retrieve headers
 	me      module.Local            // used to access local node information
@@ -42,8 +42,8 @@ type Engine struct {
 // New creates a new collection propagation engine.
 func New(
 	log zerolog.Logger,
-	metrics module.EngineMetrics,
 	tracer module.Tracer,
+	metrics module.EngineMetrics,
 	spans module.ConsensusMetrics,
 	mempool module.MempoolMetrics,
 	net module.Network,
@@ -57,9 +57,9 @@ func New(
 	e := &Engine{
 		unit:    engine.NewUnit(),
 		log:     log.With().Str("engine", "ingestion").Logger(),
+		tracer:  tracer,
 		metrics: metrics,
 		mempool: mempool,
-		tracer:  tracer,
 		spans:   spans,
 		state:   state,
 		headers: headers,
@@ -129,15 +129,16 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
 	case *flow.CollectionGuarantee:
 		e.metrics.MessageReceived(metrics.EngineConsensusIngestion, metrics.MessageCollectionGuarantee)
-		return e.onCollectionGuarantee(originID, ev)
+		return e.onGuarantee(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
 }
 
-// onCollectionGuarantee is used to process collection guarantees received
+// onGuarantee is used to process collection guarantees received
 // from nodes that are not consensus nodes (notably collection nodes).
-func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
+func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
+
 	span := e.tracer.StartSpan(guarantee.CollectionID, trace.CONProcessCollection)
 	// TODO finish span if we error? How are they shown in Jaeger?
 	span.SetTag("collection_id", guarantee.CollectionID)
@@ -166,7 +167,7 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	}
 
 	// get the identity of the origin node, so we can check if it's a valid
-	// source for a collection guarantee (usually collection nodes)
+	// source for a collection guarantee (collection or consensus nodes)
 	identity, err := e.state.Final().Identity(originID)
 	if err != nil {
 		return fmt.Errorf("could not get origin node identity: %w", err)

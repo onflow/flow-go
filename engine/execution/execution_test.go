@@ -58,9 +58,9 @@ func TestExecutionFlow(t *testing.T) {
 	col1 := flow.Collection{Transactions: []*flow.TransactionBody{&tx1, &tx2}}
 	col2 := flow.Collection{Transactions: []*flow.TransactionBody{&tx3, &tx4}}
 
-	collections := map[flow.Identifier]flow.Collection{
-		col1.ID(): col1,
-		col2.ID(): col2,
+	collections := map[flow.Identifier]*flow.Collection{
+		col1.ID(): &col1,
+		col2.ID(): &col2,
 	}
 
 	block := unittest.BlockWithParentFixture(genesis)
@@ -87,25 +87,30 @@ func TestExecutionFlow(t *testing.T) {
 	consensusNode := testutil.GenericNode(t, hub, conID, identities, chainID)
 	defer consensusNode.Done()
 
-	collectionEngine := new(network.Engine)
-	colConduit, _ := collectionNode.Net.Register(engine.RequestCollections, collectionEngine)
-	collectionEngine.On("Submit", exeID.NodeID, mock.Anything).
+	providerEngine := new(network.Engine)
+	provConduit, _ := collectionNode.Net.Register(engine.ProvideCollections, providerEngine)
+	providerEngine.On("Submit", exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
-			originID, _ := args[0].(flow.Identifier)
-			req, _ := args[1].(*messages.CollectionRequest)
+			originID := args.Get(0).(flow.Identifier)
+			req := args.Get(1).(*messages.EntityRequest)
 
-			col, exists := collections[req.ID]
-			assert.True(t, exists)
-
-			res := &messages.CollectionResponse{
-				Collection: col,
+			var entities []flow.Entity
+			for _, entityID := range req.EntityIDs {
+				coll, exists := collections[entityID]
+				require.True(t, exists)
+				entities = append(entities, coll)
 			}
 
-			err := colConduit.Submit(res, originID)
+			res := &messages.EntityResponse{
+				Nonce:    req.Nonce,
+				Entities: entities,
+			}
+
+			err := provConduit.Submit(res, originID)
 			assert.NoError(t, err)
 		}).
-		Return(nil).
-		Times(len(collections))
+		Once().
+		Return(nil)
 
 	var receipt *flow.ExecutionReceipt
 
@@ -144,7 +149,7 @@ func TestExecutionFlow(t *testing.T) {
 		return receipt != nil
 	}, time.Second*10, time.Millisecond*500)
 
-	collectionEngine.AssertExpectations(t)
+	providerEngine.AssertExpectations(t)
 	verificationEngine.AssertExpectations(t)
 	consensusEngine.AssertExpectations(t)
 }
@@ -250,7 +255,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	require.NoError(t, err)
 	seq++
 
-	col1 := flow.Collection{Transactions: []*flow.TransactionBody{tx1}}
+	col1 := &flow.Collection{Transactions: []*flow.TransactionBody{tx1}}
 	block1 := unittest.BlockWithParentFixture(genesis)
 	block1.Header.View = 1
 	block1.Header.ProposerID = conID.ID()
@@ -267,7 +272,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	err = execTestutil.SignTransactionAsServiceAccount(tx2, seq, chain)
 	require.NoError(t, err)
 
-	col2 := flow.Collection{Transactions: []*flow.TransactionBody{tx2}}
+	col2 := &flow.Collection{Transactions: []*flow.TransactionBody{tx2}}
 	block2 := unittest.BlockWithParentFixture(block1.Header)
 	block2.Header.View = 2
 	block2.Header.ProposerID = conID.ID()
@@ -284,15 +289,15 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	collectionEngine.On("Submit", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			originID := args[0].(flow.Identifier)
-			req := args[1].(*messages.CollectionRequest)
-			if req.ID == col1.ID() {
-				err := colConduit.Submit(&messages.CollectionResponse{Collection: col1}, originID)
+			req := args[1].(*messages.EntityRequest)
+			if req.EntityIDs[0] == col1.ID() {
+				err := colConduit.Submit(&messages.EntityResponse{Entities: []flow.Entity{col1}}, originID)
 				assert.NoError(t, err)
-			} else if req.ID == col2.ID() {
-				err := colConduit.Submit(&messages.CollectionResponse{Collection: col2}, originID)
+			} else if req.EntityIDs[0] == col2.ID() {
+				err := colConduit.Submit(&messages.EntityResponse{Entities: []flow.Entity{col2}}, originID)
 				assert.NoError(t, err)
 			} else {
-				assert.Fail(t, "requesting unexpected collection", req.ID)
+				assert.FailNow(t, "requesting unexpected collection", req.EntityIDs[0])
 			}
 		}).
 		Return(nil).

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math/rand"
 	"sync"
-	"time"
 
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
@@ -39,34 +38,32 @@ import (
 
 // An Engine receives and saves incoming blocks.
 type Engine struct {
-	unit                                *engine.Unit
-	log                                 zerolog.Logger
-	me                                  module.Local
-	request                             module.Requester // used to request collections
-	state                               protocol.State
-	receiptHasher                       hash.Hasher // used as hasher to sign the execution receipt
-	syncConduit                         network.Conduit
-	blocks                              storage.Blocks
-	payloads                            storage.Payloads
-	collections                         storage.Collections
-	events                              storage.Events
-	transactionResults                  storage.TransactionResults
-	computationManager                  computation.ComputationManager
-	providerEngine                      provider.ProviderEngine
-	blockSync                           module.BlockRequester
-	mempool                             *Mempool
-	execState                           state.ExecutionState
-	wg                                  sync.WaitGroup
-	syncWg                              sync.WaitGroup
-	syncModeThreshold                   uint64 // how many consecutive orphaned blocks trigger sync
-	syncInProgress                      *atomic.Bool
-	syncTargetBlockID                   atomic.Value
-	stateSync                           executionSync.StateSynchronizer
-	metrics                             module.ExecutionMetrics
-	tracer                              module.Tracer
-	extensiveLogging                    bool
-	collectionRequestTimeout            time.Duration
-	maximumCollectionRequestRetryNumber uint
+	unit               *engine.Unit
+	log                zerolog.Logger
+	me                 module.Local
+	request            module.Requester // used to request collections
+	state              protocol.State
+	receiptHasher      hash.Hasher // used as hasher to sign the execution receipt
+	syncConduit        network.Conduit
+	blocks             storage.Blocks
+	payloads           storage.Payloads
+	collections        storage.Collections
+	events             storage.Events
+	transactionResults storage.TransactionResults
+	computationManager computation.ComputationManager
+	providerEngine     provider.ProviderEngine
+	blockSync          module.BlockRequester
+	mempool            *Mempool
+	execState          state.ExecutionState
+	wg                 sync.WaitGroup
+	syncWg             sync.WaitGroup
+	syncModeThreshold  uint64 // how many consecutive orphaned blocks trigger sync
+	syncInProgress     *atomic.Bool
+	syncTargetBlockID  atomic.Value
+	stateSync          executionSync.StateSynchronizer
+	metrics            module.ExecutionMetrics
+	tracer             module.Tracer
+	extensiveLogging   bool
 }
 
 func New(
@@ -88,38 +85,34 @@ func New(
 	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
 	extLog bool,
-	collectionRequestTimeout time.Duration,
-	maximumCollectionRequestRetryNumber uint,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "blocks").Logger()
 
 	mempool := newMempool()
 
 	eng := Engine{
-		unit:                                engine.NewUnit(),
-		log:                                 log,
-		me:                                  me,
-		request:                             request,
-		state:                               state,
-		receiptHasher:                       utils.NewExecutionReceiptHasher(),
-		blocks:                              blocks,
-		payloads:                            payloads,
-		collections:                         collections,
-		events:                              events,
-		transactionResults:                  transactionResults,
-		computationManager:                  executionEngine,
-		providerEngine:                      providerEngine,
-		blockSync:                           blockSync,
-		mempool:                             mempool,
-		execState:                           execState,
-		syncModeThreshold:                   syncThreshold,
-		syncInProgress:                      atomic.NewBool(false),
-		stateSync:                           executionSync.NewStateSynchronizer(execState),
-		metrics:                             metrics,
-		tracer:                              tracer,
-		extensiveLogging:                    extLog,
-		collectionRequestTimeout:            collectionRequestTimeout,
-		maximumCollectionRequestRetryNumber: maximumCollectionRequestRetryNumber,
+		unit:               engine.NewUnit(),
+		log:                log,
+		me:                 me,
+		request:            request,
+		state:              state,
+		receiptHasher:      utils.NewExecutionReceiptHasher(),
+		blocks:             blocks,
+		payloads:           payloads,
+		collections:        collections,
+		events:             events,
+		transactionResults: transactionResults,
+		computationManager: executionEngine,
+		providerEngine:     providerEngine,
+		blockSync:          blockSync,
+		mempool:            mempool,
+		execState:          execState,
+		syncModeThreshold:  syncThreshold,
+		syncInProgress:     atomic.NewBool(false),
+		stateSync:          executionSync.NewStateSynchronizer(execState),
+		metrics:            metrics,
+		tracer:             tracer,
+		extensiveLogging:   extLog,
 	}
 
 	_, err := net.Register(engine.ReceiveBlocks, &eng)
@@ -437,24 +430,21 @@ func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 	return false
 }
 
-func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) error {
+func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
+	err := e.handleCollection(originID, entity)
+	if err != nil {
+		e.log.Error().Err(err).Msg("could not handle collection")
+		return
+	}
+}
+
+func (e *Engine) handleCollection(originID flow.Identifier, entity flow.Entity) error {
 
 	// convert entity to strongly typed collection
 	collection, ok := entity.(*flow.Collection)
 	if !ok {
 		return fmt.Errorf("invalid entity type (%T)", entity)
 	}
-
-	// process the collection
-	err := e.handleCollection(originID, collection)
-	if err != nil {
-		return fmt.Errorf("could not handle collection: %w", err)
-	}
-
-	return nil
-}
-
-func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Collection) error {
 
 	collID := collection.ID()
 
@@ -564,6 +554,9 @@ func (e *Engine) matchOrRequestCollections(
 	backdata *stdmap.BlockByCollectionBackdata,
 ) error {
 
+	// make sure that the requests are dispatched immediately by the requester
+	defer e.request.Force()
+
 	for _, guarantee := range executableBlock.Block.Payload.Guarantees {
 		var transactions []*flow.TransactionBody
 		maybeBlockByCollection, exists := backdata.ByID(guarantee.ID())
@@ -594,10 +587,8 @@ func (e *Engine) matchOrRequestCollections(
 					Hex("collection_id", logging.ID(guarantee.ID())).
 					Msg("requesting collection")
 
-				err := e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantee.SignerIDs...))
-				if err != nil {
-					return fmt.Errorf("could not request collection: %w", err)
-				}
+				// queue the collection to be requested from one of the guarantors
+				e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantee.SignerIDs...))
 
 			} else {
 				return fmt.Errorf("error while querying for collection: %w", err)

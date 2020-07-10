@@ -121,19 +121,19 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated
 func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 	e.unit.Launch(func() {
-		id := hb.BlockID
-		err := e.processFinalizedBlock(id)
+		blockID := hb.BlockID
+		err := e.processFinalizedBlock(blockID)
 		if err != nil {
-			e.log.Error().Err(err).Hex("block_id", id[:]).Msg("failed to process block")
+			e.log.Error().Err(err).Hex("block_id", blockID[:]).Msg("failed to process block")
 			return
 		}
 	})
 }
 
 // processBlock handles an incoming finalized block.
-func (e *Engine) processFinalizedBlock(id flow.Identifier) error {
+func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 
-	block, err := e.blocks.ByID(id)
+	block, err := e.blocks.ByID(blockID)
 	if err != nil {
 		return fmt.Errorf("failed to lookup block: %w", err)
 	}
@@ -152,17 +152,22 @@ func (e *Engine) processFinalizedBlock(id flow.Identifier) error {
 		return fmt.Errorf("could not index block for collections: %w", err)
 	}
 
-	// request each of the collections from the collection node
-	err = e.requestCollections(block.Payload.Guarantees...)
-	if err != nil {
-		return fmt.Errorf("could not request collections: %w", err)
+	// queue requesting each of the collections from the collection node
+	for _, guarantee := range block.Payload.Guarantees {
+		e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantee.SignerIDs...))
 	}
 
 	return nil
 }
 
 // handleCollection handles the response of the a collection request made earlier when a block was received
-func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Collection) error {
+func (e *Engine) handleCollection(originID flow.Identifier, entity flow.Entity) error {
+
+	// convert the entity to a strictly typed collection
+	collection, ok := entity.(*flow.Collection)
+	if !ok {
+		return fmt.Errorf("invalid entity type (%T)", entity)
+	}
 
 	light := collection.Light()
 
@@ -176,7 +181,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 		// ignore collection if already seen
 		if errors.Is(err, storage.ErrAlreadyExists) {
 			e.log.Debug().
-				Hex("collection_id", logging.ID(light.ID())).
+				Hex("collection_id", logging.Entity(light)).
 				Msg("collection is already seen")
 			return nil
 		}
@@ -187,38 +192,19 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 	for _, tx := range collection.Transactions {
 		err := e.transactions.Store(tx)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not store transaction (%x): %w", tx.ID(), err)
 		}
 	}
 
 	return nil
 }
 
-func (e *Engine) requestCollections(guarantees ...*flow.CollectionGuarantee) error {
-	for _, guarantee := range guarantees {
-		err := e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantee.SignerIDs...))
-		if err != nil {
-			return fmt.Errorf("could not request collection (%x)", guarantee.ID())
-		}
-	}
-	return nil
-}
-
-func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) error {
-
-	// convert the entity to a strictly typed collection
-	collection, ok := entity.(*flow.Collection)
-	if !ok {
-		return fmt.Errorf("invalid entity type (%T)", entity)
-	}
-
-	// process the collection
-	err := e.handleCollection(originID, collection)
+func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
+	err := e.handleCollection(originID, entity)
 	if err != nil {
-		return fmt.Errorf("could not handle collection: %w", err)
+		e.log.Error().Err(err).Msg("could not handle collection")
+		return
 	}
-
-	return nil
 }
 
 // OnBlockIncorporated is a noop for this engine since access node is only dealing with finalized blocks
