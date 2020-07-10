@@ -31,6 +31,12 @@ func LightPayload8(key uint8, value uint8) *ledger.Payload {
 	return &ledger.Payload{Key: k, Value: v}
 }
 
+func KeyPartFixture(typ uint16, val string) *ledger.KeyPart {
+	kp1t := uint16(typ)
+	kp1v := []byte(val)
+	return ledger.NewKeyPart(kp1t, kp1v)
+}
+
 func ProofFixture() (*ledger.Proof, ledger.StateCommitment) {
 	p := ledger.NewProof()
 	p.Path = TwoBytesPath(330)

@@ -31,8 +31,8 @@ func (k *Key) String() string {
 	return ret
 }
 
-// Equal compares this key to another key
-func (k *Key) Equal(other *Key) bool {
+// Equals compares this key to another key
+func (k *Key) Equals(other *Key) bool {
 	if other == nil {
 		return false
 	}
@@ -40,7 +40,7 @@ func (k *Key) Equal(other *Key) bool {
 		return false
 	}
 	for i, kp := range k.KeyParts {
-		if !kp.Equal(&other.KeyParts[i]) {
+		if !kp.Equals(&other.KeyParts[i]) {
 			return false
 		}
 	}
@@ -59,8 +59,8 @@ func NewKeyPart(typ uint16, val []byte) *KeyPart {
 	return &KeyPart{Type: typ, Value: val}
 }
 
-// Equal compares this key part to another key part
-func (kp *KeyPart) Equal(other *KeyPart) bool {
+// Equals compares this key part to another key part
+func (kp *KeyPart) Equals(other *KeyPart) bool {
 	if other == nil {
 		return false
 	}

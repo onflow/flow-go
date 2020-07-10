@@ -22,15 +22,15 @@ func (p *Payload) String() string {
 	return p.Key.String() + " " + p.Value.String()
 }
 
-// Equal compares this payload to another payload
-func (p *Payload) Equal(other *Payload) bool {
+// Equals compares this payload to another payload
+func (p *Payload) Equals(other *Payload) bool {
 	if other == nil {
 		return false
 	}
-	if !p.Key.Equal(&other.Key) {
+	if !p.Key.Equals(&other.Key) {
 		return false
 	}
-	if !p.Value.Equal(other.Value) {
+	if !p.Value.Equals(other.Value) {
 		return false
 	}
 	return true

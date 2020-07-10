@@ -13,15 +13,12 @@ import (
 
 // Test_KeyPartEncodingDecoding tests encoding decoding functionality of a ledger key part
 func Test_KeyPartEncodingDecoding(t *testing.T) {
-	kpt := uint16(1)
-	kpv := []byte("key part")
-	kp := ledger.NewKeyPart(kpt, kpv)
 
+	kp := common.KeyPartFixture(1, "key part 1")
 	encoded := common.EncodeKeyPart(kp)
 	newkp, err := common.DecodeKeyPart(encoded)
 	require.NoError(t, err)
-	require.Equal(t, newkp.Type, kpt)
-	require.Equal(t, newkp.Value, kpv)
+	require.True(t, kp.Equals(newkp))
 
 	// wrong type decoding
 	_, err = common.DecodeKey(encoded)
@@ -35,32 +32,22 @@ func Test_KeyPartEncodingDecoding(t *testing.T) {
 
 // Test_KeyEncodingDecoding tests encoding decoding functionality of a ledger key
 func Test_KeyEncodingDecoding(t *testing.T) {
-	kp1t := uint16(1)
-	kp1v := []byte("key part 1")
-	kp1 := ledger.NewKeyPart(kp1t, kp1v)
-
-	kp2t := uint16(22)
-	kp2v := []byte("key part 2")
-	kp2 := ledger.NewKeyPart(kp2t, kp2v)
-
+	kp1 := common.KeyPartFixture(1, "key part 1")
+	kp2 := common.KeyPartFixture(22, "key part 2")
 	k := ledger.NewKey([]ledger.KeyPart{*kp1, *kp2})
-
 	encoded := common.EncodeKey(k)
 	newk, err := common.DecodeKey(encoded)
 	require.NoError(t, err)
-
-	require.True(t, newk.Equal(k))
+	require.True(t, newk.Equals(k))
 }
 
 // Test_ValueEncodingDecoding tests encoding decoding functionality of a ledger value
 func Test_ValueEncodingDecoding(t *testing.T) {
 	v := ledger.Value("value")
-
 	encoded := common.EncodeValue(v)
 	newV, err := common.DecodeValue(encoded)
 	require.NoError(t, err)
 	require.Equal(t, v, newV)
-
 }
 
 // Test_PayloadEncodingDecoding tests encoding decoding functionality of a payload
@@ -80,7 +67,7 @@ func Test_PayloadEncodingDecoding(t *testing.T) {
 	encoded := common.EncodePayload(p)
 	newp, err := common.DecodePayload(encoded)
 	require.NoError(t, err)
-	require.True(t, newp.Equal(p))
+	require.True(t, newp.Equals(p))
 }
 
 // Test_ProofEncodingDecoding tests encoding decoding functionality of a proof
@@ -89,7 +76,7 @@ func Test_ProofEncodingDecoding(t *testing.T) {
 	encoded := common.EncodeProof(p)
 	newp, err := common.DecodeProof(encoded)
 	require.NoError(t, err)
-	require.True(t, newp.Equal(p))
+	require.True(t, newp.Equals(p))
 }
 
 // Test_BatchProofEncodingDecoding tests encoding decoding functionality of a batch proof
@@ -98,5 +85,5 @@ func Test_BatchProofEncodingDecoding(t *testing.T) {
 	encoded := common.EncodeBatchProof(bp)
 	newbp, err := common.DecodeBatchProof(encoded)
 	require.NoError(t, err)
-	require.True(t, newbp.Equal(bp))
+	require.True(t, newbp.Equals(bp))
 }

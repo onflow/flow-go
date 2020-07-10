@@ -17,7 +17,7 @@ func (v Value) String() string {
 	return hex.EncodeToString(v)
 }
 
-func (v Value) Equal(other Value) bool {
+func (v Value) Equals(other Value) bool {
 	if other == nil {
 		return false
 	}

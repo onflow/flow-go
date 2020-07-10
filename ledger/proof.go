@@ -53,15 +53,15 @@ func (p *Proof) String() string {
 	return proofStr
 }
 
-// Equal compares this proof to another payload
-func (p *Proof) Equal(o *Proof) bool {
+// Equals compares this proof to another payload
+func (p *Proof) Equals(o *Proof) bool {
 	if o == nil {
 		return false
 	}
-	if !p.Path.Equal(o.Path) {
+	if !p.Path.Equals(o.Path) {
 		return false
 	}
-	if !p.Payload.Equal(o.Payload) {
+	if !p.Payload.Equals(o.Payload) {
 		return false
 	}
 	if len(p.Interims) != len(o.Interims) {
@@ -135,8 +135,8 @@ func (bp *BatchProof) MergeInto(dest *BatchProof) {
 	}
 }
 
-// Equal compares this batch proof to another batch proof
-func (bp *BatchProof) Equal(o *BatchProof) bool {
+// Equals compares this batch proof to another batch proof
+func (bp *BatchProof) Equals(o *BatchProof) bool {
 	if o == nil {
 		return false
 	}
@@ -144,7 +144,7 @@ func (bp *BatchProof) Equal(o *BatchProof) bool {
 		return false
 	}
 	for i, proof := range bp.Proofs {
-		if !proof.Equal(o.Proofs[i]) {
+		if !proof.Equals(o.Proofs[i]) {
 			return false
 		}
 	}
