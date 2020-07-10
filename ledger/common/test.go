@@ -31,7 +31,7 @@ func LightPayload8(key uint8, value uint8) *ledger.Payload {
 	return &ledger.Payload{Key: k, Value: v}
 }
 
-func ProofFixture() *ledger.Proof {
+func ProofFixture() (*ledger.Proof, ledger.StateCommitment) {
 	p := ledger.NewProof()
 	p.Path = TwoBytesPath(330)
 	p.Payload = LightPayload8('A', 'A')
@@ -43,10 +43,11 @@ func ProofFixture() *ledger.Proof {
 	p.Interims = append(p.Interims, interim1)
 	p.Interims = append(p.Interims, interim2)
 	p.Steps = uint8(7)
-	return p
+	sc, _ := hex.DecodeString("6a7a565add94fb36069d79e8725c221cd1e5740742501ef014ea6db999fd98ad")
+	return p, ledger.StateCommitment(sc)
 }
 
-func BatchProofFixture() *ledger.BatchProof {
+func BatchProofFixture() (*ledger.BatchProof, ledger.StateCommitment) {
 	p1 := ledger.NewProof()
 	p1.Path = TwoBytesPath(330)
 	p1.Payload = LightPayload8('A', 'A')
@@ -74,5 +75,7 @@ func BatchProofFixture() *ledger.BatchProof {
 	bp := ledger.NewBatchProof()
 	bp.Proofs = append(bp.Proofs, p1)
 	bp.Proofs = append(bp.Proofs, p2)
-	return bp
+
+	sc, _ := hex.DecodeString("6a7a565add94fb36069d79e8725c221cd1e5740742501ef014ea6db999fd98ad")
+	return bp, ledger.StateCommitment(sc)
 }

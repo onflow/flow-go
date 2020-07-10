@@ -5,9 +5,6 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 )
 
-// StateCommitment captures a commitment to an specific state of the ledger
-type StateCommitment []byte
-
 // Ledger takes care of storing and reading registers (key, value pairs)
 type Ledger interface {
 	module.ReadyDoneAware

@@ -85,7 +85,7 @@ func Test_PayloadEncodingDecoding(t *testing.T) {
 
 // Test_ProofEncodingDecoding tests encoding decoding functionality of a proof
 func Test_ProofEncodingDecoding(t *testing.T) {
-	p := common.ProofFixture()
+	p, _ := common.ProofFixture()
 	encoded := common.EncodeProof(p)
 	newp, err := common.DecodeProof(encoded)
 	require.NoError(t, err)
@@ -94,7 +94,7 @@ func Test_ProofEncodingDecoding(t *testing.T) {
 
 // Test_BatchProofEncodingDecoding tests encoding decoding functionality of a batch proof
 func Test_BatchProofEncodingDecoding(t *testing.T) {
-	bp := common.BatchProofFixture()
+	bp, _ := common.BatchProofFixture()
 	encoded := common.EncodeBatchProof(bp)
 	newbp, err := common.DecodeBatchProof(encoded)
 	require.NoError(t, err)

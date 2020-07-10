@@ -885,7 +885,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		batchProof, err := fStore.Proofs(testTrie.RootHash(), proofPaths)
 		fmt.Println(batchProof)
 		require.NoError(t, err, "error generating proofs")
-		require.True(t, common.VerifyBatchProof(batchProof, proofPaths, proofPayloads, testTrie.RootHash(), pathByteSize))
+		require.True(t, common.VerifyBatchProof(batchProof, testTrie.RootHash(), pathByteSize))
 
 		proofToGo := common.EncodeBatchProof(batchProof)
 		psmt, err := ptrie.NewPSMT(testTrie.RootHash(), pathByteSize, proofPaths, proofPayloads, proofToGo)
@@ -935,7 +935,7 @@ func TestProofGenerationInclusion(t *testing.T) {
 	proof, err := fStore.Proofs(updatedTrie.RootHash(), paths)
 
 	require.NoError(t, err)
-	require.True(t, common.VerifyBatchProof(proof, paths, payloads, updatedTrie.RootHash(), pathByteSize))
+	require.True(t, common.VerifyBatchProof(proof, updatedTrie.RootHash(), pathByteSize))
 }
 
 func payloadBySlices(keydata []byte, valuedata []byte) *ledger.Payload {
