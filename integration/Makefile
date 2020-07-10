@@ -34,6 +34,11 @@ verification-tests:
 benchmark:
 	GO111MODULE=on go test -tags relic -count=1 -timeout 30m ./benchmark -run Benchmark
 
+.PHONY: ci-benchmark
+ci-benchmark:
+	GO111MODULE=on ENV=TEAMCITY go test -tags relic -count=1 -timeout 15m ./benchmark -run Benchmark
+	cat ${TMP}/tx_per_second_test_teamcity.txt
+
 .PHONY: spam-localnet
 spam:
 	GO111MODULE=on go run -tags relic ./benchmark/main -verbose=true
