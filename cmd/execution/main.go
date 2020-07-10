@@ -203,8 +203,8 @@ func main() {
 func loadBootstrapState(dir, trie string) error {
 	filename := ""
 
-	if _, err := os.Stat(filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, "checkpoint.00000000")); err == nil {
-		filename = "checkpoint.00000000"
+	if _, err := os.Stat(filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, wal.RootCheckpointFilename)); err == nil {
+		filename = wal.RootCheckpointFilename
 	} else if _, err := os.Stat(filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, "00000000")); err == nil {
 		filename = "00000000"
 	} else {
