@@ -506,23 +506,87 @@ func (suite *Suite) TestGetAccount() {
 	handler := NewHandler(suite.log, suite.state, suite.execClient, nil, nil, suite.headers, nil, nil, suite.chainID)
 
 	suite.Run("happy path - valid request and valid response", func() {
-		expectedResp := &access.GetAccountResponse{
+		expectedResp := &access.AccountResponse{
 			Account: account,
 		}
-		req := &access.GetAccountRequest{
-			Address: address.Bytes(),
+		req := &access.GetAccountAtLatestBlockRequest{
+			Address: address,
 		}
-		actualResp, err := handler.GetAccount(ctx, req)
+		actualResp, err := handler.GetAccountAtLatestBlock(ctx, req)
 		suite.checkResponse(actualResp, err)
 		suite.assertAllExpectations()
 		suite.Require().Equal(expectedResp, actualResp)
 	})
 
 	suite.Run("invalid request with nil address", func() {
-		req := &access.GetAccountRequest{
+		req := &access.GetAccountAtLatestBlockRequest{
 			Address: nil,
 		}
-		_, err := handler.GetAccount(ctx, req)
+		_, err := handler.GetAccountAtLatestBlock(ctx, req)
+		suite.Require().Error(err)
+	})
+}
+
+func (suite *Suite) TestGetAccountAtBlockHeight() {
+	height := uint64(5)
+	address := unittest.AddressFixture()
+	account := &entities.Account{
+		Address: address.Bytes(),
+	}
+	ctx := context.Background()
+
+	// create a mock block header
+	h := unittest.BlockHeaderFixture()
+	// setup headers storage to return the header when queried by height
+	suite.headers.On("ByHeight", height).Return(&h, nil).Once()
+
+	// create the expected execution API request
+	blockID := h.ID()
+	exeReq := &execution.GetAccountAtBlockIDRequest{
+		BlockId: blockID[:],
+		Address: address.Bytes(),
+	}
+
+	// create the expected execution API response
+	exeResp := &execution.GetAccountAtBlockIDResponse{
+		Account: account,
+	}
+
+	// setup the execution client mock
+	suite.execClient.On("GetAccountAtBlockID", ctx, exeReq).Return(exeResp, nil).Once()
+
+	// create the handler with the mock
+	handler := NewHandler(suite.log, suite.state, suite.execClient, nil, nil, suite.headers, nil, nil, flow.Testnet)
+
+	suite.Run("happy path - valid request and valid response", func() {
+		expectedResp := &access.AccountResponse{
+			Account: account,
+		}
+		req := &access.GetAccountAtBlockHeightRequest{
+			Address:     address.Bytes(),
+			BlockHeight: height,
+		}
+		actualResp, err := handler.GetAccountAtBlockHeight(ctx, req)
+		suite.checkResponse(actualResp, err)
+		suite.assertAllExpectations()
+		suite.Require().Equal(expectedResp, actualResp)
+	})
+
+	suite.Run("invalid request with nil address", func() {
+		req := &access.GetAccountAtBlockHeightRequest{
+			Address:     nil,
+			BlockHeight: height,
+		}
+		_, err := handler.GetAccountAtBlockHeight(ctx, req)
+		suite.Require().Error(err)
+	})
+
+	suite.Run("invalid request with empty address", func() {
+		req := &access.GetAccountAtBlockHeightRequest{
+			Address:     []byte{},
+			BlockHeight: height,
+		}
+		_, err := handler.GetAccountAtBlockHeight(ctx, req)
 		suite.Require().Error(err)
 	})
 }
