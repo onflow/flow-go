@@ -37,7 +37,7 @@ type Engine struct {
 	channel  uint8
 	selector flow.IdentityFilter
 	handle   HandleFunc
-	items    map[flow.Identifier]Item
+	items    map[flow.Identifier]*Item
 	requests map[uint64]*messages.EntityRequest
 }
 
@@ -91,7 +91,7 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 		channel:  channel,
 		selector: selector,
 		handle:   nil,
-		items:    make(map[flow.Identifier]Item),           // holds all pending items
+		items:    make(map[flow.Identifier]*Item),          // holds all pending items
 		requests: make(map[uint64]*messages.EntityRequest), // holds all sent requests
 	}
 
@@ -183,7 +183,7 @@ func (e *Engine) EntityByID(entityID flow.Identifier, selector flow.IdentityFilt
 	}
 
 	// otherwise, add a new item to the list
-	item := Item{
+	item := &Item{
 		EntityID:      entityID,
 		NumAttempts:   0,
 		LastRequested: time.Time{},
@@ -196,6 +196,7 @@ func (e *Engine) EntityByID(entityID flow.Identifier, selector flow.IdentityFilt
 // Force will force the requester engine to dispatch all currently
 // valid batch requests.
 func (e *Engine) Force() {
+	count := uint(0)
 	for {
 		dispatched, err := e.dispatchRequest()
 		if err != nil {
@@ -203,8 +204,10 @@ func (e *Engine) Force() {
 			return
 		}
 		if !dispatched {
+			e.log.Debug().Uint("requests", count).Msg("forced request dispatch")
 			return
 		}
+		count++
 	}
 }
 
@@ -223,6 +226,7 @@ PollLoop:
 				e.log.Error().Err(err).Msg("could not dispatch requests")
 				continue PollLoop
 			}
+			e.log.Debug().Uint("requests", 1).Msg("regular request dispatch")
 		}
 	}
 
@@ -244,10 +248,12 @@ func (e *Engine) dispatchRequest() (bool, error) {
 	now := time.Now().UTC()
 	var providerID flow.Identifier
 	var entityIDs []flow.Identifier
+	fmt.Println(len(e.items))
 	for entityID, item := range e.items {
 
 		// if the item should not be requested yet, ignore
-		if item.LastRequested.Add(item.RetryAfter).Before(now) {
+		cutoff := item.LastRequested.Add(item.RetryAfter)
+		if cutoff.After(now) {
 			continue
 		}
 
@@ -290,7 +296,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		// to a more even distribution of entities over batch requests
 		entityIDs = append(entityIDs, entityID)
 		item.NumAttempts++
-		item.LastRequested = item.LastRequested.Add(item.RetryAfter)
+		item.LastRequested = now
 		item.RetryAfter = e.cfg.RetryFunction(item.RetryAfter)
 
 		// make sure the interval is within parameters

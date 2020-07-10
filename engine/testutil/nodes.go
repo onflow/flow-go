@@ -321,6 +321,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	require.NoError(t, err)
 
+	requestEngine.WithHandle(ingestionEngine.OnCollection)
+
 	syncEngine, err := synchronization.New(
 		node.Log,
 		node.Metrics,

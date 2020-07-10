@@ -554,6 +554,9 @@ func (e *Engine) matchOrRequestCollections(
 	backdata *stdmap.BlockByCollectionBackdata,
 ) error {
 
+	// make sure that the requests are dispatched immediately by the requester
+	defer e.request.Force()
+
 	for _, guarantee := range executableBlock.Block.Payload.Guarantees {
 		var transactions []*flow.TransactionBody
 		maybeBlockByCollection, exists := backdata.ByID(guarantee.ID())
@@ -597,9 +600,6 @@ func (e *Engine) matchOrRequestCollections(
 			Transactions: transactions,
 		}
 	}
-
-	// make sure that the requests are dispatched immediately by the requester
-	e.request.Force()
 
 	return nil
 }
