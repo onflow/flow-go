@@ -24,8 +24,7 @@ func TestBsearch(t *testing.T) {
 	}
 	sel := make([]int, 0, 10)
 	for i := 0; i < 10; i++ {
-		index, err := binarySearch(uint64(i), sums)
-		require.NoError(t, err)
+		index := binarySearch(uint64(i), sums)
 		sel = append(sel, index)
 	}
 	require.Equal(t, []int{0, 1, 1, 2, 2, 2, 3, 3, 3, 3}, sel)
@@ -48,7 +47,7 @@ func TestBsearchWithNormalSearch(t *testing.T) {
 		expected, err := bruteSearch(value, sums)
 		require.NoError(t, err)
 
-		actual, err := binarySearch(value, sums)
+		actual := binarySearch(value, sums)
 		require.NoError(t, err)
 
 		require.Equal(t, expected, actual)

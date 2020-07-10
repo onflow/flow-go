@@ -74,35 +74,31 @@ func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]int, e
 
 	// create an array of weight ranges for each identity.
 	// an i-th identity is selected as the leader if the random number falls into its weight range.
-	weightSum := make([]uint64, 0, len(weights))
-	var sum uint64
+	weightSums := make([]uint64, 0, len(weights))
+
+	// cumulative sum of weights
+	// after cumulating the weights, the sum is the total weight
+	// total weight is used to specify the range of the random number.
+	var cumsum uint64
 	for _, weight := range weights {
-		sum += weight
-		weightSum = append(weightSum, sum)
+		cumsum += weight
+		weightSums = append(weightSums, cumsum)
 	}
 
-	// after accumulating the weights, the sum is the total weight
-	// total weight is used to specify the range of the random number.
-	totalWeight := sum
-
-	if totalWeight == 0 {
+	if cumsum == 0 {
 		return nil, fmt.Errorf("total weight must be greater than 0")
 	}
 
 	leaders := make([]int, 0, count)
 	for i := 0; i < count; i++ {
-		// make a random number by specifying the range.
-		// the range should be from 0 (inclusive) to totalWeight (exclusive). Or [0, totalWeight)
-		randomness, err := rng.IntN(int(totalWeight))
+		// pick a random number from 0 (inclusive) to cumsum (exclusive). Or [0, cumsum)
+		randomness, err := rng.IntN(int(cumsum))
 		if err != nil {
 			return nil, fmt.Errorf("could not generate randomness: %w", err)
 		}
 
 		// binary search to find the leader index by the random number
-		leader, err := binarySearch(uint64(randomness), weightSum)
-		if err != nil {
-			return nil, fmt.Errorf("could not generate leader index: %w", err)
-		}
+		leader := binarySearch(uint64(randomness), weightSums)
 
 		leaders = append(leaders, leader)
 	}
@@ -110,17 +106,13 @@ func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]int, e
 }
 
 // binary search to find the index of the first item in the given array that is
-// bigger or equal to the given value.
-func binarySearch(value uint64, arr []uint64) (int, error) {
-	if len(arr) == 0 {
-		return 0, fmt.Errorf("arr is empty")
-	}
-
-	if value >= arr[len(arr)-1] {
-		return 0, fmt.Errorf("value (%v) exceeds the search range: [0, %v)", value, arr[len(arr)-1])
-	}
-
-	return bsearch(0, len(arr)-1, value, arr), nil
+// strictly bigger to the given value.
+// There are a few assumptions on inputs:
+// - `arr` must be non-empty
+// - items in `arr` must be in increasing order
+// - `value` must be less than the last item in `arr`
+func binarySearch(value uint64, arr []uint64) int {
+	return bsearch(0, len(arr)-1, value, arr)
 }
 
 func bsearch(left, right int, value uint64, arr []uint64) int {
