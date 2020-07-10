@@ -199,7 +199,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	seals, err := stdmap.NewSeals(1000)
 	require.NoError(t, err)
 
-	ingestionEngine, err := consensusingest.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Metrics, node.Net, node.State, node.Headers, node.Me, guarantees)
+	ingestionEngine, err := consensusingest.New(node.Log, node.Tracer, node.Metrics, node.Metrics, node.Metrics, node.Net, node.State, node.Headers, node.Me, guarantees)
 	require.Nil(t, err)
 
 	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Net, node.State, node.Me, resultsDB, sealsDB, node.Headers, node.Index, results, receipts, approvals, seals)

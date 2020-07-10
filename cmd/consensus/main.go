@@ -173,8 +173,8 @@ func main() {
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			ing, err := ingestion.New(
 				node.Logger,
-				node.Metrics.Engine,
 				node.Tracer,
+				node.Metrics.Engine,
 				conMetrics,
 				node.Metrics.Mempool,
 				node.Network,
