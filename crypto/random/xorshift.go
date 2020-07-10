@@ -85,16 +85,13 @@ func (x *xorshiftp) prn() uint64 {
 // IntN returns an uint64 pseudo-random number in [0,n-1]
 // using the xorshift+ of the current index. The index is updated
 // to use another xorshift+ at the next round
-func (x *xorshifts) IntN(n int) (int, error) {
-	if n <= 0 {
-		return 0, fmt.Errorf("input must be positive")
-	}
-	res := x.states[x.stateIndex].prn() % uint64(n)
+func (x *xorshifts) IntN(n uint64) uint64 {
+	res := x.states[x.stateIndex].prn() % n
 	// update the state
 	x.states[x.stateIndex].next()
 	// update the index
 	x.stateIndex = (x.stateIndex + 1) % len(x.states)
-	return int(res), nil
+	return res
 }
 
 // Permutation returns a permutation of the set [0,n-1]
@@ -108,7 +105,7 @@ func (x *xorshifts) Permutation(n int) ([]int, error) {
 	}
 	items := make([]int, n)
 	for i := 0; i < n; i++ {
-		j, _ := x.IntN(i + 1)
+		j := x.IntN(uint64(i + 1))
 		items[i] = items[j]
 		items[j] = i
 	}
@@ -138,8 +135,8 @@ func (x *xorshifts) Shuffle(n int, swap func(i, j int)) error {
 		return fmt.Errorf("population size cannot be negative")
 	}
 	for i := n - 1; i > 0; i-- {
-		j, _ := x.IntN(i + 1)
-		swap(i, j)
+		j := x.IntN(uint64(i + 1))
+		swap(i, int(j))
 	}
 	return nil
 }
@@ -156,8 +153,8 @@ func (x *xorshifts) Samples(n int, m int, swap func(i, j int)) error {
 		return fmt.Errorf("sample size (%d) cannot be larger than entire population (%d)", m, n)
 	}
 	for i := 0; i < m; i++ {
-		j, _ := x.IntN(n - i)
-		swap(i, i+j)
+		j := x.IntN(uint64(n - i))
+		swap(i, i+int(j))
 	}
 	return nil
 }

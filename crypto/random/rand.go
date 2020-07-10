@@ -2,8 +2,8 @@ package random
 
 // Rand is a pseudo random number generator
 type Rand interface {
-	// IntN returns a int random number between 0 and "to" (exclusive)
-	IntN(int) (int, error)
+	// IntN returns a int random number between 0 and N (exclusive)
+	IntN(uint64) uint64
 
 	// Permutation returns a permutation of the set [0,n-1]
 	// the theoretical output space grows very fast with (!n) so that input (n) should be chosen carefully

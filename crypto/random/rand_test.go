@@ -18,7 +18,7 @@ import (
 func TestRandInt(t *testing.T) {
 	sampleSize := 64768
 	tolerance := 0.05
-	sampleSpace := 16 // this should be a power of 2 for a more uniform distribution
+	sampleSpace := uint64(16) // this should be a power of 2 for a more uniform distribution
 	distribution := make([]float64, sampleSpace)
 	seed := []uint8{0x6A, 0x23, 0x41, 0xB7, 0x80, 0xE1, 0x64, 0x59,
 		0x6A, 0x53, 0x40, 0xB7, 0x80, 0xE4, 0x64, 0x5C,
@@ -27,7 +27,7 @@ func TestRandInt(t *testing.T) {
 	rng, err := NewRand(seed)
 	require.NoError(t, err)
 	for i := 0; i < sampleSize; i++ {
-		r, _ := rng.IntN(sampleSpace)
+		r := rng.IntN(sampleSpace)
 		distribution[r] += 1.0
 	}
 	stdev := stat.StdDev(distribution, nil)
@@ -246,7 +246,7 @@ func TestState(t *testing.T) {
 	// evolve the internal state of the rng
 	iterations := rand.Intn(100)
 	for i := 0; i < iterations; i++ {
-		_, err = rng.IntN(1024)
+		_ = rng.IntN(1024)
 	}
 	// get the internal state of the rng
 	state := rng.State()
@@ -256,8 +256,8 @@ func TestState(t *testing.T) {
 	// test the 2 rngs are giving identical outputs
 	iterations = rand.Intn(100)
 	for i := 0; i < iterations; i++ {
-		rand1, _ := rng.IntN(1024)
-		rand2, _ := secondRng.IntN(1024)
+		rand1 := rng.IntN(1024)
+		rand2 := secondRng.IntN(1024)
 		require.Equal(t, rand1, rand2, "the 2 rngs are not identical")
 	}
 }
