@@ -263,7 +263,7 @@ func unwrapFile(bootDir, nodeId string) error {
 	plaintext := make([]byte, 0, len(ciphertext)-box.AnonymousOverhead)
 	plaintext, ok := box.OpenAnonymous(plaintext, ciphertext, &pubKeyBytes, &privKeyBytes)
 	if !ok {
-		return fmt.Errorf("Failed to decrypt random beacon key using private key: %s", privKeyPath)
+		return fmt.Errorf("Failed to decrypt random beacon key using private key from file: %s", privKeyPath)
 	}
 
 	err = ioutil.WriteFile(plaintextPath, plaintext, fileMode)
