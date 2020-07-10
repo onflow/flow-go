@@ -63,7 +63,7 @@ func NewPSMT(
 	pathByteSize int,
 	paths []ledger.Path,
 	payloads []ledger.Payload,
-	proofs [][]byte,
+	proofs []byte,
 ) (*PSMT, error) {
 
 	if pathByteSize < 1 {
@@ -75,7 +75,7 @@ func NewPSMT(
 	if len(proofs) < 1 {
 		return nil, fmt.Errorf("at least a proof is needed to be able to contruct a partial trie")
 	}
-	batchProof, err := ledger.DecodeBatchProof(proofs)
+	batchProof, err := common.DecodeBatchProof(proofs)
 	if err != nil {
 		return nil, fmt.Errorf("decoding proof failed: %w", err)
 	}

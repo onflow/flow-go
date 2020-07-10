@@ -51,7 +51,7 @@ func Test_TrieWithRightRegister(t *testing.T) {
 	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
 	require.NoError(t, err)
 
-	path := common.Uint2binary(65535)
+	path := common.TwoBytesPath(65535)
 	payload := common.LightPayload(12346, 54321)
 	rightPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
@@ -67,7 +67,7 @@ func Test_TrieWithMiddleRegister(t *testing.T) {
 	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
 	require.NoError(t, err)
 
-	path := common.Uint2binary(56809)
+	path := common.TwoBytesPath(56809)
 	payload := common.LightPayload(12346, 59656)
 	leftPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)

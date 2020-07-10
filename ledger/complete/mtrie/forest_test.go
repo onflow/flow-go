@@ -80,7 +80,7 @@ func TestTrieUpdate(t *testing.T) {
 
 	retPayloads, err := fStore.Read(updatedTrie.RootHash(), paths)
 	require.NoError(t, err)
-	require.True(t, bytes.Equal(retPayloads[0].Encode(), payloads[0].Encode()))
+	require.True(t, bytes.Equal(common.EncodePayload(&retPayloads[0]), common.EncodePayload(&payloads[0])))
 }
 
 // TestLeftEmptyInsert tests inserting a new value into an empty sub-trie:
@@ -148,7 +148,7 @@ func TestLeftEmptyInsert(t *testing.T) {
 	retPayloads, err := fStore.Read(updatedTrie.RootHash(), paths)
 	require.NoError(t, err)
 	for i := range paths {
-		require.True(t, bytes.Equal(retPayloads[i].Encode(), payloads[i].Encode()))
+		require.True(t, bytes.Equal(common.EncodePayload(&retPayloads[i]), common.EncodePayload(&payloads[i])))
 	}
 }
 
@@ -220,7 +220,7 @@ func TestRightEmptyInsert(t *testing.T) {
 	retPayloads, err := fStore.Read(updatedTrie.RootHash(), paths)
 	require.NoError(t, err)
 	for i := range paths {
-		require.True(t, bytes.Equal(retPayloads[i].Encode(), payloads[i].Encode()))
+		require.True(t, bytes.Equal(common.EncodePayload(&retPayloads[i]), common.EncodePayload(&payloads[i])))
 	}
 }
 
@@ -292,7 +292,7 @@ func TestExpansionInsert(t *testing.T) {
 	retPayloads, err := fStore.Read(updatedTrie.RootHash(), paths)
 	require.NoError(t, err)
 	for i := range paths {
-		require.True(t, bytes.Equal(retPayloads[i].Encode(), payloads[i].Encode()))
+		require.True(t, bytes.Equal(common.EncodePayload(&retPayloads[i]), common.EncodePayload(&payloads[i])))
 	}
 }
 
@@ -376,7 +376,7 @@ func TestFullHouseInsert(t *testing.T) {
 	retPayloads, err := fStore.Read(updatedTrie.RootHash(), paths)
 	require.NoError(t, err)
 	for i := range paths {
-		require.True(t, bytes.Equal(retPayloads[i].Encode(), payloads[i].Encode()))
+		require.True(t, bytes.Equal(common.EncodePayload(&retPayloads[i]), common.EncodePayload(&payloads[i])))
 	}
 }
 
@@ -429,7 +429,7 @@ func TestLeafInsert(t *testing.T) {
 	retPayloads, err := fStore.Read(updatedTrie.RootHash(), paths)
 	require.NoError(t, err)
 	for i := range paths {
-		require.True(t, bytes.Equal(retPayloads[i].Encode(), payloads[i].Encode()))
+		require.True(t, bytes.Equal(common.EncodePayload(&retPayloads[i]), common.EncodePayload(&payloads[i])))
 	}
 }
 
@@ -471,7 +471,8 @@ func TestOverrideValue(t *testing.T) {
 
 	retPayloads, err := fStore.Read(updatedTrie.RootHash(), paths)
 	require.NoError(t, err)
-	require.True(t, bytes.Equal(retPayloads[0].Encode(), payloads[0].Encode()))
+	require.True(t, bytes.Equal(common.EncodePayload(&retPayloads[0]), common.EncodePayload(&payloads[0])))
+
 }
 
 // TestDuplicateOverride tests behaviour when the updates contain two different payloads for the
@@ -506,7 +507,8 @@ func TestDuplicateOverride(t *testing.T) {
 
 	retPayloads, err := fStore.Read(updatedTrie.RootHash(), []ledger.Path{p0})
 	require.NoError(t, err)
-	require.True(t, bytes.Equal(retPayloads[0].Encode(), v2.Encode()))
+	require.True(t, bytes.Equal(common.EncodePayload(&retPayloads[0]), common.EncodePayload(v2)))
+
 }
 
 // TestUpdateWithWrongPathSize verifies that attempting to update a trie with a wrong path size
@@ -563,13 +565,13 @@ func TestReadOrder(t *testing.T) {
 
 	retPayloads, err := fStore.Read(testTrie.RootHash(), []ledger.Path{p1, p2})
 	require.NoError(t, err)
-	require.True(t, bytes.Equal(retPayloads[0].Encode(), payloads[0].Encode()))
-	require.True(t, bytes.Equal(retPayloads[1].Encode(), payloads[1].Encode()))
+	require.True(t, bytes.Equal(common.EncodePayload(&retPayloads[0]), common.EncodePayload(&payloads[0])))
+	require.True(t, bytes.Equal(common.EncodePayload(&retPayloads[1]), common.EncodePayload(&payloads[1])))
 
 	retPayloads, err = fStore.Read(testTrie.RootHash(), []ledger.Path{p2, p1})
 	require.NoError(t, err)
-	require.True(t, bytes.Equal(retPayloads[1].Encode(), payloads[0].Encode()))
-	require.True(t, bytes.Equal(retPayloads[0].Encode(), payloads[1].Encode()))
+	require.True(t, bytes.Equal(common.EncodePayload(&retPayloads[1]), common.EncodePayload(&payloads[0])))
+	require.True(t, bytes.Equal(common.EncodePayload(&retPayloads[0]), common.EncodePayload(&payloads[1])))
 }
 
 // TestMixRead tests reading a mixture of set and unset registers.
@@ -612,7 +614,7 @@ func TestMixRead(t *testing.T) {
 	retPayloads, err := fStore.Read(baseTrie.RootHash(), readPaths)
 	require.NoError(t, err)
 	for i := range paths {
-		require.True(t, bytes.Equal(retPayloads[i].Encode(), expectedPayloads[i].Encode()))
+		require.True(t, bytes.Equal(common.EncodePayload(&retPayloads[i]), common.EncodePayload(&expectedPayloads[i])))
 	}
 }
 
@@ -645,7 +647,7 @@ func TestReadWithDuplicatedKeys(t *testing.T) {
 	retPayloads, err := fStore.Read(testTrie.RootHash(), paths)
 	require.NoError(t, err)
 	for i := range paths {
-		require.True(t, bytes.Equal(retPayloads[i].Encode(), expectedPayloads[i].Encode()))
+		require.True(t, bytes.Equal(common.EncodePayload(&retPayloads[i]), common.EncodePayload(&expectedPayloads[i])))
 	}
 }
 
@@ -753,19 +755,19 @@ func TestForkingUpdates(t *testing.T) {
 	retPayloads, err := fStore.Read(baseTrie.RootHash(), paths) // reading from original Trie
 	require.NoError(t, err)
 	for i := range paths {
-		require.True(t, bytes.Equal(retPayloads[i].Encode(), payloads[i].Encode()))
+		require.True(t, bytes.Equal(common.EncodePayload(&retPayloads[i]), common.EncodePayload(&payloads[i])))
 	}
 
 	retPayloads, err = fStore.Read(updatedTrieA.RootHash(), pathsA) // reading from updatedTrieA
 	require.NoError(t, err)
 	for i := range paths {
-		require.True(t, bytes.Equal(retPayloads[i].Encode(), payloadsA[i].Encode()))
+		require.True(t, bytes.Equal(common.EncodePayload(&retPayloads[i]), common.EncodePayload(&payloadsA[i])))
 	}
 
 	retPayloads, err = fStore.Read(updatedTrieB.RootHash(), pathsA) // reading from updatedTrieB
 	require.NoError(t, err)
 	for i := range paths {
-		require.True(t, bytes.Equal(retPayloads[i].Encode(), payloadsB[i].Encode()))
+		require.True(t, bytes.Equal(common.EncodePayload(&retPayloads[i]), common.EncodePayload(&payloadsB[i])))
 	}
 }
 
@@ -805,13 +807,13 @@ func TestIdenticalUpdateAppliedTwice(t *testing.T) {
 	retPayloadsA, err := fStore.Read(updatedTrieA.RootHash(), paths)
 	require.NoError(t, err)
 	for i := range paths {
-		require.True(t, bytes.Equal(retPayloadsA[i].Encode(), payloads[i].Encode()))
+		require.True(t, bytes.Equal(common.EncodePayload(&retPayloadsA[i]), common.EncodePayload(&payloads[i])))
 	}
 
 	retPayloadsB, err := fStore.Read(updatedTrieB.RootHash(), paths)
 	require.NoError(t, err)
 	for i := range paths {
-		require.True(t, bytes.Equal(retPayloadsB[i].Encode(), payloads[i].Encode()))
+		require.True(t, bytes.Equal(common.EncodePayload(&retPayloadsB[i]), common.EncodePayload(&payloads[i])))
 	}
 }
 
@@ -864,7 +866,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		retPayloads, err = fStore.Read(testTrie.RootHash(), paths)
 		require.NoError(t, err, "error reading")
 		for i := range payloads {
-			require.True(t, bytes.Equal(retPayloads[i].Encode(), payloads[i].Encode()))
+			require.True(t, bytes.Equal(common.EncodePayload(&retPayloads[i]), common.EncodePayload(&payloads[i])))
 		}
 
 		// test proof (mix of existing and non existing keys)
@@ -884,7 +886,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		require.NoError(t, err, "error generating proofs")
 		require.True(t, common.VerifyBatchProof(batchProof, proofPaths, proofPayloads, testTrie.RootHash(), pathByteSize))
 
-		proofToGo, _ := batchProof.Encode()
+		proofToGo := common.EncodeBatchProof(batchProof)
 		psmt, err := ptrie.NewPSMT(testTrie.RootHash(), pathByteSize, proofPaths, proofPayloads, proofToGo)
 		require.NoError(t, err, "error building partial trie")
 		require.True(t, bytes.Equal(psmt.RootHash(), testTrie.RootHash()))
@@ -899,7 +901,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		retPayloads, err = fStore.Read(testTrie.RootHash(), allPaths)
 		require.NoError(t, err)
 		for i, v := range retPayloads {
-			require.True(t, bytes.Equal(v.Encode(), retPayloads[i].Encode()))
+			require.True(t, bytes.Equal(common.EncodePayload(&v), common.EncodePayload(&retPayloads[i])))
 		}
 	}
 }

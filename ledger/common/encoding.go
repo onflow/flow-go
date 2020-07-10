@@ -490,60 +490,88 @@ func decodeProof(inp []byte) (*ledger.Proof, error) {
 	return pInst, nil
 }
 
-// // EncodeBatchProof encodes all the content of a batch proof into a slice of byte slices and total len
-// // TODO change this to only an slice of bytes
-// func EncodeBatchProof(bp *ledger.BatchProof) ([][]byte, int) {
-// 	proofs := make([][]byte, 0)
-// 	totalLength := 0
-// 	// for each proof we create a byte array
-// 	for _, p := range bp.Proofs {
-// 		proof := EncodeProof(p)
-// 		totalLength += len(proof)
-// 		proofs = append(proofs, proof)
-// 	}
-// 	return proofs, totalLength
-// }
+// EncodeBatchProof encodes a batch proof into a byte slice
+func EncodeBatchProof(bp *ledger.BatchProof) []byte {
+	// encode EncodingDecodingType
+	buffer := appendUint64([]byte{}, EncodingDecodingVersion)
+	// encode key entity type
+	buffer = appendUint16(buffer, EncodingTypeBatchProof)
+	// encode batch proof content
+	buffer = append(buffer, encodeBatchProof(bp)...)
 
-// // DecodeBatchProof takes in an encodes array of byte arrays an converts them into a BatchProof
-// // TODO create proof decoder
-// func DecodeBatchProof(proofs [][]byte) (*ledger.BatchProof, error) {
-// 	bp := ledger.NewBatchProof()
-// 	// The decode logic is as follows:
-// 	// The first byte in the array is the inclusion flag, with the first bit set as the inclusion (1 = inclusion, 0 = non-inclusion)
-// 	// The second byte is size, needs to be converted to uint8
-// 	// The next 32 bytes are the flag
-// 	// Each subsequent 32 bytes are the proofs needed for the verifier
-// 	// Each result is put into their own array and put into a BatchProof
-// 	for _, proof := range proofs {
-// 		if len(proof) < 4 {
-// 			return nil, fmt.Errorf("error decoding the proof: proof size too small")
-// 		}
-// 		pInst := ledger.NewProof()
-// 		byteInclusion := proof[0:1]
-// 		pInst.Inclusion = utils.IsBitSet(byteInclusion, 0)
-// 		step := proof[1:2]
-// 		pInst.Steps = step[0]
-// 		flagSize := int(proof[2])
-// 		if flagSize < 1 {
-// 			return nil, fmt.Errorf("error decoding the proof: flag size should be greater than 0")
-// 		}
-// 		pInst.Flags = proof[3 : flagSize+3]
-// 		byteProofs := make([][]byte, 0)
-// 		for i := flagSize + 3; i < len(proof); i += 32 {
-// 			// TODO understand the logic here
-// 			if i+32 <= len(proof) {
-// 				byteProofs = append(byteProofs, proof[i:i+32])
-// 			} else {
-// 				byteProofs = append(byteProofs, proof[i:])
-// 			}
-// 		}
-// 		pInst.Interims = byteProofs
-// 		bp.AppendProof(pInst)
-// 	}
-// 	return bp, nil
-// }
+	return buffer
+}
 
-// TODO RAMTIN FIX proof encoder decoder
+// encodeBatchProof encodes a batch proof into a byte slice
+func encodeBatchProof(bp *ledger.BatchProof) []byte {
+	buffer := make([]byte, 0)
+	// encode number of proofs
+	buffer = appendUint32(buffer, uint32(len(bp.Proofs)))
+	// iterate over proofs
+	for _, p := range bp.Proofs {
+		// encode the proof
+		encP := encodeProof(p)
+		// encode the len of the encoded proof
+		buffer = appendUint64(buffer, uint64(len(encP)))
+		// append the encoded proof
+		buffer = append(buffer, encP...)
+	}
+	return buffer
+}
+
+// DecodeBatchProof constructs a batch proof from an encoded byte slice
+func DecodeBatchProof(encodedBatchProof []byte) (*ledger.BatchProof, error) {
+	// check the enc dec version
+	rest, _, err := checkEncDecVer(encodedBatchProof)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding batch proof: %w", err)
+	}
+	// check the encoding type
+	rest, err = checkEncodingType(rest, EncodingTypeBatchProof)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding batch proof: %w", err)
+	}
+
+	// decode the batch proof content
+	bp, err := decodeBatchProof(rest)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding batch proof: %w", err)
+	}
+	return bp, nil
+}
+
+func decodeBatchProof(inp []byte) (*ledger.BatchProof, error) {
+	bp := ledger.NewBatchProof()
+	// number of proofs
+	numOfProofs, rest, err := readUint32(inp)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding batch proof (content): %w", err)
+	}
+
+	for i := 0; i < int(numOfProofs); i++ {
+		var encProofSize uint64
+		var encProof []byte
+		// read encoded proof size
+		encProofSize, rest, err = readUint64(rest)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding batch proof (content): %w", err)
+		}
+
+		// read encoded proof
+		encProof, rest, err = readSlice(rest, int(encProofSize))
+		if err != nil {
+			return nil, fmt.Errorf("error decoding batch proof (content): %w", err)
+		}
+
+		// decode encoded proof
+		proof, err := decodeProof(encProof)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding batch proof (content): %w", err)
+		}
+		bp.Proofs = append(bp.Proofs, proof)
+	}
+	return bp, nil
+}
 
 func readSlice(input []byte, size int) (value []byte, rest []byte, err error) {
 	if len(input) < size {

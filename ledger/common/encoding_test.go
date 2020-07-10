@@ -9,6 +9,8 @@ import (
 	"github.com/dapperlabs/flow-go/ledger/common"
 )
 
+// TODO add tests for raw byte values (useful for versioning)
+
 // Test_KeyPartEncodingDecoding tests encoding decoding functionality of a ledger key part
 func Test_KeyPartEncodingDecoding(t *testing.T) {
 	kpt := uint16(1)
@@ -88,6 +90,7 @@ func Test_PayloadEncodingDecoding(t *testing.T) {
 	require.Equal(t, newp.Value, v)
 }
 
+// TODO RAMTIN add tests for proof encoding and batch proof encoding without using fStore
 // func TestBatchProofEncoderDecoder(t *testing.T) {
 // 	pathByteSize := 1 // key size of 8 bits
 // 	dir, err := ioutil.TempDir("", "test-mtrie-")
