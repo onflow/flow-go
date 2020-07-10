@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -38,15 +39,17 @@ const (
 
 // Output file which records the transaction per second for a test run
 const (
-	ResultFile = "/tmp/tx_per_second_test_%s.txt"
+	ResultFile = "tx_per_second_test_%s.txt"
 )
 
 const (
 	// total test accounts to create
 	// This is a long running test. On a local environment use more conservative numbers for TotalAccounts (~3)
-	TotalAccounts = 3
+	TotalAccounts = 50
 	// each account transfers 10 tokens to the next account RoundsOfTransfer number of times
 	RoundsOfTransfer = 50
+	// threshold for TPS
+	TPSThreshold = float64(1)
 )
 
 var (
@@ -54,6 +57,8 @@ var (
 	flowTokenAddress     flowsdk.Address
 
 	fileCache = map[string][]byte{}
+
+	tmpDir string
 )
 
 // TestTransactionsPerSecondBenchmark measures the average number of transactions executed per second by an execution node
@@ -86,6 +91,12 @@ func (gs *TransactionsPerSecondSuite) SetupTest() {
 	gs.accessAddr = fmt.Sprintf(":%s", gs.AccessPort())
 	gs.privateKeyHex = gs.privateKey()
 	gs.metricsAddr = fmt.Sprintf("http://localhost:%s/metrics", gs.MetricsPort())
+
+	// Get tmp dir
+	tmpDir = os.Getenv("TMP")
+	if len(tmpDir) == 0 {
+		tmpDir = "/tmp"
+	}
 }
 
 func (gs *TransactionsPerSecondSuite) privateKey() string {
@@ -183,7 +194,7 @@ func (gs *TransactionsPerSecondSuite) TestTransactionsPerSecond() {
 	transferWG.Wait()
 
 	close(done) // stop the sampler
-	require.FileExists(gs.T(), resultFileName, "did not log TPS to file, may need to increase timeout")
+	require.FileExists(gs.T(), filepath.Join(tmpDir, resultFileName), "did not log TPS to file, may need to increase timeout")
 }
 
 // SetTokenAddresses sets the addresses for the Fungible token and the Flow token contract that were bootstrapped as part of genesis state
@@ -339,7 +350,9 @@ func (gs *TransactionsPerSecondSuite) Transfer10Tokens(flowClient *client.Client
 
 // logTPSToFile records the instantaneous as average values to the output file
 func logTPSToFile(msg string, resultFileName string) error {
-	resultFile, err := os.OpenFile(resultFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	fullResultFilePath := filepath.Join(tmpDir, resultFileName)
+
+	resultFile, err := os.OpenFile(fullResultFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
@@ -465,8 +478,6 @@ func (gs *TransactionsPerSecondSuite) AddKeys(flowClient *client.Client) {
 	}
 `, publicKeysStr.String())
 
-	fmt.Println(string(script))
-
 	addKeysTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(gs.ref.ID).
 		SetScript([]byte(script)).
@@ -517,7 +528,7 @@ func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resul
 		return 0
 	}
 
-	avg := func() {
+	logAvg := func() {
 		total := 0.0
 		for _, inst := range instantaneous {
 			total = total + inst
@@ -529,6 +540,11 @@ func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resul
 
 		fmt.Printf("Total transactions ===========> : %d\n", totalExecutedTx)
 		logTPSToFile(fmt.Sprintf("total transactions %d", totalExecutedTx), resultFileName)
+
+		require.Greater(gs.T(), avg, TPSThreshold)
+		if os.Getenv("ENV") == "TEAMCITY" {
+			logTPSToFile(fmt.Sprintf("##teamcity[buildStatisticValue key='BenchmarkTPS' value='%f']", avg), fmt.Sprintf(ResultFile, "teamcity"))
+		}
 	}
 
 	// sample every 1 minute
@@ -540,7 +556,7 @@ func (gs *TransactionsPerSecondSuite) sampleTotalExecutedTransactionMetric(resul
 		select {
 		case <-done:
 			minTicker.Stop()
-			avg()
+			logAvg()
 			return
 		case <-minTicker.C:
 			endTime := time.Now()
