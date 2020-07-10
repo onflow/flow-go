@@ -14,19 +14,19 @@ type Ledger interface {
 
 	InitStateCommitment() flow.StateCommitment
 
-	// Get returns value by key at specific stateCommitment
+	// Get returns value by key at specific state commitment
 	Get(key *Key, stcom StateCommitment) (value *Value, err error)
 
-	// BatchGet returns payloads for the given payload IDs at specific stateCommitment
+	// Get returns values for the given keys (same order) at specific state commitment
 	BatchGet(keys []Key, stcom StateCommitment) (values []Value, err error)
 
-	// Update updates the key with a new value at specific stateCommitment
+	// Update updates the key with a new value at specific state commitment
 	Update(key *Key, value *Value, stcom StateCommitment) (newStateCommitment StateCommitment, err error)
 
-	// BatchUpdate updates a list of keys with new values at specific stateCommitment
+	// BatchUpdate updates a list of keys with new values at specific state commitment and returns a new state commitment
 	BatchUpdate(keys []Key, values []Value, stcom StateCommitment) (newStateCommitment StateCommitment, err error)
 
-	// Proof returns a proof for the given key at specific stateCommitment
+	// Proof returns a proof for the given key at specific state commitment
 	Proof(key *Key, stcom StateCommitment) (proof *Proof, err error)
 
 	// Proof returns a batch proof for a list of keys at specific stateCommitment

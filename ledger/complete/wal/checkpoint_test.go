@@ -11,13 +11,13 @@ import (
 
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/flattener"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/ledger"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/trie"
+	realWAL "github.com/dapperlabs/flow-go/ledger/complete/wal"
 	"github.com/dapperlabs/flow-go/ledger/utils"
-	realWAL "github.com/dapperlabs/flow-go/ledger/wal"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/util"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )

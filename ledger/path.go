@@ -20,6 +20,10 @@ func (p Path) String() string {
 	return str
 }
 
+func (p *Path) Size() int {
+	return len(*p)
+}
+
 // Equals compares this path to another path
 func (p Path) Equals(o Path) bool {
 	if o == nil {

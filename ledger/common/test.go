@@ -19,8 +19,8 @@ func TwoBytesPath(inp uint16) ledger.Path {
 }
 
 func LightPayload(key uint16, value uint16) *ledger.Payload {
-	k := ledger.Key{KeyParts: []ledger.KeyPart{ledger.KeyPart{Type: 0, Value: Uint2binary(key)}}}
-	v := ledger.Value(Uint2binary(value))
+	k := ledger.Key{KeyParts: []ledger.KeyPart{ledger.KeyPart{Type: 0, Value: Uint16ToBinary(key)}}}
+	v := ledger.Value(Uint16ToBinary(value))
 	return &ledger.Payload{Key: k, Value: v}
 }
 

@@ -1,12 +1,13 @@
 package outright
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/dapperlabs/flow-go/ledger"
+	"github.com/dapperlabs/flow-go/ledger/common"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/trie"
 	"github.com/dapperlabs/flow-go/ledger/complete/wal"
@@ -86,34 +87,70 @@ func (f *MTrieStorage) Done() <-chan struct{} {
 	return done
 }
 
-// EmptyStateCommitment returns the state commitment of an empty store (initial state)
-func (f *MTrieStorage) EmptyStateCommitment() flow.StateCommitment {
+// InitStateCommitment returns the inital state commitment of initial trie
+func (f *MTrieStorage) InitStateCommitment() flow.StateCommitment {
+	// TODO change me
 	return f.mForest.GetEmptyRootHash()
 }
 
-// GetRegisters read the values of the given register IDs at the given state commitment
+// BatchGet read the values of the given keys at the given state commitment
 // it returns the values in the same order as given registerIDs and errors (if any)
-func (f *MTrieStorage) GetRegisters(
-	registerIDs []flow.RegisterID,
-	stateCommitment flow.StateCommitment,
+func (f *MTrieStorage) BatchGet(
+	keys []ledger.Key,
+	stcom flow.StateCommitment,
 ) (
-	values []flow.RegisterValue,
+	values []ledger.Value,
 	err error,
 ) {
 	start := time.Now()
-	values, err = f.mForest.Read(stateCommitment, registerIDs)
+	paths, err := common.KeysToPaths(keys)
+	if err != nil {
+		return nil, err
+	}
+	payloads, err = f.mForest.Read(stateCommitment, paths)
+	if err != nil {
+		return nil, err
+	}
 
-	f.metrics.ReadValuesNumber(uint64(len(registerIDs)))
+	values, err := common.PayloadsToValues(payloads)
+	if err != nil {
+		return nil, err
+	}
+	f.metrics.ReadValuesNumber(uint64(len(keys)))
 	readDuration := time.Since(start)
 	f.metrics.ReadDuration(readDuration)
 
-	if len(registerIDs) > 0 {
-		durationPerValue := time.Duration(readDuration.Nanoseconds()/int64(len(registerIDs))) * time.Nanosecond
+	if len(keys) > 0 {
+		durationPerValue := time.Duration(readDuration.Nanoseconds()/int64(len(keys))) * time.Nanosecond
 		f.metrics.ReadDurationPerItem(durationPerValue)
 	}
 
 	return values, err
 }
+
+// // Get returns value by key at specific state commitment
+// Get(key *Key, stcom StateCommitment) (value *Value, err error)
+
+// // Get returns values for the given keys (same order) at specific state commitment
+// BatchGet(keys []Key, stcom StateCommitment) (values []Value, err error)
+
+// // Update updates the key with a new value at specific state commitment
+// Update(key *Key, value *Value, stcom StateCommitment) (newStateCommitment StateCommitment, err error)
+
+// // BatchUpdate updates a list of keys with new values at specific state commitment and returns a new state commitment
+// BatchUpdate(keys []Key, values []Value, stcom StateCommitment) (newStateCommitment StateCommitment, err error)
+
+// // Proof returns a proof for the given key at specific state commitment
+// Proof(key *Key, stcom StateCommitment) (proof *Proof, err error)
+
+// // Proof returns a batch proof for a list of keys at specific stateCommitment
+// BatchProof(keys []Key, stcom StateCommitment) (batchproof *BatchProof, err error)
+
+// // returns an approximate size of memory used by the ledger
+// MemSize() (int64, error)
+
+// // returns an approximate size of disk used by the ledger
+// DiskSize() (int64, error)
 
 // UpdateRegisters updates the values by register ID given the state commitment
 // it returns a new state commitment (state after update) and errors (if any)
@@ -268,12 +305,4 @@ func (f *MTrieStorage) Checkpointer() (*wal.Checkpointer, error) {
 		return nil, fmt.Errorf("cannot create checkpointer for compactor: %w", err)
 	}
 	return checkpointer, nil
-}
-
-// keyToPath computes the storage path given a key
-func keyToPath(key []byte) []byte {
-	// TODO change this to Sha3
-	h := sha256.New()
-	_, _ = h.Write(key)
-	return h.Sum(nil)
 }

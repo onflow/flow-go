@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	realWAL "github.com/dapperlabs/flow-go/ledger/wal"
+	realWAL "github.com/dapperlabs/flow-go/ledger/complete/wal"
 )
 
 func Test_emptyDir(t *testing.T) {
