@@ -12,8 +12,8 @@ func (sc StateCommitment) String() string {
 	return hex.EncodeToString(sc)
 }
 
-// Equal compares the state commitment to another one
-func (sc StateCommitment) Equal(o StateCommitment) bool {
+// Equals compares the state commitment to another one
+func (sc StateCommitment) Equals(o StateCommitment) bool {
 	if o == nil {
 		return false
 	}

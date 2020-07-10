@@ -20,6 +20,7 @@ func (p Path) String() string {
 	return str
 }
 
+// Size returns the size of the path
 func (p *Path) Size() int {
 	return len(*p)
 }

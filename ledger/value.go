@@ -17,6 +17,7 @@ func (v Value) String() string {
 	return hex.EncodeToString(v)
 }
 
+// Equals compares a ledger Value to another one
 func (v Value) Equals(other Value) bool {
 	if other == nil {
 		return false
