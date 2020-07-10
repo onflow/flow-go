@@ -45,7 +45,7 @@ const (
 const (
 	// total test accounts to create
 	// This is a long running test. On a local environment use more conservative numbers for TotalAccounts (~3)
-	TotalAccounts = 50
+	TotalAccounts = 25
 	// each account transfers 10 tokens to the next account RoundsOfTransfer number of times
 	RoundsOfTransfer = 50
 	// threshold for TPS
@@ -97,6 +97,10 @@ func (gs *TransactionsPerSecondSuite) SetupTest() {
 	if len(tmpDir) == 0 {
 		tmpDir = "/tmp"
 	}
+
+	// Cache file
+	_, err := DownloadFile(FungibleTokenTransactionsBaseURL + TransferTokens)
+	handle(err)
 }
 
 func (gs *TransactionsPerSecondSuite) privateKey() string {

@@ -36,7 +36,7 @@ benchmark:
 
 .PHONY: ci-benchmark
 ci-benchmark:
-	GO111MODULE=on ENV=TEAMCITY go test -tags relic -count=1 -timeout 30m ./benchmark -run Benchmark
+	GO111MODULE=on ENV=TEAMCITY go test -tags relic -count=1 -timeout 15m ./benchmark -run Benchmark
 	cat ${TMP}/tx_per_second_test_teamcity.txt
 
 .PHONY: spam-localnet
