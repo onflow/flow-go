@@ -510,7 +510,7 @@ func (suite *Suite) TestGetAccount() {
 			Account: account,
 		}
 		req := &access.GetAccountAtLatestBlockRequest{
-			Address: address,
+			Address: address.Bytes(),
 		}
 		actualResp, err := handler.GetAccountAtLatestBlock(ctx, req)
 		suite.checkResponse(actualResp, err)
