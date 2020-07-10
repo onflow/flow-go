@@ -51,7 +51,8 @@ func NewHandler(log zerolog.Logger,
 	collections storage.Collections,
 	transactions storage.Transactions,
 	chainID flow.ChainID) *Handler {
-	return &Handler{
+	retry := newRetry()
+	h := &Handler{
 		executionRPC: e,
 		state:        s,
 		// create the sub-handlers
@@ -68,6 +69,7 @@ func NewHandler(log zerolog.Logger,
 			collections:   collections,
 			blocks:        blocks,
 			transactions:  transactions,
+			retry:         retry,
 		},
 		handlerEvents: handlerEvents{
 			executionRPC: e,
@@ -90,6 +92,8 @@ func NewHandler(log zerolog.Logger,
 		},
 		chainID: chainID,
 	}
+	retry.SetHandler(h)
+	return h
 }
 
 // Ping responds to requests when the server is up.

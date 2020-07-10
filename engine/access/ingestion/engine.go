@@ -11,6 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/access/rpc"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -38,6 +39,8 @@ type Engine struct {
 	headers      storage.Headers
 	collections  storage.Collections
 	transactions storage.Transactions
+
+	rpcEngine *rpc.Engine
 }
 
 // New creates a new access ingestion engine
@@ -48,7 +51,9 @@ func New(log zerolog.Logger,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
-	transactions storage.Transactions) (*Engine, error) {
+	transactions storage.Transactions,
+	rpcEngine *rpc.Engine,
+) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	eng := &Engine{
@@ -60,6 +65,7 @@ func New(log zerolog.Logger,
 		headers:      headers,
 		collections:  collections,
 		transactions: transactions,
+		rpcEngine:    rpcEngine,
 	}
 
 	collConduit, err := net.Register(engine.CollectionProvider, eng)
@@ -146,6 +152,9 @@ func (e *Engine) processFinalizedBlock(id flow.Identifier) error {
 	if err != nil {
 		return fmt.Errorf("failed to lookup block: %w", err)
 	}
+
+	// Notify rpc handler of new finalized block height
+	e.rpcEngine.SubmitLocal(block)
 
 	// FIX: we can't index guarantees here, as we might have more than one block
 	// with the same collection as long as it is not finalized
