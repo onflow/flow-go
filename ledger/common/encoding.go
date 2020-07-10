@@ -12,7 +12,8 @@ import (
 // decoding data with version smaller or equal to this value
 // bumping this number prevents older versions of the code
 // to deal with the newer version of data
-// codes should be always updated with backward compatibility
+// codes should be updated with backward compatibility if needed
+// and act differently based on the encoding decoding version
 const EncodingDecodingVersion = uint64(0)
 
 // EncodingType capture the type of encoded entity
