@@ -265,6 +265,45 @@ func decodeValue(inp []byte) (ledger.Value, error) {
 	return ledger.Value(inp), nil
 }
 
+// EncodePath encodes a path into a byte slice
+func EncodePath(p ledger.Path) []byte {
+	// encode EncodingDecodingType
+	buffer := appendUint64([]byte{}, EncodingDecodingVersion)
+
+	// encode key entity type
+	buffer = appendUint16(buffer, EncodingTypePath)
+
+	// encode path
+	buffer = append(buffer, encodePath(p)...)
+
+	return buffer
+}
+
+func encodePath(p ledger.Path) []byte {
+	return p
+}
+
+// DecodePath constructs a path value using an encoded byte slice
+func DecodePath(encodedPath []byte) (ledger.Path, error) {
+	// check enc dec version
+	rest, _, err := checkEncDecVer(encodedPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// check the encoding type
+	rest, err = checkEncodingType(rest, EncodingTypePath)
+	if err != nil {
+		return nil, err
+	}
+
+	return decodePath(rest)
+}
+
+func decodePath(inp []byte) (ledger.Path, error) {
+	return ledger.Path(inp), nil
+}
+
 // EncodePayload encodes a ledger payload
 func EncodePayload(p *ledger.Payload) []byte {
 	if p == nil {
@@ -308,6 +347,10 @@ func encodePayload(p *ledger.Payload) []byte {
 
 // DecodePayload construct a payload from an encoded byte slice
 func DecodePayload(encodedPayload []byte) (*ledger.Payload, error) {
+	// if empty don't decode
+	if len(encodedPayload) == 0 {
+		return nil, nil
+	}
 	// check the enc dec version
 	rest, _, err := checkEncDecVer(encodedPayload)
 	if err != nil {
