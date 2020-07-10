@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
 
-	"github.com/onflow/flow-go-sdk/templates"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
@@ -200,6 +199,18 @@ func (gs *TransactionsPerSecondSuite) SetTokenAddresses() {
 	fmt.Println("Flow Address:", flowTokenAddress)
 }
 
+const createAccountTemplate = `
+transaction(publicKeys: [[UInt8]], code: [UInt8]) {
+  prepare(signer: AuthAccount) {
+	let acct = AuthAccount(payer: signer)
+	for key in publicKeys {
+		acct.addPublicKey(key)
+	}
+	acct.setCode(code)
+  }
+}
+`
+
 // CreateAccountAndTransfer will create an account and transfer 1000 tokens to it
 func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(keyIndex int) (flowsdk.Address, *flowsdk.AccountKey) {
 	ctx := context.Background()
@@ -212,18 +223,23 @@ func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(keyIndex int) (fl
 	mySigner := crypto.NewInMemorySigner(myPrivateKey, accountKey.HashAlgo)
 
 	// Generate an account creation script
-	createAccountScript, err := templates.CreateAccount([]*flowsdk.AccountKey{accountKey}, nil)
-	handle(err)
+	// TODO: use flow-go-sdk template/func instead
+	publicKeys := []cadence.Value{bytesToCadenceArray(accountKey.Encode())}
+
+	cadencePublicKeys := cadence.NewArray(publicKeys)
+	cadenceCode := bytesToCadenceArray(nil)
 
 	createAccountTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(gs.ref.ID).
 		AddAuthorizer(gs.rootAcctAddr).
-		SetScript(createAccountScript).
+		SetScript([]byte(createAccountTemplate)).
+		AddArgument(cadencePublicKeys).
+		AddArgument(cadenceCode).
 		SetProposalKey(gs.rootAcctAddr, keyIndex, gs.sequenceNumbers[keyIndex]).
 		SetPayer(gs.rootAcctAddr)
 
 	gs.rootSignerLock.Lock()
-	err = createAccountTx.SignEnvelope(gs.rootAcctAddr, keyIndex, gs.rootSigner)
+	err := createAccountTx.SignEnvelope(gs.rootAcctAddr, keyIndex, gs.rootSigner)
 	handle(err)
 
 	gs.ref, err = gs.flowClient.GetLatestBlockHeader(context.Background(), false)
