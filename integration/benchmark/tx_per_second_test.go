@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/cadence"
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
@@ -52,6 +53,8 @@ const (
 var (
 	fungibleTokenAddress flowsdk.Address
 	flowTokenAddress     flowsdk.Address
+
+	fileCache = map[string][]byte{}
 )
 
 // TestTransactionsPerSecondBenchmark measures the average number of transactions executed per second by an execution node
@@ -335,15 +338,17 @@ func logTPSToFile(msg string, resultFileName string) error {
 
 // DownloadFile will download a url a byte slice
 func DownloadFile(url string) ([]byte, error) {
-
+	if file, ok := fileCache[url]; ok {
+		return file, nil
+	}
 	// Get the data
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-
-	return ioutil.ReadAll(resp.Body)
+	fileCache[url], err = ioutil.ReadAll(resp.Body)
+	return fileCache[url], err
 }
 
 func ServiceAccountWithKey(flowClient *client.Client, key string) (flowsdk.Address, *flowsdk.AccountKey, crypto.Signer) {
@@ -368,7 +373,7 @@ func ServiceAccountWithKey(flowClient *client.Client, key string) (flowsdk.Addre
 
 func WaitForFinalized(ctx context.Context, c *client.Client, id flowsdk.Identifier) *flowsdk.TransactionResult {
 	result, err := c.GetTransactionResult(ctx, id)
-	// Handle(err)
+	handle(err)
 
 	fmt.Printf("Waiting for transaction %s to be finalized...\n", id)
 	errCount := 0
@@ -386,7 +391,6 @@ func WaitForFinalized(ctx context.Context, c *client.Client, id flowsdk.Identifi
 		} else {
 			fmt.Print(".")
 		}
-		// Handle(err)
 	}
 
 	fmt.Println()
@@ -409,37 +413,48 @@ func GenerateTransferScript(ftAddr, flowToken, toAddr flowsdk.Address, amount in
 	return []byte(withAmount)
 }
 
-// languageEncodeBytes converts a byte slice to a comma-separated list of uint8 integers.
-func languageEncodeBytes(b []byte) string {
-	if len(b) == 0 {
-		return "[]"
+func bytesToCadenceArray(b []byte) cadence.Array {
+	values := make([]cadence.Value, len(b))
+
+	for i, v := range b {
+		values[i] = cadence.NewUInt8(v)
 	}
 
-	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
+	return cadence.NewArray(values)
 }
+
+const addAccountKeyTemplate = `
+transaction(publicKey: [UInt8]) {
+  prepare(signer: AuthAccount) {
+	signer.addPublicKey(publicKey)
+  }
+}
+`
 
 func (gs *TransactionsPerSecondSuite) AddKeys(flowClient *client.Client) {
 	ctx := context.Background()
 
 	gs.sequenceNumbers = make([]uint64, TotalAccounts)
 	publicKeysStr := strings.Builder{}
+	accountKeyBytes := gs.rootAcctKey.Encode()
 
 	for i := 0; i < TotalAccounts; i++ {
-		publicKeysStr.WriteString("signer.addPublicKey(")
-		publicKeysStr.WriteString(languageEncodeBytes(gs.rootAcctKey.Encode()))
-		publicKeysStr.WriteString(")\n")
+		publicKeysStr.WriteString("signer.addPublicKey(publicKey)\n")
 	}
 	script := fmt.Sprintf(`
-	transaction {
-	  prepare(signer: AuthAccount) {
+	transaction(publicKey: [UInt8]) {
+		prepare(signer: AuthAccount) {
 			%s
 		}
 	}
 `, publicKeysStr.String())
 
+	fmt.Println(string(script))
+
 	addKeysTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(gs.ref.ID).
 		SetScript([]byte(script)).
+		AddArgument(bytesToCadenceArray(accountKeyBytes)).
 		SetProposalKey(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootAcctKey.SequenceNumber).
 		SetPayer(gs.rootAcctAddr).
 		AddAuthorizer(gs.rootAcctAddr)

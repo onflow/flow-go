@@ -60,7 +60,9 @@ func (s *Suite) SetupTest() {
 	for _, nodeID := range s.nodeIDs {
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithID(nodeID),
 			testnet.WithLogLevel(zerolog.FatalLevel),
-			testnet.WithAdditionalFlag("--hotstuff-timeout=12s"))
+			testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
+			testnet.WithAdditionalFlag("--block-rate-delay=10ms"),
+		)
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
 	}
 
@@ -77,10 +79,17 @@ func (s *Suite) SetupTest() {
 	// s.nodeConfigs = append(s.nodeConfigs, verConfig)
 
 	// need one collection node
-	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel))
-	s.nodeConfigs = append(s.nodeConfigs, collConfig)
+	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
+		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithAdditionalFlag("--block-rate-delay=10ms"),
+	)
+	coll2Config := testnet.NewNodeConfig(flow.RoleCollection,
+		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithAdditionalFlag("--block-rate-delay=10ms"),
+	)
+	s.nodeConfigs = append(s.nodeConfigs, coll1Config, coll2Config)
 
-	// add the ghost node config
+	// add the ghost (verification) node config
 	s.ghostID = unittest.IdentifierFixture()
 	ghostConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithID(s.ghostID), testnet.AsGhost(),
 		testnet.WithLogLevel(zerolog.InfoLevel))
