@@ -12,13 +12,13 @@ type Ledger interface {
 	InitStateCommitment() flow.StateCommitment
 
 	// Get returns values for the given slice of keys at specific state commitment
-	Get(read *Read) (values []Value, err error)
+	Get(query *Query) (values []Value, err error)
 
 	// Update updates a list of keys with new values at specific state commitment (update) and returns a new state commitment
 	Set(update *Update) (newStateCommitment StateCommitment, err error)
 
 	// Proof returns a proof for the given keys at specific state commitment
-	Proof(read *Read) (proof *Proof, err error)
+	Proof(query *Query) (proof *Proof, err error)
 
 	// returns an approximate size of memory used by the ledger
 	MemSize() (int64, error)
