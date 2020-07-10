@@ -1,6 +1,7 @@
 package requester
 
 import (
+	"math/rand"
 	"testing"
 	"time"
 
@@ -206,4 +207,94 @@ func TestDispatchRequestBatchSize(t *testing.T) {
 	require.True(t, dispatched)
 
 	con.AssertExpectations(t)
+}
+
+func TestOnEntityResponseValid(t *testing.T) {
+
+	identities := unittest.IdentityListFixture(16)
+	targetID := identities[0].NodeID
+
+	final := &protocol.Snapshot{}
+	final.On("Identities", mock.Anything).Return(
+		func(selector flow.IdentityFilter) flow.IdentityList {
+			return identities.Filter(selector)
+		},
+		nil,
+	)
+
+	state := &protocol.State{}
+	state.On("Final").Return(final)
+
+	nonce := rand.Uint64()
+
+	wanted1 := unittest.CollectionFixture(1)
+	wanted2 := unittest.CollectionFixture(2)
+	unavailable := unittest.CollectionFixture(3)
+	unwanted := unittest.CollectionFixture(4)
+
+	now := time.Now()
+
+	iwanted1 := &Item{
+		EntityID:      wanted1.ID(),
+		LastRequested: now,
+		ExtraSelector: filter.Any,
+	}
+	iwanted2 := &Item{
+		EntityID:      wanted2.ID(),
+		LastRequested: now,
+		ExtraSelector: filter.Any,
+	}
+	iunavailable := &Item{
+		EntityID:      unavailable.ID(),
+		LastRequested: now,
+		ExtraSelector: filter.Any,
+	}
+
+	res := &messages.EntityResponse{
+		Nonce:    nonce,
+		Entities: []flow.Entity{wanted1, wanted2, unwanted},
+	}
+
+	req := &messages.EntityRequest{
+		Nonce:     nonce,
+		EntityIDs: []flow.Identifier{wanted1.ID(), wanted2.ID(), unavailable.ID()},
+	}
+
+	called := 0
+	request := Engine{
+		unit:     engine.NewUnit(),
+		metrics:  metrics.NewNoopCollector(),
+		state:    state,
+		items:    make(map[flow.Identifier]*Item),
+		requests: make(map[uint64]*messages.EntityRequest),
+		selector: filter.HasNodeID(targetID),
+		handle:   func(flow.Identifier, flow.Entity) { called++ },
+	}
+
+	request.items[iwanted1.EntityID] = iwanted1
+	request.items[iwanted2.EntityID] = iwanted2
+	request.items[iunavailable.EntityID] = iunavailable
+
+	request.requests[req.Nonce] = req
+
+	err := request.onEntityResponse(targetID, res)
+	assert.NoError(t, err)
+
+	// check that the request was removed
+	assert.NotContains(t, request.requests, nonce)
+
+	// check that the provided items were removed
+	assert.NotContains(t, request.items, wanted1.ID())
+	assert.NotContains(t, request.items, wanted2.ID())
+
+	// check that the missing item is still there
+	assert.Contains(t, request.items, unavailable.ID())
+
+	time.Sleep(100 * time.Millisecond)
+
+	// make sure we processed two items
+	assert.Equal(t, called, 2)
+
+	// check that the missing items timestamp was reset
+	assert.Equal(t, iunavailable.LastRequested, time.Time{})
 }

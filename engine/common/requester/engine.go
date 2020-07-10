@@ -380,6 +380,7 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 	needed := make(map[flow.Identifier]struct{})
 	req, exists := e.requests[res.Nonce]
 	if exists {
+		delete(e.requests, req.Nonce)
 		for _, entityID := range req.EntityIDs {
 			needed[entityID] = struct{}{}
 		}
