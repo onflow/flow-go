@@ -17,28 +17,22 @@ import (
 
 // SPOCKProve generates a spock poof for data under the private key sk.
 func SPOCKProve(sk PrivateKey, data []byte, kmac hash.Hasher) (Signature, error) {
-	blsSk, ok := sk.(*PrKeyBLSBLS12381)
-	if !ok {
+	if sk.Algorithm() != BLSBLS12381 {
 		return nil, errors.New("private key must be a BLS key.")
 	}
 
-	// hash the input to 128 bytes
-	h := kmac.ComputeHash(data)
 	// BLS signature of data
-	return newBLSBLS12381().blsSign(&blsSk.scalar, h), nil
+	return sk.Sign(data, kmac)
 }
 
 // SPOCKVerifyAgainstData verifies a SPoCK proof is generated from the given data
 // and the prover's public key.
 func SPOCKVerifyAgainstData(pk PublicKey, proof Signature, data []byte, kmac hash.Hasher) (bool, error) {
-	blsPk, ok := pk.(*PubKeyBLSBLS12381)
-	if !ok {
+	if pk.Algorithm() != BLSBLS12381 {
 		return false, errors.New("public key must be a BLS key.")
 	}
-	// hash the input to 128 bytes
-	h := kmac.ComputeHash(data)
-	// verify the spock proof using the secret data
-	return newBLSBLS12381().blsVerify(&blsPk.point, proof, h), nil
+	// BLS verification of data
+	return pk.Verify(proof, data, kmac)
 }
 
 // SPOCKVerify verifies a 2 SPoCK proofs are consistent against 2 public keys.
