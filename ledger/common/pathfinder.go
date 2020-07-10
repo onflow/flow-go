@@ -7,19 +7,6 @@ import (
 	"github.com/dapperlabs/flow-go/ledger"
 )
 
-// KeysToPaths converts an slice of keys into a paths
-func KeysToPaths(keys []ledger.Key, version uint8) ([]ledger.Path, error) {
-	paths := make([]ledger.Path, 0)
-	for _, k := range keys {
-		p, err := KeyToPath(&k, version)
-		if err != nil {
-			return nil, err
-		}
-		paths = append(paths, p)
-	}
-	return paths, nil
-}
-
 // KeyToPath converts key into a path
 func KeyToPath(key *ledger.Key, version uint8) (ledger.Path, error) {
 	switch version {
@@ -38,4 +25,17 @@ func KeyToPath(key *ledger.Key, version uint8) (ledger.Path, error) {
 		}
 	}
 	return nil, fmt.Errorf("unsuported key to path version")
+}
+
+// KeysToPaths converts an slice of keys into a paths
+func KeysToPaths(keys []ledger.Key, version uint8) ([]ledger.Path, error) {
+	paths := make([]ledger.Path, 0)
+	for _, k := range keys {
+		p, err := KeyToPath(&k, version)
+		if err != nil {
+			return nil, err
+		}
+		paths = append(paths, p)
+	}
+	return paths, nil
 }

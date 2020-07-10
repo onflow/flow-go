@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/utils"
 )
 
 // EncodingDecodingVersion encoder/decoder code only supports
@@ -424,7 +423,7 @@ func decodeProof(inp []byte) (*ledger.Proof, error) {
 
 	// Inclusion flag
 	byteInclusion, rest, err := readSlice(inp, 1)
-	pInst.Inclusion = utils.IsBitSet(byteInclusion, 0)
+	pInst.Inclusion, _ = IsBitSet(byteInclusion, 0)
 
 	// read steps
 	steps, rest, err := readUint8(rest)
