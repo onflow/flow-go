@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/ledger"
+	"github.com/dapperlabs/flow-go/ledger/utils"
 )
 
 // EncodingDecodingVersion encoder/decoder code only supports
@@ -68,12 +69,12 @@ func checkEncodingType(rawInput []byte, expectedType uint16) (rest []byte, err e
 
 	// error if type is known for this code
 	if t >= encodingTypeUnknown {
-		return r, fmt.Errorf("unknown entity type in the encoded data (%d > %d): %w", t, encodingTypeUnknown, err)
+		return r, fmt.Errorf("unknown entity type in the encoded data (%d > %d)", t, encodingTypeUnknown)
 	}
 
 	// error if type is known for this code
 	if t != expectedType {
-		return r, fmt.Errorf("unexpected entity type, got (%v) but (%v) was expected: %w", EncodingType(t), expectedType, err)
+		return r, fmt.Errorf("unexpected entity type, got (%v) but (%v) was expected", EncodingType(t), EncodingType(expectedType))
 	}
 
 	// return the rest of bytes
@@ -88,13 +89,13 @@ func EncodeKeyPart(kp *ledger.KeyPart) []byte {
 	// encode key part entity type
 	buffer = appendUint16(buffer, EncodingTypeKeyPart)
 
-	// encode the key content
+	// encode the key part content
 	buffer = append(buffer, encodeKeyPart(kp)...)
 	return buffer
 }
 
 func encodeKeyPart(kp *ledger.KeyPart) []byte {
-	buffer := []byte{}
+	buffer := make([]byte, 0)
 
 	// encode "Type" field of the key part
 	buffer = appendUint16(buffer, kp.Type)
@@ -152,7 +153,7 @@ func EncodeKey(k *ledger.Key) []byte {
 
 // encodeKey encodes a key into a byte slice
 func encodeKey(k *ledger.Key) []byte {
-	buffer := []byte{}
+	buffer := make([]byte, 0)
 	// encode number of key parts
 	buffer = appendUint16(buffer, uint16(len(k.KeyParts)))
 	// iterate over key parts
@@ -261,15 +262,23 @@ func decodeValue(inp []byte) (ledger.Value, error) {
 
 // EncodePayload encodes a ledger payload
 func EncodePayload(p *ledger.Payload) []byte {
-
 	// encode EncodingDecodingType
 	buffer := appendUint64([]byte{}, EncodingDecodingVersion)
 
 	// encode key entity type
 	buffer = appendUint16(buffer, EncodingTypePayload)
 
+	// append encoded payload content
+	buffer = append(buffer, encodePayload(p)...)
+
+	return buffer
+}
+
+func encodePayload(p *ledger.Payload) []byte {
+	buffer := make([]byte, 0)
+
 	// encode key
-	encK := EncodeKey(&p.Key)
+	encK := encodeKey(&p.Key)
 
 	// encode encoded key size
 	buffer = appendUint64(buffer, uint64(len(encK)))
@@ -278,7 +287,7 @@ func EncodePayload(p *ledger.Payload) []byte {
 	buffer = append(buffer, encK...)
 
 	// encode value
-	encV := EncodeKey(&p.Key)
+	encV := encodeValue(p.Value)
 
 	// encode encoded value size
 	buffer = appendUint64(buffer, uint64(len(encV)))
@@ -297,13 +306,17 @@ func DecodePayload(encodedPayload []byte) (*ledger.Payload, error) {
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
 	// check the encoding type
-	rest, err = checkEncodingType(rest, EncodingTypeKey)
+	rest, err = checkEncodingType(rest, EncodingTypePayload)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
+	return decodePayload(rest)
+}
+
+func decodePayload(inp []byte) (*ledger.Payload, error) {
 
 	// read encoded key size
-	encKeySize, rest, err := readUint64(rest)
+	encKeySize, rest, err := readUint64(inp)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
@@ -315,7 +328,7 @@ func DecodePayload(encodedPayload []byte) (*ledger.Payload, error) {
 	}
 
 	// decode the key
-	key, err := DecodeKey(encKey)
+	key, err := decodeKey(encKey)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
@@ -333,7 +346,7 @@ func DecodePayload(encodedPayload []byte) (*ledger.Payload, error) {
 	}
 
 	// decode value
-	value, err := DecodeValue(encValue)
+	value, err := decodeValue(encValue)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
@@ -341,41 +354,141 @@ func DecodePayload(encodedPayload []byte) (*ledger.Payload, error) {
 	return &ledger.Payload{Key: *key, Value: value}, nil
 }
 
-// // EncodeProof encodes all the content of a proof into a byte slice
-// func EncodeProof(p *ledger.Proof) []byte {
-// 	// 1. first byte is reserved for inclusion flag
-// 	byteInclusion := make([]byte, 1)
-// 	if p.Inclusion {
-// 		// set the first bit to 1 if it is an inclusion proof
-// 		byteInclusion[0] |= 1 << 7
-// 	}
-// 	// 2. steps is encoded as a single byte
-// 	byteSteps := []byte{p.Steps}
-// 	proof := append(byteInclusion, byteSteps...)
+// EncodeProof encodes the content of a proof into a byte slice
+func EncodeProof(p *ledger.Proof) []byte {
+	// encode EncodingDecodingType
+	buffer := appendUint64([]byte{}, EncodingDecodingVersion)
 
-// 	// 3. include flag size first and then all the flags
-// 	flagSize := []byte{uint8(len(p.Flags))}
-// 	proof = append(proof, flagSize...)
-// 	proof = append(proof, p.Flags...)
+	// encode key entity type
+	buffer = appendUint16(buffer, EncodingTypeProof)
 
-// 	// 4. include path size first and then path
-// 	pathSize := Uint16ToBinary(uint16(p.Path.Size()))
-// 	proof = append(proof, pathSize...)
-// 	proof = append(proof, p.Path...)
+	// append encoded proof content
+	buffer = append(buffer, encodeProof(p)...)
 
-// 	// 5. include payload size first and then payload
-// 	encPayload := p.Payload.Encode()
-// 	encPayloadSize := Uint64ToBinary(uint64(len(encPayload)))
-// 	proof = append(proof, encPayloadSize...)
-// 	proof = append(proof, encPayload...)
+	return buffer
+}
 
-// 	// 6. and finally include all interims (hash values)
-// 	for _, inter := range p.Interims {
-// 		proof = append(proof, inter...)
-// 	}
+func encodeProof(p *ledger.Proof) []byte {
+	// first byte is reserved for inclusion flag
+	buffer := make([]byte, 1)
+	if p.Inclusion {
+		// set the first bit to 1 if it is an inclusion proof
+		buffer[0] |= 1 << 7
+	}
 
-// 	return proof
-// }
+	// steps are encoded as a single byte
+	buffer = appendUint8(buffer, p.Steps)
+
+	// include flags size and content
+	buffer = appendUint8(buffer, uint8(len(p.Flags)))
+	buffer = append(buffer, p.Flags...)
+
+	// include path size and content
+	buffer = appendUint16(buffer, uint16(p.Path.Size()))
+	buffer = append(buffer, p.Path...)
+
+	// include encoded payload size and content
+	encPayload := encodePayload(&p.Payload)
+	buffer = appendUint64(buffer, uint64(len(encPayload)))
+	buffer = append(buffer, encPayload...)
+
+	// and finally include all interims (hash values)
+	// number of interims
+	buffer = appendUint8(buffer, uint8(len(p.Interims)))
+	for _, inter := range p.Interims {
+		buffer = appendUint16(buffer, uint16(len(inter)))
+		buffer = append(buffer, inter...)
+	}
+
+	return buffer
+}
+
+// DecodeProof construct a proof from an encoded byte slice
+func DecodeProof(encodedProof []byte) (*ledger.Proof, error) {
+	// check the enc dec version
+	rest, _, err := checkEncDecVer(encodedProof)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding proof: %w", err)
+	}
+	// check the encoding type
+	rest, err = checkEncodingType(rest, EncodingTypeProof)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding proof: %w", err)
+	}
+	return decodeProof(rest)
+}
+
+func decodeProof(inp []byte) (*ledger.Proof, error) {
+	pInst := ledger.NewProof()
+
+	// Inclusion flag
+	byteInclusion, rest, err := readSlice(inp, 1)
+	pInst.Inclusion = utils.IsBitSet(byteInclusion, 0)
+
+	// read steps
+	steps, rest, err := readUint8(rest)
+	pInst.Steps = steps
+
+	// read flags
+	flagsSize, rest, err := readUint8(rest)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding proof: %w", err)
+	}
+	flags, rest, err := readSlice(rest, int(flagsSize))
+	if err != nil {
+		return nil, fmt.Errorf("error decoding proof: %w", err)
+	}
+	pInst.Flags = flags
+
+	// read path
+	pathSize, rest, err := readUint16(rest)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding proof: %w", err)
+	}
+	path, rest, err := readSlice(rest, int(pathSize))
+	if err != nil {
+		return nil, fmt.Errorf("error decoding proof: %w", err)
+	}
+	pInst.Path = path
+
+	// read payload
+	encPayloadSize, rest, err := readUint64(rest)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding proof: %w", err)
+	}
+	encPayload, rest, err := readSlice(rest, int(encPayloadSize))
+	if err != nil {
+		return nil, fmt.Errorf("error decoding proof: %w", err)
+	}
+	payload, err := decodePayload(encPayload)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding proof: %w", err)
+	}
+	pInst.Payload = *payload
+
+	// read interims
+	interimsLen, rest, err := readUint8(rest)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding proof: %w", err)
+	}
+	interims := make([][]byte, 0)
+
+	for i := 0; i < int(interimsLen); i++ {
+		interimSize, rest, err := readUint16(rest)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding proof: %w", err)
+		}
+
+		interim, rest, err := readSlice(rest, int(interimSize))
+		if err != nil {
+			return nil, fmt.Errorf("error decoding proof: %w", err)
+		}
+		interims = append(interims, interim)
+	}
+	pInst.Interims = interims
+
+	return pInst, nil
+}
 
 // // EncodeBatchProof encodes all the content of a batch proof into a slice of byte slices and total len
 // // TODO change this to only an slice of bytes
@@ -431,7 +544,6 @@ func DecodePayload(encodedPayload []byte) (*ledger.Payload, error) {
 // }
 
 // TODO RAMTIN FIX proof encoder decoder
-// TODO add encoding version
 
 func readSlice(input []byte, size int) (value []byte, rest []byte, err error) {
 	if len(input) < size {
@@ -509,24 +621,3 @@ func appendUint64(input []byte, value uint64) []byte {
 	binary.BigEndian.PutUint64(buffer, value)
 	return append(input, buffer...)
 }
-
-// // encodeSlice encodes an slice (version) into an encoded slice
-// func encodeSlice(inp []byte, typ uint8, version uint8) []byte {
-// 	// first byte is reserved for version
-// 	byteInclusion := make([]byte, 1)
-// 	if p.Inclusion {
-// 		// set the first bit to 1 if it is an inclusion proof
-// 		byteInclusion[0] |= 1 << 7
-// 	}
-
-// 	// encode size
-// 	// and byte
-// 	return nil
-// }
-
-// // decodeSlice decodes an encoded slice and returns a byte slice
-// func decodeSlice(encSlice []byte, version uint8) ([]byte, version) {
-// 	// encode size
-// 	// and byte
-// 	return nil
-// }

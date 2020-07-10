@@ -64,6 +64,30 @@ func Test_ValueEncodingDecoding(t *testing.T) {
 
 }
 
+// Test_PayloadEncodingDecoding tests encoding decoding functionality of a payload
+func Test_PayloadEncodingDecoding(t *testing.T) {
+	kp1t := uint16(1)
+	kp1v := []byte("key part 1")
+	kp1 := ledger.NewKeyPart(kp1t, kp1v)
+
+	kp2t := uint16(22)
+	kp2v := []byte("key part 2")
+	kp2 := ledger.NewKeyPart(kp2t, kp2v)
+
+	k := ledger.NewKey([]ledger.KeyPart{*kp1, *kp2})
+	v := ledger.Value([]byte{'A'})
+	p := ledger.NewPayload(*k, v)
+
+	encoded := common.EncodePayload(p)
+	newp, err := common.DecodePayload(encoded)
+	require.NoError(t, err)
+	require.Equal(t, newp.Key.KeyParts[0].Type, kp1t)
+	require.Equal(t, newp.Key.KeyParts[0].Value, kp1v)
+	require.Equal(t, newp.Key.KeyParts[1].Type, kp2t)
+	require.Equal(t, newp.Key.KeyParts[1].Value, kp2v)
+	require.Equal(t, newp.Value, v)
+}
+
 // func TestBatchProofEncoderDecoder(t *testing.T) {
 // 	pathByteSize := 1 // key size of 8 bits
 // 	dir, err := ioutil.TempDir("", "test-mtrie-")
@@ -88,30 +112,4 @@ func Test_ValueEncodingDecoding(t *testing.T) {
 // 	p, err := ledger.DecodeBatchProof(encProf)
 // 	require.NoError(t, err)
 // 	require.Equal(t, p, batchProof, "Proof encoder and/or decoder has an issue")
-// }
-
-// // Test_PayloadEncodingDecoding tests encoding decoding functionality of a payload
-// func Test_PayloadEncodingDecoding(t *testing.T) {
-// 	kp1t := uint16(1)
-// 	kp1v := []byte("key part 1")
-// 	kp1 := ledger.NewKeyPart(kp1t, kp1v)
-
-// 	kp2t := uint16(22)
-// 	kp2v := []byte("key part 2")
-// 	kp2 := ledger.NewKeyPart(kp2t, kp2v)
-
-// 	k := ledger.NewKey([]ledger.KeyPart{*kp1, *kp2})
-
-// 	v := ledger.Value([]byte{'A'})
-
-// 	p := ledger.NewPayload(*k, v)
-
-// 	encoded := p.Encode()
-// 	newp, err := ledger.DecodePayload(encoded)
-// 	require.NoError(t, err)
-// 	require.Equal(t, newp.Key.KeyParts[0].Type, kp1t)
-// 	require.Equal(t, newp.Key.KeyParts[0].Value, kp1v)
-// 	require.Equal(t, newp.Key.KeyParts[1].Type, kp2t)
-// 	require.Equal(t, newp.Key.KeyParts[1].Value, kp2v)
-// 	require.Equal(t, newp.Value, v)
 // }
