@@ -130,3 +130,17 @@ func (mr *MockLocalMockRecorder) Sign(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Sign", reflect.TypeOf((*MockLocal)(nil).Sign), arg0, arg1)
 }
+
+// StakingKey mocks base method
+func (m *MockLocal) StakingKey() crypto.PrivateKey {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StakingKey")
+	ret0, _ := ret[0].(crypto.PrivateKey)
+	return ret0
+}
+
+// StakingKey indicates an expected call of StakingKey
+func (mr *MockLocalMockRecorder) StakingKey() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StakingKey", reflect.TypeOf((*MockLocal)(nil).StakingKey))
+}

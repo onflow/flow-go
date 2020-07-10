@@ -47,3 +47,7 @@ func (m *MockLocal) MockNodeID(id flow.Identifier) {
 func (m *MockLocal) NotMeFilter() flow.IdentityFilter {
 	return filter.Not(filter.HasNodeID(m.id))
 }
+
+func (m *MockLocal) StakingKey() crypto.PrivateKey {
+	return m.sk
+}

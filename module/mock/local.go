@@ -84,3 +84,19 @@ func (_m *Local) Sign(_a0 []byte, _a1 hash.Hasher) (crypto.Signature, error) {
 
 	return r0, r1
 }
+
+// StakingKey provides a mock function with given fields:
+func (_m *Local) StakingKey() crypto.PrivateKey {
+	ret := _m.Called()
+
+	var r0 crypto.PrivateKey
+	if rf, ok := ret.Get(0).(func() crypto.PrivateKey); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(crypto.PrivateKey)
+		}
+	}
+
+	return r0
+}

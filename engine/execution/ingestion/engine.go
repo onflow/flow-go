@@ -68,6 +68,7 @@ type Engine struct {
 	extensiveLogging                    bool
 	collectionRequestTimeout            time.Duration
 	maximumCollectionRequestRetryNumber uint
+	spockHasher                         hash.Hasher
 }
 
 func New(
@@ -101,6 +102,7 @@ func New(
 		me:                                  me,
 		state:                               state,
 		receiptHasher:                       utils.NewExecutionReceiptHasher(),
+		spockHasher:                         utils.NewSPoCKHasher(),
 		blocks:                              blocks,
 		payloads:                            payloads,
 		collections:                         collections,
@@ -825,7 +827,7 @@ func (e *Engine) saveExecutionResults(
 		return nil, fmt.Errorf("could not generate execution result: %w", err)
 	}
 
-	receipt, err := e.generateExecutionReceipt(childCtx, executionResult)
+	receipt, err := e.generateExecutionReceipt(childCtx, executionResult, stateInteractions)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
 	}
@@ -945,11 +947,24 @@ func (e *Engine) generateExecutionResultForBlock(
 func (e *Engine) generateExecutionReceipt(
 	ctx context.Context,
 	result *flow.ExecutionResult,
+	stateInteractions []*delta.Snapshot,
 ) (*flow.ExecutionReceipt, error) {
+
+	spocks := make([]crypto.Signature, len(stateInteractions))
+
+	for i, stateInteraction := range stateInteractions {
+		stateInteraction.RegisterTouches()
+
+		spock, err := crypto.SPOCKProve(e.me.StakingKey(), stateInteraction.SpockSecret, e.spockHasher)
+		if err != nil {
+			return nil, fmt.Errorf("error while generating SPoCK: %w", err)
+		}
+		spocks[i] = spock
+	}
 
 	receipt := &flow.ExecutionReceipt{
 		ExecutionResult:   *result,
-		Spocks:            nil, // TODO: include SPoCKs
+		Spocks:            spocks,
 		ExecutorSignature: crypto.Signature{},
 		ExecutorID:        e.me.NodeID(),
 	}

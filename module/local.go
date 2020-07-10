@@ -24,4 +24,6 @@ type Local interface {
 
 	// NotMeFilter returns handy not-me filter for searching identity
 	NotMeFilter() flow.IdentityFilter
+
+	StakingKey() crypto.PrivateKey
 }

@@ -249,6 +249,24 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 			assert.NoError(ctx.t, err)
 
 			assert.True(ctx.t, validSig, "execution receipt signature invalid")
+
+			spocks := receipt.Spocks
+
+			assert.Len(ctx.t, spocks, len(computationResult.StateSnapshots))
+
+			for i, stateSnapshot := range computationResult.StateSnapshots {
+
+				valid, err := crypto.SPOCKVerifyAgainstData(
+					ctx.engine.me.StakingKey().PublicKey(),
+					spocks[i],
+					stateSnapshot.SpockSecret,
+					ctx.engine.spockHasher,
+				)
+
+				assert.NoError(ctx.t, err)
+				assert.True(ctx.t, valid)
+			}
+
 		}).
 		Return(nil)
 }
@@ -400,5 +418,48 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 		ctx.computationManager.AssertExpectations(t)
 		ctx.executionState.AssertExpectations(t)
 		ctx.state.AssertExpectations(t)
+	})
+}
+
+func Test_SPoCKGeneration(t *testing.T) {
+	runWithEngine(t, func(ctx testingContext) {
+
+		snapshots := []*delta.Snapshot{
+			{
+				SpockSecret: []byte{1, 2, 3},
+			},
+			{
+				SpockSecret: []byte{3, 2, 1},
+			},
+			{
+				SpockSecret: []byte{},
+			},
+			{
+				SpockSecret: unittest.RandomBytes(100),
+			},
+		}
+
+		executionReceipt, err := ctx.engine.generateExecutionReceipt(
+			context.Background(),
+			&flow.ExecutionResult{
+				ExecutionResultBody: flow.ExecutionResultBody{},
+				Signatures:          nil,
+			},
+			snapshots,
+		)
+		require.NoError(t, err)
+
+		for i, snapshot := range snapshots {
+			valid, err := crypto.SPOCKVerifyAgainstData(
+				ctx.engine.me.StakingKey().PublicKey(),
+				executionReceipt.Spocks[i],
+				snapshot.SpockSecret,
+				ctx.engine.spockHasher,
+			)
+
+			require.NoError(t, err)
+			require.True(t, valid)
+		}
+
 	})
 }

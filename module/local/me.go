@@ -37,3 +37,7 @@ func (l *Local) Sign(msg []byte, hasher hash.Hasher) (crypto.Signature, error) {
 func (l *Local) NotMeFilter() flow.IdentityFilter {
 	return filter.Not(filter.HasNodeID(l.NodeID()))
 }
+
+func (l *Local) StakingKey() crypto.PrivateKey {
+	return l.sk
+}
