@@ -18,8 +18,22 @@ func (p *Payload) IsEmpty() bool {
 
 // TODO fix me
 func (p *Payload) String() string {
-	// TODO Add key, values
-	return ""
+	// TODO improve this key, values
+	return p.Key.String() + " " + p.Value.String()
+}
+
+// Equal compares this payload to another payload
+func (p *Payload) Equal(other *Payload) bool {
+	if other == nil {
+		return false
+	}
+	if !p.Key.Equal(&other.Key) {
+		return false
+	}
+	if !p.Value.Equal(other.Value) {
+		return false
+	}
+	return true
 }
 
 // NewPayload returns a new payload

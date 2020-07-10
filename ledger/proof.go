@@ -1,6 +1,7 @@
 package ledger
 
 import (
+	"bytes"
 	"fmt"
 )
 
@@ -9,7 +10,7 @@ import (
 // up to the root of the trie.
 type Proof struct {
 	Path      Path     // path
-	Payload   Payload  // payload
+	Payload   *Payload // payload
 	Interims  [][]byte // the non-default intermediate nodes in the proof
 	Inclusion bool     // flag indicating if this is an inclusion or exclusion
 	Flags     []byte   // The flags of the proofs (is set if an intermediate node has a non-default)
@@ -20,7 +21,7 @@ type Proof struct {
 func NewProof() *Proof {
 	return &Proof{
 		Path:      make([]byte, 0),
-		Payload:   *EmptyPayload(),
+		Payload:   EmptyPayload(),
 		Interims:  make([][]byte, 0),
 		Inclusion: false,
 		Flags:     make([]byte, 0),
@@ -50,6 +51,37 @@ func (p *Proof) String() string {
 		}
 	}
 	return proofStr
+}
+
+// Equal compares this proof to another payload
+func (p *Proof) Equal(o *Proof) bool {
+	if o == nil {
+		return false
+	}
+	if !p.Path.Equal(o.Path) {
+		return false
+	}
+	if !p.Payload.Equal(o.Payload) {
+		return false
+	}
+	if len(p.Interims) != len(o.Interims) {
+		return false
+	}
+	for i, inter := range p.Interims {
+		if !bytes.Equal(inter, o.Interims[i]) {
+			return false
+		}
+	}
+	if p.Inclusion != o.Inclusion {
+		return false
+	}
+	if !bytes.Equal(p.Flags, o.Flags) {
+		return false
+	}
+	if p.Steps != o.Steps {
+		return false
+	}
+	return true
 }
 
 // BatchProof is a struct that holds the proofs for several keys
@@ -101,4 +133,20 @@ func (bp *BatchProof) MergeInto(dest *BatchProof) {
 	for _, p := range bp.Proofs {
 		dest.AppendProof(p)
 	}
+}
+
+// Equal compares this batch proof to another batch proof
+func (bp *BatchProof) Equal(o *BatchProof) bool {
+	if o == nil {
+		return false
+	}
+	if len(bp.Proofs) != len(o.Proofs) {
+		return false
+	}
+	for i, proof := range bp.Proofs {
+		if !proof.Equal(o.Proofs[i]) {
+			return false
+		}
+	}
+	return true
 }

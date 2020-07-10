@@ -312,6 +312,8 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.P
 	if head.IsLeaf() {
 		// value matches (inclusion proof)
 		if bytes.Equal(head.Path(), paths[0]) {
+			proofs[0].Path = head.Path()
+			proofs[0].Payload = head.Payload()
 			proofs[0].Inclusion = true
 		}
 		// TODO: insert ERROR if len(paths) != 1

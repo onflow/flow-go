@@ -48,11 +48,8 @@ func Test_KeyEncodingDecoding(t *testing.T) {
 	encoded := common.EncodeKey(k)
 	newk, err := common.DecodeKey(encoded)
 	require.NoError(t, err)
-	require.Equal(t, newk.KeyParts[0].Type, kp1t)
-	require.Equal(t, newk.KeyParts[0].Value, kp1v)
 
-	require.Equal(t, newk.KeyParts[1].Type, kp2t)
-	require.Equal(t, newk.KeyParts[1].Value, kp2v)
+	require.True(t, newk.Equal(k))
 }
 
 // Test_ValueEncodingDecoding tests encoding decoding functionality of a ledger value
@@ -83,36 +80,23 @@ func Test_PayloadEncodingDecoding(t *testing.T) {
 	encoded := common.EncodePayload(p)
 	newp, err := common.DecodePayload(encoded)
 	require.NoError(t, err)
-	require.Equal(t, newp.Key.KeyParts[0].Type, kp1t)
-	require.Equal(t, newp.Key.KeyParts[0].Value, kp1v)
-	require.Equal(t, newp.Key.KeyParts[1].Type, kp2t)
-	require.Equal(t, newp.Key.KeyParts[1].Value, kp2v)
-	require.Equal(t, newp.Value, v)
+	require.True(t, newp.Equal(p))
 }
 
-// TODO RAMTIN add tests for proof encoding and batch proof encoding without using fStore
-// func TestBatchProofEncoderDecoder(t *testing.T) {
-// 	pathByteSize := 1 // key size of 8 bits
-// 	dir, err := ioutil.TempDir("", "test-mtrie-")
-// 	require.NoError(t, err)
-// 	defer os.RemoveAll(dir)
+// Test_ProofEncodingDecoding tests encoding decoding functionality of a proof
+func Test_ProofEncodingDecoding(t *testing.T) {
+	p := common.ProofFixture()
+	encoded := common.EncodeProof(p)
+	newp, err := common.DecodeProof(encoded)
+	require.NoError(t, err)
+	require.True(t, newp.Equal(p))
+}
 
-// 	metricsCollector := &metrics.NoopCollector{}
-// 	fStore, err := mtrie.NewMForest(pathByteSize, dir, 5, metricsCollector, nil)
-// 	require.NoError(t, err)
-
-// 	p1 := ledger.Path([]byte{'p'})
-// 	v1 := ledger.Payload{Key: ledger.Key{KeyParts: []ledger.KeyPart{ledger.KeyPart{Type: 0,
-// 		Value: []byte{'k'}}}},
-// 		Value: ledger.Value([]byte{'v'})}
-
-// 	testTrie, err := fStore.Update(fStore.GetEmptyRootHash(), []ledger.Path{p1}, []ledger.Payload{v1})
-// 	require.NoError(t, err)
-// 	batchProof, err := fStore.Proofs(testTrie.RootHash(), []ledger.Path{p1})
-// 	require.NoError(t, err)
-
-// 	encProf, _ := batchProof.Encode()
-// 	p, err := ledger.DecodeBatchProof(encProf)
-// 	require.NoError(t, err)
-// 	require.Equal(t, p, batchProof, "Proof encoder and/or decoder has an issue")
-// }
+// Test_BatchProofEncodingDecoding tests encoding decoding functionality of a batch proof
+func Test_BatchProofEncodingDecoding(t *testing.T) {
+	bp := common.BatchProofFixture()
+	encoded := common.EncodeBatchProof(bp)
+	newbp, err := common.DecodeBatchProof(encoded)
+	require.NoError(t, err)
+	require.True(t, newbp.Equal(bp))
+}

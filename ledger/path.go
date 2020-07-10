@@ -25,7 +25,7 @@ func (p *Path) Size() int {
 }
 
 // Equals compares this path to another path
-func (p Path) Equals(o Path) bool {
+func (p Path) Equal(o Path) bool {
 	if o == nil {
 		return false
 	}

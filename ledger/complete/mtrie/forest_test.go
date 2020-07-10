@@ -883,6 +883,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		}
 
 		batchProof, err := fStore.Proofs(testTrie.RootHash(), proofPaths)
+		fmt.Println(batchProof)
 		require.NoError(t, err, "error generating proofs")
 		require.True(t, common.VerifyBatchProof(batchProof, proofPaths, proofPayloads, testTrie.RootHash(), pathByteSize))
 
@@ -932,6 +933,7 @@ func TestProofGenerationInclusion(t *testing.T) {
 	updatedTrie, err := fStore.Update(emptyTrieHash, paths, payloads)
 	require.NoError(t, err)
 	proof, err := fStore.Proofs(updatedTrie.RootHash(), paths)
+
 	require.NoError(t, err)
 	require.True(t, common.VerifyBatchProof(proof, paths, payloads, updatedTrie.RootHash(), pathByteSize))
 }

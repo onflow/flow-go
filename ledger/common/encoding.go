@@ -388,7 +388,7 @@ func encodeProof(p *ledger.Proof) []byte {
 	buffer = append(buffer, p.Path...)
 
 	// include encoded payload size and content
-	encPayload := encodePayload(&p.Payload)
+	encPayload := encodePayload(p.Payload)
 	buffer = appendUint64(buffer, uint64(len(encPayload)))
 	buffer = append(buffer, encPayload...)
 
@@ -464,7 +464,7 @@ func decodeProof(inp []byte) (*ledger.Proof, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
-	pInst.Payload = *payload
+	pInst.Payload = payload
 
 	// read interims
 	interimsLen, rest, err := readUint8(rest)
@@ -473,13 +473,16 @@ func decodeProof(inp []byte) (*ledger.Proof, error) {
 	}
 	interims := make([][]byte, 0)
 
+	var interimSize uint16
+	var interim []byte
+
 	for i := 0; i < int(interimsLen); i++ {
-		interimSize, rest, err := readUint16(rest)
+		interimSize, rest, err = readUint16(rest)
 		if err != nil {
 			return nil, fmt.Errorf("error decoding proof: %w", err)
 		}
 
-		interim, rest, err := readSlice(rest, int(interimSize))
+		interim, rest, err = readSlice(rest, int(interimSize))
 		if err != nil {
 			return nil, fmt.Errorf("error decoding proof: %w", err)
 		}
