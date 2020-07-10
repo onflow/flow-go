@@ -15,3 +15,9 @@ See `tests/mvp_test.go` for example usage.
 All integration test files live under `tests`. This is used to distinguish
 between unit tests of testing utilities and integration tests for the network
 in the Makefile.
+
+### Spamming/Load testing
+
+To send random transactions, for example to spam/load test a network, run `cd integration; make spam`.
+
+In order to build a docker container with the benchmarking binary, run `make docker-build-spammer` from the root of this repository.

@@ -8,9 +8,10 @@ import (
 
 	flowsdk "github.com/onflow/flow-go-sdk"
 
+	"github.com/dapperlabs/flow-go/integration/tests/common"
+
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go-sdk/examples"
 )
 
 type flowAccount struct {
@@ -117,7 +118,7 @@ func loadServiceAccount(flowClient *client.Client,
 
 func (lg *LoadGenerator) getBlockIDRef() flowsdk.Identifier {
 	ref, err := lg.flowClient.GetLatestBlockHeader(context.Background(), false)
-	examples.Handle(err)
+	handle(err)
 	return ref.ID
 }
 
@@ -161,7 +162,7 @@ func (lg *LoadGenerator) setupServiceAccountKeys() error {
 	lg.step++
 
 	err = lg.flowClient.SendTransaction(context.Background(), *addKeysTx)
-	examples.Handle(err)
+	handle(err)
 
 	txWG := sync.WaitGroup{}
 	txWG.Add(1)
@@ -187,7 +188,7 @@ func (lg *LoadGenerator) createAccounts() error {
 	blockRef := lg.getBlockIDRef()
 	allTxWG := sync.WaitGroup{}
 	for i := 0; i < lg.numberOfAccounts; i++ {
-		privKey := examples.RandomPrivateKey()
+		privKey := common.RandomPrivateKey()
 		accountKey := flowsdk.NewAccountKey().
 			FromPrivateKey(privKey).
 			SetHashAlgo(crypto.SHA3_256).
@@ -199,7 +200,7 @@ func (lg *LoadGenerator) createAccounts() error {
 			return err
 		}
 		// Generate an account creation script
-		examples.Handle(err)
+		handle(err)
 		createAccountTx := flowsdk.NewTransaction().
 			SetReferenceBlockID(blockRef).
 			SetScript(script).
@@ -215,7 +216,7 @@ func (lg *LoadGenerator) createAccounts() error {
 		lg.serviceAccount.signerLock.Unlock()
 
 		err = lg.flowClient.SendTransaction(context.Background(), *createAccountTx)
-		examples.Handle(err)
+		handle(err)
 		allTxWG.Add(1)
 
 		lg.txTracker.AddTx(createAccountTx.ID(),
@@ -274,7 +275,7 @@ func (lg *LoadGenerator) distributeInitialTokens() error {
 		lg.serviceAccount.signerLock.Unlock()
 
 		err = lg.flowClient.SendTransaction(context.Background(), *transferTx)
-		examples.Handle(err)
+		handle(err)
 		allTxWG.Add(1)
 
 		lg.txTracker.AddTx(transferTx.ID(),
@@ -319,7 +320,7 @@ func (lg *LoadGenerator) rotateTokens() error {
 		lg.accounts[i].signerLock.Unlock()
 
 		err = lg.flowClient.SendTransaction(context.Background(), *transferTx)
-		examples.Handle(err)
+		handle(err)
 		allTxWG.Add(1)
 		lg.txTracker.AddTx(transferTx.ID(),
 			nil,
@@ -352,5 +353,12 @@ func (lg *LoadGenerator) Next() error {
 		return lg.distributeInitialTokens()
 	default:
 		return lg.rotateTokens()
+	}
+}
+
+func handle(err error) {
+	if err != nil {
+		fmt.Println("err:", err.Error())
+		panic(err)
 	}
 }

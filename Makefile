@@ -363,3 +363,8 @@ monitor-rollout:
 	kubectl --kubeconfig=$$kconfig rollout status statefulsets.apps flow-consensus-node-v1; \
 	kubectl --kubeconfig=$$kconfig rollout status statefulsets.apps flow-execution-node-v1; \
 	kubectl --kubeconfig=$$kconfig rollout status statefulsets.apps flow-verification-node-v1
+
+.PHONY: docker-build-spammer
+docker-build-spammer:
+	docker build -f ./integration/benchmark/main/Dockerfile --ssh default --build-arg TARGET=benchmark/main --target production \
+		-t gcr.io/dl-flow/bechmark:latest -t "gcr.io/dl-flow/bechmark:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/bechmark:$(IMAGE_TAG)" .
