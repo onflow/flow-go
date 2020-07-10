@@ -57,6 +57,15 @@ func ComputeLeaderSelectionFromSeed(epochStartView uint64, seed []byte, count in
 	}, nil
 }
 
+type indexedCumSum struct {
+	index  int
+	cumsum uint64
+}
+
+func (i indexedCumSum) value() uint64 {
+	return i.cumsum
+}
+
 // WeightedRandomSelection - given a seed and a given count, pre-generate the indexs of leader.
 // The chance to be selected as leader is proportional to its weight.
 // This algorithm is essentially Fitness proportionate selection:
@@ -74,15 +83,20 @@ func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]int, e
 
 	// create an array of weight ranges for each identity.
 	// an i-th identity is selected as the leader if the random number falls into its weight range.
-	weightSums := make([]uint64, 0, len(weights))
+	weightSums := make([]*indexedCumSum, 0, len(weights))
 
 	// cumulative sum of weights
 	// after cumulating the weights, the sum is the total weight
 	// total weight is used to specify the range of the random number.
 	var cumsum uint64
-	for _, weight := range weights {
-		cumsum += weight
-		weightSums = append(weightSums, cumsum)
+	for i, weight := range weights {
+		if weight > 0 {
+			cumsum += weight
+			weightSums = append(weightSums, &indexedCumSum{
+				index:  i,
+				cumsum: cumsum,
+			})
+		}
 	}
 
 	if cumsum == 0 {
@@ -98,7 +112,8 @@ func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]int, e
 		}
 
 		// binary search to find the leader index by the random number
-		leader := binarySearch(uint64(randomness), weightSums)
+		itemIndex := binarySearch(uint64(randomness), weightSums)
+		leader := weightSums[itemIndex].index
 
 		leaders = append(leaders, leader)
 	}
@@ -106,22 +121,22 @@ func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]int, e
 }
 
 // binary search to find the index of the first item in the given array that is
-// strictly bigger to the given value.
+// strictly bigger to the given value
 // There are a few assumptions on inputs:
 // - `arr` must be non-empty
 // - items in `arr` must be in increasing order
 // - `value` must be less than the last item in `arr`
-func binarySearch(value uint64, arr []uint64) int {
+func binarySearch(value uint64, arr []*indexedCumSum) int {
 	return bsearch(0, len(arr)-1, value, arr)
 }
 
-func bsearch(left, right int, value uint64, arr []uint64) int {
+func bsearch(left, right int, value uint64, arr []*indexedCumSum) int {
 	if left == right {
 		return left
 	}
 
 	mid := (left + right) / 2
-	if value < arr[mid] {
+	if value < arr[mid].value() {
 		return bsearch(left, mid, value, arr)
 	}
 	return bsearch(mid+1, right, value, arr)

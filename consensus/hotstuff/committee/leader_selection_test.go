@@ -17,10 +17,13 @@ var someSeed = []uint8{0x6A, 0x23, 0x41, 0xB7, 0x80, 0xE1, 0x64, 0x59,
 func TestBsearch(t *testing.T) {
 	stakes := []uint64{1, 2, 3, 4}
 	var sum uint64
-	sums := make([]uint64, 0)
+	sums := make([]*indexedCumSum, 0)
 	for i := 0; i < len(stakes); i++ {
 		sum += stakes[i]
-		sums = append(sums, sum)
+		sums = append(sums, &indexedCumSum{
+			index:  i,
+			cumsum: sum,
+		})
 	}
 	sel := make([]int, 0, 10)
 	for i := 0; i < 10; i++ {
@@ -34,16 +37,18 @@ func TestBsearch(t *testing.T) {
 // should be the same.
 func TestBsearchWithNormalSearch(t *testing.T) {
 	count := 100
-	sums := make([]uint64, 0, count)
-	sum := 0
+	sums := make([]*indexedCumSum, 0, count)
+	sum := uint64(0)
 	for i := 0; i < count; i++ {
-		sum += i
-		sums = append(sums, uint64(sum))
+		sum += uint64(i)
+		sums = append(sums, &indexedCumSum{
+			index:  i,
+			cumsum: sum,
+		})
 	}
 
 	var value uint64
-	total := sums[len(sums)-1]
-	for value = 0; value < total; value++ {
+	for value = 0; value < sum; value++ {
 		expected, err := bruteSearch(value, sums)
 		require.NoError(t, err)
 
@@ -54,10 +59,10 @@ func TestBsearchWithNormalSearch(t *testing.T) {
 	}
 }
 
-func bruteSearch(value uint64, arr []uint64) (int, error) {
+func bruteSearch(value uint64, arr []*indexedCumSum) (int, error) {
 	// value ranges from [arr[0], arr[len(arr) -1 ]) exclusive
 	for i, a := range arr {
-		if a > value {
+		if a.value() > value {
 			return i, nil
 		}
 	}
