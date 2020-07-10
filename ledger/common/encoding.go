@@ -83,6 +83,9 @@ func checkEncodingType(rawInput []byte, expectedType uint16) (rest []byte, err e
 
 // EncodeKeyPart encodes a key part into a byte slice
 func EncodeKeyPart(kp *ledger.KeyPart) []byte {
+	if kp == nil {
+		return []byte{}
+	}
 	// EncodingDecodingType
 	buffer := appendUint64([]byte{}, EncodingDecodingVersion)
 
@@ -140,7 +143,9 @@ func decodeKeyPart(inp []byte) (*ledger.KeyPart, error) {
 
 // EncodeKey encodes a key into a byte slice
 func EncodeKey(k *ledger.Key) []byte {
-
+	if k == nil {
+		return []byte{}
+	}
 	// encode EncodingDecodingType
 	buffer := appendUint64([]byte{}, EncodingDecodingVersion)
 	// encode key entity type
@@ -262,6 +267,9 @@ func decodeValue(inp []byte) (ledger.Value, error) {
 
 // EncodePayload encodes a ledger payload
 func EncodePayload(p *ledger.Payload) []byte {
+	if p == nil {
+		return []byte{}
+	}
 	// encode EncodingDecodingType
 	buffer := appendUint64([]byte{}, EncodingDecodingVersion)
 
@@ -356,6 +364,9 @@ func decodePayload(inp []byte) (*ledger.Payload, error) {
 
 // EncodeProof encodes the content of a proof into a byte slice
 func EncodeProof(p *ledger.Proof) []byte {
+	if p == nil {
+		return []byte{}
+	}
 	// encode EncodingDecodingType
 	buffer := appendUint64([]byte{}, EncodingDecodingVersion)
 
@@ -495,6 +506,9 @@ func decodeProof(inp []byte) (*ledger.Proof, error) {
 
 // EncodeBatchProof encodes a batch proof into a byte slice
 func EncodeBatchProof(bp *ledger.BatchProof) []byte {
+	if bp == nil {
+		return []byte{}
+	}
 	// encode EncodingDecodingType
 	buffer := appendUint64([]byte{}, EncodingDecodingVersion)
 	// encode key entity type
