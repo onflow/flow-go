@@ -36,6 +36,12 @@ const (
 	EncodingTypeProof
 	// EncodingTypeBatchProof - encoding type for BatchProofs
 	EncodingTypeBatchProof
+	// EncodingTypeQuery - encoding type for ledger query
+	EncodingTypeQuery
+	// EncodingTypeUpdate - encoding type for ledger update
+	EncodingTypeUpdate
+	// EncodingTypeTrieUpdate - encoding type for trie update
+	EncodingTypeTrieUpdate
 	// encodingTypeUnknown - unknown encoding type - Warning this should always be the last item in the list
 	encodingTypeUnknown
 )
@@ -403,6 +409,132 @@ func decodePayload(inp []byte) (*ledger.Payload, error) {
 	}
 
 	return &ledger.Payload{Key: *key, Value: value}, nil
+}
+
+// EncodeTrieUpdate encodes a trie update struct
+func EncodeTrieUpdate(t *ledger.TrieUpdate) []byte {
+	if t == nil {
+		return []byte{}
+	}
+	// encode EncodingDecodingType
+	buffer := appendUint64([]byte{}, EncodingDecodingVersion)
+
+	// encode key entity type
+	buffer = appendUint16(buffer, EncodingTypeTrieUpdate)
+
+	// append encoded payload content
+	buffer = append(buffer, encodeTrieUpdate(t)...)
+
+	return buffer
+}
+
+func encodeTrieUpdate(t *ledger.TrieUpdate) []byte {
+	buffer := make([]byte, 0)
+
+	// encode state commitment (size and data)
+	buffer = appendUint16(buffer, uint16(len(t.StateCommitment)))
+	buffer = append(buffer, t.StateCommitment...)
+
+	// encode number of paths
+	buffer = appendUint32(buffer, uint32(t.Size()))
+
+	if t.Size() == 0 {
+		return buffer
+	}
+
+	// encode paths
+	// encode path size (assuming all paths are the same size)
+	buffer = appendUint16(buffer, uint16(t.Paths[0].Size()))
+	for _, path := range t.Paths {
+		buffer = append(buffer, encodePath(path)...)
+	}
+
+	// we assume same number of payloads
+	// encode payloads
+	for _, pl := range t.Payloads {
+		encPl := encodePayload(pl)
+		buffer = appendUint32(buffer, uint32(len(encPl)))
+		buffer = append(buffer, encPl...)
+	}
+
+	return buffer
+}
+
+// DecodeTrieUpdate construct a trie update from an encoded byte slice
+func DecodeTrieUpdate(encodedTrieUpdate []byte) (*ledger.TrieUpdate, error) {
+	// if empty don't decode
+	if len(encodedTrieUpdate) == 0 {
+		return nil, nil
+	}
+	// check the enc dec version
+	rest, _, err := checkEncDecVer(encodedTrieUpdate)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding trie update: %w", err)
+	}
+	// check the encoding type
+	rest, err = checkEncodingType(rest, EncodingTypeTrieUpdate)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding trie update: %w", err)
+	}
+	return decodeTrieUpdate(rest)
+}
+
+func decodeTrieUpdate(inp []byte) (*ledger.TrieUpdate, error) {
+
+	paths := make([]ledger.Path, 0)
+	payloads := make([]*ledger.Payload, 0)
+
+	// decode state commitment
+	scSize, rest, err := readUint16(inp)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding trie update: %w", err)
+	}
+
+	sc, rest, err := readSlice(rest, int(scSize))
+	if err != nil {
+		return nil, fmt.Errorf("error decoding trie update: %w", err)
+	}
+
+	// decode number of paths
+	numOfPaths, rest, err := readUint32(rest)
+
+	// decode path size
+	pathSize, rest, err := readUint16(rest)
+
+	var path ledger.Path
+	var encPath []byte
+	for i := 0; i < int(numOfPaths); i++ {
+		encPath, rest, err = readSlice(rest, int(pathSize))
+		if err != nil {
+			return nil, fmt.Errorf("error decoding trie update: %w", err)
+		}
+		path, err = decodePath(encPath)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding trie update: %w", err)
+		}
+		paths = append(paths, path)
+	}
+
+	var payloadSize uint32
+	var encPayload []byte
+	var payload *ledger.Payload
+
+	for i := 0; i < int(numOfPaths); i++ {
+		payloadSize, rest, err = readUint32(rest)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding trie update: %w", err)
+		}
+		encPayload, rest, err = readSlice(rest, int(payloadSize))
+		if err != nil {
+			return nil, fmt.Errorf("error decoding trie update: %w", err)
+		}
+		payload, err = decodePayload(encPayload)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding trie update: %w", err)
+		}
+		payloads = append(payloads, payload)
+	}
+	return &ledger.TrieUpdate{StateCommitment: sc, Paths: paths, Payloads: payloads}, nil
 }
 
 // EncodeProof encodes the content of a proof into a byte slice

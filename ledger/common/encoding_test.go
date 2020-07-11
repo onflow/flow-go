@@ -87,3 +87,29 @@ func Test_BatchProofEncodingDecoding(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, newbp.Equals(bp))
 }
+
+// Test_TrieUpdateEncodingDecoding tests encoding decoding functionality of a trie update
+func Test_TrieUpdateEncodingDecoding(t *testing.T) {
+
+	p1 := common.TwoBytesPath(2)
+	kp1 := ledger.NewKeyPart(uint16(1), []byte("key 1 part 1"))
+	kp2 := ledger.NewKeyPart(uint16(22), []byte("key 1 part 2"))
+	k1 := ledger.NewKey([]ledger.KeyPart{*kp1, *kp2})
+	pl1 := ledger.NewPayload(*k1, ledger.Value([]byte{'A'}))
+
+	p2 := common.TwoBytesPath(2)
+	kp3 := ledger.NewKeyPart(uint16(1), []byte("key2 part 1"))
+	k2 := ledger.NewKey([]ledger.KeyPart{*kp3})
+	pl2 := ledger.NewPayload(*k2, ledger.Value([]byte{'B'}))
+
+	tu := &ledger.TrieUpdate{
+		StateCommitment: common.StateCommitmentFixture(),
+		Paths:           []ledger.Path{p1, p2},
+		Payloads:        []*ledger.Payload{pl1, pl2},
+	}
+
+	encoded := common.EncodeTrieUpdate(tu)
+	newtu, err := common.DecodeTrieUpdate(encoded)
+	require.NoError(t, err)
+	require.True(t, newtu.Equals(tu))
+}

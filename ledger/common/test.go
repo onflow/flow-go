@@ -37,6 +37,11 @@ func KeyPartFixture(typ uint16, val string) *ledger.KeyPart {
 	return ledger.NewKeyPart(kp1t, kp1v)
 }
 
+func StateCommitmentFixture() ledger.StateCommitment {
+	sc, _ := hex.DecodeString("6a7a565add94fb36069d79e8725c221cd1e5740742501ef014ea6db999fd98ad")
+	return ledger.StateCommitment(sc)
+}
+
 func ProofFixture() (*ledger.Proof, ledger.StateCommitment) {
 	p := ledger.NewProof()
 	p.Path = TwoBytesPath(330)
