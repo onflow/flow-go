@@ -31,6 +31,7 @@ ExecStart=docker run --rm \
 	--bootstrapdir=/bootstrap \
 	--datadir=/data/protocol \
 	--rpc-addr=0.0.0.0:9000 \
+	--http-addr=0.0.0.0:8000 \
 	--ingress-addr=${FLOW_NETWORK_COLLECTION_NODE} \
 	--script-addr=${FLOW_NETWORK_EXECUTION_NODE} \
 	--bind 0.0.0.0:3569 \
