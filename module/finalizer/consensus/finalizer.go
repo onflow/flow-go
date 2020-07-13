@@ -16,21 +16,19 @@ import (
 // Finalizer is a simple wrapper around our temporary state to clean up after a
 // block has been fully finalized to the persistent protocol state.
 type Finalizer struct {
-	db       *badger.DB
-	headers  storage.Headers
-	payloads storage.Payloads
-	proto    protocol.State
-	cleanup  CleanupFunc
+	db      *badger.DB
+	headers storage.Headers
+	state   protocol.State
+	cleanup CleanupFunc
 }
 
 // NewFinalizer creates a new finalizer for the temporary state.
-func NewFinalizer(db *badger.DB, headers storage.Headers, payloads storage.Payloads, proto protocol.State, options ...func(*Finalizer)) *Finalizer {
+func NewFinalizer(db *badger.DB, headers storage.Headers, state protocol.State, options ...func(*Finalizer)) *Finalizer {
 	f := &Finalizer{
-		db:       db,
-		proto:    proto,
-		headers:  headers,
-		payloads: payloads,
-		cleanup:  CleanupNothing(),
+		db:      db,
+		state:   state,
+		headers: headers,
+		cleanup: CleanupNothing(),
 	}
 	for _, option := range options {
 		option(f)
@@ -104,7 +102,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
 	for i := len(pendingIDs) - 1; i >= 0; i-- {
 		pendingID := pendingIDs[i]
-		err = f.proto.Mutate().Finalize(pendingID)
+		err = f.state.Mutate().Finalize(pendingID)
 		if err != nil {
 			return fmt.Errorf("could not finalize block (%x): %w", pendingID, err)
 		}

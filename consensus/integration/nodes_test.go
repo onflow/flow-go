@@ -189,7 +189,7 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	require.NoError(t, err)
 
 	// initialize the block finalizer
-	final := finalizer.NewFinalizer(db, headersDB, payloadsDB, state)
+	final := finalizer.NewFinalizer(db, headersDB, state)
 
 	// initialize the persister
 	persist := persister.New(db)

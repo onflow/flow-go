@@ -233,7 +233,7 @@ func main() {
 
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, node.Storage.Payloads, node.State)
+			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, node.State)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)

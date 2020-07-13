@@ -252,7 +252,6 @@ func main() {
 			finalize := finalizer.NewFinalizer(
 				node.DB,
 				node.Storage.Headers,
-				node.Storage.Payloads,
 				node.State,
 				finalizer.WithCleanup(finalizer.CleanupMempools(
 					node.Metrics.Mempool,
