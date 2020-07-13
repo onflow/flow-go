@@ -77,7 +77,7 @@ func TestNetwork(t *testing.T) {
 
 	// seed a message, it should propagate to all nodes.
 	// (unlike regular nodes, a ghost node subscribes to all topics)
-	err = ghostClient.Send(ctx, engine.CollectionProvider, event, targets...)
+	err = ghostClient.Send(ctx, engine.TestNetwork, event, targets...)
 	assert.NoError(t, err)
 
 	// wait for all read loops to finish

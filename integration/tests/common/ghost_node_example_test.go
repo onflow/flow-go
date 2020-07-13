@@ -134,7 +134,7 @@ func TestGhostNodeExample_Send(t *testing.T) {
 	tx := generateTransaction(t, net, realCollNode.Identifier)
 
 	// send the transaction as an event to the real collection node
-	err = ghostClient.Send(ctx, engine.CollectionIngest, &tx, realCollNode.Identifier)
+	err = ghostClient.Send(ctx, engine.PushTransactions, &tx, realCollNode.Identifier)
 	assert.NoError(t, err)
 }
 

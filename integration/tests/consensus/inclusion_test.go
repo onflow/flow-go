@@ -113,7 +113,7 @@ SendingLoop:
 	for time.Now().Before(deadline) {
 		conID := is.conIDs[rand.Intn(len(is.conIDs))]
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		err := is.Collection().Send(ctx, engine.CollectionProvider, sentinel, conID)
+		err := is.Collection().Send(ctx, engine.PushGuarantees, sentinel, conID)
 		cancel()
 		if err != nil {
 			is.T().Logf("could not send collection guarantee: %s", err)

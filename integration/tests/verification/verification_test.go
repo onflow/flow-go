@@ -171,7 +171,7 @@ func testHappyPath(t *testing.T, verNodeCount int, chunkNum int) {
 		assert.True(t, ok)
 		verNet.StartConDev(requestInterval, true)
 		verNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
-			return m.ChannelID == engine.CollectionProvider
+			return m.ChannelID == engine.ProvideCollections
 		})
 
 		verNets = append(verNets, verNet)
