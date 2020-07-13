@@ -13,18 +13,25 @@ type Compactor struct {
 	stopc        chan struct{}
 	wg           sync.WaitGroup
 	sync.Mutex
-	interval time.Duration
+	interval           time.Duration
+	checkpointDistance uint
 }
 
-func NewCompactor(checkpointer *Checkpointer, interval time.Duration) *Compactor {
+func NewCompactor(checkpointer *Checkpointer, interval time.Duration, checkpointDistance uint) *Compactor {
+	if checkpointDistance < 1 {
+		checkpointDistance = 1
+	}
 	return &Compactor{
-		checkpointer: checkpointer,
-		done:         make(chan struct{}),
-		stopc:        make(chan struct{}),
-		interval:     interval,
+		checkpointer:       checkpointer,
+		done:               make(chan struct{}),
+		stopc:              make(chan struct{}),
+		interval:           interval,
+		checkpointDistance: checkpointDistance,
 	}
 }
 
+// Ready periodically fires Run function, every `interval`
+// If called more then once, behaviour is undefined.
 func (c *Compactor) Ready() <-chan struct{} {
 	ch := make(chan struct{})
 
@@ -48,10 +55,6 @@ func (c *Compactor) Done() <-chan struct{} {
 	return ch
 }
 
-// Start periodically fires Run function, every `interval`
-// This function blocks until the `Done()` is called, so it's advised to
-// run in it different thread.
-// If called more then once, behaviour is undefined.
 func (c *Compactor) start() {
 
 	for {
@@ -76,14 +79,19 @@ func (c *Compactor) Run() error {
 		return fmt.Errorf("cannot get latest checkpoint: %w", err)
 	}
 
+	fmt.Printf("%d %d\n", from, to)
+
 	// more then one segment means we can checkpoint safely up to `to`-1
 	// presumably last segment is being written to
-	if to-from > 1 {
-		err = c.checkpointer.Checkpoint(to-1, func() (io.WriteCloser, error) {
-			return c.checkpointer.CheckpointWriter(to - 1)
+	if to-from > int(c.checkpointDistance) {
+		checkpointNumber := to - 1
+		fmt.Printf("checkpointing to %d\n", checkpointNumber)
+
+		err = c.checkpointer.Checkpoint(checkpointNumber, func() (io.WriteCloser, error) {
+			return c.checkpointer.CheckpointWriter(checkpointNumber)
 		})
 		if err != nil {
-			return fmt.Errorf("error creating checkpoint: %w", err)
+			return fmt.Errorf("error creating checkpoint (%d): %w", checkpointNumber, err)
 		}
 	}
 	return nil

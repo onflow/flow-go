@@ -7,24 +7,28 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/fvm"
+	"github.com/dapperlabs/flow-go/fvm/state"
 	chmodels "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/ptrie"
 )
 
+type VirtualMachine interface {
+	Run(fvm.Context, fvm.Procedure, state.Ledger) error
+}
+
 // ChunkVerifier is a verifier based on the current definitions of the flow network
 type ChunkVerifier struct {
-	vm     fvm.VirtualMachine
-	blocks storage.Blocks
+	vm    VirtualMachine
+	vmCtx fvm.Context
 }
 
 // NewChunkVerifier creates a chunk verifier containing a flow virtual machine
-func NewChunkVerifier(vm fvm.VirtualMachine, blocks storage.Blocks) *ChunkVerifier {
+func NewChunkVerifier(vm VirtualMachine, vmCtx fvm.Context) *ChunkVerifier {
 	return &ChunkVerifier{
-		vm:     vm,
-		blocks: blocks,
+		vm:    vm,
+		vmCtx: vmCtx,
 	}
 }
 
@@ -39,7 +43,7 @@ func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) (chmodels
 	execResID := vc.Result.ID()
 
 	// build a block context
-	blockCtx := fcv.vm.NewBlockContext(vc.Header, fcv.blocks)
+	blockCtx := fvm.NewContextFromParent(fcv.vmCtx, fvm.WithBlockHeader(vc.Header))
 
 	// constructing a partial trie given chunk data package
 	if vc.ChunkDataPack == nil {
@@ -74,16 +78,19 @@ func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) (chmodels
 	chunkView := delta.NewView(getRegister)
 
 	// executes all transactions in this chunk
-	for i, tx := range vc.Collection.Transactions {
+	for i, txBody := range vc.Collection.Transactions {
 		txView := chunkView.NewChild()
 
-		result, err := blockCtx.ExecuteTransaction(txView, tx)
+		tx := fvm.Transaction(txBody)
+
+		err := fcv.vm.Run(blockCtx, tx, txView)
 		if err != nil {
 			// this covers unexpected and very rare cases (e.g. system memory issues...),
 			// so we shouldn't be here even if transaction naturally fails (e.g. permission, runtime ... )
 			return nil, fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
 		}
-		if result.Succeeded() {
+
+		if tx.Err == nil {
 			// if tx is successful, we apply changes to the chunk view by merging the txView into chunk view
 			chunkView.MergeView(txView)
 		}

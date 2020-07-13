@@ -120,6 +120,14 @@ func (v *View) Set(key flow.RegisterID, value flow.RegisterValue) {
 	v.delta.Set(key, value)
 }
 
+// Touch explicitly adds a register to the touched registers set.
+func (v *View) Touch(key flow.RegisterID) {
+	// capture register touch
+	v.regTouchSet[string(key)] = true
+	// increase reads
+	v.readsCount++
+}
+
 // Delete removes a register in this view.
 func (v *View) Delete(key flow.RegisterID) {
 	v.delta.Delete(key)

@@ -132,7 +132,7 @@ func main() {
 				return nil, fmt.Errorf("could not initialize follower core: %w", err)
 			}
 
-			follower, err := followereng.New(
+			followerEng, err = followereng.New(
 				node.Logger,
 				node.Network,
 				node.Me,
@@ -150,7 +150,7 @@ func main() {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
 
-			return follower, nil
+			return followerEng, nil
 		}).
 		Component("sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			sync, err := synceng.New(

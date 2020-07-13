@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
-	"github.com/dapperlabs/flow-go/fvm"
+	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
 )
@@ -77,9 +77,9 @@ func run(*cobra.Command, []string) {
 		return values[0], nil
 	})
 
-	dal := fvm.NewLedgerDAL(ledger, chain)
+	accounts := state.NewAccounts(ledger, chain)
 
-	finalGenerator, err := dal.GetAddressState()
+	finalGenerator, err := accounts.GetAddressGeneratorState()
 	if err != nil {
 		log.Fatal().Err(err).Msgf("cannot get current address state")
 	}
@@ -94,12 +94,18 @@ func run(*cobra.Command, []string) {
 			log.Fatal().Err(err).Msgf("cannot get address")
 		}
 
-		account := dal.GetAccount(address)
+		account, err := accounts.Get(address)
+		if err != nil {
+			log.Fatal().Err(err).Msg("error while getting account")
+		}
+
 		fmt.Printf("Account address %s:\n", account.Address.Short())
+
 		b, err := json.MarshalIndent(account, "", "  ")
 		if err != nil {
 			log.Fatal().Err(err).Msg("error while marshalling account")
 		}
+
 		fmt.Println(string(b))
 	}
 

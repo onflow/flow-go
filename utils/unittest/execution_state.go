@@ -2,6 +2,9 @@ package unittest
 
 import (
 	"encoding/hex"
+	"fmt"
+
+	"github.com/onflow/cadence"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -20,7 +23,13 @@ const GenesisStateCommitmentHex = "729ab6bd97c3a948062b650a6dd990fc46d9df47887e9
 
 var GenesisStateCommitment flow.StateCommitment
 
-const GenesisTokenSupply uint64 = 1_000_000_000_000_000
+var GenesisTokenSupply = func() cadence.UFix64 {
+	value, err := cadence.NewUFix64("10000000.00000000")
+	if err != nil {
+		panic(fmt.Errorf("invalid genesis token supply: %w", err))
+	}
+	return value
+}()
 
 var ServiceAccountPrivateKey flow.AccountPrivateKey
 var ServiceAccountPublicKey flow.AccountPublicKey

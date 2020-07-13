@@ -16,7 +16,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	module "github.com/dapperlabs/flow-go/module/mock"
-	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -25,13 +24,13 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	chain := flow.Mainnet.Chain()
 
-	vm, err := fvm.New(rt, chain)
-	require.NoError(t, err)
+	vm := fvm.New(rt)
+	execCtx := fvm.NewContext(fvm.WithChain(chain))
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(2)
 	require.NoError(t, err)
 
-	ledger := testutil.RootBootstrappedLedger(chain)
+	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
 	accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
 	require.NoError(t, err)
 
@@ -86,7 +85,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	blockComputer := computer.NewBlockComputer(vm, new(storage.Blocks), nil, nil, zerolog.Nop())
+	blockComputer := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
 
 	engine := &Manager{
 		blockComputer: blockComputer,
