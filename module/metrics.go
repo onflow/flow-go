@@ -141,9 +141,14 @@ type VerificationMetrics interface {
 	// by Match engine to Verifier engine.
 	// It increments the total number of chunks matched by match engine.
 	OnVerifiableChunkSent()
+
 	// OnChunkDataPackReceived is called on a receiving a chunk data pack by Match engine
 	// It increments the total number of chunk data packs received.
 	OnChunkDataPackReceived()
+
+	// OnChunkDataPackRequested is called on requesting a chunk data pack by Match engine
+	// It increments the total number of chunk data packs requested.
+	OnChunkDataPackRequested()
 
 	// Verifier Engine
 	//
@@ -232,9 +237,16 @@ type RuntimeMetrics interface {
 	TransactionInterpreted(dur time.Duration)
 }
 
+type ProviderMetrics interface {
+	// ChunkDataPackRequested is executed every time a chunk data pack request is arrived at execution node.
+	// It increases the request counter by one.
+	ChunkDataPackRequested()
+}
+
 type ExecutionMetrics interface {
 	LedgerMetrics
 	RuntimeMetrics
+	ProviderMetrics
 
 	// StartBlockReceivedToExecuted starts a span to trace the duration of a block
 	// from being received for execution to execution being finished

@@ -260,8 +260,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	stateSync := sync.NewStateSynchronizer(execState)
 
+	collector := metrics.NewNoopCollector()
 	providerEngine, err := executionprovider.New(
-		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, stateSync,
+		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, stateSync, collector,
 	)
 	require.NoError(t, err)
 

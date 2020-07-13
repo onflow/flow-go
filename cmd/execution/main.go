@@ -143,6 +143,7 @@ func main() {
 				node.Me,
 				executionState,
 				stateSync,
+				collector,
 			)
 
 			return providerEngine, err
