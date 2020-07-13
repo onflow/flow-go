@@ -1,7 +1,10 @@
 package ledger
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"bytes"
+	"encoding/hex"
+	"fmt"
+
 	"github.com/dapperlabs/flow-go/module"
 )
 
@@ -9,7 +12,7 @@ import (
 type Ledger interface {
 	module.ReadyDoneAware
 
-	InitStateCommitment() flow.StateCommitment
+	EmptyStateCommitment() StateCommitment
 
 	// Get returns values for the given slice of keys at specific state commitment
 	Get(query *Query) (values []Value, err error)
@@ -25,4 +28,148 @@ type Ledger interface {
 
 	// returns an approximate size of disk used by the ledger
 	DiskSize() (int64, error)
+}
+
+// Query holds all data needed for a ledger read or ledger proof
+type Query struct {
+	StateCommitment StateCommitment
+	Keys            []Key
+}
+
+// Size returns number of keys in the query
+func (q *Query) Size() int {
+	return len(q.Keys)
+}
+
+// Update holds all data needed for a ledger update
+type Update struct {
+	stateCommitment StateCommitment
+	keys            []Key
+	values          []Value
+}
+
+// Size returns number of keys in the ledger update
+func (u *Update) Size() int {
+	return len(u.keys)
+}
+
+// appendKV append a key value pair to the update
+func (u *Update) appendKV(key *Key, value Value) {
+	u.keys = append(u.keys, *key)
+}
+
+// NewEmptyUpdate returns an empty ledger update
+func NewEmptyUpdate(sc StateCommitment) (*Update, error) {
+	return &Update{stateCommitment: sc}, nil
+}
+
+// NewUpdate returns an ledger update
+func NewUpdate(sc StateCommitment, keys []Key, values []Value) (*Update, error) {
+	if len(keys) != len(values) {
+		return nil, fmt.Errorf("length mismatch: keys have %d elements, but values have %d elements", len(keys), len(values))
+	}
+	return &Update{stateCommitment: sc, keys: keys, values: values}, nil
+
+}
+
+// StateCommitment captures a commitment to an state of the ledger
+type StateCommitment []byte
+
+func (sc StateCommitment) String() string {
+	return hex.EncodeToString(sc)
+}
+
+// Equals compares the state commitment to another state commitment
+func (sc StateCommitment) Equals(o StateCommitment) bool {
+	if o == nil {
+		return false
+	}
+	return bytes.Equal(sc, o)
+}
+
+// Key represents a hierarchical ledger key
+type Key struct {
+	KeyParts []KeyPart
+}
+
+// NewKey construct a new key
+func NewKey(kp []KeyPart) *Key {
+	return &Key{KeyParts: kp}
+}
+
+// Size returns the byte size needed to encode the key
+func (k *Key) Size() int {
+	size := 0
+	for _, kp := range k.KeyParts {
+		// value size + 2 bytes for type
+		size += len(kp.Value) + 2
+	}
+	return size
+}
+
+func (k *Key) String() string {
+	// TODO include type
+	ret := ""
+	for _, kp := range k.KeyParts {
+		ret += string(kp.Value)
+	}
+	return ret
+}
+
+// Equals compares this key to another key
+func (k *Key) Equals(other *Key) bool {
+	if other == nil {
+		return false
+	}
+	if len(k.KeyParts) != len(other.KeyParts) {
+		return false
+	}
+	for i, kp := range k.KeyParts {
+		if !kp.Equals(&other.KeyParts[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// KeyPart is a typed part of a key
+type KeyPart struct {
+	Type  uint16
+	Value []byte
+}
+
+// NewKeyPart construct a new key part
+func NewKeyPart(typ uint16, val []byte) *KeyPart {
+	return &KeyPart{Type: typ, Value: val}
+}
+
+// Equals compares this key part to another key part
+func (kp *KeyPart) Equals(other *KeyPart) bool {
+	if other == nil {
+		return false
+	}
+	if kp.Type != other.Type {
+		return false
+	}
+	return bytes.Equal(kp.Value, other.Value)
+}
+
+// Value holds the value part of a ledger key value pair
+type Value []byte
+
+// Size returns the value size
+func (v Value) Size() int {
+	return len(v)
+}
+
+func (v Value) String() string {
+	return hex.EncodeToString(v)
+}
+
+// Equals compares a ledger Value to another one
+func (v Value) Equals(other Value) bool {
+	if other == nil {
+		return false
+	}
+	return bytes.Equal(v, other)
 }

@@ -431,9 +431,9 @@ func EncodeTrieUpdate(t *ledger.TrieUpdate) []byte {
 func encodeTrieUpdate(t *ledger.TrieUpdate) []byte {
 	buffer := make([]byte, 0)
 
-	// encode state commitment (size and data)
-	buffer = appendUint16(buffer, uint16(len(t.StateCommitment)))
-	buffer = append(buffer, t.StateCommitment...)
+	// encode root hash (size and data)
+	buffer = appendUint16(buffer, uint16(len(t.RootHash)))
+	buffer = append(buffer, t.RootHash...)
 
 	// encode number of paths
 	buffer = appendUint32(buffer, uint32(t.Size()))
@@ -484,13 +484,13 @@ func decodeTrieUpdate(inp []byte) (*ledger.TrieUpdate, error) {
 	paths := make([]ledger.Path, 0)
 	payloads := make([]*ledger.Payload, 0)
 
-	// decode state commitment
-	scSize, rest, err := readUint16(inp)
+	// decode root hash
+	rhSize, rest, err := readUint16(inp)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding trie update: %w", err)
 	}
 
-	sc, rest, err := readSlice(rest, int(scSize))
+	rh, rest, err := readSlice(rest, int(rhSize))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding trie update: %w", err)
 	}
@@ -534,7 +534,7 @@ func decodeTrieUpdate(inp []byte) (*ledger.TrieUpdate, error) {
 		}
 		payloads = append(payloads, payload)
 	}
-	return &ledger.TrieUpdate{StateCommitment: sc, Paths: paths, Payloads: payloads}, nil
+	return &ledger.TrieUpdate{RootHash: rh, Paths: paths, Payloads: payloads}, nil
 }
 
 // EncodeProof encodes the content of a proof into a byte slice
