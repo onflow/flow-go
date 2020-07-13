@@ -357,9 +357,12 @@ func VerificationNode(t testing.TB,
 	identity *flow.Identity,
 	identities []*flow.Identity,
 	assigner module.ChunkAssigner,
-	requestIntervalMs uint,
+	requestInterval time.Duration,
+	processInterval time.Duration,
 	failureThreshold uint,
 	chainID flow.ChainID,
+	collector module.VerificationMetrics, // used to enable collecting metrics on happy path integration
+	mempoolCollector module.MempoolMetrics, // used to enable collecting metrics on happy path integration
 	opts ...VerificationOpt) mock.VerificationNode {
 
 	var err error
@@ -371,20 +374,37 @@ func VerificationNode(t testing.TB,
 		apply(&node)
 	}
 
-	collector := metrics.NewNoopCollector()
-
-	if node.Receipts == nil {
-		node.Receipts, err = stdmap.NewReceipts(1000)
+	if node.CachedReceipts == nil {
+		node.CachedReceipts, err = stdmap.NewReceiptDataPacks(1000)
+		require.Nil(t, err)
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourceCachedReceipt, node.CachedReceipts.Size)
 		require.Nil(t, err)
 	}
 
 	if node.PendingReceipts == nil {
-		node.PendingReceipts, err = stdmap.NewPendingReceipts(1000)
+		node.PendingReceipts, err = stdmap.NewReceiptDataPacks(1000)
+		require.Nil(t, err)
+
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourcePendingReceipt, node.PendingReceipts.Size)
+		require.Nil(t, err)
+	}
+
+	if node.ReadyReceipts == nil {
+		node.ReadyReceipts, err = stdmap.NewReceiptDataPacks(1000)
+		require.Nil(t, err)
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourceReceipt, node.ReadyReceipts.Size)
 		require.Nil(t, err)
 	}
 
 	if node.PendingResults == nil {
 		node.PendingResults = stdmap.NewPendingResults()
+		require.Nil(t, err)
+
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourcePendingResult, node.PendingResults.Size)
 		require.Nil(t, err)
 	}
 
@@ -392,22 +412,47 @@ func VerificationNode(t testing.TB,
 		node.HeaderStorage = storage.NewHeaders(node.Metrics, node.DB)
 	}
 
-	if node.Chunks == nil {
-		node.Chunks = match.NewChunks(1000)
+	if node.PendingChunks == nil {
+		node.PendingChunks = match.NewChunks(1000)
+
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourcePendingChunk, node.PendingChunks.Size)
+		require.Nil(t, err)
 	}
 
 	if node.ProcessedResultIDs == nil {
 		node.ProcessedResultIDs, err = stdmap.NewIdentifiers(1000)
 		require.Nil(t, err)
+
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourceProcessedResultID, node.ProcessedResultIDs.Size)
+		require.Nil(t, err)
 	}
 
-	if node.ReceiptIDsByBlock == nil {
-		node.ReceiptIDsByBlock, err = stdmap.NewIdentifierMap(1000)
+	if node.BlockIDsCache == nil {
+		node.BlockIDsCache, err = stdmap.NewIdentifiers(1000)
+		require.Nil(t, err)
+
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourceCachedBlockID, node.BlockIDsCache.Size)
+		require.Nil(t, err)
+	}
+
+	if node.PendingReceiptIDsByBlock == nil {
+		node.PendingReceiptIDsByBlock, err = stdmap.NewIdentifierMap(1000)
+		require.Nil(t, err)
+
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourcePendingReceiptIDsByBlock, node.PendingReceiptIDsByBlock.Size)
 		require.Nil(t, err)
 	}
 
 	if node.ReceiptIDsByResult == nil {
 		node.ReceiptIDsByResult, err = stdmap.NewIdentifierMap(1000)
+		require.Nil(t, err)
+
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourceReceiptIDsByResult, node.ReceiptIDsByResult.Size)
 		require.Nil(t, err)
 	}
 
@@ -443,9 +488,9 @@ func VerificationNode(t testing.TB,
 			node.VerifierEngine,
 			assigner,
 			node.State,
-			node.Chunks,
+			node.PendingChunks,
 			node.HeaderStorage,
-			time.Duration(requestIntervalMs)*time.Millisecond,
+			requestInterval,
 			int(failureThreshold))
 		require.Nil(t, err)
 	}
@@ -457,11 +502,15 @@ func VerificationNode(t testing.TB,
 			node.Net,
 			node.Me,
 			node.MatchEngine,
+			node.CachedReceipts,
 			node.PendingReceipts,
+			node.ReadyReceipts,
 			node.Headers,
 			node.ProcessedResultIDs,
-			node.ReceiptIDsByBlock,
-			node.ReceiptIDsByResult)
+			node.PendingReceiptIDsByBlock,
+			node.ReceiptIDsByResult,
+			node.BlockIDsCache,
+			processInterval)
 		require.Nil(t, err)
 	}
 

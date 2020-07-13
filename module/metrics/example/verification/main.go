@@ -9,11 +9,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 
-	verification3 "github.com/dapperlabs/flow-go/engine/testutil/verification"
+	vertestutil "github.com/dapperlabs/flow-go/engine/testutil/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/match"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
-	verification2 "github.com/dapperlabs/flow-go/model/verification"
+	vermodel "github.com/dapperlabs/flow-go/model/verification"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -39,6 +39,10 @@ func main() {
 // a single execution receipt of 10 chunks
 func happyPathExample() {
 	example.WithMetricsServer(func(logger zerolog.Logger) {
+		tracer, err := trace.NewTracer(logger, "verification")
+		if err != nil {
+			panic(err)
+		}
 
 		// initiates and starts mempool collector
 		// since happy path goes very fast leap timer on collector set to 1 nanosecond.
@@ -47,8 +51,8 @@ func happyPathExample() {
 
 		// starts happy path
 		t := &testing.T{}
-		verification3.VerificationHappyPath(t, 1, 10)
-
+		verificationCollector := metrics.NewVerificationCollector(tracer, prometheus.DefaultRegisterer, logger)
+		vertestutil.VerificationHappyPath(t, 1, 10, verificationCollector, mempoolCollector)
 		<-mempoolCollector.Done()
 	})
 }
@@ -78,8 +82,8 @@ func demo() {
 			panic(err)
 		}
 
-		// creates pending receipts mempool, and registers size method of backend for metrics
-		pendingReceipts, err := stdmap.NewPendingReceipts(100)
+		// creates a pending receipts mempool and registers a metric on its size
+		pendingReceipts, err := stdmap.NewReceiptDataPacks(100)
 		if err != nil {
 			panic(err)
 		}
@@ -103,7 +107,7 @@ func demo() {
 		if err != nil {
 			panic(err)
 		}
-		err = mempoolCollector.Register(metrics.ResourcePendingReceiptIDsByResult, receiptIDsByResult.Size)
+		err = mempoolCollector.Register(metrics.ResourceReceiptIDsByResult, receiptIDsByResult.Size)
 		if err != nil {
 			panic(err)
 		}
@@ -179,8 +183,9 @@ func demo() {
 			if rand.Int()%2 == 0 {
 				receipts.Add(receipt)
 			}
+
 			if rand.Int()%2 == 0 {
-				pendingReceipts.Add(&verification2.PendingReceipt{
+				pendingReceipts.Add(&vermodel.ReceiptDataPack{
 					Receipt:  receipt,
 					OriginID: unittest.IdentifierFixture(),
 				})

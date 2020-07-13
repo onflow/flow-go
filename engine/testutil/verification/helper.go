@@ -40,7 +40,9 @@ import (
 // - broadcast of a matching result approval to consensus nodes for each assigned chunk
 func VerificationHappyPath(t *testing.T,
 	verNodeCount int,
-	chunkNum int) {
+	chunkNum int,
+	verCollector module.VerificationMetrics,
+	mempoolCollector module.MempoolMetrics) {
 	// to demarcate the debug logs
 	log.Debug().
 		Int("verification_nodes_count", verNodeCount).
@@ -48,14 +50,15 @@ func VerificationHappyPath(t *testing.T,
 		Msg("TestHappyPath started")
 
 	// ingest engine parameters
-	// set based on issue (3443)
-	requestInterval := uint(1000)
+	// set based on following issue (3443)
+	processInterval := 1 * time.Second
+	requestInterval := 1 * time.Second
 	failureThreshold := uint(2)
 
 	// generates network hub
 	hub := stub.NewNetworkHub()
 
-	chainID := flow.Mainnet
+	chainID := flow.Testnet
 
 	// generates identities of nodes, one of each type, `verNodeCount` many of verification nodes
 	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
@@ -70,7 +73,7 @@ func VerificationHappyPath(t *testing.T,
 	//
 	// creates an execution receipt and its associated data
 	// with `chunkNum` chunks
-	completeER := utils.CompleteExecutionResultFixture(t, chunkNum, flow.Testnet.Chain())
+	completeER := utils.CompleteExecutionResultFixture(t, chunkNum, chainID.Chain())
 
 	// mocks the assignment to only assign "some" chunks to the verIdentity
 	// the assignment is done based on `isAssgined` function
@@ -102,8 +105,11 @@ func VerificationHappyPath(t *testing.T,
 			identities,
 			assigner,
 			requestInterval,
+			processInterval,
 			failureThreshold,
-			chainID)
+			chainID,
+			verCollector,
+			mempoolCollector)
 
 		// starts all the engines
 		<-verNode.FinderEngine.Ready()
