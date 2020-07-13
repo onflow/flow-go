@@ -145,3 +145,147 @@ func NewPayload(key Key, value Value) *Payload {
 func EmptyPayload() *Payload {
 	return &Payload{}
 }
+
+// TrieProof includes all the information needed to walk
+// through a trie branch from an specific leaf node (key)
+// up to the root of the trie.
+type TrieProof struct {
+	Path      Path     // path
+	Payload   *Payload // payload
+	Interims  [][]byte // the non-default intermediate nodes in the proof
+	Inclusion bool     // flag indicating if this is an inclusion or exclusion
+	Flags     []byte   // The flags of the proofs (is set if an intermediate node has a non-default)
+	Steps     uint8    // number of steps for the proof (path len) // TODO: should this be a type allowing for larger values?
+}
+
+// NewTrieProof creates a new instance of Trie Proof
+func NewTrieProof() *TrieProof {
+	return &TrieProof{
+		Path:      make([]byte, 0),
+		Payload:   EmptyPayload(),
+		Interims:  make([][]byte, 0),
+		Inclusion: false,
+		Flags:     make([]byte, 0),
+		Steps:     0,
+	}
+}
+
+func (p *TrieProof) String() string {
+	flagStr := ""
+	for _, f := range p.Flags {
+		flagStr += fmt.Sprintf("%08b", f)
+	}
+	proofStr := fmt.Sprintf("size: %d flags: %v\n", p.Steps, flagStr)
+	proofStr += fmt.Sprintf("\t path: %v payload: %v\n", p.Path, p.Payload)
+
+	if p.Inclusion {
+		proofStr += fmt.Sprint("\t inclusion proof:\n")
+	} else {
+		proofStr += fmt.Sprint("\t noninclusion proof:\n")
+	}
+	interimIndex := 0
+	for j := 0; j < int(p.Steps); j++ {
+		// if bit is set
+		if p.Flags[j/8]&(1<<int(7-j%8)) != 0 {
+			proofStr += fmt.Sprintf("\t\t %d: [%x]\n", j, p.Interims[interimIndex])
+			interimIndex++
+		}
+	}
+	return proofStr
+}
+
+// Equals compares this proof to another payload
+func (p *TrieProof) Equals(o *TrieProof) bool {
+	if o == nil {
+		return false
+	}
+	if !p.Path.Equals(o.Path) {
+		return false
+	}
+	if !p.Payload.Equals(o.Payload) {
+		return false
+	}
+	if len(p.Interims) != len(o.Interims) {
+		return false
+	}
+	for i, inter := range p.Interims {
+		if !bytes.Equal(inter, o.Interims[i]) {
+			return false
+		}
+	}
+	if p.Inclusion != o.Inclusion {
+		return false
+	}
+	if !bytes.Equal(p.Flags, o.Flags) {
+		return false
+	}
+	if p.Steps != o.Steps {
+		return false
+	}
+	return true
+}
+
+// TrieBatchProof is a struct that holds the proofs for several keys
+//
+// so there is no need for two calls (read, proofs)
+type TrieBatchProof struct {
+	Proofs []*TrieProof
+}
+
+// NewTrieBatchProof creates a new instance of BatchProof
+func NewTrieBatchProof() *TrieBatchProof {
+	bp := new(TrieBatchProof)
+	bp.Proofs = make([]*TrieProof, 0)
+	return bp
+}
+
+// NewTrieBatchProofWithEmptyProofs creates an instance of Batchproof
+// filled with n newly created proofs (empty)
+func NewTrieBatchProofWithEmptyProofs(numberOfProofs int) *TrieBatchProof {
+	bp := NewTrieBatchProof()
+	for i := 0; i < numberOfProofs; i++ {
+		bp.AppendProof(NewTrieProof())
+	}
+	return bp
+}
+
+// Size returns the number of proofs
+func (bp *TrieBatchProof) Size() int {
+	return len(bp.Proofs)
+}
+
+func (bp *TrieBatchProof) String() string {
+	res := fmt.Sprintf("trie batch proof includes %d proofs: \n", bp.Size())
+	for _, proof := range bp.Proofs {
+		res = res + "\n" + proof.String()
+	}
+	return res
+}
+
+// AppendProof adds a proof to the batch proof
+func (bp *TrieBatchProof) AppendProof(p *TrieProof) {
+	bp.Proofs = append(bp.Proofs, p)
+}
+
+// MergeInto adds all of its proofs into the dest batch proof
+func (bp *TrieBatchProof) MergeInto(dest *TrieBatchProof) {
+	for _, p := range bp.Proofs {
+		dest.AppendProof(p)
+	}
+}
+
+// Equals compares this batch proof to another batch proof
+func (bp *TrieBatchProof) Equals(o *TrieBatchProof) bool {
+	if o == nil {
+		return false
+	}
+	if len(bp.Proofs) != len(o.Proofs) {
+		return false
+	}
+	for i, proof := range bp.Proofs {
+		if !proof.Equals(o.Proofs[i]) {
+			return false
+		}
+	}
+	return true
+}

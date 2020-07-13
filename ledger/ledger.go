@@ -20,8 +20,8 @@ type Ledger interface {
 	// Update updates a list of keys with new values at specific state commitment (update) and returns a new state commitment
 	Set(update *Update) (newStateCommitment StateCommitment, err error)
 
-	// Proof returns a proof for the given keys at specific state commitment
-	Proof(query *Query) (proof *Proof, err error)
+	// Prove returns proofs for the given keys at specific state commitment
+	Prove(query *Query) (proof Proof, err error)
 
 	// returns an approximate size of memory used by the ledger
 	MemSize() (int64, error)
@@ -32,13 +32,28 @@ type Ledger interface {
 
 // Query holds all data needed for a ledger read or ledger proof
 type Query struct {
-	StateCommitment StateCommitment
-	Keys            []Key
+	stateCommitment StateCommitment
+	keys            []Key
+}
+
+// NewQuery constructs a new ledger  query
+func NewQuery(sc StateCommitment, keys []Key) (*Query, error) {
+	return &Query{stateCommitment: sc, keys: keys}, nil
+}
+
+// Keys returns keys of the query
+func (q *Query) Keys() []Key {
+	return q.keys
 }
 
 // Size returns number of keys in the query
 func (q *Query) Size() int {
-	return len(q.Keys)
+	return len(q.keys)
+}
+
+// StateCommitment returns the state commitment of this query
+func (q *Query) StateCommitment() StateCommitment {
+	return q.stateCommitment
 }
 
 // Update holds all data needed for a ledger update
@@ -51,6 +66,21 @@ type Update struct {
 // Size returns number of keys in the ledger update
 func (u *Update) Size() int {
 	return len(u.keys)
+}
+
+// Keys returns keys of the update
+func (u *Update) Keys() []Key {
+	return u.keys
+}
+
+// Values returns value of the update
+func (u *Update) Values() []Value {
+	return u.values
+}
+
+// StateCommitment returns the state commitment of this update
+func (u *Update) StateCommitment() StateCommitment {
+	return u.stateCommitment
 }
 
 // appendKV append a key value pair to the update
@@ -85,6 +115,21 @@ func (sc StateCommitment) Equals(o StateCommitment) bool {
 		return false
 	}
 	return bytes.Equal(sc, o)
+}
+
+// Proof is a byte slice capturing encoded version of a batch proof
+type Proof []byte
+
+func (pr Proof) String() string {
+	return hex.EncodeToString(pr)
+}
+
+// Equals compares a proof to another ledger proof
+func (pr Proof) Equals(o Proof) bool {
+	if o == nil {
+		return false
+	}
+	return bytes.Equal(pr, o)
 }
 
 // Key represents a hierarchical ledger key
