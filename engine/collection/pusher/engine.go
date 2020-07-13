@@ -1,4 +1,4 @@
-// Package provider implements an engine for providing access to resources held
+// Package pusher implements an engine for providing access to resources held
 // by the collection node, including collections, collection guarantees, and
 // transactions.
 package pusher
@@ -21,9 +21,8 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-// Engine is the collection provider engine, which provides access to resources
+// Engine is the collection pusher engine, which provides access to resources
 // held by the collection node.
-// TODO consolidate with common resource provider engine (4148)
 type Engine struct {
 	unit         *engine.Unit
 	log          zerolog.Logger
@@ -40,7 +39,7 @@ type Engine struct {
 func New(log zerolog.Logger, net module.Network, state protocol.State, engMetrics module.EngineMetrics, colMetrics module.CollectionMetrics, me module.Local, pool mempool.Transactions, collections storage.Collections, transactions storage.Transactions) (*Engine, error) {
 	e := &Engine{
 		unit:         engine.NewUnit(),
-		log:          log.With().Str("engine", "provider").Logger(),
+		log:          log.With().Str("engine", "pusher").Logger(),
 		engMetrics:   engMetrics,
 		colMetrics:   colMetrics,
 		me:           me,
@@ -100,7 +99,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-// process processes events for the provider engine on the collection node.
+// process processes events for the pusher engine on the collection node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
 	case *messages.SubmitCollectionGuarantee:

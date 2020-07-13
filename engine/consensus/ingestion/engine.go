@@ -175,7 +175,7 @@ func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.Collectio
 
 	// we only accept guarantees from collection nodes or other consensus nodes
 	if identity.Role != flow.RoleCollection && identity.Role != flow.RoleConsensus {
-		return fmt.Errorf("invalid origin role for guarantee (%s)", identity.Role)
+		return engine.NewInvalidInputErrorf("invalid origin role for guarantee (%s)", identity.Role)
 	}
 
 	// ensure that collection has not expired

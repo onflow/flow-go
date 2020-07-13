@@ -39,7 +39,6 @@ func main() {
 		blockLimit      uint
 		collectionLimit uint
 		receiptLimit    uint
-		requestEng      *requester.Engine
 		ingestEng       *ingestion.Engine
 		followerEng     *followereng.Engine
 		syncCore        *synchronization.Core
@@ -99,14 +98,11 @@ func main() {
 			rpcEng = rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.RootChainID)
 			return rpcEng, nil
 		}).
-		Component("requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			requestEng, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
+		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			requestEng, err := requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
 				engine.RequestCollections,
 				filter.HasRole(flow.RoleCollection),
 			)
-			return requestEng, err
-		}).
-		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			ingestEng, err = ingestion.New(node.Logger, node.State, node.Me, requestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, rpcEng)
 			requestEng.WithHandle(ingestEng.OnCollection)
 			return ingestEng, err
