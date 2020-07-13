@@ -17,12 +17,13 @@
 /protobuf/services/observation/** @psiemens
 
 # Verification Stream
-/cmd/verification/** @ramtinms
-/engine/verification/** @ramtinms
+/cmd/verification/** @ramtinms @yhassanzadeh13
+/engine/verification/** @ramtinms @yhassanzadeh13
 /module/chunking/** @ramtinms
+/integration/tests/verification @ramtinms @yhassanzadeh13
 
 # Networking Stream
-/network/** @yhassanzadeh @vishalchangraniaxiom
+/network/** @yhassanzadeh13 @vishalchangraniaxiom
 
 # Cryptography Stream
 /crypto/** @tarakby
