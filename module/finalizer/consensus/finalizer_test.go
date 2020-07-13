@@ -35,7 +35,11 @@ func TestNewFinalizer(t *testing.T) {
 	})
 }
 
-func TestMakeFinal(t *testing.T) {
+// TestMakeFinalValidChain checks whether calling `MakeFinal` with the ID of a valid
+// descendant block of the latest finalized header results in the finalization of the
+// valid descendant and all of its parents up to the finalized header, but excluding
+// the children of the valid descendant.
+func TestMakeFinalValidChain(t *testing.T) {
 
 	// create one block that we consider the last finalized
 	final := unittest.BlockHeaderFixture()
@@ -106,4 +110,110 @@ func TestMakeFinal(t *testing.T) {
 
 	// make sure that cleanup was called for all of them too
 	assert.ElementsMatch(t, list, flow.GetIDs(pending[:cutoff]))
+}
+
+// TestMakeFinalInvalidHeight checks whether we receive an error when calling `MakeFinal`
+// with a header that is at the same height as the already highest finalized header.
+func TestMakeFinalInvalidHeight(t *testing.T) {
+
+	// create one block that we consider the last finalized
+	final := unittest.BlockHeaderFixture()
+	final.Height = uint64(rand.Uint32())
+
+	// generate a couple of children that are pending
+	pending := unittest.BlockHeaderFixture()
+	pending.Height = uint64(rand.Uint32())
+
+	// create a mock protocol state to check finalize calls
+	mutator := &mockprot.Mutator{}
+	state := &mockprot.State{}
+	state.On("Mutate").Return(mutator)
+
+	// this will hold the IDs of blocks clean up
+	var list []flow.Identifier
+
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+
+		// insert the latest finalized height
+		err := db.Update(operation.InsertFinalizedHeight(final.Height))
+		require.NoError(t, err)
+
+		// map the finalized height to the finalized block ID
+		err = db.Update(operation.IndexBlockHeight(final.Height, final.ID()))
+		require.NoError(t, err)
+
+		// insert the finalized block header into the DB
+		err = db.Update(operation.InsertHeader(final.ID(), &final))
+		require.NoError(t, err)
+
+		// insert all of the pending header into DB
+		err = db.Update(operation.InsertHeader(pending.ID(), &pending))
+		require.NoError(t, err)
+
+		// initialize the finalizer with the dependencies and make the call
+		metrics := metrics.NewNoopCollector()
+		fin := Finalizer{
+			db:      db,
+			headers: storage.NewHeaders(metrics, db),
+			state:   state,
+			cleanup: LogCleanup(&list),
+		}
+		err = fin.MakeFinal(pending.ID())
+		require.Error(t, err)
+	})
+
+	// make sure that nothing was finalized
+	mutator.AssertExpectations(t)
+
+	// make sure no cleanup was done
+	assert.Empty(t, list)
+}
+
+// TestMakeFinalDuplicate checks whether calling `MakeFinal` with the ID of the currently
+// highest finalized header is a no-op and does not result in an error.
+func TestMakeFinalDuplicate(t *testing.T) {
+
+	// create one block that we consider the last finalized
+	final := unittest.BlockHeaderFixture()
+	final.Height = uint64(rand.Uint32())
+
+	// create a mock protocol state to check finalize calls
+	mutator := &mockprot.Mutator{}
+	state := &mockprot.State{}
+	state.On("Mutate").Return(mutator)
+
+	// this will hold the IDs of blocks clean up
+	var list []flow.Identifier
+
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+
+		// insert the latest finalized height
+		err := db.Update(operation.InsertFinalizedHeight(final.Height))
+		require.NoError(t, err)
+
+		// map the finalized height to the finalized block ID
+		err = db.Update(operation.IndexBlockHeight(final.Height, final.ID()))
+		require.NoError(t, err)
+
+		// insert the finalized block header into the DB
+		err = db.Update(operation.InsertHeader(final.ID(), &final))
+		require.NoError(t, err)
+
+		// initialize the finalizer with the dependencies and make the call
+		metrics := metrics.NewNoopCollector()
+		fin := Finalizer{
+			db:      db,
+			headers: storage.NewHeaders(metrics, db),
+			state:   state,
+			cleanup: LogCleanup(&list),
+		}
+		err = fin.MakeFinal(final.ID())
+		require.NoError(t, err)
+	})
+
+	// make sure that nothing was finalized
+	mutator.AssertExpectations(t)
+
+	// make sure no cleanup was done
+	assert.Empty(t, list)
 }
