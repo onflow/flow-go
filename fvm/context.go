@@ -12,6 +12,7 @@ type Context struct {
 	Metrics                          *MetricsCollector
 	GasLimit                         uint64
 	BlockHeader                      *flow.Header
+	ServiceAccountEnabled            bool
 	RestrictedAccountCreationEnabled bool
 	RestrictedDeploymentEnabled      bool
 	SignatureVerifier                SignatureVerifier
@@ -49,6 +50,7 @@ func defaultContext() Context {
 		Metrics:                          nil,
 		GasLimit:                         defaultGasLimit,
 		BlockHeader:                      nil,
+		ServiceAccountEnabled:            true,
 		RestrictedAccountCreationEnabled: true,
 		RestrictedDeploymentEnabled:      true,
 		SignatureVerifier:                NewDefaultSignatureVerifier(),
@@ -128,6 +130,14 @@ func WithMetricsCollector(mc *MetricsCollector) Option {
 func WithTransactionProcessors(processors []TransactionProcessor) Option {
 	return func(ctx Context) Context {
 		ctx.TransactionProcessors = processors
+		return ctx
+	}
+}
+
+// WithServiceAccount enables or disables calls to the Flow service account.
+func WithServiceAccount(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.ServiceAccountEnabled = enabled
 		return ctx
 	}
 }
