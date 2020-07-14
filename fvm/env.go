@@ -10,6 +10,7 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -17,6 +18,7 @@ import (
 )
 
 var _ runtime.Interface = &hostEnv{}
+var _ runtime.HighLevelStorage = &hostEnv{}
 
 type hostEnv struct {
 	ctx           Context
@@ -228,6 +230,14 @@ func (e *hostEnv) VerifySignature(
 	}
 
 	return valid
+}
+
+func (e *hostEnv) HighLevelStorageEnabled() bool {
+	return e.ctx.SetValueHandler != nil
+}
+
+func (e *hostEnv) SetCadenceValue(owner common.Address, key string, value cadence.Value) error {
+	return e.ctx.SetValueHandler(flow.Address(owner), key, value)
 }
 
 // Block Environment Functions

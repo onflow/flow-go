@@ -1,6 +1,8 @@
 package fvm
 
 import (
+	"github.com/onflow/cadence"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -15,10 +17,14 @@ type Context struct {
 	ServiceAccountEnabled            bool
 	RestrictedAccountCreationEnabled bool
 	RestrictedDeploymentEnabled      bool
+	SetValueHandler                  SetValueHandler
 	SignatureVerifier                SignatureVerifier
 	TransactionProcessors            []TransactionProcessor
 	ScriptProcessors                 []ScriptProcessor
 }
+
+// SetValueHandler receives a value written by the Cadence runtime.
+type SetValueHandler func(owner flow.Address, key string, value cadence.Value) error
 
 // NewContext initializes a new execution context with the provided options.
 func NewContext(opts ...Option) Context {
@@ -156,6 +162,15 @@ func WithRestrictedDeployment(enabled bool) Option {
 func WithRestrictedAccountCreation(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.RestrictedAccountCreationEnabled = enabled
+		return ctx
+	}
+}
+
+// WithSetValueHandler sets a handler that is called when a value is written
+// by the Cadence runtime.
+func WithSetValueHandler(handler SetValueHandler) Option {
+	return func(ctx Context) Context {
+		ctx.SetValueHandler = handler
 		return ctx
 	}
 }
