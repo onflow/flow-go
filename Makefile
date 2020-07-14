@@ -54,7 +54,8 @@ unittest:
 	# test all packages with Relic library enabled
 	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) --tags relic ./...
 	whereis clang
-	echo $PATH
+	clang 
+	echo $(PATH)
 	cd crypto \
 		&& CC=clang CGO_LDFLAGS_ALLOW="--coverage|-fprofile-instr-generate" CGO_CFLAGS_ALLOW="--coverage|-fprofile-arcs|-ftest-coverage|-fprofile-instr-generate|-fcoverage-mapping" go test -tags=relic,coverage -c \
 		&& ./crypto.test \
