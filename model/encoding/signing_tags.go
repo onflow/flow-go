@@ -10,5 +10,6 @@ const (
 	ConsensusVoteTag    = "ConsensusVote"
 	CollectorVoteTag    = "CollectorVote"
 	ExecutionReceiptTag = "ExecutionReceipt"
+	SPoCKTag            = "SPoCK"
 	ResultApprovalTag   = "ResultApproval"
 )

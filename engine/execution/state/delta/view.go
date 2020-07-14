@@ -24,8 +24,9 @@ type View struct {
 
 // Snapshot is set of interactions with the register
 type Snapshot struct {
-	Delta Delta
-	Reads []flow.RegisterID
+	Delta       Delta
+	Reads       []flow.RegisterID
+	SpockSecret []byte
 }
 
 // NewView instantiates a new ledger view with the provided read function.
@@ -43,6 +44,7 @@ func (r *View) Interactions() *Snapshot {
 
 	var delta = make(Delta, len(r.delta))
 	var reads = make([]flow.RegisterID, 0, len(r.regTouchSet))
+	var spockSecret = make([]byte, len(r.spockSecret))
 
 	//copy data
 	for s, value := range r.delta {
@@ -52,9 +54,12 @@ func (r *View) Interactions() *Snapshot {
 		reads = append(reads, []byte(key))
 	}
 
+	copy(spockSecret, r.spockSecret)
+
 	return &Snapshot{
-		Delta: delta,
-		Reads: reads,
+		Delta:       delta,
+		Reads:       reads,
+		SpockSecret: spockSecret,
 	}
 }
 

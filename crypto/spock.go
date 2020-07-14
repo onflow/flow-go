@@ -25,7 +25,7 @@ import (
 func SPOCKProve(sk PrivateKey, data []byte, kmac hash.Hasher) (Signature, error) {
 	_, ok := sk.(*PrKeyBLSBLS12381)
 	if !ok {
-		return nil, errors.New("private key must be a BLS key.")
+		return nil, errors.New("private key must be a BLS key")
 	}
 
 	s := make([]byte, SignatureLenBLSBLS12381)
@@ -40,7 +40,7 @@ func SPOCKProve(sk PrivateKey, data []byte, kmac hash.Hasher) (Signature, error)
 func SPOCKVerifyAgainstData(pk PublicKey, proof Signature, data []byte, kmac hash.Hasher) (bool, error) {
 	_, ok := pk.(*PubKeyBLSBLS12381)
 	if !ok {
-		return false, errors.New("public key must be a BLS key.")
+		return false, errors.New("public key must be a BLS key")
 	}
 	var minLen int
 	if len(data) < SignatureLenBLSBLS12381-10 {
@@ -60,7 +60,7 @@ func SPOCKVerify(pk1 PublicKey, proof1 Signature, pk2 PublicKey, proof2 Signatur
 	_, ok1 := pk1.(*PubKeyBLSBLS12381)
 	_, ok2 := pk2.(*PubKeyBLSBLS12381)
 	if !(ok1 && ok2) {
-		return false, errors.New("public keys must be BLS keys.")
+		return false, errors.New("public keys must be BLS keys")
 	}
 	return bytes.Equal(pk1.Encode()[:10], proof1[:10]) &&
 		bytes.Equal(pk2.Encode()[:10], proof2[:10]) &&
