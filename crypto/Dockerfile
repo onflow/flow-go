@@ -2,7 +2,7 @@
 
 FROM golang:1.13
 RUN apt-get update
-RUN apt-get -y install cmake zip sudo
+RUN apt-get -y install cmake clang zip sudo
 RUN go get github.com/axw/gocov/gocov
 RUN go get github.com/matm/gocov-html
 RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
