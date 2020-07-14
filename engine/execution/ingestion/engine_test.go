@@ -60,6 +60,7 @@ type testingContext struct {
 	providerEngine     *provider.ProviderEngine
 	executionState     *state.ExecutionState
 	snapshot           *protocol.Snapshot
+	identity           *flow.Identity
 }
 
 func runWithEngine(t *testing.T, f func(testingContext)) {
@@ -168,6 +169,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		providerEngine:     providerEngine,
 		executionState:     executionState,
 		snapshot:           snapshot,
+		identity:           myIdentity,
 	})
 
 	<-engine.Done()
@@ -257,7 +259,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 			for i, stateSnapshot := range computationResult.StateSnapshots {
 
 				valid, err := crypto.SPOCKVerifyAgainstData(
-					ctx.engine.me.StakingKey().PublicKey(),
+					ctx.identity.StakingPubKey,
 					spocks[i],
 					stateSnapshot.SpockSecret,
 					ctx.engine.spockHasher,
@@ -451,7 +453,7 @@ func Test_SPoCKGeneration(t *testing.T) {
 
 		for i, snapshot := range snapshots {
 			valid, err := crypto.SPOCKVerifyAgainstData(
-				ctx.engine.me.StakingKey().PublicKey(),
+				ctx.identity.StakingPubKey,
 				executionReceipt.Spocks[i],
 				snapshot.SpockSecret,
 				ctx.engine.spockHasher,

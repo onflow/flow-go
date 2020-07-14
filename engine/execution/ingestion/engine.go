@@ -953,9 +953,8 @@ func (e *Engine) generateExecutionReceipt(
 	spocks := make([]crypto.Signature, len(stateInteractions))
 
 	for i, stateInteraction := range stateInteractions {
-		stateInteraction.RegisterTouches()
+		spock, err := e.me.SignFunc(stateInteraction.SpockSecret, e.spockHasher, crypto.SPOCKProve)
 
-		spock, err := crypto.SPOCKProve(e.me.StakingKey(), stateInteraction.SpockSecret, e.spockHasher)
 		if err != nil {
 			return nil, fmt.Errorf("error while generating SPoCK: %w", err)
 		}

@@ -85,18 +85,25 @@ func (_m *Local) Sign(_a0 []byte, _a1 hash.Hasher) (crypto.Signature, error) {
 	return r0, r1
 }
 
-// StakingKey provides a mock function with given fields:
-func (_m *Local) StakingKey() crypto.PrivateKey {
-	ret := _m.Called()
+// SignFunc provides a mock function with given fields: _a0, _a1, _a2
+func (_m *Local) SignFunc(_a0 []byte, _a1 hash.Hasher, _a2 func(crypto.PrivateKey, []byte, hash.Hasher) (crypto.Signature, error)) (crypto.Signature, error) {
+	ret := _m.Called(_a0, _a1, _a2)
 
-	var r0 crypto.PrivateKey
-	if rf, ok := ret.Get(0).(func() crypto.PrivateKey); ok {
-		r0 = rf()
+	var r0 crypto.Signature
+	if rf, ok := ret.Get(0).(func([]byte, hash.Hasher, func(crypto.PrivateKey, []byte, hash.Hasher) (crypto.Signature, error)) crypto.Signature); ok {
+		r0 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(crypto.PrivateKey)
+			r0 = ret.Get(0).(crypto.Signature)
 		}
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func([]byte, hash.Hasher, func(crypto.PrivateKey, []byte, hash.Hasher) (crypto.Signature, error)) error); ok {
+		r1 = rf(_a0, _a1, _a2)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }

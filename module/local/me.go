@@ -38,6 +38,11 @@ func (l *Local) NotMeFilter() flow.IdentityFilter {
 	return filter.Not(filter.HasNodeID(l.NodeID()))
 }
 
-func (l *Local) StakingKey() crypto.PrivateKey {
-	return l.sk
+// SignFunc provides a signature oracle that given a message, a hasher, and a signing function, it
+// generates and returns a signature over the message using the node's private key
+// as well as the input hasher by invoking the given signing function. The overall idea of this function
+// is to not expose the private key to the caller.
+func (l *Local) SignFunc(data []byte, hasher hash.Hasher, f func(crypto.PrivateKey, []byte, hash.Hasher) (crypto.Signature,
+	error)) (crypto.Signature, error) {
+	return f(l.sk, data, hasher)
 }
