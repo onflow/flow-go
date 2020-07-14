@@ -37,13 +37,29 @@ func KeyPartFixture(typ uint16, val string) *ledger.KeyPart {
 	return ledger.NewKeyPart(kp1t, kp1v)
 }
 
-func StateCommitmentFixture() ledger.StateCommitment {
+func UpdateFixture() *ledger.Update {
 	sc, _ := hex.DecodeString("6a7a565add94fb36069d79e8725c221cd1e5740742501ef014ea6db999fd98ad")
-	return ledger.StateCommitment(sc)
+	k1p1 := ledger.NewKeyPart(uint16(1), []byte("1"))
+	k1p2 := ledger.NewKeyPart(uint16(22), []byte("2"))
+	k1 := ledger.NewKey([]ledger.KeyPart{*k1p1, *k1p2})
+	v1 := ledger.Value([]byte{'A'})
+
+	k2p1 := ledger.NewKeyPart(uint16(1), []byte("3"))
+	k2p2 := ledger.NewKeyPart(uint16(22), []byte("4"))
+	k2 := ledger.NewKey([]ledger.KeyPart{*k2p1, *k2p2})
+	v2 := ledger.Value([]byte{'B'})
+
+	u, _ := ledger.NewUpdate(sc, []ledger.Key{*k1, *k2}, []ledger.Value{v1, v2})
+	return u
 }
 
-func ProofFixture() (*ledger.Proof, ledger.StateCommitment) {
-	p := ledger.NewProof()
+func RootHashFixture() ledger.RootHash {
+	sc, _ := hex.DecodeString("6a7a565add94fb36069d79e8725c221cd1e5740742501ef014ea6db999fd98ad")
+	return ledger.RootHash(sc)
+}
+
+func TrieProofFixture() (*ledger.TrieProof, ledger.StateCommitment) {
+	p := ledger.NewTrieProof()
 	p.Path = TwoBytesPath(330)
 	p.Payload = LightPayload8('A', 'A')
 	p.Inclusion = true
@@ -58,8 +74,8 @@ func ProofFixture() (*ledger.Proof, ledger.StateCommitment) {
 	return p, ledger.StateCommitment(sc)
 }
 
-func BatchProofFixture() (*ledger.BatchProof, ledger.StateCommitment) {
-	p1 := ledger.NewProof()
+func TrieBatchProofFixture() (*ledger.TrieBatchProof, ledger.StateCommitment) {
+	p1 := ledger.NewTrieProof()
 	p1.Path = TwoBytesPath(330)
 	p1.Payload = LightPayload8('A', 'A')
 	p1.Inclusion = true
@@ -71,7 +87,7 @@ func BatchProofFixture() (*ledger.BatchProof, ledger.StateCommitment) {
 	p1.Interims = append(p1.Interims, p1interim2)
 	p1.Steps = uint8(7)
 
-	p2 := ledger.NewProof()
+	p2 := ledger.NewTrieProof()
 	p2.Path = TwoBytesPath(33354)
 	p2.Payload = LightPayload8('C', 'C')
 	p2.Inclusion = true
@@ -83,7 +99,7 @@ func BatchProofFixture() (*ledger.BatchProof, ledger.StateCommitment) {
 	p2.Interims = append(p2.Interims, p2interim2)
 	p2.Steps = uint8(8)
 
-	bp := ledger.NewBatchProof()
+	bp := ledger.NewTrieBatchProof()
 	bp.Proofs = append(bp.Proofs, p1)
 	bp.Proofs = append(bp.Proofs, p2)
 

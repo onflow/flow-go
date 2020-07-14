@@ -9,13 +9,13 @@ import (
 )
 
 // Test_ProofVerify tests proof verification
-func Test_ProofVerify(t *testing.T) {
-	p, sc := common.ProofFixture()
-	require.True(t, common.VerifyProof(p, sc, 2))
+func Test_TrieProofVerify(t *testing.T) {
+	p, sc := common.TrieProofFixture()
+	require.True(t, common.VerifyTrieProof(p, sc, 2))
 }
 
 // Test_BatchProofVerify tests batch proof verification
-func Test_BatchProofVerify(t *testing.T) {
-	bp, sc := common.BatchProofFixture()
-	require.True(t, common.VerifyBatchProof(bp, sc, 2))
+func Test_TrieBatchProofVerify(t *testing.T) {
+	bp, sc := common.TrieBatchProofFixture()
+	require.True(t, common.VerifyTrieBatchProof(bp, sc, 2))
 }

@@ -7,9 +7,9 @@ import (
 	"github.com/dapperlabs/flow-go/ledger/utils"
 )
 
-// VerifyProof verifies the proof, by constructing all the
+// VerifyTrieProof verifies the proof, by constructing all the
 // hash from the leaf to the root and comparing the rootHash
-func VerifyProof(p *ledger.Proof, expectedStateCommitment ledger.StateCommitment, expectedKeySize int) bool {
+func VerifyTrieProof(p *ledger.TrieProof, expectedStateCommitment ledger.StateCommitment, expectedKeySize int) bool {
 	treeHeight := 8 * expectedKeySize
 	leafHeight := treeHeight - int(p.Steps)             // p.Steps is the number of edges we are traversing until we hit the compactified leaf.
 	if !(0 <= leafHeight && leafHeight <= treeHeight) { // sanity check
@@ -44,11 +44,11 @@ func VerifyProof(p *ledger.Proof, expectedStateCommitment ledger.StateCommitment
 	return bytes.Equal(computed, expectedStateCommitment) == p.Inclusion
 }
 
-// VerifyBatchProof verifies all the proof inside the batchproof
-func VerifyBatchProof(bp *ledger.BatchProof, expectedRootHash []byte, expectedKeySize int) bool {
+// VerifyTrieBatchProof verifies all the proof inside the batchproof
+func VerifyTrieBatchProof(bp *ledger.TrieBatchProof, expectedRootHash []byte, expectedKeySize int) bool {
 	for _, p := range bp.Proofs {
 		// any invalid proof
-		if !VerifyProof(p, expectedRootHash, expectedKeySize) {
+		if !VerifyTrieProof(p, expectedRootHash, expectedKeySize) {
 			return false
 		}
 	}

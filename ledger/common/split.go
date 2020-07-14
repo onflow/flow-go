@@ -46,12 +46,12 @@ func SplitSortedPaths(paths []ledger.Path, bitIndex int) ([]ledger.Path, []ledge
 	return paths, nil, nil
 }
 
-// SplitProofsByPath splits a set of unordered path and proof pairs based on the value of bit (bitIndex) of path
-func SplitProofsByPath(paths []ledger.Path, proofs []*ledger.Proof, bitIndex int) ([]ledger.Path, []*ledger.Proof, []ledger.Path, []*ledger.Proof, error) {
+// SplitTrieProofsByPath splits a set of unordered path and proof pairs based on the value of bit (bitIndex) of path
+func SplitTrieProofsByPath(paths []ledger.Path, proofs []*ledger.TrieProof, bitIndex int) ([]ledger.Path, []*ledger.TrieProof, []ledger.Path, []*ledger.TrieProof, error) {
 	rpaths := make([]ledger.Path, 0, len(paths))
-	rproofs := make([]*ledger.Proof, 0, len(proofs))
+	rproofs := make([]*ledger.TrieProof, 0, len(proofs))
 	lpaths := make([]ledger.Path, 0, len(paths))
-	lproofs := make([]*ledger.Proof, 0, len(proofs))
+	lproofs := make([]*ledger.TrieProof, 0, len(proofs))
 
 	for i, path := range paths {
 		bitIsSet, err := IsBitSet(path, bitIndex)

@@ -538,7 +538,7 @@ func decodeTrieUpdate(inp []byte) (*ledger.TrieUpdate, error) {
 }
 
 // EncodeProof encodes the content of a proof into a byte slice
-func EncodeProof(p *ledger.Proof) []byte {
+func EncodeTrieProof(p *ledger.TrieProof) []byte {
 	if p == nil {
 		return []byte{}
 	}
@@ -549,12 +549,12 @@ func EncodeProof(p *ledger.Proof) []byte {
 	buffer = appendUint16(buffer, EncodingTypeProof)
 
 	// append encoded proof content
-	buffer = append(buffer, encodeProof(p)...)
+	buffer = append(buffer, encodeTrieProof(p)...)
 
 	return buffer
 }
 
-func encodeProof(p *ledger.Proof) []byte {
+func encodeTrieProof(p *ledger.TrieProof) []byte {
 	// first byte is reserved for inclusion flag
 	buffer := make([]byte, 1)
 	if p.Inclusion {
@@ -590,7 +590,7 @@ func encodeProof(p *ledger.Proof) []byte {
 }
 
 // DecodeProof construct a proof from an encoded byte slice
-func DecodeProof(encodedProof []byte) (*ledger.Proof, error) {
+func DecodeTrieProof(encodedProof []byte) (*ledger.TrieProof, error) {
 	// check the enc dec version
 	rest, _, err := checkEncDecVer(encodedProof)
 	if err != nil {
@@ -601,11 +601,11 @@ func DecodeProof(encodedProof []byte) (*ledger.Proof, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
-	return decodeProof(rest)
+	return decodeTrieProof(rest)
 }
 
-func decodeProof(inp []byte) (*ledger.Proof, error) {
-	pInst := ledger.NewProof()
+func decodeTrieProof(inp []byte) (*ledger.TrieProof, error) {
+	pInst := ledger.NewTrieProof()
 
 	// Inclusion flag
 	byteInclusion, rest, err := readSlice(inp, 1)
@@ -679,8 +679,8 @@ func decodeProof(inp []byte) (*ledger.Proof, error) {
 	return pInst, nil
 }
 
-// EncodeBatchProof encodes a batch proof into a byte slice
-func EncodeBatchProof(bp *ledger.BatchProof) []byte {
+// EncodeTrieBatchProof encodes a batch proof into a byte slice
+func EncodeTrieBatchProof(bp *ledger.TrieBatchProof) []byte {
 	if bp == nil {
 		return []byte{}
 	}
@@ -689,20 +689,20 @@ func EncodeBatchProof(bp *ledger.BatchProof) []byte {
 	// encode key entity type
 	buffer = appendUint16(buffer, EncodingTypeBatchProof)
 	// encode batch proof content
-	buffer = append(buffer, encodeBatchProof(bp)...)
+	buffer = append(buffer, encodeTrieBatchProof(bp)...)
 
 	return buffer
 }
 
 // encodeBatchProof encodes a batch proof into a byte slice
-func encodeBatchProof(bp *ledger.BatchProof) []byte {
+func encodeTrieBatchProof(bp *ledger.TrieBatchProof) []byte {
 	buffer := make([]byte, 0)
 	// encode number of proofs
 	buffer = appendUint32(buffer, uint32(len(bp.Proofs)))
 	// iterate over proofs
 	for _, p := range bp.Proofs {
 		// encode the proof
-		encP := encodeProof(p)
+		encP := encodeTrieProof(p)
 		// encode the len of the encoded proof
 		buffer = appendUint64(buffer, uint64(len(encP)))
 		// append the encoded proof
@@ -711,8 +711,8 @@ func encodeBatchProof(bp *ledger.BatchProof) []byte {
 	return buffer
 }
 
-// DecodeBatchProof constructs a batch proof from an encoded byte slice
-func DecodeBatchProof(encodedBatchProof []byte) (*ledger.BatchProof, error) {
+// DecodeTrieBatchProof constructs a batch proof from an encoded byte slice
+func DecodeTrieBatchProof(encodedBatchProof []byte) (*ledger.TrieBatchProof, error) {
 	// check the enc dec version
 	rest, _, err := checkEncDecVer(encodedBatchProof)
 	if err != nil {
@@ -725,15 +725,15 @@ func DecodeBatchProof(encodedBatchProof []byte) (*ledger.BatchProof, error) {
 	}
 
 	// decode the batch proof content
-	bp, err := decodeBatchProof(rest)
+	bp, err := decodeTrieBatchProof(rest)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding batch proof: %w", err)
 	}
 	return bp, nil
 }
 
-func decodeBatchProof(inp []byte) (*ledger.BatchProof, error) {
-	bp := ledger.NewBatchProof()
+func decodeTrieBatchProof(inp []byte) (*ledger.TrieBatchProof, error) {
+	bp := ledger.NewTrieBatchProof()
 	// number of proofs
 	numOfProofs, rest, err := readUint32(inp)
 	if err != nil {
@@ -756,7 +756,7 @@ func decodeBatchProof(inp []byte) (*ledger.BatchProof, error) {
 		}
 
 		// decode encoded proof
-		proof, err := decodeProof(encProof)
+		proof, err := decodeTrieProof(encProof)
 		if err != nil {
 			return nil, fmt.Errorf("error decoding batch proof (content): %w", err)
 		}

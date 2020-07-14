@@ -71,19 +71,19 @@ func Test_PayloadEncodingDecoding(t *testing.T) {
 }
 
 // Test_ProofEncodingDecoding tests encoding decoding functionality of a proof
-func Test_ProofEncodingDecoding(t *testing.T) {
-	p, _ := common.ProofFixture()
-	encoded := common.EncodeProof(p)
-	newp, err := common.DecodeProof(encoded)
+func Test_TrieProofEncodingDecoding(t *testing.T) {
+	p, _ := common.TrieProofFixture()
+	encoded := common.EncodeTrieProof(p)
+	newp, err := common.DecodeTrieProof(encoded)
 	require.NoError(t, err)
 	require.True(t, newp.Equals(p))
 }
 
 // Test_BatchProofEncodingDecoding tests encoding decoding functionality of a batch proof
 func Test_BatchProofEncodingDecoding(t *testing.T) {
-	bp, _ := common.BatchProofFixture()
-	encoded := common.EncodeBatchProof(bp)
-	newbp, err := common.DecodeBatchProof(encoded)
+	bp, _ := common.TrieBatchProofFixture()
+	encoded := common.EncodeTrieBatchProof(bp)
+	newbp, err := common.DecodeTrieBatchProof(encoded)
 	require.NoError(t, err)
 	require.True(t, newbp.Equals(bp))
 }
@@ -103,9 +103,9 @@ func Test_TrieUpdateEncodingDecoding(t *testing.T) {
 	pl2 := ledger.NewPayload(*k2, ledger.Value([]byte{'B'}))
 
 	tu := &ledger.TrieUpdate{
-		StateCommitment: common.StateCommitmentFixture(),
-		Paths:           []ledger.Path{p1, p2},
-		Payloads:        []*ledger.Payload{pl1, pl2},
+		RootHash: common.RootHashFixture(),
+		Paths:    []ledger.Path{p1, p2},
+		Payloads: []*ledger.Payload{pl1, pl2},
 	}
 
 	encoded := common.EncodeTrieUpdate(tu)

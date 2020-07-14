@@ -11,5 +11,15 @@ func PayloadsToValues(payloads []ledger.Payload) ([]ledger.Value, error) {
 		ret = append(ret, p.Value)
 	}
 	return ret, nil
+}
 
+// UpdateToPayloads constructs an slice of payloads given ledger update
+func UpdateToPayloads(update *ledger.Update) ([]ledger.Payload, error) {
+	keys := update.Keys()
+	values := update.Values()
+	payloads := make([]ledger.Payload, 0)
+	for i := range keys {
+		payloads = append(payloads, ledger.Payload{Key: keys[i], Value: values[i]})
+	}
+	return payloads, nil
 }
