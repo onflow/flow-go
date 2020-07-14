@@ -84,22 +84,22 @@ func (e *hostEnv) getLogs() []string {
 	return e.logs
 }
 
-func (e *hostEnv) GetValue(owner, controller, key []byte) ([]byte, error) {
+func (e *hostEnv) GetValue(owner, key []byte) ([]byte, error) {
 	v, _ := e.ledger.Get(
 		state.RegisterID(
 			string(owner),
-			string(controller),
+			"", // TODO: Remove empty controller key
 			string(key),
 		),
 	)
 	return v, nil
 }
 
-func (e *hostEnv) SetValue(owner, controller, key, value []byte) error {
+func (e *hostEnv) SetValue(owner, key, value []byte) error {
 	e.ledger.Set(
 		state.RegisterID(
 			string(owner),
-			string(controller),
+			"", // TODO: Remove empty controller key
 			string(key),
 		),
 		value,
@@ -107,8 +107,8 @@ func (e *hostEnv) SetValue(owner, controller, key, value []byte) error {
 	return nil
 }
 
-func (e *hostEnv) ValueExists(owner, controller, key []byte) (exists bool, err error) {
-	v, err := e.GetValue(owner, controller, key)
+func (e *hostEnv) ValueExists(owner, key []byte) (exists bool, err error) {
+	v, err := e.GetValue(owner, key)
 	if err != nil {
 		return false, err
 	}
