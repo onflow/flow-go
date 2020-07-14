@@ -11,6 +11,7 @@ functionality required by the Flow protocol.
 import (
     "github.com/onflow/cadence/runtime"
     "github.com/dapperlabs/flow-go/fvm"
+    "github.com/dapperlabs/flow-go/model/flow"
 )
 
 vm := fvm.New(runtime.NewInterpreterRuntime())
@@ -21,26 +22,28 @@ tx := flow.NewTransactionBody().
 ctx := fvm.NewContext()
 ledger := make(fvm.MapLedger)
 
-result, err := vm.Invoke(ctx, fvm.Transaction(tx), ledger)
+txProc := fvm.Transaction(tx)
+
+err := vm.Run(ctx, txProc, ledger)
 if err != nil {
-  panic("fatal error during invocation!")
+  panic("fatal error during transaction procedure!")
 }
 
-fmt.Println(result.Logs[0]) // prints "Hello, World!"
+fmt.Println(txProc.Logs[0]) // prints "Hello, World!"
 ```
 
-### Invocations
+### Procedure
 
-The FVM interacts with the Flow execution state by performing atomic invocations against 
-a shared ledger. An `Invokable` is an operation that can be applied to a `Ledger`.
+The FVM interacts with the Flow execution state by running atomic procedures against 
+a shared ledger. A `Procedure` is an operation that can be applied to a `Ledger`.
 
-#### Invocation Types
+#### Procedure Types
 
-##### Transactions (Read/Write)
+##### Transactions (Read/write)
 
-An `InvokableTransaction` is an operation that mutates the ledger state.
+A `TransactionProcedure` is an operation that mutates the ledger state.
 
-Invokable transactions can be created from a `flow.TransactionBody`:
+A transaction procedure can be created from a `flow.TransactionBody`:
 
 ```go
 var tx flow.TransactionBody
@@ -48,7 +51,7 @@ var tx flow.TransactionBody
 i := fvm.Transaction(tx)
 ```
 
-Transaction invocation has the following steps:
+A transaction procedure has the following steps:
 
 1. Verify all transaction signatures against the current ledger state
 1. Validate and increment the proposal key sequence number
@@ -57,7 +60,7 @@ Transaction invocation has the following steps:
 
 ##### Scripts (Read-only)
 
-An `InvokableScript` is a simple operation that reads from the ledger state.
+A `ScriptProcedure` is an operation that reads from the ledger state.
 
 ```go
 foo := fvm.Script([]byte(`fun main(): Int { return 42 }`))
@@ -74,7 +77,7 @@ bar := script.WithArguments(argB)
 
 ### Contexts
 
-Invocations are applied inside of an execution context that defines the host
+The VM runs procedures inside of an execution context that defines the host
 functionality provided to the Cadence runtime. A `Context` instance is 
 an immutable object, and any changes to a context must be made by spawning
 a new child context.
@@ -117,14 +120,14 @@ any parameters that it chooses.
 
 ### `HostEnvironment`
 
-A `HostEnvironment` is a short-lived component that is consumed by an invocation. A `HostEnvironment` is the 
+A `HostEnvironment` is a short-lived component that is consumed by a procedure. A `HostEnvironment` is the 
 interface through which the VM communicates with the Cadence runtime. The `HostEnvironment` provides information about
 the current `Context` and also collects logs, events and metrics emitted from the runtime.
 
-### Invocation Lifecycle
+### Procedure Lifecycle
 
-The diagram below illustrates the relationship between contexts, host environments and invocations. The context below
-is reused for multiple invocations, each of which is supplied with a unique `HostEnvironment` instance.
+The diagram below illustrates the relationship between contexts, host environments and procedures. Multiple procedures
+can reuse the same context, each of which is supplied with a unique `HostEnvironment` instance.
 
 ![fvm](./fvm.svg)
 
@@ -144,6 +147,6 @@ is reused for multiple invocations, each of which is supplied with a unique `Hos
 
 ## Open Questions
 
-- Currently the caller is responsible for providing the correct `Ledger` instance when performing an invocation. When
+- Currently the caller is responsible for providing the correct `Ledger` instance when running a procedure. When
 performing atomic operations in batches (i.e blocks or chunks), multiple ledgers are spawned in a hierarchy similar to 
 that of multiple `Context` instances. Does it make sense for the `fvm` package to manage ledgers as well?

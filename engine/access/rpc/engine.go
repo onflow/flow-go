@@ -3,6 +3,7 @@ package rpc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 
@@ -64,7 +65,7 @@ func New(log zerolog.Logger,
 	)
 
 	// wrap the GRPC server with an HTTP proxy server to serve HTTP clients
-	httpServer := NewHTTPServer(grpcServer, 8080)
+	httpServer := NewHTTPServer(grpcServer, config.HTTPListenAddr)
 
 	eng := &Engine{
 		log:        log,
@@ -84,7 +85,8 @@ func New(log zerolog.Logger,
 // started. The RPC engine is ready when the gRPC server has successfully
 // started.
 func (e *Engine) Ready() <-chan struct{} {
-	e.unit.Launch(e.serve)
+	e.unit.Launch(e.serveGRPC)
+	e.unit.Launch(e.serveGRPCWebProxy)
 	return e.unit.Ready()
 }
 
@@ -101,10 +103,35 @@ func (e *Engine) Done() <-chan struct{} {
 		})
 }
 
-// serve starts the gRPC server and the http proxy server
+// SubmitLocal submits an event originating on the local node.
+func (e *Engine) SubmitLocal(event interface{}) {
+	e.unit.Launch(func() {
+		err := e.process(event)
+		if err != nil {
+			e.log.Error().Err(err).Msg("could not process submitted event")
+		}
+	})
+}
+
+// process processes the given ingestion engine event. Events that are given
+// to this function originate within the expulsion engine on the node with the
+// given origin ID.
+func (e *Engine) process(event interface{}) error {
+	switch entity := event.(type) {
+	case *flow.Block:
+		e.handler.NotifyFinalizedBlockHeight(entity.Header.Height)
+		return nil
+	default:
+		return fmt.Errorf("invalid event type (%T)", event)
+	}
+}
+
+// serveGRPC starts the gRPC server
 // When this function returns, the server is considered ready.
-func (e *Engine) serve() {
-	e.log.Info().Msgf("starting grpc server on address %s", e.config.GRPCListenAddr)
+func (e *Engine) serveGRPC() {
+	log := e.log.With().Str("grpc_address", e.config.GRPCListenAddr).Logger()
+
+	log.Info().Msg("starting grpc server on address")
 
 	l, err := net.Listen("tcp", e.config.GRPCListenAddr)
 	if err != nil {
@@ -116,9 +143,15 @@ func (e *Engine) serve() {
 	if err != nil {
 		e.log.Err(err).Msg("fatal error in grpc server")
 	}
+}
 
-	e.log.Info().Msgf("starting http server on address %s", e.config.HTTPListenAddr)
-	err = e.httpServer.ListenAndServe()
+// serveGRPCWebProxy starts the gRPC web proxy server
+func (e *Engine) serveGRPCWebProxy() {
+	log := e.log.With().Str("http_proxy_address", e.config.HTTPListenAddr).Logger()
+
+	log.Info().Msg("starting http proxy server on address")
+
+	err := e.httpServer.ListenAndServe()
 	if errors.Is(err, http.ErrServerClosed) {
 		return
 	}

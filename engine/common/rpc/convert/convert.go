@@ -10,46 +10,59 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func MessageToTransaction(m *entities.Transaction) (flow.TransactionBody, error) {
+func MessageToTransaction(m *entities.Transaction, chain flow.Chain) (flow.TransactionBody, error) {
 	if m == nil {
 		return flow.TransactionBody{}, fmt.Errorf("message is empty")
 	}
 
 	t := flow.NewTransactionBody()
 
-	t.SetScript(m.GetScript())
-	t.SetArguments(m.GetArguments())
-	t.SetReferenceBlockID(flow.HashToID(m.GetReferenceBlockId()))
-	t.SetGasLimit(m.GetGasLimit())
-
 	proposalKey := m.GetProposalKey()
 	if proposalKey != nil {
-		proposalAddress := flow.BytesToAddress(proposalKey.GetAddress())
+		proposalAddress, err := Address(proposalKey.GetAddress(), chain)
+		if err != nil {
+			return *t, err
+		}
 		t.SetProposalKey(proposalAddress, uint64(proposalKey.GetKeyId()), proposalKey.GetSequenceNumber())
 	}
 
 	payer := m.GetPayer()
 	if payer != nil {
-		t.SetPayer(
-			flow.BytesToAddress(payer),
-		)
+		payerAddress, err := Address(payer, chain)
+		if err != nil {
+			return *t, err
+		}
+		t.SetPayer(payerAddress)
 	}
 
 	for _, authorizer := range m.GetAuthorizers() {
-		t.AddAuthorizer(
-			flow.BytesToAddress(authorizer),
-		)
+		authorizerAddress, err := Address(authorizer, chain)
+		if err != nil {
+			return *t, err
+		}
+		t.AddAuthorizer(authorizerAddress)
 	}
 
 	for _, sig := range m.GetPayloadSignatures() {
-		addr := flow.BytesToAddress(sig.GetAddress())
+		addr, err := Address(sig.GetAddress(), chain)
+		if err != nil {
+			return *t, err
+		}
 		t.AddPayloadSignature(addr, uint64(sig.GetKeyId()), sig.GetSignature())
 	}
 
 	for _, sig := range m.GetEnvelopeSignatures() {
-		addr := flow.BytesToAddress(sig.GetAddress())
+		addr, err := Address(sig.GetAddress(), chain)
+		if err != nil {
+			return *t, err
+		}
 		t.AddEnvelopeSignature(addr, uint64(sig.GetKeyId()), sig.GetSignature())
 	}
+
+	t.SetScript(m.GetScript())
+	t.SetArguments(m.GetArguments())
+	t.SetReferenceBlockID(flow.HashToID(m.GetReferenceBlockId()))
+	t.SetGasLimit(m.GetGasLimit())
 
 	return *t, nil
 }

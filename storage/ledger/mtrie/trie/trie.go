@@ -72,9 +72,13 @@ func NewMTrie(root *node.Node) (*MTrie, error) {
 	}, nil
 }
 
+func RootHashToString(rootHash []byte) string {
+	return hex.EncodeToString(rootHash)
+}
+
 // StringRootHash returns the trie's Hex-encoded root hash.
 // Concurrency safe (as Tries are immutable structures by convention)
-func (mt *MTrie) StringRootHash() string { return hex.EncodeToString(mt.root.Hash()) }
+func (mt *MTrie) StringRootHash() string { return RootHashToString(mt.root.Hash()) }
 
 // RootHash returns the trie's root hash (i.e. the hash of the trie's root node).
 // Concurrency safe (as Tries are immutable structures by convention)

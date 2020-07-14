@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
 	mockaccess "github.com/dapperlabs/flow-go/engine/access/mock"
-	"github.com/dapperlabs/flow-go/engine/common/convert"
+	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	realstorage "github.com/dapperlabs/flow-go/storage"
@@ -59,6 +59,7 @@ func (suite *Suite) SetupTest() {
 	suite.collections = new(storage.Collections)
 	suite.colClient = new(mockaccess.AccessAPIClient)
 	suite.execClient = new(mockaccess.ExecutionAPIClient)
+	suite.chainID = flow.Mainnet
 }
 
 func (suite *Suite) TestPing() {
@@ -121,7 +122,7 @@ func (suite *Suite) TestGetTransaction() {
 	resp, err := handler.GetTransaction(context.Background(), req)
 	suite.checkResponse(resp, err)
 
-	actual, err := convert.MessageToTransaction(resp.GetTransaction())
+	actual, err := convert.MessageToTransaction(resp.GetTransaction(), suite.chainID.Chain())
 	suite.checkResponse(resp, err)
 	suite.Require().Equal(expected, actual)
 	suite.assertAllExpectations()
@@ -472,9 +473,11 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 func (suite *Suite) TestGetAccount() {
 
-	address := []byte{1}
+	address, err := suite.chainID.Chain().NewAddressGenerator().NextAddress()
+	suite.Require().NoError(err)
+
 	account := &entities.Account{
-		Address: address,
+		Address: address.Bytes(),
 	}
 	ctx := context.Background()
 
@@ -488,7 +491,7 @@ func (suite *Suite) TestGetAccount() {
 	blockID := header.ID()
 	exeReq := &execution.GetAccountAtBlockIDRequest{
 		BlockId: blockID[:],
-		Address: address,
+		Address: address.Bytes(),
 	}
 
 	// create the expected execution API response
@@ -503,87 +506,23 @@ func (suite *Suite) TestGetAccount() {
 	handler := NewHandler(suite.log, suite.state, suite.execClient, nil, nil, suite.headers, nil, nil, suite.chainID)
 
 	suite.Run("happy path - valid request and valid response", func() {
-		expectedResp := &access.AccountResponse{
+		expectedResp := &access.GetAccountResponse{
 			Account: account,
 		}
-		req := &access.GetAccountAtLatestBlockRequest{
-			Address: address,
+		req := &access.GetAccountRequest{
+			Address: address.Bytes(),
 		}
-		actualResp, err := handler.GetAccountAtLatestBlock(ctx, req)
+		actualResp, err := handler.GetAccount(ctx, req)
 		suite.checkResponse(actualResp, err)
 		suite.assertAllExpectations()
 		suite.Require().Equal(expectedResp, actualResp)
 	})
 
 	suite.Run("invalid request with nil address", func() {
-		req := &access.GetAccountAtLatestBlockRequest{
+		req := &access.GetAccountRequest{
 			Address: nil,
 		}
-		_, err := handler.GetAccountAtLatestBlock(ctx, req)
-		suite.Require().Error(err)
-	})
-}
-
-func (suite *Suite) TestGetAccountAtBlockHeight() {
-	height := uint64(5)
-	address := unittest.AddressFixture()
-	account := &entities.Account{
-		Address: address.Bytes(),
-	}
-	ctx := context.Background()
-
-	// create a mock block header
-	h := unittest.BlockHeaderFixture()
-	// setup headers storage to return the header when queried by height
-	suite.headers.On("ByHeight", height).Return(&h, nil).Once()
-
-	// create the expected execution API request
-	blockID := h.ID()
-	exeReq := &execution.GetAccountAtBlockIDRequest{
-		BlockId: blockID[:],
-		Address: address.Bytes(),
-	}
-
-	// create the expected execution API response
-	exeResp := &execution.GetAccountAtBlockIDResponse{
-		Account: account,
-	}
-
-	// setup the execution client mock
-	suite.execClient.On("GetAccountAtBlockID", ctx, exeReq).Return(exeResp, nil).Once()
-
-	// create the handler with the mock
-	handler := NewHandler(suite.log, suite.state, suite.execClient, nil, nil, suite.headers, nil, nil, flow.Testnet)
-
-	suite.Run("happy path - valid request and valid response", func() {
-		expectedResp := &access.AccountResponse{
-			Account: account,
-		}
-		req := &access.GetAccountAtBlockHeightRequest{
-			Address:     address.Bytes(),
-			BlockHeight: height,
-		}
-		actualResp, err := handler.GetAccountAtBlockHeight(ctx, req)
-		suite.checkResponse(actualResp, err)
-		suite.assertAllExpectations()
-		suite.Require().Equal(expectedResp, actualResp)
-	})
-
-	suite.Run("invalid request with nil address", func() {
-		req := &access.GetAccountAtBlockHeightRequest{
-			Address:     nil,
-			BlockHeight: height,
-		}
-		_, err := handler.GetAccountAtBlockHeight(ctx, req)
-		suite.Require().Error(err)
-	})
-
-	suite.Run("invalid request with empty address", func() {
-		req := &access.GetAccountAtBlockHeightRequest{
-			Address:     []byte{},
-			BlockHeight: height,
-		}
-		_, err := handler.GetAccountAtBlockHeight(ctx, req)
+		_, err := handler.GetAccount(ctx, req)
 		suite.Require().Error(err)
 	})
 }

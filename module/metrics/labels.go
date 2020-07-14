@@ -30,28 +30,30 @@ const (
 )
 
 const (
-	ResourceUndefined                 = "undefined"
-	ResourceProposal                  = "proposal"
-	ResourceHeader                    = "header"
-	ResourceIndex                     = "index"
-	ResourceIdentity                  = "identity"
-	ResourceGuarantee                 = "guarantee"
-	ResourceResult                    = "result"
-	ResourceReceipt                   = "receipt"
-	ResourceCollection                = "collection"
-	ResourceApproval                  = "approval"
-	ResourceSeal                      = "seal"
-	ResourceCommit                    = "commit"
-	ResourceTransaction               = "transaction"
-	ResourceClusterPayload            = "cluster_payload"
-	ResourceClusterProposal           = "cluster_proposal"
-	ResourceProcessedResultID         = "processed_result_ids"          // verification node, finder engine
-	ResourcePendingReceipt            = "pending_receipt"               // verification node, finder engine
-	ResourcePendingReceiptIDsByResult = "pending_receipt_ids_by_result" // verification node, finder engine
-	ResourcePendingReceiptIDsByBlock  = "pending_receipt_ids_by_block"  // verification node, finder engine
-	ResourcePendingResult             = "pending_result"                // verification node, match engine
-	ResourcePendingChunk              = "pending_chunk"                 // verification node, match engine
-	ResourcePendingBlock              = "pending_block"                 // verification node, match engine
+	ResourceUndefined                = "undefined"
+	ResourceProposal                 = "proposal"
+	ResourceHeader                   = "header"
+	ResourceIndex                    = "index"
+	ResourceIdentity                 = "identity"
+	ResourceGuarantee                = "guarantee"
+	ResourceResult                   = "result"
+	ResourceReceipt                  = "receipt"
+	ResourceCollection               = "collection"
+	ResourceApproval                 = "approval"
+	ResourceSeal                     = "seal"
+	ResourceCommit                   = "commit"
+	ResourceTransaction              = "transaction"
+	ResourceClusterPayload           = "cluster_payload"
+	ResourceClusterProposal          = "cluster_proposal"
+	ResourceProcessedResultID        = "processed_result_ids"         // verification node, finder engine
+	ResourcePendingReceipt           = "pending_receipt"              // verification node, finder engine
+	ResourceReceiptIDsByResult       = "receipt_ids_by_result"        // verification node, finder engine
+	ResourcePendingReceiptIDsByBlock = "pending_receipt_ids_by_block" // verification node, finder engine
+	ResourcePendingResult            = "pending_result"               // verification node, match engine
+	ResourcePendingChunk             = "pending_chunk"                // verification node, match engine
+	ResourcePendingBlock             = "pending_block"                // verification node, match engine
+	ResourceCachedReceipt            = "cached_receipt"               // verification node, finder engine
+	ResourceCachedBlockID            = "cached_block_id"              // verification node, finder engine
 )
 
 const (

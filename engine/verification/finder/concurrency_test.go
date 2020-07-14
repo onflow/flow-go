@@ -25,6 +25,7 @@ import (
 // TestConcurrency evaluates behavior of finder engine against:
 // - finder engine receives concurrent receipts from different sources
 // - for each distinct receipt with an available block finder engine emits it to the matching engine
+// - it does a correct resource clean up of the pipeline after handling all incoming receipts
 // Each test case is tried with a scenario where block goes first then receipt, and vice versa.
 func TestConcurrency(t *testing.T) {
 	var mu sync.Mutex
@@ -63,17 +64,12 @@ func TestConcurrency(t *testing.T) {
 			senderCount: 5,
 			chunksNum:   4,
 		},
-		{
-			erCount:     1,
-			senderCount: 1,
-			chunksNum:   2,
-		},
 	}
 
 	for _, blockFirst := range []bool{true, false} {
 		for _, tc := range testcases {
-			t.Run(fmt.Sprintf("%d-ers/%d-senders/%d-chunks",
-				tc.erCount, tc.senderCount, tc.chunksNum), func(t *testing.T) {
+			t.Run(fmt.Sprintf("%d-ers/%d-senders/%d-chunks/%t-block-first",
+				tc.erCount, tc.senderCount, tc.chunksNum, blockFirst), func(t *testing.T) {
 				mu.Lock()
 				defer mu.Unlock()
 				testConcurrency(t, tc.erCount, tc.senderCount, tc.chunksNum, blockFirst)
@@ -120,7 +116,8 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 	}
 
 	// set up mock matching engine that asserts each receipt is submitted exactly once.
-	requestInterval := uint(1000)
+	requestInterval := 1 * time.Second
+	processInterval := 1 * time.Second
 	failureThreshold := uint(2)
 	matchEng, matchEngWG := SetupMockMatchEng(t, exeID, results)
 	assigner := utils.NewMockAssigner(verID.NodeID, IsAssigned)
@@ -128,8 +125,22 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 	// creates a verification node with a real finder engine, and mock matching engine.
 	// no metrics is meant to be collected, hence both verification and mempool collectors are noop
 	collector := metrics.NewNoopCollector()
-	verNode := testutil.VerificationNode(t, hub, collector, collector, verID, identities,
-		assigner, requestInterval, failureThreshold, chainID, testutil.WithMatchEngine(matchEng))
+	verNode := testutil.VerificationNode(t,
+		hub,
+		verID,
+		identities,
+		assigner,
+		requestInterval,
+		processInterval,
+		failureThreshold,
+		chainID,
+		collector,
+		collector,
+		testutil.WithMatchEngine(matchEng))
+
+	// starts finder engine of verification node
+	// the rest are not involved in this test
+	<-verNode.FinderEngine.Ready()
 
 	// the wait group tracks goroutines for each Execution Receipt sent to finder engine
 	var senderWG sync.WaitGroup
@@ -201,13 +212,25 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 	// happens. This sleep is necessary since we are evaluating cleanup right after the sleep.
 	time.Sleep(1 * time.Second)
 
+	// stops finder engine of verification node
+	<-verNode.FinderEngine.Done()
+
 	for _, er := range ers {
 		// all distinct execution results should be marked as processed by finder engine
 		assert.True(t, verNode.ProcessedResultIDs.Has(er.Receipt.ExecutionResult.ID()))
 
-		// no execution receipt should reside in mempool of finder engine
-		assert.False(t, verNode.PendingReceipts.Has(er.Receipt.ID()))
+		// no execution receipt should reside in cached, pending, or ready mempools of finder engine
+		require.False(t, verNode.CachedReceipts.Has(er.Receipt.ID()))
+		require.False(t, verNode.PendingReceipts.Has(er.Receipt.ID()))
+		require.False(t, verNode.ReadyReceipts.Has(er.Receipt.ID()))
 	}
+
+	// no execution receipt should be pending for a block
+	require.True(t, verNode.PendingReceiptIDsByBlock.Size() == 0)
+	require.True(t, verNode.ReceiptIDsByResult.Size() == 0)
+
+	// no block should remain cached
+	require.True(t, verNode.CachedReceipts.Size() == 0)
 
 	verNode.Done()
 

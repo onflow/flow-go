@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution/testutil"
-	"github.com/dapperlabs/flow-go/fvm"
+	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -58,7 +58,7 @@ func TestMVP_Emulator(t *testing.T) {
 	c, err := testnet.NewClientWithKey(":3569", key, flow.Emulator.Chain())
 	require.NoError(t, err)
 
-	//TODO commented out because main test requires genesis for sending tx
+	//TODO commented out because main test requires root for sending tx
 	// with valid reference block ID
 	//runMVPTest(t, c)
 	_ = c
@@ -66,8 +66,8 @@ func TestMVP_Emulator(t *testing.T) {
 
 func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 
-	genesis := net.Genesis()
-	chain := genesis.Header.ChainID.Chain()
+	root := net.Root()
+	chain := root.Header.ChainID.Chain()
 
 	serviceAccountClient, err := testnet.NewClient(fmt.Sprintf(":%s", net.AccessPorts[testnet.AccessNodeAPIPort]), chain)
 	require.NoError(t, err)
@@ -77,7 +77,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	require.NoError(t, err)
 
 	childCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
-	err = createAccount(childCtx, serviceAccountClient, genesis, []byte(CounterContract.ToCadence()), accountPrivateKey.PublicKey(fvm.AccountKeyWeightThreshold))
+	err = createAccount(childCtx, serviceAccountClient, root, []byte(CounterContract.ToCadence()), accountPrivateKey.PublicKey(fvm.AccountKeyWeightThreshold))
 	cancel()
 
 	var newAccountAddress = flow.EmptyAddress
@@ -130,7 +130,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	// create counter instance
 	tx := flow.NewTransactionBody().
 		SetScript([]byte(CreateCounterTx(newAccountAddress).ToCadence())).
-		SetReferenceBlockID(genesis.ID()).
+		SetReferenceBlockID(root.ID()).
 		SetProposalKey(newAccountAddress, 0, 0).
 		SetPayer(newAccountAddress).
 		AddAuthorizer(newAccountAddress)

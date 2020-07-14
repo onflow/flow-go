@@ -8,26 +8,28 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
+	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // A BootstrapProcedure is an invokable that can be used to bootstrap the ledger state
 // with the default accounts and contracts required by the Flow virtual machine.
 type BootstrapProcedure struct {
-	vm      *VirtualMachine
-	ledger  Ledger
-	metaCtx Context
+	vm       *VirtualMachine
+	ctx      Context
+	ledger   state.Ledger
+	accounts *state.Accounts
 
 	// genesis parameters
 	serviceAccountPublicKey flow.AccountPublicKey
-	initialTokenSupply      uint64
+	initialTokenSupply      cadence.UFix64
 }
 
 // Bootstrap returns a new BootstrapProcedure instance configured with the provided
 // genesis parameters.
 func Bootstrap(
 	servicePublicKey flow.AccountPublicKey,
-	initialTokenSupply uint64,
+	initialTokenSupply cadence.UFix64,
 ) *BootstrapProcedure {
 	return &BootstrapProcedure{
 		serviceAccountPublicKey: servicePublicKey,
@@ -35,24 +37,14 @@ func Bootstrap(
 	}
 }
 
-func (b *BootstrapProcedure) Parse(vm *VirtualMachine, ctx Context, ledger Ledger) (Invokable, error) {
-	// no-op: Bootstrapping invocation does not support pre-parsing
-	return b, nil
-}
-
-func (b *BootstrapProcedure) Invoke(vm *VirtualMachine, ctx Context, ledger Ledger) (*InvocationResult, error) {
-	b.metaCtx = NewContextFromParent(
-		ctx,
-		WithSignatureVerification(false),
-		WithFeePayments(false),
-		WithRestrictedDeployment(false),
-	)
-
+func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, ledger state.Ledger) error {
 	b.vm = vm
+	b.ctx = NewContextFromParent(ctx, WithRestrictedDeployment(false))
 	b.ledger = ledger
 
 	// initialize the account addressing state
-	setAddressState(ledger, vm.chain.NewAddressGenerator())
+	b.accounts = state.NewAccounts(ledger, ctx.Chain)
+	b.accounts.InitAddressGeneratorState()
 
 	service := b.createServiceAccount(b.serviceAccountPublicKey)
 
@@ -66,11 +58,11 @@ func (b *BootstrapProcedure) Invoke(vm *VirtualMachine, ctx Context, ledger Ledg
 
 	b.deployServiceAccount(service, fungibleToken, flowToken, feeContract)
 
-	return nil, nil
+	return nil
 }
 
 func (b *BootstrapProcedure) createAccount() flow.Address {
-	address, err := createAccount(b.ledger, b.vm.chain, nil)
+	address, err := b.accounts.Create(nil)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create account: %s", err))
 	}
@@ -79,7 +71,7 @@ func (b *BootstrapProcedure) createAccount() flow.Address {
 }
 
 func (b *BootstrapProcedure) createServiceAccount(accountKey flow.AccountPublicKey) flow.Address {
-	address, err := createAccount(b.ledger, b.vm.chain, []flow.AccountPublicKey{accountKey})
+	address, err := b.accounts.Create([]flow.AccountPublicKey{accountKey})
 	if err != nil {
 		panic(fmt.Sprintf("failed to create service account: %s", err))
 	}
@@ -91,7 +83,7 @@ func (b *BootstrapProcedure) deployFungibleToken() flow.Address {
 	fungibleToken := b.createAccount()
 
 	err := b.vm.invokeMetaTransaction(
-		b.metaCtx,
+		b.ctx,
 		deployContractTransaction(fungibleToken, contracts.FungibleToken()),
 		b.ledger,
 	)
@@ -108,7 +100,7 @@ func (b *BootstrapProcedure) deployFlowToken(service, fungibleToken flow.Address
 	contract := contracts.FlowToken(fungibleToken.Hex())
 
 	err := b.vm.invokeMetaTransaction(
-		b.metaCtx,
+		b.ctx,
 		deployFlowTokenTransaction(flowToken, service, contract),
 		b.ledger,
 	)
@@ -125,7 +117,7 @@ func (b *BootstrapProcedure) deployFlowFees(service, fungibleToken, flowToken fl
 	contract := contracts.FlowFees(fungibleToken.Hex(), flowToken.Hex())
 
 	err := b.vm.invokeMetaTransaction(
-		b.metaCtx,
+		b.ctx,
 		deployFlowFeesTransaction(flowFees, service, contract),
 		b.ledger,
 	)
@@ -140,7 +132,7 @@ func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowTo
 	contract := contracts.FlowServiceAccount(fungibleToken.Hex(), flowToken.Hex(), feeContract.Hex())
 
 	err := b.vm.invokeMetaTransaction(
-		b.metaCtx,
+		b.ctx,
 		deployContractTransaction(service, contract),
 		b.ledger,
 	)
@@ -149,9 +141,12 @@ func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowTo
 	}
 }
 
-func (b *BootstrapProcedure) mintInitialTokens(service, fungibleToken, flowToken flow.Address, initialSupply uint64) {
+func (b *BootstrapProcedure) mintInitialTokens(
+	service, fungibleToken, flowToken flow.Address,
+	initialSupply cadence.UFix64,
+) {
 	err := b.vm.invokeMetaTransaction(
-		b.metaCtx,
+		b.ctx,
 		mintFlowTokenTransaction(fungibleToken, flowToken, service, initialSupply),
 		b.ledger,
 	)
@@ -217,7 +212,7 @@ transaction(amount: UFix64) {
 }
 `
 
-func deployContractTransaction(address flow.Address, contract []byte) InvokableTransaction {
+func deployContractTransaction(address flow.Address, contract []byte) *TransactionProcedure {
 	return Transaction(
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(deployContractTransactionTemplate, hex.EncodeToString(contract)))).
@@ -225,7 +220,7 @@ func deployContractTransaction(address flow.Address, contract []byte) InvokableT
 	)
 }
 
-func deployFlowTokenTransaction(flowToken, service flow.Address, contract []byte) InvokableTransaction {
+func deployFlowTokenTransaction(flowToken, service flow.Address, contract []byte) *TransactionProcedure {
 	return Transaction(
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(deployFlowTokenTransactionTemplate, hex.EncodeToString(contract)))).
@@ -234,7 +229,7 @@ func deployFlowTokenTransaction(flowToken, service flow.Address, contract []byte
 	)
 }
 
-func deployFlowFeesTransaction(flowFees, service flow.Address, contract []byte) InvokableTransaction {
+func deployFlowFeesTransaction(flowFees, service flow.Address, contract []byte) *TransactionProcedure {
 	return Transaction(
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(deployFlowFeesTransactionTemplate, hex.EncodeToString(contract)))).
@@ -243,8 +238,11 @@ func deployFlowFeesTransaction(flowFees, service flow.Address, contract []byte) 
 	)
 }
 
-func mintFlowTokenTransaction(fungibleToken, flowToken, service flow.Address, initialSupply uint64) InvokableTransaction {
-	initialSupplyArg, err := jsoncdc.Encode(cadence.NewUFix64(initialSupply))
+func mintFlowTokenTransaction(
+	fungibleToken, flowToken, service flow.Address,
+	initialSupply cadence.UFix64,
+) *TransactionProcedure {
+	initialSupplyArg, err := jsoncdc.Encode(initialSupply)
 	if err != nil {
 		panic(fmt.Sprintf("failed to encode initial token supply: %s", err.Error()))
 	}

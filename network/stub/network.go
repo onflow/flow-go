@@ -182,8 +182,8 @@ func (mn *Network) sendToAllTargets(m *PendingMessage, recursive bool) error {
 // In this mode, the network continuously checks the nodes' buffer
 // every `updateInterval` milliseconds, and delivers all the pending
 // messages. `recursive` determines whether the delivery is in recursive mode or not
-func (mn *Network) StartConDev(updateInterval uint, recursive bool) {
-	timer := time.NewTicker(time.Duration(updateInterval))
+func (mn *Network) StartConDev(updateInterval time.Duration, recursive bool) {
+	timer := time.NewTicker(updateInterval)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)

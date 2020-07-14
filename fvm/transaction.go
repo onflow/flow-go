@@ -1,271 +1,99 @@
 package fvm
 
 import (
-	"errors"
+	"fmt"
 
+	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func Transaction(tx *flow.TransactionBody) InvokableTransaction {
-	return InvokableTransaction{tx: tx}
+func Transaction(tx *flow.TransactionBody) *TransactionProcedure {
+	return &TransactionProcedure{
+		ID:          tx.ID(),
+		Transaction: tx,
+	}
 }
 
-type InvokableTransaction struct {
-	tx *flow.TransactionBody
+type TransactionProcedure struct {
+	ID          flow.Identifier
+	Transaction *flow.TransactionBody
+	Logs        []string
+	Events      []cadence.Event
+	// TODO: report gas consumption: https://github.com/dapperlabs/flow-go/issues/4139
+	GasUsed uint64
+	Err     Error
 }
 
-func (i InvokableTransaction) Transaction() *flow.TransactionBody {
-	return i.tx
+type TransactionProcessor interface {
+	Process(*VirtualMachine, Context, *TransactionProcedure, state.Ledger) error
 }
 
-func (i InvokableTransaction) Parse(vm *VirtualMachine, ctx Context, ledger Ledger) (Invokable, error) {
-	panic("implement me")
-}
-
-func (i InvokableTransaction) Invoke(vm *VirtualMachine, ctx Context, ledger Ledger) (*InvocationResult, error) {
-	metaCtx := NewContextFromParent(
-		ctx,
-		WithSignatureVerification(false),
-		WithFeePayments(false),
-	)
-
-	txID := i.tx.ID()
-
-	if ctx.SignatureVerificationEnabled {
-		err := verifySignatures(ledger, i.tx)
-		if err != nil {
-			return createInvocationResult(txID, nil, nil, nil, err)
+func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, ledger state.Ledger) error {
+	for _, p := range ctx.TransactionProcessors {
+		err := p.Process(vm, ctx, proc, ledger)
+		vmErr, fatalErr := handleError(err)
+		if fatalErr != nil {
+			return fatalErr
 		}
 
-		err = checkAndIncrementSequenceNumber(ledger, i.tx.ProposalKey)
-		if err != nil {
-			return createInvocationResult(txID, nil, nil, nil, err)
+		if vmErr != nil {
+			proc.Err = vmErr
+			return nil
 		}
-	}
-
-	if ctx.FeePaymentsEnabled {
-		err := vm.invokeMetaTransaction(
-			metaCtx,
-			deductTransactionFeeTransaction(i.tx.Payer, vm.chain.ServiceAddress()),
-			ledger,
-		)
-		if err != nil {
-			return createInvocationResult(txID, nil, nil, nil, err)
-		}
-	}
-
-	env := newEnvironment(vm, ctx, ledger).setTransaction(i.tx, metaCtx)
-
-	location := runtime.TransactionLocation(txID[:])
-
-	err := vm.runtime.ExecuteTransaction(i.tx.Script, i.tx.Arguments, env, location)
-
-	return createInvocationResult(txID, nil, env.getEvents(), env.getLogs(), err)
-}
-
-func checkAndIncrementSequenceNumber(ledger Ledger, proposalKey flow.ProposalKey) error {
-	accountKey, err := getAccountPublicKey(ledger, proposalKey.Address, proposalKey.KeyID)
-	if err != nil {
-		if errors.Is(err, ErrAccountPublicKeyNotFound) {
-			return &InvalidProposalKeyPublicKeyDoesNotExistError{
-				Address:  proposalKey.Address,
-				KeyIndex: proposalKey.KeyID,
-			}
-		}
-
-		return err
-	}
-
-	if accountKey.Revoked {
-		return &InvalidProposalKeyPublicKeyRevokedError{
-			Address:  proposalKey.Address,
-			KeyIndex: proposalKey.KeyID,
-		}
-	}
-
-	valid := accountKey.SeqNumber == proposalKey.SequenceNumber
-
-	if !valid {
-		return &InvalidProposalKeySequenceNumberError{
-			Address:           proposalKey.Address,
-			KeyIndex:          proposalKey.KeyID,
-			CurrentSeqNumber:  accountKey.SeqNumber,
-			ProvidedSeqNumber: proposalKey.SequenceNumber,
-		}
-	}
-
-	accountKey.SeqNumber++
-
-	_, err = setAccountPublicKey(ledger, proposalKey.Address, proposalKey.KeyID, accountKey)
-	if err != nil {
-		return err
 	}
 
 	return nil
 }
 
-// verifySignatures verifies that a transaction contains the necessary signatures.
-//
-// An error is returned if any of the expected signatures are invalid or missing.
-func verifySignatures(ledger Ledger, tx *flow.TransactionBody) (err error) {
-	if tx.Payer == flow.EmptyAddress {
-		return &MissingPayerError{}
-	}
+func (proc *TransactionProcedure) ConvertEvents(txIndex uint32) ([]flow.Event, error) {
+	flowEvents := make([]flow.Event, len(proc.Events))
 
-	var payloadWeights map[flow.Address]int
-	var proposalKeyVerifiedInPayload bool
-
-	payloadWeights, proposalKeyVerifiedInPayload, err = aggregateAccountSignatures(
-		ledger,
-		tx.PayloadSignatures,
-		tx.PayloadMessage(),
-		tx.ProposalKey,
-	)
-	if err != nil {
-		return err
-	}
-
-	var envelopeWeights map[flow.Address]int
-	var proposalKeyVerifiedInEnvelope bool
-
-	envelopeWeights, proposalKeyVerifiedInEnvelope, err = aggregateAccountSignatures(
-		ledger,
-		tx.EnvelopeSignatures,
-		tx.EnvelopeMessage(),
-		tx.ProposalKey,
-	)
-	if err != nil {
-		return err
-	}
-
-	proposalKeyVerified := proposalKeyVerifiedInPayload || proposalKeyVerifiedInEnvelope
-
-	if !proposalKeyVerified {
-		return &InvalidProposalKeyMissingSignatureError{
-			Address:  tx.ProposalKey.Address,
-			KeyIndex: tx.ProposalKey.KeyID,
-		}
-	}
-
-	for _, addr := range tx.Authorizers {
-		// Skip this authorizer if it is also the payer. In the case where an account is
-		// both a PAYER as well as an AUTHORIZER or PROPOSER, that account is required
-		// to sign only the envelope.
-		if addr == tx.Payer {
-			continue
-		}
-
-		if !hasSufficientKeyWeight(payloadWeights, addr) {
-			return &MissingSignatureError{addr}
-		}
-	}
-
-	if !hasSufficientKeyWeight(envelopeWeights, tx.Payer) {
-		return &MissingSignatureError{tx.Payer}
-	}
-
-	return nil
-}
-
-func aggregateAccountSignatures(
-	ledger Ledger,
-	signatures []flow.TransactionSignature,
-	message []byte,
-	proposalKey flow.ProposalKey,
-) (
-	weights map[flow.Address]int,
-	proposalKeyVerified bool,
-	err error,
-) {
-	weights = make(map[flow.Address]int)
-
-	for _, txSig := range signatures {
-		accountKey, err := verifyAccountSignature(ledger, txSig, message)
+	for i, event := range proc.Events {
+		payload, err := jsoncdc.Encode(event)
 		if err != nil {
-			return nil, false, err
+			return nil, fmt.Errorf("failed to encode event: %w", err)
 		}
 
-		if sigIsForProposalKey(txSig, proposalKey) {
-			proposalKeyVerified = true
+		flowEvents[i] = flow.Event{
+			Type:             flow.EventType(event.EventType.ID()),
+			TransactionID:    proc.ID,
+			TransactionIndex: txIndex,
+			EventIndex:       uint32(i),
+			Payload:          payload,
 		}
-
-		weights[txSig.Address] += accountKey.Weight
 	}
 
-	return
+	return flowEvents, nil
 }
 
-// verifyAccountSignature verifies that an account signature is valid for the
-// account and given message.
-//
-// If the signature is valid, this function returns the associated account key.
-//
-// An error is returned if the account does not contain a public key that
-// correctly verifies the signature against the given message.
-func verifyAccountSignature(
-	ledger Ledger,
-	txSig flow.TransactionSignature,
-	message []byte,
-) (*flow.AccountPublicKey, error) {
-	accountKey, err := getAccountPublicKey(ledger, txSig.Address, txSig.KeyID)
+type TransactionInvocator struct{}
+
+func NewTransactionInvocator() *TransactionInvocator {
+	return &TransactionInvocator{}
+}
+
+func (i *TransactionInvocator) Process(
+	vm *VirtualMachine,
+	ctx Context,
+	proc *TransactionProcedure,
+	ledger state.Ledger,
+) error {
+	env := newEnvironment(ctx, ledger)
+	env.setTransaction(vm, proc.Transaction)
+
+	location := runtime.TransactionLocation(proc.ID[:])
+
+	err := vm.Runtime.ExecuteTransaction(proc.Transaction.Script, proc.Transaction.Arguments, env, location)
 	if err != nil {
-		if errors.Is(err, ErrAccountPublicKeyNotFound) {
-			return nil, &InvalidSignaturePublicKeyDoesNotExistError{
-				Address:  txSig.Address,
-				KeyIndex: txSig.KeyID,
-			}
-		}
-
-		return nil, err
+		return err
 	}
 
-	if accountKey.Revoked {
-		return nil, &InvalidSignaturePublicKeyRevokedError{
-			Address:  txSig.Address,
-			KeyIndex: txSig.KeyID,
-		}
-	}
-
-	hasher := newHasher(accountKey.HashAlgo)
-	if hasher == nil {
-		return nil, &InvalidHashAlgorithmError{
-			Address:  txSig.Address,
-			KeyID:    txSig.KeyID,
-			HashAlgo: accountKey.HashAlgo,
-		}
-	}
-
-	valid, err := accountKey.PublicKey.Verify(txSig.Signature, message, hasher)
-	if err != nil {
-		return nil, err
-	}
-
-	if !valid {
-		return nil, &InvalidSignatureVerificationError{Address: txSig.Address, KeyIndex: txSig.KeyID}
-
-	}
-
-	return &accountKey, nil
-}
-
-func sigIsForProposalKey(txSig flow.TransactionSignature, proposalKey flow.ProposalKey) bool {
-	return txSig.Address == proposalKey.Address && txSig.KeyID == proposalKey.KeyID
-}
-
-func hasSufficientKeyWeight(weights map[flow.Address]int, address flow.Address) bool {
-	return weights[address] >= AccountKeyWeightThreshold
-}
-
-func newHasher(hashAlgo hash.HashingAlgorithm) hash.Hasher {
-	switch hashAlgo {
-	case hash.SHA2_256:
-		return hash.NewSHA2_256()
-	case hash.SHA3_256:
-		return hash.NewSHA3_256()
-	}
+	proc.Events = env.getEvents()
+	proc.Logs = env.getLogs()
 
 	return nil
 }

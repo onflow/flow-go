@@ -19,7 +19,7 @@ import (
 	protoBadger "github.com/dapperlabs/flow-go/state/protocol/badger"
 )
 
-func GenerateClusterGenesisQC(participants []bootstrap.NodeInfo, block *flow.Block, clusterBlock *cluster.Block) (
+func GenerateClusterRootQC(participants []bootstrap.NodeInfo, block *flow.Block, clusterBlock *cluster.Block) (
 	*model.QuorumCertificate, error) {
 
 	ps, db, err := NewProtocolState(block)
@@ -92,11 +92,11 @@ func createClusterValidators(ps *protoBadger.State, participants []bootstrap.Nod
 		}
 
 		// create cluster committee state
-		genesisBlockID := block.ID()
-		// just use the genesis block as the reference for bootstrapping
+		rootID := block.ID()
+		// just use the root block as the reference for bootstrapping
 		blockTranslator := committee.NewBlockTranslator(
 			func(clusterBlock flow.Identifier) (flow.Identifier, error) {
-				return genesisBlockID, nil
+				return rootID, nil
 			},
 		)
 

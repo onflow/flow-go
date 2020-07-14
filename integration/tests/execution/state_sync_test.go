@@ -49,7 +49,7 @@ func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 	s.T().Logf("got erExe1BlockA with SC %x", erExe1BlockA.ExecutionResult.FinalStateCommit)
 
 	// send transaction
-	err = s.AccessClient().DeployContract(context.Background(), s.net.Genesis().ID(), common.CounterContract)
+	err = s.AccessClient().DeployContract(context.Background(), s.net.Root().ID(), common.CounterContract)
 	require.NoError(s.T(), err, "could not deploy counter")
 
 	// wait until we see a different state commitment for a finalized block, call that block blockB

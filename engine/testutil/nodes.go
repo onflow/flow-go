@@ -21,13 +21,14 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
+	bootstrapexec "github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
 	"github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/engine/verification/finder"
 	"github.com/dapperlabs/flow-go/engine/verification/match"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/fvm"
+	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/chunks"
@@ -73,7 +74,9 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	require.NoError(t, err)
 
 	genesis := flow.Genesis(participants, chainID)
-	err = state.Mutate().Bootstrap(unittest.GenesisStateCommitment, genesis)
+	result := bootstrap.Result(genesis, unittest.GenesisStateCommitment)
+	seal := bootstrap.Seal(result)
+	err = state.Mutate().Bootstrap(genesis, result, seal)
 	require.NoError(t, err)
 
 	for _, option := range options {
@@ -244,8 +247,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	genesisHead, err := node.State.Final().Head()
 	require.NoError(t, err)
 
-	bootstrapper := bootstrap.NewBootstrapper(node.Log)
-
+	bootstrapper := bootstrapexec.NewBootstrapper(node.Log)
 	commit, err := bootstrapper.BootstrapLedger(ls, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply, node.ChainID.Chain())
 	require.NoError(t, err)
 
@@ -265,7 +267,12 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	rt := runtime.NewInterpreterRuntime()
 
-	vm := fvm.New(rt, node.ChainID.Chain())
+	vm := fvm.New(rt)
+
+	vmCtx := fvm.NewContext(
+		fvm.WithChain(node.ChainID.Chain()),
+		fvm.WithBlocks(node.Blocks),
+	)
 
 	computationEngine := computation.New(
 		node.Log,
@@ -273,8 +280,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Tracer,
 		node.Me,
 		node.State,
-		node.Blocks,
 		vm,
+		vmCtx,
 	)
 	require.NoError(t, err)
 
@@ -347,14 +354,15 @@ func WithMatchEngine(eng network.Engine) VerificationOpt {
 
 func VerificationNode(t testing.TB,
 	hub *stub.Hub,
-	verificationCollector module.VerificationMetrics,
-	mempoolCollector module.MempoolMetrics,
 	identity *flow.Identity,
 	identities []*flow.Identity,
 	assigner module.ChunkAssigner,
-	requestIntervalMs uint,
+	requestInterval time.Duration,
+	processInterval time.Duration,
 	failureThreshold uint,
 	chainID flow.ChainID,
+	collector module.VerificationMetrics, // used to enable collecting metrics on happy path integration
+	mempoolCollector module.MempoolMetrics, // used to enable collecting metrics on happy path integration
 	opts ...VerificationOpt) mock.VerificationNode {
 
 	var err error
@@ -366,25 +374,35 @@ func VerificationNode(t testing.TB,
 		apply(&node)
 	}
 
-	if node.Receipts == nil {
-		node.Receipts, err = stdmap.NewReceipts(1000)
+	if node.CachedReceipts == nil {
+		node.CachedReceipts, err = stdmap.NewReceiptDataPacks(1000)
 		require.Nil(t, err)
 		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourceReceipt, node.Receipts.Size)
+		err = mempoolCollector.Register(metrics.ResourceCachedReceipt, node.CachedReceipts.Size)
 		require.Nil(t, err)
 	}
 
 	if node.PendingReceipts == nil {
-		node.PendingReceipts, err = stdmap.NewPendingReceipts(1000)
+		node.PendingReceipts, err = stdmap.NewReceiptDataPacks(1000)
 		require.Nil(t, err)
+
 		// registers size method of backend for metrics
 		err = mempoolCollector.Register(metrics.ResourcePendingReceipt, node.PendingReceipts.Size)
+		require.Nil(t, err)
+	}
+
+	if node.ReadyReceipts == nil {
+		node.ReadyReceipts, err = stdmap.NewReceiptDataPacks(1000)
+		require.Nil(t, err)
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourceReceipt, node.ReadyReceipts.Size)
 		require.Nil(t, err)
 	}
 
 	if node.PendingResults == nil {
 		node.PendingResults = stdmap.NewPendingResults()
 		require.Nil(t, err)
+
 		// registers size method of backend for metrics
 		err = mempoolCollector.Register(metrics.ResourcePendingResult, node.PendingResults.Size)
 		require.Nil(t, err)
@@ -394,46 +412,64 @@ func VerificationNode(t testing.TB,
 		node.HeaderStorage = storage.NewHeaders(node.Metrics, node.DB)
 	}
 
-	if node.Chunks == nil {
-		node.Chunks = match.NewChunks(1000)
+	if node.PendingChunks == nil {
+		node.PendingChunks = match.NewChunks(1000)
+
 		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourcePendingChunk, node.Chunks.Size)
+		err = mempoolCollector.Register(metrics.ResourcePendingChunk, node.PendingChunks.Size)
 		require.Nil(t, err)
 	}
 
 	if node.ProcessedResultIDs == nil {
 		node.ProcessedResultIDs, err = stdmap.NewIdentifiers(1000)
 		require.Nil(t, err)
+
 		// registers size method of backend for metrics
 		err = mempoolCollector.Register(metrics.ResourceProcessedResultID, node.ProcessedResultIDs.Size)
 		require.Nil(t, err)
 	}
 
-	if node.ReceiptIDsByBlock == nil {
-		node.ReceiptIDsByBlock, err = stdmap.NewIdentifierMap(1000)
+	if node.BlockIDsCache == nil {
+		node.BlockIDsCache, err = stdmap.NewIdentifiers(1000)
 		require.Nil(t, err)
+
 		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourcePendingReceiptIDsByBlock, node.ReceiptIDsByBlock.Size)
+		err = mempoolCollector.Register(metrics.ResourceCachedBlockID, node.BlockIDsCache.Size)
+		require.Nil(t, err)
+	}
+
+	if node.PendingReceiptIDsByBlock == nil {
+		node.PendingReceiptIDsByBlock, err = stdmap.NewIdentifierMap(1000)
+		require.Nil(t, err)
+
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourcePendingReceiptIDsByBlock, node.PendingReceiptIDsByBlock.Size)
 		require.Nil(t, err)
 	}
 
 	if node.ReceiptIDsByResult == nil {
 		node.ReceiptIDsByResult, err = stdmap.NewIdentifierMap(1000)
 		require.Nil(t, err)
+
 		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourcePendingReceiptIDsByResult, node.ReceiptIDsByResult.Size)
+		err = mempoolCollector.Register(metrics.ResourceReceiptIDsByResult, node.ReceiptIDsByResult.Size)
 		require.Nil(t, err)
 	}
 
 	if node.VerifierEngine == nil {
 		rt := runtime.NewInterpreterRuntime()
 
-		vm := fvm.New(rt, node.ChainID.Chain())
+		vm := fvm.New(rt)
 
-		chunkVerifier := chunks.NewChunkVerifier(vm, node.Blocks)
+		vmCtx := fvm.NewContext(
+			fvm.WithChain(node.ChainID.Chain()),
+			fvm.WithBlocks(node.Blocks),
+		)
+
+		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
 
 		node.VerifierEngine, err = verifier.New(node.Log,
-			verificationCollector,
+			collector,
 			node.Tracer,
 			node.Net,
 			node.State,
@@ -444,7 +480,7 @@ func VerificationNode(t testing.TB,
 
 	if node.MatchEngine == nil {
 		node.MatchEngine, err = match.New(node.Log,
-			verificationCollector,
+			collector,
 			node.Tracer,
 			node.Net,
 			node.Me,
@@ -452,25 +488,29 @@ func VerificationNode(t testing.TB,
 			node.VerifierEngine,
 			assigner,
 			node.State,
-			node.Chunks,
+			node.PendingChunks,
 			node.HeaderStorage,
-			time.Duration(requestIntervalMs)*time.Millisecond,
+			requestInterval,
 			int(failureThreshold))
 		require.Nil(t, err)
 	}
 
 	if node.FinderEngine == nil {
 		node.FinderEngine, err = finder.New(node.Log,
-			verificationCollector,
+			collector,
 			node.Tracer,
 			node.Net,
 			node.Me,
 			node.MatchEngine,
+			node.CachedReceipts,
 			node.PendingReceipts,
+			node.ReadyReceipts,
 			node.Headers,
 			node.ProcessedResultIDs,
-			node.ReceiptIDsByBlock,
-			node.ReceiptIDsByResult)
+			node.PendingReceiptIDsByBlock,
+			node.ReceiptIDsByResult,
+			node.BlockIDsCache,
+			processInterval)
 		require.Nil(t, err)
 	}
 

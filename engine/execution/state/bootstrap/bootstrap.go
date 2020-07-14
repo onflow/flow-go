@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 
@@ -29,16 +30,16 @@ func NewBootstrapper(logger zerolog.Logger) *Bootstrapper {
 func (b *Bootstrapper) BootstrapLedger(
 	ledger storage.Ledger,
 	servicePublicKey flow.AccountPublicKey,
-	initialTokenSupply uint64,
+	initialTokenSupply cadence.UFix64,
 	chain flow.Chain,
 ) (flow.StateCommitment, error) {
 	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.EmptyStateCommitment()))
 
-	vm := fvm.New(runtime.NewInterpreterRuntime(), chain)
+	vm := fvm.New(runtime.NewInterpreterRuntime())
 
-	ctx := fvm.NewContext()
+	ctx := fvm.NewContext(fvm.WithChain(chain))
 
-	_, err := vm.Invoke(ctx, fvm.Bootstrap(servicePublicKey, initialTokenSupply), view)
+	err := vm.Run(ctx, fvm.Bootstrap(servicePublicKey, initialTokenSupply), view)
 	if err != nil {
 		return nil, err
 	}

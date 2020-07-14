@@ -1,6 +1,10 @@
 package flow
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/dapperlabs/flow-go/utils/slices"
+)
 
 // A ChainID is a unique identifier for a specific Flow network instance.
 //
@@ -15,6 +19,9 @@ const Testnet ChainID = "flow-testnet"
 
 // Emulator is the chain ID for the emulated node chain.
 const Emulator ChainID = "flow-emulator"
+
+// MonotonicEmulator is the chain ID for the emulated node chain with monotonic address generation.
+const MonotonicEmulator ChainID = "flow-emulator-monotonic"
 
 // networkType is the type of network for which account addresses
 // are generated and checked.
@@ -33,7 +40,7 @@ func (c ChainID) getNetworkType() networkType {
 	case Emulator:
 		return networkType(invalidCodeEmulator)
 	default:
-		panic(fmt.Sprintf("chain ID [%s] is invalid ", c))
+		panic(fmt.Sprintf("chain ID [%s] is invalid or does not support linear code address generation", c))
 	}
 }
 
@@ -103,6 +110,13 @@ var testnet = &addressedChain{
 
 var emulator = &addressedChain{
 	chainID: Emulator,
+	impl: &LinearCodeImpl{
+		chainID: Emulator,
+	},
+}
+
+var monotonicEmulator = &addressedChain{
+	chainID: Emulator,
 	impl:    &MonotonicImpl{},
 }
 
@@ -114,6 +128,8 @@ func (c ChainID) Chain() Chain {
 		return testnet
 	case Emulator:
 		return emulator
+	case MonotonicEmulator:
+		return monotonicEmulator
 	default:
 		panic(fmt.Sprintf("chain ID [%s] is invalid ", c))
 	}
@@ -128,9 +144,10 @@ type Chain interface {
 	AddressAtIndex(index uint64) (Address, error)
 	ServiceAddress() Address
 	ZeroAddress() Address
-	BytesToAddressState(b []byte) AddressGenerator
+	BytesToAddressGenerator(b []byte) AddressGenerator
 	IsValid(Address) bool
 	newAddressGeneratorAtState(state uint64) AddressGenerator
+	String() string
 }
 
 // NewAddressGenerator returns a new AddressGenerator with an
@@ -165,14 +182,11 @@ func (id *addressedChain) ZeroAddress() Address {
 	return address
 }
 
-// BytesToAddressState converts an array of bytes into an address state
-func (id *addressedChain) BytesToAddressState(b []byte) AddressGenerator {
-	if len(b) > addressStateLength {
-		b = b[len(b)-addressStateLength:]
-	}
-	var stateBytes [addressStateLength]byte
-	copy(stateBytes[addressStateLength-len(b):], b)
-	state := uint48(stateBytes[:])
+// BytesToAddressGenerator converts an array of bytes into an address state
+func (id *addressedChain) BytesToAddressGenerator(b []byte) AddressGenerator {
+	bytes := slices.EnsureByteSliceSize(b, addressStateLength)
+
+	state := uint48(bytes[:])
 	return id.newAddressGeneratorAtState(state)
 }
 

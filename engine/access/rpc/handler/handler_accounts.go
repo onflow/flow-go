@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -18,14 +19,15 @@ type handlerAccounts struct {
 	state        protocol.State
 	executionRPC execution.ExecutionAPIClient
 	headers      storage.Headers
+	chainID      flow.ChainID
 }
 
-func (h *handlerAccounts) GetAccountAtLatestBlock(ctx context.Context, req *access.GetAccountAtLatestBlockRequest) (*access.AccountResponse, error) {
+func (h *handlerAccounts) GetAccount(ctx context.Context, req *access.GetAccountRequest) (*access.GetAccountResponse, error) {
 
 	address := req.GetAddress()
 
-	if address == nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid address")
+	if _, err := convert.Address(address, h.chainID.Chain()); err != nil {
+		return nil, err
 	}
 
 	// get the latest sealed header
@@ -43,40 +45,7 @@ func (h *handlerAccounts) GetAccountAtLatestBlock(ctx context.Context, req *acce
 		return nil, err
 	}
 
-	return &access.AccountResponse{
-		Account: account,
-	}, nil
-
-}
-
-func (h *handlerAccounts) GetAccountAtBlockHeight(ctx context.Context,
-	req *access.GetAccountAtBlockHeightRequest) (*access.AccountResponse, error) {
-
-	address := req.GetAddress()
-
-	if len(address) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "account address is required")
-	}
-
-	height := req.GetBlockHeight()
-
-	// get header at given height
-	header, err := h.headers.ByHeight(height)
-	if err != nil {
-		err = convertStorageError(err)
-		return nil, err
-	}
-
-	// get block ID of the header at the given height
-	blockID := header.ID()
-
-	account, err := h.getAccountAtBlockID(ctx, address, blockID)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &access.AccountResponse{
+	return &access.GetAccountResponse{
 		Account: account,
 	}, nil
 

@@ -1,4 +1,4 @@
-package fvm
+package state
 
 import (
 	"crypto/sha256"
@@ -11,24 +11,45 @@ import (
 type Ledger interface {
 	Set(key flow.RegisterID, value flow.RegisterValue)
 	Get(key flow.RegisterID) (flow.RegisterValue, error)
+	Touch(key flow.RegisterID)
 	Delete(key flow.RegisterID)
 }
 
 // A MapLedger is a naive ledger storage implementation backed by a simple map.
 //
 // This implementation is designed for testing purposes.
-type MapLedger map[string]flow.RegisterValue
+type MapLedger struct {
+	Registers       map[string]flow.RegisterValue
+	RegisterTouches map[string]bool
+}
+
+func NewMapLedger() *MapLedger {
+	return &MapLedger{
+		Registers:       make(map[string]flow.RegisterValue),
+		RegisterTouches: make(map[string]bool),
+	}
+}
 
 func (m MapLedger) Set(key flow.RegisterID, value flow.RegisterValue) {
-	m[string(key)] = value
+	m.RegisterTouches[string(key)] = true
+	m.Registers[string(key)] = value
 }
 
 func (m MapLedger) Get(key flow.RegisterID) (flow.RegisterValue, error) {
-	return m[string(key)], nil
+	m.RegisterTouches[string(key)] = true
+	return m.Registers[string(key)], nil
+}
+
+func (m MapLedger) Touch(key flow.RegisterID) {
+	m.RegisterTouches[string(key)] = true
 }
 
 func (m MapLedger) Delete(key flow.RegisterID) {
-	delete(m, string(key))
+	delete(m.Registers, string(key))
+}
+
+func RegisterID(owner, controller, key string) flow.RegisterID {
+	return fullKeyHash(owner, controller, key)
 }
 
 func fullKey(owner, controller, key string) string {

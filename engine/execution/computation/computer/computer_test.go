@@ -32,8 +32,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		// create a block with 1 collection with 2 transactions
 		block := generateBlock(1, 2)
 
-		vm.On("Invoke", mock.Anything, mock.Anything, mock.Anything).
-			Return(&fvm.InvocationResult{}, nil).
+		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).
 			Twice()
 
 		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
@@ -66,8 +66,14 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		// create dummy events
 		events := generateEvents(eventsPerTransaction)
 
-		vm.On("Invoke", mock.Anything, mock.Anything, mock.Anything).
-			Return(&fvm.InvocationResult{Events: events, Error: &fvm.MissingPayerError{}}, nil).
+		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
+			Run(func(args mock.Arguments) {
+				tx := args[1].(*fvm.TransactionProcedure)
+
+				tx.Err = &fvm.MissingPayerError{}
+				tx.Events = events
+			}).
+			Return(nil).
 			Times(totalTransactionCount)
 
 		view := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {

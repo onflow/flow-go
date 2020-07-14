@@ -14,6 +14,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/access/rpc"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 
@@ -78,7 +79,9 @@ func (suite *Suite) SetupTest() {
 	suite.collections = new(storage.Collections)
 	suite.transactions = new(storage.Transactions)
 
-	eng, err := New(log, suite.net, suite.proto.state, suite.me, suite.blocks, suite.headers, suite.collections, suite.transactions)
+	rpcEng := rpc.New(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections, suite.transactions, flow.Testnet)
+
+	eng, err := New(log, suite.net, suite.proto.state, suite.me, suite.blocks, suite.headers, suite.collections, suite.transactions, rpcEng)
 	require.NoError(suite.T(), err)
 	suite.eng = eng
 

@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
-	"github.com/dapperlabs/flow-go/engine/common/convert"
+	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -25,21 +25,23 @@ type handlerTransactions struct {
 	collections   storage.Collections
 	blocks        storage.Blocks
 	state         protocol.State
+	chainID       flow.ChainID
+	retry         *Retry
 }
 
 // SendTransaction forwards the transaction to the collection node
 func (h *handlerTransactions) SendTransaction(ctx context.Context, req *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {
 
-	// send the transaction to the collection node
+	// convert the request message to a transaction (has the side effect of validating the address in the tx as well)
+	tx, err := convert.MessageToTransaction(req.Transaction, h.chainID.Chain())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to convert transaction: %v", err))
+	}
+
+	// send the transaction to the collection node if valid
 	resp, err := h.collectionRPC.SendTransaction(ctx, req)
 	if err != nil {
 		return resp, status.Error(codes.Internal, fmt.Sprintf("failed to send transaction to a collection node: %v", err))
-	}
-
-	// convert the request message to a transaction
-	tx, err := convert.MessageToTransaction(req.Transaction)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to convert transaction: %v", err))
 	}
 
 	// store the transaction locally
@@ -48,12 +50,29 @@ func (h *handlerTransactions) SendTransaction(ctx context.Context, req *access.S
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to store transaction: %v", err))
 	}
 
+	go h.registerTransactionForRetry(&tx)
+
 	return resp, nil
+}
+
+// SendRawTransaction sends a raw transaction to the collection node
+func (h *handlerTransactions) SendRawTransaction(ctx context.Context, tx *entities.Transaction) (*access.SendTransactionResponse, error) {
+	req := &access.SendTransactionRequest{
+		Transaction: tx,
+	}
+
+	// send the transaction to the collection node
+	return h.collectionRPC.SendTransaction(ctx, req)
 }
 
 func (h *handlerTransactions) GetTransaction(_ context.Context, req *access.GetTransactionRequest) (*access.TransactionResponse, error) {
 
-	id := flow.HashToID(req.Id)
+	reqTxID := req.GetId()
+	id, err := convert.TransactionID(reqTxID)
+	if err != nil {
+		return nil, err
+	}
+
 	// look up transaction from storage
 	tx, err := h.transactions.ByID(id)
 	if err != nil {
@@ -72,7 +91,11 @@ func (h *handlerTransactions) GetTransaction(_ context.Context, req *access.GetT
 
 func (h *handlerTransactions) GetTransactionResult(ctx context.Context, req *access.GetTransactionRequest) (*access.TransactionResultResponse, error) {
 
-	id := flow.HashToID(req.GetId())
+	reqTxID := req.GetId()
+	id, err := convert.TransactionID(reqTxID)
+	if err != nil {
+		return nil, err
+	}
 
 	// look up transaction from storage
 	tx, err := h.transactions.ByID(id)
@@ -89,7 +112,7 @@ func (h *handlerTransactions) GetTransactionResult(ctx context.Context, req *acc
 	}
 
 	// derive status of the transaction
-	status, err := h.deriveTransactionStatus(tx, executed)
+	status, err := h.DeriveTransactionStatus(tx, executed)
 	if err != nil {
 		return nil, convertStorageError(err)
 	}
@@ -107,8 +130,8 @@ func (h *handlerTransactions) GetTransactionResult(ctx context.Context, req *acc
 	return resp, nil
 }
 
-// deriveTransactionStatus derives the transaction status based on current protocol state
-func (h *handlerTransactions) deriveTransactionStatus(tx *flow.TransactionBody, executed bool) (entities.TransactionStatus, error) {
+// DeriveTransactionStatus derives the transaction status based on current protocol state
+func (h *handlerTransactions) DeriveTransactionStatus(tx *flow.TransactionBody, executed bool) (entities.TransactionStatus, error) {
 
 	block, err := h.lookupBlock(tx.ID())
 	if errors.Is(err, storage.ErrNotFound) {
@@ -200,6 +223,14 @@ func (h *handlerTransactions) lookupTransactionResult(ctx context.Context, txID 
 	return true, events, txStatus, message, nil
 }
 
+func (h *handlerTransactions) registerTransactionForRetry(tx *flow.TransactionBody) {
+	referenceBlock, err := h.state.AtBlockID(tx.ReferenceBlockID).Head()
+	if err != nil {
+		return
+	}
+	h.retry.RegisterTransaction(referenceBlock.Height, tx)
+}
+
 func (h *handlerTransactions) getTransactionResultFromExecutionNode(ctx context.Context,
 	blockID []byte,
 	transactionID []byte) ([]*entities.Event, uint32, string, error) {
@@ -223,4 +254,8 @@ func (h *handlerTransactions) getTransactionResultFromExecutionNode(ctx context.
 	exeResults := resp.GetEvents()
 
 	return exeResults, resp.GetStatusCode(), resp.GetErrorMessage(), nil
+}
+
+func (h *handlerTransactions) NotifyFinalizedBlockHeight(height uint64) {
+	h.retry.Retry(height)
 }

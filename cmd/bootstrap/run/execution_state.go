@@ -1,6 +1,7 @@
 package run
 
 import (
+	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/crypto"
@@ -11,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage/ledger"
 )
 
+// NOTE: this is now unused and should become part of another tool.
 func GenerateServiceAccountPrivateKey(seed []byte) (flow.AccountPrivateKey, error) {
 	priv, err := crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
 	if err != nil {
@@ -24,7 +26,13 @@ func GenerateServiceAccountPrivateKey(seed []byte) (flow.AccountPrivateKey, erro
 	}, nil
 }
 
-func GenerateExecutionState(dbDir string, accountKey flow.AccountPublicKey, tokenSupply uint64, chain flow.Chain) (flow.StateCommitment, error) {
+// NOTE: this is now unused and should become part of another tool.
+func GenerateExecutionState(
+	dbDir string,
+	accountKey flow.AccountPublicKey,
+	tokenSupply cadence.UFix64,
+	chain flow.Chain,
+) (flow.StateCommitment, error) {
 	metricsCollector := &metrics.NoopCollector{}
 
 	ledgerStorage, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)

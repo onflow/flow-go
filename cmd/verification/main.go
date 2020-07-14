@@ -11,7 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
-	protocolRecovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
+	recovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
 	synceng "github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/verification/finder"
@@ -38,39 +38,46 @@ const (
 	// DISCLAIMER: alpha down there is not a production-level value
 	chunkAssignmentAlpha = 1
 
-	// requestIntervalMs represents the time interval in milliseconds that the
-	// ingest engine retries sending resource requests to the network
-	// this value is set following issue (3443).
-	requestIntervalMs = 1000 * time.Millisecond
+	// requestInterval represents the time interval in milliseconds that the
+	// match engine retries sending resource requests to the network
+	// this value is set following this issue (3443)
+	requestInterval = 1000 * time.Millisecond
 
-	// failureThreshold represents the number of retries ingest engine sends
-	// at `requestIntervalMs` milliseconds for each of the missing resources.
+	// processInterval represents the time interval in milliseconds that the
+	// finder engine iterates over the execution receipts ready to process
+	// this value is set following this issue (3443)
+	processInterval = 1000 * time.Millisecond
+
+	// failureThreshold represents the number of retries match engine sends
+	// at `requestInterval` milliseconds for each of the missing resources.
 	// When it reaches the threshold ingest engine makes a missing challenge for the resources.
-	// this value is set following issue (3443).
+	// this value is set following this issue (3443)
 	failureThreshold = 2
 )
 
 func main() {
-
 	var (
-		alpha               uint
-		receiptLimit        uint
-		chunkLimit          uint
 		err                 error
-		pendingReceipts     *stdmap.PendingReceipts
-		pendingResults      *stdmap.PendingResults
-		pendingBlocks       *buffer.PendingBlocks
-		receiptIDsByBlock   *stdmap.IdentifierMap
-		receiptIDsByResult  *stdmap.IdentifierMap
-		pendingChunks       *match.Chunks
-		headerStorage       *storage.Headers
-		processedResultsIDs *stdmap.Identifiers
-		finderEng           *finder.Engine
-		verifierEng         *verifier.Engine
-		matchEng            *match.Engine
-		followerEng         *followereng.Engine
-		syncCore            *synchronization.Core
-		collector           module.VerificationMetrics
+		alpha               uint
+		receiptLimit        uint                       // size of execution-receipt/result related mempools
+		chunkLimit          uint                       // size of chunk-related mempools
+		cachedReceipts      *stdmap.ReceiptDataPacks   // used in finder engine
+		pendingReceipts     *stdmap.ReceiptDataPacks   // used in finder engine
+		readyReceipts       *stdmap.ReceiptDataPacks   // used in finder engine
+		blockIDsCache       *stdmap.Identifiers        // used in finder engine
+		processedResultsIDs *stdmap.Identifiers        // used in finder engine
+		receiptIDsByBlock   *stdmap.IdentifierMap      // used in finder engine
+		receiptIDsByResult  *stdmap.IdentifierMap      // used in finder engine
+		pendingResults      *stdmap.PendingResults     // used in match engine
+		pendingChunks       *match.Chunks              // used in match engine
+		headerStorage       *storage.Headers           // used in match and finder engines
+		syncCore            *synchronization.Core      // used in follower engine
+		pendingBlocks       *buffer.PendingBlocks      // used in follower engine
+		finderEng           *finder.Engine             // the finder engine
+		verifierEng         *verifier.Engine           // the verifier engine
+		matchEng            *match.Engine              // the match engine
+		followerEng         *followereng.Engine        // the follower engine
+		collector           module.VerificationMetrics // used to collect metrics of all engines
 	)
 
 	cmd.FlowNode(flow.RoleVerification.String()).
@@ -83,8 +90,21 @@ func main() {
 			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegisterer, node.Logger)
 			return nil
 		}).
-		Module("pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-			pendingReceipts, err = stdmap.NewPendingReceipts(receiptLimit)
+		Module("cached execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
+			cachedReceipts, err = stdmap.NewReceiptDataPacks(receiptLimit)
+			if err != nil {
+				return err
+			}
+
+			// registers size method of backend for metrics
+			err = node.Metrics.Mempool.Register(metrics.ResourceCachedReceipt, cachedReceipts.Size)
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
+			}
+			return nil
+		}).
+		Module("pending execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
+			pendingReceipts, err = stdmap.NewReceiptDataPacks(receiptLimit)
 			if err != nil {
 				return err
 			}
@@ -96,7 +116,20 @@ func main() {
 			}
 			return nil
 		}).
-		Module("pending receipt ids by block mempool", func(node *cmd.FlowNodeBuilder) error {
+		Module("ready execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
+			readyReceipts, err = stdmap.NewReceiptDataPacks(receiptLimit)
+			if err != nil {
+				return err
+			}
+
+			// registers size method of backend for metrics
+			err = node.Metrics.Mempool.Register(metrics.ResourceReceipt, readyReceipts.Size)
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
+			}
+			return nil
+		}).
+		Module("pending execution receipts ids by block mempool", func(node *cmd.FlowNodeBuilder) error {
 			receiptIDsByBlock, err = stdmap.NewIdentifierMap(receiptLimit)
 			if err != nil {
 				return err
@@ -110,14 +143,28 @@ func main() {
 
 			return nil
 		}).
-		Module("pending receipt ids by result mempool", func(node *cmd.FlowNodeBuilder) error {
+		Module("execution receipt ids by result mempool", func(node *cmd.FlowNodeBuilder) error {
 			receiptIDsByResult, err = stdmap.NewIdentifierMap(receiptLimit)
 			if err != nil {
 				return err
 			}
 
 			// registers size method of backend for metrics
-			err = node.Metrics.Mempool.Register(metrics.ResourcePendingReceiptIDsByResult, receiptIDsByResult.Size)
+			err = node.Metrics.Mempool.Register(metrics.ResourceReceiptIDsByResult, receiptIDsByResult.Size)
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
+			}
+
+			return nil
+		}).
+		Module("cached block ids mempool", func(node *cmd.FlowNodeBuilder) error {
+			blockIDsCache, err = stdmap.NewIdentifiers(receiptLimit)
+			if err != nil {
+				return err
+			}
+
+			// registers size method of backend for metrics
+			err = node.Metrics.Mempool.Register(metrics.ResourceCachedBlockID, blockIDsCache.Size)
 			if err != nil {
 				return fmt.Errorf("could not register backend metric: %w", err)
 			}
@@ -176,11 +223,17 @@ func main() {
 			return err
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+
 			rt := runtime.NewInterpreterRuntime()
 
-			vm := fvm.New(rt, node.RootChainID.Chain())
+			vm := fvm.New(rt)
 
-			chunkVerifier := chunks.NewChunkVerifier(vm, node.Storage.Blocks)
+			vmCtx := fvm.NewContext(
+				fvm.WithChain(node.RootChainID.Chain()),
+				fvm.WithBlocks(node.Storage.Blocks),
+			)
+
+			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
 			verifierEng, err = verifier.New(node.Logger, collector, node.Tracer, node.Network, node.State, node.Me,
 				chunkVerifier)
 			return verifierEng, err
@@ -201,7 +254,7 @@ func main() {
 				node.State,
 				pendingChunks,
 				headerStorage,
-				requestIntervalMs,
+				requestInterval,
 				failureThreshold)
 			return matchEng, err
 		}).
@@ -212,11 +265,15 @@ func main() {
 				node.Network,
 				node.Me,
 				matchEng,
+				cachedReceipts,
 				pendingReceipts,
+				readyReceipts,
 				headerStorage,
 				processedResultsIDs,
 				receiptIDsByBlock,
-				receiptIDsByResult)
+				receiptIDsByResult,
+				blockIDsCache,
+				processInterval)
 			return finderEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -245,21 +302,16 @@ func main() {
 			// initialize the verifier for the protocol consensus
 			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, node.DKGState, staking, beacon, merger)
 
-			finalized, pending, err := protocolRecovery.FindLatest(node.State, node.Storage.Headers, node.GenesisBlock.Header)
+			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			followerCore, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, node.Storage.Headers, final, verifier, finderEng, node.GenesisBlock.Header, node.GenesisQC, finalized, pending)
+			followerCore, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, node.Storage.Headers, final, verifier, finderEng, node.RootBlock.Header, node.RootQC, finalized, pending)
 			if err != nil {
-				// return nil, fmt.Errorf("could not create follower core logic: %w", err)
-				// TODO for now we ignore failures in follower
-				// this is necessary for integration tests to run, until they are
-				// updated to generate/use valid genesis QC and DKG files.
-				// ref https://github.com/dapperlabs/flow-go/issues/3057
-				node.Logger.Debug().Err(err).Msg("ignoring failures in follower core")
+				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
 
 			followerEng, err = followereng.New(

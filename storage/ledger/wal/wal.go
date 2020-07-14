@@ -7,10 +7,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	prometheusWAL "github.com/prometheus/tsdb/wal"
 
+	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
 	"github.com/dapperlabs/flow-go/storage/ledger/mtrie/flattener"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 )
+
+const SegmentSize = 32 * 1024 * 1024
 
 type LedgerWAL struct {
 	wal            *prometheusWAL.WAL
@@ -19,8 +22,8 @@ type LedgerWAL struct {
 }
 
 // TODO use real logger and metrics, but that would require passing them to Trie storage
-func NewWAL(logger log.Logger, reg prometheus.Registerer, dir string, forestCapacity int, keyByteSize int) (*LedgerWAL, error) {
-	w, err := prometheusWAL.NewSize(logger, reg, dir, 32*1024)
+func NewWAL(logger log.Logger, reg prometheus.Registerer, dir string, forestCapacity int, keyByteSize int, segmentSize int) (*LedgerWAL, error) {
+	w, err := prometheusWAL.NewSize(logger, reg, dir, segmentSize)
 	if err != nil {
 		return nil, err
 	}
@@ -53,6 +56,31 @@ func (w *LedgerWAL) RecordDelete(stateCommitment flow.StateCommitment) error {
 	return nil
 }
 
+func (w *LedgerWAL) ReplayOnMForest(mForest *mtrie.MForest) error {
+	return w.Replay(
+		func(forestSequencing *flattener.FlattenedForest) error {
+			rebuiltTries, err := flattener.RebuildTries(forestSequencing)
+			if err != nil {
+				return fmt.Errorf("rebuilding forest from sequenced nodes failed: %w", err)
+			}
+			err = mForest.AddTries(rebuiltTries)
+			if err != nil {
+				return fmt.Errorf("adding rebuilt tries to forest failed: %w", err)
+			}
+			return nil
+		},
+		func(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
+			_, err := mForest.Update(stateCommitment, keys, values)
+			// _, err := trie.UpdateRegisters(keys, values, stateCommitment)
+			return err
+		},
+		func(stateCommitment flow.StateCommitment) error {
+			mForest.RemoveTrie(stateCommitment)
+			return nil
+		},
+	)
+}
+
 func (w *LedgerWAL) Replay(
 	checkpointFn func(forestSequencing *flattener.FlattenedForest) error,
 	updateFn func(flow.StateCommitment, [][]byte, [][]byte) error,
@@ -66,6 +94,7 @@ func (w *LedgerWAL) Replay(
 }
 
 func (w *LedgerWAL) ReplayLogsOnly(
+	checkpointFn func(forestSequencing *flattener.FlattenedForest) error,
 	updateFn func(flow.StateCommitment, [][]byte, [][]byte) error,
 	deleteFn func(flow.StateCommitment) error,
 ) error {
@@ -73,7 +102,7 @@ func (w *LedgerWAL) ReplayLogsOnly(
 	if err != nil {
 		return err
 	}
-	return w.replay(from, to, nil, updateFn, deleteFn, false)
+	return w.replay(from, to, checkpointFn, updateFn, deleteFn, false)
 }
 
 func (w *LedgerWAL) replay(
@@ -91,12 +120,12 @@ func (w *LedgerWAL) replay(
 	loadedCheckpoint := false
 	startSegment := from
 
-	if useCheckpoints {
+	checkpointer, err := w.NewCheckpointer()
+	if err != nil {
+		return fmt.Errorf("cannot create checkpointer: %w", err)
+	}
 
-		checkpointer, err := w.NewCheckpointer()
-		if err != nil {
-			return fmt.Errorf("cannot create checkpointer: %w", err)
-		}
+	if useCheckpoints {
 
 		latestCheckpoint, err := checkpointer.LatestCheckpoint()
 		if err != nil {
@@ -122,6 +151,24 @@ func (w *LedgerWAL) replay(
 		if loadedCheckpoint {
 			startSegment = latestCheckpoint + 1
 		}
+	}
+
+	if !loadedCheckpoint && startSegment == 0 {
+		hasRootCheckpoint, err := checkpointer.HasRootCheckpoint()
+		if err != nil {
+			return fmt.Errorf("cannot check root checkpoint existence: %w", err)
+		}
+		if hasRootCheckpoint {
+			flattenedForest, err := checkpointer.LoadRootCheckpoint()
+			if err != nil {
+				return fmt.Errorf("cannot load root checkpoint: %w", err)
+			}
+			err = checkpointFn(flattenedForest)
+			if err != nil {
+				return fmt.Errorf("error while handling root checkpoint: %w", err)
+			}
+		}
+
 	}
 
 	sr, err := prometheusWAL.NewSegmentsRangeReader(prometheusWAL.SegmentRange{

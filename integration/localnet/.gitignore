@@ -1,5 +1,6 @@
 /bootstrap/
 /profiler/
-/datadir/
+/data/
+/trie/
 docker-compose.nodes.yml
 targets.nodes.json

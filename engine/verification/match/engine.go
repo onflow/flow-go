@@ -190,15 +190,28 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, r *flow.Executi
 		return fmt.Errorf("could not find my chunk assignments: %w", err)
 	}
 
+	log.Debug().
+		Int("total_chunks", len(result.ExecutionResult.Chunks)).
+		Int("total_assigned_chunks", len(chunks)).
+		Msg("chunk assignment done")
+
 	// add each chunk to a pending list to be processed by onTimer
 	for _, chunk := range chunks {
 		status := NewChunkStatus(chunk, result.ExecutionResult.ID(), result.ExecutorID)
 		added = e.pendingChunks.Add(status)
 		if !added {
 			log.Debug().
+				Hex("chunk_id", logging.ID(chunk.ID())).
+				Hex("result_id", logging.ID(status.ExecutionResultID)).
 				Int("pendingChunks", len(chunks)).
 				Msg("could not add chunk status to pendingChunks mempool")
+			continue
 		}
+		log.Debug().
+			Hex("chunk_id", logging.ID(chunk.ID())).
+			Hex("result_id", logging.ID(status.ExecutionResultID)).
+			Int("pendingChunks", len(chunks)).
+			Msg("chunk marked assigned to this verification node")
 	}
 
 	log.Debug().

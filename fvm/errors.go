@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -27,10 +28,8 @@ const (
 	errCodeExecution = 100
 )
 
-var (
-	ErrAccountNotFound          = errors.New("account not found")
-	ErrAccountPublicKeyNotFound = errors.New("account public key not found")
-)
+var ErrAccountNotFound = errors.New("account not found")
+var ErrInvalidHashAlgorithm = errors.New("invalid hash algorithm")
 
 // An Error represents a non-fatal error that is expected during normal operation of the virtual machine.
 //
@@ -202,12 +201,12 @@ func (e *InvalidProposalKeyMissingSignatureError) Code() uint32 {
 // An InvalidHashAlgorithmError indicates that a given key has an invalid hash algorithm.
 type InvalidHashAlgorithmError struct {
 	Address  flow.Address
-	KeyID    uint64
+	KeyIndex uint64
 	HashAlgo hash.HashingAlgorithm
 }
 
 func (e *InvalidHashAlgorithmError) Error() string {
-	return fmt.Sprintf("invalid hash algorithm %d for key %d on account %s", e.HashAlgo, e.KeyID, e.Address)
+	return fmt.Sprintf("invalid hash algorithm %d for key %d on account %s", e.HashAlgo, e.KeyIndex, e.Address)
 }
 
 func (e *InvalidHashAlgorithmError) Code() uint32 {
@@ -224,4 +223,40 @@ func (e *ExecutionError) Error() string {
 
 func (e *ExecutionError) Code() uint32 {
 	return errCodeExecution
+}
+
+func handleError(err error) (vmErr Error, fatalErr error) {
+	switch typedErr := err.(type) {
+	case runtime.Error:
+		// If the error originated from the runtime, handle separately
+		return handleRuntimeError(typedErr)
+	case Error:
+		// If the error is an fvm.Error, return as is
+		return typedErr, nil
+	default:
+		// All other errors are considered fatal
+		return nil, err
+	}
+}
+
+func handleRuntimeError(err runtime.Error) (vmErr Error, fatalErr error) {
+	innerErr := err.Err
+
+	// External errors are reported by the runtime but originate from the VM.
+	//
+	// External errors may be fatal or non-fatal, so additional handling
+	// is required.
+	if externalErr, ok := innerErr.(interpreter.ExternalError); ok {
+		if recoveredErr, ok := externalErr.Recovered.(error); ok {
+			// If the recovered value is an error, pass it to the original
+			// error handler to distinguish between fatal and non-fatal errors.
+			return handleError(recoveredErr)
+		}
+
+		// If the recovered value is not an error, bubble up the panic.
+		panic(externalErr.Recovered)
+	}
+
+	// All other errors are non-fatal Cadence errors.
+	return &ExecutionError{Err: err}, nil
 }

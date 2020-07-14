@@ -348,24 +348,55 @@ func EncodeStorableTrie(storableTrie *flattener.StorableTrie) []byte {
 	return buf
 }
 
-func ReadStorableTrie(reader io.Reader) (*flattener.StorableTrie, error) {
+func ReadStorableTrie(reader io.Reader, version uint16) (*flattener.StorableTrie, error) {
 	storableNode := &flattener.StorableTrie{}
 
-	// read root uint64 RootIndex
-	buf := make([]byte, 8)
-	read, err := io.ReadFull(reader, buf)
-	if err != nil {
-		return nil, fmt.Errorf("cannot read fixed-legth part: %w", err)
-	}
-	if read != len(buf) {
-		return nil, fmt.Errorf("not enough bytes read %d expected %d", read, len(buf))
-	}
-	storableNode.RootIndex, _ = readUint64(buf, 0)
+	switch version {
+	case VersionV1:
+		{
+			buf := make([]byte, 8+8)
 
-	// read RootHash bytes: variable length
-	storableNode.RootHash, err = readShortDataFromReader(reader)
-	if err != nil {
-		return nil, fmt.Errorf("cannot read roothash data: %w", err)
+			read, err := io.ReadFull(reader, buf)
+			if err != nil {
+				return nil, fmt.Errorf("cannot read fixed-legth part: %w", err)
+			}
+			if read != len(buf) {
+				return nil, fmt.Errorf("not enough bytes read %d expected %d", read, len(buf))
+			}
+
+			pos := 0
+
+			_, pos = readUint64(buf, pos) // ignore Number
+			storableNode.RootIndex, _ = readUint64(buf, pos)
+
+			storableNode.RootHash, err = readShortDataFromReader(reader)
+			if err != nil {
+				return nil, fmt.Errorf("cannot read roothash data: %w", err)
+			}
+			_, err = readShortDataFromReader(reader) // ignore parent root hash
+			if err != nil {
+				return nil, fmt.Errorf("cannot read parentRootHash data: %w", err)
+			}
+		}
+	case VersionV2:
+		{
+			// read root uint64 RootIndex
+			buf := make([]byte, 8)
+			read, err := io.ReadFull(reader, buf)
+			if err != nil {
+				return nil, fmt.Errorf("cannot read fixed-legth part: %w", err)
+			}
+			if read != len(buf) {
+				return nil, fmt.Errorf("not enough bytes read %d expected %d", read, len(buf))
+			}
+			storableNode.RootIndex, _ = readUint64(buf, 0)
+
+			// read RootHash bytes: variable length
+			storableNode.RootHash, err = readShortDataFromReader(reader)
+			if err != nil {
+				return nil, fmt.Errorf("cannot read roothash data: %w", err)
+			}
+		}
 	}
 
 	return storableNode, nil

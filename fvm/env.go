@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
 
+	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
 )
@@ -18,40 +19,35 @@ import (
 var _ runtime.Interface = &hostEnv{}
 
 type hostEnv struct {
-	vm       *VirtualMachine
-	ledger   Ledger
-	astCache ASTCache
-	blocks   Blocks
+	ctx           Context
+	ledger        state.Ledger
+	accounts      *state.Accounts
+	uuidGenerator *UUIDGenerator
 
 	runtime.Metrics
-
-	gasLimit    uint64
-	uuid        uint64
-	blockHeader *flow.Header
-	rng         *rand.Rand
 
 	events []cadence.Event
 	logs   []string
 
-	transactionEnv             *transactionEnv
-	restrictContractDeployment bool
-	restrictAccountCreation    bool
+	transactionEnv *transactionEnv
+	rng            *rand.Rand
 }
 
-func newEnvironment(vm *VirtualMachine, ctx Context, ledger Ledger) *hostEnv {
+func newEnvironment(ctx Context, ledger state.Ledger) *hostEnv {
+	accounts := state.NewAccounts(ledger, ctx.Chain)
+
+	uuids := state.NewUUIDs(ledger)
+	uuidGenerator := NewUUIDGenerator(uuids)
+
 	env := &hostEnv{
-		vm:                         vm,
-		ledger:                     ledger,
-		astCache:                   ctx.ASTCache,
-		blocks:                     ctx.Blocks,
-		Metrics:                    &noopMetricsCollector{},
-		gasLimit:                   ctx.GasLimit,
-		restrictContractDeployment: ctx.RestrictedDeploymentEnabled,
-		restrictAccountCreation:    ctx.RestrictedAccountCreationEnabled,
+		ctx:           ctx,
+		ledger:        ledger,
+		Metrics:       &noopMetricsCollector{},
+		accounts:      accounts,
+		uuidGenerator: uuidGenerator,
 	}
 
 	if ctx.BlockHeader != nil {
-		env.setBlockHeader(ctx.BlockHeader)
 		env.seedRNG(ctx.BlockHeader)
 	}
 
@@ -62,10 +58,6 @@ func newEnvironment(vm *VirtualMachine, ctx Context, ledger Ledger) *hostEnv {
 	return env
 }
 
-func (e *hostEnv) setBlockHeader(header *flow.Header) {
-	e.blockHeader = header
-}
-
 func (e *hostEnv) seedRNG(header *flow.Header) {
 	// Seed the random number generator with entropy created from the block header ID. The random number generator will
 	// be used by the UnsafeRandom function.
@@ -74,19 +66,14 @@ func (e *hostEnv) seedRNG(header *flow.Header) {
 	e.rng = rand.New(source)
 }
 
-func (e *hostEnv) setTransaction(
-	tx *flow.TransactionBody,
-	txCtx Context,
-) *hostEnv {
+func (e *hostEnv) setTransaction(vm *VirtualMachine, tx *flow.TransactionBody) {
 	e.transactionEnv = newTransactionEnv(
-		e.vm,
+		vm,
+		e.ctx,
 		e.ledger,
+		e.accounts,
 		tx,
-		txCtx,
-		e.restrictContractDeployment,
-		e.restrictAccountCreation,
 	)
-	return e
 }
 
 func (e *hostEnv) getEvents() []cadence.Event {
@@ -99,9 +86,9 @@ func (e *hostEnv) getLogs() []string {
 
 func (e *hostEnv) GetValue(owner, controller, key []byte) ([]byte, error) {
 	v, _ := e.ledger.Get(
-		fullKeyHash(
-			string(flow.BytesToAddress(owner).Bytes()),
-			string(flow.BytesToAddress(controller).Bytes()),
+		state.RegisterID(
+			string(owner),
+			string(controller),
 			string(key),
 		),
 	)
@@ -110,9 +97,9 @@ func (e *hostEnv) GetValue(owner, controller, key []byte) ([]byte, error) {
 
 func (e *hostEnv) SetValue(owner, controller, key, value []byte) error {
 	e.ledger.Set(
-		fullKeyHash(
-			string(flow.BytesToAddress(owner).Bytes()),
-			string(flow.BytesToAddress(controller).Bytes()),
+		state.RegisterID(
+			string(owner),
+			string(controller),
 			string(key),
 		),
 		value,
@@ -132,17 +119,19 @@ func (e *hostEnv) ValueExists(owner, controller, key []byte) (exists bool, err e
 func (e *hostEnv) ResolveImport(location runtime.Location) ([]byte, error) {
 	addressLocation, ok := location.(runtime.AddressLocation)
 	if !ok {
-		return nil, fmt.Errorf("import location must be an account address")
+		return nil, nil
 	}
 
 	address := flow.BytesToAddress(addressLocation)
 
-	code, err := getAccountCode(e.ledger, address)
+	code, err := e.accounts.GetCode(address)
 	if err != nil {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return nil, err
 	}
 
 	if code == nil {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return nil, fmt.Errorf("no code deployed at address %s", address)
 	}
 
@@ -150,19 +139,31 @@ func (e *hostEnv) ResolveImport(location runtime.Location) ([]byte, error) {
 }
 
 func (e *hostEnv) GetCachedProgram(location ast.Location) (*ast.Program, error) {
-	if e.astCache == nil {
+	if e.ctx.ASTCache == nil {
 		return nil, nil
 	}
 
-	return e.astCache.GetProgram(location)
+	program, err := e.ctx.ASTCache.GetProgram(location)
+	if program != nil {
+		// Program was found within cache, do an explicit ledger register touch
+		// to ensure consistent reads during chunk verification.
+		if addressLocation, ok := location.(runtime.AddressLocation); ok {
+			address := flow.BytesToAddress(addressLocation)
+			e.accounts.TouchCode(address)
+		}
+	}
+
+	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+	return program, err
 }
 
 func (e *hostEnv) CacheProgram(location ast.Location, program *ast.Program) error {
-	if e.astCache == nil {
+	if e.ctx.ASTCache == nil {
 		return nil
 	}
 
-	return e.astCache.SetProgram(location, program)
+	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+	return e.ctx.ASTCache.SetProgram(location, program)
 }
 
 func (e *hostEnv) Log(message string) {
@@ -174,9 +175,13 @@ func (e *hostEnv) EmitEvent(event cadence.Event) {
 }
 
 func (e *hostEnv) GenerateUUID() uint64 {
-	// TODO: https://github.com/dapperlabs/flow-go/issues/4141
-	defer func() { e.uuid++ }()
-	return e.uuid
+	uuid, err := e.uuidGenerator.GenerateUUID()
+	if err != nil {
+		// TODO - Return error once Cadence interface accommodates it
+		panic(fmt.Errorf("cannot get UUID: %w", err))
+	}
+
+	return uuid
 }
 
 func (e *hostEnv) GetComputationLimit() uint64 {
@@ -184,7 +189,7 @@ func (e *hostEnv) GetComputationLimit() uint64 {
 		return e.transactionEnv.GetComputationLimit()
 	}
 
-	return e.gasLimit
+	return e.ctx.GasLimit
 }
 
 func (e *hostEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {
@@ -199,15 +204,41 @@ func (e *hostEnv) Logs() []string {
 	return e.logs
 }
 
+func (e *hostEnv) VerifySignature(
+	signature []byte,
+	tag string,
+	message []byte,
+	rawPublicKey []byte,
+	rawSigAlgo string,
+	rawHashAlgo string,
+) bool {
+	valid, err := verifySignatureFromRuntime(
+		e.ctx.SignatureVerifier,
+		signature,
+		tag,
+		message,
+		rawPublicKey,
+		rawSigAlgo,
+		rawHashAlgo,
+	)
+
+	if err != nil {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		panic(err)
+	}
+
+	return valid
+}
+
 // Block Environment Functions
 
 // GetCurrentBlockHeight returns the current block height.
 func (e *hostEnv) GetCurrentBlockHeight() uint64 {
-	if e.blockHeader == nil {
+	if e.ctx.BlockHeader == nil {
 		panic("GetCurrentBlockHeight is not supported by this environment")
 	}
 
-	return e.blockHeader.Height
+	return e.ctx.BlockHeader.Height
 }
 
 // UnsafeRandom returns a random uint64, where the process of random number derivation is not cryptographically
@@ -224,19 +255,21 @@ func (e *hostEnv) UnsafeRandom() uint64 {
 
 // GetBlockAtHeight returns the block at the given height.
 func (e *hostEnv) GetBlockAtHeight(height uint64) (hash runtime.BlockHash, timestamp int64, exists bool, err error) {
-	if e.blocks == nil {
+	if e.ctx.Blocks == nil {
 		panic("GetBlockAtHeight is not supported by this environment")
 	}
 
-	block, err := e.blocks.ByHeight(height)
-	// TODO remove dependency on storage
+	block, err := e.ctx.Blocks.ByHeight(height)
+	// TODO: remove dependency on storage
 	if errors.Is(err, storage.ErrNotFound) {
 		return runtime.BlockHash{}, 0, false, nil
 	} else if err != nil {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return runtime.BlockHash{}, 0, false, fmt.Errorf(
 			"unexpected failure of GetBlockAtHeight, height %v: %w", height, err)
 	}
 
+	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 	return runtime.BlockHash(block.ID()), block.Header.Timestamp.UnixNano(), true, nil
 }
 
@@ -247,6 +280,7 @@ func (e *hostEnv) CreateAccount(payer runtime.Address) (address runtime.Address,
 		panic("CreateAccount is not supported by this environment")
 	}
 
+	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 	return e.transactionEnv.CreateAccount(payer)
 }
 
@@ -255,6 +289,7 @@ func (e *hostEnv) AddAccountKey(address runtime.Address, publicKey []byte) error
 		panic("AddAccountKey is not supported by this environment")
 	}
 
+	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 	return e.transactionEnv.AddAccountKey(address, publicKey)
 }
 
@@ -263,6 +298,7 @@ func (e *hostEnv) RemoveAccountKey(address runtime.Address, index int) (publicKe
 		panic("RemoveAccountKey is not supported by this environment")
 	}
 
+	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 	return e.transactionEnv.RemoveAccountKey(address, index)
 }
 
@@ -271,6 +307,7 @@ func (e *hostEnv) UpdateAccountCode(address runtime.Address, code []byte) (err e
 		panic("UpdateAccountCode is not supported by this environment")
 	}
 
+	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 	return e.transactionEnv.UpdateAccountCode(address, code)
 }
 
@@ -285,34 +322,28 @@ func (e *hostEnv) GetSigningAccounts() []runtime.Address {
 // Transaction Environment
 
 type transactionEnv struct {
-	vm     *VirtualMachine
-	ledger Ledger
-	tx     *flow.TransactionBody
+	vm       *VirtualMachine
+	ctx      Context
+	ledger   state.Ledger
+	accounts *state.Accounts
 
-	// txCtx is an execution context used to execute meta transactions
-	// within this transaction context.
-	txCtx Context
-
-	authorizers                []runtime.Address
-	restrictContractDeployment bool
-	restrictAccountCreation    bool
+	tx          *flow.TransactionBody
+	authorizers []runtime.Address
 }
 
 func newTransactionEnv(
 	vm *VirtualMachine,
-	ledger Ledger,
+	ctx Context,
+	ledger state.Ledger,
+	accounts *state.Accounts,
 	tx *flow.TransactionBody,
-	txCtx Context,
-	restrictContractDeployment bool,
-	restrictAccountCreation bool,
 ) *transactionEnv {
 	return &transactionEnv{
-		vm:                         vm,
-		ledger:                     ledger,
-		tx:                         tx,
-		txCtx:                      txCtx,
-		restrictContractDeployment: restrictContractDeployment,
-		restrictAccountCreation:    restrictAccountCreation,
+		vm:       vm,
+		ctx:      ctx,
+		ledger:   ledger,
+		accounts: accounts,
+		tx:       tx,
 	}
 }
 
@@ -333,33 +364,40 @@ func (e *transactionEnv) GetComputationLimit() uint64 {
 }
 
 func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
-	err = e.vm.invokeMetaTransaction(
-		e.txCtx,
-		deductAccountCreationFeeTransaction(
-			flow.Address(payer),
-			e.vm.chain.ServiceAddress(),
-			e.restrictAccountCreation,
-		),
-		e.ledger,
-	)
-	if err != nil {
-		return address, err
+	if e.ctx.ServiceAccountEnabled {
+		err = e.vm.invokeMetaTransaction(
+			e.ctx,
+			deductAccountCreationFeeTransaction(
+				flow.Address(payer),
+				e.ctx.Chain.ServiceAddress(),
+				e.ctx.RestrictedAccountCreationEnabled,
+			),
+			e.ledger,
+		)
+		if err != nil {
+			// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+			return address, err
+		}
 	}
 
 	var flowAddress flow.Address
 
-	flowAddress, err = createAccount(e.ledger, e.vm.chain, nil)
+	flowAddress, err = e.accounts.Create(nil)
 	if err != nil {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return address, err
 	}
 
-	err = e.vm.invokeMetaTransaction(
-		e.txCtx,
-		initFlowTokenTransaction(flowAddress, e.vm.chain.ServiceAddress()),
-		e.ledger,
-	)
-	if err != nil {
-		return address, err
+	if e.ctx.ServiceAccountEnabled {
+		err = e.vm.invokeMetaTransaction(
+			e.ctx,
+			initFlowTokenTransaction(flowAddress, e.ctx.Chain.ServiceAddress()),
+			e.ledger,
+		)
+		if err != nil {
+			// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+			return address, err
+		}
 	}
 
 	return runtime.Address(flowAddress), nil
@@ -374,12 +412,14 @@ func (e *transactionEnv) AddAccountKey(address runtime.Address, encodedPublicKey
 
 	var ok bool
 
-	ok, err = accountExists(e.ledger, accountAddress)
+	ok, err = e.accounts.Exists(accountAddress)
 	if err != nil {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return err
 	}
 
 	if !ok {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return fmt.Errorf("account with address %s does not exist", address)
 	}
 
@@ -387,19 +427,22 @@ func (e *transactionEnv) AddAccountKey(address runtime.Address, encodedPublicKey
 
 	publicKey, err = flow.DecodeRuntimeAccountPublicKey(encodedPublicKey, 0)
 	if err != nil {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return fmt.Errorf("cannot decode runtime public account key: %w", err)
 	}
 
 	var publicKeys []flow.AccountPublicKey
 
-	publicKeys, err = getAccountPublicKeys(e.ledger, accountAddress)
+	publicKeys, err = e.accounts.GetPublicKeys(accountAddress)
 	if err != nil {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return err
 	}
 
 	publicKeys = append(publicKeys, publicKey)
 
-	return setAccountPublicKeys(e.ledger, accountAddress, publicKeys)
+	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+	return e.accounts.SetPublicKeys(accountAddress, publicKeys)
 }
 
 // RemoveAccountKey revokes a public key by index from an existing account.
@@ -411,12 +454,14 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, keyIndex int)
 
 	var ok bool
 
-	ok, err = accountExists(e.ledger, accountAddress)
+	ok, err = e.accounts.Exists(accountAddress)
 	if err != nil {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return nil, err
 	}
 
 	if !ok {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return nil, fmt.Errorf("account with address %s does not exist", address)
 	}
 
@@ -425,7 +470,7 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, keyIndex int)
 	}
 
 	var publicKey flow.AccountPublicKey
-	publicKey, err = getAccountPublicKey(e.ledger, accountAddress, uint64(keyIndex))
+	publicKey, err = e.accounts.GetPublicKey(accountAddress, uint64(keyIndex))
 	if err != nil {
 		return nil, err
 	}
@@ -433,9 +478,10 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, keyIndex int)
 	// mark this key as revoked
 	publicKey.Revoked = true
 
-	encodedPublicKey, err = setAccountPublicKey(e.ledger, accountAddress, uint64(keyIndex), publicKey)
+	encodedPublicKey, err = e.accounts.SetPublicKey(accountAddress, uint64(keyIndex), publicKey)
 	if err != nil {
-		return nil, err
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202 {
+		return nil, fmt.Errorf("failed to revoke account key: %w", err)
 	}
 
 	return encodedPublicKey, nil
@@ -450,11 +496,12 @@ func (e *transactionEnv) UpdateAccountCode(address runtime.Address, code []byte)
 
 	// currently, every transaction that sets account code (deploys/updates contracts)
 	// must be signed by the service account
-	if e.restrictContractDeployment && !e.isAuthorizer(runtime.Address(e.vm.chain.ServiceAddress())) {
+	if e.ctx.RestrictedDeploymentEnabled && !e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress())) {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return fmt.Errorf("code deployment requires authorization from the service account")
 	}
 
-	return setAccountCode(e.ledger, accountAddress, code)
+	return e.accounts.SetCode(accountAddress, code)
 }
 
 func (e *transactionEnv) isAuthorizer(address runtime.Address) bool {

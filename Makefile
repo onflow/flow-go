@@ -35,6 +35,9 @@ crypto/relic/update:
 cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
 
+cmd/util/util:
+	go build -o cmd/util/util --tags relic cmd/util/main.go
+
 .PHONY: install-tools
 install-tools: crypto/relic/build check-go-version
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.23.8; \
@@ -314,7 +317,7 @@ docker-run-verification:
 
 .PHONY: docker-run-access
 docker-run-access:
-	docker run -p 9000:9000 -p 3569:3569 -p 8080:8080 gcr.io/dl-flow/access:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries access-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
+	docker run -p 9000:9000 -p 3569:3569 -p 8080:8080  -p 8000:8000 gcr.io/dl-flow/access:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries access-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
 
 .PHONY: docker-run-ghost
 docker-run-ghost:
