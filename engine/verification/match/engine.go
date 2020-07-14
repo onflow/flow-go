@@ -299,12 +299,10 @@ func (e *Engine) onTimer() {
 
 		// check if has reached max try
 		if !CanTry(e.maxAttempt, chunk) {
-			// TODO not to drop max reach, but to ignore it
-			e.pendingChunks.Rem(cid)
 			log.Debug().
 				Int("max_attempt", e.maxAttempt).
 				Int("actual_attempts", chunk.Attempt).
-				Msg("max attampts reached")
+				Msg("max attempts reached, chunk is not longer retried")
 			continue
 		}
 
