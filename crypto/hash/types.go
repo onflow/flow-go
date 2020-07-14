@@ -31,6 +31,8 @@ func StringToHashingAlgorithm(s string) HashingAlgorithm {
 		return SHA3_256
 	case SHA3_384.String():
 		return SHA3_384
+	case KMAC128.String():
+		return KMAC128
 	default:
 		return UnknownHashingAlgorithm
 	}
