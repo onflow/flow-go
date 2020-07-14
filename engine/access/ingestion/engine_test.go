@@ -90,10 +90,14 @@ func (suite *Suite) SetupTest() {
 // TestHandleBlock checks that when a block is received, a request for each individual collection is made
 func (suite *Suite) TestHandleBlock() {
 
-	block := unittest.BlockFixture()
-
 	cNodeIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
-	suite.proto.snapshot.On("Identities", mock.Anything).Return(cNodeIdentities, nil).Once()
+
+	block := unittest.BlockFixture()
+	block.SetPayload(*unittest.PayloadFixture(func(p *flow.Payload) {
+		for _, g := range p.Guarantees {
+			g.SignerIDs = cNodeIdentities.NodeIDs()
+		}
+	}))
 
 	suite.blocks.On("ByID", block.ID()).Return(&block, nil).Once()
 
@@ -121,7 +125,6 @@ func (suite *Suite) TestHandleBlock() {
 		}
 	}, time.Second, time.Millisecond)
 
-	suite.proto.snapshot.AssertExpectations(suite.T())
 	suite.headers.AssertExpectations(suite.T())
 	suite.collectionsConduit.AssertExpectations(suite.T())
 }
