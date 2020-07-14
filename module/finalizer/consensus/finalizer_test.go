@@ -120,9 +120,9 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 	final := unittest.BlockHeaderFixture()
 	final.Height = uint64(rand.Uint32())
 
-	// generate a couple of children that are pending
+	// generate an alternative block at same height
 	pending := unittest.BlockHeaderFixture()
-	pending.Height = uint64(rand.Uint32())
+	pending.Height = final.Height
 
 	// create a mock protocol state to check finalize calls
 	mutator := &mockprot.Mutator{}
