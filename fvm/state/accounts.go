@@ -15,7 +15,10 @@ const (
 	keyPublicKeyCount = "public_key_count"
 )
 
-var ErrAccountNotFound = errors.New("account not found")
+var (
+	ErrAccountNotFound          = errors.New("account not found")
+	ErrAccountPublicKeyNotFound = errors.New("account public key not found")
+)
 
 func keyPublicKey(index uint64) string {
 	return fmt.Sprintf("public_key_%d", index)
@@ -109,6 +112,26 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey) (flow.Address, err
 	return newAddress, nil
 }
 
+func (a *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error) {
+	publicKey, err := a.ledger.Get(
+		RegisterID(string(address.Bytes()), string(address.Bytes()), keyPublicKey(keyIndex)),
+	)
+	if err != nil {
+		return flow.AccountPublicKey{}, newLedgerGetError(keyPublicKey(keyIndex), address, err)
+	}
+
+	if publicKey == nil {
+		return flow.AccountPublicKey{}, ErrAccountPublicKeyNotFound
+	}
+
+	decodedPublicKey, err := flow.DecodeAccountPublicKey(publicKey)
+	if err != nil {
+		return flow.AccountPublicKey{}, fmt.Errorf("failed to decode public key: %w", err)
+	}
+
+	return decodedPublicKey, nil
+}
+
 func (a *Accounts) GetPublicKeys(address flow.Address) (publicKeys []flow.AccountPublicKey, err error) {
 	var countBytes []byte
 	countBytes, err = a.ledger.Get(
@@ -136,26 +159,38 @@ func (a *Accounts) GetPublicKeys(address flow.Address) (publicKeys []flow.Accoun
 	publicKeys = make([]flow.AccountPublicKey, count)
 
 	for i := uint64(0); i < count; i++ {
-		publicKey, err := a.ledger.Get(
-			RegisterID(string(address.Bytes()), string(address.Bytes()), keyPublicKey(i)),
-		)
+		publicKey, err := a.GetPublicKey(address, i)
 		if err != nil {
-			return nil, newLedgerGetError(keyPublicKey(i), address, err)
+			return nil, err
 		}
 
-		if publicKey == nil {
-			return nil, fmt.Errorf("failed to retrieve public key from account %s", address)
-		}
-
-		decodedPublicKey, err := flow.DecodeAccountPublicKey(publicKey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode public key: %w", err)
-		}
-
-		publicKeys[i] = decodedPublicKey
+		publicKeys[i] = publicKey
 	}
 
 	return publicKeys, nil
+}
+
+func (a *Accounts) SetPublicKey(
+	address flow.Address,
+	keyIndex uint64,
+	publicKey flow.AccountPublicKey,
+) (encodedPublicKey []byte, err error) {
+	err = publicKey.Validate()
+	if err != nil {
+		return nil, fmt.Errorf("invalid public key: %w", err)
+	}
+
+	encodedPublicKey, err = flow.EncodeAccountPublicKey(publicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode public key: %w", err)
+	}
+
+	a.ledger.Set(
+		RegisterID(string(address.Bytes()), string(address.Bytes()), keyPublicKey(keyIndex)),
+		encodedPublicKey,
+	)
+
+	return encodedPublicKey, nil
 }
 
 func (a *Accounts) SetPublicKeys(address flow.Address, publicKeys []flow.AccountPublicKey) error {
@@ -191,19 +226,11 @@ func (a *Accounts) SetPublicKeys(address flow.Address, publicKeys []flow.Account
 	)
 
 	for i, publicKey := range publicKeys {
-
-		err = publicKey.Validate()
-		if err != nil {
-			return fmt.Errorf("invalid public key: %w", err)
-		}
-
-		publicKeyBytes, err := flow.EncodeAccountPublicKey(publicKey)
-		if err != nil {
-			return fmt.Errorf("failed to encode public key: %w", err)
-		}
-
 		// asserted length of publicKeys so i should always fit into uint64
-		a.SetPublicKey(address, uint64(i), publicKeyBytes)
+		_, err := a.SetPublicKey(address, uint64(i), publicKey)
+		if err != nil {
+			return err
+		}
 	}
 
 	// delete leftover keys
@@ -212,13 +239,6 @@ func (a *Accounts) SetPublicKeys(address flow.Address, publicKeys []flow.Account
 	}
 
 	return nil
-}
-
-func (a *Accounts) SetPublicKey(address flow.Address, keyID uint64, publicKey []byte) {
-	a.ledger.Set(
-		RegisterID(string(address.Bytes()), string(address.Bytes()), keyPublicKey(keyID)),
-		publicKey,
-	)
 }
 
 func (a *Accounts) GetCode(address flow.Address) ([]byte, error) {
