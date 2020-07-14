@@ -3,6 +3,7 @@ package finder
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -21,17 +22,21 @@ import (
 )
 
 type Engine struct {
-	unit               *engine.Unit
-	log                zerolog.Logger
-	metrics            module.VerificationMetrics
-	tracer             module.Tracer
-	me                 module.Local
-	match              network.Engine
-	receipts           mempool.PendingReceipts // used to keep the receipts as mempool
-	headerStorage      storage.Headers         // used to check block existence before verifying
-	processedResult    mempool.Identifiers     // used to keep track of the processed results
-	receiptIDsByBlock  mempool.IdentifierMap   // used as a mapping to keep track of receipts associated with a block
-	receiptIDsByResult mempool.IdentifierMap   // used as a mapping to keep track of receipts with the same result
+	unit                     *engine.Unit
+	log                      zerolog.Logger
+	metrics                  module.VerificationMetrics
+	me                       module.Local
+	match                    network.Engine
+	cachedReceipts           mempool.ReceiptDataPacks // used to keep incoming receipts before checking
+	pendingReceipts          mempool.ReceiptDataPacks // used to keep the receipts pending for a block as mempool
+	readyReceipts            mempool.ReceiptDataPacks // used to keep the receipts ready for process
+	headerStorage            storage.Headers          // used to check block existence before verifying
+	processedResultIDs       mempool.Identifiers      // used to keep track of the processed results
+	blockIDsCache            mempool.Identifiers      // used as a cache to keep track of new finalized blocks
+	pendingReceiptIDsByBlock mempool.IdentifierMap    // used as a mapping to keep track of receipts associated with a block
+	receiptIDsByResult       mempool.IdentifierMap    // used as a mapping to keep track of receipts with the same result
+	processInterval          time.Duration            // used to define intervals at which engine moves receipts through pipeline
+	tracer                   module.Tracer
 }
 
 func New(
@@ -41,24 +46,32 @@ func New(
 	net module.Network,
 	me module.Local,
 	match network.Engine,
-	receipts mempool.PendingReceipts,
+	cachedReceipts mempool.ReceiptDataPacks,
+	pendingReceipts mempool.ReceiptDataPacks,
+	readyReceipts mempool.ReceiptDataPacks,
 	headerStorage storage.Headers,
-	processedResults mempool.Identifiers,
-	receiptsByBlock mempool.IdentifierMap,
-	receiptsByResult mempool.IdentifierMap,
+	processedResultIDs mempool.Identifiers,
+	pendingReceiptIDsByBlock mempool.IdentifierMap,
+	receiptsIDsByResult mempool.IdentifierMap,
+	blockIDsCache mempool.Identifiers,
+	processInterval time.Duration,
 ) (*Engine, error) {
 	e := &Engine{
-		unit:               engine.NewUnit(),
-		log:                log.With().Str("engine", "finder").Logger(),
-		metrics:            metrics,
-		tracer:             tracer,
-		me:                 me,
-		match:              match,
-		headerStorage:      headerStorage,
-		receipts:           receipts,
-		processedResult:    processedResults,
-		receiptIDsByBlock:  receiptsByBlock,
-		receiptIDsByResult: receiptsByResult,
+		unit:                     engine.NewUnit(),
+		log:                      log.With().Str("engine", "finder").Logger(),
+		metrics:                  metrics,
+		me:                       me,
+		match:                    match,
+		headerStorage:            headerStorage,
+		cachedReceipts:           cachedReceipts,
+		pendingReceipts:          pendingReceipts,
+		readyReceipts:            readyReceipts,
+		processedResultIDs:       processedResultIDs,
+		pendingReceiptIDsByBlock: pendingReceiptIDsByBlock,
+		receiptIDsByResult:       receiptsIDsByResult,
+		blockIDsCache:            blockIDsCache,
+		processInterval:          processInterval,
+		tracer:                   tracer,
 	}
 
 	_, err := net.Register(engine.ExecutionReceiptProvider, e)
@@ -68,8 +81,13 @@ func New(
 	return e, nil
 }
 
-// Ready returns a channel that is closed when the verifier engine is ready.
+// Ready returns a channel that is closed when the finder engine is ready.
 func (e *Engine) Ready() <-chan struct{} {
+	// Runs a periodic check to iterate over receipts and move them through the pipeline.
+	// If onTimer takes longer than processInterval, the next call will be blocked until the previous
+	// call has finished. That being said, there won't be two onTimer running in parallel.
+	// See test cases for LaunchPeriodically
+	e.unit.LaunchPeriodically(e.onTimer, e.processInterval, time.Duration(0))
 	return e.unit.Ready()
 }
 
@@ -122,9 +140,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	}
 }
 
-// handleExecutionReceipt receives an execution receipt and adds it to receipts mempool if all of following
-// conditions are satisfied:
-// - It has not yet been added to the mempool
+// handleExecutionReceipt receives an execution receipt and adds it to the cached receipt mempool.
 func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
 	span, ok := e.tracer.GetSpan(receipt.ID(), trace.VERProcessExecutionReceipt)
 	ctx := context.Background()
@@ -150,33 +166,17 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	// monitoring: increases number of received execution receipts
 	e.metrics.OnExecutionReceiptReceived()
 
-	// checks if the result has already been handled
-	if e.processedResult.Has(resultID) {
-		log.Debug().Msg("drops handling already processed result")
-		return nil
-	}
-
-	// adds the execution receipt in the mempool
-	pr := &verification.PendingReceipt{
+	// caches receipt as a receipt data pack for further processing
+	rdp := &verification.ReceiptDataPack{
 		Receipt:  receipt,
 		OriginID: originID,
-	}
-	added := e.receipts.Add(pr)
-	if !added {
-		log.Debug().Msg("drops adding duplicate receipt")
-		return nil
+		Ctx:      ctx,
 	}
 
-	// records the execution receipt id based on its result id
-	_, err := e.receiptIDsByResult.Append(resultID, receiptID)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not add receipt id to receipt-ids-by-result mempool")
-	}
-
-	log.Info().Msg("execution receipt successfully handled")
-
-	// checks receipt being processable
-	e.checkReceipts([]context.Context{ctx}, []*verification.PendingReceipt{pr})
+	ok = e.cachedReceipts.Add(rdp)
+	log.Info().
+		Bool("cached", ok).
+		Msg("execution receipt successfully handled")
 
 	return nil
 }
@@ -187,6 +187,7 @@ func (e *Engine) OnBlockIncorporated(*model.Block) {
 }
 
 // OnFinalizedBlock is part of implementing FinalizationConsumer interface
+// On receiving a block, it caches the block ID to be checked in the next onTimer loop.
 //
 // OnFinalizedBlock notifications are produced by the Finalization Logic whenever
 // a block has been finalized. They are emitted in the order the blocks are finalized.
@@ -194,49 +195,11 @@ func (e *Engine) OnBlockIncorporated(*model.Block) {
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 func (e *Engine) OnFinalizedBlock(block *model.Block) {
-	start := time.Now()
-
-	// retrieves all receipts that are pending for this block
-	erIDs, ok := e.receiptIDsByBlock.Get(block.BlockID)
-	if !ok {
-		// no pending receipt for this block
-		return
-	}
-	// removes list of receipt ids for this block
-	ok = e.receiptIDsByBlock.Rem(block.BlockID)
-	if !ok {
-		e.log.Debug().
-			Hex("block_id", logging.ID(block.BlockID)).
-			Msg("could not remove pending receipts from mempool")
-	}
-
-	// constructs list of receipts pending for this block
-	ers := make([]*verification.PendingReceipt, 0, len(erIDs))
-	ctxs := make([]context.Context, 0, len(erIDs))
-	for _, erID := range erIDs {
-		span, ok := e.tracer.GetSpan(erID, trace.VERProcessExecutionReceipt)
-		ctx := context.Background()
-		if !ok {
-			span = e.tracer.StartSpan(erID, trace.VERProcessExecutionReceipt, opentracing.StartTime(start))
-			span.SetTag("execution_receipt_id", erID)
-			defer span.Finish()
-		}
-		ctx = opentracing.ContextWithSpan(ctx, span)
-		childSpan, _ := e.tracer.StartSpanFromContext(ctx, trace.VERFindOnFinalizedBlock,
-			opentracing.StartTime(start))
-		defer childSpan.Finish()
-
-		er, ok := e.receipts.Get(erID)
-		if !ok {
-			e.log.Debug().
-				Hex("receipt_id", logging.ID(erID)).
-				Msg("could not retrieve pending receipt")
-			continue
-		}
-		ers = append(ers, er)
-		ctxs = append(ctxs, ctx)
-	}
-	e.checkReceipts(ctxs, ers)
+	ok := e.blockIDsCache.Add(block.BlockID)
+	e.log.Debug().
+		Bool("added_new_blocks", ok).
+		Hex("block_id", logging.ID(block.BlockID)).
+		Msg("new finalized block received")
 }
 
 // To implement FinalizationConsumer
@@ -258,7 +221,7 @@ func (e *Engine) processResult(ctx context.Context, originID flow.Identifier, re
 	defer span.Finish()
 
 	resultID := result.ID()
-	if e.processedResult.Has(resultID) {
+	if e.processedResultIDs.Has(resultID) {
 		e.log.Debug().
 			Hex("result_id", logging.ID(resultID)).
 			Msg("result already processed")
@@ -268,6 +231,10 @@ func (e *Engine) processResult(ctx context.Context, originID flow.Identifier, re
 	if err != nil {
 		return fmt.Errorf("submission error to match engine: %w", err)
 	}
+
+	e.log.Debug().
+		Hex("result_id", logging.ID(resultID)).
+		Msg("result submitted to match engine")
 
 	// monitoring: increases number of execution results sent
 	e.metrics.OnExecutionResultSent()
@@ -286,68 +253,239 @@ func (e *Engine) onResultProcessed(ctx context.Context, resultID flow.Identifier
 		Hex("result_id", logging.ID(resultID)).
 		Logger()
 	// marks result as processed
-	added := e.processedResult.Add(resultID)
+	added := e.processedResultIDs.Add(resultID)
 	if added {
 		log.Debug().Msg("result marked as processed")
 	}
 
 	// extracts all receipt ids with this result
-	prIDs, ok := e.receiptIDsByResult.Get(resultID)
+	receiptIDs, ok := e.receiptIDsByResult.Get(resultID)
 	if !ok {
 		log.Debug().Msg("could not retrieve receipt ids associated with this result")
 	}
 
+	// removes indices of all receipts associated with processed result
+	ok = e.receiptIDsByResult.Rem(resultID)
+	if !ok {
+		log.Debug().Msg("could not remove processed result from receipt-ids-by-result")
+	}
+
 	// drops all receipts with the same result
-	for _, prID := range prIDs {
+	for _, receiptID := range receiptIDs {
 		// removes receipt from mempool
-		removed := e.receipts.Rem(prID)
+		removed := e.readyReceipts.Rem(receiptID)
 		if removed {
 			log.Debug().
-				Hex("receipt_id", logging.ID(prID)).
+				Hex("receipt_id", logging.ID(receiptID)).
 				Msg("receipt with processed result cleaned up")
 		}
 	}
 }
 
-// checkReceipts receives a set of receipts and evaluates each of them
-// against being processable. If a receipt is processable, it gets processed.
-func (e *Engine) checkReceipts(ctxs []context.Context, receipts []*verification.PendingReceipt) {
-	e.unit.Lock()
-	defer e.unit.Unlock()
+// checkCachedReceipts iterates over the newly cached receipts and moves them
+// further in the pipeline depending on whether they are processable or not.
+func (e *Engine) checkCachedReceipts() {
+	for _, rdp := range e.cachedReceipts.All() {
+		// NOTE: this anonymous function is solely for sake of encapsulating a block of code
+		// for tracing. To avoid closure, it should NOT encompass any goroutine involving rdp.
+		func() {
+			var span opentracing.Span
+			span, _ = e.tracer.StartSpanFromContext(rdp.Ctx, trace.VERFindCheckCachedReceipts)
+			defer span.Finish()
 
-	for i, pr := range receipts {
-		ctx := ctxs[i]
-		var span opentracing.Span
-		span, ctx = e.tracer.StartSpanFromContext(ctx, trace.VERFindCheckReceipts)
-		defer span.Finish()
+			receiptID := rdp.Receipt.ID()
+			resultID := rdp.Receipt.ExecutionResult.ID()
 
-		receiptID := pr.Receipt.ID()
-		resultID := pr.Receipt.ExecutionResult.ID()
-		if e.isProcessable(&pr.Receipt.ExecutionResult) {
-			// checks if result is ready to process
-			err := e.processResult(ctx, pr.OriginID, &pr.Receipt.ExecutionResult)
+			log := e.log.With().
+				Str("engine", "finder").
+				Hex("origin_id", logging.ID(rdp.OriginID)).
+				Hex("receipt_id", logging.ID(receiptID)).
+				Hex("result_id", logging.ID(resultID)).Logger()
+
+			// removes receipt from cache
+			ok := e.cachedReceipts.Rem(receiptID)
+			if !ok {
+				log.Debug().Msg("cached receipt has been removed")
+				return
+			}
+
+			// checks if the result has already been handled
+			if e.processedResultIDs.Has(resultID) {
+				log.Debug().Msg("drops handling already processed result")
+				return
+			}
+
+			// adds receipt to pending or ready mempools depending on its processable status
+			ready := e.isProcessable(&rdp.Receipt.ExecutionResult)
+			if ready {
+				// block for the receipt is available,
+				// receipt is ready for process
+				ok := e.readyReceipts.Add(rdp)
+				if !ok {
+					log.Debug().Msg("drops adding duplicate receipt to ready mempool")
+					return
+				}
+			} else {
+				// block for the receipt is not available
+				// receipt moves to pending mempool
+				ok := e.pendingReceipts.Add(rdp)
+				if !ok {
+					log.Debug().Msg("drops adding duplicate receipt to pending mempool")
+					return
+				}
+
+				// marks receipt pending for its block ID
+				_, err := e.pendingReceiptIDsByBlock.Append(rdp.Receipt.ExecutionResult.BlockID, receiptID)
+				if err != nil {
+					e.log.Error().
+						Err(err).
+						Hex("block_id", logging.ID(rdp.Receipt.ExecutionResult.BlockID)).
+						Hex("receipt_id", logging.ID(receiptID)).
+						Msg("could not append receipt to receipt-ids-by-block mempool")
+				}
+			}
+
+			// records the execution receipt id based on its result id
+			_, err := e.receiptIDsByResult.Append(resultID, receiptID)
+			if err != nil {
+				log.Debug().Err(err).Msg("could not add receipt id to receipt-ids-by-result mempool")
+			}
+
+			log.Info().
+				Bool("ready", ready).
+				Msg("cached execution receipt moved to proper mempool")
+		}()
+	}
+}
+
+// checkReceipts iterates over the new cached finalized blocks. It moves
+// their corresponding receipt from pending to ready mempools.
+func (e *Engine) checkPendingReceipts() {
+	for _, blockID := range e.blockIDsCache.All() {
+		// removes blockID from new blocks mempool
+		ok := e.blockIDsCache.Rem(blockID)
+		if !ok {
+			e.log.Debug().
+				Hex("block_id", logging.ID(blockID)).
+				Msg("could not remove block ID from cache")
+		}
+
+		// retrieves all receipts that are pending for this block
+		receiptIDs, ok := e.pendingReceiptIDsByBlock.Get(blockID)
+		if !ok {
+			// no pending receipt for this block
+			continue
+		}
+		// removes list of receipt ids for this block
+		ok = e.pendingReceiptIDsByBlock.Rem(blockID)
+		if !ok {
+			e.log.Debug().
+				Hex("block_id", logging.ID(blockID)).
+				Msg("could not remove receipt id from receipt-ids-by-block mempool for block")
+		}
+
+		// moves receipts from pending to ready
+		for _, receiptID := range receiptIDs {
+			// retrieves receipt from pending mempool
+			rdp, ok := e.pendingReceipts.Get(receiptID)
+			if !ok {
+				e.log.Debug().
+					Hex("receipt_id", logging.ID(receiptID)).
+					Msg("could not retrieve receipt from pending receipts mempool")
+				continue
+			}
+
+			// NOTE: this anonymous function is solely for sake of encapsulating a block of code
+			// for tracing. To avoid closure, it should NOT encompass any goroutine involving rdp.
+			func() {
+				var span opentracing.Span
+				span, _ = e.tracer.StartSpanFromContext(rdp.Ctx, trace.VERFindCheckPendingReceipts)
+				defer span.Finish()
+
+				// removes receipt from pending mempool
+				ok = e.pendingReceipts.Rem(receiptID)
+				if !ok {
+					e.log.Debug().
+						Hex("receipt_id", logging.ID(receiptID)).
+						Msg("could not remove receipt from pending receipts mempool")
+					return
+				}
+
+				// adds receipt to ready mempoool
+				ok = e.readyReceipts.Add(rdp)
+				if !ok {
+					e.log.Debug().
+						Hex("receipt_id", logging.ID(receiptID)).
+						Msg("could not add receipt to ready mempool")
+					return
+				}
+
+				e.log.Debug().
+					Hex("receipt_id", logging.ID(receiptID)).
+					Hex("block_id", logging.ID(blockID)).
+					Msg("pending receipt moved to ready successfully")
+			}()
+		}
+	}
+}
+
+// checkReadyReceipts iterates over receipts ready for process and processes them.
+func (e *Engine) checkReadyReceipts() {
+	for _, rdp := range e.readyReceipts.All() {
+		// NOTE: this anonymous function is solely for sake of encapsulating a block of code
+		// for tracing. To avoid closure, it should NOT encompass any goroutine involving rdp.
+		func() {
+			span, ctx := e.tracer.StartSpanFromContext(rdp.Ctx, trace.VERFindCheckReadyReceipts)
+			defer span.Finish()
+
+			receiptID := rdp.Receipt.ID()
+			resultID := rdp.Receipt.ExecutionResult.ID()
+
+			err := e.processResult(ctx, rdp.OriginID, &rdp.Receipt.ExecutionResult)
 			if err != nil {
 				e.log.Error().
 					Err(err).
 					Hex("receipt_id", logging.ID(receiptID)).
 					Hex("result_id", logging.ID(resultID)).
 					Msg("could not process result")
-				continue
+				return
 			}
 
 			// performs clean up
 			e.onResultProcessed(ctx, resultID)
-		} else {
-			// receipt is not processable
-			// keeps track of it in id map
-			_, err := e.receiptIDsByBlock.Append(pr.Receipt.ExecutionResult.BlockID, receiptID)
-			if err != nil {
-				e.log.Error().
-					Err(err).
-					Hex("block_id", logging.ID(pr.Receipt.ExecutionResult.BlockID)).
-					Hex("receipt_id", logging.ID(receiptID)).
-					Msg("could not append receipt to receipt-ids-by-block mempool")
-			}
-		}
+
+			e.log.Debug().
+				Hex("receipt_id", logging.ID(receiptID)).
+				Hex("result_id", logging.ID(resultID)).
+				Msg("result processed successfully")
+		}()
 	}
+}
+
+// onTimer is called periodically by the unit module of Finder engine.
+// It encapsulates the set of handlers should be executed periodically in order.
+func (e *Engine) onTimer() {
+	wg := &sync.WaitGroup{}
+
+	wg.Add(3)
+
+	// moves receipts from cache to either ready or pending mempools
+	go func() {
+		e.checkCachedReceipts()
+		wg.Done()
+	}()
+
+	// moves pending receipt to ready mempool
+	go func() {
+		e.checkPendingReceipts()
+		wg.Done()
+	}()
+
+	// processes ready receipts
+	go func() {
+		e.checkReadyReceipts()
+		wg.Done()
+	}()
+
+	wg.Wait()
 }

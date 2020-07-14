@@ -46,6 +46,7 @@ type ExecutionCollector struct {
 	transactionParseTime             prometheus.Histogram
 	transactionCheckTime             prometheus.Histogram
 	transactionInterpretTime         prometheus.Histogram
+	totalChunkDataPackRequests       prometheus.Counter
 }
 
 func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer) *ExecutionCollector {
@@ -201,6 +202,13 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 		Help:      "the interpretation time for a transaction in nanoseconds",
 	})
 
+	totalChunkDataPackRequests := prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemProvider,
+		Name:      "chunk_data_packs_requested_total",
+		Help:      "total number of chunk data pack requests provider engine received",
+	})
+
 	registerer.MustRegister(forestApproxMemorySize)
 	registerer.MustRegister(forestNumberOfTrees)
 	registerer.MustRegister(latestTrieRegCount)
@@ -222,31 +230,33 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 	registerer.MustRegister(transactionParseTime)
 	registerer.MustRegister(transactionCheckTime)
 	registerer.MustRegister(transactionInterpretTime)
+	registerer.MustRegister(totalChunkDataPackRequests)
 
 	ec := &ExecutionCollector{
 		tracer: tracer,
 
-		forestApproxMemorySize:   forestApproxMemorySize,
-		forestNumberOfTrees:      forestNumberOfTrees,
-		latestTrieRegCount:       latestTrieRegCount,
-		latestTrieRegCountDiff:   latestTrieRegCountDiff,
-		latestTrieMaxDepth:       latestTrieMaxDepth,
-		latestTrieMaxDepthDiff:   latestTrieMaxDepthDiff,
-		updated:                  updatedCount,
-		proofSize:                proofSize,
-		updatedValuesNumber:      updatedValuesNumber,
-		updatedValuesSize:        updatedValuesSize,
-		updatedDuration:          updatedDuration,
-		updatedDurationPerValue:  updatedDurationPerValue,
-		readValuesNumber:         readValuesNumber,
-		readValuesSize:           readValuesSize,
-		readDuration:             readDuration,
-		readDurationPerValue:     readDurationPerValue,
-		collectionRequestSent:    collectionRequestsSent,
-		collectionRequestRetried: collectionRequestsRetries,
-		transactionParseTime:     transactionParseTime,
-		transactionCheckTime:     transactionCheckTime,
-		transactionInterpretTime: transactionInterpretTime,
+		forestApproxMemorySize:     forestApproxMemorySize,
+		forestNumberOfTrees:        forestNumberOfTrees,
+		latestTrieRegCount:         latestTrieRegCount,
+		latestTrieRegCountDiff:     latestTrieRegCountDiff,
+		latestTrieMaxDepth:         latestTrieMaxDepth,
+		latestTrieMaxDepthDiff:     latestTrieMaxDepthDiff,
+		updated:                    updatedCount,
+		proofSize:                  proofSize,
+		updatedValuesNumber:        updatedValuesNumber,
+		updatedValuesSize:          updatedValuesSize,
+		updatedDuration:            updatedDuration,
+		updatedDurationPerValue:    updatedDurationPerValue,
+		readValuesNumber:           readValuesNumber,
+		readValuesSize:             readValuesSize,
+		readDuration:               readDuration,
+		readDurationPerValue:       readDurationPerValue,
+		collectionRequestSent:      collectionRequestsSent,
+		collectionRequestRetried:   collectionRequestsRetries,
+		transactionParseTime:       transactionParseTime,
+		transactionCheckTime:       transactionCheckTime,
+		transactionInterpretTime:   transactionInterpretTime,
+		totalChunkDataPackRequests: totalChunkDataPackRequests,
 
 		gasUsedPerBlock: promauto.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespaceExecution,
@@ -439,4 +449,10 @@ func (ec *ExecutionCollector) TransactionChecked(dur time.Duration) {
 // TransactionInterpreted reports the time spent interpreting a single transaction
 func (ec *ExecutionCollector) TransactionInterpreted(dur time.Duration) {
 	ec.transactionInterpretTime.Observe(float64(dur))
+}
+
+// ChunkDataPackRequested is executed every time a chunk data pack request is arrived at execution node.
+// It increases the request counter by one.
+func (ec *ExecutionCollector) ChunkDataPackRequested() {
+	ec.totalChunkDataPackRequests.Inc()
 }

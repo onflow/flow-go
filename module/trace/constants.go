@@ -50,7 +50,9 @@ const (
 	// children of VERProcessExecutionReceipt
 	VERFindHandleExecutionReceipt SpanName = "ver.find.handleExecutionReceipt"
 	VERFindOnFinalizedBlock       SpanName = "ver.finder.OnFinalizedBlock"
-	VERFindCheckReceipts          SpanName = "ver.finder.checkReceipts"
+	VERFindCheckCachedReceipts    SpanName = "ver.finder.checkCachedReceipts"
+	VERFindCheckPendingReceipts   SpanName = "ver.finder.checkPendingReceipts"
+	VERFindCheckReadyReceipts     SpanName = "ver.finder.checkReadyReceipts"
 	VERFindProcessResult          SpanName = "ver.finder.processResult"
 	VERFindOnResultProcessed      SpanName = "ver.finder.onResultProcessed"
 

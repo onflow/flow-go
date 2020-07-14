@@ -64,6 +64,15 @@ func TestIdentiferMap(t *testing.T) {
 		assert.NotContains(t, ids, id2)
 	})
 
+	t.Run("getting all keys", func(t *testing.T) {
+		keys, ok := idMap.Keys()
+
+		// Keys should return all keys in mempool
+		require.True(t, ok)
+		assert.Contains(t, keys, key1)
+		assert.Contains(t, keys, key2)
+	})
+
 	// tests against removing a key
 	t.Run("removing key", func(t *testing.T) {
 		ok := idMap.Rem(key1)
@@ -80,6 +89,12 @@ func TestIdentiferMap(t *testing.T) {
 		require.True(t, ok)
 		assert.Contains(t, ids, id1)
 		assert.NotContains(t, ids, id2)
+
+		// Keys method should only return key2
+		keys, ok := idMap.Keys()
+		require.True(t, ok)
+		assert.NotContains(t, keys, key1)
+		assert.Contains(t, keys, key2)
 	})
 
 	// tests against appending an existing id for a key
