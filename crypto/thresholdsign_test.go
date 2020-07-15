@@ -246,7 +246,7 @@ func tsDkgRunChan(proc *testDKGProcessor,
 				}
 				n := proc.dkg.Size()
 				kmac := NewBLSKMAC(thresholdSignatureTag)
-				proc.ts, err = NewThresholdSigner(n, proc.current, kmac)
+				proc.ts, err = NewThresholdSigner(n, optimalThreshold(n), proc.current, kmac)
 				require.NoError(t, err)
 				proc.ts.SetKeys(sk, groupPK, nodesPK)
 				proc.ts.SetMessageToSign(messageToSign)
@@ -344,10 +344,10 @@ func tsStatelessRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing
 					signers = append(signers, newMsg.orig)
 				}
 			}
-			threshReached := EnoughShares(n, len(signShares))
+			threshReached := EnoughShares(optimalThreshold(n), len(signShares))
 			if threshReached {
 				// Reconstruct the threshold signature
-				thresholdSignature, err := ReconstructThresholdSignature(n, signShares, signers)
+				thresholdSignature, err := ReconstructThresholdSignature(n, optimalThreshold(n), signShares, signers)
 				require.NoError(t, err)
 				verif, err = proc.keys.groupPublicKey.Verify(thresholdSignature, messageToSign, kmac)
 				require.NoError(t, err)
@@ -377,7 +377,7 @@ func testStatelessThresholdSignatureSimpleKeyGen(t *testing.T) {
 	seed := make([]byte, SeedMinLenDKG)
 	_, err := mrand.Read(seed)
 	require.NoError(t, err)
-	skShares, pkShares, pkGroup, err := ThresholdSignKeyGen(n, seed)
+	skShares, pkShares, pkGroup, err := ThresholdSignKeyGen(n, threshold, seed)
 	require.NoError(t, err)
 	// signature hasher
 	kmac := NewBLSKMAC(thresholdSignatureTag)
@@ -404,7 +404,7 @@ func testStatelessThresholdSignatureSimpleKeyGen(t *testing.T) {
 		}
 	}
 	// reconstruct and test the threshold signature
-	thresholdSignature, err := ReconstructThresholdSignature(n, signShares, signers[:threshold+1])
+	thresholdSignature, err := ReconstructThresholdSignature(n, threshold, signShares, signers[:threshold+1])
 	require.NoError(t, err)
 	verif, err := pkGroup.Verify(thresholdSignature, messageToSign, kmac)
 	require.NoError(t, err)
@@ -417,7 +417,7 @@ func BenchmarkSimpleKeyGen(b *testing.B) {
 	rand.Read(seed)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _, _, _ = ThresholdSignKeyGen(n, seed)
+		_, _, _, _ = ThresholdSignKeyGen(n, optimalThreshold(n), seed)
 	}
 	b.StopTimer()
 }
