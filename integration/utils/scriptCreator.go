@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/templates"
 )
 
 const (
@@ -36,11 +35,6 @@ func (sc *ScriptCreator) TokenTransferScript(ftAddr, flowToken, toAddr *flowsdk.
 	withToAddr := strings.Replace(string(withFlowTokenAddr), "0x04", "0x"+toAddr.Hex(), 1)
 	withAmount := strings.Replace(string(withToAddr), fmt.Sprintf("%d.0", amount), "0.01", 1)
 	return []byte(withAmount), nil
-}
-
-// CreateAccountScript returns a transaction script for creating a new account
-func (sc *ScriptCreator) CreateAccountScript(accountKey *flowsdk.AccountKey) ([]byte, error) {
-	return templates.CreateAccount([]*flowsdk.AccountKey{accountKey}, nil)
 }
 
 // AddKeyToAccountScript returns a transaction script for adding keys to an already existing account
