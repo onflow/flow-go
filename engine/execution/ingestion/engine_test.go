@@ -38,6 +38,8 @@ var (
 	collection1Identity = unittest.IdentityFixture()
 	collection2Identity = unittest.IdentityFixture()
 	collection3Identity = unittest.IdentityFixture()
+	collection4Identity = unittest.IdentityFixture()
+	collection5Identity = unittest.IdentityFixture()
 	myIdentity          = unittest.IdentityFixture()
 )
 
@@ -45,6 +47,8 @@ func init() {
 	collection1Identity.Role = flow.RoleCollection
 	collection2Identity.Role = flow.RoleCollection
 	collection3Identity.Role = flow.RoleCollection
+	collection4Identity.Role = flow.RoleCollection
+	collection5Identity.Role = flow.RoleCollection
 	myIdentity.Role = flow.RoleExecution
 }
 
@@ -463,5 +467,61 @@ func Test_SPoCKGeneration(t *testing.T) {
 			require.True(t, valid)
 		}
 
+	})
+}
+
+func Test_ProperNumberOfCollectorsIsQueries(t *testing.T) {
+
+	identityList := flow.IdentityList{
+		collection1Identity, collection2Identity,
+		collection3Identity, collection4Identity,
+		collection5Identity,
+	}
+
+	protocolState := new(protocol.State)
+	snapshot := new(protocol.Snapshot)
+
+	snapshot.On("Identities", mock.Anything).Return(func(selector flow.IdentityFilter) flow.IdentityList {
+		return identityList.Filter(selector)
+	}, nil)
+	protocolState.On("AtBlockID", mock.Anything).Return(snapshot)
+
+	blockID := unittest.IdentifierFixture()
+
+	engine := &Engine{
+		state: protocolState,
+	}
+
+	t.Run("less then 3", func(t *testing.T) {
+
+		guarantee := &flow.CollectionGuarantee{
+			SignerIDs: []flow.Identifier{
+				collection1Identity.NodeID,
+				collection2Identity.NodeID,
+			},
+		}
+
+		guarantors, err := engine.findCollectionNodesForGuarantee(blockID, guarantee)
+		require.NoError(t, err)
+
+		assert.ElementsMatch(t, guarantee.SignerIDs, guarantors)
+	})
+
+	t.Run("more then 3", func(t *testing.T) {
+
+		guarantee := &flow.CollectionGuarantee{
+			SignerIDs: []flow.Identifier{
+				collection1Identity.NodeID,
+				collection2Identity.NodeID,
+				collection3Identity.NodeID,
+				collection4Identity.NodeID,
+				collection5Identity.NodeID,
+			},
+		}
+
+		guarantors, err := engine.findCollectionNodesForGuarantee(blockID, guarantee)
+		require.NoError(t, err)
+
+		assert.Len(t, guarantors, 3)
 	})
 }

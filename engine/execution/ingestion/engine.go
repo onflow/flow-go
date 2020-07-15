@@ -525,6 +525,19 @@ func (e *Engine) findCollectionNodesForGuarantee(
 	if len(identities) < 1 {
 		return nil, fmt.Errorf("no collection identity found")
 	}
+	targetLength := len(identities)
+
+	if targetLength > 3 {
+		targetLength = 3
+		identifiers := make([]flow.Identifier, targetLength)
+
+		rand.Shuffle(len(identities), func(i, j int) { identities[i], identities[j] = identities[j], identities[i] })
+		for i, id := range identities[:targetLength] {
+			identifiers[i] = id.NodeID
+		}
+
+		return identifiers, nil
+	}
 
 	identifiers := make([]flow.Identifier, len(identities))
 	for i, id := range identities {
