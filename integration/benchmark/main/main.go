@@ -16,9 +16,11 @@ import (
 
 func main() {
 
-	verbose := flag.Bool("verbose", false, "print verbose information")
+	verbose := flag.Bool("verbose", true, "print verbose information")
 	chainIDStr := flag.String("chain", string(flowsdk.Testnet), "chain ID")
+	fmt.Println(chainIDStr)
 	chainID := flowsdk.ChainID([]byte(*chainIDStr))
+	fmt.Println(chainID)
 	accessNodeAddress := flag.String("access", "localhost:3569", "access node address")
 	serviceAccountPrivateKeyHex := flag.String("servPrivHex", unittest.ServiceAccountPrivateKeyHex, "service account private key hex")
 
@@ -45,7 +47,7 @@ func main() {
 	priv := hex.EncodeToString(ServiceAccountPrivateKey.PrivateKey.Encode())
 
 	flowClient, err := client.New(*accessNodeAddress, grpc.WithInsecure())
-	lg, err := utils.NewLoadGenerator(flowClient, priv, &serviceAccountAddress, &fungibleTokenAddress, &flowTokenAddress, 100, *verbose)
+	lg, err := utils.NewLoadGenerator(flowClient, priv, &serviceAccountAddress, &fungibleTokenAddress, &flowTokenAddress, 10, *verbose)
 	if err != nil {
 		panic(err)
 	}

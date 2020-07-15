@@ -180,7 +180,7 @@ func (lg *LoadGenerator) setupServiceAccountKeys() error {
 		nil, // on expired
 		nil, // on timout
 		nil, // on error,
-		60)
+		120)
 
 	txWG.Wait()
 
@@ -234,6 +234,8 @@ func (lg *LoadGenerator) createAccounts() error {
 			nil,
 			func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
 				defer allTxWG.Done()
+				fmt.Println("HERERERERERE")
+				fmt.Println(res)
 				for _, event := range res.Events {
 					if event.Type == flowsdk.EventAccountCreated {
 						accountCreatedEvent := flowsdk.AccountCreatedEvent(event)
@@ -248,7 +250,7 @@ func (lg *LoadGenerator) createAccounts() error {
 			nil, // on expired
 			nil, // on timout
 			nil, // on error
-			30)
+			120)
 
 		fmt.Println("<<<", i)
 	}
@@ -299,7 +301,7 @@ func (lg *LoadGenerator) distributeInitialTokens() error {
 			func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
 				allTxWG.Done()
 			},
-			nil, nil, nil, nil, 60)
+			nil, nil, nil, nil, 120)
 	}
 	allTxWG.Wait()
 	lg.step++
