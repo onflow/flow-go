@@ -299,7 +299,7 @@ func main() {
 				node.State,
 				node.Storage.Blocks,
 				followerEng,
-				clusterSyncCore,
+				mainChainSyncCore,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
