@@ -4,13 +4,12 @@ import (
 	"bytes"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/utils"
 )
 
 // VerifyTrieProof verifies the proof, by constructing all the
 // hash from the leaf to the root and comparing the rootHash
-func VerifyTrieProof(p *ledger.TrieProof, expectedStateCommitment ledger.StateCommitment, expectedKeySize int) bool {
-	treeHeight := 8 * expectedKeySize
+func VerifyTrieProof(p *ledger.TrieProof, expectedStateCommitment ledger.StateCommitment) bool {
+	treeHeight := 8 * len(p.Path)
 	leafHeight := treeHeight - int(p.Steps)             // p.Steps is the number of edges we are traversing until we hit the compactified leaf.
 	if !(0 <= leafHeight && leafHeight <= treeHeight) { // sanity check
 		return false
@@ -25,7 +24,11 @@ func VerifyTrieProof(p *ledger.TrieProof, expectedStateCommitment ledger.StateCo
 		// and the sibling to node n, whose hash (aka `siblingHash`) must be defined by the Proof.
 
 		var siblingHash []byte
-		if utils.IsBitSet(p.Flags, treeHeight-h) { // if flag is set, siblingHash is stored in the proof
+		flagIsSet, err := IsBitSet(p.Flags, treeHeight-h)
+		if err != nil {
+			return false
+		}
+		if flagIsSet { // if flag is set, siblingHash is stored in the proof
 			if proofIndex < 0 { // proof invalid: too few values
 				return false
 			}
@@ -34,8 +37,13 @@ func VerifyTrieProof(p *ledger.TrieProof, expectedStateCommitment ledger.StateCo
 		} else { // otherwise, siblingHash is a default hash
 			siblingHash = GetDefaultHashForHeight(h - 1)
 		}
+
+		bitIsSet, err := IsBitSet(p.Path, treeHeight-h)
+		if err != nil {
+			return false
+		}
 		// hashing is order dependant
-		if utils.IsBitSet(p.Path, treeHeight-h) { // we hash our way up to the parent along the parent's right branch
+		if bitIsSet { // we hash our way up to the parent along the parent's right branch
 			computed = HashInterNode(siblingHash, computed)
 		} else { // we hash our way up to the parent along the parent's left branch
 			computed = HashInterNode(computed, siblingHash)
@@ -45,10 +53,10 @@ func VerifyTrieProof(p *ledger.TrieProof, expectedStateCommitment ledger.StateCo
 }
 
 // VerifyTrieBatchProof verifies all the proof inside the batchproof
-func VerifyTrieBatchProof(bp *ledger.TrieBatchProof, expectedRootHash []byte, expectedKeySize int) bool {
+func VerifyTrieBatchProof(bp *ledger.TrieBatchProof, expectedStateCommitment ledger.StateCommitment) bool {
 	for _, p := range bp.Proofs {
 		// any invalid proof
-		if !VerifyTrieProof(p, expectedRootHash, expectedKeySize) {
+		if !VerifyTrieProof(p, expectedStateCommitment) {
 			return false
 		}
 	}

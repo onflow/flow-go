@@ -3,6 +3,8 @@ package common
 import (
 	"encoding/binary"
 	"fmt"
+	"io"
+	"math"
 
 	"github.com/dapperlabs/flow-go/ledger"
 )
@@ -13,10 +15,10 @@ import (
 // to deal with the newer version of data
 // codes should be updated with backward compatibility if needed
 // and act differently based on the encoding decoding version
-const EncodingDecodingVersion = uint64(0)
+const EncodingDecodingVersion = uint16(0)
 
 // EncodingType capture the type of encoded entity
-type EncodingType uint16
+type EncodingType uint8
 
 const (
 	// EncodingTypeStateCommitment - encoding type for StateCommitments
@@ -50,10 +52,10 @@ func (e EncodingType) String() string {
 	return [...]string{"StateCommitment", "KeyPart", "Key", "Value", "Path", "Payload", "Proof", "BatchProof", "Unknown"}[e]
 }
 
-// checkEncDecVer extracts encoding bytes from a raw encoded message
+// CheckEncDecVer extracts encoding bytes from a raw encoded message
 // checks it against the supported versions and returns the rest of rawInput (excluding encDecVersion bytes)
-func checkEncDecVer(rawInput []byte) (rest []byte, version uint64, err error) {
-	version, rest, err = readUint64(rawInput)
+func CheckEncDecVer(rawInput []byte) (rest []byte, version uint16, err error) {
+	version, rest, err = ReadUint16(rawInput)
 	if err != nil {
 		return rest, version, fmt.Errorf("error checking the encoding decoding version: %w", err)
 	}
@@ -65,10 +67,10 @@ func checkEncDecVer(rawInput []byte) (rest []byte, version uint64, err error) {
 	return rest, version, nil
 }
 
-// checkEncodingType extracts encoding byte from a raw encoded message
+// CheckEncodingType extracts encoding byte from a raw encoded message
 // checks it against the supported versions and returns the rest of rawInput (excluding encDecVersion bytes)
-func checkEncodingType(rawInput []byte, expectedType uint16) (rest []byte, err error) {
-	t, r, err := readUint16(rawInput)
+func CheckEncodingType(rawInput []byte, expectedType uint8) (rest []byte, err error) {
+	t, r, err := ReadUint8(rawInput)
 	if err != nil {
 		return r, fmt.Errorf("error checking type of the encoded entity: %w", err)
 	}
@@ -93,10 +95,10 @@ func EncodeKeyPart(kp *ledger.KeyPart) []byte {
 		return []byte{}
 	}
 	// EncodingDecodingType
-	buffer := appendUint64([]byte{}, EncodingDecodingVersion)
+	buffer := AppendUint16([]byte{}, EncodingDecodingVersion)
 
 	// encode key part entity type
-	buffer = appendUint16(buffer, EncodingTypeKeyPart)
+	buffer = AppendUint8(buffer, EncodingTypeKeyPart)
 
 	// encode the key part content
 	buffer = append(buffer, encodeKeyPart(kp)...)
@@ -107,7 +109,7 @@ func encodeKeyPart(kp *ledger.KeyPart) []byte {
 	buffer := make([]byte, 0)
 
 	// encode "Type" field of the key part
-	buffer = appendUint16(buffer, kp.Type)
+	buffer = AppendUint16(buffer, kp.Type)
 
 	// encode "Value" field of the key part
 	buffer = append(buffer, kp.Value...)
@@ -118,13 +120,13 @@ func encodeKeyPart(kp *ledger.KeyPart) []byte {
 func DecodeKeyPart(encodedKeyPart []byte) (*ledger.KeyPart, error) {
 	// currently we ignore the version but in the future we
 	// can do switch case based on the version if needed
-	rest, _, err := checkEncDecVer(encodedKeyPart)
+	rest, _, err := CheckEncDecVer(encodedKeyPart)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding key part: %w", err)
 	}
 
 	// check the encoding type
-	rest, err = checkEncodingType(rest, EncodingTypeKeyPart)
+	rest, err = CheckEncodingType(rest, EncodingTypeKeyPart)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding key part: %w", err)
 	}
@@ -140,7 +142,7 @@ func DecodeKeyPart(encodedKeyPart []byte) (*ledger.KeyPart, error) {
 
 func decodeKeyPart(inp []byte) (*ledger.KeyPart, error) {
 	// read key part type and the rest is the key item part
-	kpt, kpv, err := readUint16(inp)
+	kpt, kpv, err := ReadUint16(inp)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding key part (content): %w", err)
 	}
@@ -153,9 +155,9 @@ func EncodeKey(k *ledger.Key) []byte {
 		return []byte{}
 	}
 	// encode EncodingDecodingType
-	buffer := appendUint64([]byte{}, EncodingDecodingVersion)
+	buffer := AppendUint16([]byte{}, EncodingDecodingVersion)
 	// encode key entity type
-	buffer = appendUint16(buffer, EncodingTypeKey)
+	buffer = AppendUint8(buffer, EncodingTypeKey)
 	// encode key content
 	buffer = append(buffer, encodeKey(k)...)
 
@@ -166,13 +168,13 @@ func EncodeKey(k *ledger.Key) []byte {
 func encodeKey(k *ledger.Key) []byte {
 	buffer := make([]byte, 0)
 	// encode number of key parts
-	buffer = appendUint16(buffer, uint16(len(k.KeyParts)))
+	buffer = AppendUint16(buffer, uint16(len(k.KeyParts)))
 	// iterate over key parts
 	for _, kp := range k.KeyParts {
 		// encode the key part
 		encKP := encodeKeyPart(&kp)
 		// encode the len of the encoded key part
-		buffer = appendUint64(buffer, uint64(len(encKP)))
+		buffer = AppendUint32(buffer, uint32(len(encKP)))
 		// append the encoded key part
 		buffer = append(buffer, encKP...)
 	}
@@ -182,12 +184,12 @@ func encodeKey(k *ledger.Key) []byte {
 // DecodeKey constructs a key from an encoded key part
 func DecodeKey(encodedKey []byte) (*ledger.Key, error) {
 	// check the enc dec version
-	rest, _, err := checkEncDecVer(encodedKey)
+	rest, _, err := CheckEncDecVer(encodedKey)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding key: %w", err)
 	}
 	// check the encoding type
-	rest, err = checkEncodingType(rest, EncodingTypeKey)
+	rest, err = CheckEncodingType(rest, EncodingTypeKey)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding key: %w", err)
 	}
@@ -202,22 +204,22 @@ func DecodeKey(encodedKey []byte) (*ledger.Key, error) {
 
 func decodeKey(inp []byte) (*ledger.Key, error) {
 	key := &ledger.Key{}
-	numOfParts, rest, err := readUint16(inp)
+	numOfParts, rest, err := ReadUint16(inp)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding key (content): %w", err)
 	}
 
 	for i := 0; i < int(numOfParts); i++ {
-		var kpEncSize uint64
+		var kpEncSize uint32
 		var kpEnc []byte
 		// read encoded key part size
-		kpEncSize, rest, err = readUint64(rest)
+		kpEncSize, rest, err = ReadUint32(rest)
 		if err != nil {
 			return nil, fmt.Errorf("error decoding key (content): %w", err)
 		}
 
 		// read encoded key part
-		kpEnc, rest, err = readSlice(rest, int(kpEncSize))
+		kpEnc, rest, err = ReadSlice(rest, int(kpEncSize))
 		if err != nil {
 			return nil, fmt.Errorf("error decoding key (content): %w", err)
 		}
@@ -235,10 +237,10 @@ func decodeKey(inp []byte) (*ledger.Key, error) {
 // EncodeValue encodes a value into a byte slice
 func EncodeValue(v ledger.Value) []byte {
 	// encode EncodingDecodingType
-	buffer := appendUint64([]byte{}, EncodingDecodingVersion)
+	buffer := AppendUint16([]byte{}, EncodingDecodingVersion)
 
 	// encode key entity type
-	buffer = appendUint16(buffer, EncodingTypeValue)
+	buffer = AppendUint8(buffer, EncodingTypeValue)
 
 	// encode value
 	buffer = append(buffer, encodeValue(v)...)
@@ -253,13 +255,13 @@ func encodeValue(v ledger.Value) []byte {
 // DecodeValue constructs a ledger value using an encoded byte slice
 func DecodeValue(encodedValue []byte) (ledger.Value, error) {
 	// check enc dec version
-	rest, _, err := checkEncDecVer(encodedValue)
+	rest, _, err := CheckEncDecVer(encodedValue)
 	if err != nil {
 		return nil, err
 	}
 
 	// check the encoding type
-	rest, err = checkEncodingType(rest, EncodingTypeValue)
+	rest, err = CheckEncodingType(rest, EncodingTypeValue)
 	if err != nil {
 		return nil, err
 	}
@@ -274,10 +276,10 @@ func decodeValue(inp []byte) (ledger.Value, error) {
 // EncodePath encodes a path into a byte slice
 func EncodePath(p ledger.Path) []byte {
 	// encode EncodingDecodingType
-	buffer := appendUint64([]byte{}, EncodingDecodingVersion)
+	buffer := AppendUint16([]byte{}, EncodingDecodingVersion)
 
 	// encode key entity type
-	buffer = appendUint16(buffer, EncodingTypePath)
+	buffer = AppendUint8(buffer, EncodingTypePath)
 
 	// encode path
 	buffer = append(buffer, encodePath(p)...)
@@ -292,13 +294,13 @@ func encodePath(p ledger.Path) []byte {
 // DecodePath constructs a path value using an encoded byte slice
 func DecodePath(encodedPath []byte) (ledger.Path, error) {
 	// check enc dec version
-	rest, _, err := checkEncDecVer(encodedPath)
+	rest, _, err := CheckEncDecVer(encodedPath)
 	if err != nil {
 		return nil, err
 	}
 
 	// check the encoding type
-	rest, err = checkEncodingType(rest, EncodingTypePath)
+	rest, err = CheckEncodingType(rest, EncodingTypePath)
 	if err != nil {
 		return nil, err
 	}
@@ -316,10 +318,10 @@ func EncodePayload(p *ledger.Payload) []byte {
 		return []byte{}
 	}
 	// encode EncodingDecodingType
-	buffer := appendUint64([]byte{}, EncodingDecodingVersion)
+	buffer := AppendUint16([]byte{}, EncodingDecodingVersion)
 
 	// encode key entity type
-	buffer = appendUint16(buffer, EncodingTypePayload)
+	buffer = AppendUint8(buffer, EncodingTypePayload)
 
 	// append encoded payload content
 	buffer = append(buffer, encodePayload(p)...)
@@ -334,7 +336,7 @@ func encodePayload(p *ledger.Payload) []byte {
 	encK := encodeKey(&p.Key)
 
 	// encode encoded key size
-	buffer = appendUint64(buffer, uint64(len(encK)))
+	buffer = AppendUint32(buffer, uint32(len(encK)))
 
 	// append encoded key content
 	buffer = append(buffer, encK...)
@@ -343,7 +345,7 @@ func encodePayload(p *ledger.Payload) []byte {
 	encV := encodeValue(p.Value)
 
 	// encode encoded value size
-	buffer = appendUint64(buffer, uint64(len(encV)))
+	buffer = AppendUint64(buffer, uint64(len(encV)))
 
 	// append encoded key content
 	buffer = append(buffer, encV...)
@@ -358,12 +360,12 @@ func DecodePayload(encodedPayload []byte) (*ledger.Payload, error) {
 		return nil, nil
 	}
 	// check the enc dec version
-	rest, _, err := checkEncDecVer(encodedPayload)
+	rest, _, err := CheckEncDecVer(encodedPayload)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
 	// check the encoding type
-	rest, err = checkEncodingType(rest, EncodingTypePayload)
+	rest, err = CheckEncodingType(rest, EncodingTypePayload)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
@@ -373,13 +375,13 @@ func DecodePayload(encodedPayload []byte) (*ledger.Payload, error) {
 func decodePayload(inp []byte) (*ledger.Payload, error) {
 
 	// read encoded key size
-	encKeySize, rest, err := readUint64(inp)
+	encKeySize, rest, err := ReadUint32(inp)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
 
 	// read encoded key
-	encKey, rest, err := readSlice(rest, int(encKeySize))
+	encKey, rest, err := ReadSlice(rest, int(encKeySize))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
@@ -391,13 +393,13 @@ func decodePayload(inp []byte) (*ledger.Payload, error) {
 	}
 
 	// read encoded value size
-	encValeSize, rest, err := readUint64(rest)
+	encValeSize, rest, err := ReadUint64(rest)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
 
 	// read encoded value
-	encValue, rest, err := readSlice(rest, int(encValeSize))
+	encValue, rest, err := ReadSlice(rest, int(encValeSize))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
@@ -417,10 +419,10 @@ func EncodeTrieUpdate(t *ledger.TrieUpdate) []byte {
 		return []byte{}
 	}
 	// encode EncodingDecodingType
-	buffer := appendUint64([]byte{}, EncodingDecodingVersion)
+	buffer := AppendUint16([]byte{}, EncodingDecodingVersion)
 
 	// encode key entity type
-	buffer = appendUint16(buffer, EncodingTypeTrieUpdate)
+	buffer = AppendUint8(buffer, EncodingTypeTrieUpdate)
 
 	// append encoded payload content
 	buffer = append(buffer, encodeTrieUpdate(t)...)
@@ -432,11 +434,11 @@ func encodeTrieUpdate(t *ledger.TrieUpdate) []byte {
 	buffer := make([]byte, 0)
 
 	// encode root hash (size and data)
-	buffer = appendUint16(buffer, uint16(len(t.RootHash)))
+	buffer = AppendUint16(buffer, uint16(len(t.RootHash)))
 	buffer = append(buffer, t.RootHash...)
 
 	// encode number of paths
-	buffer = appendUint32(buffer, uint32(t.Size()))
+	buffer = AppendUint32(buffer, uint32(t.Size()))
 
 	if t.Size() == 0 {
 		return buffer
@@ -444,7 +446,7 @@ func encodeTrieUpdate(t *ledger.TrieUpdate) []byte {
 
 	// encode paths
 	// encode path size (assuming all paths are the same size)
-	buffer = appendUint16(buffer, uint16(t.Paths[0].Size()))
+	buffer = AppendUint16(buffer, uint16(t.Paths[0].Size()))
 	for _, path := range t.Paths {
 		buffer = append(buffer, encodePath(path)...)
 	}
@@ -453,7 +455,7 @@ func encodeTrieUpdate(t *ledger.TrieUpdate) []byte {
 	// encode payloads
 	for _, pl := range t.Payloads {
 		encPl := encodePayload(pl)
-		buffer = appendUint32(buffer, uint32(len(encPl)))
+		buffer = AppendUint32(buffer, uint32(len(encPl)))
 		buffer = append(buffer, encPl...)
 	}
 
@@ -467,12 +469,12 @@ func DecodeTrieUpdate(encodedTrieUpdate []byte) (*ledger.TrieUpdate, error) {
 		return nil, nil
 	}
 	// check the enc dec version
-	rest, _, err := checkEncDecVer(encodedTrieUpdate)
+	rest, _, err := CheckEncDecVer(encodedTrieUpdate)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding trie update: %w", err)
 	}
 	// check the encoding type
-	rest, err = checkEncodingType(rest, EncodingTypeTrieUpdate)
+	rest, err = CheckEncodingType(rest, EncodingTypeTrieUpdate)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding trie update: %w", err)
 	}
@@ -485,26 +487,26 @@ func decodeTrieUpdate(inp []byte) (*ledger.TrieUpdate, error) {
 	payloads := make([]*ledger.Payload, 0)
 
 	// decode root hash
-	rhSize, rest, err := readUint16(inp)
+	rhSize, rest, err := ReadUint16(inp)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding trie update: %w", err)
 	}
 
-	rh, rest, err := readSlice(rest, int(rhSize))
+	rh, rest, err := ReadSlice(rest, int(rhSize))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding trie update: %w", err)
 	}
 
 	// decode number of paths
-	numOfPaths, rest, err := readUint32(rest)
+	numOfPaths, rest, err := ReadUint32(rest)
 
 	// decode path size
-	pathSize, rest, err := readUint16(rest)
+	pathSize, rest, err := ReadUint16(rest)
 
 	var path ledger.Path
 	var encPath []byte
 	for i := 0; i < int(numOfPaths); i++ {
-		encPath, rest, err = readSlice(rest, int(pathSize))
+		encPath, rest, err = ReadSlice(rest, int(pathSize))
 		if err != nil {
 			return nil, fmt.Errorf("error decoding trie update: %w", err)
 		}
@@ -520,11 +522,11 @@ func decodeTrieUpdate(inp []byte) (*ledger.TrieUpdate, error) {
 	var payload *ledger.Payload
 
 	for i := 0; i < int(numOfPaths); i++ {
-		payloadSize, rest, err = readUint32(rest)
+		payloadSize, rest, err = ReadUint32(rest)
 		if err != nil {
 			return nil, fmt.Errorf("error decoding trie update: %w", err)
 		}
-		encPayload, rest, err = readSlice(rest, int(payloadSize))
+		encPayload, rest, err = ReadSlice(rest, int(payloadSize))
 		if err != nil {
 			return nil, fmt.Errorf("error decoding trie update: %w", err)
 		}
@@ -543,10 +545,10 @@ func EncodeTrieProof(p *ledger.TrieProof) []byte {
 		return []byte{}
 	}
 	// encode EncodingDecodingType
-	buffer := appendUint64([]byte{}, EncodingDecodingVersion)
+	buffer := AppendUint16([]byte{}, EncodingDecodingVersion)
 
 	// encode key entity type
-	buffer = appendUint16(buffer, EncodingTypeProof)
+	buffer = AppendUint8(buffer, EncodingTypeProof)
 
 	// append encoded proof content
 	buffer = append(buffer, encodeTrieProof(p)...)
@@ -563,26 +565,26 @@ func encodeTrieProof(p *ledger.TrieProof) []byte {
 	}
 
 	// steps are encoded as a single byte
-	buffer = appendUint8(buffer, p.Steps)
+	buffer = AppendUint8(buffer, p.Steps)
 
 	// include flags size and content
-	buffer = appendUint8(buffer, uint8(len(p.Flags)))
+	buffer = AppendUint8(buffer, uint8(len(p.Flags)))
 	buffer = append(buffer, p.Flags...)
 
 	// include path size and content
-	buffer = appendUint16(buffer, uint16(p.Path.Size()))
+	buffer = AppendUint16(buffer, uint16(p.Path.Size()))
 	buffer = append(buffer, p.Path...)
 
 	// include encoded payload size and content
 	encPayload := encodePayload(p.Payload)
-	buffer = appendUint64(buffer, uint64(len(encPayload)))
+	buffer = AppendUint64(buffer, uint64(len(encPayload)))
 	buffer = append(buffer, encPayload...)
 
 	// and finally include all interims (hash values)
 	// number of interims
-	buffer = appendUint8(buffer, uint8(len(p.Interims)))
+	buffer = AppendUint8(buffer, uint8(len(p.Interims)))
 	for _, inter := range p.Interims {
-		buffer = appendUint16(buffer, uint16(len(inter)))
+		buffer = AppendUint16(buffer, uint16(len(inter)))
 		buffer = append(buffer, inter...)
 	}
 
@@ -592,12 +594,12 @@ func encodeTrieProof(p *ledger.TrieProof) []byte {
 // DecodeProof construct a proof from an encoded byte slice
 func DecodeTrieProof(encodedProof []byte) (*ledger.TrieProof, error) {
 	// check the enc dec version
-	rest, _, err := checkEncDecVer(encodedProof)
+	rest, _, err := CheckEncDecVer(encodedProof)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
 	// check the encoding type
-	rest, err = checkEncodingType(rest, EncodingTypeProof)
+	rest, err = CheckEncodingType(rest, EncodingTypeProof)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
@@ -608,41 +610,41 @@ func decodeTrieProof(inp []byte) (*ledger.TrieProof, error) {
 	pInst := ledger.NewTrieProof()
 
 	// Inclusion flag
-	byteInclusion, rest, err := readSlice(inp, 1)
+	byteInclusion, rest, err := ReadSlice(inp, 1)
 	pInst.Inclusion, _ = IsBitSet(byteInclusion, 0)
 
 	// read steps
-	steps, rest, err := readUint8(rest)
+	steps, rest, err := ReadUint8(rest)
 	pInst.Steps = steps
 
 	// read flags
-	flagsSize, rest, err := readUint8(rest)
+	flagsSize, rest, err := ReadUint8(rest)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
-	flags, rest, err := readSlice(rest, int(flagsSize))
+	flags, rest, err := ReadSlice(rest, int(flagsSize))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
 	pInst.Flags = flags
 
 	// read path
-	pathSize, rest, err := readUint16(rest)
+	pathSize, rest, err := ReadUint16(rest)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
-	path, rest, err := readSlice(rest, int(pathSize))
+	path, rest, err := ReadSlice(rest, int(pathSize))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
 	pInst.Path = path
 
 	// read payload
-	encPayloadSize, rest, err := readUint64(rest)
+	encPayloadSize, rest, err := ReadUint64(rest)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
-	encPayload, rest, err := readSlice(rest, int(encPayloadSize))
+	encPayload, rest, err := ReadSlice(rest, int(encPayloadSize))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
@@ -653,7 +655,7 @@ func decodeTrieProof(inp []byte) (*ledger.TrieProof, error) {
 	pInst.Payload = payload
 
 	// read interims
-	interimsLen, rest, err := readUint8(rest)
+	interimsLen, rest, err := ReadUint8(rest)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
@@ -663,12 +665,12 @@ func decodeTrieProof(inp []byte) (*ledger.TrieProof, error) {
 	var interim []byte
 
 	for i := 0; i < int(interimsLen); i++ {
-		interimSize, rest, err = readUint16(rest)
+		interimSize, rest, err = ReadUint16(rest)
 		if err != nil {
 			return nil, fmt.Errorf("error decoding proof: %w", err)
 		}
 
-		interim, rest, err = readSlice(rest, int(interimSize))
+		interim, rest, err = ReadSlice(rest, int(interimSize))
 		if err != nil {
 			return nil, fmt.Errorf("error decoding proof: %w", err)
 		}
@@ -685,9 +687,10 @@ func EncodeTrieBatchProof(bp *ledger.TrieBatchProof) []byte {
 		return []byte{}
 	}
 	// encode EncodingDecodingType
-	buffer := appendUint64([]byte{}, EncodingDecodingVersion)
+	buffer := AppendUint16([]byte{}, EncodingDecodingVersion)
+
 	// encode key entity type
-	buffer = appendUint16(buffer, EncodingTypeBatchProof)
+	buffer = AppendUint8(buffer, EncodingTypeBatchProof)
 	// encode batch proof content
 	buffer = append(buffer, encodeTrieBatchProof(bp)...)
 
@@ -698,13 +701,13 @@ func EncodeTrieBatchProof(bp *ledger.TrieBatchProof) []byte {
 func encodeTrieBatchProof(bp *ledger.TrieBatchProof) []byte {
 	buffer := make([]byte, 0)
 	// encode number of proofs
-	buffer = appendUint32(buffer, uint32(len(bp.Proofs)))
+	buffer = AppendUint32(buffer, uint32(len(bp.Proofs)))
 	// iterate over proofs
 	for _, p := range bp.Proofs {
 		// encode the proof
 		encP := encodeTrieProof(p)
 		// encode the len of the encoded proof
-		buffer = appendUint64(buffer, uint64(len(encP)))
+		buffer = AppendUint64(buffer, uint64(len(encP)))
 		// append the encoded proof
 		buffer = append(buffer, encP...)
 	}
@@ -714,12 +717,12 @@ func encodeTrieBatchProof(bp *ledger.TrieBatchProof) []byte {
 // DecodeTrieBatchProof constructs a batch proof from an encoded byte slice
 func DecodeTrieBatchProof(encodedBatchProof []byte) (*ledger.TrieBatchProof, error) {
 	// check the enc dec version
-	rest, _, err := checkEncDecVer(encodedBatchProof)
+	rest, _, err := CheckEncDecVer(encodedBatchProof)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding batch proof: %w", err)
 	}
 	// check the encoding type
-	rest, err = checkEncodingType(rest, EncodingTypeBatchProof)
+	rest, err = CheckEncodingType(rest, EncodingTypeBatchProof)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding batch proof: %w", err)
 	}
@@ -735,7 +738,7 @@ func DecodeTrieBatchProof(encodedBatchProof []byte) (*ledger.TrieBatchProof, err
 func decodeTrieBatchProof(inp []byte) (*ledger.TrieBatchProof, error) {
 	bp := ledger.NewTrieBatchProof()
 	// number of proofs
-	numOfProofs, rest, err := readUint32(inp)
+	numOfProofs, rest, err := ReadUint32(inp)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding batch proof (content): %w", err)
 	}
@@ -744,13 +747,13 @@ func decodeTrieBatchProof(inp []byte) (*ledger.TrieBatchProof, error) {
 		var encProofSize uint64
 		var encProof []byte
 		// read encoded proof size
-		encProofSize, rest, err = readUint64(rest)
+		encProofSize, rest, err = ReadUint64(rest)
 		if err != nil {
 			return nil, fmt.Errorf("error decoding batch proof (content): %w", err)
 		}
 
 		// read encoded proof
-		encProof, rest, err = readSlice(rest, int(encProofSize))
+		encProof, rest, err = ReadSlice(rest, int(encProofSize))
 		if err != nil {
 			return nil, fmt.Errorf("error decoding batch proof (content): %w", err)
 		}
@@ -765,79 +768,171 @@ func decodeTrieBatchProof(inp []byte) (*ledger.TrieBatchProof, error) {
 	return bp, nil
 }
 
-func readSlice(input []byte, size int) (value []byte, rest []byte, err error) {
+// func WriteUint8(buffer []byte, loc int, value uint8) int {
+// 	buffer[loc] = byte(value)
+// 	return loc + 1
+// }
+
+// func WriteUint16(buffer []byte, loc int, value uint16) int {
+// 	binary.BigEndian.PutUint16(buffer[loc:], value)
+// 	return loc + 2
+// }
+
+// func WriteUint32(buffer []byte, loc int, value uint32) int {
+// 	binary.BigEndian.PutUint32(buffer[loc:], value)
+// 	return loc + 4
+// }
+
+// func WriteUint64(buffer []byte, loc int, value uint64) int {
+// 	binary.BigEndian.PutUint64(buffer[loc:], value)
+// 	return loc + 8
+// }
+
+func AppendUint8(input []byte, value uint8) []byte {
+	return append(input, byte(value))
+}
+
+func AppendUint16(input []byte, value uint16) []byte {
+	buffer := make([]byte, 2)
+	binary.BigEndian.PutUint16(buffer, value)
+	return append(input, buffer...)
+}
+
+func AppendUint32(input []byte, value uint32) []byte {
+	buffer := make([]byte, 4)
+	binary.BigEndian.PutUint32(buffer, value)
+	return append(input, buffer...)
+}
+
+func AppendUint64(input []byte, value uint64) []byte {
+	buffer := make([]byte, 8)
+	binary.BigEndian.PutUint64(buffer, value)
+	return append(input, buffer...)
+}
+
+// AppendShortData appends data shorter than 16kB
+func AppendShortData(input []byte, data []byte) []byte {
+	if len(data) > math.MaxUint16 {
+		panic(fmt.Sprintf("short data too long! %d", len(data)))
+	}
+	input = AppendUint16(input, uint16(len(data)))
+	input = append(input, data...)
+	return input
+}
+
+// AppendLongData appends data shorter than 32MB
+func AppendLongData(input []byte, data []byte) []byte {
+	if len(data) > math.MaxUint32 {
+		panic(fmt.Sprintf("long data too long! %d", len(data)))
+	}
+	input = AppendUint32(input, uint32(len(data)))
+	input = append(input, data...)
+	return input
+}
+
+func ReadSlice(input []byte, size int) (value []byte, rest []byte, err error) {
 	if len(input) < size {
 		return nil, input, fmt.Errorf("input size is too small to be splited %d < %d ", len(input), size)
 	}
 	return input[:size], input[size:], nil
 }
 
-func readUint8(input []byte) (value uint8, rest []byte, err error) {
+func ReadUint8(input []byte) (value uint8, rest []byte, err error) {
 	if len(input) < 1 {
 		return 0, input, fmt.Errorf("input size (%d) is too small to read a uint8", len(input))
 	}
 	return uint8(input[0]), input[1:], nil
 }
 
-func readUint16(input []byte) (value uint16, rest []byte, err error) {
+func ReadUint16(input []byte) (value uint16, rest []byte, err error) {
 	if len(input) < 2 {
 		return 0, input, fmt.Errorf("input size (%d) is too small to read a uint16", len(input))
 	}
 	return binary.BigEndian.Uint16(input[:2]), input[2:], nil
 }
 
-func readUint32(input []byte) (value uint32, rest []byte, err error) {
+func ReadUint32(input []byte) (value uint32, rest []byte, err error) {
 	if len(input) < 4 {
 		return 0, input, fmt.Errorf("input size (%d) is too small to read a uint32", len(input))
 	}
 	return binary.BigEndian.Uint32(input[:4]), input[4:], nil
 }
 
-func readUint64(input []byte) (value uint64, rest []byte, err error) {
+func ReadUint64(input []byte) (value uint64, rest []byte, err error) {
 	if len(input) < 8 {
 		return 0, input, fmt.Errorf("input size (%d) is too small to read a uint64", len(input))
 	}
 	return binary.BigEndian.Uint64(input[:8]), input[8:], nil
 }
 
-func writeUint8(buffer []byte, loc int, value uint8) int {
-	buffer[loc] = byte(value)
-	return loc + 1
+// ReadShortData read data shorter than 16kB and return the rest of bytes
+func ReadShortData(input []byte) (data []byte, rest []byte, err error) {
+	var size uint16
+	size, rest, err = ReadUint16(input)
+	if err != nil {
+		return nil, rest, err
+	}
+	data = rest[:size]
+	return
 }
 
-func writeUint16(buffer []byte, loc int, value uint16) int {
-	binary.BigEndian.PutUint16(buffer[loc:], value)
-	return loc + 2
+// ReadLongData read data shorter than 32MB and return the rest of bytes
+func ReadLongData(input []byte) (data []byte, rest []byte, err error) {
+	var size uint32
+	size, rest, err = ReadUint32(input)
+	if err != nil {
+		return nil, rest, err
+	}
+	data = rest[:size]
+	return
 }
 
-func writeUint32(buffer []byte, loc int, value uint32) int {
-	binary.BigEndian.PutUint32(buffer[loc:], value)
-	return loc + 4
+// ReadShortDataFromReader reads data shorter than 16kB from reader
+func ReadShortDataFromReader(reader io.Reader) ([]byte, error) {
+	buf, err := ReadFromBuffer(reader, 2)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read short data length: %w", err)
+	}
+
+	size, _, err := ReadUint16(buf)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read short data length: %w", err)
+	}
+
+	buf, err = ReadFromBuffer(reader, int(size))
+	if err != nil {
+		return nil, fmt.Errorf("cannot read short data: %w", err)
+	}
+
+	return buf, nil
 }
 
-func writeUint64(buffer []byte, loc int, value uint64) int {
-	binary.BigEndian.PutUint64(buffer[loc:], value)
-	return loc + 8
+// ReadLongDataFromReader reads data shorter than 16kB from reader
+func ReadLongDataFromReader(reader io.Reader) ([]byte, error) {
+	buf, err := ReadFromBuffer(reader, 4)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read long data length: %w", err)
+	}
+	size, _, err := ReadUint32(buf)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read long data length: %w", err)
+	}
+	buf, err = ReadFromBuffer(reader, int(size))
+	if err != nil {
+		return nil, fmt.Errorf("cannot read long data: %w", err)
+	}
+
+	return buf, nil
 }
 
-func appendUint8(input []byte, value uint8) []byte {
-	return append(input, byte(value))
-}
-
-func appendUint16(input []byte, value uint16) []byte {
-	buffer := make([]byte, 2)
-	binary.BigEndian.PutUint16(buffer, value)
-	return append(input, buffer...)
-}
-
-func appendUint32(input []byte, value uint32) []byte {
-	buffer := make([]byte, 4)
-	binary.BigEndian.PutUint32(buffer, value)
-	return append(input, buffer...)
-}
-
-func appendUint64(input []byte, value uint64) []byte {
-	buffer := make([]byte, 8)
-	binary.BigEndian.PutUint64(buffer, value)
-	return append(input, buffer...)
+func ReadFromBuffer(reader io.Reader, length int) ([]byte, error) {
+	if length == 0 {
+		return nil, nil
+	}
+	buf := make([]byte, length)
+	_, err := io.ReadFull(reader, buf)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read data: %w", err)
+	}
+	return buf, nil
 }

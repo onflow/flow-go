@@ -36,6 +36,11 @@ type Query struct {
 	keys            []Key
 }
 
+// NewEmptyQuery returns an empty ledger query
+func NewEmptyQuery(sc StateCommitment) (*Query, error) {
+	return &Query{stateCommitment: sc}, nil
+}
+
 // NewQuery constructs a new ledger  query
 func NewQuery(sc StateCommitment, keys []Key) (*Query, error) {
 	return &Query{stateCommitment: sc, keys: keys}, nil
@@ -51,9 +56,14 @@ func (q *Query) Size() int {
 	return len(q.keys)
 }
 
-// StateCommitment returns the state commitment of this query
+// StateCommitment returns the state commitment of the query
 func (q *Query) StateCommitment() StateCommitment {
 	return q.stateCommitment
+}
+
+// SetStateCommitment sets the state commitment for the query
+func (q *Query) SetStateCommitment(sc StateCommitment) {
+	q.stateCommitment = sc
 }
 
 // Update holds all data needed for a ledger update
@@ -81,6 +91,11 @@ func (u *Update) Values() []Value {
 // StateCommitment returns the state commitment of this update
 func (u *Update) StateCommitment() StateCommitment {
 	return u.stateCommitment
+}
+
+// SetStateCommitment sets the state commitment for the update
+func (u *Update) SetStateCommitment(sc StateCommitment) {
+	u.stateCommitment = sc
 }
 
 // appendKV append a key value pair to the update
@@ -153,9 +168,11 @@ func (k *Key) Size() int {
 }
 
 func (k *Key) String() string {
-	// TODO include type
 	ret := ""
 	for _, kp := range k.KeyParts {
+		ret += "/"
+		ret += string(kp.Type)
+		ret += "/"
 		ret += string(kp.Value)
 	}
 	return ret
