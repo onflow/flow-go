@@ -1,4 +1,4 @@
-impackage wal
+package wal
 
 import (
 	"bufio"
