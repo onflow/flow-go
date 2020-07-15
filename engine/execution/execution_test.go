@@ -127,7 +127,7 @@ func TestExecutionFlow(t *testing.T) {
 			receipt, _ = args[1].(*flow.ExecutionReceipt)
 
 			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
-			assert.Equal(t, len(collections), len(receipt.ExecutionResult.Chunks))
+			assert.Equal(t, len(collections), len(receipt.ExecutionResult.Chunks)-1) // don't count system chunk
 
 			for i, chunk := range receipt.ExecutionResult.Chunks {
 				assert.EqualValues(t, i, chunk.CollectionIndex)

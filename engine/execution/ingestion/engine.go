@@ -795,10 +795,18 @@ func (e *Engine) saveExecutionResults(
 			)
 		}
 
-		collectionGuarantee := executableBlock.Block.Payload.Guarantees[i]
-		completeCollection := executableBlock.CompleteCollections[collectionGuarantee.ID()]
+		var collectionID flow.Identifier
 
-		chdp := generateChunkDataPack(chunk, completeCollection.Collection().ID(), allRegisters, values, proofs)
+		// account for system chunk being last
+		if i < len(stateInteractions)-1 {
+			collectionGuarantee := executableBlock.Block.Payload.Guarantees[i]
+			completeCollection := executableBlock.CompleteCollections[collectionGuarantee.ID()]
+			collectionID = completeCollection.Collection().ID()
+		} else {
+			collectionID = flow.ZeroID
+		}
+
+		chdp := generateChunkDataPack(chunk, collectionID, allRegisters, values, proofs)
 
 		err = e.execState.PersistChunkDataPack(childCtx, chdp)
 		if err != nil {
