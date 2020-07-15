@@ -8,6 +8,7 @@ import (
 	"time"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/templates"
 
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
@@ -149,7 +150,7 @@ func (lg *LoadGenerator) setupServiceAccountKeys() error {
 
 	addKeysTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(blockRef).
-		SetScript([]byte(script)).
+		SetScript(script).
 		SetProposalKey(*lg.serviceAccount.address, lg.serviceAccount.accountKey.ID, lg.serviceAccount.accountKey.SequenceNumber).
 		SetPayer(*lg.serviceAccount.address).
 		AddAuthorizer(*lg.serviceAccount.address)
@@ -201,17 +202,18 @@ func (lg *LoadGenerator) createAccounts() error {
 			FromPrivateKey(privKey).
 			SetHashAlgo(crypto.SHA3_256).
 			SetWeight(flowsdk.AccountKeyWeightThreshold)
+
 		signer := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
-		// TODO herer
-		script, err := lg.scriptCreator.CreateAccountScript(accountKey)
-		if err != nil {
-			return err
-		}
+
+		createAccountTx := templates.CreateAccount(
+			[]*flowsdk.AccountKey{accountKey},
+			nil,
+			*lg.serviceAccount.address,
+		)
+
 		// Generate an account creation script
-		createAccountTx := flowsdk.NewTransaction().
+		createAccountTx.
 			SetReferenceBlockID(blockRef).
-			SetScript(script).
-			AddAuthorizer(*lg.serviceAccount.address).
 			SetProposalKey(*lg.serviceAccount.address, i+1, 0).
 			SetPayer(*lg.serviceAccount.address)
 
