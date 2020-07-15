@@ -12,7 +12,7 @@ require (
 	github.com/go-openapi/strfmt v0.19.5 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/onflow/cadence v0.6.0
-	github.com/onflow/flow-go-sdk v0.5.1-0.20200620041402-7cc94298795c
+	github.com/onflow/flow-go-sdk v0.8.0
 	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200619174948-a3a856d16a27
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/rs/zerolog v1.19.0
@@ -23,8 +23,4 @@ require (
 
 replace github.com/dapperlabs/flow-go => ../
 
-replace github.com/dapperlabs/flow-go/protobuf => ../protobuf
-
 replace github.com/dapperlabs/flow-go/crypto => ../crypto
-
-replace github.com/dapperlabs/flow-go/integration => ../integration

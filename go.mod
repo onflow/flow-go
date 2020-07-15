@@ -28,7 +28,6 @@ require (
 	github.com/libp2p/go-tcp-transport v0.2.0
 	github.com/multiformats/go-multiaddr v0.2.2
 	github.com/onflow/cadence v0.6.0
-	github.com/onflow/flow-go-sdk v0.5.1-0.20200620041402-7cc94298795c // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200619174948-a3a856d16a27
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/pkg/errors v0.9.1
@@ -38,7 +37,6 @@ require (
 	github.com/spf13/cobra v0.0.6
 	github.com/spf13/pflag v1.0.3
 	github.com/spf13/viper v1.4.0
-	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.6.1
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
 	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
@@ -51,12 +49,4 @@ require (
 	google.golang.org/grpc v1.28.0
 )
 
-replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
-
-replace github.com/dapperlabs/flow-go => ./
-
 replace github.com/dapperlabs/flow-go/crypto => ./crypto
-
-replace github.com/dapperlabs/flow-go/protobuf => ./protobuf
-
-replace github.com/dapperlabs/flow-go/integration => ./integration
