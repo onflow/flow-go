@@ -2,6 +2,7 @@ package synchronization
 
 import (
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -39,6 +40,7 @@ func DefaultConfig() Config {
 type Core struct {
 	log      zerolog.Logger
 	Config   Config
+	mu       sync.Mutex
 	heights  map[uint64]*Status
 	blockIDs map[flow.Identifier]*Status
 }
@@ -57,6 +59,8 @@ func New(log zerolog.Logger, config Config) (*Core, error) {
 // true if the block should be processed by the compliance layer and false
 // if it should be ignored.
 func (c *Core) HandleBlock(header *flow.Header) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	status := c.getRequestStatus(header.Height, header.ID())
 	// if we never asked for this block, discard it
@@ -83,6 +87,8 @@ func (c *Core) HandleBlock(header *flow.Header) bool {
 // If the height difference between local and the reported height, we do nothing.
 // Otherwise, we queue each missing height.
 func (c *Core) HandleHeight(final *flow.Header, height uint64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	// don't bother queueing anything if we're within tolerance
 	if c.WithinTolerance(final, height) {
@@ -98,6 +104,8 @@ func (c *Core) HandleHeight(final *flow.Header, height uint64) {
 }
 
 func (c *Core) RequestBlock(blockID flow.Identifier) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	// if we already received this block, reset the status so we can re-queue
 	status := c.blockIDs[blockID]
@@ -113,6 +121,8 @@ func (c *Core) RequestBlock(blockID flow.Identifier) {
 // requested. It apportions requestable items into range and batch requests
 // according to configured maximums, giving precedence to range requests.
 func (c *Core) ScanPending(final *flow.Header) ([]flow.Range, []flow.Batch) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	// prune before doing any work
 	c.prune(final)
@@ -281,6 +291,9 @@ func (c *Core) getRequestableItems() ([]uint64, []flow.Identifier) {
 // RangeRequested updates status state for a range of block heights that has
 // been successfully requested. Must be called when a range request is submitted.
 func (c *Core) RangeRequested(ran flow.Range) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	for height := ran.From; height <= ran.To; height++ {
 		status, exists := c.heights[height]
 		if !exists {
@@ -294,6 +307,9 @@ func (c *Core) RangeRequested(ran flow.Range) {
 // BatchRequested updates status state for a batch of block IDs that has been
 // successfully requested. Must be called when a batch request is submitted.
 func (c *Core) BatchRequested(batch flow.Batch) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	for _, blockID := range batch.BlockIDs {
 		status, exists := c.blockIDs[blockID]
 		if !exists {
