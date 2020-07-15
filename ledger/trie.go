@@ -119,6 +119,13 @@ func (p Path) Equals(o Path) bool {
 	return bytes.Equal([]byte(p), []byte(o))
 }
 
+// NewPath returns an new path
+func NewPath(data []byte) Path {
+	p := make([]byte, len(data))
+	copy(p, data)
+	return Path(p)
+}
+
 // Payload is the smallest immutable storable unit in ledger
 type Payload struct {
 	Key   Key
