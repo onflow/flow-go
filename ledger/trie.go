@@ -29,6 +29,25 @@ func (u *TrieUpdate) IsEmpty() bool {
 	return u.Size() == 0
 }
 
+// TODO clean me
+func (u *TrieUpdate) String() string {
+	str := "Trie Update:\n "
+	str += "\t triehash : " + u.RootHash.String() + "\n"
+	tp := 0
+	for i, p := range u.Paths {
+		tp += p.Size()
+		// Temporary
+		str += fmt.Sprintf("\t path %d : %s\n", i, p)
+	}
+	str += fmt.Sprintf("\t paths len: %d , bytesize: %d\n", len(u.Paths), tp)
+	tp = 0
+	for _, p := range u.Payloads {
+		tp += p.Size()
+	}
+	str += fmt.Sprintf("\t total size of payloads : %d \n", tp)
+	return str
+}
+
 // Equals compares this trie update to another trie update
 func (u *TrieUpdate) Equals(other *TrieUpdate) bool {
 	if other == nil {

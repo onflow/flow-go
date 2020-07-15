@@ -3,6 +3,7 @@ package common
 import (
 	"encoding/binary"
 	"encoding/hex"
+	"fmt"
 	"math/rand"
 
 	"github.com/dapperlabs/flow-go/ledger"
@@ -203,7 +204,7 @@ func RandomUniqueKeys(n, m, minByteSize, maxByteSize int) []ledger.Key {
 			}
 			keyPartData := make([]byte, byteSize)
 			rand.Read(keyPartData)
-			ledger.NewKeyPart(uint16(j), keyPartData)
+			keyParts = append(keyParts, *ledger.NewKeyPart(uint16(j), keyPartData))
 		}
 		key := ledger.NewKey(keyParts)
 
@@ -212,6 +213,8 @@ func RandomUniqueKeys(n, m, minByteSize, maxByteSize int) []ledger.Key {
 			keys = append(keys, *key)
 			alreadySelectKeys[string(EncodeKey(key))] = true
 			i++
+		} else {
+			fmt.Println("Already existing")
 		}
 	}
 	return keys
