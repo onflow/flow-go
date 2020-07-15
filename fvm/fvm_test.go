@@ -1263,9 +1263,9 @@ func TestWithServiceAccount(t *testing.T) {
 	ctxA := fvm.NewContext(
 		fvm.WithChain(chain),
 		fvm.WithASTCache(cache),
-		fvm.WithTransactionProcessors([]fvm.TransactionProcessor{
+		fvm.WithTransactionProcessors(
 			fvm.NewTransactionInvocator(),
-		}),
+		),
 	)
 
 	ledger := state.NewMapLedger()
