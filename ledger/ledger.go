@@ -178,6 +178,15 @@ func (k *Key) String() string {
 	return ret
 }
 
+// DeepCopy returns a deep copy of the key
+func (k *Key) DeepCopy() *Key {
+	newKPs := make([]KeyPart, 0, len(k.KeyParts))
+	for _, kp := range k.KeyParts {
+		newKPs = append(newKPs, *kp.DeepCopy())
+	}
+	return &Key{KeyParts: newKPs}
+}
+
 // Equals compares this key to another key
 func (k *Key) Equals(other *Key) bool {
 	if other == nil {
@@ -216,6 +225,13 @@ func (kp *KeyPart) Equals(other *KeyPart) bool {
 	return bytes.Equal(kp.Value, other.Value)
 }
 
+// DeepCopy returns a deep copy of the key part
+func (kp *KeyPart) DeepCopy() *KeyPart {
+	newV := make([]byte, len(kp.Value))
+	copy(newV, kp.Value)
+	return &KeyPart{Type: kp.Type, Value: newV}
+}
+
 // Value holds the value part of a ledger key value pair
 type Value []byte
 
@@ -226,6 +242,13 @@ func (v Value) Size() int {
 
 func (v Value) String() string {
 	return hex.EncodeToString(v)
+}
+
+// DeepCopy returns a deep copy of the value
+func (v Value) DeepCopy() Value {
+	newV := make([]byte, len(v))
+	copy(newV, v)
+	return newV
 }
 
 // Equals compares a ledger Value to another one

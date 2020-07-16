@@ -119,11 +119,11 @@ func (p Path) Equals(o Path) bool {
 	return bytes.Equal([]byte(p), []byte(o))
 }
 
-// NewPath returns an new path
-func NewPath(data []byte) Path {
-	p := make([]byte, len(data))
-	copy(p, data)
-	return Path(p)
+// DeepCopy returns a deep copy of the payload
+func (p *Path) DeepCopy() Path {
+	newP := make([]byte, len(*p))
+	copy(newP, *p)
+	return Path(newP)
 }
 
 // Payload is the smallest immutable storable unit in ledger
@@ -160,6 +160,11 @@ func (p *Payload) Equals(other *Payload) bool {
 		return false
 	}
 	return true
+}
+
+// DeepCopy returns a deep copy of the payload
+func (p *Payload) DeepCopy() *Payload {
+	return &Payload{Key: *p.Key.DeepCopy(), Value: p.Value.DeepCopy()}
 }
 
 // NewPayload returns a new payload
