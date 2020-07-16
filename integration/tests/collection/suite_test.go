@@ -158,7 +158,7 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transac
 	// hash-grind the script until the transaction will be routed to target cluster
 	for {
 		tx.SetScript(append(tx.Script, '/', '/'))
-		err := tx.SignEnvelope(sdk.ServiceAddress(sdk.Mainnet), acct.key.ID, acct.signer)
+		err := tx.SignEnvelope(sdk.ServiceAddress(sdk.Testnet), acct.key.ID, acct.signer)
 		require.Nil(suite.T(), err)
 		routed := clusters.ByTxID(convert.IDFromSDK(tx.ID()))
 		if routed.Fingerprint() == target.Fingerprint() {

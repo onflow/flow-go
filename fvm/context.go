@@ -1,6 +1,8 @@
 package fvm
 
 import (
+	"github.com/onflow/cadence"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -12,12 +14,17 @@ type Context struct {
 	Metrics                          *MetricsCollector
 	GasLimit                         uint64
 	BlockHeader                      *flow.Header
+	ServiceAccountEnabled            bool
 	RestrictedAccountCreationEnabled bool
 	RestrictedDeploymentEnabled      bool
+	SetValueHandler                  SetValueHandler
 	SignatureVerifier                SignatureVerifier
 	TransactionProcessors            []TransactionProcessor
 	ScriptProcessors                 []ScriptProcessor
 }
+
+// SetValueHandler receives a value written by the Cadence runtime.
+type SetValueHandler func(owner flow.Address, key string, value cadence.Value) error
 
 // NewContext initializes a new execution context with the provided options.
 func NewContext(opts ...Option) Context {
@@ -49,8 +56,10 @@ func defaultContext() Context {
 		Metrics:                          nil,
 		GasLimit:                         defaultGasLimit,
 		BlockHeader:                      nil,
+		ServiceAccountEnabled:            true,
 		RestrictedAccountCreationEnabled: true,
 		RestrictedDeploymentEnabled:      true,
+		SetValueHandler:                  nil,
 		SignatureVerifier:                NewDefaultSignatureVerifier(),
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
@@ -132,6 +141,14 @@ func WithTransactionProcessors(processors []TransactionProcessor) Option {
 	}
 }
 
+// WithServiceAccount enables or disables calls to the Flow service account.
+func WithServiceAccount(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.ServiceAccountEnabled = enabled
+		return ctx
+	}
+}
+
 // WithRestrictedDeployment enables or disables restricted contract deployment for a
 // virtual machine context.
 func WithRestrictedDeployment(enabled bool) Option {
@@ -146,6 +163,15 @@ func WithRestrictedDeployment(enabled bool) Option {
 func WithRestrictedAccountCreation(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.RestrictedAccountCreationEnabled = enabled
+		return ctx
+	}
+}
+
+// WithSetValueHandler sets a handler that is called when a value is written
+// by the Cadence runtime.
+func WithSetValueHandler(handler SetValueHandler) Option {
+	return func(ctx Context) Context {
+		ctx.SetValueHandler = handler
 		return ctx
 	}
 }

@@ -147,6 +147,7 @@ type Chain interface {
 	BytesToAddressGenerator(b []byte) AddressGenerator
 	IsValid(Address) bool
 	newAddressGeneratorAtState(state uint64) AddressGenerator
+	String() string
 }
 
 // NewAddressGenerator returns a new AddressGenerator with an

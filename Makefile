@@ -36,7 +36,7 @@ cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
 
 cmd/util/util:
-	go build -o cmd/util/util cmd/util/main.go
+	go build -o cmd/util/util --tags relic cmd/util/main.go
 
 .PHONY: install-tools
 install-tools: crypto/relic/build check-go-version
@@ -109,7 +109,7 @@ generate-mocks:
 	GO111MODULE=on mockery -name 'Vertex' -dir="./consensus/hotstuff/forks/finalizer/forest" -case=underscore -output="./consensus/hotstuff/forks/finalizer/forest/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir="./consensus/hotstuff" -case=underscore -output="./consensus/hotstuff/mocks" -outpkg="mocks"
 	GO111MODULE=on mockery -name '.*' -dir="./engine/access/wrapper" -case=underscore -output="./engine/access/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name 'IngestRPC' -dir="./engine/execution/ingestion" -case=underscore -output="./engine/execution/ingestion/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name 'IngestRPC' -dir="./engine/execution/ingestion" -case=underscore -tags relic -output="./engine/execution/ingestion/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=model/fingerprint -case=underscore -output="./model/fingerprint/mock" -outpkg="mock"
 
 # this ensures there is no unused dependency being added by accident

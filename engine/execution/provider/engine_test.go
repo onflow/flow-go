@@ -13,6 +13,7 @@ import (
 	state "github.com/dapperlabs/flow-go/engine/execution/state/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -25,7 +26,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		execState := new(state.ExecutionState)
 
-		e := Engine{state: ps, execState: execState}
+		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector()}
 
 		originID := unittest.IdentifierFixture()
 		chunkID := unittest.IdentifierFixture()
@@ -56,7 +57,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).
 			Return(nil, errors.New("not found!"))
 
-		e := Engine{state: ps, execState: execState}
+		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector()}
 
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
@@ -84,7 +85,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		execState := new(state.ExecutionState)
 
-		e := Engine{state: ps, chunksConduit: con, execState: execState}
+		e := Engine{state: ps, chunksConduit: con, execState: execState, metrics: metrics.NewNoopCollector()}
 
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 

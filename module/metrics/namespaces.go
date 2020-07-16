@@ -47,6 +47,7 @@ const (
 	subsystemMTrie        = "mtrie"
 	subsystemIngestion    = "ingestion"
 	subsystemRuntime      = "runtime"
+	subsystemProvider     = "provider"
 )
 
 // Verification Subsystems

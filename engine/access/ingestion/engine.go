@@ -12,8 +12,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/access/rpc"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
@@ -46,6 +46,8 @@ type Engine struct {
 	collectionsToMarkFinalized *stdmap.Times
 	collectionsToMarkExecuted  *stdmap.Times
 	blocksToMarkExecuted       *stdmap.Times
+
+	rpcEngine *rpc.Engine
 }
 
 // New creates a new access ingestion engine
@@ -61,6 +63,7 @@ func New(log zerolog.Logger,
 	collectionsToMarkFinalized *stdmap.Times,
 	collectionsToMarkExecuted *stdmap.Times,
 	blocksToMarkExecuted *stdmap.Times,
+	rpcEngine *rpc.Engine,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
@@ -77,6 +80,7 @@ func New(log zerolog.Logger,
 		collectionsToMarkFinalized: collectionsToMarkFinalized,
 		collectionsToMarkExecuted:  collectionsToMarkExecuted,
 		blocksToMarkExecuted:       blocksToMarkExecuted,
+		rpcEngine:                  rpcEngine,
 	}
 
 	collConduit, err := net.Register(engine.CollectionProvider, eng)
@@ -172,6 +176,9 @@ func (e *Engine) processFinalizedBlock(id flow.Identifier) error {
 	if err != nil {
 		return fmt.Errorf("failed to lookup block: %w", err)
 	}
+
+	// Notify rpc handler of new finalized block height
+	e.rpcEngine.SubmitLocal(block)
 
 	// FIX: we can't index guarantees here, as we might have more than one block
 	// with the same collection as long as it is not finalized
@@ -313,14 +320,12 @@ func (e *Engine) handleCollectionResponse(originID flow.Identifier, response *me
 }
 
 func (e *Engine) requestCollections(guarantees ...*flow.CollectionGuarantee) error {
-	ids, err := e.findCollectionNodes()
-	if err != nil {
-		return err
-	}
-
-	// Request all the collections for this block
-	for _, g := range guarantees {
-		err := e.collectionConduit.Submit(&messages.CollectionRequest{ID: g.ID(), Nonce: rand.Uint64()}, ids...)
+	for _, guarantee := range guarantees {
+		req := &messages.CollectionRequest{
+			ID:    guarantee.ID(),
+			Nonce: rand.Uint64(),
+		}
+		err := e.collectionConduit.Submit(req, guarantee.SignerIDs...)
 		if err != nil {
 			return err
 		}
@@ -328,18 +333,6 @@ func (e *Engine) requestCollections(guarantees ...*flow.CollectionGuarantee) err
 
 	return nil
 
-}
-
-func (e *Engine) findCollectionNodes() ([]flow.Identifier, error) {
-	identities, err := e.state.Final().Identities(filter.HasRole(flow.RoleCollection))
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve identities: %w", err)
-	}
-	if len(identities) < 1 {
-		return nil, fmt.Errorf("no collection identity found")
-	}
-	identifiers := flow.GetIDs(identities)
-	return identifiers, nil
 }
 
 // OnBlockIncorporated is a noop for this engine since access node is only dealing with finalized blocks

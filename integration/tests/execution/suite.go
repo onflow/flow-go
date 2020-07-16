@@ -50,6 +50,7 @@ func (s *Suite) MetricsPort() string {
 }
 
 func (s *Suite) SetupTest() {
+	blockRateFlag := "--block-rate-delay=1ms"
 
 	// need one access node
 	acsConfig := testnet.NewNodeConfig(flow.RoleAccess)
@@ -60,7 +61,9 @@ func (s *Suite) SetupTest() {
 	for _, nodeID := range s.nodeIDs {
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithID(nodeID),
 			testnet.WithLogLevel(zerolog.FatalLevel),
-			testnet.WithAdditionalFlag("--hotstuff-timeout=12s"))
+			testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
+			testnet.WithAdditionalFlag(blockRateFlag),
+		)
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
 	}
 
@@ -70,17 +73,18 @@ func (s *Suite) SetupTest() {
 		testnet.WithLogLevel(zerolog.InfoLevel))
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
-	// need one verification node
-	// s.verID = unittest.IdentifierFixture()
-	// verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithID(s.verID),
-	// 	testnet.WithLogLevel(zerolog.InfoLevel))
-	// s.nodeConfigs = append(s.nodeConfigs, verConfig)
+	// need two collection node
+	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
+		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithAdditionalFlag(blockRateFlag),
+	)
+	coll2Config := testnet.NewNodeConfig(flow.RoleCollection,
+		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithAdditionalFlag(blockRateFlag),
+	)
+	s.nodeConfigs = append(s.nodeConfigs, coll1Config, coll2Config)
 
-	// need one collection node
-	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel))
-	s.nodeConfigs = append(s.nodeConfigs, collConfig)
-
-	// add the ghost node config
+	// add the ghost (verification) node config
 	s.ghostID = unittest.IdentifierFixture()
 	ghostConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithID(s.ghostID), testnet.AsGhost(),
 		testnet.WithLogLevel(zerolog.InfoLevel))

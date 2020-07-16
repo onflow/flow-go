@@ -428,6 +428,18 @@ func generateRandomSeed() []byte {
 	return seed
 }
 
+func RandomBytes(n int) []byte {
+	b := make([]byte, n)
+	read, err := crand.Read(b)
+	if err != nil {
+		panic("cannot read random bytes")
+	}
+	if read != n {
+		panic(fmt.Errorf("cannot read enough random bytes (got %d of %d)", read, n))
+	}
+	return b
+}
+
 // IdentityFixture returns a node identity.
 func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 	nodeID := IdentifierFixture()

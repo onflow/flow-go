@@ -18,7 +18,7 @@ func Address(rawAddress []byte, chain flow.Chain) (flow.Address, error) {
 	address := flow.BytesToAddress(rawAddress)
 
 	if !chain.IsValid(address) {
-		return flow.EmptyAddress, status.Error(codes.InvalidArgument, "address is invalid")
+		return flow.EmptyAddress, status.Errorf(codes.InvalidArgument, "address %s is invalid for chain %s", address, chain)
 	}
 
 	return address, nil

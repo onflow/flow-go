@@ -65,10 +65,7 @@ func (r RandPermTopology) Subset(idList flow.IdentityList, size int, seed string
 		}
 
 		// choose 1 out of all the remaining nodes of this role
-		selectedID, err := rng.IntN(len(ids))
-		if err != nil {
-			return nil, fmt.Errorf("cannot sample topology: %w", err)
-		}
+		selectedID := rng.UintN(uint64(len(ids)))
 
 		oneOfEachRoleIDs = append(oneOfEachRoleIDs, ids[selectedID])
 	}

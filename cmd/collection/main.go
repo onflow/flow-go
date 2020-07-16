@@ -225,7 +225,7 @@ func main() {
 
 			// create a finalizer that will handling updating the protocol
 			// state when the follower detects newly finalized blocks
-			finalizer := confinalizer.NewFinalizer(node.DB, node.Storage.Headers, node.Storage.Payloads, node.State)
+			finalizer := confinalizer.NewFinalizer(node.DB, node.Storage.Headers, node.State)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -299,7 +299,7 @@ func main() {
 				node.State,
 				node.Storage.Blocks,
 				followerEng,
-				clusterSyncCore,
+				mainChainSyncCore,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)

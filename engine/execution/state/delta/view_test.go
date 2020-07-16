@@ -95,6 +95,11 @@ func TestView_Set(t *testing.T) {
 		v := delta.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
 		})
+
+		t.Run("reflects in the snapshot", func(t *testing.T) {
+			assert.Equal(t, v.SpockSecret(), v.Interactions().SpockSecret)
+		})
+
 		registerID1 := make([]byte, 32)
 		copy(registerID1, "reg1")
 
@@ -123,6 +128,10 @@ func TestView_Set(t *testing.T) {
 
 		s := v.SpockSecret()
 		assert.Equal(t, s, []byte("1233456"))
+
+		t.Run("reflects in the snapshot", func(t *testing.T) {
+			assert.Equal(t, v.SpockSecret(), v.Interactions().SpockSecret)
+		})
 	})
 }
 

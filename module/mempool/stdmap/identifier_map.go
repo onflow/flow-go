@@ -96,3 +96,17 @@ func (i *IdentifierMap) Rem(id flow.Identifier) bool {
 func (i *IdentifierMap) Size() uint {
 	return i.Backend.Size()
 }
+
+// Keys returns a list of all keys in the mempool
+func (i *IdentifierMap) Keys() ([]flow.Identifier, bool) {
+	entities := i.Backend.All()
+	keys := make([]flow.Identifier, 0)
+	for _, entity := range entities {
+		idMapEntity, ok := entity.(model.IdMapEntity)
+		if !ok {
+			return nil, false
+		}
+		keys = append(keys, idMapEntity.Key)
+	}
+	return keys, true
+}

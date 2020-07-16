@@ -13,6 +13,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+const SegmentSize = 32 * 1024 * 1024
+
 type LedgerWAL struct {
 	wal            *prometheusWAL.WAL
 	forestCapacity int
@@ -20,8 +22,8 @@ type LedgerWAL struct {
 }
 
 // TODO use real logger and metrics, but that would require passing them to Trie storage
-func NewWAL(logger log.Logger, reg prometheus.Registerer, dir string, forestCapacity int, keyByteSize int) (*LedgerWAL, error) {
-	w, err := prometheusWAL.NewSize(logger, reg, dir, 32*1024)
+func NewWAL(logger log.Logger, reg prometheus.Registerer, dir string, forestCapacity int, keyByteSize int, segmentSize int) (*LedgerWAL, error) {
+	w, err := prometheusWAL.NewSize(logger, reg, dir, segmentSize)
 	if err != nil {
 		return nil, err
 	}
@@ -92,6 +94,7 @@ func (w *LedgerWAL) Replay(
 }
 
 func (w *LedgerWAL) ReplayLogsOnly(
+	checkpointFn func(forestSequencing *flattener.FlattenedForest) error,
 	updateFn func(flow.StateCommitment, [][]byte, [][]byte) error,
 	deleteFn func(flow.StateCommitment) error,
 ) error {
@@ -99,7 +102,7 @@ func (w *LedgerWAL) ReplayLogsOnly(
 	if err != nil {
 		return err
 	}
-	return w.replay(from, to, nil, updateFn, deleteFn, false)
+	return w.replay(from, to, checkpointFn, updateFn, deleteFn, false)
 }
 
 func (w *LedgerWAL) replay(
@@ -117,12 +120,12 @@ func (w *LedgerWAL) replay(
 	loadedCheckpoint := false
 	startSegment := from
 
-	if useCheckpoints {
+	checkpointer, err := w.NewCheckpointer()
+	if err != nil {
+		return fmt.Errorf("cannot create checkpointer: %w", err)
+	}
 
-		checkpointer, err := w.NewCheckpointer()
-		if err != nil {
-			return fmt.Errorf("cannot create checkpointer: %w", err)
-		}
+	if useCheckpoints {
 
 		latestCheckpoint, err := checkpointer.LatestCheckpoint()
 		if err != nil {
@@ -148,6 +151,24 @@ func (w *LedgerWAL) replay(
 		if loadedCheckpoint {
 			startSegment = latestCheckpoint + 1
 		}
+	}
+
+	if !loadedCheckpoint && startSegment == 0 {
+		hasRootCheckpoint, err := checkpointer.HasRootCheckpoint()
+		if err != nil {
+			return fmt.Errorf("cannot check root checkpoint existence: %w", err)
+		}
+		if hasRootCheckpoint {
+			flattenedForest, err := checkpointer.LoadRootCheckpoint()
+			if err != nil {
+				return fmt.Errorf("cannot load root checkpoint: %w", err)
+			}
+			err = checkpointFn(flattenedForest)
+			if err != nil {
+				return fmt.Errorf("error while handling root checkpoint: %w", err)
+			}
+		}
+
 	}
 
 	sr, err := prometheusWAL.NewSegmentsRangeReader(prometheusWAL.SegmentRange{

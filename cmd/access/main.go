@@ -41,6 +41,7 @@ func main() {
 		followerEng                  *followereng.Engine
 		syncCore                     *synchronization.Core
 		rpcConf                      rpc.Config
+		rpcEng                       *rpc.Engine
 		collectionRPC                access.AccessAPIClient
 		executionRPC                 execution.ExecutionAPIClient
 		err                          error
@@ -126,10 +127,14 @@ func main() {
 				logTxTimeToExecuted, logTxTimeToFinalizedExecuted)
 			return nil
 		}).
+		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			rpcEng = rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.RootChainID, transactionMetrics)
+			return rpcEng, nil
+		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, node.Storage.Blocks,
 				node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, transactionMetrics,
-				collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted)
+				collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
 			return ingestEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -140,7 +145,7 @@ func main() {
 
 			// create a finalizer that will handle updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, node.Storage.Payloads, node.State)
+			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, node.State)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -205,10 +210,6 @@ func main() {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
 			return sync, nil
-		}).
-		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.RootChainID, transactionMetrics)
-			return rpcEng, nil
 		}).
 		Run()
 }

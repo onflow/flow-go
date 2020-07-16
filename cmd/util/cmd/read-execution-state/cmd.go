@@ -46,6 +46,7 @@ func loadExecutionState() *mtrie.MForest {
 		flagExecutionStateDir,
 		ledger.CacheSize,
 		ledger.RegisterKeySize,
+		wal.SegmentSize,
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while creating WAL")

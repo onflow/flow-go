@@ -2,13 +2,13 @@ package utils
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"sync"
 	"time"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
-
-	"github.com/dapperlabs/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go-sdk/templates"
 
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
@@ -116,10 +116,12 @@ func loadServiceAccount(flowClient *client.Client,
 	}, nil
 }
 
-func (lg *LoadGenerator) getBlockIDRef() flowsdk.Identifier {
+func (lg *LoadGenerator) getBlockIDRef() (flowsdk.Identifier, error) {
 	ref, err := lg.flowClient.GetLatestBlockHeader(context.Background(), false)
-	handle(err)
-	return ref.ID
+	if err != nil {
+		return flowsdk.Identifier{}, err
+	}
+	return ref.ID, err
 }
 
 // Stats returns the statsTracker that captures stats for transactions submitted
@@ -133,8 +135,10 @@ func (lg *LoadGenerator) Close() {
 }
 
 func (lg *LoadGenerator) setupServiceAccountKeys() error {
-
-	blockRef := lg.getBlockIDRef()
+	blockRef, err := lg.getBlockIDRef()
+	if err != nil {
+		return err
+	}
 	keys := make([]*flowsdk.AccountKey, 0)
 	for i := 0; i < lg.numberOfAccounts; i++ {
 		keys = append(keys, lg.serviceAccount.accountKey)
@@ -146,7 +150,7 @@ func (lg *LoadGenerator) setupServiceAccountKeys() error {
 
 	addKeysTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(blockRef).
-		SetScript([]byte(script)).
+		SetScript(script).
 		SetProposalKey(*lg.serviceAccount.address, lg.serviceAccount.accountKey.ID, lg.serviceAccount.accountKey.SequenceNumber).
 		SetPayer(*lg.serviceAccount.address).
 		AddAuthorizer(*lg.serviceAccount.address)
@@ -162,7 +166,9 @@ func (lg *LoadGenerator) setupServiceAccountKeys() error {
 	lg.step++
 
 	err = lg.flowClient.SendTransaction(context.Background(), *addKeysTx)
-	handle(err)
+	if err != nil {
+		return err
+	}
 
 	txWG := sync.WaitGroup{}
 	txWG.Add(1)
@@ -185,26 +191,29 @@ func (lg *LoadGenerator) setupServiceAccountKeys() error {
 
 func (lg *LoadGenerator) createAccounts() error {
 	fmt.Printf("creating %d accounts...", lg.numberOfAccounts)
-	blockRef := lg.getBlockIDRef()
+	blockRef, err := lg.getBlockIDRef()
+	if err != nil {
+		return err
+	}
 	allTxWG := sync.WaitGroup{}
 	for i := 0; i < lg.numberOfAccounts; i++ {
-		privKey := common.RandomPrivateKey()
+		privKey := randomPrivateKey()
 		accountKey := flowsdk.NewAccountKey().
 			FromPrivateKey(privKey).
 			SetHashAlgo(crypto.SHA3_256).
 			SetWeight(flowsdk.AccountKeyWeightThreshold)
+
 		signer := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
-		// TODO herer
-		script, err := lg.scriptCreator.CreateAccountScript(accountKey)
-		if err != nil {
-			return err
-		}
+
+		createAccountTx := templates.CreateAccount(
+			[]*flowsdk.AccountKey{accountKey},
+			nil,
+			*lg.serviceAccount.address,
+		)
+
 		// Generate an account creation script
-		handle(err)
-		createAccountTx := flowsdk.NewTransaction().
+		createAccountTx.
 			SetReferenceBlockID(blockRef).
-			SetScript(script).
-			AddAuthorizer(*lg.serviceAccount.address).
 			SetProposalKey(*lg.serviceAccount.address, i+1, 0).
 			SetPayer(*lg.serviceAccount.address)
 
@@ -216,7 +225,9 @@ func (lg *LoadGenerator) createAccounts() error {
 		lg.serviceAccount.signerLock.Unlock()
 
 		err = lg.flowClient.SendTransaction(context.Background(), *createAccountTx)
-		handle(err)
+		if err != nil {
+			return err
+		}
 		allTxWG.Add(1)
 
 		lg.txTracker.AddTx(createAccountTx.ID(),
@@ -248,7 +259,10 @@ func (lg *LoadGenerator) createAccounts() error {
 }
 
 func (lg *LoadGenerator) distributeInitialTokens() error {
-	blockRef := lg.getBlockIDRef()
+	blockRef, err := lg.getBlockIDRef()
+	if err != nil {
+		return err
+	}
 	allTxWG := sync.WaitGroup{}
 	fmt.Println("load generator step 2 started")
 	for i := 0; i < lg.numberOfAccounts; i++ {
@@ -275,7 +289,9 @@ func (lg *LoadGenerator) distributeInitialTokens() error {
 		lg.serviceAccount.signerLock.Unlock()
 
 		err = lg.flowClient.SendTransaction(context.Background(), *transferTx)
-		handle(err)
+		if err != nil {
+			return err
+		}
 		allTxWG.Add(1)
 
 		lg.txTracker.AddTx(transferTx.ID(),
@@ -292,7 +308,10 @@ func (lg *LoadGenerator) distributeInitialTokens() error {
 }
 
 func (lg *LoadGenerator) rotateTokens() error {
-	blockRef := lg.getBlockIDRef()
+	blockRef, err := lg.getBlockIDRef()
+	if err != nil {
+		return err
+	}
 	allTxWG := sync.WaitGroup{}
 	fmt.Println("load generator step 3 started")
 
@@ -320,7 +339,10 @@ func (lg *LoadGenerator) rotateTokens() error {
 		lg.accounts[i].signerLock.Unlock()
 
 		err = lg.flowClient.SendTransaction(context.Background(), *transferTx)
-		handle(err)
+		if err != nil {
+			return err
+		}
+
 		allTxWG.Add(1)
 		lg.txTracker.AddTx(transferTx.ID(),
 			nil,
@@ -356,9 +378,19 @@ func (lg *LoadGenerator) Next() error {
 	}
 }
 
-func handle(err error) {
+// randomPrivateKey returns a randomly generated ECDSA P-256 private key.
+func randomPrivateKey() crypto.PrivateKey {
+	seed := make([]byte, crypto.MinSeedLength)
+
+	_, err := rand.Read(seed)
 	if err != nil {
-		fmt.Println("err:", err.Error())
 		panic(err)
 	}
+
+	privateKey, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, seed)
+	if err != nil {
+		panic(err)
+	}
+
+	return privateKey
 }
