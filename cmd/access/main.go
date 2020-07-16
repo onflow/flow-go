@@ -12,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
 	"github.com/dapperlabs/flow-go/engine/access/ingestion"
@@ -114,10 +115,16 @@ func main() {
 			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
 			merger := signature.NewCombiner()
 
+			// initialize and pre-generate leader selections from the seed
+			selection, err := leader.NewSelectionForConsensus(leader.EstimatedSixMonthOfViews, node.RootBlock.Header, node.RootQC, node.State)
+			if err != nil {
+				return nil, fmt.Errorf("could not create leader selection for main consensus: %w", err)
+			}
+
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
 			// Note: node.Me.NodeID() is not part of the consensus committee
-			mainConsensusCommittee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID())
+			mainConsensusCommittee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID(), selection)
 			if err != nil {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}

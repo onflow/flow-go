@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"math/rand"
 	"os"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/helper"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
@@ -29,6 +31,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	"github.com/dapperlabs/flow-go/module/signature"
 	synccore "github.com/dapperlabs/flow-go/module/synchronization"
 	"github.com/dapperlabs/flow-go/module/trace"
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
@@ -78,22 +81,45 @@ func createNodes(t *testing.T, n int, stopAtView uint64, stopCountAt uint) ([]*N
 	parentID := flow.ZeroID
 	height := uint64(0)
 	timestamp := time.Now().UTC()
-	// add all identities to genesis block and
-	// create and bootstrap consensus node with the genesis
-	genesis := run.GenerateRootBlock(chainID, parentID, height, timestamp, participants)
+	// add all identities to rootBlock block and
+	// create and bootstrap consensus node with the rootBlock
+	rootBlock := run.GenerateRootBlock(chainID, parentID, height, timestamp, participants)
+
+	// make root QC
+	sig1 := make([]byte, 32)
+	rand.Read(sig1[:])
+	sig2 := make([]byte, 32)
+	rand.Read(sig2[:])
+	c := &signature.Combiner{}
+	combined, err := c.Join(sig1, sig2)
+	require.NoError(t, err)
+
+	// all participants will sign the rootBlock block
+	signerIDs := make([]flow.Identifier, 0)
+	// only consensus participants can sign root block
+	for _, participant := range consensus {
+		signerIDs = append(signerIDs, participant.ID())
+	}
+
+	rootQC := &model.QuorumCertificate{
+		View:      rootBlock.Header.View,
+		BlockID:   rootBlock.ID(),
+		SignerIDs: signerIDs,
+		SigData:   combined,
+	}
 
 	hub := NewHub()
 	stopper := NewStopper(stopAtView, stopCountAt)
 	nodes := make([]*Node, 0, len(consensus))
 	for i, identity := range consensus {
-		node := createNode(t, i, identity, consensus, genesis, hub, stopper)
+		node := createNode(t, i, identity, consensus, rootBlock, rootQC, hub, stopper)
 		nodes = append(nodes, node)
 	}
 
 	return nodes, stopper, hub
 }
 
-func createNode(t *testing.T, index int, identity *flow.Identity, participants flow.IdentityList, genesis *flow.Block, hub *Hub, stopper *Stopper) *Node {
+func createNode(t *testing.T, index int, identity *flow.Identity, participants flow.IdentityList, rootBlock *flow.Block, rootQC *model.QuorumCertificate, hub *Hub, stopper *Stopper) *Node {
 	db, dbDir := unittest.TempBadgerDB(t)
 
 	metrics := metrics.NewNoopCollector()
@@ -110,9 +136,9 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	state, err := protocol.NewState(metrics, db, headersDB, identitiesDB, sealsDB, indexDB, payloadsDB, blocksDB)
 	require.NoError(t, err)
 
-	result := bootstrap.Result(genesis, unittest.GenesisStateCommitment)
+	result := bootstrap.Result(rootBlock, unittest.GenesisStateCommitment)
 	seal := bootstrap.Seal(result)
-	err = state.Mutate().Bootstrap(genesis, result, seal)
+	err = state.Mutate().Bootstrap(rootBlock, result, seal)
 	require.NoError(t, err)
 
 	localID := identity.ID()
@@ -171,21 +197,14 @@ func createNode(t *testing.T, index int, identity *flow.Identity, participants f
 	// initialize the pending blocks cache
 	cache := buffer.NewPendingBlocks()
 
-	// all participants will sign the genesis block
-	signerIDs := make([]flow.Identifier, 0)
-	for _, participant := range participants {
-		signerIDs = append(signerIDs, participant.ID())
-	}
+	rootHeader := rootBlock.Header
 
-	rootHeader := genesis.Header
-	rootQC := &model.QuorumCertificate{
-		View:      genesis.Header.View,
-		BlockID:   genesis.ID(),
-		SignerIDs: signerIDs,
-		SigData:   nil,
-	}
+	// initialize and pre-generate leader selections from the seed
+	selection, err := leader.NewSelectionForConsensus(10000, rootHeader, rootQC, state)
+	require.NoError(t, err)
+
 	// selector := filter.HasRole(flow.RoleConsensus)
-	com, err := committee.NewMainConsensusCommitteeState(state, localID)
+	com, err := committee.NewMainConsensusCommitteeState(state, localID, selection)
 	require.NoError(t, err)
 
 	// initialize the block finalizer

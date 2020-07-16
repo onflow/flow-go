@@ -178,7 +178,7 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	if err != nil {
 		return fmt.Errorf("could not get clusters: %w", err)
 	}
-	cluster, ok := clusters.ByNodeID(guarantors[0])
+	cluster, _, ok := clusters.ByNodeID(guarantors[0])
 	if !ok {
 		return engine.NewInvalidInputErrorf("guarantor (id=%s) does not exist in any cluster", guarantors[0])
 	}

@@ -174,7 +174,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// get the locally assigned cluster and the cluster responsible for the transaction
 	txCluster := clusters.ByTxID(tx.ID())
 	localID := e.me.NodeID()
-	localCluster, ok := clusters.ByNodeID(localID)
+	localCluster, _, ok := clusters.ByNodeID(localID)
 	if !ok {
 		return fmt.Errorf("could not get local cluster")
 	}

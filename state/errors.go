@@ -56,3 +56,24 @@ func IsOutdatedExtensionError(err error) bool {
 	var errOutdatedExtensionError OutdatedExtensionError
 	return errors.As(err, &errOutdatedExtensionError)
 }
+
+// NoValidChildBlockError is a sentinal error when the case where a certain block has
+// no valid child.
+type NoValidChildBlockError struct {
+	msg string
+}
+
+func NewNoValidChildBlockError(msg string) error {
+	return NoValidChildBlockError{
+		msg: msg,
+	}
+}
+
+func (e NoValidChildBlockError) Error() string {
+	return e.msg
+}
+
+func IsNoValidChildBlockError(err error) bool {
+	var errNoValidChildBlockError NoValidChildBlockError
+	return errors.As(err, &errNoValidChildBlockError)
+}

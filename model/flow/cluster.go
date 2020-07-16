@@ -45,12 +45,12 @@ func (cl *ClusterList) ByTxID(txID Identifier) IdentityList {
 // ByNodeID select the cluster that the node with the given ID is part of.
 //
 // Nodes will be divided into equally sized clusters as far as possible.
-func (cl ClusterList) ByNodeID(nodeID Identifier) (IdentityList, bool) {
+func (cl ClusterList) ByNodeID(nodeID Identifier) (IdentityList, uint, bool) {
 	index, ok := cl.lookup[nodeID]
 	if !ok {
-		return nil, false
+		return nil, 0, false
 	}
-	return cl.ByIndex(index), true
+	return cl.ByIndex(index), index, true
 }
 
 // Size returns the number of clusters.
