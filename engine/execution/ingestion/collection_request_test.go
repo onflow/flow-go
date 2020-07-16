@@ -102,7 +102,7 @@ func TestCollectionRequests(t *testing.T) {
 
 		ctx.collectionConduit.EXPECT().Submit(
 			&colReqMatcher{req: &messages.CollectionRequest{ID: guarantees[2].ID(), Nonce: rand.Uint64()}},
-			gomock.Eq([]flow.Identifier{collection2Identity.NodeID, collection3Identity.NodeID}),
+			&identifierListMatcher{identifiers: []flow.Identifier{collection2Identity.NodeID, collection3Identity.NodeID}},
 		)
 
 		ctx.executionState.
