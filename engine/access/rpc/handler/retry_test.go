@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	realstorage "github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -40,7 +41,8 @@ func (suite *Suite) TestTransactionRetry() {
 	// txID := transactionBody.ID()
 	// blockID := block.ID()
 	// Setup Handler + Retry
-	handler := NewHandler(suite.log, suite.state, suite.execClient, suite.colClient, suite.blocks, suite.headers, suite.collections, suite.transactions, suite.chainID)
+	handler := NewHandler(suite.log, suite.state, suite.execClient, suite.colClient, suite.blocks, suite.headers,
+		suite.collections, suite.transactions, suite.chainID, metrics.NewNoopCollector())
 	retry := newRetry().SetHandler(handler)
 	handler.retry = retry
 
@@ -104,7 +106,8 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	}
 
 	// Setup Handler + Retry
-	handler := NewHandler(suite.log, suite.state, suite.execClient, suite.colClient, suite.blocks, suite.headers, suite.collections, suite.transactions, suite.chainID)
+	handler := NewHandler(suite.log, suite.state, suite.execClient, suite.colClient, suite.blocks, suite.headers,
+		suite.collections, suite.transactions, suite.chainID, metrics.NewNoopCollector())
 	retry := newRetry().SetHandler(handler)
 	handler.retry = retry
 
