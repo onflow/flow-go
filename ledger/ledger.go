@@ -179,12 +179,12 @@ func (k *Key) String() string {
 }
 
 // DeepCopy returns a deep copy of the key
-func (k *Key) DeepCopy() *Key {
+func (k *Key) DeepCopy() Key {
 	newKPs := make([]KeyPart, 0, len(k.KeyParts))
 	for _, kp := range k.KeyParts {
 		newKPs = append(newKPs, *kp.DeepCopy())
 	}
-	return &Key{KeyParts: newKPs}
+	return Key{KeyParts: newKPs}
 }
 
 // Equals compares this key to another key

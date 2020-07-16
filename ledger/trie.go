@@ -164,7 +164,9 @@ func (p *Payload) Equals(other *Payload) bool {
 
 // DeepCopy returns a deep copy of the payload
 func (p *Payload) DeepCopy() *Payload {
-	return &Payload{Key: *p.Key.DeepCopy(), Value: p.Value.DeepCopy()}
+	k := p.Key.DeepCopy()
+	v := p.Value.DeepCopy()
+	return &Payload{Key: k, Value: v}
 }
 
 // NewPayload returns a new payload

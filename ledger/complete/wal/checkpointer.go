@@ -68,8 +68,6 @@ func (c *Checkpointer) LatestCheckpoint() (int, error) {
 // or -1, -1 if there are no segments
 func (c *Checkpointer) NotCheckpointedSegments() (from, to int, err error) {
 
-	fmt.Println(">>>NotCheckpointedSegs>", from, to)
-
 	latestCheckpoint, err := c.LatestCheckpoint()
 	if err != nil {
 		return -1, -1, fmt.Errorf("cannot get last checkpoint: %w", err)
@@ -106,7 +104,6 @@ func (c *Checkpointer) NotCheckpointedSegments() (from, to int, err error) {
 // Checkpoint creates new checkpoint stopping at given segment
 func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, error)) error {
 
-	fmt.Println(">>>CheckingPointin>")
 	_, notCheckpointedTo, err := c.NotCheckpointedSegments()
 	if err != nil {
 		return fmt.Errorf("cannot get not checkpointed segments: %w", err)
@@ -139,8 +136,6 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 				return err
 			}
 			for _, t := range tries {
-				fmt.Println("?????????trie added")
-				fmt.Println(t)
 				err := forest.AddTrie(t)
 				if err != nil {
 					return err
@@ -149,8 +144,7 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 			return nil
 		},
 		func(update *ledger.TrieUpdate) error {
-			rr, err := forest.Update(update)
-			fmt.Println(">>>>>>>>", rr, len(update.Paths), err)
+			_, err := forest.Update(update)
 			return err
 		}, func(rootHash ledger.RootHash) error {
 			return nil

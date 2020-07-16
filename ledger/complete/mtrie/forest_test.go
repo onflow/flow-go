@@ -18,7 +18,6 @@ import (
 	"github.com/dapperlabs/flow-go/module/metrics"
 )
 
-// TODO RAMTIN FIX THIS
 // TestTrieOperations tests adding removing and retrieving Trie from Forest
 func TestTrieOperations(t *testing.T) {
 	pathByteSize := 2 // path size of 16 bits

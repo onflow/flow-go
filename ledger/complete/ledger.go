@@ -72,7 +72,7 @@ func NewLedger(dbDir string, capacity int, metrics module.LedgerMetrics, reg pro
 
 // Ready implements interface module.ReadyDoneAware
 // it starts the EventLoop's internal processing loop.
-func (f *Ledger) Ready() <-chan struct{} {
+func (l *Ledger) Ready() <-chan struct{} {
 	ready := make(chan struct{})
 	close(ready)
 	return ready
@@ -80,28 +80,28 @@ func (f *Ledger) Ready() <-chan struct{} {
 
 // Done implements interface module.ReadyDoneAware
 // it closes all the open write-ahead log files.
-func (f *Ledger) Done() <-chan struct{} {
-	_ = f.wal.Close()
+func (l *Ledger) Done() <-chan struct{} {
+	_ = l.wal.Close()
 	done := make(chan struct{})
 	close(done)
 	return done
 }
 
 // EmptyStateCommitment returns the state commitment of an empty ledger
-func (f *Ledger) EmptyStateCommitment() flow.StateCommitment {
-	return flow.StateCommitment(f.forest.GetEmptyRootHash())
+func (l *Ledger) EmptyStateCommitment() flow.StateCommitment {
+	return flow.StateCommitment(l.forest.GetEmptyRootHash())
 }
 
 // Get read the values of the given keys at the given state commitment
 // it returns the values in the same order as given registerIDs and errors (if any)
-func (f *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
+func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 	start := time.Now()
 	paths, err := common.KeysToPaths(query.Keys(), 0)
 	if err != nil {
 		return nil, err
 	}
 	trieRead := &ledger.TrieRead{RootHash: ledger.RootHash(query.StateCommitment()), Paths: paths}
-	payloads, err := f.forest.Read(trieRead)
+	payloads, err := l.forest.Read(trieRead)
 	if err != nil {
 		return nil, err
 	}
@@ -110,13 +110,13 @@ func (f *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 		return nil, err
 	}
 
-	f.metrics.ReadValuesNumber(uint64(len(paths)))
+	l.metrics.ReadValuesNumber(uint64(len(paths)))
 	readDuration := time.Since(start)
-	f.metrics.ReadDuration(readDuration)
+	l.metrics.ReadDuration(readDuration)
 
 	if len(paths) > 0 {
 		durationPerValue := time.Duration(readDuration.Nanoseconds()/int64(len(paths))) * time.Nanosecond
-		f.metrics.ReadDurationPerItem(durationPerValue)
+		l.metrics.ReadDurationPerItem(durationPerValue)
 	}
 
 	return values, err
@@ -124,7 +124,7 @@ func (f *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 
 // Set updates the ledger given an update
 // it returns a new state commitment (state after update) and errors (if any)
-func (f *Ledger) Set(update *ledger.Update) (newStateCommitment ledger.StateCommitment, err error) {
+func (l *Ledger) Set(update *ledger.Update) (newStateCommitment ledger.StateCommitment, err error) {
 	start := time.Now()
 
 	// TODO: add test case
@@ -133,40 +133,33 @@ func (f *Ledger) Set(update *ledger.Update) (newStateCommitment ledger.StateComm
 		return update.StateCommitment(), nil
 	}
 
-	paths, err := common.KeysToPaths(update.Keys(), 0)
+	trieUpdate, err := common.UpdateToTrieUpdate(update, 0)
 	if err != nil {
 		return nil, err
 	}
 
-	payloads, err := common.UpdateToPayloads(update)
-	if err != nil {
-		return nil, err
-	}
+	l.metrics.UpdateCount()
+	l.metrics.UpdateValuesNumber(uint64(len(trieUpdate.Paths)))
 
-	f.metrics.UpdateCount()
-	f.metrics.UpdateValuesNumber(uint64(len(paths)))
-
-	trieUpdate := &ledger.TrieUpdate{RootHash: ledger.RootHash(update.StateCommitment()), Paths: paths, Payloads: payloads}
-
-	err = f.wal.RecordUpdate(trieUpdate)
+	err = l.wal.RecordUpdate(trieUpdate)
 	if err != nil {
 		return nil, fmt.Errorf("cannot update state, error while writing LedgerWAL: %w", err)
 	}
 
-	newRootHash, err := f.forest.Update(trieUpdate)
+	newRootHash, err := l.forest.Update(trieUpdate)
 	if err != nil {
 		return nil, fmt.Errorf("cannot update state: %w", err)
 	}
 
 	// TODO update to proper value once https://github.com/dapperlabs/flow-go/pull/3720 is merged
-	f.metrics.ForestApproxMemorySize(0)
+	l.metrics.ForestApproxMemorySize(0)
 
 	elapsed := time.Since(start)
-	f.metrics.UpdateDuration(elapsed)
+	l.metrics.UpdateDuration(elapsed)
 
-	if len(paths) > 0 {
-		durationPerValue := time.Duration(elapsed.Nanoseconds()/int64(len(paths))) * time.Nanosecond
-		f.metrics.UpdateDurationPerItem(durationPerValue)
+	if len(trieUpdate.Paths) > 0 {
+		durationPerValue := time.Duration(elapsed.Nanoseconds()/int64(len(trieUpdate.Paths))) * time.Nanosecond
+		l.metrics.UpdateDurationPerItem(durationPerValue)
 	}
 
 	// TODO log info state commitments
@@ -174,7 +167,7 @@ func (f *Ledger) Set(update *ledger.Update) (newStateCommitment ledger.StateComm
 }
 
 // Prove provides proofs for a ledger query and errors (if any)
-func (f *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
+func (l *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
 
 	paths, err := common.KeysToPaths(query.Keys(), 0)
 	if err != nil {
@@ -182,7 +175,7 @@ func (f *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
 	}
 
 	trieRead := &ledger.TrieRead{RootHash: ledger.RootHash(query.StateCommitment()), Paths: paths}
-	batchProof, err := f.forest.Proofs(trieRead)
+	batchProof, err := l.forest.Proofs(trieRead)
 	if err != nil {
 		return nil, fmt.Errorf("could not get proofs: %w", err)
 	}
@@ -190,34 +183,34 @@ func (f *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
 	proofToGo := common.EncodeTrieBatchProof(batchProof)
 
 	if len(paths) > 0 {
-		f.metrics.ProofSize(uint32(len(proofToGo) / len(paths)))
+		l.metrics.ProofSize(uint32(len(proofToGo) / len(paths)))
 	}
 
 	return proofToGo, err
 }
 
 // CloseStorage closes the DB
-func (f *Ledger) CloseStorage() {
-	_ = f.wal.Close()
+func (l *Ledger) CloseStorage() {
+	_ = l.wal.Close()
 }
 
 // TODO implement an approximate MemSize method
-func (f *Ledger) MemSize() (int64, error) {
+func (l *Ledger) MemSize() (int64, error) {
 	return 0, nil
 }
 
 // DiskSize returns the amount of disk space used by the storage (in bytes)
-func (f *Ledger) DiskSize() (int64, error) {
-	return f.forest.DiskSize()
+func (l *Ledger) DiskSize() (int64, error) {
+	return l.forest.DiskSize()
 }
 
 // ForestSize returns the number of tries stored in the forest
-func (f *Ledger) ForestSize() int {
-	return f.forest.Size()
+func (l *Ledger) ForestSize() int {
+	return l.forest.Size()
 }
 
-func (f *Ledger) Checkpointer() (*wal.Checkpointer, error) {
-	checkpointer, err := f.wal.NewCheckpointer()
+func (l *Ledger) Checkpointer() (*wal.Checkpointer, error) {
+	checkpointer, err := l.wal.NewCheckpointer()
 	if err != nil {
 		return nil, fmt.Errorf("cannot create checkpointer for compactor: %w", err)
 	}
