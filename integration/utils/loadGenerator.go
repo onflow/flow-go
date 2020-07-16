@@ -143,17 +143,16 @@ func (lg *LoadGenerator) setupServiceAccountKeys() error {
 	for i := 0; i < lg.numberOfAccounts; i++ {
 		keys = append(keys, lg.serviceAccount.accountKey)
 	}
-	script, err := lg.scriptCreator.AddKeyToAccountScript(keys)
+
+	addKeysTx, err := lg.scriptCreator.AddKeysToAccountTransaction(*lg.serviceAccount.address, keys)
 	if err != nil {
 		return err
 	}
 
-	addKeysTx := flowsdk.NewTransaction().
+	addKeysTx.
 		SetReferenceBlockID(blockRef).
-		SetScript(script).
 		SetProposalKey(*lg.serviceAccount.address, lg.serviceAccount.accountKey.ID, lg.serviceAccount.accountKey.SequenceNumber).
-		SetPayer(*lg.serviceAccount.address).
-		AddAuthorizer(*lg.serviceAccount.address)
+		SetPayer(*lg.serviceAccount.address)
 
 	lg.serviceAccount.signerLock.Lock()
 	defer lg.serviceAccount.signerLock.Unlock()
