@@ -96,7 +96,7 @@ func NewLeaf(path ledger.Path,
 		rChild:   nil,
 		height:   height,
 		path:     ledger.NewPath(path),
-		payload:  payload,
+		payload:  ledger.NewPayload(payload.Key, payload.Value),
 		maxDepth: 0,
 		regCount: regCount,
 	}
