@@ -247,14 +247,20 @@ func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(keyIndex int) (fl
 	createAccountTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(gs.ref.ID).
 		AddAuthorizer(gs.rootAcctAddr).
-		SetScript([]byte(createAccountTemplate)).
-		AddArgument(cadencePublicKeys).
-		AddArgument(cadenceCode).
+		SetScript([]byte(createAccountTemplate))
+
+	err := createAccountTx.AddArgument(cadencePublicKeys)
+	handle(err)
+
+	err = createAccountTx.AddArgument(cadenceCode)
+	handle(err)
+
+	createAccountTx = createAccountTx.
 		SetProposalKey(gs.rootAcctAddr, keyIndex, gs.sequenceNumbers[keyIndex]).
 		SetPayer(gs.rootAcctAddr)
 
 	gs.rootSignerLock.Lock()
-	err := createAccountTx.SignEnvelope(gs.rootAcctAddr, keyIndex, gs.rootSigner)
+	err = createAccountTx.SignEnvelope(gs.rootAcctAddr, keyIndex, gs.rootSigner)
 	handle(err)
 
 	gs.ref, err = gs.flowClient.GetLatestBlockHeader(context.Background(), false)
@@ -485,12 +491,15 @@ func (gs *TransactionsPerSecondSuite) AddKeys(flowClient *client.Client) {
 	addKeysTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(gs.ref.ID).
 		SetScript([]byte(script)).
-		AddArgument(bytesToCadenceArray(accountKeyBytes)).
 		SetProposalKey(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootAcctKey.SequenceNumber).
 		SetPayer(gs.rootAcctAddr).
 		AddAuthorizer(gs.rootAcctAddr)
 
-	err := addKeysTx.SignEnvelope(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootSigner)
+	err := addKeysTx.AddArgument(bytesToCadenceArray(accountKeyBytes))
+	handle(err)
+
+
+	err = addKeysTx.SignEnvelope(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootSigner)
 	handle(err)
 
 	err = flowClient.SendTransaction(ctx, *addKeysTx)
