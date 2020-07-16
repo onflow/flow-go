@@ -154,14 +154,10 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 // written value.
 func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 
-	fmt.Println("~====~", u)
-
 	parentTrie, err := f.GetTrie(u.RootHash)
 	if err != nil {
 		return nil, err
 	}
-
-	fmt.Println("parent trie", parentTrie)
 
 	if len(u.Paths) == 0 { // no key no change
 		return parentTrie.RootHash(), nil
@@ -202,8 +198,6 @@ func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
 
-	fmt.Println("new trie", newTrie)
-
 	f.metrics.LatestTrieRegCount(newTrie.AllocatedRegCount())
 	f.metrics.LatestTrieRegCountDiff(newTrie.AllocatedRegCount() - parentTrie.AllocatedRegCount())
 	f.metrics.LatestTrieMaxDepth(uint64(newTrie.MaxDepth()))
@@ -213,12 +207,6 @@ func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 	if err != nil {
 		return nil, fmt.Errorf("adding updated trie to forest failed: %w", err)
 	}
-
-	// temp
-	temp, _ := f.GetTrie(ledger.RootHash(newTrie.RootHash()))
-	fmt.Println("new trie 2", temp)
-
-	fmt.Println("~~~~~~", ledger.RootHash(newTrie.RootHash()), "Added")
 
 	return ledger.RootHash(newTrie.RootHash()), nil
 }
