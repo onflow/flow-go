@@ -4,6 +4,7 @@ package crypto
 
 import (
 	"crypto/rand"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -49,7 +50,7 @@ func testFeldmanVSSSimple(t *testing.T) {
 			msgType: dkgType,
 		})
 	}
-	dkgCommonTest(t, FeldmanVSS, processors)
+	dkgCommonTest(t, feldmanVSS, processors)
 }
 
 // Testing Feldman VSS with the qualification system by simulating a network of n nodes
@@ -72,7 +73,7 @@ func testFeldmanVSSQual(t *testing.T) {
 			msgType: dkgType,
 		})
 	}
-	dkgCommonTest(t, FeldmanVSSQual, processors)
+	dkgCommonTest(t, feldmanVSSQual, processors)
 }
 
 // Testing Feldman VSS with the qualification system by simulating a network of n nodes
@@ -96,7 +97,7 @@ func testFeldmanVSSQualUnhappyPath(t *testing.T) {
 			malicious: true,
 		})
 	}
-	dkgCommonTest(t, FeldmanVSSQual, processors)
+	dkgCommonTest(t, feldmanVSSQual, processors)
 }
 
 // Testing JointFeldman by simulating a network of n nodes
@@ -119,7 +120,7 @@ func testJointFeldman(t *testing.T) {
 			msgType: dkgType,
 		})
 	}
-	dkgCommonTest(t, JointFeldman, processors)
+	dkgCommonTest(t, jointFeldman, processors)
 }
 
 func testJointFeldmanUnhappyPath(t *testing.T) {
@@ -142,10 +143,32 @@ func testJointFeldmanUnhappyPath(t *testing.T) {
 			malicious: true,
 		})
 	}
-	dkgCommonTest(t, JointFeldman, processors)
+	dkgCommonTest(t, jointFeldman, processors)
 }
 
-func dkgCommonTest(t *testing.T, dkg DKGProtocol, processors []testDKGProcessor) {
+// Supported Key Generation protocols
+const (
+	feldmanVSS = iota
+	feldmanVSSQual
+	jointFeldman
+)
+
+func newDKG(dkg int, size int, threshold int, currentIndex int,
+	processor DKGProcessor, leaderIndex int) (DKGState, error) {
+	switch dkg {
+	case feldmanVSS:
+		return NewFeldmanVSS(size, threshold, currentIndex, processor, leaderIndex)
+	case feldmanVSSQual:
+		return NewFeldmanVSSQual(size, threshold, currentIndex, processor, leaderIndex)
+	case jointFeldman:
+		return NewJointFeldman(size, threshold, currentIndex, processor)
+	default:
+		return nil, fmt.Errorf("non supported protocol")
+	}
+
+}
+
+func dkgCommonTest(t *testing.T, dkg int, processors []testDKGProcessor) {
 	log.Info("DKG protocol starts")
 	// number of nodes to test
 	n := len(processors)
@@ -155,13 +178,13 @@ func dkgCommonTest(t *testing.T, dkg DKGProtocol, processors []testDKGProcessor)
 	// create DKG in all nodes
 	for current := 0; current < n; current++ {
 		var err error
-		processors[current].dkg, err = NewDKG(dkg, n, optimalThreshold(n),
+		processors[current].dkg, err = newDKG(dkg, n, optimalThreshold(n),
 			current, &processors[current], lead)
-		require.Nil(t, err)
+		require.NoError(t, err)
 	}
 
 	phase := 0
-	if dkg == FeldmanVSS {
+	if dkg == feldmanVSS {
 		phase = 2
 	}
 

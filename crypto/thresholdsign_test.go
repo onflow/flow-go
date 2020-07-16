@@ -44,7 +44,7 @@ func testThresholdSignatureFeldmanVSS(t *testing.T) {
 		})
 		// create DKG in all nodes
 		var err error
-		processors[current].dkg, err = NewDKG(FeldmanVSS, n, optimalThreshold(n),
+		processors[current].dkg, err = NewFeldmanVSS(n, optimalThreshold(n),
 			current, &processors[current], lead)
 		require.NoError(t, err)
 	}
@@ -88,7 +88,6 @@ func testThresholdSignatureJointFeldman(t *testing.T) {
 	log.Info("DKG starts")
 	// number of nodes to test
 	n := 5
-	lead := 0
 	var sync sync.WaitGroup
 	chans := make([]chan *message, n)
 	processors := make([]testDKGProcessor, 0, n)
@@ -102,8 +101,8 @@ func testThresholdSignatureJointFeldman(t *testing.T) {
 		})
 		// create DKG in all nodes
 		var err error
-		processors[current].dkg, err = NewDKG(JointFeldman, n,
-			optimalThreshold(n), current, &processors[current], lead)
+		processors[current].dkg, err = NewJointFeldman(n,
+			optimalThreshold(n), current, &processors[current])
 		require.NoError(t, err)
 	}
 
@@ -170,7 +169,7 @@ func testStatelessThresholdSignatureFeldmanVSS(t *testing.T) {
 		})
 		// create DKG in all nodes
 		var err error
-		processors[current].dkg, err = NewDKG(FeldmanVSS, n, optimalThreshold(n),
+		processors[current].dkg, err = NewFeldmanVSS(n, optimalThreshold(n),
 			current, &processors[current], lead)
 		require.NoError(t, err)
 	}

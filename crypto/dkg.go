@@ -21,24 +21,6 @@ import (
 	"fmt"
 )
 
-// DKGProtocol is the type for supported protocols
-type DKGProtocol int
-
-// Supported Key Generation protocols
-const (
-	// FeldmanVSS is Feldman Verifiable Secret Sharing
-	// (non distributed generation)
-	FeldmanVSS DKGProtocol = iota
-	// FeldmanVSSQual is Feldman Verifiable Secret Sharing using a complaint
-	// mechanism to qualify/disqualify the leader
-	// (non distributed generation)
-	FeldmanVSSQual
-	// Joint Feldman (Pedersen) is a protocol made of (n) parallel Feldman VSS
-	// with a complaint mechanism
-	// (distributed generation)
-	JointFeldman
-)
-
 type DKGState interface {
 	// Size returns the size of the DKG group n
 	Size() int
@@ -71,13 +53,9 @@ type DKGState interface {
 // index is the node index type used as participants ID
 type index byte
 
-// NewDKG creates a new instance of a DKG protocol.
-//
-// An instance is run by a single node and is usable for only one protocol.
-// In order to run the protocol again, a new instance needs to be created
-// leaderIndex value is ignored if the protocol does not require a leader (JointFeldman for instance)
-func NewDKG(dkg DKGProtocol, size int, threshold int, currentIndex int,
-	processor DKGProcessor, leaderIndex int) (DKGState, error) {
+// newDKGCommon initializes the common structure of DKG protocols
+func newDKGCommon(size int, threshold int, currentIndex int,
+	processor DKGProcessor, leaderIndex int) (*dkgCommon, error) {
 	if size < DKGMinSize || size > DKGMaxSize {
 		return nil, fmt.Errorf("size should be between %d and %d", DKGMinSize, DKGMaxSize)
 	}
@@ -86,40 +64,16 @@ func NewDKG(dkg DKGProtocol, size int, threshold int, currentIndex int,
 		return nil, fmt.Errorf("indices of current and leader nodes must be between 0 and %d", size-1)
 	}
 
-	common := &dkgCommon{
+	if threshold >= size-1 || threshold < 1 {
+		return nil, fmt.Errorf("The threshold must be between 1 and %d", size-2)
+	}
+
+	return &dkgCommon{
 		size:         size,
 		threshold:    threshold,
 		currentIndex: index(currentIndex),
 		processor:    processor,
-	}
-	switch dkg {
-	case FeldmanVSS:
-		fvss := &feldmanVSSstate{
-			dkgCommon:   common,
-			leaderIndex: index(leaderIndex),
-		}
-		fvss.init()
-		return fvss, nil
-	case FeldmanVSSQual:
-		fvss := &feldmanVSSstate{
-			dkgCommon:   common,
-			leaderIndex: index(leaderIndex),
-		}
-		fvssq := &feldmanVSSQualState{
-			feldmanVSSstate: fvss,
-			disqualified:    false,
-		}
-		fvssq.init()
-		return fvssq, nil
-	case JointFeldman:
-		jf := &JointFeldmanState{
-			dkgCommon: common,
-		}
-		jf.init()
-		return jf, nil
-	default:
-		return nil, fmt.Errorf("the Distributed Key Generation %d is not supported", dkg)
-	}
+	}, nil
 }
 
 // dkgCommon holds the common data of all DKG protocols

@@ -37,8 +37,8 @@ func RunDKG(n int, seeds [][]byte) (model.DKGData, error) {
 	// create DKG instances for all nodes
 	for i := 0; i < n; i++ {
 		var err error
-		processors[i].dkg, err = crypto.NewDKG(crypto.JointFeldman, n,
-			signature.RandomBeaconThreshold(n), i, &processors[i], 0)
+		processors[i].dkg, err = crypto.NewJointFeldman(n,
+			signature.RandomBeaconThreshold(n), i, &processors[i])
 		if err != nil {
 			return model.DKGData{}, err
 		}
