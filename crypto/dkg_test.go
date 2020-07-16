@@ -21,6 +21,14 @@ func TestDKG(t *testing.T) {
 	t.Run("Joint Feldman Unhappy Path", testJointFeldmanUnhappyPath)
 }
 
+// optimal threshold (t) to allow the largest number of malicious nodes (m)
+// assuming the protocol requires:
+//   m<=t for unforgeability
+//   n-m>=t+1 for robustness
+func optimalThreshold(size int) int {
+	return (size - 1) / 2
+}
+
 // Testing the happy path of Feldman VSS by simulating a network of n nodes
 func testFeldmanVSSSimple(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
@@ -147,8 +155,8 @@ func dkgCommonTest(t *testing.T, dkg DKGProtocol, processors []testDKGProcessor)
 	// create DKG in all nodes
 	for current := 0; current < n; current++ {
 		var err error
-		processors[current].dkg, err = NewDKG(dkg, n, current,
-			&processors[current], lead)
+		processors[current].dkg, err = NewDKG(dkg, n, optimalThreshold(n),
+			current, &processors[current], lead)
 		require.Nil(t, err)
 	}
 

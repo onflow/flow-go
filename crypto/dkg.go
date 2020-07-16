@@ -71,20 +71,12 @@ type DKGState interface {
 // index is the node index type used as participants ID
 type index byte
 
-// optimal threshold (t) to allow the largest number of malicious nodes (m)
-// assuming the protocol requires:
-//   m<=t for unforgeability
-//   n-m>=t+1 for robustness
-func optimalThreshold(size int) int {
-	return (size - 1) / 2
-}
-
 // NewDKG creates a new instance of a DKG protocol.
 //
 // An instance is run by a single node and is usable for only one protocol.
 // In order to run the protocol again, a new instance needs to be created
 // leaderIndex value is ignored if the protocol does not require a leader (JointFeldman for instance)
-func NewDKG(dkg DKGProtocol, size int, currentIndex int,
+func NewDKG(dkg DKGProtocol, size int, threshold int, currentIndex int,
 	processor DKGProcessor, leaderIndex int) (DKGState, error) {
 	if size < DKGMinSize || size > DKGMaxSize {
 		return nil, fmt.Errorf("size should be between %d and %d", DKGMinSize, DKGMaxSize)
@@ -94,8 +86,6 @@ func NewDKG(dkg DKGProtocol, size int, currentIndex int,
 		return nil, fmt.Errorf("indices of current and leader nodes must be between 0 and %d", size-1)
 	}
 
-	// optimal threshold (t) to allow the largest number of malicious nodes (m)
-	threshold := optimalThreshold(size)
 	common := &dkgCommon{
 		size:         size,
 		threshold:    threshold,
