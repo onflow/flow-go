@@ -32,6 +32,9 @@ func NewWAL(logger log.Logger, reg prometheus.Registerer, dir string, forestCapa
 }
 
 func (w *LedgerWAL) RecordUpdate(update *ledger.TrieUpdate) error {
+
+	fmt.Printf("WAL UPDATE -> %s\n", update.RootHash.String())
+
 	bytes := EncodeUpdate(update)
 
 	err := w.wal.Log(bytes)
@@ -67,6 +70,8 @@ func (w *LedgerWAL) ReplayOnForest(forest *mtrie.Forest) error {
 			return nil
 		},
 		func(update *ledger.TrieUpdate) error {
+			fmt.Printf("WAL UPDATE <- %s\n", update.RootHash.String())
+
 			_, err := forest.Update(update)
 			return err
 		},

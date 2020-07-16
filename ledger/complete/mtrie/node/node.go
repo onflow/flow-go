@@ -197,7 +197,7 @@ func (n *Node) IsLeaf() bool {
 }
 
 // FmtStr provides formatted string representation of the Node and sub tree
-func (n Node) FmtStr(prefix string, subpath string) string {
+func (n *Node) FmtStr(prefix string, subpath string) string {
 	right := ""
 	if n.rChild != nil {
 		right = fmt.Sprintf("\n%v", n.rChild.FmtStr(prefix+"\t", subpath+"1"))
@@ -208,5 +208,5 @@ func (n Node) FmtStr(prefix string, subpath string) string {
 	}
 	hashStr := hex.EncodeToString(n.hashValue)
 	hashStr = hashStr[:3] + "..." + hashStr[len(hashStr)-3:]
-	return fmt.Sprintf("%v%v: (path:%v, hash:%v)[%s] %v %v ", prefix, n.height, n.path, hashStr, subpath, left, right)
+	return fmt.Sprintf("%v%v: (path:%v, hash:%v)[%s] (obj %p) %v %v ", prefix, n.height, n.path, hashStr, subpath, n, left, right)
 }
