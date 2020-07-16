@@ -57,3 +57,16 @@ func UpdateToTrieUpdate(u *ledger.Update, version uint8) (*ledger.TrieUpdate, er
 
 	return trieUpdate, nil
 }
+
+// QueryToTrieRead converts a ledger query into a trie read
+func QueryToTrieRead(q *ledger.Query, version uint8) (*ledger.TrieRead, error) {
+
+	paths, err := KeysToPaths(q.Keys(), version)
+	if err != nil {
+		return nil, err
+	}
+
+	trieRead := &ledger.TrieRead{RootHash: ledger.RootHash(q.StateCommitment()), Paths: paths}
+
+	return trieRead, nil
+}

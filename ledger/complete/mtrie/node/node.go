@@ -198,7 +198,7 @@ func (n *Node) RigthChild() *Node { return n.rChild }
 // IsLeaf returns true if and only if Node is a LEAF.
 func (n *Node) IsLeaf() bool {
 	// Per definition, a node is a leaf if and only if it has defined path
-	return n.path != nil
+	return n.path != nil && len(n.path) > 0
 }
 
 // FmtStr provides formatted string representation of the Node and sub tree
@@ -211,7 +211,11 @@ func (n *Node) FmtStr(prefix string, subpath string) string {
 	if n.lChild != nil {
 		left = fmt.Sprintf("\n%v", n.lChild.FmtStr(prefix+"\t", subpath+"0"))
 	}
+	payloadSize := 0
+	if n.payload != nil {
+		payloadSize = n.payload.Size()
+	}
 	hashStr := hex.EncodeToString(n.hashValue)
 	hashStr = hashStr[:3] + "..." + hashStr[len(hashStr)-3:]
-	return fmt.Sprintf("%v%v: (path:%v, hash:%v)[%s] (obj %p) %v %v ", prefix, n.height, n.path, hashStr, subpath, n, left, right)
+	return fmt.Sprintf("%v%v: (path:%v, payloadSize:%d hash:%v)[%s] (obj %p) %v %v ", prefix, n.height, n.path, payloadSize, hashStr, subpath, n, left, right)
 }

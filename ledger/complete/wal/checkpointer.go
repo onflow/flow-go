@@ -172,13 +172,13 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 	return err
 }
 
-func numberToFilenamePart(n int) string {
+func NumberToFilenamePart(n int) string {
 	return fmt.Sprintf("%08d", n)
 }
 
-func numberToFilename(n int) string {
+func NumberToFilename(n int) string {
 
-	return fmt.Sprintf("%s%s", checkpointFilenamePrefix, numberToFilenamePart(n))
+	return fmt.Sprintf("%s%s", checkpointFilenamePrefix, NumberToFilenamePart(n))
 }
 
 type SyncOnCloseFile struct {
@@ -206,7 +206,7 @@ func (c *Checkpointer) CheckpointWriter(to int) (io.WriteCloser, error) {
 }
 
 func CreateCheckpointWriter(dir string, fileNo int) (io.WriteCloser, error) {
-	file, err := os.Create(path.Join(dir, numberToFilename(fileNo)))
+	file, err := os.Create(path.Join(dir, NumberToFilename(fileNo)))
 	if err != nil {
 		return nil, fmt.Errorf("cannot create file for checkpoint %d: %w", fileNo, err)
 	}
@@ -255,7 +255,7 @@ func StoreCheckpoint(forestSequencing *flattener.FlattenedForest, writer io.Writ
 
 func (c *Checkpointer) LoadCheckpoint(checkpoint int) (*flattener.FlattenedForest, error) {
 
-	filepath := path.Join(c.dir, numberToFilename(checkpoint))
+	filepath := path.Join(c.dir, NumberToFilename(checkpoint))
 	file, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open checkpoint file %s: %w", filepath, err)

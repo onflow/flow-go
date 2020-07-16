@@ -102,27 +102,27 @@ func (mt *MTrie) String() string {
 }
 
 // TODO move consistency checks from Forrest into Trie to obtain a safe, self-contained API
-func (mt *MTrie) UnsafeRead(paths []ledger.Path) ([]ledger.Payload, error) {
+func (mt *MTrie) UnsafeRead(paths []ledger.Path) ([]*ledger.Payload, error) {
 	return mt.read(mt.root, paths)
 }
 
-func (mt *MTrie) read(head *node.Node, paths []ledger.Path) ([]ledger.Payload, error) {
+func (mt *MTrie) read(head *node.Node, paths []ledger.Path) ([]*ledger.Payload, error) {
 	// path not found
 	if head == nil {
-		res := make([]ledger.Payload, 0, len(paths))
+		res := make([]*ledger.Payload, 0, len(paths))
 		for range paths {
-			res = append(res, *ledger.EmptyPayload())
+			res = append(res, ledger.EmptyPayload())
 		}
 		return res, nil
 	}
 	// reached a leaf node
 	if head.IsLeaf() {
-		res := make([]ledger.Payload, 0)
+		res := make([]*ledger.Payload, 0)
 		for _, p := range paths {
 			if bytes.Equal(head.Path(), p) {
-				res = append(res, *head.Payload())
+				res = append(res, head.Payload())
 			} else {
-				res = append(res, *ledger.EmptyPayload())
+				res = append(res, ledger.EmptyPayload())
 			}
 		}
 		return res, nil
@@ -134,23 +134,23 @@ func (mt *MTrie) read(head *node.Node, paths []ledger.Path) ([]ledger.Payload, e
 	}
 
 	// TODO make this parallel
-	values := make([]ledger.Payload, 0)
+	payloads := make([]*ledger.Payload, 0)
 	if len(lpaths) > 0 {
-		v, err := mt.read(head.LeftChild(), lpaths)
+		p, err := mt.read(head.LeftChild(), lpaths)
 		if err != nil {
 			return nil, err
 		}
-		values = append(values, v...)
+		payloads = append(payloads, p...)
 	}
 
 	if len(rpaths) > 0 {
-		v, err := mt.read(head.RigthChild(), rpaths)
+		p, err := mt.read(head.RigthChild(), rpaths)
 		if err != nil {
 			return nil, err
 		}
-		values = append(values, v...)
+		payloads = append(payloads, p...)
 	}
-	return values, nil
+	return payloads, nil
 }
 
 // NewTrieWithUpdatedRegisters constructs a new trie containing all registers from the parent trie.

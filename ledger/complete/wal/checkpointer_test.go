@@ -141,7 +141,7 @@ func Test_Checkpointing(t *testing.T) {
 		f, err := mtrie.NewForest(pathByteSize, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
-		var stateCommitment = f.GetEmptyRootHash()
+		var rootHash = f.GetEmptyRootHash()
 
 		//saved data after updates
 		savedData := make(map[string]map[string]*ledger.Payload)
@@ -159,25 +159,24 @@ func Test_Checkpointing(t *testing.T) {
 
 				keys := common.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
 				values := common.RandomValues(numInsPerStep, 1, valueMaxByteSize)
-				update, err := ledger.NewUpdate(stateCommitment, keys, values)
+				update, err := ledger.NewUpdate(rootHash, keys, values)
 				require.NoError(t, err)
 
 				trieUpdate, err := common.UpdateToTrieUpdate(update, pathFinderVersion)
 				err = wal.RecordUpdate(trieUpdate)
 				require.NoError(t, err)
 
-				newRoot, err := f.Update(trieUpdate)
-				stateCommitment := ledger.StateCommitment(newRoot)
+				rootHash, err := f.Update(trieUpdate)
 				require.NoError(t, err)
 
-				fmt.Printf("Updated with %x\n", stateCommitment)
+				fmt.Printf("Updated with %x\n", rootHash)
 
 				data := make(map[string]*ledger.Payload, len(trieUpdate.Paths))
 				for j, path := range trieUpdate.Paths {
 					data[string(path)] = trieUpdate.Payloads[j]
 				}
 
-				savedData[string(stateCommitment)] = data
+				savedData[string(rootHash)] = data
 			}
 			err = wal.Close()
 			require.NoError(t, err)
@@ -262,12 +261,15 @@ func Test_Checkpointing(t *testing.T) {
 
 				fmt.Printf("Querying with %x\n", rootHash)
 
+				fmt.Println(f.GetTrie(ledger.RootHash(rootHash)))
 				payloads1, err := f.Read(&ledger.TrieRead{RootHash: ledger.RootHash([]byte(rootHash)), Paths: paths})
 				require.NoError(t, err)
 
+				fmt.Println(f2.GetTrie(ledger.RootHash(rootHash)))
 				payloads2, err := f2.Read(&ledger.TrieRead{RootHash: ledger.RootHash([]byte(rootHash)), Paths: paths})
 				require.NoError(t, err)
 
+				fmt.Println(f3.GetTrie(ledger.RootHash(rootHash)))
 				payloads3, err := f3.Read(&ledger.TrieRead{RootHash: ledger.RootHash([]byte(rootHash)), Paths: paths})
 				require.NoError(t, err)
 
@@ -279,74 +281,80 @@ func Test_Checkpointing(t *testing.T) {
 			}
 		})
 
-		// keys2 := utils.GetRandomKeysFixedN(numInsPerStep, keyByteSize)
-		// values2 := utils.GetRandomValues(len(keys2), valueMaxByteSize, valueMaxByteSize)
+		keys2 := common.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+		values2 := common.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+		t.Run("create segment after checkpoint", func(t *testing.T) {
 
-		// t.Run("create segment after checkpoint", func(t *testing.T) {
+			require.NoFileExists(t, path.Join(dir, "00000011"))
 
-		// 	require.NoFileExists(t, path.Join(dir, "00000011"))
+			//generate one more segment
+			wal4, err := realWAL.NewWAL(nil, nil, dir, size*10, pathByteSize)
+			require.NoError(t, err)
+			update, err := ledger.NewUpdate(rootHash, keys2, values2)
+			require.NoError(t, err)
+			trieUpdate, err := common.UpdateToTrieUpdate(update, pathFinderVersion)
 
-		// 	//generate one more segment
-		// 	wal4, err := realWAL.NewWAL(nil, nil, dir, size*10, keyByteSize)
-		// 	require.NoError(t, err)
+			err = wal4.RecordUpdate(trieUpdate)
+			require.NoError(t, err)
 
-		// 	err = wal4.RecordUpdate(stateCommitment, keys2, values2)
-		// 	require.NoError(t, err)
+			_, err = f.Update(trieUpdate)
+			require.NoError(t, err)
 
-		// 	newTrie, err := f.Update(stateCommitment, keys2, values2)
-		// 	require.NoError(t, err)
-		// 	stateCommitment = newTrie.RootHash()
+			err = wal4.Close()
+			require.NoError(t, err)
 
-		// 	err = wal4.Close()
-		// 	require.NoError(t, err)
+			require.FileExists(t, path.Join(dir, "00000011")) //make sure we have extra segment
+		})
 
-		// 	require.FileExists(t, path.Join(dir, "00000011")) //make sure we have extra segment
-		// })
+		f5, err := mtrie.NewForest(pathByteSize, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		require.NoError(t, err)
 
-		// f5, err := mtrie.NewForest(keyByteSize, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
-		// require.NoError(t, err)
+		t.Run("replay both checkpoint and updates after checkpoint", func(t *testing.T) {
+			wal5, err := realWAL.NewWAL(nil, nil, dir, size*10, pathByteSize)
+			require.NoError(t, err)
 
-		// t.Run("replay both checkpoint and updates after checkpoint", func(t *testing.T) {
-		// 	wal5, err := realWAL.NewWAL(nil, nil, dir, size*10, keyByteSize)
-		// 	require.NoError(t, err)
+			updatesLeft := 1 // there should be only one update
 
-		// 	updatesLeft := 1 // there should be only one update
+			err = wal5.Replay(
+				func(forestSequencing *flattener.FlattenedForest) error {
+					return loadIntoForest(f5, forestSequencing)
+				},
+				func(update *ledger.TrieUpdate) error {
+					if updatesLeft == 0 {
+						return fmt.Errorf("more updates called then expected")
+					}
+					_, err := f5.Update(update)
+					updatesLeft--
+					return err
+				},
+				func(rootHash ledger.RootHash) error {
+					return fmt.Errorf("I should fail as there should be no deletions")
+				},
+			)
+			require.NoError(t, err)
 
-		// 	err = wal5.Replay(
-		// 		func(forestSequencing *flattener.FlattenedForest) error {
-		// 			return loadIntoForest(f5, forestSequencing)
-		// 		},
-		// 		func(commitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
-		// 			if updatesLeft == 0 {
-		// 				return fmt.Errorf("more updates called then expected")
-		// 			}
-		// 			_, err := f5.Update(commitment, keys, values)
-		// 			updatesLeft--
-		// 			return err
-		// 		},
-		// 		func(commitment flow.StateCommitment) error {
-		// 			return fmt.Errorf("I should fail as there should be no deletions")
-		// 		},
-		// 	)
-		// 	require.NoError(t, err)
+			err = wal5.Close()
+			require.NoError(t, err)
+		})
 
-		// 	err = wal5.Close()
-		// 	require.NoError(t, err)
-		// })
+		t.Run("extra updates were applied correctly", func(t *testing.T) {
 
-		// t.Run("extra updates were applied correctly", func(t *testing.T) {
-		// 	registerValues, err := f.Read([]byte(stateCommitment), keys2)
-		// 	require.NoError(t, err)
+			query, err := ledger.NewQuery(rootHash, keys2)
+			require.NoError(t, err)
+			trieRead, err := common.QueryToTrieRead(query, pathFinderVersion)
+			require.NoError(t, err)
 
-		// 	registerValues5, err := f5.Read([]byte(stateCommitment), keys2)
-		// 	require.NoError(t, err)
+			payloads, err := f.Read(trieRead)
+			require.NoError(t, err)
 
-		// 	for i := range keys2 {
-		// 		require.Equal(t, values2[i], registerValues[i])
-		// 		require.Equal(t, values2[i], registerValues5[i])
-		// 	}
-		// })
+			payloads5, err := f5.Read(trieRead)
+			require.NoError(t, err)
 
+			for i := range keys2 {
+				require.Equal(t, values2[i], payloads[i].Value)
+				require.Equal(t, values2[i], payloads5[i].Value)
+			}
+		})
 	})
 }
 
