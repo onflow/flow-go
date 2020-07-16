@@ -3,8 +3,11 @@
 package module
 
 import (
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network"
 )
+
+type GetIdentityList func() flow.IdentityList
 
 // Network represents the network layer of the node. It allows processes that
 // work across the peer-to-peer network to register themselves as an engine with
@@ -16,5 +19,6 @@ type Network interface {
 	// of the node that wants to communicate across the network. It will return a
 	// conduit which connects the process to a bus allowing it to communicate with
 	// all other engines on the network that are on the same channel.
-	Register(channelID uint8, engine network.Engine) (network.Conduit, error)
+	Register(channelID uint8, engine network.Engine,getIdentities GetIdentityList) (network.Conduit, error)
+	RemoveNode(slashedNode flow.Identity)
 }
