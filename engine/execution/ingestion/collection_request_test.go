@@ -3,6 +3,7 @@ package ingestion
 import (
 	"fmt"
 	"math/rand"
+	"strings"
 	"testing"
 	"time"
 
@@ -30,6 +31,44 @@ func (c *colReqMatcher) String() string {
 	return fmt.Sprintf("ID %x", c.req.ID)
 }
 
+// Compares two lists of identifiers regardless of order
+// and number of occurrences
+type identifierListMatcher struct {
+	identifiers []flow.Identifier
+}
+
+func (c *identifierListMatcher) Matches(x interface{}) bool {
+	if other, ok := x.([]flow.Identifier); ok {
+		m := make(map[flow.Identifier]bool, len(other))
+		for _, identifier := range other {
+			m[identifier] = false
+		}
+		for _, identifier := range c.identifiers {
+			if _, has := m[identifier]; has {
+				m[identifier] = true
+				continue
+			}
+			return false
+		}
+
+		for _, present := range m {
+			if !present {
+				return false
+			}
+		}
+		return true
+	}
+
+	return false
+}
+func (c *identifierListMatcher) String() string {
+	s := make([]string, len(c.identifiers))
+	for i, identifier := range c.identifiers {
+		s[i] = identifier.String()
+	}
+	return fmt.Sprintf("IDs %s", strings.Join(s, ", "))
+}
+
 func TestCollectionRequests(t *testing.T) {
 
 	runWithEngine(t, func(ctx testingContext) {
@@ -53,7 +92,7 @@ func TestCollectionRequests(t *testing.T) {
 
 		ctx.collectionConduit.EXPECT().Submit(
 			&colReqMatcher{req: &messages.CollectionRequest{ID: guarantees[0].ID(), Nonce: rand.Uint64()}},
-			gomock.Eq([]flow.Identifier{collection1Identity.NodeID, collection3Identity.NodeID}),
+			&identifierListMatcher{identifiers: []flow.Identifier{collection1Identity.NodeID, collection3Identity.NodeID}},
 		)
 
 		ctx.collectionConduit.EXPECT().Submit(

@@ -309,6 +309,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		false,
 		2137*time.Hour, // just don't retry
 		10,
+		3,
 	)
 	require.NoError(t, err)
 

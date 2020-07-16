@@ -173,6 +173,7 @@ func main() {
 				true,
 				time.Second, //TODO - config param
 				10,          // TODO - config param
+				3,           //TODO - config param
 			)
 			return ingestionEng, err
 		}).

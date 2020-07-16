@@ -69,6 +69,7 @@ type Engine struct {
 	collectionRequestTimeout            time.Duration
 	maximumCollectionRequestRetryNumber uint
 	spockHasher                         hash.Hasher
+	collectorsNumberToQuery             uint
 }
 
 func New(
@@ -91,6 +92,7 @@ func New(
 	extLog bool,
 	collectionRequestTimeout time.Duration,
 	maximumCollectionRequestRetryNumber uint,
+	collectorsNumberToQuery uint,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "blocks").Logger()
 
@@ -121,6 +123,7 @@ func New(
 		extensiveLogging:                    extLog,
 		collectionRequestTimeout:            collectionRequestTimeout,
 		maximumCollectionRequestRetryNumber: maximumCollectionRequestRetryNumber,
+		collectorsNumberToQuery:             collectorsNumberToQuery,
 	}
 
 	con, err := net.Register(engine.BlockProvider, &eng)
@@ -525,14 +528,7 @@ func (e *Engine) findCollectionNodesForGuarantee(
 	if len(identities) < 1 {
 		return nil, fmt.Errorf("no collection identity found")
 	}
-	return identities.Sample(3).NodeIDs(), nil
-
-	identifiers := make([]flow.Identifier, len(identities))
-	for i, id := range identities {
-		identifiers[i] = id.NodeID
-	}
-
-	return identifiers, nil
+	return identities.Sample(e.collectorsNumberToQuery).NodeIDs(), nil
 }
 
 func (e *Engine) onExecutionStateSyncRequest(

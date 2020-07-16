@@ -158,6 +158,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		false,
 		1*time.Hour, //practically disable retrying
 		10,
+		3,
 	)
 	require.NoError(t, err)
 
@@ -489,7 +490,8 @@ func Test_ProperNumberOfCollectorsIsQueries(t *testing.T) {
 	blockID := unittest.IdentifierFixture()
 
 	engine := &Engine{
-		state: protocolState,
+		state:                   protocolState,
+		collectorsNumberToQuery: 3,
 	}
 
 	t.Run("less then 3", func(t *testing.T) {
