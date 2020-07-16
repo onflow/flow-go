@@ -5,7 +5,9 @@ import (
 )
 
 // State represents the chain state for collection node cluster consensus. It
-// tracks which blocks are finalized and indexes blocks by number and ID.
+// tracks which blocks are finalized and indexes blocks by number and ID. The
+// purpose of cluster consensus is to agree on collections of transactions, so
+// each block within the cluster state corresponds to a proposed collection.
 //
 // NOTE: This is modelled after, and is a simpler version of, protocol.State.
 type State interface {

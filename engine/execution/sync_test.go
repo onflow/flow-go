@@ -22,6 +22,8 @@ import (
 func TestSyncFlow(t *testing.T) {
 	hub := stub.NewNetworkHub()
 
+	chainID := flow.Mainnet
+
 	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 	exe1ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
@@ -31,16 +33,16 @@ func TestSyncFlow(t *testing.T) {
 	identities := unittest.CompleteIdentitySet(colID, conID, exe1ID, exe2ID, verID)
 
 	// exe1 will sync from exe2 after exe2 executes transactions
-	exeNode1 := testutil.ExecutionNode(t, hub, exe1ID, identities, 1)
+	exeNode1 := testutil.ExecutionNode(t, hub, exe1ID, identities, 1, chainID)
 	defer exeNode1.Done()
-	exeNode2 := testutil.ExecutionNode(t, hub, exe2ID, identities, 21)
+	exeNode2 := testutil.ExecutionNode(t, hub, exe2ID, identities, 21, chainID)
 	defer exeNode2.Done()
 
-	collectionNode := testutil.GenericNode(t, hub, colID, identities)
+	collectionNode := testutil.GenericNode(t, hub, colID, identities, chainID)
 	defer collectionNode.Done()
-	verificationNode := testutil.GenericNode(t, hub, verID, identities)
+	verificationNode := testutil.GenericNode(t, hub, verID, identities, chainID)
 	defer verificationNode.Done()
-	consensusNode := testutil.GenericNode(t, hub, conID, identities)
+	consensusNode := testutil.GenericNode(t, hub, conID, identities, chainID)
 	defer consensusNode.Done()
 
 	genesis, err := exeNode1.State.AtHeight(0).Head()

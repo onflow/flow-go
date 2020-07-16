@@ -15,49 +15,58 @@ type Proof struct {
 	Values    [][]byte // the non-default intermediate nodes in the proof
 	Inclusion bool     // flag indicating if this is an inclusion or exclusion
 	Flags     []byte   // The flags of the proofs (is set if an intermediate node has a non-default)
-	Steps     uint8    // number of steps for the proof (path len)
+	Steps     uint8    // number of steps for the proof (path len) // TODO: should this be a type allowing for larger values?
 }
 
 // NewProof creates a new instance of Proof
 func NewProof() *Proof {
-	p := new(Proof)
-	p.Values = make([][]byte, 0)
-	p.Inclusion = false
-	p.Flags = make([]byte, 0)
-	p.Steps = 0
-	return p
+	return &Proof{
+		Values:    make([][]byte, 0),
+		Inclusion: false,
+		Flags:     make([]byte, 0),
+		Steps:     0,
+	}
 }
 
 // Verify verifies the proof, by constructing all the
 // hash from the leaf to the root and comparing the rootHash
-func (p *Proof) Verify(key []byte, value []byte, rootHash []byte, trieMaxHeight int) bool {
-	// get index of proof we start our calculations from
-	proofIndex := 0
-
-	if len(p.Values) != 0 {
-		proofIndex = len(p.Values) - 1
+func (p *Proof) Verify(key []byte, value []byte, expectedRootHash []byte, expectedKeySize int) bool {
+	if len(key) != expectedKeySize { // key has unexpected length
+		return false
 	}
-	// base case at the bottom of the trie
-	computed := common.ComputeCompactValue(key, value, trieMaxHeight-int(p.Steps)-1)
-	for i := int(p.Steps) - 1; i > -1; i-- {
+	treeHeight := 8 * expectedKeySize
+	leafHeight := treeHeight - int(p.Steps)             // p.Steps is the number of edges we are traversing until we hit the compactified leaf.
+	if !(0 <= leafHeight && leafHeight <= treeHeight) { // sanity check
+		return false
+	}
+
+	// We start with the leaf and hash our way upwards towards the root
+	proofIndex := len(p.Values) - 1                                // the index of the last non-default value furthest down the tree (-1 if there is none)
+	computed := common.ComputeCompactValue(key, value, leafHeight) // we first compute the hash of the fully-expanded leaf (at height 0)
+	for h := leafHeight + 1; h <= treeHeight; h++ {                // then, we hash our way upwards until we hit the root (at height `treeHeight`)
+		// we are currently at a node n (initially the leaf). In this iteration, we want to compute the
+		// parent's hash. Here, h is the height of the parent, whose hash want to compute.
+		// The parent has two children: child n, whose hash we have already computed (aka `computed`);
+		// and the sibling to node n, whose hash (aka `siblingHash`) must be defined by the Proof.
+
+		var siblingHash []byte
+		if utils.IsBitSet(p.Flags, treeHeight-h) { // if flag is set, siblingHash is stored in the proof
+			if proofIndex < 0 { // proof invalid: too few values
+				return false
+			}
+			siblingHash = p.Values[proofIndex]
+			proofIndex--
+		} else { // otherwise, siblingHash is a default hash
+			siblingHash = common.GetDefaultHashForHeight(h - 1)
+		}
 		// hashing is order dependant
-		if utils.IsBitSet(key, i) {
-			if !utils.IsBitSet(p.Flags, i) {
-				computed = common.HashInterNode(common.GetDefaultHashForHeight((trieMaxHeight-i)-2), computed)
-			} else {
-				computed = common.HashInterNode(p.Values[proofIndex], computed)
-				proofIndex--
-			}
-		} else {
-			if !utils.IsBitSet(p.Flags, i) {
-				computed = common.HashInterNode(computed, common.GetDefaultHashForHeight((trieMaxHeight-i)-2))
-			} else {
-				computed = common.HashInterNode(computed, p.Values[proofIndex])
-				proofIndex--
-			}
+		if utils.IsBitSet(key, treeHeight-h) { // we hash our way up to the parent along the parent's right branch
+			computed = common.HashInterNode(siblingHash, computed)
+		} else { // we hash our way up to the parent along the parent's left branch
+			computed = common.HashInterNode(computed, siblingHash)
 		}
 	}
-	return bytes.Equal(computed, rootHash) == p.Inclusion
+	return bytes.Equal(computed, expectedRootHash) == p.Inclusion
 }
 
 func (p *Proof) String() string {
@@ -117,10 +126,10 @@ func (bp *BatchProof) Size() int {
 }
 
 // Verify verifies all the proof inside the batchproof
-func (bp *BatchProof) Verify(keys [][]byte, values [][]byte, rootHash []byte, trieMaxHeight int) bool {
+func (bp *BatchProof) Verify(keys [][]byte, values [][]byte, expectedRootHash []byte, expectedKeySize int) bool {
 	for i, p := range bp.Proofs {
 		// any invalid proof
-		if !p.Verify(keys[i], values[i], rootHash, trieMaxHeight) {
+		if !p.Verify(keys[i], values[i], expectedRootHash, expectedKeySize) {
 			return false
 		}
 	}

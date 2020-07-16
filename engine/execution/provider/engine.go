@@ -38,6 +38,7 @@ type Engine struct {
 	execState     state.ReadOnlyExecutionState
 	me            module.Local
 	chunksConduit network.Conduit
+	metrics       module.ExecutionMetrics
 }
 
 func New(
@@ -48,6 +49,7 @@ func New(
 	me module.Local,
 	execState state.ReadOnlyExecutionState,
 	stateSync sync.StateSynchronizer,
+	metrics module.ExecutionMetrics,
 ) (*Engine, error) {
 
 	log := logger.With().Str("engine", "receipts").Logger()
@@ -59,6 +61,7 @@ func New(
 		state:     state,
 		me:        me,
 		execState: execState,
+		metrics:   metrics,
 	}
 
 	var err error
@@ -140,6 +143,9 @@ func (e *Engine) onChunkDataRequest(
 		Logger()
 
 	log.Debug().Msg("received chunk data pack request")
+
+	// increases collector metric
+	e.metrics.ChunkDataPackRequested()
 
 	origin, err := e.state.Final().Identity(originID)
 	if err != nil {

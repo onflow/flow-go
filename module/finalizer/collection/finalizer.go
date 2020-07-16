@@ -148,8 +148,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			// For now, we just use the parent signers as the guarantors of this
 			// collection.
 
-			// TODO add real signatures here
-			// https://github.com/dapperlabs/flow-go/issues/2711
+			// TODO add real signatures here (2711)
 			f.prov.SubmitLocal(&messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID:     payload.Collection.ID(),

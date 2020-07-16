@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
+	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 )
@@ -23,13 +24,16 @@ type handlerEvents struct {
 func (h *handlerEvents) GetEventsForHeightRange(ctx context.Context, req *access.GetEventsForHeightRangeRequest) (*access.EventsResponse, error) {
 
 	// validate the request
-	if req.GetEndHeight() < req.GetStartHeight() {
-		return nil, status.Error(codes.InvalidArgument, "invalid start or end height")
+	minHeight := req.GetStartHeight()
+	maxHeight := req.GetEndHeight()
+	if err := convert.BlockHeight(minHeight, maxHeight); err != nil {
+		return nil, err
 	}
 
+	// validate the event type
 	reqEvent := req.GetType()
-	if reqEvent == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid event type")
+	if _, err := convert.EventType(reqEvent); err != nil {
+		return nil, err
 	}
 
 	// get the latest sealed block header
@@ -38,16 +42,9 @@ func (h *handlerEvents) GetEventsForHeightRange(ctx context.Context, req *access
 		return nil, status.Errorf(codes.Internal, " failed to get events: %v", err)
 	}
 
-	var minHeight, maxHeight uint64
-
-	// derive bounds for block height
-	minHeight = req.GetStartHeight()
-
 	// limit max height to last sealed block in the chain
-	if head.Height < req.GetEndHeight() {
+	if head.Height < maxHeight {
 		maxHeight = head.Height
-	} else {
-		maxHeight = req.GetEndHeight()
 	}
 
 	// find the block IDs for all the blocks between min and max height (inclusive)
@@ -61,22 +58,30 @@ func (h *handlerEvents) GetEventsForHeightRange(ctx context.Context, req *access
 		blockIDs = append(blockIDs, id[:])
 	}
 
+	if _, err := convert.BlockIDs(blockIDs); err != nil {
+		return nil, err
+	}
+
 	return h.getBlockEventsFromExecutionNode(ctx, blockIDs, reqEvent)
 }
 
 // GetEventsForBlockIDs retrieves events for all the specified block IDs that have the given type
 func (h *handlerEvents) GetEventsForBlockIDs(ctx context.Context, req *access.GetEventsForBlockIDsRequest) (*access.EventsResponse, error) {
 
-	if len(req.GetBlockIds()) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "block IDs not specified")
+	// validate the block ids
+	blockIDs := req.GetBlockIds()
+	if _, err := convert.BlockIDs(blockIDs); err != nil {
+		return nil, err
 	}
 
-	if req.GetType() == "" {
-		return nil, status.Error(codes.InvalidArgument, "invalid event type")
+	// validate the event type
+	reqEvent := req.GetType()
+	if _, err := convert.EventType(reqEvent); err != nil {
+		return nil, err
 	}
 
 	// forward the request to the execution node
-	return h.getBlockEventsFromExecutionNode(ctx, req.GetBlockIds(), req.GetType())
+	return h.getBlockEventsFromExecutionNode(ctx, blockIDs, reqEvent)
 }
 
 func (h *handlerEvents) getBlockEventsFromExecutionNode(ctx context.Context, blockIDs [][]byte, etype string) (*access.EventsResponse, error) {

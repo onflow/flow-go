@@ -25,7 +25,7 @@ import (
 )
 
 // NewParticipant initialize the EventLoop instance and recover the forks' state with all pending block
-func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics module.HotstuffMetrics, headers storage.Headers,
+func NewParticipant(log zerolog.Logger, tracer module.Tracer, notifier hotstuff.Consumer, metrics module.HotstuffMetrics, headers storage.Headers,
 	committee hotstuff.Committee, builder module.Builder, updater module.Finalizer, persist hotstuff.Persister,
 	signer hotstuff.Signer, communicator hotstuff.Communicator, rootHeader *flow.Header, rootQC *model.QuorumCertificate,
 	finalized *flow.Header, pending []*flow.Header, options ...Option) (*hotstuff.EventLoop, error) {
@@ -110,7 +110,7 @@ func NewParticipant(log zerolog.Logger, notifier hotstuff.Consumer, metrics modu
 	voter := voter.New(signer, forks, persist, voted)
 
 	// initialize the event handler
-	handler, err := eventhandler.New(log, pacemaker, producer, forks, persist, communicator, committee, aggregator, voter, validator, notifier)
+	handler, err := eventhandler.New(log, tracer, pacemaker, producer, forks, persist, communicator, committee, aggregator, voter, validator, notifier)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize event handler: %w", err)
 	}

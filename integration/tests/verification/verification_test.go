@@ -12,6 +12,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
+	"github.com/dapperlabs/flow-go/engine/testutil/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	chmodel "github.com/dapperlabs/flow-go/model/chunks"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -55,21 +56,23 @@ func TestHappyPath(t *testing.T) {
 		t.Run(fmt.Sprintf("%d-verification node %d-chunk number", tc.verNodeCount, tc.chunkCount), func(t *testing.T) {
 			mu.Lock()
 			defer mu.Unlock()
-			// no metrics is meant to be collected, hence both verification and mempool collectors are noop
+
 			collector := metrics.NewNoopCollector()
-			VerificationHappyPath(t, collector, collector, tc.verNodeCount, tc.chunkCount)
+			verification.VerificationHappyPath(t, tc.verNodeCount, tc.chunkCount, collector, collector)
 		})
 	}
 }
 
 // TestSingleCollectionProcessing checks the full happy
 // path assuming a single collection (including transactions on counter example)
-// are submited to the verification node.
+// are submitted to the verification node.
 func TestSingleCollectionProcessing(t *testing.T) {
-	// ingest engine parameters
-	// set based on following issue
-	// https://github.com/dapperlabs/flow-go/issues/3443
-	requestInterval := uint(1000)
+	chainID := flow.Testnet
+
+	// finder and match engine parameters
+	// set based on following issue (3443)
+	requestInterval := 1 * time.Second
+	processInterval := 1 * time.Second
 	failureThreshold := uint(2)
 
 	// network identity setup
@@ -102,13 +105,15 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	collector := metrics.NewNoopCollector()
 	verNode := testutil.VerificationNode(t,
 		hub,
-		collector,
-		collector,
 		verIdentity,
 		identities,
 		assigner,
 		requestInterval,
-		failureThreshold)
+		processInterval,
+		failureThreshold,
+		chainID,
+		collector,
+		collector)
 	// inject block
 	err := verNode.Blocks.Store(completeER.Block)
 	assert.Nil(t, err)
@@ -124,7 +129,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	verNet.StartConDev(100, true)
 
 	// execution node
-	exeNode := testutil.GenericNode(t, hub, exeIdentity, identities)
+	exeNode := testutil.GenericNode(t, hub, exeIdentity, identities, chainID)
 	exeEngine := new(network.Engine)
 	exeChunkDataConduit, err := exeNode.Net.Register(engine.ChunkDataPackProvider, exeEngine)
 	assert.Nil(t, err)
@@ -143,7 +148,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 		}).Return(nil).Once()
 
 	// consensus node
-	conNode := testutil.GenericNode(t, hub, conIdentity, identities)
+	conNode := testutil.GenericNode(t, hub, conIdentity, identities, chainID)
 	conEngine := new(network.Engine)
 	approvalWG := sync.WaitGroup{}
 	approvalWG.Add(1)

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	golog "github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
@@ -43,7 +44,7 @@ func (m *MeshNetTestSuite) SetupTest() {
 	// defines total number of nodes in our network (minimum 3 needed to use 1-k messaging)
 	const count = 10
 	const cacheSize = 100
-	//golog.SetAllLoggers(gologging.INFO)
+	golog.SetAllLoggers(golog.LevelInfo)
 
 	m.ids = CreateIDs(count)
 
@@ -237,7 +238,8 @@ func (m *MeshNetTestSuite) TestMaxMessageSize() {
 	require.NoError(m.T(), err)
 
 	// create a large message approximately equal to max message size
-	overhead := 500                                                       // approx 500 bytes overhead for message headers & encoding overhead
+	// approx 1000 bytes overhead for message headers, encoding overhead and libp2p message overhead
+	overhead := 1000
 	payloadSize := libp2p.DefaultMaxPubSubMsgSize - overhead - len(empty) // max possible payload size
 	payload := make([]byte, payloadSize)                                  // create a message of max possible payload size
 	for i := range payload {

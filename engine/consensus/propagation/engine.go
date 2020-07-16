@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -24,6 +25,7 @@ type Engine struct {
 	unit       *engine.Unit            // used to control startup/shutdown
 	log        zerolog.Logger          // used to log relevant actions with context
 	metrics    module.EngineMetrics    // used to track sent & received messages
+	tracer     module.Tracer           // used for tracing
 	mempool    module.MempoolMetrics   // used to track mempool sizes
 	spans      module.ConsensusMetrics // used to track timespans
 	con        network.Conduit         // used to talk to other nodes on the network
@@ -33,7 +35,17 @@ type Engine struct {
 }
 
 // New creates a new collection propagation engine.
-func New(log zerolog.Logger, collector module.EngineMetrics, mempool module.MempoolMetrics, spans module.ConsensusMetrics, net module.Network, state protocol.State, me module.Local, guarantees mempool.Guarantees) (*Engine, error) {
+func New(
+	log zerolog.Logger,
+	collector module.EngineMetrics,
+	mempool module.MempoolMetrics,
+	tracer module.Tracer,
+	spans module.ConsensusMetrics,
+	net module.Network,
+	state protocol.State,
+	me module.Local,
+	guarantees mempool.Guarantees,
+) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
@@ -41,6 +53,7 @@ func New(log zerolog.Logger, collector module.EngineMetrics, mempool module.Memp
 		log:        log.With().Str("engine", "propagation").Logger(),
 		metrics:    collector,
 		mempool:    mempool,
+		tracer:     tracer,
 		spans:      spans,
 		state:      state,
 		me:         me,
@@ -118,6 +131,10 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // onGuarantee is called when a new collection guarantee is received
 // from another node on the network.
 func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
+	if span, ok := e.tracer.GetSpan(guarantee.CollectionID, trace.CONProcessCollection); ok {
+		childSpan := e.tracer.StartSpanFromParent(span, trace.CONPropOnGuarantee)
+		defer childSpan.Finish()
+	}
 
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
@@ -137,7 +154,7 @@ func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.Collectio
 
 	log.Info().Msg("collection guarantee processed")
 
-	// select all the collection nodes on the network as our targets
+	// select all the consensus nodes on the network as our targets
 	identities, err := e.state.Final().Identities(filter.And(
 		filter.HasRole(flow.RoleConsensus),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),

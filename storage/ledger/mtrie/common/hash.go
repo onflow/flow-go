@@ -63,25 +63,25 @@ func HashInterNode(hash1 []byte, hash2 []byte) []byte {
 
 // ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.
 func ComputeCompactValue(key []byte, value []byte, nodeHeight int) []byte {
-	// if value is nil return default hash
+	// if register is unallocated: return default hash
 	if len(value) == 0 {
 		return GetDefaultHashForHeight(nodeHeight)
 	}
-	computedHash := HashLeaf(key, value)
 
-	// we have: len(key) = keyByteSize = (maxHeight - 1) / 8
-	// hence: maxHeight = 8 * len(key) + 1
-	maxHeight := 8*len(key) + 1
-	for j := maxHeight - 2; j > maxHeight-nodeHeight-2; j-- {
-		bitIsSet, err := IsBitSet(key, j)
-		// this won't happen ever
-		if err != nil {
+	// register is allocated
+	treeHeight := 8 * len(key)
+	computedHash := HashLeaf(key, value) // we first compute the hash of the fully-expanded leaf
+	for h := 1; h <= nodeHeight; h++ {   // then, we hash our way upwards towards the root until we hit the specified nodeHeight
+		// h is the height of the node, whose hash we are computing in this iteration.
+		// The hash is computed from the node's children at height h-1.
+		bitIsSet, err := IsBitSet(key, treeHeight-h)
+		if err != nil { // this won't happen ever
 			panic(err)
 		}
 		if bitIsSet { // right branching
-			computedHash = HashInterNode(GetDefaultHashForHeight(maxHeight-j-2), computedHash)
+			computedHash = HashInterNode(GetDefaultHashForHeight(h-1), computedHash)
 		} else { // left branching
-			computedHash = HashInterNode(computedHash, GetDefaultHashForHeight(maxHeight-j-2))
+			computedHash = HashInterNode(computedHash, GetDefaultHashForHeight(h-1))
 		}
 	}
 	return computedHash

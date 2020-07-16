@@ -102,10 +102,8 @@ func toStorableTrie(mtrie *trie.MTrie, indexForNode node2indexMap) (*StorableTri
 		return nil, fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(mtrie.RootNode().Hash()))
 	}
 	storableTrie := &StorableTrie{
-		RootIndex:      rootIndex,
-		Number:         mtrie.Number(),
-		RootHash:       mtrie.RootHash(),
-		ParentRootHash: mtrie.ParentRootHash(),
+		RootIndex: rootIndex,
+		RootHash:  mtrie.RootHash(),
 	}
 
 	return storableTrie, nil
@@ -120,11 +118,7 @@ func RebuildTries(flatForest *FlattenedForest) ([]*trie.MTrie, error) {
 
 	//restore tries
 	for _, storableTrie := range flatForest.Tries {
-		mtrie, err := trie.NewMTrie(
-			nodes[storableTrie.RootIndex],
-			storableTrie.Number,
-			storableTrie.ParentRootHash,
-		)
+		mtrie, err := trie.NewMTrie(nodes[storableTrie.RootIndex])
 		if err != nil {
 			return nil, fmt.Errorf("restoring trie failed: %w", err)
 		}

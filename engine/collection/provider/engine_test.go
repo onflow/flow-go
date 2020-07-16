@@ -32,12 +32,14 @@ type Suite struct {
 	reqNode   mock.GenericNode    // used for request/response flows
 	reqEngine *mocknetwork.Engine
 	conduit   network.Conduit
+	chainID   flow.ChainID
 }
 
 func (suite *Suite) SetupTest() {
 	var err error
 
 	suite.hub = stub.NewNetworkHub()
+	suite.chainID = flow.Mainnet
 
 	// add some dummy identities so we have one of each role
 	suite.identities = unittest.IdentityListFixture(5, unittest.WithAllRoles())
@@ -45,9 +47,9 @@ func (suite *Suite) SetupTest() {
 	conIdentity := suite.identities.Filter(filter.HasRole(flow.RoleConsensus))[0]
 	reqIdentity := suite.identities.Filter(filter.HasRole(flow.RoleExecution))[0]
 
-	suite.colNode = testutil.CollectionNode(suite.T(), suite.hub, colIdentity, suite.identities)
-	suite.conNode = testutil.ConsensusNode(suite.T(), suite.hub, conIdentity, suite.identities)
-	suite.reqNode = testutil.GenericNode(suite.T(), suite.hub, reqIdentity, suite.identities)
+	suite.colNode = testutil.CollectionNode(suite.T(), suite.hub, colIdentity, suite.identities, suite.chainID)
+	suite.conNode = testutil.ConsensusNode(suite.T(), suite.hub, conIdentity, suite.identities, suite.chainID)
+	suite.reqNode = testutil.GenericNode(suite.T(), suite.hub, reqIdentity, suite.identities, suite.chainID)
 
 	suite.reqEngine = new(mocknetwork.Engine)
 	suite.conduit, err = suite.reqNode.Net.Register(engine.CollectionProvider, suite.reqEngine)

@@ -3,8 +3,8 @@ package cmd
 import (
 	"fmt"
 	"strings"
+	"time"
 
-	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
@@ -17,12 +17,15 @@ var (
 	flagCollectionClusters                           uint16
 	flagGeneratedCollectorAddressTemplate            string
 	flagGeneratedCollectorStake                      uint64
-	flagGenesisTokenSupply                           uint64
 	flagPartnerNodeInfoDir                           string
 	flagPartnerStakes                                string
-	flagServiceAccountPublicKeyFile                  string
 	flagCollectorGenerationMaxHashGrindingIterations uint
 	flagFastKG                                       bool
+	flagRootChain                                    string
+	flagRootParent                                   string
+	flagRootHeight                                   uint64
+	flagRootTimestamp                                string
+	flagRootCommit                                   string
 )
 
 type PartnerStakes map[flow.Identifier]uint64
@@ -32,8 +35,10 @@ var finalizeCmd = &cobra.Command{
 	Use:   "finalize",
 	Short: "Finalize the bootstrapping process",
 	Long: `Finalize the bootstrapping process, which includes generating of internal networking and staking keys,
-running the DKG for generating the random beacon keys, generating genesis execution state, seal, block and QC.`,
+running the DKG for the generation of the random beacon keys and generating the root block, QC, execution result
+and block seal.`,
 	Run: func(cmd *cobra.Command, args []string) {
+
 		log.Info().Msg("✨ collecting partner network and staking keys")
 		partnerNodes := assemblePartnerNodes()
 		log.Info().Msg("")
@@ -51,27 +56,12 @@ running the DKG for generating the random beacon keys, generating genesis execut
 		dkgData := runDKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
 		log.Info().Msg("")
 
-		// Flag?
-		chainID := flow.Mainnet
-		chain := chainID.Chain()
-
-		if len(flagServiceAccountPublicKeyFile) > 0 {
-			publicKey := readServiceAccountPublicKey(flagServiceAccountPublicKeyFile)
-			log.Info().Msg("✨ using provided public key file for service account and generating genesis execution state")
-			genGenesisExecutionState(publicKey, flagGenesisTokenSupply, chain)
-			log.Info().Msg("")
-		} else {
-			log.Info().Msg("✨ generating private key for service account and generating genesis execution state")
-			genGenesisExecutionState(nil, flagGenesisTokenSupply, chain)
-			log.Info().Msg("")
-		}
-
-		log.Info().Msg("✨ constructing genesis seal and genesis block")
-		block := constructGenesisBlock(stakingNodes, chainID)
+		log.Info().Msg("✨ constructing root block")
+		block := constructRootBlock(flagRootChain, flagRootParent, flagRootHeight, flagRootTimestamp, stakingNodes)
 		log.Info().Msg("")
 
-		log.Info().Msg("✨ constructing genesis QC")
-		constructGenesisQC(
+		log.Info().Msg("✨ constructing root QC")
+		constructRootQC(
 			block,
 			model.FilterByRole(stakingNodes, flow.RoleConsensus),
 			model.FilterByRole(internalNodes, flow.RoleConsensus),
@@ -79,16 +69,20 @@ running the DKG for generating the random beacon keys, generating genesis execut
 		)
 		log.Info().Msg("")
 
-		log.Info().Msg("✨ computing collector clusters")
+		log.Info().Msg("✨ constructing root execution result and block seal")
+		constructRootResultAndSeal(flagRootCommit, block)
+		log.Info().Msg("")
+
+		log.Info().Msg("✨ computing collection node clusters")
 		clusters := protocol.Clusters(uint(flagCollectionClusters), model.ToIdentityList(stakingNodes))
 		log.Info().Msg("")
 
-		log.Info().Msg("✨ constructing genesis blocks for collector clusters")
-		clusterBlocks := constructGenesisBlocksForCollectorClusters(clusters)
+		log.Info().Msg("✨ constructing root blocks for collection node clusters")
+		clusterBlocks := constructRootBlocksForClusters(clusters)
 		log.Info().Msg("")
 
-		log.Info().Msg("✨ constructing genesis QCs for collector clusters")
-		constructGenesisQCsForCollectorClusters(clusters, internalNodes, block, clusterBlocks)
+		log.Info().Msg("✨ constructing root QCs for collection node clusters")
+		constructRootQCsForClusters(clusters, internalNodes, block, clusterBlocks)
 		log.Info().Msg("")
 
 		log.Info().Msg("🌊 🏄 🤙 Done – ready to flow!")
@@ -98,9 +92,32 @@ running the DKG for generating the random beacon keys, generating genesis execut
 func init() {
 	rootCmd.AddCommand(finalizeCmd)
 
+	// required parameters for network configuration and generation of root node identities
 	finalizeCmd.Flags().StringVar(&flagConfig, "config", "",
 		"path to a JSON file containing multiple node configurations (fields Role, Address, Stake)")
+	finalizeCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", fmt.Sprintf("path to directory "+
+		"containing one JSON file starting with %v for every partner node (fields Role, Address, NodeID, "+
+		"NetworkPubKey, StakingPubKey)", model.PathPartnerNodeInfoPrefix))
+	finalizeCmd.Flags().StringVar(&flagPartnerStakes, "partner-stakes", "", "path to a JSON file containing "+
+		"a map from partner node's NodeID to their stake")
+
 	_ = finalizeCmd.MarkFlagRequired("config")
+	_ = finalizeCmd.MarkFlagRequired("partner-dir")
+	_ = finalizeCmd.MarkFlagRequired("partner-stakes")
+
+	// required parameters for generation of root block, root execution result and root block seal
+	finalizeCmd.Flags().StringVar(&flagRootChain, "root-chain", "emulator", "chain ID for the root block (can be \"main\", \"test\" or \"emulator\"")
+	finalizeCmd.Flags().StringVar(&flagRootParent, "root-parent", "0x0000000000000000000000000000000000000000000000000000000000000000", "ID for the parent of the root block")
+	finalizeCmd.Flags().Uint64Var(&flagRootHeight, "root-height", 0, "height of the root block")
+	finalizeCmd.Flags().StringVar(&flagRootTimestamp, "root-timestamp", time.Now().UTC().Format(time.RFC3339), "timestamp of the root block (RFC3339)")
+	finalizeCmd.Flags().StringVar(&flagRootCommit, "root-commit", "0x0000000000000000000000000000000000000000000000000000000000000000", "state commitment of root execution state")
+
+	_ = finalizeCmd.MarkFlagRequired("root-chain")
+	_ = finalizeCmd.MarkFlagRequired("root-parent")
+	_ = finalizeCmd.MarkFlagRequired("root-height")
+	_ = finalizeCmd.MarkFlagRequired("root-commit")
+
+	// optional parameters to influence various aspects of identity generation
 	finalizeCmd.Flags().Uint16Var(&flagCollectionClusters, "collection-clusters", 2,
 		"number of collection clusters")
 	finalizeCmd.Flags().StringVar(&flagGeneratedCollectorAddressTemplate, "generated-collector-address-template",
@@ -108,21 +125,11 @@ func init() {
 			"will be replaced by an index)")
 	finalizeCmd.Flags().Uint64Var(&flagGeneratedCollectorStake, "generated-collector-stake", 100,
 		"stake for collector nodes that will be generated")
-	finalizeCmd.Flags().Uint64Var(&flagGenesisTokenSupply, "genesis-token-supply", 0,
-		"number of tokens that exist at the genesis execution state")
 	finalizeCmd.Flags().UintVar(&flagCollectorGenerationMaxHashGrindingIterations, "collector-gen-max-iter", 1000,
 		"max hash grinding iterations for collector generation")
-	finalizeCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", fmt.Sprintf("path to directory "+
-		"containing one JSON file starting with %v for every partner node (fields Role, Address, NodeID, "+
-		"NetworkPubKey, StakingPubKey)", model.PathPartnerNodeInfoPrefix))
-	_ = finalizeCmd.MarkFlagRequired("partner-dir")
-	finalizeCmd.Flags().StringVar(&flagServiceAccountPublicKeyFile, "public-key", "", "path to a JSON file containing "+
-		"the public key of the root account. A private key will be generated if no public key is provided")
-	finalizeCmd.Flags().StringVar(&flagPartnerStakes, "partner-stakes", "", "path to a JSON file containing "+
-		"a map from partner node's NodeID to their stake")
-	_ = finalizeCmd.MarkFlagRequired("partner-stakes")
 	finalizeCmd.Flags().BoolVar(&flagFastKG, "fast-kg", false, "use fast (centralized) random beacon key generation "+
 		"instead of DKG")
+
 }
 
 func assemblePartnerNodes() []model.NodeInfo {
@@ -225,10 +232,4 @@ func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) []model.NodeIn
 	}
 
 	return nodes
-}
-
-func readServiceAccountPublicKey(filename string) *flow.AccountPublicKey {
-	publicKey := &flow.AccountPublicKey{}
-	readJSON(filename, publicKey)
-	return publicKey
 }

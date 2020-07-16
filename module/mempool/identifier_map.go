@@ -16,6 +16,9 @@ type IdentifierMap interface {
 	// Otherwise it returns nil and false.
 	Get(key flow.Identifier) ([]flow.Identifier, bool)
 
+	// Keys returns a list of all keys in the mempool
+	Keys() ([]flow.Identifier, bool)
+
 	// Size returns number of IdMapEntities in mempool
 	Size() uint
 }

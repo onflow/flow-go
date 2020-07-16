@@ -14,6 +14,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/access/rpc"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 
@@ -78,7 +79,9 @@ func (suite *Suite) SetupTest() {
 	suite.collections = new(storage.Collections)
 	suite.transactions = new(storage.Transactions)
 
-	eng, err := New(log, suite.net, suite.proto.state, suite.me, suite.blocks, suite.headers, suite.collections, suite.transactions)
+	rpcEng := rpc.New(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections, suite.transactions, flow.Testnet)
+
+	eng, err := New(log, suite.net, suite.proto.state, suite.me, suite.blocks, suite.headers, suite.collections, suite.transactions, rpcEng)
 	require.NoError(suite.T(), err)
 	suite.eng = eng
 
@@ -87,10 +90,14 @@ func (suite *Suite) SetupTest() {
 // TestHandleBlock checks that when a block is received, a request for each individual collection is made
 func (suite *Suite) TestHandleBlock() {
 
-	block := unittest.BlockFixture()
-
 	cNodeIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
-	suite.proto.snapshot.On("Identities", mock.Anything).Return(cNodeIdentities, nil).Once()
+
+	block := unittest.BlockFixture()
+	block.SetPayload(*unittest.PayloadFixture(func(p *flow.Payload) {
+		for _, g := range p.Guarantees {
+			g.SignerIDs = cNodeIdentities.NodeIDs()
+		}
+	}))
 
 	suite.blocks.On("ByID", block.ID()).Return(&block, nil).Once()
 
@@ -118,7 +125,6 @@ func (suite *Suite) TestHandleBlock() {
 		}
 	}, time.Second, time.Millisecond)
 
-	suite.proto.snapshot.AssertExpectations(suite.T())
 	suite.headers.AssertExpectations(suite.T())
 	suite.collectionsConduit.AssertExpectations(suite.T())
 }

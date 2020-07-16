@@ -4,6 +4,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+// Config defines configuration for the transaction ingest engine.
 type Config struct {
 	// how much buffer time there is between a transaction being ingested by a
 	// collection node and being included in a collection and block

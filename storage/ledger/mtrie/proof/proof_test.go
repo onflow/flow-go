@@ -13,13 +13,13 @@ import (
 )
 
 func TestBatchProofEncoderDecoder(t *testing.T) {
-	trieHeight := 9
+	keyByteSize := 1 // key size of 8 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	fStore, err := mtrie.NewMForest(trieHeight, dir, 5, metricsCollector, nil)
+	fStore, err := mtrie.NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
 	k1 := []byte([]uint8{uint8(1)})

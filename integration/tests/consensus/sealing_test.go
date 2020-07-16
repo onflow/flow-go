@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"context"
-	"encoding/hex"
 	"math/rand"
 	"testing"
 	"time"
@@ -188,16 +187,15 @@ SearchLoop:
 		EndState: unittest.StateCommitmentFixture(), // random end execution state
 	}
 
-	// hard-coded genesis result
-	resultID, _ := hex.DecodeString("80ef756372ebde1b6b873ba16522b7b132d74f46610aea34fc3f9a4dfd04f5fc")
+	resultID := ss.net.Seal().ResultID
 
 	// create the execution result for the target block
 	result := flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: flow.HashToID(resultID), // need genesis result
-			BlockID:          targetID,                // refer the target block
-			FinalStateCommit: chunk.EndState,          // end state of only chunk
-			Chunks:           flow.ChunkList{&chunk},  // include only chunk
+			PreviousResultID: resultID,               // need genesis result
+			BlockID:          targetID,               // refer the target block
+			FinalStateCommit: chunk.EndState,         // end state of only chunk
+			Chunks:           flow.ChunkList{&chunk}, // include only chunk
 		},
 		Signatures: nil,
 	}

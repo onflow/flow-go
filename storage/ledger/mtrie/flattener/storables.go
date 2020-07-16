@@ -13,8 +13,6 @@ type StorableNode struct {
 
 // StorableTrie is a data structure for storing trie
 type StorableTrie struct {
-	RootIndex      uint64
-	Number         uint64
-	RootHash       []byte
-	ParentRootHash []byte
+	RootIndex uint64
+	RootHash  []byte
 }

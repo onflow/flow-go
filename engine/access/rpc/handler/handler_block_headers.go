@@ -8,7 +8,7 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 
-	"github.com/dapperlabs/flow-go/engine/common/convert"
+	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"

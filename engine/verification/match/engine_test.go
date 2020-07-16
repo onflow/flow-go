@@ -16,8 +16,10 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
+	realModule "github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	module "github.com/dapperlabs/flow-go/module/mock"
+	"github.com/dapperlabs/flow-go/module/trace"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
@@ -28,6 +30,7 @@ func SetupTest(t *testing.T, maxTry int) (
 	e *Engine,
 	participants flow.IdentityList,
 	metrics *module.VerificationMetrics,
+	tracer realModule.Tracer,
 	myID flow.Identifier,
 	otherID flow.Identifier,
 	head *flow.Header,
@@ -71,14 +74,15 @@ func SetupTest(t *testing.T, maxTry int) (
 	verifier = &network.Engine{}
 	assigner = &module.ChunkAssigner{}
 	metrics = &module.VerificationMetrics{}
+	tracer = trace.NewNoopTracer()
 	chunks = NewChunks(10)
 
 	log := zerolog.New(os.Stderr)
 	retryInterval := 100 * time.Millisecond
 
-	e, err := New(log, metrics, net, me, er, verifier, assigner, state, chunks, headers, retryInterval, maxTry)
+	e, err := New(log, metrics, tracer, net, me, er, verifier, assigner, state, chunks, headers, retryInterval, maxTry)
 	require.NoError(t, err)
-	return e, participants, metrics, myID, otherID, head, me, con, net, headers, headerDB, state, snapshot, er, verifier, chunks, assigner
+	return e, participants, metrics, tracer, myID, otherID, head, me, con, net, headers, headerDB, state, snapshot, er, verifier, chunks, assigner
 }
 
 func createExecutionResult(blockID flow.Identifier, options ...func(result *flow.ExecutionResult, assignments *chunks.Assignment)) (*flow.ExecutionResult, *chunks.Assignment) {
@@ -131,16 +135,23 @@ func FromChunkID(chunkID flow.Identifier) flow.ChunkDataPack {
 	}
 }
 
-func ChunkDataPackIsRequestedNTimes(con *network.Conduit, n int, f func(*messages.ChunkDataRequest)) <-chan []*messages.ChunkDataRequest {
+func ChunkDataPackIsRequestedNTimes(t *testing.T, timeout time.Duration, con *network.Conduit, n int,
+	f func(*messages.ChunkDataRequest)) <-chan []*messages.ChunkDataRequest {
 	reqs := make([]*messages.ChunkDataRequest, 0)
 	c := make(chan []*messages.ChunkDataRequest, 1)
 
-	var wg sync.WaitGroup
+	wg := &sync.WaitGroup{}
+
+	// to counter race condition in concurrent invocations of Run
+	mutex := &sync.Mutex{}
 	wg.Add(n)
 	// chunk data was requested once, and return the chunk data pack when requested
 	// called with 3 mock.Anything, the first is the request, the second and third are the 2
 	// execution nodes
 	con.On("Submit", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		mutex.Lock()
+		defer mutex.Unlock()
+
 		req := args.Get(0).(*messages.ChunkDataRequest)
 		reqs = append(reqs, req)
 
@@ -154,7 +165,7 @@ func ChunkDataPackIsRequestedNTimes(con *network.Conduit, n int, f func(*message
 	}).Return(nil).Times(n)
 
 	go func() {
-		wg.Wait()
+		unittest.AssertReturnsBefore(t, wg.Wait, timeout)
 		c <- reqs
 		close(c)
 	}()
@@ -174,21 +185,44 @@ func RespondChunkDataPack(t *testing.T, engine *Engine, en flow.Identifier) func
 	}
 }
 
-func VerifierCalledNTimes(verifier *network.Engine, n int) <-chan []*verification.VerifiableChunkData {
-	var wg sync.WaitGroup
+func VerifierCalledNTimes(t *testing.T, timeout time.Duration, verifier *network.Engine, n int) <-chan []*verification.VerifiableChunkData {
+	wg := &sync.WaitGroup{}
 	vchunks := make([]*verification.VerifiableChunkData, 0)
 	c := make(chan []*verification.VerifiableChunkData, 1)
 
 	wg.Add(n)
+
+	// to counter race condition in concurrent invocations of Run
+	mutex := &sync.Mutex{}
 	verifier.On("ProcessLocal", mock.Anything).Run(func(args mock.Arguments) {
+		mutex.Lock()
+		defer mutex.Unlock()
+
 		vchunk := args.Get(0).(*verification.VerifiableChunkData)
 		vchunks = append(vchunks, vchunk)
 		wg.Done()
 	}).Return(nil).Times(n)
 
 	go func() {
-		wg.Wait()
+		unittest.AssertReturnsBefore(t, wg.Wait, timeout)
 		c <- vchunks
+		close(c)
+	}()
+	return c
+}
+
+func OnVerifiableChunkSentMetricCalledNTimes(metrics *module.VerificationMetrics, n int) <-chan struct{} {
+	var wg sync.WaitGroup
+	c := make(chan struct{}, 1)
+
+	wg.Add(n)
+	metrics.On("OnVerifiableChunkSent").Run(func(args mock.Arguments) {
+		wg.Done()
+	}).Return().Times(n)
+
+	go func() {
+		wg.Wait()
+		c <- struct{}{}
 		close(c)
 	}()
 	return c
@@ -197,7 +231,7 @@ func VerifierCalledNTimes(verifier *network.Engine, n int) <-chan []*verificatio
 // Happy Path: When receives a ER, and 1 chunk is assigned to me,
 // it will fetch that collection and chunk data, and produces a verifiable chunk
 func TestChunkVerified(t *testing.T) {
-	e, participants, metrics, myID, _, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, 1)
+	e, participants, metrics, _, myID, _, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, 1)
 	// create a execution result that assigns to me
 	result, assignment := createExecutionResult(
 		head.ID(),
@@ -229,10 +263,10 @@ func TestChunkVerified(t *testing.T) {
 
 	// setup conduit to return requested chunk data packs
 	// return received requests
-	reqsC := ChunkDataPackIsRequestedNTimes(con, 1, RespondChunkDataPack(t, e, en.ID()))
+	reqsC := ChunkDataPackIsRequestedNTimes(t, 5*time.Second, con, 1, RespondChunkDataPack(t, e, en.ID()))
 
 	// check verifier's method is called
-	vchunksC := VerifierCalledNTimes(verifier, 1)
+	vchunksC := VerifierCalledNTimes(t, 5*time.Second, verifier, 1)
 
 	<-e.Ready()
 
@@ -252,14 +286,14 @@ func TestChunkVerified(t *testing.T) {
 	require.Equal(t, result, vchunks[0].Result)
 	require.Equal(t, &chunkDataPack, vchunks[0].ChunkDataPack)
 
+	<-e.Done()
 	mock.AssertExpectationsForObjects(t, assigner, con, verifier, metrics)
-	e.Done()
 }
 
 // No assignment: When receives a ER, and no chunk is assigned to me, then I won’t fetch any collection or chunk,
 // nor produce any verifiable chunk
 func TestNoAssignment(t *testing.T) {
-	e, participants, metrics, _, otherID, head, _, _, _, _, headerDB, _, _, _, _, _, assigner := SetupTest(t, 1)
+	e, participants, metrics, _, _, otherID, head, _, _, _, _, headerDB, _, _, _, _, _, assigner := SetupTest(t, 1)
 	// create a execution result that assigns to me
 	result, assignment := createExecutionResult(
 		head.ID(),
@@ -285,14 +319,15 @@ func TestNoAssignment(t *testing.T) {
 
 	err := e.Process(en.ID(), result)
 	require.NoError(t, err)
-	e.Done()
+
+	<-e.Done()
 	mock.AssertExpectationsForObjects(t, metrics)
 }
 
 // Multiple Assignments: When receives a ER, and 2 chunks out of 3 are assigned to me,
 // it will produce 2 verifiable chunks.
 func TestMultiAssignment(t *testing.T) {
-	e, participants, metrics, myID, otherID, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, 1)
+	e, participants, metrics, _, myID, otherID, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, 1)
 	// create a execution result that assigns to me
 	result, assignment := createExecutionResult(
 		head.ID(),
@@ -322,10 +357,10 @@ func TestMultiAssignment(t *testing.T) {
 
 	// setup conduit to return requested chunk data packs
 	// return received requests
-	_ = ChunkDataPackIsRequestedNTimes(con, 2, RespondChunkDataPack(t, e, en.ID()))
+	_ = ChunkDataPackIsRequestedNTimes(t, 5*time.Second, con, 2, RespondChunkDataPack(t, e, en.ID()))
 
 	// check verifier's method is called
-	vchunksC := VerifierCalledNTimes(verifier, 2)
+	vchunksC := VerifierCalledNTimes(t, 5*time.Second, verifier, 2)
 
 	<-e.Ready()
 
@@ -338,13 +373,13 @@ func TestMultiAssignment(t *testing.T) {
 
 	require.Equal(t, 2, len(vchunks))
 
+	<-e.Done()
 	mock.AssertExpectationsForObjects(t, assigner, con, verifier)
-	e.Done()
 }
 
 // Duplication: When receives 2 ER for the same block, which only has 1 chunk, only 1 verifiable chunk will be produced.
 func TestDuplication(t *testing.T) {
-	e, participants, metrics, myID, otherID, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, 1)
+	e, participants, metrics, _, myID, otherID, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, 1)
 	// create a execution result that assigns to me
 	result, assignment := createExecutionResult(
 		head.ID(),
@@ -373,10 +408,10 @@ func TestDuplication(t *testing.T) {
 
 	// setup conduit to return requested chunk data packs
 	// return received requests
-	_ = ChunkDataPackIsRequestedNTimes(con, 1, RespondChunkDataPack(t, e, en.ID()))
+	_ = ChunkDataPackIsRequestedNTimes(t, 5*time.Second, con, 1, RespondChunkDataPack(t, e, en.ID()))
 
 	// check verifier's method is called
-	vchunksC := VerifierCalledNTimes(verifier, 1)
+	vchunkC := VerifierCalledNTimes(t, 5*time.Second, verifier, 1)
 
 	<-e.Ready()
 
@@ -388,11 +423,10 @@ func TestDuplication(t *testing.T) {
 	err = e.Process(en.ID(), result)
 	require.NoError(t, err)
 
-	// wait until verifier has been called
-	<-vchunksC
+	<-vchunkC
 
+	<-e.Done()
 	mock.AssertExpectationsForObjects(t, assigner, con, verifier, metrics)
-	e.Done()
 }
 
 // Retry: When receives 1 ER, and 1 chunk is assigned assigned to me, if max retry is 3,
@@ -400,7 +434,7 @@ func TestDuplication(t *testing.T) {
 // and successful to return in the 3rd try, a verifiable chunk will be produced
 func TestRetry(t *testing.T) {
 	maxTry := 3
-	e, participants, metrics, myID, _, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, maxTry)
+	e, participants, metrics, _, myID, _, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner := SetupTest(t, maxTry)
 	// create a execution result that assigns to me
 	result, assignment := createExecutionResult(
 		head.ID(),
@@ -429,7 +463,7 @@ func TestRetry(t *testing.T) {
 	// setup conduit to return requested chunk data packs
 	// return received requests
 	called := 0
-	_ = ChunkDataPackIsRequestedNTimes(con, 3, func(req *messages.ChunkDataRequest) {
+	_ = ChunkDataPackIsRequestedNTimes(t, 5*time.Second, con, 3, func(req *messages.ChunkDataRequest) {
 		called++
 		if called >= 3 {
 			RespondChunkDataPack(t, e, en.ID())(req)
@@ -437,7 +471,7 @@ func TestRetry(t *testing.T) {
 	})
 
 	// check verifier's method is called
-	vchunksC := VerifierCalledNTimes(verifier, 1)
+	vchunkC := VerifierCalledNTimes(t, 5*time.Second, verifier, 1)
 
 	<-e.Ready()
 
@@ -445,18 +479,17 @@ func TestRetry(t *testing.T) {
 	err := e.Process(en.ID(), result)
 	require.NoError(t, err)
 
-	// wait until verifier has been called
-	<-vchunksC
+	<-vchunkC
 
+	<-e.Done()
 	mock.AssertExpectationsForObjects(t, assigner, con, verifier, metrics)
-	e.Done()
 }
 
 // MaxRetry: When receives 1 ER, and 1 chunk is assigned assigned to me, if max retry is 2,
 // and the execution node fails to return data for the first 2 requests, then no verifiable chunk will be produced
 func TestMaxRetry(t *testing.T) {
 	maxAttempt := 3
-	e, participants, metrics, myID, _, head, _, con, _, _, headerDB, _, _, _, _, _, assigner := SetupTest(t, maxAttempt)
+	e, participants, metrics, _, myID, _, head, _, con, _, _, headerDB, _, _, _, _, _, assigner := SetupTest(t, maxAttempt)
 	// create a execution result that assigns to me
 	result, assignment := createExecutionResult(
 		head.ID(),
@@ -479,7 +512,7 @@ func TestMaxRetry(t *testing.T) {
 	en := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
 	// never returned any chunk data pack
-	reqsC := ChunkDataPackIsRequestedNTimes(con, 3, func(req *messages.ChunkDataRequest) {})
+	reqC := ChunkDataPackIsRequestedNTimes(t, 5*time.Second, con, 3, func(req *messages.ChunkDataRequest) {})
 
 	<-e.Ready()
 
@@ -487,17 +520,16 @@ func TestMaxRetry(t *testing.T) {
 	err := e.Process(en.ID(), result)
 	require.NoError(t, err)
 
-	// wait until 3 retry attampts are done
-	<-reqsC
+	<-reqC
 
-	mock.AssertExpectationsForObjects(t, assigner, con)
-	e.Done()
+	<-e.Done()
+	mock.AssertExpectationsForObjects(t, assigner, con, metrics)
 }
 
 // Concurrency: When 10 different ER are received concurrently, chunks from both
 // results will be processed
 func TestProcessExecutionResultConcurrently(t *testing.T) {
-	e, participants, metrics, myID, _, _, _, con, _, _, headerDB, _, _, _, verifier, _, assigner :=
+	e, participants, metrics, _, myID, _, _, _, con, _, _, headerDB, _, _, _, verifier, _, assigner :=
 		SetupTest(t, 1)
 
 	ers := make([]*flow.ExecutionResult, 0)
@@ -532,10 +564,10 @@ func TestProcessExecutionResultConcurrently(t *testing.T) {
 	// find the execution node id that created the execution result
 	en := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
-	_ = ChunkDataPackIsRequestedNTimes(con, count, RespondChunkDataPack(t, e, en.ID()))
+	_ = ChunkDataPackIsRequestedNTimes(t, 5*time.Second, con, count, RespondChunkDataPack(t, e, en.ID()))
 
 	// check verifier's method is called
-	vchunksC := VerifierCalledNTimes(verifier, count)
+	vchunkC := VerifierCalledNTimes(t, 5*time.Second, verifier, count)
 
 	<-e.Ready()
 
@@ -549,16 +581,16 @@ func TestProcessExecutionResultConcurrently(t *testing.T) {
 	}
 
 	// wait until verifier has been called
-	<-vchunksC
+	<-vchunkC
 
-	mock.AssertExpectationsForObjects(t, assigner, con, verifier)
-	e.Done()
+	<-e.Done()
+	mock.AssertExpectationsForObjects(t, assigner, con, verifier, metrics)
 }
 
 // Concurrency: When chunk data pack are sent concurrently, match engine is able to receive
 // all of them, and process concurrently.
 func TestProcessChunkDataPackConcurrently(t *testing.T) {
-	e, participants, metrics, myID, _, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner :=
+	e, participants, metrics, _, myID, _, head, _, con, _, _, headerDB, _, _, _, verifier, _, assigner :=
 		SetupTest(t, 1)
 
 	// create a execution result that assigns to me
@@ -578,7 +610,7 @@ func TestProcessChunkDataPackConcurrently(t *testing.T) {
 	// receiving `len(result.Chunk)`-many result
 	metrics.On("OnExecutionResultReceived").Return().Once()
 	// sending `len(result.Chunk)`-many verifiable chunks
-	metrics.On("OnVerifiableChunkSent").Return().Times(len(result.Chunks))
+	sentMetricsC := OnVerifiableChunkSentMetricCalledNTimes(metrics, len(result.Chunks))
 	// receiving `len(result.Chunk)`-many chunk data packs
 	metrics.On("OnChunkDataPackReceived").Return().Times(len(result.Chunks))
 
@@ -592,10 +624,10 @@ func TestProcessChunkDataPackConcurrently(t *testing.T) {
 	en := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
 	count := len(result.Chunks)
-	reqsC := ChunkDataPackIsRequestedNTimes(con, count, func(*messages.ChunkDataRequest) {})
+	reqsC := ChunkDataPackIsRequestedNTimes(t, 5*time.Second, con, count, func(*messages.ChunkDataRequest) {})
 
 	// check verifier's method is called
-	vchunksC := VerifierCalledNTimes(verifier, count)
+	_ = VerifierCalledNTimes(t, 5*time.Second, verifier, count)
 
 	<-e.Ready()
 
@@ -605,11 +637,10 @@ func TestProcessChunkDataPackConcurrently(t *testing.T) {
 	err := e.Process(en.ID(), result)
 	require.NoError(t, err)
 
-	// wait until all chunk data requests have received
 	reqs := <-reqsC
 
 	// send chunk data pack responses concurrently
-	var wg sync.WaitGroup
+	wg := sync.WaitGroup{}
 	for _, req := range reqs {
 		wg.Add(1)
 		go func(req *messages.ChunkDataRequest) {
@@ -619,9 +650,10 @@ func TestProcessChunkDataPackConcurrently(t *testing.T) {
 	}
 	wg.Wait()
 
-	// wait until verifier are called
-	<-vchunksC
+	// wait until verifier metrics are called
+	// this indicates end of matching all assigned chunks
+	unittest.AssertClosesBefore(t, sentMetricsC, 1*time.Second)
 
+	<-e.Done()
 	mock.AssertExpectationsForObjects(t, assigner, con, verifier, metrics)
-	e.Done()
 }

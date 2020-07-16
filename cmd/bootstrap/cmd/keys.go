@@ -3,8 +3,6 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/rs/zerolog/log"
-
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	"github.com/dapperlabs/flow-go/crypto"
 	model "github.com/dapperlabs/flow-go/model/bootstrap"

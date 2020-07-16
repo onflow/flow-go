@@ -19,6 +19,7 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/trace"
 )
 
 const (
@@ -350,6 +351,7 @@ func (es *EventHandlerSuite) SetupTest() {
 
 	eventhandler, err := eventhandler.New(
 		zerolog.New(os.Stderr),
+		trace.NewNoopTracer(),
 		es.paceMaker,
 		es.blockProducer,
 		es.forks,

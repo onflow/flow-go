@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -27,19 +28,28 @@ type Engine struct {
 	unit    *engine.Unit         // used for concurrency & shutdown
 	log     zerolog.Logger       // used to log relevant actions with context
 	message module.EngineMetrics // used to track sent & received messages
-	con     network.Conduit      // used to talk to other nodes on the network
-	state   protocol.State       // used to access the  protocol state
-	me      module.Local         // used to access local node information
+	tracer  module.Tracer
+	con     network.Conduit // used to talk to other nodes on the network
+	state   protocol.State  // used to access the  protocol state
+	me      module.Local    // used to access local node information
 }
 
 // New creates a new block provider engine.
-func New(log zerolog.Logger, message module.EngineMetrics, net module.Network, state protocol.State, me module.Local) (*Engine, error) {
+func New(
+	log zerolog.Logger,
+	message module.EngineMetrics,
+	tracer module.Tracer,
+	net module.Network,
+	state protocol.State,
+	me module.Local,
+) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		unit:    engine.NewUnit(),
 		log:     log.With().Str("engine", "provider").Logger(),
 		message: message,
+		tracer:  tracer,
 		state:   state,
 		me:      me,
 	}
@@ -110,9 +120,19 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	}
 }
 
-// onBlockProposal is used when a block has been finalized locally and we want to
-// broadcast it to the network.
+// onBlockProposal is used when we want to broadcast a local block to the network.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
+	if span, ok := e.tracer.GetSpan(proposal.Header.ID(), trace.CONProcessBlock); ok {
+		childSpan := e.tracer.StartSpanFromParent(span, trace.CONProvOnBlockProposal)
+		defer childSpan.Finish()
+	}
+
+	for _, g := range proposal.Payload.Guarantees {
+		if span, ok := e.tracer.GetSpan(g.CollectionID, trace.CONProcessCollection); ok {
+			childSpan := e.tracer.StartSpanFromParent(span, trace.CONProvOnBlockProposal)
+			defer childSpan.Finish()
+		}
+	}
 
 	log := e.log.With().
 		Hex("origin_id", originID[:]).

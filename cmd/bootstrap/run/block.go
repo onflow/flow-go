@@ -1,22 +1,23 @@
 package run
 
 import (
+	"time"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// TODO consolidate this with model/flow/Block.Genesis
-func GenerateRootBlock(identityList flow.IdentityList, chainID flow.ChainID) *flow.Block {
+func GenerateRootBlock(chainID flow.ChainID, parentID flow.Identifier, height uint64, timestamp time.Time, participants flow.IdentityList) *flow.Block {
 	payload := flow.Payload{
-		Identities: identityList,
+		Identities: participants,
 		Guarantees: nil,
 		Seals:      nil,
 	}
 	header := flow.Header{
 		ChainID:        chainID,
-		ParentID:       flow.ZeroID,
-		Height:         0,
+		ParentID:       parentID,
+		Height:         height,
 		PayloadHash:    payload.Hash(),
-		Timestamp:      flow.GenesisTime(),
+		Timestamp:      timestamp,
 		View:           0,
 		ParentVoterIDs: nil,
 		ParentVoterSig: nil,

@@ -72,3 +72,9 @@ func ChannelName(channelID uint8) string {
 	}
 	return fmt.Sprintf("unknown-channel-%d", channelID)
 }
+
+// FullyQualifiedChannelName returns the unique channel name made up of channel name string suffixed with root block id
+// The root block id is used to prevent cross talks between nodes on different sporks
+func FullyQualifiedChannelName(channelID uint8, rootBlockID string) string {
+	return fmt.Sprintf("%s/%s", ChannelName(channelID), rootBlockID)
+}

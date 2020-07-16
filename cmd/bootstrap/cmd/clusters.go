@@ -3,27 +3,25 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/rs/zerolog/log"
-
 	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func constructGenesisBlocksForCollectorClusters(clusters *flow.ClusterList) []*cluster.Block {
-	clusterBlocks := run.GenerateGenesisClusterBlocks(clusters)
+func constructRootBlocksForClusters(clusters *flow.ClusterList) []*cluster.Block {
+	clusterBlocks := run.GenerateRootClusterBlocks(clusters)
 
 	for _, clusterBlock := range clusterBlocks {
 		// cluster ID is equivalent to chain ID
 		clusterID := clusterBlock.Header.ChainID
-		writeJSON(fmt.Sprintf(model.PathGenesisClusterBlock, clusterID), clusterBlock)
+		writeJSON(fmt.Sprintf(model.PathRootClusterBlock, clusterID), clusterBlock)
 	}
 
 	return clusterBlocks
 }
 
-func constructGenesisQCsForCollectorClusters(clusterList *flow.ClusterList, nodeInfos []model.NodeInfo, block *flow.Block, clusterBlocks []*cluster.Block) {
+func constructRootQCsForClusters(clusterList *flow.ClusterList, nodeInfos []model.NodeInfo, block *flow.Block, clusterBlocks []*cluster.Block) {
 
 	if len(clusterBlocks) != clusterList.Size() {
 		log.Fatal().Int("len(clusterBlocks)", len(clusterBlocks)).Int("clusterList.Size()", clusterList.Size()).
@@ -33,14 +31,14 @@ func constructGenesisQCsForCollectorClusters(clusterList *flow.ClusterList, node
 	for i, cluster := range clusterList.All() {
 		signers := filterClusterSigners(cluster, nodeInfos)
 
-		qc, err := run.GenerateClusterGenesisQC(signers, block, clusterBlocks[i])
+		qc, err := run.GenerateClusterRootQC(signers, block, clusterBlocks[i])
 		if err != nil {
-			log.Fatal().Err(err).Int("cluster index", i).Msg("generating collector cluster genesis QC failed")
+			log.Fatal().Err(err).Int("cluster index", i).Msg("generating collector cluster root QC failed")
 		}
 
 		// cluster ID is equivalent to chain ID
 		clusterID := clusterBlocks[i].Header.ChainID
-		writeJSON(fmt.Sprintf(model.PathGenesisClusterQC, clusterID), qc)
+		writeJSON(fmt.Sprintf(model.PathRootClusterQC, clusterID), qc)
 	}
 }
 

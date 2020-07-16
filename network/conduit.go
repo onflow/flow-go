@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/hashicorp/go-multierror"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -55,8 +53,8 @@ func IsPeerUnreachableError(e error) bool {
 }
 
 // AllPeerUnreachableError returns whether all errors are PeerUnreachableError
-func AllPeerUnreachableError(errs *multierror.Error) bool {
-	for _, err := range errs.WrappedErrors() {
+func AllPeerUnreachableError(errs ...error) bool {
+	for _, err := range errs {
 		if !IsPeerUnreachableError(err) {
 			return false
 		}

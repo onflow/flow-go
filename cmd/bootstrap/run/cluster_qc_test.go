@@ -11,7 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestGenerateClusterGenesisQC(t *testing.T) {
+func TestGenerateClusterRootQC(t *testing.T) {
 	participants := createClusterParticipants(t, 3)
 
 	block := unittest.BlockFixture()
@@ -41,7 +41,7 @@ func TestGenerateClusterGenesisQC(t *testing.T) {
 	payload := cluster.EmptyPayload(flow.ZeroID)
 	clusterBlock.SetPayload(payload)
 
-	_, err := GenerateClusterGenesisQC(participants, &block, &clusterBlock)
+	_, err := GenerateClusterRootQC(participants, &block, &clusterBlock)
 	require.NoError(t, err)
 }
 

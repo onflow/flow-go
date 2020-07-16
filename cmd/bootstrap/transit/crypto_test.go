@@ -70,7 +70,7 @@ func TestMd5(t *testing.T) {
 
 	assert.NoError(t, tmpFile.Close())
 
-	md5, err := getFileMd5(tmpFile.Name())
+	md5, err := getFileMD5(tmpFile.Name())
 	assert.NoError(t, err)
 	assert.Equal(t, "1b8e86521e7e04d647faa9e6192a65f5", md5)
 }

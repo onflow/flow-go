@@ -141,9 +141,14 @@ type VerificationMetrics interface {
 	// by Match engine to Verifier engine.
 	// It increments the total number of chunks matched by match engine.
 	OnVerifiableChunkSent()
+
 	// OnChunkDataPackReceived is called on a receiving a chunk data pack by Match engine
 	// It increments the total number of chunk data packs received.
 	OnChunkDataPackReceived()
+
+	// OnChunkDataPackRequested is called on requesting a chunk data pack by Match engine
+	// It increments the total number of chunk data packs requested.
+	OnChunkDataPackRequested()
 
 	// Verifier Engine
 	//
@@ -164,8 +169,7 @@ type VerificationMetrics interface {
 	// chunk. It adds the size of the verifiable chunk to the histogram. A verifiable chunk is assumed
 	// to capture all the resources needed to verify a chunk.
 	// The purpose of this function is to track the overall chunk resources size on disk.
-	// Todo wire this up to do monitoring
-	// https://github.com/dapperlabs/flow-go/issues/3183
+	// Todo wire this up to do monitoring (3183)
 	LogVerifiableChunkSize(size float64)
 }
 
@@ -233,9 +237,16 @@ type RuntimeMetrics interface {
 	TransactionInterpreted(dur time.Duration)
 }
 
+type ProviderMetrics interface {
+	// ChunkDataPackRequested is executed every time a chunk data pack request is arrived at execution node.
+	// It increases the request counter by one.
+	ChunkDataPackRequested()
+}
+
 type ExecutionMetrics interface {
 	LedgerMetrics
 	RuntimeMetrics
+	ProviderMetrics
 
 	// StartBlockReceivedToExecuted starts a span to trace the duration of a block
 	// from being received for execution to execution being finished

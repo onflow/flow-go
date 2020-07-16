@@ -24,6 +24,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	module2 "github.com/dapperlabs/flow-go/module/mock"
 	module "github.com/dapperlabs/flow-go/module/mocks"
 	"github.com/dapperlabs/flow-go/module/trace"
 	network "github.com/dapperlabs/flow-go/network/mocks"
@@ -59,6 +60,7 @@ type testingContext struct {
 	providerEngine     *provider.ProviderEngine
 	executionState     *state.ExecutionState
 	snapshot           *protocol.Snapshot
+	identity           *flow.Identity
 }
 
 func runWithEngine(t *testing.T, f func(testingContext)) {
@@ -130,6 +132,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.BlockProvider)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.ExecutionSync)), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
+	blockSync := new(module2.BlockRequester)
 
 	engine, err = New(
 		log,
@@ -143,6 +146,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		txResults,
 		computationManager,
 		providerEngine,
+		blockSync,
 		executionState,
 		21,
 		metrics,
@@ -165,6 +169,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		providerEngine:     providerEngine,
 		executionState:     executionState,
 		snapshot:           snapshot,
+		identity:           myIdentity,
 	})
 
 	<-engine.Done()
@@ -246,6 +251,24 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 			assert.NoError(ctx.t, err)
 
 			assert.True(ctx.t, validSig, "execution receipt signature invalid")
+
+			spocks := receipt.Spocks
+
+			assert.Len(ctx.t, spocks, len(computationResult.StateSnapshots))
+
+			for i, stateSnapshot := range computationResult.StateSnapshots {
+
+				valid, err := crypto.SPOCKVerifyAgainstData(
+					ctx.identity.StakingPubKey,
+					spocks[i],
+					stateSnapshot.SpockSecret,
+					ctx.engine.spockHasher,
+				)
+
+				assert.NoError(ctx.t, err)
+				assert.True(ctx.t, valid)
+			}
+
 		}).
 		Return(nil)
 }
@@ -397,5 +420,48 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 		ctx.computationManager.AssertExpectations(t)
 		ctx.executionState.AssertExpectations(t)
 		ctx.state.AssertExpectations(t)
+	})
+}
+
+func Test_SPoCKGeneration(t *testing.T) {
+	runWithEngine(t, func(ctx testingContext) {
+
+		snapshots := []*delta.Snapshot{
+			{
+				SpockSecret: []byte{1, 2, 3},
+			},
+			{
+				SpockSecret: []byte{3, 2, 1},
+			},
+			{
+				SpockSecret: []byte{},
+			},
+			{
+				SpockSecret: unittest.RandomBytes(100),
+			},
+		}
+
+		executionReceipt, err := ctx.engine.generateExecutionReceipt(
+			context.Background(),
+			&flow.ExecutionResult{
+				ExecutionResultBody: flow.ExecutionResultBody{},
+				Signatures:          nil,
+			},
+			snapshots,
+		)
+		require.NoError(t, err)
+
+		for i, snapshot := range snapshots {
+			valid, err := crypto.SPOCKVerifyAgainstData(
+				ctx.identity.StakingPubKey,
+				executionReceipt.Spocks[i],
+				snapshot.SpockSecret,
+				ctx.engine.spockHasher,
+			)
+
+			require.NoError(t, err)
+			require.True(t, valid)
+		}
+
 	})
 }

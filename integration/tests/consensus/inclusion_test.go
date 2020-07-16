@@ -104,7 +104,7 @@ func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
 	// generate a sentinel collection guarantee
 	sentinel := unittest.CollectionGuaranteeFixture()
 	sentinel.SignerIDs = []flow.Identifier{is.collID}
-	sentinel.ReferenceBlockID = is.net.Genesis().ID()
+	sentinel.ReferenceBlockID = is.net.Root().ID()
 
 	is.T().Logf("collection guarantee generated: %x", sentinel.CollectionID)
 

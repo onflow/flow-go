@@ -14,7 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestGenerateGenesisQC(t *testing.T) {
+func TestGenerateRootQC(t *testing.T) {
 	participantData := createSignerData(t, 3)
 
 	block := unittest.BlockFixture()
@@ -33,7 +33,7 @@ func TestGenerateGenesisQC(t *testing.T) {
 	block.Header.View = 3
 	block.Header.PayloadHash = block.Payload.Hash()
 
-	_, err := GenerateGenesisQC(participantData, &block)
+	_, err := GenerateRootQC(participantData, &block)
 	require.NoError(t, err)
 }
 

@@ -6,15 +6,15 @@ import (
 )
 
 type TrieVerifier struct {
-	trieHeight int
+	keyByteSize int
 }
 
 // NewTrieVerifier creates a new trie-backed ledger verifier.
 //
 // The verifier is configured with a height and a default hash value for each level.
-func NewTrieVerifier(trieHeight int) *TrieVerifier {
+func NewTrieVerifier(keyByteSize int) *TrieVerifier {
 	return &TrieVerifier{
-		trieHeight: trieHeight,
+		keyByteSize: keyByteSize,
 	}
 }
 
@@ -30,5 +30,5 @@ func (v *TrieVerifier) VerifyRegistersProof(
 	if err != nil {
 		return false, err
 	}
-	return bp.Verify(registerIDs, values, stateCommitment, v.trieHeight), nil
+	return bp.Verify(registerIDs, values, stateCommitment, v.keyByteSize), nil
 }

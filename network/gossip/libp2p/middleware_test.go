@@ -20,7 +20,10 @@ import (
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/mock"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
+
+var rootID = unittest.BlockFixture().ID().String()
 
 type MiddlewareTestSuit struct {
 	suite.Suite
@@ -265,8 +268,9 @@ func (m *MiddlewareTestSuit) createMiddleWares(count int) ([]flow.Identifier, []
 
 		key := m.generateNetworkingKey(target[:])
 
-		// creates new middleware
-		mw, err := NewMiddleware(logger, codec, "0.0.0.0:0", targetID, key, m.metrics, DefaultMaxPubSubMsgSize)
+		// creates new middleware (with an arbitrary genesis block id)
+		mw, err := NewMiddleware(logger, codec, "0.0.0.0:0", targetID, key, m.metrics, DefaultMaxPubSubMsgSize,
+			rootID)
 		require.NoError(m.Suite.T(), err)
 
 		mws = append(mws, mw)

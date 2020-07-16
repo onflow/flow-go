@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
-	"github.com/dapperlabs/flow-go/engine/common/convert"
+	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -51,7 +51,8 @@ func NewHandler(log zerolog.Logger,
 	collections storage.Collections,
 	transactions storage.Transactions,
 	chainID flow.ChainID) *Handler {
-	return &Handler{
+	retry := newRetry()
+	h := &Handler{
 		executionRPC: e,
 		state:        s,
 		// create the sub-handlers
@@ -64,9 +65,11 @@ func NewHandler(log zerolog.Logger,
 			collectionRPC: c,
 			executionRPC:  e,
 			state:         s,
+			chainID:       chainID,
 			collections:   collections,
 			blocks:        blocks,
 			transactions:  transactions,
+			retry:         retry,
 		},
 		handlerEvents: handlerEvents{
 			executionRPC: e,
@@ -84,10 +87,13 @@ func NewHandler(log zerolog.Logger,
 		handlerAccounts: handlerAccounts{
 			executionRPC: e,
 			state:        s,
+			chainID:      chainID,
 			headers:      headers,
 		},
 		chainID: chainID,
 	}
+	retry.SetHandler(h)
+	return h
 }
 
 // Ping responds to requests when the server is up.
@@ -105,7 +111,11 @@ func (h *Handler) Ping(ctx context.Context, req *access.PingRequest) (*access.Pi
 
 func (h *Handler) GetCollectionByID(_ context.Context, req *access.GetCollectionByIDRequest) (*access.CollectionResponse, error) {
 
-	id := flow.HashToID(req.Id)
+	reqCollID := req.GetId()
+	id, err := convert.CollectionID(reqCollID)
+	if err != nil {
+		return nil, err
+	}
 
 	// retrieve the collection from the collection storage
 	cl, err := h.collections.LightByID(id)

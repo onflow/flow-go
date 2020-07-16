@@ -29,8 +29,8 @@ func TestReadyDone(t *testing.T) {
 	<-eventLoop.Ready()
 	time.Sleep(1 * time.Second)
 	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
-		wg.Add(1)
 		<-eventLoop.Done()
 		wg.Done()
 	}()

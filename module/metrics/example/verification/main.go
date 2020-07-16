@@ -9,8 +9,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/integration/tests/verification"
-	verification2 "github.com/dapperlabs/flow-go/model/verification"
+	vertestutil "github.com/dapperlabs/flow-go/engine/testutil/verification"
+	"github.com/dapperlabs/flow-go/engine/verification/match"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/messages"
+	vermodel "github.com/dapperlabs/flow-go/model/verification"
+	"github.com/dapperlabs/flow-go/module/buffer"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/metrics/example"
@@ -44,12 +48,11 @@ func happyPathExample() {
 		// since happy path goes very fast leap timer on collector set to 1 nanosecond.
 		mempoolCollector := metrics.NewMempoolCollector(1 * time.Nanosecond)
 		<-mempoolCollector.Ready()
-		verificationCollector := metrics.NewVerificationCollector(tracer, prometheus.DefaultRegisterer, logger)
 
 		// starts happy path
 		t := &testing.T{}
-		verification.VerificationHappyPath(t, verificationCollector, mempoolCollector, 1, 10)
-
+		verificationCollector := metrics.NewVerificationCollector(tracer, prometheus.DefaultRegisterer, logger)
+		vertestutil.VerificationHappyPath(t, 1, 10, verificationCollector, mempoolCollector)
 		<-mempoolCollector.Done()
 	})
 }
@@ -79,8 +82,8 @@ func demo() {
 			panic(err)
 		}
 
-		// creates a pending receipt mempool and registers a metric on its size
-		pendingReceipts, err := stdmap.NewPendingReceipts(100)
+		// creates a pending receipts mempool and registers a metric on its size
+		pendingReceipts, err := stdmap.NewReceiptDataPacks(100)
 		if err != nil {
 			panic(err)
 		}
@@ -89,32 +92,154 @@ func demo() {
 			panic(err)
 		}
 
+		// creates pending receipt ids by block mempool, and registers size method of backend for metrics
+		receiptIDsByBlock, err := stdmap.NewIdentifierMap(100)
+		if err != nil {
+			panic(err)
+		}
+		err = mempoolCollector.Register(metrics.ResourcePendingReceiptIDsByBlock, receiptIDsByBlock.Size)
+		if err != nil {
+			panic(err)
+		}
+
+		// creates pending receipt ids by result mempool, and registers size method of backend for metrics
+		receiptIDsByResult, err := stdmap.NewIdentifierMap(100)
+		if err != nil {
+			panic(err)
+		}
+		err = mempoolCollector.Register(metrics.ResourceReceiptIDsByResult, receiptIDsByResult.Size)
+		if err != nil {
+			panic(err)
+		}
+
+		// creates pending results mempool, and registers size method of backend for metrics
+		pendingResults := stdmap.NewPendingResults()
+		err = mempoolCollector.Register(metrics.ResourcePendingResult, pendingResults.Size)
+		if err != nil {
+			panic(err)
+		}
+
+		// creates pending chunks mempool, and registers size method of backend for metrics
+		pendingChunks := match.NewChunks(100)
+		err = mempoolCollector.Register(metrics.ResourcePendingChunk, pendingChunks.Size)
+		if err != nil {
+			panic(err)
+		}
+
+		// creates processed results ids mempool, and registers size method of backend for metrics
+		processedResultsIDs, err := stdmap.NewIdentifiers(100)
+		if err != nil {
+			panic(err)
+		}
+		err = mempoolCollector.Register(metrics.ResourceProcessedResultID, processedResultsIDs.Size)
+		if err != nil {
+			panic(err)
+		}
+
+		// creates consensus cache for follower engine, and registers size method of backend for metrics
+		pendingBlocks := buffer.NewPendingBlocks()
+		err = mempoolCollector.Register(metrics.ResourcePendingBlock, pendingBlocks.Size)
+		if err != nil {
+			panic(err)
+		}
+
+		// Over iterations each metric is gone through
+		// a probabilistic experiment with probability 0.5
+		// to collect or not.
+		// This is done to stretch metrics and scatter their pattern
+		// for a clear visualization.
 		for i := 0; i < 100; i++ {
 			chunkID := unittest.ChunkFixture().ID()
 			// finder
-			verificationCollector.OnExecutionReceiptReceived()
-			verificationCollector.OnExecutionResultSent()
+			if rand.Int()%2 == 0 {
+				verificationCollector.OnExecutionReceiptReceived()
+			}
+
+			if rand.Int()%2 == 0 {
+				verificationCollector.OnExecutionResultSent()
+			}
 
 			// match
-			verificationCollector.OnExecutionResultReceived()
-			verificationCollector.OnVerifiableChunkSent()
+			if rand.Int()%2 == 0 {
+				verificationCollector.OnExecutionResultReceived()
+			}
+			if rand.Int()%2 == 0 {
+				verificationCollector.OnChunkDataPackReceived()
+			}
+			if rand.Int()%2 == 0 {
+				verificationCollector.OnVerifiableChunkSent()
+			}
 
 			// verifier
-			verificationCollector.OnVerifiableChunkReceived()
+			if rand.Int()%2 == 0 {
+				verificationCollector.OnVerifiableChunkReceived()
+			}
+
 			verificationCollector.OnChunkVerificationStarted(chunkID)
 
-			// adds a receipt to the pending receipts
+			// mempools
+			// creates and add a receipt
 			receipt := unittest.ExecutionReceiptFixture()
-			pendingReceipts.Add(&verification2.PendingReceipt{
-				Receipt:  receipt,
-				OriginID: unittest.IdentifierFixture(),
-			})
-			receipts.Add(receipt)
+			if rand.Int()%2 == 0 {
+				receipts.Add(receipt)
+			}
+
+			if rand.Int()%2 == 0 {
+				pendingReceipts.Add(&vermodel.ReceiptDataPack{
+					Receipt:  receipt,
+					OriginID: unittest.IdentifierFixture(),
+				})
+			}
+
+			if rand.Int()%2 == 0 {
+				_, err := receiptIDsByBlock.Append(receipt.ExecutionResult.BlockID, receipt.ID())
+				if err != nil {
+					panic(err)
+				}
+			}
+
+			if rand.Int()%2 == 0 {
+				_, err = receiptIDsByResult.Append(receipt.ExecutionResult.BlockID, receipt.ExecutionResult.ID())
+				if err != nil {
+					panic(err)
+				}
+			}
+
+			if rand.Int()%2 == 0 {
+				pendingResults.Add(&flow.PendingResult{
+					ExecutorID:      receipt.ExecutorID,
+					ExecutionResult: &receipt.ExecutionResult,
+				})
+			}
+
+			if rand.Int()%2 == 0 {
+				pendingChunks.Add(&match.ChunkStatus{
+					Chunk:             receipt.ExecutionResult.Chunks[0],
+					ExecutionResultID: receipt.ExecutionResult.ID(),
+					ExecutorID:        receipt.ExecutorID,
+					LastAttempt:       time.Time{},
+					Attempt:           0,
+				})
+			}
+
+			if rand.Int()%2 == 0 {
+				processedResultsIDs.Add(receipt.ExecutionResult.ID())
+			}
+
+			if rand.Int()%2 == 0 {
+				block := unittest.BlockFixture()
+				pendingBlocks.Add(unittest.IdentifierFixture(), &messages.BlockProposal{
+					Header:  block.Header,
+					Payload: block.Payload,
+				})
+			}
 
 			// adds a synthetic 1 s delay for verification duration
 			time.Sleep(1 * time.Second)
 			verificationCollector.OnChunkVerificationFinished(chunkID)
-			verificationCollector.OnResultApproval()
+			if rand.Int()%2 == 0 {
+				verificationCollector.OnResultApproval()
+			}
 
 			// storage tests
 			// making randomized verifiable chunks that capture all storage per chunk

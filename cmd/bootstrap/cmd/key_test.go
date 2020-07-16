@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,9 +21,9 @@ var happyPathRegex = `^will generate networking key` +
 	`generated staking key` +
 	`assembling node information` +
 	`encoded public staking and network keys` +
-	`wrote file /tmp/%s/public-genesis-information/node-id` +
-	`wrote file /tmp/%s/private-genesis-information/private-node-info_\S+/node-info.priv.json` +
-	`wrote file /tmp/%s/public-genesis-information/node-info.pub.\S+.json`
+	`wrote file /tmp/%s/public-root-information/node-id` +
+	`wrote file /tmp/%s/private-root-information/private-node-info_\S+/node-info.priv.json` +
+	`wrote file /tmp/%s/public-root-information/node-info.pub.\S+.json`
 
 func TestHappyPath(t *testing.T) {
 	dirName := strconv.FormatInt(time.Now().UnixNano(), 10)
@@ -35,12 +34,12 @@ func TestHappyPath(t *testing.T) {
 	hook := zeroLoggerHook{
 		logs: &strings.Builder{},
 	}
-	log.Logger = log.Logger.Hook(hook)
+	log = log.Hook(hook)
 	keyCmdRun(nil, nil)
 	require.Regexp(t, regex, hook.logs.String())
-	require.DirExists(t, flagOutdir+"/public-genesis-information")
-	require.FileExists(t, flagOutdir+"/public-genesis-information/node-id", "node-id file not created")
-	require.DirExists(t, flagOutdir+"/private-genesis-information")
+	require.DirExists(t, flagOutdir+"/public-root-information")
+	require.FileExists(t, flagOutdir+"/public-root-information/node-id", "node-id file not created")
+	require.DirExists(t, flagOutdir+"/private-root-information")
 }
 
 func TestInvalidAddress(t *testing.T) {

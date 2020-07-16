@@ -6,6 +6,14 @@ import (
 	"github.com/dgraph-io/badger/v2"
 )
 
+func InsertRootHeight(height uint64) func(*badger.Txn) error {
+	return insert(makePrefix(codeRootHeight), height)
+}
+
+func RetrieveRootHeight(height *uint64) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeRootHeight), height)
+}
+
 func InsertFinalizedHeight(height uint64) func(*badger.Txn) error {
 	return insert(makePrefix(codeFinalizedHeight), height)
 }

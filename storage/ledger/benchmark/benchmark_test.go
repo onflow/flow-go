@@ -86,7 +86,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 
 		start = time.Now()
 		// construct a partial trie using proofs
-		_, err = ptrie.NewPSMT(newState, keyByteSize*8+1, keys, retValues, proofs)
+		_, err = ptrie.NewPSMT(newState, keyByteSize, keys, retValues, proofs)
 		if err != nil {
 			b.Fatal("failed to create PSMT")
 		}

@@ -7,19 +7,24 @@ package encoding
 // independent random oracles, the hashing process includes
 // a domain tag that specifies the type of the signed object.
 
-const (
-	// Flow protocol version and prefix
-	versionPrefix = "FLOW-V0.0-"
+func tag(domain string) string {
+	return versionPrefix + domain
+}
+
+// Flow protocol version and prefix
+const versionPrefix = "FLOW-V0.0-"
+
+var (
 	// RandomBeaconTag is used for threshold signatures in the random beacon
-	RandomBeaconTag = versionPrefix + "RandomBeacon"
+	RandomBeaconTag = tag("RandomBeacon")
 	// ConsensusVoteTag is used for Consensus Hotstuff votes
-	ConsensusVoteTag = versionPrefix + "ConsensusVote"
+	ConsensusVoteTag = tag("ConsensusVote")
 	// CollectorVoteTag is used for Collection Hotstuff votes
-	CollectorVoteTag = versionPrefix + "CollectorVote"
+	CollectorVoteTag = tag("CollectorVote")
 	// ExecutionReceiptTag is used for execution receipts
-	ExecutionReceiptTag = versionPrefix + "ExecutionReceipt"
+	ExecutionReceiptTag = tag("ExecutionReceipt")
 	// ResultApprovalTag is used for result approvals
-	ResultApprovalTag = versionPrefix + "ResultApproval"
+	ResultApprovalTag = tag("ResultApproval")
 	// SPOCKTag is used to generate SPoCK proofs
-	SPOCKTag = versionPrefix + "SPoCK"
+	SPOCKTag = tag("SPoCK")
 )

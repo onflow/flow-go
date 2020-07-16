@@ -22,18 +22,18 @@ import (
 
 // TestTrieOperations tests adding removing and retrieving Trie from Forrest
 func TestTrieOperations(t *testing.T) {
-	trieHeight := 17
+	keyByteSize := 2 // key size of 16 bits
 
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	fStore, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
+	fStore, err := NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
 	// Make new Trie (independently of MForest):
-	nt, err := trie.NewEmptyMTrie(trieHeight, 23, []byte{})
+	nt, err := trie.NewEmptyMTrie(keyByteSize)
 	require.NoError(t, err)
 	k1 := []byte([]uint8{uint8(53), uint8(74)})
 	v1 := []byte{'A'}
@@ -59,14 +59,14 @@ func TestTrieOperations(t *testing.T) {
 // TestTrieUpdate updates the empty trie with some values and verifies that the
 // written values can be retrieved from the updated trie.
 func TestTrieUpdate(t *testing.T) {
-	trieHeight := 17
+	keyByteSize := 2 // key size of 16 bits
 
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	fStore, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
+	fStore, err := NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash := fStore.GetEmptyRootHash()
 
@@ -94,13 +94,13 @@ func TestLeftEmptyInsert(t *testing.T) {
 	//      /  \        //
 	//    (X)  [~]      //
 	//////////////////////
-	trieHeight := 17
+	keyByteSize := 2 // key size of 16 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	fStore, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
+	fStore, err := NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
 	k1 := []byte([]uint8{uint8(129), uint8(1)}) // key: 1000...
@@ -159,13 +159,13 @@ func TestRightEmptyInsert(t *testing.T) {
 	//      /  \         //
 	//    [~]  (X)       //
 	///////////////////////
-	trieHeight := 17
+	keyByteSize := 2 // key size of 16 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	fStore, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
+	fStore, err := NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
 	k1 := []byte([]uint8{uint8(1), uint8(1)}) // key: 0000...
@@ -228,13 +228,13 @@ func TestExpansionInsert(t *testing.T) {
 	//         [~]        //
 	////////////////////////
 
-	trieHeight := 17
+	keyByteSize := 2 // key size of 16 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	fStore, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
+	fStore, err := NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
 	k1 := []byte([]uint8{uint8(129), uint8(1)}) // key: 1000000...
@@ -296,13 +296,13 @@ func TestFullHouseInsert(t *testing.T) {
 	//    [~1]  [~2]     //
 	///////////////////////
 
-	trieHeight := 17
+	keyByteSize := 2 // key size of 16 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	fStore, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
+	fStore, err := NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
 	// key-value pair (k0,v0) forms [~1]; (k1,v1) and (k2,v2) form [~2]
@@ -372,13 +372,13 @@ func TestLeafInsert(t *testing.T) {
 	//          /  \     //
 	//         ()  ()    //
 	///////////////////////
-	trieHeight := 17
+	keyByteSize := 2 // key size of 16 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	fStore, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
+	fStore, err := NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
 	k1 := []byte([]uint8{uint8(1), uint8(0)})
@@ -412,13 +412,13 @@ func TestLeafInsert(t *testing.T) {
 // We verify that values for _all_ keys in the updated Trie have correct values
 // TODO: move to Trie test (as it directly tests trie update as opposed to forest functions)
 func TestOverrideValue(t *testing.T) {
-	trieHeight := 17 // should be key size (in bits) + 1
+	keyByteSize := 2 // key size of 16 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	fStore, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
+	fStore, err := NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
 	k1 := []byte([]uint8{uint8(53), uint8(74)})
@@ -448,13 +448,13 @@ func TestOverrideValue(t *testing.T) {
 // We expect that the _last_ written value is persisted in the Trie
 // TODO: move to Trie test (as it directly tests trie update as opposed to forest functions)
 func TestDuplicateOverride(t *testing.T) {
-	trieHeight := 17 // should be key size (in bits) + 1
+	keyByteSize := 2 // key size of 16 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	fStore, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
+	fStore, err := NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
 	k0 := []byte([]uint8{uint8(53), uint8(74)})
@@ -475,13 +475,13 @@ func TestDuplicateOverride(t *testing.T) {
 // TestUpdateWithWrongKeySize verifies that attempting to update a trie with wrong key size errors
 // TODO: move to Trie test (as it directly tests trie update as opposed to forest functions)
 func TestUpdateWithWrongKeySize(t *testing.T) {
-	trieHeight := 17 // should be key size (in bits) + 1
+	keyByteSize := 2 // key size of 16 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	fStore, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
+	fStore, err := NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
 	// short key
@@ -508,13 +508,13 @@ func TestUpdateWithWrongKeySize(t *testing.T) {
 // TestReadOrder tests that values from reading a trie are delivered in the order as specified by the keys
 // TODO: move to Trie test (as it directly tests trie update as opposed to forest functions)
 func TestReadOrder(t *testing.T) {
-	trieHeight := 17 // should be key size (in bits) + 1
+	keyByteSize := 2 // key size of 16 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	fStore, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
+	fStore, err := NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
 	k1 := []byte([]uint8{uint8(116), uint8(74)})
@@ -541,13 +541,13 @@ func TestReadOrder(t *testing.T) {
 // We expect the default value (empty slice) to be returned for unset registers.
 // TODO: move to Trie test (as it directly tests trie update as opposed to forest functions)
 func TestMixRead(t *testing.T) {
-	trieHeight := 17 // should be key size (in bits) + 1
+	keyByteSize := 2 // key size of 16 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	fStore, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
+	fStore, err := NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
 	k1 := []byte([]uint8{uint8(125), uint8(23)}) // key: 01111101...
@@ -580,13 +580,13 @@ func TestMixRead(t *testing.T) {
 // We expect that we receive the respective value twice in the return.
 // TODO: move to Trie test (as it directly tests trie update as opposed to forest functions)
 func TestReadWithDuplicatedKeys(t *testing.T) {
-	trieHeight := 17 // should be key size (in bits) + 1
+	keyByteSize := 2 // key size of 16 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	fStore, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
+	fStore, err := NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
 	k1 := []byte([]uint8{uint8(53), uint8(74)})
@@ -615,13 +615,13 @@ func TestReadWithDuplicatedKeys(t *testing.T) {
 // TestReadNonExistKey tests reading an unset registers.
 // TODO: move to Trie test (as it directly tests trie update as opposed to forest functions)
 func TestReadNonExistKey(t *testing.T) {
-	trieHeight := 17 // should be key size (in bits) + 1
+	keyByteSize := 2 // key size of 16 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	fStore, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
+	fStore, err := NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
 	k1 := []byte([]uint8{uint8(53), uint8(74)})
@@ -642,13 +642,13 @@ func TestReadNonExistKey(t *testing.T) {
 // TestReadWithWrongKeySize verifies that attempting to read a trie with wrong key size errors
 // TODO: move to Trie test (as it directly tests trie update as opposed to forest functions)
 func TestReadWithWrongKeySize(t *testing.T) {
-	trieHeight := 17 // should be key size (in bits) + 1
+	keyByteSize := 2 // key size of 16 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	fStore, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
+	fStore, err := NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
 	// setup
@@ -682,13 +682,13 @@ func TestReadWithWrongKeySize(t *testing.T) {
 // that for each update, a new trie is added to the forest preserving the
 // updated values independently of the other update.
 func TestForkingUpdates(t *testing.T) {
-	trieHeight := 17 // should be key size (in bits) + 1
+	keyByteSize := 2 // key size of 16 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	fStore, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
+	fStore, err := NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
 	k1 := []byte([]uint8{uint8(53), uint8(74)})
@@ -750,13 +750,13 @@ func TestForkingUpdates(t *testing.T) {
 // Hence, the forest should de-duplicate the resulting two version of the identical trie
 // without an error.
 func TestIdenticalUpdateAppliedTwice(t *testing.T) {
-	trieHeight := 17 // should be key size (in bits) + 1
+	keyByteSize := 2 // key size of 16 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	fStore, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
+	fStore, err := NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
 	k1 := []byte([]uint8{uint8(53), uint8(74)})
@@ -788,8 +788,7 @@ func TestIdenticalUpdateAppliedTwice(t *testing.T) {
 // TestRandomUpdateReadProof tests a read proof against the ChainSafe Trie implementation
 // TODO: move to Trie test (as it directly tests trie update as opposed to forest functions)
 func TestRandomUpdateReadProof(t *testing.T) {
-	keyByteSize := 2
-	trieHeight := keyByteSize*8 + 1
+	keyByteSize := 2 // key size of 16 bits
 	rep := 10
 	maxNumKeysPerStep := 10
 	maxValueSize := 6 // bytes
@@ -799,7 +798,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 	defer os.RemoveAll(dir) // clean up
 
 	metricsCollector := &metrics.NoopCollector{}
-	fStore, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
+	fStore, err := NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
 	testTrie, err := fStore.GetTrie(fStore.GetEmptyRootHash())
@@ -855,12 +854,12 @@ func TestRandomUpdateReadProof(t *testing.T) {
 
 		batchProof, err := fStore.Proofs(testTrie.RootHash(), proofKeys)
 		require.NoError(t, err, "error generating proofs")
-		require.True(t, batchProof.Verify(proofKeys, proofValues, testTrie.RootHash(), trieHeight))
+		require.True(t, batchProof.Verify(proofKeys, proofValues, testTrie.RootHash(), keyByteSize))
 
 		proofToGo, _ := proof.EncodeBatchProof(batchProof)
-		psmt, err := ptrie.NewPSMT(testTrie.RootHash(), trieHeight, proofKeys, proofValues, proofToGo)
+		psmt, err := ptrie.NewPSMT(testTrie.RootHash(), keyByteSize, proofKeys, proofValues, proofToGo)
 		require.NoError(t, err, "error building partial trie")
-		require.True(t, bytes.Equal(psmt.GetRootHash(), testTrie.RootHash()))
+		require.True(t, bytes.Equal(psmt.RootHash(), testTrie.RootHash()))
 
 		// check values for all existing keys
 		allKeys := make([][]byte, 0, len(latestValueByKey))
@@ -880,13 +879,13 @@ func TestRandomUpdateReadProof(t *testing.T) {
 // TestProofGenerationInclusion tests that inclusion proofs generated by a Trie pass verification
 // TODO: move to Trie test (as it directly tests trie update as opposed to forest functions)
 func TestProofGenerationInclusion(t *testing.T) {
-	trieHeight := 17
+	keyByteSize := 2 // key size of 16 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	fStore, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
+	fStore, err := NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	emptyTrieHash := fStore.GetEmptyRootHash()
 
@@ -908,7 +907,7 @@ func TestProofGenerationInclusion(t *testing.T) {
 	require.NoError(t, err)
 	proof, err := fStore.Proofs(updatedTrie.RootHash(), keys)
 	require.NoError(t, err)
-	require.True(t, proof.Verify(keys, values, updatedTrie.RootHash(), trieHeight))
+	require.True(t, proof.Verify(keys, values, updatedTrie.RootHash(), keyByteSize))
 }
 
 // TestPurgeAndLoad this test updates the Tries repeatedly until the forest should
@@ -917,15 +916,14 @@ func TestProofGenerationInclusion(t *testing.T) {
 // TODO: implement this functionality for MForest
 func TestPurgeAndLoad(t *testing.T) {
 	t.Skip("we don't have this functionality right now")
-	keyByteSize := 2
-	trieHeight := keyByteSize*8 + 1
+	keyByteSize := 2 // key size of 16 bits
 
 	dir, err := ioutil.TempDir("", "test-mtrie")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir) // clean up
 
 	metricsCollector := &metrics.NoopCollector{}
-	fStore, err := NewMForest(trieHeight, dir, 2, metricsCollector, nil)
+	fStore, err := NewMForest(keyByteSize, dir, 2, metricsCollector, nil)
 	require.NoError(t, err)
 
 	k1 := []byte([]uint8{uint8(1), uint8(74)})
@@ -981,13 +979,13 @@ func TestPurgeAndLoad(t *testing.T) {
 // the expected root hash.
 // TODO: implement this functionality for MForest
 func TestTrieStoreAndLoad(t *testing.T) {
-	trieHeight := 17
+	keyByteSize := 2 // key size of 16 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	fStore, err := NewMForest(trieHeight, dir, 5, metricsCollector, nil)
+	fStore, err := NewMForest(keyByteSize, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
 	k1 := []byte([]uint8{uint8(1), uint8(74)})
@@ -1017,7 +1015,7 @@ func TestTrieStoreAndLoad(t *testing.T) {
 
 	// create new store
 
-	fStore, err = NewMForest(trieHeight, "", 5, metricsCollector, nil)
+	fStore, err = NewMForest(keyByteSize, "", 5, metricsCollector, nil)
 	require.NoError(t, err)
 	loadedTrie, err := fStore.LoadTrie(file.Name())
 	require.NoError(t, err)
@@ -1026,7 +1024,4 @@ func TestTrieStoreAndLoad(t *testing.T) {
 	retValues, err := fStore.Read(loadedTrie.RootHash(), keys)
 	require.NoError(t, err)
 	require.Equal(t, retValues, values)
-	//for i := range keys {
-	//	require.True(t, bytes.Equal(values[i], retValues[i]))
-	//}
 }

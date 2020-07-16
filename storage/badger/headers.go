@@ -96,3 +96,9 @@ func (h *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
 	}
 	return headers, nil
 }
+
+func (h *Headers) FindHeaders(filter func(header *flow.Header) bool) ([]flow.Header, error) {
+	blocks := make([]flow.Header, 0, 1)
+	err := h.db.View(operation.FindHeaders(filter, &blocks))
+	return blocks, err
+}

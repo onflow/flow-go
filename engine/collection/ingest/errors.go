@@ -5,9 +5,8 @@ import (
 	"fmt"
 )
 
-var (
-	ErrUnknownReferenceBlock = errors.New("unknown reference block")
-)
+// ErrUnknownReferenceBlock indicates a transaction references an unknown block.
+var ErrUnknownReferenceBlock = errors.New("unknown reference block")
 
 // IncompleteTransactionError returned when transactions are missing fields.
 type IncompleteTransactionError struct {
@@ -16,11 +15,6 @@ type IncompleteTransactionError struct {
 
 func (e IncompleteTransactionError) Error() string {
 	return fmt.Sprint("incomplete transaction missing fields: ", e.Missing)
-}
-
-func (e IncompleteTransactionError) Is(other error) bool {
-	_, ok := other.(IncompleteTransactionError)
-	return ok
 }
 
 // ExpiredTransactionError indicates a transaction has expired.
@@ -32,11 +26,6 @@ func (e ExpiredTransactionError) Error() string {
 	return fmt.Sprintf("expired transaction: ref_height=%d final_height=%d", e.RefHeight, e.FinalHeight)
 }
 
-func (e ExpiredTransactionError) Is(other error) bool {
-	_, ok := other.(ExpiredTransactionError)
-	return ok
-}
-
 // InvalidScriptError indicates a transaction with an invalid scipt.
 type InvalidScriptError struct {
 	ParserErr error
@@ -44,11 +33,6 @@ type InvalidScriptError struct {
 
 func (e InvalidScriptError) Error() string {
 	return fmt.Sprintf("invalid transaction script: %s", e.ParserErr)
-}
-
-func (e InvalidScriptError) Is(other error) bool {
-	_, ok := other.(InvalidScriptError)
-	return ok
 }
 
 func (e InvalidScriptError) Unwrap() error {
@@ -62,9 +46,4 @@ type GasLimitExceededError struct {
 
 func (e GasLimitExceededError) Error() string {
 	return fmt.Sprintf("transaction's gas limit (%d) exceeds the allowed max gas limit (%d)", e.Actual, e.Maximum)
-}
-
-func (e GasLimitExceededError) Is(other error) bool {
-	_, ok := other.(GasLimitExceededError)
-	return ok
 }
