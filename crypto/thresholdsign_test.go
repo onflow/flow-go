@@ -88,64 +88,66 @@ func testThresholdSignatureJointFeldman(t *testing.T) {
 	log.Info("DKG starts")
 	// number of nodes to test
 	n := 5
-	var sync sync.WaitGroup
-	chans := make([]chan *message, n)
-	processors := make([]testDKGProcessor, 0, n)
+	for threshold := 1; threshold < n-1; threshold++ {
+		var sync sync.WaitGroup
+		chans := make([]chan *message, n)
+		processors := make([]testDKGProcessor, 0, n)
 
-	// create n processors for all nodes
-	for current := 0; current < n; current++ {
-		processors = append(processors, testDKGProcessor{
-			current: current,
-			chans:   chans,
-			msgType: dkgType,
-		})
-		// create DKG in all nodes
-		var err error
-		processors[current].dkg, err = NewJointFeldman(n,
-			optimalThreshold(n), current, &processors[current])
+		// create n processors for all nodes
+		for current := 0; current < n; current++ {
+			processors = append(processors, testDKGProcessor{
+				current: current,
+				chans:   chans,
+				msgType: dkgType,
+			})
+			// create DKG in all nodes
+			var err error
+			processors[current].dkg, err = NewJointFeldman(n,
+				optimalThreshold(n), current, &processors[current])
+			require.NoError(t, err)
+		}
+
+		// create the node (buffered) communication channels
+		for i := 0; i < n; i++ {
+			chans[i] = make(chan *message, 2*n)
+		}
+		// start DKG in all nodes but the leader
+		seed := make([]byte, SeedMinLenDKG)
+		read, err := rand.Read(seed)
+		require.Equal(t, read, SeedMinLenDKG)
 		require.NoError(t, err)
-	}
-
-	// create the node (buffered) communication channels
-	for i := 0; i < n; i++ {
-		chans[i] = make(chan *message, 2*n)
-	}
-	// start DKG in all nodes but the leader
-	seed := make([]byte, SeedMinLenDKG)
-	read, err := rand.Read(seed)
-	require.Equal(t, read, SeedMinLenDKG)
-	require.NoError(t, err)
-	sync.Add(n)
-	for current := 0; current < n; current++ {
-		err := processors[current].dkg.Start(seed)
-		require.NoError(t, err)
-		go tsDkgRunChan(&processors[current], &sync, t, 0)
-	}
-
-	// sync the 2 timeouts at all nodes and start the next phase
-	for phase := 1; phase <= 2; phase++ {
-		sync.Wait()
 		sync.Add(n)
 		for current := 0; current < n; current++ {
-			go tsDkgRunChan(&processors[current], &sync, t, phase)
+			err := processors[current].dkg.Start(seed)
+			require.NoError(t, err)
+			go tsDkgRunChan(&processors[current], &sync, t, 0)
 		}
-	}
 
-	// synchronize the main thread to end DKG
-	sync.Wait()
-	for i := 1; i < n; i++ {
-		assert.Equal(t, processors[i].pkBytes, processors[0].pkBytes,
-			"2 group public keys are mismatching")
-	}
+		// sync the 2 timeouts at all nodes and start the next phase
+		for phase := 1; phase <= 2; phase++ {
+			sync.Wait()
+			sync.Add(n)
+			for current := 0; current < n; current++ {
+				go tsDkgRunChan(&processors[current], &sync, t, phase)
+			}
+		}
 
-	// Start TS
-	log.Info("TS starts")
-	sync.Add(n)
-	for current := 0; current < n; current++ {
-		go tsRunChan(&processors[current], &sync, t)
+		// synchronize the main thread to end DKG
+		sync.Wait()
+		for i := 1; i < n; i++ {
+			assert.Equal(t, processors[i].pkBytes, processors[0].pkBytes,
+				"2 group public keys are mismatching")
+		}
+
+		// Start TS
+		log.Info("TS starts")
+		sync.Add(n)
+		for current := 0; current < n; current++ {
+			go tsRunChan(&processors[current], &sync, t)
+		}
+		// synchronize the main thread to end TS
+		sync.Wait()
 	}
-	// synchronize the main thread to end TS
-	sync.Wait()
 }
 
 // Testing Threshold Signature statless api
@@ -369,45 +371,46 @@ func tsStatelessRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing
 // The test generates keys for a threshold signatures scheme, uses the keys to sign shares,
 // and reconstruct the threshold signatures using (t+1) random shares.
 func testStatelessThresholdSignatureSimpleKeyGen(t *testing.T) {
-	n := 80
-	threshold := optimalThreshold(n)
-	// generate threshold keys
-	mrand.Seed(time.Now().UnixNano())
-	seed := make([]byte, SeedMinLenDKG)
-	_, err := mrand.Read(seed)
-	require.NoError(t, err)
-	skShares, pkShares, pkGroup, err := ThresholdSignKeyGen(n, threshold, seed)
-	require.NoError(t, err)
-	// signature hasher
-	kmac := NewBLSKMAC(thresholdSignatureTag)
-	// generate signature shares
-	signShares := make([]Signature, 0, n)
-	signers := make([]int, 0, n)
-	// fill the signers list and shuffle it
-	for i := 0; i < n; i++ {
-		signers = append(signers, i)
-	}
-	mrand.Shuffle(n, func(i, j int) {
-		signers[i], signers[j] = signers[j], signers[i]
-	})
-	// create (t+1) signatures of the first randomly chosen signers
-	for j := 0; j < threshold+1; j++ {
-		i := signers[j]
-		share, err := skShares[i].Sign(messageToSign, kmac)
+	n := 10
+	for threshold := 1; threshold < n-1; threshold++ {
+		// generate threshold keys
+		mrand.Seed(time.Now().UnixNano())
+		seed := make([]byte, SeedMinLenDKG)
+		_, err := mrand.Read(seed)
 		require.NoError(t, err)
-		verif, err := pkShares[i].Verify(share, messageToSign, kmac)
+		skShares, pkShares, pkGroup, err := ThresholdSignKeyGen(n, threshold, seed)
+		require.NoError(t, err)
+		// signature hasher
+		kmac := NewBLSKMAC(thresholdSignatureTag)
+		// generate signature shares
+		signShares := make([]Signature, 0, n)
+		signers := make([]int, 0, n)
+		// fill the signers list and shuffle it
+		for i := 0; i < n; i++ {
+			signers = append(signers, i)
+		}
+		mrand.Shuffle(n, func(i, j int) {
+			signers[i], signers[j] = signers[j], signers[i]
+		})
+		// create (t+1) signatures of the first randomly chosen signers
+		for j := 0; j < threshold+1; j++ {
+			i := signers[j]
+			share, err := skShares[i].Sign(messageToSign, kmac)
+			require.NoError(t, err)
+			verif, err := pkShares[i].Verify(share, messageToSign, kmac)
+			require.NoError(t, err)
+			assert.True(t, verif, "signature share is not valid")
+			if verif {
+				signShares = append(signShares, share)
+			}
+		}
+		// reconstruct and test the threshold signature
+		thresholdSignature, err := ReconstructThresholdSignature(n, threshold, signShares, signers[:threshold+1])
+		require.NoError(t, err)
+		verif, err := pkGroup.Verify(thresholdSignature, messageToSign, kmac)
 		require.NoError(t, err)
 		assert.True(t, verif, "signature share is not valid")
-		if verif {
-			signShares = append(signShares, share)
-		}
 	}
-	// reconstruct and test the threshold signature
-	thresholdSignature, err := ReconstructThresholdSignature(n, threshold, signShares, signers[:threshold+1])
-	require.NoError(t, err)
-	verif, err := pkGroup.Verify(thresholdSignature, messageToSign, kmac)
-	require.NoError(t, err)
-	assert.True(t, verif, "signature share is not valid")
 }
 
 func BenchmarkSimpleKeyGen(b *testing.B) {
