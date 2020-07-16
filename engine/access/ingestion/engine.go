@@ -16,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -41,7 +42,10 @@ type Engine struct {
 	transactions storage.Transactions
 
 	// metrics
-	transactionMetrics module.TransactionMetrics
+	transactionMetrics         module.TransactionMetrics
+	collectionsToMarkFinalized *stdmap.Times
+	collectionsToMarkExecuted  *stdmap.Times
+	blocksToMarkExecuted       *stdmap.Times
 }
 
 // New creates a new access ingestion engine
@@ -54,19 +58,25 @@ func New(log zerolog.Logger,
 	collections storage.Collections,
 	transactions storage.Transactions,
 	transactionMetrics module.TransactionMetrics,
+	collectionsToMarkFinalized *stdmap.Times,
+	collectionsToMarkExecuted *stdmap.Times,
+	blocksToMarkExecuted *stdmap.Times,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	eng := &Engine{
-		unit:               engine.NewUnit(),
-		log:                log.With().Str("engine", "ingestion").Logger(),
-		state:              state,
-		me:                 me,
-		blocks:             blocks,
-		headers:            headers,
-		collections:        collections,
-		transactions:       transactions,
-		transactionMetrics: transactionMetrics,
+		unit:                       engine.NewUnit(),
+		log:                        log.With().Str("engine", "ingestion").Logger(),
+		state:                      state,
+		me:                         me,
+		blocks:                     blocks,
+		headers:                    headers,
+		collections:                collections,
+		transactions:               transactions,
+		transactionMetrics:         transactionMetrics,
+		collectionsToMarkFinalized: collectionsToMarkFinalized,
+		collectionsToMarkExecuted:  collectionsToMarkExecuted,
+		blocksToMarkExecuted:       blocksToMarkExecuted,
 	}
 
 	collConduit, err := net.Register(engine.CollectionProvider, eng)
@@ -151,7 +161,7 @@ func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 			e.log.Error().Err(err).Hex("block_id", id[:]).Msg("failed to process block")
 			return
 		}
-		e.trackFinalizedMetric(hb)
+		e.trackFinalizedMetricForBlock(hb)
 	})
 }
 
@@ -178,7 +188,7 @@ func (e *Engine) processFinalizedBlock(id flow.Identifier) error {
 	return e.requestCollections(block.Payload.Guarantees...)
 }
 
-func (e *Engine) trackFinalizedMetric(hb *model.Block) {
+func (e *Engine) trackFinalizedMetricForBlock(hb *model.Block) {
 	// retrieve the block
 	block, err := e.blocks.ByID(hb.BlockID)
 	if err != nil {
@@ -193,7 +203,10 @@ func (e *Engine) trackFinalizedMetric(hb *model.Block) {
 	// TODO: sample to reduce performance overhead
 	for _, g := range block.Payload.Guarantees {
 		l, err := e.collections.LightByID(g.CollectionID)
-		if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			e.collectionsToMarkFinalized.Add(g.CollectionID, now)
+			continue
+		} else if err != nil {
 			e.log.Warn().Err(err).Str("collection_id", g.CollectionID.String()).
 				Msg("could not track tx finalized metric: finalized collection not found locally")
 			continue
@@ -203,36 +216,51 @@ func (e *Engine) trackFinalizedMetric(hb *model.Block) {
 			e.transactionMetrics.TransactionFinalized(t, now)
 		}
 	}
+
+	if ti, found := e.blocksToMarkExecuted.ByID(hb.BlockID); found {
+		e.trackExecutedMetricForBlock(block, ti)
+		e.blocksToMarkExecuted.Rem(hb.BlockID)
+	}
 }
 
 func (e *Engine) handleExecutionReceipt(originID flow.Identifier, r *flow.ExecutionReceipt) error {
-	e.trackExecutedMetric(r)
+	e.trackExecutedMetricForReceipt(r)
 	return nil
 }
 
-func (e *Engine) trackExecutedMetric(r *flow.ExecutionReceipt) {
+func (e *Engine) trackExecutedMetricForReceipt(r *flow.ExecutionReceipt) {
+	// TODO add actual execution time to execution receipt?
+	now := time.Now().UTC()
+
 	// retrieve the block
-	block, err := e.blocks.ByID(r.ExecutionResult.BlockID)
-	if err != nil {
+	b, err := e.blocks.ByID(r.ExecutionResult.BlockID)
+	if errors.Is(err, storage.ErrNotFound) {
+		e.blocksToMarkExecuted.Add(r.ExecutionResult.BlockID, now)
+		return
+	} else if err != nil {
 		e.log.Warn().Err(err).Msg("could not track tx executed metric: executed block not found locally")
 		return
 	}
+	e.trackExecutedMetricForBlock(b, now)
+}
 
-	// TODO add actual execution time to execution receipt?
-	now := time.Now().UTC()
+func (e *Engine) trackExecutedMetricForBlock(block *flow.Block, ti time.Time) {
 
 	// mark all transactions as executed
 	// TODO: sample to reduce performance overhead
 	for _, g := range block.Payload.Guarantees {
 		l, err := e.collections.LightByID(g.CollectionID)
-		if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			e.collectionsToMarkExecuted.Add(g.CollectionID, ti)
+			continue
+		} else if err != nil {
 			e.log.Warn().Err(err).Str("collection_id", g.CollectionID.String()).
 				Msg("could not track tx executed metric: executed collection not found locally")
 			continue
 		}
 
 		for _, t := range l.Transactions {
-			e.transactionMetrics.TransactionFinalized(t, now)
+			e.transactionMetrics.TransactionExecuted(t, ti)
 		}
 	}
 }
@@ -241,6 +269,20 @@ func (e *Engine) trackExecutedMetric(r *flow.ExecutionReceipt) {
 func (e *Engine) handleCollectionResponse(originID flow.Identifier, response *messages.CollectionResponse) error {
 	collection := response.Collection
 	light := collection.Light()
+
+	if ti, found := e.collectionsToMarkFinalized.ByID(light.ID()); found {
+		for _, t := range light.Transactions {
+			e.transactionMetrics.TransactionFinalized(t, ti)
+		}
+		e.collectionsToMarkFinalized.Rem(light.ID())
+	}
+
+	if ti, found := e.collectionsToMarkExecuted.ByID(light.ID()); found {
+		for _, t := range light.Transactions {
+			e.transactionMetrics.TransactionExecuted(t, ti)
+		}
+		e.collectionsToMarkExecuted.Rem(light.ID())
+	}
 
 	// FIX: we can't index guarantees here, as we might have more than one block
 	// with the same collection as long as it is not finalized

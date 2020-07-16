@@ -257,6 +257,11 @@ docker-build-bootstrap-transit:
 	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=bootstrap/transit --target production-nocgo \
 		-t gcr.io/dl-flow/bootstrap-transit:latest -t "gcr.io/dl-flow/bootstrap-transit:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/bootstrap-transit:$(IMAGE_TAG)" .
 
+.PHONY: docker-build-spammer
+docker-build-spammer:
+	docker build -f ./integration/benchmark/main/Dockerfile --ssh default --build-arg TARGET=benchmark/main --target production \
+		-t gcr.io/dl-flow/bechmark:latest -t "gcr.io/dl-flow/bechmark:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/bechmark:$(IMAGE_TAG)" .
+
 .PHONY: docker-build-flow
 docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification docker-build-access docker-build-ghost
 
@@ -363,8 +368,3 @@ monitor-rollout:
 	kubectl --kubeconfig=$$kconfig rollout status statefulsets.apps flow-consensus-node-v1; \
 	kubectl --kubeconfig=$$kconfig rollout status statefulsets.apps flow-execution-node-v1; \
 	kubectl --kubeconfig=$$kconfig rollout status statefulsets.apps flow-verification-node-v1
-
-.PHONY: docker-build-spammer
-docker-build-spammer:
-	docker build -f ./integration/benchmark/main/Dockerfile --ssh default --build-arg TARGET=benchmark/main --target production \
-		-t gcr.io/dl-flow/bechmark:latest -t "gcr.io/dl-flow/bechmark:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/bechmark:$(IMAGE_TAG)" .

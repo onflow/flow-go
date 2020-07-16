@@ -45,6 +45,10 @@ func main() {
 		executionRPC                 execution.ExecutionAPIClient
 		err                          error
 		conCache                     *buffer.PendingBlocks // pending block cache for follower
+		transactionTimings           *stdmap.TransactionTimings
+		collectionsToMarkFinalized   *stdmap.Times
+		collectionsToMarkExecuted    *stdmap.Times
+		blocksToMarkExecuted         *stdmap.Times
 		transactionMetrics           module.TransactionMetrics
 		logTxTimeToFinalized         bool
 		logTxTimeToExecuted          bool
@@ -98,18 +102,34 @@ func main() {
 			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
-		Module("transaction metrics", func(node *cmd.FlowNodeBuilder) error {
-			transactionTimings, err := stdmap.NewTransactionTimings(1500 * 120) // assume 1500 TPS * 120 seconds
+		Module("transaction timing mempools", func(node *cmd.FlowNodeBuilder) error {
+			transactionTimings, err = stdmap.NewTransactionTimings(1500 * 300) // assume 1500 TPS * 300 seconds
 			if err != nil {
 				return err
 			}
 
+			collectionsToMarkFinalized, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
+			if err != nil {
+				return err
+			}
+
+			collectionsToMarkExecuted, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
+			if err != nil {
+				return err
+			}
+
+			blocksToMarkExecuted, err = stdmap.NewTimes(1 * 300) // assume 1 block per second * 300 seconds
+			return err
+		}).
+		Module("transaction metrics", func(node *cmd.FlowNodeBuilder) error {
 			transactionMetrics = metrics.NewTransactionCollector(transactionTimings, node.Logger, logTxTimeToFinalized,
 				logTxTimeToExecuted, logTxTimeToFinalizedExecuted)
 			return nil
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, transactionMetrics)
+			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, node.Storage.Blocks,
+				node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, transactionMetrics,
+				collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted)
 			return ingestEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {

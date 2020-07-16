@@ -25,6 +25,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	mockmodule "github.com/dapperlabs/flow-go/module/mock"
 	networkmock "github.com/dapperlabs/flow-go/network/mock"
@@ -224,10 +225,16 @@ func (suite *Suite) TestGetSealedTransaction() {
 		metrics := metrics.NewNoopCollector()
 		transactions := storage.NewTransactions(metrics, db)
 		collections := storage.NewCollections(db, transactions)
+		collectionsToMarkFinalized, err := stdmap.NewTimes(100)
+		require.NoError(suite.T(), err)
+		collectionsToMarkExecuted, err := stdmap.NewTimes(100)
+		require.NoError(suite.T(), err)
+		blocksToMarkExecuted, err := stdmap.NewTimes(100)
+		require.NoError(suite.T(), err)
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, blocks, headers, collections,
-			transactions, metrics)
+			transactions, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted)
 		require.NoError(suite.T(), err)
 
 		// create the handler (called by the grpc engine)

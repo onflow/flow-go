@@ -17,6 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 
+	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
@@ -81,9 +82,16 @@ func (suite *Suite) SetupTest() {
 	suite.headers = new(storage.Headers)
 	suite.collections = new(storage.Collections)
 	suite.transactions = new(storage.Transactions)
+	collectionsToMarkFinalized, err := stdmap.NewTimes(100)
+	require.NoError(suite.T(), err)
+	collectionsToMarkExecuted, err := stdmap.NewTimes(100)
+	require.NoError(suite.T(), err)
+	blocksToMarkExecuted, err := stdmap.NewTimes(100)
+	require.NoError(suite.T(), err)
 
 	eng, err := New(log, suite.net, suite.proto.state, suite.me, suite.blocks, suite.headers, suite.collections,
-		suite.transactions, metrics.NewNoopCollector())
+		suite.transactions, metrics.NewNoopCollector(), collectionsToMarkFinalized, collectionsToMarkExecuted,
+		blocksToMarkExecuted)
 	require.NoError(suite.T(), err)
 	suite.eng = eng
 
