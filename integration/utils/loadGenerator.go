@@ -233,8 +233,6 @@ func (lg *LoadGenerator) createAccounts() error {
 			nil,
 			func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
 				defer allTxWG.Done()
-				fmt.Println("HERERERERERE")
-				fmt.Println(res)
 				for _, event := range res.Events {
 					if event.Type == flowsdk.EventAccountCreated {
 						accountCreatedEvent := flowsdk.AccountCreatedEvent(event)
