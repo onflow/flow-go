@@ -27,8 +27,11 @@ func (cl *ClusterList) Add(index uint, identity *Identity) {
 }
 
 // ByIndex returns a cluster by index.
-func (cl *ClusterList) ByIndex(index uint) IdentityList {
-	return cl.clusters[int(index)]
+func (cl *ClusterList) ByIndex(index uint) (IdentityList, bool) {
+	if int(index) >= len(cl.clusters) {
+		return nil, false
+	}
+	return cl.clusters[int(index)], true
 }
 
 // ByTxID selects the cluster that should receive the transaction with the given
@@ -36,9 +39,10 @@ func (cl *ClusterList) ByIndex(index uint) IdentityList {
 //
 // For evenly distributed transaction IDs, this will evenly distribute
 // transactions between clusters.
-func (cl *ClusterList) ByTxID(txID Identifier) IdentityList {
+func (cl *ClusterList) ByTxID(txID Identifier) (IdentityList, bool) {
 	bigTxID := new(big.Int).SetBytes(txID[:])
 	bigIndex := new(big.Int).Mod(bigTxID, big.NewInt(int64(len(cl.clusters))))
+
 	return cl.ByIndex(uint(bigIndex.Uint64()))
 }
 
@@ -50,7 +54,13 @@ func (cl ClusterList) ByNodeID(nodeID Identifier) (IdentityList, uint, bool) {
 	if !ok {
 		return nil, 0, false
 	}
-	return cl.ByIndex(index), index, true
+
+	cluster, found := cl.ByIndex(index)
+	if !found {
+		return nil, 0, false
+	}
+
+	return cluster, index, true
 }
 
 // Size returns the number of clusters.
