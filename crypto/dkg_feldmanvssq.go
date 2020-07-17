@@ -58,6 +58,31 @@ type complaint struct {
 	answer         scalar
 }
 
+// NewFeldmanVSSq creates a new instance of a Feldman VSS protocol
+// with a qualification mechanism.
+//
+// An instance is run by a single node and is usable for only one protocol.
+// In order to run the protocol again, a new instance needs to be created
+func NewFeldmanVSSQual(size int, threshold int, currentIndex int,
+	processor DKGProcessor, leaderIndex int) (DKGState, error) {
+
+	common, err := newDKGCommon(size, threshold, currentIndex, processor, leaderIndex)
+	if err != nil {
+		return nil, err
+	}
+
+	fvss := &feldmanVSSstate{
+		dkgCommon:   common,
+		leaderIndex: index(leaderIndex),
+	}
+	fvssq := &feldmanVSSQualState{
+		feldmanVSSstate: fvss,
+		disqualified:    false,
+	}
+	fvssq.init()
+	return fvssq, nil
+}
+
 func (s *feldmanVSSQualState) init() {
 	s.feldmanVSSstate.init()
 	s.complaints = make(map[index]*complaint)
