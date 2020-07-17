@@ -284,7 +284,7 @@ func (lg *LoadGenerator) distributeInitialTokens() error {
 
 		// TODO signer be thread safe
 		lg.serviceAccount.signerLock.Lock()
-		err = transferTx.SignEnvelope(*lg.serviceAccount.address, 0, lg.serviceAccount.signer)
+		err = transferTx.SignEnvelope(*lg.serviceAccount.address, i+1, lg.serviceAccount.signer)
 		lg.serviceAccount.signerLock.Unlock()
 
 		err = lg.flowClient.SendTransaction(context.Background(), *transferTx)
@@ -296,6 +296,7 @@ func (lg *LoadGenerator) distributeInitialTokens() error {
 		lg.txTracker.AddTx(transferTx.ID(),
 			nil,
 			func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
+				fmt.Println(res)
 				allTxWG.Done()
 			},
 			nil, nil, nil, nil, 120)
