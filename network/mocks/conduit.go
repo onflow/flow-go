@@ -33,21 +33,49 @@ func (m *MockConduit) EXPECT() *MockConduitMockRecorder {
 	return m.recorder
 }
 
-// Submit mocks base method
-func (m *MockConduit) Submit(arg0 interface{}, arg1 ...flow.Identifier) error {
+// Publish mocks base method
+func (m *MockConduit) Publish(arg0 interface{}, arg1 flow.IdentityFilter) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Publish", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Publish indicates an expected call of Publish
+func (mr *MockConduitMockRecorder) Publish(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Publish", reflect.TypeOf((*MockConduit)(nil).Publish), arg0, arg1)
+}
+
+// Send mocks base method
+func (m *MockConduit) Send(arg0 interface{}, arg1 uint, arg2 flow.IdentityFilter) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Send", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Send indicates an expected call of Send
+func (mr *MockConduitMockRecorder) Send(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Send", reflect.TypeOf((*MockConduit)(nil).Send), arg0, arg1, arg2)
+}
+
+// Transmit mocks base method
+func (m *MockConduit) Transmit(arg0 interface{}, arg1 ...flow.Identifier) error {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0}
 	for _, a := range arg1 {
 		varargs = append(varargs, a)
 	}
-	ret := m.ctrl.Call(m, "Submit", varargs...)
+	ret := m.ctrl.Call(m, "Transmit", varargs...)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// Submit indicates an expected call of Submit
-func (mr *MockConduitMockRecorder) Submit(arg0 interface{}, arg1 ...interface{}) *gomock.Call {
+// Transmit indicates an expected call of Transmit
+func (mr *MockConduitMockRecorder) Transmit(arg0 interface{}, arg1 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0}, arg1...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Submit", reflect.TypeOf((*MockConduit)(nil).Submit), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Transmit", reflect.TypeOf((*MockConduit)(nil).Transmit), varargs...)
 }

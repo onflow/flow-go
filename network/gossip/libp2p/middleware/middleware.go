@@ -13,7 +13,8 @@ import (
 type Middleware interface {
 	Start(overlay Overlay) error
 	Stop()
-	Send(channelID uint8, msg *message.Message, targetIDs ...flow.Identifier) error
+	Send(msg *message.Message, recipientIDs ...flow.Identifier) error
+	Publish(msg *message.Message) error
 	Subscribe(channelID uint8) error
 }
 
@@ -21,9 +22,9 @@ type Middleware interface {
 // overlay network layer.
 type Overlay interface {
 	// Topology returns the identities of a uniform subset of nodes in protocol state
-	Topology() (map[flow.Identifier]flow.Identity, error)
+	Topology() (map[flow.Identifier]*flow.Identity, error)
 	// Identity returns a map of all identifier to flow identity
-	Identity() (map[flow.Identifier]flow.Identity, error)
+	Identity(nodeID flow.Identifier) (*flow.Identity, error)
 	Receive(nodeID flow.Identifier, msg *message.Message) error
 }
 
@@ -35,5 +36,5 @@ type Connection interface {
 
 // Topology represents an interface to get subset of nodes which a given node should directly connect to for 1-k messaging
 type Topology interface {
-	Subset(idList flow.IdentityList, size int, seed string) (map[flow.Identifier]flow.Identity, error)
+	Subset(idList flow.IdentityList, size int, seed string) (map[flow.Identifier]*flow.Identity, error)
 }

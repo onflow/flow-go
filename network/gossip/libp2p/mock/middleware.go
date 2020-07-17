@@ -15,20 +15,34 @@ type Middleware struct {
 	mock.Mock
 }
 
-// Send provides a mock function with given fields: channelID, msg, targetIDs
-func (_m *Middleware) Send(channelID uint8, msg *message.Message, targetIDs ...flow.Identifier) error {
-	_va := make([]interface{}, len(targetIDs))
-	for _i := range targetIDs {
-		_va[_i] = targetIDs[_i]
+// Publish provides a mock function with given fields: msg
+func (_m *Middleware) Publish(msg *message.Message) error {
+	ret := _m.Called(msg)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*message.Message) error); ok {
+		r0 = rf(msg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Send provides a mock function with given fields: msg, recipientIDs
+func (_m *Middleware) Send(msg *message.Message, recipientIDs ...flow.Identifier) error {
+	_va := make([]interface{}, len(recipientIDs))
+	for _i := range recipientIDs {
+		_va[_i] = recipientIDs[_i]
 	}
 	var _ca []interface{}
-	_ca = append(_ca, channelID, msg)
+	_ca = append(_ca, msg)
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(uint8, *message.Message, ...flow.Identifier) error); ok {
-		r0 = rf(channelID, msg, targetIDs...)
+	if rf, ok := ret.Get(0).(func(*message.Message, ...flow.Identifier) error); ok {
+		r0 = rf(msg, recipientIDs...)
 	} else {
 		r0 = ret.Error(0)
 	}

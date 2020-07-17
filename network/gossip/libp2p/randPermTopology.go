@@ -26,7 +26,7 @@ func NewRandPermTopology(role flow.Role) middleware.Topology {
 	}
 }
 
-func (r RandPermTopology) Subset(idList flow.IdentityList, size int, seed string) (map[flow.Identifier]flow.Identity, error) {
+func (r RandPermTopology) Subset(idList flow.IdentityList, size int, seed string) (map[flow.Identifier]*flow.Identity, error) {
 
 	if len(idList) < size {
 		return nil, fmt.Errorf("cannot sample topology idList %d smaller than desired fanout %d", len(idList), size)
@@ -41,54 +41,54 @@ func (r RandPermTopology) Subset(idList flow.IdentityList, size int, seed string
 	}
 
 	// find a random subset of the given size from the list
-	fanoutIDs, err := randomSubset(idList, size, rng)
+	fanoutIdentities, err := randomSubset(idList, size, rng)
 	if err != nil {
 		return nil, fmt.Errorf("cannot sample topology: %w", err)
 	}
 
-	remainder := idList.Filter(filter.Not(filter.In(fanoutIDs)))
+	remainder := idList.Filter(filter.Not(filter.In(fanoutIdentities)))
 
 	// find one id for each role from the remaining list,
-	// if it is not already part of fanoutIDs
+	// if it is not already part of fanoutIdentities
 	oneOfEachRoleIDs := make(flow.IdentityList, 0)
 	for _, role := range flow.Roles() {
 
-		if len(fanoutIDs.Filter(filter.HasRole(role))) > 0 {
+		if len(fanoutIdentities.Filter(filter.HasRole(role))) > 0 {
 			// we already have a node with this role
 			continue
 		}
 
-		ids := remainder.Filter(filter.HasRole(role))
-		if len(ids) == 0 {
+		identities := remainder.Filter(filter.HasRole(role))
+		if len(identities) == 0 {
 			// there are no more nodes of this role to choose from
 			continue
 		}
 
 		// choose 1 out of all the remaining nodes of this role
-		selectedID := rng.UintN(uint64(len(ids)))
+		selectedID := rng.UintN(uint64(len(identities)))
 
-		oneOfEachRoleIDs = append(oneOfEachRoleIDs, ids[selectedID])
+		oneOfEachRoleIDs = append(oneOfEachRoleIDs, identities[selectedID])
 	}
 
 	remainder = remainder.Filter(filter.Not(filter.In(oneOfEachRoleIDs)))
 
 	// find a n/2 random subset of nodes of the given role from the remaining list
-	ids := remainder.Filter(filter.HasRole(r.myRole))
-	sameRoleIDs := (len(ids) + 1) / 2 // rounded up to the closest integer
+	identities := remainder.Filter(filter.HasRole(r.myRole))
+	sameRoleIDs := (len(identities) + 1) / 2 // rounded up to the closest integer
 
-	selfRoleIDs, err := randomSubset(ids, sameRoleIDs, rng)
+	selfRoleIDs, err := randomSubset(identities, sameRoleIDs, rng)
 	if err != nil {
 		return nil, fmt.Errorf("cannot sample topology: %w", err)
 	}
 
 	// combine all three subsets
-	finalIDs := append(fanoutIDs, oneOfEachRoleIDs...)
-	finalIDs = append(finalIDs, selfRoleIDs...)
+	finalIdentities := append(fanoutIdentities, oneOfEachRoleIDs...)
+	finalIdentities = append(finalIdentities, selfRoleIDs...)
 
 	// creates a map of all the selected ids
-	topMap := make(map[flow.Identifier]flow.Identity)
-	for _, id := range finalIDs {
-		topMap[id.NodeID] = *id
+	topMap := make(map[flow.Identifier]*flow.Identity)
+	for _, identity := range finalIdentities {
+		topMap[identity.NodeID] = identity
 	}
 
 	return topMap, nil

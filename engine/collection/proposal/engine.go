@@ -172,7 +172,7 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		SigData: sigData,
 	}
 
-	err := e.con.Submit(vote, recipientID)
+	err := e.con.Transmit(vote, recipientID)
 	if err != nil {
 		return fmt.Errorf("could not send vote: %w", err)
 	}
@@ -231,33 +231,24 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 	log = log.With().Int("collection_size", payload.Collection.Len()).Logger()
 
 	// retrieve all collection nodes in our cluster
-	recipients, err := e.protoState.Final().Identities(filter.And(
-		filter.In(e.participants),
-		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	))
-	if err != nil {
-		return fmt.Errorf("could not get cluster members: %w", err)
-	}
 
 	e.unit.LaunchAfter(delay, func() {
 
 		go e.hotstuff.SubmitProposal(header, parent.View)
 
-		// create the proposal message for the collection
+		// create the proposal message for the collection and send to all
+		// participants of the cluster
 		msg := &messages.ClusterBlockProposal{
 			Header:  header,
 			Payload: payload,
 		}
-
-		err = e.con.Submit(msg, recipients.NodeIDs()...)
+		err = e.con.Publish(msg, filter.HasNodeID(e.participants.NodeIDs()...))
 		if err != nil {
 			log.Error().Err(err).Msg("could not broadcast proposal")
 			return
 		}
 
-		log.Debug().
-			Str("recipients", fmt.Sprintf("%v", recipients.NodeIDs())).
-			Msg("broadcast proposal from hotstuff")
+		log.Debug().Msg("broadcast proposal from hotstuff")
 
 		e.engMetrics.MessageSent(metrics.EngineProposal, metrics.MessageClusterBlockProposal)
 		block := &cluster.Block{

@@ -16,12 +16,23 @@ import (
 // engines with the same ID over a shared bus, accessible through the conduit.
 type Conduit interface {
 
-	// Submit will submit end event to the network layer. The network layer will
-	// ensure that the event is delivered to the same engine on the desired target
-	// nodes. It's possible that the event traverses other nodes than the target
-	// nodes on its path across the network. The network codec needs to be aware
-	// of how to encode the given event type, otherwise the send will fail.
-	Submit(event interface{}, targetIDs ...flow.Identifier) error
+	// Transmit submits a message to the network layer for reliable delivery
+	// to the specified recipients. If the message can not be delivered to any
+	// one of the recipients, an error will be returned.
+	Transmit(message interface{}, recipientIDs ...flow.Identifier) error
+
+	// Send submits a message to the network layer for reliable delivery to the
+	// specified number of recipients. The specified selector will determine
+	// the subset of nodes that serves as the pool from which the recipients
+	// will be randomly drawn. If an insufficient number of recipients is
+	// available within the subset, the function will return an error.
+	Send(message interface{}, num uint, selector flow.IdentityFilter) error
+
+	// Publish submits a message to the network layer for unreliable delivery
+	// to subscribers of the given message on the network layer. It uses a
+	// publish-subscribe layer and can thus not guarantee that the specified
+	// recipients received the message.
+	Publish(message interface{}, restrictor flow.IdentityFilter) error
 }
 
 // PeerUnreachableError is the error when submitting events to target fails due to the

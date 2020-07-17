@@ -242,7 +242,7 @@ func SetupMockExeNode(t *testing.T,
 								Collection:    *completeER.Collections[i],
 								Nonce:         rand.Uint64(),
 							}
-							err := exeChunkDataConduit.Submit(res, originID)
+							err := exeChunkDataConduit.Transmit(res, originID)
 							assert.Nil(t, err)
 
 							log.Debug().

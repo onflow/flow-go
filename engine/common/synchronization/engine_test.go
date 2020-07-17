@@ -43,6 +43,7 @@ type SyncSuite struct {
 	me           *module.Local
 	state        *protocol.State
 	snapshot     *protocol.Snapshot
+	selector     flow.IdentityFilter
 	blocks       *storage.Blocks
 	comp         *network.Engine
 	core         *module.SyncCore
@@ -145,7 +146,7 @@ func (ss *SyncSuite) SetupTest() {
 	// initialize the engine
 	log := zerolog.New(ioutil.Discard)
 	metrics := metrics.NewNoopCollector()
-	e, err := New(log, metrics, ss.net, ss.me, ss.state, ss.blocks, ss.comp, ss.core)
+	e, err := New(log, metrics, ss.net, ss.me, ss.state, ss.selector, ss.blocks, ss.comp, ss.core)
 	require.NoError(ss.T(), err, "should pass engine initialization")
 
 	ss.e = e
@@ -374,8 +375,8 @@ func (ss *SyncSuite) TestPollHeight() {
 			require.Contains(ss.T(), consensus.NodeIDs(), targetID, "target should be in participants")
 		},
 	)
-	errs := ss.e.pollHeight()
-	require.NoError(ss.T(), errs.ErrorOrNil(), "should pass poll height")
+	err := ss.e.pollHeight()
+	require.NoError(ss.T(), err, "should pass poll height")
 	ss.con.AssertNumberOfCalls(ss.T(), "Submit", 3)
 }
 

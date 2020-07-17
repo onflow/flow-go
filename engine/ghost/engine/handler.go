@@ -59,8 +59,8 @@ func (h Handler) SendEvent(_ context.Context, req *ghost.SendEventRequest) (*emp
 		flowIDs[i] = flow.HashToID(id)
 	}
 
-	// Submit the message over libp2p
-	err = conduit.Submit(event, flowIDs...)
+	// reliably send the message over libp2p to the given nodes
+	err = conduit.Transmit(event, flowIDs...)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to submit message: %v", err)
 	}

@@ -11,7 +11,7 @@ type PendingMessage struct {
 	// The sender node id
 	From      flow.Identifier
 	ChannelID uint8
-	Event     interface{}
+	Message   interface{}
 	// The id of the receiver nodes
 	TargetIDs []flow.Identifier
 }

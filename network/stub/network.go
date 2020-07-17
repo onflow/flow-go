@@ -56,19 +56,19 @@ func (mn *Network) Register(channelID uint8, engine network.Engine) (network.Con
 	}
 	conduit := &Conduit{
 		channelID: channelID,
-		submit:    mn.submit,
+		send:      mn.send,
 	}
 	mn.engines[channelID] = engine
 	return conduit, nil
 }
 
-// submit is called when an Engine is sending an event to an Engine on another node or nodes.
-func (mn *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.Identifier) error {
+// send is called when an Engine is sending an event to an Engine on another node or nodes.
+func (mn *Network) send(channelID uint8, selection network.SelectionFunc, selector flow.IdentityFilter, message interface{}) error {
 	m := &PendingMessage{
 		From:      mn.GetID(),
 		ChannelID: channelID,
-		Event:     event,
-		TargetIDs: targetIDs,
+		Message:   message,
+		TargetIDs: nil, // TODO: fix for selection/selector API
 	}
 
 	mn.buffer(m)
@@ -135,7 +135,7 @@ func (mn *Network) sendToAllTargets(m *PendingMessage, recursive bool) error {
 	mn.Lock()
 	defer mn.Unlock()
 
-	key, err := eventKey(m.From, m.ChannelID, m.Event)
+	key, err := eventKey(m.From, m.ChannelID, m.Message)
 	if err != nil {
 		return err
 	}
@@ -162,16 +162,16 @@ func (mn *Network) sendToAllTargets(m *PendingMessage, recursive bool) error {
 		}
 
 		if recursive {
-			err := receiverEngine.Process(m.From, m.Event)
+			err := receiverEngine.Process(m.From, m.Message)
 			if err != nil {
-				return fmt.Errorf("senderEngine failed to process event (%v): %w", m.Event, err)
+				return fmt.Errorf("senderEngine failed to process event (%v): %w", m.Message, err)
 			}
 		} else {
 			// Call `Submit` to let receiver engine receive the event directly.
 			// Submit is supposed to process event asynchronously, but if it doesn't we are risking
 			// deadlock (if it trigger another message sending we might end up calling this very function again)
 			// Running it in Go-routine is some cheap form of defense against deadlock in tests
-			go receiverEngine.Submit(m.From, m.Event)
+			go receiverEngine.Submit(m.From, m.Message)
 		}
 
 	}

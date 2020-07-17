@@ -34,20 +34,21 @@ func TestSyncEngine(t *testing.T) {
 
 type SyncSuite struct {
 	suite.Suite
-	myID         flow.Identifier
-	participants flow.IdentityList
-	head         *flow.Header
-	heights      map[uint64]*model.Block
-	blockIDs     map[flow.Identifier]*model.Block
-	net          *module.Network
-	con          *network.Conduit
-	me           *module.Local
-	state        *cluster.State
-	snapshot     *cluster.Snapshot
-	blocks       *storage.ClusterBlocks
-	comp         *network.Engine
-	core         *module.SyncCore
-	e            *Engine
+	identities flow.IdentityList
+	myID       flow.Identifier
+	selector   flow.IdentityFilter
+	head       *flow.Header
+	heights    map[uint64]*model.Block
+	blockIDs   map[flow.Identifier]*model.Block
+	me         *module.Local
+	net        *module.Network
+	con        *network.Conduit
+	state      *cluster.State
+	snapshot   *cluster.Snapshot
+	blocks     *storage.ClusterBlocks
+	comp       *network.Engine
+	core       *module.SyncCore
+	e          *Engine
 }
 
 func (ss *SyncSuite) SetupTest() {
@@ -55,8 +56,9 @@ func (ss *SyncSuite) SetupTest() {
 	rand.Seed(time.Now().UnixNano())
 
 	// generate own ID
-	ss.participants = unittest.IdentityListFixture(8, unittest.WithRole(flow.RoleConsensus))
-	ss.myID = ss.participants[0].NodeID
+	ss.identities = unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleConsensus))
+	ss.myID = ss.identities[0].NodeID
+	ss.selector = filter.HasRole(flow.RoleConsensus)
 
 	// generate a header for the final state
 	header := unittest.BlockHeaderFixture()
@@ -80,11 +82,6 @@ func (ss *SyncSuite) SetupTest() {
 
 	// set up the local module mock
 	ss.me = &module.Local{}
-	ss.me.On("NodeID").Return(
-		func() flow.Identifier {
-			return ss.myID
-		},
-	)
 
 	// set up the protocol state mock
 	ss.state = &cluster.State{}
@@ -104,7 +101,7 @@ func (ss *SyncSuite) SetupTest() {
 	)
 	ss.snapshot.On("Identities", mock.Anything).Return(
 		func(selector flow.IdentityFilter) flow.IdentityList {
-			return ss.participants.Filter(selector)
+			return ss.identities.Filter(selector)
 		},
 		nil,
 	)
@@ -146,7 +143,7 @@ func (ss *SyncSuite) SetupTest() {
 	// initialize the engine
 	log := zerolog.New(ioutil.Discard)
 	metrics := metrics.NewNoopCollector()
-	e, err := New(log, metrics, ss.net, ss.me, ss.participants, ss.state, ss.blocks, ss.comp, ss.core)
+	e, err := New(log, metrics, ss.net, ss.me, ss.selector, ss.state, ss.blocks, ss.comp, ss.core)
 	require.NoError(ss.T(), err, "should pass engine initialization")
 
 	ss.e = e
@@ -366,7 +363,7 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 func (ss *SyncSuite) TestPollHeight() {
 
 	// check that we send to three nodes from our total list
-	consensus := ss.participants.Filter(filter.HasNodeID(ss.participants[1:].NodeIDs()...))
+	consensus := ss.identities.Filter(filter.HasNodeID(ss.identities[1:].NodeIDs()...))
 	ss.con.On("Submit", mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
 			req := args.Get(0).(*messages.SyncRequest)

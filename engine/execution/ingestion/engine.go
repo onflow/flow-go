@@ -558,7 +558,7 @@ func (e *Engine) onExecutionStateSyncRequest(
 				Hex("block_id", logging.ID(delta.Block.ID())).
 				Msg("sending block delta")
 
-			err := e.syncConduit.Submit(delta, originID)
+			err := e.syncConduit.Transmit(delta, originID)
 			if err != nil {
 				return fmt.Errorf("could not submit block delta: %w", err)
 			}
@@ -598,8 +598,9 @@ func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Que
 	return newQueue(blockify, queues)
 }
 
-func (e *Engine) submitCollectionRequest(timer **time.Timer, collID flow.Identifier, recipients []flow.Identifier, retry uint) {
+func (e *Engine) submitCollectionRequest(timer **time.Timer, guarantee *flow.CollectionGuarantee, retry uint) {
 
+	collID := guarantee.CollectionID
 	request := &messages.CollectionRequest{
 		ID:    collID,
 		Nonce: rand.Uint64(),
@@ -617,16 +618,13 @@ func (e *Engine) submitCollectionRequest(timer **time.Timer, collID flow.Identif
 		e.metrics.ExecutionCollectionRequestSent()
 	}
 
-	err := e.collectionConduit.Submit(
-		request,
-		recipients...,
-	)
+	err := e.collectionConduit.Send(request, 1, filter.HasNodeID(guarantee.SignerIDs...))
 	if err != nil {
 		e.log.Warn().Err(err).Hex("collection_id", collID[:]).Msg("cannot submit collection requests")
 	}
 
 	*timer = time.AfterFunc(e.collectionRequestTimeout, func() {
-		e.submitCollectionRequest(timer, collID, recipients, retry+1)
+		e.submitCollectionRequest(timer, guarantee, retry+1)
 	})
 }
 
@@ -660,20 +658,12 @@ func (e *Engine) matchOrRequestCollections(
 					return fmt.Errorf("collection already mapped to block")
 				}
 
-				collectionGuaranteesIdentifiers, err := e.findCollectionNodesForGuarantee(
-					executableBlock.Block.ID(),
-					guarantee,
-				)
-				if err != nil {
-					return err
-				}
-
 				e.log.Debug().
 					Hex("block_id", logging.Entity(executableBlock.Block)).
 					Hex("collection_id", logging.ID(guarantee.ID())).
 					Msg("requesting collection")
 
-				e.submitCollectionRequest(&maybeBlockByCollection.TimeoutTimer, guarantee.ID(), collectionGuaranteesIdentifiers, 0)
+				e.submitCollectionRequest(&maybeBlockByCollection.TimeoutTimer, guarantee, 0)
 			} else {
 				return fmt.Errorf("error while querying for collection: %w", err)
 			}
@@ -1007,45 +997,31 @@ func (e *Engine) StartSync(ctx context.Context, firstKnown *entity.ExecutableBlo
 		return
 	}
 
-	e.log.Debug().
-		Msgf("syncing from height %d to height %d", lastExecutedHeight, targetHeight)
-
-	otherNodes, err := e.state.Final().Identities(filter.And(filter.HasRole(flow.RoleExecution), e.me.NotMeFilter()))
-	if err != nil {
-		e.log.Fatal().Err(err).Msg("error while finding other execution nodes identities")
-		return
-	}
-
-	if len(otherNodes) < 1 {
-		e.log.Debug().
-			Msgf("no other execution nodes found, request last block instead at height %d", targetHeight)
-		e.blockSync.RequestBlock(targetBlockID)
-		return
-	}
+	e.log.Debug().Msgf("syncing from height %d to height %d", lastExecutedHeight, targetHeight)
 
 	// select other node at random
 	// TODO - protocol which surveys other nodes for state
 	// TODO - ability to sync from multiple servers
 	// TODO - handle byzantine other node that does not send response
-	otherNodeIdentity := otherNodes[rand.Intn(len(otherNodes))]
-
 	exeStateReq := messages.ExecutionStateSyncRequest{
 		CurrentBlockID: lastExecutedBlockID,
 		TargetBlockID:  targetBlockID,
 	}
 
 	e.log.Debug().
-		Hex("target_node", logging.Entity(otherNodeIdentity)).
 		Hex("current_block_id", logging.ID(exeStateReq.CurrentBlockID)).
 		Hex("target_block_id", logging.ID(exeStateReq.TargetBlockID)).
 		Msg("requesting execution state sync")
 
-	err = e.syncConduit.Submit(&exeStateReq, otherNodeIdentity.NodeID)
-
+	// request an execution state sync from one other execution node
+	// TODO: make sure we handle the no peers available error gracefully,
+	// as other nodes can be down at times
+	err = e.syncConduit.Send(&exeStateReq, 1, filter.HasRole(flow.RoleExecution))
 	if err != nil {
-		e.log.Fatal().
+		// NOTE: this should probably not be fatal; (all) other execution nodes could
+		// be down, so we want to retry again later
+		e.log.Error().
 			Err(err).
-			Str("target_node_id", otherNodeIdentity.NodeID.String()).
 			Msg("error while requesting state sync from other node")
 	}
 }

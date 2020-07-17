@@ -14,15 +14,15 @@ type Topology struct {
 }
 
 // Subset provides a mock function with given fields: idList, size, seed
-func (_m *Topology) Subset(idList flow.IdentityList, size int, seed string) (map[flow.Identifier]flow.Identity, error) {
+func (_m *Topology) Subset(idList flow.IdentityList, size int, seed string) (map[flow.Identifier]*flow.Identity, error) {
 	ret := _m.Called(idList, size, seed)
 
-	var r0 map[flow.Identifier]flow.Identity
-	if rf, ok := ret.Get(0).(func(flow.IdentityList, int, string) map[flow.Identifier]flow.Identity); ok {
+	var r0 map[flow.Identifier]*flow.Identity
+	if rf, ok := ret.Get(0).(func(flow.IdentityList, int, string) map[flow.Identifier]*flow.Identity); ok {
 		r0 = rf(idList, size, seed)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[flow.Identifier]flow.Identity)
+			r0 = ret.Get(0).(map[flow.Identifier]*flow.Identity)
 		}
 	}
 

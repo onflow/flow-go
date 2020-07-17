@@ -111,7 +111,7 @@ func (suite *Suite) TestCollectionRequest() {
 
 		// send a request for the collection
 		req := messages.CollectionRequest{ID: coll.ID(), Nonce: nonce}
-		err = suite.conduit.Submit(&req, suite.colNode.Me.NodeID())
+		err = suite.conduit.Send(&req, 1, filter.HasNodeID(suite.colNode.Me.NodeID()))
 		assert.NoError(t, err)
 
 		// flush the request

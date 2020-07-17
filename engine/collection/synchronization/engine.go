@@ -8,14 +8,12 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
 	clustermodel "github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/events"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -26,15 +24,15 @@ import (
 
 // Engine is the synchronization engine, responsible for synchronizing chain state.
 type Engine struct {
-	unit         *engine.Unit
-	log          zerolog.Logger
-	metrics      module.EngineMetrics
-	me           module.Local
-	participants flow.IdentityList
-	state        cluster.State
-	con          network.Conduit
-	blocks       storage.ClusterBlocks
-	comp         network.Engine // compliance layer engine
+	unit     *engine.Unit
+	log      zerolog.Logger
+	metrics  module.EngineMetrics
+	me       module.Local
+	selector flow.IdentityFilter
+	state    cluster.State
+	con      network.Conduit
+	blocks   storage.ClusterBlocks
+	comp     network.Engine // compliance layer engine
 
 	pollInterval time.Duration
 	scanInterval time.Duration
@@ -47,7 +45,7 @@ func New(
 	metrics module.EngineMetrics,
 	net module.Network,
 	me module.Local,
-	participants flow.IdentityList,
+	selector flow.IdentityFilter,
 	state cluster.State,
 	blocks storage.ClusterBlocks,
 	comp network.Engine,
@@ -60,7 +58,7 @@ func New(
 		log:          log.With().Str("engine", "cluster_synchronization").Logger(),
 		metrics:      metrics,
 		me:           me,
-		participants: participants.Filter(filter.Not(filter.HasNodeID(me.NodeID()))),
+		selector:     selector,
 		state:        state,
 		blocks:       blocks,
 		comp:         comp,
@@ -186,7 +184,7 @@ func (e *Engine) onSyncRequest(originID flow.Identifier, req *messages.SyncReque
 		Height: final.Height,
 		Nonce:  req.Nonce,
 	}
-	err = e.con.Submit(res, originID)
+	err = e.con.Transmit(res, originID)
 	if err != nil {
 		return fmt.Errorf("could not send sync response: %w", err)
 	}
@@ -247,7 +245,7 @@ func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeReq
 		Nonce:  req.Nonce,
 		Blocks: blocks,
 	}
-	err = e.con.Submit(res, originID)
+	err = e.con.Transmit(res, originID)
 	if err != nil {
 		return fmt.Errorf("could not send range response: %w", err)
 	}
@@ -296,7 +294,7 @@ func (e *Engine) onBatchRequest(originID flow.Identifier, req *messages.BatchReq
 		Nonce:  req.Nonce,
 		Blocks: blocks,
 	}
-	err := e.con.Submit(res, originID)
+	err := e.con.Transmit(res, originID)
 	if err != nil {
 		return fmt.Errorf("could not send batch response: %w", err)
 	}
@@ -352,18 +350,11 @@ CheckLoop:
 		case <-e.unit.Quit():
 			break CheckLoop
 		case <-poll.C:
-			errs := e.pollHeight()
-			if errs.ErrorOrNil() == nil {
-				continue
+			err := e.pollHeight()
+			if err != nil {
+				e.log.Error().Err(err).Msg("could not poll heights")
 			}
 
-			// if there are errors, and errors are all PeerUnreachableError, then log as warn
-			// otherwise log as error
-			if network.AllPeerUnreachableError(errs.WrappedErrors()...) {
-				e.log.Warn().Err(errs).Msg("could not poll heights due to peer unreachable")
-			} else {
-				e.log.Error().Err(errs).Msg("could not poll heights")
-			}
 		case <-scan.C:
 			final, err := e.state.Final().Head()
 			if err != nil {
@@ -387,66 +378,64 @@ CheckLoop:
 }
 
 // pollHeight will send a synchronization request to three random nodes.
-func (e *Engine) pollHeight() *multierror.Error {
+func (e *Engine) pollHeight() error {
 
-	var errs *multierror.Error
 	// get the last finalized header
 	final, err := e.state.Final().Head()
 	if err != nil {
-		errs = multierror.Append(errs, fmt.Errorf("could not get last finalized header: %w", err))
-		return errs
+		return fmt.Errorf("could not get final head: %w", err)
 	}
 
-	// send the request for synchronization
-	for _, targetID := range e.participants.Sample(3).NodeIDs() {
-
-		req := &messages.SyncRequest{
-			Nonce:  rand.Uint64(),
-			Height: final.Height,
-		}
-		err := e.con.Submit(req, targetID)
-		if err != nil {
-			errs = multierror.Append(errs, fmt.Errorf("could not send sync request: %w", err))
-		}
-
-		e.metrics.MessageSent(metrics.EngineClusterSynchronization, metrics.MessageSyncRequest)
+	// Send the request for synchronization to one node out of our selection.
+	// Rather than sending to multiple nodes, it's better to increase the
+	// frequency; that way we avoid de-duplication of identical responses.
+	req := &messages.SyncRequest{
+		Nonce:  rand.Uint64(),
+		Height: final.Height,
+	}
+	err = e.con.Send(req, 1, e.selector)
+	if err != nil {
+		return fmt.Errorf("could not send sync request: %w", err)
 	}
 
-	return errs
+	return nil
 }
 
 // sendRequests sends a request for each range and batch.
 func (e *Engine) sendRequests(ranges []flow.Range, batches []flow.Batch) error {
 
-	var errs error
 	for _, ran := range ranges {
+
+		// for each range request, we send it reliably to one of the cluster
+		// participants
 		req := &messages.RangeRequest{
 			Nonce:      rand.Uint64(),
 			FromHeight: ran.From,
 			ToHeight:   ran.To,
 		}
-		err := e.con.Submit(req, e.participants.Sample(3).NodeIDs()...)
+		err := e.con.Send(req, 1, e.selector)
 		if err != nil {
-			errs = multierror.Append(errs, fmt.Errorf("could not submit range request: %w", err))
-			continue
+			return fmt.Errorf("could not send range request: %w", err)
 		}
 		e.core.RangeRequested(ran)
 		e.metrics.MessageSent(metrics.EngineClusterSynchronization, metrics.MessageRangeRequest)
 	}
 
 	for _, batch := range batches {
+
+		// for each batch request, we send it reliably to one of the cluster
+		// participants
 		req := &messages.BatchRequest{
 			Nonce:    rand.Uint64(),
 			BlockIDs: batch.BlockIDs,
 		}
-		err := e.con.Submit(req, e.participants.Sample(3).NodeIDs()...)
+		err := e.con.Send(req, 1, e.selector)
 		if err != nil {
-			errs = multierror.Append(errs, fmt.Errorf("could not submit batch request: %w", err))
-			continue
+			return fmt.Errorf("could not send batch request: %w", err)
 		}
 		e.core.BatchRequested(batch)
 		e.metrics.MessageSent(metrics.EngineClusterSynchronization, metrics.MessageBatchRequest)
 	}
 
-	return errs
+	return nil
 }

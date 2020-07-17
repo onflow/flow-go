@@ -193,25 +193,20 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 	// if the message was submitted internally (ie. via the Access API)
 	// propagate it to all members of the responsible cluster
-	if originID == localID {
-
-		// always send the transaction to one node in the responsible cluster
-		// send to additional nodes based on configuration
-		targetIDs := txCluster.
-			Filter(filter.Not(filter.HasNodeID(localID))).
-			Sample(e.config.PropagationRedundancy + 1)
-
-		log.Debug().
-			Str("recipients", fmt.Sprintf("%v", targetIDs.NodeIDs())).
-			Msg("propagating transaction to cluster")
-
-		err = e.con.Submit(tx, targetIDs.NodeIDs()...)
-		if err != nil {
-			return fmt.Errorf("could not route transaction to cluster: %w", err)
-		}
-
-		e.engMetrics.MessageSent(metrics.EngineCollectionIngest, metrics.MessageTransaction)
+	if originID != localID {
+		return nil
 	}
+
+	log.Debug().Msg("propagating transaction to cluster")
+
+	// always send the transaction to one node in the responsible cluster
+	// send to additional nodes based on configuration
+	err = e.con.Send(tx, e.config.PropagationRedundancy+1, filter.HasNodeID(txCluster.NodeIDs()...))
+	if err != nil {
+		return fmt.Errorf("could not route transaction to cluster: %w", err)
+	}
+
+	e.engMetrics.MessageSent(metrics.EngineCollectionIngest, metrics.MessageTransaction)
 
 	log.Info().Msg("transaction processed")
 

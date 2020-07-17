@@ -173,7 +173,7 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 	}
 
 	// send the vote the desired recipient
-	err := e.con.Submit(vote, recipientID)
+	err := e.con.Transmit(vote, recipientID)
 	if err != nil {
 		return fmt.Errorf("could not send vote: %w", err)
 	}
@@ -232,15 +232,6 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		}
 	}
 
-	// retrieve all consensus nodes without our ID
-	recipients, err := e.state.AtBlockID(header.ParentID).Identities(filter.And(
-		filter.HasRole(flow.RoleConsensus),
-		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	))
-	if err != nil {
-		return fmt.Errorf("could not get consensus recipients: %w", err)
-	}
-
 	e.unit.LaunchAfter(delay, func() {
 
 		go e.hotstuff.SubmitProposal(header, parent.View)
@@ -254,7 +245,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		}
 
 		// broadcast the proposal to consensus nodes
-		err = e.con.Submit(proposal, recipients.NodeIDs()...)
+		err = e.con.Publish(proposal, filter.HasRole(flow.RoleConsensus))
 		if err != nil {
 			log.Error().Err(err).Msg("could not send proposal message")
 		}

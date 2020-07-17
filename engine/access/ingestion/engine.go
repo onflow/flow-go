@@ -205,14 +205,14 @@ func (e *Engine) handleCollectionResponse(originID flow.Identifier, response *me
 }
 
 func (e *Engine) requestCollections(guarantees ...*flow.CollectionGuarantee) error {
-	ids, err := e.findCollectionNodes()
-	if err != nil {
-		return err
-	}
 
 	// Request all the collections for this block
-	for _, g := range guarantees {
-		err := e.collectionConduit.Submit(&messages.CollectionRequest{ID: g.ID(), Nonce: rand.Uint64()}, ids...)
+	for _, guarantee := range guarantees {
+		req := &messages.CollectionRequest{
+			ID:    guarantee.ID(),
+			Nonce: rand.Uint64(),
+		}
+		err := e.collectionConduit.Send(req, 1, filter.HasNodeID(guarantee.SignerIDs...))
 		if err != nil {
 			return err
 		}

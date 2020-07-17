@@ -153,7 +153,7 @@ func (e *Engine) onCollectionRequest(originID flow.Identifier, req *messages.Col
 		Collection: *coll,
 		Nonce:      req.Nonce,
 	}
-	err = e.con.Submit(res, originID)
+	err = e.con.Transmit(res, originID)
 	if err != nil {
 		return fmt.Errorf("could not respond to collection requester: %w", err)
 	}
@@ -167,12 +167,9 @@ func (e *Engine) onCollectionRequest(originID flow.Identifier, req *messages.Col
 // consensus nodes.
 func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
 
-	consensusNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		return fmt.Errorf("could not get consensus nodes: %w", err)
-	}
-
-	err = e.con.Submit(guarantee, consensusNodes.NodeIDs()...)
+	// send the collection guarantee to at least one consensus node; as delivery is
+	// reliable, we can let the consensus node take care of propagating it further
+	err := e.con.Send(guarantee, 1, filter.HasRole(flow.RoleConsensus))
 	if err != nil {
 		return fmt.Errorf("could not submit collection guarantee: %w", err)
 	}

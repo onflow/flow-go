@@ -150,14 +150,8 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		return engine.NewInvalidInputErrorf("non-local block (nodeID: %x)", originID)
 	}
 
-	// get all non-consensus nodes in the system
-	identities, err := e.state.Final().Identities(filter.Not(filter.HasRole(flow.RoleConsensus)))
-	if err != nil {
-		return fmt.Errorf("could not get identities: %w", err)
-	}
-
 	// submit the blocks to the targets
-	err = e.con.Submit(proposal, identities.NodeIDs()...)
+	err := e.con.Publish(proposal, filter.Not(filter.HasRole(flow.RoleConsensus)))
 	if err != nil {
 		return fmt.Errorf("could not broadcast block: %w", err)
 	}

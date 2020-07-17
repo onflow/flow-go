@@ -14,22 +14,22 @@ type Overlay struct {
 	mock.Mock
 }
 
-// Identity provides a mock function with given fields:
-func (_m *Overlay) Identity() (map[flow.Identifier]flow.Identity, error) {
-	ret := _m.Called()
+// Identity provides a mock function with given fields: nodeID
+func (_m *Overlay) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
+	ret := _m.Called(nodeID)
 
-	var r0 map[flow.Identifier]flow.Identity
-	if rf, ok := ret.Get(0).(func() map[flow.Identifier]flow.Identity); ok {
-		r0 = rf()
+	var r0 *flow.Identity
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Identity); ok {
+		r0 = rf(nodeID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[flow.Identifier]flow.Identity)
+			r0 = ret.Get(0).(*flow.Identity)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(nodeID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -52,15 +52,15 @@ func (_m *Overlay) Receive(nodeID flow.Identifier, msg *message.Message) error {
 }
 
 // Topology provides a mock function with given fields:
-func (_m *Overlay) Topology() (map[flow.Identifier]flow.Identity, error) {
+func (_m *Overlay) Topology() (map[flow.Identifier]*flow.Identity, error) {
 	ret := _m.Called()
 
-	var r0 map[flow.Identifier]flow.Identity
-	if rf, ok := ret.Get(0).(func() map[flow.Identifier]flow.Identity); ok {
+	var r0 map[flow.Identifier]*flow.Identity
+	if rf, ok := ret.Get(0).(func() map[flow.Identifier]*flow.Identity); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[flow.Identifier]flow.Identity)
+			r0 = ret.Get(0).(map[flow.Identifier]*flow.Identity)
 		}
 	}
 

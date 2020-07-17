@@ -154,17 +154,8 @@ func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.Collectio
 
 	log.Info().Msg("collection guarantee processed")
 
-	// select all the consensus nodes on the network as our targets
-	identities, err := e.state.Final().Identities(filter.And(
-		filter.HasRole(flow.RoleConsensus),
-		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	))
-	if err != nil {
-		return fmt.Errorf("could not get identities: %w", err)
-	}
-
 	// send the collection guarantee to all consensus identities
-	err = e.con.Submit(guarantee, identities.NodeIDs()...)
+	err := e.con.Publish(guarantee, filter.HasRole(flow.RoleConsensus))
 	if err != nil {
 		return fmt.Errorf("could not send collection guarantee: %w", err)
 	}

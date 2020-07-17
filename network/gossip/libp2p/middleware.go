@@ -185,71 +185,22 @@ func (m *Middleware) Stop() {
 	m.wg.Wait()
 }
 
-// Send sends the message to the set of target ids
-// If there is only one target NodeID, then a direct 1-1 connection is used by calling middleware.sendDirect
-// Otherwise, middleware.publish is used, which uses the PubSub method of communication.
-func (m *Middleware) Send(channelID uint8, msg *message.Message, targetIDs ...flow.Identifier) error {
-	var err error
-	mode := m.chooseMode(channelID, msg, targetIDs...)
-	// decide what mode of communication to use
-	switch mode {
-	case NoOp:
-		// NOTE: we can't error on this at the moment, because single nodes of
-		// a role in tests will attempt to send messages like this, which should
-		// be a no-op, but not an error
-		m.log.Debug().Msg("send to no-one")
-		return nil
-	case OneToOne:
-		if targetIDs[0] == m.me {
-			// to avoid self dial by the underlay
-			m.log.Debug().Msg("send to self")
-			return nil
-		}
-		err = m.sendDirect(targetIDs[0], msg)
-	case OneToK:
-		err = m.publish(channelID, msg)
-	default:
-		err = fmt.Errorf("invalid communcation mode: %d", mode)
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to send message to %s:%w", targetIDs, err)
-	}
-	return nil
-}
-
-// chooseMode determines the communication mode to use. Currently it only considers the length of the targetIDs.
-func (m *Middleware) chooseMode(_ uint8, _ *message.Message, targetIDs ...flow.Identifier) communicationMode {
-	switch len(targetIDs) {
-	case 0:
-		return NoOp
-	case 1:
-		return OneToOne
-	default:
-		return OneToK
-	}
-}
-
-// sendDirect will try to send the given message to the given peer utilizing a 1-1 direct connection
-func (m *Middleware) sendDirect(targetID flow.Identifier, msg *message.Message) error {
+// Send will try to send the given message to the given peer utilizing a 1-1 direct connection
+func (m *Middleware) Send(msg *message.Message, recipientID flow.Identifier) error {
 
 	// get an identity to connect to. The identity provides the destination TCP address.
-	idsMap, err := m.ov.Identity()
+	identity, err := m.ov.Identity(recipientID)
 	if err != nil {
-		return fmt.Errorf("could not get identities: %w", err)
-	}
-	flowIdentity, found := idsMap[targetID]
-	if !found {
-		return fmt.Errorf("could not get identity for %s: %w", targetID.String(), err)
+		return fmt.Errorf("could not get identity: %w", err)
 	}
 
 	// create new stream
 	// (streams don't need to be reused and are fairly inexpensive to be created for each send.
 	// A stream creation does NOT incur an RTT as stream negotiation happens as part of the first message
 	// sent out the the receiver
-	stream, err := m.connect(flowIdentity.NodeID.String(), flowIdentity.Address, flowIdentity.NetworkPubKey)
+	stream, err := m.connect(identity.NodeID.String(), identity.Address, identity.NetworkPubKey)
 	if err != nil {
-		return fmt.Errorf("could not create new stream for %s: %w", targetID.String(), err)
+		return fmt.Errorf("could not create new stream for %s: %w", recipientID.String(), err)
 	}
 
 	// create a gogo protobuf writer
@@ -258,13 +209,13 @@ func (m *Middleware) sendDirect(targetID flow.Identifier, msg *message.Message) 
 
 	err = writer.WriteMsg(msg)
 	if err != nil {
-		return fmt.Errorf("failed to send message to %s: %w", targetID.String(), err)
+		return fmt.Errorf("failed to send message to %s: %w", recipientID.String(), err)
 	}
 
 	// flush the stream
 	err = bufw.Flush()
 	if err != nil {
-		return fmt.Errorf("failed to flush stream for %s: %w", targetID.String(), err)
+		return fmt.Errorf("failed to flush stream for %s: %w", recipientID.String(), err)
 	}
 
 	// track the number of bytes that will be written to the wire for metrics
@@ -273,7 +224,7 @@ func (m *Middleware) sendDirect(targetID flow.Identifier, msg *message.Message) 
 	// flush the stream
 	err = bufw.Flush()
 	if err != nil {
-		return fmt.Errorf("failed to flush stream for %s: %w", targetID.String(), err)
+		return fmt.Errorf("failed to flush stream for %s: %w", recipientID.String(), err)
 	}
 
 	// close the stream immediately
@@ -423,7 +374,7 @@ func (m *Middleware) processMessage(msg *message.Message) {
 }
 
 // Publish publishes the given payload on the topic
-func (m *Middleware) publish(channelID uint8, msg *message.Message) error {
+func (m *Middleware) Publish(channelID uint8, msg *message.Message) error {
 
 	// convert the message to bytes to be put on the wire.
 	data, err := msg.Marshal()
