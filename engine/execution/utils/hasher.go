@@ -15,10 +15,10 @@ func NewExecutionReceiptHasher() hash.Hasher {
 	return h
 }
 
-// NewSPoCKHasher generates and returns a hasher for signing
+// NewSPOCKHasher generates and returns a hasher for signing
 // and verification of SPoCKs
-func NewSPoCKHasher() hash.Hasher {
-	h := crypto.NewBLSKMAC(encoding.SPoCKTag)
+func NewSPOCKHasher() hash.Hasher {
+	h := crypto.NewBLSKMAC(encoding.SPOCKTag)
 	return h
 }
 
