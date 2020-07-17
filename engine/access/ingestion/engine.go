@@ -13,7 +13,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/access/rpc"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
@@ -205,14 +204,12 @@ func (e *Engine) handleCollectionResponse(originID flow.Identifier, response *me
 }
 
 func (e *Engine) requestCollections(guarantees ...*flow.CollectionGuarantee) error {
-	ids, err := e.findCollectionNodes()
-	if err != nil {
-		return err
-	}
-
-	// Request all the collections for this block
-	for _, g := range guarantees {
-		err := e.collectionConduit.Submit(&messages.CollectionRequest{ID: g.ID(), Nonce: rand.Uint64()}, ids...)
+	for _, guarantee := range guarantees {
+		req := &messages.CollectionRequest{
+			ID:    guarantee.ID(),
+			Nonce: rand.Uint64(),
+		}
+		err := e.collectionConduit.Submit(req, guarantee.SignerIDs...)
 		if err != nil {
 			return err
 		}
@@ -220,18 +217,6 @@ func (e *Engine) requestCollections(guarantees ...*flow.CollectionGuarantee) err
 
 	return nil
 
-}
-
-func (e *Engine) findCollectionNodes() ([]flow.Identifier, error) {
-	identities, err := e.state.Final().Identities(filter.HasRole(flow.RoleCollection))
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve identities: %w", err)
-	}
-	if len(identities) < 1 {
-		return nil, fmt.Errorf("no collection identity found")
-	}
-	identifiers := flow.GetIDs(identities)
-	return identifiers, nil
 }
 
 // OnBlockIncorporated is a noop for this engine since access node is only dealing with finalized blocks

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/templates"
 
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
@@ -142,17 +143,16 @@ func (lg *LoadGenerator) setupServiceAccountKeys() error {
 	for i := 0; i < lg.numberOfAccounts; i++ {
 		keys = append(keys, lg.serviceAccount.accountKey)
 	}
-	script, err := lg.scriptCreator.AddKeyToAccountScript(keys)
+
+	addKeysTx, err := lg.scriptCreator.AddKeysToAccountTransaction(*lg.serviceAccount.address, keys)
 	if err != nil {
 		return err
 	}
 
-	addKeysTx := flowsdk.NewTransaction().
+	addKeysTx.
 		SetReferenceBlockID(blockRef).
-		SetScript([]byte(script)).
 		SetProposalKey(*lg.serviceAccount.address, lg.serviceAccount.accountKey.ID, lg.serviceAccount.accountKey.SequenceNumber).
-		SetPayer(*lg.serviceAccount.address).
-		AddAuthorizer(*lg.serviceAccount.address)
+		SetPayer(*lg.serviceAccount.address)
 
 	lg.serviceAccount.signerLock.Lock()
 	defer lg.serviceAccount.signerLock.Unlock()
@@ -179,7 +179,7 @@ func (lg *LoadGenerator) setupServiceAccountKeys() error {
 		nil, // on expired
 		nil, // on timout
 		nil, // on error,
-		60)
+		120)
 
 	txWG.Wait()
 
@@ -201,17 +201,18 @@ func (lg *LoadGenerator) createAccounts() error {
 			FromPrivateKey(privKey).
 			SetHashAlgo(crypto.SHA3_256).
 			SetWeight(flowsdk.AccountKeyWeightThreshold)
+
 		signer := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
-		// TODO herer
-		script, err := lg.scriptCreator.CreateAccountScript(accountKey)
-		if err != nil {
-			return err
-		}
+
+		createAccountTx := templates.CreateAccount(
+			[]*flowsdk.AccountKey{accountKey},
+			nil,
+			*lg.serviceAccount.address,
+		)
+
 		// Generate an account creation script
-		createAccountTx := flowsdk.NewTransaction().
+		createAccountTx.
 			SetReferenceBlockID(blockRef).
-			SetScript(script).
-			AddAuthorizer(*lg.serviceAccount.address).
 			SetProposalKey(*lg.serviceAccount.address, i+1, 0).
 			SetPayer(*lg.serviceAccount.address)
 
@@ -246,7 +247,7 @@ func (lg *LoadGenerator) createAccounts() error {
 			nil, // on expired
 			nil, // on timout
 			nil, // on error
-			30)
+			120)
 
 		fmt.Println("<<<", i)
 	}
@@ -283,7 +284,7 @@ func (lg *LoadGenerator) distributeInitialTokens() error {
 
 		// TODO signer be thread safe
 		lg.serviceAccount.signerLock.Lock()
-		err = transferTx.SignEnvelope(*lg.serviceAccount.address, 0, lg.serviceAccount.signer)
+		err = transferTx.SignEnvelope(*lg.serviceAccount.address, i+1, lg.serviceAccount.signer)
 		lg.serviceAccount.signerLock.Unlock()
 
 		err = lg.flowClient.SendTransaction(context.Background(), *transferTx)
@@ -295,9 +296,10 @@ func (lg *LoadGenerator) distributeInitialTokens() error {
 		lg.txTracker.AddTx(transferTx.ID(),
 			nil,
 			func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
+				fmt.Println(res)
 				allTxWG.Done()
 			},
-			nil, nil, nil, nil, 60)
+			nil, nil, nil, nil, 120)
 	}
 	allTxWG.Wait()
 	lg.step++

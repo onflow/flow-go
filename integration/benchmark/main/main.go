@@ -45,7 +45,7 @@ func main() {
 	priv := hex.EncodeToString(ServiceAccountPrivateKey.PrivateKey.Encode())
 
 	flowClient, err := client.New(*accessNodeAddress, grpc.WithInsecure())
-	lg, err := utils.NewLoadGenerator(flowClient, priv, &serviceAccountAddress, &fungibleTokenAddress, &flowTokenAddress, 100, *verbose)
+	lg, err := utils.NewLoadGenerator(flowClient, priv, &serviceAccountAddress, &fungibleTokenAddress, &flowTokenAddress, 25, *verbose)
 	if err != nil {
 		panic(err)
 	}
