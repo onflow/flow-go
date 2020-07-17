@@ -40,6 +40,21 @@ func ClusterFor(sn Snapshot, id flow.Identifier) (flow.IdentityList, uint, error
 	return participants, clusterIndex, nil
 }
 
+// ClusterByIndex returns the cluster by the given index
+func ClusterByIndex(sn Snapshot, index uint) (flow.IdentityList, error) {
+	clusters, err := sn.Clusters()
+	if err != nil {
+		return nil, fmt.Errorf("could not get clusters: %w", err)
+	}
+
+	cluster, ok := clusters.ByIndex(index)
+	if !ok {
+		return nil, fmt.Errorf("could not find cluster by index: %v", index)
+	}
+
+	return cluster, nil
+}
+
 // ChainIDForCluster returns the canonical chain ID for a collection node cluster.
 func ChainIDForCluster(cluster flow.IdentityList) flow.ChainID {
 	return flow.ChainID(cluster.Fingerprint().String())

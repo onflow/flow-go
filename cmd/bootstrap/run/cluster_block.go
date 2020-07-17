@@ -1,6 +1,8 @@
 package run
 
 import (
+	"fmt"
+
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/protocol"
@@ -9,7 +11,12 @@ import (
 func GenerateRootClusterBlocks(clusters *flow.ClusterList) []*cluster.Block {
 	clusterBlocks := make([]*cluster.Block, clusters.Size())
 	for i := range clusterBlocks {
-		clusterBlocks[i] = GenerateRootClusterBlock(clusters.ByIndex(uint(i)))
+		cluster, ok := clusters.ByIndex(uint(i))
+		if !ok {
+			panic(fmt.Sprintf("failed to get cluster by index: %v", i))
+		}
+
+		clusterBlocks[i] = GenerateRootClusterBlock(cluster)
 	}
 	return clusterBlocks
 }
