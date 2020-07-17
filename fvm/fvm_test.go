@@ -31,7 +31,7 @@ func vmTest(
 	return func(t *testing.T) {
 		rt := runtime.NewInterpreterRuntime()
 
-		chain := flow.Mainnet.Chain()
+		chain := flow.Testnet.Chain()
 
 		vm := fvm.New(rt)
 
@@ -69,7 +69,7 @@ func encodeJSONCDC(t *testing.T, value cadence.Value) []byte {
 func TestBlockContext_ExecuteTransaction(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 
-	chain := flow.Mainnet.Chain()
+	chain := flow.Testnet.Chain()
 
 	vm := fvm.New(rt)
 

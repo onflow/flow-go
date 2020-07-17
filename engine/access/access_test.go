@@ -68,7 +68,7 @@ func (suite *Suite) SetupTest() {
 	suite.me = new(mockmodule.Local)
 	obsIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 	suite.me.On("NodeID").Return(obsIdentity.NodeID)
-	suite.chainID = flow.Mainnet
+	suite.chainID = flow.Testnet
 }
 
 func (suite *Suite) TestSendAndGetTransaction() {
