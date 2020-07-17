@@ -17,7 +17,7 @@ import (
 )
 
 func AddressFixture() flow.Address {
-	return flow.Mainnet.Chain().ServiceAddress()
+	return flow.Testnet.Chain().ServiceAddress()
 }
 
 func TransactionSignatureFixture() flow.TransactionSignature {
@@ -609,7 +609,7 @@ func WithReferenceBlock(id flow.Identifier) func(tx *flow.TransactionBody) {
 
 func TransactionDSLFixture(chain flow.Chain) dsl.Transaction {
 	return dsl.Transaction{
-		Import: dsl.Import{Address: chain.ServiceAddress()},
+		Import: dsl.Import{Address: sdk.Address(chain.ServiceAddress())},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
 				pub fun main() {}

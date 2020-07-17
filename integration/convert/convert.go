@@ -28,3 +28,20 @@ func ToSDKID(id flow.Identifier) sdk.Identifier {
 func ToSDKAddress(addr flow.Address) sdk.Address {
 	return sdk.BytesToAddress(addr.Bytes())
 }
+
+func ToSDKTransactionSignature(sig flow.TransactionSignature) sdk.TransactionSignature {
+	return sdk.TransactionSignature{
+		Address:     sdk.Address(sig.Address),
+		SignerIndex: sig.SignerIndex,
+		Signature:   sig.Signature,
+		KeyID:       int(sig.KeyID),
+	}
+}
+
+func ToSDKProposalKey(key flow.ProposalKey) sdk.ProposalKey {
+	return sdk.ProposalKey{
+		Address:        sdk.Address(key.Address),
+		KeyID:          int(key.KeyID),
+		SequenceNumber: key.SequenceNumber,
+	}
+}

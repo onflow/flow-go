@@ -70,7 +70,7 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 		exeNode = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.AsGhost())
 		verNode = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.AsGhost())
 	)
-	colNodes := testnet.NewNodeConfigSet(nNodes, flow.RoleCollection)
+	colNodes := testnet.NewNodeConfigSet(nNodes, flow.RoleCollection, testnet.WithAdditionalFlag("--block-rate-delay=1ms"))
 
 	suite.nClusters = nClusters
 
@@ -213,6 +213,8 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 		// for keeping track of proposals we've seen, and which transactions
 		// they contain
 		proposals = make(map[flow.Identifier][]flow.Identifier)
+		// incase we see a guarantee first
+		guarantees = make(map[flow.Identifier]bool)
 	)
 	for _, txID := range txIDs {
 		lookup[txID] = struct{}{}
@@ -232,12 +234,26 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 			header := val.Header
 			collection := val.Payload.Collection
 			suite.T().Logf("got proposal height=%d col_id=%x size=%d", header.Height, collection.ID(), collection.Len())
-			proposals[collection.ID()] = collection.Light().Transactions
+			if guarantees[collection.ID()] {
+				for _, txID := range collection.Light().Transactions {
+					finalized[txID] = struct{}{}
+				}
+
+				if len(finalized) == len(lookup) {
+					return
+				}
+			} else {
+				proposals[collection.ID()] = collection.Light().Transactions
+			}
 
 		case *flow.CollectionGuarantee:
 			finalizedTxIDs, ok := proposals[val.CollectionID]
 			if !ok {
 				suite.T().Logf("got unseen guarantee (id=%x)", val.CollectionID)
+				guarantees[val.CollectionID] = true
+				continue
+			} else {
+				suite.T().Logf("got guarantee (id=%x)", val.CollectionID)
 			}
 			for _, txID := range finalizedTxIDs {
 				finalized[txID] = struct{}{}
@@ -284,7 +300,7 @@ func (suite *CollectorSuite) Collector(clusterIdx, nodeIdx uint) *testnet.Contai
 // with the given ID.
 func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstate.State {
 
-	myCluster, ok := suite.Clusters().ByNodeID(id)
+	myCluster, _, ok := suite.Clusters().ByNodeID(id)
 	require.True(suite.T(), ok, "could not get node %s in clusters", id)
 
 	chainID := protocol.ChainIDForCluster(myCluster)

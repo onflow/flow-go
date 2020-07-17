@@ -6,31 +6,36 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/cadence/encoding/json"
+	sdk "github.com/onflow/flow-go-sdk"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go-sdk/templates"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/execution/testutil"
-	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 // timeout for individual actions
 const defaultTimeout = time.Second * 10
 
 func TestMVP_Network(t *testing.T) {
-	colNode := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.WarnLevel))
+	consensusConfigs := []func(*testnet.NodeConfig){
+		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
+		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
+		testnet.WithLogLevel(zerolog.WarnLevel),
+	}
+
+	colNode := testnet.NewNodeConfig(flow.RoleCollection, consensusConfigs...)
 	exeNode := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel))
 
 	net := []testnet.NodeConfig{
 		colNode,
 		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.WarnLevel)),
 		exeNode,
-		testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithAdditionalFlag("--hotstuff-timeout=12s"), testnet.WithLogLevel(zerolog.WarnLevel)),
-		testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithAdditionalFlag("--hotstuff-timeout=12s"), testnet.WithLogLevel(zerolog.WarnLevel)),
-		testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithAdditionalFlag("--hotstuff-timeout=12s"), testnet.WithLogLevel(zerolog.WarnLevel)),
+		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
+		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
+		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleVerification),
 		testnet.NewNodeConfig(flow.RoleAccess),
 	}
@@ -52,16 +57,16 @@ func TestMVP_Emulator(t *testing.T) {
 	// TODO - start an emulator instance
 	t.Skip()
 
-	key, err := unittest.EmulatorRootKey()
-	require.NoError(t, err)
+	// key, err := unittest.EmulatorRootKey()
+	// require.NoError(t, err)
 
-	c, err := testnet.NewClientWithKey(":3569", key, flow.Emulator.Chain())
-	require.NoError(t, err)
+	// c, err := testnet.NewClientWithKey(":3569", key, flow.Emulator.Chain())
+	// require.NoError(t, err)
 
 	//TODO commented out because main test requires root for sending tx
 	// with valid reference block ID
 	//runMVPTest(t, c)
-	_ = c
+	// _ = c
 }
 
 func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
@@ -73,49 +78,45 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	require.NoError(t, err)
 
 	//create new account to deploy Counter to
-	accountPrivateKey, err := testutil.GenerateAccountPrivateKey()
+	accountPrivateKey := RandomPrivateKey()
+
 	require.NoError(t, err)
+	accountKey := sdk.NewAccountKey().
+		FromPrivateKey(accountPrivateKey).
+		SetHashAlgo(sdkcrypto.SHA3_256).
+		SetWeight(sdk.AccountKeyWeightThreshold)
+
+	serviceAddress := sdk.Address(serviceAccountClient.Chain.ServiceAddress())
+
+	// err = createAccount(childCtx, serviceAccountClient, root, []byte(CounterContract.ToCadence()), )
+	// Generate the account creation transaction
+	createAccountTx := templates.CreateAccount([]*sdk.AccountKey{accountKey}, []byte(CounterContract.ToCadence()), serviceAddress).
+		SetReferenceBlockID(sdk.Identifier(root.ID())).
+		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
+		SetPayer(serviceAddress)
 
 	childCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
-	err = createAccount(childCtx, serviceAccountClient, root, []byte(CounterContract.ToCadence()), accountPrivateKey.PublicKey(fvm.AccountKeyWeightThreshold))
+	err = serviceAccountClient.SignAndSendTransaction(ctx, createAccountTx)
+	require.NoError(t, err)
+
 	cancel()
 
-	var newAccountAddress = flow.EmptyAddress
-
 	// wait for account to be created
-	require.Eventually(t, func() bool {
-		childCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
-		responses, err := serviceAccountClient.Events(childCtx, "flow.AccountCreated")
-		cancel()
+	accountCreationTxRes, err := serviceAccountClient.WaitForSealed(context.Background(), createAccountTx.ID())
+	require.NoError(t, err)
 
-		if err != nil {
-			return false
+	var newAccountAddress sdk.Address
+	for _, event := range accountCreationTxRes.Events {
+		if event.Type == sdk.EventAccountCreated {
+			accountCreatedEvent := sdk.AccountCreatedEvent(event)
+			newAccountAddress = accountCreatedEvent.Address()
 		}
-
-		found := false
-
-		for _, response := range responses {
-			for _, e := range response.Events {
-				if e.Type == string(flow.EventAccountCreated) { //just to be sure
-
-					event, err := json.Decode(e.Payload)
-					if err != nil {
-						fmt.Printf("decoding payload err = %s\n", err)
-					}
-
-					newAccountAddress = event.ToGoValue().([]interface{})[0].([flow.AddressLength]byte)
-
-					found = true
-				}
-			}
-		}
-
-		return found
-	}, 30*time.Second, time.Second)
+	}
 
 	accountClient, err := testnet.NewClientWithKey(
 		fmt.Sprintf(":%s", net.AccessPorts[testnet.AccessNodeAPIPort]),
-		&accountPrivateKey,
+		newAccountAddress,
+		accountPrivateKey,
 		chain,
 	)
 	require.NoError(t, err)
@@ -128,18 +129,24 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	require.Equal(t, -3, counter)
 
 	// create counter instance
-	tx := flow.NewTransactionBody().
+	createCounterTx := sdk.NewTransaction().
 		SetScript([]byte(CreateCounterTx(newAccountAddress).ToCadence())).
-		SetReferenceBlockID(root.ID()).
+		SetReferenceBlockID(sdk.Identifier(root.ID())).
 		SetProposalKey(newAccountAddress, 0, 0).
 		SetPayer(newAccountAddress).
 		AddAuthorizer(newAccountAddress)
 
 	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
-	err = accountClient.SignAndSendTransaction(ctx, *tx)
+	err = accountClient.SignAndSendTransaction(ctx, createCounterTx)
 	cancel()
 
 	require.NoError(t, err)
+
+	resp, err := accountClient.WaitForSealed(context.Background(), createCounterTx.ID())
+	require.NoError(t, err)
+
+	require.NoError(t, resp.Error)
+	t.Log(resp)
 
 	// counter is created and incremented eventually
 	require.Eventually(t, func() bool {
@@ -147,7 +154,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 		counter, err = readCounter(ctx, serviceAccountClient, newAccountAddress)
 		cancel()
 
-		t.Logf("read counter: counter=%d, err=%s", counter, err)
+		t.Logf("read counter: counter=%d, err=%v", counter, err)
 		return err == nil && counter == 2
 	}, 30*time.Second, time.Second)
 }
