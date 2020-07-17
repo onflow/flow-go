@@ -60,8 +60,6 @@ func (p *PSMT) Update(paths []ledger.Path, payloads []ledger.Payload) ([]byte, [
 func NewPSMT(
 	rootValue []byte, // stateCommitment
 	pathByteSize int,
-	paths []ledger.Path,
-	payloads []*ledger.Payload,
 	proofs []byte,
 ) (*PSMT, error) {
 
@@ -78,6 +76,9 @@ func NewPSMT(
 	if err != nil {
 		return nil, fmt.Errorf("decoding proof failed: %w", err)
 	}
+
+	paths := batchProof.Paths()
+	payloads := batchProof.Payloads()
 
 	// check that size of path, size of payloads are consistent
 	if len(paths) != len(payloads) {

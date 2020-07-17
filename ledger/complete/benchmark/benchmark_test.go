@@ -1,111 +1,118 @@
 package benchmark
 
-// // func TestFullBenchamark(t *testing.T) {
-// // 	t.Skipf("manual debug only")
-// // 	StorageBenchmark()
-// // }
+import (
+	"io/ioutil"
+	"math/rand"
+	"os"
+	"testing"
+	"time"
 
-// import (
-// 	"io/ioutil"
-// 	"math/rand"
-// 	"os"
-// 	"testing"
-// 	"time"
+	"github.com/dapperlabs/flow-go/ledger"
+	"github.com/dapperlabs/flow-go/ledger/common"
+	"github.com/dapperlabs/flow-go/ledger/complete"
+	"github.com/dapperlabs/flow-go/ledger/partial/ptrie"
+	"github.com/dapperlabs/flow-go/module/metrics"
+)
 
-// 	"github.com/dapperlabs/flow-go/ledger"
-// 	"github.com/dapperlabs/flow-go/ledger/partial/ptrie"
-// 	"github.com/dapperlabs/flow-go/ledger/utils"
-// 	"github.com/dapperlabs/flow-go/module/metrics"
-// )
+func BenchmarkStorage(b *testing.B) { benchmarkStorage(100, b) }
 
-// func BenchmarkStorage(b *testing.B) { benchmarkStorage(100, b) }
+// BenchmarkStorage benchmarks the performance of the storage layer
+func benchmarkStorage(steps int, b *testing.B) {
+	// assumption: 1000 key updates per collection
+	pathByteSize := 32
+	numInsPerStep := 1000
+	keyNumberOfParts := 10
+	keyPartMinByteSize := 1
+	keyPartMaxByteSize := 100
+	valueMaxByteSize := 32
+	rand.Seed(time.Now().UnixNano())
 
-// // BenchmarkStorage benchmarks the performance of the storage layer
-// func benchmarkStorage(steps int, b *testing.B) {
-// 	// assumption: 1000 key updates per collection
-// 	numInsPerStep := 1000
-// 	keyByteSize := 32
-// 	valueMaxByteSize := 32
-// 	rand.Seed(time.Now().UnixNano())
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	defer os.RemoveAll(dir)
+	if err != nil {
+		b.Fatal(err)
+	}
 
-// 	dir, err := ioutil.TempDir("", "test-mtrie-")
-// 	defer os.RemoveAll(dir)
-// 	if err != nil {
-// 		b.Fatal(err)
-// 	}
+	led, err := complete.NewLedger(dir, steps+1, &metrics.NoopCollector{}, nil)
+	defer led.Done()
+	if err != nil {
+		b.Fatal("can't create a new complete ledger")
+	}
+	totalUpdateTimeMS := 0
+	totalReadTimeMS := 0
+	totalProofTimeMS := 0
+	totalRegOperation := 0
+	totalProofSize := 0
+	totalPTrieConstTimeMS := 0
 
-// 	led, err := ledger.NewMTrieStorage(dir, steps+1, &metrics.NoopCollector{}, nil)
-// 	defer led.Done()
-// 	if err != nil {
-// 		b.Fatal("can't create MTrieStorage")
-// 	}
-// 	totalUpdateTimeMS := 0
-// 	totalReadTimeMS := 0
-// 	totalProofTimeMS := 0
-// 	totalRegOperation := 0
-// 	totalProofSize := 0
-// 	totalPTrieConstTimeMS := 0
+	stateCommitment := led.EmptyStateCommitment()
+	for i := 0; i < steps; i++ {
 
-// 	stateCommitment := led.EmptyStateCommitment()
-// 	for i := 0; i < steps; i++ {
-// 		keys := utils.GetRandomKeysFixedN(numInsPerStep, keyByteSize)
-// 		values := utils.GetRandomValues(len(keys), 0, valueMaxByteSize)
-// 		totalRegOperation += len(keys)
+		keys := common.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+		values := common.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 
-// 		start := time.Now()
-// 		newState, err := led.UpdateRegisters(keys, values, stateCommitment)
-// 		if err != nil {
-// 			panic(err)
-// 		}
-// 		elapsed := time.Since(start)
-// 		totalUpdateTimeMS += int(elapsed / time.Millisecond)
+		totalRegOperation += len(keys)
 
-// 		// read values and compare values
-// 		start = time.Now()
-// 		_, err = led.GetRegisters(keys, newState)
-// 		if err != nil {
-// 			panic("failed to update register")
-// 		}
-// 		elapsed = time.Since(start)
-// 		totalReadTimeMS += int(elapsed / time.Millisecond)
+		start := time.Now()
+		update, err := ledger.NewUpdate(stateCommitment, keys, values)
+		if err != nil {
+			b.Fatal(err)
+		}
 
-// 		start = time.Now()
-// 		// validate proofs (check individual proof and batch proof)
-// 		retValues, proofs, err := led.GetRegistersWithProof(keys, newState)
-// 		if err != nil {
-// 			panic("failed to update register")
-// 		}
-// 		elapsed = time.Since(start)
-// 		totalProofTimeMS += int(elapsed / time.Millisecond)
+		newState, err := led.Set(update)
+		if err != nil {
+			b.Fatal(err)
+		}
 
-// 		byteSize := 0
-// 		for _, p := range proofs {
-// 			byteSize += len(p)
-// 		}
-// 		totalProofSize += byteSize
+		elapsed := time.Since(start)
+		totalUpdateTimeMS += int(elapsed / time.Millisecond)
 
-// 		start = time.Now()
-// 		// construct a partial trie using proofs
-// 		_, err = ptrie.NewPSMT(newState, keyByteSize, keys, retValues, proofs)
-// 		if err != nil {
-// 			b.Fatal("failed to create PSMT")
-// 		}
-// 		elapsed = time.Since(start)
-// 		totalPTrieConstTimeMS += int(elapsed / time.Millisecond)
+		// read values and compare values
+		start = time.Now()
+		query, err := ledger.NewQuery(newState, keys)
+		if err != nil {
+			b.Fatal(err)
+		}
+		_, err = led.Get(query)
+		if err != nil {
+			b.Fatal(err)
+		}
+		elapsed = time.Since(start)
+		totalReadTimeMS += int(elapsed / time.Millisecond)
 
-// 		stateCommitment = newState
-// 	}
+		start = time.Now()
+		// validate proofs (check individual proof and batch proof)
+		proof, err := led.Prove(query)
+		if err != nil {
+			b.Fatal(err)
+		}
+		elapsed = time.Since(start)
+		totalProofTimeMS += int(elapsed / time.Millisecond)
 
-// 	b.ReportMetric(float64(totalUpdateTimeMS/steps), "update_time_(ms)")
-// 	b.ReportMetric(float64(totalUpdateTimeMS*1000000/totalRegOperation), "update_time_per_reg_(ns)")
+		totalProofSize += len(proof)
 
-// 	b.ReportMetric(float64(totalReadTimeMS/steps), "read_time_(ms)")
-// 	b.ReportMetric(float64(totalReadTimeMS*1000000/totalRegOperation), "read_time_per_reg_(ns)")
+		start = time.Now()
+		// construct a partial trie using proofs
+		_, err = ptrie.NewPSMT(newState, pathByteSize, proof)
+		if err != nil {
+			b.Fatal("failed to create PSMT")
+		}
+		elapsed = time.Since(start)
+		totalPTrieConstTimeMS += int(elapsed / time.Millisecond)
 
-// 	b.ReportMetric(float64(totalProofTimeMS/steps), "read_w_proof_time_(ms)")
-// 	b.ReportMetric(float64(totalProofTimeMS*1000000/totalRegOperation), "read_w_proof_time_per_reg_(ns)")
+		stateCommitment = newState
+	}
 
-// 	b.ReportMetric(float64(totalProofSize/steps), "proof_size_(MB)")
-// 	b.ReportMetric(float64(totalPTrieConstTimeMS/steps), "ptrie_const_time_(ms)")
+	b.ReportMetric(float64(totalUpdateTimeMS/steps), "update_time_(ms)")
+	b.ReportMetric(float64(totalUpdateTimeMS*1000000/totalRegOperation), "update_time_per_reg_(ns)")
 
-// }
+	b.ReportMetric(float64(totalReadTimeMS/steps), "read_time_(ms)")
+	b.ReportMetric(float64(totalReadTimeMS*1000000/totalRegOperation), "read_time_per_reg_(ns)")
+
+	b.ReportMetric(float64(totalProofTimeMS/steps), "read_w_proof_time_(ms)")
+	b.ReportMetric(float64(totalProofTimeMS*1000000/totalRegOperation), "read_w_proof_time_per_reg_(ns)")
+
+	b.ReportMetric(float64(totalProofSize/steps), "proof_size_(MB)")
+	b.ReportMetric(float64(totalPTrieConstTimeMS/steps), "ptrie_const_time_(ms)")
+
+}

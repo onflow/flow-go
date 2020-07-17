@@ -287,6 +287,24 @@ func (bp *TrieBatchProof) Size() int {
 	return len(bp.Proofs)
 }
 
+// Paths returns the slice of paths for this batch proof
+func (bp *TrieBatchProof) Paths() []Path {
+	paths := make([]Path, 0)
+	for _, p := range bp.Proofs {
+		paths = append(paths, p.Path)
+	}
+	return paths
+}
+
+// Payloads returns the slice of paths for this batch proof
+func (bp *TrieBatchProof) Payloads() []*Payload {
+	payloads := make([]*Payload, 0)
+	for _, p := range bp.Proofs {
+		payloads = append(payloads, p.Payload)
+	}
+	return payloads
+}
+
 func (bp *TrieBatchProof) String() string {
 	res := fmt.Sprintf("trie batch proof includes %d proofs: \n", bp.Size())
 	for _, proof := range bp.Proofs {
