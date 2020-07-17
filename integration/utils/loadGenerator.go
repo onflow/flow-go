@@ -143,17 +143,16 @@ func (lg *LoadGenerator) setupServiceAccountKeys() error {
 	for i := 0; i < lg.numberOfAccounts; i++ {
 		keys = append(keys, lg.serviceAccount.accountKey)
 	}
-	script, err := lg.scriptCreator.AddKeyToAccountScript(keys)
+
+	addKeysTx, err := lg.scriptCreator.AddKeysToAccountTransaction(*lg.serviceAccount.address, keys)
 	if err != nil {
 		return err
 	}
 
-	addKeysTx := flowsdk.NewTransaction().
+	addKeysTx.
 		SetReferenceBlockID(blockRef).
-		SetScript(script).
 		SetProposalKey(*lg.serviceAccount.address, lg.serviceAccount.accountKey.ID, lg.serviceAccount.accountKey.SequenceNumber).
-		SetPayer(*lg.serviceAccount.address).
-		AddAuthorizer(*lg.serviceAccount.address)
+		SetPayer(*lg.serviceAccount.address)
 
 	lg.serviceAccount.signerLock.Lock()
 	defer lg.serviceAccount.signerLock.Unlock()
@@ -180,7 +179,7 @@ func (lg *LoadGenerator) setupServiceAccountKeys() error {
 		nil, // on expired
 		nil, // on timout
 		nil, // on error,
-		60)
+		120)
 
 	txWG.Wait()
 
@@ -248,7 +247,7 @@ func (lg *LoadGenerator) createAccounts() error {
 			nil, // on expired
 			nil, // on timout
 			nil, // on error
-			30)
+			120)
 
 		fmt.Println("<<<", i)
 	}
@@ -299,7 +298,7 @@ func (lg *LoadGenerator) distributeInitialTokens() error {
 			func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
 				allTxWG.Done()
 			},
-			nil, nil, nil, nil, 60)
+			nil, nil, nil, nil, 120)
 	}
 	allTxWG.Wait()
 	lg.step++

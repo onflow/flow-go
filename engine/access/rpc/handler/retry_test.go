@@ -79,9 +79,6 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	// Height needs to be at least DefaultTransactionExpiry before we start doing retries
 	block.Header.Height = flow.DefaultTransactionExpiry + 1
 	transactionBody.SetReferenceBlockID(block.ID())
-	headBlock := unittest.BlockFixture()
-	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
-	suite.snapshot.On("Head").Return(headBlock.Header, nil)
 
 	light := collection.Light()
 	// transaction storage returns the corresponding transaction

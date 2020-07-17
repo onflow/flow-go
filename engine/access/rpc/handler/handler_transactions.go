@@ -167,26 +167,26 @@ func (h *handlerTransactions) DeriveTransactionStatus(tx *flow.TransactionBody, 
 		return entities.TransactionStatus_UNKNOWN, err
 	}
 
+	if !executed {
+		// If we've gotten here, but the block has not yet been executed, report it as only been finalized
+		return entities.TransactionStatus_FINALIZED, nil
+	}
+
+	// From this point on, we know for sure this transaction has at least been executed
+
 	// get the latest sealed block from the state
 	sealed, err := h.state.Sealed().Head()
 	if err != nil {
 		return entities.TransactionStatus_UNKNOWN, err
 	}
 
-	// if the finalized block precedes the latest sealed block, then it can be safely assumed that it would have been
-	// sealed as well and the transaction can be considered sealed
-	if block.Header.Height <= sealed.Height {
-		return entities.TransactionStatus_SEALED, nil
-	}
-
-	// We've explicitly seen some form of execution result, therefore this Tx must have been executed
-	if executed {
+	if block.Header.Height > sealed.Height {
+		// The block is not yet sealed, so we'll report it as only executed
 		return entities.TransactionStatus_EXECUTED, nil
 	}
 
-	// otherwise, the finalized block of the transaction has not yet been sealed
-	// hence the transaction is finalized but not sealed
-	return entities.TransactionStatus_FINALIZED, nil
+	// otherwise, this block has been executed, and sealed, so report as sealed
+	return entities.TransactionStatus_SEALED, nil
 }
 
 func (h *handlerTransactions) lookupBlock(txID flow.Identifier) (*flow.Block, error) {

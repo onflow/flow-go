@@ -19,6 +19,7 @@ import (
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go-sdk/templates"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -237,19 +238,9 @@ func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(keyIndex int) (fl
 		SetWeight(flowsdk.AccountKeyWeightThreshold)
 	mySigner := crypto.NewInMemorySigner(myPrivateKey, accountKey.HashAlgo)
 
-	// Generate an account creation script
-	// TODO: use flow-go-sdk template/func instead
-	publicKeys := []cadence.Value{bytesToCadenceArray(accountKey.Encode())}
-
-	cadencePublicKeys := cadence.NewArray(publicKeys)
-	cadenceCode := bytesToCadenceArray(nil)
-
-	createAccountTx := flowsdk.NewTransaction().
+	// Generate the account creation transaction
+	createAccountTx := templates.CreateAccount([]*flowsdk.AccountKey{accountKey}, nil, gs.rootAcctAddr).
 		SetReferenceBlockID(gs.ref.ID).
-		AddAuthorizer(gs.rootAcctAddr).
-		SetScript([]byte(createAccountTemplate)).
-		AddArgument(cadencePublicKeys).
-		AddArgument(cadenceCode).
 		SetProposalKey(gs.rootAcctAddr, keyIndex, gs.sequenceNumbers[keyIndex]).
 		SetPayer(gs.rootAcctAddr)
 
@@ -260,6 +251,7 @@ func (gs *TransactionsPerSecondSuite) CreateAccountAndTransfer(keyIndex int) (fl
 	gs.ref, err = gs.flowClient.GetLatestBlockHeader(context.Background(), false)
 	handle(err)
 
+	// execute the CreateAccount transaction
 	err = gs.flowClient.SendTransaction(ctx, *createAccountTx)
 	handle(err)
 
@@ -456,14 +448,6 @@ func bytesToCadenceArray(b []byte) cadence.Array {
 	return cadence.NewArray(values)
 }
 
-const addAccountKeyTemplate = `
-transaction(publicKey: [UInt8]) {
-  prepare(signer: AuthAccount) {
-	signer.addPublicKey(publicKey)
-  }
-}
-`
-
 func (gs *TransactionsPerSecondSuite) AddKeys(flowClient *client.Client) {
 	ctx := context.Background()
 
@@ -485,12 +469,15 @@ func (gs *TransactionsPerSecondSuite) AddKeys(flowClient *client.Client) {
 	addKeysTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(gs.ref.ID).
 		SetScript([]byte(script)).
-		AddArgument(bytesToCadenceArray(accountKeyBytes)).
 		SetProposalKey(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootAcctKey.SequenceNumber).
 		SetPayer(gs.rootAcctAddr).
 		AddAuthorizer(gs.rootAcctAddr)
 
-	err := addKeysTx.SignEnvelope(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootSigner)
+	err := addKeysTx.AddArgument(bytesToCadenceArray(accountKeyBytes))
+	handle(err)
+
+
+	err = addKeysTx.SignEnvelope(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootSigner)
 	handle(err)
 
 	err = flowClient.SendTransaction(ctx, *addKeysTx)
