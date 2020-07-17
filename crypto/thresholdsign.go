@@ -64,20 +64,21 @@ type thresholdSigner struct {
 
 // NewThresholdSigner creates a new instance of Threshold signer using BLS
 // hash is the hashing algorithm to be used
-// size is the number of participants
-func NewThresholdSigner(size int, currentIndex int, hashAlgo hash.Hasher) (*thresholdSigner, error) {
+// size is the number of participants, threshold is the threshold value
+func NewThresholdSigner(size int, threshold int, currentIndex int, hashAlgo hash.Hasher) (*thresholdSigner, error) {
 	if size < ThresholdMinSize || size > ThresholdMaxSize {
 		return nil, fmt.Errorf("size should be between %d and %d", ThresholdMinSize, ThresholdMaxSize)
 	}
 	if currentIndex >= size || currentIndex < 0 {
 		return nil, fmt.Errorf("The current index must be between 0 and %d", size-1)
 	}
+	if threshold >= size-1 || threshold < 1 {
+		return nil, fmt.Errorf("The threshold must be between 1 and %d", size-2)
+	}
 
 	// initialize BLS settings
 	_ = newBLSBLS12381()
 
-	// optimal threshold (t) to allow the largest number of malicious nodes (m)
-	threshold := optimalThreshold(size)
 	// internal list of valid signature shares
 	shares := make([]byte, 0, (threshold+1)*SignatureLenBLSBLS12381)
 	signers := make([]index, 0, threshold+1)
@@ -255,19 +256,22 @@ func (s *thresholdSigner) reconstructThresholdSignature() (Signature, error) {
 // ReconstructThresholdSignature returns:
 // - error if the inputs are not in the correct range or if the threshold is not reached
 // - Signature: the threshold signature if there is no returned error, nil otherwise
-func ReconstructThresholdSignature(size int, shares []Signature, signers []int) (Signature, error) {
+func ReconstructThresholdSignature(size int, threshold int,
+	shares []Signature, signers []int) (Signature, error) {
 	// initialize BLS settings
 	_ = newBLSBLS12381()
 	if size < ThresholdMinSize || size > ThresholdMaxSize {
 		return nil, fmt.Errorf("size should be between %d and %d",
 			ThresholdMinSize, ThresholdMaxSize)
 	}
+	if threshold >= size-1 || threshold < 1 {
+		return nil, fmt.Errorf("The threshold must be between 1 and %d", size-2)
+	}
 
 	if len(shares) != len(signers) {
 		return nil, errors.New("The number of signature shares is not matching the number of signers")
 	}
-	// check if the threshold was not reached
-	threshold := optimalThreshold(size)
+
 	if len(shares) < threshold+1 {
 		return nil, errors.New("The number of signatures does not reach the threshold")
 	}
@@ -293,18 +297,23 @@ func ReconstructThresholdSignature(size int, shares []Signature, signers []int) 
 	return thresholdSignature, nil
 }
 
-// EnoughShares is a stateless function that takes the size of the threshold
-// signature group and a shares number and returns true if the shares number
-// is enough to reconstruct a threshold signature
-// The function assumes the threshold value is equal to floor((n-1)/2)
-func EnoughShares(size int, sharesNumber int) bool {
-	return sharesNumber >= (optimalThreshold(size) + 1)
+// EnoughShares is a stateless function that takes the value of the threshold
+// and a shares number and returns true if the shares number is enough
+// to reconstruct a threshold signature.
+func EnoughShares(threshold int, sharesNumber int) bool {
+	return sharesNumber > threshold
 }
 
-func ThresholdSignKeyGen(size int, seed []byte) ([]PrivateKey,
+// ThresholdSignKeyGen is a centralized key generation for a BLS-based
+// threeshold signature scheme.
+func ThresholdSignKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	[]PublicKey, PublicKey, error) {
-	// set threshold
-	threshold := optimalThreshold(size)
+	if size < ThresholdMinSize || size > ThresholdMaxSize {
+		return nil, nil, nil, fmt.Errorf("size should be between %d and %d", ThresholdMinSize, ThresholdMaxSize)
+	}
+	if threshold >= size-1 || threshold < 1 {
+		return nil, nil, nil, fmt.Errorf("The threshold must be between 1 and %d", size-2)
+	}
 	// initialize BLS settings
 	_ = newBLSBLS12381()
 	// the scalars x and G2 points y

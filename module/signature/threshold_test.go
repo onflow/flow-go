@@ -18,7 +18,8 @@ func createThresholdsT(t *testing.T, n uint) ([]*ThresholdProvider, crypto.Publi
 	seed := make([]byte, crypto.SeedMinLenDKG)
 	_, err := rand.Read(seed)
 	require.NoError(t, err)
-	beaconKeys, _, groupKey, err := crypto.ThresholdSignKeyGen(int(n), seed)
+	beaconKeys, _, groupKey, err := crypto.ThresholdSignKeyGen(int(n),
+		RandomBeaconThreshold(int(n)), seed)
 	require.NoError(t, err)
 	signers := make([]*ThresholdProvider, 0, int(n))
 	for i := 0; i < int(n); i++ {
@@ -77,7 +78,7 @@ func TestThresholdCombineVerifyThreshold(t *testing.T) {
 
 	// should generate valid signature with sufficient signers
 	var sufficient int
-	for sufficient = 0; !crypto.EnoughShares(len(signers), sufficient); sufficient++ {
+	for sufficient = 0; !crypto.EnoughShares(RandomBeaconThreshold(len(signers)), sufficient); sufficient++ {
 		// just count up sufficient until we have enough shares
 	}
 	threshold, err := signers[0].Combine(uint(len(signers)), shares[:sufficient], indices[:sufficient])
@@ -85,7 +86,7 @@ func TestThresholdCombineVerifyThreshold(t *testing.T) {
 
 	// should not generate valid signature with insufficient signers
 	var insufficient int
-	for insufficient = len(shares); crypto.EnoughShares(len(signers), insufficient); insufficient-- {
+	for insufficient = len(shares); crypto.EnoughShares(RandomBeaconThreshold(len(signers)), insufficient); insufficient-- {
 		// just count down insufficient until it's no longer enough shares
 	}
 	_, err = signers[0].Combine(uint(len(signers)), shares[:insufficient], indices[:insufficient])
