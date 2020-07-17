@@ -6,6 +6,8 @@ import (
 	"math/rand"
 	"time"
 
+	sdk "github.com/onflow/flow-go-sdk"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/verification"

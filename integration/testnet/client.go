@@ -39,7 +39,9 @@ func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.
 	}
 
 	acc, err := flowClient.GetAccount(context.Background(), accountAddr)
-
+	if err != nil {
+		return nil, err
+	}
 	accountKey := acc.Keys[0]
 
 	mySigner := crypto.NewInMemorySigner(key, accountKey.HashAlgo)

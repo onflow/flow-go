@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/integration/testnet"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/dsl"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 var (
@@ -170,13 +171,13 @@ func RandomPrivateKey() sdkcrypto.PrivateKey {
 func SDKTransactionFixture(opts ...func(*sdk.Transaction)) sdk.Transaction {
 	tx := sdk.Transaction{
 		Script:             []byte("pub fun main() {}"),
-		ReferenceBlockID:   sdk.Identifier(IdentifierFixture()),
+		ReferenceBlockID:   sdk.Identifier(unittest.IdentifierFixture()),
 		GasLimit:           10,
-		ProposalKey:        convert.ToSDKProposalKey(ProposalKeyFixture()),
-		Payer:              sdk.Address(AddressFixture()),
-		Authorizers:        []sdk.Address{sdk.Address(AddressFixture())},
-		PayloadSignatures:  []sdk.TransactionSignature{convert.ToSDKTransactionSignature(TransactionSignatureFixture())},
-		EnvelopeSignatures: []sdk.TransactionSignature{convert.ToSDKTransactionSignature(TransactionSignatureFixture())},
+		ProposalKey:        convert.ToSDKProposalKey(unittest.ProposalKeyFixture()),
+		Payer:              sdk.Address(unittest.AddressFixture()),
+		Authorizers:        []sdk.Address{sdk.Address(unittest.AddressFixture())},
+		PayloadSignatures:  []sdk.TransactionSignature{convert.ToSDKTransactionSignature(unittest.TransactionSignatureFixture())},
+		EnvelopeSignatures: []sdk.TransactionSignature{convert.ToSDKTransactionSignature(unittest.TransactionSignatureFixture())},
 	}
 
 	for _, apply := range opts {
@@ -184,4 +185,16 @@ func SDKTransactionFixture(opts ...func(*sdk.Transaction)) sdk.Transaction {
 	}
 
 	return tx
+}
+
+func WithTransactionDSL(txDSL dsl.Transaction) func(tx *sdk.Transaction) {
+	return func(tx *sdk.Transaction) {
+		tx.Script = []byte(txDSL.ToCadence())
+	}
+}
+
+func WithReferenceBlock(id sdk.Identifier) func(tx *sdk.Transaction) {
+	return func(tx *sdk.Transaction) {
+		tx.ReferenceBlockID = id
+	}
 }
