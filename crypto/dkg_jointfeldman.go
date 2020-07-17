@@ -49,7 +49,6 @@ type JointFeldmanState struct {
 //
 // An instance is run by a single node and is usable for only one protocol.
 // In order to run the protocol again, a new instance needs to be created
-// leaderIndex value is ignored if the protocol does not require a leader (JointFeldman for instance)
 func NewJointFeldman(size int, threshold int, currentIndex int,
 	processor DKGProcessor) (DKGState, error) {
 
