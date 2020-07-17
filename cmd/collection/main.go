@@ -456,7 +456,7 @@ func initClusterCommittee(node *cmd.FlowNodeBuilder, colPayloads *storagekv.Clus
 
 	translator := clusterkv.NewTranslator(colPayloads)
 
-	selection, err := leader.NewSelectionForCollection(leader.EstimatedSixMonthOfViews, node.RootBlock.Header, node.RootQC, node.State, clusterGenesisHeader, clusterState, clusterIndex)
+	selection, err := leader.NewSelectionForCollection(leader.EstimatedSixMonthOfViews, node.RootBlock.Header, node.RootQC, node.State, clusterGenesisHeader, clusterState, clusterIndex, cluster)
 	if err != nil {
 		return nil, fmt.Errorf("could not create leader selection for collection cluster: %w", err)
 	}
