@@ -16,9 +16,6 @@ type Config struct {
 	AllowUnknownReference bool
 	// whether or not we check that transaction scripts are parse-able
 	CheckScriptsParse bool
-	// how many extra nodes in the responsible cluster we propagate transactions to
-	// (we always send to at least one)
-	PropagationRedundancy uint
 }
 
 func DefaultConfig() Config {
@@ -27,6 +24,5 @@ func DefaultConfig() Config {
 		MaxGasLimit:           flow.DefaultMaxGasLimit,
 		AllowUnknownReference: false,
 		CheckScriptsParse:     true,
-		PropagationRedundancy: 2,
 	}
 }

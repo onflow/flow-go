@@ -48,7 +48,7 @@ func (mn *Network) GetID() flow.Identifier {
 	return mn.me.NodeID()
 }
 
-// Register implements pkg/module/Network's interface
+// Register implements pkg/module/network's interface
 func (mn *Network) Register(channelID uint8, engine network.Engine) (network.Conduit, error) {
 	_, ok := mn.engines[channelID]
 	if ok {
@@ -56,23 +56,53 @@ func (mn *Network) Register(channelID uint8, engine network.Engine) (network.Con
 	}
 	conduit := &Conduit{
 		channelID: channelID,
+		transmit:  mn.transmit,
 		send:      mn.send,
+		publish:   mn.publish,
 	}
 	mn.engines[channelID] = engine
 	return conduit, nil
 }
 
-// send is called when an Engine is sending an event to an Engine on another node or nodes.
-func (mn *Network) send(channelID uint8, selection network.SelectionFunc, selector flow.IdentityFilter, message interface{}) error {
-	m := &PendingMessage{
+// transmit is called when an engine wants to reliably send a message to a fully defined list of recipients.
+func (mn *Network) transmit(channelID uint8, message interface{}, recipientIDs ...flow.Identifier) error {
+	msg := &PendingMessage{
 		From:      mn.GetID(),
 		ChannelID: channelID,
 		Message:   message,
-		TargetIDs: nil, // TODO: fix for selection/selector API
+		TargetIDs: recipientIDs,
 	}
+	mn.buffer(msg)
+	return nil
+}
 
-	mn.buffer(m)
+// send is called when an engine is sending an event to an engine on another node or nodes.
+func (mn *Network) send(channelID uint8, message interface{}, num uint, selector flow.IdentityFilter) error {
+	// TODO: implement the selector instead of randomly selecting number
+	recipientIDs := mn.hub.GetIDs()
+	if uint(len(recipientIDs)) > num {
+		recipientIDs = recipientIDs[:num]
+	}
+	msg := &PendingMessage{
+		From:      mn.GetID(),
+		ChannelID: channelID,
+		Message:   message,
+		TargetIDs: recipientIDs,
+	}
+	mn.buffer(msg)
+	return nil
+}
 
+// publish is called when an engine wants to publish an event to all other nodes on a channel.
+func (mn *Network) publish(channelID uint8, message interface{}, selector flow.IdentityFilter) error {
+	recipientIDs := mn.hub.GetIDs()
+	msg := &PendingMessage{
+		From:      mn.GetID(),
+		ChannelID: channelID,
+		Message:   message,
+		TargetIDs: recipientIDs,
+	}
+	mn.buffer(msg)
 	return nil
 }
 

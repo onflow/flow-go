@@ -52,3 +52,12 @@ func (hub *Hub) GetNetwork(nodeID flow.Identifier) (*Network, bool) {
 func (hub *Hub) Plug(net *Network) {
 	hub.networks[net.GetID()] = net
 }
+
+// GetIDs gets all node IDs from the network hub.
+func (hub *Hub) GetIDs() []flow.Identifier {
+	nodeIDs := make([]flow.Identifier, 0, len(hub.networks))
+	for nodeID := range hub.networks {
+		nodeIDs = append(nodeIDs, nodeID)
+	}
+	return nodeIDs
+}

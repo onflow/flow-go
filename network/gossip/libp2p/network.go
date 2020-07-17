@@ -252,7 +252,7 @@ func (n *Network) transmit(channelID uint8, message interface{}, recipientIDs ..
 
 	var result *multierror.Error
 	for _, recipientID := range recipientIDs {
-		if recipientID == n.me.NodeID {
+		if recipientID == n.me.NodeID() {
 			n.logger.Debug().Msg("ignoring transmit to self")
 			continue
 		}
@@ -272,7 +272,7 @@ func (n *Network) transmit(channelID uint8, message interface{}, recipientIDs ..
 func (n *Network) send(channelID uint8, message interface{}, num uint, selector flow.IdentityFilter) error {
 
 	// we always exclude ourselves
-	selector = filter.And(selector, filter.Not(filter.HasNodeID(n.me.NodeID)))
+	selector = filter.And(selector, filter.Not(filter.HasNodeID(n.me.NodeID())))
 
 	// try to encode the payload first
 	msg, err := n.encodeMessage(channelID, message)
@@ -325,7 +325,7 @@ func (n *Network) send(channelID uint8, message interface{}, num uint, selector 
 func (n *Network) publish(channelID uint8, message interface{}, selector flow.IdentityFilter) error {
 
 	// we always exclude ourselves
-	selector = filter.And(selector, filter.Not(filter.HasNodeID(n.me.NodeID)))
+	selector = filter.And(selector, filter.Not(filter.HasNodeID(n.me.NodeID())))
 
 	// first, we try to encode the network message
 	msg, err := n.encodeMessage(channelID, message)

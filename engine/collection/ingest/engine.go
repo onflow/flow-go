@@ -201,7 +201,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 	// always send the transaction to one node in the responsible cluster
 	// send to additional nodes based on configuration
-	err = e.con.Send(tx, e.config.PropagationRedundancy+1, filter.HasNodeID(txCluster.NodeIDs()...))
+	err = e.con.Send(tx, 1, filter.HasNodeID(txCluster.NodeIDs()...))
 	if err != nil {
 		return fmt.Errorf("could not route transaction to cluster: %w", err)
 	}

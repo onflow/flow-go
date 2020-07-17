@@ -214,24 +214,12 @@ func (e *Engine) requestCollections(guarantees ...*flow.CollectionGuarantee) err
 		}
 		err := e.collectionConduit.Send(req, 1, filter.HasNodeID(guarantee.SignerIDs...))
 		if err != nil {
-			return err
+			return fmt.Errorf("could not send collection request: %w", err)
 		}
 	}
 
 	return nil
 
-}
-
-func (e *Engine) findCollectionNodes() ([]flow.Identifier, error) {
-	identities, err := e.state.Final().Identities(filter.HasRole(flow.RoleCollection))
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve identities: %w", err)
-	}
-	if len(identities) < 1 {
-		return nil, fmt.Errorf("no collection identity found")
-	}
-	identifiers := flow.GetIDs(identities)
-	return identifiers, nil
 }
 
 // OnBlockIncorporated is a noop for this engine since access node is only dealing with finalized blocks

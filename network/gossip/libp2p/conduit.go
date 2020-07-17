@@ -35,5 +35,5 @@ func (c *Conduit) Send(message interface{}, num uint, selector flow.IdentityFilt
 }
 
 func (c *Conduit) Publish(message interface{}, selector flow.IdentityFilter) error {
-	return c.publish(c.channelID, message)
+	return c.publish(c.channelID, message, selector)
 }
