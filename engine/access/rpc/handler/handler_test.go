@@ -59,7 +59,7 @@ func (suite *Suite) SetupTest() {
 	suite.collections = new(storage.Collections)
 	suite.colClient = new(mockaccess.AccessAPIClient)
 	suite.execClient = new(mockaccess.ExecutionAPIClient)
-	suite.chainID = flow.Mainnet
+	suite.chainID = flow.Testnet
 }
 
 func (suite *Suite) TestPing() {
@@ -592,8 +592,8 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 }
 
 func (suite *Suite) TestGetNetworkParameters() {
-	expectedChainID := string(flow.Mainnet)
-	handler := NewHandler(suite.log, nil, nil, nil, nil, nil, nil, nil, flow.Mainnet)
+	expectedChainID := string(flow.Testnet)
+	handler := NewHandler(suite.log, nil, nil, nil, nil, nil, nil, nil, flow.Testnet)
 	npReq := &access.GetNetworkParametersRequest{}
 	npResp, err := handler.GetNetworkParameters(context.Background(), npReq)
 	suite.checkResponse(npResp, err)

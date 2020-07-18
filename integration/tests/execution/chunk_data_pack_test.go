@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	sdk "github.com/onflow/flow-go-sdk"
+
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/integration/tests/common"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -39,7 +41,7 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 		"expected no ChunkDataRequest to be sent before a transaction existed")
 
 	// send transaction
-	err := gs.AccessClient().DeployContract(context.Background(), gs.net.Root().ID(), common.CounterContract)
+	err := gs.AccessClient().DeployContract(context.Background(), sdk.Identifier(gs.net.Root().ID()), common.CounterContract)
 	require.NoError(gs.T(), err, "could not deploy counter")
 
 	// wait until we see a different state commitment for a finalized block, call that block blockB

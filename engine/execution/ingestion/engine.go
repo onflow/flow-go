@@ -544,7 +544,7 @@ func (e *Engine) onExecutionStateSyncRequest(
 		return fmt.Errorf("invalid origin id (%s): %w", id, err)
 	}
 
-	if id.Role != flow.RoleExecution {
+	if id.Role != flow.RoleExecution && id.Role != flow.RoleVerification {
 		return fmt.Errorf("invalid role for requesting state synchronization: %s", id.Role)
 	}
 
