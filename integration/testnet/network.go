@@ -498,9 +498,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	nodeContainer.Container = suiteContainer
 	net.Containers[nodeContainer.Name()] = nodeContainer
 	if nodeConf.Role == flow.RoleAccess || nodeConf.Role == flow.RoleConsensus {
-		// collection1, _ := net.ContainerByName("collection_1")
 		execution1 := net.ContainerByName("execution_1")
-		// collection1.After(suiteContainer)
 		execution1.After(suiteContainer)
 	} else {
 		net.network.After(suiteContainer)

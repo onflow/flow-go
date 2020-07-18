@@ -88,7 +88,6 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 
 	serviceAddress := sdk.Address(serviceAccountClient.Chain.ServiceAddress())
 
-	// err = createAccount(childCtx, serviceAccountClient, root, []byte(CounterContract.ToCadence()), )
 	// Generate the account creation transaction
 	createAccountTx := templates.CreateAccount([]*sdk.AccountKey{accountKey}, []byte(CounterContract.ToCadence()), serviceAddress).
 		SetReferenceBlockID(sdk.Identifier(root.ID())).
