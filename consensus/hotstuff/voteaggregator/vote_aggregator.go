@@ -83,6 +83,14 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *model.Vote, block *model.Blo
 	if !valid {
 		return nil, false, nil
 	}
+	// accumulate pending votes by order
+	pendingStatus, exists := va.pendingVotes.votes[block.BlockID]
+	if exists {
+		err = va.convertPendingVotes(pendingStatus.orderedVotes, block)
+		if err != nil {
+			return nil, false, fmt.Errorf("could not build QC on receiving block: %w", err)
+		}
+	}
 	// try to build the QC with existing votes
 	newQC, built, err := va.tryBuildQC(block.BlockID)
 	if err != nil {
