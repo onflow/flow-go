@@ -88,7 +88,7 @@ func testThresholdSignatureJointFeldman(t *testing.T) {
 	log.Info("DKG starts")
 	// number of nodes to test
 	n := 5
-	for threshold := 1; threshold < n-1; threshold++ {
+	for threshold := 0; threshold < n; threshold++ {
 		var sync sync.WaitGroup
 		chans := make([]chan *message, n)
 		processors := make([]testDKGProcessor, 0, n)
@@ -372,7 +372,7 @@ func tsStatelessRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing
 // and reconstruct the threshold signatures using (t+1) random shares.
 func testStatelessThresholdSignatureSimpleKeyGen(t *testing.T) {
 	n := 10
-	for threshold := 1; threshold < n-1; threshold++ {
+	for threshold := 0; threshold < n; threshold++ {
 		// generate threshold keys
 		mrand.Seed(time.Now().UnixNano())
 		seed := make([]byte, SeedMinLenDKG)

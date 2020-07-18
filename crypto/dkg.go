@@ -64,8 +64,8 @@ func newDKGCommon(size int, threshold int, currentIndex int,
 		return nil, fmt.Errorf("indices of current and leader nodes must be between 0 and %d", size-1)
 	}
 
-	if threshold >= size-1 || threshold < 1 {
-		return nil, fmt.Errorf("The threshold must be between 1 and %d", size-2)
+	if threshold >= size || threshold < 0 {
+		return nil, fmt.Errorf("The threshold must be between 0 and %d", size-1)
 	}
 
 	return &dkgCommon{
