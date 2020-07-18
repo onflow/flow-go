@@ -91,7 +91,8 @@ func MakeHotstuffCommitteeState(t *testing.T, identities flow.IdentityList, beac
 		n, err := rand.Read(seed)
 		require.NoError(t, err)
 		require.Equal(t, n, crypto.SeedMinLenDKG)
-		beaconSKs, beaconPKs, beaconGroupPK, err = crypto.ThresholdSignKeyGen(len(identities), seed)
+		beaconSKs, beaconPKs, beaconGroupPK, err = crypto.ThresholdSignKeyGen(len(identities),
+			signature.RandomBeaconThreshold(len(identities)), seed)
 		require.NoError(t, err)
 		dkg.On("GroupSize").Return(uint(len(beaconSKs)), nil)
 		dkg.On("GroupKey").Return(beaconGroupPK, nil)

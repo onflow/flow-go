@@ -102,7 +102,7 @@ func New(
 		me:                                  me,
 		state:                               state,
 		receiptHasher:                       utils.NewExecutionReceiptHasher(),
-		spockHasher:                         utils.NewSPoCKHasher(),
+		spockHasher:                         utils.NewSPOCKHasher(),
 		blocks:                              blocks,
 		payloads:                            payloads,
 		collections:                         collections,

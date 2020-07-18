@@ -423,7 +423,7 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 	})
 }
 
-func Test_SPoCKGeneration(t *testing.T) {
+func Test_SPOCKGeneration(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
 
 		snapshots := []*delta.Snapshot{

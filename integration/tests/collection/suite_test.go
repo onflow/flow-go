@@ -160,7 +160,8 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transac
 		tx.SetScript(append(tx.Script, '/', '/'))
 		err := tx.SignEnvelope(sdk.ServiceAddress(sdk.Testnet), acct.key.ID, acct.signer)
 		require.Nil(suite.T(), err)
-		routed := clusters.ByTxID(convert.IDFromSDK(tx.ID()))
+		routed, ok := clusters.ByTxID(convert.IDFromSDK(tx.ID()))
+		require.True(suite.T(), ok)
 		if routed.Fingerprint() == target.Fingerprint() {
 			break
 		}
@@ -289,7 +290,8 @@ func (suite *CollectorSuite) Collector(clusterIdx, nodeIdx uint) *testnet.Contai
 	clusters := suite.Clusters()
 	require.True(suite.T(), clusterIdx < uint(clusters.Size()), "invalid cluster index")
 
-	cluster := clusters.ByIndex(clusterIdx)
+	cluster, ok := clusters.ByIndex(clusterIdx)
+	require.True(suite.T(), ok)
 	node, ok := cluster.ByIndex(nodeIdx)
 	require.True(suite.T(), ok, "invalid node index")
 

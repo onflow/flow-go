@@ -25,7 +25,11 @@ func AlterTransactionForCluster(tx flow.TransactionBody, clusters *flow.ClusterL
 		tx.Script = append(tx.Script, '/', '/')
 
 		after(&tx)
-		routed := clusters.ByTxID(tx.ID())
+		routed, ok := clusters.ByTxID(tx.ID())
+		if !ok {
+			panic(fmt.Sprintf("unable to find cluster by txID: %x", tx.ID()))
+		}
+
 		if routed.Fingerprint() == target.Fingerprint() {
 			return tx
 		}
