@@ -23,7 +23,7 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 		nClusters     = 3
 		clusterSize   = nNodes / nClusters
 		nTransactions = 10
-		restTime = 5*time.Second
+		restTime = 10*time.Second
 	)
 
 	suite.SetupTest("col_proposal_multicluster", uint(nNodes), uint(nClusters))
