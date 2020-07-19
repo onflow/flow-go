@@ -50,7 +50,7 @@ func (s *Suite) MetricsPort() string {
 }
 
 func (s *Suite) SetupTest() {
-	blockRateFlag := "--block-rate-delay=100ms"
+	blockRateFlag := "--block-rate-delay=1000ms"
 
 	// need one access node
 	acsConfig := testnet.NewNodeConfig(flow.RoleAccess)

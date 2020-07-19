@@ -22,7 +22,7 @@ const defaultTimeout = time.Second * 10
 func TestMVP_Network(t *testing.T) {
 	consensusConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
-		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
+		testnet.WithAdditionalFlag("--block-rate-delay=1000ms"),
 		testnet.WithLogLevel(zerolog.WarnLevel),
 	}
 
