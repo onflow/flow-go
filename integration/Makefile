@@ -8,7 +8,7 @@ test:
 
 # Run the integration test suite
 .PHONY: integration-test
-integration-test: collection-tests consensus-tests common-tests execution-tests verification-tests
+integration-test: consensus-tests common-tests execution-tests verification-tests # SKIP collection-tests 
 
 .PHONY: collection-tests
 collection-tests:
