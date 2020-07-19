@@ -3,6 +3,7 @@ package collection
 import (
 	"context"
 	"math/rand"
+	"time"
 
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/stretchr/testify/require"
@@ -22,6 +23,7 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 		nClusters     = 3
 		clusterSize   = nNodes / nClusters
 		nTransactions = 10
+		restTime = time.Second
 	)
 
 	suite.SetupTest("col_proposal_multicluster", uint(nNodes), uint(nClusters))
@@ -45,7 +47,7 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 
 	suite.Run("correct cluster - no dupes", func() {
 		suite.T().Log("ROUND 1")
-
+		time.Sleep(restTime)
 		// keep track of which cluster is responsible for which transaction ID
 		txIDsByCluster := [3][]flow.Identifier{{}, {}, {}}
 
@@ -80,6 +82,7 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 
 	suite.Run("correct cluster - with dupes", func() {
 		suite.T().Log("ROUND 2")
+		time.Sleep(restTime)
 
 		// keep track of which cluster is responsible for which transaction ID
 		txIDsByCluster := [3][]flow.Identifier{{}, {}, {}}
@@ -119,6 +122,7 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 
 	suite.Run("wrong cluster - no dupes", func() {
 		suite.T().Log("ROUND 3")
+		time.Sleep(restTime)
 
 		// keep track of which cluster is responsible for which transaction ID
 		txIDsByCluster := [3][]flow.Identifier{{}, {}, {}}
@@ -159,6 +163,7 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 
 	suite.Run("wrong cluster - with dupes", func() {
 		suite.T().Log("ROUND 4")
+		time.Sleep(restTime)
 
 		// keep track of which cluster is responsible for which transaction ID
 		txIDsByCluster := [3][]flow.Identifier{{}, {}, {}}

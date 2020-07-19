@@ -234,7 +234,7 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 		case *messages.ClusterBlockProposal:
 			header := val.Header
 			collection := val.Payload.Collection
-			suite.T().Logf("got proposal height=%d col_id=%x size=%d", header.Height, collection.ID(), collection.Len())
+			suite.T().Logf("got proposal @ %s height=%d col_id=%x size=%d", time.Now(), header.Height, collection.ID(), collection.Len())
 			if guarantees[collection.ID()] {
 				for _, txID := range collection.Light().Transactions {
 					finalized[txID] = struct{}{}
@@ -265,7 +265,7 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 			}
 
 		case *flow.TransactionBody:
-			suite.T().Log("got tx: ", val.ID())
+			suite.T().Logf("got tx @ %s: %s", time.Now(), val.ID())
 		}
 	}
 
