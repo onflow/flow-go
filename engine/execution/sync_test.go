@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/vmihailenco/msgpack"
 
 	"github.com/dapperlabs/flow-go/engine"
 	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
@@ -75,6 +76,11 @@ func TestSyncFlow(t *testing.T) {
 	col2 := &flow.Collection{Transactions: []*flow.TransactionBody{tx2}}
 	col4 := &flow.Collection{Transactions: []*flow.TransactionBody{tx4}}
 	col5 := &flow.Collection{Transactions: []*flow.TransactionBody{tx5}}
+
+	blob1, _ := msgpack.Marshal(col1)
+	blob2, _ := msgpack.Marshal(col2)
+	blob4, _ := msgpack.Marshal(col4)
+	blob5, _ := msgpack.Marshal(col5)
 
 	// Create three blocks, with one tx each
 	block1 := unittest.BlockWithParentFixture(genesis)
@@ -146,19 +152,19 @@ func TestSyncFlow(t *testing.T) {
 			originID := args.Get(0).(flow.Identifier)
 			request := args.Get(1).(*messages.EntityRequest)
 			if originID == exe2ID.NodeID && request.EntityIDs[0] == col1.ID() {
-				_ = colConduit.Submit(&messages.EntityResponse{Nonce: request.Nonce, Entities: []flow.Entity{col1}}, originID)
+				_ = colConduit.Submit(&messages.EntityResponse{Nonce: request.Nonce, Blobs: [][]byte{blob1}}, originID)
 				return
 			}
 			if originID == exe2ID.NodeID && request.EntityIDs[0] == col2.ID() {
-				_ = colConduit.Submit(&messages.EntityResponse{Nonce: request.Nonce, Entities: []flow.Entity{col2}}, originID)
+				_ = colConduit.Submit(&messages.EntityResponse{Nonce: request.Nonce, Blobs: [][]byte{blob2}}, originID)
 				return
 			}
 			if originID == exe1ID.NodeID && request.EntityIDs[0] == col4.ID() {
-				_ = colConduit.Submit(&messages.EntityResponse{Nonce: request.Nonce, Entities: []flow.Entity{col4}}, originID)
+				_ = colConduit.Submit(&messages.EntityResponse{Nonce: request.Nonce, Blobs: [][]byte{blob4}}, originID)
 				return
 			}
 			if originID == exe1ID.NodeID && request.EntityIDs[0] == col5.ID() {
-				_ = colConduit.Submit(&messages.EntityResponse{Nonce: request.Nonce, Entities: []flow.Entity{col5}}, originID)
+				_ = colConduit.Submit(&messages.EntityResponse{Nonce: request.Nonce, Blobs: [][]byte{blob5}}, originID)
 				return
 			}
 			assert.FailNowf(t, "invalid collection request", "(origin: %x, entities: %s)", originID, request.EntityIDs)
@@ -167,16 +173,16 @@ func TestSyncFlow(t *testing.T) {
 		Times(4).
 		Return(nil)
 	providerEngine.On("Submit", exe2ID.NodeID, mock.MatchedBy(func(r *messages.EntityRequest) bool { return r.EntityIDs[0] == col1.ID() })).Run(func(args mock.Arguments) {
-		_ = colConduit.Submit(&messages.EntityResponse{Entities: []flow.Entity{col1}}, exe2ID.NodeID)
+		_ = colConduit.Submit(&messages.EntityResponse{Blobs: [][]byte{blob1}}, exe2ID.NodeID)
 	}).Return(nil)
 	providerEngine.On("Submit", exe2ID.NodeID, mock.MatchedBy(func(r *messages.EntityRequest) bool { return r.EntityIDs[0] == col2.ID() })).Run(func(args mock.Arguments) {
-		_ = colConduit.Submit(&messages.EntityResponse{Entities: []flow.Entity{col2}}, exe2ID.NodeID)
+		_ = colConduit.Submit(&messages.EntityResponse{Blobs: [][]byte{blob2}}, exe2ID.NodeID)
 	}).Return(nil)
 	providerEngine.On("Submit", exe1ID.NodeID, mock.MatchedBy(func(r *messages.EntityRequest) bool { return r.EntityIDs[0] == col4.ID() })).Run(func(args mock.Arguments) {
-		_ = colConduit.Submit(&messages.EntityResponse{Entities: []flow.Entity{col4}}, exe2ID.NodeID)
+		_ = colConduit.Submit(&messages.EntityResponse{Blobs: [][]byte{blob4}}, exe2ID.NodeID)
 	}).Return(nil)
 	providerEngine.On("Submit", exe1ID.NodeID, mock.MatchedBy(func(r *messages.EntityRequest) bool { return r.EntityIDs[0] == col5.ID() })).Run(func(args mock.Arguments) {
-		_ = colConduit.Submit(&messages.EntityResponse{Entities: []flow.Entity{col5}}, exe2ID.NodeID)
+		_ = colConduit.Submit(&messages.EntityResponse{Blobs: [][]byte{blob5}}, exe2ID.NodeID)
 	}).Return(nil)
 
 	var receipt *flow.ExecutionReceipt

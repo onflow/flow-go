@@ -10,6 +10,6 @@ type EntityRequest struct {
 }
 
 type EntityResponse struct {
-	Nonce    uint64
-	Entities []flow.Entity
+	Nonce uint64
+	Blobs [][]byte
 }

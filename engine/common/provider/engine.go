@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
+	"github.com/vmihailenco/msgpack"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -164,6 +165,16 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityR
 		entities = append(entities, entity)
 	}
 
+	// encode all of the entities
+	blobs := make([][]byte, 0, len(entities))
+	for _, entity := range entities {
+		blob, err := msgpack.Marshal(entity)
+		if err != nil {
+			return fmt.Errorf("could not encode entity (%x): %w", entity.ID(), err)
+		}
+		blobs = append(blobs, blob)
+	}
+
 	// NOTE: we do _NOT_ avoid sending empty responses, as this will allow
 	// the requester to know we don't have any of the requested entities, which
 	// allows him to retry them immediately, rather than waiting for the expiry
@@ -171,8 +182,8 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityR
 
 	// send back the response
 	res := &messages.EntityResponse{
-		Nonce:    req.Nonce,
-		Entities: entities,
+		Nonce: req.Nonce,
+		Blobs: blobs,
 	}
 	err = e.con.Submit(res, originID)
 	if err != nil {

@@ -155,6 +155,7 @@ func main() {
 			requestEng, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
 				engine.RequestCollections,
 				filter.HasRole(flow.RoleCollection),
+				func() flow.Entity { return &flow.Collection{} },
 				requester.WithBatchInterval(24*time.Hour), // we are manually triggering batches in execution
 			)
 

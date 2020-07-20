@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/vmihailenco/msgpack"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -23,6 +24,10 @@ import (
 // and errors should be handled internally within the function.
 type HandleFunc func(originID flow.Identifier, entity flow.Entity)
 
+// CreateFunc is a function that creates a `flow.Entity` with an underlying type
+// so that we can properly decode entities transmitted over the network.
+type CreateFunc func() flow.Entity
+
 // Engine is a generic requester engine, handling the requesting of entities
 // on the flow network. It is the `request` part of the request-reply
 // pattern provided by the pair of generic exchange engines.
@@ -36,6 +41,7 @@ type Engine struct {
 	con      network.Conduit
 	channel  uint8
 	selector flow.IdentityFilter
+	create   CreateFunc
 	handle   HandleFunc
 	items    map[flow.Identifier]*Item
 	requests map[uint64]*messages.EntityRequest
@@ -45,7 +51,7 @@ type Engine struct {
 // within the set obtained by applying the provided selector filter. The options allow customization of the parameters
 // related to the batch and retry logic.
 func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, me module.Local, state protocol.State,
-	channel uint8, selector flow.IdentityFilter, options ...OptionFunc) (*Engine, error) {
+	channel uint8, selector flow.IdentityFilter, create CreateFunc, options ...OptionFunc) (*Engine, error) {
 
 	// initialize the default config
 	cfg := Config{
@@ -90,6 +96,7 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 		state:    state,
 		channel:  channel,
 		selector: selector,
+		create:   create,
 		handle:   nil,
 		items:    make(map[flow.Identifier]*Item),          // holds all pending items
 		requests: make(map[uint64]*messages.EntityRequest), // holds all sent requests
@@ -388,7 +395,14 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 	// process each entity in the response
 	// NOTE: this requires engines to be somewhat idempotent, which is a good
 	// thing, as it increases the robustness of their code
-	for _, entity := range res.Entities {
+	for _, blob := range res.Blobs {
+
+		// create the entity with underlying concrete type and decode blob
+		entity := e.create()
+		err := msgpack.Unmarshal(blob, &entity)
+		if err != nil {
+			return fmt.Errorf("could not decode entity: %w", err)
+		}
 
 		// the entity might already have been returned in another response
 		entityID := entity.ID()

@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/vmihailenco/msgpack"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -63,7 +64,13 @@ func TestOnEntityRequestFull(t *testing.T) {
 			response := args.Get(0).(*messages.EntityResponse)
 			nodeID := args.Get(1).(flow.Identifier)
 			assert.Equal(t, nodeID, originID)
-			assert.ElementsMatch(t, response.Entities, []flow.Entity{coll1, coll2, coll3, coll4, coll5})
+			var entities []flow.Entity
+			for _, blob := range response.Blobs {
+				coll := &flow.Collection{}
+				_ = msgpack.Unmarshal(blob, &coll)
+				entities = append(entities, coll)
+			}
+			assert.ElementsMatch(t, entities, []flow.Entity{&coll1, &coll2, &coll3, &coll4, &coll5})
 		},
 	).Return(nil)
 
@@ -130,7 +137,13 @@ func TestOnEntityRequestPartial(t *testing.T) {
 			response := args.Get(0).(*messages.EntityResponse)
 			nodeID := args.Get(1).(flow.Identifier)
 			assert.Equal(t, nodeID, originID)
-			assert.ElementsMatch(t, response.Entities, []flow.Entity{coll1, coll3, coll5})
+			var entities []flow.Entity
+			for _, blob := range response.Blobs {
+				coll := &flow.Collection{}
+				_ = msgpack.Unmarshal(blob, &coll)
+				entities = append(entities, coll)
+			}
+			assert.ElementsMatch(t, entities, []flow.Entity{&coll1, &coll3, &coll5})
 		},
 	).Return(nil)
 
@@ -197,7 +210,7 @@ func TestOnEntityRequestEmpty(t *testing.T) {
 			response := args.Get(0).(*messages.EntityResponse)
 			nodeID := args.Get(1).(flow.Identifier)
 			assert.Equal(t, nodeID, originID)
-			assert.Empty(t, response.Entities)
+			assert.Empty(t, response.Blobs)
 		},
 	).Return(nil)
 

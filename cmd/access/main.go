@@ -103,6 +103,7 @@ func main() {
 			requestEng, err := requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
 				engine.RequestCollections,
 				filter.HasRole(flow.RoleCollection),
+				func() flow.Entity { return &flow.Collection{} },
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)

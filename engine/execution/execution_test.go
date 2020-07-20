@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/vmihailenco/msgpack"
 
 	"github.com/dapperlabs/flow-go/engine"
 	execTestutil "github.com/dapperlabs/flow-go/engine/execution/testutil"
@@ -101,9 +102,15 @@ func TestExecutionFlow(t *testing.T) {
 				entities = append(entities, coll)
 			}
 
+			var blobs [][]byte
+			for _, entity := range entities {
+				blob, _ := msgpack.Marshal(entity)
+				blobs = append(blobs, blob)
+			}
+
 			res := &messages.EntityResponse{
-				Nonce:    req.Nonce,
-				Entities: entities,
+				Nonce: req.Nonce,
+				Blobs: blobs,
 			}
 
 			err := provConduit.Submit(res, originID)
@@ -266,6 +273,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	})
 
 	proposal1 := unittest.ProposalFromBlock(&block1)
+	blob1, _ := msgpack.Marshal(col1)
 
 	// transaction that will change state but then panic and revert, used to test that state commitment stays identical
 	tx2 := execTestutil.CreateCounterPanicTransaction(chain.ServiceAddress(), chain.ServiceAddress())
@@ -281,7 +289,9 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 			{CollectionID: col2.ID(), SignerIDs: []flow.Identifier{colID.NodeID}},
 		},
 	})
+
 	proposal2 := unittest.ProposalFromBlock(&block2)
+	blob2, _ := msgpack.Marshal(col2)
 
 	// setup mocks and assertions
 	collectionEngine := new(network.Engine)
@@ -291,10 +301,10 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 			originID := args[0].(flow.Identifier)
 			req := args[1].(*messages.EntityRequest)
 			if req.EntityIDs[0] == col1.ID() {
-				err := colConduit.Submit(&messages.EntityResponse{Entities: []flow.Entity{col1}}, originID)
+				err := colConduit.Submit(&messages.EntityResponse{Blobs: [][]byte{blob1}}, originID)
 				assert.NoError(t, err)
 			} else if req.EntityIDs[0] == col2.ID() {
-				err := colConduit.Submit(&messages.EntityResponse{Entities: []flow.Entity{col2}}, originID)
+				err := colConduit.Submit(&messages.EntityResponse{Blobs: [][]byte{blob2}}, originID)
 				assert.NoError(t, err)
 			} else {
 				assert.FailNow(t, "requesting unexpected collection", req.EntityIDs[0])

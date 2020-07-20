@@ -272,6 +272,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Log, node.Metrics, node.Net, node.Me, node.State,
 		engine.RequestCollections,
 		filter.HasRole(flow.RoleCollection),
+		func() flow.Entity { return &flow.Collection{} },
 	)
 	require.NoError(t, err)
 

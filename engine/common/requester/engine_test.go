@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/vmihailenco/msgpack"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -250,9 +251,13 @@ func TestOnEntityResponseValid(t *testing.T) {
 		ExtraSelector: filter.Any,
 	}
 
+	bwanted1, _ := msgpack.Marshal(wanted1)
+	bwanted2, _ := msgpack.Marshal(wanted2)
+	bunwanted, _ := msgpack.Marshal(unwanted)
+
 	res := &messages.EntityResponse{
-		Nonce:    nonce,
-		Entities: []flow.Entity{wanted1, wanted2, unwanted},
+		Nonce: nonce,
+		Blobs: [][]byte{bwanted1, bwanted2, bunwanted},
 	}
 
 	req := &messages.EntityRequest{
@@ -268,6 +273,7 @@ func TestOnEntityResponseValid(t *testing.T) {
 		items:    make(map[flow.Identifier]*Item),
 		requests: make(map[uint64]*messages.EntityRequest),
 		selector: filter.HasNodeID(targetID),
+		create:   func() flow.Entity { return &flow.Collection{} },
 		handle:   func(flow.Identifier, flow.Entity) { called++ },
 	}
 
