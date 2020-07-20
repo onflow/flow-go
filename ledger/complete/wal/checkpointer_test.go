@@ -21,14 +21,6 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-// "fmt"
-// "io"
-// "path"
-// "testing"
-
-// "github.com/stretchr/testify/assert"
-// "github.com/stretchr/testify/require"
-
 func RunWithWALCheckpointerWithFiles(t *testing.T, names ...interface{}) {
 	f := names[len(names)-1].(func(*testing.T, *realWAL.LedgerWAL, *realWAL.Checkpointer))
 

@@ -186,7 +186,7 @@ func (l *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
 		l.metrics.ProofSize(uint32(len(proofToGo) / len(paths)))
 	}
 
-	return proofToGo, err
+	return ledger.Proof(proofToGo), err
 }
 
 // CloseStorage closes the DB

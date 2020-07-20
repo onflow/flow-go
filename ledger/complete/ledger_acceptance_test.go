@@ -30,6 +30,7 @@ func TestLedgerFunctionality(t *testing.T) {
 		keyNumberOfParts := 10
 		keyPartMinByteSize := 1
 		keyPartMaxByteSize := 100
+		stateComSize := 32
 		valueMaxByteSize := 2 << 16 //16kB
 		activeTries := 1000
 		steps := 40                                  // number of steps
@@ -51,8 +52,9 @@ func TestLedgerFunctionality(t *testing.T) {
 
 				// capture new values for future query
 				for j, k := range keys {
-					histStorage[k.String()+string(newState)] = values[j]
-					latestValue[k.String()] = values[j]
+					encKey := common.EncodeKey(&k)
+					histStorage[string(newState)+string(encKey)] = values[j]
+					latestValue[string(encKey)] = values[j]
 				}
 
 				// read values and compare values
@@ -66,33 +68,42 @@ func TestLedgerFunctionality(t *testing.T) {
 				// validate proofs (check individual proof and batch proof)
 				proof, err := led.Prove(query)
 				assert.NoError(t, err)
-				v := common.Verifiy.NewTrieVerifier(keyByteSize)
 
-				// validate individual proofs
-				isValid, err := v.VerifyRegistersProof(keys, retValues, proofs, newState)
+				bProof, err := common.DecodeTrieBatchProof(proof)
 				assert.NoError(t, err)
+
+				// validate batch proofs
+				isValid := common.VerifyTrieBatchProof(bProof, newState)
 				assert.True(t, isValid)
 
 				// validate proofs as a batch
-				_, err = ptrie.NewPSMT(newState, keyByteSize, keys, retValues, proofs)
+				_, err = ptrie.NewPSMT(newState, pathByteSize, proof)
 				assert.NoError(t, err)
 
 				// query all exising keys (check no drop)
-				for k, v := range latestValue {
-					rv, err := led.GetRegisters([][]byte{[]byte(k)}, newState)
+				for ek, v := range latestValue {
+					k, err := common.DecodeKey([]byte(ek))
 					assert.NoError(t, err)
-					assert.True(t, valuesMatches([][]byte{v}, rv))
+					query, err := ledger.NewQuery(newState, []ledger.Key{*k})
+					assert.NoError(t, err)
+					rv, err := led.Get(query)
+					assert.NoError(t, err)
+					assert.True(t, v.Equals(rv[0]))
 				}
 
 				// query some of historic values (map return is random)
 				j := 0
 				for s := range histStorage {
 					value := histStorage[s]
-					key := []byte(s[:keyByteSize])
-					state := []byte(s[keyByteSize:])
-					rv, err := led.GetRegisters([][]byte{key}, state)
+					state := []byte(s[:stateComSize])
+					enk := []byte(s[stateComSize:])
+					key, err := common.DecodeKey([]byte(enk))
 					assert.NoError(t, err)
-					assert.True(t, valuesMatches([][]byte{value}, rv))
+					query, err := ledger.NewQuery(state, []ledger.Key{*key})
+					assert.NoError(t, err)
+					rv, err := led.Get(query)
+					assert.NoError(t, err)
+					assert.True(t, value.Equals(rv[0]))
 					j++
 					if j >= numHistLookupPerStep {
 						break
