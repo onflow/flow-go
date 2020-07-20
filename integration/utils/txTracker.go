@@ -173,6 +173,16 @@ func statusWorker(workerID int, txs chan *txInFlight, done <-chan bool, fclient 
 							fmt.Println(err)
 						}
 						continue
+					case flowsdk.TransactionStatusExpired:
+						if tx.onExpired != nil {
+							go tx.onExpired(tx.txID)
+						}
+						tx.stat.isExpired = true
+						stats.AddTxStats(tx.stat)
+						if verbose {
+							fmt.Printf("worker %d tx %v has been expired in %v seconds\n", workerID, tx.txID, time.Since(tx.createdAt).Seconds())
+						}
+						continue
 					}
 				}
 			}
