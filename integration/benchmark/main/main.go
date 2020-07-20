@@ -56,7 +56,8 @@ func main() {
 		lg.Next()
 	}
 
-	fmt.Println(lg.Stats())
+	// this prints all transactions
+	// fmt.Println(lg.Stats())
 	fmt.Println(lg.Stats().Digest())
 	lg.Close()
 }
