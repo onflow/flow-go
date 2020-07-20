@@ -176,10 +176,13 @@ func (lg *LoadGenerator) setupServiceAccountKeys() error {
 			txWG.Done()
 		},
 		nil, // on sealed
-		nil, // on expired
-		func(_ flowsdk.Identifier){
-		        txWG.Done()
+		func(_ flowsdk.Identifier) {
+			txWG.Done()
 			panic("The setup transaction (service account keys) has expired. can not continue!")
+		}, // on expired
+		func(_ flowsdk.Identifier) {
+			txWG.Done()
+			panic("The setup transaction (service account keys) has timed out. can not continue!")
 		}, // on timout
 		nil, // on error,
 		120)
@@ -247,8 +250,14 @@ func (lg *LoadGenerator) createAccounts() error {
 				}
 			},
 			nil, // on sealed
-			nil, // on expired
-			nil, // on timout
+			func(_ flowsdk.Identifier) {
+				allTxWG.Done()
+				panic("The setup transaction (account creation) has expired. can not continue!")
+			}, // on expired
+			func(_ flowsdk.Identifier) {
+				allTxWG.Done()
+				panic("The setup transaction (account creation) has timed out. can not continue!")
+			}, // on timout
 			nil, // on error
 			120)
 
@@ -316,7 +325,7 @@ func (lg *LoadGenerator) rotateTokens() error {
 		return err
 	}
 	allTxWG := sync.WaitGroup{}
-	fmt.Println("load generator step 3 started")
+	fmt.Printf("load generator step %d started \n", lg.step)
 
 	for i := 0; i < lg.numberOfAccounts; i++ {
 		j := (i + 1) % lg.numberOfAccounts
@@ -353,15 +362,19 @@ func (lg *LoadGenerator) rotateTokens() error {
 				allTxWG.Done()
 			},
 			nil, // on sealed
-			nil, // on expired
-			nil, // on timout
+			func(_ flowsdk.Identifier) {
+				allTxWG.Done()
+			}, // on expired
+			func(_ flowsdk.Identifier) {
+				allTxWG.Done()
+			}, // on timout
 			nil, // on error
 			30)
 
 	}
 	allTxWG.Wait()
+	fmt.Printf("load generator step %d is done \n", lg.step)
 	lg.step++
-	fmt.Println("load generator step 3 done")
 	return nil
 }
 
