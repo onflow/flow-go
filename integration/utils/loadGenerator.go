@@ -177,7 +177,10 @@ func (lg *LoadGenerator) setupServiceAccountKeys() error {
 		},
 		nil, // on sealed
 		nil, // on expired
-		nil, // on timout
+		func(_ flowsdk.Identifier){
+		        txWG.Done()
+			panic("The setup transaction (service account keys) has expired. can not continue!")
+		}, // on timout
 		nil, // on error,
 		120)
 
