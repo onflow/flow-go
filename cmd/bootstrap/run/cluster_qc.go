@@ -5,6 +5,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
@@ -100,7 +101,8 @@ func createClusterValidators(ps *protoBadger.State, participants []bootstrap.Nod
 			},
 		)
 
-		committee := committee.New(ps, blockTranslator, participant.NodeID, selector, nodeIDs)
+		selection := leader.NewSelectionForBootstrap()
+		committee := committee.New(ps, blockTranslator, participant.NodeID, selector, nodeIDs, selection)
 
 		// create signer for participant
 		provider := signature.NewAggregationProvider(encoding.CollectorVoteTag, local)

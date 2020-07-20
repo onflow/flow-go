@@ -10,6 +10,7 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -17,6 +18,7 @@ import (
 )
 
 var _ runtime.Interface = &hostEnv{}
+var _ runtime.HighLevelStorage = &hostEnv{}
 
 type hostEnv struct {
 	ctx           Context
@@ -84,22 +86,22 @@ func (e *hostEnv) getLogs() []string {
 	return e.logs
 }
 
-func (e *hostEnv) GetValue(owner, controller, key []byte) ([]byte, error) {
+func (e *hostEnv) GetValue(owner, key []byte) ([]byte, error) {
 	v, _ := e.ledger.Get(
 		state.RegisterID(
 			string(owner),
-			string(controller),
+			"", // TODO: Remove empty controller key
 			string(key),
 		),
 	)
 	return v, nil
 }
 
-func (e *hostEnv) SetValue(owner, controller, key, value []byte) error {
+func (e *hostEnv) SetValue(owner, key, value []byte) error {
 	e.ledger.Set(
 		state.RegisterID(
 			string(owner),
-			string(controller),
+			"", // TODO: Remove empty controller key
 			string(key),
 		),
 		value,
@@ -107,8 +109,8 @@ func (e *hostEnv) SetValue(owner, controller, key, value []byte) error {
 	return nil
 }
 
-func (e *hostEnv) ValueExists(owner, controller, key []byte) (exists bool, err error) {
-	v, err := e.GetValue(owner, controller, key)
+func (e *hostEnv) ValueExists(owner, key []byte) (exists bool, err error) {
+	v, err := e.GetValue(owner, key)
 	if err != nil {
 		return false, err
 	}
@@ -228,6 +230,14 @@ func (e *hostEnv) VerifySignature(
 	}
 
 	return valid
+}
+
+func (e *hostEnv) HighLevelStorageEnabled() bool {
+	return e.ctx.SetValueHandler != nil
+}
+
+func (e *hostEnv) SetCadenceValue(owner common.Address, key string, value cadence.Value) error {
+	return e.ctx.SetValueHandler(flow.Address(owner), key, value)
 }
 
 // Block Environment Functions
@@ -364,18 +374,20 @@ func (e *transactionEnv) GetComputationLimit() uint64 {
 }
 
 func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
-	err = e.vm.invokeMetaTransaction(
-		e.ctx,
-		deductAccountCreationFeeTransaction(
-			flow.Address(payer),
-			e.ctx.Chain.ServiceAddress(),
-			e.ctx.RestrictedAccountCreationEnabled,
-		),
-		e.ledger,
-	)
-	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return address, err
+	if e.ctx.ServiceAccountEnabled {
+		err = e.vm.invokeMetaTransaction(
+			e.ctx,
+			deductAccountCreationFeeTransaction(
+				flow.Address(payer),
+				e.ctx.Chain.ServiceAddress(),
+				e.ctx.RestrictedAccountCreationEnabled,
+			),
+			e.ledger,
+		)
+		if err != nil {
+			// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+			return address, err
+		}
 	}
 
 	var flowAddress flow.Address
@@ -386,14 +398,16 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 		return address, err
 	}
 
-	err = e.vm.invokeMetaTransaction(
-		e.ctx,
-		initFlowTokenTransaction(flowAddress, e.ctx.Chain.ServiceAddress()),
-		e.ledger,
-	)
-	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return address, err
+	if e.ctx.ServiceAccountEnabled {
+		err = e.vm.invokeMetaTransaction(
+			e.ctx,
+			initFlowTokenTransaction(flowAddress, e.ctx.Chain.ServiceAddress()),
+			e.ledger,
+		)
+		if err != nil {
+			// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+			return address, err
+		}
 	}
 
 	return runtime.Address(flowAddress), nil

@@ -3,6 +3,7 @@ package rpc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 
@@ -100,6 +101,29 @@ func (e *Engine) Done() <-chan struct{} {
 				e.log.Error().Err(err).Msg("error stopping http server")
 			}
 		})
+}
+
+// SubmitLocal submits an event originating on the local node.
+func (e *Engine) SubmitLocal(event interface{}) {
+	e.unit.Launch(func() {
+		err := e.process(event)
+		if err != nil {
+			e.log.Error().Err(err).Msg("could not process submitted event")
+		}
+	})
+}
+
+// process processes the given ingestion engine event. Events that are given
+// to this function originate within the expulsion engine on the node with the
+// given origin ID.
+func (e *Engine) process(event interface{}) error {
+	switch entity := event.(type) {
+	case *flow.Block:
+		e.handler.NotifyFinalizedBlockHeight(entity.Header.Height)
+		return nil
+	default:
+		return fmt.Errorf("invalid event type (%T)", event)
+	}
 }
 
 // serveGRPC starts the gRPC server

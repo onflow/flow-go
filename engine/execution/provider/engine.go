@@ -38,6 +38,7 @@ type Engine struct {
 	execState     state.ReadOnlyExecutionState
 	me            module.Local
 	chunksConduit network.Conduit
+	metrics       module.ExecutionMetrics
 }
 
 func New(
@@ -48,6 +49,7 @@ func New(
 	me module.Local,
 	execState state.ReadOnlyExecutionState,
 	stateSync sync.StateSynchronizer,
+	metrics module.ExecutionMetrics,
 ) (*Engine, error) {
 
 	log := logger.With().Str("engine", "receipts").Logger()
@@ -59,16 +61,17 @@ func New(
 		state:     state,
 		me:        me,
 		execState: execState,
+		metrics:   metrics,
 	}
 
 	var err error
 
-	eng.receiptCon, err = net.Register(engine.ExecutionReceiptProvider, &eng)
+	eng.receiptCon, err = net.Register(engine.PushReceipts, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register receipt provider engine: %w", err)
 	}
 
-	chunksConduit, err := net.Register(engine.ChunkDataPackProvider, &eng)
+	chunksConduit, err := net.Register(engine.ProvideChunks, &eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register chunk data pack provider engine: %w", err)
 	}
@@ -140,6 +143,9 @@ func (e *Engine) onChunkDataRequest(
 		Logger()
 
 	log.Debug().Msg("received chunk data pack request")
+
+	// increases collector metric
+	e.metrics.ChunkDataPackRequested()
 
 	origin, err := e.state.Final().Identity(originID)
 	if err != nil {

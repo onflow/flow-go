@@ -3,16 +3,14 @@
 package badger
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"sort"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/flow/order"
-	"github.com/dapperlabs/flow-go/module/signature"
+	"github.com/dapperlabs/flow-go/state"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
@@ -131,10 +129,6 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 		return nil, s.err
 	}
 
-	if len(indices)*4 > hash.KmacMaxParamsLen {
-		return nil, fmt.Errorf("unsupported number of indices")
-	}
-
 	// get the current state snapshot head
 	var childrenIDs []flow.Identifier
 	err := s.state.db.View(procedure.LookupBlockChildren(s.blockID, &childrenIDs))
@@ -144,7 +138,7 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 
 	// check we have at least one child
 	if len(childrenIDs) == 0 {
-		return nil, fmt.Errorf("block doesn't have children yet")
+		return nil, state.NewNoValidChildBlockError("block doesn't have children yet")
 	}
 
 	// find the first child that has been validated
@@ -166,7 +160,7 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 	}
 
 	if validChildID == flow.ZeroID {
-		return nil, fmt.Errorf("block has no valid children")
+		return nil, state.NewNoValidChildBlockError("block has no valid children")
 	}
 
 	// get the header of the first child (they all have the same threshold sig)
@@ -175,31 +169,10 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 		return nil, fmt.Errorf("could not get head: %w", err)
 	}
 
-	// create the key used for the KMAC by concatenating all indices
-	key := make([]byte, 4*len(indices))
-	for i, index := range indices {
-		binary.LittleEndian.PutUint32(key[4*i:4*i+4], index)
-	}
-
-	// create a KMAC instance with our key and 32 bytes output size
-	kmac, err := hash.NewKMAC_128(key, nil, 32)
+	seed, err := protocol.SeedFromParentSignature(indices, head.ParentVoterSig)
 	if err != nil {
-		return nil, fmt.Errorf("could not create kmac: %w", err)
+		return nil, fmt.Errorf("could not create seed from header's signature: %w", err)
 	}
-
-	// split the parent voter sig into staking & beacon parts
-	combiner := signature.NewCombiner()
-	sigs, err := combiner.Split(head.ParentVoterSig)
-	if err != nil {
-		return nil, fmt.Errorf("could not split block signature: %w", err)
-	}
-	if len(sigs) != 2 {
-		return nil, fmt.Errorf("invalid block signature split")
-	}
-
-	// generate the seed by hashing the random beacon threshold signature
-	beaconSig := sigs[1]
-	seed := kmac.ComputeHash(beaconSig)
 
 	return seed, nil
 }

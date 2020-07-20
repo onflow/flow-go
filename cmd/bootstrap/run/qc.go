@@ -8,6 +8,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/validator"
@@ -106,8 +107,10 @@ func createValidators(ps protocol.State, participantData ParticipantData, block 
 			return nil, nil, err
 		}
 
+		selection := leader.NewSelectionForBootstrap()
+
 		// create consensus committee's state
-		committee, err := committee.NewMainConsensusCommitteeState(ps, participant.NodeID)
+		committee, err := committee.NewMainConsensusCommitteeState(ps, participant.NodeID, selection)
 		if err != nil {
 			return nil, nil, err
 		}

@@ -2,15 +2,16 @@ package utils
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"sync"
 	"time"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/templates"
 
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go-sdk/examples"
 )
 
 type flowAccount struct {
@@ -115,10 +116,12 @@ func loadServiceAccount(flowClient *client.Client,
 	}, nil
 }
 
-func (lg *LoadGenerator) getBlockIDRef() flowsdk.Identifier {
+func (lg *LoadGenerator) getBlockIDRef() (flowsdk.Identifier, error) {
 	ref, err := lg.flowClient.GetLatestBlockHeader(context.Background(), false)
-	examples.Handle(err)
-	return ref.ID
+	if err != nil {
+		return flowsdk.Identifier{}, err
+	}
+	return ref.ID, err
 }
 
 // Stats returns the statsTracker that captures stats for transactions submitted
@@ -132,23 +135,24 @@ func (lg *LoadGenerator) Close() {
 }
 
 func (lg *LoadGenerator) setupServiceAccountKeys() error {
-
-	blockRef := lg.getBlockIDRef()
+	blockRef, err := lg.getBlockIDRef()
+	if err != nil {
+		return err
+	}
 	keys := make([]*flowsdk.AccountKey, 0)
 	for i := 0; i < lg.numberOfAccounts; i++ {
 		keys = append(keys, lg.serviceAccount.accountKey)
 	}
-	script, err := lg.scriptCreator.AddKeyToAccountScript(keys)
+
+	addKeysTx, err := lg.scriptCreator.AddKeysToAccountTransaction(*lg.serviceAccount.address, keys)
 	if err != nil {
 		return err
 	}
 
-	addKeysTx := flowsdk.NewTransaction().
+	addKeysTx.
 		SetReferenceBlockID(blockRef).
-		SetScript([]byte(script)).
 		SetProposalKey(*lg.serviceAccount.address, lg.serviceAccount.accountKey.ID, lg.serviceAccount.accountKey.SequenceNumber).
-		SetPayer(*lg.serviceAccount.address).
-		AddAuthorizer(*lg.serviceAccount.address)
+		SetPayer(*lg.serviceAccount.address)
 
 	lg.serviceAccount.signerLock.Lock()
 	defer lg.serviceAccount.signerLock.Unlock()
@@ -161,7 +165,9 @@ func (lg *LoadGenerator) setupServiceAccountKeys() error {
 	lg.step++
 
 	err = lg.flowClient.SendTransaction(context.Background(), *addKeysTx)
-	examples.Handle(err)
+	if err != nil {
+		return err
+	}
 
 	txWG := sync.WaitGroup{}
 	txWG.Add(1)
@@ -173,7 +179,7 @@ func (lg *LoadGenerator) setupServiceAccountKeys() error {
 		nil, // on expired
 		nil, // on timout
 		nil, // on error,
-		60)
+		120)
 
 	txWG.Wait()
 
@@ -184,26 +190,29 @@ func (lg *LoadGenerator) setupServiceAccountKeys() error {
 
 func (lg *LoadGenerator) createAccounts() error {
 	fmt.Printf("creating %d accounts...", lg.numberOfAccounts)
-	blockRef := lg.getBlockIDRef()
+	blockRef, err := lg.getBlockIDRef()
+	if err != nil {
+		return err
+	}
 	allTxWG := sync.WaitGroup{}
 	for i := 0; i < lg.numberOfAccounts; i++ {
-		privKey := examples.RandomPrivateKey()
+		privKey := randomPrivateKey()
 		accountKey := flowsdk.NewAccountKey().
 			FromPrivateKey(privKey).
 			SetHashAlgo(crypto.SHA3_256).
 			SetWeight(flowsdk.AccountKeyWeightThreshold)
+
 		signer := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
-		// TODO herer
-		script, err := lg.scriptCreator.CreateAccountScript(accountKey)
-		if err != nil {
-			return err
-		}
+
+		createAccountTx := templates.CreateAccount(
+			[]*flowsdk.AccountKey{accountKey},
+			nil,
+			*lg.serviceAccount.address,
+		)
+
 		// Generate an account creation script
-		examples.Handle(err)
-		createAccountTx := flowsdk.NewTransaction().
+		createAccountTx.
 			SetReferenceBlockID(blockRef).
-			SetScript(script).
-			AddAuthorizer(*lg.serviceAccount.address).
 			SetProposalKey(*lg.serviceAccount.address, i+1, 0).
 			SetPayer(*lg.serviceAccount.address)
 
@@ -215,7 +224,9 @@ func (lg *LoadGenerator) createAccounts() error {
 		lg.serviceAccount.signerLock.Unlock()
 
 		err = lg.flowClient.SendTransaction(context.Background(), *createAccountTx)
-		examples.Handle(err)
+		if err != nil {
+			return err
+		}
 		allTxWG.Add(1)
 
 		lg.txTracker.AddTx(createAccountTx.ID(),
@@ -236,7 +247,7 @@ func (lg *LoadGenerator) createAccounts() error {
 			nil, // on expired
 			nil, // on timout
 			nil, // on error
-			30)
+			120)
 
 		fmt.Println("<<<", i)
 	}
@@ -247,7 +258,10 @@ func (lg *LoadGenerator) createAccounts() error {
 }
 
 func (lg *LoadGenerator) distributeInitialTokens() error {
-	blockRef := lg.getBlockIDRef()
+	blockRef, err := lg.getBlockIDRef()
+	if err != nil {
+		return err
+	}
 	allTxWG := sync.WaitGroup{}
 	fmt.Println("load generator step 2 started")
 	for i := 0; i < lg.numberOfAccounts; i++ {
@@ -270,19 +284,22 @@ func (lg *LoadGenerator) distributeInitialTokens() error {
 
 		// TODO signer be thread safe
 		lg.serviceAccount.signerLock.Lock()
-		err = transferTx.SignEnvelope(*lg.serviceAccount.address, 0, lg.serviceAccount.signer)
+		err = transferTx.SignEnvelope(*lg.serviceAccount.address, i+1, lg.serviceAccount.signer)
 		lg.serviceAccount.signerLock.Unlock()
 
 		err = lg.flowClient.SendTransaction(context.Background(), *transferTx)
-		examples.Handle(err)
+		if err != nil {
+			return err
+		}
 		allTxWG.Add(1)
 
 		lg.txTracker.AddTx(transferTx.ID(),
 			nil,
 			func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
+				fmt.Println(res)
 				allTxWG.Done()
 			},
-			nil, nil, nil, nil, 60)
+			nil, nil, nil, nil, 120)
 	}
 	allTxWG.Wait()
 	lg.step++
@@ -291,7 +308,10 @@ func (lg *LoadGenerator) distributeInitialTokens() error {
 }
 
 func (lg *LoadGenerator) rotateTokens() error {
-	blockRef := lg.getBlockIDRef()
+	blockRef, err := lg.getBlockIDRef()
+	if err != nil {
+		return err
+	}
 	allTxWG := sync.WaitGroup{}
 	fmt.Println("load generator step 3 started")
 
@@ -319,7 +339,10 @@ func (lg *LoadGenerator) rotateTokens() error {
 		lg.accounts[i].signerLock.Unlock()
 
 		err = lg.flowClient.SendTransaction(context.Background(), *transferTx)
-		examples.Handle(err)
+		if err != nil {
+			return err
+		}
+
 		allTxWG.Add(1)
 		lg.txTracker.AddTx(transferTx.ID(),
 			nil,
@@ -353,4 +376,21 @@ func (lg *LoadGenerator) Next() error {
 	default:
 		return lg.rotateTokens()
 	}
+}
+
+// randomPrivateKey returns a randomly generated ECDSA P-256 private key.
+func randomPrivateKey() crypto.PrivateKey {
+	seed := make([]byte, crypto.MinSeedLength)
+
+	_, err := rand.Read(seed)
+	if err != nil {
+		panic(err)
+	}
+
+	privateKey, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, seed)
+	if err != nil {
+		panic(err)
+	}
+
+	return privateKey
 }

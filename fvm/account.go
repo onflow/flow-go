@@ -26,27 +26,29 @@ func getAccount(
 		return nil, err
 	}
 
-	script := getFlowTokenBalanceScript(address, chain.ServiceAddress())
+	if ctx.ServiceAccountEnabled {
+		script := getFlowTokenBalanceScript(address, chain.ServiceAddress())
 
-	err = vm.Run(
-		ctx,
-		script,
-		ledger,
-	)
-	if err != nil {
-		return nil, err
+		err = vm.Run(
+			ctx,
+			script,
+			ledger,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		var balance uint64
+
+		// TODO: Figure out how to handle this error. Currently if a runtime error occurs, balance will be 0.
+		// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
+		// 2. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
+		if script.Err == nil {
+			balance = script.Value.ToGoValue().(uint64)
+		}
+
+		account.Balance = balance
 	}
-
-	var balance uint64
-
-	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, balance will be 0.
-	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
-	// 2. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
-	if script.Err == nil {
-		balance = script.Value.ToGoValue().(uint64)
-	}
-
-	account.Balance = balance
 
 	return account, nil
 }

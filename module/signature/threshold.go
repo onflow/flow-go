@@ -15,6 +15,14 @@ type ThresholdVerifier struct {
 	hasher hash.Hasher
 }
 
+// RandomBeaconThreshold returns the threshold (t) to allow the largest number of
+// malicious nodes (m) assuming the protocol requires:
+//   m<=t for unforgeability
+//   n-m>=t+1 for robustness
+func RandomBeaconThreshold(size int) int {
+	return (size - 1) / 2
+}
+
 // NewThresholdVerifier creates a new threshold verifier. *Important*: the
 // threshold provider can only verify signatures in the context of the provided
 // KMAC tag.
@@ -70,7 +78,7 @@ func (tp *ThresholdProvider) Sign(msg []byte) (crypto.Signature, error) {
 func (tp *ThresholdProvider) Combine(size uint, shares []crypto.Signature, indices []uint) (crypto.Signature, error) {
 
 	// check that we have sufficient shares to reconstruct the threshold signature
-	if !crypto.EnoughShares(int(size), len(shares)) {
+	if !crypto.EnoughShares(RandomBeaconThreshold(int(size)), len(shares)) {
 		return nil, fmt.Errorf("not enough signature shares (size: %d, shares: %d)", size, len(shares))
 	}
 
@@ -81,7 +89,7 @@ func (tp *ThresholdProvider) Combine(size uint, shares []crypto.Signature, indic
 	}
 
 	// try to reconstruct the threshold signature using the given shares & indices
-	thresSig, err := crypto.ReconstructThresholdSignature(int(size), shares, converted)
+	thresSig, err := crypto.ReconstructThresholdSignature(int(size), RandomBeaconThreshold(int(size)), shares, converted)
 	if err != nil {
 		return nil, fmt.Errorf("could not reconstruct threshold signature: %w", err)
 	}

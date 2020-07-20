@@ -60,7 +60,7 @@ func New(
 	}
 
 	var err error
-	e.conduit, err = net.Register(engine.ApprovalProvider, e)
+	e.conduit, err = net.Register(engine.PushApprovals, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine on approval provider channel: %w", err)
 	}

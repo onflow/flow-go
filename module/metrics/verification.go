@@ -23,7 +23,8 @@ type VerificationCollector struct {
 	// Match Engine
 	rcvExecutionResultsTotal prometheus.Counter // total execution results received by match engine
 	sntVerifiableChunksTotal prometheus.Counter // total chunks matched by match engine and sent to verifier engine
-	rcvChunkDataPack         prometheus.Counter // total chunk data packs received by match engine
+	rcvChunkDataPackTotal    prometheus.Counter // total chunk data packs received by match engine
+	reqChunkDataPackTotal    prometheus.Counter // total number of chunk data packs requested by match engine
 
 	// Verifier Engine
 	rcvVerifiableChunksTotal prometheus.Counter // total verifiable chunks received by verifier engine
@@ -79,15 +80,26 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 		log.Debug().Err(err).Msg("could not register sntVerifiableChunksTotal metric")
 	}
 
-	rcvChunkDataPack := promauto.NewCounter(prometheus.CounterOpts{
+	rcvChunkDataPackTotal := promauto.NewCounter(prometheus.CounterOpts{
 		Name:      "chunk_data_pack_received_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemMatchEngine,
 		Help:      "total number of chunk data packs received by match engine",
 	})
-	err = registerer.Register(rcvChunkDataPack)
+	err = registerer.Register(rcvChunkDataPackTotal)
 	if err != nil {
-		log.Debug().Err(err).Msg("could not register rcvChunkDataPack metric")
+		log.Debug().Err(err).Msg("could not register rcvChunkDataPackTotal metric")
+	}
+
+	reqChunkDataPackTotal := promauto.NewCounter(prometheus.CounterOpts{
+		Name:      "chunk_data_pack_requested_total",
+		Namespace: namespaceVerification,
+		Subsystem: subsystemMatchEngine,
+		Help:      "total number of chunk data packs requested by match engine",
+	})
+	err = registerer.Register(reqChunkDataPackTotal)
+	if err != nil {
+		log.Debug().Err(err).Msg("could not register reqChunkDataPackTotal metric")
 	}
 
 	// Verifier Engine
@@ -105,6 +117,7 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 	sntResultApprovalTotal := promauto.NewCounter(prometheus.CounterOpts{
 		Name:      "result_approvals_total",
 		Namespace: namespaceVerification,
+		Subsystem: subsystemVerifierEngine,
 		Help:      "total number of emitted result approvals by verifier engine",
 	})
 	err = registerer.Register(sntResultApprovalTotal)
@@ -132,7 +145,8 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 		rcvVerifiableChunksTotal: rcvVerifiableChunksTotal,
 		resultApprovalsTotal:     sntResultApprovalTotal,
 		storagePerChunk:          storagePerChunk,
-		rcvChunkDataPack:         rcvChunkDataPack,
+		rcvChunkDataPackTotal:    rcvChunkDataPackTotal,
+		reqChunkDataPackTotal:    reqChunkDataPackTotal,
 	}
 
 	return vc
@@ -167,7 +181,13 @@ func (vc *VerificationCollector) OnVerifiableChunkSent() {
 // OnChunkDataPackReceived is called on a receiving a chunk data pack by Match engine
 // It increments the total number of chunk data packs received.
 func (vc *VerificationCollector) OnChunkDataPackReceived() {
-	vc.rcvChunkDataPack.Inc()
+	vc.rcvChunkDataPackTotal.Inc()
+}
+
+// OnChunkDataPackRequested is called on requesting a chunk data pack by Match engine
+// It increments the total number of chunk data packs requested.
+func (vc *VerificationCollector) OnChunkDataPackRequested() {
+	vc.reqChunkDataPackTotal.Inc()
 }
 
 // OnVerifiableChunkReceived is called whenever a verifiable chunk is received by Verifier engine

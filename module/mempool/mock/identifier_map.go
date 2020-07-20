@@ -57,6 +57,29 @@ func (_m *IdentifierMap) Get(key flow.Identifier) ([]flow.Identifier, bool) {
 	return r0, r1
 }
 
+// Keys provides a mock function with given fields:
+func (_m *IdentifierMap) Keys() ([]flow.Identifier, bool) {
+	ret := _m.Called()
+
+	var r0 []flow.Identifier
+	if rf, ok := ret.Get(0).(func() []flow.Identifier); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]flow.Identifier)
+		}
+	}
+
+	var r1 bool
+	if rf, ok := ret.Get(1).(func() bool); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	return r0, r1
+}
+
 // Rem provides a mock function with given fields: key
 func (_m *IdentifierMap) Rem(key flow.Identifier) bool {
 	ret := _m.Called(key)

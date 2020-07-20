@@ -84,16 +84,16 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 		return newInvalidBlockError(block, fmt.Errorf("invalid proposer signature: %w", err))
 	}
 	if err != nil {
-		return fmt.Errorf("error verifying primary signature for block %x: %w", block.BlockID, err)
+		return fmt.Errorf("error verifying leader signature for block %x: %w", block.BlockID, err)
 	}
 
 	// check the proposer is the leader for the proposed block's view
 	leader, err := v.committee.LeaderForView(block.View)
 	if err != nil {
-		return fmt.Errorf("error determining primary for block %x: %w", block.BlockID, err)
+		return fmt.Errorf("error determining leader for block %x: %w", block.BlockID, err)
 	}
 	if leader != block.ProposerID {
-		return newInvalidBlockError(block, fmt.Errorf("proposer %s is not primary for view %d", block.ProposerID, block.View))
+		return newInvalidBlockError(block, fmt.Errorf("proposer %s is not leader (%s) for view %d", block.ProposerID, leader, block.View))
 	}
 
 	// check that we have the parent for the proposal

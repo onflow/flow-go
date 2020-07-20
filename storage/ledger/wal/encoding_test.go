@@ -126,7 +126,7 @@ func TestStorableTrie(t *testing.T) {
 
 		reader := bytes.NewReader(expected)
 
-		newStorableNode, err := ReadStorableTrie(reader)
+		newStorableNode, err := ReadStorableTrie(reader, VersionV2)
 		require.NoError(t, err)
 
 		assert.Equal(t, storableTrie, newStorableNode)

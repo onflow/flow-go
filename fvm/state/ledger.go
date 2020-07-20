@@ -1,9 +1,9 @@
 package state
 
 import (
-	"crypto/sha256"
 	"strings"
 
+	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -58,7 +58,6 @@ func fullKey(owner, controller, key string) string {
 }
 
 func fullKeyHash(owner, controller, key string) flow.RegisterID {
-	h := sha256.New()
-	_, _ = h.Write([]byte(fullKey(owner, controller, key)))
-	return h.Sum(nil)
+	hasher := hash.NewSHA2_256()
+	return hasher.ComputeHash([]byte(fullKey(owner, controller, key)))
 }

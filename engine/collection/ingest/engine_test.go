@@ -133,7 +133,7 @@ func TestClusterRouting(t *testing.T) {
 		require.NoError(t, err)
 
 		// set target cluster to the local cluster
-		localCluster, ok := clusters.ByNodeID(localNode.Me.NodeID())
+		localCluster, _, ok := clusters.ByNodeID(localNode.Me.NodeID())
 		require.True(t, ok)
 
 		// get a transaction that will be routed to local
@@ -173,7 +173,7 @@ func TestClusterRouting(t *testing.T) {
 		require.NoError(t, err)
 
 		// set target cluster to remote cluster
-		remoteCluster, ok := clusters.ByNodeID(remoteNode.Me.NodeID())
+		remoteCluster, _, ok := clusters.ByNodeID(remoteNode.Me.NodeID())
 		require.True(t, ok)
 
 		// get a transaction that will be routed to the target cluster
@@ -213,7 +213,7 @@ func TestClusterRouting(t *testing.T) {
 		require.Nil(t, err)
 
 		// set target cluster to remote cluster
-		targetCluster, ok := clusters.ByNodeID(remoteNode.Me.NodeID())
+		targetCluster, _, ok := clusters.ByNodeID(remoteNode.Me.NodeID())
 		require.True(t, ok)
 
 		// get a transaction that will be routed to remote cluster
@@ -250,7 +250,7 @@ func TestClusterRouting(t *testing.T) {
 		require.Nil(t, err)
 
 		// set the target cluster to local cluster
-		targetCluster, ok := clusters.ByNodeID(localNode.Me.NodeID())
+		targetCluster, _, ok := clusters.ByNodeID(localNode.Me.NodeID())
 		require.True(t, ok)
 
 		// get transaction for target cluster, but make it invalid

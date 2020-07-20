@@ -8,6 +8,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/state/dkg"
 )
 
@@ -104,7 +105,7 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*model.QuorumCertificate
 	}
 
 	// check if we have sufficient threshold signature shares
-	if !crypto.EnoughShares(int(groupSize), len(votes)) {
+	if !crypto.EnoughShares(signature.RandomBeaconThreshold(int(groupSize)), len(votes)) {
 		return nil, ErrInsufficientShares
 	}
 

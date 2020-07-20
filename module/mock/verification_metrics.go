@@ -22,6 +22,11 @@ func (_m *VerificationMetrics) OnChunkDataPackReceived() {
 	_m.Called()
 }
 
+// OnChunkDataPackRequested provides a mock function with given fields:
+func (_m *VerificationMetrics) OnChunkDataPackRequested() {
+	_m.Called()
+}
+
 // OnChunkVerificationFinished provides a mock function with given fields: chunkID
 func (_m *VerificationMetrics) OnChunkVerificationFinished(chunkID flow.Identifier) {
 	_m.Called(chunkID)
