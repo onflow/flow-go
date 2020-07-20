@@ -152,6 +152,14 @@ func statusWorker(workerID int, txs chan *txInFlight, done <-chan bool, fclient 
 							fmt.Printf("worker %d tx %v has been executed in %v seconds\n", workerID, tx.txID, time.Since(tx.createdAt).Seconds())
 						}
 					case flowsdk.TransactionStatusSealed:
+						// sometimes we miss the executed call and just get sealed directly
+						if tx.lastStatus != flowsdk.TransactionStatusExecuted {
+							if tx.onExecuted != nil {
+								go tx.onExecuted(tx.txID, result)
+							}
+							// TODO fix me
+							// tx.stat.TTE = time.Since(tx.createdAt)
+						}
 						if tx.onSealed != nil {
 							go tx.onSealed(tx.txID, result)
 						}
