@@ -57,5 +57,6 @@ func main() {
 	}
 
 	fmt.Println(lg.Stats())
+	fmt.Println(lg.Stats().Digest())
 	lg.Close()
 }
