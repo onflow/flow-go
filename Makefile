@@ -136,7 +136,14 @@ ci: install-tools tidy lint test coverage
 # on Teamcity
 .PHONY: ci-integration
 ci-integration: install-tools
-	$(MAKE) -C integration integration-test
+	$(MAKE) -C integration ci-integration-test
+
+# Runs benchmark tests
+# NOTE: we do not need `docker-build-flow` as this is run as a separate step
+# on Teamcity
+.PHONY: ci-benchmark
+ci-benchmark: install-tools
+	$(MAKE) -C integration ci-benchmark
 
 # Runs unit tests, test coverage, lint in Docker (for mac)
 .PHONY: docker-ci
@@ -186,6 +193,22 @@ docker-ci-integration-team-city:
 		-v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
 		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.7 \
 		make ci-integration
+
+# This command is should only be used by Team City (for linux)
+# Includes a TeamCity specific git fix, ref:https://github.com/akkadotnet/akka.net/issues/2834#issuecomment-494795604
+.PHONY: docker-ci-benchmark-team-city
+docker-ci-benchmark-team-city:
+	docker run \
+		--env DOCKER_API_VERSION='1.39' \
+		--network host \
+		-v ${SSH_AUTH_SOCK}:/tmp/ssh_auth_sock -e SSH_AUTH_SOCK="/tmp/ssh_auth_sock" \
+		-v /tmp:/tmp \
+		-v /var/run/docker.sock:/var/run/docker.sock \
+		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
+		-v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
+		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.7 \
+		make ci-benchmark
+	cat /tmp/tx_per_second_test_teamcity.txt
 
 .PHONY: docker-build-collection
 docker-build-collection:
