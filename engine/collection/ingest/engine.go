@@ -62,7 +62,7 @@ func New(
 		config:     config,
 	}
 
-	con, err := net.Register(engine.CollectionIngest, e)
+	con, err := net.Register(engine.PushTransactions, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -172,7 +172,11 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	}
 
 	// get the locally assigned cluster and the cluster responsible for the transaction
-	txCluster := clusters.ByTxID(tx.ID())
+	txCluster, ok := clusters.ByTxID(tx.ID())
+	if !ok {
+		return fmt.Errorf("could not get local cluster by txID: %x", tx.ID())
+	}
+
 	localID := e.me.NodeID()
 	localCluster, _, ok := clusters.ByNodeID(localID)
 	if !ok {

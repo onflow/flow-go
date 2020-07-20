@@ -7,18 +7,10 @@ import (
 )
 
 const (
-	CodePing = iota
-	CodePong
-	CodeAuth
-	CodeAnnounce
-	CodeRequest
-	CodeResponse
-	CodeEcho
 
 	// consensus
-	CodeBlockProposal
+	CodeBlockProposal = iota + 1
 	CodeBlockVote
-	CodeBlockCommit // coldstuff-only
 
 	// protocol state sync
 	CodeSyncRequest
@@ -32,26 +24,29 @@ const (
 	CodeClusterBlockVote
 	CodeClusterBlockResponse
 
+	// collections, guarantees & transactions
 	CodeCollectionGuarantee
 	CodeTransaction
 	CodeTransactionBody
 
-	CodeBlock
-
-	CodeCollectionRequest
-	CodeCollectionResponse
-
-	CodeTransactionRequest
-	CodeTransactionResponse
-
+	// core messages for execution & verification
 	CodeExecutionReceipt
-	CodeExecutionStateRequest
-	CodeExecutionStateResponse
+	CodeResultApproval
+
+	// execution state synchronization
 	CodeExecutionStateSyncRequest
 	CodeExecutionStateDelta
+
+	// data exchange for execution of blocks
 	CodeChunkDataRequest
 	CodeChunkDataResponse
-	CodeResultApproval
+
+	// generic entity exchange engines
+	CodeEntityRequest
+	CodeEntityResponse
+
+	// testing
+	CodeEcho
 )
 
 // Envelope is a wrapper to convey type information with JSON encoding without

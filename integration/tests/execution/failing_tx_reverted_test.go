@@ -7,9 +7,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	sdk "github.com/onflow/flow-go-sdk"
+
 	"github.com/dapperlabs/flow-go/integration/tests/common"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestExecutionFailingTxReverted(t *testing.T) {
@@ -32,7 +33,7 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 	s.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
 
 	// send transaction
-	err := s.AccessClient().DeployContract(context.Background(), s.net.Root().ID(), common.CounterContract)
+	err := s.AccessClient().DeployContract(context.Background(), sdk.Identifier(s.net.Root().ID()), common.CounterContract)
 	require.NoError(s.T(), err, "could not deploy counter")
 
 	// wait until we see a different state commitment for a finalized block, call that block blockB
@@ -40,21 +41,21 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 	s.T().Logf("got blockB height %v ID %v", blockB.Header.Height, blockB.Header.ID())
 
 	// send transaction that panics and should revert
-	tx := unittest.TransactionBodyFixture(
-		unittest.WithTransactionDSL(common.CreateCounterPanicTx(chain)),
-		unittest.WithReferenceBlock(s.net.Root().ID()),
+	tx := common.SDKTransactionFixture(
+		common.WithTransactionDSL(common.CreateCounterPanicTx(chain)),
+		common.WithReferenceBlock(sdk.Identifier(s.net.Root().ID())),
 	)
-	err = s.AccessClient().SendTransaction(context.Background(), tx)
+	err = s.AccessClient().SendTransaction(context.Background(), &tx)
 	require.NoError(s.T(), err, "could not send tx to create counter that should panic")
 
 	// send transaction that has no sigs and should not execute
-	tx = unittest.TransactionBodyFixture(
-		unittest.WithTransactionDSL(common.CreateCounterTx(chain.ServiceAddress())),
-		unittest.WithReferenceBlock(s.net.Root().ID()),
+	tx = common.SDKTransactionFixture(
+		common.WithTransactionDSL(common.CreateCounterTx(sdk.Address(chain.ServiceAddress()))),
+		common.WithReferenceBlock(sdk.Identifier(s.net.Root().ID())),
 	)
 	tx.PayloadSignatures = nil
 	tx.EnvelopeSignatures = nil
-	err = s.AccessClient().SendTransaction(context.Background(), tx)
+	err = s.AccessClient().SendTransaction(context.Background(), &tx)
 	require.NoError(s.T(), err, "could not send tx to create counter with wrong sig")
 
 	// wait until the next proposed block is finalized, called blockC

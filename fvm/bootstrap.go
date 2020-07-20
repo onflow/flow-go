@@ -4,9 +4,10 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/dapperlabs/flow-core-contracts/contracts"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+
+	"github.com/dapperlabs/flow-core-contracts/contracts"
 
 	"github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/flow"

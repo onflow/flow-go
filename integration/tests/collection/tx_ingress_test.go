@@ -144,7 +144,8 @@ func (suite *CollectorSuite) TestTxIngressMultiCluster_CorrectCluster() {
 	clusters := suite.Clusters()
 
 	// pick a cluster to target
-	targetCluster := clusters.ByIndex(0)
+	targetCluster, ok := clusters.ByIndex(0)
+	require.True(suite.T(), ok)
 	targetNode := suite.Collector(0, 0)
 
 	// get a client pointing to the cluster member
@@ -216,7 +217,8 @@ func (suite *CollectorSuite) TestTxIngressMultiCluster_OtherCluster() {
 
 	// pick a cluster to target
 	// this cluster is responsible for the transaction
-	targetCluster := clusters.ByIndex(0)
+	targetCluster, ok := clusters.ByIndex(0)
+	require.True(suite.T(), ok)
 
 	// pick 1 node from the other cluster to send the transaction to
 	otherNode := suite.Collector(1, 0)
