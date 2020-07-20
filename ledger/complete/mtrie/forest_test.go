@@ -933,7 +933,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		require.True(t, common.VerifyTrieBatchProof(batchProof, activeRoot))
 
 		proofToGo := common.EncodeTrieBatchProof(batchProof)
-		psmt, err := ptrie.NewPSMT(activeRoot, pathByteSize, proofPaths, proofPayloads, proofToGo)
+		psmt, err := ptrie.NewPSMT(activeRoot, pathByteSize, proofToGo)
 		require.NoError(t, err, "error building partial trie")
 		require.True(t, bytes.Equal(psmt.RootHash(), activeRoot))
 
