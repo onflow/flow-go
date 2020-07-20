@@ -259,7 +259,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	// state and should process it to see whether to forward to hotstuff or not
 	err = e.processBlockProposal(proposal)
 	if err != nil {
-		return fmt.Errorf("could not process block proposal: %w", err)
+		return fmt.Errorf("follower could not process block proposal: %w", err)
 	}
 
 	// most of the heavy database checks are done at this point, so this is a

@@ -436,7 +436,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 
 	err = e.processBlockProposal(proposal)
 	if err != nil {
-		return fmt.Errorf("could not process block proposal: %w", err)
+		return fmt.Errorf("collector could not process block proposal: %w", err)
 	}
 
 	return nil
