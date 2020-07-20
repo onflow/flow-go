@@ -260,8 +260,6 @@ func (lg *LoadGenerator) createAccounts() error {
 			}, // on timout
 			nil, // on error
 			120)
-
-		fmt.Println("<<<", i)
 	}
 	allTxWG.Wait()
 	lg.step++
@@ -276,7 +274,7 @@ func (lg *LoadGenerator) distributeInitialTokens() error {
 	}
 	allTxWG := sync.WaitGroup{}
 	fmt.Println("load generator step 2 started")
-	for i := 0; i < lg.numberOfAccounts; i++ {
+	for i := 0; i < len(lg.accounts); i++ {
 
 		// Transfer 10000 tokens
 		transferScript, err := lg.scriptCreator.TokenTransferScript(
