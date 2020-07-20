@@ -65,7 +65,7 @@ func NewLoadGenerator(fclient *client.Client,
 
 	// TODO get these params hooked to the top level
 	stTracker := NewStatsTracker(&StatsConfig{1, 1, 1, 1, 1, numberOfAccounts})
-	txTracker, err := NewTxTracker(5000, 2, "localhost:3569", verbose, time.Second/10, stTracker)
+	txTracker, err := NewTxTracker(5000, 5, "localhost:3569", verbose, time.Second/10, stTracker)
 	if err != nil {
 		return nil, err
 	}
@@ -323,9 +323,9 @@ func (lg *LoadGenerator) rotateTokens() error {
 		return err
 	}
 	allTxWG := sync.WaitGroup{}
-	fmt.Printf("load generator step %d started \n", lg.step)
+	fmt.Printf("load generator step %d starting (%d accounts)... \n", lg.step, len(lg.accounts))
 
-	for i := 0; i < lg.numberOfAccounts; i++ {
+	for i := 0; i < len(lg.accounts); i++ {
 		j := (i + 1) % lg.numberOfAccounts
 		transferScript, err := lg.scriptCreator.TokenTransferScript(
 			lg.fungibleTokenAddress,
@@ -367,7 +367,7 @@ func (lg *LoadGenerator) rotateTokens() error {
 				allTxWG.Done()
 			}, // on timout
 			nil, // on error
-			30)
+			120)
 
 	}
 	allTxWG.Wait()
