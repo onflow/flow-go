@@ -8,7 +8,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -25,10 +24,6 @@ func encode(v interface{}) (*Envelope, error) {
 		code = CodeBlockProposal
 	case *messages.BlockVote:
 		code = CodeBlockVote
-
-	// coldstuff-specific
-	case *coldstuff.Commit:
-		code = CodeBlockCommit
 
 	// protocol state sync
 	case *messages.SyncRequest:
@@ -50,6 +45,7 @@ func encode(v interface{}) (*Envelope, error) {
 	case *messages.ClusterBlockResponse:
 		code = CodeClusterBlockResponse
 
+	// collections, guarantees & transactions
 	case *flow.CollectionGuarantee:
 		code = CodeCollectionGuarantee
 	case *flow.TransactionBody:
@@ -57,26 +53,33 @@ func encode(v interface{}) (*Envelope, error) {
 	case *flow.Transaction:
 		code = CodeTransaction
 
-	case *messages.CollectionRequest:
-		code = CodeCollectionRequest
-	case *messages.CollectionResponse:
-		code = CodeCollectionResponse
-
-	case *message.Echo:
-		code = CodeEcho
-
+	// core messages for execution & verification
 	case *flow.ExecutionReceipt:
 		code = CodeExecutionReceipt
-	case *messages.ChunkDataRequest:
-		code = CodeChunkDataRequest
-	case *messages.ChunkDataResponse:
-		code = CodeChunkDataResponse
+	case *flow.ResultApproval:
+		code = CodeResultApproval
+
+	// execution state synchronization
 	case *messages.ExecutionStateSyncRequest:
 		code = CodeExecutionStateSyncRequest
 	case *messages.ExecutionStateDelta:
 		code = CodeExecutionStateDelta
-	case *flow.ResultApproval:
-		code = CodeResultApproval
+
+	// data exchange for execution of blocks
+	case *messages.ChunkDataRequest:
+		code = CodeChunkDataRequest
+	case *messages.ChunkDataResponse:
+		code = CodeChunkDataResponse
+
+	// generic entity exchange engines
+	case *messages.EntityRequest:
+		code = CodeEntityRequest
+	case *messages.EntityResponse:
+		code = CodeEntityResponse
+
+	// testing
+	case *message.Echo:
+		code = CodeEcho
 
 	default:
 		return nil, errors.Errorf("invalid encode type (%T)", v)

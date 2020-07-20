@@ -61,7 +61,7 @@ func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 	require.Equal(s.T(), erExe1BlockB.ExecutionResult.FinalStateCommit, erExe1BlockC.ExecutionResult.FinalStateCommit)
 
 	// send a ExecutionStateSyncRequest from Ghost node
-	err = s.Ghost().Send(context.Background(), engine.ExecutionSync,
+	err = s.Ghost().Send(context.Background(), engine.SyncExecution,
 		&messages.ExecutionStateSyncRequest{CurrentBlockID: blockA.Header.ID(), TargetBlockID: blockB.Header.ID()},
 		[]flow.Identifier{s.exe1ID}...)
 	require.NoError(s.T(), err)

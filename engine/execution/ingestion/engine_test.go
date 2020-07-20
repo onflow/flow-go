@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/rand"
 	"testing"
-	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/rs/zerolog"
@@ -68,6 +67,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	ctrl := gomock.NewController(t)
 
 	net := module.NewMockNetwork(ctrl)
+	request := module.NewMockRequester(ctrl)
 
 	// initialize the mocks and engine
 	conduit := network.NewMockConduit(ctrl)
@@ -129,15 +129,17 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	tracer, err := trace.NewTracer(log, "test")
 	require.NoError(t, err)
 
-	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.BlockProvider)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
-	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
-	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.ExecutionSync)), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
+	request.EXPECT().Force().Return().AnyTimes()
+
+	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.PushBlocks)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
+	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.SyncExecution)), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 	blockSync := new(module2.BlockRequester)
 
 	engine, err = New(
 		log,
 		net,
 		me,
+		request,
 		protocolState,
 		blocks,
 		payloads,
@@ -152,8 +154,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		metrics,
 		tracer,
 		false,
-		1*time.Hour, //practically disable retrying
-		10,
 	)
 	require.NoError(t, err)
 
