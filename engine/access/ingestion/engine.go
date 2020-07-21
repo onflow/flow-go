@@ -5,17 +5,15 @@ package ingestion
 import (
 	"errors"
 	"fmt"
-	"math/rand"
 
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/access/rpc"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/state/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -24,13 +22,11 @@ import (
 // Engine represents the ingestion engine, used to funnel data from other nodes
 // to a centralized location that can be queried by a user
 type Engine struct {
-	unit  *engine.Unit   // used to manage concurrency & shutdown
-	log   zerolog.Logger // used to log relevant actions with context
-	state protocol.State // used to access the  protocol state
-	me    module.Local   // used to access local node information
-
-	// Conduits
-	collectionConduit network.Conduit
+	unit    *engine.Unit     // used to manage concurrency & shutdown
+	log     zerolog.Logger   // used to log relevant actions with context
+	state   protocol.State   // used to access the  protocol state
+	me      module.Local     // used to access local node information
+	request module.Requester // used to request collections
 
 	// storage
 	// FIX: remove direct DB access by substituting indexer module
@@ -38,17 +34,22 @@ type Engine struct {
 	headers      storage.Headers
 	collections  storage.Collections
 	transactions storage.Transactions
+
+	rpcEngine *rpc.Engine
 }
 
 // New creates a new access ingestion engine
-func New(log zerolog.Logger,
-	net module.Network,
+func New(
+	log zerolog.Logger,
 	state protocol.State,
 	me module.Local,
+	request module.Requester,
 	blocks storage.Blocks,
 	headers storage.Headers,
 	collections storage.Collections,
-	transactions storage.Transactions) (*Engine, error) {
+	transactions storage.Transactions,
+	rpcEngine *rpc.Engine,
+) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	eng := &Engine{
@@ -56,18 +57,13 @@ func New(log zerolog.Logger,
 		log:          log.With().Str("engine", "ingestion").Logger(),
 		state:        state,
 		me:           me,
+		request:      request,
 		blocks:       blocks,
 		headers:      headers,
 		collections:  collections,
 		transactions: transactions,
+		rpcEngine:    rpcEngine,
 	}
-
-	collConduit, err := net.Register(engine.CollectionProvider, eng)
-	if err != nil {
-		return nil, fmt.Errorf("could not register collection provider engine: %w", err)
-	}
-
-	eng.collectionConduit = collConduit
 
 	return eng, nil
 }
@@ -119,33 +115,31 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // to this function originate within the expulsion engine on the node with the
 // given origin ID.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch entity := event.(type) {
-	case *messages.CollectionResponse:
-		return e.handleCollectionResponse(originID, entity)
-	default:
-		return fmt.Errorf("invalid event type (%T)", event)
-	}
+	return fmt.Errorf("invalid event type (%T)", event)
 }
 
 // OnFinalizedBlock is called by the follower engine after a block has been finalized and the state has been updated
 func (e *Engine) OnFinalizedBlock(hb *model.Block) {
 	e.unit.Launch(func() {
-		id := hb.BlockID
-		err := e.processFinalizedBlock(id)
+		blockID := hb.BlockID
+		err := e.processFinalizedBlock(blockID)
 		if err != nil {
-			e.log.Error().Err(err).Hex("block_id", id[:]).Msg("failed to process block")
+			e.log.Error().Err(err).Hex("block_id", blockID[:]).Msg("failed to process block")
 			return
 		}
 	})
 }
 
 // processBlock handles an incoming finalized block.
-func (e *Engine) processFinalizedBlock(id flow.Identifier) error {
+func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 
-	block, err := e.blocks.ByID(id)
+	block, err := e.blocks.ByID(blockID)
 	if err != nil {
 		return fmt.Errorf("failed to lookup block: %w", err)
 	}
+
+	// Notify rpc handler of new finalized block height
+	e.rpcEngine.SubmitLocal(block)
 
 	// FIX: we can't index guarantees here, as we might have more than one block
 	// with the same collection as long as it is not finalized
@@ -158,13 +152,23 @@ func (e *Engine) processFinalizedBlock(id flow.Identifier) error {
 		return fmt.Errorf("could not index block for collections: %w", err)
 	}
 
-	// request each of the collections from the collection node
-	return e.requestCollections(block.Payload.Guarantees...)
+	// queue requesting each of the collections from the collection node
+	for _, guarantee := range block.Payload.Guarantees {
+		e.request.EntityByID(guarantee.ID(), filter.HasNodeID(guarantee.SignerIDs...))
+	}
+
+	return nil
 }
 
-// handleCollectionResponse handles the response of the a collection request made earlier when a block was received
-func (e *Engine) handleCollectionResponse(originID flow.Identifier, response *messages.CollectionResponse) error {
-	collection := response.Collection
+// handleCollection handles the response of the a collection request made earlier when a block was received
+func (e *Engine) handleCollection(originID flow.Identifier, entity flow.Entity) error {
+
+	// convert the entity to a strictly typed collection
+	collection, ok := entity.(*flow.Collection)
+	if !ok {
+		return fmt.Errorf("invalid entity type (%T)", entity)
+	}
+
 	light := collection.Light()
 
 	// FIX: we can't index guarantees here, as we might have more than one block
@@ -177,7 +181,7 @@ func (e *Engine) handleCollectionResponse(originID flow.Identifier, response *me
 		// ignore collection if already seen
 		if errors.Is(err, storage.ErrAlreadyExists) {
 			e.log.Debug().
-				Hex("collection_id", logging.ID(light.ID())).
+				Hex("collection_id", logging.Entity(light)).
 				Msg("collection is already seen")
 			return nil
 		}
@@ -188,41 +192,19 @@ func (e *Engine) handleCollectionResponse(originID flow.Identifier, response *me
 	for _, tx := range collection.Transactions {
 		err := e.transactions.Store(tx)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not store transaction (%x): %w", tx.ID(), err)
 		}
 	}
 
 	return nil
 }
 
-func (e *Engine) requestCollections(guarantees ...*flow.CollectionGuarantee) error {
-	ids, err := e.findCollectionNodes()
+func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
+	err := e.handleCollection(originID, entity)
 	if err != nil {
-		return err
+		e.log.Error().Err(err).Msg("could not handle collection")
+		return
 	}
-
-	// Request all the collections for this block
-	for _, g := range guarantees {
-		err := e.collectionConduit.Submit(&messages.CollectionRequest{ID: g.ID(), Nonce: rand.Uint64()}, ids...)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-
-}
-
-func (e *Engine) findCollectionNodes() ([]flow.Identifier, error) {
-	identities, err := e.state.Final().Identities(filter.HasRole(flow.RoleCollection))
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve identities: %w", err)
-	}
-	if len(identities) < 1 {
-		return nil, fmt.Errorf("no collection identity found")
-	}
-	identifiers := flow.GetIDs(identities)
-	return identifiers, nil
 }
 
 // OnBlockIncorporated is a noop for this engine since access node is only dealing with finalized blocks

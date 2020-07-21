@@ -36,7 +36,7 @@ cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
 
 cmd/util/util:
-	go build -o cmd/util/util cmd/util/main.go
+	go build -o cmd/util/util --tags relic cmd/util/main.go
 
 .PHONY: install-tools
 install-tools: crypto/relic/build check-go-version
@@ -87,7 +87,7 @@ generate-proto:
 .PHONY: generate-mocks
 generate-mocks:
 	GO111MODULE=on mockgen -destination=storage/mocks/storage.go -package=mocks github.com/dapperlabs/flow-go/storage Blocks,Payloads,Collections,Commits,Events,TransactionResults
-	GO111MODULE=on mockgen -destination=module/mocks/network.go -package=mocks github.com/dapperlabs/flow-go/module Network,Local
+	GO111MODULE=on mockgen -destination=module/mocks/network.go -package=mocks github.com/dapperlabs/flow-go/module Network,Local,Requester
 	GO111MODULE=on mockgen -destination=network/mocks/conduit.go -package=mocks github.com/dapperlabs/flow-go/network Conduit
 	GO111MODULE=on mockgen -destination=network/mocks/engine.go -package=mocks github.com/dapperlabs/flow-go/network Engine
 	GO111MODULE=on mockery -name 'ExecutionState' -dir=engine/execution/state -case=underscore -output="engine/execution/state/mock" -outpkg="mock"
@@ -109,7 +109,7 @@ generate-mocks:
 	GO111MODULE=on mockery -name 'Vertex' -dir="./consensus/hotstuff/forks/finalizer/forest" -case=underscore -output="./consensus/hotstuff/forks/finalizer/forest/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir="./consensus/hotstuff" -case=underscore -output="./consensus/hotstuff/mocks" -outpkg="mocks"
 	GO111MODULE=on mockery -name '.*' -dir="./engine/access/wrapper" -case=underscore -output="./engine/access/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name 'IngestRPC' -dir="./engine/execution/ingestion" -case=underscore -output="./engine/execution/ingestion/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name 'IngestRPC' -dir="./engine/execution/ingestion" -case=underscore -tags relic -output="./engine/execution/ingestion/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=model/fingerprint -case=underscore -output="./model/fingerprint/mock" -outpkg="mock"
 
 # this ensures there is no unused dependency being added by accident
@@ -136,7 +136,14 @@ ci: install-tools tidy lint test coverage
 # on Teamcity
 .PHONY: ci-integration
 ci-integration: install-tools
-	$(MAKE) -C integration integration-test
+	$(MAKE) -C integration ci-integration-test
+
+# Runs benchmark tests
+# NOTE: we do not need `docker-build-flow` as this is run as a separate step
+# on Teamcity
+.PHONY: ci-benchmark
+ci-benchmark: install-tools
+	$(MAKE) -C integration ci-benchmark
 
 # Runs unit tests, test coverage, lint in Docker (for mac)
 .PHONY: docker-ci
@@ -186,6 +193,22 @@ docker-ci-integration-team-city:
 		-v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
 		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.7 \
 		make ci-integration
+
+# This command is should only be used by Team City (for linux)
+# Includes a TeamCity specific git fix, ref:https://github.com/akkadotnet/akka.net/issues/2834#issuecomment-494795604
+.PHONY: docker-ci-benchmark-team-city
+docker-ci-benchmark-team-city:
+	docker run \
+		--env DOCKER_API_VERSION='1.39' \
+		--network host \
+		-v ${SSH_AUTH_SOCK}:/tmp/ssh_auth_sock -e SSH_AUTH_SOCK="/tmp/ssh_auth_sock" \
+		-v /tmp:/tmp \
+		-v /var/run/docker.sock:/var/run/docker.sock \
+		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
+		-v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
+		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.7 \
+		make ci-benchmark
+	cat /tmp/tx_per_second_test_teamcity.txt
 
 .PHONY: docker-build-collection
 docker-build-collection:

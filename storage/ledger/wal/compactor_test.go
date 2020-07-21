@@ -40,7 +40,7 @@ func Test_Compactor(t *testing.T) {
 
 		t.Run("Compactor creates checkpoints eventually", func(t *testing.T) {
 
-			wal, err := NewWAL(nil, nil, dir, size*10, 4)
+			wal, err := NewWAL(nil, nil, dir, size*10, 4, 32*1024)
 			require.NoError(t, err)
 
 			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
@@ -119,7 +119,7 @@ func Test_Compactor(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Run("load data from checkpoint and WAL", func(t *testing.T) {
-			wal2, err := NewWAL(nil, nil, dir, size*10, 4)
+			wal2, err := NewWAL(nil, nil, dir, size*10, 4, 32*1024)
 			require.NoError(t, err)
 
 			err = wal2.Replay(
@@ -194,7 +194,7 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 
 		t.Run("Compactor creates checkpoints", func(t *testing.T) {
 
-			wal, err := NewWAL(nil, nil, dir, size*10, 4)
+			wal, err := NewWAL(nil, nil, dir, size*10, 4, 32*1024)
 			require.NoError(t, err)
 
 			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
@@ -230,7 +230,7 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 			}
 
 			// assert precisely creation of checkpoint files
-			require.NoFileExists(t, path.Join(dir, "checkpoint.00000000"))
+			require.NoFileExists(t, path.Join(dir, RootCheckpointFilename))
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000001"))
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000002"))
 			require.FileExists(t, path.Join(dir, "checkpoint.00000003"))

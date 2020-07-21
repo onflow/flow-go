@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/onflow/cadence"
 	flowsdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/templates"
 )
 
 const (
@@ -38,27 +38,39 @@ func (sc *ScriptCreator) TokenTransferScript(ftAddr, flowToken, toAddr *flowsdk.
 	return []byte(withAmount), nil
 }
 
-// CreateAccountScript returns a transaction script for creating a new account
-func (sc *ScriptCreator) CreateAccountScript(accountKey *flowsdk.AccountKey) ([]byte, error) {
-	return templates.CreateAccount([]*flowsdk.AccountKey{accountKey}, nil)
-}
-
-// AddKeyToAccountScript returns a transaction script for adding keys to an already existing account
-func (sc *ScriptCreator) AddKeyToAccountScript(keys []*flowsdk.AccountKey) ([]byte, error) {
-	publicKeysStr := strings.Builder{}
-	for i := 0; i < len(keys); i++ {
-		publicKeysStr.WriteString("signer.addPublicKey(")
-		publicKeysStr.WriteString(languageEncodeBytes(keys[i].Encode()))
-		publicKeysStr.WriteString(")\n")
+var addKeysScript = []byte(`
+transaction(keys: [[UInt8]]) {
+  prepare(signer: AuthAccount) {
+	for key in keys {
+	  signer.addPublicKey(key)
 	}
-	script := fmt.Sprintf(`
-	transaction {
-	prepare(signer: AuthAccount) {
-			%s
-		}
-	}`, publicKeysStr.String())
+  }
+}
+`)
 
-	return []byte(script), nil
+// AddKeysToAccountTransaction returns a transaction for adding keys to an already existing account
+func (sc *ScriptCreator) AddKeysToAccountTransaction(
+	address flowsdk.Address,
+	keys []*flowsdk.AccountKey,
+) (*flowsdk.Transaction, error) {
+	cadenceKeys := make([]cadence.Value, len(keys))
+
+	for i, key := range keys {
+		cadenceKeys[i] = bytesToCadenceArray(key.Encode())
+	}
+
+	cadenceKeysArray := cadence.NewArray(cadenceKeys)
+
+	tx := flowsdk.NewTransaction().
+		SetScript(addKeysScript).
+		AddAuthorizer(address)
+
+	err := tx.AddArgument(cadenceKeysArray)
+	if err != nil {
+		return nil, err
+	}
+
+	return tx, err
 }
 
 func getTokenTransferTemplate() ([]byte, error) {
@@ -70,11 +82,11 @@ func getTokenTransferTemplate() ([]byte, error) {
 	return ioutil.ReadAll(resp.Body)
 }
 
-// languageEncodeBytes converts a byte slice to a comma-separated list of uint8 integers.
-func languageEncodeBytes(b []byte) string {
-	if len(b) == 0 {
-		return "[]"
+func bytesToCadenceArray(l []byte) cadence.Array {
+	values := make([]cadence.Value, len(l))
+	for i, b := range l {
+		values[i] = cadence.NewUInt8(b)
 	}
 
-	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
+	return cadence.NewArray(values)
 }

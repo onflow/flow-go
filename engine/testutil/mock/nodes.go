@@ -10,11 +10,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	collectioningest "github.com/dapperlabs/flow-go/engine/collection/ingest"
-	"github.com/dapperlabs/flow-go/engine/collection/provider"
+	"github.com/dapperlabs/flow-go/engine/collection/pusher"
+	"github.com/dapperlabs/flow-go/engine/common/provider"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
-	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
@@ -71,19 +71,19 @@ type CollectionNode struct {
 	Collections     storage.Collections
 	Transactions    storage.Transactions
 	IngestionEngine *collectioningest.Engine
+	PusherEngine    *pusher.Engine
 	ProviderEngine  *provider.Engine
 }
 
 // ConsensusNode implements an in-process consensus node for tests.
 type ConsensusNode struct {
 	GenericNode
-	Guarantees        mempool.Guarantees
-	Approvals         mempool.Approvals
-	Receipts          mempool.Receipts
-	Seals             mempool.Seals
-	IngestionEngine   *consensusingest.Engine
-	PropagationEngine *propagation.Engine
-	MatchingEngine    *matching.Engine
+	Guarantees      mempool.Guarantees
+	Approvals       mempool.Approvals
+	Receipts        mempool.Receipts
+	Seals           mempool.Seals
+	IngestionEngine *consensusingest.Engine
+	MatchingEngine  *matching.Engine
 }
 
 // ExecutionNode implements a mocked execution node for tests.
@@ -129,15 +129,17 @@ func (en ExecutionNode) AssertHighestExecutedBlock(t *testing.T, header *flow.He
 // VerificationNode implements an in-process verification node for tests.
 type VerificationNode struct {
 	GenericNode
-	Receipts           mempool.Receipts
-	PendingReceipts    mempool.PendingReceipts
-	PendingResults     mempool.PendingResults
-	ProcessedResultIDs mempool.Identifiers
-	ReceiptIDsByBlock  mempool.IdentifierMap
-	ReceiptIDsByResult mempool.IdentifierMap
-	Chunks             *match.Chunks
-	HeaderStorage      storage.Headers
-	VerifierEngine     network.Engine
-	FinderEngine       *finder.Engine
-	MatchEngine        network.Engine
+	CachedReceipts           mempool.ReceiptDataPacks
+	ReadyReceipts            mempool.ReceiptDataPacks
+	PendingReceipts          mempool.ReceiptDataPacks
+	PendingResults           mempool.PendingResults
+	ProcessedResultIDs       mempool.Identifiers
+	BlockIDsCache            mempool.Identifiers
+	PendingReceiptIDsByBlock mempool.IdentifierMap
+	ReceiptIDsByResult       mempool.IdentifierMap
+	PendingChunks            *match.Chunks
+	HeaderStorage            storage.Headers
+	VerifierEngine           network.Engine
+	FinderEngine             *finder.Engine
+	MatchEngine              network.Engine
 }

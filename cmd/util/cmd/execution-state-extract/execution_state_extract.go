@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"path"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -24,7 +25,7 @@ func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flo
 
 func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDir string, log zerolog.Logger) error {
 
-	w, err := wal.NewWAL(nil, nil, dir, ledger.CacheSize, ledger.RegisterKeySize)
+	w, err := wal.NewWAL(nil, nil, dir, ledger.CacheSize, ledger.RegisterKeySize, wal.SegmentSize)
 	if err != nil {
 		return fmt.Errorf("cannot create WAL: %w", err)
 	}
@@ -47,32 +48,44 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 
 	FoundHashError := fmt.Errorf("found hash %s", targetHash)
 
-	err = w.ReplayLogsOnly(func(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
+	err = w.ReplayLogsOnly(
+		func(forestSequencing *flattener.FlattenedForest) error {
+			rebuiltTries, err := flattener.RebuildTries(forestSequencing)
+			if err != nil {
+				return fmt.Errorf("rebuilding forest from sequenced nodes failed: %w", err)
+			}
+			err = mForest.AddTries(rebuiltTries)
+			if err != nil {
+				return fmt.Errorf("adding rebuilt tries to forest failed: %w", err)
+			}
+			return nil
+		},
+		func(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
 
-		newTrie, err := mForest.Update(stateCommitment, keys, values)
+			newTrie, err := mForest.Update(stateCommitment, keys, values)
 
-		for _, value := range values {
-			valuesSize += len(value)
-		}
+			for _, value := range values {
+				valuesSize += len(value)
+			}
 
-		valuesCount += len(values)
+			valuesCount += len(values)
 
-		if err != nil {
-			return fmt.Errorf("error while updating mForest: %w", err)
-		}
+			if err != nil {
+				return fmt.Errorf("error while updating mForest: %w", err)
+			}
 
-		if bytes.Equal(targetHash, newTrie.RootHash()) {
-			found = true
-			return FoundHashError
-		}
+			if bytes.Equal(targetHash, newTrie.RootHash()) {
+				found = true
+				return FoundHashError
+			}
 
-		i++
-		if i%1000 == 0 {
-			log.Info().Int("values_count", valuesCount).Int("values_size_bytes", valuesSize).Int("updates_count", i).Msg("progress")
-		}
+			i++
+			if i%1000 == 0 {
+				log.Info().Int("values_count", valuesCount).Int("values_size_bytes", valuesSize).Int("updates_count", i).Msg("progress")
+			}
 
-		return err
-	},
+			return err
+		},
 		func(commitment flow.StateCommitment) error {
 			return nil
 		})
@@ -87,14 +100,17 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 		return fmt.Errorf("no value found: %w", err)
 	}
 
-	log.Info().Int("values_count", valuesCount).Int("values_size_bytes", valuesSize).Int("updates_count", i).Float64("total_time_s", duration.Seconds()).Msg("finished")
+	log.Info().Int("values_count", valuesCount).Int("values_size_bytes", valuesSize).Int("updates_count", i).Float64("total_time_s", duration.Seconds()).Msg("finished seeking")
+	log.Info().Msg("writing root checkpoint")
+
+	startTime = time.Now()
 
 	flattenForest, err := flattener.FlattenForest(mForest)
 	if err != nil {
 		return fmt.Errorf("cannot flatten forest: %w", err)
 	}
 
-	checkpointWriter, err := wal.CreateCheckpointWriter(outputDir, 0)
+	checkpointWriter, err := wal.CreateCheckpointWriterForFile(path.Join(outputDir, wal.RootCheckpointFilename))
 	if err != nil {
 		return fmt.Errorf("cannot create checkpointer writer: %w", err)
 	}
@@ -109,6 +125,9 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 	if err != nil {
 		return fmt.Errorf("cannot store checkpoint: %w", err)
 	}
+
+	duration = time.Since(startTime)
+	log.Info().Float64("total_time_s", duration.Seconds()).Msg("finished writing checkpoiunt")
 
 	return nil
 }

@@ -6,6 +6,8 @@ import (
 	"math/rand"
 	"time"
 
+	sdk "github.com/onflow/flow-go-sdk"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine/verification"
@@ -17,7 +19,7 @@ import (
 )
 
 func AddressFixture() flow.Address {
-	return flow.Mainnet.Chain().ServiceAddress()
+	return flow.Testnet.Chain().ServiceAddress()
 }
 
 func TransactionSignatureFixture() flow.TransactionSignature {
@@ -428,6 +430,18 @@ func generateRandomSeed() []byte {
 	return seed
 }
 
+func RandomBytes(n int) []byte {
+	b := make([]byte, n)
+	read, err := crand.Read(b)
+	if err != nil {
+		panic("cannot read random bytes")
+	}
+	if read != n {
+		panic(fmt.Errorf("cannot read enough random bytes (got %d of %d)", read, n))
+	}
+	return b
+}
+
 // IdentityFixture returns a node identity.
 func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 	nodeID := IdentifierFixture()
@@ -597,7 +611,7 @@ func WithReferenceBlock(id flow.Identifier) func(tx *flow.TransactionBody) {
 
 func TransactionDSLFixture(chain flow.Chain) dsl.Transaction {
 	return dsl.Transaction{
-		Import: dsl.Import{Address: chain.ServiceAddress()},
+		Import: dsl.Import{Address: sdk.Address(chain.ServiceAddress())},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
 				pub fun main() {}

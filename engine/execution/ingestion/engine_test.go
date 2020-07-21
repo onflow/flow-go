@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/rand"
 	"testing"
-	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/rs/zerolog"
@@ -60,6 +59,7 @@ type testingContext struct {
 	providerEngine     *provider.ProviderEngine
 	executionState     *state.ExecutionState
 	snapshot           *protocol.Snapshot
+	identity           *flow.Identity
 }
 
 func runWithEngine(t *testing.T, f func(testingContext)) {
@@ -67,6 +67,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	ctrl := gomock.NewController(t)
 
 	net := module.NewMockNetwork(ctrl)
+	request := module.NewMockRequester(ctrl)
 
 	// initialize the mocks and engine
 	conduit := network.NewMockConduit(ctrl)
@@ -128,15 +129,17 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	tracer, err := trace.NewTracer(log, "test")
 	require.NoError(t, err)
 
-	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.BlockProvider)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
-	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
-	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.ExecutionSync)), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
+	request.EXPECT().Force().Return().AnyTimes()
+
+	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.PushBlocks)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
+	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.SyncExecution)), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 	blockSync := new(module2.BlockRequester)
 
 	engine, err = New(
 		log,
 		net,
 		me,
+		request,
 		protocolState,
 		blocks,
 		payloads,
@@ -151,8 +154,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		metrics,
 		tracer,
 		false,
-		1*time.Hour, //practically disable retrying
-		10,
 	)
 	require.NoError(t, err)
 
@@ -168,6 +169,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		providerEngine:     providerEngine,
 		executionState:     executionState,
 		snapshot:           snapshot,
+		identity:           myIdentity,
 	})
 
 	<-engine.Done()
@@ -249,6 +251,24 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 			assert.NoError(ctx.t, err)
 
 			assert.True(ctx.t, validSig, "execution receipt signature invalid")
+
+			spocks := receipt.Spocks
+
+			assert.Len(ctx.t, spocks, len(computationResult.StateSnapshots))
+
+			for i, stateSnapshot := range computationResult.StateSnapshots {
+
+				valid, err := crypto.SPOCKVerifyAgainstData(
+					ctx.identity.StakingPubKey,
+					spocks[i],
+					stateSnapshot.SpockSecret,
+					ctx.engine.spockHasher,
+				)
+
+				assert.NoError(ctx.t, err)
+				assert.True(ctx.t, valid)
+			}
+
 		}).
 		Return(nil)
 }
@@ -400,5 +420,48 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 		ctx.computationManager.AssertExpectations(t)
 		ctx.executionState.AssertExpectations(t)
 		ctx.state.AssertExpectations(t)
+	})
+}
+
+func Test_SPOCKGeneration(t *testing.T) {
+	runWithEngine(t, func(ctx testingContext) {
+
+		snapshots := []*delta.Snapshot{
+			{
+				SpockSecret: []byte{1, 2, 3},
+			},
+			{
+				SpockSecret: []byte{3, 2, 1},
+			},
+			{
+				SpockSecret: []byte{},
+			},
+			{
+				SpockSecret: unittest.RandomBytes(100),
+			},
+		}
+
+		executionReceipt, err := ctx.engine.generateExecutionReceipt(
+			context.Background(),
+			&flow.ExecutionResult{
+				ExecutionResultBody: flow.ExecutionResultBody{},
+				Signatures:          nil,
+			},
+			snapshots,
+		)
+		require.NoError(t, err)
+
+		for i, snapshot := range snapshots {
+			valid, err := crypto.SPOCKVerifyAgainstData(
+				ctx.identity.StakingPubKey,
+				executionReceipt.Spocks[i],
+				snapshot.SpockSecret,
+				ctx.engine.spockHasher,
+			)
+
+			require.NoError(t, err)
+			require.True(t, valid)
+		}
+
 	})
 }

@@ -31,7 +31,7 @@ func vmTest(
 	return func(t *testing.T) {
 		rt := runtime.NewInterpreterRuntime()
 
-		chain := flow.Mainnet.Chain()
+		chain := flow.Testnet.Chain()
 
 		vm := fvm.New(rt)
 
@@ -69,7 +69,7 @@ func encodeJSONCDC(t *testing.T, value cadence.Value) []byte {
 func TestBlockContext_ExecuteTransaction(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 
-	chain := flow.Mainnet.Chain()
+	chain := flow.Testnet.Chain()
 
 	vm := fvm.New(rt)
 
@@ -1248,4 +1248,51 @@ func TestSignatureVerification(t *testing.T) {
 			})
 		},
 	))
+}
+
+func TestWithServiceAccount(t *testing.T) {
+	rt := runtime.NewInterpreterRuntime()
+
+	chain := flow.Mainnet.Chain()
+
+	vm := fvm.New(rt)
+
+	cache, err := fvm.NewLRUASTCache(CacheSize)
+	require.NoError(t, err)
+
+	ctxA := fvm.NewContext(
+		fvm.WithChain(chain),
+		fvm.WithASTCache(cache),
+		fvm.WithTransactionProcessors([]fvm.TransactionProcessor{
+			fvm.NewTransactionInvocator(),
+		}),
+	)
+
+	ledger := state.NewMapLedger()
+
+	txBody := flow.NewTransactionBody().
+		SetScript([]byte(`transaction { prepare(signer: AuthAccount) { AuthAccount(payer: signer) } }`)).
+		AddAuthorizer(chain.ServiceAddress())
+
+	t.Run("With service account enabled", func(t *testing.T) {
+		tx := fvm.Transaction(txBody)
+
+		err = vm.Run(ctxA, tx, ledger)
+		require.NoError(t, err)
+
+		// transaction should fail on non-bootstrapped ledger
+		assert.Error(t, tx.Err)
+	})
+
+	t.Run("With service account disabled", func(t *testing.T) {
+		ctxB := fvm.NewContextFromParent(ctxA, fvm.WithServiceAccount(false))
+
+		tx := fvm.Transaction(txBody)
+
+		err = vm.Run(ctxB, tx, ledger)
+		require.NoError(t, err)
+
+		// transaction should succeed on non-bootstrapped ledger
+		assert.NoError(t, tx.Err)
+	})
 }

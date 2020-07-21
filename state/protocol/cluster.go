@@ -11,33 +11,48 @@ import (
 
 // ClusterFilterFor returns a filter to retrieve all nodes within the cluster
 // that the node with the given ID belongs to.
-func ClusterFilterFor(sn Snapshot, id flow.Identifier) (flow.IdentityFilter, error) {
+func ClusterFilterFor(sn Snapshot, id flow.Identifier) (flow.IdentityFilter, uint, error) {
 
+	clusters, err := sn.Clusters()
+	if err != nil {
+		return nil, 0, fmt.Errorf("could not get clusters: %w", err)
+	}
+	cluster, index, ok := clusters.ByNodeID(id)
+	if !ok {
+		return nil, 0, fmt.Errorf("could not get cluster for node")
+	}
+
+	return filter.In(cluster), index, nil
+}
+
+// ClusterFor returns the cluster that the node with given ID belongs to.
+func ClusterFor(sn Snapshot, id flow.Identifier) (flow.IdentityList, uint, error) {
+
+	clusterFilter, clusterIndex, err := ClusterFilterFor(sn, id)
+	if err != nil {
+		return nil, 0, fmt.Errorf("could not get cluster filter: %w", err)
+	}
+	participants, err := sn.Identities(clusterFilter)
+	if err != nil {
+		return nil, 0, fmt.Errorf("could not get nodes in cluster: %w", err)
+	}
+
+	return participants, clusterIndex, nil
+}
+
+// ClusterByIndex returns the cluster by the given index
+func ClusterByIndex(sn Snapshot, index uint) (flow.IdentityList, error) {
 	clusters, err := sn.Clusters()
 	if err != nil {
 		return nil, fmt.Errorf("could not get clusters: %w", err)
 	}
-	cluster, ok := clusters.ByNodeID(id)
+
+	cluster, ok := clusters.ByIndex(index)
 	if !ok {
-		return nil, fmt.Errorf("could not get cluster for node")
+		return nil, fmt.Errorf("could not find cluster by index: %v", index)
 	}
 
-	return filter.In(cluster), nil
-}
-
-// ClusterFor returns the cluster that the node with given ID belongs to.
-func ClusterFor(sn Snapshot, id flow.Identifier) (flow.IdentityList, error) {
-
-	clusterFilter, err := ClusterFilterFor(sn, id)
-	if err != nil {
-		return nil, fmt.Errorf("could not get cluster filter: %w", err)
-	}
-	participants, err := sn.Identities(clusterFilter)
-	if err != nil {
-		return nil, fmt.Errorf("could not get nodes in cluster: %w", err)
-	}
-
-	return participants, nil
+	return cluster, nil
 }
 
 // ChainIDForCluster returns the canonical chain ID for a collection node cluster.

@@ -12,14 +12,18 @@ import (
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
+	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/access/ingestion"
 	"github.com/dapperlabs/flow-go/engine/access/rpc"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
+	"github.com/dapperlabs/flow-go/engine/common/requester"
 	synceng "github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
@@ -40,6 +44,7 @@ func main() {
 		followerEng     *followereng.Engine
 		syncCore        *synchronization.Core
 		rpcConf         rpc.Config
+		rpcEng          *rpc.Engine
 		collectionRPC   access.AccessAPIClient
 		executionRPC    execution.ExecutionAPIClient
 		err             error
@@ -90,8 +95,21 @@ func main() {
 			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
+		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			rpcEng = rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.RootChainID)
+			return rpcEng, nil
+		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions)
+			requestEng, err := requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
+				engine.RequestCollections,
+				filter.HasRole(flow.RoleCollection),
+				func() flow.Entity { return &flow.Collection{} },
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create requester engine: %w", err)
+			}
+			ingestEng, err = ingestion.New(node.Logger, node.State, node.Me, requestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, rpcEng)
+			requestEng.WithHandle(ingestEng.OnCollection)
 			return ingestEng, err
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -102,17 +120,23 @@ func main() {
 
 			// create a finalizer that will handle updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, node.Storage.Payloads, node.State)
+			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, node.State)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
 			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
 			merger := signature.NewCombiner()
 
+			// initialize and pre-generate leader selections from the seed
+			selection, err := leader.NewSelectionForConsensus(leader.EstimatedSixMonthOfViews, node.RootBlock.Header, node.RootQC, node.State)
+			if err != nil {
+				return nil, fmt.Errorf("could not create leader selection for main consensus: %w", err)
+			}
+
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
 			// Note: node.Me.NodeID() is not part of the consensus committee
-			mainConsensusCommittee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID())
+			mainConsensusCommittee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID(), selection)
 			if err != nil {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
@@ -167,10 +191,6 @@ func main() {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
 			return sync, nil
-		}).
-		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, node.State, rpcConf, executionRPC, collectionRPC, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.RootChainID)
-			return rpcEng, nil
 		}).
 		Run()
 }

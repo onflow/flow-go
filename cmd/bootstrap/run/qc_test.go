@@ -10,6 +10,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/dkg"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/state/dkg/wrapper"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -49,7 +50,8 @@ func createSignerData(t *testing.T, n int) ParticipantData {
 	seed := make([]byte, crypto.SeedMinLenDKG)
 	_, err = rand.Read(seed)
 	require.NoError(t, err)
-	randomBSKs, randomBPKs, groupKey, err := crypto.ThresholdSignKeyGen(n, seed)
+	randomBSKs, randomBPKs, groupKey, err := crypto.ThresholdSignKeyGen(n,
+		signature.RandomBeaconThreshold(n), seed)
 	require.NoError(t, err)
 
 	pubData := dkg.PublicData{

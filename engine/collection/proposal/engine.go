@@ -66,7 +66,7 @@ func New(
 	sync module.BlockRequester,
 ) (*Engine, error) {
 
-	participants, err := protocol.ClusterFor(protoState.Final(), me.NodeID())
+	participants, _, err := protocol.ClusterFor(protoState.Final(), me.NodeID())
 	if err != nil {
 		return nil, fmt.Errorf("could not get cluster participants: %w", err)
 	}
@@ -92,7 +92,7 @@ func New(
 
 	e.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, e.pending.Size())
 
-	con, err := net.Register(engine.ProtocolClusterConsensus, e)
+	con, err := net.Register(engine.ConsensusCluster, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}

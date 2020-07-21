@@ -66,6 +66,7 @@ func (nc *NoopCollector) OnExecutionResultReceived()                            
 func (nc *NoopCollector) OnVerifiableChunkSent()                                    {}
 func (nc *NoopCollector) OnVerifiableChunkReceived()                                {}
 func (nc *NoopCollector) OnChunkDataPackReceived()                                  {}
+func (nc *NoopCollector) OnChunkDataPackRequested()                                 {}
 func (nc *NoopCollector) OnResultApproval()                                         {}
 func (nc *NoopCollector) OnChunkVerificationStarted(chunkID flow.Identifier)        {}
 func (nc *NoopCollector) OnChunkVerificationFinished(chunkID flow.Identifier)       {}
@@ -99,3 +100,4 @@ func (nc *NoopCollector) ExecutionCollectionRequestRetried()                    
 func (nc *NoopCollector) TransactionParsed(dur time.Duration)                       {}
 func (nc *NoopCollector) TransactionChecked(dur time.Duration)                      {}
 func (nc *NoopCollector) TransactionInterpreted(dur time.Duration)                  {}
+func (nc *NoopCollector) ChunkDataPackRequested()                                   {}

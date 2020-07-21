@@ -45,6 +45,25 @@ type JointFeldmanState struct {
 	jointy []pointG2
 }
 
+// NewJointFeldman creates a new instance of a Joint Feldman protocol.
+//
+// An instance is run by a single node and is usable for only one protocol.
+// In order to run the protocol again, a new instance needs to be created
+func NewJointFeldman(size int, threshold int, currentIndex int,
+	processor DKGProcessor) (DKGState, error) {
+
+	common, err := newDKGCommon(size, threshold, currentIndex, processor, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	jf := &JointFeldmanState{
+		dkgCommon: common,
+	}
+	jf.init()
+	return jf, nil
+}
+
 func (s *JointFeldmanState) init() {
 	s.fvss = make([]feldmanVSSQualState, s.size)
 	for i := 0; i < s.size; i++ {

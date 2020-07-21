@@ -9,7 +9,7 @@ type Spock []byte
 type ExecutionReceipt struct {
 	ExecutorID        Identifier
 	ExecutionResult   ExecutionResult
-	Spocks            []Spock
+	Spocks            []crypto.Signature
 	ExecutorSignature crypto.Signature
 }
 
@@ -18,7 +18,7 @@ func (er *ExecutionReceipt) Body() interface{} {
 	return struct {
 		ExecutorID      Identifier
 		ExecutionResult ExecutionResult
-		Spocks          []Spock
+		Spocks          []crypto.Signature
 	}{
 		ExecutorID:      er.ExecutorID,
 		ExecutionResult: er.ExecutionResult,

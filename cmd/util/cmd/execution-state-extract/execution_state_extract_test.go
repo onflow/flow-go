@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
+	"github.com/dapperlabs/flow-go/storage/ledger/wal"
 
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -117,7 +118,7 @@ func TestExtractExecutionState(t *testing.T) {
 					err := Cmd.Execute()
 					require.NoError(t, err)
 
-					require.FileExists(t, path.Join(outdir, "checkpoint.00000000")) //make sure we have checkpoint file
+					require.FileExists(t, path.Join(outdir, wal.RootCheckpointFilename)) //make sure we have root checkpoint file
 
 					storage, err := ledger.NewMTrieStorage(outdir, 1000, metr, nil)
 
