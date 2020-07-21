@@ -44,6 +44,12 @@ func allFinalizedViews(t *testing.T, nodes []*Instance) [][]uint64 {
 	// verify all nodes arrive at the same state
 	for _, node := range nodes {
 		views := FinalizedViews(node)
+
+		// finalized views ordered from small to large
+		sort.Slice(views, func(i, j int) bool {
+			return views[i] < views[j]
+		})
+
 		allViews = append(allViews, views)
 	}
 
