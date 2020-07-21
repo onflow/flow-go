@@ -476,7 +476,6 @@ func (gs *TransactionsPerSecondSuite) AddKeys(flowClient *client.Client) {
 	err := addKeysTx.AddArgument(bytesToCadenceArray(accountKeyBytes))
 	handle(err)
 
-
 	err = addKeysTx.SignEnvelope(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootSigner)
 	handle(err)
 
