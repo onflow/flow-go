@@ -98,11 +98,6 @@ func (u *Update) SetStateCommitment(sc StateCommitment) {
 	u.stateCommitment = sc
 }
 
-// appendKV append a key value pair to the update
-func (u *Update) appendKV(key *Key, value Value) {
-	u.keys = append(u.keys, *key)
-}
-
 // NewEmptyUpdate returns an empty ledger update
 func NewEmptyUpdate(sc StateCommitment) (*Update, error) {
 	return &Update{stateCommitment: sc}, nil
