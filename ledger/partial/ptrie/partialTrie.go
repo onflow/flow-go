@@ -59,7 +59,7 @@ func (p *PSMT) Get(paths []ledger.Path) ([]*ledger.Payload, []ledger.Path, error
 
 // Update updates registers and returns rootValue after updates
 // in case of error, it returns a list of paths for which update failed
-func (p *PSMT) Update(paths []ledger.Path, payloads []ledger.Payload) ([]byte, []string, error) {
+func (p *PSMT) Update(paths []ledger.Path, payloads []*ledger.Payload) ([]byte, []string, error) {
 	var failedPaths []string
 	for i, path := range paths {
 		payload := payloads[i]
@@ -69,7 +69,7 @@ func (p *PSMT) Update(paths []ledger.Path, payloads []ledger.Payload) ([]byte, [
 			failedPaths = append(failedPaths, string(path))
 			continue
 		}
-		node.hashValue = common.ComputeCompactValue(path, &payload, node.height)
+		node.hashValue = common.ComputeCompactValue(path, payload, node.height)
 	}
 	if len(failedPaths) > 0 {
 		return nil, failedPaths, fmt.Errorf("path(s) doesn't exist")
