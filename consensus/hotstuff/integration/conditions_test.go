@@ -1,5 +1,7 @@
 package integration
 
+import "time"
+
 type Condition func(*Instance) bool
 
 func RightAway(*Instance) bool {
@@ -15,5 +17,12 @@ func ViewFinalized(view uint64) Condition {
 func ViewReached(view uint64) Condition {
 	return func(in *Instance) bool {
 		return in.pacemaker.CurView() >= view
+	}
+}
+
+func AfterPriod(dur time.Duration) Condition {
+	endTime := time.Now().Add(dur)
+	return func(in *Instance) bool {
+		return time.Now().After(endTime)
 	}
 }
