@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -35,7 +34,7 @@ type VerificationCollector struct {
 func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer, log zerolog.Logger) *VerificationCollector {
 
 	// Finder Engine
-	rcvReceiptsTotals := promauto.NewCounter(prometheus.CounterOpts{
+	rcvReceiptsTotals := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "execution_receipt_received_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemFinderEngine,
@@ -46,7 +45,7 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 		log.Debug().Err(err).Msg("could not register rcvReceiptsTotals metric")
 	}
 
-	sntExecutionResultsTotal := promauto.NewCounter(prometheus.CounterOpts{
+	sntExecutionResultsTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "execution_result_sent_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemFinderEngine,
@@ -58,7 +57,7 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 	}
 
 	// Match Engine
-	rcvExecutionResultsTotal := promauto.NewCounter(prometheus.CounterOpts{
+	rcvExecutionResultsTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "execution_result_received_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemMatchEngine,
@@ -69,7 +68,7 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 		log.Debug().Err(err).Msg("could not register rcvExecutionResultsTotal) metric")
 	}
 
-	sntVerifiableChunksTotal := promauto.NewCounter(prometheus.CounterOpts{
+	sntVerifiableChunksTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "verifiable_chunk_sent_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemMatchEngine,
@@ -80,7 +79,7 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 		log.Debug().Err(err).Msg("could not register sntVerifiableChunksTotal metric")
 	}
 
-	rcvChunkDataPackTotal := promauto.NewCounter(prometheus.CounterOpts{
+	rcvChunkDataPackTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "chunk_data_pack_received_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemMatchEngine,
@@ -91,7 +90,7 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 		log.Debug().Err(err).Msg("could not register rcvChunkDataPackTotal metric")
 	}
 
-	reqChunkDataPackTotal := promauto.NewCounter(prometheus.CounterOpts{
+	reqChunkDataPackTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "chunk_data_pack_requested_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemMatchEngine,
@@ -103,7 +102,7 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 	}
 
 	// Verifier Engine
-	rcvVerifiableChunksTotal := promauto.NewCounter(prometheus.CounterOpts{
+	rcvVerifiableChunksTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "verifiable_chunk_received_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemVerifierEngine,
@@ -114,7 +113,7 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 		log.Debug().Err(err).Msg("could not register rcvVerifiableChunksTotal metric")
 	}
 
-	sntResultApprovalTotal := promauto.NewCounter(prometheus.CounterOpts{
+	sntResultApprovalTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "result_approvals_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemVerifierEngine,
@@ -126,7 +125,7 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 	}
 
 	// Storage
-	storagePerChunk := promauto.NewGauge(prometheus.GaugeOpts{
+	storagePerChunk := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name:      "storage_latest_chunk_size_bytes",
 		Namespace: namespaceVerification,
 		Help:      "latest ingested chunk resources storage (bytes)",
