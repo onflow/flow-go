@@ -1,92 +1,89 @@
 package ptrie
 
-// import (
-// 	"bytes"
-// 	"io/ioutil"
-// 	"math/rand"
-// 	"os"
-// 	"testing"
-// 	"time"
+import (
+	"bytes"
+	"io/ioutil"
+	"os"
+	"testing"
 
-// 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/require"
 
-// 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie"
-// 	"github.com/dapperlabs/flow-go/ledger/utils"
-// 	"github.com/dapperlabs/flow-go/module/metrics"
-// )
+	"github.com/dapperlabs/flow-go/ledger"
+	"github.com/dapperlabs/flow-go/ledger/common"
+	"github.com/dapperlabs/flow-go/ledger/complete"
+	"github.com/dapperlabs/flow-go/module/metrics"
+)
 
-// func withMForest(
-// 	t *testing.T,
-// 	keyByteSize int,
-// 	numberOfActiveTries int, f func(t *testing.T, mForest *mtrie.MForest)) {
+func withMForest(
+	t *testing.T,
+	numberOfActiveTries int, f func(t *testing.T, led *complete.Ledger)) {
 
-// 	dir, err := ioutil.TempDir("", "test-mtrie-")
-// 	require.NoError(t, err)
-// 	defer os.RemoveAll(dir)
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
 
-// 	metricsCollector := &metrics.NoopCollector{}
-// 	mForest, err := mtrie.NewMForest(keyByteSize, dir, numberOfActiveTries, metricsCollector, nil)
-// 	require.NoError(t, err)
+	metricsCollector := &metrics.NoopCollector{}
+	led, err := complete.NewLedger(dir, numberOfActiveTries, metricsCollector, nil)
+	require.NoError(t, err)
 
-// 	f(t, mForest)
-// }
+	f(t, led)
+}
 
-// func TestPartialTrieEmptyTrie(t *testing.T) {
+func TestPartialTrieEmptyTrie(t *testing.T) {
 
-// 	pathByteSize := 1 // path size of 8 bits
-// 	withMForest(t, pathByteSize, 10, func(t *testing.T, mForest *mtrie.MForest) {
+	pathByteSize := 1 // path size of 8 bits
+	withMForest(t, pathByteSize, 10, func(t *testing.T, led *complete.Ledger) {
 
-// 		// add path1 to the empty trie
-// 		path1 := make([]byte, 1) // 00000000 (0)
-// 		key1 := []byte{'A'}
-// 		value1 := []byte{'a'}
+		// add path1 to the empty trie
+		// 00000000...0 (0)
+		path1 := common.TwoBytesPath(0)
+		payload1 := common.LightPayload('A', 'a')
 
-// 		paths := [][]byte{path1}
-// 		keys := [][]byte{key1}
-// 		values := [][]byte{value1}
+		paths := []ledger.Path{path1}
+		payload := []ledger.Payload{payload1}
 
-// 		rootHash := mForest.GetEmptyRootHash()
+		rootHash := led.EmptyStateCommitment()
 
-// 		retValues, err := mForest.Read(rootHash, paths)
-// 		require.NoError(t, err, "error reading values")
+		retValues, err := led.Read(rootHash, paths)
+		require.NoError(t, err, "error reading values")
 
-// 		bp, err := mForest.Proofs(rootHash, paths)
-// 		require.NoError(t, err, "error getting proofs values")
+		bp, err := led.Proofs(rootHash, paths)
+		require.NoError(t, err, "error getting proofs values")
 
-// 		encBP, _ := bp.Encode()
-// 		psmt, err := NewPSMT(rootHash, pathByteSize, paths, keys, retValues, encBP)
+		encBP, _ := bp.Encode()
+		psmt, err := NewPSMT(rootHash, pathByteSize, paths, keys, retValues, encBP)
 
-// 		require.NoError(t, err, "error building partial trie")
-// 		if !bytes.Equal(rootHash, psmt.root.ComputeValue()) {
-// 			t.Fatal("rootNode hash doesn't match [before set]")
-// 		}
-// 		newTrie, err := mForest.Update(rootHash, paths, keys, values)
-// 		require.NoError(t, err, "error updating trie")
-// 		rootHash = newTrie.RootHash()
+		require.NoError(t, err, "error building partial trie")
+		if !bytes.Equal(rootHash, psmt.root.ComputeValue()) {
+			t.Fatal("rootNode hash doesn't match [before set]")
+		}
+		newTrie, err := led.Update(rootHash, paths, keys, values)
+		require.NoError(t, err, "error updating trie")
+		rootHash = newTrie.RootHash()
 
-// 		_, _, err = psmt.Update(paths, keys, values)
-// 		require.NoError(t, err, "error updating psmt")
+		_, _, err = psmt.Update(paths, keys, values)
+		require.NoError(t, err, "error updating psmt")
 
-// 		if !bytes.Equal(rootHash, psmt.root.ComputeValue()) {
-// 			t.Fatal("rootNode hash doesn't match [after set]")
-// 		}
+		if !bytes.Equal(rootHash, psmt.root.ComputeValue()) {
+			t.Fatal("rootNode hash doesn't match [after set]")
+		}
 
-// 		updatedValue1 := []byte{'b'}
-// 		values = [][]byte{updatedValue1}
+		updatedValue1 := []byte{'b'}
+		values = [][]byte{updatedValue1}
 
-// 		newTrie, err = mForest.Update(rootHash, paths, keys, values)
-// 		require.NoError(t, err, "error updating trie")
-// 		rootHash = newTrie.RootHash()
+		newTrie, err = mForest.Update(rootHash, paths, keys, values)
+		require.NoError(t, err, "error updating trie")
+		rootHash = newTrie.RootHash()
 
-// 		_, _, err = psmt.Update(paths, keys, values)
-// 		require.NoError(t, err, "error updating psmt")
+		_, _, err = psmt.Update(paths, keys, values)
+		require.NoError(t, err, "error updating psmt")
 
-// 		if !bytes.Equal(rootHash, psmt.root.ComputeValue()) {
-// 			t.Fatal("rootNode hash doesn't match [after update]")
-// 		}
+		if !bytes.Equal(rootHash, psmt.root.ComputeValue()) {
+			t.Fatal("rootNode hash doesn't match [after update]")
+		}
 
-// 	})
-// }
+	})
+}
 
 // func TestPartialTrieLeafUpdates(t *testing.T) {
 

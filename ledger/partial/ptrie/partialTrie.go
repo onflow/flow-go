@@ -34,6 +34,29 @@ func (p *PSMT) RootHash() []byte {
 	return p.root.HashValue()
 }
 
+// Get returns an slice of payloads (same order), an slice of failed paths and errors (if any)
+// TODO return list of indecies instead of paths
+func (p *PSMT) Get(paths []ledger.Path) ([]*ledger.Payload, []ledger.Path, error) {
+	var failedPaths []ledger.Path
+	payloads := make([]*ledger.Payload, 0)
+	for _, path := range paths {
+		// lookup the path for the payload
+		node, found := p.pathLookUp[string(path)]
+		if !found {
+			payloads = append(payloads, nil)
+			failedPaths = append(failedPaths, path)
+			continue
+		}
+		payloads = append(payloads, node.payload)
+	}
+	if len(failedPaths) > 0 {
+		return payloads, failedPaths, fmt.Errorf("path(s) doesn't exist")
+	}
+
+	// after updating all the nodes, compute the value recursively only once
+	return payloads, failedPaths, nil
+}
+
 // Update updates registers and returns rootValue after updates
 // in case of error, it returns a list of paths for which update failed
 func (p *PSMT) Update(paths []ledger.Path, payloads []ledger.Payload) ([]byte, []string, error) {
