@@ -13,22 +13,21 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func StorageLayer(t testing.TB, db *badger.DB) (*storage.Headers, *storage.Identities, *storage.Guarantees, *storage.Seals, *storage.Index, *storage.Payloads, *storage.Blocks) {
+func StorageLayer(t testing.TB, db *badger.DB) (*storage.Headers, *storage.Guarantees, *storage.Seals, *storage.Index, *storage.Payloads, *storage.Blocks) {
 	metrics := metrics.NewNoopCollector()
 	headers := storage.NewHeaders(metrics, db)
-	identities := storage.NewIdentities(metrics, db)
 	guarantees := storage.NewGuarantees(metrics, db)
 	seals := storage.NewSeals(metrics, db)
 	index := storage.NewIndex(metrics, db)
-	payloads := storage.NewPayloads(db, index, identities, guarantees, seals)
+	payloads := storage.NewPayloads(db, index, guarantees, seals)
 	blocks := storage.NewBlocks(db, headers, payloads)
-	return headers, identities, guarantees, seals, index, payloads, blocks
+	return headers, guarantees, seals, index, payloads, blocks
 }
 
-func RunWithStorageLayer(t testing.TB, f func(*badger.DB, *storage.Headers, *storage.Identities, *storage.Guarantees, *storage.Seals, *storage.Index, *storage.Payloads, *storage.Blocks)) {
+func RunWithStorageLayer(t testing.TB, f func(*badger.DB, *storage.Headers, *storage.Guarantees, *storage.Seals, *storage.Index, *storage.Payloads, *storage.Blocks)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		headers, identities, guarantees, seals, index, payloads, blocks := StorageLayer(t, db)
-		f(db, headers, identities, guarantees, seals, index, payloads, blocks)
+		headers, guarantees, seals, index, payloads, blocks := StorageLayer(t, db)
+		f(db, headers, guarantees, seals, index, payloads, blocks)
 	})
 }
 

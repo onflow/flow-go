@@ -31,28 +31,22 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		return nil, s.err
 	}
 
-	// retrieve the root height
-	var height uint64
-	err := s.state.db.View(operation.RetrieveRootHeight(&height))
+	// retrieve the current epoch
+	var counter uint64
+	err := s.state.db.View(operation.RetrieveEpochCounter(&counter))
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve root height: %w", err)
 	}
 
-	// retrieve root block ID
-	var rootID flow.Identifier
-	err = s.state.db.View(operation.LookupBlockHeight(height, &rootID))
+	// retrieve the identities for the epoch
+	var identities flow.IdentityList
+	err = s.state.db.View(operation.RetrieveEpochIdentities(counter, &identities))
 	if err != nil {
-		return nil, fmt.Errorf("could not look up root block: %w", err)
-	}
-
-	// retrieve identities from storage
-	payload, err := s.state.payloads.ByBlockID(rootID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get root block payload: %w", err)
+		return nil, fmt.Errorf("could not retrieve epoch identities: %w", err)
 	}
 
 	// apply the filter to the identities
-	identities := payload.Identities.Filter(selector)
+	identities = identities.Filter(selector)
 
 	// apply a deterministic sort to the identities
 	sort.Slice(identities, func(i int, j int) bool {

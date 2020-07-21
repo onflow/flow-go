@@ -47,6 +47,10 @@ const (
 	codePayloadSeals      = 53 // index mapping block ID to payload seals
 	codeCollectionBlock   = 54 // index mapping collection ID to block ID
 
+	// codes related to epoch storage
+	codeEpochCounter    = 60
+	codeEpochIdentities = 61
+
 	// legacy codes (should be cleaned up)
 	codeChunkDataPack                = 100
 	codeCommit                       = 101

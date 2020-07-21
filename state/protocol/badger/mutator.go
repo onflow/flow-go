@@ -36,6 +36,17 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 			return fmt.Errorf("root block seal for wrong execution result (%x != %x)", seal.ResultID, result.ID())
 		}
 
+		// EPOCHS: If we bootstrap with epochs, we no longer need identities as a payload to the root block; instead, we
+		// want to see two system events with all necessary information: one epoch setup and one epoch commit.
+
+		if len(seal.SystemEvents) != 2 {
+			return fmt.Errorf("root block seal must contain two system events (have %d)", len(seal.SystemEvents))
+		}
+
+		// TODO: see how we can decode these without having circular dependency between SDK and main repo
+		var setup *flow.EpochSetup
+		// var commit *flow.EpochCommit
+
 		// FIRST: validate the root block and its payload
 
 		// NOTE: we might need to relax these restrictions and find a way to process the
@@ -51,9 +62,9 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 			return fmt.Errorf("root block must not have seals")
 		}
 
-		// the root block needs at least one identity for each role
+		// the root identities need at least one identity for each role
 		roles := make(map[flow.Role]uint)
-		for _, identity := range root.Payload.Identities {
+		for _, identity := range setup.Identities {
 			roles[identity.Role]++
 		}
 		if roles[flow.RoleConsensus] < 1 {
@@ -69,9 +80,14 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 			return fmt.Errorf("need at least one verification node")
 		}
 
-		// the root block should not contain duplicate identities
+		// we should have at least one root collection cluster
+		if setup.Clusters.Size() == 0 {
+			return fmt.Errorf("need at least one colletion cluster")
+		}
+
+		// the root identities should not contain duplicates
 		identLookup := make(map[flow.Identifier]struct{})
-		for _, identity := range root.Payload.Identities {
+		for _, identity := range setup.Identities {
 			_, ok := identLookup[identity.NodeID]
 			if ok {
 				return fmt.Errorf("duplicate node identifier (%x)", identity.NodeID)
@@ -79,9 +95,9 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 			identLookup[identity.NodeID] = struct{}{}
 		}
 
-		// the root block identities should not contain duplicate addresses
+		// the root identities should not contain duplicate addresses
 		addrLookup := make(map[string]struct{})
-		for _, identity := range root.Payload.Identities {
+		for _, identity := range setup.Identities {
 			_, ok := addrLookup[identity.Address]
 			if ok {
 				return fmt.Errorf("duplicate node address (%x)", identity.Address)
@@ -89,8 +105,8 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 			addrLookup[identity.Address] = struct{}{}
 		}
 
-		// the root block identities should all have a non-zero stake
-		for _, identity := range root.Payload.Identities {
+		// the root identities should all have a non-zero stake
+		for _, identity := range setup.Identities {
 			if identity.Stake == 0 {
 				return fmt.Errorf("zero stake identity (%x)", identity.NodeID)
 			}
@@ -154,6 +170,16 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 			return fmt.Errorf("could not insert sealed height: %w", err)
 		}
 
+		// 5) initialize values related to the epoch logic
+		err = operation.InsertEpochCounter(setup.Counter)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert epoch counter: %w", err)
+		}
+		err = operation.InsertEpochIdentities(setup.Counter, setup.Identities)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert epoch identities: %w", err)
+		}
+
 		m.state.metrics.FinalizedHeight(root.Header.Height)
 		m.state.metrics.BlockFinalized(root)
 
@@ -172,9 +198,6 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 
 	header := candidate.Header
 	payload := candidate.Payload
-	if len(payload.Identities) > 0 {
-		return state.NewInvalidExtensionError("extend block has identities")
-	}
 	if payload.Hash() != header.PayloadHash {
 		return state.NewInvalidExtensionError("payload integrity check failed")
 	}

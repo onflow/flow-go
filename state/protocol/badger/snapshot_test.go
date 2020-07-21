@@ -63,42 +63,6 @@ func TestHead(t *testing.T) {
 	})
 }
 
-func TestIdentity(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		identity := unittest.IdentityFixture()
-		blockID := unittest.IdentifierFixture()
-
-		err := db.Update(operation.InsertRootHeight(0))
-		require.NoError(t, err)
-
-		err = db.Update(operation.InsertFinalizedHeight(0))
-		require.NoError(t, err)
-
-		err = db.Update(operation.IndexBlockHeight(0, blockID))
-		require.NoError(t, err)
-
-		err = db.Update(operation.InsertIdentity(identity.ID(), identity))
-		require.NoError(t, err)
-
-		err = db.Update(operation.IndexPayloadIdentities(blockID, []flow.Identifier{identity.NodeID}))
-		require.NoError(t, err)
-
-		err = db.Update(operation.IndexPayloadGuarantees(blockID, nil))
-		require.NoError(t, err)
-
-		err = db.Update(operation.IndexPayloadSeals(blockID, nil))
-		require.NoError(t, err)
-
-		actual, err := state.Final().Identity(identity.NodeID)
-		require.NoError(t, err)
-		assert.EqualValues(t, identity, actual)
-
-		_, err = state.Final().Identity(unittest.IdentifierFixture())
-		require.Error(t, err)
-	})
-}
-
 func TestIdentities(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
@@ -114,12 +78,10 @@ func TestIdentities(t *testing.T) {
 		err = db.Update(operation.IndexBlockHeight(0, blockID))
 		require.NoError(t, err)
 
-		for _, identity := range identities {
-			err = db.Update(operation.InsertIdentity(identity.ID(), identity))
-			require.NoError(t, err)
-		}
+		err = db.Update(operation.InsertEpochCounter(1337))
+		require.NoError(t, err)
 
-		err = db.Update(operation.IndexPayloadIdentities(blockID, flow.GetIDs(identities)))
+		err = db.Update(operation.InsertEpochIdentities(1337, identities))
 		require.NoError(t, err)
 
 		err = db.Update(operation.IndexPayloadGuarantees(blockID, nil))
@@ -149,12 +111,10 @@ func TestClusters(t *testing.T) {
 		err = db.Update(operation.IndexBlockHeight(0, blockID))
 		require.NoError(t, err)
 
-		for _, identity := range identities {
-			err = db.Update(operation.InsertIdentity(identity.ID(), identity))
-			require.NoError(t, err)
-		}
+		err = db.Update(operation.InsertEpochCounter(1337))
+		require.NoError(t, err)
 
-		err = db.Update(operation.IndexPayloadIdentities(blockID, flow.GetIDs(identities)))
+		err = db.Update(operation.InsertEpochIdentities(1337, identities))
 		require.NoError(t, err)
 
 		err = db.Update(operation.IndexPayloadGuarantees(blockID, nil))

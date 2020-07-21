@@ -9,10 +9,12 @@ import (
 	"github.com/dapperlabs/flow-go/model/fingerprint"
 )
 
-// List of built-in account event types.
+// List of built-in event types.
 const (
 	EventAccountCreated EventType = "flow.AccountCreated"
 	EventAccountUpdated EventType = "flow.AccountUpdated"
+	EventEpochSetup     EventType = "flow.EpochSetup"
+	EventEpochCommit    EventType = "flow.EpochCommit"
 )
 
 type EventType string
@@ -68,4 +70,22 @@ func wrapEvent(e Event) eventWrapper {
 		TxID:  e.TransactionID[:],
 		Index: e.EventIndex,
 	}
+}
+
+type EpochSetup struct {
+	Counter    uint64
+	FinalView  uint64
+	Identities IdentityList
+	Clusters   *ClusterList
+	Seed       []byte
+}
+
+// TODO: the usage of flow events inside of the main repo
+// creates significant issues around dependencies for
+// transactions events, which are mostly located in the
+// SDK repo for now.
+type EpochCommit struct {
+	Counter uint64
+	// DKGData    *dkg.PublicData
+	// ClusterQCs []*model.QuorumCertificate
 }

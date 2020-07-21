@@ -7,6 +7,7 @@ type Seal struct {
 	ResultID     Identifier
 	InitialState StateCommitment
 	FinalState   StateCommitment
+	SystemEvents []*Event
 }
 
 func (s Seal) Body() interface{} {
