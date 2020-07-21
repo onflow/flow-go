@@ -163,8 +163,7 @@ void bn_sum_vector(bn_t jointx, bn_st* x, int len) {
     bn_free(r);
 }
 
-// computes the sum of the array elements y and writes the sum in jointy
-// the sum is computed in G2
+// computes the sum of the G2 array elements y and writes the sum in jointy
 void ep2_sum_vector(ep2_t jointy, ep2_st* y, int len){
     ep2_set_infty(jointy);
     for (int i=0; i<len; i++){

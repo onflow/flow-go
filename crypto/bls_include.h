@@ -43,4 +43,7 @@ int      check_membership_G2(const ep2_t);
 
 void     map_to_G1(ep_t, const byte*, const int);
 void     opswu_test(uint8_t *, const uint8_t *, int);
+
+// bls multi signature
+int G1_sum_vector(byte*, const byte*, const int);
 #endif
