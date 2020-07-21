@@ -41,6 +41,7 @@ func main() {
 		collectionLimit uint
 		receiptLimit    uint
 		ingestEng       *ingestion.Engine
+		requestEng      *requester.Engine
 		followerEng     *followereng.Engine
 		syncCore        *synchronization.Core
 		rpcConf         rpc.Config
@@ -100,7 +101,7 @@ func main() {
 			return rpcEng, nil
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			requestEng, err := requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
+			requestEng, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
 				engine.RequestCollections,
 				filter.HasRole(flow.RoleCollection),
 				func() flow.Entity { return &flow.Collection{} },
@@ -112,10 +113,15 @@ func main() {
 			requestEng.WithHandle(ingestEng.OnCollection)
 			return ingestEng, err
 		}).
+		Component("requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
+			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
+			// be handled by the scaffold.
+			return requestEng, nil
+		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
-			// TODO frequency of 0 turns off the cleaner, turn back on once we know the proper tuning
 			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
 
 			// create a finalizer that will handle updating the protocol
