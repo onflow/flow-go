@@ -119,6 +119,13 @@ func (p Path) Equals(o Path) bool {
 	return bytes.Equal([]byte(p), []byte(o))
 }
 
+// DeepCopy returns a deep copy of the payload
+func (p *Path) DeepCopy() Path {
+	newP := make([]byte, len(*p))
+	copy(newP, *p)
+	return Path(newP)
+}
+
 // Payload is the smallest immutable storable unit in ledger
 type Payload struct {
 	Key   Key
@@ -153,6 +160,13 @@ func (p *Payload) Equals(other *Payload) bool {
 		return false
 	}
 	return true
+}
+
+// DeepCopy returns a deep copy of the payload
+func (p *Payload) DeepCopy() *Payload {
+	k := p.Key.DeepCopy()
+	v := p.Value.DeepCopy()
+	return &Payload{Key: k, Value: v}
 }
 
 // NewPayload returns a new payload
@@ -271,6 +285,24 @@ func NewTrieBatchProofWithEmptyProofs(numberOfProofs int) *TrieBatchProof {
 // Size returns the number of proofs
 func (bp *TrieBatchProof) Size() int {
 	return len(bp.Proofs)
+}
+
+// Paths returns the slice of paths for this batch proof
+func (bp *TrieBatchProof) Paths() []Path {
+	paths := make([]Path, 0)
+	for _, p := range bp.Proofs {
+		paths = append(paths, p.Path)
+	}
+	return paths
+}
+
+// Payloads returns the slice of paths for this batch proof
+func (bp *TrieBatchProof) Payloads() []*Payload {
+	payloads := make([]*Payload, 0)
+	for _, p := range bp.Proofs {
+		payloads = append(payloads, p.Payload)
+	}
+	return payloads
 }
 
 func (bp *TrieBatchProof) String() string {
