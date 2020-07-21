@@ -114,14 +114,14 @@ func main() {
 			return ingestEng, err
 		}).
 		Component("requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			// Since we are not manually calling Force on access, we'll have make sure the requester engine and it's loop is started
-			// Easiest way to do this is to register it as a component, which will properly call it's Ready func
+			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
+			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
+			// be handled by the scaffold.
 			return requestEng, nil
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
-			// TODO frequency of 0 turns off the cleaner, turn back on once we know the proper tuning
 			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
 
 			// create a finalizer that will handle updating the protocol

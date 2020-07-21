@@ -189,7 +189,13 @@ func main() {
 
 			return ingestionEng, err
 		}).
-		// TODO: currently issues with this engine on the EXE node, as there  is no follower engine, https://github.com/dapperlabs/flow-go/issues/4382
+		Component("requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
+			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
+			// be handled by the scaffold.
+			return requestEng, nil
+		}).
+		// TODO: currently issues with this engine on the EXE node, as there is no follower engine, https://github.com/dapperlabs/flow-go/issues/4382
 		// Component("sychronization engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 		// 	// initialize the synchronization engine
 		// 	syncEngine, err = synchronization.New(
