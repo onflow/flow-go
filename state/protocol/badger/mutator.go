@@ -175,9 +175,21 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		if err != nil {
 			return fmt.Errorf("could not insert epoch counter: %w", err)
 		}
+		err = operation.InsertEpochSeed(setup.Counter, setup.Seed)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert epoch seed: %w", err)
+		}
+		err = operation.InsertEpochEnd(setup.Counter, setup.FinalView)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert eoch end: %w", err)
+		}
 		err = operation.InsertEpochIdentities(setup.Counter, setup.Identities)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert epoch identities: %w", err)
+		}
+		err = operation.InsertEpochClusters(setup.Counter, setup.Clusters.All())(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert epoch clusters: %w", err)
 		}
 
 		m.state.metrics.FinalizedHeight(root.Header.Height)

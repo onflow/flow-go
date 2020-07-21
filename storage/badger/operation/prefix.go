@@ -49,7 +49,10 @@ const (
 
 	// codes related to epoch storage
 	codeEpochCounter    = 60
-	codeEpochIdentities = 61
+	codeEpochSeed       = 61
+	codeEpochEnd        = 62
+	codeEpochIdentities = 63
+	codeEpochClusters   = 64
 
 	// legacy codes (should be cleaned up)
 	codeChunkDataPack                = 100
