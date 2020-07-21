@@ -83,21 +83,12 @@ func TestThreeInstances(t *testing.T) {
 	}
 	wg.Wait()
 
-	// check that all instances have the same finalized block
-	in1 := instances[0]
-	in2 := instances[1]
-	in3 := instances[2]
-	// verify progress has been made
-	assert.GreaterOrEqual(t, in1.forks.FinalizedBlock().View, finalView, "the first instance 's finalized view should be four lower than current view")
-	// verify same progresses have been made
-	assert.Equal(t, in1.forks.FinalizedBlock(), in2.forks.FinalizedBlock(), "second instance should have same finalized block as first instance")
-	assert.Equal(t, in1.forks.FinalizedBlock(), in3.forks.FinalizedBlock(), "third instance should have same finalized block as first instance")
-	assert.Equal(t, FinalizedViews(in1), FinalizedViews(in2))
-	assert.Equal(t, FinalizedViews(in1), FinalizedViews(in3))
+	allViews := allFinalizedViews(t, instances)
+	assertSafety(t, allViews)
+	assertLiveness(t, allViews, finalView)
 }
 
 func TestSevenInstances(t *testing.T) {
-	t.Skip()
 	// test parameters
 	// NOTE: block finalization seems to be rather slow on CI at the moment,
 	// needing around 1 minute on Travis for 1000 blocks and 10 minutes on
@@ -108,7 +99,8 @@ func TestSevenInstances(t *testing.T) {
 
 	// When using 100 as finalView, I often saw this tests fail on CI, because it only made to around 64-86
 	// so using 30 will still check that it's making progress and give enough buffer.
-	finalView := uint64(30)
+	finalView := uint64(100)
+	runFor := 3 * time.Second
 
 	// generate the seven hotstuff participants
 	participants := unittest.IdentityListFixture(numPass + numFail)
@@ -124,7 +116,7 @@ func TestSevenInstances(t *testing.T) {
 			WithParticipants(participants),
 			WithLocalID(participants[n].NodeID),
 			WithTimeouts(timeouts),
-			WithStopCondition(ViewFinalized(finalView)),
+			WithStopCondition(AfterPriod(runFor)),
 		)
 		instances = append(instances, in)
 	}
@@ -136,7 +128,7 @@ func TestSevenInstances(t *testing.T) {
 			WithParticipants(participants),
 			WithLocalID(participants[n].NodeID),
 			WithTimeouts(timeouts),
-			WithStopCondition(ViewFinalized(finalView)),
+			WithStopCondition(AfterPriod(runFor)),
 			WithOutgoingVotes(BlockAllVotes),
 		)
 		instances = append(instances, in)
@@ -157,12 +149,7 @@ func TestSevenInstances(t *testing.T) {
 	}
 	wg.Wait()
 
-	// check that all instances have the same finalized block
-	ref := instances[0]
-	assert.Less(t, finalView-uint64(2*numPass+numFail), ref.forks.FinalizedBlock().View, "expect instance 0 should made enough progress, but didn't")
-	finalizedViews := FinalizedViews(ref)
-	for i := 1; i < numPass; i++ {
-		assert.Equal(t, ref.forks.FinalizedBlock(), instances[i].forks.FinalizedBlock(), "instance %d should have same finalized block as first instance")
-		assert.Equal(t, finalizedViews, FinalizedViews(instances[i]), "instance %d should have same finalized view as first instance")
-	}
+	allViews := allFinalizedViews(t, instances)
+	assertSafety(t, allViews)
+	assertLiveness(t, allViews, finalView)
 }

@@ -1,6 +1,12 @@
 package integration
 
-import "github.com/dapperlabs/flow-go/model/flow"
+import (
+	"sort"
+	"testing"
+
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/stretchr/testify/require"
+)
 
 func FinalizedBlocks(in *Instance) []*flow.Header {
 	finalized := make([]*flow.Header, 0)
@@ -30,4 +36,42 @@ func FinalizedViews(in *Instance) []uint64 {
 		views = append(views, b.View)
 	}
 	return views
+}
+
+func allFinalizedViews(t *testing.T, nodes []*Instance) [][]uint64 {
+	allViews := make([][]uint64, 0)
+
+	// verify all nodes arrive at the same state
+	for _, node := range nodes {
+		views := FinalizedViews(node)
+		allViews = append(allViews, views)
+	}
+
+	// sort all Views by chain length
+	sort.Slice(allViews, func(i, j int) bool {
+		return len(allViews[i]) < len(allViews[j])
+	})
+
+	return allViews
+}
+
+func assertSafety(t *testing.T, allViews [][]uint64) {
+	// find the longest chain of finalized views
+	longest := allViews[len(allViews)-1]
+
+	for _, views := range allViews {
+		// each view in a chain should match with the longest chain
+		for j, view := range views {
+			require.Equal(t, longest[j], view, "each view in a chain must match with the view in longest chain at the same height, but didn't")
+		}
+	}
+}
+
+// assert all finalized views must have reached a given view to ensure enough process has been made
+func assertLiveness(t *testing.T, allViews [][]uint64, view uint64) {
+	// the shortest chain must made enough progress
+	shortest := allViews[0]
+	require.Greater(t, len(shortest), 0, "no block was finalized")
+	highestView := shortest[len(shortest)-1]
+	require.Greater(t, highestView, view, "did not finalize enough block")
 }
