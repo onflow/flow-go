@@ -60,7 +60,7 @@ func NewTransactionCollector(transactionTimings mempool.TransactionTimings, log 
 			BufCap:     500,
 		}),
 		timeToFinalizedExecuted: promauto.NewSummary(prometheus.SummaryOpts{
-			Name:      "time_to_executed_finalized_seconds",
+			Name:      "time_to_finalized_executed_seconds",
 			Namespace: namespaceAccess,
 			Subsystem: subsystemTransactionTiming,
 			Help: "the duration of how long it took between the transaction was received until it was both " +
@@ -94,13 +94,8 @@ func (tc *TransactionCollector) TransactionFinalized(txID flow.Identifier, when 
 		return
 	}
 
-	if tc.logTimeToFinalized {
-		tc.logTTF(t)
-	}
-
-	if tc.logTimeToFinalizedExecuted {
-		tc.logTTEF(t)
-	}
+	tc.trackTTF(t, tc.logTimeToFinalized)
+	tc.trackTTFE(t, tc.logTimeToFinalizedExecuted)
 
 	// remove transaction timing from mempool if finalized and executed
 	if !t.Finalized.IsZero() && !t.Executed.IsZero() {
@@ -118,13 +113,8 @@ func (tc *TransactionCollector) TransactionExecuted(txID flow.Identifier, when t
 		return
 	}
 
-	if tc.logTimeToExecuted {
-		tc.logTTE(t)
-	}
-
-	if tc.logTimeToFinalizedExecuted {
-		tc.logTTEF(t)
-	}
+	tc.trackTTE(t, tc.logTimeToExecuted)
+	tc.trackTTFE(t, tc.logTimeToFinalizedExecuted)
 
 	// remove transaction timing from mempool if finalized and executed
 	if !t.Finalized.IsZero() && !t.Executed.IsZero() {
@@ -132,33 +122,50 @@ func (tc *TransactionCollector) TransactionExecuted(txID flow.Identifier, when t
 	}
 }
 
-func (tc *TransactionCollector) logTTF(t *flow.TransactionTiming) {
+func (tc *TransactionCollector) trackTTF(t *flow.TransactionTiming, log bool) {
 	if t.Received.IsZero() || t.Finalized.IsZero() {
 		return
 	}
 
-	tc.log.Info().Str("transaction_id", t.TransactionID.String()).Int64("duration", int64(t.Finalized.Sub(t.Received))).
-		Msg("transaction time to finalized")
+	duration := t.Finalized.Sub(t.Received).Seconds()
+
+	tc.timeToFinalized.Observe(duration)
+
+	if log {
+		tc.log.Info().Str("transaction_id", t.TransactionID.String()).Float64("duration", duration).
+			Msg("transaction time to finalized")
+	}
 }
 
-func (tc *TransactionCollector) logTTE(t *flow.TransactionTiming) {
+func (tc *TransactionCollector) trackTTE(t *flow.TransactionTiming, log bool) {
 	if t.Received.IsZero() || t.Executed.IsZero() {
 		return
 	}
 
-	tc.log.Info().Str("transaction_id", t.TransactionID.String()).Int64("duration", int64(t.Executed.Sub(t.Received))).
-		Msg("transaction time to executed")
+	duration := t.Executed.Sub(t.Received).Seconds()
+
+	tc.timeToExecuted.Observe(duration)
+
+	if log {
+		tc.log.Info().Str("transaction_id", t.TransactionID.String()).Float64("duration", duration).
+			Msg("transaction time to executed")
+	}
 }
 
-func (tc *TransactionCollector) logTTEF(t *flow.TransactionTiming) {
+func (tc *TransactionCollector) trackTTFE(t *flow.TransactionTiming, log bool) {
 	if t.Received.IsZero() || t.Finalized.IsZero() || t.Executed.IsZero() {
 		return
 	}
 
-	finalizedAndExecuted := t.Finalized.Sub(t.Received)
+	duration := t.Finalized.Sub(t.Received).Seconds()
 	if t.Executed.After(t.Finalized) {
-		finalizedAndExecuted = t.Executed.Sub(t.Received)
+		duration = t.Executed.Sub(t.Received).Seconds()
 	}
-	tc.log.Info().Str("transaction_id", t.TransactionID.String()).Int64("duration", int64(finalizedAndExecuted)).
-		Msg("transaction time to finalized and executed")
+
+	tc.timeToFinalizedExecuted.Observe(duration)
+
+	if log {
+		tc.log.Info().Str("transaction_id", t.TransactionID.String()).Float64("duration", duration).
+			Msg("transaction time to finalized and executed")
+	}
 }
