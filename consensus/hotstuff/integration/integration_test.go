@@ -18,6 +18,7 @@ import (
 const safeTimeout = 2 * time.Second
 const safeDecrease = 200 * time.Millisecond
 const safeDecreaseFactor = 0.85
+const livenessViewFactor = 0.9
 
 func TestSingleInstance(t *testing.T) {
 
@@ -48,7 +49,6 @@ func TestThreeInstances(t *testing.T) {
 	// number low here
 	num := 3
 	finalView := uint64(30)
-	// runFor := 30 * time.Second
 
 	// generate three hotstuff participants
 	participants := unittest.IdentityListFixture(num)
@@ -86,7 +86,7 @@ func TestThreeInstances(t *testing.T) {
 
 	allViews := allFinalizedViews(t, instances)
 	assertSafety(t, allViews)
-	assertLiveness(t, allViews, finalView)
+	assertLiveness(t, allViews, uint64(float64(finalView)*livenessViewFactor))
 }
 
 func TestSevenInstances(t *testing.T) {
@@ -152,5 +152,5 @@ func TestSevenInstances(t *testing.T) {
 
 	allViews := allFinalizedViews(t, instances)
 	assertSafety(t, allViews)
-	assertLiveness(t, allViews, finalView)
+	assertLiveness(t, allViews, uint64(float64(finalView)*livenessViewFactor))
 }
