@@ -56,8 +56,8 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 		if !bytes.Equal(rootHash, psmt.root.HashValue()) {
 			t.Fatal("rootNode hash doesn't match [before set]")
 		}
-		r = &ledger.TrieUpdate{rootHash, paths, payloads}
-		rootHash, err = f.Update(r)
+		u := &ledger.TrieUpdate{rootHash, paths, payloads}
+		rootHash, err = f.Update(u)
 		require.NoError(t, err, "error updating trie")
 
 		_, _, err = psmt.Update(paths, payloads)
@@ -70,7 +70,7 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 		updatedPayload1 := common.LightPayload('B', 'b')
 		payloads = []*ledger.Payload{updatedPayload1}
 
-		u := &ledger.TrieUpdate{rootHash, paths, payloads}
+		u = &ledger.TrieUpdate{rootHash, paths, payloads}
 		rootHash, err = f.Update(u)
 		require.NoError(t, err, "error updating trie")
 
@@ -247,7 +247,6 @@ func TestMixProof(t *testing.T) {
 		payload1 := common.LightPayload('A', 'a')
 
 		path2 := common.TwoBytesPath(2)
-		payload2 := common.LightPayload('C', 'c')
 		updatedPayload2 := common.LightPayload('D', 'd')
 
 		path3 := common.TwoBytesPath(8)
