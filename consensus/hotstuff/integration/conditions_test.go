@@ -20,7 +20,7 @@ func ViewReached(view uint64) Condition {
 	}
 }
 
-func AfterPriod(dur time.Duration) Condition {
+func AfterDuration(dur time.Duration) Condition {
 	endTime := time.Now().Add(dur)
 	return func(in *Instance) bool {
 		return time.Now().After(endTime)
