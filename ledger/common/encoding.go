@@ -617,10 +617,16 @@ func decodeTrieProof(inp []byte) (*ledger.TrieProof, error) {
 
 	// Inclusion flag
 	byteInclusion, rest, err := ReadSlice(inp, 1)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding proof: %w", err)
+	}
 	pInst.Inclusion, _ = IsBitSet(byteInclusion, 0)
 
 	// read steps
 	steps, rest, err := ReadUint8(rest)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding proof: %w", err)
+	}
 	pInst.Steps = steps
 
 	// read flags
