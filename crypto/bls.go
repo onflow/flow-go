@@ -78,7 +78,7 @@ func (sk *PrKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, erro
 	return newBLSBLS12381().blsSign(&sk.scalar, h), nil
 }
 
-// BLS_KMACFunction is the customizer used for KMAC in BLS
+// blsKMACFunction is the customizer used for KMAC in BLS
 const blsKMACFunction = "H2C"
 
 // NewBLSKMAC returns a new KMAC128 instance with the right parameters

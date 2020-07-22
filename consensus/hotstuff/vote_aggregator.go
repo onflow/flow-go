@@ -9,7 +9,7 @@ type VoteAggregator interface {
 
 	// StorePendingVote is used to store a vote for a block for which we don't
 	// have a block yet.
-	StorePendingVote(vote *model.Vote) bool
+	StorePendingVote(vote *model.Vote) (bool, error)
 
 	// StoreVoteAndBuildQC will store a vote and build the QC related to the
 	// voted upon block if enough votes can be accumulated.

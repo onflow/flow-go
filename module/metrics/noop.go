@@ -68,8 +68,6 @@ func (nc *NoopCollector) OnVerifiableChunkReceived()                            
 func (nc *NoopCollector) OnChunkDataPackReceived()                                  {}
 func (nc *NoopCollector) OnChunkDataPackRequested()                                 {}
 func (nc *NoopCollector) OnResultApproval()                                         {}
-func (nc *NoopCollector) OnChunkVerificationStarted(chunkID flow.Identifier)        {}
-func (nc *NoopCollector) OnChunkVerificationFinished(chunkID flow.Identifier)       {}
 func (nc *NoopCollector) LogVerifiableChunkSize(size float64)                       {}
 func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)      {}
 func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)     {}

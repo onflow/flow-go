@@ -96,6 +96,9 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
 	require.NoError(t, err)
 
+	// sets staking public key of the node
+	identity.StakingPubKey = sk.PublicKey()
+
 	me, err := local.New(identity, sk)
 	require.NoError(t, err)
 
