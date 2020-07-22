@@ -10,7 +10,9 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
@@ -26,46 +28,51 @@ import (
 type Engine struct {
 	unit    *engine.Unit            // used to manage concurrency & shutdown
 	log     zerolog.Logger          // used to log relevant actions with context
-	metrics module.EngineMetrics    // used to track sent & received messages
 	tracer  module.Tracer           // used for tracing
+	metrics module.EngineMetrics    // used to track sent & received messages
+	mempool module.MempoolMetrics   // used to track mempool metrics
 	spans   module.ConsensusMetrics // used to track consensus spans
-	prop    network.Engine          // used to process & propagate collections
 	state   protocol.State          // used to access the protocol state
 	headers storage.Headers         // used to retrieve headers
 	me      module.Local            // used to access local node information
+	pool    mempool.Guarantees      // used to keep pending guarantees in pool
+	con     network.Conduit         // conduit to receive/send guarantees
 }
 
 // New creates a new collection propagation engine.
 func New(
 	log zerolog.Logger,
-	metrics module.EngineMetrics,
 	tracer module.Tracer,
+	metrics module.EngineMetrics,
 	spans module.ConsensusMetrics,
+	mempool module.MempoolMetrics,
 	net module.Network,
-	prop network.Engine,
 	state protocol.State,
 	headers storage.Headers,
 	me module.Local,
+	pool mempool.Guarantees,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		unit:    engine.NewUnit(),
 		log:     log.With().Str("engine", "ingestion").Logger(),
-		metrics: metrics,
 		tracer:  tracer,
+		metrics: metrics,
+		mempool: mempool,
 		spans:   spans,
-		prop:    prop,
 		state:   state,
 		headers: headers,
 		me:      me,
+		pool:    pool,
 	}
 
 	// register the engine with the network layer and store the conduit
-	_, err := net.Register(engine.CollectionProvider, e)
+	con, err := net.Register(engine.ReceiveGuarantees, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
+	e.con = con
 
 	return e, nil
 }
@@ -122,15 +129,16 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
 	case *flow.CollectionGuarantee:
 		e.metrics.MessageReceived(metrics.EngineConsensusIngestion, metrics.MessageCollectionGuarantee)
-		return e.onCollectionGuarantee(originID, ev)
+		return e.onGuarantee(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
 }
 
-// onCollectionGuarantee is used to process collection guarantees received
+// onGuarantee is used to process collection guarantees received
 // from nodes that are not consensus nodes (notably collection nodes).
-func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
+func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
+
 	span := e.tracer.StartSpan(guarantee.CollectionID, trace.CONProcessCollection)
 	// TODO finish span if we error? How are they shown in Jaeger?
 	span.SetTag("collection_id", guarantee.CollectionID)
@@ -143,7 +151,14 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 		Int("signers", len(guarantee.SignerIDs)).
 		Logger()
 
-	log.Info().Msg("collection guarantee received from collection cluster")
+	log.Info().Msg("collection guarantee received")
+
+	// skip collection guarantees that are already in our memory pool
+	exists := e.pool.Has(guarantee.ID())
+	if exists {
+		log.Debug().Msg("skipping known collection guarantee")
+		return nil
+	}
 
 	// ensure there is at least one guarantor
 	guarantors := guarantee.SignerIDs
@@ -152,19 +167,15 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 	}
 
 	// get the identity of the origin node, so we can check if it's a valid
-	// source for a collection guarantee (usually collection nodes)
+	// source for a collection guarantee (collection or consensus nodes)
 	identity, err := e.state.Final().Identity(originID)
 	if err != nil {
 		return fmt.Errorf("could not get origin node identity: %w", err)
 	}
 
-	// check that the origin is a collection node; this check is fine even if it
-	// excludes our own ID - in the case of local submission of collections, we
-	// should use the propagation engine, which is for exchange of collections
-	// between consensus nodes anyway; we do no processing or validation in this
-	// engine beyond validating the origin
-	if identity.Role != flow.RoleCollection {
-		return engine.NewInvalidInputErrorf("invalid origin node role (%s)", identity.Role)
+	// we only accept guarantees from collection nodes or other consensus nodes
+	if identity.Role != flow.RoleCollection && identity.Role != flow.RoleConsensus {
+		return engine.NewInvalidInputErrorf("invalid origin role for guarantee (%s)", identity.Role)
 	}
 
 	// ensure that collection has not expired
@@ -197,12 +208,50 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 		}
 	}
 
-	log.Info().Msg("forwarding collection guarantee to propagation engine")
+	// at this point, we can add the guarantee to the memory pool
+	added := e.pool.Add(guarantee)
+	if !added {
+		log.Debug().Msg("discarding guarantee already in pool")
+		return nil
+	}
 
-	// submit the collection to the propagation engine - this is non-blocking
-	// we could just validate it here and add it to the memory pool directly,
-	// but then we would duplicate the validation logic
-	e.prop.SubmitLocal(guarantee)
+	e.mempool.MempoolEntries(metrics.ResourceGuarantee, e.pool.Size())
+
+	log.Info().Msg("collection guarantee added to pool")
+
+	// if the collection guarantee stems from a collection node, we should propagate it
+	// to the other consensus nodes on the network; we no longer need to care about
+	// fan-out here, as libp2p will take care of the pub-sub pattern adequately
+	if identity.Role != flow.RoleCollection {
+		return nil
+	}
+
+	// NOTE: there are two ways to go about this:
+	// - expect the collection nodes to propagate the guarantee to all consensus nodes;
+	// - ensure that we take care of propagating guarantees to other consensus nodes.
+	// It's probably a better idea to make sure the consensus nodes take care of this.
+	// The consensus committee is the backbone of the network and should rely as little
+	// as possible on correct behaviour from other node roles. At the same time, there
+	// are likely to be significantly more consensus nodes on the network, which means
+	// it's a better usage of resources to distribute the load for propagation over
+	// consensus node committee than over the collection clusters.
+
+	// select all the consensus nodes on the network as our targets
+	committee, err := e.state.Final().Identities(filter.And(
+		filter.HasRole(flow.RoleConsensus),
+		filter.Not(filter.HasNodeID(e.me.NodeID())),
+	))
+	if err != nil {
+		return fmt.Errorf("could not get committee: %w", err)
+	}
+
+	// send the collection guarantee to all consensus committee
+	err = e.con.Submit(guarantee, committee.NodeIDs()...)
+	if err != nil {
+		return fmt.Errorf("could not send guarantee: %w", err)
+	}
+
+	log.Info().Msg("collection guarantee broadcasted to committee")
 
 	return nil
 }

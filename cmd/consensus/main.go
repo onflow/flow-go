@@ -25,7 +25,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
 	"github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
-	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/consensus/provider"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/encoding"
@@ -67,7 +66,6 @@ func main() {
 		receipts       mempool.Receipts
 		approvals      mempool.Approvals
 		seals          mempool.Seals
-		prop           *propagation.Engine
 		prov           *provider.Engine
 		syncCore       *synchronization.Core
 		comp           *compliance.Engine
@@ -173,31 +171,18 @@ func main() {
 			)
 			return prov, err
 		}).
-		Component("propagation engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			prop, err = propagation.New(
-				node.Logger,
-				node.Metrics.Engine,
-				node.Metrics.Mempool,
-				node.Tracer,
-				conMetrics,
-				node.Network,
-				node.State,
-				node.Me,
-				guarantees,
-			)
-			return prop, err
-		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			ing, err := ingestion.New(
 				node.Logger,
-				node.Metrics.Engine,
 				node.Tracer,
+				node.Metrics.Engine,
 				conMetrics,
+				node.Metrics.Mempool,
 				node.Network,
-				prop,
 				node.State,
 				node.Storage.Headers,
 				node.Me,
+				guarantees,
 			)
 			return ing, err
 		}).
@@ -206,7 +191,6 @@ func main() {
 			// TODO: we should probably find a way to initialize mutually dependent engines separately
 
 			// initialize the entity database accessors
-			// TODO frequency of 0 turns off the cleaner, turn back on once we know the proper tuning
 			cleaner := bstorage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
 
 			// initialize the pending blocks cache

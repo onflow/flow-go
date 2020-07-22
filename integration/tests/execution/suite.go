@@ -107,5 +107,7 @@ func (s *Suite) SetupTest() {
 
 func (s *Suite) TearDownTest() {
 	s.net.Remove()
-	s.cancel()
+	if s.cancel != nil {
+		s.cancel()
+	}
 }

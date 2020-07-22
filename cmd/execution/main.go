@@ -12,7 +12,8 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/cmd"
-	"github.com/dapperlabs/flow-go/engine/common/synchronization"
+	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/common/requester"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	"github.com/dapperlabs/flow-go/engine/execution/provider"
@@ -23,6 +24,7 @@ import (
 	"github.com/dapperlabs/flow-go/fvm"
 	bootstrapFilenames "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	chainsync "github.com/dapperlabs/flow-go/module/synchronization"
@@ -41,7 +43,7 @@ func main() {
 		providerEngine     *provider.Engine
 		syncCore           *chainsync.Core
 		computationManager *computation.Manager
-		syncEngine         *synchronization.Engine
+		requestEng         *requester.Engine
 		ingestionEng       *ingestion.Engine
 		rpcConf            rpc.Config
 		err                error
@@ -150,6 +152,13 @@ func main() {
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
+			requestEng, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
+				engine.RequestCollections,
+				filter.HasRole(flow.RoleCollection),
+				func() flow.Entity { return &flow.Collection{} },
+				requester.WithBatchInterval(24*time.Hour), // we are manually triggering batches in execution
+			)
+
 			// Needed for gRPC server, make sure to assign to main scoped vars
 			events = badger.NewEvents(node.DB)
 			txResults = badger.NewTransactionResults(node.DB)
@@ -157,6 +166,7 @@ func main() {
 				node.Logger,
 				node.Network,
 				node.Me,
+				requestEng,
 				node.State,
 				node.Storage.Blocks,
 				node.Storage.Payloads,
@@ -171,34 +181,43 @@ func main() {
 				collector,
 				node.Tracer,
 				true,
-				time.Second, //TODO - config param
-				10,          // TODO - config param
 			)
+
+			// TODO: we should solve these mutual dependencies better
+			// => https://github.com/dapperlabs/flow-go/issues/4360
+			requestEng = requestEng.WithHandle(ingestionEng.OnCollection)
+
 			return ingestionEng, err
 		}).
-		Component("sychronization engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			// initialize the synchronization engine
-			syncEngine, err = synchronization.New(
-				node.Logger,
-				node.Metrics.Engine,
-				node.Network,
-				node.Me,
-				node.State,
-				node.Storage.Blocks,
-				ingestionEng,
-				syncCore,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
-			}
-
-			return syncEngine, nil
+		Component("requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
+			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
+			// be handled by the scaffold.
+			return requestEng, nil
 		}).
+		// TODO: currently issues with this engine on the EXE node, as there is no follower engine, https://github.com/dapperlabs/flow-go/issues/4382
+		// Component("sychronization engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		// 	// initialize the synchronization engine
+		// 	syncEngine, err = synchronization.New(
+		// 		node.Logger,
+		// 		node.Metrics.Engine,
+		// 		node.Network,
+		// 		node.Me,
+		// 		node.State,
+		// 		node.Storage.Blocks,
+		// 		ingestionEng,
+		// 		syncCore,
+		// 	)
+		// 	if err != nil {
+		// 		return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
+		// 	}
+
+		// 	return syncEngine, nil
+		// }).
 		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, events, txResults, node.RootChainID)
 			return rpcEng, nil
 		}).Run()
-
 }
 
 func loadBootstrapState(dir, trie string) error {

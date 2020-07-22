@@ -167,9 +167,18 @@ func TestClusters(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, 3, actual.Size())
-		assert.Len(t, actual.ByIndex(0), 3)
-		assert.Len(t, actual.ByIndex(1), 2)
-		assert.Len(t, actual.ByIndex(2), 2)
+		cluster, ok := actual.ByIndex(0)
+		require.True(t, ok)
+		assert.Len(t, cluster, 3)
+
+		cluster, ok = actual.ByIndex(1)
+		require.True(t, ok)
+		assert.Len(t, cluster, 2)
+
+		cluster, ok = actual.ByIndex(2)
+		require.True(t, ok)
+		assert.Len(t, cluster, 2)
+
 	}, protocol.SetClusters(3))
 }
 

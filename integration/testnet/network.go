@@ -117,6 +117,9 @@ func (net *FlowNetwork) Remove() {
 // StopContainers stops all containers in the network, without removing them. This allows containers to be
 // restarted. To remove them, call `RemoveContainers`.
 func (net *FlowNetwork) StopContainers() {
+	if net == nil || net.suite == nil {
+		return
+	}
 
 	err := net.suite.Close()
 	if err != nil {
@@ -126,6 +129,9 @@ func (net *FlowNetwork) StopContainers() {
 
 // RemoveContainers removes all the containers in the network. Containers need to be stopped first using `Stop`.
 func (net *FlowNetwork) RemoveContainers() {
+	if net == nil || net.suite == nil {
+		return
+	}
 
 	err := net.suite.Remove()
 	if err != nil {
@@ -135,7 +141,9 @@ func (net *FlowNetwork) RemoveContainers() {
 
 // Cleanup cleans up all temporary files used by the network.
 func (net *FlowNetwork) Cleanup() {
-
+	if net == nil || net.suite == nil {
+		return
+	}
 	// remove data directories
 	for _, c := range net.Containers {
 		err := os.RemoveAll(c.datadir)
@@ -490,9 +498,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	nodeContainer.Container = suiteContainer
 	net.Containers[nodeContainer.Name()] = nodeContainer
 	if nodeConf.Role == flow.RoleAccess || nodeConf.Role == flow.RoleConsensus {
-		// collection1, _ := net.ContainerByName("collection_1")
 		execution1 := net.ContainerByName("execution_1")
-		// collection1.After(suiteContainer)
 		execution1.After(suiteContainer)
 	} else {
 		net.network.After(suiteContainer)
