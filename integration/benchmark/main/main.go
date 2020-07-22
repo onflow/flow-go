@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"strings"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
@@ -19,8 +20,9 @@ func main() {
 	verbose := flag.Bool("verbose", false, "print verbose information")
 	chainIDStr := flag.String("chain", string(flowsdk.Testnet), "chain ID")
 	chainID := flowsdk.ChainID([]byte(*chainIDStr))
-	accessNodeAddress := flag.String("access", "localhost:3569", "access node address")
+	access := flag.String("access", "localhost:3569", "access node address")
 	serviceAccountPrivateKeyHex := flag.String("servPrivHex", unittest.ServiceAccountPrivateKeyHex, "service account private key hex")
+	accessNodeAddrs := strings.Split(*access, ",")
 
 	addressGen := flowsdk.NewAddressGenerator(chainID)
 	serviceAccountAddress := addressGen.NextAddress()
@@ -44,7 +46,7 @@ func main() {
 	// get the private key string
 	priv := hex.EncodeToString(ServiceAccountPrivateKey.PrivateKey.Encode())
 
-	flowClient, err := client.New(*accessNodeAddress, grpc.WithInsecure())
+	flowClient, err := client.New(accessNodeAddrs[0], grpc.WithInsecure())
 	lg, err := utils.NewLoadGenerator(flowClient, priv, &serviceAccountAddress, &fungibleTokenAddress, &flowTokenAddress, 25, *verbose)
 	if err != nil {
 		panic(err)
