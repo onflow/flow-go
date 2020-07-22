@@ -141,6 +141,9 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 			}
 		}
 
+		// TODO: Determine what other compliance checks we want to execute on
+		// the epoch events of the root seal.
+
 		// SECOND: insert the initial protocol state data into the database
 
 		// 1) insert the root block with its payload into the state and index it
@@ -463,7 +466,14 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 
 	// for each event, check if it is valid
 	didSetup := false
+	didCommit := false
 	for _, event := range events {
+
+		// decode the event first; should work for all
+		value, err := json.Decode(event.Payload)
+		if err != nil {
+			return fmt.Errorf("could not decode system event: %w", err)
+		}
 
 		// check if the event is an epoch setup event
 		if event.Type == flow.EventEpochSetup {
@@ -473,29 +483,26 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 				return fmt.Errorf("duplicate epoch setup system event")
 			}
 
-			// first, we check if we already have an epoch setup event
+			// first, we check if we already have a finalized epoch setup event
 			var dummy flow.EpochSetup
 			err = m.state.db.View(operation.RetrieveEpochSetup(counter+1, &dummy))
 			if err == nil {
-				return fmt.Errorf("invalid epoch setup event in payload")
+				return fmt.Errorf("unexpected epoch setup system event")
 			}
 			if !errors.Is(err, storage.ErrNotFound) {
 				return fmt.Errorf("could not retrieve next epoch setup: %w", err)
 			}
 
-			// TODO: check if there is a non-finalized epoch setup event on our branch
+			// TODO: Check whether there is a pending epoch setup event on this branch
+			// of the non-finalized blockchain.
 
-			// next, we decode and type assert so we can do further checks
-			value, err := json.Decode(event.Payload)
-			if err != nil {
-				return fmt.Errorf("could not decode next epoch setup: %w", err)
-			}
+			// type assert the event and check if the counter is valid
 			setup := value.ToGoValue().(*flow.EpochSetup)
 			if setup.Counter != counter+1 {
-				return fmt.Errorf("invalid epoch setup counter (%d => %d)", counter, setup.Counter)
+				return fmt.Errorf("invalid epoch setup event counter (%d => %d)", counter, setup.Counter)
 			}
 
-			// TODO: check if the view, identities, clusters & seed are valid
+			// TODO: Determine what other compliance checks we want to run on the epoch setup event.
 
 			didSetup = true
 			continue
@@ -504,7 +511,34 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		// check if the event is an epoch commit event
 		if event.Type == flow.EventEpochCommit {
 
-			// TODO: do same thing for commit event
+			// check if we already had a commit event in our iteration
+			if didCommit {
+				return fmt.Errorf("duplicate epoch commit system event")
+			}
+
+			// first, we check if we already have a finalized epoch commit event
+			var dummy flow.EpochCommit
+			err = m.state.db.View(operation.RetrieveEpochCommit(counter+1, &dummy))
+			if err == nil {
+				return fmt.Errorf("unexpected epoch commit system event")
+			}
+			if !errors.Is(err, storage.ErrNotFound) {
+				return fmt.Errorf("could not retrieve next epoch commit: %w", err)
+			}
+
+			// TODO: Check whether there is a pending epoch commit event on this branch
+			// of the non-finalized blockchain.
+
+			// type assert the event and check if the counter is valid
+			commit := value.ToGoValue().(*flow.EpochCommit)
+			if commit.Counter != counter+1 {
+				return fmt.Errorf("invalid epoch commit event counter (%d => %d)", counter, commit.Counter)
+			}
+
+			// Determine what other compliance checks we want to run on the epoch commit event.
+
+			didCommit = true
+			continue
 		}
 
 		return fmt.Errorf("invalid system event in seal (%s)", event.Type)
@@ -597,7 +631,8 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 				setup := value.ToGoValue().(*flow.EpochSetup)
 				ops = append(ops, operation.InsertEpochSetup(setup.Counter, setup))
 			case flow.EventEpochCommit:
-				// TODO: do the same
+				commit := value.ToGoValue().(*flow.EpochCommit)
+				ops = append(ops, operation.InsertEpochCommit(commit.Counter, commit))
 			default:
 				return fmt.Errorf("invalid system event type in payload (%s)", event.Type)
 			}
@@ -626,6 +661,12 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		err = operation.UpdateSealedHeight(sealed.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not update sealed height: %w", err)
+		}
+		for _, op := range ops {
+			err = op(tx)
+			if err != nil {
+				return fmt.Errorf("could not apply additional operation: %w", err)
+			}
 		}
 		return nil
 	})
