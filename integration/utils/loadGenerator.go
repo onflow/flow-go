@@ -326,7 +326,7 @@ func (lg *LoadGenerator) rotateTokens() error {
 	fmt.Printf("load generator step %d starting (%d accounts)... \n", lg.step, len(lg.accounts))
 
 	for i := 0; i < len(lg.accounts); i++ {
-		j := (i + 1) % lg.numberOfAccounts
+		j := (i + 1) % len(lg.accounts)
 		transferScript, err := lg.scriptCreator.TokenTransferScript(
 			lg.fungibleTokenAddress,
 			lg.accounts[i].address,
