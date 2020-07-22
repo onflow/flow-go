@@ -289,7 +289,7 @@ func Test_Checkpointing(t *testing.T) {
 			err = wal4.RecordUpdate(trieUpdate)
 			require.NoError(t, err)
 
-			_, err = f.Update(trieUpdate)
+			rootHash, err = f.Update(trieUpdate)
 			require.NoError(t, err)
 
 			err = wal4.Close()
