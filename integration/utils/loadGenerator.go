@@ -65,7 +65,7 @@ func NewLoadGenerator(fclient *client.Client,
 
 	// TODO get these params hooked to the top level
 	stTracker := NewStatsTracker(&StatsConfig{1, 1, 1, 1, 1, numberOfAccounts})
-	txTracker, err := NewTxTracker(5000, 2, "localhost:3569", verbose, time.Second/10, stTracker)
+	txTracker, err := NewTxTracker(5000, 5, "localhost:3569", verbose, time.Second/10, stTracker)
 	if err != nil {
 		return nil, err
 	}
@@ -176,8 +176,14 @@ func (lg *LoadGenerator) setupServiceAccountKeys() error {
 			txWG.Done()
 		},
 		nil, // on sealed
-		nil, // on expired
-		nil, // on timout
+		func(_ flowsdk.Identifier) {
+			txWG.Done()
+			panic("The setup transaction (service account keys) has expired. can not continue!")
+		}, // on expired
+		func(_ flowsdk.Identifier) {
+			txWG.Done()
+			panic("The setup transaction (service account keys) has timed out. can not continue!")
+		}, // on timout
 		nil, // on error,
 		120)
 
@@ -244,12 +250,16 @@ func (lg *LoadGenerator) createAccounts() error {
 				}
 			},
 			nil, // on sealed
-			nil, // on expired
-			nil, // on timout
+			func(_ flowsdk.Identifier) {
+				allTxWG.Done()
+				panic("The setup transaction (account creation) has expired. can not continue!")
+			}, // on expired
+			func(_ flowsdk.Identifier) {
+				allTxWG.Done()
+				panic("The setup transaction (account creation) has timed out. can not continue!")
+			}, // on timout
 			nil, // on error
 			120)
-
-		fmt.Println("<<<", i)
 	}
 	allTxWG.Wait()
 	lg.step++
@@ -264,7 +274,7 @@ func (lg *LoadGenerator) distributeInitialTokens() error {
 	}
 	allTxWG := sync.WaitGroup{}
 	fmt.Println("load generator step 2 started")
-	for i := 0; i < lg.numberOfAccounts; i++ {
+	for i := 0; i < len(lg.accounts); i++ {
 
 		// Transfer 10000 tokens
 		transferScript, err := lg.scriptCreator.TokenTransferScript(
@@ -313,9 +323,9 @@ func (lg *LoadGenerator) rotateTokens() error {
 		return err
 	}
 	allTxWG := sync.WaitGroup{}
-	fmt.Println("load generator step 3 started")
+	fmt.Printf("load generator step %d starting (%d accounts)... \n", lg.step, len(lg.accounts))
 
-	for i := 0; i < lg.numberOfAccounts; i++ {
+	for i := 0; i < len(lg.accounts); i++ {
 		j := (i + 1) % lg.numberOfAccounts
 		transferScript, err := lg.scriptCreator.TokenTransferScript(
 			lg.fungibleTokenAddress,
@@ -350,15 +360,19 @@ func (lg *LoadGenerator) rotateTokens() error {
 				allTxWG.Done()
 			},
 			nil, // on sealed
-			nil, // on expired
-			nil, // on timout
+			func(_ flowsdk.Identifier) {
+				allTxWG.Done()
+			}, // on expired
+			func(_ flowsdk.Identifier) {
+				allTxWG.Done()
+			}, // on timout
 			nil, // on error
-			30)
+			120)
 
 	}
 	allTxWG.Wait()
+	fmt.Printf("load generator step %d is done \n", lg.step)
 	lg.step++
-	fmt.Println("load generator step 3 done")
 	return nil
 }
 

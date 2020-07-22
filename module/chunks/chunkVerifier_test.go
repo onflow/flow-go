@@ -46,9 +46,10 @@ func TestChunkVerifier(t *testing.T) {
 func (s *ChunkVerifierTestSuite) TestHappyPath() {
 	vch := GetBaselineVerifiableChunk(s.T(), []byte{})
 	assert.NotNil(s.T(), vch)
-	chFaults, err := s.verifier.Verify(vch)
+	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.Nil(s.T(), chFaults)
+	assert.NotNil(s.T(), spockSecret)
 }
 
 // TestMissingRegisterTouchForUpdate tests verification given a chunkdatapack missing a register touch (update)
@@ -57,9 +58,10 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 	assert.NotNil(s.T(), vch)
 	// remove the second register touch
 	vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[:1]
-	chFaults, err := s.verifier.Verify(vch)
+	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.NotNil(s.T(), chFaults)
+	assert.Nil(s.T(), spockSecret)
 	_, ok := chFaults.(*chunksmodels.CFMissingRegisterTouch)
 	assert.True(s.T(), ok)
 }
@@ -70,9 +72,10 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
 	assert.NotNil(s.T(), vch)
 	// remove the second register touch
 	vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[1:]
-	chFaults, err := s.verifier.Verify(vch)
+	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.NotNil(s.T(), chFaults)
+	assert.Nil(s.T(), spockSecret)
 	_, ok := chFaults.(*chunksmodels.CFMissingRegisterTouch)
 	assert.True(s.T(), ok)
 }
@@ -83,9 +86,10 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
 func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 	vch := GetBaselineVerifiableChunk(s.T(), []byte("wrongEndState"))
 	assert.NotNil(s.T(), vch)
-	chFaults, err := s.verifier.Verify(vch)
+	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.NotNil(s.T(), chFaults)
+	assert.Nil(s.T(), spockSecret)
 	_, ok := chFaults.(*chunksmodels.CFNonMatchingFinalState)
 	assert.True(s.T(), ok)
 }
@@ -96,9 +100,10 @@ func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 func (s *ChunkVerifierTestSuite) TestFailedTx() {
 	vch := GetBaselineVerifiableChunk(s.T(), []byte("failedTx"))
 	assert.NotNil(s.T(), vch)
-	chFaults, err := s.verifier.Verify(vch)
+	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.Nil(s.T(), chFaults)
+	assert.NotNil(s.T(), spockSecret)
 }
 
 // TestEmptyCollection tests verification behaviour if a
@@ -109,9 +114,10 @@ func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
 	col := unittest.CollectionFixture(0)
 	vch.Collection = &col
 	vch.EndState = vch.ChunkDataPack.StartState
-	chFaults, err := s.verifier.Verify(vch)
+	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.Nil(s.T(), chFaults)
+	assert.NotNil(s.T(), spockSecret)
 }
 
 // GetBaselineVerifiableChunk returns a verifiable chunk and sets the script
