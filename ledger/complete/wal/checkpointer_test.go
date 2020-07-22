@@ -158,6 +158,8 @@ func Test_Checkpointing(t *testing.T) {
 				require.NoError(t, err)
 
 				trieUpdate, err := common.UpdateToTrieUpdate(update, pathFinderVersion)
+				require.NoError(t, err)
+
 				err = wal.RecordUpdate(trieUpdate)
 				require.NoError(t, err)
 

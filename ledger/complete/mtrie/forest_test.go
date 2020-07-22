@@ -916,15 +916,12 @@ func TestRandomUpdateReadProof(t *testing.T) {
 
 		// test proof (mix of existing and non existing keys)
 		proofPaths := make([]ledger.Path, 0)
-		proofPayloads := make([]*ledger.Payload, 0)
-		for i, p := range paths {
+		for _, p := range paths {
 			proofPaths = append(proofPaths, p)
-			proofPayloads = append(proofPayloads, payloads[i])
 		}
 
 		for _, p := range nonExistingPaths {
 			proofPaths = append(proofPaths, p)
-			proofPayloads = append(proofPayloads, ledger.EmptyPayload())
 		}
 
 		read = &ledger.TrieRead{RootHash: activeRoot, Paths: proofPaths}
