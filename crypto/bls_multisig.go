@@ -15,6 +15,7 @@ import (
 //  - the same BLS set-up in bls.go
 //  - Use the proof of possession (PoP) to prevent the Rogue public-key attack.
 //  - Non-interactive aggregation of multiple signatures into one.
+//  - Non-interactive aggregation of multiple private keys into one.
 
 // #cgo CFLAGS: -g -Wall -std=c99 -I./ -I./relic/build/include
 // #cgo LDFLAGS: -Lrelic/build/lib -l relic_s
@@ -51,13 +52,11 @@ func AggregateSignatures(sigs []Signature) (Signature, error) {
 	return aggregatedSig, nil
 }
 
-// AggregateSignatures aggregate multiple BLS signatures into one.
+// AggregatePrivateKeys aggregate multiple BLS private keys into one.
 //
-// Signatures could be generated from the same or distinct messages, they
-// could also be the aggregation of other signatures.
-// The order of the signatures in the slice does not matter since the aggregation
+// The order of the keys in the slice does not matter since the aggregation
 // is commutative.
-// No subgroup membership check is performed on the input signatures.
+// No check is performed on the input private keys.
 func AggregatePrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 	scalars := make([]scalar, 0, len(keys))
 	for _, sk := range keys {
