@@ -4,6 +4,7 @@ package badger
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
@@ -441,7 +443,73 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		return fmt.Errorf("not all seals connected to state (left: %d)", len(byBlock))
 	}
 
-	// SIXTH: Both the header itself and its payload are in compliance with the
+	// SIXTH: In case any of the payload seals includes system events, we need to
+	// check if they are valid and must apply them to the protocol state as needed.
+
+	// retrieve the current epoch counter and collect system events from seals
+	var counter uint64
+	err = m.state.db.View(operation.RetrieveEpochCounter(&counter))
+	if err != nil {
+		return fmt.Errorf("could not retrieve epoch counter: %w", err)
+	}
+	var events []*flow.Event
+	for _, seal := range payload.Seals {
+		events = append(events, seal.SystemEvents...)
+	}
+
+	// NOTE: We could check that we have at most two here, but using more
+	// sophisticated checks that catch invalid events one by one makes
+	// the code more extensible in the future.
+
+	// for each event, check if it is valid
+	didSetup := false
+	for _, event := range events {
+
+		// check if the event is an epoch setup event
+		if event.Type == flow.EventEpochSetup {
+
+			// check if we already had a setup event in our iteration
+			if didSetup {
+				return fmt.Errorf("duplicate epoch setup system event")
+			}
+
+			// first, we check if we already have an epoch setup event
+			var dummy flow.EpochSetup
+			err = m.state.db.View(operation.RetrieveEpochSetup(counter+1, &dummy))
+			if err == nil {
+				return fmt.Errorf("invalid epoch setup event in payload")
+			}
+			if !errors.Is(err, storage.ErrNotFound) {
+				return fmt.Errorf("could not retrieve next epoch setup: %w", err)
+			}
+
+			// TODO: check if there is a non-finalized epoch setup event on our branch
+
+			// next, we decode and type assert so we can do further checks
+			value, err := json.Decode(event.Payload)
+			if err != nil {
+				return fmt.Errorf("could not decode next epoch setup: %w", err)
+			}
+			setup := value.ToGoValue().(*flow.EpochSetup)
+			if setup.Counter != counter+1 {
+				return fmt.Errorf("invalid epoch setup counter (%d => %d)", counter, setup.Counter)
+			}
+
+			// TODO: check if the view, identities, clusters & seed are valid
+
+			continue
+		}
+
+		// check if the event is an epoch commit event
+		if event.Type == flow.EventEpochCommit {
+
+			// TODO: do same thing for commit event
+		}
+
+		return fmt.Errorf("invalid system event in seal (%s)", event.Type)
+	}
+
+	// FINALLY: Both the header itself and its payload are in compliance with the
 	// protocol state. We can now store the candidate block, as well as adding
 	// its final seal to the seal index and initializing its children index.
 
