@@ -41,7 +41,7 @@ func AggregateSignatures(sigs []Signature) (Signature, error) {
 	aggregatedSig := make([]byte, signatureLengthBLSBLS12381)
 
 	// add the points in the C layeer
-	if C.G1_sum_vector(
+	if C.ep_sum_vector(
 		(*C.uchar)(&aggregatedSig[0]),
 		(*C.uchar)(&flatSigs[0]),
 		(C.int)(len(sigs)),
@@ -49,4 +49,30 @@ func AggregateSignatures(sigs []Signature) (Signature, error) {
 		return nil, fmt.Errorf("decoding signatures has failed")
 	}
 	return aggregatedSig, nil
+}
+
+// AggregateSignatures aggregate multiple BLS signatures into one.
+//
+// Signatures could be generated from the same or distinct messages, they
+// could also be the aggregation of other signatures.
+// The order of the signatures in the slice does not matter since the aggregation
+// is commutative.
+// No subgroup membership check is performed on the input signatures.
+func AggregatePrivateKeys(keys []PrivateKey) (PrivateKey, error) {
+	scalars := make([]scalar, 0, len(keys))
+	for _, sk := range keys {
+		if sk.Algorithm() != BLSBLS12381 {
+			return nil, fmt.Errorf("all keys must be BLS keys")
+		}
+		skBls, _ := sk.(*PrKeyBLSBLS12381)
+		scalars = append(scalars, skBls.scalar)
+	}
+
+	var sum scalar
+	C.bn_sum_vector((*C.bn_st)(&sum), (*C.bn_st)(&scalars[0]),
+		(C.int)(len(scalars)))
+	return &PrKeyBLSBLS12381{
+		pk:     nil,
+		scalar: sum,
+	}, nil
 }

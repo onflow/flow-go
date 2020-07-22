@@ -147,22 +147,6 @@ int verifyshare(const bn_t x, const ep2_t y) {
     return (ep2_cmp(res, (ep2_st*)y) == RLC_EQ);
 }
 
-// computes the sum of the array elements x and writes the sum in jointx
-// the sum is computed in Zr
-void bn_sum_vector(bn_t jointx, bn_st* x, int len) {
-    bn_t r;
-    bn_new(r); 
-    g2_get_ord(r);
-    bn_set_dig(jointx, 0);
-    bn_new_size(jointx, BITS_TO_DIGITS(Fr_BITS+1));
-    for (int i=0; i<len; i++) {
-        bn_add(jointx, jointx, &x[i]);
-        if (bn_cmp(jointx, r) == RLC_GT) 
-            bn_sub(jointx, jointx, r);
-    }
-    bn_free(r);
-}
-
 // computes the sum of the G2 array elements y and writes the sum in jointy
 void ep2_sum_vector(ep2_t jointy, ep2_st* y, int len){
     ep2_set_infty(jointy);
