@@ -497,6 +497,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 
 			// TODO: check if the view, identities, clusters & seed are valid
 
+			didSetup = true
 			continue
 		}
 
@@ -558,12 +559,13 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve final header: %w", err)
 	}
-	header, err := m.state.headers.ByBlockID(blockID)
+	block, err := m.state.blocks.ByID(blockID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve pending header: %w", err)
+		return fmt.Errorf("could not retrieve pending block: %w", err)
 	}
+	header := block.Header
 	if header.ParentID != finalID {
-		return fmt.Errorf("can only finalized child of last finalized block")
+		return fmt.Errorf("can only finalize child of last finalized block")
 	}
 
 	// SECOND: We also want to update the last sealed height. Retrieve the block
@@ -578,7 +580,31 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		return fmt.Errorf("could not retrieve sealed header: %w", err)
 	}
 
-	// THIRD: A block inserted into the protocol state is already a valid
+	// THIRD: If we have system events in any of the seals, we should insert
+	// them into the protocol state accordingly on finalization. We create a
+	// list of operations to be applied on top of the rest.
+
+	payload := block.Payload
+	var ops []func(*badger.Txn) error
+	for _, seal := range payload.Seals {
+		for _, event := range seal.SystemEvents {
+			value, err := json.Decode(event.Payload)
+			if err != nil {
+				return fmt.Errorf("could not decode system event: %w", err)
+			}
+			switch event.Type {
+			case flow.EventEpochSetup:
+				setup := value.ToGoValue().(*flow.EpochSetup)
+				ops = append(ops, operation.InsertEpochSetup(setup.Counter, setup))
+			case flow.EventEpochCommit:
+				// TODO: do the same
+			default:
+				return fmt.Errorf("invalid system event type in payload (%s)", event.Type)
+			}
+		}
+	}
+
+	// FINALLY: A block inserted into the protocol state is already a valid
 	// extension; in order to make it final, we need to do just three things:
 	// 1) Map its height to its index; there can no longer be other blocks at
 	// this height, as it becomes immutable.
@@ -612,15 +638,9 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	m.state.metrics.FinalizedHeight(header.Height)
 	m.state.metrics.SealedHeight(sealed.Height)
 
-	// get the finalized block for finalized metrics
-	final, err := m.state.blocks.ByID(blockID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve finalized block: %w", err)
-	}
+	m.state.metrics.BlockFinalized(block)
 
-	m.state.metrics.BlockFinalized(final)
-
-	for _, seal := range final.Payload.Seals {
+	for _, seal := range block.Payload.Seals {
 
 		// get each sealed block for sealed metrics
 		sealed, err := m.state.blocks.ByID(seal.BlockID)
