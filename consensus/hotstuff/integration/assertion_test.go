@@ -4,8 +4,9 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 func FinalizedBlocks(in *Instance) []*flow.Header {
@@ -79,5 +80,5 @@ func assertLiveness(t *testing.T, allViews [][]uint64, view uint64) {
 	shortest := allViews[0]
 	require.Greater(t, len(shortest), 0, "no block was finalized")
 	highestView := shortest[len(shortest)-1]
-	require.Greater(t, highestView, view, "did not finalize enough block")
+	require.GreaterOrEqual(t, highestView, view, "did not finalize enough block")
 }

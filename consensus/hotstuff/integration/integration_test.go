@@ -47,8 +47,8 @@ func TestThreeInstances(t *testing.T) {
 	// TeamCity for 1000 blocks; in order to avoid test timeouts, we keep the
 	// number low here
 	num := 3
-	finalView := uint64(10)
-	runFor := 30 * time.Second
+	finalView := uint64(30)
+	// runFor := 30 * time.Second
 
 	// generate three hotstuff participants
 	participants := unittest.IdentityListFixture(num)
@@ -64,7 +64,7 @@ func TestThreeInstances(t *testing.T) {
 			WithParticipants(participants),
 			WithLocalID(participants[n].NodeID),
 			WithTimeouts(timeouts),
-			WithStopCondition(AfterDuration(runFor)),
+			WithStopCondition(ViewFinalized(finalView)),
 		)
 		instances = append(instances, in)
 	}
@@ -101,8 +101,7 @@ func TestSevenInstances(t *testing.T) {
 
 	// When using 100 as finalView, I often saw this tests fail on CI, because it only made to around 64-86
 	// so using 10 will still check that it's making progress and give enough buffer.
-	finalView := uint64(10)
-	runFor := 30 * time.Second
+	finalView := uint64(30)
 
 	// generate the seven hotstuff participants
 	participants := unittest.IdentityListFixture(numPass + numFail)
@@ -118,7 +117,7 @@ func TestSevenInstances(t *testing.T) {
 			WithParticipants(participants),
 			WithLocalID(participants[n].NodeID),
 			WithTimeouts(timeouts),
-			WithStopCondition(AfterDuration(runFor)),
+			WithStopCondition(ViewFinalized(finalView)),
 		)
 		instances = append(instances, in)
 	}
@@ -130,7 +129,7 @@ func TestSevenInstances(t *testing.T) {
 			WithParticipants(participants),
 			WithLocalID(participants[n].NodeID),
 			WithTimeouts(timeouts),
-			WithStopCondition(AfterDuration(runFor)),
+			WithStopCondition(ViewFinalized(finalView)),
 			WithOutgoingVotes(BlockAllVotes),
 		)
 		instances = append(instances, in)
