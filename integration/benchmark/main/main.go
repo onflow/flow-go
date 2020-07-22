@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"strings"
+	"time"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
@@ -16,6 +17,9 @@ import (
 )
 
 func main() {
+
+	sleep := flag.Int64("sleep", 0, "seconds to sleep before benchmarking starts")
+	time.Sleep(time.Duration(*sleep) * time.Second)
 
 	verbose := flag.Bool("verbose", false, "print verbose information")
 	chainIDStr := flag.String("chain", string(flowsdk.Testnet), "chain ID")
@@ -47,7 +51,8 @@ func main() {
 	priv := hex.EncodeToString(ServiceAccountPrivateKey.PrivateKey.Encode())
 
 	flowClient, err := client.New(accessNodeAddrs[0], grpc.WithInsecure())
-	lg, err := utils.NewLoadGenerator(flowClient, priv, &serviceAccountAddress, &fungibleTokenAddress, &flowTokenAddress, 300, *verbose)
+	lg, err := utils.NewLoadGenerator(flowClient, priv, &serviceAccountAddress, &fungibleTokenAddress,
+		&flowTokenAddress, 2000, *verbose)
 	if err != nil {
 		panic(err)
 	}
