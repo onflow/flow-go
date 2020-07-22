@@ -65,7 +65,7 @@ func NewLoadGenerator(fclient *client.Client,
 
 	// TODO get these params hooked to the top level
 	stTracker := NewStatsTracker(&StatsConfig{1, 1, 1, 1, 1, numberOfAccounts})
-	txTracker, err := NewTxTracker(5000, 5, "localhost:3569", verbose, time.Second/10, stTracker)
+	txTracker, err := NewTxTracker(5000, 100, "localhost:3569", verbose, time.Second/10, stTracker)
 	if err != nil {
 		return nil, err
 	}
