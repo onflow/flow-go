@@ -21,6 +21,8 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
+	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/common/requester"
 	synceng "github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/engine/consensus/compliance"
 	"github.com/dapperlabs/flow-go/engine/consensus/ingestion"
@@ -29,6 +31,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
@@ -67,6 +70,7 @@ func main() {
 		approvals      mempool.Approvals
 		seals          mempool.Seals
 		prov           *provider.Engine
+		requesterEng   *requester.Engine
 		syncCore       *synchronization.Core
 		comp           *compliance.Engine
 		conMetrics     module.ConsensusMetrics
@@ -141,6 +145,19 @@ func main() {
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			resultsDB := bstorage.NewExecutionResults(node.DB)
 			sealsDB := bstorage.NewSeals(node.Metrics.Cache, node.DB)
+			requesterEng, err = requester.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				engine.RequestReceipts,
+				filter.HasRole(flow.RoleExecution),
+				func() flow.Entity { return &flow.ExecutionResult{} },
+			)
+			if err != nil {
+				return nil, err
+			}
 			match, err := matching.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -149,6 +166,7 @@ func main() {
 				node.Network,
 				node.State,
 				node.Me,
+				requesterEng,
 				resultsDB,
 				sealsDB,
 				node.Storage.Headers,
@@ -158,6 +176,7 @@ func main() {
 				approvals,
 				seals,
 			)
+			requesterEng.WithHandle(match.HandleReceipt)
 			return match, err
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -340,6 +359,10 @@ func main() {
 			}
 
 			return sync, nil
+		}).
+		Component("requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			// created with matching engine
+			return requesterEng, nil
 		}).
 		Run()
 }

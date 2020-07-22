@@ -176,6 +176,11 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	}
 }
 
+// HandleReceipts handles receipts we have explicitly requested by block ID.
+func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
+	e.Submit(originID, receipt)
+}
+
 // onReceipt processes a new execution receipt.
 func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
 
