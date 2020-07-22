@@ -45,7 +45,7 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 		payloads := []*ledger.Payload{payload1}
 
 		rootHash := f.GetEmptyRootHash()
-		r := &ledger.TrieRead{rootHash, paths}
+		r := &ledger.TrieRead{RootHash: rootHash, Paths: paths}
 		bp, err := f.Proofs(r)
 		require.NoError(t, err, "error getting proofs values")
 
@@ -56,7 +56,7 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 		if !bytes.Equal(rootHash, psmt.root.HashValue()) {
 			t.Fatal("rootNode hash doesn't match [before set]")
 		}
-		u := &ledger.TrieUpdate{rootHash, paths, payloads}
+		u := &ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads}
 		rootHash, err = f.Update(u)
 		require.NoError(t, err, "error updating trie")
 
@@ -70,7 +70,7 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 		updatedPayload1 := common.LightPayload('B', 'b')
 		payloads = []*ledger.Payload{updatedPayload1}
 
-		u = &ledger.TrieUpdate{rootHash, paths, payloads}
+		u = &ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads}
 		rootHash, err = f.Update(u)
 		require.NoError(t, err, "error updating trie")
 
@@ -100,11 +100,11 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 		paths := []ledger.Path{path1, path2}
 		payloads := []*ledger.Payload{payload1, payload2}
 
-		u := &ledger.TrieUpdate{f.GetEmptyRootHash(), paths, payloads}
+		u := &ledger.TrieUpdate{RootHash: f.GetEmptyRootHash(), Paths: paths, Payloads: payloads}
 		rootHash, err := f.Update(u)
 		require.NoError(t, err, "error updating trie")
 
-		r := &ledger.TrieRead{rootHash, paths}
+		r := &ledger.TrieRead{RootHash: rootHash, Paths: paths}
 		bp, err := f.Proofs(r)
 		require.NoError(t, err, "error getting batch proof")
 
@@ -117,7 +117,7 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 		}
 
 		payloads = []*ledger.Payload{updatedPayload1, updatedPayload2}
-		rootHash, err = f.Update(&ledger.TrieUpdate{rootHash, paths, payloads})
+		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads})
 		require.NoError(t, err, "error updating trie")
 
 		_, _, err = psmt.Update(paths, payloads)
@@ -151,7 +151,7 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 		payloads := []*ledger.Payload{payload1, payload2, payload3}
 
 		rootHash := f.GetEmptyRootHash()
-		bp, err := f.Proofs(&ledger.TrieRead{rootHash, paths})
+		bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 		require.NoError(t, err, "error getting batch proof")
 
 		encBP := common.EncodeTrieBatchProof(bp)
@@ -162,7 +162,7 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 			t.Fatal("rootNode hash doesn't match [before update]")
 		}
 		// first update
-		rootHash, err = f.Update(&ledger.TrieUpdate{rootHash, paths, payloads})
+		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads})
 		require.NoError(t, err, "error updating trie")
 
 		_, _, err = psmt.Update(paths, payloads)
@@ -174,7 +174,7 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 
 		// second update
 		payloads = []*ledger.Payload{updatedPayload1, updatedPayload2, updatedPayload3}
-		rootHash, err = f.Update(&ledger.TrieUpdate{rootHash, paths, payloads})
+		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads})
 		require.NoError(t, err, "error updating trie")
 
 		_, _, err = psmt.Update(paths, payloads)
@@ -204,7 +204,7 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 		payloads := []*ledger.Payload{payload1, payload2}
 
 		rootHash := f.GetEmptyRootHash()
-		bp, err := f.Proofs(&ledger.TrieRead{rootHash, paths})
+		bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 		require.NoError(t, err, "error getting batch proof")
 
 		encBP := common.EncodeTrieBatchProof(bp)
@@ -216,7 +216,7 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 		}
 
 		// first update
-		rootHash, err = f.Update(&ledger.TrieUpdate{rootHash, paths, payloads})
+		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads})
 		require.NoError(t, err, "error updating trie")
 
 		pRootHash, _, err := psmt.Update(paths, payloads)
@@ -256,12 +256,12 @@ func TestMixProof(t *testing.T) {
 		payloads := []*ledger.Payload{payload1, payload3}
 
 		rootHash := f.GetEmptyRootHash()
-		rootHash, err := f.Update(&ledger.TrieUpdate{rootHash, paths, payloads})
+		rootHash, err := f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads})
 		require.NoError(t, err, "error updating trie")
 
 		paths = []ledger.Path{path1, path2, path3}
 
-		bp, err := f.Proofs(&ledger.TrieRead{rootHash, paths})
+		bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 		require.NoError(t, err, "error getting batch proof")
 
 		encBP := common.EncodeTrieBatchProof(bp)
@@ -275,7 +275,7 @@ func TestMixProof(t *testing.T) {
 		paths = []ledger.Path{path2, path3}
 		payloads = []*ledger.Payload{updatedPayload2, updatedPayload2}
 
-		rootHash, err = f.Update(&ledger.TrieUpdate{rootHash, paths, payloads})
+		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads})
 		require.NoError(t, err, "error updating trie")
 
 		pRootHash, _, err := psmt.Update(paths, payloads)
@@ -305,7 +305,7 @@ func TestRandomProofs(t *testing.T) {
 			insertPaths := paths[:split]
 			insertPayloads := payloads[:split]
 
-			rootHash, err := f.Update(&ledger.TrieUpdate{f.GetEmptyRootHash(), insertPaths, insertPayloads})
+			rootHash, err := f.Update(&ledger.TrieUpdate{RootHash: f.GetEmptyRootHash(), Paths: insertPaths, Payloads: insertPayloads})
 			require.NoError(t, err, "error updating trie")
 
 			// shuffle paths for read
@@ -314,7 +314,7 @@ func TestRandomProofs(t *testing.T) {
 				payloads[i], payloads[j] = payloads[j], payloads[i]
 			})
 
-			bp, err := f.Proofs(&ledger.TrieRead{rootHash, paths})
+			bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 			require.NoError(t, err, "error getting batch proof")
 
 			encBP := common.EncodeTrieBatchProof(bp)
@@ -334,7 +334,7 @@ func TestRandomProofs(t *testing.T) {
 				updatePayloads[i], updatePayloads[j] = updatePayloads[j], updatePayloads[i]
 			})
 
-			rootHash2, err := f.Update(&ledger.TrieUpdate{rootHash, updatePaths, updatePayloads})
+			rootHash2, err := f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: updatePaths, Payloads: updatePayloads})
 			require.NoError(t, err, "error updating trie")
 
 			pRootHash2, _, err := psmt.Update(updatePaths, updatePayloads)

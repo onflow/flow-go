@@ -105,7 +105,7 @@ func Test_WAL(t *testing.T) {
 			fmt.Printf("Querying with %x\n", stateCommitment)
 
 			query, err := ledger.NewQuery([]byte(stateCommitment), keys)
-
+			require.NoError(t, err)
 			values, err := led2.Get(query)
 			require.NoError(t, err)
 
