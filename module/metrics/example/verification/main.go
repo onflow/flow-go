@@ -43,15 +43,16 @@ func happyPathExample() {
 		if err != nil {
 			panic(err)
 		}
+		registerer := metrics.NewRegisterer(prometheus.DefaultRegisterer)
 
 		// initiates and starts mempool collector
 		// since happy path goes very fast leap timer on collector set to 1 nanosecond.
-		mempoolCollector := metrics.NewMempoolCollector(1 * time.Nanosecond)
+		mempoolCollector := metrics.NewMempoolCollector(1*time.Nanosecond, registerer)
 		<-mempoolCollector.Ready()
 
 		// starts happy path
 		t := &testing.T{}
-		verificationCollector := metrics.NewVerificationCollector(tracer, prometheus.DefaultRegisterer, logger)
+		verificationCollector := metrics.NewVerificationCollector(tracer, registerer)
 		vertestutil.VerificationHappyPath(t, 1, 10, verificationCollector, mempoolCollector)
 		<-mempoolCollector.Done()
 	})
@@ -65,9 +66,10 @@ func demo() {
 		if err != nil {
 			panic(err)
 		}
+		registerer := metrics.NewRegisterer(prometheus.DefaultRegisterer)
 
-		verificationCollector := metrics.NewVerificationCollector(tracer, prometheus.DefaultRegisterer, logger)
-		mempoolCollector := metrics.NewMempoolCollector(5 * time.Second)
+		verificationCollector := metrics.NewVerificationCollector(tracer, registerer)
+		mempoolCollector := metrics.NewMempoolCollector(5*time.Second, registerer)
 
 		// starts periodic launch of mempoolCollector
 		<-mempoolCollector.Ready()

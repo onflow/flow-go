@@ -88,7 +88,7 @@ func main() {
 			flags.UintVar(&alpha, "alpha", 10, "maximum number of chunk states in the memory pool")
 		}).
 		Module("verification metrics", func(node *cmd.FlowNodeBuilder) error {
-			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegisterer, node.Logger)
+			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
 		}).
 		Module("cached execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
@@ -280,7 +280,7 @@ func main() {
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
-			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
+			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(node.MetricsRegisterer), flow.DefaultValueLogGCFrequency)
 
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks

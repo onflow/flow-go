@@ -2,8 +2,6 @@ package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/module/trace"
 )
@@ -24,125 +22,80 @@ type VerificationCollector struct {
 
 	// Verifier Engine
 	rcvVerifiableChunksTotal prometheus.Counter // total verifiable chunks received by verifier engine
-	resultApprovalsTotal     prometheus.Counter // total result approvals sent by verifier engine
+	sntResultApprovalsTotal  prometheus.Counter // total result approvals sent by verifier engine
 
 }
 
-func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer, log zerolog.Logger) *VerificationCollector {
-
-	// Finder Engine
-	rcvReceiptsTotals := promauto.NewCounter(prometheus.CounterOpts{
-		Name:      "execution_receipt_received_total",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemFinderEngine,
-		Help:      "total number of execution receipts received by finder engine",
-	})
-	err := registerer.Register(rcvReceiptsTotals)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register rcvReceiptsTotals metric")
-	}
-
-	sntExecutionResultsTotal := promauto.NewCounter(prometheus.CounterOpts{
-		Name:      "execution_result_sent_total",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemFinderEngine,
-		Help:      "total number of execution results sent by finder engine to match engine",
-	})
-	err = registerer.Register(sntExecutionResultsTotal)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register sntExecutionResultsTotal metric")
-	}
-
-	// Match Engine
-	rcvExecutionResultsTotal := promauto.NewCounter(prometheus.CounterOpts{
-		Name:      "execution_result_received_total",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemMatchEngine,
-		Help:      "total number of execution results received by match engine from finder engine",
-	})
-	err = registerer.Register(rcvExecutionResultsTotal)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register rcvExecutionResultsTotal) metric")
-	}
-
-	sntVerifiableChunksTotal := promauto.NewCounter(prometheus.CounterOpts{
-		Name:      "verifiable_chunk_sent_total",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemMatchEngine,
-		Help:      "total number of verifiable chunks sent by match engine to verifier engine",
-	})
-	err = registerer.Register(sntVerifiableChunksTotal)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register sntVerifiableChunksTotal metric")
-	}
-
-	rcvChunkDataPackTotal := promauto.NewCounter(prometheus.CounterOpts{
-		Name:      "chunk_data_pack_received_total",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemMatchEngine,
-		Help:      "total number of chunk data packs received by match engine",
-	})
-	err = registerer.Register(rcvChunkDataPackTotal)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register rcvChunkDataPackTotal metric")
-	}
-
-	reqChunkDataPackTotal := promauto.NewCounter(prometheus.CounterOpts{
-		Name:      "chunk_data_pack_requested_total",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemMatchEngine,
-		Help:      "total number of chunk data packs requested by match engine",
-	})
-	err = registerer.Register(reqChunkDataPackTotal)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register reqChunkDataPackTotal metric")
-	}
-
-	// Verifier Engine
-	rcvVerifiableChunksTotal := promauto.NewCounter(prometheus.CounterOpts{
-		Name:      "verifiable_chunk_received_total",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemVerifierEngine,
-		Help:      "total number verifiable chunks received by verifier engine from match engine",
-	})
-	err = registerer.Register(rcvVerifiableChunksTotal)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register rcvVerifiableChunksTotal metric")
-	}
-
-	sntResultApprovalTotal := promauto.NewCounter(prometheus.CounterOpts{
-		Name:      "result_approvals_total",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemVerifierEngine,
-		Help:      "total number of emitted result approvals by verifier engine",
-	})
-	err = registerer.Register(sntResultApprovalTotal)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register sntResultApprovalTotal metric")
-	}
-
-	// Storage
-	storagePerChunk := promauto.NewGauge(prometheus.GaugeOpts{
-		Name:      "storage_latest_chunk_size_bytes",
-		Namespace: namespaceVerification,
-		Help:      "latest ingested chunk resources storage (bytes)",
-	})
-	err = registerer.Register(storagePerChunk)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register storagePerChunk metric")
-	}
+func NewVerificationCollector(tracer *trace.OpenTracer, registerer *Registerer) *VerificationCollector {
 
 	vc := &VerificationCollector{
-		tracer:                   tracer,
-		rcvReceiptsTotal:         rcvReceiptsTotals,
-		sntExecutionResultsTotal: sntExecutionResultsTotal,
-		rcvExecutionResultsTotal: rcvExecutionResultsTotal,
-		sntVerifiableChunksTotal: sntVerifiableChunksTotal,
-		rcvVerifiableChunksTotal: rcvVerifiableChunksTotal,
-		resultApprovalsTotal:     sntResultApprovalTotal,
-		storagePerChunk:          storagePerChunk,
-		rcvChunkDataPackTotal:    rcvChunkDataPackTotal,
-		reqChunkDataPackTotal:    reqChunkDataPackTotal,
+		tracer: tracer,
+
+		// Finder Engine
+		rcvReceiptsTotal: registerer.RegisterNewCounter(prometheus.CounterOpts{
+			Name:      "execution_receipt_received_total",
+			Namespace: namespaceVerification,
+			Subsystem: subsystemFinderEngine,
+			Help:      "total number of execution receipts received by finder engine",
+		}),
+
+		sntExecutionResultsTotal: registerer.RegisterNewCounter(prometheus.CounterOpts{
+			Name:      "execution_result_sent_total",
+			Namespace: namespaceVerification,
+			Subsystem: subsystemFinderEngine,
+			Help:      "total number of execution results sent by finder engine to match engine",
+		}),
+
+		// Match Engine
+		rcvExecutionResultsTotal: registerer.RegisterNewCounter(prometheus.CounterOpts{
+			Name:      "execution_result_received_total",
+			Namespace: namespaceVerification,
+			Subsystem: subsystemMatchEngine,
+			Help:      "total number of execution results received by match engine from finder engine",
+		}),
+
+		sntVerifiableChunksTotal: registerer.RegisterNewCounter(prometheus.CounterOpts{
+			Name:      "verifiable_chunk_sent_total",
+			Namespace: namespaceVerification,
+			Subsystem: subsystemMatchEngine,
+			Help:      "total number of verifiable chunks sent by match engine to verifier engine",
+		}),
+
+		rcvChunkDataPackTotal: registerer.RegisterNewCounter(prometheus.CounterOpts{
+			Name:      "chunk_data_pack_received_total",
+			Namespace: namespaceVerification,
+			Subsystem: subsystemMatchEngine,
+			Help:      "total number of chunk data packs received by match engine",
+		}),
+
+		reqChunkDataPackTotal: registerer.RegisterNewCounter(prometheus.CounterOpts{
+			Name:      "chunk_data_pack_requested_total",
+			Namespace: namespaceVerification,
+			Subsystem: subsystemMatchEngine,
+			Help:      "total number of chunk data packs requested by match engine",
+		}),
+
+		// Verifier Engine
+		rcvVerifiableChunksTotal: registerer.RegisterNewCounter(prometheus.CounterOpts{
+			Name:      "verifiable_chunk_received_total",
+			Namespace: namespaceVerification,
+			Subsystem: subsystemVerifierEngine,
+			Help:      "total number verifiable chunks received by verifier engine from match engine",
+		}),
+
+		sntResultApprovalsTotal: registerer.RegisterNewCounter(prometheus.CounterOpts{
+			Name:      "result_approvals_total",
+			Namespace: namespaceVerification,
+			Subsystem: subsystemVerifierEngine,
+			Help:      "total number of emitted result approvals by verifier engine",
+		}),
+
+		// Storage
+		storagePerChunk: registerer.RegisterNewGauge(prometheus.GaugeOpts{
+			Name:      "storage_latest_chunk_size_bytes",
+			Namespace: namespaceVerification,
+			Help:      "latest ingested chunk resources storage (bytes)",
+		}),
 	}
 
 	return vc
@@ -198,7 +151,7 @@ func (vc *VerificationCollector) OnResultApproval() {
 	// increases the counter of disseminated result approvals
 	// fo by one. Each result approval corresponds to a single chunk of the block
 	// the approvals disseminated by verifier engine
-	vc.resultApprovalsTotal.Inc()
+	vc.sntResultApprovalsTotal.Inc()
 
 }
 

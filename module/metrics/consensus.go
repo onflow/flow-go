@@ -22,7 +22,7 @@ type ConsensusCollector struct {
 	tracer *trace.OpenTracer
 }
 
-func NewConsensusCollector(tracer *trace.OpenTracer) *ConsensusCollector {
+func NewConsensusCollector(tracer *trace.OpenTracer, registerer *Registerer) *ConsensusCollector {
 
 	cc := &ConsensusCollector{
 		tracer: tracer,

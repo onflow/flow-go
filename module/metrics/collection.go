@@ -3,7 +3,6 @@ package metrics
 import (
 	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -28,25 +27,24 @@ type CollectionCollector struct {
 	guarantees           *prometheus.HistogramVec // counts the number/size of FINALIZED collections
 }
 
-func NewCollectionCollector(tracer *trace.OpenTracer) *CollectionCollector {
-
+func NewCollectionCollector(tracer *trace.OpenTracer, registerer *Registerer) *CollectionCollector {
 	cc := &CollectionCollector{
 		tracer: tracer,
 
-		transactionsIngested: promauto.NewCounter(prometheus.CounterOpts{
+		transactionsIngested: registerer.RegisterNewCounter(prometheus.CounterOpts{
 			Namespace: namespaceCollection,
 			Name:      "ingested_transactions_total",
 			Help:      "count of transactions ingested by this node",
 		}),
 
-		finalizedHeight: promauto.NewGaugeVec(prometheus.GaugeOpts{
+		finalizedHeight: registerer.RegisterNewGaugeVec(prometheus.GaugeOpts{
 			Namespace: namespaceCollection,
 			Subsystem: subsystemProposal,
 			Name:      "finalized_height",
 			Help:      "tracks the latest finalized height",
 		}, []string{LabelChain}),
 
-		proposals: promauto.NewHistogramVec(prometheus.HistogramOpts{
+		proposals: registerer.RegisterNewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespaceCollection,
 			Subsystem: subsystemProposal,
 			Buckets:   []float64{5, 10, 50, 100}, //TODO(andrew) update once collection limits are known
@@ -54,7 +52,7 @@ func NewCollectionCollector(tracer *trace.OpenTracer) *CollectionCollector {
 			Help:      "size/number of proposed collections",
 		}, []string{LabelChain}),
 
-		guarantees: promauto.NewHistogramVec(prometheus.HistogramOpts{
+		guarantees: registerer.RegisterNewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespaceCollection,
 			Subsystem: subsystemProposal,
 			Buckets:   []float64{5, 10, 50, 100}, //TODO(andrew) update once collection limits are known

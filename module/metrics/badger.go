@@ -7,7 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-func RegisterBadgerMetrics() {
+func RegisterBadgerMetrics(registerer *Registerer) {
 	expvarCol := prometheus.NewExpvarCollector(map[string]*prometheus.Desc{
 		"badger_disk_reads_total": prometheus.NewDesc(
 			fmt.Sprintf("%s_%s_disk_reads_total", namespaceStorage, subsystemBadger), "cumulative number of reads", nil, nil),
@@ -38,8 +38,5 @@ func RegisterBadgerMetrics() {
 			fmt.Sprintf("%s_%s_vlog_size_bytes", namespaceStorage, subsystemBadger), "size of the value log in bytes", []string{"path"}, nil),
 	})
 
-	err := prometheus.Register(expvarCol)
-	if err != nil {
-		panic(err)
-	}
+	registerer.MustRegister(expvarCol)
 }

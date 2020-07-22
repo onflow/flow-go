@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 type EngineCollector struct {
@@ -11,25 +10,25 @@ type EngineCollector struct {
 	handled  *prometheus.CounterVec
 }
 
-func NewEngineCollector() *EngineCollector {
+func NewEngineCollector(registerer *Registerer) *EngineCollector {
 
 	ec := &EngineCollector{
 
-		sent: promauto.NewCounterVec(prometheus.CounterOpts{
+		sent: registerer.RegisterNewCounterVec(prometheus.CounterOpts{
 			Name:      "messages_sent_total",
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemEngine,
 			Help:      "the number of messages sent by engines",
 		}, []string{EngineLabel, LabelMessage}),
 
-		received: promauto.NewCounterVec(prometheus.CounterOpts{
+		received: registerer.RegisterNewCounterVec(prometheus.CounterOpts{
 			Name:      "messages_received_total",
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemEngine,
 			Help:      "the number of messages received by engines",
 		}, []string{EngineLabel, LabelMessage}),
 
-		handled: promauto.NewCounterVec(prometheus.CounterOpts{
+		handled: registerer.RegisterNewCounterVec(prometheus.CounterOpts{
 			Name:      "messages_handled_total",
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemEngine,

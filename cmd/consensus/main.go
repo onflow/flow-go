@@ -127,11 +127,11 @@ func main() {
 			return err
 		}).
 		Module("consensus node metrics", func(node *cmd.FlowNodeBuilder) error {
-			conMetrics = metrics.NewConsensusCollector(node.Tracer)
+			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
 		}).
 		Module("hotstuff main metrics", func(node *cmd.FlowNodeBuilder) error {
-			mainMetrics = metrics.NewHotstuffCollector(node.RootChainID)
+			mainMetrics = metrics.NewHotstuffCollector(node.RootChainID, node.MetricsRegisterer)
 			return nil
 		}).
 		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
@@ -191,7 +191,7 @@ func main() {
 			// TODO: we should probably find a way to initialize mutually dependent engines separately
 
 			// initialize the entity database accessors
-			cleaner := bstorage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
+			cleaner := bstorage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(node.MetricsRegisterer), flow.DefaultValueLogGCFrequency)
 
 			// initialize the pending blocks cache
 			proposals := buffer.NewPendingBlocks()

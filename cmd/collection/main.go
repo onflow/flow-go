@@ -156,8 +156,8 @@ func main() {
 			return nil
 		}).
 		Module("metrics", func(node *cmd.FlowNodeBuilder) error {
-			colMetrics = metrics.NewCollectionCollector(node.Tracer)
-			clusterMetrics = metrics.NewHotstuffCollector(clusterID)
+			colMetrics = metrics.NewCollectionCollector(node.Tracer, node.MetricsRegisterer)
+			clusterMetrics = metrics.NewHotstuffCollector(clusterID, node.MetricsRegisterer)
 			return nil
 		}).
 		// regardless of whether we are starting from scratch or from an
@@ -223,7 +223,7 @@ func main() {
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
-			cleaner := storagekv.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
+			cleaner := storagekv.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(node.MetricsRegisterer), flow.DefaultValueLogGCFrequency)
 
 			// create a finalizer that will handling updating the protocol
 			// state when the follower detects newly finalized blocks

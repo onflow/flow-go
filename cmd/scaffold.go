@@ -110,7 +110,7 @@ type FlowNodeBuilder struct {
 	Logger            zerolog.Logger
 	Me                *local.Local
 	Tracer            *trace.OpenTracer
-	MetricsRegisterer prometheus.Registerer
+	MetricsRegisterer *metrics.Registerer
 	Metrics           Metrics
 	DB                *badger.DB
 	Storage           Storage
@@ -197,10 +197,6 @@ func (fnb *FlowNodeBuilder) enqueueMetricsServerInit() {
 	})
 }
 
-func (fnb *FlowNodeBuilder) registerBadgerMetrics() {
-	metrics.RegisterBadgerMetrics()
-}
-
 func (fnb *FlowNodeBuilder) enqueueTracer() {
 	fnb.Component("tracer", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
 		return fnb.Tracer, nil
@@ -251,16 +247,18 @@ func (fnb *FlowNodeBuilder) initLogger() {
 func (fnb *FlowNodeBuilder) initMetrics() {
 	tracer, err := trace.NewTracer(fnb.Logger, fnb.BaseConfig.nodeRole)
 	fnb.MustNot(err).Msg("could not initialize tracer")
-	fnb.MetricsRegisterer = prometheus.DefaultRegisterer
+	fnb.MetricsRegisterer = metrics.NewRegisterer(prometheus.DefaultRegisterer)
 	fnb.Tracer = tracer
 
-	mempools := metrics.NewMempoolCollector(5 * time.Second)
+	metrics.RegisterBadgerMetrics(fnb.MetricsRegisterer)
+
+	mempools := metrics.NewMempoolCollector(5*time.Second, fnb.MetricsRegisterer)
 
 	fnb.Metrics = Metrics{
-		Network:    metrics.NewNetworkCollector(),
-		Engine:     metrics.NewEngineCollector(),
-		Compliance: metrics.NewComplianceCollector(),
-		Cache:      metrics.NewCacheCollector(fnb.RootChainID),
+		Network:    metrics.NewNetworkCollector(fnb.MetricsRegisterer),
+		Engine:     metrics.NewEngineCollector(fnb.MetricsRegisterer),
+		Compliance: metrics.NewComplianceCollector(fnb.MetricsRegisterer),
+		Cache:      metrics.NewCacheCollector(fnb.RootChainID, fnb.MetricsRegisterer),
 		Mempool:    mempools,
 	}
 
@@ -575,8 +573,6 @@ func FlowNode(role string) *FlowNodeBuilder {
 	builder.enqueueNetworkInit()
 
 	builder.enqueueMetricsServerInit()
-
-	builder.registerBadgerMetrics()
 
 	builder.enqueueTracer()
 

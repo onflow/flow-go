@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -19,14 +20,15 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+		registerer := metrics.NewRegisterer(prometheus.DefaultRegisterer)
 		collector := struct {
 			*metrics.HotstuffCollector
 			*metrics.CollectionCollector
 			*metrics.NetworkCollector
 		}{
-			HotstuffCollector:   metrics.NewHotstuffCollector("some_chain_id"),
-			CollectionCollector: metrics.NewCollectionCollector(tracer),
-			NetworkCollector:    metrics.NewNetworkCollector(),
+			HotstuffCollector:   metrics.NewHotstuffCollector("some_chain_id", registerer),
+			CollectionCollector: metrics.NewCollectionCollector(tracer, registerer),
+			NetworkCollector:    metrics.NewNetworkCollector(registerer),
 		}
 
 		topic1 := engine.ChannelName(engine.TestNetwork)

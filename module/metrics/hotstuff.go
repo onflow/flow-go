@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -41,11 +40,11 @@ type HotstuffCollector struct {
 	payloadProductionCsCounter     prometheus.Counter
 }
 
-func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
+func NewHotstuffCollector(chain flow.ChainID, registerer *Registerer) *HotstuffCollector {
 
 	hc := &HotstuffCollector{
 
-		busyDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
+		busyDuration: registerer.RegisterNewHistogramVec(prometheus.HistogramOpts{
 			Name:        "busy_duration_seconds",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
@@ -53,7 +52,8 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Buckets:     []float64{0.05, 0.2, 0.5, 1, 2, 5},
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}, []string{"event_type"}),
-		busyDurationCsCounter: promauto.NewCounterVec(prometheus.CounterOpts{
+
+		busyDurationCsCounter: registerer.RegisterNewCounterVec(prometheus.CounterOpts{
 			Name:        "busy_duration_cseconds_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
@@ -61,7 +61,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}, []string{"event_type"}),
 
-		idleDuration: promauto.NewHistogram(prometheus.HistogramOpts{
+		idleDuration: registerer.RegisterNewHistogram(prometheus.HistogramOpts{
 			Name:        "idle_duration_seconds",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
@@ -69,7 +69,8 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Buckets:     []float64{0.05, 0.2, 0.5, 1, 2, 5},
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
-		idleDurationCsCounter: promauto.NewCounter(prometheus.CounterOpts{
+
+		idleDurationCsCounter: registerer.RegisterNewCounter(prometheus.CounterOpts{
 			Name:        "idle_duration_cseconds_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
@@ -77,7 +78,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
-		waitDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
+		waitDuration: registerer.RegisterNewHistogramVec(prometheus.HistogramOpts{
 			Name:        "wait_duration_seconds",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
@@ -85,7 +86,8 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			Buckets:     []float64{0.05, 0.2, 0.5, 1, 2, 5},
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}, []string{"event_type"}),
-		waitDurationCsCounter: promauto.NewCounterVec(prometheus.CounterOpts{
+
+		waitDurationCsCounter: registerer.RegisterNewCounterVec(prometheus.CounterOpts{
 			Name:        "wait_duration_cseconds_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
@@ -93,7 +95,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}, []string{"event_type"}),
 
-		curView: promauto.NewGauge(prometheus.GaugeOpts{
+		curView: registerer.RegisterNewGauge(prometheus.GaugeOpts{
 			Name:        "cur_view",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
@@ -101,7 +103,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
-		qcView: promauto.NewGauge(prometheus.GaugeOpts{
+		qcView: registerer.RegisterNewGauge(prometheus.GaugeOpts{
 			Name:        "qc_view",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
@@ -109,7 +111,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
-		skips: promauto.NewCounter(prometheus.CounterOpts{
+		skips: registerer.RegisterNewCounter(prometheus.CounterOpts{
 			Name:        "skips_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
@@ -117,7 +119,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
-		timeouts: promauto.NewCounter(prometheus.CounterOpts{
+		timeouts: registerer.RegisterNewCounter(prometheus.CounterOpts{
 			Name:        "timeouts_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
@@ -125,7 +127,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
-		timeoutDuration: promauto.NewGauge(prometheus.GaugeOpts{
+		timeoutDuration: registerer.RegisterNewGauge(prometheus.GaugeOpts{
 			Name:        "timeout_seconds",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
@@ -133,7 +135,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
-		committeeComputationsCsCounter: promauto.NewCounter(prometheus.CounterOpts{
+		committeeComputationsCsCounter: registerer.RegisterNewCounter(prometheus.CounterOpts{
 			Name:        "committee_computations_cseconds_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
@@ -141,7 +143,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
-		signerComputationsCsCounter: promauto.NewCounter(prometheus.CounterOpts{
+		signerComputationsCsCounter: registerer.RegisterNewCounter(prometheus.CounterOpts{
 			Name:        "crypto_computations_cseconds_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
@@ -149,7 +151,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
-		validatorComputationsCsCounter: promauto.NewCounter(prometheus.CounterOpts{
+		validatorComputationsCsCounter: registerer.RegisterNewCounter(prometheus.CounterOpts{
 			Name:        "message_validation_cseconds_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,
@@ -157,7 +159,7 @@ func NewHotstuffCollector(chain flow.ChainID) *HotstuffCollector {
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}),
 
-		payloadProductionCsCounter: promauto.NewCounter(prometheus.CounterOpts{
+		payloadProductionCsCounter: registerer.RegisterNewCounter(prometheus.CounterOpts{
 			Name:        "payload_production_cseconds_total",
 			Namespace:   namespaceConsensus,
 			Subsystem:   subsystemHotstuff,

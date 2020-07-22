@@ -21,14 +21,15 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+		registerer := metrics.NewRegisterer(prometheus.DefaultRegisterer)
 		collector := struct {
 			*metrics.HotstuffCollector
 			*metrics.ExecutionCollector
 			*metrics.NetworkCollector
 		}{
-			HotstuffCollector:  metrics.NewHotstuffCollector("some_chain_id"),
-			ExecutionCollector: metrics.NewExecutionCollector(tracer, prometheus.DefaultRegisterer),
-			NetworkCollector:   metrics.NewNetworkCollector(),
+			HotstuffCollector:  metrics.NewHotstuffCollector("some_chain_id", registerer),
+			ExecutionCollector: metrics.NewExecutionCollector(tracer, registerer),
+			NetworkCollector:   metrics.NewNetworkCollector(registerer),
 		}
 		diskTotal := rand.Int63n(1024 ^ 3)
 		for i := 0; i < 1000; i++ {
