@@ -287,9 +287,12 @@ func Test_Checkpointing(t *testing.T) {
 			//generate one more segment
 			wal4, err := realWAL.NewWAL(nil, nil, dir, size*10, pathByteSize)
 			require.NoError(t, err)
+
 			update, err := ledger.NewUpdate(rootHash, keys2, values2)
 			require.NoError(t, err)
+
 			trieUpdate, err := common.UpdateToTrieUpdate(update, pathFinderVersion)
+			require.NoError(t, err)
 
 			err = wal4.RecordUpdate(trieUpdate)
 			require.NoError(t, err)

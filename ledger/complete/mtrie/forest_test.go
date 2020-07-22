@@ -916,13 +916,8 @@ func TestRandomUpdateReadProof(t *testing.T) {
 
 		// test proof (mix of existing and non existing keys)
 		proofPaths := make([]ledger.Path, 0)
-		for _, p := range paths {
-			proofPaths = append(proofPaths, p)
-		}
-
-		for _, p := range nonExistingPaths {
-			proofPaths = append(proofPaths, p)
-		}
+		proofPaths = append(proofPaths, paths...)
+		proofPaths = append(proofPaths, nonExistingPaths...)
 
 		read = &ledger.TrieRead{RootHash: activeRoot, Paths: proofPaths}
 		batchProof, err := forest.Proofs(read)
