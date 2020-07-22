@@ -51,16 +51,20 @@ func NewNode(height int,
 	maxDepth uint16,
 	regCount uint64) *Node {
 
-	var p *ledger.Payload
+	var pl *ledger.Payload
+	var p ledger.Path
 	if payload != nil {
-		p = payload.DeepCopy()
+		pl = payload.DeepCopy()
+	}
+	if len(path) > 0 {
+		p = path.DeepCopy()
 	}
 	n := &Node{
 		lChild:    lchild,
 		rChild:    rchild,
 		height:    height,
-		path:      path.DeepCopy(),
-		payload:   p,
+		path:      p,
+		payload:   pl,
 		hashValue: hashValue,
 		maxDepth:  maxDepth,
 		regCount:  regCount,

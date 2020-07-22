@@ -65,7 +65,7 @@ func TestForestStoreAndLoad(t *testing.T) {
 	require.NoError(t, err)
 
 	//forests are the same now
-	assert.Equal(t, *mForest, *newForest)
+	assert.Equal(t, mForest, newForest)
 
 	read := &ledger.TrieRead{RootHash: rootHash, Paths: paths}
 	retPayloads, err := mForest.Read(read)

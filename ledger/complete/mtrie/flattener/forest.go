@@ -143,19 +143,17 @@ func RebuildNodes(storableNodes []*StorableNode) ([]*node.Node, error) {
 			return nil, fmt.Errorf("sequence of StorableNodes does not satisfy Descendents-First-Relationship")
 		}
 
-		var payload *ledger.Payload
-		var err error
-		if len(snode.EncPayload) > 0 {
-			payload, err = common.DecodePayload(snode.EncPayload)
+		if len(snode.Path) > 0 {
+			path := ledger.Path(snode.Path)
+			payload, err := common.DecodePayload(snode.EncPayload)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode a payload for an storableNode %w", err)
 			}
+			node := node.NewNode(int(snode.Height), nodes[snode.LIndex], nodes[snode.RIndex], path, payload, snode.HashValue, snode.MaxDepth, snode.RegCount)
+			nodes = append(nodes, node)
+			continue
 		}
-		var path ledger.Path
-		if len(snode.Path) > 0 {
-			path = ledger.Path(snode.Path)
-		}
-		node := node.NewNode(int(snode.Height), nodes[snode.LIndex], nodes[snode.RIndex], path, payload, snode.HashValue, snode.MaxDepth, snode.RegCount)
+		node := node.NewNode(int(snode.Height), nodes[snode.LIndex], nodes[snode.RIndex], nil, nil, snode.HashValue, snode.MaxDepth, snode.RegCount)
 		nodes = append(nodes, node)
 	}
 	return nodes, nil
