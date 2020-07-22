@@ -162,10 +162,10 @@ func RandomPayload(minByteSize int, maxByteSize int) *ledger.Payload {
 }
 
 // RandomPayloads returns n random payloads
-func RandomPayloads(n int) []*ledger.Payload {
+func RandomPayloads(n int, minByteSize int, maxByteSize int) []*ledger.Payload {
 	res := make([]*ledger.Payload, 0)
 	for i := 0; i < n; i++ {
-		res = append(res, RandomPayload(2, 10))
+		res = append(res, RandomPayload(minByteSize, maxByteSize))
 	}
 	return res
 }

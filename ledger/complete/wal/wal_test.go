@@ -23,7 +23,6 @@ func Test_emptyDir(t *testing.T) {
 }
 
 // Prometheus WAL require files to be 8 characters, otherwise it gets confused
-
 func Test_noCheckpoints(t *testing.T) {
 	RunWithWALCheckpointerWithFiles(t, "00000000", "00000001", "00000002", func(t *testing.T, wal *realWAL.LedgerWAL, checkpointer *realWAL.Checkpointer) {
 		latestCheckpoint, err := checkpointer.LatestCheckpoint()

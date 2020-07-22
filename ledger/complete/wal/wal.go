@@ -12,22 +12,24 @@ import (
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/flattener"
 )
 
+const SegmentSize = 32 * 1024 * 1024
+
 type LedgerWAL struct {
 	wal            *prometheusWAL.WAL
 	forestCapacity int
-	keyByteSize    int
+	pathByteSize   int
 }
 
 // TODO use real logger and metrics, but that would require passing them to Trie storage
-func NewWAL(logger log.Logger, reg prometheus.Registerer, dir string, forestCapacity int, keyByteSize int) (*LedgerWAL, error) {
-	w, err := prometheusWAL.NewSize(logger, reg, dir, 32*1024)
+func NewWAL(logger log.Logger, reg prometheus.Registerer, dir string, forestCapacity int, pathByteSize int, segmentSize int) (*LedgerWAL, error) {
+	w, err := prometheusWAL.NewSize(logger, reg, dir, segmentSize)
 	if err != nil {
 		return nil, err
 	}
 	return &LedgerWAL{
 		wal:            w,
 		forestCapacity: forestCapacity,
-		keyByteSize:    keyByteSize,
+		pathByteSize:   pathByteSize,
 	}, nil
 }
 
@@ -116,13 +118,12 @@ func (w *LedgerWAL) replay(
 	loadedCheckpoint := false
 	startSegment := from
 
+	checkpointer, err := w.NewCheckpointer()
+	if err != nil {
+		return fmt.Errorf("cannot create checkpointer: %w", err)
+	}
+
 	if useCheckpoints {
-
-		checkpointer, err := w.NewCheckpointer()
-		if err != nil {
-			return fmt.Errorf("cannot create checkpointer: %w", err)
-		}
-
 		latestCheckpoint, err := checkpointer.LatestCheckpoint()
 		if err != nil {
 			return fmt.Errorf("cannot get latest checkpoint: %w", err)
@@ -146,6 +147,23 @@ func (w *LedgerWAL) replay(
 
 		if loadedCheckpoint {
 			startSegment = latestCheckpoint + 1
+		}
+	}
+
+	if !loadedCheckpoint && startSegment == 0 {
+		hasRootCheckpoint, err := checkpointer.HasRootCheckpoint()
+		if err != nil {
+			return fmt.Errorf("cannot check root checkpoint existence: %w", err)
+		}
+		if hasRootCheckpoint {
+			flattenedForest, err := checkpointer.LoadRootCheckpoint()
+			if err != nil {
+				return fmt.Errorf("cannot load root checkpoint: %w", err)
+			}
+			err = checkpointFn(flattenedForest)
+			if err != nil {
+				return fmt.Errorf("error while handling root checkpoint: %w", err)
+			}
 		}
 	}
 
@@ -192,7 +210,7 @@ func (w *LedgerWAL) replay(
 
 // NewCheckpointer returns a Checkpointer for this WAL
 func (w *LedgerWAL) NewCheckpointer() (*Checkpointer, error) {
-	return NewCheckpointer(w, w.keyByteSize, w.forestCapacity), nil
+	return NewCheckpointer(w, w.pathByteSize, w.forestCapacity), nil
 }
 
 func (w *LedgerWAL) Close() error {

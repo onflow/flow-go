@@ -291,6 +291,8 @@ func TestMixProof(t *testing.T) {
 
 func TestRandomProofs(t *testing.T) {
 	pathByteSize := 2 // key size of 16 bits
+	minPayloadSize := 2
+	maxPayloadSize := 10
 	experimentRep := 20
 	for e := 0; e < experimentRep; e++ {
 		withForest(t, pathByteSize, experimentRep+1, func(t *testing.T, f *mtrie.Forest) {
@@ -299,7 +301,7 @@ func TestRandomProofs(t *testing.T) {
 			rand.Seed(time.Now().UnixNano())
 			numberOfPaths := rand.Intn(256) + 1
 			paths := common.GetRandomPaths(numberOfPaths, pathByteSize)
-			payloads := common.RandomPayloads(numberOfPaths)
+			payloads := common.RandomPayloads(numberOfPaths, minPayloadSize, maxPayloadSize)
 			// keep a subset as initial insert and keep the rest for reading default values
 			split := rand.Intn(numberOfPaths)
 			insertPaths := paths[:split]

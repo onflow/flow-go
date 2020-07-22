@@ -863,6 +863,8 @@ func TestIdenticalUpdateAppliedTwice(t *testing.T) {
 // this simulates the common patern of actions on flow
 func TestRandomUpdateReadProof(t *testing.T) {
 	pathByteSize := 2 // path size of 16 bits
+	minPayloadByteSize := 2
+	maxPayloadByteSize := 10
 	rep := 10
 	maxNumPathsPerStep := 10
 	rand.Seed(time.Now().UnixNano())
@@ -879,7 +881,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 
 	for e := 0; e < rep; e++ {
 		paths := common.GetRandomPathsRandLen(maxNumPathsPerStep, pathByteSize)
-		payloads := common.RandomPayloads(len(paths))
+		payloads := common.RandomPayloads(len(paths), minPayloadByteSize, maxPayloadByteSize)
 
 		// update map store with key values
 		// we use this at the end of each step to check all existing keys

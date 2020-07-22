@@ -33,7 +33,7 @@ func RunWithWALCheckpointerWithFiles(t *testing.T, names ...interface{}) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		util.CreateFiles(t, dir, fileNames...)
 
-		wal, err := realWAL.NewWAL(nil, nil, dir, 10, segmentSize)
+		wal, err := realWAL.NewWAL(nil, nil, dir, 10, pathByteSize, segmentSize)
 		require.NoError(t, err)
 
 		checkpointer, err := wal.NewCheckpointer()
@@ -52,6 +52,8 @@ var (
 	size               = 10
 	metricsCollector   = &metrics.NoopCollector{}
 	segmentSize        = 32 * 1024
+	pathByteSize       = 32
+	pathFinderVersion  = uint8(0)
 )
 
 func Test_WAL(t *testing.T) {
@@ -121,15 +123,13 @@ func Test_WAL(t *testing.T) {
 
 func Test_Checkpointing(t *testing.T) {
 
-	numInsPerStep := 2
-	keyNumberOfParts := 10
-	keyPartMinByteSize := 1
-	keyPartMaxByteSize := 100
-	valueMaxByteSize := 2 << 16 //16kB
-	size := 10
-	metricsCollector := &metrics.NoopCollector{}
-	pathByteSize := 32
-	pathFinderVersion := uint8(0)
+	// numInsPerStep := 2
+	// keyNumberOfParts := 10
+	// keyPartMinByteSize := 1
+	// keyPartMaxByteSize := 100
+	// valueMaxByteSize := 2 << 16 //16kB
+	// size := 10
+	// metricsCollector := &metrics.NoopCollector{}
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
@@ -143,7 +143,7 @@ func Test_Checkpointing(t *testing.T) {
 
 		t.Run("create WAL and initial trie", func(t *testing.T) {
 
-			wal, err := realWAL.NewWAL(nil, nil, dir, size*10, pathByteSize)
+			wal, err := realWAL.NewWAL(nil, nil, dir, size*10, pathByteSize, segmentSize)
 			require.NoError(t, err)
 
 			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
@@ -189,7 +189,7 @@ func Test_Checkpointing(t *testing.T) {
 
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000010"))
 
-			wal2, err := realWAL.NewWAL(nil, nil, dir, size*10, pathByteSize)
+			wal2, err := realWAL.NewWAL(nil, nil, dir, size*10, pathByteSize, segmentSize)
 			require.NoError(t, err)
 
 			err = wal2.Replay(
@@ -224,7 +224,7 @@ func Test_Checkpointing(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Run("read checkpoint", func(t *testing.T) {
-			wal3, err := realWAL.NewWAL(nil, nil, dir, size*10, pathByteSize)
+			wal3, err := realWAL.NewWAL(nil, nil, dir, size*10, pathByteSize, segmentSize)
 			require.NoError(t, err)
 
 			err = wal3.Replay(
@@ -285,7 +285,7 @@ func Test_Checkpointing(t *testing.T) {
 			require.NoFileExists(t, path.Join(dir, "00000011"))
 
 			//generate one more segment
-			wal4, err := realWAL.NewWAL(nil, nil, dir, size*10, pathByteSize)
+			wal4, err := realWAL.NewWAL(nil, nil, dir, size*10, pathByteSize, segmentSize)
 			require.NoError(t, err)
 
 			update, err := ledger.NewUpdate(rootHash, keys2, values2)
@@ -310,7 +310,7 @@ func Test_Checkpointing(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Run("replay both checkpoint and updates after checkpoint", func(t *testing.T) {
-			wal5, err := realWAL.NewWAL(nil, nil, dir, size*10, pathByteSize)
+			wal5, err := realWAL.NewWAL(nil, nil, dir, size*10, pathByteSize, segmentSize)
 			require.NoError(t, err)
 
 			updatesLeft := 1 // there should be only one update
