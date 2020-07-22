@@ -20,6 +20,7 @@ const safeDecrease = 200 * time.Millisecond
 const safeDecreaseFactor = 0.85
 
 func TestSingleInstance(t *testing.T) {
+	t.Skip()
 
 	// set up a single instance to run
 	// NOTE: currently, the HotStuff logic will infinitely call back on itself
@@ -89,6 +90,7 @@ func TestThreeInstances(t *testing.T) {
 }
 
 func TestSevenInstances(t *testing.T) {
+	t.Skip()
 
 	// test parameters
 	// NOTE: block finalization seems to be rather slow on CI at the moment,
