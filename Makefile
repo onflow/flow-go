@@ -280,8 +280,8 @@ docker-build-bootstrap-transit:
 	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=bootstrap/transit --target production-nocgo \
 		-t gcr.io/dl-flow/bootstrap-transit:latest -t "gcr.io/dl-flow/bootstrap-transit:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/bootstrap-transit:$(IMAGE_TAG)" .
 
-.PHONY: docker-build-spammer
-docker-build-spammer:
+.PHONY: docker-build-loader
+docker-build-loader:
 	docker build -f ./integration/benchmark/main/Dockerfile --ssh default --build-arg TARGET=benchmark/main --target production \
 		-t gcr.io/dl-flow/bechmark:latest -t "gcr.io/dl-flow/bechmark:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/bechmark:$(IMAGE_TAG)" .
 
