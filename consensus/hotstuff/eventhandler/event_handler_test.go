@@ -107,8 +107,8 @@ func (v *VoteAggregator) StoreVoteAndBuildQC(vote *model.Vote, block *model.Bloc
 	return qc, ok, nil
 }
 
-func (v *VoteAggregator) StorePendingVote(vote *model.Vote) bool {
-	return false
+func (v *VoteAggregator) StorePendingVote(vote *model.Vote) (bool, error) {
+	return false, nil
 }
 
 func (v *VoteAggregator) StoreProposerVote(vote *model.Vote) bool {
