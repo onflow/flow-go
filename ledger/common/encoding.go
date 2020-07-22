@@ -399,7 +399,7 @@ func decodePayload(inp []byte) (*ledger.Payload, error) {
 	}
 
 	// read encoded value
-	encValue, rest, err := ReadSlice(rest, int(encValeSize))
+	encValue, _, err := ReadSlice(rest, int(encValeSize))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
@@ -499,9 +499,15 @@ func decodeTrieUpdate(inp []byte) (*ledger.TrieUpdate, error) {
 
 	// decode number of paths
 	numOfPaths, rest, err := ReadUint32(rest)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding trie update: %w", err)
+	}
 
 	// decode path size
 	pathSize, rest, err := ReadUint16(rest)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding trie update: %w", err)
+	}
 
 	var path ledger.Path
 	var encPath []byte

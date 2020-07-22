@@ -99,7 +99,7 @@ func ReadStorableNode(reader io.Reader) (*StorableNode, error) {
 		return nil, fmt.Errorf("error reading storable node: %w", err)
 	}
 
-	storableNode.RegCount, buf, err = common.ReadUint64(buf)
+	storableNode.RegCount, _, err = common.ReadUint64(buf)
 	if err != nil {
 		return nil, fmt.Errorf("error reading storable node: %w", err)
 	}

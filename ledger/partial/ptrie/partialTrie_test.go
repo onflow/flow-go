@@ -45,7 +45,8 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 		payloads := []*ledger.Payload{payload1}
 
 		rootHash := f.GetEmptyRootHash()
-		bp, err := f.Proofs(&ledger.TrieRead{rootHash, paths})
+		r := &ledger.TrieRead{rootHash, paths}
+		bp, err := f.Proofs(r)
 		require.NoError(t, err, "error getting proofs values")
 
 		encBP := common.EncodeTrieBatchProof(bp)
@@ -55,7 +56,8 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 		if !bytes.Equal(rootHash, psmt.root.HashValue()) {
 			t.Fatal("rootNode hash doesn't match [before set]")
 		}
-		rootHash, err = f.Update(&ledger.TrieUpdate{rootHash, paths, payloads})
+		r = &ledger.TrieUpdate{rootHash, paths, payloads}
+		rootHash, err = f.Update(r)
 		require.NoError(t, err, "error updating trie")
 
 		_, _, err = psmt.Update(paths, payloads)
@@ -68,7 +70,8 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 		updatedPayload1 := common.LightPayload('B', 'b')
 		payloads = []*ledger.Payload{updatedPayload1}
 
-		rootHash, err = f.Update(&ledger.TrieUpdate{rootHash, paths, payloads})
+		u := &ledger.TrieUpdate{rootHash, paths, payloads}
+		rootHash, err = f.Update(u)
 		require.NoError(t, err, "error updating trie")
 
 		_, _, err = psmt.Update(paths, payloads)
@@ -97,10 +100,12 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 		paths := []ledger.Path{path1, path2}
 		payloads := []*ledger.Payload{payload1, payload2}
 
-		rootHash, err := f.Update(&ledger.TrieUpdate{f.GetEmptyRootHash(), paths, payloads})
+		u := &ledger.TrieUpdate{f.GetEmptyRootHash(), paths, payloads}
+		rootHash, err := f.Update(u)
 		require.NoError(t, err, "error updating trie")
 
-		bp, err := f.Proofs(&ledger.TrieRead{rootHash, paths})
+		r := &ledger.TrieRead{rootHash, paths}
+		bp, err := f.Proofs(r)
 		require.NoError(t, err, "error getting batch proof")
 
 		encBP := common.EncodeTrieBatchProof(bp)
@@ -256,7 +261,6 @@ func TestMixProof(t *testing.T) {
 		require.NoError(t, err, "error updating trie")
 
 		paths = []ledger.Path{path1, path2, path3}
-		payloads = []*ledger.Payload{payload1, payload2, payload3}
 
 		bp, err := f.Proofs(&ledger.TrieRead{rootHash, paths})
 		require.NoError(t, err, "error getting batch proof")

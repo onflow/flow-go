@@ -995,8 +995,6 @@ func payloadBySlices(keydata []byte, valuedata []byte) *ledger.Payload {
 
 func pathByUint8s(inputs []uint8, pathByteSize int) ledger.Path {
 	b := make([]byte, pathByteSize)
-	for i, inp := range inputs {
-		b[i] = inp
-	}
+	copy(b, inputs)
 	return ledger.Path([]byte(b))
 }

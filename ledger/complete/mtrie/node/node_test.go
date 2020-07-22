@@ -10,11 +10,6 @@ import (
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/node"
 )
 
-const (
-	ReferenceImplKeyByteSize   = 2
-	ReferenceImplValueByteSize = 2
-)
-
 // Test_ProperLeaf verifies that the hash value of a proper leaf (at height 0) is computed correctly
 func Test_ProperLeaf(t *testing.T) {
 	path := common.TwoBytesPath(56809)

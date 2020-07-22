@@ -29,7 +29,7 @@ func NewLedger(proof ledger.Proof, sc ledger.StateCommitment) (*Ledger, error) {
 		return nil, ledger.NewErrLedgerConstruction(err)
 	}
 
-	return &Ledger{ptrie: psmt}, nil
+	return &Ledger{ptrie: psmt, proof: proof}, nil
 }
 
 // Ready implements interface module.ReadyDoneAware
