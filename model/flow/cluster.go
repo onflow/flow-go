@@ -49,6 +49,7 @@ func (cl *ClusterList) ByTxID(txID Identifier) (IdentityList, bool) {
 // ByNodeID select the cluster that the node with the given ID is part of.
 //
 // Nodes will be divided into equally sized clusters as far as possible.
+// The last return value will indicate if the look up was successful
 func (cl ClusterList) ByNodeID(nodeID Identifier) (IdentityList, uint, bool) {
 	index, ok := cl.lookup[nodeID]
 	if !ok {

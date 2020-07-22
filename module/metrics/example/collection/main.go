@@ -29,8 +29,8 @@ func main() {
 			NetworkCollector:    metrics.NewNetworkCollector(),
 		}
 
-		topic1 := engine.ChannelName(engine.CollectionProvider)
-		topic2 := engine.ChannelName(engine.CollectionIngest)
+		topic1 := engine.ChannelName(engine.TestNetwork)
+		topic2 := engine.ChannelName(engine.TestMetrics)
 
 		for i := 0; i < 100; i++ {
 			collector.TransactionIngested(unittest.IdentifierFixture())

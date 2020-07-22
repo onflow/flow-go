@@ -215,7 +215,7 @@ ReceiptLoop:
 	for time.Now().Before(deadline) {
 		conID := ss.conIDs[0]
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		err := ss.Execution().Send(ctx, engine.ExecutionReceiptProvider, &receipt, conID)
+		err := ss.Execution().Send(ctx, engine.PushReceipts, &receipt, conID)
 		cancel()
 		if err != nil {
 			ss.T().Logf("could not send execution receipt: %s", err)
@@ -246,7 +246,7 @@ ApprovalLoop:
 	for time.Now().Before(deadline) {
 		conID := ss.conIDs[0]
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		err := ss.Verification().Send(ctx, engine.ApprovalProvider, &approval, conID)
+		err := ss.Verification().Send(ctx, engine.PushApprovals, &approval, conID)
 		cancel()
 		if err != nil {
 			ss.T().Logf("could not send result approval: %s", err)

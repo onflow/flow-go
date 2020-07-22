@@ -93,12 +93,7 @@ func (st *StatsTracker) MedTTF() float64 {
 			observations = append(observations, t.TTF.Seconds())
 		}
 	}
-	sort.Float64s(observations)
-
-	if len(observations)%2 == 0 { // even
-		return (observations[(len(observations)/2)-1] + observations[len(observations)/2]) / 2
-	}
-	return observations[len(observations)/2]
+	return computeMedian(observations)
 }
 
 // MaxTTF returns the maximum transaction time to finality (in seconds)
@@ -142,12 +137,7 @@ func (st *StatsTracker) MedTTE() float64 {
 			observations = append(observations, t.TTE.Seconds())
 		}
 	}
-	sort.Float64s(observations)
-
-	if len(observations)%2 == 0 { // even
-		return (observations[(len(observations)/2)-1] + observations[len(observations)/2]) / 2
-	}
-	return observations[len(observations)/2]
+	return computeMedian(observations)
 }
 
 // MaxTTE returns the maximum transaction time to execution (in seconds)
@@ -206,15 +196,27 @@ func (st *StatsTracker) MedTTS() float64 {
 			observations = append(observations, t.TTS.Seconds())
 		}
 	}
-	sort.Float64s(observations)
-
-	if len(observations)%2 == 0 { // even
-		return (observations[(len(observations)/2)-1] + observations[len(observations)/2]) / 2
-	}
-	return observations[len(observations)/2]
+	return computeMedian(observations)
 }
 
 func (st *StatsTracker) String() string {
+	t := table.NewWriter()
+	t.AppendHeader(table.Row{"index",
+		"TTF (s)",
+		"TTE (s)",
+		"TTS (s)",
+		"isExpired"})
+	for i, tx := range st.txStats {
+		t.AppendRow(table.Row{i,
+			tx.TTF,
+			tx.TTE,
+			tx.TTS})
+
+	}
+	return t.Render()
+}
+
+func (st *StatsTracker) Digest() string {
 	t := table.NewWriter()
 	t.AppendHeader(table.Row{"total TX",
 		"failure rate",
@@ -239,4 +241,21 @@ func (st *StatsTracker) String() string {
 		st.MedTTS(),
 		st.MaxTTS()})
 	return t.Render()
+}
+
+func computeMedian(obs []float64) float64 {
+	sort.Float64s(obs)
+	switch len(obs) {
+	case 0:
+		return float64(0)
+	case 1:
+		return obs[0]
+	case 2:
+		return (obs[0] + obs[1]) / float64(2)
+	default:
+		if len(obs)%2 == 0 { // even
+			return (obs[(len(obs)/2)-1] + obs[len(obs)/2]) / 2
+		}
+		return obs[len(obs)/2]
+	}
 }

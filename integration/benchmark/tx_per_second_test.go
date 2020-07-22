@@ -46,7 +46,7 @@ const (
 const (
 	// total test accounts to create
 	// This is a long running test. On a local environment use more conservative numbers for TotalAccounts (~3)
-	TotalAccounts = 25
+	TotalAccounts = 20
 	// each account transfers 10 tokens to the next account RoundsOfTransfer number of times
 	RoundsOfTransfer = 50
 	// threshold for TPS
@@ -475,7 +475,6 @@ func (gs *TransactionsPerSecondSuite) AddKeys(flowClient *client.Client) {
 
 	err := addKeysTx.AddArgument(bytesToCadenceArray(accountKeyBytes))
 	handle(err)
-
 
 	err = addKeysTx.SignEnvelope(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootSigner)
 	handle(err)
