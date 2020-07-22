@@ -39,14 +39,14 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 	}
 
 	// retrieve the identities for the epoch
-	var identities flow.IdentityList
-	err = s.state.db.View(operation.RetrieveEpochIdentities(counter, &identities))
+	var event flow.EpochSetup
+	err = s.state.db.View(operation.RetrieveEpochSetup(counter, &event))
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch identities: %w", err)
 	}
 
 	// apply the filter to the identities
-	identities = identities.Filter(selector)
+	identities := event.Identities.Filter(selector)
 
 	// apply a deterministic sort to the identities
 	sort.Slice(identities, func(i int, j int) bool {

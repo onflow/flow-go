@@ -17,34 +17,18 @@ func RetrieveEpochCounter(counter *uint64) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeEpochCounter), counter)
 }
 
-func InsertEpochSeed(counter uint64, seed []byte) func(*badger.Txn) error {
-	return insert(makePrefix(codeEpochSeed, counter), seed)
+func InsertEpochSetup(counter uint64, event *flow.EpochSetup) func(*badger.Txn) error {
+	return insert(makePrefix(codeEpochSetup, counter), event)
 }
 
-func RetrieveEpochSeed(counter uint64, seed *[]byte) func(*badger.Txn) error {
-	return insert(makePrefix(codeEpochSeed, counter), seed)
+func RetrieveEpochSetup(counter uint64, event *flow.EpochSetup) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeEpochSetup, counter), event)
 }
 
-func InsertEpochEnd(counter uint64, view uint64) func(*badger.Txn) error {
-	return insert(makePrefix(codeEpochEnd, counter), view)
+func InsertEpochCommit(counter uint64, event *flow.EpochCommit) func(*badger.Txn) error {
+	return insert(makePrefix(codeEpochCommit, counter), event)
 }
 
-func RetrieveEpochEnd(counter uint64, view *uint64) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeEpochEnd, counter), view)
-}
-
-func InsertEpochClusters(counter uint64, clusters []flow.IdentityList) func(*badger.Txn) error {
-	return insert(makePrefix(codeEpochClusters, counter), clusters)
-}
-
-func RetrieveEpochClusters(counter uint64, clusters *[]flow.IdentityList) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeEpochClusters, counter), clusters)
-}
-
-func InsertEpochIdentities(counter uint64, identities flow.IdentityList) func(*badger.Txn) error {
-	return insert(makePrefix(codeEpochIdentities, counter), identities)
-}
-
-func RetrieveEpochIdentities(counter uint64, identities *flow.IdentityList) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeEpochIdentities, counter), identities)
+func RetrieveEpochCommit(counter uint64, event *flow.EpochCommit) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeEpochCommit, counter), event)
 }

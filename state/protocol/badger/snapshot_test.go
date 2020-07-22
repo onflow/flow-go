@@ -66,8 +66,10 @@ func TestHead(t *testing.T) {
 func TestIdentities(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
+		counter := uint64(1337)
 		blockID := unittest.IdentifierFixture()
-		identities := unittest.IdentityListFixture(8)
+		identities := unittest.IdentityListFixture(8, unittest.WithRole(flow.RoleCollection))
+		event := &flow.EpochSetup{Identities: identities}
 
 		err := db.Update(operation.InsertRootHeight(0))
 		require.NoError(t, err)
@@ -78,10 +80,10 @@ func TestIdentities(t *testing.T) {
 		err = db.Update(operation.IndexBlockHeight(0, blockID))
 		require.NoError(t, err)
 
-		err = db.Update(operation.InsertEpochCounter(1337))
+		err = db.Update(operation.InsertEpochCounter(counter))
 		require.NoError(t, err)
 
-		err = db.Update(operation.InsertEpochIdentities(1337, identities))
+		err = db.Update(operation.InsertEpochSetup(counter, event))
 		require.NoError(t, err)
 
 		err = db.Update(operation.IndexPayloadGuarantees(blockID, nil))
@@ -99,8 +101,10 @@ func TestIdentities(t *testing.T) {
 func TestClusters(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
 
+		counter := uint64(1337)
 		blockID := unittest.IdentifierFixture()
 		identities := unittest.IdentityListFixture(7, unittest.WithRole(flow.RoleCollection))
+		event := &flow.EpochSetup{Identities: identities}
 
 		err := db.Update(operation.InsertRootHeight(0))
 		require.NoError(t, err)
@@ -111,10 +115,10 @@ func TestClusters(t *testing.T) {
 		err = db.Update(operation.IndexBlockHeight(0, blockID))
 		require.NoError(t, err)
 
-		err = db.Update(operation.InsertEpochCounter(1337))
+		err = db.Update(operation.InsertEpochCounter(counter))
 		require.NoError(t, err)
 
-		err = db.Update(operation.InsertEpochIdentities(1337, identities))
+		err = db.Update(operation.InsertEpochSetup(counter, event))
 		require.NoError(t, err)
 
 		err = db.Update(operation.IndexPayloadGuarantees(blockID, nil))

@@ -45,7 +45,12 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 
 		// TODO: see how we can decode these without having circular dependency between SDK and main repo
 		var setup *flow.EpochSetup
-		// var commit *flow.EpochCommit
+		var commit *flow.EpochCommit
+
+		// make sure they both refer to the same epoch
+		if setup.Counter != commit.Counter {
+			return fmt.Errorf("epoch setup counter differs from epoch commit counter (%d != %d)", setup.Counter, commit.Counter)
+		}
 
 		// FIRST: validate the root block and its payload
 
@@ -175,21 +180,13 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		if err != nil {
 			return fmt.Errorf("could not insert epoch counter: %w", err)
 		}
-		err = operation.InsertEpochSeed(setup.Counter, setup.Seed)(tx)
+		err = operation.InsertEpochSetup(setup.Counter, setup)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert epoch seed: %w", err)
 		}
-		err = operation.InsertEpochEnd(setup.Counter, setup.FinalView)(tx)
+		err = operation.InsertEpochCommit(commit.Counter, commit)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert eoch end: %w", err)
-		}
-		err = operation.InsertEpochIdentities(setup.Counter, setup.Identities)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert epoch identities: %w", err)
-		}
-		err = operation.InsertEpochClusters(setup.Counter, setup.Clusters.All())(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert epoch clusters: %w", err)
 		}
 
 		m.state.metrics.FinalizedHeight(root.Header.Height)
