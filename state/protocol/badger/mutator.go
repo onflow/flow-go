@@ -317,7 +317,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		}
 		index, err := m.state.index.ByBlockID(ancestorID)
 		if err != nil {
-			return fmt.Errorf("could not retrieve ancestor payload (%x): %w", ancestorID, err)
+			return fmt.Errorf("could not retrieve ancestor index (%x): %w", ancestorID, err)
 		}
 		for _, collID := range index.CollectionIDs {
 			lookup[collID] = struct{}{}
@@ -464,9 +464,40 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	// sophisticated checks that catch invalid events one by one makes
 	// the code more extensible in the future.
 
-	// for each event, check if it is valid
+	// identify whether we already had setup or commit events on this fork
+	// of the pending chain
 	didSetup := false
 	didCommit := false
+	ancestorID = header.ParentID
+	for ancestorID != finalID {
+		ancestor, err := m.state.headers.ByBlockID(ancestorID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve ancestor (%x): %w", ancestorID, err)
+		}
+		if ancestor.Height < finalized {
+			return state.NewOutdatedExtensionErrorf("candidate block conflicts with finalized state (ancestor: %d final: %d)",
+				ancestor.Height, finalized)
+		}
+		payload, err := m.state.payloads.ByBlockID(ancestorID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve payload (%x): %w", ancestorID, err)
+		}
+		for _, seal := range payload.Seals {
+			for _, event := range seal.SystemEvents {
+				if event.Type == flow.EventEpochSetup {
+					didSetup = true
+					continue
+				}
+				if event.Type == flow.EventEpochCommit {
+					didCommit = true
+					continue
+				}
+			}
+		}
+		ancestorID = ancestor.ParentID
+	}
+
+	// for each event, check if it is valid
 	for _, event := range events {
 
 		// decode the event first; should work for all
@@ -487,14 +518,11 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 			var dummy flow.EpochSetup
 			err = m.state.db.View(operation.RetrieveEpochSetup(counter+1, &dummy))
 			if err == nil {
-				return fmt.Errorf("unexpected epoch setup system event")
+				return fmt.Errorf("conflicting epoch setup system event")
 			}
 			if !errors.Is(err, storage.ErrNotFound) {
 				return fmt.Errorf("could not retrieve next epoch setup: %w", err)
 			}
-
-			// TODO: Check whether there is a pending epoch setup event on this branch
-			// of the non-finalized blockchain.
 
 			// type assert the event and check if the counter is valid
 			setup := value.ToGoValue().(*flow.EpochSetup)
@@ -503,6 +531,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 			}
 
 			// TODO: Determine what other compliance checks we want to run on the epoch setup event.
+			// => https://github.com/dapperlabs/flow-go/issues/4437
 
 			didSetup = true
 			continue
@@ -520,14 +549,11 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 			var dummy flow.EpochCommit
 			err = m.state.db.View(operation.RetrieveEpochCommit(counter+1, &dummy))
 			if err == nil {
-				return fmt.Errorf("unexpected epoch commit system event")
+				return fmt.Errorf("conflicting epoch commit system event")
 			}
 			if !errors.Is(err, storage.ErrNotFound) {
 				return fmt.Errorf("could not retrieve next epoch commit: %w", err)
 			}
-
-			// TODO: Check whether there is a pending epoch commit event on this branch
-			// of the non-finalized blockchain.
 
 			// type assert the event and check if the counter is valid
 			commit := value.ToGoValue().(*flow.EpochCommit)
@@ -535,7 +561,8 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 				return fmt.Errorf("invalid epoch commit event counter (%d => %d)", counter, commit.Counter)
 			}
 
-			// Determine what other compliance checks we want to run on the epoch commit event.
+			// TODO: Determine what other compliance checks we want to run on the epoch commit event.
+			// => https://github.com/dapperlabs/flow-go/issues/4437
 
 			didCommit = true
 			continue
