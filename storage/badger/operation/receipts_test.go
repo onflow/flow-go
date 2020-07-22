@@ -28,3 +28,20 @@ func TestReceipts_InsertRetrieve(t *testing.T) {
 		assert.Equal(t, expected, &actual)
 	})
 }
+
+func TestReceipts_Index(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		receipt := unittest.ExecutionReceiptFixture()
+		expected := receipt.ID()
+		blockID := receipt.ExecutionResult.BlockID
+
+		err := db.Update(IndexExecutionReceipt(blockID, expected))
+		require.Nil(t, err)
+
+		var actual flow.Identifier
+		err = db.View(LookupExecutionReceipt(blockID, &actual))
+		require.Nil(t, err)
+
+		assert.Equal(t, expected, actual)
+	})
+}
