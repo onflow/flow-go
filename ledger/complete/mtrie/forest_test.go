@@ -948,7 +948,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		read = &ledger.TrieRead{RootHash: activeRoot, Paths: allPaths}
 		retPayloads, err = forest.Read(read)
 		require.NoError(t, err)
-		for i, v := range retPayloads {
+		for i, v := range allPayloads {
 			require.True(t, bytes.Equal(common.EncodePayload(v), common.EncodePayload(retPayloads[i])))
 		}
 	}

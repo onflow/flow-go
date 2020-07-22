@@ -227,7 +227,7 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 
 		// second update
 		payloads = []*ledger.Payload{updatedPayload1, updatedPayload2}
-		rootHash, err = f.Update(&ledger.TrieUpdate{rootHash, paths, payloads})
+		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads})
 		require.NoError(t, err, "error updating trie")
 
 		pRootHash, _, err = psmt.Update(paths, payloads)
