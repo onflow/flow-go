@@ -33,7 +33,7 @@ func RunWithWALCheckpointerWithFiles(t *testing.T, names ...interface{}) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		util.CreateFiles(t, dir, fileNames...)
 
-		wal, err := realWAL.NewWAL(nil, nil, dir, 10, 1)
+		wal, err := realWAL.NewWAL(nil, nil, dir, 10, segmentSize)
 		require.NoError(t, err)
 
 		checkpointer, err := wal.NewCheckpointer()
@@ -43,15 +43,18 @@ func RunWithWALCheckpointerWithFiles(t *testing.T, names ...interface{}) {
 	})
 }
 
-func Test_WAL(t *testing.T) {
+var (
+	numInsPerStep      = 2
+	keyNumberOfParts   = 10
+	keyPartMinByteSize = 1
+	keyPartMaxByteSize = 100
+	valueMaxByteSize   = 2 << 16 //16kB
+	size               = 10
+	metricsCollector   = &metrics.NoopCollector{}
+	segmentSize        = 32 * 1024
+)
 
-	numInsPerStep := 2
-	keyNumberOfParts := 10
-	keyPartMinByteSize := 1
-	keyPartMaxByteSize := 100
-	valueMaxByteSize := 2 << 16 //16kB
-	size := 10
-	metricsCollector := &metrics.NoopCollector{}
+func Test_WAL(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 

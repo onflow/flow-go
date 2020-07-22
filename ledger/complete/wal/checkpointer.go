@@ -19,10 +19,13 @@ import (
 	"github.com/dapperlabs/flow-go/module/metrics"
 )
 
-var checkpointFilenamePrefix = "checkpoint."
+const checkpointFilenamePrefix = "checkpoint."
 
 const MagicBytes uint16 = 0x2137
 const VersionV1 uint16 = 0x01
+const VersionV2 uint16 = 0x02
+
+const RootCheckpointFilename = "root.checkpoint"
 
 type Checkpointer struct {
 	dir            string
@@ -154,8 +157,6 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 		return fmt.Errorf("cannot replay WAL: %w", err)
 	}
 
-	fmt.Printf("Got the tries...\n")
-
 	forestSequencing, err := flattener.FlattenForest(forest)
 	if err != nil {
 		return fmt.Errorf("cannot get storables: %w", err)
@@ -206,9 +207,14 @@ func (c *Checkpointer) CheckpointWriter(to int) (io.WriteCloser, error) {
 }
 
 func CreateCheckpointWriter(dir string, fileNo int) (io.WriteCloser, error) {
-	file, err := os.Create(path.Join(dir, NumberToFilename(fileNo)))
+	filename := path.Join(dir, NumberToFilename(fileNo))
+	return CreateCheckpointWriterForFile(filename)
+}
+
+func CreateCheckpointWriterForFile(filename string) (io.WriteCloser, error) {
+	file, err := os.Create(filename)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create file for checkpoint %d: %w", fileNo, err)
+		return nil, fmt.Errorf("cannot create file for checkpoint %s: %w", filename, err)
 	}
 
 	writer := bufio.NewWriter(file)
@@ -254,8 +260,26 @@ func StoreCheckpoint(forestSequencing *flattener.FlattenedForest, writer io.Writ
 }
 
 func (c *Checkpointer) LoadCheckpoint(checkpoint int) (*flattener.FlattenedForest, error) {
-
 	filepath := path.Join(c.dir, NumberToFilename(checkpoint))
+	return LoadCheckpoint(filepath)
+}
+
+func (c *Checkpointer) LoadRootCheckpoint() (*flattener.FlattenedForest, error) {
+	filepath := path.Join(c.dir, RootCheckpointFilename)
+	return LoadCheckpoint(filepath)
+}
+
+func (c *Checkpointer) HasRootCheckpoint() (bool, error) {
+	if _, err := os.Stat(path.Join(c.dir, RootCheckpointFilename)); err == nil {
+		return true, nil
+	} else if os.IsNotExist(err) {
+		return false, nil
+	} else {
+		return false, err
+	}
+}
+
+func LoadCheckpoint(filepath string) (*flattener.FlattenedForest, error) {
 	file, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open checkpoint file %s: %w", filepath, err)
@@ -281,7 +305,7 @@ func (c *Checkpointer) LoadCheckpoint(checkpoint int) (*flattener.FlattenedFores
 	if magicBytes != MagicBytes {
 		return nil, fmt.Errorf("unknown file format. Magic constant %x does not match expected %x", magicBytes, MagicBytes)
 	}
-	if version != VersionV1 {
+	if version != VersionV1 && version != VersionV2 {
 		return nil, fmt.Errorf("unsupported file version %x ", version)
 	}
 
@@ -296,6 +320,7 @@ func (c *Checkpointer) LoadCheckpoint(checkpoint int) (*flattener.FlattenedFores
 		nodes[i] = storableNode
 	}
 
+	// TODO version ?
 	for i := uint16(0); i < triesCount; i++ {
 		storableTrie, err := flattener.ReadStorableTrie(reader)
 		if err != nil {
