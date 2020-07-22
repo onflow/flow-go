@@ -38,8 +38,6 @@ func RegisterBadgerMetrics() {
 			fmt.Sprintf("%s_%s_vlog_size_bytes", namespaceStorage, subsystemBadger), "size of the value log in bytes", []string{"path"}, nil),
 	})
 
-	err := prometheus.Register(expvarCol)
-	if err != nil {
-		panic(err)
-	}
+	prometheus.MustRegister(expvarCol)
+
 }

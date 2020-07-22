@@ -254,13 +254,13 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 	fnb.MetricsRegisterer = prometheus.DefaultRegisterer
 	fnb.Tracer = tracer
 
-	mempools := metrics.NewMempoolCollector(5 * time.Second)
+	mempools := metrics.NewMempoolCollector(5*time.Second, fnb.MetricsRegisterer)
 
 	fnb.Metrics = Metrics{
-		Network:    metrics.NewNetworkCollector(),
-		Engine:     metrics.NewEngineCollector(),
-		Compliance: metrics.NewComplianceCollector(),
-		Cache:      metrics.NewCacheCollector(fnb.RootChainID),
+		Network:    metrics.NewNetworkCollector(fnb.MetricsRegisterer),
+		Engine:     metrics.NewEngineCollector(fnb.MetricsRegisterer),
+		Compliance: metrics.NewComplianceCollector(fnb.MetricsRegisterer),
+		Cache:      metrics.NewCacheCollector(fnb.RootChainID, fnb.MetricsRegisterer),
 		Mempool:    mempools,
 	}
 

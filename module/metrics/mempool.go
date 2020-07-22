@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/dapperlabs/flow-go/engine"
 )
@@ -20,7 +19,7 @@ type MempoolCollector struct {
 	entriesFuncs map[string]EntriesFunc // keeps map of registered EntriesFunc of mempools
 }
 
-func NewMempoolCollector(interval time.Duration) *MempoolCollector {
+func NewMempoolCollector(interval time.Duration, registerer prometheus.Registerer) *MempoolCollector {
 
 	mc := &MempoolCollector{
 		unit:         engine.NewUnit(),
@@ -28,13 +27,15 @@ func NewMempoolCollector(interval time.Duration) *MempoolCollector {
 		delay:        0,
 		entriesFuncs: make(map[string]EntriesFunc),
 
-		entries: promauto.NewGaugeVec(prometheus.GaugeOpts{
+		entries: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Name:      "entries_total",
 			Namespace: namespaceStorage,
 			Subsystem: subsystemMempool,
 			Help:      "the number of entries in the mempool",
 		}, []string{LabelResource}),
 	}
+
+	registerer.MustRegister(mc.entries)
 
 	return mc
 }

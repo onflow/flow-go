@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -28,11 +29,11 @@ func main() {
 			*metrics.ComplianceCollector
 			*metrics.MempoolCollector
 		}{
-			HotstuffCollector:   metrics.NewHotstuffCollector("some_chain_id"),
-			ConsensusCollector:  metrics.NewConsensusCollector(tracer),
-			NetworkCollector:    metrics.NewNetworkCollector(),
-			ComplianceCollector: metrics.NewComplianceCollector(),
-			MempoolCollector:    metrics.NewMempoolCollector(5 * time.Second),
+			HotstuffCollector:   metrics.NewHotstuffCollector("some_chain_id", prometheus.DefaultRegisterer),
+			ConsensusCollector:  metrics.NewConsensusCollector(tracer, prometheus.DefaultRegisterer),
+			NetworkCollector:    metrics.NewNetworkCollector(prometheus.DefaultRegisterer),
+			ComplianceCollector: metrics.NewComplianceCollector(prometheus.DefaultRegisterer),
+			MempoolCollector:    metrics.NewMempoolCollector(5*time.Second, prometheus.DefaultRegisterer),
 		}
 
 		for i := 0; i < 100; i++ {

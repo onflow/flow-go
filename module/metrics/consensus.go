@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/trace"
 )
@@ -22,11 +24,13 @@ type ConsensusCollector struct {
 	tracer *trace.OpenTracer
 }
 
-func NewConsensusCollector(tracer *trace.OpenTracer) *ConsensusCollector {
+func NewConsensusCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer) *ConsensusCollector {
 
 	cc := &ConsensusCollector{
 		tracer: tracer,
 	}
+
+	registerAllFields(cc, registerer)
 
 	return cc
 }

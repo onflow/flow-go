@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -16,52 +15,54 @@ type ComplianceCollector struct {
 	sealedPayload    *prometheus.CounterVec
 }
 
-func NewComplianceCollector() *ComplianceCollector {
+func NewComplianceCollector(registerer prometheus.Registerer) *ComplianceCollector {
 
 	cc := &ComplianceCollector{
 
-		finalizedHeight: promauto.NewGauge(prometheus.GaugeOpts{
+		finalizedHeight: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name:      "finalized_height",
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
 			Help:      "the last finalized height",
 		}),
 
-		sealedHeight: promauto.NewGauge(prometheus.GaugeOpts{
+		sealedHeight: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name:      "sealed_height",
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
 			Help:      "the last sealed height",
 		}),
 
-		finalizedBlocks: promauto.NewCounter(prometheus.CounterOpts{
+		finalizedBlocks: prometheus.NewCounter(prometheus.CounterOpts{
 			Name:      "finalized_blocks_total",
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
 			Help:      "the number of finalized blocks",
 		}),
 
-		sealedBlocks: promauto.NewCounter(prometheus.CounterOpts{
+		sealedBlocks: prometheus.NewCounter(prometheus.CounterOpts{
 			Name:      "sealed_blocks_total",
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
 			Help:      "the number of sealed blocks",
 		}),
 
-		finalizedPayload: promauto.NewCounterVec(prometheus.CounterOpts{
+		finalizedPayload: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name:      "finalized_payload_total",
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
 			Help:      "the number of resources in finalized blocks",
 		}, []string{LabelResource}),
 
-		sealedPayload: promauto.NewCounterVec(prometheus.CounterOpts{
+		sealedPayload: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name:      "sealed_payload_total",
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
 			Help:      "the number of resources in sealed blocks",
 		}, []string{LabelResource}),
 	}
+
+	registerAllFields(cc, registerer)
 
 	return cc
 }

@@ -4,16 +4,15 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 type CleanerCollector struct {
 	gcDuration prometheus.Histogram
 }
 
-func NewCleanerCollector() *CleanerCollector {
+func NewCleanerCollector(registerer prometheus.Registerer) *CleanerCollector {
 	cc := &CleanerCollector{
-		gcDuration: promauto.NewHistogram(prometheus.HistogramOpts{
+		gcDuration: prometheus.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespaceStorage,
 			Subsystem: subsystemBadger,
 			Name:      "garbage_collection_runtime_s",
@@ -21,6 +20,8 @@ func NewCleanerCollector() *CleanerCollector {
 			Help:      "the time spent on badger garbage collection",
 		}),
 	}
+	registerAllFields(cc, registerer)
+
 	return cc
 }
 

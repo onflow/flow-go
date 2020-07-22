@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/trace"
@@ -50,215 +49,168 @@ type ExecutionCollector struct {
 }
 
 func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer) *ExecutionCollector {
-
-	forestApproxMemorySize := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "forest_approx_memory_size",
-		Help:      "approximate size of in-memory forest in bytes",
-	})
-
-	forestNumberOfTrees := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "forest_number_of_trees",
-		Help:      "number of trees in memory",
-	})
-
-	latestTrieRegCount := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "latest_trie_reg_count",
-		Help:      "number of allocated registers (latest created trie)",
-	})
-
-	latestTrieRegCountDiff := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "latest_trie_reg_count_diff",
-		Help:      "the difference between number of unique register allocated of the latest created trie and parent trie",
-	})
-
-	latestTrieMaxDepth := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "latest_trie_max_depth",
-		Help:      "maximum depth of the latest created trie",
-	})
-
-	latestTrieMaxDepthDiff := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "latest_trie_max_depth_diff",
-		Help:      "the difference between the max depth of the latest created trie and parent trie",
-	})
-
-	updatedCount := prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "updates_counted",
-		Help:      "number of updates",
-	})
-
-	proofSize := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "average_proof_size",
-		Help:      "average size of a single generated proof in bytes",
-	})
-
-	updatedValuesNumber := prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "update_values_number",
-		Help:      "total number of values updated",
-	})
-
-	updatedValuesSize := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "update_values_size",
-		Help:      "total size of values for single update in bytes",
-	})
-
-	updatedDuration := prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "update_duration",
-		Help:      "duration of update operation",
-		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
-	})
-
-	updatedDurationPerValue := prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "update_duration_per_Value",
-		Help:      "duration of update operation per value",
-		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
-	})
-
-	readValuesNumber := prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "read_values_number",
-		Help:      "total number of values read",
-	})
-
-	readValuesSize := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "read_values_size",
-		Help:      "total size of values for single read in bytes",
-	})
-
-	readDuration := prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "read_duration",
-		Help:      "duration of read operation",
-		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
-	})
-
-	readDurationPerValue := prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemMTrie,
-		Name:      "read_duration_per_value",
-		Help:      "duration of read operation per value",
-		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
-	})
-
-	collectionRequestsSent := prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemIngestion,
-		Name:      "collection_requests_sent",
-		Help:      "number of collection requests sent",
-	})
-
-	collectionRequestsRetries := prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemIngestion,
-		Name:      "collection_requests_retries",
-		Help:      "number of collection requests retried",
-	})
-
-	transactionParseTime := prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
-		Name:      "transaction_parse_time_nanoseconds",
-		Help:      "the parse time for a transaction in nanoseconds",
-	})
-
-	transactionCheckTime := prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
-		Name:      "transaction_check_time_nanoseconds",
-		Help:      "the checking time for a transaction in nanoseconds",
-	})
-
-	transactionInterpretTime := prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
-		Name:      "transaction_interpret_time_nanoseconds",
-		Help:      "the interpretation time for a transaction in nanoseconds",
-	})
-
-	totalChunkDataPackRequests := prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemProvider,
-		Name:      "chunk_data_packs_requested_total",
-		Help:      "total number of chunk data pack requests provider engine received",
-	})
-
-	registerer.MustRegister(forestApproxMemorySize)
-	registerer.MustRegister(forestNumberOfTrees)
-	registerer.MustRegister(latestTrieRegCount)
-	registerer.MustRegister(latestTrieRegCountDiff)
-	registerer.MustRegister(latestTrieMaxDepth)
-	registerer.MustRegister(latestTrieMaxDepthDiff)
-	registerer.MustRegister(updatedCount)
-	registerer.MustRegister(proofSize)
-	registerer.MustRegister(updatedValuesNumber)
-	registerer.MustRegister(updatedValuesSize)
-	registerer.MustRegister(updatedDuration)
-	registerer.MustRegister(updatedDurationPerValue)
-	registerer.MustRegister(readValuesNumber)
-	registerer.MustRegister(readValuesSize)
-	registerer.MustRegister(readDuration)
-	registerer.MustRegister(readDurationPerValue)
-	registerer.MustRegister(collectionRequestsSent)
-	registerer.MustRegister(collectionRequestsRetries)
-	registerer.MustRegister(transactionParseTime)
-	registerer.MustRegister(transactionCheckTime)
-	registerer.MustRegister(transactionInterpretTime)
-	registerer.MustRegister(totalChunkDataPackRequests)
-
 	ec := &ExecutionCollector{
 		tracer: tracer,
 
-		forestApproxMemorySize:     forestApproxMemorySize,
-		forestNumberOfTrees:        forestNumberOfTrees,
-		latestTrieRegCount:         latestTrieRegCount,
-		latestTrieRegCountDiff:     latestTrieRegCountDiff,
-		latestTrieMaxDepth:         latestTrieMaxDepth,
-		latestTrieMaxDepthDiff:     latestTrieMaxDepthDiff,
-		updated:                    updatedCount,
-		proofSize:                  proofSize,
-		updatedValuesNumber:        updatedValuesNumber,
-		updatedValuesSize:          updatedValuesSize,
-		updatedDuration:            updatedDuration,
-		updatedDurationPerValue:    updatedDurationPerValue,
-		readValuesNumber:           readValuesNumber,
-		readValuesSize:             readValuesSize,
-		readDuration:               readDuration,
-		readDurationPerValue:       readDurationPerValue,
-		collectionRequestSent:      collectionRequestsSent,
-		collectionRequestRetried:   collectionRequestsRetries,
-		transactionParseTime:       transactionParseTime,
-		transactionCheckTime:       transactionCheckTime,
-		transactionInterpretTime:   transactionInterpretTime,
-		totalChunkDataPackRequests: totalChunkDataPackRequests,
+		forestApproxMemorySize: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemMTrie,
+			Name:      "forest_approx_memory_size",
+			Help:      "approximate size of in-memory forest in bytes",
+		}),
 
-		gasUsedPerBlock: promauto.NewHistogram(prometheus.HistogramOpts{
+		forestNumberOfTrees: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemMTrie,
+			Name:      "forest_number_of_trees",
+			Help:      "number of trees in memory",
+		}),
+
+		latestTrieRegCount: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemMTrie,
+			Name:      "latest_trie_reg_count",
+			Help:      "number of allocated registers (latest created trie)",
+		}),
+
+		latestTrieRegCountDiff: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemMTrie,
+			Name:      "latest_trie_reg_count_diff",
+			Help:      "the difference between number of unique register allocated of the latest created trie and parent trie",
+		}),
+
+		latestTrieMaxDepth: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemMTrie,
+			Name:      "latest_trie_max_depth",
+			Help:      "maximum depth of the latest created trie",
+		}),
+
+		latestTrieMaxDepthDiff: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemMTrie,
+			Name:      "latest_trie_max_depth_diff",
+			Help:      "the difference between the max depth of the latest created trie and parent trie",
+		}),
+
+		updated: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemMTrie,
+			Name:      "updates_counted",
+			Help:      "number of updates",
+		}),
+
+		proofSize: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemMTrie,
+			Name:      "average_proof_size",
+			Help:      "average size of a single generated proof in bytes",
+		}),
+
+		updatedValuesNumber: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemMTrie,
+			Name:      "update_values_number",
+			Help:      "total number of values updated",
+		}),
+
+		updatedValuesSize: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemMTrie,
+			Name:      "update_values_size",
+			Help:      "total size of values for single update in bytes",
+		}),
+
+		updatedDuration: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemMTrie,
+			Name:      "update_duration",
+			Help:      "duration of update operation",
+			Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
+		}),
+
+		updatedDurationPerValue: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemMTrie,
+			Name:      "update_duration_per_Value",
+			Help:      "duration of update operation per value",
+			Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
+		}),
+
+		readValuesNumber: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemMTrie,
+			Name:      "read_values_number",
+			Help:      "total number of values read",
+		}),
+
+		readValuesSize: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemMTrie,
+			Name:      "read_values_size",
+			Help:      "total size of values for single read in bytes",
+		}),
+
+		readDuration: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemMTrie,
+			Name:      "read_duration",
+			Help:      "duration of read operation",
+			Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
+		}),
+
+		readDurationPerValue: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemMTrie,
+			Name:      "read_duration_per_value",
+			Help:      "duration of read operation per value",
+			Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
+		}),
+
+		collectionRequestSent: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemIngestion,
+			Name:      "collection_requests_sent",
+			Help:      "number of collection requests sent",
+		}),
+
+		collectionRequestRetried: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemIngestion,
+			Name:      "collection_requests_retries",
+			Help:      "number of collection requests retried",
+		}),
+
+		transactionParseTime: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "transaction_parse_time_nanoseconds",
+			Help:      "the parse time for a transaction in nanoseconds",
+		}),
+
+		transactionCheckTime: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "transaction_check_time_nanoseconds",
+			Help:      "the checking time for a transaction in nanoseconds",
+		}),
+
+		transactionInterpretTime: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "transaction_interpret_time_nanoseconds",
+			Help:      "the interpretation time for a transaction in nanoseconds",
+		}),
+
+		totalChunkDataPackRequests: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemProvider,
+			Name:      "chunk_data_packs_requested_total",
+			Help:      "total number of chunk data pack requests provider engine received",
+		}),
+
+		gasUsedPerBlock: prometheus.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemRuntime,
 			Buckets:   []float64{1}, //TODO(andrew) Set once there are some figures around gas usage and limits
@@ -266,7 +218,7 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 			Help:      "the gas used per block",
 		}),
 
-		stateReadsPerBlock: promauto.NewHistogram(prometheus.HistogramOpts{
+		stateReadsPerBlock: prometheus.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemRuntime,
 			Buckets:   []float64{5, 10, 50, 100, 500},
@@ -274,34 +226,36 @@ func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 			Help:      "count of state access/read operations performed per block",
 		}),
 
-		totalExecutedTransactionsCounter: promauto.NewCounter(prometheus.CounterOpts{
+		totalExecutedTransactionsCounter: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemRuntime,
 			Name:      "total_executed_transactions",
 			Help:      "the total number of transactions that have been executed",
 		}),
 
-		lastExecutedBlockViewGauge: promauto.NewGauge(prometheus.GaugeOpts{
+		lastExecutedBlockViewGauge: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemRuntime,
 			Name:      "last_executed_block_view",
 			Help:      "the last view that was executed",
 		}),
 
-		stateStorageDiskTotal: promauto.NewGauge(prometheus.GaugeOpts{
+		stateStorageDiskTotal: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemStateStorage,
 			Name:      "data_size_bytes",
 			Help:      "the execution state size on disk in bytes",
 		}),
 
-		storageStateCommitment: promauto.NewGauge(prometheus.GaugeOpts{
+		storageStateCommitment: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemStateStorage,
 			Name:      "commitment_size_bytes",
 			Help:      "the storage size of a state commitment in bytes",
 		}),
 	}
+
+	registerAllFields(ec, registerer)
 
 	return ec
 }

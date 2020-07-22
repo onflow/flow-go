@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 const (
@@ -18,11 +17,11 @@ type NetworkCollector struct {
 	duplicateMessagesDropped *prometheus.CounterVec
 }
 
-func NewNetworkCollector() *NetworkCollector {
+func NewNetworkCollector(registerer prometheus.Registerer) *NetworkCollector {
 
 	nc := &NetworkCollector{
 
-		outboundMessageSize: promauto.NewHistogramVec(prometheus.HistogramOpts{
+		outboundMessageSize: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Name:      "outbound_message_size_bytes",
@@ -30,7 +29,7 @@ func NewNetworkCollector() *NetworkCollector {
 			Buckets:   []float64{KiB, 100 * KiB, 500 * KiB, 1 * MiB, 2 * MiB, 4 * MiB},
 		}, []string{LabelChannel}),
 
-		inboundMessageSize: promauto.NewHistogramVec(prometheus.HistogramOpts{
+		inboundMessageSize: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Name:      "inbound_message_size_bytes",
@@ -38,13 +37,15 @@ func NewNetworkCollector() *NetworkCollector {
 			Buckets:   []float64{KiB, 100 * KiB, 500 * KiB, 1 * MiB, 2 * MiB, 4 * MiB},
 		}, []string{LabelChannel}),
 
-		duplicateMessagesDropped: promauto.NewCounterVec(prometheus.CounterOpts{
+		duplicateMessagesDropped: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Name:      "duplicate_messages_dropped",
 			Help:      "number of duplicate messages dropped",
 		}, []string{LabelChannel}),
 	}
+
+	registerAllFields(nc, registerer)
 
 	return nc
 }

@@ -26,9 +26,9 @@ func main() {
 			*metrics.ExecutionCollector
 			*metrics.NetworkCollector
 		}{
-			HotstuffCollector:  metrics.NewHotstuffCollector("some_chain_id"),
+			HotstuffCollector:  metrics.NewHotstuffCollector("some_chain_id", prometheus.DefaultRegisterer),
 			ExecutionCollector: metrics.NewExecutionCollector(tracer, prometheus.DefaultRegisterer),
-			NetworkCollector:   metrics.NewNetworkCollector(),
+			NetworkCollector:   metrics.NewNetworkCollector(prometheus.DefaultRegisterer),
 		}
 		diskTotal := rand.Int63n(1024 ^ 3)
 		for i := 0; i < 1000; i++ {

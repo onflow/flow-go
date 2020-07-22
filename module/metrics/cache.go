@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -13,11 +12,11 @@ type CacheCollector struct {
 	misses  *prometheus.CounterVec
 }
 
-func NewCacheCollector(chain flow.ChainID) *CacheCollector {
+func NewCacheCollector(chain flow.ChainID, registerer prometheus.Registerer) *CacheCollector {
 
 	cm := &CacheCollector{
 
-		entries: promauto.NewGaugeVec(prometheus.GaugeOpts{
+		entries: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Name:        "entries_total",
 			Namespace:   namespaceStorage,
 			Subsystem:   subsystemCache,
@@ -25,7 +24,7 @@ func NewCacheCollector(chain flow.ChainID) *CacheCollector {
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}, []string{LabelResource}),
 
-		hits: promauto.NewCounterVec(prometheus.CounterOpts{
+		hits: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name:        "hits_total",
 			Namespace:   namespaceStorage,
 			Subsystem:   subsystemCache,
@@ -33,7 +32,7 @@ func NewCacheCollector(chain flow.ChainID) *CacheCollector {
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}, []string{LabelResource}),
 
-		misses: promauto.NewCounterVec(prometheus.CounterOpts{
+		misses: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name:        "misses_total",
 			Namespace:   namespaceStorage,
 			Subsystem:   subsystemCache,
@@ -41,6 +40,8 @@ func NewCacheCollector(chain flow.ChainID) *CacheCollector {
 			ConstLabels: prometheus.Labels{LabelChain: chain.String()},
 		}, []string{LabelResource}),
 	}
+
+	registerAllFields(cm, registerer)
 
 	return cm
 }
