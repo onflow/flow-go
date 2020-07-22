@@ -32,6 +32,7 @@ const (
 	// Channels for actively requesting missing entities
 	RequestCollections = 200
 	RequestChunks      = 201
+	RequestReceipts    = 202
 
 	// Channel aliases to make the code more readable / more robust to errors
 	ReceiveTransactions = PushTransactions
@@ -39,8 +40,10 @@ const (
 	ReceiveBlocks       = PushBlocks
 	ReceiveReceipts     = PushReceipts
 	ReceiveApprovals    = PushApprovals
-	ProvideCollections  = RequestCollections
-	ProvideChunks       = RequestChunks
+
+	ProvideCollections = RequestCollections
+	ProvideChunks      = RequestChunks
+	ProvideReceipts    = RequestReceipts
 )
 
 func ChannelName(channelID uint8) string {
