@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/cadence/encoding/json"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state"
@@ -39,13 +40,34 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		// EPOCHS: If we bootstrap with epochs, we no longer need identities as a payload to the root block; instead, we
 		// want to see two system events with all necessary information: one epoch setup and one epoch commit.
 
+		// check that we have one epoch setup and one epoch commit event
 		if len(seal.SystemEvents) != 2 {
 			return fmt.Errorf("root block seal must contain two system events (have %d)", len(seal.SystemEvents))
 		}
+		event1 := seal.SystemEvents[0]
+		event2 := seal.SystemEvents[1]
+		if event1.Type != flow.EventEpochSetup {
+			return fmt.Errorf("first system event is not epoch setup (%s)", event1.Type)
+		}
+		if event2.Type != flow.EventEpochCommit {
+			return fmt.Errorf("second system event is not epoch commit (%s)", event2.Type)
+		}
 
-		// TODO: see how we can decode these without having circular dependency between SDK and main repo
-		var setup *flow.EpochSetup
-		var commit *flow.EpochCommit
+		// decode the event payloads into cadence values
+		value1, err := json.Decode(event1.Payload)
+		if err != nil {
+			return fmt.Errorf("could not decode first system event: %w", err)
+		}
+		value2, err := json.Decode(event2.Payload)
+		if err != nil {
+			return fmt.Errorf("could not decode second system event: %w", err)
+		}
+
+		// use type assertion to get the native types
+		// NOTE: this should always work, as we checked the types
+		// earlier, and will panic otherwise anyway
+		setup := value1.ToGoValue().(*flow.EpochSetup)
+		commit := value2.ToGoValue().(*flow.EpochCommit)
 
 		// make sure they both refer to the same epoch
 		if setup.Counter != commit.Counter {
@@ -120,7 +142,7 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		// SECOND: insert the initial protocol state data into the database
 
 		// 1) insert the root block with its payload into the state and index it
-		err := m.state.blocks.Store(root)
+		err = m.state.blocks.Store(root)
 		if err != nil {
 			return fmt.Errorf("could not insert root block: %w", err)
 		}

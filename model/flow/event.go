@@ -13,6 +13,8 @@ import (
 const (
 	EventAccountCreated EventType = "flow.AccountCreated"
 	EventAccountUpdated EventType = "flow.AccountUpdated"
+	EventEpochSetup     EventType = "flow.EpochSetup"
+	EventEpochCommit    EventType = "flow.EpochCommit"
 )
 
 type EventType string
