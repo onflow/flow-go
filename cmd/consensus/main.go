@@ -32,6 +32,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
@@ -151,9 +152,9 @@ func main() {
 				node.Network,
 				node.Me,
 				node.State,
-				engine.RequestReceipts,
+				engine.RequestReceiptsByBlockID,
 				filter.HasRole(flow.RoleExecution),
-				func() flow.Entity { return &flow.ExecutionResult{} },
+				func() flow.Entity { return &messages.ExecutionReceiptByBlockID{} },
 			)
 			if err != nil {
 				return nil, err

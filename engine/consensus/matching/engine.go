@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -177,8 +178,22 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 }
 
 // HandleReceipts handles receipts we have explicitly requested by block ID.
-func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
-	e.Submit(originID, receipt)
+func (e *Engine) HandleReceipt(originID flow.Identifier, msg flow.Entity) {
+	e.unit.Lock()
+	defer e.unit.Unlock()
+
+	wrapper, ok := msg.(*messages.ExecutionReceiptByBlockID)
+	if !ok {
+		e.log.Error().Msgf("received invalid receipt type: %T", msg)
+		return
+	}
+
+	e.log.Debug().Msg("received receipt from requester engine")
+
+	err := e.onReceipt(originID, wrapper.Receipt)
+	if err != nil {
+		e.log.Error().Err(err).Msg("could not process receipt")
+	}
 }
 
 // onReceipt processes a new execution receipt.
@@ -467,7 +482,7 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 		blockID := header.ID()
 		// get the execution result for the block at this height
 		result, err := e.resultsDB.ByBlockID(blockID)
-		if errors.Is(storage.ErrNotFound, err) {
+		if errors.Is(err, storage.ErrNotFound) {
 			missingByBlockID[blockID] = struct{}{}
 			continue
 		}
@@ -514,6 +529,13 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 		// add the result to the results that should be sealed
 		results = append(results, result)
 	}
+
+	e.log.Info().
+		Uint64("final", final.Height).
+		Uint64("sealed", sealed.Height).
+		Uint("threshold", e.requestReceiptThreshold).
+		Int("missing", len(missingByBlockID)).
+		Msg("check missing receipts")
 
 	// request missing execution results, if sealed height is low enough
 	if uint(final.Height-sealed.Height) >= e.requestReceiptThreshold {
