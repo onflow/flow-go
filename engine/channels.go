@@ -32,7 +32,7 @@ const (
 	// Channels for actively requesting missing entities
 	RequestCollections = 200
 	RequestChunks      = 201
-	RequestReceipts    = 202
+	RequestReceipts    = 202 // request receipts by block ID
 
 	// Channel aliases to make the code more readable / more robust to errors
 	ReceiveTransactions = PushTransactions
