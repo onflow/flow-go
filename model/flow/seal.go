@@ -3,11 +3,11 @@
 package flow
 
 type Seal struct {
-	BlockID      Identifier
-	ResultID     Identifier
-	InitialState StateCommitment
-	FinalState   StateCommitment
-	SystemEvents []*Event
+	BlockID       Identifier
+	ResultID      Identifier
+	InitialState  StateCommitment
+	FinalState    StateCommitment
+	ServiceEvents []*Event
 }
 
 func (s Seal) Body() interface{} {
