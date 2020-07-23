@@ -53,7 +53,7 @@ func (suite *SnapshotSuite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 
-	headers, identities, _, seals, index, conPayloads, blocks := util.StorageLayer(suite.T(), suite.db)
+	headers, _, seals, index, conPayloads, blocks := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
 	suite.state, err = NewState(suite.db, suite.chainID, headers, colPayloads)
@@ -61,7 +61,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	suite.mutator = suite.state.Mutate()
 
 	// just bootstrap with a genesis block, we'll use this as reference
-	suite.protoState, err = protocol.NewState(metrics, suite.db, headers, identities, seals, index, conPayloads, blocks)
+	suite.protoState, err = protocol.NewState(metrics, suite.db, headers, seals, index, conPayloads, blocks)
 	suite.Assert().Nil(err)
 	genesis := unittest.GenesisFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
 	result := bootstrap.Result(genesis, unittest.GenesisStateCommitment)

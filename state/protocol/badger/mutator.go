@@ -4,12 +4,15 @@ package badger
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/cadence/encoding/json"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
@@ -36,6 +39,43 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 			return fmt.Errorf("root block seal for wrong execution result (%x != %x)", seal.ResultID, result.ID())
 		}
 
+		// EPOCHS: If we bootstrap with epochs, we no longer need identities as a payload to the root block; instead, we
+		// want to see two system events with all necessary information: one epoch setup and one epoch commit.
+
+		// check that we have one epoch setup and one epoch commit event
+		if len(seal.SystemEvents) != 2 {
+			return fmt.Errorf("root block seal must contain two system events (have %d)", len(seal.SystemEvents))
+		}
+		event1 := seal.SystemEvents[0]
+		event2 := seal.SystemEvents[1]
+		if event1.Type != flow.EventEpochSetup {
+			return fmt.Errorf("first system event is not epoch setup (%s)", event1.Type)
+		}
+		if event2.Type != flow.EventEpochCommit {
+			return fmt.Errorf("second system event is not epoch commit (%s)", event2.Type)
+		}
+
+		// decode the event payloads into cadence values
+		value1, err := json.Decode(event1.Payload)
+		if err != nil {
+			return fmt.Errorf("could not decode first system event: %w", err)
+		}
+		value2, err := json.Decode(event2.Payload)
+		if err != nil {
+			return fmt.Errorf("could not decode second system event: %w", err)
+		}
+
+		// use type assertion to get the native types
+		// NOTE: this should always work, as we checked the types
+		// earlier, and will panic otherwise anyway
+		setup := value1.ToGoValue().(*flow.EpochSetup)
+		commit := value2.ToGoValue().(*flow.EpochCommit)
+
+		// make sure they both refer to the same epoch
+		if setup.Counter != commit.Counter {
+			return fmt.Errorf("epoch setup counter differs from epoch commit counter (%d != %d)", setup.Counter, commit.Counter)
+		}
+
 		// FIRST: validate the root block and its payload
 
 		// NOTE: we might need to relax these restrictions and find a way to process the
@@ -51,9 +91,9 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 			return fmt.Errorf("root block must not have seals")
 		}
 
-		// the root block needs at least one identity for each role
+		// the root identities need at least one identity for each role
 		roles := make(map[flow.Role]uint)
-		for _, identity := range root.Payload.Identities {
+		for _, identity := range setup.Identities {
 			roles[identity.Role]++
 		}
 		if roles[flow.RoleConsensus] < 1 {
@@ -69,9 +109,14 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 			return fmt.Errorf("need at least one verification node")
 		}
 
-		// the root block should not contain duplicate identities
+		// we should have at least one root collection cluster
+		if setup.Clusters.Size() == 0 {
+			return fmt.Errorf("need at least one colletion cluster")
+		}
+
+		// the root identities should not contain duplicates
 		identLookup := make(map[flow.Identifier]struct{})
-		for _, identity := range root.Payload.Identities {
+		for _, identity := range setup.Identities {
 			_, ok := identLookup[identity.NodeID]
 			if ok {
 				return fmt.Errorf("duplicate node identifier (%x)", identity.NodeID)
@@ -79,9 +124,9 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 			identLookup[identity.NodeID] = struct{}{}
 		}
 
-		// the root block identities should not contain duplicate addresses
+		// the root identities should not contain duplicate addresses
 		addrLookup := make(map[string]struct{})
-		for _, identity := range root.Payload.Identities {
+		for _, identity := range setup.Identities {
 			_, ok := addrLookup[identity.Address]
 			if ok {
 				return fmt.Errorf("duplicate node address (%x)", identity.Address)
@@ -89,8 +134,8 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 			addrLookup[identity.Address] = struct{}{}
 		}
 
-		// the root block identities should all have a non-zero stake
-		for _, identity := range root.Payload.Identities {
+		// the root identities should all have a non-zero stake
+		for _, identity := range setup.Identities {
 			if identity.Stake == 0 {
 				return fmt.Errorf("zero stake identity (%x)", identity.NodeID)
 			}
@@ -99,7 +144,7 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		// SECOND: insert the initial protocol state data into the database
 
 		// 1) insert the root block with its payload into the state and index it
-		err := m.state.blocks.Store(root)
+		err = m.state.blocks.Store(root)
 		if err != nil {
 			return fmt.Errorf("could not insert root block: %w", err)
 		}
@@ -154,6 +199,20 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 			return fmt.Errorf("could not insert sealed height: %w", err)
 		}
 
+		// 5) initialize values related to the epoch logic
+		err = operation.InsertEpochCounter(setup.Counter)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert epoch counter: %w", err)
+		}
+		err = operation.InsertEpochSetup(setup.Counter, setup)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert epoch seed: %w", err)
+		}
+		err = operation.InsertEpochCommit(commit.Counter, commit)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert eoch end: %w", err)
+		}
+
 		m.state.metrics.FinalizedHeight(root.Header.Height)
 		m.state.metrics.BlockFinalized(root)
 
@@ -172,9 +231,6 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 
 	header := candidate.Header
 	payload := candidate.Payload
-	if len(payload.Identities) > 0 {
-		return state.NewInvalidExtensionError("extend block has identities")
-	}
 	if payload.Hash() != header.PayloadHash {
 		return state.NewInvalidExtensionError("payload integrity check failed")
 	}
@@ -387,7 +443,74 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		return fmt.Errorf("not all seals connected to state (left: %d)", len(byBlock))
 	}
 
-	// SIXTH: Both the header itself and its payload are in compliance with the
+	// SIXTH: In case any of the payload seals includes system events, we need to
+	// check if they are valid and must apply them to the protocol state as needed.
+
+	// retrieve the current epoch counter and collect system events from seals
+	var counter uint64
+	err = m.state.db.View(operation.RetrieveEpochCounter(&counter))
+	if err != nil {
+		return fmt.Errorf("could not retrieve epoch counter: %w", err)
+	}
+	var events []*flow.Event
+	for _, seal := range payload.Seals {
+		events = append(events, seal.SystemEvents...)
+	}
+
+	// NOTE: We could check that we have at most two here, but using more
+	// sophisticated checks that catch invalid events one by one makes
+	// the code more extensible in the future.
+
+	// for each event, check if it is valid
+	didSetup := false
+	for _, event := range events {
+
+		// check if the event is an epoch setup event
+		if event.Type == flow.EventEpochSetup {
+
+			// check if we already had a setup event in our iteration
+			if didSetup {
+				return fmt.Errorf("duplicate epoch setup system event")
+			}
+
+			// first, we check if we already have an epoch setup event
+			var dummy flow.EpochSetup
+			err = m.state.db.View(operation.RetrieveEpochSetup(counter+1, &dummy))
+			if err == nil {
+				return fmt.Errorf("invalid epoch setup event in payload")
+			}
+			if !errors.Is(err, storage.ErrNotFound) {
+				return fmt.Errorf("could not retrieve next epoch setup: %w", err)
+			}
+
+			// TODO: check if there is a non-finalized epoch setup event on our branch
+
+			// next, we decode and type assert so we can do further checks
+			value, err := json.Decode(event.Payload)
+			if err != nil {
+				return fmt.Errorf("could not decode next epoch setup: %w", err)
+			}
+			setup := value.ToGoValue().(*flow.EpochSetup)
+			if setup.Counter != counter+1 {
+				return fmt.Errorf("invalid epoch setup counter (%d => %d)", counter, setup.Counter)
+			}
+
+			// TODO: check if the view, identities, clusters & seed are valid
+
+			didSetup = true
+			continue
+		}
+
+		// check if the event is an epoch commit event
+		if event.Type == flow.EventEpochCommit {
+
+			// TODO: do same thing for commit event
+		}
+
+		return fmt.Errorf("invalid system event in seal (%s)", event.Type)
+	}
+
+	// FINALLY: Both the header itself and its payload are in compliance with the
 	// protocol state. We can now store the candidate block, as well as adding
 	// its final seal to the seal index and initializing its children index.
 
@@ -436,12 +559,13 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve final header: %w", err)
 	}
-	header, err := m.state.headers.ByBlockID(blockID)
+	block, err := m.state.blocks.ByID(blockID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve pending header: %w", err)
+		return fmt.Errorf("could not retrieve pending block: %w", err)
 	}
+	header := block.Header
 	if header.ParentID != finalID {
-		return fmt.Errorf("can only finalized child of last finalized block")
+		return fmt.Errorf("can only finalize child of last finalized block")
 	}
 
 	// SECOND: We also want to update the last sealed height. Retrieve the block
@@ -456,7 +580,31 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 		return fmt.Errorf("could not retrieve sealed header: %w", err)
 	}
 
-	// THIRD: A block inserted into the protocol state is already a valid
+	// THIRD: If we have system events in any of the seals, we should insert
+	// them into the protocol state accordingly on finalization. We create a
+	// list of operations to be applied on top of the rest.
+
+	payload := block.Payload
+	var ops []func(*badger.Txn) error
+	for _, seal := range payload.Seals {
+		for _, event := range seal.SystemEvents {
+			value, err := json.Decode(event.Payload)
+			if err != nil {
+				return fmt.Errorf("could not decode system event: %w", err)
+			}
+			switch event.Type {
+			case flow.EventEpochSetup:
+				setup := value.ToGoValue().(*flow.EpochSetup)
+				ops = append(ops, operation.InsertEpochSetup(setup.Counter, setup))
+			case flow.EventEpochCommit:
+				// TODO: do the same
+			default:
+				return fmt.Errorf("invalid system event type in payload (%s)", event.Type)
+			}
+		}
+	}
+
+	// FINALLY: A block inserted into the protocol state is already a valid
 	// extension; in order to make it final, we need to do just three things:
 	// 1) Map its height to its index; there can no longer be other blocks at
 	// this height, as it becomes immutable.
@@ -490,15 +638,9 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	m.state.metrics.FinalizedHeight(header.Height)
 	m.state.metrics.SealedHeight(sealed.Height)
 
-	// get the finalized block for finalized metrics
-	final, err := m.state.blocks.ByID(blockID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve finalized block: %w", err)
-	}
+	m.state.metrics.BlockFinalized(block)
 
-	m.state.metrics.BlockFinalized(final)
-
-	for _, seal := range final.Payload.Seals {
+	for _, seal := range block.Payload.Seals {
 
 		// get each sealed block for sealed metrics
 		sealed, err := m.state.blocks.ByID(seal.BlockID)

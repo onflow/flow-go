@@ -12,17 +12,15 @@ import (
 type Payloads struct {
 	db         *badger.DB
 	index      *Index
-	identities *Identities
 	guarantees *Guarantees
 	seals      *Seals
 }
 
-func NewPayloads(db *badger.DB, index *Index, identities *Identities, guarantees *Guarantees, seals *Seals) *Payloads {
+func NewPayloads(db *badger.DB, index *Index, guarantees *Guarantees, seals *Seals) *Payloads {
 
 	p := &Payloads{
 		db:         db,
 		index:      index,
-		identities: identities,
 		guarantees: guarantees,
 		seals:      seals,
 	}
@@ -32,14 +30,6 @@ func NewPayloads(db *badger.DB, index *Index, identities *Identities, guarantees
 
 func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
-
-		// make sure all payload entities are stored
-		for _, identity := range payload.Identities {
-			err := p.identities.storeTx(identity)(tx)
-			if err != nil {
-				return fmt.Errorf("could not store identity: %w", err)
-			}
-		}
 
 		// make sure all payload guarantees are stored
 		for _, guarantee := range payload.Guarantees {
@@ -76,16 +66,6 @@ func (p *Payloads) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (*fl
 			return nil, fmt.Errorf("could not retrieve index: %w", err)
 		}
 
-		// retrieve identities
-		identities := make(flow.IdentityList, 0, len(idx.NodeIDs))
-		for _, nodeID := range idx.NodeIDs {
-			identity, err := p.identities.retrieveTx(nodeID)(tx)
-			if err != nil {
-				return nil, fmt.Errorf("could not retrieve identity (%x): %w", nodeID, err)
-			}
-			identities = append(identities, identity)
-		}
-
 		// retrieve guarantees
 		guarantees := make([]*flow.CollectionGuarantee, 0, len(idx.CollectionIDs))
 		for _, collID := range idx.CollectionIDs {
@@ -108,7 +88,6 @@ func (p *Payloads) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (*fl
 
 		payload := &flow.Payload{
 			Seals:      seals,
-			Identities: identities,
 			Guarantees: guarantees,
 		}
 

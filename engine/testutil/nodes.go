@@ -65,15 +65,14 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 
 	metrics := metrics.NewNoopCollector()
 
-	identities := storage.NewIdentities(metrics, db)
 	guarantees := storage.NewGuarantees(metrics, db)
 	seals := storage.NewSeals(metrics, db)
 	headers := storage.NewHeaders(metrics, db)
 	index := storage.NewIndex(metrics, db)
-	payloads := storage.NewPayloads(db, index, identities, guarantees, seals)
+	payloads := storage.NewPayloads(db, index, guarantees, seals)
 	blocks := storage.NewBlocks(db, headers, payloads)
 
-	state, err := protocol.NewState(metrics, db, headers, identities, seals, index, payloads, blocks)
+	state, err := protocol.NewState(metrics, db, headers, seals, index, payloads, blocks)
 	require.NoError(t, err)
 
 	genesis := flow.Genesis(participants, chainID)
@@ -113,7 +112,6 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 		Tracer:     tracer,
 		DB:         db,
 		Headers:    headers,
-		Identities: identities,
 		Guarantees: guarantees,
 		Seals:      seals,
 		Payloads:   payloads,

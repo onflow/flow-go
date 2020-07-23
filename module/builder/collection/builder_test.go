@@ -68,7 +68,7 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
 
 	metrics := metrics.NewNoopCollector()
-	headers, _, _, _, _, _, blocks := sutil.StorageLayer(suite.T(), suite.db)
+	headers, _, _, _, _, blocks := sutil.StorageLayer(suite.T(), suite.db)
 	suite.headers = headers
 	suite.blocks = blocks
 	suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
@@ -575,7 +575,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		}()
 
 		metrics := metrics.NewNoopCollector()
-		headers, _, _, _, _, _, blocks := sutil.StorageLayer(suite.T(), suite.db)
+		headers, _, _, _, _, blocks := sutil.StorageLayer(suite.T(), suite.db)
 		suite.headers = headers
 		suite.blocks = blocks
 		suite.payloads = storage.NewClusterPayloads(metrics, suite.db)

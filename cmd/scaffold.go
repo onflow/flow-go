@@ -350,18 +350,16 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	fnb.MustNot(err).Msg("could not initialize max tracker")
 
 	headers := bstorage.NewHeaders(fnb.Metrics.Cache, fnb.DB)
-	identities := bstorage.NewIdentities(fnb.Metrics.Cache, fnb.DB)
 	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB)
 	seals := bstorage.NewSeals(fnb.Metrics.Cache, fnb.DB)
 	index := bstorage.NewIndex(fnb.Metrics.Cache, fnb.DB)
-	payloads := bstorage.NewPayloads(fnb.DB, index, identities, guarantees, seals)
+	payloads := bstorage.NewPayloads(fnb.DB, index, guarantees, seals)
 	blocks := bstorage.NewBlocks(fnb.DB, headers, payloads)
 	transactions := bstorage.NewTransactions(fnb.Metrics.Cache, fnb.DB)
 	collections := bstorage.NewCollections(fnb.DB, transactions)
 
 	fnb.Storage = Storage{
 		Headers:      headers,
-		Identities:   identities,
 		Guarantees:   guarantees,
 		Seals:        seals,
 		Index:        index,
@@ -378,7 +376,6 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.Metrics.Compliance,
 		fnb.DB,
 		fnb.Storage.Headers,
-		fnb.Storage.Identities,
 		fnb.Storage.Seals,
 		fnb.Storage.Index,
 		fnb.Storage.Payloads,

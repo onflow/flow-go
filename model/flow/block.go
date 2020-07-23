@@ -4,9 +4,11 @@ package flow
 
 func Genesis(identities IdentityList, chainID ChainID) *Block {
 
+	// TODO: Generate root block seal with epoch setup and epoch
+	// commit event to hold the initial identities.
+
 	// create the raw content for the genesis block
 	payload := Payload{
-		Identities: identities,
 		Guarantees: nil,
 		Seals:      nil,
 	}

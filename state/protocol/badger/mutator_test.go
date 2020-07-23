@@ -368,7 +368,6 @@ func TestExtendSealedBoundary(t *testing.T) {
 		assert.Equal(t, seal.FinalState, finalCommit, "original commit should be root commit")
 
 		first := unittest.BlockFixture()
-		first.Payload.Identities = nil
 		first.Payload.Guarantees = nil
 		first.Payload.Seals = nil
 		first.Header.Height = 1
@@ -383,7 +382,6 @@ func TestExtendSealedBoundary(t *testing.T) {
 		}
 
 		second := unittest.BlockFixture()
-		second.Payload.Identities = nil
 		second.Payload.Guarantees = nil
 		second.Payload.Seals = []*flow.Seal{extend}
 		second.Header.Height = 2
@@ -573,7 +571,6 @@ func TestExtendSealNotConnected(t *testing.T) {
 		require.NoError(t, err)
 
 		extend := unittest.BlockFixture()
-		extend.Payload.Identities = nil
 		extend.Payload.Guarantees = nil
 		extend.Payload.Seals = nil
 		extend.Header.Height = 1
@@ -592,7 +589,6 @@ func TestExtendSealNotConnected(t *testing.T) {
 		}
 
 		sealing := unittest.BlockFixture()
-		sealing.Payload.Identities = nil
 		sealing.Payload.Guarantees = nil
 		sealing.Payload.Seals = []*flow.Seal{second}
 		sealing.Header.Height = 2
