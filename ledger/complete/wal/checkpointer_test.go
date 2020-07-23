@@ -16,6 +16,8 @@ import (
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/trie"
 	realWAL "github.com/dapperlabs/flow-go/ledger/complete/wal"
+	"github.com/dapperlabs/flow-go/ledger/encoding"
+	"github.com/dapperlabs/flow-go/ledger/utils"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/util"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -72,8 +74,8 @@ func Test_WAL(t *testing.T) {
 		// so we should get at least `size` segments
 		for i := 0; i < size; i++ {
 
-			keys := common.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-			values := common.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+			keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+			values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 			update, err := ledger.NewUpdate(stateCommitment, keys, values)
 			require.NoError(t, err)
 			stateCommitment, err = led.Set(update)
@@ -83,7 +85,7 @@ func Test_WAL(t *testing.T) {
 
 			data := make(map[string]ledger.Value, len(keys))
 			for j, key := range keys {
-				data[string(common.EncodeKey(&key))] = values[j]
+				data[string(encoding.EncodeKey(&key))] = values[j]
 			}
 
 			savedData[string(stateCommitment)] = data
@@ -99,7 +101,7 @@ func Test_WAL(t *testing.T) {
 
 			keys := make([]ledger.Key, 0, len(data))
 			for keyString := range data {
-				key, err := common.DecodeKey([]byte(keyString))
+				key, err := encoding.DecodeKey([]byte(keyString))
 				require.NoError(t, err)
 				keys = append(keys, *key)
 			}
@@ -112,7 +114,7 @@ func Test_WAL(t *testing.T) {
 			require.NoError(t, err)
 
 			for i, key := range keys {
-				assert.Equal(t, data[string(common.EncodeKey(&key))], values[i])
+				assert.Equal(t, data[string(encoding.EncodeKey(&key))], values[i])
 			}
 		}
 
@@ -152,8 +154,8 @@ func Test_Checkpointing(t *testing.T) {
 			// Generate the tree and create WAL
 			for i := 0; i < size; i++ {
 
-				keys := common.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-				values := common.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+				keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+				values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 				update, err := ledger.NewUpdate(rootHash, keys, values)
 				require.NoError(t, err)
 
@@ -278,8 +280,8 @@ func Test_Checkpointing(t *testing.T) {
 			}
 		})
 
-		keys2 := common.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-		values2 := common.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+		keys2 := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+		values2 := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 		t.Run("create segment after checkpoint", func(t *testing.T) {
 
 			require.NoFileExists(t, path.Join(dir, "00000011"))
