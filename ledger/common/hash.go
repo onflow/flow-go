@@ -3,6 +3,7 @@ package common
 import (
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/ledger"
+	"github.com/dapperlabs/flow-go/ledger/utils"
 )
 
 var emptySlice []byte
@@ -79,7 +80,7 @@ func ComputeCompactValue(path []byte, payload *ledger.Payload, nodeHeight int) [
 	for h := 1; h <= nodeHeight; h++ {            // then, we hash our way upwards towards the root until we hit the specified nodeHeight
 		// h is the height of the node, whose hash we are computing in this iteration.
 		// The hash is computed from the node's children at height h-1.
-		bitIsSet, err := IsBitSet(path, treeHeight-h)
+		bitIsSet, err := utils.IsBitSet(path, treeHeight-h)
 		if err != nil { // this won't happen ever
 			panic(err)
 		}
