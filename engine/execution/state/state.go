@@ -68,7 +68,7 @@ type ExecutionState interface {
 	// PersistChunkDataPack stores a chunk data pack by chunk ID.
 	PersistChunkDataPack(context.Context, *flow.ChunkDataPack) error
 
-	PersistExecutionResult(context.Context, flow.Identifier, flow.ExecutionResult) error
+	PersistExecutionReceipt(context.Context, *flow.ExecutionReceipt) error
 
 	PersistStateInteractions(context.Context, flow.Identifier, []*delta.Snapshot) error
 
@@ -76,14 +76,14 @@ type ExecutionState interface {
 }
 
 type state struct {
-	tracer           module.Tracer
-	ls               storage.Ledger
-	commits          storage.Commits
-	blocks           storage.Blocks
-	collections      storage.Collections
-	chunkDataPacks   storage.ChunkDataPacks
-	executionResults storage.ExecutionResults
-	db               *badger.DB
+	tracer            module.Tracer
+	ls                storage.Ledger
+	commits           storage.Commits
+	blocks            storage.Blocks
+	collections       storage.Collections
+	chunkDataPacks    storage.ChunkDataPacks
+	executionReceipts storage.ExecutionReceipts
+	db                *badger.DB
 }
 
 // NewExecutionState returns a new execution state access layer for the given ledger storage.
@@ -93,19 +93,19 @@ func NewExecutionState(
 	blocks storage.Blocks,
 	collections storage.Collections,
 	chunkDataPacks storage.ChunkDataPacks,
-	executionResult storage.ExecutionResults,
+	executionReceipts storage.ExecutionReceipts,
 	db *badger.DB,
 	tracer module.Tracer,
 ) ExecutionState {
 	return &state{
-		tracer:           tracer,
-		ls:               ls,
-		commits:          commits,
-		blocks:           blocks,
-		collections:      collections,
-		chunkDataPacks:   chunkDataPacks,
-		executionResults: executionResult,
-		db:               db,
+		tracer:            tracer,
+		ls:                ls,
+		commits:           commits,
+		blocks:            blocks,
+		collections:       collections,
+		chunkDataPacks:    chunkDataPacks,
+		executionReceipts: executionReceipts,
+		db:                db,
 	}
 }
 
@@ -213,26 +213,26 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 		defer span.Finish()
 	}
 
-	res, err := s.executionResults.ByBlockID(blockID)
+	receipt, err := s.executionReceipts.ByBlockID(blockID)
 	if err != nil {
 		return flow.ZeroID, err
 	}
-	return res.ID(), nil
+	return receipt.ExecutionResult.ID(), nil
 }
 
-func (s *state) PersistExecutionResult(ctx context.Context, blockID flow.Identifier, result flow.ExecutionResult) error {
+func (s *state) PersistExecutionReceipt(ctx context.Context, receipt *flow.ExecutionReceipt) error {
 	if s.tracer != nil {
 		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistExecutionResult)
 		defer span.Finish()
 	}
 
-	err := s.executionResults.Store(&result)
+	err := s.executionReceipts.Store(receipt)
 	if err != nil {
 		return fmt.Errorf("could not persist execution result: %w", err)
 	}
 	// TODO if the second operation fails we should remove stored execution result
 	// This is global execution storage problem - see TODO at the top
-	return s.executionResults.Index(blockID, result.ID())
+	return s.executionReceipts.Index(receipt.ExecutionResult.BlockID, receipt.ID())
 }
 
 func (s *state) PersistStateInteractions(ctx context.Context, blockID flow.Identifier, views []*delta.Snapshot) error {

@@ -246,7 +246,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	txResultStorage := storage.NewTransactionResults(node.DB)
 	commitsStorage := storage.NewCommits(node.Metrics, node.DB)
 	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
-	executionResults := storage.NewExecutionResults(node.DB)
+	results := storage.NewExecutionResults(node.DB)
+	receipts := storage.NewExecutionReceipts(node.DB, results)
 
 	dbDir := unittest.TempDir(t)
 
@@ -265,7 +266,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	execState := state.NewExecutionState(
-		ls, commitsStorage, node.Blocks, collectionsStorage, chunkDataPackStorage, executionResults, node.DB, node.Tracer,
+		ls, commitsStorage, node.Blocks, collectionsStorage, chunkDataPackStorage, receipts, node.DB, node.Tracer,
 	)
 
 	stateSync := sync.NewStateSynchronizer(execState)

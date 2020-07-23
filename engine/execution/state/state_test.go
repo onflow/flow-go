@@ -38,10 +38,10 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 
 				chunkDataPacks := new(storage.ChunkDataPacks)
 
-				executionResults := new(storage.ExecutionResults)
+				receipts := new(storage.ExecutionReceipts)
 
 				es := state.NewExecutionState(
-					ls, stateCommitments, blocks, collections, chunkDataPacks, executionResults, badgerDB, nil,
+					ls, stateCommitments, blocks, collections, chunkDataPacks, receipts, badgerDB, nil,
 				)
 
 				f(t, es)
