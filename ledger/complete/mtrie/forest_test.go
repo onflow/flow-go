@@ -14,7 +14,9 @@ import (
 	"github.com/dapperlabs/flow-go/ledger"
 	"github.com/dapperlabs/flow-go/ledger/common"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/trie"
+	"github.com/dapperlabs/flow-go/ledger/encoding"
 	"github.com/dapperlabs/flow-go/ledger/partial/ptrie"
+	"github.com/dapperlabs/flow-go/ledger/utils"
 	"github.com/dapperlabs/flow-go/module/metrics"
 )
 
@@ -79,7 +81,7 @@ func TestTrieUpdate(t *testing.T) {
 	read := &ledger.TrieRead{RootHash: updatedRoot, Paths: paths}
 	retPayloads, err := forest.Read(read)
 	require.NoError(t, err)
-	require.True(t, bytes.Equal(common.EncodePayload(retPayloads[0]), common.EncodePayload(payloads[0])))
+	require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[0]), encoding.EncodePayload(payloads[0])))
 }
 
 // TestLeftEmptyInsert tests inserting a new value into an empty sub-trie:
@@ -154,7 +156,7 @@ func TestLeftEmptyInsert(t *testing.T) {
 	retPayloads, err := forest.Read(read)
 	require.NoError(t, err)
 	for i := range paths {
-		require.True(t, bytes.Equal(common.EncodePayload(retPayloads[i]), common.EncodePayload(payloads[i])))
+		require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[i]), encoding.EncodePayload(payloads[i])))
 	}
 }
 
@@ -232,7 +234,7 @@ func TestRightEmptyInsert(t *testing.T) {
 	retPayloads, err := forest.Read(read)
 	require.NoError(t, err)
 	for i := range paths {
-		require.True(t, bytes.Equal(common.EncodePayload(retPayloads[i]), common.EncodePayload(payloads[i])))
+		require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[i]), encoding.EncodePayload(payloads[i])))
 	}
 }
 
@@ -310,7 +312,7 @@ func TestExpansionInsert(t *testing.T) {
 	retPayloads, err := forest.Read(read)
 	require.NoError(t, err)
 	for i := range paths {
-		require.True(t, bytes.Equal(common.EncodePayload(retPayloads[i]), common.EncodePayload(payloads[i])))
+		require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[i]), encoding.EncodePayload(payloads[i])))
 	}
 }
 
@@ -401,7 +403,7 @@ func TestFullHouseInsert(t *testing.T) {
 	retPayloads, err := forest.Read(read)
 	require.NoError(t, err)
 	for i := range paths {
-		require.True(t, bytes.Equal(common.EncodePayload(retPayloads[i]), common.EncodePayload(payloads[i])))
+		require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[i]), encoding.EncodePayload(payloads[i])))
 	}
 }
 
@@ -457,7 +459,7 @@ func TestLeafInsert(t *testing.T) {
 	retPayloads, err := forest.Read(read)
 	require.NoError(t, err)
 	for i := range paths {
-		require.True(t, bytes.Equal(common.EncodePayload(retPayloads[i]), common.EncodePayload(payloads[i])))
+		require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[i]), encoding.EncodePayload(payloads[i])))
 	}
 }
 
@@ -499,7 +501,7 @@ func TestOverrideValue(t *testing.T) {
 	read := &ledger.TrieRead{RootHash: updatedRoot, Paths: paths}
 	retPayloads, err := forest.Read(read)
 	require.NoError(t, err)
-	require.True(t, bytes.Equal(common.EncodePayload(retPayloads[0]), common.EncodePayload(payloads[0])))
+	require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[0]), encoding.EncodePayload(payloads[0])))
 
 }
 
@@ -536,7 +538,7 @@ func TestDuplicateOverride(t *testing.T) {
 	read := &ledger.TrieRead{RootHash: updatedRoot, Paths: paths}
 	retPayloads, err := forest.Read(read)
 	require.NoError(t, err)
-	require.True(t, bytes.Equal(common.EncodePayload(retPayloads[0]), common.EncodePayload(v2)))
+	require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[0]), encoding.EncodePayload(v2)))
 
 }
 
@@ -596,14 +598,14 @@ func TestReadOrder(t *testing.T) {
 	read := &ledger.TrieRead{RootHash: testRoot, Paths: []ledger.Path{p1, p2}}
 	retPayloads, err := forest.Read(read)
 	require.NoError(t, err)
-	require.True(t, bytes.Equal(common.EncodePayload(retPayloads[0]), common.EncodePayload(payloads[0])))
-	require.True(t, bytes.Equal(common.EncodePayload(retPayloads[1]), common.EncodePayload(payloads[1])))
+	require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[0]), encoding.EncodePayload(payloads[0])))
+	require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[1]), encoding.EncodePayload(payloads[1])))
 
 	read = &ledger.TrieRead{RootHash: testRoot, Paths: []ledger.Path{p2, p1}}
 	retPayloads, err = forest.Read(read)
 	require.NoError(t, err)
-	require.True(t, bytes.Equal(common.EncodePayload(retPayloads[1]), common.EncodePayload(payloads[0])))
-	require.True(t, bytes.Equal(common.EncodePayload(retPayloads[0]), common.EncodePayload(payloads[1])))
+	require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[1]), encoding.EncodePayload(payloads[0])))
+	require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[0]), encoding.EncodePayload(payloads[1])))
 }
 
 // TestMixRead tests reading a mixture of set and unset registers.
@@ -647,7 +649,7 @@ func TestMixRead(t *testing.T) {
 	retPayloads, err := forest.Read(read)
 	require.NoError(t, err)
 	for i := range paths {
-		require.True(t, bytes.Equal(common.EncodePayload(retPayloads[i]), common.EncodePayload(expectedPayloads[i])))
+		require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[i]), encoding.EncodePayload(expectedPayloads[i])))
 	}
 }
 
@@ -680,7 +682,7 @@ func TestReadWithDuplicatedKeys(t *testing.T) {
 	retPayloads, err := forest.Read(read)
 	require.NoError(t, err)
 	for i := range paths {
-		require.True(t, bytes.Equal(common.EncodePayload(retPayloads[i]), common.EncodePayload(expectedPayloads[i])))
+		require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[i]), encoding.EncodePayload(expectedPayloads[i])))
 	}
 }
 
@@ -792,21 +794,21 @@ func TestForkingUpdates(t *testing.T) {
 	retPayloads, err := forest.Read(read) // reading from original Trie
 	require.NoError(t, err)
 	for i := range paths {
-		require.True(t, bytes.Equal(common.EncodePayload(retPayloads[i]), common.EncodePayload(payloads[i])))
+		require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[i]), encoding.EncodePayload(payloads[i])))
 	}
 
 	readA := &ledger.TrieRead{RootHash: updatedRootA, Paths: pathsA}
 	retPayloads, err = forest.Read(readA) // reading from updatedTrieA
 	require.NoError(t, err)
 	for i := range paths {
-		require.True(t, bytes.Equal(common.EncodePayload(retPayloads[i]), common.EncodePayload(payloadsA[i])))
+		require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[i]), encoding.EncodePayload(payloadsA[i])))
 	}
 
 	readB := &ledger.TrieRead{RootHash: updatedRootB, Paths: pathsB}
 	retPayloads, err = forest.Read(readB) // reading from updatedTrieB
 	require.NoError(t, err)
 	for i := range paths {
-		require.True(t, bytes.Equal(common.EncodePayload(retPayloads[i]), common.EncodePayload(payloadsB[i])))
+		require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[i]), encoding.EncodePayload(payloadsB[i])))
 	}
 }
 
@@ -848,14 +850,14 @@ func TestIdenticalUpdateAppliedTwice(t *testing.T) {
 	retPayloadsA, err := forest.Read(read)
 	require.NoError(t, err)
 	for i := range paths {
-		require.True(t, bytes.Equal(common.EncodePayload(retPayloadsA[i]), common.EncodePayload(payloads[i])))
+		require.True(t, bytes.Equal(encoding.EncodePayload(retPayloadsA[i]), encoding.EncodePayload(payloads[i])))
 	}
 
 	read = &ledger.TrieRead{RootHash: updatedRootB, Paths: paths}
 	retPayloadsB, err := forest.Read(read)
 	require.NoError(t, err)
 	for i := range paths {
-		require.True(t, bytes.Equal(common.EncodePayload(retPayloadsB[i]), common.EncodePayload(payloads[i])))
+		require.True(t, bytes.Equal(encoding.EncodePayload(retPayloadsB[i]), encoding.EncodePayload(payloads[i])))
 	}
 }
 
@@ -880,8 +882,8 @@ func TestRandomUpdateReadProof(t *testing.T) {
 	latestPayloadByPath := make(map[string]*ledger.Payload) // map store
 
 	for e := 0; e < rep; e++ {
-		paths := common.GetRandomPathsRandLen(maxNumPathsPerStep, pathByteSize)
-		payloads := common.RandomPayloads(len(paths), minPayloadByteSize, maxPayloadByteSize)
+		paths := utils.RandomPathsRandLen(maxNumPathsPerStep, pathByteSize)
+		payloads := utils.RandomPayloads(len(paths), minPayloadByteSize, maxPayloadByteSize)
 
 		// update map store with key values
 		// we use this at the end of each step to check all existing keys
@@ -913,7 +915,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		retPayloads, err = forest.Read(read)
 		require.NoError(t, err, "error reading")
 		for i := range payloads {
-			require.True(t, bytes.Equal(common.EncodePayload(retPayloads[i]), common.EncodePayload(payloads[i])))
+			require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[i]), encoding.EncodePayload(payloads[i])))
 		}
 
 		// test proof (mix of existing and non existing keys)
@@ -942,7 +944,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		retPayloads, err = forest.Read(read)
 		require.NoError(t, err)
 		for i, v := range allPayloads {
-			require.True(t, bytes.Equal(common.EncodePayload(v), common.EncodePayload(retPayloads[i])))
+			require.True(t, bytes.Equal(encoding.EncodePayload(v), encoding.EncodePayload(retPayloads[i])))
 		}
 	}
 }

@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/common"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/flattener"
+	"github.com/dapperlabs/flow-go/ledger/utils"
 	"github.com/dapperlabs/flow-go/module/metrics"
 )
 
@@ -26,16 +26,16 @@ func TestForestStoreAndLoad(t *testing.T) {
 	require.NoError(t, err)
 	rootHash := mForest.GetEmptyRootHash()
 
-	p1 := common.OneBytePath(1)
-	v1 := common.LightPayload8('A', 'a')
-	p2 := common.OneBytePath(2)
-	v2 := common.LightPayload8('B', 'b')
-	p3 := common.OneBytePath(130)
-	v3 := common.LightPayload8('C', 'c')
-	p4 := common.OneBytePath(131)
-	v4 := common.LightPayload8('D', 'd')
-	p5 := common.OneBytePath(132)
-	v5 := common.LightPayload8('E', 'e')
+	p1 := utils.OneBytePath(1)
+	v1 := utils.LightPayload8('A', 'a')
+	p2 := utils.OneBytePath(2)
+	v2 := utils.LightPayload8('B', 'b')
+	p3 := utils.OneBytePath(130)
+	v3 := utils.LightPayload8('C', 'c')
+	p4 := utils.OneBytePath(131)
+	v4 := utils.LightPayload8('D', 'd')
+	p5 := utils.OneBytePath(132)
+	v5 := utils.LightPayload8('E', 'e')
 
 	paths := []ledger.Path{p1, p2, p3, p4, p5}
 	payloads := []*ledger.Payload{v1, v2, v3, v4, v5}
@@ -44,8 +44,8 @@ func TestForestStoreAndLoad(t *testing.T) {
 	rootHash, err = mForest.Update(update)
 	require.NoError(t, err)
 
-	p6 := common.OneBytePath(133)
-	v6 := common.LightPayload8('F', 'f')
+	p6 := utils.OneBytePath(133)
+	v6 := utils.LightPayload8('F', 'f')
 	update = &ledger.TrieUpdate{RootHash: rootHash, Paths: []ledger.Path{p6}, Payloads: []*ledger.Payload{v6}}
 	rootHash, err = mForest.Update(update)
 	require.NoError(t, err)

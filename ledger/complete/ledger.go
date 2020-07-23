@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/trie"
 	"github.com/dapperlabs/flow-go/ledger/complete/wal"
+	"github.com/dapperlabs/flow-go/ledger/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 )
@@ -180,7 +181,7 @@ func (l *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
 		return nil, fmt.Errorf("could not get proofs: %w", err)
 	}
 
-	proofToGo := common.EncodeTrieBatchProof(batchProof)
+	proofToGo := encoding.EncodeTrieBatchProof(batchProof)
 
 	if len(paths) > 0 {
 		l.metrics.ProofSize(uint32(len(proofToGo) / len(paths)))

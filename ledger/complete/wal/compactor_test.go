@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/common"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/trie"
+	"github.com/dapperlabs/flow-go/ledger/utils"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -58,8 +58,8 @@ func Test_Compactor(t *testing.T) {
 			// Generate the tree and create WAL
 			for i := 0; i < size; i++ {
 
-				paths0 := common.GetRandomPaths(numInsPerStep, pathByteSize)
-				payloads0 := common.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
+				paths0 := utils.RandomPaths(numInsPerStep, pathByteSize)
+				payloads0 := utils.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
 
 				var paths []ledger.Path
 				var payloads []*ledger.Payload
@@ -212,8 +212,8 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 			// Generate the tree and create WAL
 			for i := 0; i < size; i++ {
 
-				paths0 := common.GetRandomPaths(numInsPerStep, pathByteSize)
-				payloads0 := common.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
+				paths0 := utils.RandomPaths(numInsPerStep, pathByteSize)
+				payloads0 := utils.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
 
 				var paths []ledger.Path
 				var payloads []*ledger.Payload

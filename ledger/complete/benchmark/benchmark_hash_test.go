@@ -9,6 +9,7 @@ import (
 	"golang.org/x/crypto/sha3"
 
 	"github.com/dapperlabs/flow-go/ledger/common"
+	"github.com/dapperlabs/flow-go/ledger/utils"
 )
 
 // GENERAL COMMENT:
@@ -25,7 +26,7 @@ const (
 func Test_BenchmarkHashingWithAllocation(t *testing.T) {
 	pairs := 100000
 
-	paths := common.GetRandomPaths(2*pairs, pathByteSize)
+	paths := utils.RandomPaths(2*pairs, pathByteSize)
 
 	var totalElapsed uint64 = 0
 	var res []byte
@@ -49,7 +50,7 @@ func Test_BenchmarkHashingWithAllocation(t *testing.T) {
 // which still leads to heap allocations.
 func Test_BenchmarkHashingWithConstantHasher(t *testing.T) {
 	pairs := 100000
-	paths := common.GetRandomPaths(2*pairs, pathByteSize)
+	paths := utils.RandomPaths(2*pairs, pathByteSize)
 
 	hasher := sha3.New256()
 
@@ -84,7 +85,7 @@ func Test_BenchmarkHashingWithConstantHasher(t *testing.T) {
 // are purely from the Hasher clearing its internal state.
 func Benchmark_Hash(b *testing.B) {
 	pairs := 100000
-	paths := common.GetRandomPaths(2*pairs, pathByteSize)
+	paths := utils.RandomPaths(2*pairs, pathByteSize)
 	p1 := paths[0]
 	p2 := paths[1]
 

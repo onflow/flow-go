@@ -8,8 +8,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/common"
 	"github.com/dapperlabs/flow-go/ledger/complete"
+	"github.com/dapperlabs/flow-go/ledger/encoding"
+	"github.com/dapperlabs/flow-go/ledger/utils"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -36,8 +37,8 @@ func Test_WAL(t *testing.T) {
 
 		for i := 0; i < size; i++ {
 
-			keys := common.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-			values := common.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+			keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+			values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 			update, err := ledger.NewUpdate(stateCommitment, keys, values)
 			assert.NoError(t, err)
 			stateCommitment, err = led.Set(update)
@@ -46,7 +47,7 @@ func Test_WAL(t *testing.T) {
 
 			data := make(map[string]ledger.Value, len(keys))
 			for j, key := range keys {
-				encKey := common.EncodeKey(&key)
+				encKey := encoding.EncodeKey(&key)
 				data[string(encKey)] = values[j]
 			}
 
@@ -63,7 +64,7 @@ func Test_WAL(t *testing.T) {
 
 			keys := make([]ledger.Key, 0, len(data))
 			for encKey := range data {
-				key, err := common.DecodeKey([]byte(encKey))
+				key, err := encoding.DecodeKey([]byte(encKey))
 				assert.NoError(t, err)
 				keys = append(keys, *key)
 			}
@@ -77,7 +78,7 @@ func Test_WAL(t *testing.T) {
 
 			for i, key := range keys {
 				registerValue := registerValues[i]
-				encKey := common.EncodeKey(&key)
+				encKey := encoding.EncodeKey(&key)
 				assert.True(t, data[string(encKey)].Equals(registerValue))
 			}
 		}

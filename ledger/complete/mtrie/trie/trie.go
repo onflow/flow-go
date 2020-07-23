@@ -12,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/ledger"
 	"github.com/dapperlabs/flow-go/ledger/common"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/node"
+	"github.com/dapperlabs/flow-go/ledger/utils"
 )
 
 // MTrie is a fully in memory trie with option to persist to disk.
@@ -124,7 +125,7 @@ func (mt *MTrie) read(head *node.Node, paths []ledger.Path) ([]*ledger.Payload, 
 		return res, nil
 	}
 
-	lpaths, rpaths, err := common.SplitSortedPaths(paths, mt.height-head.Height())
+	lpaths, rpaths, err := utils.SplitSortedPaths(paths, mt.height-head.Height())
 	if err != nil {
 		return nil, fmt.Errorf("can't read due to split path error: %w", err)
 	}
@@ -205,7 +206,7 @@ func update(treeHeight int, nodeHeight int, parentNode *node.Node, paths []ledge
 	}
 
 	// Split payloads so we can update the trie in parallel
-	lpaths, lpayloads, rpaths, rpayloads, err := common.SplitByPath(paths, payloads, treeHeight-nodeHeight)
+	lpaths, lpayloads, rpaths, rpayloads, err := utils.SplitByPath(paths, payloads, treeHeight-nodeHeight)
 	if err != nil {
 		return nil, fmt.Errorf("error spliting payloads by path: %w", err)
 	}
@@ -257,7 +258,7 @@ func constructSubtrie(treeHeight int, nodeHeight int, paths []ledger.Path, paylo
 	// from here on, we have: len(paths) > 1
 
 	// Split updates by paths so we can update the trie in parallel
-	lpaths, lpayloads, rpaths, rpayloads, err := common.SplitByPath(paths, payloads, treeHeight-nodeHeight)
+	lpaths, lpayloads, rpaths, rpayloads, err := utils.SplitByPath(paths, payloads, treeHeight-nodeHeight)
 	// Note: (pathLength-height) will never reach the value pathLength, i.e. we will never execute this code for height==0
 	// This is because at height=0, we only have (at most) one path left, as paths are not duplicated
 	// (by requirement of this function). But even if this condition is violated, the code will not return a faulty
@@ -321,7 +322,7 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 		p.Steps++
 	}
 	// split paths based on the value of i-th bit (i = trie height - node height)
-	lpaths, lproofs, rpaths, rproofs, err := common.SplitTrieProofsByPath(paths, proofs, mt.height-head.Height())
+	lpaths, lproofs, rpaths, rproofs, err := utils.SplitTrieProofsByPath(paths, proofs, mt.height-head.Height())
 	if err != nil {
 		return fmt.Errorf("proof generation failed, path split error: %w", err)
 	}
@@ -332,7 +333,7 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 			isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(rChild.Height()))
 			if !isDef { // in proofs, we only provide non-default value hashes
 				for _, p := range lproofs {
-					err := common.SetBit(p.Flags, mt.height-head.Height())
+					err := utils.SetBit(p.Flags, mt.height-head.Height())
 					if err != nil {
 						return err
 					}
@@ -352,7 +353,7 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 			isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(lChild.Height()))
 			if !isDef { // in proofs, we only provide non-default value hashes
 				for _, p := range rproofs {
-					err := common.SetBit(p.Flags, mt.height-head.Height())
+					err := utils.SetBit(p.Flags, mt.height-head.Height())
 					if err != nil {
 						return err
 					}

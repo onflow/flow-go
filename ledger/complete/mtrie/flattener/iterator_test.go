@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/common"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/trie"
+	"github.com/dapperlabs/flow-go/ledger/utils"
 )
 
 func TestEmptyTrie(t *testing.T) {
@@ -31,12 +31,12 @@ func TestPopulatedTrie(t *testing.T) {
 	require.NoError(t, err)
 
 	// key: 0000...
-	p1 := common.OneBytePath(1)
-	v1 := common.LightPayload8('A', 'a')
+	p1 := utils.OneBytePath(1)
+	v1 := utils.LightPayload8('A', 'a')
 
 	// key: 0100....
-	p2 := common.OneBytePath(64)
-	v2 := common.LightPayload8('B', 'b')
+	p2 := utils.OneBytePath(64)
+	v2 := utils.LightPayload8('B', 'b')
 
 	paths := []ledger.Path{p1, p2}
 	payloads := []ledger.Payload{*v1, *v2}

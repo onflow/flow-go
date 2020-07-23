@@ -123,15 +123,15 @@ func TrieBatchProofFixture() (*ledger.TrieBatchProof, ledger.StateCommitment) {
 	return bp, ledger.StateCommitment(sc)
 }
 
-// GetRandomPathsRandLen generate m random paths (size: byteSize),
+// RandomPathsRandLen generate m random paths (size: byteSize),
 // the number of paths, m, is also randomly selected from the range [1, maxN]
-func GetRandomPathsRandLen(maxN int, byteSize int) []ledger.Path {
+func RandomPathsRandLen(maxN int, byteSize int) []ledger.Path {
 	numberOfPaths := rand.Intn(maxN) + 1
-	return GetRandomPaths(numberOfPaths, byteSize)
+	return RandomPaths(numberOfPaths, byteSize)
 }
 
-// GetRandomPaths generates n random (no repetition) fixed sized (byteSize) paths
-func GetRandomPaths(n int, byteSize int) []ledger.Path {
+// RandomPaths generates n random (no repetition) fixed sized (byteSize) paths
+func RandomPaths(n int, byteSize int) []ledger.Path {
 	paths := make([]ledger.Path, 0, n)
 	alreadySelectPaths := make(map[string]bool)
 	i := 0

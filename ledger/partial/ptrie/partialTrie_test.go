@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/common"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie"
+	"github.com/dapperlabs/flow-go/ledger/utils"
 	"github.com/dapperlabs/flow-go/module/metrics"
 )
 
@@ -38,8 +38,8 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 
 		// add path1 to the empty trie
 		// 00000000...0 (0)
-		path1 := common.TwoBytesPath(0)
-		payload1 := common.LightPayload('A', 'a')
+		path1 := utils.TwoBytesPath(0)
+		payload1 := utils.LightPayload('A', 'a')
 
 		paths := []ledger.Path{path1}
 		payloads := []*ledger.Payload{payload1}
@@ -66,7 +66,7 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 			t.Fatal("rootNode hash doesn't match [after set]")
 		}
 
-		updatedPayload1 := common.LightPayload('B', 'b')
+		updatedPayload1 := utils.LightPayload('B', 'b')
 		payloads = []*ledger.Payload{updatedPayload1}
 
 		u = &ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads}
@@ -88,13 +88,13 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 	pathByteSize := 2
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
 
-		path1 := common.TwoBytesPath(0)
-		payload1 := common.LightPayload('A', 'a')
-		updatedPayload1 := common.LightPayload('B', 'b')
+		path1 := utils.TwoBytesPath(0)
+		payload1 := utils.LightPayload('A', 'a')
+		updatedPayload1 := utils.LightPayload('B', 'b')
 
-		path2 := common.TwoBytesPath(1)
-		payload2 := common.LightPayload('C', 'c')
-		updatedPayload2 := common.LightPayload('D', 'd')
+		path2 := utils.TwoBytesPath(1)
+		payload2 := utils.LightPayload('C', 'c')
+		updatedPayload2 := utils.LightPayload('D', 'd')
 
 		paths := []ledger.Path{path1, path2}
 		payloads := []*ledger.Payload{payload1, payload2}
@@ -133,17 +133,17 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 	pathByteSize := 2
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
 
-		path1 := common.TwoBytesPath(0)
-		payload1 := common.LightPayload('A', 'a')
-		updatedPayload1 := common.LightPayload('B', 'b')
+		path1 := utils.TwoBytesPath(0)
+		payload1 := utils.LightPayload('A', 'a')
+		updatedPayload1 := utils.LightPayload('B', 'b')
 
-		path2 := common.TwoBytesPath(2)
-		payload2 := common.LightPayload('C', 'c')
-		updatedPayload2 := common.LightPayload('D', 'd')
+		path2 := utils.TwoBytesPath(2)
+		payload2 := utils.LightPayload('C', 'c')
+		updatedPayload2 := utils.LightPayload('D', 'd')
 
-		path3 := common.TwoBytesPath(8)
-		payload3 := common.LightPayload('E', 'e')
-		updatedPayload3 := common.LightPayload('F', 'f')
+		path3 := utils.TwoBytesPath(8)
+		payload3 := utils.LightPayload('E', 'e')
+		updatedPayload3 := utils.LightPayload('F', 'f')
 
 		paths := []ledger.Path{path1, path2, path3}
 		payloads := []*ledger.Payload{payload1, payload2, payload3}
@@ -189,13 +189,13 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 	pathByteSize := 2
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
 
-		path1 := common.TwoBytesPath(0)
-		payload1 := common.LightPayload('A', 'a')
-		updatedPayload1 := common.LightPayload('B', 'b')
+		path1 := utils.TwoBytesPath(0)
+		payload1 := utils.LightPayload('A', 'a')
+		updatedPayload1 := utils.LightPayload('B', 'b')
 		//  10000....0
-		path2 := common.TwoBytesPath(32768)
-		payload2 := common.LightPayload('C', 'c')
-		updatedPayload2 := common.LightPayload('D', 'd')
+		path2 := utils.TwoBytesPath(32768)
+		payload2 := utils.LightPayload('C', 'c')
+		updatedPayload2 := utils.LightPayload('D', 'd')
 
 		paths := []ledger.Path{path1, path2}
 		payloads := []*ledger.Payload{payload1, payload2}
@@ -239,14 +239,14 @@ func TestMixProof(t *testing.T) {
 	pathByteSize := 2
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
 
-		path1 := common.TwoBytesPath(0)
-		payload1 := common.LightPayload('A', 'a')
+		path1 := utils.TwoBytesPath(0)
+		payload1 := utils.LightPayload('A', 'a')
 
-		path2 := common.TwoBytesPath(2)
-		updatedPayload2 := common.LightPayload('D', 'd')
+		path2 := utils.TwoBytesPath(2)
+		updatedPayload2 := utils.LightPayload('D', 'd')
 
-		path3 := common.TwoBytesPath(8)
-		payload3 := common.LightPayload('E', 'e')
+		path3 := utils.TwoBytesPath(8)
+		payload3 := utils.LightPayload('E', 'e')
 
 		paths := []ledger.Path{path1, path3}
 		payloads := []*ledger.Payload{payload1, payload3}
@@ -295,8 +295,8 @@ func TestRandomProofs(t *testing.T) {
 			// generate some random paths and payloads
 			rand.Seed(time.Now().UnixNano())
 			numberOfPaths := rand.Intn(256) + 1
-			paths := common.GetRandomPaths(numberOfPaths, pathByteSize)
-			payloads := common.RandomPayloads(numberOfPaths, minPayloadSize, maxPayloadSize)
+			paths := utils.RandomPaths(numberOfPaths, pathByteSize)
+			payloads := utils.RandomPayloads(numberOfPaths, minPayloadSize, maxPayloadSize)
 			// keep a subset as initial insert and keep the rest for reading default values
 			split := rand.Intn(numberOfPaths)
 			insertPaths := paths[:split]

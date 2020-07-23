@@ -7,6 +7,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/ledger"
 	"github.com/dapperlabs/flow-go/ledger/common"
+	"github.com/dapperlabs/flow-go/ledger/utils"
 )
 
 // PSMT (Partial Sparse Merkle Tree) holds a subset of an sparse merkle tree at specific
@@ -123,7 +124,7 @@ func NewPSMT(
 			// if a flag (bit j in flags) is false, the value is a default value
 			// otherwise the value is stored in the proofs
 			v := common.GetDefaultHashForHeight(currentNode.height - 1)
-			flagIsSet, err := common.IsBitSet(pr.Flags, j)
+			flagIsSet, err := utils.IsBitSet(pr.Flags, j)
 			if err != nil {
 				return nil, err
 			}
@@ -132,7 +133,7 @@ func NewPSMT(
 				v = pr.Interims[prValueIndex]
 				prValueIndex++
 			}
-			bitIsSet, err := common.IsBitSet(path, j)
+			bitIsSet, err := utils.IsBitSet(path, j)
 			if err != nil {
 				return nil, err
 			}

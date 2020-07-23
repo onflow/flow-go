@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/dapperlabs/flow-go/ledger/common"
+	"github.com/dapperlabs/flow-go/ledger/utils"
 )
 
 const encodingDecodingVersion = uint16(0)
@@ -15,31 +15,31 @@ func EncodeStorableNode(storableNode *StorableNode) []byte {
 	length := 2 + 2 + 8 + 8 + 2 + 8 + 2 + len(storableNode.Path) + 4 + len(storableNode.EncPayload) + 2 + len(storableNode.HashValue)
 	buf := make([]byte, 0, length)
 	// 2-bytes encoding version
-	buf = common.AppendUint16(buf, encodingDecodingVersion)
+	buf = utils.AppendUint16(buf, encodingDecodingVersion)
 
 	// 2-bytes Big Endian uint16 height
-	buf = common.AppendUint16(buf, storableNode.Height)
+	buf = utils.AppendUint16(buf, storableNode.Height)
 
 	// 8-bytes Big Endian uint64 LIndex
-	buf = common.AppendUint64(buf, storableNode.LIndex)
+	buf = utils.AppendUint64(buf, storableNode.LIndex)
 
 	// 8-bytes Big Endian uint64 RIndex
-	buf = common.AppendUint64(buf, storableNode.RIndex)
+	buf = utils.AppendUint64(buf, storableNode.RIndex)
 
 	// 2-bytes Big Endian maxDepth
-	buf = common.AppendUint16(buf, storableNode.MaxDepth)
+	buf = utils.AppendUint16(buf, storableNode.MaxDepth)
 
 	// 8-bytes Big Endian regCount
-	buf = common.AppendUint64(buf, storableNode.RegCount)
+	buf = utils.AppendUint64(buf, storableNode.RegCount)
 
 	// 2-bytes Big Endian uint16 encoded path length and n-bytes encoded path
-	buf = common.AppendShortData(buf, storableNode.Path)
+	buf = utils.AppendShortData(buf, storableNode.Path)
 
 	// 4-bytes Big Endian uint32 encoded payload length and n-bytes encoded payload
-	buf = common.AppendLongData(buf, storableNode.EncPayload)
+	buf = utils.AppendLongData(buf, storableNode.EncPayload)
 
 	// 2-bytes Big Endian uint16 hashValue length and n-bytes hashValue
-	buf = common.AppendShortData(buf, storableNode.HashValue)
+	buf = utils.AppendShortData(buf, storableNode.HashValue)
 
 	return buf
 }
@@ -57,7 +57,7 @@ func ReadStorableNode(reader io.Reader) (*StorableNode, error) {
 		return nil, fmt.Errorf("not enough bytes read %d expected %d", read, len(buf))
 	}
 
-	version, _, err := common.ReadUint16(buf)
+	version, _, err := utils.ReadUint16(buf)
 	if err != nil {
 		return nil, fmt.Errorf("error reading storable node: %w", err)
 	}
@@ -79,42 +79,42 @@ func ReadStorableNode(reader io.Reader) (*StorableNode, error) {
 
 	storableNode := &StorableNode{}
 
-	storableNode.Height, buf, err = common.ReadUint16(buf)
+	storableNode.Height, buf, err = utils.ReadUint16(buf)
 	if err != nil {
 		return nil, fmt.Errorf("error reading storable node: %w", err)
 	}
 
-	storableNode.LIndex, buf, err = common.ReadUint64(buf)
+	storableNode.LIndex, buf, err = utils.ReadUint64(buf)
 	if err != nil {
 		return nil, fmt.Errorf("error reading storable node: %w", err)
 	}
 
-	storableNode.RIndex, buf, err = common.ReadUint64(buf)
+	storableNode.RIndex, buf, err = utils.ReadUint64(buf)
 	if err != nil {
 		return nil, fmt.Errorf("error reading storable node: %w", err)
 	}
 
-	storableNode.MaxDepth, buf, err = common.ReadUint16(buf)
+	storableNode.MaxDepth, buf, err = utils.ReadUint16(buf)
 	if err != nil {
 		return nil, fmt.Errorf("error reading storable node: %w", err)
 	}
 
-	storableNode.RegCount, _, err = common.ReadUint64(buf)
+	storableNode.RegCount, _, err = utils.ReadUint64(buf)
 	if err != nil {
 		return nil, fmt.Errorf("error reading storable node: %w", err)
 	}
 
-	storableNode.Path, err = common.ReadShortDataFromReader(reader)
+	storableNode.Path, err = utils.ReadShortDataFromReader(reader)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read key data: %w", err)
 	}
 
-	storableNode.EncPayload, err = common.ReadLongDataFromReader(reader)
+	storableNode.EncPayload, err = utils.ReadLongDataFromReader(reader)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read value data: %w", err)
 	}
 
-	storableNode.HashValue, err = common.ReadShortDataFromReader(reader)
+	storableNode.HashValue, err = utils.ReadShortDataFromReader(reader)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read hashValue data: %w", err)
 	}
@@ -127,13 +127,13 @@ func EncodeStorableTrie(storableTrie *StorableTrie) []byte {
 	length := 8 + 2 + len(storableTrie.RootHash)
 	buf := make([]byte, 0, length)
 	// 2-bytes encoding version
-	buf = common.AppendUint16(buf, encodingDecodingVersion)
+	buf = utils.AppendUint16(buf, encodingDecodingVersion)
 
 	// 8-bytes Big Endian uint64 RootIndex
-	buf = common.AppendUint64(buf, storableTrie.RootIndex)
+	buf = utils.AppendUint64(buf, storableTrie.RootIndex)
 
 	// 2-bytes Big Endian uint16 RootHash length and n-bytes RootHash
-	buf = common.AppendShortData(buf, storableTrie.RootHash)
+	buf = utils.AppendShortData(buf, storableTrie.RootHash)
 
 	return buf
 }
@@ -152,7 +152,7 @@ func ReadStorableTrie(reader io.Reader) (*StorableTrie, error) {
 		return nil, fmt.Errorf("not enough bytes read %d expected %d", read, len(buf))
 	}
 
-	version, _, err := common.ReadUint16(buf)
+	version, _, err := utils.ReadUint16(buf)
 	if err != nil {
 		return nil, fmt.Errorf("error reading storable node: %w", err)
 	}
@@ -171,13 +171,13 @@ func ReadStorableTrie(reader io.Reader) (*StorableTrie, error) {
 		return nil, fmt.Errorf("not enough bytes read %d expected %d", read, len(buf))
 	}
 
-	rootIndex, _, err := common.ReadUint64(buf)
+	rootIndex, _, err := utils.ReadUint64(buf)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read root index data: %w", err)
 	}
 	storableTrie.RootIndex = rootIndex
 
-	roothash, err := common.ReadShortDataFromReader(reader)
+	roothash, err := utils.ReadShortDataFromReader(reader)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read roothash data: %w", err)
 	}

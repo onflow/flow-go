@@ -6,6 +6,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/ledger"
 	"github.com/dapperlabs/flow-go/ledger/common"
+	"github.com/dapperlabs/flow-go/ledger/utils"
 )
 
 // TODO RAMTIN update this documentation
@@ -133,7 +134,7 @@ func NewInterimNode(height int, lchild, rchild *Node) *Node {
 		height:   height,
 		path:     nil,
 		payload:  nil,
-		maxDepth: common.MaxUint16(lMaxDepth, rMaxDepth) + uint16(1),
+		maxDepth: utils.MaxUint16(lMaxDepth, rMaxDepth) + uint16(1),
 		regCount: lRegCount + rRegCount,
 	}
 	n.hashValue = n.computeHash()

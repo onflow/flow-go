@@ -11,7 +11,9 @@ import (
 	"github.com/dapperlabs/flow-go/ledger"
 	"github.com/dapperlabs/flow-go/ledger/common"
 	"github.com/dapperlabs/flow-go/ledger/complete"
+	"github.com/dapperlabs/flow-go/ledger/encoding"
 	"github.com/dapperlabs/flow-go/ledger/partial/ptrie"
+	"github.com/dapperlabs/flow-go/ledger/utils"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -43,8 +45,8 @@ func TestLedgerFunctionality(t *testing.T) {
 			for i := 0; i < steps; i++ {
 				// add new keys
 				// TODO update some of the existing keys and shuffle them
-				keys := common.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-				values := common.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+				keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+				values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 				update, err := ledger.NewUpdate(stateCommitment, keys, values)
 				assert.NoError(t, err)
 				newState, err := led.Set(update)
@@ -52,7 +54,7 @@ func TestLedgerFunctionality(t *testing.T) {
 
 				// capture new values for future query
 				for j, k := range keys {
-					encKey := common.EncodeKey(&k)
+					encKey := encoding.EncodeKey(&k)
 					histStorage[string(newState)+string(encKey)] = values[j]
 					latestValue[string(encKey)] = values[j]
 				}
@@ -69,7 +71,7 @@ func TestLedgerFunctionality(t *testing.T) {
 				proof, err := led.Prove(query)
 				assert.NoError(t, err)
 
-				bProof, err := common.DecodeTrieBatchProof(proof)
+				bProof, err := encoding.DecodeTrieBatchProof(proof)
 				assert.NoError(t, err)
 
 				// validate batch proofs
@@ -82,7 +84,7 @@ func TestLedgerFunctionality(t *testing.T) {
 
 				// query all exising keys (check no drop)
 				for ek, v := range latestValue {
-					k, err := common.DecodeKey([]byte(ek))
+					k, err := encoding.DecodeKey([]byte(ek))
 					assert.NoError(t, err)
 					query, err := ledger.NewQuery(newState, []ledger.Key{*k})
 					assert.NoError(t, err)
@@ -97,7 +99,7 @@ func TestLedgerFunctionality(t *testing.T) {
 					value := histStorage[s]
 					state := []byte(s[:stateComSize])
 					enk := []byte(s[stateComSize:])
-					key, err := common.DecodeKey([]byte(enk))
+					key, err := encoding.DecodeKey([]byte(enk))
 					assert.NoError(t, err)
 					query, err := ledger.NewQuery(state, []ledger.Key{*key})
 					assert.NoError(t, err)

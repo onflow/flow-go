@@ -4,7 +4,8 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/common"
+	"github.com/dapperlabs/flow-go/ledger/encoding"
+	"github.com/dapperlabs/flow-go/ledger/utils"
 )
 
 type WALOperation uint8
@@ -33,7 +34,7 @@ The code here is deliberately simple, for performance.
 */
 
 func EncodeUpdate(update *ledger.TrieUpdate) []byte {
-	encUpdate := common.EncodeTrieUpdate(update)
+	encUpdate := encoding.EncodeTrieUpdate(update)
 	buf := make([]byte, 0, len(encUpdate)+1)
 	// set WAL type
 	buf = append(buf, byte(WALUpdate))
@@ -46,7 +47,7 @@ func EncodeUpdate(update *ledger.TrieUpdate) []byte {
 func EncodeDelete(rootHash ledger.RootHash) []byte {
 	buf := make([]byte, 0)
 	buf = append(buf, byte(WALDelete))
-	buf = common.AppendShortData(buf, rootHash)
+	buf = utils.AppendShortData(buf, rootHash)
 	return buf
 }
 
@@ -59,10 +60,10 @@ func Decode(data []byte) (operation WALOperation, rootHash ledger.RootHash, upda
 	operation = WALOperation(data[0])
 	switch operation {
 	case WALUpdate:
-		update, err = common.DecodeTrieUpdate(data[1:])
+		update, err = encoding.DecodeTrieUpdate(data[1:])
 		return
 	case WALDelete:
-		rootHash, _, err = common.ReadShortData(data[1:])
+		rootHash, _, err = utils.ReadShortData(data[1:])
 		if err != nil {
 			err = fmt.Errorf("cannot read state commitment: %w", err)
 		}

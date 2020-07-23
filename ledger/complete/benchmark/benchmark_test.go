@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/common"
 	"github.com/dapperlabs/flow-go/ledger/complete"
+	"github.com/dapperlabs/flow-go/ledger/encoding"
 	"github.com/dapperlabs/flow-go/ledger/partial/ptrie"
+	"github.com/dapperlabs/flow-go/ledger/utils"
 	"github.com/dapperlabs/flow-go/module/metrics"
 )
 
@@ -48,8 +49,8 @@ func benchmarkStorage(steps int, b *testing.B) {
 	stateCommitment := led.EmptyStateCommitment()
 	for i := 0; i < steps; i++ {
 
-		keys := common.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-		values := common.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+		keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+		values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 
 		totalRegOperation += len(keys)
 
@@ -92,7 +93,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 		totalProofSize += len(proof)
 
 		start = time.Now()
-		p, _ := common.DecodeTrieBatchProof(proof)
+		p, _ := encoding.DecodeTrieBatchProof(proof)
 
 		// construct a partial trie using proofs
 		_, err = ptrie.NewPSMT(newState, pathByteSize, p)

@@ -7,18 +7,18 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/common"
 	realWAL "github.com/dapperlabs/flow-go/ledger/complete/wal"
+	"github.com/dapperlabs/flow-go/ledger/utils"
 )
 
 func TestUpdate(t *testing.T) {
 
 	rootHash := ledger.RootHash([]byte{2, 1, 3, 7})
-	p1 := common.TwoBytesPath(uint16(1))
-	p2 := common.TwoBytesPath(uint16(772))
+	p1 := utils.TwoBytesPath(uint16(1))
+	p2 := utils.TwoBytesPath(uint16(772))
 	paths := []ledger.Path{p1, p2}
-	v1 := common.LightPayload8(1, 2)
-	v2 := common.LightPayload(2, 3)
+	v1 := utils.LightPayload8(1, 2)
+	v2 := utils.LightPayload(2, 3)
 	payloads := []*ledger.Payload{v1, v2}
 	update := &ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads}
 

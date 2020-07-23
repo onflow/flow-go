@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/common"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/node"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/trie"
+	"github.com/dapperlabs/flow-go/ledger/encoding"
 )
 
 // FlattenedForest represents an Forest as a flattened data structure.
@@ -90,7 +90,7 @@ func toStorableNode(node *node.Node, indexForNode node2indexMap) (*StorableNode,
 		RIndex:     rightIndex,
 		Height:     uint16(node.Height()),
 		Path:       node.Path(),
-		EncPayload: common.EncodePayload(node.Payload()),
+		EncPayload: encoding.EncodePayload(node.Payload()),
 		HashValue:  node.Hash(),
 		MaxDepth:   node.MaxDepth(),
 		RegCount:   node.RegCount(),
@@ -145,7 +145,7 @@ func RebuildNodes(storableNodes []*StorableNode) ([]*node.Node, error) {
 
 		if len(snode.Path) > 0 {
 			path := ledger.Path(snode.Path)
-			payload, err := common.DecodePayload(snode.EncPayload)
+			payload, err := encoding.DecodePayload(snode.EncPayload)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode a payload for an storableNode %w", err)
 			}

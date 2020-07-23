@@ -6,14 +6,14 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/ledger/common"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/node"
+	"github.com/dapperlabs/flow-go/ledger/utils"
 )
 
 // Test_ProperLeaf verifies that the hash value of a proper leaf (at height 0) is computed correctly
 func Test_ProperLeaf(t *testing.T) {
-	path := common.TwoBytesPath(56809)
-	payload := common.LightPayload(56810, 59656)
+	path := utils.TwoBytesPath(56809)
+	payload := utils.LightPayload(56810, 59656)
 	n := node.NewLeaf(path, payload, 0)
 	expectedRootHashHex := "aa7693d498e9a087b1cadf5bfe9a1ff07829badc1915c210e482f369f9a00a70"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(n.Hash()))
@@ -24,8 +24,8 @@ func Test_ProperLeaf(t *testing.T) {
 // We test the hash at the lowest-possible height (1), for the leaf to be still compactified,
 // at an interim height (9) and the max possible height (16)
 func Test_CompactifiedLeaf(t *testing.T) {
-	path := common.TwoBytesPath(56809)
-	payload := common.LightPayload(56810, 59656)
+	path := utils.TwoBytesPath(56809)
+	payload := utils.LightPayload(56810, 59656)
 	n := node.NewLeaf(path, payload, 1)
 	expectedRootHashHex := "34ee03b8ca7d5cc8638d28b7cf2d70641efd5dfa428333863904a0fd19930700"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(n.Hash()))
@@ -58,8 +58,8 @@ func Test_InterimNodeWithoutChildren(t *testing.T) {
 // Test_InterimNodeWithOneChild verifies that the hash value of an interim node with
 // only one child (left or right) is computed correctly.
 func Test_InterimNodeWithOneChild(t *testing.T) {
-	path := common.TwoBytesPath(56809)
-	payload := common.LightPayload(56810, 59656)
+	path := utils.TwoBytesPath(56809)
+	payload := utils.LightPayload(56810, 59656)
 	c := node.NewLeaf(path, payload, 0)
 
 	n := node.NewInterimNode(1, c, nil)
@@ -74,12 +74,12 @@ func Test_InterimNodeWithOneChild(t *testing.T) {
 // Test_InterimNodeWithBothChildren verifies that the hash value of an interim node with
 // both children (left and right) is computed correctly.
 func Test_InterimNodeWithBothChildren(t *testing.T) {
-	leftPath := common.TwoBytesPath(56809)
-	leftPayload := common.LightPayload(56810, 59656)
+	leftPath := utils.TwoBytesPath(56809)
+	leftPayload := utils.LightPayload(56810, 59656)
 	leftChild := node.NewLeaf(leftPath, leftPayload, 0)
 
-	rightPath := common.TwoBytesPath(2)
-	rightPayload := common.LightPayload(11, 22)
+	rightPath := utils.TwoBytesPath(2)
+	rightPayload := utils.LightPayload(11, 22)
 	rightChild := node.NewLeaf(rightPath, rightPayload, 0)
 
 	n := node.NewInterimNode(1, leftChild, rightChild)
@@ -88,8 +88,8 @@ func Test_InterimNodeWithBothChildren(t *testing.T) {
 }
 
 func Test_MaxDepth(t *testing.T) {
-	path := common.TwoBytesPath(1)
-	payload := common.LightPayload(2, 3)
+	path := utils.TwoBytesPath(1)
+	payload := utils.LightPayload(2, 3)
 
 	n1 := node.NewLeaf(path, payload, 0)
 	n2 := node.NewLeaf(path, payload, 0)
@@ -101,8 +101,8 @@ func Test_MaxDepth(t *testing.T) {
 }
 
 func Test_RegCount(t *testing.T) {
-	path := common.TwoBytesPath(1)
-	payload := common.LightPayload(2, 3)
+	path := utils.TwoBytesPath(1)
+	payload := utils.LightPayload(2, 3)
 	n1 := node.NewLeaf(path, payload, 0)
 	n2 := node.NewLeaf(path, payload, 0)
 	n3 := node.NewLeaf(path, payload, 0)

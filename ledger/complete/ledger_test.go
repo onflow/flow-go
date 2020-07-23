@@ -10,6 +10,8 @@ import (
 	"github.com/dapperlabs/flow-go/ledger"
 	"github.com/dapperlabs/flow-go/ledger/common"
 	"github.com/dapperlabs/flow-go/ledger/complete"
+	"github.com/dapperlabs/flow-go/ledger/encoding"
+	"github.com/dapperlabs/flow-go/ledger/utils"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -51,7 +53,7 @@ func TestLedger_Update(t *testing.T) {
 
 			curSC := led.EmptyStateCommitment()
 
-			u := common.UpdateFixture()
+			u := utils.UpdateFixture()
 			u.SetStateCommitment(curSC)
 
 			newSc, err := led.Set(u)
@@ -94,7 +96,7 @@ func TestLedger_Get(t *testing.T) {
 
 			curSC := led.EmptyStateCommitment()
 
-			q := common.QueryFixture()
+			q := utils.QueryFixture()
 			q.SetStateCommitment(curSC)
 
 			retValues, err := led.Get(q)
@@ -120,7 +122,7 @@ func TestLedger_Proof(t *testing.T) {
 			retProof, err := led.Prove(q)
 			require.NoError(t, err)
 
-			proof, err := common.DecodeTrieBatchProof(retProof)
+			proof, err := encoding.DecodeTrieBatchProof(retProof)
 			require.NoError(t, err)
 			assert.Equal(t, 0, len(proof.Proofs))
 		})
@@ -132,14 +134,14 @@ func TestLedger_Proof(t *testing.T) {
 			require.NoError(t, err)
 
 			curSC := led.EmptyStateCommitment()
-			q := common.QueryFixture()
+			q := utils.QueryFixture()
 			q.SetStateCommitment(curSC)
 			require.NoError(t, err)
 
 			retProof, err := led.Prove(q)
 			require.NoError(t, err)
 
-			proof, err := common.DecodeTrieBatchProof(retProof)
+			proof, err := encoding.DecodeTrieBatchProof(retProof)
 			require.NoError(t, err)
 			assert.Equal(t, 2, len(proof.Proofs))
 			assert.True(t, common.VerifyTrieBatchProof(proof, curSC))
@@ -153,7 +155,7 @@ func TestLedger_Proof(t *testing.T) {
 
 			curSC := led.EmptyStateCommitment()
 
-			u := common.UpdateFixture()
+			u := utils.UpdateFixture()
 			u.SetStateCommitment(curSC)
 
 			newSc, err := led.Set(u)
@@ -166,7 +168,7 @@ func TestLedger_Proof(t *testing.T) {
 			retProof, err := led.Prove(q)
 			require.NoError(t, err)
 
-			proof, err := common.DecodeTrieBatchProof(retProof)
+			proof, err := encoding.DecodeTrieBatchProof(retProof)
 			require.NoError(t, err)
 			assert.Equal(t, 2, len(proof.Proofs))
 			assert.True(t, common.VerifyTrieBatchProof(proof, newSc))
