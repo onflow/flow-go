@@ -16,6 +16,7 @@ import (
 //  - Use the proof of possession (PoP) to prevent the Rogue public-key attack.
 //  - Non-interactive aggregation of multiple signatures into one.
 //  - Non-interactive aggregation of multiple private keys into one.
+//  - Non-interactive aggregation of multiple public keys into one.
 
 // #cgo CFLAGS: -g -Wall -std=c99 -I./ -I./relic/build/include
 // #cgo LDFLAGS: -Lrelic/build/lib -l relic_s
@@ -63,8 +64,8 @@ func AggregatePrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 		if sk.Algorithm() != BLSBLS12381 {
 			return nil, fmt.Errorf("all keys must be BLS keys")
 		}
-		skBls, _ := sk.(*PrKeyBLSBLS12381)
-		scalars = append(scalars, skBls.scalar)
+		skBLS, _ := sk.(*PrKeyBLSBLS12381)
+		scalars = append(scalars, skBLS.scalar)
 	}
 
 	var sum scalar
@@ -73,5 +74,28 @@ func AggregatePrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 	return &PrKeyBLSBLS12381{
 		pk:     nil,
 		scalar: sum,
+	}, nil
+}
+
+// AggregatePublicKeys aggregate multiple BLS public keys into one.
+//
+// The order of the keys in the slice does not matter since the aggregation
+// is commutative.
+// No check is performed on the input public keys.
+func AggregatePublicKeys(keys []PublicKey) (PublicKey, error) {
+	points := make([]pointG2, 0, len(keys))
+	for _, pk := range keys {
+		if pk.Algorithm() != BLSBLS12381 {
+			return nil, fmt.Errorf("all keys must be BLS keys")
+		}
+		pkBLS, _ := pk.(*PubKeyBLSBLS12381)
+		points = append(points, pkBLS.point)
+	}
+
+	var sum pointG2
+	C.ep2_sum_vector((*C.ep2_st)(&sum), (*C.ep2_st)(&points[0]),
+		(C.int)(len(points)))
+	return &PubKeyBLSBLS12381{
+		point: sum,
 	}, nil
 }
