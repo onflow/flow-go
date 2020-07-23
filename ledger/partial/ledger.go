@@ -5,6 +5,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/ledger"
 	"github.com/dapperlabs/flow-go/ledger/common"
+	"github.com/dapperlabs/flow-go/ledger/encoding"
 	"github.com/dapperlabs/flow-go/ledger/partial/ptrie"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -26,7 +27,7 @@ func NewLedger(proof ledger.Proof, sc ledger.StateCommitment) (*Ledger, error) {
 	if len(proof) < 1 {
 		return nil, fmt.Errorf("at least a proof is needed to be able to contruct a partial trie")
 	}
-	batchProof, err := common.DecodeTrieBatchProof(proof)
+	batchProof, err := encoding.DecodeTrieBatchProof(proof)
 	if err != nil {
 		return nil, fmt.Errorf("decoding proof failed: %w", err)
 	}
