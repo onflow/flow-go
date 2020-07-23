@@ -441,7 +441,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		last = next
 	}
 
-	// this is just a sanity check; at this point, no seals should be left
+	// This is just a sanity check; at this point, no seals should be left.
 	if len(byBlock) > 0 {
 		return fmt.Errorf("not all seals connected to state (left: %d)", len(byBlock))
 	}
@@ -449,20 +449,22 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	// SIXTH: In case any of the payload seals includes system events, we need to
 	// check if they are valid and must apply them to the protocol state as needed.
 
-	// retrieve the current epoch counter and collect system events from seals
+	// Retrieve the current epoch counter and the current epoch's service events.
 	var counter uint64
 	err = m.state.db.View(operation.RetrieveEpochCounter(&counter))
 	if err != nil {
 		return fmt.Errorf("could not retrieve epoch counter: %w", err)
 	}
-	var events []*flow.Event
-	for _, seal := range payload.Seals {
-		events = append(events, seal.ServiceEvents...)
+	var setup flow.EpochSetup
+	err = m.state.db.View(operation.RetrieveEpochSetup(counter, &setup))
+	if err != nil {
+		return fmt.Errorf("could not retrieve current epoch setup: %w", err)
 	}
-
-	// NOTE: We could check that we have at most two here, but using more
-	// sophisticated checks that catch invalid events one by one makes
-	// the code more extensible in the future.
+	var commit flow.EpochCommit
+	err = m.state.db.View(operation.RetrieveEpochCommit(counter, &commit))
+	if err != nil {
+		return fmt.Errorf("could not retrieve current epoch commit: %w", err)
+	}
 
 	// Let's first establish the status quo of the current epoch. This function
 	// checks if we already had an epoch setup or commit event in the history of
@@ -472,54 +474,75 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 		return fmt.Errorf("could not check epoch status: %w", err)
 	}
 
-	// for each event, check if it is valid
-	for _, event := range events {
+	// For each service event included in the payload, check whether it
+	// is compliant with the protocol rules.
+	// NOTE: We could check that we have at most two service eventshere,
+	// but using more granular checks that catch invalid events one by one
+	// makes the code more extensible in the future.
+	for _, seal := range payload.Seals {
+		for _, event := range seal.ServiceEvents {
 
-		// convert the event into a strongly typed service event
-		service, err := flow.ServiceEvent(event)
-		if err != nil {
-			return fmt.Errorf("could not decode service event: %w", err)
-		}
-
-		// type assert the event to know what to do about it
-		switch service.(type) {
-
-		// handle epoch setup events
-		case *flow.EpochSetup:
-
-			// we should only have a single epoch setup event per epoch
-			if didSetup {
-				return fmt.Errorf("duplicate epoch setup service event")
+			// convert the event into a strongly typed service event
+			// TODO: We might want to do this upon creation of the seals
+			// instead; the only question is how to encode it over the
+			// network nicely, as a slice of interfaces needs additional
+			// meta information, and having two nil fields for most seals
+			// is ugly.
+			service, err := flow.ServiceEvent(event)
+			if err != nil {
+				return fmt.Errorf("could not decode service event: %w", err)
 			}
 
-			// make sure to disallow multiple commit events per payload
-			didSetup = true
+			// type assert the event to know what to do about it
+			switch ev := service.(type) {
 
-		// handle epoch commit events
-		case *flow.EpochCommit:
+			// handle epoch setup events
+			case *flow.EpochSetup:
 
-			// we should only have a single epoch commit event per epoch
-			if didCommit {
-				return fmt.Errorf("duplicate epoch commit service event")
+				// we should only have a single epoch setup event per epoch
+				if didSetup {
+					return fmt.Errorf("duplicate epoch setup service event")
+				}
+
+				// the setup event should have the counter increased by one
+				if ev.Counter != counter+1 {
+					return fmt.Errorf("next epoch setup has invalid counter (%d => %d)", counter, ev.Counter)
+				}
+
+				// make sure to disallow multiple commit events per payload
+				didSetup = true
+
+			// handle epoch commit events
+			case *flow.EpochCommit:
+
+				// we should only have a single epoch commit event per epoch
+				if didCommit {
+					return fmt.Errorf("duplicate epoch commit service event")
+				}
+
+				// the epoch setup event needs to happen before the commit
+				// NOTE: once we add the check for the view windows within
+				// which each event is valid, this check turns into a mere
+				// sanity check, because the chain shouldn't make progress
+				// unless the setup event has happened
+				if !didSetup {
+					return fmt.Errorf("missing epoch setup for epoch commit")
+				}
+
+				// the commit event should have the counter increased by one
+				if ev.Counter != counter+1 {
+					return fmt.Errorf("next epoch commit has invalid counter (%d => %d)", counter, ev.Counter)
+				}
+
+				// make sure to disallow multiple commit events per payload
+				didCommit = true
+
+			default:
+				// NOTE: this is already handled as error in the decoding; if
+				// we decode an event successfully, it should be processed, so
+				// all we need to do here is do a warning log that there are
+				// unprocessed service events.
 			}
-
-			// the epoch setup event needs to happen before the commit
-			// NOTE: once we add the check for the view windows within
-			// which each event is valid, this check turns into a mere
-			// sanity check, because the chain shouldn't make progress
-			// unless the setup event has happened
-			if !didSetup {
-				return fmt.Errorf("missing epoch setup for epoch commit")
-			}
-
-			// make sure to disallow multiple commit events per payload
-			didCommit = true
-
-		default:
-			// NOTE: this is already handled as error in the decoding; if
-			// we decode an event successfully, it should be processed, so
-			// all we need to do here is do a warning log that there are
-			// unprocessed service events.
 		}
 	}
 
@@ -601,6 +624,7 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	var ops []func(*badger.Txn) error
 	for _, seal := range payload.Seals {
 		for _, event := range seal.ServiceEvents {
+			// TODO: switch to the other decoding approach.
 			value, err := json.Decode(event.Payload)
 			if err != nil {
 				return fmt.Errorf("could not decode system event: %w", err)
@@ -617,6 +641,15 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 			}
 		}
 	}
+
+	// TODO: There are a number of checks related to epoch compliance we need to
+	// execute here, as the rules apply only when trying to finalize.
+	// 1) NEXT EPOCH: if we have a block with a view that is bigger than the final
+	// view of the current epoch setup, we need to increase the view counter.
+	// 2) MISSING SETUP: if we finalize a block that has a view beyond the window
+	// allowed for the submission of the epoch setup event, we have a fatal error.
+	// 3) MISSING COMMIT: if we finalie a block that has a view beyond the window
+	// allowed for the submission of the epoch commit event, we have a fatal error.
 
 	// FINALLY: A block inserted into the protocol state is already a valid
 	// extension; in order to make it final, we need to do just three things:
