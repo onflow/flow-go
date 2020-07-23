@@ -30,9 +30,9 @@ const (
 	PushApprovals    = 104
 
 	// Channels for actively requesting missing entities
-	RequestCollections = 200
-	RequestChunks      = 201
-	RequestReceipts    = 202 // request receipts by block ID
+	RequestCollections       = 200
+	RequestChunks            = 201
+	RequestReceiptsByBlockID = 202
 
 	// Channel aliases to make the code more readable / more robust to errors
 	ReceiveTransactions = PushTransactions
@@ -41,9 +41,9 @@ const (
 	ReceiveReceipts     = PushReceipts
 	ReceiveApprovals    = PushApprovals
 
-	ProvideCollections = RequestCollections
-	ProvideChunks      = RequestChunks
-	ProvideReceipts    = RequestReceipts
+	ProvideCollections       = RequestCollections
+	ProvideChunks            = RequestChunks
+	ProvideReceiptsByBlockID = RequestReceiptsByBlockID
 )
 
 func ChannelName(channelID uint8) string {
@@ -76,6 +76,8 @@ func ChannelName(channelID uint8) string {
 		return "request-collections"
 	case RequestChunks:
 		return "request-chunks"
+	case RequestReceiptsByBlockID:
+		return "request-receipts-by-block-id"
 	}
 	return fmt.Sprintf("unknown-channel-%d", channelID)
 }
