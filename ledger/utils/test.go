@@ -1,4 +1,4 @@
-package common
+package utils
 
 import (
 	"encoding/binary"
@@ -209,9 +209,9 @@ func RandomUniqueKeys(n, m, minByteSize, maxByteSize int) []ledger.Key {
 		key := ledger.NewKey(keyParts)
 
 		// deduplicate
-		if _, found := alreadySelectKeys[string(EncodeKey(key))]; !found {
+		if _, found := alreadySelectKeys[key.String()]; !found {
 			keys = append(keys, *key)
-			alreadySelectKeys[string(EncodeKey(key))] = true
+			alreadySelectKeys[key.String()] = true
 			i++
 		} else {
 			fmt.Println("Already existing")

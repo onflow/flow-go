@@ -4,6 +4,7 @@ import (
 	"bytes"
 
 	"github.com/dapperlabs/flow-go/ledger"
+	"github.com/dapperlabs/flow-go/ledger/utils"
 )
 
 // VerifyTrieProof verifies the proof, by constructing all the
@@ -24,7 +25,7 @@ func VerifyTrieProof(p *ledger.TrieProof, expectedStateCommitment ledger.StateCo
 		// and the sibling to node n, whose hash (aka `siblingHash`) must be defined by the Proof.
 
 		var siblingHash []byte
-		flagIsSet, err := IsBitSet(p.Flags, treeHeight-h)
+		flagIsSet, err := utils.IsBitSet(p.Flags, treeHeight-h)
 		if err != nil {
 			return false
 		}
@@ -38,7 +39,7 @@ func VerifyTrieProof(p *ledger.TrieProof, expectedStateCommitment ledger.StateCo
 			siblingHash = GetDefaultHashForHeight(h - 1)
 		}
 
-		bitIsSet, err := IsBitSet(p.Path, treeHeight-h)
+		bitIsSet, err := utils.IsBitSet(p.Path, treeHeight-h)
 		if err != nil {
 			return false
 		}
