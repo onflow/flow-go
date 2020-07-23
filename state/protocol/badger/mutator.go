@@ -43,11 +43,11 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		// want to see two system events with all necessary information: one epoch setup and one epoch commit.
 
 		// check that we have one epoch setup and one epoch commit event
-		if len(seal.SystemEvents) != 2 {
-			return fmt.Errorf("root block seal must contain two system events (have %d)", len(seal.SystemEvents))
+		if len(seal.ServiceEvents) != 2 {
+			return fmt.Errorf("root block seal must contain two system events (have %d)", len(seal.ServiceEvents))
 		}
-		event1 := seal.SystemEvents[0]
-		event2 := seal.SystemEvents[1]
+		event1 := seal.ServiceEvents[0]
+		event2 := seal.ServiceEvents[1]
 		if event1.Type != flow.EventEpochSetup {
 			return fmt.Errorf("first system event is not epoch setup (%s)", event1.Type)
 		}
@@ -111,7 +111,7 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 
 		// we should have at least one root collection cluster
 		if setup.Clusters.Size() == 0 {
-			return fmt.Errorf("need at least one colletion cluster")
+			return fmt.Errorf("need at least one collection cluster")
 		}
 
 		// the root identities should not contain duplicates
@@ -457,7 +457,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	}
 	var events []*flow.Event
 	for _, seal := range payload.Seals {
-		events = append(events, seal.SystemEvents...)
+		events = append(events, seal.ServiceEvents...)
 	}
 
 	// NOTE: We could check that we have at most two here, but using more
@@ -483,7 +483,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 			return fmt.Errorf("could not retrieve payload (%x): %w", ancestorID, err)
 		}
 		for _, seal := range payload.Seals {
-			for _, event := range seal.SystemEvents {
+			for _, event := range seal.ServiceEvents {
 				if event.Type == flow.EventEpochSetup {
 					didSetup = true
 					continue
@@ -515,8 +515,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 			}
 
 			// first, we check if we already have a finalized epoch setup event
-			var dummy flow.EpochSetup
-			err = m.state.db.View(operation.RetrieveEpochSetup(counter+1, &dummy))
+			err = m.state.db.View(operation.RetrieveEpochSetup(counter+1, &flow.EpochSetup{}))
 			if err == nil {
 				return fmt.Errorf("conflicting epoch setup system event")
 			}
@@ -546,8 +545,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 			}
 
 			// first, we check if we already have a finalized epoch commit event
-			var dummy flow.EpochCommit
-			err = m.state.db.View(operation.RetrieveEpochCommit(counter+1, &dummy))
+			err = m.state.db.View(operation.RetrieveEpochCommit(counter+1, &flow.EpochCommit{}))
 			if err == nil {
 				return fmt.Errorf("conflicting epoch commit system event")
 			}
@@ -648,7 +646,7 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	payload := block.Payload
 	var ops []func(*badger.Txn) error
 	for _, seal := range payload.Seals {
-		for _, event := range seal.SystemEvents {
+		for _, event := range seal.ServiceEvents {
 			value, err := json.Decode(event.Payload)
 			if err != nil {
 				return fmt.Errorf("could not decode system event: %w", err)
