@@ -36,6 +36,17 @@ func (r *ExecutionResults) byID(resultID flow.Identifier) func(*badger.Txn) (*fl
 	}
 }
 
+func (r *ExecutionResults) byBlockID(blockID flow.Identifier) func(*badger.Txn) (*flow.ExecutionResult, error) {
+	return func(tx *badger.Txn) (*flow.ExecutionResult, error) {
+		var resultID flow.Identifier
+		err := operation.LookupExecutionResult(blockID, &resultID)(tx)
+		if err != nil {
+			return nil, fmt.Errorf("could not lookup execution result ID: %w", err)
+		}
+		return r.byID(resultID)(tx)
+	}
+}
+
 func (r *ExecutionResults) index(blockID, resultID flow.Identifier) func(*badger.Txn) error {
 	return operation.IndexExecutionResult(blockID, resultID)
 }
@@ -59,10 +70,7 @@ func (r *ExecutionResults) Index(blockID flow.Identifier, resultID flow.Identifi
 }
 
 func (r *ExecutionResults) ByBlockID(blockID flow.Identifier) (*flow.ExecutionResult, error) {
-	var resultID flow.Identifier
-	err := r.db.View(operation.LookupExecutionResult(blockID, &resultID))
-	if err != nil {
-		return nil, fmt.Errorf("could not lookup execution result ID: %w", err)
-	}
-	return r.ByID(resultID)
+	tx := r.db.NewTransaction(false)
+	defer tx.Discard()
+	return r.byBlockID(blockID)(tx)
 }

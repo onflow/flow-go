@@ -16,8 +16,8 @@ func RetrieveExecutionReceiptMeta(receiptID flow.Identifier, meta *flow.Executio
 }
 
 // IndexExecutionReceipt inserts an execution receipt ID keyed by block ID
-func IndexExecutionReceipt(blockID flow.Identifier, resultID flow.Identifier) func(*badger.Txn) error {
-	return insert(makePrefix(codeBlockExecutionReceipt, blockID), resultID)
+func IndexExecutionReceipt(blockID flow.Identifier, receiptID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeBlockExecutionReceipt, blockID), receiptID)
 }
 
 // LookupExecutionReceipt finds execution receipt ID by block
