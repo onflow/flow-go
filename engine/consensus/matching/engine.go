@@ -508,10 +508,8 @@ func (e *Engine) sealableResults() ([]*flow.ExecutionResult, error) {
 			}
 		}
 
-		// if we find the result in the pending pool, remove it from missing list
-		if _, ok := missingByBlockID[result.BlockID]; ok {
-			delete(missingByBlockID, result.BlockID)
-		}
+		// ensure we mark this result as not missing if applicable
+		delete(missingByBlockID, result.BlockID)
 
 		// get all of the approver identities and check threshold
 		approvers := verifiers.Filter(filter.And(

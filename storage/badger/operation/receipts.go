@@ -1,8 +1,9 @@
 package operation
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dgraph-io/badger/v2"
+
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // InsertExecutionReceiptMeta inserts an execution receipt meta by ID.
