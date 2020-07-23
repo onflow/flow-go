@@ -26,8 +26,8 @@ const (
 	codeRootHeight      = 24 // the height of the first loaded block
 
 	// codes for single entity storage
+	// 31 was used for identities before epochs
 	codeHeader          = 30
-	codeIdentity        = 31
 	codeGuarantee       = 32
 	codeSeal            = 33
 	codeTransaction     = 34
@@ -41,11 +41,16 @@ const (
 	codeBlockValidity       = 43 // validity of block per HotStuff
 
 	// codes for indexing multiple identifiers by identifier
+	// 51 was used for identity indexes before epochs
 	codeBlockChildren     = 50 // index mapping block ID to children blocks
-	codePayloadIdentities = 51 // index mapping block ID to payload identities
 	codePayloadGuarantees = 52 // index mapping block ID to payload guarantees
 	codePayloadSeals      = 53 // index mapping block ID to payload seals
 	codeCollectionBlock   = 54 // index mapping collection ID to block ID
+
+	// codes related to epoch information
+	codeEpochCounter = 60 // current epoch counter
+	codeEpochSetup   = 61 // setup events by epoch counter
+	codeEpochCommit  = 62 // commit events by epoch counter
 
 	// legacy codes (should be cleaned up)
 	codeChunkDataPack                = 100

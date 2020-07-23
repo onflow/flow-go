@@ -59,7 +59,6 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 	guarantees := []*flow.CollectionGuarantee{&guarantee}
 
 	payload := flow.Payload{
-		Identities: unittest.IdentityListFixture(32),
 		Guarantees: guarantees,
 	}
 	header := unittest.BlockHeaderFixture()
@@ -245,7 +244,6 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 	})
 
 	payload = flow.Payload{
-		Identities: unittest.IdentityListFixture(32),
 		Guarantees: guarantees,
 	}
 	header = unittest.BlockHeaderFixture()
@@ -311,7 +309,6 @@ func LightExecutionResultFixture(chunkCount int) CompleteExecutionResult {
 	}
 
 	payload := flow.Payload{
-		Identities: nil,
 		Guarantees: guarantees,
 	}
 

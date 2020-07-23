@@ -19,16 +19,8 @@ func TestGenerateRootQC(t *testing.T) {
 	participantData := createSignerData(t, 3)
 
 	block := unittest.BlockFixture()
-	block.Payload.Identities = flow.IdentityList{
-		unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection)),
-		unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)),
-		unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
-	}
 	block.Payload.Guarantees = nil
 	block.Payload.Seals = nil
-	for _, participant := range participantData.Participants {
-		block.Payload.Identities = append(block.Payload.Identities, participant.Identity())
-	}
 	block.Header.Height = 0
 	block.Header.ParentID = flow.ZeroID
 	block.Header.View = 3

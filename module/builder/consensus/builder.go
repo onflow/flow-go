@@ -283,7 +283,6 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 	// build the payload so we can get the hash
 	payload := &flow.Payload{
-		Identities: nil,
 		Guarantees: guarantees,
 		Seals:      seals,
 	}
