@@ -4,11 +4,14 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"os"
 	"strings"
+	"sync"
 	"time"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
 	"github.com/dapperlabs/flow-go/integration/utils"
@@ -19,31 +22,43 @@ import (
 func main() {
 
 	sleep := flag.Duration("sleep", 0, "duration to sleep before benchmarking starts")
-	verbose := flag.Bool("verbose", false, "print verbose information")
+	tps := flag.Int("tps", 100, "transactions to send per second")
 	chainIDStr := flag.String("chain", string(flowsdk.Testnet), "chain ID")
 	chainID := flowsdk.ChainID([]byte(*chainIDStr))
 	access := flag.String("access", "localhost:3569", "access node address")
 	serviceAccountPrivateKeyHex := flag.String("servPrivHex", unittest.ServiceAccountPrivateKeyHex, "service account private key hex")
-	accessNodeAddrs := strings.Split(*access, ",")
+	logLvl := flag.String("log-level", "info", "set log level")
 	flag.Parse()
+
+	// parse log level and apply to logger
+	log := zerolog.New(os.Stderr).With().Timestamp().Logger().Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	lvl, err := zerolog.ParseLevel(strings.ToLower(*logLvl))
+	if err != nil {
+		log.Fatal().Err(err).Msg("invalid log level")
+	}
+	log = log.Level(lvl)
+
+	accessNodeAddrs := strings.Split(*access, ",")
+
+	log.Info().Msgf("TPS to send: %v", *tps)
 
 	addressGen := flowsdk.NewAddressGenerator(chainID)
 	serviceAccountAddress := addressGen.NextAddress()
-	fmt.Println("Root Service Address:", serviceAccountAddress)
+	log.Info().Msgf("Service Address: %v", serviceAccountAddress)
 	fungibleTokenAddress := addressGen.NextAddress()
-	fmt.Println("Fungible Address:", fungibleTokenAddress)
+	log.Info().Msgf("Fungible Token Address: %v", fungibleTokenAddress)
 	flowTokenAddress := addressGen.NextAddress()
-	fmt.Println("Flow Address:", flowTokenAddress)
+	log.Info().Msgf("Flow Token Address: %v", flowTokenAddress)
 
 	serviceAccountPrivateKeyBytes, err := hex.DecodeString(*serviceAccountPrivateKeyHex)
 	if err != nil {
-		panic("error while hex decoding hardcoded root key")
+		log.Fatal().Err(err).Msgf("error while hex decoding hardcoded root key")
 	}
 
 	// RLP decode the key
 	ServiceAccountPrivateKey, err := flow.DecodeAccountPrivateKey(serviceAccountPrivateKeyBytes)
 	if err != nil {
-		panic("error while decoding hardcoded root key bytes")
+		log.Fatal().Err(err).Msgf("error while decoding hardcoded root key bytes")
 	}
 
 	// get the private key string
@@ -56,20 +71,16 @@ func main() {
 	}
 
 	flowClient, err := client.New(accessNodeAddrs[0], grpc.WithInsecure())
-	lg, err := utils.NewLoadGenerator(flowClient, priv, &serviceAccountAddress, &fungibleTokenAddress,
-		&flowTokenAddress, 100, *verbose)
+	lg, err := utils.NewContLoadGenerator(log, flowClient, accessNodeAddrs[0], priv, &serviceAccountAddress, &fungibleTokenAddress,
+		&flowTokenAddress, *tps)
 	if err != nil {
 		panic(err)
 	}
 
-	rounds := 5
-	// extra 3 is for setup
-	for i := 0; i < rounds+3; i++ {
-		lg.Next()
-	}
+	lg.Init()
+	lg.Start()
 
-	// this prints all transactions
-	// fmt.Println(lg.Stats())
-	fmt.Println(lg.Stats().Digest())
-	lg.Close()
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	wg.Wait()
 }

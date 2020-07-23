@@ -4,17 +4,20 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/templates"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
 )
 
 type flowAccount struct {
+	i          int
 	address    *flowsdk.Address
 	accountKey *flowsdk.AccountKey
 	seqNumber  uint64
@@ -22,7 +25,7 @@ type flowAccount struct {
 	signerLock sync.Mutex
 }
 
-func newFlowAccount(address *flowsdk.Address,
+func newFlowAccount(i int, address *flowsdk.Address,
 	accountKey *flowsdk.AccountKey,
 	signer crypto.InMemorySigner) *flowAccount {
 	return &flowAccount{address: address,
@@ -33,9 +36,9 @@ func newFlowAccount(address *flowsdk.Address,
 	}
 }
 
-// LoadGenerator submits a batch of transactions to the network
+// BatchLoadGenerator submits a batch of transactions to the network
 // by creating many accounts and transfer flow tokens between them
-type LoadGenerator struct {
+type BatchLoadGenerator struct {
 	numberOfAccounts     int
 	flowClient           *client.Client
 	serviceAccount       *flowAccount
@@ -45,18 +48,19 @@ type LoadGenerator struct {
 	step                 int
 	scriptCreator        *ScriptCreator
 	txTracker            *TxTracker
-	statsTracker         *StatsTracker
+	statsTracker         *TxStatsTracker
 }
 
-// NewLoadGenerator returns a new LoadGenerator
+// NewBatchLoadGenerator returns a new LoadGenerator
 // TODO remove servAccPrivKeyHex when we open up account creation to everyone
-func NewLoadGenerator(fclient *client.Client,
+func NewBatchLoadGenerator(fclient *client.Client,
+	accessNodeAddress string,
 	servAccPrivKeyHex string,
 	serviceAccountAddress *flowsdk.Address,
 	fungibleTokenAddress *flowsdk.Address,
 	flowTokenAddress *flowsdk.Address,
 	numberOfAccounts int,
-	verbose bool) (*LoadGenerator, error) {
+	verbose bool) (*BatchLoadGenerator, error) {
 
 	servAcc, err := loadServiceAccount(fclient, serviceAccountAddress, servAccPrivKeyHex)
 	if err != nil {
@@ -64,8 +68,8 @@ func NewLoadGenerator(fclient *client.Client,
 	}
 
 	// TODO get these params hooked to the top level
-	stTracker := NewStatsTracker(&StatsConfig{1, 1, 1, 1, 1, numberOfAccounts})
-	txTracker, err := NewTxTracker(5000, 100, "localhost:3569", verbose, time.Second/10, stTracker)
+	stTracker := NewTxStatsTracker(&StatsConfig{1, 1, 1, 1, 1, numberOfAccounts})
+	txTracker, err := NewTxTracker(zerolog.New(os.Stderr), 5000, 100, accessNodeAddress, time.Second/10, stTracker)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +79,7 @@ func NewLoadGenerator(fclient *client.Client,
 		return nil, err
 	}
 
-	lGen := &LoadGenerator{
+	lGen := &BatchLoadGenerator{
 		numberOfAccounts:     numberOfAccounts,
 		flowClient:           fclient,
 		serviceAccount:       servAcc,
@@ -116,8 +120,8 @@ func loadServiceAccount(flowClient *client.Client,
 	}, nil
 }
 
-func (lg *LoadGenerator) getBlockIDRef() (flowsdk.Identifier, error) {
-	ref, err := lg.flowClient.GetLatestBlockHeader(context.Background(), false)
+func getBlockIDRef(c *client.Client) (flowsdk.Identifier, error) {
+	ref, err := c.GetLatestBlockHeader(context.Background(), false)
 	if err != nil {
 		return flowsdk.Identifier{}, err
 	}
@@ -125,17 +129,17 @@ func (lg *LoadGenerator) getBlockIDRef() (flowsdk.Identifier, error) {
 }
 
 // Stats returns the statsTracker that captures stats for transactions submitted
-func (lg *LoadGenerator) Stats() *StatsTracker {
+func (lg *BatchLoadGenerator) Stats() *TxStatsTracker {
 	return lg.statsTracker
 }
 
 // Close closes the transaction tracker gracefully.
-func (lg *LoadGenerator) Close() {
+func (lg *BatchLoadGenerator) Close() {
 	lg.txTracker.Stop()
 }
 
-func (lg *LoadGenerator) setupServiceAccountKeys() error {
-	blockRef, err := lg.getBlockIDRef()
+func (lg *BatchLoadGenerator) setupServiceAccountKeys() error {
+	blockRef, err := getBlockIDRef(lg.flowClient)
 	if err != nil {
 		return err
 	}
@@ -185,7 +189,7 @@ func (lg *LoadGenerator) setupServiceAccountKeys() error {
 			panic("The setup transaction (service account keys) has timed out. can not continue!")
 		}, // on timout
 		nil, // on error,
-		120)
+		240)
 
 	txWG.Wait()
 
@@ -194,9 +198,9 @@ func (lg *LoadGenerator) setupServiceAccountKeys() error {
 
 }
 
-func (lg *LoadGenerator) createAccounts() error {
+func (lg *BatchLoadGenerator) createAccounts() error {
 	fmt.Printf("creating %d accounts...", lg.numberOfAccounts)
-	blockRef, err := lg.getBlockIDRef()
+	blockRef, err := getBlockIDRef(lg.flowClient)
 	if err != nil {
 		return err
 	}
@@ -235,6 +239,8 @@ func (lg *LoadGenerator) createAccounts() error {
 		}
 		allTxWG.Add(1)
 
+		i := 0
+
 		lg.txTracker.AddTx(createAccountTx.ID(),
 			nil,
 			func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
@@ -243,7 +249,8 @@ func (lg *LoadGenerator) createAccounts() error {
 					if event.Type == flowsdk.EventAccountCreated {
 						accountCreatedEvent := flowsdk.AccountCreatedEvent(event)
 						accountAddress := accountCreatedEvent.Address()
-						newAcc := newFlowAccount(&accountAddress, accountKey, signer)
+						newAcc := newFlowAccount(i, &accountAddress, accountKey, signer)
+						i++
 						lg.accounts = append(lg.accounts, newAcc)
 						fmt.Printf("new account %v added\n", accountAddress)
 					}
@@ -259,7 +266,7 @@ func (lg *LoadGenerator) createAccounts() error {
 				panic("The setup transaction (account creation) has timed out. can not continue!")
 			}, // on timout
 			nil, // on error
-			120)
+			240)
 	}
 	allTxWG.Wait()
 	lg.step++
@@ -267,8 +274,8 @@ func (lg *LoadGenerator) createAccounts() error {
 	return nil
 }
 
-func (lg *LoadGenerator) distributeInitialTokens() error {
-	blockRef, err := lg.getBlockIDRef()
+func (lg *BatchLoadGenerator) distributeInitialTokens() error {
+	blockRef, err := getBlockIDRef(lg.flowClient)
 	if err != nil {
 		return err
 	}
@@ -295,6 +302,9 @@ func (lg *LoadGenerator) distributeInitialTokens() error {
 		// TODO signer be thread safe
 		lg.serviceAccount.signerLock.Lock()
 		err = transferTx.SignEnvelope(*lg.serviceAccount.address, i+1, lg.serviceAccount.signer)
+		if err != nil {
+			return err
+		}
 		lg.serviceAccount.signerLock.Unlock()
 
 		err = lg.flowClient.SendTransaction(context.Background(), *transferTx)
@@ -309,7 +319,7 @@ func (lg *LoadGenerator) distributeInitialTokens() error {
 				fmt.Println(res)
 				allTxWG.Done()
 			},
-			nil, nil, nil, nil, 120)
+			nil, nil, nil, nil, 240)
 	}
 	allTxWG.Wait()
 	lg.step++
@@ -317,8 +327,8 @@ func (lg *LoadGenerator) distributeInitialTokens() error {
 	return nil
 }
 
-func (lg *LoadGenerator) rotateTokens() error {
-	blockRef, err := lg.getBlockIDRef()
+func (lg *BatchLoadGenerator) rotateTokens() error {
+	blockRef, err := getBlockIDRef(lg.flowClient)
 	if err != nil {
 		return err
 	}
@@ -345,6 +355,9 @@ func (lg *LoadGenerator) rotateTokens() error {
 		// TODO signer be thread safe
 		lg.accounts[i].signerLock.Lock()
 		err = transferTx.SignEnvelope(*lg.accounts[i].address, 0, lg.accounts[i].signer)
+		if err != nil {
+			return err
+		}
 		lg.accounts[i].seqNumber++
 		lg.accounts[i].signerLock.Unlock()
 
@@ -367,7 +380,7 @@ func (lg *LoadGenerator) rotateTokens() error {
 				allTxWG.Done()
 			}, // on timout
 			nil, // on error
-			120)
+			240)
 
 	}
 	allTxWG.Wait()
@@ -379,7 +392,7 @@ func (lg *LoadGenerator) rotateTokens() error {
 // Next submits the next batch of transactions to the network and waits
 // until transactions are finalized, the first 3 calls setup accounts
 // needed, and the rest of the calls rotates tokens between accounts
-func (lg *LoadGenerator) Next() error {
+func (lg *BatchLoadGenerator) Next() error {
 	switch lg.step {
 	case 0:
 		return lg.setupServiceAccountKeys()
