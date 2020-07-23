@@ -41,7 +41,7 @@ func main() {
 		ledgerStorage       *ledger.MTrieStorage
 		events              storage.Events
 		txResults           storage.TransactionResults
-		exeResults          storage.ExecutionResults
+		receipts            storage.ExecutionReceipts
 		providerEngine      *exeprovider.Engine
 		syncCore            *chainsync.Core
 		computationManager  *computation.Manager
@@ -96,8 +96,9 @@ func main() {
 			syncCore, err = chainsync.New(node.Logger, chainsync.DefaultConfig())
 			return err
 		}).
-		Module("execution results storage", func(node *cmd.FlowNodeBuilder) error {
-			exeResults = badger.NewExecutionResults(node.DB)
+		Module("execution receipts storage", func(node *cmd.FlowNodeBuilder) error {
+			results := badger.NewExecutionResults(node.DB)
+			receipts = badger.NewExecutionReceipts(node.DB, results)
 			return nil
 		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -135,7 +136,7 @@ func main() {
 				node.Storage.Blocks,
 				node.Storage.Collections,
 				chunkDataPacks,
-				exeResults,
+				receipts,
 				node.DB,
 				node.Tracer,
 			)
@@ -202,7 +203,7 @@ func main() {
 		}).
 		Component("receipt provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			retrieve := func(blockID flow.Identifier) (flow.Entity, error) {
-				receipt, err := exeResults.ByBlockID(blockID)
+				receipt, err := receipts.ByBlockID(blockID)
 				return receipt, err
 			}
 			eng, err := provider.New(
