@@ -7,6 +7,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/fingerprint"
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/json"
 )
 
 // List of built-in event types.
@@ -70,4 +72,31 @@ func wrapEvent(e Event) eventWrapper {
 		TxID:  e.TransactionID[:],
 		Index: e.EventIndex,
 	}
+}
+
+func ServiceEvent(event *Event) (interface{}, error) {
+	value, err := json.Decode(event.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("could not event: %w", err)
+	}
+	switch event.Type {
+	case EventEpochSetup:
+		return valueToSetup(value)
+	case EventEpochCommit:
+		return valueToCommit(value)
+	default:
+		return nil, fmt.Errorf("invalid service event type (%s)", event.Type)
+	}
+}
+
+func valueToSetup(value cadence.Value) (*EpochSetup, error) {
+	// TODO: figure out the cadence encoding (probably map) and
+	// type assert all fields into the strongly typed struct
+	return &EpochSetup{}, nil
+}
+
+func valueToCommit(value cadence.Value) (*EpochCommit, error) {
+	// TODO: figure out the cadence encoding (probably map) and
+	// type assert all fields into the strongly typed struct
+	return &EpochCommit{}, nil
 }

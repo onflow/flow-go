@@ -475,64 +475,52 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	// for each event, check if it is valid
 	for _, event := range events {
 
-		// decode the event first; should work for all
-		value, err := json.Decode(event.Payload)
+		// convert the event into a strongly typed service event
+		service, err := flow.ServiceEvent(event)
 		if err != nil {
 			return fmt.Errorf("could not decode service event: %w", err)
 		}
 
-		// check if the event is an epoch setup event
-		if event.Type == flow.EventEpochSetup {
+		// type assert the event to know what to do about it
+		switch service.(type) {
+
+		// handle epoch setup events
+		case *flow.EpochSetup:
 
 			// we should only have a single epoch setup event per epoch
 			if didSetup {
 				return fmt.Errorf("duplicate epoch setup service event")
 			}
 
-			// type assert the event and check if the counter is valid
-			setup := value.ToGoValue().(*flow.EpochCommit)
-			if setup.Counter != counter+1 {
-				return fmt.Errorf("invalid epoch setup event counter (%d => %d)", counter, setup.Counter)
-			}
-
-			// TODO: Determine what other compliance checks we want to run on the epoch setup event.
-			// => https://github.com/dapperlabs/flow-go/issues/4437
-
-			// make sure we don't allow multiple setup events per payload
+			// make sure to disallow multiple commit events per payload
 			didSetup = true
 
-			continue
-		}
-
-		// check if the event is an epoch commit event
-		if event.Type == flow.EventEpochCommit {
+		// handle epoch commit events
+		case *flow.EpochCommit:
 
 			// we should only have a single epoch commit event per epoch
 			if didCommit {
 				return fmt.Errorf("duplicate epoch commit service event")
 			}
 
-			// an epoch commit event is only valid if it was preceeded by a setup event
+			// the epoch setup event needs to happen before the commit
+			// NOTE: once we add the check for the view windows within
+			// which each event is valid, this check turns into a mere
+			// sanity check, because the chain shouldn't make progress
+			// unless the setup event has happened
 			if !didSetup {
 				return fmt.Errorf("missing epoch setup for epoch commit")
 			}
 
-			// type assert the event and check if the counter is valid
-			commit := value.ToGoValue().(*flow.EpochCommit)
-			if commit.Counter != counter+1 {
-				return fmt.Errorf("invalid epoch commit event counter (%d => %d)", counter, commit.Counter)
-			}
-
-			// TODO: Determine what other compliance checks we want to run on the epoch commit event.
-			// => https://github.com/dapperlabs/flow-go/issues/4437
-
-			// make sure we don't allow multiple commit events per payload
+			// make sure to disallow multiple commit events per payload
 			didCommit = true
 
-			continue
+		default:
+			// NOTE: this is already handled as error in the decoding; if
+			// we decode an event successfully, it should be processed, so
+			// all we need to do here is do a warning log that there are
+			// unprocessed service events.
 		}
-
-		return fmt.Errorf("invalid service event type in block seal (%s)", event.Type)
 	}
 
 	// FINALLY: Both the header itself and its payload are in compliance with the
