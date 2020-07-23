@@ -1,0 +1,20 @@
+{
+  "Header": {
+    "ChainID": "f8ee3c5c424e2ac144fb006ffc4d576414db9353b51c60d4a5eccd1ad5190aa3",
+    "ParentID": "0000000000000000000000000000000000000000000000000000000000000000",
+    "Height": 0,
+    "PayloadHash": "0114797c3404a47fd9d3bffb926b8df8a611dcbd94854e870af5f3c22fe55ab2",
+    "Timestamp": "2018-12-19T22:32:30.000000042Z",
+    "View": 0,
+    "ParentVoterIDs": null,
+    "ParentVoterSig": null,
+    "ProposerID": "0000000000000000000000000000000000000000000000000000000000000000",
+    "ProposerSig": null
+  },
+  "Payload": {
+    "Collection": {
+      "Transactions": []
+    },
+    "ReferenceBlockID": "0000000000000000000000000000000000000000000000000000000000000000"
+  }
+}
