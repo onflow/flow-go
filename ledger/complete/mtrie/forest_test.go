@@ -926,8 +926,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		require.NoError(t, err, "error generating proofs")
 		require.True(t, common.VerifyTrieBatchProof(batchProof, activeRoot))
 
-		proofToGo := common.EncodeTrieBatchProof(batchProof)
-		psmt, err := ptrie.NewPSMT(activeRoot, pathByteSize, proofToGo)
+		psmt, err := ptrie.NewPSMT(activeRoot, pathByteSize, batchProof)
 		require.NoError(t, err, "error building partial trie")
 		require.True(t, bytes.Equal(psmt.RootHash(), activeRoot))
 

@@ -83,22 +83,13 @@ func (p *PSMT) Update(paths []ledger.Path, payloads []*ledger.Payload) ([]byte, 
 func NewPSMT(
 	rootValue []byte, // stateCommitment
 	pathByteSize int,
-	proofs []byte,
+	batchProof *ledger.TrieBatchProof,
 ) (*PSMT, error) {
 
 	if pathByteSize < 1 {
 		return nil, errors.New("trie's path size [in bytes] must be positive")
 	}
 	psmt := PSMT{newNode(nil, pathByteSize*8), pathByteSize, make(map[string]*node)}
-
-	// Decode proof encodings
-	if len(proofs) < 1 {
-		return nil, fmt.Errorf("at least a proof is needed to be able to contruct a partial trie")
-	}
-	batchProof, err := common.DecodeTrieBatchProof(proofs)
-	if err != nil {
-		return nil, fmt.Errorf("decoding proof failed: %w", err)
-	}
 
 	paths := batchProof.Paths()
 	payloads := batchProof.Payloads()

@@ -49,8 +49,7 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 		bp, err := f.Proofs(r)
 		require.NoError(t, err, "error getting proofs values")
 
-		encBP := common.EncodeTrieBatchProof(bp)
-		psmt, err := NewPSMT(rootHash, pathByteSize, encBP)
+		psmt, err := NewPSMT(rootHash, pathByteSize, bp)
 
 		require.NoError(t, err, "error building partial trie")
 		if !bytes.Equal(rootHash, psmt.root.HashValue()) {
@@ -108,8 +107,7 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 		bp, err := f.Proofs(r)
 		require.NoError(t, err, "error getting batch proof")
 
-		encBP := common.EncodeTrieBatchProof(bp)
-		psmt, err := NewPSMT(rootHash, pathByteSize, encBP)
+		psmt, err := NewPSMT(rootHash, pathByteSize, bp)
 		require.NoError(t, err, "error building partial trie")
 
 		if !bytes.Equal(rootHash, psmt.root.HashValue()) {
@@ -154,8 +152,7 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 		bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 		require.NoError(t, err, "error getting batch proof")
 
-		encBP := common.EncodeTrieBatchProof(bp)
-		psmt, err := NewPSMT(rootHash, pathByteSize, encBP)
+		psmt, err := NewPSMT(rootHash, pathByteSize, bp)
 		require.NoError(t, err, "error building partial trie")
 
 		if !bytes.Equal(f.GetEmptyRootHash(), psmt.root.HashValue()) {
@@ -207,8 +204,7 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 		bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 		require.NoError(t, err, "error getting batch proof")
 
-		encBP := common.EncodeTrieBatchProof(bp)
-		psmt, err := NewPSMT(rootHash, pathByteSize, encBP)
+		psmt, err := NewPSMT(rootHash, pathByteSize, bp)
 		require.NoError(t, err, "error building partial trie")
 
 		if !bytes.Equal(rootHash, psmt.root.HashValue()) {
@@ -264,8 +260,7 @@ func TestMixProof(t *testing.T) {
 		bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 		require.NoError(t, err, "error getting batch proof")
 
-		encBP := common.EncodeTrieBatchProof(bp)
-		psmt, err := NewPSMT(rootHash, pathByteSize, encBP)
+		psmt, err := NewPSMT(rootHash, pathByteSize, bp)
 		require.NoError(t, err, "error building partial trie")
 
 		if !bytes.Equal(rootHash, psmt.root.HashValue()) {
@@ -319,8 +314,7 @@ func TestRandomProofs(t *testing.T) {
 			bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 			require.NoError(t, err, "error getting batch proof")
 
-			encBP := common.EncodeTrieBatchProof(bp)
-			psmt, err := NewPSMT(rootHash, pathByteSize, encBP)
+			psmt, err := NewPSMT(rootHash, pathByteSize, bp)
 			require.NoError(t, err, "error building partial trie")
 
 			if !bytes.Equal(rootHash, psmt.root.HashValue()) {

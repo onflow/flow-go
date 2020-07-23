@@ -77,7 +77,7 @@ func TestLedgerFunctionality(t *testing.T) {
 				assert.True(t, isValid)
 
 				// validate proofs as a batch
-				_, err = ptrie.NewPSMT(newState, pathByteSize, proof)
+				_, err = ptrie.NewPSMT(newState, pathByteSize, bProof)
 				assert.NoError(t, err)
 
 				// query all exising keys (check no drop)
