@@ -1,0 +1,7 @@
+{
+  "Role": "consensus",
+  "Address": "123.0.2.20",
+  "NodeID": "416c65782048656e74736368656c007187c281c46f4fa85e16c26b294b54456e",
+  "NetworkPrivKey": "F+NwcCSO9WtoNfOIu06wSDhVkT4e2QP0ci8/5lhFkdA=",
+  "StakingPrivKey": "En9lUfaaiSNU07BA1u2Mh/0EUYR+PQErKd3gMtInGMI="
+}

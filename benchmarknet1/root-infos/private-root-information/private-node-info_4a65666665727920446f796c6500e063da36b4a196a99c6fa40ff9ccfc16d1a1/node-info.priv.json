@@ -1,0 +1,7 @@
+{
+  "Role": "collection",
+  "Address": "collector-2.example.com",
+  "NodeID": "4a65666665727920446f796c6500e063da36b4a196a99c6fa40ff9ccfc16d1a1",
+  "NetworkPrivKey": "aeyND2c3RWdSTWmhsF0FOpjQBE9SRmri5txvGOpyeCc=",
+  "StakingPrivKey": "ECKqYJyIZOrUlIq/0Hn+1YsR6JvdzldytuXED5rovBQ="
+}

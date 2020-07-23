@@ -1,0 +1,52 @@
+[
+  {
+    "Role": "access",
+    "Address": "access-001.benchmarknet1.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "access",
+    "Address": "access-002.benchmarknet1.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-001.benchmarknet1.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "collection",
+    "Address": "collection-002.benchmarknet1.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-001.benchmarknet1.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-002.benchmarknet1.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "consensus",
+    "Address": "consensus-003.benchmarknet1.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "execution",
+    "Address": "execution-001.benchmarknet1.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "execution",
+    "Address": "execution-002.benchmarknet1.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
+    "Role": "verification",
+    "Address": "verification-001.benchmarknet1.nodes.onflow.org:3569",
+    "Stake": 100
+  }
+]
