@@ -28,9 +28,10 @@ import "C"
 // Signatures could be generated from the same or distinct messages, they
 // could also be the aggregation of other signatures.
 // The order of the signatures in the slice does not matter since the aggregation
-// is commutative.
+// is commutative. An error is returned if the slice is empty.
 // No subgroup membership check is performed on the input signatures.
 func AggregateSignatures(sigs []Signature) (Signature, error) {
+	_ = newBLSBLS12381()
 	// TODO: check if it's fine to return identity g_1
 	if len(sigs) == 0 {
 		return nil, fmt.Errorf("signature list is empty")
@@ -56,9 +57,10 @@ func AggregateSignatures(sigs []Signature) (Signature, error) {
 // AggregatePrivateKeys aggregate multiple BLS private keys into one.
 //
 // The order of the keys in the slice does not matter since the aggregation
-// is commutative.
+// is commutative. The slice can be empty.
 // No check is performed on the input private keys.
 func AggregatePrivateKeys(keys []PrivateKey) (PrivateKey, error) {
+	_ = newBLSBLS12381()
 	scalars := make([]scalar, 0, len(keys))
 	for _, sk := range keys {
 		if sk.Algorithm() != BLSBLS12381 {
@@ -69,7 +71,13 @@ func AggregatePrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 	}
 
 	var sum scalar
-	C.bn_sum_vector((*C.bn_st)(&sum), (*C.bn_st)(&scalars[0]),
+	var scalarPointer *C.bn_st
+	if len(keys) != 0 {
+		scalarPointer = (*C.bn_st)(&scalars[0])
+	} else {
+		scalarPointer = (*C.bn_st)(nil)
+	}
+	C.bn_sum_vector((*C.bn_st)(&sum), scalarPointer,
 		(C.int)(len(scalars)))
 	return &PrKeyBLSBLS12381{
 		pk:     nil,
@@ -80,9 +88,10 @@ func AggregatePrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 // AggregatePublicKeys aggregate multiple BLS public keys into one.
 //
 // The order of the keys in the slice does not matter since the aggregation
-// is commutative.
+// is commutative. The slice can be empty.
 // No check is performed on the input public keys.
 func AggregatePublicKeys(keys []PublicKey) (PublicKey, error) {
+	_ = newBLSBLS12381()
 	points := make([]pointG2, 0, len(keys))
 	for _, pk := range keys {
 		if pk.Algorithm() != BLSBLS12381 {
@@ -93,7 +102,13 @@ func AggregatePublicKeys(keys []PublicKey) (PublicKey, error) {
 	}
 
 	var sum pointG2
-	C.ep2_sum_vector((*C.ep2_st)(&sum), (*C.ep2_st)(&points[0]),
+	var pointsPointer *C.ep2_st
+	if len(keys) != 0 {
+		pointsPointer = (*C.ep2_st)(&points[0])
+	} else {
+		pointsPointer = (*C.ep2_st)(nil)
+	}
+	C.ep2_sum_vector((*C.ep2_st)(&sum), pointsPointer,
 		(C.int)(len(points)))
 	return &PubKeyBLSBLS12381{
 		point: sum,
