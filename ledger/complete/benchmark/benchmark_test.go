@@ -92,8 +92,10 @@ func benchmarkStorage(steps int, b *testing.B) {
 		totalProofSize += len(proof)
 
 		start = time.Now()
+		p, _ := common.DecodeTrieBatchProof(proof)
+
 		// construct a partial trie using proofs
-		_, err = ptrie.NewPSMT(newState, pathByteSize, proof)
+		_, err = ptrie.NewPSMT(newState, pathByteSize, p)
 		if err != nil {
 			b.Fatal("failed to create PSMT")
 		}
