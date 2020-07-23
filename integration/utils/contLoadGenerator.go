@@ -35,6 +35,7 @@ type ContLoadGenerator struct {
 	txStatsTracker       *TxStatsTracker
 	workerStatsTracker   *WorkerStatsTracker
 	workers              []*Worker
+	blockRef             BlockRef
 }
 
 // NewContLoadGenerator returns a new ContLoadGenerator
@@ -84,6 +85,7 @@ func NewContLoadGenerator(
 		txStatsTracker:       txStatsTracker,
 		workerStatsTracker:   NewWorkerStatsTracker(),
 		scriptCreator:        scriptCreator,
+		blockRef:             NewBlockRef(fclient),
 	}
 
 	return lGen, nil
@@ -130,7 +132,7 @@ func (lg *ContLoadGenerator) Stop() error {
 func (lg *ContLoadGenerator) setupServiceAccountKeys() error {
 	lg.log.Info().Msg("setting up service account keys...")
 
-	blockRef, err := getBlockIDRef(lg.flowClient)
+	blockRef, err := lg.blockRef.Get()
 	if err != nil {
 		return err
 	}
@@ -190,7 +192,7 @@ func (lg *ContLoadGenerator) setupServiceAccountKeys() error {
 
 func (lg *ContLoadGenerator) createAccounts() error {
 	lg.log.Info().Msgf("creating %d accounts...", lg.numberOfAccounts)
-	blockRef, err := getBlockIDRef(lg.flowClient)
+	blockRef, err := lg.blockRef.Get()
 	if err != nil {
 		return err
 	}
@@ -314,7 +316,7 @@ func (lg *ContLoadGenerator) fundAccount(blockRef flowsdk.Identifier, acc *flowA
 
 func (lg *ContLoadGenerator) distributeInitialTokens() error {
 	lg.log.Info().Msgf("distributing initial tokens...")
-	blockRef, err := getBlockIDRef(lg.flowClient)
+	blockRef, err := lg.blockRef.Get()
 	if err != nil {
 		return err
 	}
@@ -336,8 +338,7 @@ func (lg *ContLoadGenerator) distributeInitialTokens() error {
 func (lg *ContLoadGenerator) sendTx(workerID int) {
 	lg.log.Debug().Msgf("sending tx from worker %v", workerID)
 
-	// TODO cache/put into separate routine to not fetch 1500 times per second
-	blockRef, err := getBlockIDRef(lg.flowClient)
+	blockRef, err := lg.blockRef.Get()
 	if err != nil {
 		lg.log.Error().Err(err).Msgf("error getting reference block")
 		return

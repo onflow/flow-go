@@ -143,6 +143,7 @@ func (lg *BatchLoadGenerator) setupServiceAccountKeys() error {
 	if err != nil {
 		return err
 	}
+
 	keys := make([]*flowsdk.AccountKey, 0)
 	for i := 0; i < lg.numberOfAccounts; i++ {
 		keys = append(keys, lg.serviceAccount.accountKey)
@@ -200,6 +201,7 @@ func (lg *BatchLoadGenerator) setupServiceAccountKeys() error {
 
 func (lg *BatchLoadGenerator) createAccounts() error {
 	fmt.Printf("creating %d accounts...", lg.numberOfAccounts)
+
 	blockRef, err := getBlockIDRef(lg.flowClient)
 	if err != nil {
 		return err
