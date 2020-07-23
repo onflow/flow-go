@@ -9,9 +9,9 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// TODO (Ramtin) add metrics
-// TODO deal with PathByteSize (move it to pathfinder)
-// Path Finder Version
+// TODO(Ramtin) add metrics
+// TODO(Ramtin) deal with PathByteSize (move it to pathfinder)
+// TODO(Ramtin) add Path Finder Version
 
 type Ledger struct {
 	ptrie *ptrie.PSMT
