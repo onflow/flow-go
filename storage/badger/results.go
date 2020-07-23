@@ -36,6 +36,10 @@ func (r *ExecutionResults) byID(resultID flow.Identifier) func(*badger.Txn) (*fl
 	}
 }
 
+func (r *ExecutionResults) index(blockID, resultID flow.Identifier) func(*badger.Txn) error {
+	return operation.IndexExecutionResult(blockID, resultID)
+}
+
 func (r *ExecutionResults) Store(result *flow.ExecutionResult) error {
 	return operation.RetryOnConflict(r.db.Update, r.store(result))
 }
@@ -47,7 +51,7 @@ func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult
 }
 
 func (r *ExecutionResults) Index(blockID flow.Identifier, resultID flow.Identifier) error {
-	err := operation.RetryOnConflict(r.db.Update, operation.IndexExecutionResult(blockID, resultID))
+	err := operation.RetryOnConflict(r.db.Update, r.index(blockID, resultID))
 	if err != nil {
 		return fmt.Errorf("could not index execution result: %w", err)
 	}

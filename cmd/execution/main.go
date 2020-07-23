@@ -30,7 +30,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/metrics"
 	chainsync "github.com/dapperlabs/flow-go/module/synchronization"
 	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/storage/badger"
+	bstorage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/wal"
 )
@@ -39,9 +39,10 @@ func main() {
 
 	var (
 		ledgerStorage       *ledger.MTrieStorage
-		events              storage.Events
-		txResults           storage.TransactionResults
-		receipts            storage.ExecutionReceipts
+		events              *bstorage.Events
+		txResults           *bstorage.TransactionResults
+		results             *bstorage.ExecutionResults
+		receipts            *bstorage.ExecutionReceipts
 		providerEngine      *exeprovider.Engine
 		syncCore            *chainsync.Core
 		computationManager  *computation.Manager
@@ -97,8 +98,8 @@ func main() {
 			return err
 		}).
 		Module("execution receipts storage", func(node *cmd.FlowNodeBuilder) error {
-			results := badger.NewExecutionResults(node.DB)
-			receipts = badger.NewExecutionReceipts(node.DB, results)
+			results = bstorage.NewExecutionResults(node.DB)
+			receipts = bstorage.NewExecutionReceipts(node.DB, results)
 			return nil
 		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -127,8 +128,8 @@ func main() {
 			return compactor, nil
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			chunkDataPacks := badger.NewChunkDataPacks(node.DB)
-			stateCommitments := badger.NewCommits(node.Metrics.Cache, node.DB)
+			chunkDataPacks := bstorage.NewChunkDataPacks(node.DB)
+			stateCommitments := bstorage.NewCommits(node.Metrics.Cache, node.DB)
 
 			executionState = state.NewExecutionState(
 				ledgerStorage,
@@ -136,6 +137,7 @@ func main() {
 				node.Storage.Blocks,
 				node.Storage.Collections,
 				chunkDataPacks,
+				results,
 				receipts,
 				node.DB,
 				node.Tracer,
@@ -166,8 +168,8 @@ func main() {
 			)
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
-			events = badger.NewEvents(node.DB)
-			txResults = badger.NewTransactionResults(node.DB)
+			events = bstorage.NewEvents(node.DB)
+			txResults = bstorage.NewTransactionResults(node.DB)
 			ingestionEng, err = ingestion.New(
 				node.Logger,
 				node.Network,

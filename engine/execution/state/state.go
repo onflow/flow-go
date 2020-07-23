@@ -76,14 +76,15 @@ type ExecutionState interface {
 }
 
 type state struct {
-	tracer            module.Tracer
-	ls                storage.Ledger
-	commits           storage.Commits
-	blocks            storage.Blocks
-	collections       storage.Collections
-	chunkDataPacks    storage.ChunkDataPacks
-	executionReceipts storage.ExecutionReceipts
-	db                *badger.DB
+	tracer         module.Tracer
+	ls             storage.Ledger
+	commits        storage.Commits
+	blocks         storage.Blocks
+	collections    storage.Collections
+	chunkDataPacks storage.ChunkDataPacks
+	results        storage.ExecutionResults
+	receipts       storage.ExecutionReceipts
+	db             *badger.DB
 }
 
 // NewExecutionState returns a new execution state access layer for the given ledger storage.
@@ -93,19 +94,21 @@ func NewExecutionState(
 	blocks storage.Blocks,
 	collections storage.Collections,
 	chunkDataPacks storage.ChunkDataPacks,
-	executionReceipts storage.ExecutionReceipts,
+	results storage.ExecutionResults,
+	receipts storage.ExecutionReceipts,
 	db *badger.DB,
 	tracer module.Tracer,
 ) ExecutionState {
 	return &state{
-		tracer:            tracer,
-		ls:                ls,
-		commits:           commits,
-		blocks:            blocks,
-		collections:       collections,
-		chunkDataPacks:    chunkDataPacks,
-		executionReceipts: executionReceipts,
-		db:                db,
+		tracer:         tracer,
+		ls:             ls,
+		commits:        commits,
+		blocks:         blocks,
+		collections:    collections,
+		chunkDataPacks: chunkDataPacks,
+		results:        results,
+		receipts:       receipts,
+		db:             db,
 	}
 }
 
@@ -213,11 +216,11 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 		defer span.Finish()
 	}
 
-	receipt, err := s.executionReceipts.ByBlockID(blockID)
+	result, err := s.results.ByBlockID(blockID)
 	if err != nil {
 		return flow.ZeroID, err
 	}
-	return receipt.ExecutionResult.ID(), nil
+	return result.ID(), nil
 }
 
 func (s *state) PersistExecutionReceipt(ctx context.Context, receipt *flow.ExecutionReceipt) error {
@@ -226,13 +229,21 @@ func (s *state) PersistExecutionReceipt(ctx context.Context, receipt *flow.Execu
 		defer span.Finish()
 	}
 
-	err := s.executionReceipts.Store(receipt)
+	err := s.receipts.Store(receipt)
 	if err != nil {
 		return fmt.Errorf("could not persist execution result: %w", err)
 	}
 	// TODO if the second operation fails we should remove stored execution result
 	// This is global execution storage problem - see TODO at the top
-	return s.executionReceipts.Index(receipt.ExecutionResult.BlockID, receipt.ID())
+	err = s.receipts.Index(receipt.ExecutionResult.BlockID, receipt.ID())
+	if err != nil {
+		return fmt.Errorf("could not index execution receipt: %w", err)
+	}
+	err = s.results.Index(receipt.ExecutionResult.BlockID, receipt.ExecutionResult.ID())
+	if err != nil {
+		return fmt.Errorf("could not index execution result: %w", err)
+	}
+	return nil
 }
 
 func (s *state) PersistStateInteractions(ctx context.Context, blockID flow.Identifier, views []*delta.Snapshot) error {

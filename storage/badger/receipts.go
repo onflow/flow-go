@@ -53,10 +53,6 @@ func (r *ExecutionReceipts) byID(receiptID flow.Identifier) func(*badger.Txn) (*
 	}
 }
 
-func (r *ExecutionReceipts) index(blockID flow.Identifier, receiptID flow.Identifier) func(*badger.Txn) error {
-	return operation.IndexExecutionReceipt(blockID, receiptID)
-}
-
 func (r *ExecutionReceipts) byBlockID(blockID flow.Identifier) func(*badger.Txn) (*flow.ExecutionReceipt, error) {
 	return func(tx *badger.Txn) (*flow.ExecutionReceipt, error) {
 		var receiptID flow.Identifier
@@ -79,7 +75,7 @@ func (r *ExecutionReceipts) ByID(receiptID flow.Identifier) (*flow.ExecutionRece
 }
 
 func (r *ExecutionReceipts) Index(blockID, receiptID flow.Identifier) error {
-	return operation.RetryOnConflict(r.db.Update, r.index(blockID, receiptID))
+	return operation.RetryOnConflict(r.db.Update, operation.IndexExecutionReceipt(blockID, receiptID))
 }
 
 func (r *ExecutionReceipts) ByBlockID(blockID flow.Identifier) (*flow.ExecutionReceipt, error) {
