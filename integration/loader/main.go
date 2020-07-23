@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/hex"
 	"flag"
-	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -66,7 +65,7 @@ func main() {
 
 	// sleep in order to ensure the testnet is up and running
 	if *sleep > 0 {
-		fmt.Printf("Sleeping for %v before starting benchmark\n", sleep)
+		log.Info().Msgf("Sleeping for %v before starting benchmark", sleep)
 		time.Sleep(*sleep)
 	}
 
@@ -74,10 +73,13 @@ func main() {
 	lg, err := utils.NewContLoadGenerator(log, flowClient, accessNodeAddrs[0], priv, &serviceAccountAddress, &fungibleTokenAddress,
 		&flowTokenAddress, *tps)
 	if err != nil {
-		panic(err)
+		log.Fatal().Err(err).Msgf("unable to create new cont load generator")
 	}
 
-	lg.Init()
+	err = lg.Init()
+	if err != nil {
+		log.Fatal().Err(err).Msgf("unable to init loader")
+	}
 	lg.Start()
 
 	wg := sync.WaitGroup{}

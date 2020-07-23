@@ -104,7 +104,7 @@ func (lg *ContLoadGenerator) Init() error {
 	return err
 }
 
-func (lg *ContLoadGenerator) Start() error {
+func (lg *ContLoadGenerator) Start() {
 	// spawn workers
 	for i := 0; i < lg.tps; i++ {
 		worker := NewWorker(i, 1*time.Second, lg.sendTx)
@@ -115,18 +115,14 @@ func (lg *ContLoadGenerator) Start() error {
 	}
 
 	lg.workerStatsTracker.StartPrinting(1 * time.Second)
-
-	return nil
 }
 
-func (lg *ContLoadGenerator) Stop() error {
+func (lg *ContLoadGenerator) Stop() {
 	for _, w := range lg.workers {
 		w.Stop()
 	}
 	lg.txTracker.Stop()
 	lg.workerStatsTracker.StopPrinting()
-
-	return nil
 }
 
 func (lg *ContLoadGenerator) setupServiceAccountKeys() error {
@@ -173,14 +169,17 @@ func (lg *ContLoadGenerator) setupServiceAccountKeys() error {
 		},
 		nil, // on sealed
 		func(_ flowsdk.Identifier) {
+			lg.log.Fatal().Msg("setup transaction (service account keys) has expired")
 			txWG.Done()
-			lg.log.Fatal().Msg("The setup transaction (service account keys) has expired. can not continue!")
 		}, // on expired
 		func(_ flowsdk.Identifier) {
+			lg.log.Fatal().Msg("setup transaction (service account keys) has timed out")
 			txWG.Done()
-			lg.log.Fatal().Msg("The setup transaction (service account keys) has timed out. can not continue!")
 		}, // on timout
-		nil, // on error,
+		func(_ flowsdk.Identifier, err error) {
+			lg.log.Fatal().Err(err).Msg("setup transaction (service account keys) encountered an error")
+			txWG.Done()
+		}, // on error
 		240)
 
 	txWG.Wait()
@@ -256,15 +255,18 @@ func (lg *ContLoadGenerator) createAccounts() error {
 			},
 			nil, // on sealed
 			func(_ flowsdk.Identifier) {
-				lg.log.Fatal().Msg("The setup transaction (account creation) has expired. can not continue!")
+				lg.log.Error().Msg("setup transaction (account creation) has expired")
 				allTxWG.Done()
 			}, // on expired
 			func(_ flowsdk.Identifier) {
-				lg.log.Fatal().Msg("The setup transaction (account creation) has timed out. can not continue!")
+				lg.log.Error().Msg("setup transaction (account creation) has timed out")
 				allTxWG.Done()
 			}, // on timout
-			nil, // on error
-			240)
+			func(_ flowsdk.Identifier, err error) {
+				lg.log.Error().Err(err).Msg("setup transaction (account creation) encountered an error")
+				allTxWG.Done()
+			}, // on error
+			120)
 	}
 	allTxWG.Wait()
 
@@ -309,7 +311,20 @@ func (lg *ContLoadGenerator) fundAccount(blockRef flowsdk.Identifier, acc *flowA
 			// fmt.Println(res)
 			done()
 		},
-		nil, nil, nil, nil, 240)
+		nil,
+		func(_ flowsdk.Identifier) {
+			lg.log.Error().Msg("fund account transaction has expired")
+			done()
+		}, // on expired
+		func(_ flowsdk.Identifier) {
+			lg.log.Error().Msg("fund account transaction has timed out")
+			done()
+		}, // on timout
+		func(_ flowsdk.Identifier, err error) {
+			lg.log.Error().Err(err).Msg("fund account transaction encountered an error")
+			done()
+		}, // on error
+		120)
 
 	return nil
 }
@@ -336,8 +351,6 @@ func (lg *ContLoadGenerator) distributeInitialTokens() error {
 }
 
 func (lg *ContLoadGenerator) sendTx(workerID int) {
-	lg.log.Debug().Msgf("sending tx from worker %v", workerID)
-
 	blockRef, err := lg.blockRef.Get()
 	if err != nil {
 		lg.log.Error().Err(err).Msgf("error getting reference block")

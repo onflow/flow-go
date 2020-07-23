@@ -39,4 +39,4 @@ stop:
 
 .PHONY: load
 load:
-	go run --tags relic ../loader -log-level trace -tps 1
+	go run --tags relic ../loader -log-level debug -tps 2

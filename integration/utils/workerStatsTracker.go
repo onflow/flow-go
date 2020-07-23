@@ -86,7 +86,8 @@ func (st *WorkerStatsTracker) Digest() string {
 	t.AppendRow(table.Row{
 		st.workers,
 		st.txsSent,
-		st.AvgTPSBetween(time.Now().Add(-10*time.Second), time.Now()),
+		// use 11 seconds to correct for rounding in buckets
+		st.AvgTPSBetween(time.Now().Add(-11*time.Second), time.Now()),
 	})
 	return t.Render()
 }
