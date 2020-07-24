@@ -9,12 +9,13 @@ import (
 
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/state/protocol"
 )
 
 var (
 	flagConfig                                       string
-	flagCollectionClusters                           uint16
+	flagCollectionClusters                           uint
 	flagGeneratedCollectorAddressTemplate            string
 	flagGeneratedCollectorStake                      uint64
 	flagPartnerNodeInfoDir                           string
@@ -74,7 +75,14 @@ and block seal.`,
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ computing collection node clusters")
-		clusters := protocol.Clusters(uint(flagCollectionClusters), model.ToIdentityList(stakingNodes))
+		// TODO: clean this up
+		participants := model.ToIdentityList(stakingNodes)
+		collectors := participants.Filter(filter.HasRole(flow.RoleCollection))
+		assignments := protocol.ClusterAssignments(flagCollectionClusters, collectors)
+		clusters, err := flow.NewClusterList(assignments, collectors)
+		if err != nil {
+			panic(err)
+		}
 		log.Info().Msg("")
 
 		log.Info().Msg("✨ constructing root blocks for collection node clusters")
@@ -118,7 +126,7 @@ func init() {
 	_ = finalizeCmd.MarkFlagRequired("root-commit")
 
 	// optional parameters to influence various aspects of identity generation
-	finalizeCmd.Flags().Uint16Var(&flagCollectionClusters, "collection-clusters", 2,
+	finalizeCmd.Flags().UintVar(&flagCollectionClusters, "collection-clusters", 2,
 		"number of collection clusters")
 	finalizeCmd.Flags().StringVar(&flagGeneratedCollectorAddressTemplate, "generated-collector-address-template",
 		"collector-%v.example.com", "address template for collector nodes that will be generated (%v "+

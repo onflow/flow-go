@@ -13,15 +13,15 @@ type Snapshot struct {
 }
 
 // Clusters provides a mock function with given fields:
-func (_m *Snapshot) Clusters() (*flow.ClusterList, error) {
+func (_m *Snapshot) Clusters() (flow.ClusterList, error) {
 	ret := _m.Called()
 
-	var r0 *flow.ClusterList
-	if rf, ok := ret.Get(0).(func() *flow.ClusterList); ok {
+	var r0 flow.ClusterList
+	if rf, ok := ret.Get(0).(func() flow.ClusterList); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.ClusterList)
+			r0 = ret.Get(0).(flow.ClusterList)
 		}
 	}
 

@@ -110,7 +110,7 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		}
 
 		// we should have at least one root collection cluster
-		if setup.Clusters.Size() == 0 {
+		if len(setup.Assignments) == 0 {
 			return fmt.Errorf("need at least one collection cluster")
 		}
 
@@ -291,7 +291,7 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 	// we only look as far back for duplicates as the transaction expiry limit;
 	// if a guarantee was included before that, we will disqualify it on the
 	// basis of the reference block anyway
-	limit := header.Height - uint64(m.state.expiry)
+	limit := header.Height - m.state.cfg.transactionExpiry
 	if limit > header.Height { // overflow check
 		limit = 0
 	}
