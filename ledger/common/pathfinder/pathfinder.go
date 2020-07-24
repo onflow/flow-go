@@ -1,4 +1,4 @@
-package common
+package pathfinder
 
 import (
 	"crypto/sha256"
@@ -6,6 +6,9 @@ import (
 
 	"github.com/dapperlabs/flow-go/ledger"
 )
+
+// PathByteSize captures number of bytes each path takes
+const PathByteSize = 32
 
 // KeyToPath converts key into a path
 func KeyToPath(key ledger.Key, version uint8) (ledger.Path, error) {

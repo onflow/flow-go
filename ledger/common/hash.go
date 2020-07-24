@@ -3,7 +3,7 @@ package common
 import (
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/utils"
+	"github.com/dapperlabs/flow-go/ledger/common/utils"
 )
 
 var emptySlice []byte

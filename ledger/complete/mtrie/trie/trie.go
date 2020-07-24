@@ -12,7 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/ledger"
 	"github.com/dapperlabs/flow-go/ledger/common"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/node"
-	"github.com/dapperlabs/flow-go/ledger/utils"
+	"github.com/dapperlabs/flow-go/ledger/common/utils"
 )
 
 // MTrie is a fully in memory trie with option to persist to disk.

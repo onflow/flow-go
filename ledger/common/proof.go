@@ -4,9 +4,10 @@ import (
 	"bytes"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/utils"
+	"github.com/dapperlabs/flow-go/ledger/common/utils"
 )
 
+// TODO move this to proof itself
 // VerifyTrieProof verifies the proof, by constructing all the
 // hash from the leaf to the root and comparing the rootHash
 func VerifyTrieProof(p *ledger.TrieProof, expectedState ledger.State) bool {

@@ -5,7 +5,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/ledger"
 	"github.com/dapperlabs/flow-go/ledger/common"
-	"github.com/dapperlabs/flow-go/ledger/encoding"
+	"github.com/dapperlabs/flow-go/ledger/common/encoding"
 	"github.com/dapperlabs/flow-go/ledger/partial/ptrie"
 )
 
@@ -20,7 +20,7 @@ type Ledger struct {
 }
 
 // NewLedger creates a new in-memory trie-backed ledger storage with persistence.
-func NewLedger(proof ledger.Proof, sc ledger.State) (*Ledger, error) {
+func NewLedger(proof ledger.Proof, s ledger.State) (*Ledger, error) {
 
 	// Decode proof encodings
 	if len(proof) < 1 {
@@ -33,7 +33,7 @@ func NewLedger(proof ledger.Proof, sc ledger.State) (*Ledger, error) {
 
 	// decode proof
 	// TODO fix the byte size
-	psmt, err := ptrie.NewPSMT(sc, 32, batchProof)
+	psmt, err := ptrie.NewPSMT(s, 32, batchProof)
 
 	if err != nil {
 		// TODO provide more details based on the error type

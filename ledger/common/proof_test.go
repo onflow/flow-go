@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/ledger/common"
-	"github.com/dapperlabs/flow-go/ledger/utils"
+	"github.com/dapperlabs/flow-go/ledger/common/utils"
 )
 
 // Test_ProofVerify tests proof verification

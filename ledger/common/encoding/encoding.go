@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/utils"
+	"github.com/dapperlabs/flow-go/ledger/common/utils"
 )
 
 // Version encoder/decoder code only supports

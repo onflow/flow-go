@@ -9,7 +9,7 @@ import (
 	"golang.org/x/crypto/sha3"
 
 	"github.com/dapperlabs/flow-go/ledger/common"
-	"github.com/dapperlabs/flow-go/ledger/utils"
+	"github.com/dapperlabs/flow-go/ledger/common/utils"
 )
 
 // GENERAL COMMENT:

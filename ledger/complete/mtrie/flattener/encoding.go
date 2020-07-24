@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/dapperlabs/flow-go/ledger/utils"
+	"github.com/dapperlabs/flow-go/ledger/common/utils"
 )
 
 const encodingDecodingVersion = uint16(0)

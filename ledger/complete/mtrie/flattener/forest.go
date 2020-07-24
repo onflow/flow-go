@@ -8,7 +8,7 @@ import (
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/node"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/trie"
-	"github.com/dapperlabs/flow-go/ledger/encoding"
+	"github.com/dapperlabs/flow-go/ledger/common/encoding"
 )
 
 // FlattenedForest represents an Forest as a flattened data structure.

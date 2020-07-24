@@ -7,7 +7,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/ledger"
 	"github.com/dapperlabs/flow-go/ledger/common"
-	"github.com/dapperlabs/flow-go/ledger/utils"
+	"github.com/dapperlabs/flow-go/ledger/common/utils"
 )
 
 // PSMT (Partial Sparse Merkle Tree) holds a subset of an sparse merkle tree at specific

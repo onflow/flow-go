@@ -8,7 +8,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/ledger"
 	realWAL "github.com/dapperlabs/flow-go/ledger/complete/wal"
-	"github.com/dapperlabs/flow-go/ledger/utils"
+	"github.com/dapperlabs/flow-go/ledger/common/utils"
 )
 
 func TestUpdate(t *testing.T) {

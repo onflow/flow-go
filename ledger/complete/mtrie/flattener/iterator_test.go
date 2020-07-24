@@ -9,7 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/ledger"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/trie"
-	"github.com/dapperlabs/flow-go/ledger/utils"
+	"github.com/dapperlabs/flow-go/ledger/common/utils"
 )
 
 func TestEmptyTrie(t *testing.T) {

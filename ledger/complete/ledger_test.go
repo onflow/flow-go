@@ -10,8 +10,8 @@ import (
 	"github.com/dapperlabs/flow-go/ledger"
 	"github.com/dapperlabs/flow-go/ledger/common"
 	"github.com/dapperlabs/flow-go/ledger/complete"
-	"github.com/dapperlabs/flow-go/ledger/encoding"
-	"github.com/dapperlabs/flow-go/ledger/utils"
+	"github.com/dapperlabs/flow-go/ledger/common/encoding"
+	"github.com/dapperlabs/flow-go/ledger/common/utils"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )

@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/flattener"
-	"github.com/dapperlabs/flow-go/ledger/encoding"
-	"github.com/dapperlabs/flow-go/ledger/utils"
+	"github.com/dapperlabs/flow-go/ledger/common/encoding"
+	"github.com/dapperlabs/flow-go/ledger/common/utils"
 )
 
 func TestStorableNode(t *testing.T) {
