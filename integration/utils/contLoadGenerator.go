@@ -50,7 +50,7 @@ func NewContLoadGenerator(
 	tps int,
 ) (*ContLoadGenerator, error) {
 
-	numberOfAccounts := tps * 10 * 10 // 1 second per block, 10 seconds to finalize, factor 10 for delays to prevent sequence number collisions
+	numberOfAccounts := tps * 10 // 1 second per block, factor 10 for delays to prevent sequence number collisions
 
 	servAcc, err := loadServiceAccount(fclient, serviceAccountAddress, servAccPrivKeyHex)
 	if err != nil {

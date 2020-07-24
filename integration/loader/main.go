@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -18,10 +19,16 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
+type LoadCase struct {
+	tps      int
+	duration time.Duration
+}
+
 func main() {
 
 	sleep := flag.Duration("sleep", 0, "duration to sleep before benchmarking starts")
-	tps := flag.Int("tps", 100, "transactions to send per second")
+	tpsFlag := flag.String("tps", "1", "transactions per second (TPS) to send, accepts a comma separated list of values if used in conjunction with `tps-durations`")
+	tpsDurationsFlag := flag.String("tps-durations", "0", "duration that each load test will run, accepts a comma separted list that will be applied to multiple values of the `tps` flag (defaults to infinite if not provided, meaning only the first tps case will be tested; additional values will be ignored)")
 	chainIDStr := flag.String("chain", string(flowsdk.Testnet), "chain ID")
 	chainID := flowsdk.ChainID([]byte(*chainIDStr))
 	access := flag.String("access", "localhost:3569", "access node address")
@@ -39,7 +46,7 @@ func main() {
 
 	accessNodeAddrs := strings.Split(*access, ",")
 
-	log.Info().Msgf("TPS to send: %v", *tps)
+	cases := parseLoadCases(log, tpsFlag, tpsDurationsFlag)
 
 	addressGen := flowsdk.NewAddressGenerator(chainID)
 	serviceAccountAddress := addressGen.NextAddress()
@@ -70,19 +77,64 @@ func main() {
 	}
 
 	flowClient, err := client.New(accessNodeAddrs[0], grpc.WithInsecure())
-	lg, err := utils.NewContLoadGenerator(log, flowClient, accessNodeAddrs[0], priv, &serviceAccountAddress, &fungibleTokenAddress,
-		&flowTokenAddress, *tps)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("unable to create new cont load generator")
-	}
 
-	err = lg.Init()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("unable to init loader")
-	}
-	lg.Start()
+	go func() {
+		// run load cases
+		for i, c := range cases {
+			log.Info().Int("number", i).Int("tps", c.tps).Dur("duration", c.duration).Msgf("Running load case...")
+
+			if c.tps > 0 {
+				lg, err := utils.NewContLoadGenerator(log, flowClient, accessNodeAddrs[0], priv, &serviceAccountAddress, &fungibleTokenAddress,
+					&flowTokenAddress, c.tps)
+				if err != nil {
+					log.Fatal().Err(err).Msgf("unable to create new cont load generator")
+				}
+
+				err = lg.Init()
+				if err != nil {
+					log.Fatal().Err(err).Msgf("unable to init loader")
+				}
+				lg.Start()
+			}
+
+			// if the duration is 0, we run this case forever
+			if c.duration.Nanoseconds() == 0 {
+				return
+			}
+
+			time.Sleep(c.duration)
+		}
+	}()
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	wg.Wait()
+}
+
+func parseLoadCases(log zerolog.Logger, tpsFlag, tpsDurationsFlag *string) []LoadCase {
+	tpsStrings := strings.Split(*tpsFlag, ",")
+	var cases []LoadCase
+	for _, s := range tpsStrings {
+		t, err := strconv.ParseInt(s, 0, 32)
+		if err != nil {
+			log.Fatal().Err(err).Str("value", s).
+				Msg("could not parse tps flag, expected comma separated list of integers")
+		}
+		cases = append(cases, LoadCase{tps: int(t)})
+	}
+
+	tpsDurationsStrings := strings.Split(*tpsDurationsFlag, ",")
+	for i, _ := range cases {
+		if i >= len(tpsDurationsStrings) {
+			break
+		}
+		d, err := time.ParseDuration(tpsDurationsStrings[i])
+		if err != nil {
+			log.Fatal().Err(err).Str("value", tpsDurationsStrings[i]).
+				Msg("could not parse tps-durations flag, expected comma separated list of durations")
+		}
+		cases[i].duration = d
+	}
+
+	return cases
 }
