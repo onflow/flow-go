@@ -670,32 +670,46 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	var ops []func(*badger.Txn) error
 	for _, seal := range payload.Seals {
 		for _, event := range seal.ServiceEvents {
-			// TODO: switch to the other decoding approach.
-			value, err := json.Decode(event.Payload)
+			service, err := flow.ServiceEvent(event)
 			if err != nil {
-				return fmt.Errorf("could not decode system event: %w", err)
+				return fmt.Errorf("could not decode service event: %w", err)
 			}
-			switch event.Type {
-			case flow.EventEpochSetup:
-				setup := value.ToGoValue().(*flow.EpochSetup)
-				ops = append(ops, operation.InsertEpochSetup(setup.Counter, setup))
-			case flow.EventEpochCommit:
-				commit := value.ToGoValue().(*flow.EpochCommit)
-				ops = append(ops, operation.InsertEpochCommit(commit.Counter, commit))
+			switch ev := service.(type) {
+			case *flow.EpochSetup:
+				ops = append(ops, operation.InsertEpochSetup(ev.Counter, ev))
+			case *flow.EpochCommit:
+				ops = append(ops, operation.InsertEpochCommit(ev.Counter, ev))
 			default:
-				return fmt.Errorf("invalid system event type in payload (%s)", event.Type)
+				return fmt.Errorf("invalid service event type in payload (%s)", event.Type)
 			}
 		}
 	}
 
-	// TODO: There are a number of checks related to epoch compliance we need to
-	// execute here, as the rules apply only when trying to finalize.
-	// 1) NEXT EPOCH: if we have a block with a view that is bigger than the final
-	// view of the current epoch setup, we need to increase the view counter.
-	// 2) MISSING SETUP: if we finalize a block that has a view beyond the window
-	// allowed for the submission of the epoch setup event, we have a fatal error.
-	// 3) MISSING COMMIT: if we finalie a block that has a view beyond the window
-	// allowed for the submission of the epoch commit event, we have a fatal error.
+	// EPOCH: We need to validate whether all information is available in the
+	// protocol state to go to the next epoch when needed. In cases where there
+	// is a bug in the smart contract, it could be that this happens too late
+	// and the chain finalization should halt.
+
+	var counter uint64
+	err = m.state.db.View(operation.RetrieveEpochCounter(&counter))
+	if err != nil {
+		return fmt.Errorf("could not retrieve epoch counter: %w", err)
+	}
+	var setup flow.EpochSetup
+	err = m.state.db.View(operation.RetrieveEpochSetup(counter, &setup))
+	if err != nil {
+		return fmt.Errorf("could not retrieve epoch setup: %w", err)
+	}
+	if header.View > setup.FinalView {
+		didSetup, didCommit, err := m.epochStatus(counter+1, finalID)
+		if err != nil {
+			return fmt.Errorf("could not check epoch status: %w", err)
+		}
+		if !didSetup || !didCommit {
+			return fmt.Errorf("missing epoch transition event(s)!")
+		}
+		ops = append(ops, operation.UpdateEpochCounter(counter+1))
+	}
 
 	// FINALLY: A block inserted into the protocol state is already a valid
 	// extension; in order to make it final, we need to do just three things:
