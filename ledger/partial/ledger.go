@@ -10,7 +10,6 @@ import (
 )
 
 // TODO(Ramtin) add metrics
-// TODO(Ramtin) deal with PathByteSize (move it to pathfinder)
 // TODO(Ramtin) add tests
 
 const PathFinderVersion = 0

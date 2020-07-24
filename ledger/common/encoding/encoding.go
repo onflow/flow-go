@@ -52,9 +52,9 @@ func (e Type) String() string {
 	return [...]string{"State", "KeyPart", "Key", "Value", "Path", "Payload", "Proof", "BatchProof", "Unknown"}[e]
 }
 
-// CheckEncDecVer extracts encoding bytes from a raw encoded message
+// CheckVersion extracts encoding bytes from a raw encoded message
 // checks it against the supported versions and returns the rest of rawInput (excluding encDecVersion bytes)
-func CheckEncDecVer(rawInput []byte) (rest []byte, version uint16, err error) {
+func CheckVersion(rawInput []byte) (rest []byte, version uint16, err error) {
 	version, rest, err = utils.ReadUint16(rawInput)
 	if err != nil {
 		return rest, version, fmt.Errorf("error checking the encoding decoding version: %w", err)
@@ -67,9 +67,9 @@ func CheckEncDecVer(rawInput []byte) (rest []byte, version uint16, err error) {
 	return rest, version, nil
 }
 
-// CheckEncodingType extracts encoding byte from a raw encoded message
+// CheckType extracts encoding byte from a raw encoded message
 // checks it against the supported versions and returns the rest of rawInput (excluding encDecVersion bytes)
-func CheckEncodingType(rawInput []byte, expectedType uint8) (rest []byte, err error) {
+func CheckType(rawInput []byte, expectedType uint8) (rest []byte, err error) {
 	t, r, err := utils.ReadUint8(rawInput)
 	if err != nil {
 		return r, fmt.Errorf("error checking type of the encoded entity: %w", err)
@@ -120,13 +120,13 @@ func encodeKeyPart(kp *ledger.KeyPart) []byte {
 func DecodeKeyPart(encodedKeyPart []byte) (*ledger.KeyPart, error) {
 	// currently we ignore the version but in the future we
 	// can do switch case based on the version if needed
-	rest, _, err := CheckEncDecVer(encodedKeyPart)
+	rest, _, err := CheckVersion(encodedKeyPart)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding key part: %w", err)
 	}
 
 	// check the type
-	rest, err = CheckEncodingType(rest, TypeKeyPart)
+	rest, err = CheckType(rest, TypeKeyPart)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding key part: %w", err)
 	}
@@ -184,12 +184,12 @@ func encodeKey(k *ledger.Key) []byte {
 // DecodeKey constructs a key from an encoded key part
 func DecodeKey(encodedKey []byte) (*ledger.Key, error) {
 	// check the enc dec version
-	rest, _, err := CheckEncDecVer(encodedKey)
+	rest, _, err := CheckVersion(encodedKey)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding key: %w", err)
 	}
 	// check the encoding type
-	rest, err = CheckEncodingType(rest, TypeKey)
+	rest, err = CheckType(rest, TypeKey)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding key: %w", err)
 	}
@@ -255,13 +255,13 @@ func encodeValue(v ledger.Value) []byte {
 // DecodeValue constructs a ledger value using an encoded byte slice
 func DecodeValue(encodedValue []byte) (ledger.Value, error) {
 	// check enc dec version
-	rest, _, err := CheckEncDecVer(encodedValue)
+	rest, _, err := CheckVersion(encodedValue)
 	if err != nil {
 		return nil, err
 	}
 
 	// check the encoding type
-	rest, err = CheckEncodingType(rest, TypeValue)
+	rest, err = CheckType(rest, TypeValue)
 	if err != nil {
 		return nil, err
 	}
@@ -294,13 +294,13 @@ func encodePath(p ledger.Path) []byte {
 // DecodePath constructs a path value using an encoded byte slice
 func DecodePath(encodedPath []byte) (ledger.Path, error) {
 	// check enc dec version
-	rest, _, err := CheckEncDecVer(encodedPath)
+	rest, _, err := CheckVersion(encodedPath)
 	if err != nil {
 		return nil, err
 	}
 
 	// check the encoding type
-	rest, err = CheckEncodingType(rest, TypePath)
+	rest, err = CheckType(rest, TypePath)
 	if err != nil {
 		return nil, err
 	}
@@ -360,12 +360,12 @@ func DecodePayload(encodedPayload []byte) (*ledger.Payload, error) {
 		return nil, nil
 	}
 	// check the enc dec version
-	rest, _, err := CheckEncDecVer(encodedPayload)
+	rest, _, err := CheckVersion(encodedPayload)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
 	// check the encoding type
-	rest, err = CheckEncodingType(rest, TypePayload)
+	rest, err = CheckType(rest, TypePayload)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
@@ -469,12 +469,12 @@ func DecodeTrieUpdate(encodedTrieUpdate []byte) (*ledger.TrieUpdate, error) {
 		return nil, nil
 	}
 	// check the enc dec version
-	rest, _, err := CheckEncDecVer(encodedTrieUpdate)
+	rest, _, err := CheckVersion(encodedTrieUpdate)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding trie update: %w", err)
 	}
 	// check the encoding type
-	rest, err = CheckEncodingType(rest, TypeTrieUpdate)
+	rest, err = CheckType(rest, TypeTrieUpdate)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding trie update: %w", err)
 	}
@@ -597,15 +597,15 @@ func encodeTrieProof(p *ledger.TrieProof) []byte {
 	return buffer
 }
 
-// DecodeProof construct a proof from an encoded byte slice
+// DecodeTrieProof construct a proof from an encoded byte slice
 func DecodeTrieProof(encodedProof []byte) (*ledger.TrieProof, error) {
 	// check the enc dec version
-	rest, _, err := CheckEncDecVer(encodedProof)
+	rest, _, err := CheckVersion(encodedProof)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
 	// check the encoding type
-	rest, err = CheckEncodingType(rest, TypeProof)
+	rest, err = CheckType(rest, TypeProof)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
@@ -729,12 +729,12 @@ func encodeTrieBatchProof(bp *ledger.TrieBatchProof) []byte {
 // DecodeTrieBatchProof constructs a batch proof from an encoded byte slice
 func DecodeTrieBatchProof(encodedBatchProof []byte) (*ledger.TrieBatchProof, error) {
 	// check the enc dec version
-	rest, _, err := CheckEncDecVer(encodedBatchProof)
+	rest, _, err := CheckVersion(encodedBatchProof)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding batch proof: %w", err)
 	}
 	// check the encoding type
-	rest, err = CheckEncodingType(rest, TypeBatchProof)
+	rest, err = CheckType(rest, TypeBatchProof)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding batch proof: %w", err)
 	}
