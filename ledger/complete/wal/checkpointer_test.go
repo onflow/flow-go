@@ -10,14 +10,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/common"
+	"github.com/dapperlabs/flow-go/ledger/common/encoding"
+	"github.com/dapperlabs/flow-go/ledger/common/pathfinder"
+	"github.com/dapperlabs/flow-go/ledger/common/utils"
 	"github.com/dapperlabs/flow-go/ledger/complete"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/trie"
 	realWAL "github.com/dapperlabs/flow-go/ledger/complete/wal"
-	"github.com/dapperlabs/flow-go/ledger/common/encoding"
-	"github.com/dapperlabs/flow-go/ledger/common/utils"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/storage/util"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -159,7 +159,7 @@ func Test_Checkpointing(t *testing.T) {
 				update, err := ledger.NewUpdate(rootHash, keys, values)
 				require.NoError(t, err)
 
-				trieUpdate, err := common.UpdateToTrieUpdate(update, pathFinderVersion)
+				trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, pathFinderVersion)
 				require.NoError(t, err)
 
 				err = wal.RecordUpdate(trieUpdate)
@@ -293,7 +293,7 @@ func Test_Checkpointing(t *testing.T) {
 			update, err := ledger.NewUpdate(rootHash, keys2, values2)
 			require.NoError(t, err)
 
-			trieUpdate, err := common.UpdateToTrieUpdate(update, pathFinderVersion)
+			trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, pathFinderVersion)
 			require.NoError(t, err)
 
 			err = wal4.RecordUpdate(trieUpdate)
@@ -343,7 +343,7 @@ func Test_Checkpointing(t *testing.T) {
 
 			query, err := ledger.NewQuery(rootHash, keys2)
 			require.NoError(t, err)
-			trieRead, err := common.QueryToTrieRead(query, pathFinderVersion)
+			trieRead, err := pathfinder.QueryToTrieRead(query, pathFinderVersion)
 			require.NoError(t, err)
 
 			payloads, err := f.Read(trieRead)

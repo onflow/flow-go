@@ -7,17 +7,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/common"
+	"github.com/dapperlabs/flow-go/ledger/common/encoding"
+	"github.com/dapperlabs/flow-go/ledger/common/pathfinder"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie"
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/trie"
 	"github.com/dapperlabs/flow-go/ledger/complete/wal"
-	"github.com/dapperlabs/flow-go/ledger/common/encoding"
 	"github.com/dapperlabs/flow-go/module"
-)
-
-const (
-	// RegisterKeySize is the size of a Execution register's key [bytes]
-	RegisterKeySize = 32
 )
 
 // Ledger (complete) is a fast memory-efficient fork-aware thread-safe trie-based key/value storage.
@@ -42,12 +37,12 @@ const CacheSize = 1000
 // NewLedger creates a new in-memory trie-backed ledger storage with persistence.
 func NewLedger(dbDir string, capacity int, metrics module.LedgerMetrics, reg prometheus.Registerer) (*Ledger, error) {
 
-	w, err := wal.NewWAL(nil, reg, dbDir, capacity, RegisterKeySize, wal.SegmentSize)
+	w, err := wal.NewWAL(nil, reg, dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create LedgerWAL: %w", err)
 	}
 
-	forest, err := mtrie.NewForest(RegisterKeySize, dbDir, capacity, metrics, func(evictedTrie *trie.MTrie) error {
+	forest, err := mtrie.NewForest(pathfinder.PathByteSize, dbDir, capacity, metrics, func(evictedTrie *trie.MTrie) error {
 		return w.RecordDelete(evictedTrie.RootHash())
 	})
 	if err != nil {
@@ -96,7 +91,7 @@ func (l *Ledger) InitState() ledger.State {
 // it returns the values in the same order as given registerIDs and errors (if any)
 func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 	start := time.Now()
-	paths, err := common.KeysToPaths(query.Keys(), 0)
+	paths, err := pathfinder.KeysToPaths(query.Keys(), 0)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +100,7 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 	if err != nil {
 		return nil, err
 	}
-	values, err = common.PayloadsToValues(payloads)
+	values, err = pathfinder.PayloadsToValues(payloads)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +128,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 		return update.State(), nil
 	}
 
-	trieUpdate, err := common.UpdateToTrieUpdate(update, 0)
+	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +164,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 // Prove provides proofs for a ledger query and errors (if any)
 func (l *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
 
-	paths, err := common.KeysToPaths(query.Keys(), 0)
+	paths, err := pathfinder.KeysToPaths(query.Keys(), 0)
 	if err != nil {
 		return nil, err
 	}

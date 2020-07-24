@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/common"
 	"github.com/dapperlabs/flow-go/ledger/common/encoding"
+	"github.com/dapperlabs/flow-go/ledger/common/pathfinder"
 	"github.com/dapperlabs/flow-go/ledger/partial/ptrie"
 )
 
@@ -15,7 +15,7 @@ import (
 
 type Ledger struct {
 	ptrie *ptrie.PSMT
-	sc    ledger.State
+	state ledger.State
 	proof ledger.Proof
 }
 
@@ -32,8 +32,7 @@ func NewLedger(proof ledger.Proof, s ledger.State) (*Ledger, error) {
 	}
 
 	// decode proof
-	// TODO fix the byte size
-	psmt, err := ptrie.NewPSMT(s, 32, batchProof)
+	psmt, err := ptrie.NewPSMT(s, pathfinder.PathByteSize, batchProof)
 
 	if err != nil {
 		// TODO provide more details based on the error type
@@ -59,14 +58,14 @@ func (l *Ledger) Done() <-chan struct{} {
 
 // InitState returns the initial state of the ledger
 func (l *Ledger) InitState() ledger.State {
-	return l.sc
+	return l.state
 }
 
 // Get read the values of the given keys at the given state
 // it returns the values in the same order as given registerIDs and errors (if any)
 func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 	// TODO compare query.State() to the ledger sc
-	paths, err := common.KeysToPaths(query.Keys(), 0)
+	paths, err := pathfinder.KeysToPaths(query.Keys(), 0)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +74,7 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 	if err != nil {
 		return nil, err
 	}
-	values, err = common.PayloadsToValues(payloads)
+	values, err = pathfinder.PayloadsToValues(payloads)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +90,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 		return update.State(), nil
 	}
 
-	trieUpdate, err := common.UpdateToTrieUpdate(update, 0)
+	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, 0)
 	if err != nil {
 		return nil, err
 	}
