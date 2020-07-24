@@ -81,7 +81,6 @@ func main() {
 		log.Fatal().Err(err).Msgf("unable to initialize Flow client")
 	}
 
-
 	go func() {
 		// run load cases
 		for i, c := range cases {
@@ -96,7 +95,7 @@ func main() {
 					&serviceAccountAddress,
 					&fungibleTokenAddress,
 					&flowTokenAddress,
-					c.tps
+					c.tps,
 				)
 				if err != nil {
 					log.Fatal().Err(err).Msgf("unable to create new cont load generator")
