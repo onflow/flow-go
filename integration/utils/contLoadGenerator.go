@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go-sdk/crypto"
 )
 
-const tokensPerTransfer = 10
+const tokensPerTransfer = 0.01 // flow testnets only have 10e6 total supply, so we choose a small amount here
 
 // ContLoadGenerator creates a continuous load of transactions to the network
 // by creating many accounts and transfer flow tokens between them
