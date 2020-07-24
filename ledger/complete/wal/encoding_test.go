@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	realWAL "github.com/dapperlabs/flow-go/ledger/complete/wal"
 	"github.com/dapperlabs/flow-go/ledger/common/utils"
+	realWAL "github.com/dapperlabs/flow-go/ledger/complete/wal"
 )
 
 func TestUpdate(t *testing.T) {
