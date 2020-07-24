@@ -11,7 +11,9 @@ import (
 
 // TODO(Ramtin) add metrics
 // TODO(Ramtin) deal with PathByteSize (move it to pathfinder)
-// TODO(Ramtin) add Path Finder Version
+// TODO(Ramtin) add tests
+
+const PathFinderVersion = 0
 
 type Ledger struct {
 	ptrie *ptrie.PSMT
@@ -65,7 +67,7 @@ func (l *Ledger) InitState() ledger.State {
 // it returns the values in the same order as given registerIDs and errors (if any)
 func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 	// TODO compare query.State() to the ledger sc
-	paths, err := pathfinder.KeysToPaths(query.Keys(), 0)
+	paths, err := pathfinder.KeysToPaths(query.Keys(), PathFinderVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +92,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 		return update.State(), nil
 	}
 
-	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, 0)
+	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, PathFinderVersion)
 	if err != nil {
 		return nil, err
 	}
