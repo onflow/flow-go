@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/trie"
 	"github.com/dapperlabs/flow-go/ledger/common/utils"
+	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/trie"
 )
 
 const (

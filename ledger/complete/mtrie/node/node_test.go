@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/node"
 	"github.com/dapperlabs/flow-go/ledger/common/utils"
+	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/node"
 )
 
 // Test_ProperLeaf verifies that the hash value of a proper leaf (at height 0) is computed correctly
