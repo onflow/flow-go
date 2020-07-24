@@ -205,9 +205,15 @@ func (lg *ContLoadGenerator) createAccounts() error {
 		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
 			defer wg.Done()
 
-			lg.log.Trace().
+			lg.log.Debug().
 				Str("status", res.Status.String()).
 				Msg("account creation tx executed")
+
+			if res.Error != nil {
+				lg.log.Error().
+					Err(res.Error).
+					Msg("account creation tx failed")
+			}
 
 			for _, event := range res.Events {
 				lg.log.Trace().
@@ -243,12 +249,14 @@ func (lg *ContLoadGenerator) createAccounts() error {
 		func(_ flowsdk.Identifier) {
 			lg.log.Error().Msg("setup transaction (account creation) has timed out")
 			wg.Done()
-		}, // on timout
+		}, // on timeout
 		func(_ flowsdk.Identifier, err error) {
 			lg.log.Error().Err(err).Msg("setup transaction (account creation) encountered an error")
 			wg.Done()
 		}, // on error
 		120)
+
+	wg.Wait()
 
 	lg.log.Info().Msgf("created %d accounts", len(lg.accounts))
 
