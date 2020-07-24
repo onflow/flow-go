@@ -36,7 +36,7 @@ func TestStorableNode(t *testing.T) {
 		0, 1, // path data len
 		3,           // path data
 		0, 0, 0, 25, // payload data len
-		0, 0, 5, 0, 0, 0, 9, 0, 1, 0, 0, 0, 3, 0, 0, 65, 0, 0, 0, 0, 0, 0, 0, 1, 97, // payload data
+		0, 0, 6, 0, 0, 0, 9, 0, 1, 0, 0, 0, 3, 0, 0, 65, 0, 0, 0, 0, 0, 0, 0, 1, 97, // payload data
 		0, 3, // hashValue length
 		4, 4, 4, // hashValue
 	}

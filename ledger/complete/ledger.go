@@ -12,7 +12,6 @@ import (
 	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/trie"
 	"github.com/dapperlabs/flow-go/ledger/complete/wal"
 	"github.com/dapperlabs/flow-go/ledger/encoding"
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 )
 
@@ -25,9 +24,9 @@ const (
 // Ledger holds an array of registers (key value pairs) and keep tracks of changes over a limited time.
 // Each register is referenced by an ID (key) and holds a value (byte slice).
 // Ledger provides atomic batched update and read (with or without proofs) operation given a list of keys.
-// Every update to the Ledger creates a new state commitment which captures the state of the storage.
+// Every update to the Ledger creates a new state which captures the state of the storage.
 // Under the hood, it uses binary merkle tries to generate inclusion and noninclusion proofs.
-// Ledger is fork-aware that means any update can applied at any previous statecommitments which forms a tree of tries (forest).
+// Ledger is fork-aware that means any update can applied at any previous state which forms a tree of tries (forest).
 // The forrest is in memory but all changes (e.g. register updates) are captured inside write-ahead-logs for crash recovery reasons.
 // In order to limit the memory usage and maintain the performance storage only keeps limited number of
 // tries and purge the old ones (LRU-based); in other words Ledger is not designed to be used
@@ -88,12 +87,12 @@ func (l *Ledger) Done() <-chan struct{} {
 	return done
 }
 
-// EmptyStateCommitment returns the state commitment of an empty ledger
-func (l *Ledger) EmptyStateCommitment() flow.StateCommitment {
-	return flow.StateCommitment(l.forest.GetEmptyRootHash())
+// InitState returns the state of an empty ledger
+func (l *Ledger) InitState() ledger.State {
+	return ledger.State(l.forest.GetEmptyRootHash())
 }
 
-// Get read the values of the given keys at the given state commitment
+// Get read the values of the given keys at the given state
 // it returns the values in the same order as given registerIDs and errors (if any)
 func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 	start := time.Now()
@@ -101,7 +100,7 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 	if err != nil {
 		return nil, err
 	}
-	trieRead := &ledger.TrieRead{RootHash: ledger.RootHash(query.StateCommitment()), Paths: paths}
+	trieRead := &ledger.TrieRead{RootHash: ledger.RootHash(query.State()), Paths: paths}
 	payloads, err := l.forest.Read(trieRead)
 	if err != nil {
 		return nil, err
@@ -124,14 +123,14 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 }
 
 // Set updates the ledger given an update
-// it returns a new state commitment (state after update) and errors (if any)
-func (l *Ledger) Set(update *ledger.Update) (newStateCommitment ledger.StateCommitment, err error) {
+// it returns the state after update and errors (if any)
+func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 	start := time.Now()
 
 	// TODO: add test case
 	if update.Size() == 0 {
 		// return current state root unchanged
-		return update.StateCommitment(), nil
+		return update.State(), nil
 	}
 
 	trieUpdate, err := common.UpdateToTrieUpdate(update, 0)
@@ -163,8 +162,8 @@ func (l *Ledger) Set(update *ledger.Update) (newStateCommitment ledger.StateComm
 		l.metrics.UpdateDurationPerItem(durationPerValue)
 	}
 
-	// TODO log info state commitments
-	return ledger.StateCommitment(newRootHash), nil
+	// TODO log info state
+	return ledger.State(newRootHash), nil
 }
 
 // Prove provides proofs for a ledger query and errors (if any)
@@ -175,7 +174,7 @@ func (l *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
 		return nil, err
 	}
 
-	trieRead := &ledger.TrieRead{RootHash: ledger.RootHash(query.StateCommitment()), Paths: paths}
+	trieRead := &ledger.TrieRead{RootHash: ledger.RootHash(query.State()), Paths: paths}
 	batchProof, err := l.forest.Proofs(trieRead)
 	if err != nil {
 		return nil, fmt.Errorf("could not get proofs: %w", err)

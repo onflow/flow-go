@@ -53,7 +53,7 @@ func UpdateToTrieUpdate(u *ledger.Update, version uint8) (*ledger.TrieUpdate, er
 		return nil, err
 	}
 
-	trieUpdate := &ledger.TrieUpdate{RootHash: ledger.RootHash(u.StateCommitment()), Paths: paths, Payloads: payloads}
+	trieUpdate := &ledger.TrieUpdate{RootHash: ledger.RootHash(u.State()), Paths: paths, Payloads: payloads}
 
 	return trieUpdate, nil
 }
@@ -66,7 +66,7 @@ func QueryToTrieRead(q *ledger.Query, version uint8) (*ledger.TrieRead, error) {
 		return nil, err
 	}
 
-	trieRead := &ledger.TrieRead{RootHash: ledger.RootHash(q.StateCommitment()), Paths: paths}
+	trieRead := &ledger.TrieRead{RootHash: ledger.RootHash(q.State()), Paths: paths}
 
 	return trieRead, nil
 }

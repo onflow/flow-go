@@ -11,7 +11,7 @@ import (
 )
 
 // PSMT (Partial Sparse Merkle Tree) holds a subset of an sparse merkle tree at specific
-// state commitment (no historic views). Instead of keeping any unneeded branch, it only keeps
+// state (no historic views). Instead of keeping any unneeded branch, it only keeps
 // the hash of subtree. This implementation is fully stored in memory and doesn't use
 // a database.
 //
@@ -82,7 +82,7 @@ func (p *PSMT) Update(paths []ledger.Path, payloads []*ledger.Payload) ([]byte, 
 // NewPSMT builds a Partial Sparse Merkle Tree (PMST) given a chunkdatapack registertouches
 // TODO just accept batch proof as input
 func NewPSMT(
-	rootValue []byte, // stateCommitment
+	rootValue []byte, // rootHash
 	pathByteSize int,
 	batchProof *ledger.TrieBatchProof,
 ) (*PSMT, error) {
@@ -174,7 +174,7 @@ func NewPSMT(
 
 	}
 
-	// check if the state commitment matches the root value of the partial trie
+	// check if the rootHash matches the root node's hash value of the partial trie
 	if !bytes.Equal(psmt.root.HashValue(), rootValue) {
 		return nil, fmt.Errorf("rootNode hash doesn't match the proofs expected [%x], got [%x]", psmt.root.HashValue(), rootValue)
 	}

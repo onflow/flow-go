@@ -979,7 +979,7 @@ func TestProofGenerationInclusion(t *testing.T) {
 	proof, err := forest.Proofs(read)
 
 	require.NoError(t, err)
-	require.True(t, common.VerifyTrieBatchProof(proof, ledger.StateCommitment(updatedRoot)))
+	require.True(t, common.VerifyTrieBatchProof(proof, ledger.State(updatedRoot)))
 }
 
 func payloadBySlices(keydata []byte, valuedata []byte) *ledger.Payload {

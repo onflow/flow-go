@@ -46,7 +46,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 	totalProofSize := 0
 	totalPTrieConstTimeMS := 0
 
-	stateCommitment := led.EmptyStateCommitment()
+	state := led.InitState()
 	for i := 0; i < steps; i++ {
 
 		keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
@@ -55,7 +55,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 		totalRegOperation += len(keys)
 
 		start := time.Now()
-		update, err := ledger.NewUpdate(stateCommitment, keys, values)
+		update, err := ledger.NewUpdate(state, keys, values)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -103,7 +103,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 		elapsed = time.Since(start)
 		totalPTrieConstTimeMS += int(elapsed / time.Millisecond)
 
-		stateCommitment = newState
+		state = newState
 	}
 
 	b.ReportMetric(float64(totalUpdateTimeMS/steps), "update_time_(ms)")

@@ -36,18 +36,18 @@ func TestLedgerFunctionality(t *testing.T) {
 		valueMaxByteSize := 2 << 16 //16kB
 		activeTries := 1000
 		steps := 40                                  // number of steps
-		histStorage := make(map[string]ledger.Value) // historic storage string(key, statecommitment) -> value
+		histStorage := make(map[string]ledger.Value) // historic storage string(key, state) -> value
 		latestValue := make(map[string]ledger.Value) // key to value
 		unittest.RunWithTempDir(t, func(dbDir string) {
 			led, err := complete.NewLedger(dbDir, activeTries, metricsCollector, nil)
 			assert.NoError(t, err)
-			stateCommitment := led.EmptyStateCommitment()
+			state := led.InitState()
 			for i := 0; i < steps; i++ {
 				// add new keys
 				// TODO update some of the existing keys and shuffle them
 				keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
 				values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
-				update, err := ledger.NewUpdate(stateCommitment, keys, values)
+				update, err := ledger.NewUpdate(state, keys, values)
 				assert.NoError(t, err)
 				newState, err := led.Set(update)
 				assert.NoError(t, err)
@@ -111,7 +111,7 @@ func TestLedgerFunctionality(t *testing.T) {
 						break
 					}
 				}
-				stateCommitment = newState
+				state = newState
 			}
 		})
 	}

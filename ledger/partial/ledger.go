@@ -7,7 +7,6 @@ import (
 	"github.com/dapperlabs/flow-go/ledger/common"
 	"github.com/dapperlabs/flow-go/ledger/encoding"
 	"github.com/dapperlabs/flow-go/ledger/partial/ptrie"
-	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // TODO(Ramtin) add metrics
@@ -16,12 +15,12 @@ import (
 
 type Ledger struct {
 	ptrie *ptrie.PSMT
-	sc    ledger.StateCommitment
+	sc    ledger.State
 	proof ledger.Proof
 }
 
 // NewLedger creates a new in-memory trie-backed ledger storage with persistence.
-func NewLedger(proof ledger.Proof, sc ledger.StateCommitment) (*Ledger, error) {
+func NewLedger(proof ledger.Proof, sc ledger.State) (*Ledger, error) {
 
 	// Decode proof encodings
 	if len(proof) < 1 {
@@ -58,15 +57,15 @@ func (l *Ledger) Done() <-chan struct{} {
 	return done
 }
 
-// InitStateCommitment returns the state commitment of the initial state of the ledger
-func (l *Ledger) InitStateCommitment() flow.StateCommitment {
+// InitState returns the initial state of the ledger
+func (l *Ledger) InitState() ledger.State {
 	return l.sc
 }
 
-// Get read the values of the given keys at the given state commitment
+// Get read the values of the given keys at the given state
 // it returns the values in the same order as given registerIDs and errors (if any)
 func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
-	// TODO compare query.StateCommitment() to the ledger sc
+	// TODO compare query.State() to the ledger sc
 	paths, err := common.KeysToPaths(query.Keys(), 0)
 	if err != nil {
 		return nil, err
@@ -84,12 +83,12 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 }
 
 // Set updates the ledger given an update
-// it returns a new state commitment (state after update) and errors (if any)
-func (l *Ledger) Set(update *ledger.Update) (newStateCommitment ledger.StateCommitment, err error) {
+// it returns the state after update and errors (if any)
+func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 	// TODO: add test case
 	if update.Size() == 0 {
 		// return current state root unchanged
-		return update.StateCommitment(), nil
+		return update.State(), nil
 	}
 
 	trieUpdate, err := common.UpdateToTrieUpdate(update, 0)
@@ -103,22 +102,12 @@ func (l *Ledger) Set(update *ledger.Update) (newStateCommitment ledger.StateComm
 		return nil, err
 	}
 
-	// TODO log info state commitments
-	return ledger.StateCommitment(newRootHash), nil
+	// TODO log info state
+	return ledger.State(newRootHash), nil
 }
 
 // Prove provides proofs for a ledger query and errors (if any)
 // TODO implement this by iterating over initial proofs to find the ones for the query
 func (l *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
 	return nil, err
-}
-
-// TODO implement an approximate MemSize method
-func (l *Ledger) MemSize() (int64, error) {
-	return 0, nil
-}
-
-// DiskSize returns the amount of disk space used by the storage (in bytes)
-func (l *Ledger) DiskSize() (int64, error) {
-	return 0, nil
 }

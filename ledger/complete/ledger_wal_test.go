@@ -30,7 +30,7 @@ func Test_WAL(t *testing.T) {
 		led, err := complete.NewLedger(dir, size, metricsCollector, nil)
 		require.NoError(t, err)
 
-		var stateCommitment = led.EmptyStateCommitment()
+		var state = led.InitState()
 
 		//saved data after updates
 		savedData := make(map[string]map[string]ledger.Value)
@@ -39,11 +39,11 @@ func Test_WAL(t *testing.T) {
 
 			keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
 			values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
-			update, err := ledger.NewUpdate(stateCommitment, keys, values)
+			update, err := ledger.NewUpdate(state, keys, values)
 			assert.NoError(t, err)
-			stateCommitment, err = led.Set(update)
+			state, err = led.Set(update)
 			require.NoError(t, err)
-			fmt.Printf("Updated with %x\n", stateCommitment)
+			fmt.Printf("Updated with %x\n", state)
 
 			data := make(map[string]ledger.Value, len(keys))
 			for j, key := range keys {
@@ -51,7 +51,7 @@ func Test_WAL(t *testing.T) {
 				data[string(encKey)] = values[j]
 			}
 
-			savedData[string(stateCommitment)] = data
+			savedData[string(state)] = data
 		}
 
 		<-led.Done()
@@ -60,7 +60,7 @@ func Test_WAL(t *testing.T) {
 		require.NoError(t, err)
 
 		// random map iteration order is a benefit here
-		for stateCommitment, data := range savedData {
+		for state, data := range savedData {
 
 			keys := make([]ledger.Key, 0, len(data))
 			for encKey := range data {
@@ -69,9 +69,7 @@ func Test_WAL(t *testing.T) {
 				keys = append(keys, *key)
 			}
 
-			fmt.Printf("Querying with %x\n", stateCommitment)
-
-			query, err := ledger.NewQuery(ledger.StateCommitment(stateCommitment), keys)
+			query, err := ledger.NewQuery(ledger.State(state), keys)
 			assert.NoError(t, err)
 			registerValues, err := led2.Get(query)
 			require.NoError(t, err)

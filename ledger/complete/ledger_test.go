@@ -32,15 +32,15 @@ func TestLedger_Update(t *testing.T) {
 			require.NoError(t, err)
 
 			// create empty update
-			currentCommitment := l.EmptyStateCommitment()
-			up, err := ledger.NewEmptyUpdate(currentCommitment)
+			currentState := l.InitState()
+			up, err := ledger.NewEmptyUpdate(currentState)
 			require.NoError(t, err)
 
-			newCommitment, err := l.Set(up)
+			newState, err := l.Set(up)
 			require.NoError(t, err)
 
-			// state commitment shouldn't change
-			assert.True(t, bytes.Equal(currentCommitment, newCommitment))
+			// state shouldn't change
+			assert.True(t, bytes.Equal(currentState, newState))
 		})
 	})
 
@@ -51,10 +51,10 @@ func TestLedger_Update(t *testing.T) {
 			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, nil)
 			require.NoError(t, err)
 
-			curSC := led.EmptyStateCommitment()
+			curSC := led.InitState()
 
 			u := utils.UpdateFixture()
-			u.SetStateCommitment(curSC)
+			u.SetState(curSC)
 
 			newSc, err := led.Set(u)
 			require.NoError(t, err)
@@ -79,7 +79,7 @@ func TestLedger_Get(t *testing.T) {
 			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, nil)
 			require.NoError(t, err)
 
-			curSC := led.EmptyStateCommitment()
+			curSC := led.InitState()
 			q, err := ledger.NewEmptyQuery(curSC)
 			require.NoError(t, err)
 
@@ -94,10 +94,10 @@ func TestLedger_Get(t *testing.T) {
 			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, nil)
 			require.NoError(t, err)
 
-			curSC := led.EmptyStateCommitment()
+			curS := led.InitState()
 
 			q := utils.QueryFixture()
-			q.SetStateCommitment(curSC)
+			q.SetState(curS)
 
 			retValues, err := led.Get(q)
 			require.NoError(t, err)
@@ -115,7 +115,7 @@ func TestLedger_Proof(t *testing.T) {
 			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, nil)
 			require.NoError(t, err)
 
-			curSC := led.EmptyStateCommitment()
+			curSC := led.InitState()
 			q, err := ledger.NewEmptyQuery(curSC)
 			require.NoError(t, err)
 
@@ -133,9 +133,9 @@ func TestLedger_Proof(t *testing.T) {
 			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, nil)
 			require.NoError(t, err)
 
-			curSC := led.EmptyStateCommitment()
+			curS := led.InitState()
 			q := utils.QueryFixture()
-			q.SetStateCommitment(curSC)
+			q.SetState(curS)
 			require.NoError(t, err)
 
 			retProof, err := led.Prove(q)
@@ -144,7 +144,7 @@ func TestLedger_Proof(t *testing.T) {
 			proof, err := encoding.DecodeTrieBatchProof(retProof)
 			require.NoError(t, err)
 			assert.Equal(t, 2, len(proof.Proofs))
-			assert.True(t, common.VerifyTrieBatchProof(proof, curSC))
+			assert.True(t, common.VerifyTrieBatchProof(proof, curS))
 		})
 	})
 
@@ -153,14 +153,14 @@ func TestLedger_Proof(t *testing.T) {
 			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, nil)
 			require.NoError(t, err)
 
-			curSC := led.EmptyStateCommitment()
+			curS := led.InitState()
 
 			u := utils.UpdateFixture()
-			u.SetStateCommitment(curSC)
+			u.SetState(curS)
 
 			newSc, err := led.Set(u)
 			require.NoError(t, err)
-			assert.False(t, bytes.Equal(curSC, newSc))
+			assert.False(t, bytes.Equal(curS, newSc))
 
 			q, err := ledger.NewQuery(newSc, u.Keys())
 			require.NoError(t, err)

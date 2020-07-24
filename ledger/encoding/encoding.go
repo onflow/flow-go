@@ -19,35 +19,37 @@ const Version = uint16(0)
 type Type uint8
 
 const (
-	// TypeStateCommitment - type for StateCommitments
-	TypeStateCommitment = iota
-	// TypeKeyPart -  type for KeyParts (a subset of key)
+	// TypeUnknown - unknown type
+	TypeUnknown = iota
+	// TypeState - type for State
+	TypeState
+	// TypeKeyPart - type for KeyParts (a subset of key)
 	TypeKeyPart
-	// TypeKey -  type for Keys (unique identifier to reference a location in ledger)
+	// TypeKey - type for Keys (unique identifier to reference a location in ledger)
 	TypeKey
-	// TypeValue -  type for Ledger Values
+	// TypeValue - type for Ledger Values
 	TypeValue
-	// TypePath -  type for Paths (trie storage location of a key value pair)
+	// TypePath - type for Paths (trie storage location of a key value pair)
 	TypePath
-	// TypePayload -  type for Payloads (stored at trie nodes including key value pair )
+	// TypePayload - type for Payloads (stored at trie nodes including key value pair )
 	TypePayload
-	// TypeProof  type for Proofs
-	// (all data needed to verify a key value pair at specific stateCommitment)
+	// TypeProof type for Proofs
+	// (all data needed to verify a key value pair at specific state)
 	TypeProof
-	// TypeBatchProof -  type for BatchProofs
+	// TypeBatchProof - type for BatchProofs
 	TypeBatchProof
-	// TypeQuery -  type for ledger query
+	// TypeQuery - type for ledger query
 	TypeQuery
-	// TypeUpdate -  type for ledger update
+	// TypeUpdate - type for ledger update
 	TypeUpdate
-	// TypeTrieUpdate -  type for trie update
+	// TypeTrieUpdate - type for trie update
 	TypeTrieUpdate
-	// typeUnknown - unknown  type - Warning this should always be the last item in the list
-	typeUnknown
+	// this is used to flag types from the future
+	typeUnsuported
 )
 
 func (e Type) String() string {
-	return [...]string{"StateCommitment", "KeyPart", "Key", "Value", "Path", "Payload", "Proof", "BatchProof", "Unknown"}[e]
+	return [...]string{"State", "KeyPart", "Key", "Value", "Path", "Payload", "Proof", "BatchProof", "Unknown"}[e]
 }
 
 // CheckEncDecVer extracts encoding bytes from a raw encoded message
@@ -74,8 +76,8 @@ func CheckEncodingType(rawInput []byte, expectedType uint8) (rest []byte, err er
 	}
 
 	// error if type is known for this code
-	if t >= typeUnknown {
-		return r, fmt.Errorf("unknown entity type in the encoded data (%d > %d)", t, typeUnknown)
+	if t >= typeUnsuported {
+		return r, fmt.Errorf("unknown entity type in the encoded data (%d > %d)", t, typeUnsuported)
 	}
 
 	// error if type is known for this code

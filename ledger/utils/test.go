@@ -74,7 +74,7 @@ func RootHashFixture() ledger.RootHash {
 	return ledger.RootHash(sc)
 }
 
-func TrieProofFixture() (*ledger.TrieProof, ledger.StateCommitment) {
+func TrieProofFixture() (*ledger.TrieProof, ledger.State) {
 	p := ledger.NewTrieProof()
 	p.Path = TwoBytesPath(330)
 	p.Payload = LightPayload8('A', 'A')
@@ -87,10 +87,10 @@ func TrieProofFixture() (*ledger.TrieProof, ledger.StateCommitment) {
 	p.Interims = append(p.Interims, interim2)
 	p.Steps = uint8(7)
 	sc, _ := hex.DecodeString("6a7a565add94fb36069d79e8725c221cd1e5740742501ef014ea6db999fd98ad")
-	return p, ledger.StateCommitment(sc)
+	return p, ledger.State(sc)
 }
 
-func TrieBatchProofFixture() (*ledger.TrieBatchProof, ledger.StateCommitment) {
+func TrieBatchProofFixture() (*ledger.TrieBatchProof, ledger.State) {
 	p1 := ledger.NewTrieProof()
 	p1.Path = TwoBytesPath(330)
 	p1.Payload = LightPayload8('A', 'A')
@@ -120,7 +120,7 @@ func TrieBatchProofFixture() (*ledger.TrieBatchProof, ledger.StateCommitment) {
 	bp.Proofs = append(bp.Proofs, p2)
 
 	sc, _ := hex.DecodeString("6a7a565add94fb36069d79e8725c221cd1e5740742501ef014ea6db999fd98ad")
-	return bp, ledger.StateCommitment(sc)
+	return bp, ledger.State(sc)
 }
 
 // RandomPathsRandLen generate m random paths (size: byteSize),

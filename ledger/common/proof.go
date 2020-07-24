@@ -9,7 +9,7 @@ import (
 
 // VerifyTrieProof verifies the proof, by constructing all the
 // hash from the leaf to the root and comparing the rootHash
-func VerifyTrieProof(p *ledger.TrieProof, expectedStateCommitment ledger.StateCommitment) bool {
+func VerifyTrieProof(p *ledger.TrieProof, expectedState ledger.State) bool {
 	treeHeight := 8 * len(p.Path)
 	leafHeight := treeHeight - int(p.Steps)             // p.Steps is the number of edges we are traversing until we hit the compactified leaf.
 	if !(0 <= leafHeight && leafHeight <= treeHeight) { // sanity check
@@ -50,14 +50,14 @@ func VerifyTrieProof(p *ledger.TrieProof, expectedStateCommitment ledger.StateCo
 			computed = HashInterNode(computed, siblingHash)
 		}
 	}
-	return bytes.Equal(computed, expectedStateCommitment) == p.Inclusion
+	return bytes.Equal(computed, expectedState) == p.Inclusion
 }
 
 // VerifyTrieBatchProof verifies all the proof inside the batchproof
-func VerifyTrieBatchProof(bp *ledger.TrieBatchProof, expectedStateCommitment ledger.StateCommitment) bool {
+func VerifyTrieBatchProof(bp *ledger.TrieBatchProof, expectedState ledger.State) bool {
 	for _, p := range bp.Proofs {
 		// any invalid proof
-		if !VerifyTrieProof(p, expectedStateCommitment) {
+		if !VerifyTrieProof(p, expectedState) {
 			return false
 		}
 	}

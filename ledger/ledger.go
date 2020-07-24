@@ -12,38 +12,33 @@ import (
 type Ledger interface {
 	module.ReadyDoneAware
 
-	EmptyStateCommitment() StateCommitment
+	// InitState returns the initial state of the ledger
+	InitState() State
 
-	// Get returns values for the given slice of keys at specific state commitment
+	// Get returns values for the given slice of keys at specific state
 	Get(query *Query) (values []Value, err error)
 
-	// Update updates a list of keys with new values at specific state commitment (update) and returns a new state commitment
-	Set(update *Update) (newStateCommitment StateCommitment, err error)
+	// Update updates a list of keys with new values at specific state (update) and returns a new state
+	Set(update *Update) (newState State, err error)
 
-	// Prove returns proofs for the given keys at specific state commitment
+	// Prove returns proofs for the given keys at specific state
 	Prove(query *Query) (proof Proof, err error)
-
-	// returns an approximate size of memory used by the ledger
-	MemSize() (int64, error)
-
-	// returns an approximate size of disk used by the ledger
-	DiskSize() (int64, error)
 }
 
 // Query holds all data needed for a ledger read or ledger proof
 type Query struct {
-	stateCommitment StateCommitment
-	keys            []Key
+	state State
+	keys  []Key
 }
 
 // NewEmptyQuery returns an empty ledger query
-func NewEmptyQuery(sc StateCommitment) (*Query, error) {
-	return &Query{stateCommitment: sc}, nil
+func NewEmptyQuery(sc State) (*Query, error) {
+	return &Query{state: sc}, nil
 }
 
 // NewQuery constructs a new ledger  query
-func NewQuery(sc StateCommitment, keys []Key) (*Query, error) {
-	return &Query{stateCommitment: sc, keys: keys}, nil
+func NewQuery(sc State, keys []Key) (*Query, error) {
+	return &Query{state: sc, keys: keys}, nil
 }
 
 // Keys returns keys of the query
@@ -56,21 +51,21 @@ func (q *Query) Size() int {
 	return len(q.keys)
 }
 
-// StateCommitment returns the state commitment of the query
-func (q *Query) StateCommitment() StateCommitment {
-	return q.stateCommitment
+// State returns the state part of the query
+func (q *Query) State() State {
+	return q.state
 }
 
-// SetStateCommitment sets the state commitment for the query
-func (q *Query) SetStateCommitment(sc StateCommitment) {
-	q.stateCommitment = sc
+// SetState sets the state part of the query
+func (q *Query) SetState(s State) {
+	q.state = s
 }
 
 // Update holds all data needed for a ledger update
 type Update struct {
-	stateCommitment StateCommitment
-	keys            []Key
-	values          []Value
+	state  State
+	keys   []Key
+	values []Value
 }
 
 // Size returns number of keys in the ledger update
@@ -88,39 +83,39 @@ func (u *Update) Values() []Value {
 	return u.values
 }
 
-// StateCommitment returns the state commitment of this update
-func (u *Update) StateCommitment() StateCommitment {
-	return u.stateCommitment
+// State returns the state part of this update
+func (u *Update) State() State {
+	return u.state
 }
 
-// SetStateCommitment sets the state commitment for the update
-func (u *Update) SetStateCommitment(sc StateCommitment) {
-	u.stateCommitment = sc
+// SetState sets the state part of the update
+func (u *Update) SetState(sc State) {
+	u.state = sc
 }
 
 // NewEmptyUpdate returns an empty ledger update
-func NewEmptyUpdate(sc StateCommitment) (*Update, error) {
-	return &Update{stateCommitment: sc}, nil
+func NewEmptyUpdate(sc State) (*Update, error) {
+	return &Update{state: sc}, nil
 }
 
 // NewUpdate returns an ledger update
-func NewUpdate(sc StateCommitment, keys []Key, values []Value) (*Update, error) {
+func NewUpdate(sc State, keys []Key, values []Value) (*Update, error) {
 	if len(keys) != len(values) {
 		return nil, fmt.Errorf("length mismatch: keys have %d elements, but values have %d elements", len(keys), len(values))
 	}
-	return &Update{stateCommitment: sc, keys: keys, values: values}, nil
+	return &Update{state: sc, keys: keys, values: values}, nil
 
 }
 
-// StateCommitment captures a commitment to an state of the ledger
-type StateCommitment []byte
+// State captures an state of the ledger
+type State []byte
 
-func (sc StateCommitment) String() string {
+func (sc State) String() string {
 	return hex.EncodeToString(sc)
 }
 
-// Equals compares the state commitment to another state commitment
-func (sc StateCommitment) Equals(o StateCommitment) bool {
+// Equals compares the state to another state
+func (sc State) Equals(o State) bool {
 	if o == nil {
 		return false
 	}
