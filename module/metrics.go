@@ -272,3 +272,7 @@ type ExecutionMetrics interface {
 
 	ExecutionCollectionRequestRetried()
 }
+
+type PingMetrics interface {
+	NodeReachable(nodeID flow.Identifier, reachable bool)
+}

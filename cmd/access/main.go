@@ -17,6 +17,7 @@ import (
 	recovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/access/ingestion"
+	pingeng "github.com/dapperlabs/flow-go/engine/access/ping"
 	"github.com/dapperlabs/flow-go/engine/access/rpc"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
 	"github.com/dapperlabs/flow-go/engine/common/requester"
@@ -40,6 +41,7 @@ func main() {
 		blockLimit      uint
 		collectionLimit uint
 		receiptLimit    uint
+		pingEnabled     bool
 		ingestEng       *ingestion.Engine
 		requestEng      *requester.Engine
 		followerEng     *followereng.Engine
@@ -61,6 +63,7 @@ func main() {
 			flags.StringVarP(&rpcConf.HTTPListenAddr, "http-addr", "h", "localhost:8000", "the address the http proxy server listens on")
 			flags.StringVarP(&rpcConf.CollectionAddr, "ingress-addr", "i", "localhost:9000", "the address (of the collection node) to send transactions to")
 			flags.StringVarP(&rpcConf.ExecutionAddr, "script-addr", "s", "localhost:9000", "the address (of the execution node) forward the script to")
+			flags.BoolVar(&pingEnabled, "ping-enabled", false, "whether to enable the ping process that pings all other peers and report the connectivity to metrics")
 		}).
 		Module("collection node client", func(node *cmd.FlowNodeBuilder) error {
 			node.Logger.Info().Err(err).Msgf("Collection node Addr: %s", rpcConf.CollectionAddr)
@@ -197,6 +200,18 @@ func main() {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
 			return sync, nil
+		}).
+		Component("ping engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			ping, err := pingeng.New(
+				node.Logger,
+				node.State,
+				node.Me,
+				pingEnabled,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create ping engine: %w", err)
+			}
+			return ping, nil
 		}).
 		Run()
 }
