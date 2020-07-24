@@ -79,7 +79,7 @@ func (c *Compactor) Run() error {
 		return fmt.Errorf("cannot get latest checkpoint: %w", err)
 	}
 
-	fmt.Printf("%d %d\n", from, to)
+	fmt.Printf("not checkpointed segments from: %d to: %d\n", from, to)
 
 	// more then one segment means we can checkpoint safely up to `to`-1
 	// presumably last segment is being written to

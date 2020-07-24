@@ -1,7 +1,7 @@
 package main
 
 import (
-	"errors"
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -95,17 +95,40 @@ func main() {
 			return err
 		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+
+			// check if the execution database already exists
 			bootstrapper := bootstrap.NewBootstrapper(node.Logger)
-			err := bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal.FinalState, node.RootBlock.Header)
-			// Root block already loaded, can simply continued
-			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-				return nil, fmt.Errorf("could not bootstrap execution DB: %w", err)
-			} else if err == nil {
-				// Newly bootstrapped Execution DB. Make sure to load execution state
-				if err := loadBootstrapState(node.BaseConfig.BootstrapDir, triedir); err != nil {
-					return nil, fmt.Errorf("could not load bootstrap state: %w", err)
+
+			commit, bootstrapped, err := bootstrapper.IsBootstrapped(node.DB)
+			if err != nil {
+				return nil, fmt.Errorf("could not query database to know whether database has been bootstrapped: %w", err)
+			}
+
+			// if the execution database does not exist, then we need to bootstrap the execution database.
+			if !bootstrapped {
+				// when bootstrapping, the bootstrap folder must have a checkpoint file
+				// we need to cover this file to the trie folder to restore the trie to restore the execution state.
+				err = copyBootstrapState(node.BaseConfig.BootstrapDir, triedir)
+				if err != nil {
+					return nil, fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
+				}
+
+				// TODO: check that the checkpoint file contains the root block's statecommit hash
+
+				err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal.FinalState, node.RootBlock.Header)
+				if err != nil {
+					return nil, fmt.Errorf("could not bootstrap execution database: %w", err)
+				}
+			} else {
+				// if execution database has been bootstrapped, then the root statecommit must equal to the one
+				// in the bootstrap folder
+				if !bytes.Equal(commit, node.RootSeal.FinalState) {
+					return nil, fmt.Errorf("mismatching root statecommitment. database has state commitment: %v, "+
+						"bootstap has statecommitment: %v",
+						commit, node.RootSeal.FinalState)
 				}
 			}
+
 			ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), collector, node.MetricsRegisterer)
 			return ledgerStorage, err
 		}).
@@ -220,17 +243,44 @@ func main() {
 		}).Run()
 }
 
-func loadBootstrapState(dir, trie string) error {
+// copy the checkpoint files from the bootstrap folder to the execution state folder
+// Checkpoint file is required to restore the trie, and has to be placed in the execution
+// state folder.
+// There are two ways to generate a checkpoint file:
+// 1) From a clean state.
+// 		Refer to the code in the testcase: TestGenerateExecutionState
+// 2) From a previous execution state
+// 		This is often used when sporking the network.
+//    Use the execution-state-extract util commandline to generate a checkpoint file from
+// 		a previous checkpoint file
+func copyBootstrapState(dir, trie string) error {
 	filename := ""
+	firstCheckpointFilename := "00000000"
 
-	if _, err := os.Stat(filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, wal.RootCheckpointFilename)); err == nil {
-		filename = wal.RootCheckpointFilename
-	} else if _, err := os.Stat(filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, "00000000")); err == nil {
-		filename = "00000000"
-	} else {
-		return fmt.Errorf("could not find bootstrapped execution state")
+	fileExists := func(fileName string) bool {
+		_, err := os.Stat(filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, fileName))
+		return err == nil
 	}
 
+	// if there is a root checkpoint file, then copy that file over
+	if fileExists(wal.RootCheckpointFilename) {
+		filename = wal.RootCheckpointFilename
+	} else if fileExists(firstCheckpointFilename) {
+		// else if there is a checkpoint file, then copy that file over
+		filename = firstCheckpointFilename
+	} else {
+		filePath := filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, firstCheckpointFilename)
+
+		// include absolute path of the missing file in the error message
+		absPath, err := filepath.Abs(filePath)
+		if err != nil {
+			absPath = filePath
+		}
+
+		return fmt.Errorf("execution state file not found: %v", absPath)
+	}
+
+	// copy from the bootstrap folder to the execution state folder
 	src := filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, filename)
 	dst := filepath.Join(trie, filename)
 
@@ -250,5 +300,8 @@ func loadBootstrapState(dir, trie string) error {
 	if err != nil {
 		return err
 	}
+
+	fmt.Printf("copied bootstrap state file from: %v, to: %v\n", src, dst)
+
 	return out.Close()
 }

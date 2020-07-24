@@ -21,6 +21,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
+	utilsio "github.com/dapperlabs/flow-go/utils/io"
 )
 
 var (
@@ -123,7 +124,7 @@ func main() {
 // Read the NodeID file to build other paths from
 func fetchNodeID(bootDir string) (string, error) {
 	path := filepath.Join(bootDir, bootstrap.PathNodeID)
-	data, err := ioutil.ReadFile(path)
+	data, err := utilsio.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("Error reading file %s: %w", path, err)
 	}
@@ -240,17 +241,17 @@ func unwrapFile(bootDir, nodeId string) error {
 	ciphertextPath := filepath.Join(bootDir, fmt.Sprintf(FilenameRandomBeaconCipher, nodeId))
 	plaintextPath := filepath.Join(bootDir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeId))
 
-	ciphertext, err := ioutil.ReadFile(ciphertextPath)
+	ciphertext, err := utilsio.ReadFile(ciphertextPath)
 	if err != nil {
 		return fmt.Errorf("Failed to open ciphertext file %s: %w", ciphertextPath, err)
 	}
 
-	publicKey, err := ioutil.ReadFile(pubKeyPath)
+	publicKey, err := utilsio.ReadFile(pubKeyPath)
 	if err != nil {
 		return fmt.Errorf("Failed to open public keyfile %s: %w", pubKeyPath, err)
 	}
 
-	privateKey, err := ioutil.ReadFile(privKeyPath)
+	privateKey, err := utilsio.ReadFile(privKeyPath)
 	if err != nil {
 		return fmt.Errorf("Failed to open private keyfile %s: %w", privKeyPath, err)
 	}
@@ -279,12 +280,12 @@ func wrapFile(bootDir, nodeId string) error {
 	plaintextPath := filepath.Join(bootDir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeId))
 	ciphertextPath := filepath.Join(bootDir, fmt.Sprintf(FilenameRandomBeaconCipher, nodeId))
 
-	plaintext, err := ioutil.ReadFile(plaintextPath)
+	plaintext, err := utilsio.ReadFile(plaintextPath)
 	if err != nil {
 		return fmt.Errorf("Failed to open plaintext file %s: %w", plaintextPath, err)
 	}
 
-	publicKey, err := ioutil.ReadFile(pubKeyPath)
+	publicKey, err := utilsio.ReadFile(pubKeyPath)
 	if err != nil {
 		return fmt.Errorf("Faield to open public keyfile %s: %w", pubKeyPath, err)
 	}
