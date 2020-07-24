@@ -30,8 +30,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	chainsync "github.com/dapperlabs/flow-go/module/synchronization"
-	"github.com/dapperlabs/flow-go/storage"
-	bstorage "github.com/dapperlabs/flow-go/storage/badger"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/wal"
 )
@@ -40,10 +39,10 @@ func main() {
 
 	var (
 		ledgerStorage       *ledger.MTrieStorage
-		events              *bstorage.Events
-		txResults           *bstorage.TransactionResults
-		results             *bstorage.ExecutionResults
-		receipts            *bstorage.ExecutionReceipts
+		events              *storage.Events
+		txResults           *storage.TransactionResults
+		results             *storage.ExecutionResults
+		receipts            *storage.ExecutionReceipts
 		providerEngine      *exeprovider.Engine
 		syncCore            *chainsync.Core
 		computationManager  *computation.Manager
@@ -99,8 +98,8 @@ func main() {
 			return err
 		}).
 		Module("execution receipts storage", func(node *cmd.FlowNodeBuilder) error {
-			results = bstorage.NewExecutionResults(node.DB)
-			receipts = bstorage.NewExecutionReceipts(node.DB, results)
+			results = storage.NewExecutionResults(node.DB)
+			receipts = storage.NewExecutionReceipts(node.DB, results)
 			return nil
 		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -152,8 +151,8 @@ func main() {
 			return compactor, nil
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			chunkDataPacks := bstorage.NewChunkDataPacks(node.DB)
-			stateCommitments := bstorage.NewCommits(node.Metrics.Cache, node.DB)
+			chunkDataPacks := storage.NewChunkDataPacks(node.DB)
+			stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
 
 			executionState = state.NewExecutionState(
 				ledgerStorage,
@@ -192,8 +191,8 @@ func main() {
 			)
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
-			events = bstorage.NewEvents(node.DB)
-			txResults = bstorage.NewTransactionResults(node.DB)
+			events = storage.NewEvents(node.DB)
+			txResults = storage.NewTransactionResults(node.DB)
 			ingestionEng, err = ingestion.New(
 				node.Logger,
 				node.Network,
