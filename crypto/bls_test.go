@@ -67,6 +67,8 @@ func TestBLSPOP(t *testing.T) {
 //
 // Aggregate n signatures of the same message under different keys, and compare
 // it against the signature of the message under an aggregated private key.
+// Verify the aggregated signature using the multi signature verification with
+// one message.
 func TestAggregateSignatures(t *testing.T) {
 	// random message
 	input := make([]byte, 100)
@@ -79,6 +81,7 @@ func TestAggregateSignatures(t *testing.T) {
 	sigsNum := mrand.Intn(100) + 1
 	sigs := make([]Signature, 0, sigsNum)
 	sks := make([]PrivateKey, 0, sigsNum)
+	pks := make([]PublicKey, 0, sigsNum)
 	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
 
 	// create the signatures
@@ -92,6 +95,7 @@ func TestAggregateSignatures(t *testing.T) {
 		require.NoError(t, err)
 		sigs = append(sigs, s)
 		sks = append(sks, sk)
+		pks = append(pks, sk.PublicKey())
 	}
 	// aggregate private keys
 	aggSk, err := AggregatePrivateKeys(sks)
@@ -99,11 +103,24 @@ func TestAggregateSignatures(t *testing.T) {
 	expectedSig, err := aggSk.Sign(input, kmac)
 	// aggregate signatures
 	aggSig, err := AggregateSignatures(sigs)
-	assert.NoError(t, err)
+	require.NoError(t, err)
+	// First check: check the signatures are equal
 	assert.Equal(t, aggSig, expectedSig)
-	// aggregate signatures with an empty list
+	// Second check: Verify the aggregated signature
+	valid, err := VerifySignatureOneMessage(pks, aggSig, input, kmac)
+	require.NoError(t, err)
+	assert.True(t, valid)
+
+	// test the empty list case
+	aggSk, err = AggregatePrivateKeys(sks[:0])
+	assert.NoError(t, err)
+	expectedSig, err = aggSk.Sign(input, kmac)
 	aggSig, err = AggregateSignatures(sigs[:0])
 	assert.NoError(t, err)
+	assert.Equal(t, aggSig, expectedSig)
+	valid, err = VerifySignatureOneMessage(pks[:0], aggSig, input, kmac)
+	assert.Error(t, err)
+	assert.False(t, valid)
 }
 
 // BLS multi-signature
