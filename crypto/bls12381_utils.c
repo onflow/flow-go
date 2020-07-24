@@ -589,3 +589,28 @@ void ep2_sum_vector(ep2_t jointy, ep2_st* y, int len){
     }
     ep2_norm(jointy, jointy);
 }
+
+// Computes the sum of the signatures (G1 elements) flattened in an single sigs array
+// and store the sum bytes in dest
+// The function assmues sigs is correctly allocated with regards to len.
+int ep_sum_vector(byte* dest, const byte* sigs, const int len) {
+    // temp variables
+    ep_t acc, sig;        
+    ep_new(acc);
+    ep_new(sig);
+    ep_set_infty(acc);
+
+    // sum the points
+    for (int i=0; i < len; i++) {
+        if (ep_read_bin_compact(sig, &sigs[SIGNATURE_LEN*i], SIGNATURE_LEN) != RLC_OK)
+            return INVALID;
+        ep_add_projc(acc, acc, sig);
+    }
+    // export the result
+    ep_write_bin_compact(dest, acc, SIGNATURE_LEN);
+
+    // free the temp memory
+    ep_free(acc);
+    ep_free(sig);
+    return VALID;
+}

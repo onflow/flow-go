@@ -103,7 +103,7 @@ func TestAggregateSignatures(t *testing.T) {
 	assert.Equal(t, aggSig, expectedSig)
 	// aggregate signatures with an empty list
 	aggSig, err = AggregateSignatures(sigs[:0])
-	assert.Error(t, err)
+	assert.NoError(t, err)
 }
 
 // BLS multi-signature
@@ -136,6 +136,13 @@ func TestAggregatePubKeys(t *testing.T) {
 	expectedPk := aggSk.PublicKey()
 	// aggregate public keys
 	aggPk, err := AggregatePublicKeys(pks)
+	assert.NoError(t, err)
+	assert.Equal(t, aggPk, expectedPk)
+	// aggregate an empty list
+	aggSk, err = AggregatePrivateKeys(sks[:0])
+	assert.NoError(t, err)
+	expectedPk = aggSk.PublicKey()
+	aggPk, err = AggregatePublicKeys(pks[:0])
 	assert.NoError(t, err)
 	assert.Equal(t, aggPk, expectedPk)
 }
