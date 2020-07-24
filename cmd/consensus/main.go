@@ -5,7 +5,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"path/filepath"
 	"time"
 
@@ -44,6 +43,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/signature"
 	"github.com/dapperlabs/flow-go/module/synchronization"
 	bstorage "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/utils/io"
 )
 
 func main() {
@@ -370,7 +370,7 @@ func main() {
 
 func loadDKGPrivateData(dir string, myID flow.Identifier) (*bootstrap.DKGParticipantPriv, error) {
 	path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, myID)
-	data, err := ioutil.ReadFile(filepath.Join(dir, path))
+	data, err := io.ReadFile(filepath.Join(dir, path))
 	if err != nil {
 		return nil, err
 	}

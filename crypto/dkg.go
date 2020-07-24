@@ -3,7 +3,7 @@
 package crypto
 
 // DKG stands for distributed key generation. In this library, DKG
-// refers to specific protocols that generate keys for a BLS-based
+// refers discrete-log based protocols that generate keys for a BLS-based
 // threshold signature scheme.
 // BLS is used with the BLS12381 curve.
 
