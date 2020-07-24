@@ -101,6 +101,7 @@ func TestAggregateSignatures(t *testing.T) {
 	aggSk, err := AggregatePrivateKeys(sks)
 	require.NoError(t, err)
 	expectedSig, err := aggSk.Sign(input, kmac)
+	require.NoError(t, err)
 	// aggregate signatures
 	aggSig, err := AggregateSignatures(sigs)
 	require.NoError(t, err)
@@ -110,6 +111,35 @@ func TestAggregateSignatures(t *testing.T) {
 	valid, err := VerifySignatureOneMessage(pks, aggSig, input, kmac)
 	require.NoError(t, err)
 	assert.True(t, valid)
+
+	// check if one the signatures is not correct
+	input[0] ^= 1
+	randomIndex := mrand.Intn(sigsNum)
+	sigs[randomIndex], err = sks[randomIndex].Sign(input, kmac)
+	aggSig, err = AggregateSignatures(sigs)
+	require.NoError(t, err)
+	assert.NotEqual(t, aggSig, expectedSig)
+	valid, err = VerifySignatureOneMessage(pks, aggSig, input, kmac)
+	require.NoError(t, err)
+	assert.False(t, valid)
+	input[0] ^= 1
+	sigs[randomIndex], err = sks[randomIndex].Sign(input, kmac)
+	// check if one the public keys is not correct
+	randomIndex = mrand.Intn(sigsNum)
+	_, err = rand.Read(seed)
+	require.NoError(t, err)
+	newSk, err := GeneratePrivateKey(BLSBLS12381, seed)
+	require.NoError(t, err)
+	sks[randomIndex] = newSk
+	pks[randomIndex] = newSk.PublicKey()
+	aggSk, err = AggregatePrivateKeys(sks)
+	require.NoError(t, err)
+	expectedSig, err = aggSk.Sign(input, kmac)
+	require.NoError(t, err)
+	assert.NotEqual(t, aggSig, expectedSig)
+	valid, err = VerifySignatureOneMessage(pks, aggSig, input, kmac)
+	require.NoError(t, err)
+	assert.False(t, valid)
 
 	// test the empty list case
 	aggSk, err = AggregatePrivateKeys(sks[:0])
@@ -121,6 +151,7 @@ func TestAggregateSignatures(t *testing.T) {
 	valid, err = VerifySignatureOneMessage(pks[:0], aggSig, input, kmac)
 	assert.Error(t, err)
 	assert.False(t, valid)
+
 }
 
 // BLS multi-signature
