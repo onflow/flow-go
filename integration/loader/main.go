@@ -77,6 +77,10 @@ func main() {
 	}
 
 	flowClient, err := client.New(accessNodeAddrs[0], grpc.WithInsecure())
+	if err != nil {
+		log.Fatal().Err(err).Msgf("unable to initialize Flow client")
+	}
+
 
 	go func() {
 		// run load cases
@@ -84,8 +88,16 @@ func main() {
 			log.Info().Int("number", i).Int("tps", c.tps).Dur("duration", c.duration).Msgf("Running load case...")
 
 			if c.tps > 0 {
-				lg, err := utils.NewContLoadGenerator(log, flowClient, accessNodeAddrs[0], priv, &serviceAccountAddress, &fungibleTokenAddress,
-					&flowTokenAddress, c.tps)
+				lg, err := utils.NewContLoadGenerator(
+					log,
+					flowClient,
+					accessNodeAddrs[0],
+					priv,
+					&serviceAccountAddress,
+					&fungibleTokenAddress,
+					&flowTokenAddress,
+					c.tps
+				)
 				if err != nil {
 					log.Fatal().Err(err).Msgf("unable to create new cont load generator")
 				}
