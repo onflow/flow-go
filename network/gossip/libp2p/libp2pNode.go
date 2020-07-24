@@ -19,6 +19,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
+	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 	"github.com/libp2p/go-tcp-transport"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
@@ -26,10 +27,13 @@ import (
 	netwk "github.com/dapperlabs/flow-go/network"
 )
 
-// A unique Libp2p protocol ID prefix for Flow (https://docs.libp2p.io/concepts/protocols/)
-// All nodes communicate with each other using this protocol id suffixed with the id of the root block
 const (
-	FlowLibP2PProtocolIDPrefix string = "/flow/push/"
+	// A unique Libp2p protocol ID prefix for Flow (https://docs.libp2p.io/concepts/protocols/)
+	// All nodes communicate with each other using this protocol id suffixed with the id of the root block
+	FlowLibP2PProtocolIDPrefix = "/flow/push/"
+
+	// Maximum time to wait for a ping reply from a remote node
+	PingTimeoutSecs = time.Second * 4
 )
 
 // maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
@@ -91,9 +95,9 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 		ctx,
 		libp2p.ListenAddrs(sourceMultiAddr),
 		libp2p.ConnectionManager(p.conMgr),
-		//libp2p.NoSecurity,
 		libp2p.Identity(key),
 		transport,
+		libp2p.Ping(true),
 	)
 	if err != nil {
 		return fmt.Errorf("could not create libp2p host: %w", err)
@@ -357,6 +361,43 @@ func (p *P2PNode) Publish(ctx context.Context, topic string, data []byte) error 
 		return fmt.Errorf("could not publish top topic (%s): %w", topic, err)
 	}
 	return nil
+}
+
+// Ping pings a remote node and returns the time it took to ping the remote node if successful or the error
+func (p *P2PNode) Ping(ctx context.Context, target NodeAddress) (time.Duration, error) {
+
+	pingError := func(err error) (time.Duration, error) {
+		return -1, fmt.Errorf("failed to ping %s (%s:%s): %w", target.Name, target.IP, target.Port, err)
+	}
+
+	// convert the target node address to libp2p peer info
+	targetInfo, err := GetPeerInfo(target)
+	if err != nil {
+		return pingError(err)
+	}
+
+	// connect to the target node
+	err = p.libP2PHost.Connect(ctx, targetInfo)
+	if err != nil {
+		return pingError(err)
+	}
+
+	// create a ping client
+	pingClient := ping.NewPingService(p.libP2PHost)
+
+	// ping the target
+	resultChan := pingClient.Ping(ctx, targetInfo.ID)
+
+	// read the result channel
+	select {
+	case res := <-resultChan:
+		if err != nil {
+			return pingError(err)
+		}
+		return res.RTT, nil
+	case <-time.After(PingTimeoutSecs):
+		return pingError(fmt.Errorf("timed out after %d seconds", PingTimeoutSecs))
+	}
 }
 
 // MultiaddressStr receives a node address and returns
