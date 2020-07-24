@@ -1,15 +1,19 @@
 package cmd
 
 import (
+	"encoding/hex"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
 	model "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 var (
@@ -55,6 +59,18 @@ and block seal.`,
 		log.Info().Msg("✨ running DKG for consensus nodes")
 		dkgData := runDKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
 		log.Info().Msg("")
+
+		var commit []byte
+		if flagRootCommit == "0000000000000000000000000000000000000000000000000000000000000000" {
+			log.Info().Msg("✨ generating empty execution state")
+			var err error
+			commit, err = run.GenerateExecutionState(filepath.Join(flagOutdir, model.DirnameExecutionState), unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply, parseChainID(flagRootChain).Chain())
+			if err != nil {
+				log.Fatal().Err(err).Msg("unable to generate execution state")
+			}
+			flagRootCommit = hex.EncodeToString(commit)
+			log.Info().Msg("")
+		}
 
 		log.Info().Msg("✨ constructing root block")
 		block := constructRootBlock(flagRootChain, flagRootParent, flagRootHeight, flagRootTimestamp, stakingNodes)
@@ -107,10 +123,10 @@ func init() {
 
 	// required parameters for generation of root block, root execution result and root block seal
 	finalizeCmd.Flags().StringVar(&flagRootChain, "root-chain", "emulator", "chain ID for the root block (can be \"main\", \"test\" or \"emulator\"")
-	finalizeCmd.Flags().StringVar(&flagRootParent, "root-parent", "0x0000000000000000000000000000000000000000000000000000000000000000", "ID for the parent of the root block")
+	finalizeCmd.Flags().StringVar(&flagRootParent, "root-parent", "0000000000000000000000000000000000000000000000000000000000000000", "ID for the parent of the root block")
 	finalizeCmd.Flags().Uint64Var(&flagRootHeight, "root-height", 0, "height of the root block")
 	finalizeCmd.Flags().StringVar(&flagRootTimestamp, "root-timestamp", time.Now().UTC().Format(time.RFC3339), "timestamp of the root block (RFC3339)")
-	finalizeCmd.Flags().StringVar(&flagRootCommit, "root-commit", "0x0000000000000000000000000000000000000000000000000000000000000000", "state commitment of root execution state")
+	finalizeCmd.Flags().StringVar(&flagRootCommit, "root-commit", "0000000000000000000000000000000000000000000000000000000000000000", "state commitment of root execution state")
 
 	_ = finalizeCmd.MarkFlagRequired("root-chain")
 	_ = finalizeCmd.MarkFlagRequired("root-parent")
