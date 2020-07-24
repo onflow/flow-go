@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"path/filepath"
 	"time"
 
@@ -50,6 +49,7 @@ import (
 	"github.com/dapperlabs/flow-go/state/protocol"
 	storage "github.com/dapperlabs/flow-go/storage"
 	storagekv "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/utils/io"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -478,7 +478,7 @@ func initClusterCommittee(node *cmd.FlowNodeBuilder, colPayloads *storagekv.Clus
 
 func loadClusterBlock(path string, clusterID flow.ChainID) (*clustermodel.Block, error) {
 	filename := fmt.Sprintf(bootstrap.PathRootClusterBlock, clusterID)
-	data, err := ioutil.ReadFile(filepath.Join(path, filename))
+	data, err := io.ReadFile(filepath.Join(path, filename))
 	if err != nil {
 		return nil, err
 	}
@@ -493,7 +493,7 @@ func loadClusterBlock(path string, clusterID flow.ChainID) (*clustermodel.Block,
 
 func loadClusterQC(path string, clusterID flow.ChainID) (*hotstuffmodel.QuorumCertificate, error) {
 	filename := fmt.Sprintf(bootstrap.PathRootClusterQC, clusterID)
-	data, err := ioutil.ReadFile(filepath.Join(path, filename))
+	data, err := io.ReadFile(filepath.Join(path, filename))
 	if err != nil {
 		return nil, err
 	}

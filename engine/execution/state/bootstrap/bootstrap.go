@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
@@ -50,6 +51,31 @@ func (b *Bootstrapper) BootstrapLedger(
 	}
 
 	return newStateCommitment, nil
+}
+
+// IsBootstrapped returns whether the execution database has been bootstrapped, if yes, returns the
+// root statecommitment
+func (b *Bootstrapper) IsBootstrapped(db *badger.DB) (flow.StateCommitment, bool, error) {
+	var commit flow.StateCommitment
+
+	err := db.View(func(txn *badger.Txn) error {
+		err := operation.LookupStateCommitment(flow.ZeroID, &commit)(txn)
+		if err != nil {
+			return fmt.Errorf("could not lookup state commitment: %w", err)
+		}
+
+		return nil
+	})
+
+	if errors.Is(err, storage.ErrNotFound) {
+		return nil, false, nil
+	}
+
+	if err != nil {
+		return nil, false, err
+	}
+
+	return commit, true, nil
 }
 
 func (b *Bootstrapper) BootstrapExecutionDatabase(db *badger.DB, commit flow.StateCommitment, genesis *flow.Header) error {
