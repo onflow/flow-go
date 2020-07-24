@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/onflow/cadence/encoding/json"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/state"
@@ -42,38 +41,40 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		// EPOCHS: If we bootstrap with epochs, we no longer need identities as a payload to the root block; instead, we
 		// want to see two system events with all necessary information: one epoch setup and one epoch commit.
 
-		// check that we have one epoch setup and one epoch commit event
+		// We should have exactly two service events, one epoch setup and one epoch commit.
 		if len(seal.ServiceEvents) != 2 {
 			return fmt.Errorf("root block seal must contain two system events (have %d)", len(seal.ServiceEvents))
 		}
-		event1 := seal.ServiceEvents[0]
-		event2 := seal.ServiceEvents[1]
-		if event1.Type != flow.EventEpochSetup {
-			return fmt.Errorf("first system event is not epoch setup (%s)", event1.Type)
+		var services []interface{}
+		for _, event := range seal.ServiceEvents {
+			service, err := flow.ServiceEvent(event)
+			if err != nil {
+				return fmt.Errorf("could not decode service event: %w", err)
+			}
+			services = append(services, service)
 		}
-		if event2.Type != flow.EventEpochCommit {
-			return fmt.Errorf("second system event is not epoch commit (%s)", event2.Type)
+		setup, valid := services[0].(*flow.EpochSetup)
+		if !valid {
+			return fmt.Errorf("first service event should be epoch setup (%T)", services[0])
 		}
-
-		// decode the event payloads into cadence values
-		value1, err := json.Decode(event1.Payload)
-		if err != nil {
-			return fmt.Errorf("could not decode first system event: %w", err)
-		}
-		value2, err := json.Decode(event2.Payload)
-		if err != nil {
-			return fmt.Errorf("could not decode second system event: %w", err)
+		commit, valid := services[1].(*flow.EpochCommit)
+		if !valid {
+			return fmt.Errorf("second event should be epoch commit (%T)", services[1])
 		}
 
-		// use type assertion to get the native types
-		// NOTE: this should always work, as we checked the types
-		// earlier, and will panic otherwise anyway
-		setup := value1.ToGoValue().(*flow.EpochSetup)
-		commit := value2.ToGoValue().(*flow.EpochCommit)
-
-		// make sure they both refer to the same epoch
+		// They should both have the same epoch counter to be valid.
 		if setup.Counter != commit.Counter {
 			return fmt.Errorf("epoch setup counter differs from epoch commit counter (%d != %d)", setup.Counter, commit.Counter)
+		}
+
+		// They should also both be valid within themselves.
+		err := validSetup(setup)
+		if err != nil {
+			return fmt.Errorf("invalid epoch setup event: %w", err)
+		}
+		err = validCommit(commit)
+		if err != nil {
+			return fmt.Errorf("invalid epoch commit event: %w", err)
 		}
 
 		// FIRST: validate the root block and its payload
@@ -90,59 +91,6 @@ func (m *Mutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal
 		if len(root.Payload.Seals) > 0 {
 			return fmt.Errorf("root block must not have seals")
 		}
-
-		// the root identities need at least one identity for each role
-		roles := make(map[flow.Role]uint)
-		for _, identity := range setup.Identities {
-			roles[identity.Role]++
-		}
-		if roles[flow.RoleConsensus] < 1 {
-			return fmt.Errorf("need at least one consensus node")
-		}
-		if roles[flow.RoleCollection] < 1 {
-			return fmt.Errorf("need at least one collection node")
-		}
-		if roles[flow.RoleExecution] < 1 {
-			return fmt.Errorf("need at least one execution node")
-		}
-		if roles[flow.RoleVerification] < 1 {
-			return fmt.Errorf("need at least one verification node")
-		}
-
-		// we should have at least one root collection cluster
-		if len(setup.Assignments) == 0 {
-			return fmt.Errorf("need at least one collection cluster")
-		}
-
-		// the root identities should not contain duplicates
-		identLookup := make(map[flow.Identifier]struct{})
-		for _, identity := range setup.Identities {
-			_, ok := identLookup[identity.NodeID]
-			if ok {
-				return fmt.Errorf("duplicate node identifier (%x)", identity.NodeID)
-			}
-			identLookup[identity.NodeID] = struct{}{}
-		}
-
-		// the root identities should not contain duplicate addresses
-		addrLookup := make(map[string]struct{})
-		for _, identity := range setup.Identities {
-			_, ok := addrLookup[identity.Address]
-			if ok {
-				return fmt.Errorf("duplicate node address (%x)", identity.Address)
-			}
-			addrLookup[identity.Address] = struct{}{}
-		}
-
-		// the root identities should all have a non-zero stake
-		for _, identity := range setup.Identities {
-			if identity.Stake == 0 {
-				return fmt.Errorf("zero stake identity (%x)", identity.NodeID)
-			}
-		}
-
-		// TODO: Determine what other compliance checks we want to execute on
-		// the epoch events of the root seal.
 
 		// SECOND: insert the initial protocol state data into the database
 
@@ -544,6 +492,12 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 					return fmt.Errorf("next epoch setup inside grace peried (%d >= %d)", candidate.Header.View, grace)
 				}
 
+				// Finally, the epoch setup event must contain all necessary information.
+				err = validSetup(ev)
+				if err != nil {
+					return fmt.Errorf("invalid epoch setup: %w", err)
+				}
+
 				// Make sure to disallow multiple commit events per payload.
 				didSetup = true
 
@@ -578,6 +532,12 @@ func (m *Mutator) Extend(candidate *flow.Block) error {
 				grace := setup.FinalView - m.state.cfg.gracePeriod
 				if candidate.Header.View >= grace {
 					return fmt.Errorf("next epoch commit inside grace peried (%d >= %d)", candidate.Header.View, grace)
+				}
+
+				// Finally, the commit should commit all the necessary information.
+				err = validCommit(ev)
+				if err != nil {
+					return fmt.Errorf("invalid epoch commit: %w", err)
 				}
 
 				// Make sure to disallow multiple commit events per payload.

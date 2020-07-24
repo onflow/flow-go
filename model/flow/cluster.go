@@ -22,6 +22,9 @@ func NewClusterList(assignments AssignmentList, collectors IdentityList) (Cluste
 	for _, collector := range collectors {
 		lookup[collector.NodeID] = collector
 	}
+	if len(lookup) != len(collectors) {
+		return nil, fmt.Errorf("duplicate collector in list")
+	}
 
 	// replicate the identifier list but use identities instead
 	clusters := make(ClusterList, 0, len(assignments))
@@ -33,13 +36,15 @@ func NewClusterList(assignments AssignmentList, collectors IdentityList) (Cluste
 				return nil, fmt.Errorf("could not find collector identity (%x)", participantID)
 			}
 			cluster = append(cluster, participant)
+			delete(lookup, participantID)
 		}
 		clusters = append(clusters, cluster)
 	}
 
-	// TODO: We might want to check if:
-	// 1) every collector provided as parameter is assigned to a cluster; and
-	// 2) there is a collector in the list for every assignment.
+	// check that every collector was assigned
+	if len(lookup) != 0 {
+		return nil, fmt.Errorf("missing collector assignments (%s)", lookup)
+	}
 
 	return clusters, nil
 }

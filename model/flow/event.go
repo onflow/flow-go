@@ -5,10 +5,11 @@ package flow
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/model/encoding"
-	"github.com/dapperlabs/flow-go/model/fingerprint"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/json"
+
+	"github.com/dapperlabs/flow-go/model/encoding"
+	"github.com/dapperlabs/flow-go/model/fingerprint"
 )
 
 // List of built-in event types.
