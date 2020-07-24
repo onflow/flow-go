@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/onflow/cadence"
 	flowsdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/templates"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go-sdk/client"
@@ -92,14 +92,11 @@ func NewContLoadGenerator(
 }
 
 func (lg *ContLoadGenerator) Init() error {
-	err := lg.setupServiceAccountKeys()
+	err := lg.createAccounts()
 	if err != nil {
 		return err
 	}
-	err = lg.createAccounts()
-	if err != nil {
-		return err
-	}
+
 	err = lg.distributeInitialTokens()
 	return err
 }
@@ -125,150 +122,133 @@ func (lg *ContLoadGenerator) Stop() {
 	lg.workerStatsTracker.StopPrinting()
 }
 
-func (lg *ContLoadGenerator) setupServiceAccountKeys() error {
-	lg.log.Info().Msg("setting up service account keys...")
-
-	blockRef, err := lg.blockRef.Get()
-	if err != nil {
-		return err
-	}
-	keys := make([]*flowsdk.AccountKey, 0)
-	for i := 0; i < lg.numberOfAccounts; i++ {
-		keys = append(keys, lg.serviceAccount.accountKey)
-	}
-
-	addKeysTx, err := lg.scriptCreator.AddKeysToAccountTransaction(*lg.serviceAccount.address, keys)
-	if err != nil {
-		return err
-	}
-
-	addKeysTx.
-		SetReferenceBlockID(blockRef).
-		SetProposalKey(*lg.serviceAccount.address, lg.serviceAccount.accountKey.ID, lg.serviceAccount.accountKey.SequenceNumber).
-		SetPayer(*lg.serviceAccount.address)
-
-	lg.serviceAccount.signerLock.Lock()
-	defer lg.serviceAccount.signerLock.Unlock()
-
-	err = addKeysTx.SignEnvelope(*lg.serviceAccount.address, lg.serviceAccount.accountKey.ID, lg.serviceAccount.signer)
-	if err != nil {
-		return err
-	}
-	lg.serviceAccount.accountKey.SequenceNumber++
-
-	err = lg.flowClient.SendTransaction(context.Background(), *addKeysTx)
-	if err != nil {
-		return err
-	}
-
-	txWG := sync.WaitGroup{}
-	txWG.Add(1)
-	lg.txTracker.AddTx(addKeysTx.ID(), nil,
-		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
-			txWG.Done()
-		},
-		nil, // on sealed
-		func(_ flowsdk.Identifier) {
-			lg.log.Fatal().Msg("setup transaction (service account keys) has expired")
-			txWG.Done()
-		}, // on expired
-		func(_ flowsdk.Identifier) {
-			lg.log.Fatal().Msg("setup transaction (service account keys) has timed out")
-			txWG.Done()
-		}, // on timout
-		func(_ flowsdk.Identifier, err error) {
-			lg.log.Fatal().Err(err).Msg("setup transaction (service account keys) encountered an error")
-			txWG.Done()
-		}, // on error
-		240)
-
-	txWG.Wait()
-
-	lg.log.Info().Msg("set up service account keys")
-	return nil
-
+const createAccountsTransaction = `
+transaction(publicKey: [UInt8], count: Int) {
+  prepare(signer: AuthAccount) {
+    var i = 0
+    while i < count {
+      let account = AuthAccount(payer: signer)
+      account.addPublicKey(publicKey)
+      i = i + 1
+    }
+  }
 }
+`
 
 func (lg *ContLoadGenerator) createAccounts() error {
 	lg.log.Info().Msgf("creating %d accounts...", lg.numberOfAccounts)
+
 	blockRef, err := lg.blockRef.Get()
 	if err != nil {
 		return err
 	}
-	allTxWG := sync.WaitGroup{}
-	for i := 0; i < lg.numberOfAccounts; i++ {
-		privKey := randomPrivateKey()
-		accountKey := flowsdk.NewAccountKey().
-			FromPrivateKey(privKey).
-			SetHashAlgo(crypto.SHA3_256).
-			SetWeight(flowsdk.AccountKeyWeightThreshold)
 
-		signer := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
+	wg := sync.WaitGroup{}
 
-		createAccountTx := templates.CreateAccount(
-			[]*flowsdk.AccountKey{accountKey},
-			nil,
+	privKey := randomPrivateKey()
+	accountKey := flowsdk.NewAccountKey().
+		FromPrivateKey(privKey).
+		SetHashAlgo(crypto.SHA3_256).
+		SetWeight(flowsdk.AccountKeyWeightThreshold)
+
+	signer := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
+
+	// Generate an account creation script
+	createAccountTx := flowsdk.NewTransaction().
+		SetScript([]byte(createAccountsTransaction)).
+		SetReferenceBlockID(blockRef).
+		SetProposalKey(
 			*lg.serviceAccount.address,
-		)
+			lg.serviceAccount.accountKey.ID,
+			lg.serviceAccount.accountKey.SequenceNumber,
+		).
+		AddAuthorizer(*lg.serviceAccount.address).
+		SetPayer(*lg.serviceAccount.address)
 
-		// Generate an account creation script
-		createAccountTx.
-			SetReferenceBlockID(blockRef).
-			SetProposalKey(*lg.serviceAccount.address, i+1, 0).
-			SetPayer(*lg.serviceAccount.address)
+	publicKey := bytesToCadenceArray(accountKey.Encode())
+	count := cadence.NewInt(lg.numberOfAccounts)
 
-		lg.serviceAccount.signerLock.Lock()
-		err = createAccountTx.SignEnvelope(*lg.serviceAccount.address, i+1, lg.serviceAccount.signer)
-		if err != nil {
-			return err
-		}
-		lg.serviceAccount.signerLock.Unlock()
-
-		err = lg.flowClient.SendTransaction(context.Background(), *createAccountTx)
-		if err != nil {
-			return err
-		}
-		allTxWG.Add(1)
-
-		i := 0
-
-		lg.txTracker.AddTx(createAccountTx.ID(),
-			nil,
-			func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
-				defer allTxWG.Done()
-				lg.log.Trace().Str("status", res.Status.String()).
-					Msg("account creation tx executed")
-				for _, event := range res.Events {
-					lg.log.Trace().Str("event_type", event.Type).Str("event", event.String()).
-						Msg("account creatin tx event")
-					if event.Type == flowsdk.EventAccountCreated {
-						accountCreatedEvent := flowsdk.AccountCreatedEvent(event)
-						accountAddress := accountCreatedEvent.Address()
-						lg.log.Debug().Hex("address", accountAddress.Bytes()).Msg("new account created")
-						newAcc := newFlowAccount(i, &accountAddress, accountKey, signer)
-						i++
-						lg.accounts = append(lg.accounts, newAcc)
-						lg.availableAccounts <- newAcc
-						lg.log.Debug().Hex("address", accountAddress.Bytes()).Msg("new account added")
-					}
-				}
-			},
-			nil, // on sealed
-			func(_ flowsdk.Identifier) {
-				lg.log.Error().Msg("setup transaction (account creation) has expired")
-				allTxWG.Done()
-			}, // on expired
-			func(_ flowsdk.Identifier) {
-				lg.log.Error().Msg("setup transaction (account creation) has timed out")
-				allTxWG.Done()
-			}, // on timout
-			func(_ flowsdk.Identifier, err error) {
-				lg.log.Error().Err(err).Msg("setup transaction (account creation) encountered an error")
-				allTxWG.Done()
-			}, // on error
-			120)
+	err = createAccountTx.AddArgument(publicKey)
+	if err != nil {
+		return err
 	}
-	allTxWG.Wait()
+
+	err = createAccountTx.AddArgument(count)
+	if err != nil {
+		return err
+	}
+
+	lg.serviceAccount.signerLock.Lock()
+
+	err = createAccountTx.SignEnvelope(
+		*lg.serviceAccount.address,
+		lg.serviceAccount.accountKey.ID,
+		lg.serviceAccount.signer,
+	)
+	if err != nil {
+		return err
+	}
+
+	lg.serviceAccount.signerLock.Unlock()
+
+	err = lg.flowClient.SendTransaction(context.Background(), *createAccountTx)
+	if err != nil {
+		return err
+	}
+
+	wg.Add(1)
+
+	i := 0
+
+	lg.txTracker.AddTx(createAccountTx.ID(),
+		nil,
+		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
+			defer wg.Done()
+
+			lg.log.Trace().
+				Str("status", res.Status.String()).
+				Msg("account creation tx executed")
+
+			for _, event := range res.Events {
+				lg.log.Trace().
+					Str("event_type", event.Type).
+					Str("event", event.String()).
+					Msg("account creatin tx event")
+
+				if event.Type == flowsdk.EventAccountCreated {
+					accountCreatedEvent := flowsdk.AccountCreatedEvent(event)
+					accountAddress := accountCreatedEvent.Address()
+
+					lg.log.Debug().
+						Hex("address", accountAddress.Bytes()).
+						Msg("new account created")
+
+					newAcc := newFlowAccount(i, &accountAddress, accountKey, signer)
+					i++
+
+					lg.accounts = append(lg.accounts, newAcc)
+					lg.availableAccounts <- newAcc
+
+					lg.log.Debug().
+						Hex("address", accountAddress.Bytes()).
+						Msg("new account added")
+				}
+			}
+		},
+		nil, // on sealed
+		func(_ flowsdk.Identifier) {
+			lg.log.Error().Msg("setup transaction (account creation) has expired")
+			wg.Done()
+		}, // on expired
+		func(_ flowsdk.Identifier) {
+			lg.log.Error().Msg("setup transaction (account creation) has timed out")
+			wg.Done()
+		}, // on timout
+		func(_ flowsdk.Identifier, err error) {
+			lg.log.Error().Err(err).Msg("setup transaction (account creation) encountered an error")
+			wg.Done()
+		}, // on error
+		120)
 
 	lg.log.Info().Msgf("created %d accounts", len(lg.accounts))
 
