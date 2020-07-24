@@ -1,0 +1,7 @@
+{
+  "Role": "execution",
+  "Address": "execution-001.benchmarknet1.nodes.onflow.org:3569",
+  "NodeID": "4a616d65732048756e74657200b7ba53f81f1c356bc2165a71056c82712e2255",
+  "NetworkPrivKey": "CE0up8lnu08BpfUH1KzSAsEN+Bv5fTRhT64mpZpqHZw=",
+  "StakingPrivKey": "QFfSCtX8XTm7joXYZApm0r3x08dE+GYTby3ria/8/b8="
+}

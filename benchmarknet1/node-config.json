@@ -20,6 +20,11 @@
     "Stake": 100
   },
   {
+    "Role": "collection",
+    "Address": "collection-003.benchmarknet1.nodes.onflow.org:3569",
+    "Stake": 100
+  },
+  {
     "Role": "consensus",
     "Address": "consensus-001.benchmarknet1.nodes.onflow.org:3569",
     "Stake": 100
