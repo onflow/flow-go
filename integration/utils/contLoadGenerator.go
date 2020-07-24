@@ -151,8 +151,6 @@ func (lg *ContLoadGenerator) createAccounts() error {
 		SetHashAlgo(crypto.SHA3_256).
 		SetWeight(flowsdk.AccountKeyWeightThreshold)
 
-	signer := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
-
 	// Generate an account creation script
 	createAccountTx := flowsdk.NewTransaction().
 		SetScript([]byte(createAccountsTransaction)).
@@ -228,6 +226,8 @@ func (lg *ContLoadGenerator) createAccounts() error {
 					lg.log.Debug().
 						Hex("address", accountAddress.Bytes()).
 						Msg("new account created")
+
+					signer := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
 
 					newAcc := newFlowAccount(i, &accountAddress, accountKey, signer)
 					i++
