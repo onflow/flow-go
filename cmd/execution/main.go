@@ -290,6 +290,11 @@ func copyBootstrapState(dir, trie string) error {
 	}
 	defer in.Close()
 
+	err = os.MkdirAll(trie, 0700)
+	if err != nil {
+		return err
+	}
+
 	out, err := os.Create(dst)
 	if err != nil {
 		return err
