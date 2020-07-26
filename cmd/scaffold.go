@@ -504,9 +504,16 @@ func (fnb *FlowNodeBuilder) initState() {
 	fnb.MustNot(err).Msgf("node identity not found in the identity list of the finalized state: %v", myID)
 
 	if self.Role.String() != fnb.BaseConfig.nodeRole {
-		fnb.Logger.Fatal().Msgf("running as incorrect role, expected: %v, actual: %v",
-			self.Role.String(),
-			fnb.BaseConfig.nodeRole)
+		if rootBlockHeader.ChainID == flow.Mainnet {
+			fnb.Logger.Fatal().Msgf("running as incorrect role, expected: %v, actual: %v, exiting",
+				self.Role.String(),
+				fnb.BaseConfig.nodeRole)
+		} else {
+			// This allows ghost node to run as any role when not on mainnet
+			fnb.Logger.Warn().Msgf("running as incorrect role, expected: %v, actual: %v, continuing",
+				self.Role.String(),
+				fnb.BaseConfig.nodeRole)
+		}
 	}
 
 	// ensure that the configured staking/network keys are consistent with the protocol state
