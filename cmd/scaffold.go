@@ -350,7 +350,6 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.Storage.Index,
 		fnb.Storage.Payloads,
 		fnb.Storage.Blocks,
-		protocol.SetClusters(fnb.BaseConfig.nClusters),
 	)
 
 	fnb.MustNot(err).Msg("could not initialize flow state")

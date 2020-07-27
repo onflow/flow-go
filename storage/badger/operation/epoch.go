@@ -17,6 +17,14 @@ func RetrieveEpochCounter(counter *uint64) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeEpochCounter), counter)
 }
 
+func IndexEpochStart(counter uint64, view uint64) func(*badger.Txn) error {
+	return insert(makePrefix(codeEpochStart, counter), view)
+}
+
+func LookupEpochStart(counter uint64, view *uint64) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeEpochStart, counter), view)
+}
+
 func InsertEpochSetup(counter uint64, event *flow.EpochSetup) func(*badger.Txn) error {
 	return insert(makePrefix(codeEpochSetup, counter), event)
 }

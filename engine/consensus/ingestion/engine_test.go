@@ -58,8 +58,7 @@ func (is *IngestionSuite) SetupTest() {
 	is.collID = coll.NodeID
 	is.execID = exec.NodeID
 
-	clusters := flow.NewClusterList(1)
-	clusters.Add(0, coll)
+	clusters := flow.ClusterList{flow.IdentityList{coll}}
 
 	identities := flow.IdentityList{con1, con2, con3, coll, exec}
 	lookup := make(map[flow.Identifier]*flow.Identity)

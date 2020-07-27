@@ -96,18 +96,30 @@ func (s *Snapshot) Commit() (flow.StateCommitment, error) {
 //
 // This is guaranteed to be deterministic for an identical set of identities,
 // regardless of the order.
-func (s *Snapshot) Clusters() (*flow.ClusterList, error) {
+func (s *Snapshot) Clusters() (flow.ClusterList, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
 
-	// get the node identities
-	identities, err := s.Identities(filter.HasRole(flow.RoleCollection))
+	// retrieve the epoch setup event for current epoch
+	var counter uint64
+	err := s.state.db.View(operation.RetrieveEpochCounter(&counter))
 	if err != nil {
-		return nil, fmt.Errorf("could not get identities: %w", err)
+		return nil, fmt.Errorf("could not retrieve epoch counter: %w", err)
+	}
+	var setup flow.EpochSetup
+	err = s.state.db.View(operation.RetrieveEpochSetup(counter, &setup))
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve epoch setup: %w", err)
 	}
 
-	return protocol.Clusters(s.state.clusters, identities), nil
+	// create the list of clusters
+	clusters, err := flow.NewClusterList(
+		setup.Assignments,
+		setup.Identities.Filter(filter.HasRole(flow.RoleCollection)),
+	)
+
+	return clusters, nil
 }
 
 func (s *Snapshot) Head() (*flow.Header, error) {

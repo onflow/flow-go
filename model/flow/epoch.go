@@ -1,11 +1,11 @@
 package flow
 
 type EpochSetup struct {
-	Counter    uint64
-	FinalView  uint64
-	Identities IdentityList
-	Clusters   *ClusterList
-	Seed       []byte
+	Counter     uint64
+	FinalView   uint64
+	Identities  IdentityList
+	Assignments AssignmentList
+	Seed        []byte
 }
 
 // TODO: the usage of flow events inside of the main repo

@@ -33,7 +33,7 @@ type Snapshot interface {
 	// Cluster selects the given cluster from the node selection. You have to
 	// manually filter the identities to the desired set of nodes before
 	// clustering them.
-	Clusters() (*flow.ClusterList, error)
+	Clusters() (flow.ClusterList, error)
 
 	// Head returns the latest block at the selected point of the protocol state
 	// history. It can represent either a finalized or ambiguous block,
