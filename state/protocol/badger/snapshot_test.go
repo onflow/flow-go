@@ -130,7 +130,7 @@ func TestClusters(t *testing.T) {
 		actual, err := state.Final().Clusters()
 		require.NoError(t, err)
 
-		require.Equal(t, 3, actual.Size())
+		require.Equal(t, 3, len(actual))
 		cluster, ok := actual.ByIndex(0)
 		require.True(t, ok)
 		assert.Len(t, cluster, 3)
@@ -143,7 +143,7 @@ func TestClusters(t *testing.T) {
 		require.True(t, ok)
 		assert.Len(t, cluster, 2)
 
-	}, protocol.SetClusters(3))
+	})
 }
 
 func TestSeed(t *testing.T) {

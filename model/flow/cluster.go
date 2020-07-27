@@ -1,37 +1,61 @@
 package flow
 
 import (
+	"fmt"
 	"math/big"
 )
 
-// ClusterList is a set of clusters, keyed by ID. Each cluster must contain at
-// least one node. All nodes are collection nodes.
-type ClusterList struct {
-	clusters []IdentityList
-	lookup   map[Identifier]uint
-}
+// AssignmentList is a list of identifier lists. Each list of identifiers lists the
+// identities that are part of the given cluster.
+type AssignmentList [][]Identifier
 
-// NewClusterList creates a new list of clusters.
-func NewClusterList(nClusters uint) *ClusterList {
-	cl := &ClusterList{
-		clusters: make([]IdentityList, nClusters),
-		lookup:   make(map[Identifier]uint),
+// ClusterList is a list of identity lists. Each `IdentityList` represents the
+// nodes assigned to a specific cluster.
+type ClusterList []IdentityList
+
+// NewClusterList creates a new cluster list based on the given cluster assignment
+// and the provided list of identities.
+func NewClusterList(assignments AssignmentList, collectors IdentityList) (ClusterList, error) {
+
+	// build a lookup for all the identities by node identifier
+	lookup := make(map[Identifier]*Identity)
+	for _, collector := range collectors {
+		lookup[collector.NodeID] = collector
 	}
-	return cl
+	if len(lookup) != len(collectors) {
+		return nil, fmt.Errorf("duplicate collector in list")
+	}
+
+	// replicate the identifier list but use identities instead
+	clusters := make(ClusterList, 0, len(assignments))
+	for _, participants := range assignments {
+		cluster := make(IdentityList, 0, len(participants))
+		for _, participantID := range participants {
+			participant, found := lookup[participantID]
+			if !found {
+				return nil, fmt.Errorf("could not find collector identity (%x)", participantID)
+			}
+			cluster = append(cluster, participant)
+			delete(lookup, participantID)
+		}
+		clusters = append(clusters, cluster)
+	}
+
+	// check that every collector was assigned
+	if len(lookup) != 0 {
+		return nil, fmt.Errorf("missing collector assignments (%s)", lookup)
+	}
+
+	return clusters, nil
 }
 
-// Add will add a node to the cluster list.
-func (cl *ClusterList) Add(index uint, identity *Identity) {
-	cl.clusters[int(index)] = append(cl.clusters[int(index)], identity)
-	cl.lookup[identity.NodeID] = index
-}
-
-// ByIndex returns a cluster by index.
-func (cl *ClusterList) ByIndex(index uint) (IdentityList, bool) {
-	if int(index) >= len(cl.clusters) {
+// ByIndex retrieves the list of identities that are part of the
+// given cluster.
+func (cl ClusterList) ByIndex(index uint) (IdentityList, bool) {
+	if index >= uint(len(cl)) {
 		return nil, false
 	}
-	return cl.clusters[int(index)], true
+	return cl[int(index)], true
 }
 
 // ByTxID selects the cluster that should receive the transaction with the given
@@ -39,10 +63,9 @@ func (cl *ClusterList) ByIndex(index uint) (IdentityList, bool) {
 //
 // For evenly distributed transaction IDs, this will evenly distribute
 // transactions between clusters.
-func (cl *ClusterList) ByTxID(txID Identifier) (IdentityList, bool) {
+func (cl ClusterList) ByTxID(txID Identifier) (IdentityList, bool) {
 	bigTxID := new(big.Int).SetBytes(txID[:])
-	bigIndex := new(big.Int).Mod(bigTxID, big.NewInt(int64(len(cl.clusters))))
-
+	bigIndex := new(big.Int).Mod(bigTxID, big.NewInt(int64(len(cl))))
 	return cl.ByIndex(uint(bigIndex.Uint64()))
 }
 
@@ -51,25 +74,12 @@ func (cl *ClusterList) ByTxID(txID Identifier) (IdentityList, bool) {
 // Nodes will be divided into equally sized clusters as far as possible.
 // The last return value will indicate if the look up was successful
 func (cl ClusterList) ByNodeID(nodeID Identifier) (IdentityList, uint, bool) {
-	index, ok := cl.lookup[nodeID]
-	if !ok {
-		return nil, 0, false
+	for index, cluster := range cl {
+		for _, participant := range cluster {
+			if participant.NodeID == nodeID {
+				return cluster, uint(index), true
+			}
+		}
 	}
-
-	cluster, found := cl.ByIndex(index)
-	if !found {
-		return nil, 0, false
-	}
-
-	return cluster, index, true
-}
-
-// Size returns the number of clusters.
-func (cl ClusterList) Size() int {
-	return len(cl.clusters)
-}
-
-// All returns all the clusters.
-func (cl ClusterList) All() []IdentityList {
-	return cl.clusters
+	return nil, 0, false
 }

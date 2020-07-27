@@ -19,7 +19,7 @@ func Genesis(identities IdentityList, chainID ChainID) *Block {
 		ParentID:    ZeroID,
 		Height:      0,
 		PayloadHash: payload.Hash(),
-		Timestamp:   GenesisTime(),
+		Timestamp:   GenesisTime,
 		View:        0,
 	}
 

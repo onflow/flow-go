@@ -51,8 +51,9 @@ const (
 
 	// codes related to epoch information
 	codeEpochCounter = 60 // current epoch counter
-	codeEpochSetup   = 61 // setup events by epoch counter
-	codeEpochCommit  = 62 // commit events by epoch counter
+	codeEpochStart   = 61 // index for start views of epochs
+	codeEpochSetup   = 62 // setup events by epoch counter
+	codeEpochCommit  = 63 // commit events by epoch counter
 
 	// legacy codes (should be cleaned up)
 	codeChunkDataPack                = 100

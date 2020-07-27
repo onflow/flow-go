@@ -9,7 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func constructRootBlocksForClusters(clusters *flow.ClusterList) []*cluster.Block {
+func constructRootBlocksForClusters(clusters flow.ClusterList) []*cluster.Block {
 	clusterBlocks := run.GenerateRootClusterBlocks(clusters)
 
 	for _, clusterBlock := range clusterBlocks {
@@ -21,14 +21,14 @@ func constructRootBlocksForClusters(clusters *flow.ClusterList) []*cluster.Block
 	return clusterBlocks
 }
 
-func constructRootQCsForClusters(clusterList *flow.ClusterList, nodeInfos []model.NodeInfo, block *flow.Block, clusterBlocks []*cluster.Block) {
+func constructRootQCsForClusters(clusterList flow.ClusterList, nodeInfos []model.NodeInfo, block *flow.Block, clusterBlocks []*cluster.Block) {
 
-	if len(clusterBlocks) != clusterList.Size() {
-		log.Fatal().Int("len(clusterBlocks)", len(clusterBlocks)).Int("clusterList.Size()", clusterList.Size()).
+	if len(clusterBlocks) != len(clusterList) {
+		log.Fatal().Int("len(clusterBlocks)", len(clusterBlocks)).Int("len(clusterList)", len(clusterList)).
 			Msg("number of clusters needs to equal number of cluster blocks")
 	}
 
-	for i, cluster := range clusterList.All() {
+	for i, cluster := range clusterList {
 		signers := filterClusterSigners(cluster, nodeInfos)
 
 		qc, err := run.GenerateClusterRootQC(signers, block, clusterBlocks[i])

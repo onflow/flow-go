@@ -13,7 +13,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/network/stub"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/util"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -118,7 +117,7 @@ func TestClusterRouting(t *testing.T) {
 
 	t.Run("should store transaction for local cluster", func(t *testing.T) {
 		hub := stub.NewNetworkHub()
-		nodes := testutil.CollectionNodes(t, hub, nNodes, chainID, protocol.SetClusters(nClusters))
+		nodes := testutil.CollectionNodes(t, hub, nNodes, chainID)
 		for _, node := range nodes {
 			defer node.Done()
 		}
@@ -157,7 +156,7 @@ func TestClusterRouting(t *testing.T) {
 
 	t.Run("should propagate locally submitted transaction", func(t *testing.T) {
 		hub := stub.NewNetworkHub()
-		nodes := testutil.CollectionNodes(t, hub, nNodes, chainID, protocol.SetClusters(nClusters))
+		nodes := testutil.CollectionNodes(t, hub, nNodes, chainID)
 		for _, node := range nodes {
 			defer node.Done()
 		}
@@ -197,7 +196,7 @@ func TestClusterRouting(t *testing.T) {
 
 	t.Run("should not propagate remotely submitted transaction", func(t *testing.T) {
 		hub := stub.NewNetworkHub()
-		nodes := testutil.CollectionNodes(t, hub, nNodes, chainID, protocol.SetClusters(nClusters))
+		nodes := testutil.CollectionNodes(t, hub, nNodes, chainID)
 		for _, node := range nodes {
 			defer node.Done()
 		}
@@ -237,7 +236,7 @@ func TestClusterRouting(t *testing.T) {
 
 	t.Run("should not process invalid transaction", func(t *testing.T) {
 		hub := stub.NewNetworkHub()
-		nodes := testutil.CollectionNodes(t, hub, nNodes, chainID, protocol.SetClusters(nClusters))
+		nodes := testutil.CollectionNodes(t, hub, nNodes, chainID)
 		for _, node := range nodes {
 			defer node.Done()
 		}

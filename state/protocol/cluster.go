@@ -11,13 +11,13 @@ import (
 
 // ClusterFilterFor returns a filter to retrieve all nodes within the cluster
 // that the node with the given ID belongs to.
-func ClusterFilterFor(sn Snapshot, id flow.Identifier) (flow.IdentityFilter, uint, error) {
+func ClusterFilterFor(sn Snapshot, nodeID flow.Identifier) (flow.IdentityFilter, uint, error) {
 
 	clusters, err := sn.Clusters()
 	if err != nil {
 		return nil, 0, fmt.Errorf("could not get clusters: %w", err)
 	}
-	cluster, index, ok := clusters.ByNodeID(id)
+	cluster, index, ok := clusters.ByNodeID(nodeID)
 	if !ok {
 		return nil, 0, fmt.Errorf("could not get cluster for node")
 	}
@@ -26,9 +26,9 @@ func ClusterFilterFor(sn Snapshot, id flow.Identifier) (flow.IdentityFilter, uin
 }
 
 // ClusterFor returns the cluster that the node with given ID belongs to.
-func ClusterFor(sn Snapshot, id flow.Identifier) (flow.IdentityList, uint, error) {
+func ClusterFor(sn Snapshot, nodeID flow.Identifier) (flow.IdentityList, uint, error) {
 
-	clusterFilter, clusterIndex, err := ClusterFilterFor(sn, id)
+	clusterFilter, clusterIndex, err := ClusterFilterFor(sn, nodeID)
 	if err != nil {
 		return nil, 0, fmt.Errorf("could not get cluster filter: %w", err)
 	}
@@ -60,21 +60,24 @@ func ChainIDForCluster(cluster flow.IdentityList) flow.ChainID {
 	return flow.ChainID(cluster.Fingerprint().String())
 }
 
-func Clusters(nClusters uint, identities flow.IdentityList) *flow.ClusterList {
+// ClusterAssignments returns the assignments for clusters based on the given
+// number and the provided collector identities.
+func ClusterAssignments(num uint, collectors flow.IdentityList) flow.AssignmentList {
 
-	filtered := identities.Filter(filter.HasRole(flow.RoleCollection))
+	// double-check we only have collectors
+	collectors = collectors.Filter(filter.HasRole(flow.RoleCollection))
 
 	// order the identities by node ID
-	sort.Slice(filtered, func(i, j int) bool {
-		return order.ByNodeIDAsc(filtered[i], filtered[j])
+	sort.Slice(collectors, func(i, j int) bool {
+		return order.ByNodeIDAsc(collectors[i], collectors[j])
 	})
 
 	// create the desired number of clusters and assign nodes
-	clusters := flow.NewClusterList(nClusters)
-	for i, identity := range filtered {
-		index := uint(i) % nClusters
-		clusters.Add(index, identity)
+	var assignments flow.AssignmentList
+	for i, collector := range collectors {
+		index := uint(i) % num
+		assignments[index] = append(assignments[index], collector.NodeID)
 	}
 
-	return clusters
+	return assignments
 }
