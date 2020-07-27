@@ -48,7 +48,7 @@ func (_m *VoteAggregator) PruneByView(view uint64) {
 }
 
 // StorePendingVote provides a mock function with given fields: vote
-func (_m *VoteAggregator) StorePendingVote(vote *model.Vote) bool {
+func (_m *VoteAggregator) StorePendingVote(vote *model.Vote) (bool, error) {
 	ret := _m.Called(vote)
 
 	var r0 bool
@@ -58,7 +58,14 @@ func (_m *VoteAggregator) StorePendingVote(vote *model.Vote) bool {
 		r0 = ret.Get(0).(bool)
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func(*model.Vote) error); ok {
+		r1 = rf(vote)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // StoreProposerVote provides a mock function with given fields: vote
