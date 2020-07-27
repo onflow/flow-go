@@ -1,4 +1,4 @@
-package benchmark
+package complete_test
 
 import (
 	"io/ioutil"
@@ -15,6 +15,10 @@ import (
 	"github.com/dapperlabs/flow-go/module/metrics"
 )
 
+// GENERAL COMMENT:
+// running this test with
+//   go test -bench=.  -benchmem
+// will track the heap allocations for the Benchmarks
 func BenchmarkStorage(b *testing.B) { benchmarkStorage(100, b) }
 
 // BenchmarkStorage benchmarks the performance of the storage layer
