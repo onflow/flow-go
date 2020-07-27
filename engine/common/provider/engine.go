@@ -154,6 +154,7 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityR
 
 	// try to retrieve each entity and skip missing ones
 	entities := make([]flow.Entity, 0, len(req.EntityIDs))
+	entityIDs := make([]flow.Identifier, 0, len(req.EntityIDs))
 	for _, entityID := range req.EntityIDs {
 		entity, err := e.retrieve(entityID)
 		if errors.Is(err, storage.ErrNotFound) {
@@ -163,6 +164,7 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityR
 			return fmt.Errorf("could not retrieve entity (%x): %w", entityID, err)
 		}
 		entities = append(entities, entity)
+		entityIDs = append(entityIDs, entityID)
 	}
 
 	// encode all of the entities
@@ -182,8 +184,9 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityR
 
 	// send back the response
 	res := &messages.EntityResponse{
-		Nonce: req.Nonce,
-		Blobs: blobs,
+		Nonce:     req.Nonce,
+		EntityIDs: entityIDs,
+		Blobs:     blobs,
 	}
 	err = e.con.Submit(res, originID)
 	if err != nil {

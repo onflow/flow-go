@@ -5,7 +5,6 @@ package matching
 import (
 	"errors"
 	"fmt"
-	"math/rand"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -14,7 +13,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/metrics"
@@ -162,15 +160,19 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	e.unit.Lock()
-	defer e.unit.Unlock()
 
 	switch ev := event.(type) {
 	case *flow.ExecutionReceipt:
 		e.metrics.MessageReceived(metrics.EngineMatching, metrics.MessageExecutionReceipt)
+		e.unit.Lock()
+		defer e.unit.Unlock()
+		defer e.metrics.MessageHandled(metrics.EngineMatching, metrics.MessageExecutionReceipt)
 		return e.onReceipt(originID, ev)
 	case *flow.ResultApproval:
 		e.metrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
+		e.unit.Lock()
+		defer e.unit.Unlock()
+		defer e.metrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
 		return e.onApproval(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
@@ -178,19 +180,11 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 }
 
 // HandleReceipts handles receipts we have explicitly requested by block ID.
-func (e *Engine) HandleReceipt(originID flow.Identifier, msg flow.Entity) {
-	e.unit.Lock()
-	defer e.unit.Unlock()
-
-	wrapper, ok := msg.(*messages.ExecutionReceiptByBlockID)
-	if !ok {
-		e.log.Error().Msgf("received invalid receipt type: %T", msg)
-		return
-	}
+func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 
 	e.log.Debug().Msg("received receipt from requester engine")
 
-	err := e.onReceipt(originID, wrapper.Receipt)
+	err := e.process(originID, receipt)
 	if err != nil {
 		e.log.Error().Err(err).Msg("could not process receipt")
 	}
@@ -210,14 +204,6 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		Logger()
 
 	log.Info().Msg("execution receipt received")
-
-	{
-		// TODO testing re-requesting on localnet
-		// 10% of time, discard message
-		if rand.Intn(10) == 0 {
-			return nil
-		}
-	}
 
 	// check the execution receipt is sent by its executor
 	if receipt.ExecutorID != originID {

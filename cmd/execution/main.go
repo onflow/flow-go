@@ -26,7 +26,6 @@ import (
 	bootstrapFilenames "github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	chainsync "github.com/dapperlabs/flow-go/module/synchronization"
@@ -228,12 +227,7 @@ func main() {
 		}).
 		Component("receipt provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			retrieve := func(blockID flow.Identifier) (flow.Entity, error) {
-				receipt, err := receipts.ByBlockID(blockID)
-				if err != nil {
-					return nil, err
-				}
-				msg := &messages.ExecutionReceiptByBlockID{Receipt: receipt}
-				return msg, nil
+				return receipts.ByBlockID(blockID)
 			}
 			eng, err := provider.New(
 				node.Logger,
