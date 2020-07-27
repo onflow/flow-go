@@ -319,6 +319,12 @@ func copyBootstrapState(dir, trie string) error {
 	}
 	defer in.Close()
 
+	// It's possible that the trie dir does not yet exist. If not this will create the the required path
+	err = os.MkdirAll(trie, 0700)
+	if err != nil {
+		return err
+	}
+
 	out, err := os.Create(dst)
 	if err != nil {
 		return err
