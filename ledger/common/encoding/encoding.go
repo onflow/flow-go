@@ -49,7 +49,7 @@ const (
 )
 
 func (e Type) String() string {
-	return [...]string{"State", "KeyPart", "Key", "Value", "Path", "Payload", "Proof", "BatchProof", "Unknown"}[e]
+	return [...]string{"Unknown", "State", "KeyPart", "Key", "Value", "Path", "Payload", "Proof", "BatchProof"}[e]
 }
 
 // CheckVersion extracts encoding bytes from a raw encoded message
