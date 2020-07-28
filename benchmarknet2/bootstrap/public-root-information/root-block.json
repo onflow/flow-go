@@ -3,8 +3,8 @@
     "ChainID": "flow-testnet",
     "ParentID": "0000000000000000000000000000000000000000000000000000000000000000",
     "Height": 0,
-    "PayloadHash": "0aed7cf04ffc6869ae2015735a3ca8fa882a63d8efdc31372d7024941b675bf8",
-    "Timestamp": "2020-07-28T19:47:28Z",
+    "PayloadHash": "399b9653e0429eae2bcd691bcb33e568e32b551f6858a33771d58db1bdcbf351",
+    "Timestamp": "2020-07-28T19:51:17Z",
     "View": 0,
     "ParentVoterIDs": null,
     "ParentVoterSig": null,
@@ -14,92 +14,92 @@
   "Payload": {
     "Identities": [
       {
-        "NodeID": "204b72bfb40d0dae1b4214a6247ff28ff6cecc901af1e49170f0f9e5368c6d03",
+        "NodeID": "e6cf1e14d0776c83edace61298e9846c25cd9f2593842c49f6f50bb68858437a",
         "Address": "access-001.benchmarknet2.nodes.onflow.org:3569",
         "Role": "access",
         "Stake": 100,
-        "StakingPubKey": "kZLLABDlmuJmhtluqzpztI4Tcqzix2puKc/hGPLph6gCYNdZ/gjpM9pNE1BUWZo0Fy4bMtmZDAslD9I8jaQT29aExgnKkUb3hqMMRh95kDsf6FVi9mgz5F8p8QRuv67N",
-        "NetworkPubKey": "/pYxxUfct2GwhjV1y61i3kwwU3DLfaS+FF4UMQYqz3WzM08QRlb+DQwo2vBpCNRPz3w4LFp7fRNvV+ohBXZUUQ=="
+        "StakingPubKey": "tGFYms08dziaoij+XcC/vlRVjM3EGK432UhY/GPXa/eCYrbyT2jLTnYCzE4Ac+n3GXgMPPngV75p2Sbg8jm56gq1TrbGWE3fHap7byqOpqh1kfRvXpTNK0PC3ieSqShw",
+        "NetworkPubKey": "gcO2ohfIA7LTzifzWCLDuUrnSUcJm4uf6Kez+2QiLcLI2z5NbmW3GRKKuhVb2VCiPVl2hYMW68QYvYRWlUixJQ=="
       },
       {
-        "NodeID": "d40e8f0d99cc09cbb147eea28e85682b8a9cc20998716f3fab01419d21dc7e59",
+        "NodeID": "d629af8a358db5cba10223bb4091831476f4f276640bd5ba4be04fa79208c1ef",
         "Address": "access-002.benchmarknet2.nodes.onflow.org:3569",
         "Role": "access",
         "Stake": 100,
-        "StakingPubKey": "koG4nWPiMleN/9UQES53hBcpxc9K5Z6lVsDk+rbs4g6hSGaPC08z4QSG3VYIOZL2FYhKFRgdBhP9SKsEGblmpqoJ4xZq/b8CVQH4o8rRWD0gaKESFnB/PZ5KucibpTY3",
-        "NetworkPubKey": "nbzIwoODIa0Kyh6zVNNH73c3axeB/P2kEXJZVXvLJ6flcGrgdhHakTZeQFq5fn94TI/BoZTwuJRoj0wWXaLpCw=="
+        "StakingPubKey": "jbH1IPnONU+MqkM+1fe1PmZiimhIWRnx6LbwYGP9qcEEH3u8GslFjhJDAtuK0GMzBxrpzKRrIJsJgzgq1Z4NYyYBY+sFPG8BgO9PKsoJ/PjlT3GqEj5SVzgpngY4LxZS",
+        "NetworkPubKey": "HIb0CVuBS2YybTbM/vJtN1sp/kwyI7Ra2O4mjxgmqteTJSV7d6gSD/LK9kOJcuHKPMaBRejIEYm93CZoqbrCBg=="
       },
       {
-        "NodeID": "416c65782048656e74736368656c00fafdedb673584f0a8e6370072c8d0f9b0b",
+        "NodeID": "416c65782048656e74736368656c00441c4c8e87e1e1cf99560819e3c6b4ee59",
         "Address": "collection-001.benchmarknet2.nodes.onflow.org:3569",
         "Role": "collection",
         "Stake": 100,
-        "StakingPubKey": "ha6cseZm4qGTW1C6sxIZZQrHfFiJ7PeObAtd//CGuRX9osjl3sxd2cXHqLvuyHA7ClnP70JU6HHRJjsj91ETzDXY53eYmvIXjt7wEb/6ycFCD+Vq+oGbx4JBTATpPniR",
-        "NetworkPubKey": "Qvn9VpRQXbm6iZNjZlijxox+xcYThVtTtZUzpmakDKB2p9D6tE91iCyDxzFpN7qNlZDte6QUQvCXIv8dXZIaQw=="
+        "StakingPubKey": "oZDdkDCvNCVzaHxR3KUCpF7ftLQtn46C14ZE1KmlD63g/dDjuGsXwY70Xg5ukMo3A7qcfJ+zesdul0zMZEs4/bY5hVZbecmpdvmCV2+Nl37Knm6KFnsON7WdzJx/US51",
+        "NetworkPubKey": "CTrnfBo+riEsPXPvnzYA5X8R0DFqM7XzIZLg0/fPU0rAqQeCXrtUhlHChsbTgsjeI+0m5gQGufQP/280VT/FHA=="
       },
       {
-        "NodeID": "416e647265772042757269616e00d20f4f68b4dead5c33d2307901c7270c9851",
+        "NodeID": "416e647265772042757269616e00acf8716efaa40e8f9fc5d0160f70240fe96e",
         "Address": "collection-002.benchmarknet2.nodes.onflow.org:3569",
         "Role": "collection",
         "Stake": 100,
-        "StakingPubKey": "iiiSkNy6gvNIxWxnHGxq5FvACKKZhts0FwL6wWle1ajO/WiwATzqh5gRRN1RpcO+Cl2Z2RFjwrtg5lUARytsxK5fUxqQNEeSiA/b3kcsNilLWBXD/MVOfOljdquNKjnq",
-        "NetworkPubKey": "jUVuCDZqwvMTjEgLel8yafkZqjHG7z58QFTY8gF0wEc2XTBzrLZZhq7xiwRvV83tUfi+RlgEKie5887m9nc3YQ=="
+        "StakingPubKey": "sblrOfa8XTBJ6TJNy5/EufK5jafx0xPgzK8qWC4fR8sedy8SQqrGEn0t8/SNScUgDg2c3neNJW92M+SGD82H+t4kvtHJ5P4uYiZLqCpxl5M3jJzGFVZ7l33muN2oolVj",
+        "NetworkPubKey": "pU4E8OkXJ+dyLzoYr9MsYmkkPXl8P6rglCwhh32dNeuyEueN+co2SD539b55DxsXmVUtr59qpD+P0EZsw7T3ug=="
       },
       {
-        "NodeID": "4261737469616e204d756c6c6572002fc5bd5d15d60ff36cd2cdcb7985419417",
+        "NodeID": "4261737469616e204d756c6c657200f9eff41286b08bcab2db5789f11f438108",
         "Address": "collection-003.benchmarknet2.nodes.onflow.org:3569",
         "Role": "collection",
         "Stake": 100,
-        "StakingPubKey": "iLBkwmOyc+aBNb7BBRjrMSXxkM7FnRrguYRgS6NPXINmRnpQDJo+Bx6SpnIc6aUIC410wfi4QNZo8/hZtyb6qQEv/bgYRSIcxWWn+s9TuxeRUHWFjHHC1zHpRDaPfFvu",
-        "NetworkPubKey": "vmp2ab7LKD8MsRdJCRwSeSUTxnsixgItsdFxQxLcvhzWIk3vfARAnx1gNPebxmTMgJ1aGT1UgruPCitgVAZy6A=="
+        "StakingPubKey": "sEsRBN0uN+xFYVQvvDXJE9HHKaZtdgJklZB3yKGKGT37PJ85Fl2r3gOGy9iUhvs7AfY/zRFPKmEkWf2zq0OL0Jjm4CMqQX7nHN/cfpSLk4rkFwi+HawmWt0+YQOrP6FH",
+        "NetworkPubKey": "JFyYxpU1sBluYSsKpfPwc3H5p0z5CdieUn7JSmq3Q4S5hDsXxb5F40vi5j7VcjvA8Fsai9xp5KrvJTG/lGNNIQ=="
       },
       {
-        "NodeID": "42656e6a616d696e2056616e204d6574657200b613b21948e74f9a518a355994",
+        "NodeID": "42656e6a616d696e2056616e204d6574657200f12c25e1f8c07b28c9f5f9bb86",
         "Address": "consensus-001.benchmarknet2.nodes.onflow.org:3569",
         "Role": "consensus",
         "Stake": 100,
-        "StakingPubKey": "mFz71ligYtwLmoBpGx45rTofmwM/wXHPMR3RzxUtDb3bQt0Knc1gksUUcTzckkTBDzkkdDTT2ahwSXqlCimfL1Xe97mLDjkun2hQBJWuG9AfFVNaVzoY07VEiTQtKfAt",
-        "NetworkPubKey": "RDhRWVCPYUUWEBltZUSqQYVUhN8/ge/L9Bfu+PEya/ou2UJT6te6Q8Up6elkxXvI+dv+vn+nezz7KFxOGQxhDw=="
+        "StakingPubKey": "oIfdwgIT7tl99QwGo9LEh4TLaMnfdPLJhm+b6pofs5ZJh80lzOEazua6afvCj4GZGYTxaNKFceM/I7jkkR7RP8HWPy51KNJFqKxbosoRH4B//cQKYHR0tj6KDh3YcVS0",
+        "NetworkPubKey": "LVe4+Zz+7Ygl7X8TTEgpokQ14aOpHeHe1iPhfn/ZEegJ8Cs7ieu2MLbcKnF6aQgDLIVU4YSPYf4b5+ft1K5C5Q=="
       },
       {
-        "NodeID": "436173657920417272696e67746f6e001ace24bebe78d52f6b1911e8507ad632",
+        "NodeID": "436173657920417272696e67746f6e003ab8e4e2d6f9d1524866bdce83d18db4",
         "Address": "consensus-002.benchmarknet2.nodes.onflow.org:3569",
         "Role": "consensus",
         "Stake": 100,
-        "StakingPubKey": "tjFb3bdcoIdpEKNIgFmidpvFvUc/G/nSsrzzTeeimtRswPlwbFQJr3d7vkc7IeEUE5H235akxMAzk7b5t+blBURBYOEWIByjD9781oJ8cGwTtXF3yHTKVMmdN2qUt06A",
-        "NetworkPubKey": "qKwTEnXhnjki3DrP3tjejBfn4tpUZVE/buyToecCtIWVlJH6IbcKVDVTPAgfqwKNB6/X2uVGAFCsdYpiUMwB4g=="
+        "StakingPubKey": "rVHd7JHJ8439hCFQPqWqmlceTTQhtB5+w7q7UYG47jmz64ArNdrImJxBewqZTOB/Bz3gXacOeVSn2dXLbT17KhtsmPOXxdG1AHtjWYFCSwKy6kPeOvnd/I8Qtw/unk8I",
+        "NetworkPubKey": "ayh2bmBtIqMjLsndPZyEfBLqQNPGeIFGl4wAJyRy+TB7m5DHrs00OqfyeB7Mtg6UEYu4bdz4kiu/iqfc28Ni+w=="
       },
       {
-        "NodeID": "44696574657220536869726c657900a923cbc5919cb1f713a15cf86746072503",
+        "NodeID": "44696574657220536869726c657900723ded0046844c0103633f17e991dfeae0",
         "Address": "consensus-003.benchmarknet2.nodes.onflow.org:3569",
         "Role": "consensus",
         "Stake": 100,
-        "StakingPubKey": "glqaSxS5yW/mDGDJoIIxXRZOT+YAHpNsRCdCbQLbNJGJzzTgCNxHiE4LbO3eLLTgANrlKQ3WTzc50lbtk38LQ57xNO3HFQ/JNrsJKs/epp7WhO2AFumviVZuFWlGWKX1",
-        "NetworkPubKey": "R79DFW819SgmH4NsQXrowhGBpRVejR4gCbViGG3rZPbtxCfsz9wesce8IHAHj0VmvhScfI77blX6A6axQiaxRw=="
+        "StakingPubKey": "gD4A5anuY8ug2N1QE163jXQVrpdyoEUSIDtC5NDM36peFgYMmvNfFYCrxPFknI/1B4cHW+fV9ehK2X9sFP/wLUcsv2GJ1f56pD+CBH+GaN4/jQ/woImWNGaRSTLksHb2",
+        "NetworkPubKey": "iXJQJIoxJtFlrExPlamY2cyqR6NmnpP38pRtQuZzgjvjhUjw67U0rWnkeZKyyrwnroA58agbgFWufMabDo2JiQ=="
       },
       {
-        "NodeID": "4a616d65732048756e7465720021252b90191bd5455250566f363f1182d74682",
+        "NodeID": "4a616d65732048756e74657200dd125f1b12694401799570e903cd2e6fc1d279",
         "Address": "execution-001.benchmarknet2.nodes.onflow.org:3569",
         "Role": "execution",
         "Stake": 100,
-        "StakingPubKey": "krCjsqHKQI7b2IUOYAUhum/3SOPl8NyrqFuY7HPQGgHr9btYRCD4kMC7aZIhaaQuGOUQ0NemYRhhctEgSVlUzU+k13n2WQQk1MAnYZGs6YQGFXPkz357k1YoiOf3kS0W",
-        "NetworkPubKey": "W2Nm7qXJqoNdzN71Gw/emzyqwrpCWHSTQ0S1PRp44o/uLyNZYwON8zOORmkdFWuQg+XMFTG5smOMWqKxObmXSQ=="
+        "StakingPubKey": "jaMhwZNq8KI20Gdf59aRMPYBLgdJcvKraI/FxN/z6tY3xuDitafACFmlAyhTc3ARCzmXRgw34tF61uDTGSWtnTkMHKWAUr8XIhS0OMS9peq6jvS+BoHJEEjrz2k1LP+k",
+        "NetworkPubKey": "xLCZlC4E5q8bBf/+NW2O4B5mYD7EU49fysEKCZ4eAqrjAdm0z58pmGoUcpqcxOdWh+lrbd/XLmEQriB5vAgytA=="
       },
       {
-        "NodeID": "4a65666665727920446f796c65007af81a72ebcdb1f18ad72bbfe5253c8b9f57",
+        "NodeID": "4a65666665727920446f796c6500e98062decabe9cd15fb798243569354ece86",
         "Address": "execution-002.benchmarknet2.nodes.onflow.org:3569",
         "Role": "execution",
         "Stake": 100,
-        "StakingPubKey": "q+Z8tsQ/XmL9kRSRyOsn8F83E7livrmLpva1EG3304rhX9SUL4UcU/9VxaYqzHs7FSlKqA3Pwm2QKTmwa8NKkWXvxwHPLxgX0I6F1+d1wDb4ApUk3roiDlRq/pTqsBhw",
-        "NetworkPubKey": "hE3+HvPMRRo7Wp24HSFYi+W1+or5/LwmQOVHy9vfz0cDrESy81HzxJnBEVc3G3IYjYg2FEa7PZUgCXVb6xI9kw=="
+        "StakingPubKey": "mQj3cDkD4QukX5DGN+/0CdR54DpF+aLhURy+N807b+H4zw3MA0oXyikAo88HyJ9lBh9sNgGJSTHoeUx5821PP68o2WHslXgXDSr7m0/J/e+3dM4QBThDPrlEb/DVA9Qf",
+        "NetworkPubKey": "itxuIccL/lpfdgi06z/Da/cdoS+RWqR2jnMztnBWfQjPc8wSvQQhh4ka1mxNiF++R5ghYy0PZRKhIlsLTD7a1g=="
       },
       {
-        "NodeID": "4a6f7264616e20536368616c6d0063daa7b9be2878035198805c2d7365d75318",
+        "NodeID": "4a6f7264616e20536368616c6d0052411011beda9ba2dfc98631317b4b81cac3",
         "Address": "verification-001.benchmarknet2.nodes.onflow.org:3569",
         "Role": "verification",
         "Stake": 100,
-        "StakingPubKey": "lkP+XxgdSeptlZMwSILvqUuvhBTLgPn0YuB7aMD4r6b91vy35Pe4i84SqrgHXemlGSz1YvJoL+Jvrw/3NL1mbIdmkSfyjWzYcBifQpdE0FIAdXUmsCWGRoKy1jnuBGC7",
-        "NetworkPubKey": "qS/cdRe6txNW6MdT1R2eDTvOEXiKrK7875SYoDuUdaV7eq5yjJ6R30r7hVZw4zMgjYp46vjdhvmiNT1e+Jo7Zw=="
+        "StakingPubKey": "skGTJWG2dxY/oQyhBi++elEPbZN/0R5+hdnUSZk3YEIx96Q2reHd4OaDSRa+kdZWFanYeq6sSt7DLL1dbKSevCBk0Ph7TsOrkbP0bo8+wfddy+YSU/hH5KaY99oDWpEF",
+        "NetworkPubKey": "/eKN7+K6iVlk/XBJJpWI3ooH/4x/xl2BVWyrf3gQaByYOj0LkxdcID597Zk3VMQvn7cS4vv1Zhgm8rwD3uP8DA=="
       }
     ],
     "Guarantees": null,
