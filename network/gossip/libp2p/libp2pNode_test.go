@@ -121,7 +121,7 @@ func (l *LibP2PNodeTestSuite) TestGetPeerInfo() {
 		for j := 0; j < 10; j++ {
 			rinfo, err := GetPeerInfo(address)
 			require.NoError(l.Suite.T(), err)
-			assert.True(l.Suite.T(), rinfo.String() == info.String(), fmt.Sprintf("inconsistent id generated"))
+			assert.True(l.Suite.T(), rinfo.String() == info.String(), "inconsistent id generated")
 		}
 	}
 }
@@ -337,6 +337,28 @@ func (l *LibP2PNodeTestSuite) TestStreamClosing() {
 			break
 		}
 	}
+}
+
+// TestPing tests that a node can ping another node
+func (l *LibP2PNodeTestSuite) TestPing() {
+	defer l.cancel()
+
+	// creates two nodes
+	nodes, nodeAddr := l.CreateNodes(2)
+	defer l.StopNodes(nodes)
+
+	node1 := nodes[0]
+	node2 := nodes[1]
+	node1Addr := nodeAddr[0]
+	node2Addr := nodeAddr[1]
+
+	// test node1 can ping node 2
+	_, err := node1.Ping(l.ctx, node2Addr)
+	require.NoError(l.T(), err)
+
+	// test node 2 can ping node 1
+	_, err = node2.Ping(l.ctx, node1Addr)
+	require.NoError(l.T(), err)
 }
 
 // CreateNodes creates a number of libp2pnodes equal to the count with the given callback function for stream handling

@@ -256,8 +256,9 @@ func TestOnEntityResponseValid(t *testing.T) {
 	bunwanted, _ := msgpack.Marshal(unwanted)
 
 	res := &messages.EntityResponse{
-		Nonce: nonce,
-		Blobs: [][]byte{bwanted1, bwanted2, bunwanted},
+		Nonce:     nonce,
+		EntityIDs: []flow.Identifier{wanted1.ID(), wanted2.ID(), unwanted.ID()},
+		Blobs:     [][]byte{bwanted1, bwanted2, bunwanted},
 	}
 
 	req := &messages.EntityRequest{

@@ -53,7 +53,7 @@ func parseChainID(chainID string) flow.ChainID {
 func parseParentID(parentID string) flow.Identifier {
 	decoded, err := hex.DecodeString(parentID)
 	if err != nil {
-		log.Fatal().Str("parent_id", parentID).Msg("invalid parent ID")
+		log.Fatal().Err(err).Str("parent_id", parentID).Msg("invalid parent ID")
 	}
 	var id flow.Identifier
 	if len(decoded) != len(id) {

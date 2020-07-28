@@ -392,23 +392,29 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 		}
 	}
 
+	// ensure the response is correctly formed
+	if len(res.Blobs) != len(res.EntityIDs) {
+		return engine.NewInvalidInputErrorf("invalid response with %d blobs, %d IDs", len(res.Blobs), len(res.EntityIDs))
+	}
+
 	// process each entity in the response
 	// NOTE: this requires engines to be somewhat idempotent, which is a good
 	// thing, as it increases the robustness of their code
-	for _, blob := range res.Blobs {
+	for i := 0; i < len(res.Blobs); i++ {
+		blob := res.Blobs[i]
+		entityID := res.EntityIDs[i]
+
+		// the entity might already have been returned in another response
+		_, exists := e.items[entityID]
+		if !exists {
+			continue
+		}
 
 		// create the entity with underlying concrete type and decode blob
 		entity := e.create()
 		err := msgpack.Unmarshal(blob, &entity)
 		if err != nil {
 			return fmt.Errorf("could not decode entity: %w", err)
-		}
-
-		// the entity might already have been returned in another response
-		entityID := entity.ID()
-		_, exists := e.items[entityID]
-		if !exists {
-			continue
 		}
 
 		// remove from needed items and pending items

@@ -14,7 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/crypto/hash"
 	"github.com/dapperlabs/flow-go/engine"
-	mocklocal "github.com/dapperlabs/flow-go/engine/testutil/mocklocal"
+	"github.com/dapperlabs/flow-go/engine/testutil/mocklocal"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
@@ -69,12 +69,19 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	n, err := rand.Read(seed)
 	require.Equal(suite.T(), n, crypto.KeyGenSeedMinLenBLSBLS12381)
 	require.NoError(suite.T(), err)
+
+	// creates private key of verification node
 	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
 	require.NoError(suite.T(), err)
 	suite.sk = sk
+
 	// tag of hasher should be the same as the tag of engine's hasher
 	suite.hasher = utils.NewResultApprovalHasher()
-	suite.me = mocklocal.NewMockLocal(sk, flow.Identifier{}, suite.T())
+
+	// defines the identity of verification node and attaches its key.
+	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	verIdentity.StakingPubKey = sk.PublicKey()
+	suite.me = mocklocal.NewMockLocal(sk, verIdentity.NodeID, suite.T())
 }
 
 func (suite *VerifierEngineTestSuite) TestNewEngine() *verifier.Engine {
@@ -126,9 +133,6 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 	suite.metrics.On("OnVerifiableChunkReceived").Return()
 	// emission of result approval
 	suite.metrics.On("OnResultApproval").Return()
-	// chunk verification
-	suite.metrics.On("OnChunkVerificationStarted", vChunk.ChunkDataPack.ChunkID).Return()
-	suite.metrics.On("OnChunkVerificationFinished", vChunk.ChunkDataPack.ChunkID).Return()
 
 	suite.conduit.
 		On("Submit", testifymock.Anything, consensusNodes[0].NodeID).
@@ -144,6 +148,9 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 			suite.Assert().True(suite.sk.PublicKey().Verify(ra.Body.AttestationSignature, atstID[:], suite.hasher))
 			bodyID := ra.Body.ID()
 			suite.Assert().True(suite.sk.PublicKey().Verify(ra.VerifierSignature, bodyID[:], suite.hasher))
+
+			// spock should be non-nil
+			suite.Assert().NotNil(ra.Body.Spock)
 		}).
 		Once()
 
@@ -186,11 +193,6 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 		{unittest.VerifiableChunkDataFixture(uint64(3)), nil},
 	}
 	for _, test := range tests {
-		// mocks metrics
-		// chunk verification
-		suite.metrics.On("OnChunkVerificationStarted", test.vc.ChunkDataPack.ChunkID).Return()
-		suite.metrics.On("OnChunkVerificationFinished", test.vc.ChunkDataPack.ChunkID).Return()
-
 		err := eng.Process(myID, test.vc)
 		suite.Assert().NoError(err)
 	}
@@ -199,26 +201,26 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 type ChunkVerifierMock struct {
 }
 
-func (v ChunkVerifierMock) Verify(vc *verification.VerifiableChunkData) (chmodel.ChunkFault, error) {
+func (v ChunkVerifierMock) Verify(vc *verification.VerifiableChunkData) ([]byte, chmodel.ChunkFault, error) {
 	switch vc.Chunk.Index {
 	case 0:
-		return nil, nil
+		return []byte{}, nil, nil
 	// return error
 	case 1:
-		return chmodel.NewCFMissingRegisterTouch(
+		return nil, chmodel.NewCFMissingRegisterTouch(
 			[]string{"test missing register touch"},
 			vc.Chunk.Index,
 			vc.Result.ID()), nil
 
 	case 2:
-		return chmodel.NewCFInvalidVerifiableChunk(
+		return nil, chmodel.NewCFInvalidVerifiableChunk(
 			"test",
 			errors.New("test invalid verifiable chunk"),
 			vc.Chunk.Index,
 			vc.Result.ID()), nil
 
 	case 3:
-		return chmodel.NewCFNonMatchingFinalState(
+		return nil, chmodel.NewCFNonMatchingFinalState(
 			unittest.StateCommitmentFixture(),
 			unittest.StateCommitmentFixture(),
 			vc.Chunk.Index,
@@ -227,7 +229,7 @@ func (v ChunkVerifierMock) Verify(vc *verification.VerifiableChunkData) (chmodel
 	// TODO add cases for challenges
 	// return successful by default
 	default:
-		return nil, nil
+		return nil, nil, nil
 	}
 
 }

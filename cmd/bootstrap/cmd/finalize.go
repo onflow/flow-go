@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"encoding/hex"
-	"fmt"
 	"path/filepath"
 	"strings"
 	"time"
@@ -43,20 +42,20 @@ running the DKG for the generation of the random beacon keys and generating the 
 and block seal.`,
 	Run: func(cmd *cobra.Command, args []string) {
 
-		log.Info().Msg("✨ collecting partner network and staking keys")
+		log.Info().Msg("collecting partner network and staking keys")
 		partnerNodes := assemblePartnerNodes()
 		log.Info().Msg("")
 
-		log.Info().Msg("✨ generating internal private networking and staking keys")
+		log.Info().Msg("generating internal private networking and staking keys")
 		internalNodes := genNetworkAndStakingKeys(partnerNodes)
 		log.Info().Msg("")
 
-		log.Info().Msg("✨ assembling network and staking keys")
+		log.Info().Msg("assembling network and staking keys")
 		stakingNodes := mergeNodeInfos(internalNodes, partnerNodes)
 		writeJSON(model.PathNodeInfosPub, model.ToPublicNodeInfoList(stakingNodes))
 		log.Info().Msg("")
 
-		log.Info().Msg("✨ running DKG for consensus nodes")
+		log.Info().Msg("running DKG for consensus nodes")
 		dkgData := runDKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
 		log.Info().Msg("")
 
@@ -72,11 +71,11 @@ and block seal.`,
 			log.Info().Msg("")
 		}
 
-		log.Info().Msg("✨ constructing root block")
+		log.Info().Msg("constructing root block")
 		block := constructRootBlock(flagRootChain, flagRootParent, flagRootHeight, flagRootTimestamp, stakingNodes)
 		log.Info().Msg("")
 
-		log.Info().Msg("✨ constructing root QC")
+		log.Info().Msg("constructing root QC")
 		constructRootQC(
 			block,
 			model.FilterByRole(stakingNodes, flow.RoleConsensus),
@@ -85,20 +84,24 @@ and block seal.`,
 		)
 		log.Info().Msg("")
 
-		log.Info().Msg("✨ constructing root execution result and block seal")
+		log.Info().Msg("constructing root execution result and block seal")
 		constructRootResultAndSeal(flagRootCommit, block)
 		log.Info().Msg("")
 
-		log.Info().Msg("✨ computing collection node clusters")
+		log.Info().Msg("computing collection node clusters")
 		clusters := protocol.Clusters(uint(flagCollectionClusters), model.ToIdentityList(stakingNodes))
 		log.Info().Msg("")
 
-		log.Info().Msg("✨ constructing root blocks for collection node clusters")
+		log.Info().Msg("constructing root blocks for collection node clusters")
 		clusterBlocks := constructRootBlocksForClusters(clusters)
 		log.Info().Msg("")
 
-		log.Info().Msg("✨ constructing root QCs for collection node clusters")
+		log.Info().Msg("constructing root QCs for collection node clusters")
 		constructRootQCsForClusters(clusters, internalNodes, block, clusterBlocks)
+		log.Info().Msg("")
+
+		log.Info().Msg("saving the number of clusters")
+		savingNClusters(flagCollectionClusters)
 		log.Info().Msg("")
 
 		log.Info().Msg("🌊 🏄 🤙 Done – ready to flow!")
@@ -111,9 +114,9 @@ func init() {
 	// required parameters for network configuration and generation of root node identities
 	finalizeCmd.Flags().StringVar(&flagConfig, "config", "",
 		"path to a JSON file containing multiple node configurations (fields Role, Address, Stake)")
-	finalizeCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", fmt.Sprintf("path to directory "+
-		"containing one JSON file starting with %v for every partner node (fields Role, Address, NodeID, "+
-		"NetworkPubKey, StakingPubKey)", model.PathPartnerNodeInfoPrefix))
+	finalizeCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", "path to directory "+
+		"containing one JSON file starting with node-info.pub.<NODE_ID>.json for every partner node (fields "+
+		" in the JSON file: Role, Address, NodeID, NetworkPubKey, StakingPubKey)")
 	finalizeCmd.Flags().StringVar(&flagPartnerStakes, "partner-stakes", "", "path to a JSON file containing "+
 		"a map from partner node's NodeID to their stake")
 

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"errors"
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -13,10 +13,11 @@ import (
 
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/common/provider"
 	"github.com/dapperlabs/flow-go/engine/common/requester"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
-	"github.com/dapperlabs/flow-go/engine/execution/provider"
+	exeprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/rpc"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
@@ -28,8 +29,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	chainsync "github.com/dapperlabs/flow-go/module/synchronization"
-	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/storage/badger"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/wal"
 )
@@ -37,21 +37,23 @@ import (
 func main() {
 
 	var (
-		ledgerStorage      *ledger.MTrieStorage
-		events             storage.Events
-		txResults          storage.TransactionResults
-		providerEngine     *provider.Engine
-		syncCore           *chainsync.Core
-		computationManager *computation.Manager
-		requestEng         *requester.Engine
-		ingestionEng       *ingestion.Engine
-		rpcConf            rpc.Config
-		err                error
-		executionState     state.ExecutionState
-		triedir            string
-		collector          module.ExecutionMetrics
-		mTrieCacheSize     uint32
-		checkpointDistance uint
+		ledgerStorage       *ledger.MTrieStorage
+		events              *storage.Events
+		txResults           *storage.TransactionResults
+		results             *storage.ExecutionResults
+		receipts            *storage.ExecutionReceipts
+		providerEngine      *exeprovider.Engine
+		syncCore            *chainsync.Core
+		computationManager  *computation.Manager
+		collectionRequester *requester.Engine
+		ingestionEng        *ingestion.Engine
+		rpcConf             rpc.Config
+		err                 error
+		executionState      state.ExecutionState
+		triedir             string
+		collector           module.ExecutionMetrics
+		mTrieCacheSize      uint32
+		checkpointDistance  uint
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -94,18 +96,46 @@ func main() {
 			syncCore, err = chainsync.New(node.Logger, chainsync.DefaultConfig())
 			return err
 		}).
+		Module("execution receipts storage", func(node *cmd.FlowNodeBuilder) error {
+			results = storage.NewExecutionResults(node.DB)
+			receipts = storage.NewExecutionReceipts(node.DB, results)
+			return nil
+		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+
+			// check if the execution database already exists
 			bootstrapper := bootstrap.NewBootstrapper(node.Logger)
-			err := bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal.FinalState, node.RootBlock.Header)
-			// Root block already loaded, can simply continued
-			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-				return nil, fmt.Errorf("could not bootstrap execution DB: %w", err)
-			} else if err == nil {
-				// Newly bootstrapped Execution DB. Make sure to load execution state
-				if err := loadBootstrapState(node.BaseConfig.BootstrapDir, triedir); err != nil {
-					return nil, fmt.Errorf("could not load bootstrap state: %w", err)
+
+			commit, bootstrapped, err := bootstrapper.IsBootstrapped(node.DB)
+			if err != nil {
+				return nil, fmt.Errorf("could not query database to know whether database has been bootstrapped: %w", err)
+			}
+
+			// if the execution database does not exist, then we need to bootstrap the execution database.
+			if !bootstrapped {
+				// when bootstrapping, the bootstrap folder must have a checkpoint file
+				// we need to cover this file to the trie folder to restore the trie to restore the execution state.
+				err = copyBootstrapState(node.BaseConfig.BootstrapDir, triedir)
+				if err != nil {
+					return nil, fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
+				}
+
+				// TODO: check that the checkpoint file contains the root block's statecommit hash
+
+				err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal.FinalState, node.RootBlock.Header)
+				if err != nil {
+					return nil, fmt.Errorf("could not bootstrap execution database: %w", err)
+				}
+			} else {
+				// if execution database has been bootstrapped, then the root statecommit must equal to the one
+				// in the bootstrap folder
+				if !bytes.Equal(commit, node.RootSeal.FinalState) {
+					return nil, fmt.Errorf("mismatching root statecommitment. database has state commitment: %v, "+
+						"bootstap has statecommitment: %v",
+						commit, node.RootSeal.FinalState)
 				}
 			}
+
 			ledgerStorage, err = ledger.NewMTrieStorage(triedir, int(mTrieCacheSize), collector, node.MetricsRegisterer)
 			return ledgerStorage, err
 		}).
@@ -120,9 +150,8 @@ func main() {
 			return compactor, nil
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			chunkDataPacks := badger.NewChunkDataPacks(node.DB)
-			executionResults := badger.NewExecutionResults(node.DB)
-			stateCommitments := badger.NewCommits(node.Metrics.Cache, node.DB)
+			chunkDataPacks := storage.NewChunkDataPacks(node.DB)
+			stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
 
 			executionState = state.NewExecutionState(
 				ledgerStorage,
@@ -130,14 +159,15 @@ func main() {
 				node.Storage.Blocks,
 				node.Storage.Collections,
 				chunkDataPacks,
-				executionResults,
+				results,
+				receipts,
 				node.DB,
 				node.Tracer,
 			)
 
 			stateSync := sync.NewStateSynchronizer(executionState)
 
-			providerEngine, err = provider.New(
+			providerEngine, err = exeprovider.New(
 				node.Logger,
 				node.Tracer,
 				node.Network,
@@ -152,7 +182,7 @@ func main() {
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
-			requestEng, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
+			collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
 				engine.RequestCollections,
 				filter.HasRole(flow.RoleCollection),
 				func() flow.Entity { return &flow.Collection{} },
@@ -160,13 +190,13 @@ func main() {
 			)
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
-			events = badger.NewEvents(node.DB)
-			txResults = badger.NewTransactionResults(node.DB)
+			events = storage.NewEvents(node.DB)
+			txResults = storage.NewTransactionResults(node.DB)
 			ingestionEng, err = ingestion.New(
 				node.Logger,
 				node.Network,
 				node.Me,
-				requestEng,
+				collectionRequester,
 				node.State,
 				node.Storage.Blocks,
 				node.Storage.Payloads,
@@ -185,15 +215,31 @@ func main() {
 
 			// TODO: we should solve these mutual dependencies better
 			// => https://github.com/dapperlabs/flow-go/issues/4360
-			requestEng = requestEng.WithHandle(ingestionEng.OnCollection)
+			collectionRequester = collectionRequester.WithHandle(ingestionEng.OnCollection)
 
 			return ingestionEng, err
 		}).
-		Component("requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("collection requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
 			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
 			// be handled by the scaffold.
-			return requestEng, nil
+			return collectionRequester, nil
+		}).
+		Component("receipt provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			retrieve := func(blockID flow.Identifier) (flow.Entity, error) {
+				return receipts.ByBlockID(blockID)
+			}
+			eng, err := provider.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				engine.ProvideReceiptsByBlockID,
+				filter.HasRole(flow.RoleConsensus),
+				retrieve,
+			)
+			return eng, err
 		}).
 		// TODO: currently issues with this engine on the EXE node, as there is no follower engine, https://github.com/dapperlabs/flow-go/issues/4382
 		// Component("sychronization engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -220,17 +266,44 @@ func main() {
 		}).Run()
 }
 
-func loadBootstrapState(dir, trie string) error {
+// copy the checkpoint files from the bootstrap folder to the execution state folder
+// Checkpoint file is required to restore the trie, and has to be placed in the execution
+// state folder.
+// There are two ways to generate a checkpoint file:
+// 1) From a clean state.
+// 		Refer to the code in the testcase: TestGenerateExecutionState
+// 2) From a previous execution state
+// 		This is often used when sporking the network.
+//    Use the execution-state-extract util commandline to generate a checkpoint file from
+// 		a previous checkpoint file
+func copyBootstrapState(dir, trie string) error {
 	filename := ""
+	firstCheckpointFilename := "00000000"
 
-	if _, err := os.Stat(filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, wal.RootCheckpointFilename)); err == nil {
-		filename = wal.RootCheckpointFilename
-	} else if _, err := os.Stat(filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, "00000000")); err == nil {
-		filename = "00000000"
-	} else {
-		return fmt.Errorf("could not find bootstrapped execution state")
+	fileExists := func(fileName string) bool {
+		_, err := os.Stat(filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, fileName))
+		return err == nil
 	}
 
+	// if there is a root checkpoint file, then copy that file over
+	if fileExists(wal.RootCheckpointFilename) {
+		filename = wal.RootCheckpointFilename
+	} else if fileExists(firstCheckpointFilename) {
+		// else if there is a checkpoint file, then copy that file over
+		filename = firstCheckpointFilename
+	} else {
+		filePath := filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, firstCheckpointFilename)
+
+		// include absolute path of the missing file in the error message
+		absPath, err := filepath.Abs(filePath)
+		if err != nil {
+			absPath = filePath
+		}
+
+		return fmt.Errorf("execution state file not found: %v", absPath)
+	}
+
+	// copy from the bootstrap folder to the execution state folder
 	src := filepath.Join(dir, bootstrapFilenames.DirnameExecutionState, filename)
 	dst := filepath.Join(trie, filename)
 
@@ -239,6 +312,12 @@ func loadBootstrapState(dir, trie string) error {
 		return err
 	}
 	defer in.Close()
+
+	// It's possible that the trie dir does not yet exist. If not this will create the the required path
+	err = os.MkdirAll(trie, 0700)
+	if err != nil {
+		return err
+	}
 
 	out, err := os.Create(dst)
 	if err != nil {
@@ -250,5 +329,8 @@ func loadBootstrapState(dir, trie string) error {
 	if err != nil {
 		return err
 	}
+
+	fmt.Printf("copied bootstrap state file from: %v, to: %v\n", src, dst)
+
 	return out.Close()
 }
