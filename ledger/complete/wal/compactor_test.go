@@ -23,7 +23,7 @@ func Test_Compactor(t *testing.T) {
 
 	numInsPerStep := 2
 	pathByteSize := 4
-	minPayloadByteSize := 100
+	minPayloadByteSize := 200
 	maxPayloadByteSize := 2 << 16
 	size := 10
 	metricsCollector := &metrics.NoopCollector{}
