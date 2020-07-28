@@ -22,7 +22,7 @@ const CacheSize = 256
 func TestTransactionASTCache(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 
-	chain := flow.Mainnet.Chain()
+	chain := flow.Testnet.Chain()
 
 	vm := fvm.New(rt)
 
@@ -66,7 +66,7 @@ func TestTransactionASTCache(t *testing.T) {
 func TestScriptASTCache(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 
-	chain := flow.Mainnet.Chain()
+	chain := flow.Testnet.Chain()
 
 	vm := fvm.New(rt)
 
@@ -106,7 +106,7 @@ func TestScriptASTCache(t *testing.T) {
 func TestTransactionWithProgramASTCache(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 
-	chain := flow.Mainnet.Chain()
+	chain := flow.Testnet.Chain()
 
 	vm := fvm.New(rt)
 
@@ -171,7 +171,7 @@ func TestTransactionWithProgramASTCacheConsistentRegTouches(t *testing.T) {
 		rt := runtime.NewInterpreterRuntime()
 		h := unittest.BlockHeaderFixture()
 
-		chain := flow.Mainnet.Chain()
+		chain := flow.Testnet.Chain()
 
 		vm := fvm.New(rt)
 
@@ -242,7 +242,7 @@ func TestTransactionWithProgramASTCacheConsistentRegTouches(t *testing.T) {
 func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 	rt := runtime.NewInterpreterRuntime()
 
-	chain := flow.Mainnet.Chain()
+	chain := flow.Testnet.Chain()
 
 	vm := fvm.New(rt)
 
@@ -319,7 +319,7 @@ func (cache *nonFunctioningCache) SetProgram(location ast.Location, program *ast
 func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 	rt := runtime.NewInterpreterRuntime()
 
-	chain := flow.Mainnet.Chain()
+	chain := flow.Testnet.Chain()
 
 	vm := fvm.New(rt)
 
@@ -379,7 +379,7 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 
-	chain := flow.Mainnet.Chain()
+	chain := flow.Testnet.Chain()
 
 	vm := fvm.New(rt)
 

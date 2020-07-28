@@ -11,12 +11,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/engine"
 	collectioningest "github.com/dapperlabs/flow-go/engine/collection/ingest"
-	"github.com/dapperlabs/flow-go/engine/collection/provider"
+	"github.com/dapperlabs/flow-go/engine/collection/pusher"
+	"github.com/dapperlabs/flow-go/engine/common/provider"
+	"github.com/dapperlabs/flow-go/engine/common/requester"
 	"github.com/dapperlabs/flow-go/engine/common/synchronization"
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
-	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
@@ -30,6 +32,7 @@ import (
 	"github.com/dapperlabs/flow-go/fvm"
 	"github.com/dapperlabs/flow-go/model/bootstrap"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/chunks"
 	"github.com/dapperlabs/flow-go/module/local"
@@ -93,6 +96,9 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
 	require.NoError(t, err)
 
+	// sets staking public key of the node
+	identity.StakingPubKey = sk.PublicKey()
+
 	me, err := local.New(identity, sk)
 	require.NoError(t, err)
 
@@ -133,10 +139,18 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 	collections := storage.NewCollections(node.DB, transactions)
 
 	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, pool, collectioningest.DefaultConfig())
-	require.Nil(t, err)
+	require.NoError(t, err)
 
-	providerEngine, err := provider.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, pool, collections, transactions)
-	require.Nil(t, err)
+	selector := filter.HasRole(flow.RoleAccess, flow.RoleVerification)
+	retrieve := func(collID flow.Identifier) (flow.Entity, error) {
+		coll, err := collections.ByID(collID)
+		return coll, err
+	}
+	providerEngine, err := provider.New(node.Log, node.Metrics, node.Net, node.Me, node.State, engine.ProvideCollections, selector, retrieve)
+	require.NoError(t, err)
+
+	pusherEngine, err := pusher.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, pool, collections, transactions)
+	require.NoError(t, err)
 
 	return mock.CollectionNode{
 		GenericNode:     node,
@@ -144,6 +158,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 		Collections:     collections,
 		Transactions:    transactions,
 		IngestionEngine: ingestionEngine,
+		PusherEngine:    pusherEngine,
 		ProviderEngine:  providerEngine,
 	}
 }
@@ -187,24 +202,23 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	seals, err := stdmap.NewSeals(1000)
 	require.NoError(t, err)
 
-	propagationEngine, err := propagation.New(node.Log, node.Metrics, node.Metrics, node.Tracer, node.Metrics, node.Net, node.State, node.Me, guarantees)
-	require.NoError(t, err)
-
-	ingestionEngine, err := consensusingest.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Net, propagationEngine, node.State, node.Headers, node.Me)
+	ingestionEngine, err := consensusingest.New(node.Log, node.Tracer, node.Metrics, node.Metrics, node.Metrics, node.Net, node.State, node.Headers, node.Me, guarantees)
 	require.Nil(t, err)
 
-	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Net, node.State, node.Me, resultsDB, sealsDB, node.Headers, node.Index, results, receipts, approvals, seals)
+	requesterEng, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, engine.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
+	require.Nil(t, err)
+
+	matchingEngine, err := matching.New(node.Log, node.Metrics, node.Tracer, node.Metrics, node.Net, node.State, node.Me, requesterEng, resultsDB, sealsDB, node.Headers, node.Index, results, receipts, approvals, seals)
 	require.Nil(t, err)
 
 	return mock.ConsensusNode{
-		GenericNode:       node,
-		Guarantees:        guarantees,
-		Approvals:         approvals,
-		Receipts:          receipts,
-		Seals:             seals,
-		PropagationEngine: propagationEngine,
-		IngestionEngine:   ingestionEngine,
-		MatchingEngine:    matchingEngine,
+		GenericNode:     node,
+		Guarantees:      guarantees,
+		Approvals:       approvals,
+		Receipts:        receipts,
+		Seals:           seals,
+		IngestionEngine: ingestionEngine,
+		MatchingEngine:  matchingEngine,
 	}
 }
 
@@ -236,7 +250,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	txResultStorage := storage.NewTransactionResults(node.DB)
 	commitsStorage := storage.NewCommits(node.Metrics, node.DB)
 	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
-	executionResults := storage.NewExecutionResults(node.DB)
+	results := storage.NewExecutionResults(node.DB)
+	receipts := storage.NewExecutionReceipts(node.DB, results)
 
 	dbDir := unittest.TempDir(t)
 
@@ -255,14 +270,22 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	execState := state.NewExecutionState(
-		ls, commitsStorage, node.Blocks, collectionsStorage, chunkDataPackStorage, executionResults, node.DB, node.Tracer,
+		ls, commitsStorage, node.Blocks, collectionsStorage, chunkDataPackStorage, results, receipts, node.DB, node.Tracer,
 	)
 
 	stateSync := sync.NewStateSynchronizer(execState)
 
-	collector := metrics.NewNoopCollector()
-	providerEngine, err := executionprovider.New(
-		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, stateSync, collector,
+	requestEngine, err := requester.New(
+		node.Log, node.Metrics, node.Net, node.Me, node.State,
+		engine.RequestCollections,
+		filter.HasRole(flow.RoleCollection),
+		func() flow.Entity { return &flow.Collection{} },
+	)
+	require.NoError(t, err)
+
+	metrics := metrics.NewNoopCollector()
+	pusherEngine, err := executionprovider.New(
+		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, stateSync, metrics,
 	)
 	require.NoError(t, err)
 
@@ -293,6 +316,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Log,
 		node.Net,
 		node.Me,
+		requestEngine,
 		node.State,
 		node.Blocks,
 		node.Payloads,
@@ -300,17 +324,17 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		eventsStorage,
 		txResultStorage,
 		computationEngine,
-		providerEngine,
+		pusherEngine,
 		syncCore,
 		execState,
 		syncThreshold,
 		node.Metrics,
 		node.Tracer,
 		false,
-		2137*time.Hour, // just don't retry
-		10,
 	)
 	require.NoError(t, err)
+
+	requestEngine.WithHandle(ingestionEngine.OnCollection)
 
 	syncEngine, err := synchronization.New(
 		node.Log,
@@ -328,7 +352,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		GenericNode:     node,
 		IngestionEngine: ingestionEngine,
 		ExecutionEngine: computationEngine,
-		ReceiptsEngine:  providerEngine,
+		ReceiptsEngine:  pusherEngine,
 		SyncEngine:      syncEngine,
 		BadgerDB:        node.DB,
 		VM:              vm,

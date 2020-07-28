@@ -33,7 +33,7 @@ func NewChunkVerifier(vm VirtualMachine, vmCtx fvm.Context) *ChunkVerifier {
 }
 
 // Verify verifies the given VerifiableChunk by executing it and checking the final statecommitment
-func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) (chmodels.ChunkFault, error) {
+func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) ([]byte, chmodels.ChunkFault, error) {
 
 	// TODO check collection hash to match
 	// TODO check datapack hash to match
@@ -47,7 +47,7 @@ func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) (chmodels
 
 	// constructing a partial trie given chunk data package
 	if vc.ChunkDataPack == nil {
-		return nil, fmt.Errorf("missing chunk data pack")
+		return nil, nil, fmt.Errorf("missing chunk data pack")
 	}
 	psmt, err := ptrie.NewPSMT(vc.ChunkDataPack.StartState,
 		ledger.RegisterKeySize,
@@ -57,7 +57,8 @@ func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) (chmodels
 	)
 	if err != nil {
 		// TODO provide more details based on the error type
-		return chmodels.NewCFInvalidVerifiableChunk("error constructing partial trie", err, chIndex, execResID), nil
+		return nil, chmodels.NewCFInvalidVerifiableChunk("error constructing partial trie", err, chIndex, execResID),
+			nil
 	}
 
 	// chunk view construction
@@ -87,7 +88,7 @@ func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) (chmodels
 		if err != nil {
 			// this covers unexpected and very rare cases (e.g. system memory issues...),
 			// so we shouldn't be here even if transaction naturally fails (e.g. permission, runtime ... )
-			return nil, fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
+			return nil, nil, fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
 		}
 
 		if tx.Err == nil {
@@ -102,7 +103,7 @@ func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) (chmodels
 		for key := range unknownRegTouch {
 			missingRegs = append(missingRegs, key)
 		}
-		return chmodels.NewCFMissingRegisterTouch(missingRegs, chIndex, execResID), nil
+		return nil, chmodels.NewCFMissingRegisterTouch(missingRegs, chIndex, execResID), nil
 	}
 
 	// applying chunk delta (register updates at chunk level) to the partial trie
@@ -111,14 +112,14 @@ func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) (chmodels
 	regs, values := chunkView.Delta().RegisterUpdates()
 	expEndStateComm, failedKeys, err := psmt.Update(regs, values)
 	if err != nil {
-		return chmodels.NewCFMissingRegisterTouch(failedKeys, chIndex, execResID), nil
+		return nil, chmodels.NewCFMissingRegisterTouch(failedKeys, chIndex, execResID), nil
 	}
 
 	// TODO check if exec node provided register touches that was not used (no read and no update)
 	// check if the end state commitment mentioned in the chunk matches
 	// what the partial trie is providing.
 	if !bytes.Equal(expEndStateComm, vc.EndState) {
-		return chmodels.NewCFNonMatchingFinalState(expEndStateComm, vc.EndState, chIndex, execResID), nil
+		return nil, chmodels.NewCFNonMatchingFinalState(expEndStateComm, vc.EndState, chIndex, execResID), nil
 	}
-	return nil, nil
+	return chunkView.SpockSecret(), nil, nil
 }

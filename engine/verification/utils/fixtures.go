@@ -31,11 +31,12 @@ type CompleteExecutionResult struct {
 	Block          *flow.Block
 	Collections    []*flow.Collection
 	ChunkDataPacks []*flow.ChunkDataPack
+	SpockSecrets   [][]byte
 }
 
 // CompleteExecutionResultFixture returns complete execution result with an
 // execution receipt referencing the block/collections.
-// chunkCount determines the number of chunks inside each receipt
+// chunkCount determines the number of chunks inside each receipt.
 func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain) CompleteExecutionResult {
 
 	// setup collection
@@ -78,6 +79,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 
 	log := zerolog.Nop()
 
+	spockSecrets := make([][]byte, 0)
 	unittest.RunWithTempDir(t, func(dir string) {
 		led, err := ledger.NewMTrieStorage(dir, 100, metricsCollector, nil)
 		require.NoError(t, err)
@@ -121,8 +123,9 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 		}
 
 		// *execution.ComputationResult, error
-		_, err = bc.ExecuteBlock(context.Background(), executableBlock, view)
+		computationResult, err := bc.ExecuteBlock(context.Background(), executableBlock, view)
 		require.NoError(t, err, "error executing block")
+		spockSecrets = append(spockSecrets, computationResult.StateSnapshots[0].SpockSecret)
 
 		ids, values := view.Delta().RegisterUpdates()
 
@@ -192,8 +195,9 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 			}
 
 			// *execution.ComputationResult, error
-			_, err = bc.ExecuteBlock(context.Background(), executableBlock, view)
+			computationResult, err := bc.ExecuteBlock(context.Background(), executableBlock, view)
 			require.NoError(t, err, "error executing block")
+			spockSecrets = append(spockSecrets, computationResult.StateSnapshots[0].SpockSecret)
 
 			ids, values := view.Delta().RegisterUpdates()
 
@@ -269,6 +273,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 		Block:          &block,
 		Collections:    collections,
 		ChunkDataPacks: chunkDataPacks,
+		SpockSecrets:   spockSecrets,
 	}
 }
 

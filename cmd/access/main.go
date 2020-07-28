@@ -15,12 +15,15 @@ import (
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/committee/leader"
 	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/dapperlabs/flow-go/consensus/recovery/protocol"
+	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/access/ingestion"
 	"github.com/dapperlabs/flow-go/engine/access/rpc"
 	followereng "github.com/dapperlabs/flow-go/engine/common/follower"
+	"github.com/dapperlabs/flow-go/engine/common/requester"
 	synceng "github.com/dapperlabs/flow-go/engine/common/synchronization"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/buffer"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
@@ -38,6 +41,7 @@ func main() {
 		collectionLimit uint
 		receiptLimit    uint
 		ingestEng       *ingestion.Engine
+		requestEng      *requester.Engine
 		followerEng     *followereng.Engine
 		syncCore        *synchronization.Core
 		rpcConf         rpc.Config
@@ -97,13 +101,32 @@ func main() {
 			return rpcEng, nil
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, rpcEng)
+			requestEng, err = requester.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				engine.RequestCollections,
+				filter.HasRole(flow.RoleCollection),
+				func() flow.Entity { return &flow.Collection{} },
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create requester engine: %w", err)
+			}
+			ingestEng, err = ingestion.New(node.Logger, node.State, node.Me, requestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, rpcEng)
+			requestEng.WithHandle(ingestEng.OnCollection)
 			return ingestEng, err
+		}).
+		Component("requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
+			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
+			// be handled by the scaffold.
+			return requestEng, nil
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
-			// TODO frequency of 0 turns off the cleaner, turn back on once we know the proper tuning
 			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
 
 			// create a finalizer that will handle updating the protocol
