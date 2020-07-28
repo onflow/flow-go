@@ -13,10 +13,11 @@ import (
 
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/common/provider"
 	"github.com/dapperlabs/flow-go/engine/common/requester"
 	"github.com/dapperlabs/flow-go/engine/execution/computation"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
-	"github.com/dapperlabs/flow-go/engine/execution/provider"
+	exeprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/rpc"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/state/bootstrap"
@@ -28,8 +29,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	chainsync "github.com/dapperlabs/flow-go/module/synchronization"
-	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/storage/badger"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/wal"
 )
@@ -37,21 +37,23 @@ import (
 func main() {
 
 	var (
-		ledgerStorage      *ledger.MTrieStorage
-		events             storage.Events
-		txResults          storage.TransactionResults
-		providerEngine     *provider.Engine
-		syncCore           *chainsync.Core
-		computationManager *computation.Manager
-		requestEng         *requester.Engine
-		ingestionEng       *ingestion.Engine
-		rpcConf            rpc.Config
-		err                error
-		executionState     state.ExecutionState
-		triedir            string
-		collector          module.ExecutionMetrics
-		mTrieCacheSize     uint32
-		checkpointDistance uint
+		ledgerStorage       *ledger.MTrieStorage
+		events              *storage.Events
+		txResults           *storage.TransactionResults
+		results             *storage.ExecutionResults
+		receipts            *storage.ExecutionReceipts
+		providerEngine      *exeprovider.Engine
+		syncCore            *chainsync.Core
+		computationManager  *computation.Manager
+		collectionRequester *requester.Engine
+		ingestionEng        *ingestion.Engine
+		rpcConf             rpc.Config
+		err                 error
+		executionState      state.ExecutionState
+		triedir             string
+		collector           module.ExecutionMetrics
+		mTrieCacheSize      uint32
+		checkpointDistance  uint
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -93,6 +95,11 @@ func main() {
 		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
 			syncCore, err = chainsync.New(node.Logger, chainsync.DefaultConfig())
 			return err
+		}).
+		Module("execution receipts storage", func(node *cmd.FlowNodeBuilder) error {
+			results = storage.NewExecutionResults(node.DB)
+			receipts = storage.NewExecutionReceipts(node.DB, results)
+			return nil
 		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
@@ -143,9 +150,8 @@ func main() {
 			return compactor, nil
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			chunkDataPacks := badger.NewChunkDataPacks(node.DB)
-			executionResults := badger.NewExecutionResults(node.DB)
-			stateCommitments := badger.NewCommits(node.Metrics.Cache, node.DB)
+			chunkDataPacks := storage.NewChunkDataPacks(node.DB)
+			stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
 
 			executionState = state.NewExecutionState(
 				ledgerStorage,
@@ -153,14 +159,15 @@ func main() {
 				node.Storage.Blocks,
 				node.Storage.Collections,
 				chunkDataPacks,
-				executionResults,
+				results,
+				receipts,
 				node.DB,
 				node.Tracer,
 			)
 
 			stateSync := sync.NewStateSynchronizer(executionState)
 
-			providerEngine, err = provider.New(
+			providerEngine, err = exeprovider.New(
 				node.Logger,
 				node.Tracer,
 				node.Network,
@@ -175,7 +182,7 @@ func main() {
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
-			requestEng, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
+			collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
 				engine.RequestCollections,
 				filter.HasRole(flow.RoleCollection),
 				func() flow.Entity { return &flow.Collection{} },
@@ -183,13 +190,13 @@ func main() {
 			)
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
-			events = badger.NewEvents(node.DB)
-			txResults = badger.NewTransactionResults(node.DB)
+			events = storage.NewEvents(node.DB)
+			txResults = storage.NewTransactionResults(node.DB)
 			ingestionEng, err = ingestion.New(
 				node.Logger,
 				node.Network,
 				node.Me,
-				requestEng,
+				collectionRequester,
 				node.State,
 				node.Storage.Blocks,
 				node.Storage.Payloads,
@@ -208,15 +215,31 @@ func main() {
 
 			// TODO: we should solve these mutual dependencies better
 			// => https://github.com/dapperlabs/flow-go/issues/4360
-			requestEng = requestEng.WithHandle(ingestionEng.OnCollection)
+			collectionRequester = collectionRequester.WithHandle(ingestionEng.OnCollection)
 
 			return ingestionEng, err
 		}).
-		Component("requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("collection requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
 			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
 			// be handled by the scaffold.
-			return requestEng, nil
+			return collectionRequester, nil
+		}).
+		Component("receipt provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			retrieve := func(blockID flow.Identifier) (flow.Entity, error) {
+				return receipts.ByBlockID(blockID)
+			}
+			eng, err := provider.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				engine.ProvideReceiptsByBlockID,
+				filter.HasRole(flow.RoleConsensus),
+				retrieve,
+			)
+			return eng, err
 		}).
 		// TODO: currently issues with this engine on the EXE node, as there is no follower engine, https://github.com/dapperlabs/flow-go/issues/4382
 		// Component("sychronization engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -289,6 +312,12 @@ func copyBootstrapState(dir, trie string) error {
 		return err
 	}
 	defer in.Close()
+
+	// It's possible that the trie dir does not yet exist. If not this will create the the required path
+	err = os.MkdirAll(trie, 0700)
+	if err != nil {
+		return err
+	}
 
 	out, err := os.Create(dst)
 	if err != nil {

@@ -624,6 +624,13 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, nil, err
 	}
 
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathNClusters), bootstrap.NClusters{
+		NClusters: uint(networkConf.NClusters),
+	})
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	// write collector-specific root bootstrap files for each cluster
 	for i := 0; i < len(clusterBlocks); i++ {
 		clusterRoot := clusterBlocks[i]

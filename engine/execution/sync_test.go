@@ -150,24 +150,28 @@ func TestSyncFlow(t *testing.T) {
 	providerEngine.On("Submit", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			originID := args.Get(0).(flow.Identifier)
-			request := args.Get(1).(*messages.EntityRequest)
-			if originID == exe2ID.NodeID && request.EntityIDs[0] == col1.ID() {
-				_ = colConduit.Submit(&messages.EntityResponse{Nonce: request.Nonce, Blobs: [][]byte{blob1}}, originID)
+			req := args.Get(1).(*messages.EntityRequest)
+			if originID == exe2ID.NodeID && req.EntityIDs[0] == col1.ID() {
+				res := &messages.EntityResponse{Nonce: req.Nonce, Blobs: [][]byte{blob1}, EntityIDs: req.EntityIDs[:1]}
+				_ = colConduit.Submit(res, originID)
 				return
 			}
-			if originID == exe2ID.NodeID && request.EntityIDs[0] == col2.ID() {
-				_ = colConduit.Submit(&messages.EntityResponse{Nonce: request.Nonce, Blobs: [][]byte{blob2}}, originID)
+			if originID == exe2ID.NodeID && req.EntityIDs[0] == col2.ID() {
+				res := &messages.EntityResponse{Nonce: req.Nonce, Blobs: [][]byte{blob2}, EntityIDs: req.EntityIDs[:1]}
+				_ = colConduit.Submit(res, originID)
 				return
 			}
-			if originID == exe1ID.NodeID && request.EntityIDs[0] == col4.ID() {
-				_ = colConduit.Submit(&messages.EntityResponse{Nonce: request.Nonce, Blobs: [][]byte{blob4}}, originID)
+			if originID == exe1ID.NodeID && req.EntityIDs[0] == col4.ID() {
+				res := &messages.EntityResponse{Nonce: req.Nonce, Blobs: [][]byte{blob4}, EntityIDs: req.EntityIDs[:1]}
+				_ = colConduit.Submit(res, originID)
 				return
 			}
-			if originID == exe1ID.NodeID && request.EntityIDs[0] == col5.ID() {
-				_ = colConduit.Submit(&messages.EntityResponse{Nonce: request.Nonce, Blobs: [][]byte{blob5}}, originID)
+			if originID == exe1ID.NodeID && req.EntityIDs[0] == col5.ID() {
+				res := &messages.EntityResponse{Nonce: req.Nonce, Blobs: [][]byte{blob5}, EntityIDs: req.EntityIDs[:1]}
+				_ = colConduit.Submit(res, originID)
 				return
 			}
-			assert.FailNowf(t, "invalid collection request", "(origin: %x, entities: %s)", originID, request.EntityIDs)
+			assert.FailNowf(t, "invalid collection request", "(origin: %x, entities: %s)", originID, req.EntityIDs)
 		},
 	).
 		Times(4).
