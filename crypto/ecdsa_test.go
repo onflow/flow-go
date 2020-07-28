@@ -18,10 +18,10 @@ func TestECDSA(t *testing.T) {
 		ECDSAP256,
 		ECDSASecp256k1,
 	}
-	for i, curve := range ecdsaCurves {
+	for _, curve := range ecdsaCurves {
 		t.Logf("Testing ECDSA for curve %s", curve)
 		halg := hash.NewSHA3_256()
-		testGenSignVerify(t, ecdsaCurves[i], halg)
+		testGenSignVerify(t, curve, halg)
 	}
 }
 
@@ -180,5 +180,18 @@ func TestScalarMult(t *testing.T) {
 		Rx, Ry = test.curve.ScalarMult(Px, Py, k.Bytes())
 		assert.Equal(t, Rx.Cmp(Qx), 0)
 		assert.Equal(t, Ry.Cmp(Qy), 0)
+	}
+}
+
+// ECDSA Proof of Possession test
+func TestECDSAPOP(t *testing.T) {
+	ecdsaCurves := []SigningAlgorithm{
+		ECDSAP256,
+		ECDSASecp256k1,
+	}
+	for _, curve := range ecdsaCurves {
+		t.Logf("Testing ECDSA for curve %s", curve)
+		halg := hash.NewSHA3_256()
+		testPOP(t, curve, halg)
 	}
 }
