@@ -66,9 +66,14 @@ func New(
 	sync module.BlockRequester,
 ) (*Engine, error) {
 
-	participants, _, err := protocol.ClusterFor(protoState.Final(), me.NodeID())
+	clusters, err := protoState.Final().Clusters()
 	if err != nil {
-		return nil, fmt.Errorf("could not get cluster participants: %w", err)
+		return nil, fmt.Errorf("could not get clusters: %w", err)
+	}
+
+	participants, _, found := clusters.ByNodeID(me.NodeID())
+	if !found {
+		return nil, fmt.Errorf("could not find cluster for self")
 	}
 
 	e := &Engine{
