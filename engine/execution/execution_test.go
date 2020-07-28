@@ -109,8 +109,9 @@ func TestExecutionFlow(t *testing.T) {
 			}
 
 			res := &messages.EntityResponse{
-				Nonce: req.Nonce,
-				Blobs: blobs,
+				Nonce:     req.Nonce,
+				EntityIDs: req.EntityIDs,
+				Blobs:     blobs,
 			}
 
 			err := provConduit.Submit(res, originID)
@@ -301,10 +302,12 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 			originID := args[0].(flow.Identifier)
 			req := args[1].(*messages.EntityRequest)
 			if req.EntityIDs[0] == col1.ID() {
-				err := colConduit.Submit(&messages.EntityResponse{Blobs: [][]byte{blob1}}, originID)
+				res := &messages.EntityResponse{Blobs: [][]byte{blob1}, EntityIDs: req.EntityIDs[:1]}
+				err := colConduit.Submit(res, originID)
 				assert.NoError(t, err)
 			} else if req.EntityIDs[0] == col2.ID() {
-				err := colConduit.Submit(&messages.EntityResponse{Blobs: [][]byte{blob2}}, originID)
+				res := &messages.EntityResponse{Blobs: [][]byte{blob2}, EntityIDs: req.EntityIDs[:1]}
+				err := colConduit.Submit(res, originID)
 				assert.NoError(t, err)
 			} else {
 				assert.FailNow(t, "requesting unexpected collection", req.EntityIDs[0])
