@@ -500,7 +500,10 @@ func (e *EventHandler) processVote(vote *model.Vote) error {
 		// store the pending vote if voting block is not found.
 		// We don't need to proactively fetch the missing voting block, because the chain compliance layer has acknowledged
 		// the missing block and requested it already.
-		_ = e.voteAggregator.StorePendingVote(vote)
+		_, err := e.voteAggregator.StorePendingVote(vote)
+		if err != nil {
+			return fmt.Errorf("can not store pending vote: %w", err)
+		}
 
 		log.Debug().Msg("block for vote not found, caching for later")
 

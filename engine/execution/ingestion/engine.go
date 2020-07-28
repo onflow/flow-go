@@ -269,7 +269,7 @@ func (e *Engine) handleBlockProposal(ctx context.Context, proposal *messages.Blo
 			if errors.Is(err, storage.ErrNotFound) {
 				queue, added := enqueue(executableBlock, orphanQueues)
 				if !added {
-					panic(fmt.Sprintf("could not enqueue orphaned block"))
+					panic("could not enqueue orphaned block")
 				}
 				e.tryRequeueOrphans(executableBlock, queue, orphanQueues)
 				e.log.Debug().Hex("block_id", logging.Entity(executableBlock.Block)).Hex("parent_id", logging.ID(executableBlock.Block.Header.ParentID)).Msg("added block to new orphan queue")
@@ -321,7 +321,7 @@ func (e *Engine) tryRequeueOrphans(blockify queue.Blockify, targetQueue *queue.Q
 			err := targetQueue.Attach(queue)
 			// shouldn't happen
 			if err != nil {
-				panic(fmt.Sprintf("internal error while joining queues"))
+				panic("internal error while joining queues")
 			}
 			potentialQueues.Rem(queue.ID())
 		}
@@ -854,11 +854,6 @@ func (e *Engine) generateExecutionResultForBlock(
 		},
 	}
 
-	err = e.execState.PersistExecutionResult(ctx, block.ID(), *er)
-	if err != nil {
-		return nil, fmt.Errorf("could not persist execution result: %w", err)
-	}
-
 	return er, nil
 }
 
@@ -894,6 +889,11 @@ func (e *Engine) generateExecutionReceipt(
 	}
 
 	receipt.ExecutorSignature = sig
+
+	err = e.execState.PersistExecutionReceipt(ctx, receipt)
+	if err != nil {
+		return nil, fmt.Errorf("could not persist execution result: %w", err)
+	}
 
 	return receipt, nil
 }

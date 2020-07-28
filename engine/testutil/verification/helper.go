@@ -13,12 +13,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/rand"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
 	mock2 "github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/utils"
 	chmodel "github.com/dapperlabs/flow-go/model/chunks"
+	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
@@ -127,7 +129,13 @@ func VerificationHappyPath(t *testing.T,
 	exeNode, exeEngine := SetupMockExeNode(t, hub, exeIdentity, verIdentities, identities, chainID, completeER)
 
 	// mock consensus node
-	conNode, conEngine, conWG := SetupMockConsensusNode(t, hub, conIdentity, verIdentities, identities, completeER, chainID)
+	conNode, conEngine, conWG := SetupMockConsensusNode(t,
+		hub,
+		conIdentity,
+		verIdentities,
+		identities,
+		completeER,
+		chainID)
 
 	// sends execution receipt to each of verification nodes
 	verWG := sync.WaitGroup{}
@@ -301,6 +309,9 @@ func SetupMockConsensusNode(t *testing.T,
 		resultApprovalSeen[verIdentity.NodeID] = make(map[flow.Identifier]struct{})
 	}
 
+	// creates a hasher for spock
+	hasher := crypto.NewBLSKMAC(encoding.SPOCKTag)
+
 	conEngine.On("Process", testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
 			originID, ok := args[0].(flow.Identifier)
@@ -318,6 +329,30 @@ func SetupMockConsensusNode(t *testing.T,
 
 			// asserts that the result approval is assigned to the verifier
 			assert.True(t, IsAssigned(resultApproval.Body.ChunkIndex))
+
+			// verifies SPoCK proof of result approval
+			// against the SPoCK secret of the execution result
+			//
+			// retrieves public key of verification node
+			var pk crypto.PublicKey
+			found := false
+			for _, identity := range verIdentities {
+				if originID == identity.NodeID {
+					pk = identity.StakingPubKey
+					found = true
+				}
+			}
+			require.True(t, found)
+
+			// verifies proof
+			valid, err := crypto.SPOCKVerifyAgainstData(
+				pk,
+				resultApproval.Body.Spock,
+				completeER.SpockSecrets[resultApproval.Body.ChunkIndex],
+				hasher,
+			)
+			assert.NoError(t, err)
+			assert.True(t, valid)
 
 			wg.Done()
 		}).Return(nil)

@@ -42,6 +42,12 @@ func constructRootQCsForClusters(clusterList *flow.ClusterList, nodeInfos []mode
 	}
 }
 
+func savingNClusters(nclusters uint16) {
+	writeJSON(model.PathNClusters, model.NClusters{
+		NClusters: uint(nclusters),
+	})
+}
+
 // Filters a list of nodes to include only nodes that will sign the QC for the
 // given cluster. The resulting list of nodes is only nodes that are in the
 // given cluster AND are not partner nodes (ie. we have the private keys).

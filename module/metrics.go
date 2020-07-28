@@ -158,12 +158,6 @@ type VerificationMetrics interface {
 	// OnResultApproval is called whenever a result approval for is emitted to consensus nodes.
 	// It increases the total number of result approvals.
 	OnResultApproval()
-	// OnChunkVerificationStarted is called whenever the verification of a chunk is started
-	// it starts the timer to record the execution time
-	OnChunkVerificationStarted(chunkID flow.Identifier)
-	// OnChunkVerificationFinished is called whenever chunkID verification gets finished
-	// it records the duration of execution.
-	OnChunkVerificationFinished(chunkID flow.Identifier)
 
 	// LogVerifiableChunkSize is called whenever a verifiable chunk is shaped for a specific
 	// chunk. It adds the size of the verifiable chunk to the histogram. A verifiable chunk is assumed
