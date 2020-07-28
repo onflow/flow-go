@@ -110,7 +110,7 @@ func TestAggregateSignatures(t *testing.T) {
 // public keys aggregation sanity check
 //
 // Aggregate n public keys and their respective private keys and compare
-// the public key of the aggregated private key is equal to the aggregated
+// the public key of the aggregated private keys is equal to the aggregated
 // public key
 func TestAggregatePubKeys(t *testing.T) {
 	// number of keys to aggregate
