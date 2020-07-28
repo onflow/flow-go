@@ -8,6 +8,11 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/consensus"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/persister"
+	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/events"
@@ -15,6 +20,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
+	builder "github.com/dapperlabs/flow-go/module/builder/collection"
+	finalizer "github.com/dapperlabs/flow-go/module/finalizer/collection"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network"
@@ -24,6 +31,16 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
+
+type EpochLifecycle struct {
+	builder    *builder.Builder
+	finalizer  *finalizer.Finalizer
+	notifer    hotstuff.Consumer
+	persist    *persister.Persister
+	signer     *verification.SingleSigner
+	rootHeader *flow.Header
+	rootQC     *model.QuorumCertificate
+}
 
 // Engine is the collection proposal engine, which packages pending
 // transactions into collections and sends them to consensus nodes.
@@ -64,12 +81,20 @@ func New(
 	payloads storage.ClusterPayloads,
 	cache module.PendingClusterBlockBuffer,
 	sync module.BlockRequester,
+	push network.Engine,
+	persist hotstuff.Persister,
+	rootHeader *flow.Header,
+	rootQC *model.QuorumCertificate,
+	builderOpts []builder.Opt,
+	hotstuffOpts []consensus.Option,
 ) (*Engine, error) {
 
 	participants, _, err := protocol.ClusterFor(protoState.Final(), me.NodeID())
 	if err != nil {
 		return nil, fmt.Errorf("could not get cluster participants: %w", err)
 	}
+
+	// TODO instantiate HotStuff
 
 	e := &Engine{
 		unit:           engine.NewUnit(),
@@ -87,7 +112,7 @@ func New(
 		pending:        cache,
 		participants:   participants,
 		sync:           sync,
-		hotstuff:       nil, // use WithHotStuff
+		hotstuff:       nil,
 	}
 
 	e.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, e.pending.Size())
@@ -101,22 +126,12 @@ func New(
 	return e, nil
 }
 
-// WithConsensus adds the consensus algorithm to the engine. This must be
-// called before the engine can start.
-func (e *Engine) WithConsensus(hot module.HotStuff) *Engine {
-	e.hotstuff = hot
-	return e
-}
-
 // Ready returns a ready channel that is closed once the engine has fully
 // started. For proposal engine, this is true once the underlying consensus
 // algorithm has started.
 func (e *Engine) Ready() <-chan struct{} {
 	if e.sync == nil {
 		panic("must initialize compliance engine with synchronization module")
-	}
-	if e.hotstuff == nil {
-		panic("must initialize compliance engine with hotstuff engine")
 	}
 	return e.unit.Ready(func() {
 		<-e.hotstuff.Ready()
