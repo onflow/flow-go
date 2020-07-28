@@ -854,11 +854,6 @@ func (e *Engine) generateExecutionResultForBlock(
 		},
 	}
 
-	err = e.execState.PersistExecutionResult(ctx, block.ID(), *er)
-	if err != nil {
-		return nil, fmt.Errorf("could not persist execution result: %w", err)
-	}
-
 	return er, nil
 }
 
@@ -894,6 +889,11 @@ func (e *Engine) generateExecutionReceipt(
 	}
 
 	receipt.ExecutorSignature = sig
+
+	err = e.execState.PersistExecutionReceipt(ctx, receipt)
+	if err != nil {
+		return nil, fmt.Errorf("could not persist execution result: %w", err)
+	}
 
 	return receipt, nil
 }
