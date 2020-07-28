@@ -63,6 +63,7 @@ func AggregatePrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 		if sk.Algorithm() != BLSBLS12381 {
 			return nil, fmt.Errorf("all keys must be BLS keys")
 		}
+		// assertion is guaranteed to be correct after the algorithm check
 		skBls, _ := sk.(*PrKeyBLSBLS12381)
 		scalars = append(scalars, skBls.scalar)
 	}
