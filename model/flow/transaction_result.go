@@ -8,7 +8,7 @@ import (
 // TransactionResult contains the artifacts generated when executing a cadence transaction.
 type TransactionResult struct {
 	// TransactionID is the ID of the transaction this error was emitted from.
-	TransactionID Identifier
+	TransactionID Identifier `diff:"-"`
 	// ErrorMessage contains the error message of any error that may have occurred when the transaction was executed
 	ErrorMessage string
 }

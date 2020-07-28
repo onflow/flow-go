@@ -21,6 +21,8 @@ type Context struct {
 	SignatureVerifier                SignatureVerifier
 	TransactionProcessors            []TransactionProcessor
 	ScriptProcessors                 []ScriptProcessor
+	GetValueCallback                 func(owner, key, hash []byte)
+	SetValueCallback                 func(owner, key, hash, value []byte)
 }
 
 // SetValueHandler receives a value written by the Cadence runtime.

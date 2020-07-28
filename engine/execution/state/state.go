@@ -7,6 +7,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
+	state2 "github.com/dapperlabs/flow-go/fvm/state"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool/entity"
@@ -110,9 +111,10 @@ func NewExecutionState(
 }
 
 func LedgerGetRegister(ledger storage.Ledger, commitment flow.StateCommitment) delta.GetRegisterFunc {
-	return func(key flow.RegisterID) ([]byte, error) {
+	return func(owner, controller, key string) ([]byte, error) {
+
 		values, err := ledger.GetRegisters(
-			[]flow.RegisterID{key},
+			[]flow.RegisterID{state2.RegisterID(owner, controller, key)},
 			commitment,
 		)
 		if err != nil {

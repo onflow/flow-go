@@ -28,6 +28,8 @@ func newNonRelicSigner(algo SigningAlgorithm) (signer, error) {
 		return newECDSAP256(), nil
 	case ECDSASecp256k1:
 		return newECDSASecp256k1(), nil
+	case BLSBLS12381:
+		return newBLSBLS12381(), nil
 	default:
 		return nil, fmt.Errorf("the signature scheme %s is not supported.", algo)
 	}

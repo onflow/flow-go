@@ -20,3 +20,24 @@ func RetrieveChunkDataPack(chunkID flow.Identifier, c *flow.ChunkDataPack) func(
 func RemoveChunkDataPack(chunkID flow.Identifier) func(*badger.Txn) error {
 	return remove(makePrefix(codeChunkDataPack, chunkID))
 }
+
+// FindHeaders iterates through all items, calling `onEach` on each, which
+// return boolean indicating if next record should be server
+func IterateChunkDataPacks(onEach func(header *flow.ChunkDataPack) bool) func(*badger.Txn) error {
+	return traverse(makePrefix(codeExecutionResult), func() (checkFunc, createFunc, handleFunc) {
+		check := func(key []byte) bool {
+			return true
+		}
+		var val flow.ChunkDataPack
+		create := func() interface{} {
+			return &val
+		}
+		handle := func() error {
+			if !onEach(&val) {
+				return EndIterationError
+			}
+			return nil
+		}
+		return check, create, handle
+	})
+}

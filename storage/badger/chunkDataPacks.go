@@ -1,6 +1,7 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
@@ -43,4 +44,12 @@ func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 		return nil, fmt.Errorf("could not retrieve chunk datapack: %w", err)
 	}
 	return &c, nil
+}
+
+func (ch *ChunkDataPacks) IterateChunkDataPacka(filter func(er *flow.ChunkDataPack) bool) error {
+	err := ch.db.View(operation.IterateChunkDataPacks(filter))
+	if errors.Is(err, operation.EndIterationError) {
+		return nil
+	}
+	return err
 }

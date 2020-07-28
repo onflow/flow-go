@@ -1,6 +1,7 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
@@ -53,4 +54,12 @@ func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult
 	}
 
 	return &result, nil
+}
+
+func (r *ExecutionResults) IterateResults(filter func(er *flow.ExecutionResult) bool) error {
+	err := r.db.View(operation.IteratexecutionResult(filter))
+	if errors.Is(err, operation.EndIterationError) {
+		return nil
+	}
+	return err
 }

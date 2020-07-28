@@ -87,25 +87,24 @@ func (e *hostEnv) getLogs() []string {
 }
 
 func (e *hostEnv) GetValue(owner, key []byte) ([]byte, error) {
+
 	v, _ := e.ledger.Get(
-		state.RegisterID(
-			string(owner),
-			"", // TODO: Remove empty controller key
-			string(key),
-		),
+		string(owner),
+		"", // TODO: Remove empty controller key
+		string(key),
 	)
 	return v, nil
 }
 
 func (e *hostEnv) SetValue(owner, key, value []byte) error {
+
 	e.ledger.Set(
-		state.RegisterID(
-			string(owner),
-			"", // TODO: Remove empty controller key
-			string(key),
-		),
+		string(owner),
+		"", // TODO: Remove empty controller key
+		string(key),
 		value,
 	)
+
 	return nil
 }
 
